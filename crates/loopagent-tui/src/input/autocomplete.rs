@@ -24,8 +24,24 @@ pub(super) fn handle_autocomplete_key(app: &mut App, key: &KeyEvent) -> Option<I
             }
             Some(InputAction::None)
         }
-        KeyCode::Tab | KeyCode::Enter => {
-            // Confirm the selected command
+        KeyCode::Tab => {
+            // Tab = autocomplete only: fill command name into input, never execute
+            let selected_idx = app
+                .autocomplete
+                .as_ref()
+                .and_then(|ac| ac.matches.get(ac.selected).copied());
+            if let Some(idx) = selected_idx {
+                let entry = &app.commands[idx];
+                let suffix = if entry.has_arg { " " } else { "" };
+                let new_input = format!("{}{suffix}", entry.name);
+                app.input_cursor = new_input.len();
+                app.input = new_input;
+            }
+            app.autocomplete = None;
+            Some(InputAction::None)
+        }
+        KeyCode::Enter => {
+            // Enter = execute the selected command
             let selected_idx = app
                 .autocomplete
                 .as_ref()
@@ -33,7 +49,7 @@ pub(super) fn handle_autocomplete_key(app: &mut App, key: &KeyEvent) -> Option<I
             if let Some(idx) = selected_idx {
                 let entry = &app.commands[idx];
                 if entry.has_arg {
-                    // Fill in the command name + space, wait for argument
+                    // Needs argument: fill command name + space, wait for input
                     let new_input = format!("{} ", entry.name);
                     app.input_cursor = new_input.len();
                     app.input = new_input;

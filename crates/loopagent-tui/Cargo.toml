@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 loopagent-types = { workspace = true }
+loopagent-config = { workspace = true }
 loopagent-runtime = { workspace = true }
 loopagent-provider = { workspace = true }
 ratatui = { workspace = true }

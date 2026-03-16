@@ -3,12 +3,13 @@ use std::sync::Arc;
 use clap::Parser;
 use tokio::sync::mpsc;
 
-use loopagent_config::{load_instructions, load_settings};
+use loopagent_config::{load_instructions, load_settings, load_skills};
 use loopagent_context::ContextPipeline;
 use loopagent_context::middleware::{ContextGuard, SmartCompact, TurnLimit};
 use loopagent_context::system_prompt::build_system_prompt;
 use loopagent_kernel::Kernel;
 use loopagent_runtime::{AgentLoopParams, AgentMode, SessionManager, agent_loop};
+use loopagent_tui::command::merge_commands;
 use loopagent_types::command::UserCommand;
 use loopagent_types::event::AgentEvent;
 
@@ -69,11 +70,22 @@ pub async fn run() -> anyhow::Result<()> {
         messages.push(loopagent_types::message::Message::user(&prompt_text));
     }
 
+    // Load skills and build summary for system prompt
+    let skills = load_skills(&cwd);
+    let skills_summary = format_skills_summary(&skills);
+    let commands = merge_commands(&skills);
+
     // Build system prompt
     let instructions = load_instructions(&cwd)?;
     let tool_defs = kernel.tool_definitions();
     // NOTE: mode suffix is appended in agent_loop per-turn, not here
-    let system_prompt = build_system_prompt(&instructions, &tool_defs, "", &cwd.to_string_lossy());
+    let system_prompt = build_system_prompt(
+        &instructions,
+        &tool_defs,
+        "",
+        &cwd.to_string_lossy(),
+        &skills_summary,
+    );
 
     // Channels
     let (agent_event_tx, agent_event_rx) = mpsc::channel::<AgentEvent>(256);
@@ -125,10 +137,33 @@ pub async fn run() -> anyhow::Result<()> {
     });
 
     // Launch TUI
-    loopagent_tui::run_tui(model, mode_str, agent_event_rx, user_input_tx, tui_permission_tx)
-        .await?;
+    loopagent_tui::run_tui(
+        model,
+        mode_str,
+        commands,
+        cwd,
+        agent_event_rx,
+        user_input_tx,
+        tui_permission_tx,
+    )
+    .await?;
 
     tracing::info!("shutting down");
 
     Ok(())
+}
+
+/// Format a skills summary section for the system prompt.
+/// Returns empty string when no skills are loaded.
+fn format_skills_summary(skills: &[loopagent_config::Skill]) -> String {
+    if skills.is_empty() {
+        return String::new();
+    }
+    let mut section = String::from(
+        "# Available Skills\nUser can invoke these via /name:\n",
+    );
+    for skill in skills {
+        section.push_str(&format!("- {}: {}\n", skill.name, skill.description));
+    }
+    section
 }

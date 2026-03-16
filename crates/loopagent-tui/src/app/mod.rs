@@ -4,7 +4,9 @@ mod types;
 pub use types::*;
 
 use std::collections::VecDeque;
+use std::path::PathBuf;
 
+use crate::command::{CommandEntry, merge_commands};
 use loopagent_types::event::AgentEvent;
 use tokio::sync::mpsc;
 
@@ -32,10 +34,20 @@ pub struct App {
     pub inbox: VecDeque<String>,
     /// Whether the agent is idle (awaiting input).
     pub agent_idle: bool,
+    /// Merged command entries (built-in + skills). Refreshed on demand.
+    pub commands: Vec<CommandEntry>,
+    /// Working directory, used to reload skills on demand.
+    pub cwd: PathBuf,
 }
 
 impl App {
-    pub fn new(model: String, mode: String, event_tx: mpsc::Sender<AgentEvent>) -> Self {
+    pub fn new(
+        model: String,
+        mode: String,
+        event_tx: mpsc::Sender<AgentEvent>,
+        commands: Vec<CommandEntry>,
+        cwd: PathBuf,
+    ) -> Self {
         Self {
             state: AppState::Running,
             messages: Vec::new(),
@@ -55,6 +67,8 @@ impl App {
             sub_page: None,
             inbox: VecDeque::new(),
             agent_idle: false,
+            commands,
+            cwd,
         }
     }
 
@@ -105,5 +119,11 @@ impl App {
         } else {
             false
         }
+    }
+
+    /// Reload skills from disk and rebuild the merged command list.
+    pub fn refresh_commands(&mut self) {
+        let skills = loopagent_config::load_skills(&self.cwd);
+        self.commands = merge_commands(&skills);
     }
 }

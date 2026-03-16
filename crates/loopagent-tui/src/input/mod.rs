@@ -1,6 +1,9 @@
+mod actions;
 mod autocomplete;
 mod commands;
 mod sub_page;
+
+pub use actions::*;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -8,39 +11,6 @@ use crate::app::App;
 use autocomplete::{handle_autocomplete_key, update_autocomplete};
 use commands::try_execute_slash_command;
 use sub_page::handle_sub_page_key;
-
-/// Action triggered by a slash command from the autocomplete menu.
-pub enum SlashCommandAction {
-    Clear,
-    Compact,
-    Status,
-    Sessions,
-    Help,
-    /// Open the model picker sub-page.
-    ModelPicker,
-    /// A model was selected from the picker.
-    ModelSelected(String),
-}
-
-/// Action resulting from input handling
-pub enum InputAction {
-    /// No action needed
-    None,
-    /// User submitted a message (legacy — slash commands still use Submit path)
-    Submit(String),
-    /// User message queued into Inbox (not sent directly to agent)
-    InboxPush(String),
-    /// User wants to quit
-    Quit,
-    /// User approved tool use
-    ToolApprove,
-    /// User denied tool use
-    ToolDeny,
-    /// User wants to switch mode
-    ModeSwitch(String),
-    /// User executed a slash command
-    SlashCommand(SlashCommandAction),
-}
 
 /// Process a key event and update the app's input state.
 pub fn handle_key(app: &mut App, key: KeyEvent) -> InputAction {
@@ -85,7 +55,11 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> InputAction {
         KeyCode::Enter => {
             // Slash command entered without autocomplete (e.g., typed "/plan" manually)
             let trimmed = app.input.trim().to_string();
-            if let Some(cmd_action) = try_execute_slash_command(&trimmed) {
+            if trimmed.starts_with('/') {
+                // Refresh skills so newly added files are recognized
+                app.refresh_commands();
+            }
+            if let Some(cmd_action) = try_execute_slash_command(&trimmed, &app.commands) {
                 app.input.clear();
                 app.input_cursor = 0;
                 app.autocomplete = None;

@@ -2,11 +2,13 @@ use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Clear};
 
 use crate::app::AutocompleteState;
+use crate::command::CommandEntry;
 
 /// Render the floating command autocomplete menu above the input area.
 pub fn render_command_menu(
     f: &mut Frame,
     ac: &AutocompleteState,
+    commands: &[CommandEntry],
     input_area: Rect,
 ) {
     if ac.matches.is_empty() {
@@ -33,18 +35,16 @@ pub fn render_command_menu(
     f.render_widget(block, menu_area);
 
     // Render each command line
-    for (i, cmd) in ac.matches.iter().take(item_count as usize).enumerate() {
+    for (i, &idx) in ac.matches.iter().take(item_count as usize).enumerate() {
+        let entry = &commands[idx];
         let is_selected = i == ac.selected;
 
         let indicator = if is_selected { "▸" } else { " " };
 
         let line = Line::from(vec![
+            Span::styled(indicator, Style::default().fg(Color::Cyan)),
             Span::styled(
-                indicator,
-                Style::default().fg(Color::Cyan),
-            ),
-            Span::styled(
-                format!("{:<12}", cmd.name),
+                format!("{:<12}", entry.name),
                 if is_selected {
                     Style::default().fg(Color::Cyan).bold()
                 } else {
@@ -52,7 +52,7 @@ pub fn render_command_menu(
                 },
             ),
             Span::styled(
-                cmd.description,
+                &entry.description,
                 Style::default().fg(Color::DarkGray),
             ),
         ]);
@@ -65,7 +65,6 @@ pub fn render_command_menu(
             Style::default()
         };
 
-        // Fill background for the selected row
         f.render_widget(ratatui::widgets::Paragraph::new(line).style(bg), line_area);
     }
 }

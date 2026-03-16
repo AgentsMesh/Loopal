@@ -44,3 +44,13 @@ pub fn global_instructions_path() -> Result<PathBuf, ConfigError> {
 pub fn project_instructions_path(cwd: &Path) -> PathBuf {
     cwd.join(INSTRUCTIONS_FILE)
 }
+
+/// Returns the global skills directory: ~/.loopagent/skills/
+pub fn global_skills_dir() -> Result<PathBuf, ConfigError> {
+    Ok(global_config_dir()?.join("skills"))
+}
+
+/// Returns the project skills directory: <cwd>/.loopagent/skills/
+pub fn project_skills_dir(cwd: &Path) -> PathBuf {
+    project_config_dir(cwd).join("skills")
+}

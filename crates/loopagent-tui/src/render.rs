@@ -88,6 +88,6 @@ pub fn draw(f: &mut Frame, app: &App) {
 
     // Autocomplete command menu overlay (above input area)
     if let Some(ref ac) = app.autocomplete {
-        views::command_menu::render_command_menu(f, ac, chunks[input_idx]);
+        views::command_menu::render_command_menu(f, ac, &app.commands, chunks[input_idx]);
     }
 }

@@ -1257,6 +1257,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "crossterm",
+ "loopagent-config",
  "loopagent-provider",
  "loopagent-runtime",
  "loopagent-types",

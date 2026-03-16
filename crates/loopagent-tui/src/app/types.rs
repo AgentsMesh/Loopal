@@ -1,5 +1,3 @@
-use crate::command::SlashCommand;
-
 /// Application state machine
 #[derive(Debug, Clone, PartialEq)]
 pub enum AppState {
@@ -31,7 +29,8 @@ pub struct DisplayMessage {
 
 /// Autocomplete menu state for slash commands.
 pub struct AutocompleteState {
-    pub matches: Vec<&'static SlashCommand>,
+    /// Indices into the `App.commands` vec.
+    pub matches: Vec<usize>,
     pub selected: usize,
 }
 

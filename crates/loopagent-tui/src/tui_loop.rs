@@ -1,9 +1,11 @@
 use std::io;
+use std::path::PathBuf;
 
 use ratatui::prelude::*;
 use tokio::sync::mpsc;
 
 use crate::app::{App, AppState};
+use crate::command::CommandEntry;
 use crate::event::{AppEvent, EventHandler};
 use crate::input::{InputAction, handle_key};
 use crate::render::draw;
@@ -22,6 +24,8 @@ use loopagent_types::event::AgentEvent;
 pub async fn run_tui(
     model: String,
     mode: String,
+    commands: Vec<CommandEntry>,
+    cwd: PathBuf,
     agent_event_rx: mpsc::Receiver<AgentEvent>,
     user_input_tx: mpsc::Sender<UserCommand>,
     permission_tx: mpsc::Sender<(String, bool)>,
@@ -35,7 +39,7 @@ pub async fn run_tui(
     // Create a dummy event_tx (the App needs one but we forward via user_input_tx)
     let (event_tx, _event_rx) = mpsc::channel::<AgentEvent>(16);
 
-    let mut app = App::new(model, mode, event_tx);
+    let mut app = App::new(model, mode, event_tx, commands, cwd);
     let mut events = EventHandler::new(agent_event_rx);
 
     // Initial draw

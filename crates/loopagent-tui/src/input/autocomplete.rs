@@ -1,13 +1,13 @@
 use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::app::{App, AutocompleteState};
-use crate::command::filter_commands;
+use crate::command::filter_entries;
 
-use super::commands::dispatch_command;
 use super::InputAction;
+use super::commands::{dispatch_command, expand_skill};
 
 /// Handle keys when the autocomplete menu is open.
-/// Returns Some(action) if the key was consumed, None to fall through.
+/// Returns `Some(action)` if the key was consumed, `None` to fall through.
 pub(super) fn handle_autocomplete_key(app: &mut App, key: &KeyEvent) -> Option<InputAction> {
     match key.code {
         KeyCode::Up => {
@@ -26,24 +26,33 @@ pub(super) fn handle_autocomplete_key(app: &mut App, key: &KeyEvent) -> Option<I
         }
         KeyCode::Tab | KeyCode::Enter => {
             // Confirm the selected command
-            let selected_cmd = app
+            let selected_idx = app
                 .autocomplete
                 .as_ref()
                 .and_then(|ac| ac.matches.get(ac.selected).copied());
-            if let Some(cmd) = selected_cmd {
-                if cmd.has_arg {
+            if let Some(idx) = selected_idx {
+                let entry = &app.commands[idx];
+                if entry.has_arg {
                     // Fill in the command name + space, wait for argument
-                    let new_input = format!("{} ", cmd.name);
+                    let new_input = format!("{} ", entry.name);
                     app.input_cursor = new_input.len();
                     app.input = new_input;
                     app.autocomplete = None;
                     Some(InputAction::None)
-                } else {
-                    // Execute immediately
+                } else if let Some(ref body) = entry.skill_body {
+                    // No-arg skill: expand and push to inbox
+                    let expanded = expand_skill(body, "");
                     app.input.clear();
                     app.input_cursor = 0;
                     app.autocomplete = None;
-                    Some(dispatch_command(cmd.name, None))
+                    Some(InputAction::InboxPush(expanded))
+                } else {
+                    // Built-in command: dispatch immediately
+                    let name = entry.name.clone();
+                    app.input.clear();
+                    app.input_cursor = 0;
+                    app.autocomplete = None;
+                    Some(dispatch_command(&name, None))
                 }
             } else {
                 app.autocomplete = None;
@@ -59,15 +68,18 @@ pub(super) fn handle_autocomplete_key(app: &mut App, key: &KeyEvent) -> Option<I
 }
 
 /// Update the autocomplete state based on current input content.
+///
+/// When a `/` prefix is detected, skills are reloaded from disk so that
+/// newly created skill files are available without restarting.
 pub(super) fn update_autocomplete(app: &mut App) {
-    let trimmed = app.input.trim_start();
+    let trimmed = app.input.trim_start().to_string();
     if trimmed.starts_with('/') {
-        // Only show autocomplete when we're still in the "command part"
-        // (no space yet, unless it's a command with args being typed)
+        // Only show autocomplete when still typing the command name (no space yet)
         let first_space = trimmed.find(' ');
         if first_space.is_none() {
-            // Still typing the command name — filter
-            let matches = filter_commands(trimmed);
+            // Refresh commands from disk so new/changed skills appear immediately
+            app.refresh_commands();
+            let matches = filter_entries(&app.commands, &trimmed);
             if matches.is_empty() {
                 app.autocomplete = None;
             } else {

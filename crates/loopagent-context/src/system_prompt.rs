@@ -1,11 +1,15 @@
 use loopagent_types::tool::ToolDefinition;
 
 /// Build a full system prompt from parts.
+///
+/// `skills_summary` is a pre-formatted section listing available skills.
+/// Pass an empty string when no skills are loaded.
 pub fn build_system_prompt(
     instructions: &str,
     tools: &[ToolDefinition],
     mode_suffix: &str,
     cwd: &str,
+    skills_summary: &str,
 ) -> String {
     let mut parts = Vec::new();
 
@@ -26,6 +30,10 @@ pub fn build_system_prompt(
             ));
         }
         parts.push(tool_section);
+    }
+
+    if !skills_summary.is_empty() {
+        parts.push(format!("\n\n{skills_summary}"));
     }
 
     if !mode_suffix.is_empty() {

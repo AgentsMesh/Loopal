@@ -1,12 +1,19 @@
 //! Edge cases and regression tests for tool call/result handling.
 
 use loopagent_tui::app::{App, DisplayMessage, DisplayToolCall};
+use loopagent_tui::command::builtin_entries;
 use loopagent_types::event::AgentEvent;
 use tokio::sync::mpsc;
 
 fn make_app() -> App {
     let (tx, _rx) = mpsc::channel::<AgentEvent>(16);
-    App::new("test-model".to_string(), "act".to_string(), tx)
+    App::new(
+        "test-model".to_string(),
+        "act".to_string(),
+        tx,
+        builtin_entries(),
+        std::env::temp_dir(),
+    )
 }
 
 #[test]

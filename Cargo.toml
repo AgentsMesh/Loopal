@@ -1,0 +1,109 @@
+[package]
+name = "loopagent"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[workspace]
+resolver = "2"
+members = [
+    ".",
+    "crates/loopagent-types",
+    "crates/loopagent-config",
+    "crates/loopagent-storage",
+    "crates/loopagent-provider",
+    "crates/loopagent-tools",
+    "crates/loopagent-mcp",
+    "crates/loopagent-hooks",
+    "crates/loopagent-context",
+    "crates/loopagent-kernel",
+    "crates/loopagent-runtime",
+    "crates/loopagent-tui",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[workspace.dependencies]
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+schemars = "0.8"
+
+# Async
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+async-trait = "0.1"
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# HTTP
+reqwest = { version = "0.12", features = ["json", "stream"] }
+eventsource-stream = "0.2"
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# TUI
+ratatui = "0.29"
+crossterm = "0.28"
+
+# File operations
+globset = "0.4"
+regex = "1"
+walkdir = "2"
+
+# MCP
+rmcp = { version = "0.1", features = ["client", "transport-child-process"] }
+
+# Utilities
+dirs = "6"
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+pin-project-lite = "0.2"
+wiremock = "0.6"
+
+# Workspace crates
+loopagent-types = { path = "crates/loopagent-types" }
+loopagent-config = { path = "crates/loopagent-config" }
+loopagent-storage = { path = "crates/loopagent-storage" }
+loopagent-provider = { path = "crates/loopagent-provider" }
+loopagent-tools = { path = "crates/loopagent-tools" }
+loopagent-mcp = { path = "crates/loopagent-mcp" }
+loopagent-hooks = { path = "crates/loopagent-hooks" }
+loopagent-context = { path = "crates/loopagent-context" }
+loopagent-kernel = { path = "crates/loopagent-kernel" }
+loopagent-runtime = { path = "crates/loopagent-runtime" }
+loopagent-tui = { path = "crates/loopagent-tui" }
+
+[[bin]]
+name = "loopagent"
+path = "src/main.rs"
+
+[dependencies]
+loopagent-types = { workspace = true }
+loopagent-config = { workspace = true }
+loopagent-storage = { workspace = true }
+loopagent-provider = { workspace = true }
+loopagent-tools = { workspace = true }
+loopagent-mcp = { workspace = true }
+loopagent-hooks = { workspace = true }
+loopagent-context = { workspace = true }
+loopagent-kernel = { workspace = true }
+loopagent-runtime = { workspace = true }
+loopagent-tui = { workspace = true }
+tokio = { workspace = true }
+clap = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-appender = { workspace = true }
+chrono = { workspace = true }
+dirs = { workspace = true }
+anyhow = { workspace = true }

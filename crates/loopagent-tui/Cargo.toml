@@ -1,0 +1,16 @@
+[package]
+name = "loopagent-tui"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+loopagent-types = { workspace = true }
+loopagent-runtime = { workspace = true }
+loopagent-provider = { workspace = true }
+ratatui = { workspace = true }
+crossterm = { workspace = true }
+tokio = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }

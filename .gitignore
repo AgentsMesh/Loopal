@@ -1,0 +1,10 @@
+/target
+*.db
+*.db-journal
+.env
+.env.local
+.loopagent/settings.local.json
+.DS_Store
+
+# Third-party reference repos
+/refs/

@@ -1,0 +1,87 @@
+//! Tests for forwarding specific AgentEvent variants through EventHandler.
+
+use loopagent_tui::event::{AppEvent, EventHandler};
+use loopagent_types::event::AgentEvent;
+use tokio::sync::mpsc;
+
+/// Helper: send an event and wait for a matching AppEvent::Agent variant.
+async fn send_and_recv(event: AgentEvent) -> AgentEvent {
+    let (agent_tx, agent_rx) = mpsc::channel::<AgentEvent>(16);
+    let mut handler = EventHandler::new(agent_rx);
+
+    agent_tx.send(event).await.unwrap();
+
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(2);
+    while tokio::time::Instant::now() < deadline {
+        match tokio::time::timeout(std::time::Duration::from_millis(500), handler.next()).await {
+            Ok(Some(AppEvent::Agent(e))) => return e,
+            Ok(Some(_)) => continue,
+            _ => break,
+        }
+    }
+    panic!("did not receive expected agent event");
+}
+
+#[tokio::test]
+async fn test_agent_error_event_forwarded() {
+    let event = send_and_recv(AgentEvent::Error {
+        message: "test error".to_string(),
+    })
+    .await;
+
+    match event {
+        AgentEvent::Error { message } => assert_eq!(message, "test error"),
+        other => panic!("expected Error, got {:?}", other),
+    }
+}
+
+#[tokio::test]
+async fn test_agent_tool_call_event_forwarded() {
+    let event = send_and_recv(AgentEvent::ToolCall {
+        id: "tc-1".to_string(),
+        name: "bash".to_string(),
+        input: serde_json::json!({"command": "ls"}),
+    })
+    .await;
+
+    match event {
+        AgentEvent::ToolCall { name, .. } => assert_eq!(name, "bash"),
+        other => panic!("expected ToolCall, got {:?}", other),
+    }
+}
+
+#[tokio::test]
+async fn test_agent_token_usage_forwarded() {
+    let event = send_and_recv(AgentEvent::TokenUsage {
+        input_tokens: 500,
+        output_tokens: 200,
+        context_window: 200_000,
+    })
+    .await;
+
+    match event {
+        AgentEvent::TokenUsage {
+            input_tokens,
+            output_tokens,
+            context_window,
+        } => {
+            assert_eq!(input_tokens, 500);
+            assert_eq!(output_tokens, 200);
+            assert_eq!(context_window, 200_000);
+        }
+        other => panic!("expected TokenUsage, got {:?}", other),
+    }
+}
+
+#[tokio::test]
+async fn test_agent_mode_changed_forwarded() {
+    let event = send_and_recv(AgentEvent::ModeChanged {
+        mode: "plan".to_string(),
+    })
+    .await;
+
+    match event {
+        AgentEvent::ModeChanged { mode } => assert_eq!(mode, "plan"),
+        other => panic!("expected ModeChanged, got {:?}", other),
+    }
+}

@@ -1,5 +1,5 @@
 use loopagent_types::error::{LoopAgentError, ProviderError};
-use loopagent_types::provider::StreamChunk;
+use loopagent_types::provider::{StopReason, StreamChunk};
 
 fn parse_event(data: &str) -> (Vec<Result<StreamChunk, LoopAgentError>>, InlineState) {
     let mut state = InlineState::default();
@@ -64,7 +64,12 @@ fn parse_with_state(
                 parsed["usage"]["input_tokens"].as_u64(),
                 parsed["usage"]["output_tokens"].as_u64(),
             ) {
-                chunks.push(Ok(StreamChunk::Usage { input_tokens: i as u32, output_tokens: o as u32 }));
+                let cc = parsed["usage"]["cache_creation_input_tokens"].as_u64().unwrap_or(0) as u32;
+                let cr = parsed["usage"]["cache_read_input_tokens"].as_u64().unwrap_or(0) as u32;
+                chunks.push(Ok(StreamChunk::Usage {
+                    input_tokens: i as u32, output_tokens: o as u32,
+                    cache_creation_input_tokens: cc, cache_read_input_tokens: cr,
+                }));
             }
         }
         "message_start" => {
@@ -72,10 +77,15 @@ fn parse_with_state(
                 parsed["message"]["usage"]["input_tokens"].as_u64(),
                 parsed["message"]["usage"]["output_tokens"].as_u64(),
             ) {
-                chunks.push(Ok(StreamChunk::Usage { input_tokens: i as u32, output_tokens: o as u32 }));
+                let cc = parsed["message"]["usage"]["cache_creation_input_tokens"].as_u64().unwrap_or(0) as u32;
+                let cr = parsed["message"]["usage"]["cache_read_input_tokens"].as_u64().unwrap_or(0) as u32;
+                chunks.push(Ok(StreamChunk::Usage {
+                    input_tokens: i as u32, output_tokens: o as u32,
+                    cache_creation_input_tokens: cc, cache_read_input_tokens: cr,
+                }));
             }
         }
-        "message_stop" => chunks.push(Ok(StreamChunk::Done)),
+        "message_stop" => chunks.push(Ok(StreamChunk::Done { stop_reason: StopReason::EndTurn })),
         _ => {}
     }
     chunks
@@ -93,7 +103,7 @@ fn test_message_delta_usage() {
     let (chunks, _) = parse_event(r#"{"type":"message_delta","usage":{"input_tokens":200,"output_tokens":50}}"#);
     assert_eq!(chunks.len(), 1);
     match &chunks[0] {
-        Ok(StreamChunk::Usage { input_tokens, output_tokens }) => {
+        Ok(StreamChunk::Usage { input_tokens, output_tokens, .. }) => {
             assert_eq!(*input_tokens, 200);
             assert_eq!(*output_tokens, 50);
         }
@@ -105,7 +115,7 @@ fn test_message_delta_usage() {
 fn test_message_stop() {
     let (chunks, _) = parse_event(r#"{"type":"message_stop"}"#);
     assert_eq!(chunks.len(), 1);
-    assert!(matches!(&chunks[0], Ok(StreamChunk::Done)), "expected Done, got: {:?}", &chunks[0]);
+    assert!(matches!(&chunks[0], Ok(StreamChunk::Done { .. })), "expected Done, got: {:?}", &chunks[0]);
 }
 
 #[test]

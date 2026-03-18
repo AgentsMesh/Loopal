@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 loopagent-types = { workspace = true }
 loopagent-kernel = { workspace = true }
+loopagent-config = { workspace = true }
 loopagent-context = { workspace = true }
 loopagent-hooks = { workspace = true }
 loopagent-tools = { workspace = true }
@@ -18,6 +19,7 @@ futures = { workspace = true }
 async-trait = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+tokio-util = { workspace = true }
 
 [dev-dependencies]
 async-trait = { workspace = true }

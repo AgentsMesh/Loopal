@@ -3,56 +3,47 @@ use std::sync::Arc;
 use clap::Parser;
 use tokio::sync::mpsc;
 
+use loopagent_agent::registry::AgentRegistry;
+use loopagent_agent::router::MessageRouter;
+use loopagent_agent::shared::AgentShared;
+use loopagent_agent::task_store::TaskStore;
 use loopagent_config::{load_instructions, load_settings, load_skills};
 use loopagent_context::ContextPipeline;
-use loopagent_context::middleware::{ContextGuard, SmartCompact, TurnLimit};
+use loopagent_context::middleware::{ContextGuard, MessageSizeGuard, SmartCompact, TurnLimit};
 use loopagent_context::system_prompt::build_system_prompt;
 use loopagent_kernel::Kernel;
-use loopagent_runtime::{AgentLoopParams, AgentMode, SessionManager, agent_loop};
+use loopagent_runtime::{AgentLoopParams, AgentMode, SessionManager, UnifiedFrontend, agent_loop};
+use loopagent_runtime::frontend::tui_permission::TuiPermissionHandler;
+use loopagent_session::SessionController;
 use loopagent_tui::command::merge_commands;
-use loopagent_types::command::UserCommand;
+use loopagent_types::control::ControlCommand;
+use loopagent_types::envelope::Envelope;
 use loopagent_types::event::AgentEvent;
 
 use crate::cli::Cli;
 
 pub async fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
-
-    // Load config
     let cwd = std::env::current_dir()?;
-    let mut settings = load_settings(&cwd)?;
 
-    // CLI overrides
-    if let Some(model) = &cli.model {
-        settings.model = model.clone();
-    }
-    if let Some(perm) = &cli.permission {
-        settings.permission_mode = match perm.as_str() {
-            "accept-edits" => loopagent_types::permission::PermissionMode::AcceptEdits,
-            "bypass" | "yolo" => loopagent_types::permission::PermissionMode::BypassPermissions,
-            "plan" => loopagent_types::permission::PermissionMode::Plan,
-            _ => loopagent_types::permission::PermissionMode::Default,
-        };
-    }
-    if cli.plan {
-        settings.permission_mode = loopagent_types::permission::PermissionMode::Plan;
-    }
+    // Ensure directories exist and clean up expired volatile files
+    loopagent_config::housekeeping::startup_cleanup();
+
+    let mut settings = load_settings(&cwd)?;
+    apply_cli_overrides(&cli, &mut settings);
 
     let model = settings.model.clone();
     let max_turns = settings.max_turns;
     let permission_mode = settings.permission_mode;
-    let mode = if cli.plan {
-        AgentMode::Plan
-    } else {
-        AgentMode::Act
-    };
+    let mode = if cli.plan { AgentMode::Plan } else { AgentMode::Act };
     let mode_str = if cli.plan { "plan" } else { "act" }.to_string();
 
     tracing::info!(model = %model, mode = %mode_str, "starting");
 
-    // Build kernel
+    // Build kernel — register agent tools before wrapping in Arc
     let mut kernel = Kernel::new(settings)?;
     kernel.start_mcp().await?;
+    loopagent_agent::tools::register_all(&mut kernel);
     let kernel = Arc::new(kernel);
 
     // Session management
@@ -60,59 +51,89 @@ pub async fn run() -> anyhow::Result<()> {
     let (session, mut messages) = if let Some(ref session_id) = cli.resume {
         session_manager.resume_session(session_id)?
     } else {
-        let session = session_manager.create_session(&cwd, &model)?;
-        (session, Vec::new())
+        (session_manager.create_session(&cwd, &model)?, Vec::new())
     };
 
-    // If initial prompt provided, add as first user message
     if !cli.prompt.is_empty() {
-        let prompt_text = cli.prompt.join(" ");
-        messages.push(loopagent_types::message::Message::user(&prompt_text));
+        messages.push(loopagent_types::message::Message::user(&cli.prompt.join(" ")));
     }
 
-    // Load skills and build summary for system prompt
+    // Observation channel — runtime → TUI
+    let (agent_event_tx, agent_event_rx) = mpsc::channel::<AgentEvent>(256);
+
+    // Permission channel — TUI → runtime
+    let (permission_tx, permission_rx) = mpsc::channel::<bool>(16);
+
+    // MessageRouter — unified data plane
+    let router = Arc::new(MessageRouter::new(agent_event_tx.clone()));
+
+    // Root agent mailbox — registered with router
+    let (mailbox_tx, mailbox_rx) = mpsc::channel::<Envelope>(16);
+    router.register("main", mailbox_tx).await
+        .map_err(|e| anyhow::anyhow!(e))?;
+
+    // Control channel — TUI → runtime (mode switch, clear, compact, model switch)
+    let (control_tx, control_rx) = mpsc::channel::<ControlCommand>(16);
+
+    // Build UnifiedFrontend (root agent: no cancel_token, TUI permission handler)
+    let frontend = Arc::new(UnifiedFrontend::new(
+        None, // root agent
+        agent_event_tx.clone(),
+        mailbox_rx,
+        control_rx,
+        None, // TUI-controlled lifecycle
+        Box::new(TuiPermissionHandler::new(agent_event_tx.clone(), permission_rx)),
+    ));
+
+    // Build shared agent state (homogeneous with sub-agents)
+    let tasks_dir = loopagent_config::session_tasks_dir(&session.id)
+        .unwrap_or_else(|_| std::env::temp_dir().join("loopagent/tasks"));
+    let agent_shared = Arc::new(AgentShared {
+        kernel: kernel.clone(),
+        registry: Arc::new(tokio::sync::Mutex::new(AgentRegistry::new())),
+        task_store: Arc::new(TaskStore::new(tasks_dir)),
+        router: router.clone(),
+        cwd: cwd.clone(),
+        depth: 0,
+        max_depth: 3,
+        agent_name: "main".to_string(),
+        parent_event_tx: Some(agent_event_tx.clone()),
+        cancel_token: None,
+    });
+    let shared_any: Arc<dyn std::any::Any + Send + Sync> = Arc::new(agent_shared);
+
+    // Load skills and build system prompt
     let skills = load_skills(&cwd);
     let skills_summary = format_skills_summary(&skills);
     let commands = merge_commands(&skills);
-
-    // Build system prompt
     let instructions = load_instructions(&cwd)?;
     let tool_defs = kernel.tool_definitions();
-    // NOTE: mode suffix is appended in agent_loop per-turn, not here
     let system_prompt = build_system_prompt(
-        &instructions,
-        &tool_defs,
-        "",
-        &cwd.to_string_lossy(),
-        &skills_summary,
+        &instructions, &tool_defs, "", &cwd.to_string_lossy(), &skills_summary,
     );
 
-    // Channels
-    let (agent_event_tx, agent_event_rx) = mpsc::channel::<AgentEvent>(256);
-    let (user_input_tx, user_input_rx) = mpsc::channel::<UserCommand>(16);
-    let (permission_decision_tx, permission_decision_rx) = mpsc::channel::<bool>(16);
+    let session_ctrl = SessionController::new(
+        model.clone(), mode_str, control_tx, permission_tx,
+    );
 
-    // Build context pipeline with middlewares
     let mut context_pipeline = ContextPipeline::new();
     context_pipeline.add(Box::new(TurnLimit::new(max_turns)));
+    context_pipeline.add(Box::new(MessageSizeGuard));
     context_pipeline.add(Box::new(ContextGuard));
     context_pipeline.add(Box::new(SmartCompact::new(10)));
 
-    // Spawn agent runtime loop
     let agent_params = AgentLoopParams {
         kernel: kernel.clone(),
         session: session.clone(),
         messages,
         model: model.clone(),
         system_prompt,
-        mode,
-        permission_mode,
-        max_turns,
-        event_tx: agent_event_tx.clone(),
-        input_rx: user_input_rx,
-        permission_rx: permission_decision_rx,
-        session_manager,
-        context_pipeline,
+        mode, permission_mode, max_turns,
+        frontend,
+        session_manager, context_pipeline,
+        tool_filter: None,
+        shared: Some(shared_any),
+        interactive: true,
     };
 
     tokio::spawn(async move {
@@ -121,49 +142,31 @@ pub async fn run() -> anyhow::Result<()> {
         }
     });
 
-    // Bridge: TUI sends permission decisions as (id, bool), but agent_loop
-    // expects a plain bool on permission_rx. Bridge the two channels.
-    let permission_bridge_tx = permission_decision_tx;
-    let (tui_permission_tx, mut tui_permission_rx) = mpsc::channel::<(String, bool)>(16);
-
-    // NOTE: We drop the tool ID here because agent_loop processes tool_uses
-    // sequentially (one at a time), so there is only ever one pending permission
-    // request. If parallel tool execution is added in the future, this bridge
-    // must be updated to route approvals by ID.
-    tokio::spawn(async move {
-        while let Some((_id, approved)) = tui_permission_rx.recv().await {
-            let _ = permission_bridge_tx.send(approved).await;
-        }
-    });
-
-    // Launch TUI
     loopagent_tui::run_tui(
-        model,
-        mode_str,
-        commands,
-        cwd,
-        agent_event_rx,
-        user_input_tx,
-        tui_permission_tx,
-    )
-    .await?;
-
+        session_ctrl, router, "main".to_string(),
+        commands, cwd, agent_event_rx,
+    ).await?;
     tracing::info!("shutting down");
-
     Ok(())
 }
 
-/// Format a skills summary section for the system prompt.
-/// Returns empty string when no skills are loaded.
+fn apply_cli_overrides(cli: &Cli, settings: &mut loopagent_types::config::Settings) {
+    if let Some(model) = &cli.model {
+        settings.model = model.clone();
+    }
+    if let Some(perm) = &cli.permission {
+        settings.permission_mode = match perm.as_str() {
+            "bypass" | "yolo" => loopagent_types::permission::PermissionMode::Bypass,
+            _ => loopagent_types::permission::PermissionMode::Supervised,
+        };
+    }
+}
+
 fn format_skills_summary(skills: &[loopagent_config::Skill]) -> String {
-    if skills.is_empty() {
-        return String::new();
-    }
-    let mut section = String::from(
-        "# Available Skills\nUser can invoke these via /name:\n",
-    );
+    if skills.is_empty() { return String::new(); }
+    let mut s = String::from("# Available Skills\nUser can invoke these via /name:\n");
     for skill in skills {
-        section.push_str(&format!("- {}: {}\n", skill.name, skill.description));
+        s.push_str(&format!("- {}: {}\n", skill.name, skill.description));
     }
-    section
+    s
 }

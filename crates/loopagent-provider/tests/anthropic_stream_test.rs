@@ -1,5 +1,5 @@
 use loopagent_types::error::{LoopAgentError, ProviderError};
-use loopagent_types::provider::StreamChunk;
+use loopagent_types::provider::{StopReason, StreamChunk};
 
 // Re-export stream internals via a test-support path.
 // Since parse_anthropic_event and ToolUseAccumulator are pub(crate), we test
@@ -73,7 +73,12 @@ fn parse_with_state(
                 parsed["usage"]["input_tokens"].as_u64(),
                 parsed["usage"]["output_tokens"].as_u64(),
             ) {
-                chunks.push(Ok(StreamChunk::Usage { input_tokens: i as u32, output_tokens: o as u32 }));
+                let cc = parsed["usage"]["cache_creation_input_tokens"].as_u64().unwrap_or(0) as u32;
+                let cr = parsed["usage"]["cache_read_input_tokens"].as_u64().unwrap_or(0) as u32;
+                chunks.push(Ok(StreamChunk::Usage {
+                    input_tokens: i as u32, output_tokens: o as u32,
+                    cache_creation_input_tokens: cc, cache_read_input_tokens: cr,
+                }));
             }
         }
         "message_start" => {
@@ -81,10 +86,15 @@ fn parse_with_state(
                 parsed["message"]["usage"]["input_tokens"].as_u64(),
                 parsed["message"]["usage"]["output_tokens"].as_u64(),
             ) {
-                chunks.push(Ok(StreamChunk::Usage { input_tokens: i as u32, output_tokens: o as u32 }));
+                let cc = parsed["message"]["usage"]["cache_creation_input_tokens"].as_u64().unwrap_or(0) as u32;
+                let cr = parsed["message"]["usage"]["cache_read_input_tokens"].as_u64().unwrap_or(0) as u32;
+                chunks.push(Ok(StreamChunk::Usage {
+                    input_tokens: i as u32, output_tokens: o as u32,
+                    cache_creation_input_tokens: cc, cache_read_input_tokens: cr,
+                }));
             }
         }
-        "message_stop" => chunks.push(Ok(StreamChunk::Done)),
+        "message_stop" => chunks.push(Ok(StreamChunk::Done { stop_reason: StopReason::EndTurn })),
         _ => {}
     }
     chunks
@@ -116,7 +126,7 @@ fn assert_tool(chunk: &Result<StreamChunk, LoopAgentError>, exp_id: &str, exp_na
 
 fn assert_usage(chunk: &Result<StreamChunk, LoopAgentError>, exp_in: u32, exp_out: u32) {
     match chunk {
-        Ok(StreamChunk::Usage { input_tokens, output_tokens }) => {
+        Ok(StreamChunk::Usage { input_tokens, output_tokens, .. }) => {
             assert_eq!(*input_tokens, exp_in);
             assert_eq!(*output_tokens, exp_out);
         }

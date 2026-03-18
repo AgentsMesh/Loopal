@@ -13,9 +13,8 @@ pub struct MessageStore {
 impl MessageStore {
     /// Create a store using the default global directory (~/.loopagent).
     pub fn new() -> Result<Self, StorageError> {
-        let base_dir = dirs::home_dir()
-            .ok_or(StorageError::HomeDirNotFound)?
-            .join(".loopagent");
+        let base_dir = loopagent_config::global_config_dir()
+            .map_err(|_| StorageError::HomeDirNotFound)?;
         Ok(Self { base_dir })
     }
 

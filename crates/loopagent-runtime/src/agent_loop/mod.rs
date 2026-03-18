@@ -1,25 +1,30 @@
+mod input;
 mod llm;
 mod middleware;
 mod permission;
+mod preflight;
+mod run;
 mod runner;
 mod tools;
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use loopagent_context::ContextPipeline;
 use loopagent_kernel::Kernel;
 use loopagent_storage::Session;
-use loopagent_types::command::UserCommand;
-use loopagent_types::error::Result;
-use loopagent_types::event::AgentEvent;
+use loopagent_types::error::{AgentOutput, Result};
+use loopagent_types::frontend::AgentFrontend;
 use loopagent_types::message::Message;
 use loopagent_types::permission::PermissionMode;
-use tokio::sync::mpsc;
 
 use crate::mode::AgentMode;
 use crate::session::SessionManager;
 
-pub(crate) use runner::AgentLoopRunner;
+pub use runner::AgentLoopRunner;
+
+/// Maximum number of automatic continuations when LLM hits max_tokens.
+pub(crate) const MAX_AUTO_CONTINUATIONS: u32 = 3;
 
 pub struct AgentLoopParams {
     pub kernel: Arc<Kernel>,
@@ -30,17 +35,29 @@ pub struct AgentLoopParams {
     pub mode: AgentMode,
     pub permission_mode: PermissionMode,
     pub max_turns: u32,
-    pub event_tx: mpsc::Sender<AgentEvent>,
-    pub input_rx: mpsc::Receiver<UserCommand>,
-    pub permission_rx: mpsc::Receiver<bool>,
+    pub frontend: Arc<dyn AgentFrontend>,
     pub session_manager: SessionManager,
     pub context_pipeline: ContextPipeline,
+    /// Tool whitelist filter — if `Some`, only tools in this set are exposed to LLM.
+    pub tool_filter: Option<HashSet<String>>,
+    /// Opaque shared state forwarded to ToolContext for agent tool access.
+    pub shared: Option<Arc<dyn std::any::Any + Send + Sync>>,
+    /// Whether this agent waits for user input between turns.
+    /// `true` for root agent (TUI interaction), `false` for sub-agents (exit on no tool calls).
+    pub interactive: bool,
 }
 
 /// Public wrapper function that preserves the existing API.
-pub async fn agent_loop(params: AgentLoopParams) -> Result<()> {
+/// Returns structured AgentOutput with result text and termination reason.
+pub async fn agent_loop(params: AgentLoopParams) -> Result<AgentOutput> {
     let mut runner = AgentLoopRunner::new(params);
     runner.run().await
+}
+
+/// Output from a single turn (LLM → [tools → LLM]* → done).
+pub(crate) struct TurnOutput {
+    /// The final assistant text of this turn.
+    pub output: String,
 }
 
 /// Compact messages by keeping only the most recent `keep_last` messages.
@@ -52,7 +69,7 @@ pub(crate) fn compact_messages(messages: &mut Vec<Message>, keep_last: usize) {
 }
 
 /// Result of waiting for user input
-pub(crate) enum WaitResult {
+pub enum WaitResult {
     /// A mode switch occurred — caller should `continue` without consuming a turn
     Continue,
     /// A user message was added to the conversation

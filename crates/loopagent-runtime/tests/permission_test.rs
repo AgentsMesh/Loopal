@@ -31,89 +31,45 @@ impl Tool for DummyTool {
 }
 
 // =====================================================
-// Default mode tests
-// =====================================================
-
-#[test]
-fn test_default_mode_readonly_allows() {
-    let tool = DummyTool { perm: PermissionLevel::ReadOnly };
-    assert_eq!(check_permission(&PermissionMode::Default, &tool), PermissionDecision::Allow);
-}
-
-#[test]
-fn test_default_mode_supervised_asks() {
-    let tool = DummyTool { perm: PermissionLevel::Supervised };
-    assert_eq!(check_permission(&PermissionMode::Default, &tool), PermissionDecision::Ask);
-}
-
-#[test]
-fn test_default_mode_dangerous_asks() {
-    let tool = DummyTool { perm: PermissionLevel::Dangerous };
-    assert_eq!(check_permission(&PermissionMode::Default, &tool), PermissionDecision::Ask);
-}
-
-// =====================================================
-// AcceptEdits mode tests
-// =====================================================
-
-#[test]
-fn test_accept_edits_readonly_allows() {
-    let tool = DummyTool { perm: PermissionLevel::ReadOnly };
-    assert_eq!(check_permission(&PermissionMode::AcceptEdits, &tool), PermissionDecision::Allow);
-}
-
-#[test]
-fn test_accept_edits_supervised_allows() {
-    let tool = DummyTool { perm: PermissionLevel::Supervised };
-    assert_eq!(check_permission(&PermissionMode::AcceptEdits, &tool), PermissionDecision::Allow);
-}
-
-#[test]
-fn test_accept_edits_dangerous_asks() {
-    let tool = DummyTool { perm: PermissionLevel::Dangerous };
-    assert_eq!(check_permission(&PermissionMode::AcceptEdits, &tool), PermissionDecision::Ask);
-}
-
-// =====================================================
-// BypassPermissions mode tests
+// Bypass mode tests
 // =====================================================
 
 #[test]
 fn test_bypass_readonly_allows() {
     let tool = DummyTool { perm: PermissionLevel::ReadOnly };
-    assert_eq!(check_permission(&PermissionMode::BypassPermissions, &tool), PermissionDecision::Allow);
+    assert_eq!(check_permission(&PermissionMode::Bypass, &tool), PermissionDecision::Allow);
 }
 
 #[test]
 fn test_bypass_supervised_allows() {
     let tool = DummyTool { perm: PermissionLevel::Supervised };
-    assert_eq!(check_permission(&PermissionMode::BypassPermissions, &tool), PermissionDecision::Allow);
+    assert_eq!(check_permission(&PermissionMode::Bypass, &tool), PermissionDecision::Allow);
 }
 
 #[test]
 fn test_bypass_dangerous_allows() {
     let tool = DummyTool { perm: PermissionLevel::Dangerous };
-    assert_eq!(check_permission(&PermissionMode::BypassPermissions, &tool), PermissionDecision::Allow);
+    assert_eq!(check_permission(&PermissionMode::Bypass, &tool), PermissionDecision::Allow);
 }
 
 // =====================================================
-// Plan mode tests
+// Supervised mode tests
 // =====================================================
 
 #[test]
-fn test_plan_readonly_allows() {
+fn test_supervised_readonly_allows() {
     let tool = DummyTool { perm: PermissionLevel::ReadOnly };
-    assert_eq!(check_permission(&PermissionMode::Plan, &tool), PermissionDecision::Allow);
+    assert_eq!(check_permission(&PermissionMode::Supervised, &tool), PermissionDecision::Allow);
 }
 
 #[test]
-fn test_plan_supervised_denies() {
+fn test_supervised_supervised_asks() {
     let tool = DummyTool { perm: PermissionLevel::Supervised };
-    assert_eq!(check_permission(&PermissionMode::Plan, &tool), PermissionDecision::Deny);
+    assert_eq!(check_permission(&PermissionMode::Supervised, &tool), PermissionDecision::Ask);
 }
 
 #[test]
-fn test_plan_dangerous_denies() {
+fn test_supervised_dangerous_asks() {
     let tool = DummyTool { perm: PermissionLevel::Dangerous };
-    assert_eq!(check_permission(&PermissionMode::Plan, &tool), PermissionDecision::Deny);
+    assert_eq!(check_permission(&PermissionMode::Supervised, &tool), PermissionDecision::Ask);
 }

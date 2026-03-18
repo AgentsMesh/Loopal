@@ -16,9 +16,7 @@ pub enum SlashCommandAction {
 pub enum InputAction {
     /// No action needed
     None,
-    /// User submitted a message (legacy — slash commands still use Submit path)
-    Submit(String),
-    /// User message queued into Inbox (not sent directly to agent)
+    /// User message queued into Inbox for forwarding to agent
     InboxPush(String),
     /// User wants to quit
     Quit,
@@ -30,4 +28,8 @@ pub enum InputAction {
     ModeSwitch(String),
     /// User executed a slash command
     SlashCommand(SlashCommandAction),
+    /// Cycle focus to the next agent in the agents map
+    FocusNextAgent,
+    /// Clear agent focus (return to root view)
+    UnfocusAgent,
 }

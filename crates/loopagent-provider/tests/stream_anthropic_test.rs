@@ -14,6 +14,7 @@ fn test_chat_params() -> ChatParams {
         tools: vec![],
         max_tokens: 100,
         temperature: None,
+        debug_dump_dir: None,
     }
 }
 
@@ -73,7 +74,7 @@ data: {\"type\":\"message_stop\"}\n\n";
                 assert_eq!(text, "Hello");
                 got_text = true;
             }
-            Ok(StreamChunk::Done) => got_done = true,
+            Ok(StreamChunk::Done { .. }) => got_done = true,
             Ok(StreamChunk::Usage { .. }) => {}
             other => panic!("unexpected chunk: {:?}", other),
         }

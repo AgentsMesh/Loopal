@@ -1,4 +1,4 @@
-use loopagent_types::event::AgentEvent;
+use loopagent_types::event::AgentEventPayload;
 use loopagent_types::message::{ContentBlock, MessageRole};
 use loopagent_types::permission::PermissionMode;
 
@@ -6,8 +6,9 @@ use super::make_runner_with_channels;
 
 #[tokio::test]
 async fn test_execute_tools_bypass_mode() {
-    let (mut runner, mut event_rx, _input_tx, _perm_tx) = make_runner_with_channels();
-    runner.params.permission_mode = PermissionMode::BypassPermissions;
+    let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx, _perm_tx) =
+        make_runner_with_channels();
+    runner.params.permission_mode = PermissionMode::Bypass;
 
     // Create a temp file for Read tool
     let tmp = std::env::temp_dir().join("loopagent_exec_tools_test.txt");
@@ -20,7 +21,8 @@ async fn test_execute_tools_bypass_mode() {
         serde_json::json!({"file_path": tmp.to_str().unwrap()}),
     )];
 
-    runner.execute_tools(tool_uses).await.unwrap();
+    let completion = runner.execute_tools(tool_uses).await.unwrap();
+    assert!(completion.is_none(), "Read tool should not trigger completion");
 
     // Should have added tool result message
     assert_eq!(runner.params.messages.len(), 1);
@@ -31,7 +33,7 @@ async fn test_execute_tools_bypass_mode() {
     // Drain events
     let mut found_tool_result = false;
     while let Ok(event) = event_rx.try_recv() {
-        if matches!(event, AgentEvent::ToolResult { .. }) {
+        if matches!(event.payload, AgentEventPayload::ToolResult { .. }) {
             found_tool_result = true;
         }
     }
@@ -41,9 +43,18 @@ async fn test_execute_tools_bypass_mode() {
 }
 
 #[tokio::test]
-async fn test_execute_tools_denied_in_plan_mode() {
-    let (mut runner, _event_rx, _input_tx, _perm_tx) = make_runner_with_channels();
-    runner.params.permission_mode = PermissionMode::Plan;
+async fn test_execute_tools_supervised_denies_without_approval() {
+    // Supervised mode sends Ask → no response from perm channel → Deny
+    let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx, perm_tx) =
+        make_runner_with_channels();
+    runner.params.permission_mode = PermissionMode::Supervised;
+
+    // Drop perm_tx so the ask returns Deny
+    drop(perm_tx);
+
+    tokio::spawn(async move {
+        while event_rx.recv().await.is_some() {}
+    });
 
     let tool_uses = vec![(
         "tc-1".to_string(),
@@ -66,13 +77,24 @@ async fn test_execute_tools_denied_in_plan_mode() {
 }
 
 #[tokio::test]
-async fn test_execute_tools_multiple_with_deny_and_allow() {
-    // Tests the interleaving of denied and approved tools in execute_tools
-    let (mut runner, _event_rx, _input_tx, _perm_tx) = make_runner_with_channels();
-    runner.params.permission_mode = PermissionMode::Plan; // Only allows ReadOnly
+async fn test_execute_tools_read_allowed_write_denied_in_supervised() {
+    // Tests the interleaving: Read (ReadOnly → Allow) and Write (Supervised → Ask → Deny)
+    let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx, perm_tx) =
+        make_runner_with_channels();
+    runner.params.permission_mode = PermissionMode::Supervised;
+
+    // Drop perm_tx so the ask returns Deny
+    drop(perm_tx);
+
+    tokio::spawn(async move {
+        while event_rx.recv().await.is_some() {}
+    });
 
     // Create a temp file for Read
-    let tmp = std::env::temp_dir().join(format!("loopagent_mixed_perm_{}.txt", std::process::id()));
+    let tmp = std::env::temp_dir().join(format!(
+        "loopagent_mixed_perm_{}.txt",
+        std::process::id()
+    ));
     std::fs::write(&tmp, "mixed test").unwrap();
     runner.tool_ctx.cwd = std::env::temp_dir();
 
@@ -96,17 +118,16 @@ async fn test_execute_tools_multiple_with_deny_and_allow() {
     let msg = &runner.params.messages[0];
     assert_eq!(msg.content.len(), 2);
 
-    // Results should be ordered by original index
     // tc-1 (Read) should succeed, tc-2 (Write) should be denied
     match &msg.content[0] {
         ContentBlock::ToolResult { is_error, .. } => {
-            assert!(!is_error, "Read should succeed in Plan mode");
+            assert!(!is_error, "Read should succeed in Supervised mode");
         }
         other => panic!("expected ToolResult, got {:?}", other),
     }
     match &msg.content[1] {
         ContentBlock::ToolResult { content, is_error, .. } => {
-            assert!(*is_error, "Write should be denied in Plan mode");
+            assert!(is_error, "Write should be denied when no approval channel");
             assert!(content.contains("Permission denied"));
         }
         other => panic!("expected ToolResult, got {:?}", other),

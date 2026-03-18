@@ -2,6 +2,7 @@ pub mod bash;
 pub mod edit;
 pub mod glob;
 pub mod grep;
+pub mod grep_search;
 pub mod ls;
 pub mod read;
 pub mod web_fetch;

@@ -81,14 +81,14 @@ fn test_load_settings_all_env_var_scenarios() {
     // --- Scenario 5: LOOPAGENT_PERMISSION_MODE override ---
     {
         unsafe {
-            std::env::set_var("LOOPAGENT_PERMISSION_MODE", "Plan");
+            std::env::set_var("LOOPAGENT_PERMISSION_MODE", "Supervised");
         }
 
         let tmp = TempDir::new().unwrap();
         let settings = load_settings(tmp.path()).unwrap();
         assert_eq!(
             settings.permission_mode,
-            loopagent_types::permission::PermissionMode::Plan,
+            loopagent_types::permission::PermissionMode::Supervised,
             "env var should override permission mode"
         );
 

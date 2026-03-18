@@ -1,7 +1,10 @@
-pub mod chat;
 pub mod command_menu;
+pub mod inbox_view;
+pub mod input_view;
+pub mod message_log_view;
 pub mod picker;
-pub mod plan;
+pub mod progress;
 pub mod status_bar;
-pub mod stream;
+pub mod subagent_panel;
+pub mod task_summary;
 pub mod tool_confirm;

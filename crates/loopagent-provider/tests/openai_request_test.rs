@@ -20,6 +20,7 @@ fn make_params(
         tools,
         max_tokens: 4096,
         temperature: None,
+        debug_dump_dir: None,
     }
 }
 

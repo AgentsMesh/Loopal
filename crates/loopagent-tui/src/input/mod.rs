@@ -14,8 +14,8 @@ use sub_page::handle_sub_page_key;
 
 /// Process a key event and update the app's input state.
 pub fn handle_key(app: &mut App, key: KeyEvent) -> InputAction {
-    // Handle tool confirm state
-    if let crate::app::AppState::ToolConfirm { .. } = &app.state {
+    // Handle tool confirm state (derived from session pending_permission)
+    if app.session.lock().pending_permission.is_some() {
         return match key.code {
             KeyCode::Char('y') | KeyCode::Char('Y') => InputAction::ToolApprove,
             KeyCode::Char('n') | KeyCode::Char('N') => InputAction::ToolDeny,
@@ -39,7 +39,8 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> InputAction {
 
     // Shift+Tab to toggle Plan/Act mode (never intercepted by autocomplete)
     if key.code == KeyCode::BackTab {
-        let new_mode = if app.mode == "plan" { "act" } else { "plan" };
+        let current_mode = app.session.lock().mode.clone();
+        let new_mode = if current_mode == "plan" { "act" } else { "plan" };
         return InputAction::ModeSwitch(new_mode.to_string());
     }
 
@@ -53,10 +54,8 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> InputAction {
     // --- Normal key handling ---
     let action = match key.code {
         KeyCode::Enter => {
-            // Slash command entered without autocomplete (e.g., typed "/plan" manually)
             let trimmed = app.input.trim().to_string();
             if trimmed.starts_with('/') {
-                // Refresh skills so newly added files are recognized
                 app.refresh_commands();
             }
             if let Some(cmd_action) = try_execute_slash_command(&trimmed, &app.commands) {
@@ -125,7 +124,6 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> InputAction {
             if app.pop_inbox_to_input() {
                 // Popped last Inbox message back into input for editing
             } else if !app.input_history.is_empty() {
-                // Inbox empty — fall back to history navigation
                 let idx = match app.history_index {
                     None => app.input_history.len() - 1,
                     Some(i) if i > 0 => i - 1,
@@ -152,10 +150,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> InputAction {
             }
             InputAction::None
         }
-        KeyCode::Esc => {
-            // Close autocomplete if open (handled above), otherwise no-op
-            InputAction::None
-        }
+        KeyCode::Esc => InputAction::None,
         KeyCode::PageUp => {
             app.scroll_offset = app.scroll_offset.saturating_add(10);
             InputAction::None
@@ -167,8 +162,6 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> InputAction {
         _ => InputAction::None,
     };
 
-    // After character input / backspace / delete, update autocomplete state
     update_autocomplete(app);
-
     action
 }

@@ -14,6 +14,7 @@ fn test_chat_params() -> ChatParams {
         tools: vec![],
         max_tokens: 100,
         temperature: None,
+        debug_dump_dir: None,
     }
 }
 
@@ -72,8 +73,8 @@ data: [DONE]\n\n";
                 assert_eq!(text, "Hi");
                 got_text = true;
             }
-            Ok(StreamChunk::Done) => got_done = true,
-            Ok(StreamChunk::Usage { input_tokens, output_tokens }) => {
+            Ok(StreamChunk::Done { .. }) => got_done = true,
+            Ok(StreamChunk::Usage { input_tokens, output_tokens, .. }) => {
                 assert_eq!(*input_tokens, 10);
                 assert_eq!(*output_tokens, 5);
                 got_usage = true;

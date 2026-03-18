@@ -1,5 +1,4 @@
 use loopagent_types::command::AgentMode as TypesAgentMode;
-use loopagent_types::permission::PermissionMode;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AgentMode {
@@ -21,13 +20,6 @@ impl AgentMode {
         match self {
             AgentMode::Act => "",
             AgentMode::Plan => "\n\nYou are in PLAN mode. You can only read files and think. You cannot make any changes. Describe what you would do, but do not execute any write operations.",
-        }
-    }
-
-    pub fn permission_mode(&self) -> PermissionMode {
-        match self {
-            AgentMode::Act => PermissionMode::Default,
-            AgentMode::Plan => PermissionMode::Plan,
         }
     }
 }

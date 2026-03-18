@@ -1,77 +1,41 @@
 use loopagent_types::permission::{PermissionDecision, PermissionLevel, PermissionMode};
 
 #[test]
-fn test_default_allows_readonly() {
-    assert_eq!(
-        PermissionMode::Default.check(PermissionLevel::ReadOnly),
-        PermissionDecision::Allow
-    );
-}
-
-#[test]
-fn test_default_asks_supervised() {
-    assert_eq!(
-        PermissionMode::Default.check(PermissionLevel::Supervised),
-        PermissionDecision::Ask
-    );
-}
-
-#[test]
-fn test_default_asks_dangerous() {
-    assert_eq!(
-        PermissionMode::Default.check(PermissionLevel::Dangerous),
-        PermissionDecision::Ask
-    );
-}
-
-#[test]
-fn test_accept_edits_allows_readonly_and_supervised() {
-    assert_eq!(
-        PermissionMode::AcceptEdits.check(PermissionLevel::ReadOnly),
-        PermissionDecision::Allow
-    );
-    assert_eq!(
-        PermissionMode::AcceptEdits.check(PermissionLevel::Supervised),
-        PermissionDecision::Allow
-    );
-}
-
-#[test]
-fn test_accept_edits_asks_dangerous() {
-    assert_eq!(
-        PermissionMode::AcceptEdits.check(PermissionLevel::Dangerous),
-        PermissionDecision::Ask
-    );
-}
-
-#[test]
 fn test_bypass_allows_all() {
     assert_eq!(
-        PermissionMode::BypassPermissions.check(PermissionLevel::ReadOnly),
+        PermissionMode::Bypass.check(PermissionLevel::ReadOnly),
         PermissionDecision::Allow
     );
     assert_eq!(
-        PermissionMode::BypassPermissions.check(PermissionLevel::Supervised),
+        PermissionMode::Bypass.check(PermissionLevel::Supervised),
         PermissionDecision::Allow
     );
     assert_eq!(
-        PermissionMode::BypassPermissions.check(PermissionLevel::Dangerous),
+        PermissionMode::Bypass.check(PermissionLevel::Dangerous),
         PermissionDecision::Allow
     );
 }
 
 #[test]
-fn test_plan_allows_only_readonly() {
+fn test_supervised_allows_readonly() {
     assert_eq!(
-        PermissionMode::Plan.check(PermissionLevel::ReadOnly),
+        PermissionMode::Supervised.check(PermissionLevel::ReadOnly),
         PermissionDecision::Allow
     );
+}
+
+#[test]
+fn test_supervised_asks_supervised() {
     assert_eq!(
-        PermissionMode::Plan.check(PermissionLevel::Supervised),
-        PermissionDecision::Deny
+        PermissionMode::Supervised.check(PermissionLevel::Supervised),
+        PermissionDecision::Ask
     );
+}
+
+#[test]
+fn test_supervised_asks_dangerous() {
     assert_eq!(
-        PermissionMode::Plan.check(PermissionLevel::Dangerous),
-        PermissionDecision::Deny
+        PermissionMode::Supervised.check(PermissionLevel::Dangerous),
+        PermissionDecision::Ask
     );
 }

@@ -14,6 +14,7 @@ fn test_chat_params() -> ChatParams {
         tools: vec![],
         max_tokens: 100,
         temperature: None,
+        debug_dump_dir: None,
     }
 }
 
@@ -60,7 +61,7 @@ data: [DONE]\n\n";
         other => panic!("expected Text, got: {:?}", other),
     }
     match ok_chunks[1] {
-        StreamChunk::Done => {}
+        StreamChunk::Done { .. } => {}
         other => panic!("expected Done, got: {:?}", other),
     }
 }

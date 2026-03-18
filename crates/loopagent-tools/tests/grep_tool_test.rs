@@ -7,6 +7,7 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext {
         cwd: cwd.to_path_buf(),
         session_id: "test".into(),
+        shared: None,
     }
 }
 
@@ -40,6 +41,8 @@ fn test_grep_parameters_schema() {
     assert!(schema["properties"]["pattern"].is_object());
     assert!(schema["properties"]["path"].is_object());
     assert!(schema["properties"]["include"].is_object());
+    assert!(schema["properties"]["output_mode"].is_object());
+    assert!(schema["properties"]["head_limit"].is_object());
 }
 
 #[tokio::test]
@@ -55,7 +58,7 @@ async fn test_grep_matching_pattern_in_file() {
     let ctx = make_ctx(tmp.path());
 
     let result = tool
-        .execute(json!({"pattern": "hello"}), &ctx)
+        .execute(json!({"pattern": "hello", "output_mode": "content"}), &ctx)
         .await
         .unwrap();
 
@@ -97,7 +100,7 @@ async fn test_grep_regex_pattern() {
     let ctx = make_ctx(tmp.path());
 
     let result = tool
-        .execute(json!({"pattern": "fn \\w+\\("}), &ctx)
+        .execute(json!({"pattern": "fn \\w+\\(", "output_mode": "content"}), &ctx)
         .await
         .unwrap();
 
@@ -144,7 +147,8 @@ async fn test_grep_with_include_glob_filter() {
         .execute(
             json!({
                 "pattern": "hello",
-                "include": "*.rs"
+                "include": "*.rs",
+                "output_mode": "content"
             }),
             &ctx,
         )
@@ -169,7 +173,8 @@ async fn test_grep_with_explicit_file_path() {
         .execute(
             json!({
                 "pattern": "beta",
-                "path": file.to_str().unwrap()
+                "path": file.to_str().unwrap(),
+                "output_mode": "content"
             }),
             &ctx,
         )

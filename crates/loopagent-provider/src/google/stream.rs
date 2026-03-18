@@ -1,6 +1,6 @@
 use futures::stream::Stream;
 use loopagent_types::error::{LoopAgentError, ProviderError};
-use loopagent_types::provider::StreamChunk;
+use loopagent_types::provider::{StopReason, StreamChunk};
 use serde_json::{json, Value};
 use std::collections::VecDeque;
 use std::pin::Pin;
@@ -64,6 +64,8 @@ pub(crate) fn parse_google_event(data: &str) -> Vec<Result<StreamChunk, LoopAgen
             chunks.push(Ok(StreamChunk::Usage {
                 input_tokens: input,
                 output_tokens: output,
+                cache_creation_input_tokens: 0,
+                cache_read_input_tokens: 0,
             }));
         }
     }
@@ -94,8 +96,14 @@ pub(crate) fn parse_google_event(data: &str) -> Vec<Result<StreamChunk, LoopAgen
                 }
             }
 
-            if finish_reason == Some("STOP") || finish_reason == Some("MAX_TOKENS") {
-                chunks.push(Ok(StreamChunk::Done));
+            match finish_reason {
+                Some("MAX_TOKENS") => {
+                    chunks.push(Ok(StreamChunk::Done { stop_reason: StopReason::MaxTokens }));
+                }
+                Some("STOP") => {
+                    chunks.push(Ok(StreamChunk::Done { stop_reason: StopReason::EndTurn }));
+                }
+                _ => {}
             }
         }
     }

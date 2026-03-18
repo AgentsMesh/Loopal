@@ -1,70 +1,65 @@
 use ratatui::prelude::*;
-use ratatui::widgets::{Block, Borders, Paragraph};
 
-use crate::app::{App, AppState, SubPage};
+use crate::app::{App, SubPage};
 use crate::views;
 
-/// Input area widget rendering
-fn render_input(f: &mut Frame, app: &App, area: Rect) {
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(" Input ");
-
-    let inner = block.inner(area);
-    f.render_widget(block, area);
-
-    let input_text = Paragraph::new(app.input.as_str());
-    f.render_widget(input_text, inner);
-
-    // Place cursor
-    f.set_cursor_position((
-        inner.x + app.input_cursor as u16,
-        inner.y,
-    ));
-}
-
-/// Compose all views into the full-screen layout.
-pub fn draw(f: &mut Frame, app: &App) {
+/// Compose all views into the seven-area layout.
+///
+/// ```text
+/// ┌───────────────────────────────────────────────┐
+/// │ Progress Area (elastic main region)            │
+/// ├───────────────────────────────────────────────┤
+/// │ [~] agent (tools, turns, tokens)  (0-1 line)  │
+/// ├───────────────────────────────────────────────┤
+/// │ [src→tgt] preview...      (message feed, 0-3) │
+/// ├───────────────────────────────────────────────┤
+/// │ ● Status  3m24s  ↑1.2k ↓0.8k  (Task Summary) │
+/// ├───────────────────────────────────────────────┤
+/// │  pending message...       (Inbox, dynamic 0-3) │
+/// ├───────────────────────────────────────────────┤
+/// │ > Input                              (3 lines) │
+/// ├───────────────────────────────────────────────┤
+/// │ ACT  model  ctx:45k/200k  turns:3   (1 line)  │
+/// └───────────────────────────────────────────────┘
+/// ```
+pub fn draw(f: &mut Frame, app: &mut App) {
     let size = f.area();
+    let state = app.session.lock();
 
-    // Layout: optional plan indicator, chat area, input, status bar
-    let is_plan = app.mode == "plan";
+    let inbox_h = views::inbox_view::inbox_height(&state.inbox);
+    let panel_h = views::subagent_panel::panel_height(&state.agents);
+    let feed_h = views::message_log_view::feed_height(&state.message_feed);
 
-    let constraints = if is_plan {
-        vec![
-            Constraint::Length(3),  // plan indicator
-            Constraint::Min(5),    // chat
-            Constraint::Length(3), // input
-            Constraint::Length(1), // status bar
-        ]
-    } else {
-        vec![
-            Constraint::Min(5),    // chat
-            Constraint::Length(3), // input
-            Constraint::Length(1), // status bar
-        ]
-    };
+    let constraints = vec![
+        Constraint::Min(5),           // progress area
+        Constraint::Length(panel_h),  // agent panel (0 or 1)
+        Constraint::Length(feed_h),   // message feed (0-3)
+        Constraint::Length(1),        // task summary
+        Constraint::Length(inbox_h),  // inbox (dynamic 0-3)
+        Constraint::Length(3),        // input
+        Constraint::Length(1),        // status bar
+    ];
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints(constraints)
         .split(size);
 
-    let (chat_idx, input_idx, status_idx) = if is_plan {
-        views::plan::render_plan_indicator(f, chunks[0]);
-        (1, 2, 3)
-    } else {
-        (0, 1, 2)
-    };
+    let [progress_area, panel_area, feed_area, summary_area, inbox_area, input_area, status_area] =
+        [chunks[0], chunks[1], chunks[2], chunks[3], chunks[4], chunks[5], chunks[6]];
 
-    // Sub-page replaces the chat + input area
+    // Sub-page replaces progress + panel + feed + summary + inbox + input
     if let Some(ref sub_page) = app.sub_page {
-        // Merge chat + input into a single area for the picker
         let picker_area = Rect::new(
-            chunks[chat_idx].x,
-            chunks[chat_idx].y,
-            chunks[chat_idx].width,
-            chunks[chat_idx].height + chunks[input_idx].height,
+            progress_area.x,
+            progress_area.y,
+            progress_area.width,
+            progress_area.height
+                + panel_area.height
+                + feed_area.height
+                + summary_area.height
+                + inbox_area.height
+                + input_area.height,
         );
 
         match sub_page {
@@ -73,21 +68,41 @@ pub fn draw(f: &mut Frame, app: &App) {
             }
         }
 
-        views::status_bar::render_status_bar(f, app, chunks[status_idx]);
+        views::status_bar::render_status_bar(f, &state, status_area);
         return;
     }
 
-    views::chat::render_chat(f, app, chunks[chat_idx]);
-    render_input(f, app, chunks[input_idx]);
-    views::status_bar::render_status_bar(f, app, chunks[status_idx]);
+    // Normal seven-area render
+    views::progress::render_progress(
+        f,
+        &state,
+        app.scroll_offset,
+        &mut app.line_cache,
+        progress_area,
+    );
+    views::subagent_panel::render_subagent_panel(
+        f,
+        &state.agents,
+        state.focused_agent.as_deref(),
+        panel_area,
+    );
+    views::message_log_view::render_message_feed(f, &state.message_feed, feed_area);
+    views::task_summary::render_task_summary(f, &state, summary_area);
+    views::inbox_view::render_inbox(f, &state.inbox, inbox_area);
+    views::status_bar::render_status_bar(f, &state, status_area);
 
-    // Tool confirm popup overlay
-    if let AppState::ToolConfirm { ref name, ref input, .. } = app.state {
-        views::tool_confirm::render_tool_confirm(f, name, input, size);
+    // Tool confirm popup overlay — clone permission data, then drop lock
+    let pending_perm = state.pending_permission.clone();
+    drop(state);
+
+    views::input_view::render_input(f, &app.input, app.input_cursor, input_area);
+
+    if let Some(ref perm) = pending_perm {
+        views::tool_confirm::render_tool_confirm(f, &perm.name, &perm.input, size);
     }
 
     // Autocomplete command menu overlay (above input area)
     if let Some(ref ac) = app.autocomplete {
-        views::command_menu::render_command_menu(f, ac, &app.commands, chunks[input_idx]);
+        views::command_menu::render_command_menu(f, ac, &app.commands, input_area);
     }
 }

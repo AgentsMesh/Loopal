@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use std::pin::Pin;
 
 use crate::error::LoopAgentError;
@@ -32,6 +33,18 @@ pub struct ChatParams {
     pub tools: Vec<ToolDefinition>,
     pub max_tokens: u32,
     pub temperature: Option<f32>,
+    /// Directory for dumping failed API request bodies (diagnosis).
+    /// Typically `locations::tmp_dir()`. `None` disables dumping.
+    pub debug_dump_dir: Option<PathBuf>,
+}
+
+/// Why the LLM stopped generating output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum StopReason {
+    /// Model finished its response naturally.
+    EndTurn,
+    /// Output was truncated because it hit the max_tokens limit.
+    MaxTokens,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,8 +60,12 @@ pub enum StreamChunk {
     Usage {
         input_tokens: u32,
         output_tokens: u32,
+        cache_creation_input_tokens: u32,
+        cache_read_input_tokens: u32,
     },
-    Done,
+    Done {
+        stop_reason: StopReason,
+    },
 }
 
 /// Model metadata

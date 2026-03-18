@@ -1,31 +1,5 @@
-/// Application state machine
-#[derive(Debug, Clone, PartialEq)]
-pub enum AppState {
-    Running,
-    ToolConfirm {
-        id: String,
-        name: String,
-        input: serde_json::Value,
-    },
-    Exiting,
-}
-
-/// A tool call to display in the chat view
-#[derive(Debug, Clone)]
-pub struct DisplayToolCall {
-    pub name: String,
-    /// "pending", "success", "error"
-    pub status: String,
-    pub summary: String,
-}
-
-/// A message to display in the chat view
-#[derive(Debug, Clone)]
-pub struct DisplayMessage {
-    pub role: String,
-    pub content: String,
-    pub tool_calls: Vec<DisplayToolCall>,
-}
+// Re-export display types from session crate
+pub use loopagent_session::{DisplayMessage, DisplayToolCall, PendingPermission};
 
 /// Autocomplete menu state for slash commands.
 pub struct AutocompleteState {

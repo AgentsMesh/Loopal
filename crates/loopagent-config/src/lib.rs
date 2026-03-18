@@ -1,3 +1,4 @@
+pub mod housekeeping;
 pub mod loader;
 pub mod locations;
 pub mod skills;

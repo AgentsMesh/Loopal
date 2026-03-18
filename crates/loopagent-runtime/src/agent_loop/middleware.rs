@@ -1,12 +1,12 @@
 use loopagent_types::error::Result;
-use loopagent_types::event::AgentEvent;
+use loopagent_types::event::AgentEventPayload;
 use loopagent_types::middleware::MiddlewareContext;
 
 use super::runner::AgentLoopRunner;
 
 impl AgentLoopRunner {
     /// Execute the middleware pipeline. Returns false if the loop should break.
-    pub(crate) async fn execute_middleware(&mut self) -> Result<bool> {
+    pub async fn execute_middleware(&mut self) -> Result<bool> {
         // Resolve provider for summarization (used by SmartCompact middleware)
         let summarization_provider = self.params.kernel.resolve_provider(&self.params.model).ok();
 
@@ -23,7 +23,7 @@ impl AgentLoopRunner {
         };
 
         if let Err(e) = self.params.context_pipeline.execute(&mut mw_ctx).await {
-            self.emit(AgentEvent::Error {
+            self.emit(AgentEventPayload::Error {
                 message: e.to_string(),
             })
             .await?;

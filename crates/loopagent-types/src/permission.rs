@@ -11,17 +11,15 @@ pub enum PermissionLevel {
     Dangerous,
 }
 
-/// Permission mode set by user
+/// Permission mode set by user.
+///
+/// Two modes only — agent work-mode (Plan/Act) is separate from permission policy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PermissionMode {
-    /// Default: auto-allow ReadOnly, prompt for Supervised+Dangerous
-    Default,
-    /// Accept edits: auto-allow ReadOnly+Supervised, prompt for Dangerous
-    AcceptEdits,
-    /// Bypass all permission checks
-    BypassPermissions,
-    /// Plan mode: only allow ReadOnly, deny everything else
-    Plan,
+    /// All tools auto-allowed, no approval needed.
+    Bypass,
+    /// ReadOnly auto-allowed; Supervised and Dangerous require human approval.
+    Supervised,
 }
 
 /// Decision from permission check
@@ -37,24 +35,12 @@ pub enum PermissionDecision {
 
 impl PermissionMode {
     pub fn check(&self, level: PermissionLevel) -> PermissionDecision {
-        match (self, level) {
-            // Plan mode: only read
-            (PermissionMode::Plan, PermissionLevel::ReadOnly) => PermissionDecision::Allow,
-            (PermissionMode::Plan, _) => PermissionDecision::Deny,
-
-            // Bypass: allow all
-            (PermissionMode::BypassPermissions, _) => PermissionDecision::Allow,
-
-            // AcceptEdits: auto-allow read + supervised
-            (PermissionMode::AcceptEdits, PermissionLevel::ReadOnly) => PermissionDecision::Allow,
-            (PermissionMode::AcceptEdits, PermissionLevel::Supervised) => {
-                PermissionDecision::Allow
-            }
-            (PermissionMode::AcceptEdits, PermissionLevel::Dangerous) => PermissionDecision::Ask,
-
-            // Default: auto-allow read, ask for rest
-            (PermissionMode::Default, PermissionLevel::ReadOnly) => PermissionDecision::Allow,
-            (PermissionMode::Default, _) => PermissionDecision::Ask,
+        match self {
+            PermissionMode::Bypass => PermissionDecision::Allow,
+            PermissionMode::Supervised => match level {
+                PermissionLevel::ReadOnly => PermissionDecision::Allow,
+                _ => PermissionDecision::Ask,
+            },
         }
     }
 }

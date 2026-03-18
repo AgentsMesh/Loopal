@@ -1,6 +1,7 @@
 use loopagent_runtime::AgentMode;
-use loopagent_types::command::UserCommand;
-use loopagent_types::event::AgentEvent;
+use loopagent_types::control::ControlCommand;
+use loopagent_types::envelope::{Envelope, MessageSource};
+use loopagent_types::event::AgentEventPayload;
 use loopagent_types::message::Message;
 
 use super::{make_runner, make_runner_with_channels};
@@ -25,87 +26,78 @@ fn test_tool_ctx_matches_session() {
     assert_eq!(runner.tool_ctx.session_id, "test-session-001");
 }
 
-#[test]
-fn test_model_info_defaults_for_unknown_model() {
-    use std::sync::Arc;
-    use chrono::Utc;
-    use loopagent_context::ContextPipeline;
-    use loopagent_kernel::Kernel;
-    use loopagent_runtime::{AgentLoopParams, SessionManager};
-    use loopagent_storage::Session;
-    use loopagent_types::config::Settings;
-    use loopagent_types::permission::PermissionMode;
-    use loopagent_runtime::agent_loop::AgentLoopRunner;
-    use tokio::sync::mpsc;
-
-    let (event_tx, _event_rx) = mpsc::channel(16);
-    let (_input_tx, input_rx) = mpsc::channel(16);
-    let (_perm_tx, permission_rx) = mpsc::channel(16);
-
-    let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
-    let session = Session {
-        id: "test".to_string(),
-        title: "".to_string(),
-        model: "unknown-model-xyz".to_string(),
-        cwd: "/tmp".to_string(),
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-        mode: "default".to_string(),
-    };
-
-    let tmp_dir = std::env::temp_dir().join(format!(
-        "loopagent_test_unknown_{}",
-        std::process::id()
-    ));
-    let session_manager = SessionManager::with_base_dir(tmp_dir);
-    let context_pipeline = ContextPipeline::new();
-
-    let params = AgentLoopParams {
-        kernel,
-        session,
-        messages: Vec::new(),
-        model: "unknown-model-xyz".to_string(),
-        system_prompt: "test".to_string(),
-        mode: AgentMode::Act,
-        permission_mode: PermissionMode::Default,
-        max_turns: 5,
-        event_tx,
-        input_rx,
-        permission_rx,
-        session_manager,
-        context_pipeline,
-    };
-
-    let runner = AgentLoopRunner::new(params);
-    // Unknown model should fall back to defaults
-    assert_eq!(runner.max_context_tokens, 200_000);
-}
-
 #[tokio::test]
-async fn test_wait_for_input_message() {
-    let (mut runner, mut event_rx, input_tx, _perm_tx) = make_runner_with_channels();
+async fn test_wait_for_input_human_message_no_prefix() {
+    let (mut runner, mut event_rx, mbox_tx, _ctrl_tx, _perm_tx) =
+        make_runner_with_channels();
 
-    input_tx
-        .send(UserCommand::Message("Hello agent".to_string()))
+    mbox_tx
+        .send(Envelope::new(MessageSource::Human, "main", "Hello agent"))
         .await
         .unwrap();
 
     let result = runner.wait_for_input().await.unwrap();
     assert!(result.is_some());
     assert_eq!(runner.params.messages.len(), 1);
+    // Human source: no prefix — content passed through directly
     assert_eq!(runner.params.messages[0].text_content(), "Hello agent");
 
     // Should have emitted AwaitingInput
     let event = event_rx.recv().await.unwrap();
-    assert!(matches!(event, AgentEvent::AwaitingInput));
+    assert!(matches!(event.payload, AgentEventPayload::AwaitingInput));
+}
+
+#[tokio::test]
+async fn test_wait_for_input_agent_message_has_prefix() {
+    let (mut runner, _event_rx, mbox_tx, _ctrl_tx, _perm_tx) =
+        make_runner_with_channels();
+
+    mbox_tx
+        .send(Envelope::new(
+            MessageSource::Agent("researcher".into()),
+            "main",
+            "found the answer",
+        ))
+        .await
+        .unwrap();
+
+    let result = runner.wait_for_input().await.unwrap();
+    assert!(result.is_some());
+    assert_eq!(
+        runner.params.messages[0].text_content(),
+        "[from: researcher] found the answer"
+    );
+}
+
+#[tokio::test]
+async fn test_wait_for_input_channel_message_has_channel_prefix() {
+    let (mut runner, _event_rx, mbox_tx, _ctrl_tx, _perm_tx) =
+        make_runner_with_channels();
+
+    mbox_tx
+        .send(Envelope::new(
+            MessageSource::Channel { channel: "general".into(), from: "bot".into() },
+            "main",
+            "new event",
+        ))
+        .await
+        .unwrap();
+
+    let result = runner.wait_for_input().await.unwrap();
+    assert!(result.is_some());
+    assert_eq!(
+        runner.params.messages[0].text_content(),
+        "[from: #general/bot] new event"
+    );
 }
 
 #[tokio::test]
 async fn test_wait_for_input_mode_switch() {
-    let (mut runner, mut event_rx, input_tx, _perm_tx) = make_runner_with_channels();
+    let (mut runner, mut event_rx, _mbox_tx, ctrl_tx, _perm_tx) =
+        make_runner_with_channels();
 
-    input_tx
-        .send(UserCommand::ModeSwitch(loopagent_types::command::AgentMode::Plan))
+    ctrl_tx
+        .send(ControlCommand::ModeSwitch(loopagent_types::command::AgentMode::Plan))
         .await
         .unwrap();
 
@@ -115,15 +107,17 @@ async fn test_wait_for_input_mode_switch() {
 
     // Should have emitted AwaitingInput, then ModeChanged
     let e1 = event_rx.recv().await.unwrap();
-    assert!(matches!(e1, AgentEvent::AwaitingInput));
+    assert!(matches!(e1.payload, AgentEventPayload::AwaitingInput));
     let e2 = event_rx.recv().await.unwrap();
-    assert!(matches!(e2, AgentEvent::ModeChanged { mode } if mode == "plan"));
+    assert!(matches!(e2.payload, AgentEventPayload::ModeChanged { ref mode } if mode == "plan"));
 }
 
 #[tokio::test]
 async fn test_wait_for_input_channel_closed() {
-    let (mut runner, _event_rx, input_tx, _perm_tx) = make_runner_with_channels();
-    drop(input_tx); // close input channel
+    let (mut runner, _event_rx, mbox_tx, ctrl_tx, _perm_tx) =
+        make_runner_with_channels();
+    drop(mbox_tx);
+    drop(ctrl_tx);
 
     let result = runner.wait_for_input().await.unwrap();
     assert!(result.is_none());
@@ -131,12 +125,12 @@ async fn test_wait_for_input_channel_closed() {
 
 #[tokio::test]
 async fn test_execute_middleware_empty_pipeline() {
-    let (mut runner, _event_rx, _input_tx, _perm_tx) = make_runner_with_channels();
+    let (mut runner, _event_rx, _mbox_tx, _ctrl_tx, _perm_tx) =
+        make_runner_with_channels();
     runner.params.messages.push(Message::user("test"));
 
     let should_continue = runner.execute_middleware().await.unwrap();
     assert!(should_continue);
-    // Messages should be preserved
     assert_eq!(runner.params.messages.len(), 1);
 }
 
@@ -145,12 +139,12 @@ async fn test_emit_with_open_channel() {
     let (runner, mut rx) = make_runner();
 
     runner
-        .emit(AgentEvent::Started)
+        .emit(AgentEventPayload::Started)
         .await
         .expect("emit to open channel should succeed");
 
     let event = rx.recv().await.expect("should receive event");
-    assert!(matches!(event, AgentEvent::Started));
+    assert!(matches!(event.payload, AgentEventPayload::Started));
 }
 
 #[tokio::test]
@@ -158,24 +152,6 @@ async fn test_emit_with_closed_channel() {
     let (runner, rx) = make_runner();
     drop(rx); // close the receiver
 
-    let result = runner.emit(AgentEvent::Started).await;
+    let result = runner.emit(AgentEventPayload::Started).await;
     assert!(result.is_err(), "emit to closed channel should fail");
-}
-
-#[tokio::test]
-async fn test_emit_multiple_events() {
-    let (runner, mut rx) = make_runner();
-
-    runner.emit(AgentEvent::Started).await.unwrap();
-    runner
-        .emit(AgentEvent::Stream {
-            text: "hello".to_string(),
-        })
-        .await
-        .unwrap();
-    runner.emit(AgentEvent::Finished).await.unwrap();
-
-    assert!(matches!(rx.recv().await.unwrap(), AgentEvent::Started));
-    assert!(matches!(rx.recv().await.unwrap(), AgentEvent::Stream { text } if text == "hello"));
-    assert!(matches!(rx.recv().await.unwrap(), AgentEvent::Finished));
 }

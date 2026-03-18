@@ -1,5 +1,5 @@
 use loopagent_types::error::{LoopAgentError, ProviderError};
-use loopagent_types::provider::StreamChunk;
+use loopagent_types::provider::{StopReason, StreamChunk};
 
 /// Minimal re-implementation of parse_openai_event for integration tests.
 fn parse_event(data: &str) -> (Vec<Result<StreamChunk, LoopAgentError>>, InlineState) {
@@ -23,7 +23,7 @@ fn parse_with_state(
 
     if let Some(usage) = parsed.get("usage").filter(|u| !u.is_null())
         && let (Some(i), Some(o)) = (usage["prompt_tokens"].as_u64(), usage["completion_tokens"].as_u64()) {
-            chunks.push(Ok(StreamChunk::Usage { input_tokens: i as u32, output_tokens: o as u32 }));
+            chunks.push(Ok(StreamChunk::Usage { input_tokens: i as u32, output_tokens: o as u32, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 }));
         }
 
     let choices = match parsed["choices"].as_array() {
@@ -61,7 +61,7 @@ fn parse_with_state(
                 }
             }
             if finish_reason == Some("stop") {
-                chunks.push(Ok(StreamChunk::Done));
+                chunks.push(Ok(StreamChunk::Done { stop_reason: StopReason::EndTurn }));
             }
         }
     }
@@ -82,7 +82,7 @@ fn assert_text(chunk: &Result<StreamChunk, LoopAgentError>, expected: &str) {
 }
 
 fn assert_done(chunk: &Result<StreamChunk, LoopAgentError>) {
-    assert!(matches!(chunk, Ok(StreamChunk::Done)), "expected Done, got: {:?}", chunk);
+    assert!(matches!(chunk, Ok(StreamChunk::Done { .. })), "expected Done, got: {:?}", chunk);
 }
 
 #[test]
@@ -155,7 +155,7 @@ fn test_usage_stats() {
     let (chunks, _) = parse_event(r#"{"usage":{"prompt_tokens":150,"completion_tokens":42},"choices":[]}"#);
     assert_eq!(chunks.len(), 1);
     match &chunks[0] {
-        Ok(StreamChunk::Usage { input_tokens, output_tokens }) => {
+        Ok(StreamChunk::Usage { input_tokens, output_tokens, .. }) => {
             assert_eq!(*input_tokens, 150);
             assert_eq!(*output_tokens, 42);
         }

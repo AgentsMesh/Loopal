@@ -60,6 +60,11 @@ impl Kernel {
         &self.provider_registry
     }
 
+    /// Register an additional tool into the tool registry (before wrapping in Arc).
+    pub fn register_tool(&mut self, tool: Box<dyn loopagent_types::tool::Tool>) {
+        self.tool_registry.register(tool);
+    }
+
     /// Register an additional provider (useful for testing with mock providers).
     pub fn register_provider(&mut self, provider: Arc<dyn loopagent_types::provider::Provider>) {
         self.provider_registry.register(provider);

@@ -1,6 +1,6 @@
 use futures::stream::Stream;
 use loopagent_types::error::{LoopAgentError, ProviderError};
-use loopagent_types::provider::StreamChunk;
+use loopagent_types::provider::{StopReason, StreamChunk};
 use serde_json::{json, Value};
 use std::collections::VecDeque;
 use std::pin::Pin;
@@ -11,6 +11,7 @@ pub(crate) struct ToolUseAccumulator {
     current_tool_id: Option<String>,
     current_tool_name: Option<String>,
     json_fragments: String,
+    stop_reason: Option<StopReason>,
 }
 
 pub(crate) struct AnthropicStream {
@@ -121,10 +122,22 @@ pub(crate) fn parse_anthropic_event(
                 parsed["usage"]["input_tokens"].as_u64(),
                 parsed["usage"]["output_tokens"].as_u64(),
             ) {
+                let cache_creation = parsed["usage"]["cache_creation_input_tokens"]
+                    .as_u64().unwrap_or(0) as u32;
+                let cache_read = parsed["usage"]["cache_read_input_tokens"]
+                    .as_u64().unwrap_or(0) as u32;
                 chunks.push(Ok(StreamChunk::Usage {
                     input_tokens: input as u32,
                     output_tokens: output as u32,
+                    cache_creation_input_tokens: cache_creation,
+                    cache_read_input_tokens: cache_read,
                 }));
+            }
+            if let Some(reason) = parsed["delta"]["stop_reason"].as_str() {
+                state.stop_reason = match reason {
+                    "max_tokens" => Some(StopReason::MaxTokens),
+                    _ => Some(StopReason::EndTurn),
+                };
             }
         }
         "message_start" => {
@@ -132,14 +145,21 @@ pub(crate) fn parse_anthropic_event(
                 parsed["message"]["usage"]["input_tokens"].as_u64(),
                 parsed["message"]["usage"]["output_tokens"].as_u64(),
             ) {
+                let cache_creation = parsed["message"]["usage"]["cache_creation_input_tokens"]
+                    .as_u64().unwrap_or(0) as u32;
+                let cache_read = parsed["message"]["usage"]["cache_read_input_tokens"]
+                    .as_u64().unwrap_or(0) as u32;
                 chunks.push(Ok(StreamChunk::Usage {
                     input_tokens: input as u32,
                     output_tokens: output as u32,
+                    cache_creation_input_tokens: cache_creation,
+                    cache_read_input_tokens: cache_read,
                 }));
             }
         }
         "message_stop" => {
-            chunks.push(Ok(StreamChunk::Done));
+            let reason = state.stop_reason.take().unwrap_or(StopReason::EndTurn);
+            chunks.push(Ok(StreamChunk::Done { stop_reason: reason }));
         }
         _ => {}
     }

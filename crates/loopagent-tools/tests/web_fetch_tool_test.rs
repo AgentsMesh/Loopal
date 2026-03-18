@@ -7,6 +7,7 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext {
         cwd: cwd.to_path_buf(),
         session_id: "test".into(),
+        shared: None,
     }
 }
 
@@ -57,11 +58,14 @@ async fn test_web_fetch_invalid_url_returns_error() {
     let tool = WebFetchTool;
     let ctx = make_ctx(tmp.path());
 
-    // A URL that can't be connected to
+    // A URL with an unresolvable hostname (`.invalid` TLD is reserved by RFC 2606).
+    // Either the DNS lookup fails (Err) or the HTTP response is non-2xx (Ok with is_error).
     let result = tool
-        .execute(json!({"url": "http://0.0.0.0:1"}), &ctx)
+        .execute(json!({"url": "http://host.invalid:1/path"}), &ctx)
         .await;
 
-    // This should be an execution error (connection refused)
-    assert!(result.is_err());
+    match result {
+        Err(_) => {} // DNS/connection failure — expected on most systems
+        Ok(r) => assert!(r.is_error, "expected error result, got: {}", r.content),
+    }
 }

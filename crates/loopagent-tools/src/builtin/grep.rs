@@ -5,9 +5,15 @@ use loopagent_types::tool::{Tool, ToolContext, ToolResult};
 use regex::RegexBuilder;
 use serde_json::{json, Value};
 use std::path::PathBuf;
-use walkdir::WalkDir;
+
+use super::grep_search::{OutputMode, format_results, search_files};
 
 pub struct GrepTool;
+
+/// Default head_limit caps the number of output entries returned.
+const DEFAULT_HEAD_LIMIT: usize = 50;
+/// Absolute maximum matches collected during search.
+const MAX_TOTAL_MATCHES: usize = 500;
 
 #[async_trait]
 impl Tool for GrepTool {
@@ -16,7 +22,8 @@ impl Tool for GrepTool {
     }
 
     fn description(&self) -> &str {
-        "Search file contents using a regex pattern. Returns matching lines with file paths and line numbers."
+        "Search file contents using a regex pattern. \
+         Default output_mode is files_with_matches (file paths with match counts)."
     }
 
     fn parameters_schema(&self) -> Value {
@@ -35,6 +42,15 @@ impl Tool for GrepTool {
                 "include": {
                     "type": "string",
                     "description": "Glob pattern to filter files (e.g. \"*.rs\")"
+                },
+                "output_mode": {
+                    "type": "string",
+                    "enum": ["content", "files_with_matches", "count"],
+                    "description": "Output format (default: files_with_matches)"
+                },
+                "head_limit": {
+                    "type": "integer",
+                    "description": "Max output entries (default: 50)"
                 }
             }
         })
@@ -86,52 +102,16 @@ impl Tool for GrepTool {
             None => None,
         };
 
-        let mut results = Vec::new();
-        let max_results = 500;
+        let mode = OutputMode::from_str_opt(input["output_mode"].as_str())?;
+        let head_limit = input["head_limit"]
+            .as_u64()
+            .map(|n| n as usize)
+            .unwrap_or(DEFAULT_HEAD_LIMIT);
 
-        let entries: Vec<_> = if search_path.is_file() {
-            vec![search_path.clone()]
-        } else {
-            WalkDir::new(&search_path)
-                .follow_links(true)
-                .into_iter()
-                .filter_map(|e| e.ok())
-                .filter(|e| e.file_type().is_file())
-                .map(|e| e.into_path())
-                .collect()
-        };
-
-        'outer: for path in entries {
-            if let Some(ref glob_matcher) = include_glob
-                && let Some(name) = path.file_name()
-                    && !glob_matcher.is_match(name) {
-                        continue;
-                    }
-
-            // Skip binary files
-            let content = match std::fs::read_to_string(&path) {
-                Ok(c) => c,
-                Err(_) => continue,
-            };
-
-            for (line_num, line) in content.lines().enumerate() {
-                if re.is_match(line) {
-                    results.push(format!("{}:{}: {}", path.display(), line_num + 1, line));
-                    if results.len() >= max_results {
-                        break 'outer;
-                    }
-                }
-            }
-        }
-
-        if results.is_empty() {
-            Ok(ToolResult::success("No matches found."))
-        } else {
-            let mut output = results.join("\n");
-            if results.len() >= max_results {
-                output.push_str(&format!("\n... (truncated at {} matches)", max_results));
-            }
-            Ok(ToolResult::success(output))
-        }
+        let results = search_files(
+            &search_path, &re, include_glob.as_ref(), MAX_TOTAL_MATCHES,
+        );
+        let output = format_results(&results, mode, head_limit, MAX_TOTAL_MATCHES);
+        Ok(ToolResult::success(output))
     }
 }

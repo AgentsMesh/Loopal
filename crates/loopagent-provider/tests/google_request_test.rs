@@ -16,6 +16,7 @@ fn make_params(messages: Vec<Message>, tools: Vec<ToolDefinition>) -> ChatParams
         tools,
         max_tokens: 4096,
         temperature: None,
+        debug_dump_dir: None,
     }
 }
 

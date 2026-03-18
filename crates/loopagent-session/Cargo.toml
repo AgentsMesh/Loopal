@@ -1,0 +1,11 @@
+[package]
+name = "loopagent-session"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+loopagent-types = { workspace = true }
+indexmap = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+chrono = { workspace = true }

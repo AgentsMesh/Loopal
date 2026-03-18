@@ -1,8 +1,8 @@
 use loopagent_runtime::AgentMode;
 use loopagent_types::error::LoopAgentError;
-use loopagent_types::event::AgentEvent;
+use loopagent_types::event::AgentEventPayload;
 use loopagent_types::message::MessageRole;
-use loopagent_types::provider::StreamChunk;
+use loopagent_types::provider::{StopReason, StreamChunk};
 
 use super::{make_runner, make_runner_with_mock_provider};
 
@@ -54,12 +54,12 @@ async fn test_stream_llm_text_response() {
     let chunks = vec![
         Ok(StreamChunk::Text { text: "Hello ".to_string() }),
         Ok(StreamChunk::Text { text: "world!".to_string() }),
-        Ok(StreamChunk::Usage { input_tokens: 10, output_tokens: 5 }),
-        Ok(StreamChunk::Done),
+        Ok(StreamChunk::Usage { input_tokens: 10, output_tokens: 5, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 }),
+        Ok(StreamChunk::Done { stop_reason: StopReason::EndTurn }),
     ];
-    let (mut runner, mut event_rx, _input_tx) = make_runner_with_mock_provider(chunks);
+    let (mut runner, mut event_rx, _input_tx, _ctrl_tx) = make_runner_with_mock_provider(chunks);
 
-    let (text, tool_uses, stream_error) = runner.stream_llm().await.unwrap();
+    let (text, tool_uses, stream_error, _stop_reason) = runner.stream_llm().await.unwrap();
     assert_eq!(text, "Hello world!");
     assert!(tool_uses.is_empty());
     assert!(!stream_error);
@@ -70,8 +70,8 @@ async fn test_stream_llm_text_response() {
     // Drain events and verify
     let mut events = Vec::new();
     while let Ok(e) = event_rx.try_recv() { events.push(e); }
-    assert!(events.iter().any(|e| matches!(e, AgentEvent::Stream { text } if text == "Hello ")));
-    assert!(events.iter().any(|e| matches!(e, AgentEvent::TokenUsage { .. })));
+    assert!(events.iter().any(|e| matches!(e.payload, AgentEventPayload::Stream { ref text } if text == "Hello ")));
+    assert!(events.iter().any(|e| matches!(e.payload, AgentEventPayload::TokenUsage { .. })));
 }
 
 #[tokio::test]
@@ -83,12 +83,12 @@ async fn test_stream_llm_tool_use_response() {
             name: "Read".to_string(),
             input: serde_json::json!({"file_path": "/tmp/test.rs"}),
         }),
-        Ok(StreamChunk::Usage { input_tokens: 20, output_tokens: 10 }),
-        Ok(StreamChunk::Done),
+        Ok(StreamChunk::Usage { input_tokens: 20, output_tokens: 10, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 }),
+        Ok(StreamChunk::Done { stop_reason: StopReason::EndTurn }),
     ];
-    let (mut runner, _event_rx, _input_tx) = make_runner_with_mock_provider(chunks);
+    let (mut runner, _event_rx, _input_tx, _ctrl_tx) = make_runner_with_mock_provider(chunks);
 
-    let (text, tool_uses, stream_error) = runner.stream_llm().await.unwrap();
+    let (text, tool_uses, stream_error, _stop_reason) = runner.stream_llm().await.unwrap();
     assert_eq!(text, "Let me read.");
     assert_eq!(tool_uses.len(), 1);
     assert_eq!(tool_uses[0].0, "tc-1");
@@ -102,9 +102,9 @@ async fn test_stream_llm_error_in_stream() {
         Ok(StreamChunk::Text { text: "partial".to_string() }),
         Err(LoopAgentError::Provider(loopagent_types::error::ProviderError::StreamEnded)),
     ];
-    let (mut runner, _event_rx, _input_tx) = make_runner_with_mock_provider(chunks);
+    let (mut runner, _event_rx, _input_tx, _ctrl_tx) = make_runner_with_mock_provider(chunks);
 
-    let (text, tool_uses, stream_error) = runner.stream_llm().await.unwrap();
+    let (text, tool_uses, stream_error, _stop_reason) = runner.stream_llm().await.unwrap();
     assert_eq!(text, "partial");
     assert!(tool_uses.is_empty());
     assert!(stream_error);
@@ -114,9 +114,9 @@ async fn test_stream_llm_error_in_stream() {
 async fn test_stream_llm_empty_stream() {
     // Empty stream (no chunks at all) — tests the while loop body never executing
     let chunks = vec![];
-    let (mut runner, _event_rx, _input_tx) = make_runner_with_mock_provider(chunks);
+    let (mut runner, _event_rx, _input_tx, _ctrl_tx) = make_runner_with_mock_provider(chunks);
 
-    let (text, tool_uses, stream_error) = runner.stream_llm().await.unwrap();
+    let (text, tool_uses, stream_error, _stop_reason) = runner.stream_llm().await.unwrap();
     assert!(text.is_empty());
     assert!(tool_uses.is_empty());
     assert!(!stream_error);

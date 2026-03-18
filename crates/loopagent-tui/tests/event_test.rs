@@ -1,5 +1,5 @@
 use loopagent_tui::event::{AppEvent, EventHandler};
-use loopagent_types::event::AgentEvent;
+use loopagent_types::event::{AgentEvent, AgentEventPayload};
 use tokio::sync::mpsc;
 
 #[tokio::test]
@@ -24,7 +24,7 @@ async fn test_agent_events_come_through() {
     let mut handler = EventHandler::new(agent_rx);
 
     agent_tx
-        .send(AgentEvent::Started)
+        .send(AgentEvent::root(AgentEventPayload::Started))
         .await
         .expect("send should succeed");
 
@@ -34,7 +34,7 @@ async fn test_agent_events_come_through() {
         .expect("channel should not be closed");
 
     match event {
-        AppEvent::Agent(AgentEvent::Started) => {} // expected
+        AppEvent::Agent(e) => assert!(matches!(e.payload, AgentEventPayload::Started)),
         other => panic!("expected Agent(Started), got {:?}", other),
     }
 }
@@ -45,9 +45,9 @@ async fn test_agent_stream_event_forwarded() {
     let mut handler = EventHandler::new(agent_rx);
 
     agent_tx
-        .send(AgentEvent::Stream {
+        .send(AgentEvent::root(AgentEventPayload::Stream {
             text: "hello".to_string(),
-        })
+        }))
         .await
         .expect("send should succeed");
 
@@ -57,9 +57,10 @@ async fn test_agent_stream_event_forwarded() {
         .expect("channel should not be closed");
 
     match event {
-        AppEvent::Agent(AgentEvent::Stream { text }) => {
-            assert_eq!(text, "hello");
-        }
+        AppEvent::Agent(e) => match e.payload {
+            AgentEventPayload::Stream { text } => assert_eq!(text, "hello"),
+            other => panic!("expected Stream, got {:?}", other),
+        },
         other => panic!("expected Agent(Stream), got {:?}", other),
     }
 }
@@ -93,7 +94,7 @@ async fn test_dropping_sender_closes_agent_forwarding() {
     let mut handler = EventHandler::new(agent_rx);
 
     agent_tx
-        .send(AgentEvent::Finished)
+        .send(AgentEvent::root(AgentEventPayload::Finished))
         .await
         .expect("send should succeed");
     drop(agent_tx);
@@ -102,7 +103,9 @@ async fn test_dropping_sender_closes_agent_forwarding() {
     let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(2);
     while tokio::time::Instant::now() < deadline {
         match tokio::time::timeout(std::time::Duration::from_millis(300), handler.next()).await {
-            Ok(Some(AppEvent::Agent(AgentEvent::Finished))) => {
+            Ok(Some(AppEvent::Agent(e)))
+                if matches!(e.payload, AgentEventPayload::Finished) =>
+            {
                 got_finished = true;
                 break;
             }
@@ -120,17 +123,20 @@ async fn test_multiple_agent_events_ordering() {
     let (agent_tx, agent_rx) = mpsc::channel::<AgentEvent>(16);
     let mut handler = EventHandler::new(agent_rx);
 
-    agent_tx.send(AgentEvent::Started).await.unwrap();
     agent_tx
-        .send(AgentEvent::Stream {
-            text: "first".to_string(),
-        })
+        .send(AgentEvent::root(AgentEventPayload::Started))
         .await
         .unwrap();
     agent_tx
-        .send(AgentEvent::Stream {
+        .send(AgentEvent::root(AgentEventPayload::Stream {
+            text: "first".to_string(),
+        }))
+        .await
+        .unwrap();
+    agent_tx
+        .send(AgentEvent::root(AgentEventPayload::Stream {
             text: "second".to_string(),
-        })
+        }))
         .await
         .unwrap();
 
@@ -145,7 +151,7 @@ async fn test_multiple_agent_events_ordering() {
     }
 
     assert_eq!(agent_events.len(), 3, "should receive all 3 agent events");
-    assert!(matches!(agent_events[0], AgentEvent::Started));
-    assert!(matches!(&agent_events[1], AgentEvent::Stream { text } if text == "first"));
-    assert!(matches!(&agent_events[2], AgentEvent::Stream { text } if text == "second"));
+    assert!(matches!(agent_events[0].payload, AgentEventPayload::Started));
+    assert!(matches!(&agent_events[1].payload, AgentEventPayload::Stream { text } if text == "first"));
+    assert!(matches!(&agent_events[2].payload, AgentEventPayload::Stream { text } if text == "second"));
 }

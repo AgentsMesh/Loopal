@@ -7,6 +7,7 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext {
         cwd: cwd.to_path_buf(),
         session_id: "test".into(),
+        shared: None,
     }
 }
 
@@ -39,6 +40,7 @@ fn test_glob_parameters_schema() {
     assert!(required.contains(&json!("pattern")));
     assert!(schema["properties"]["pattern"].is_object());
     assert!(schema["properties"]["path"].is_object());
+    assert!(schema["properties"]["offset"].is_object());
 }
 
 #[tokio::test]

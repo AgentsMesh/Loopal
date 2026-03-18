@@ -40,7 +40,7 @@ impl Default for Settings {
         Self {
             model: "claude-sonnet-4-20250514".to_string(),
             max_turns: 50,
-            permission_mode: PermissionMode::BypassPermissions,
+            permission_mode: PermissionMode::Bypass,
             max_context_tokens: 200_000,
             max_cost: None,
             providers: ProvidersConfig::default(),

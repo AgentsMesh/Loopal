@@ -2,6 +2,7 @@ pub mod app;
 pub mod command;
 pub mod event;
 pub mod input;
+pub mod markdown;
 pub mod render;
 mod slash_handler;
 pub mod terminal;

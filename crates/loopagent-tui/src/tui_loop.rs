@@ -1,66 +1,54 @@
 use std::io;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use ratatui::prelude::*;
+
+use loopagent_agent::router::MessageRouter;
+use loopagent_session::SessionController;
+use loopagent_types::command::AgentMode;
+use loopagent_types::envelope::{Envelope, MessageSource};
+use loopagent_types::event::AgentEvent;
 use tokio::sync::mpsc;
 
-use crate::app::{App, AppState};
+use crate::app::App;
 use crate::command::CommandEntry;
 use crate::event::{AppEvent, EventHandler};
 use crate::input::{InputAction, handle_key};
 use crate::render::draw;
 use crate::slash_handler::handle_slash_command;
 use crate::terminal::TerminalGuard;
-use loopagent_types::command::{AgentMode, UserCommand};
-use loopagent_types::event::AgentEvent;
 
 /// Run the TUI event loop.
 ///
-/// * `model` - model name to display
-/// * `mode` - initial mode ("act" or "plan")
-/// * `agent_event_rx` - receives events from the agent runtime
-/// * `user_input_tx` - sends user input text to the runtime
-/// * `permission_tx` - sends tool permission decisions (id, approved) to the runtime
+/// The TUI owns the `router` for sending user messages (data plane)
+/// and `session` for observation and control (observation + control planes).
 pub async fn run_tui(
-    model: String,
-    mode: String,
+    session: SessionController,
+    router: Arc<MessageRouter>,
+    target_agent: String,
     commands: Vec<CommandEntry>,
     cwd: PathBuf,
     agent_event_rx: mpsc::Receiver<AgentEvent>,
-    user_input_tx: mpsc::Sender<UserCommand>,
-    permission_tx: mpsc::Sender<(String, bool)>,
 ) -> anyhow::Result<()> {
-    // Setup terminal — guard ensures cleanup even on panic or early return
     let _guard = TerminalGuard::new()?;
     let stdout = io::stdout();
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    // Create a dummy event_tx (the App needs one but we forward via user_input_tx)
-    let (event_tx, _event_rx) = mpsc::channel::<AgentEvent>(16);
-
-    let mut app = App::new(model, mode, event_tx, commands, cwd);
+    let mut app = App::new(session, commands, cwd);
     let mut events = EventHandler::new(agent_event_rx);
 
-    // Initial draw
-    terminal.draw(|f| draw(f, &app))?;
+    terminal.draw(|f| draw(f, &mut app))?;
 
-    // Main loop: batch-process all pending events, then draw once.
-    // This avoids re-drawing for every single Stream text chunk,
-    // which would throttle event consumption and cause back-pressure.
     loop {
-        // Block until at least one event arrives
-        let Some(first) = events.next().await else {
-            break;
-        };
+        let Some(first) = events.next().await else { break; };
 
-        // Collect first event + drain all already-queued events
         let mut batch = vec![first];
         while let Some(event) = events.try_next() {
             batch.push(event);
         }
 
-        // Process all events
         let mut should_quit = false;
         for event in batch {
             match event {
@@ -68,53 +56,42 @@ pub async fn run_tui(
                     let action = handle_key(&mut app, key);
                     match action {
                         InputAction::Quit => {
-                            app.state = AppState::Exiting;
+                            app.exiting = true;
                             should_quit = true;
                             break;
                         }
-                        InputAction::Submit(text) => {
-                            let _ = user_input_tx.send(UserCommand::Message(text)).await;
-                        }
                         InputAction::InboxPush(text) => {
-                            app.push_to_inbox(text);
-                            if let Some(msg) = app.try_forward_inbox() {
-                                let _ =
-                                    user_input_tx.send(UserCommand::Message(msg)).await;
+                            app.input_history.push(text.clone());
+                            app.history_index = None;
+                            if let Some(msg) = app.session.enqueue_message(text) {
+                                route_human_message(&router, &target_agent, msg).await;
                             }
                         }
                         InputAction::ToolApprove => {
-                            if let AppState::ToolConfirm { ref id, .. } = app.state {
-                                let id = id.clone();
-                                app.state = AppState::Running;
-                                let _ = permission_tx.send((id, true)).await;
-                            }
+                            let has = app.session.lock().pending_permission.is_some();
+                            if has { app.session.approve_permission().await; }
                         }
                         InputAction::ToolDeny => {
-                            if let AppState::ToolConfirm { ref id, .. } = app.state {
-                                let id = id.clone();
-                                app.state = AppState::Running;
-                                let _ = permission_tx.send((id, false)).await;
-                            }
+                            let has = app.session.lock().pending_permission.is_some();
+                            if has { app.session.deny_permission().await; }
                         }
                         InputAction::ModeSwitch(mode) => {
-                            app.mode = mode.clone();
-                            let new_mode = match mode.as_str() {
-                                "plan" => AgentMode::Plan,
-                                _ => AgentMode::Act,
-                            };
-                            let _ = user_input_tx.send(UserCommand::ModeSwitch(new_mode)).await;
+                            let m = if mode == "plan" { AgentMode::Plan } else { AgentMode::Act };
+                            app.session.switch_mode(m).await;
                         }
                         InputAction::SlashCommand(cmd) => {
-                            handle_slash_command(&mut app, cmd, &user_input_tx).await;
+                            handle_slash_command(&mut app, cmd).await;
+                        }
+                        InputAction::FocusNextAgent => { cycle_focus(&app); }
+                        InputAction::UnfocusAgent => {
+                            app.session.lock().focused_agent = None;
                         }
                         InputAction::None => {}
                     }
                 }
                 AppEvent::Agent(agent_event) => {
-                    app.handle_agent_event(agent_event);
-                    // AwaitingInput sets agent_idle=true — try forwarding queued Inbox messages
-                    if let Some(msg) = app.try_forward_inbox() {
-                        let _ = user_input_tx.send(UserCommand::Message(msg)).await;
+                    if let Some(msg) = app.session.handle_event(agent_event) {
+                        route_human_message(&router, &target_agent, msg).await;
                     }
                 }
                 AppEvent::Mouse(mouse) => {
@@ -134,16 +111,39 @@ pub async fn run_tui(
             }
         }
 
-        if should_quit || app.state == AppState::Exiting {
-            break;
-        }
-
-        // Single draw after processing all batched events
-        terminal.draw(|f| draw(f, &app))?;
+        if should_quit || app.exiting { break; }
+        terminal.draw(|f| draw(f, &mut app))?;
     }
 
-    // Explicit cleanup (guard will also clean up in Drop as a safety net)
     terminal.show_cursor()?;
-
     Ok(())
+}
+
+/// Route a human message through the data plane.
+async fn route_human_message(router: &MessageRouter, target: &str, text: String) {
+    let envelope = Envelope::new(MessageSource::Human, target, text);
+    if let Err(e) = router.route(envelope).await {
+        tracing::warn!(error = %e, "failed to route human message — agent may have exited");
+    }
+}
+
+/// Cycle focused_agent to the next agent in the agents map.
+fn cycle_focus(app: &App) {
+    let mut state = app.session.lock();
+    let keys: Vec<String> = state.agents.keys().cloned().collect();
+    if keys.is_empty() {
+        state.focused_agent = None;
+        return;
+    }
+    let next = match &state.focused_agent {
+        None => keys[0].clone(),
+        Some(current) => {
+            let pos = keys.iter().position(|k| k == current);
+            match pos {
+                Some(i) if i + 1 < keys.len() => keys[i + 1].clone(),
+                _ => keys[0].clone(),
+            }
+        }
+    };
+    state.focused_agent = Some(next);
 }

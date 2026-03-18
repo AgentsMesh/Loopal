@@ -1,6 +1,6 @@
 use futures::stream::Stream;
 use loopagent_types::error::{LoopAgentError, ProviderError};
-use loopagent_types::provider::StreamChunk;
+use loopagent_types::provider::{StopReason, StreamChunk};
 use serde_json::{json, Value};
 use std::collections::VecDeque;
 use std::pin::Pin;
@@ -75,6 +75,8 @@ pub(crate) fn parse_openai_event(
             chunks.push(Ok(StreamChunk::Usage {
                 input_tokens: input as u32,
                 output_tokens: output as u32,
+                cache_creation_input_tokens: 0,
+                cache_read_input_tokens: 0,
             }));
         }
 
@@ -123,15 +125,22 @@ pub(crate) fn parse_openai_event(
         }
 
         // On finish, emit accumulated tool calls
-        if finish_reason == Some("tool_calls") || finish_reason == Some("stop") {
+        if finish_reason == Some("tool_calls") || finish_reason == Some("stop")
+            || finish_reason == Some("length")
+        {
             for (id, name, args) in state.calls.drain(..) {
                 if !id.is_empty() && !name.is_empty() {
                     let input: Value = serde_json::from_str(&args).unwrap_or(json!({}));
                     chunks.push(Ok(StreamChunk::ToolUse { id, name, input }));
                 }
             }
-            if finish_reason == Some("stop") {
-                chunks.push(Ok(StreamChunk::Done));
+            if finish_reason == Some("stop") || finish_reason == Some("length") {
+                let stop_reason = if finish_reason == Some("length") {
+                    StopReason::MaxTokens
+                } else {
+                    StopReason::EndTurn
+                };
+                chunks.push(Ok(StreamChunk::Done { stop_reason }));
             }
         }
     }

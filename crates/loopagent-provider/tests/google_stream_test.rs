@@ -1,5 +1,5 @@
 use loopagent_types::error::{LoopAgentError, ProviderError};
-use loopagent_types::provider::StreamChunk;
+use loopagent_types::provider::{StopReason, StreamChunk};
 
 /// Minimal re-implementation of parse_google_event for integration tests.
 fn parse_event(data: &str) -> Vec<Result<StreamChunk, LoopAgentError>> {
@@ -16,7 +16,7 @@ fn parse_event(data: &str) -> Vec<Result<StreamChunk, LoopAgentError>> {
         let input = usage["promptTokenCount"].as_u64().unwrap_or(0) as u32;
         let output = usage["candidatesTokenCount"].as_u64().unwrap_or(0) as u32;
         if input > 0 || output > 0 {
-            chunks.push(Ok(StreamChunk::Usage { input_tokens: input, output_tokens: output }));
+            chunks.push(Ok(StreamChunk::Usage { input_tokens: input, output_tokens: output, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 }));
         }
     }
 
@@ -43,7 +43,7 @@ fn parse_event(data: &str) -> Vec<Result<StreamChunk, LoopAgentError>> {
             }
 
             if finish_reason == Some("STOP") || finish_reason == Some("MAX_TOKENS") {
-                chunks.push(Ok(StreamChunk::Done));
+                chunks.push(Ok(StreamChunk::Done { stop_reason: StopReason::EndTurn }));
             }
         }
     }
@@ -59,7 +59,7 @@ fn assert_text(chunk: &Result<StreamChunk, LoopAgentError>, expected: &str) {
 }
 
 fn assert_done(chunk: &Result<StreamChunk, LoopAgentError>) {
-    assert!(matches!(chunk, Ok(StreamChunk::Done)), "expected Done, got: {:?}", chunk);
+    assert!(matches!(chunk, Ok(StreamChunk::Done { .. })), "expected Done, got: {:?}", chunk);
 }
 
 #[test]
@@ -106,7 +106,7 @@ fn test_usage_metadata() {
     let chunks = parse_event(r#"{"usageMetadata":{"promptTokenCount":500,"candidatesTokenCount":120}}"#);
     assert_eq!(chunks.len(), 1);
     match &chunks[0] {
-        Ok(StreamChunk::Usage { input_tokens, output_tokens }) => {
+        Ok(StreamChunk::Usage { input_tokens, output_tokens, .. }) => {
             assert_eq!(*input_tokens, 500);
             assert_eq!(*output_tokens, 120);
         }
@@ -163,7 +163,7 @@ fn test_usage_metadata_partial() {
     let chunks = parse_event(r#"{"usageMetadata":{"promptTokenCount":50,"candidatesTokenCount":0}}"#);
     assert_eq!(chunks.len(), 1);
     match &chunks[0] {
-        Ok(StreamChunk::Usage { input_tokens, output_tokens }) => {
+        Ok(StreamChunk::Usage { input_tokens, output_tokens, .. }) => {
             assert_eq!(*input_tokens, 50);
             assert_eq!(*output_tokens, 0);
         }

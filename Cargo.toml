@@ -18,6 +18,8 @@ members = [
     "crates/loopagent-context",
     "crates/loopagent-kernel",
     "crates/loopagent-runtime",
+    "crates/loopagent-agent",
+    "crates/loopagent-session",
     "crates/loopagent-tui",
 ]
 
@@ -49,7 +51,7 @@ eventsource-stream = "0.2"
 clap = { version = "4", features = ["derive"] }
 
 # TUI
-ratatui = "0.29"
+ratatui = { version = "0.30", features = ["crossterm"] }
 crossterm = "0.28"
 
 # File operations
@@ -62,12 +64,19 @@ rmcp = { version = "0.1", features = ["client", "transport-child-process"] }
 
 # Utilities
 dirs = "6"
-uuid = { version = "1", features = ["v4"] }
+indexmap = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
+tokio-util = "0.7"
 pin-project-lite = "0.2"
+unicode-width = "0.2"
+textwrap = { version = "0.16", default-features = true }
+pulldown-cmark = { version = "0.12", default-features = false }
+syntect = { version = "5", default-features = false, features = ["default-fancy"] }
+two-face = "0.5"
 wiremock = "0.6"
 
 # Workspace crates
@@ -81,6 +90,8 @@ loopagent-hooks = { path = "crates/loopagent-hooks" }
 loopagent-context = { path = "crates/loopagent-context" }
 loopagent-kernel = { path = "crates/loopagent-kernel" }
 loopagent-runtime = { path = "crates/loopagent-runtime" }
+loopagent-agent = { path = "crates/loopagent-agent" }
+loopagent-session = { path = "crates/loopagent-session" }
 loopagent-tui = { path = "crates/loopagent-tui" }
 
 [[bin]]
@@ -98,6 +109,8 @@ loopagent-hooks = { workspace = true }
 loopagent-context = { workspace = true }
 loopagent-kernel = { workspace = true }
 loopagent-runtime = { workspace = true }
+loopagent-agent = { workspace = true }
+loopagent-session = { workspace = true }
 loopagent-tui = { workspace = true }
 tokio = { workspace = true }
 clap = { workspace = true }

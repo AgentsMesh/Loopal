@@ -16,7 +16,7 @@ fn test_settings_default_max_turns() {
 #[test]
 fn test_settings_default_permission_mode() {
     let settings = Settings::default();
-    assert_eq!(settings.permission_mode, PermissionMode::BypassPermissions);
+    assert_eq!(settings.permission_mode, PermissionMode::Bypass);
 }
 
 #[test]
@@ -73,7 +73,7 @@ fn test_settings_serde_partial_override() {
     assert_eq!(settings.model, "gpt-4");
     assert_eq!(settings.max_turns, 100);
     // Remaining fields should be defaults
-    assert_eq!(settings.permission_mode, PermissionMode::BypassPermissions);
+    assert_eq!(settings.permission_mode, PermissionMode::Bypass);
     assert_eq!(settings.max_context_tokens, 200_000);
 }
 

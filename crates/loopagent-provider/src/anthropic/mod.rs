@@ -1,21 +1,27 @@
+mod request;
 mod stream;
 
 use async_trait::async_trait;
 use loopagent_types::error::{LoopAgentError, ProviderError};
-use loopagent_types::message::{ContentBlock, MessageRole};
 use loopagent_types::provider::{ChatParams, ChatStream, Provider};
 use reqwest::Client;
-use serde_json::{json, Value};
+use serde_json::json;
 use std::collections::VecDeque;
 use std::time::Duration;
+use tokio::sync::Semaphore;
 
 use crate::sse::SseStream;
 use stream::ToolUseAccumulator;
+
+/// Maximum concurrent API requests to avoid overwhelming the upstream proxy/API.
+const MAX_CONCURRENT_REQUESTS: usize = 3;
 
 pub struct AnthropicProvider {
     client: Client,
     api_key: String,
     base_url: String,
+    /// Limits concurrent in-flight requests across all agents sharing this provider.
+    request_semaphore: Semaphore,
 }
 
 impl AnthropicProvider {
@@ -29,81 +35,13 @@ impl AnthropicProvider {
             client,
             api_key,
             base_url: "https://api.anthropic.com".to_string(),
+            request_semaphore: Semaphore::new(MAX_CONCURRENT_REQUESTS),
         }
     }
 
     pub fn with_base_url(mut self, base_url: String) -> Self {
         self.base_url = base_url;
         self
-    }
-
-    pub fn build_messages(&self, params: &ChatParams) -> Vec<Value> {
-        params
-            .messages
-            .iter()
-            .filter(|m| m.role != MessageRole::System)
-            .map(|msg| {
-                let role = match msg.role {
-                    MessageRole::User => "user",
-                    MessageRole::Assistant => "assistant",
-                    MessageRole::System => unreachable!(),
-                };
-
-                let content: Vec<Value> = msg
-                    .content
-                    .iter()
-                    .map(|block| match block {
-                        ContentBlock::Text { text } => json!({
-                            "type": "text",
-                            "text": text
-                        }),
-                        ContentBlock::ToolUse { id, name, input } => json!({
-                            "type": "tool_use",
-                            "id": id,
-                            "name": name,
-                            "input": input
-                        }),
-                        ContentBlock::ToolResult {
-                            tool_use_id,
-                            content,
-                            is_error,
-                        } => json!({
-                            "type": "tool_result",
-                            "tool_use_id": tool_use_id,
-                            "content": content,
-                            "is_error": is_error
-                        }),
-                        ContentBlock::Image { source } => json!({
-                            "type": "image",
-                            "source": {
-                                "type": source.source_type,
-                                "media_type": source.media_type,
-                                "data": source.data
-                            }
-                        }),
-                    })
-                    .collect();
-
-                json!({
-                    "role": role,
-                    "content": content
-                })
-            })
-            .collect()
-    }
-
-    pub fn build_tools(&self, params: &ChatParams) -> Vec<Value> {
-        params
-            .tools
-            .iter()
-            .map(|tool| {
-                json!({
-                    "name": tool.name,
-                    "description": tool.description,
-                    "input_schema": tool.input_schema
-                })
-            })
-            .collect()
     }
 }
 
@@ -114,7 +52,24 @@ impl Provider for AnthropicProvider {
     }
 
     async fn stream_chat(&self, params: &ChatParams) -> Result<ChatStream, LoopAgentError> {
-        // Normalize messages: filter system messages and merge consecutive same-role
+        // Acquire permit before sending — blocks if too many concurrent requests.
+        let _permit = self.request_semaphore.acquire().await
+            .map_err(|_| ProviderError::Http("request semaphore closed".into()))?;
+
+        let stream = self.do_stream_chat(params).await?;
+
+        // Permit is dropped here, but the SSE stream continues reading.
+        // This is intentional: we only gate the initial HTTP request, not the full stream lifetime.
+        Ok(stream)
+    }
+}
+
+impl AnthropicProvider {
+    /// Inner implementation of stream_chat, called after acquiring the semaphore permit.
+    async fn do_stream_chat(
+        &self,
+        params: &ChatParams,
+    ) -> Result<ChatStream, LoopAgentError> {
         let normalized = loopagent_types::message_normalize::normalize_messages(&params.messages);
         let normalized_params = ChatParams {
             messages: normalized,
@@ -131,7 +86,11 @@ impl Provider for AnthropicProvider {
         });
 
         if !params.system_prompt.is_empty() {
-            body["system"] = json!(params.system_prompt);
+            body["system"] = json!([{
+                "type": "text",
+                "text": params.system_prompt,
+                "cache_control": {"type": "ephemeral"}
+            }]);
         }
         if !tools.is_empty() {
             body["tools"] = json!(tools);
@@ -146,6 +105,7 @@ impl Provider for AnthropicProvider {
             messages = params.messages.len(),
             tools = params.tools.len(),
             max_tokens = params.max_tokens,
+            body_bytes = body.to_string().len(),
             "API request"
         );
 
@@ -163,28 +123,18 @@ impl Provider for AnthropicProvider {
         let status = response.status();
         tracing::info!(status = status.as_u16(), "API response");
         if !status.is_success() {
-            // Detect rate limiting (429)
-            if status.as_u16() == 429 {
-                let retry_after_ms = response
-                    .headers()
-                    .get("retry-after")
-                    .and_then(|v| v.to_str().ok())
-                    .and_then(|s| s.parse::<f64>().ok())
-                    .map(|secs| (secs * 1000.0) as u64)
-                    .unwrap_or(30_000);
-                tracing::warn!(retry_after_ms, "rate limited by API");
-                return Err(ProviderError::RateLimited { retry_after_ms }.into());
+            // Dump request body on error for diagnosis
+            if let Some(ref dump_dir) = params.debug_dump_dir {
+                let _ = std::fs::create_dir_all(dump_dir);
+                let ts = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_millis())
+                    .unwrap_or(0);
+                let path = dump_dir.join(format!("api_error_{status}_{ts}.json"));
+                let _ = std::fs::write(&path, body.to_string());
+                tracing::warn!(path = %path.display(), "dumped failed request body");
             }
-            let text = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "failed to read body".into());
-            tracing::error!(status = status.as_u16(), body = %text, "API error");
-            return Err(ProviderError::Api {
-                status: status.as_u16(),
-                message: text,
-            }
-            .into());
+            return Err(self.handle_error_response(response, status).await);
         }
 
         let sse = SseStream::from_response(response);
@@ -194,5 +144,46 @@ impl Provider for AnthropicProvider {
             buffer: VecDeque::new(),
         };
         Ok(Box::pin(stream))
+    }
+
+    async fn handle_error_response(
+        &self,
+        response: reqwest::Response,
+        status: reqwest::StatusCode,
+    ) -> LoopAgentError {
+        if status.as_u16() == 429 {
+            let retry_after_ms = response
+                .headers()
+                .get("retry-after")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|s| s.parse::<f64>().ok())
+                .map(|secs| (secs * 1000.0) as u64)
+                .unwrap_or(30_000);
+            tracing::warn!(retry_after_ms, "rate limited by API");
+            return ProviderError::RateLimited { retry_after_ms }.into();
+        }
+        let text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "failed to read body".into());
+        tracing::error!(status = status.as_u16(), body = %text, "API error");
+
+        // Detect context overflow: 400 + known prompt-too-long patterns
+        if status.as_u16() == 400
+            && (text.contains("prompt is too long")
+                || text.contains("maximum context length")
+                || text.contains("invalid_request_error"))
+        {
+            return ProviderError::ContextOverflow {
+                message: text,
+            }
+            .into();
+        }
+
+        ProviderError::Api {
+            status: status.as_u16(),
+            message: text,
+        }
+        .into()
     }
 }

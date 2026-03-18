@@ -14,6 +14,7 @@ fn test_chat_params() -> ChatParams {
         tools: vec![],
         max_tokens: 100,
         temperature: None,
+        debug_dump_dir: None,
     }
 }
 
@@ -59,7 +60,7 @@ data: {\"type\":\"message_stop\"}\n\n";
     for chunk in &chunks {
         match chunk {
             Ok(StreamChunk::Text { text }) if text == "OK" => got_text = true,
-            Ok(StreamChunk::Done) => got_done = true,
+            Ok(StreamChunk::Done { .. }) => got_done = true,
             _ => {} // parse errors from empty data are acceptable
         }
     }

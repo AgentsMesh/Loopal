@@ -80,7 +80,11 @@ impl Middleware for SmartCompact {
                     ContentBlock::ToolResult { content, is_error, .. } => {
                         let status = if *is_error { "error" } else { "ok" };
                         let preview = if content.len() > 200 {
-                            format!("{}...[truncated]", &content[..200])
+                            let mut end = 200;
+                            while end > 0 && !content.is_char_boundary(end) {
+                                end -= 1;
+                            }
+                            format!("{}...[truncated]", &content[..end])
                         } else {
                             content.clone()
                         };
@@ -107,6 +111,7 @@ impl Middleware for SmartCompact {
             tools: vec![],
             max_tokens: 1024,
             temperature: Some(0.0),
+            debug_dump_dir: None,
         };
 
         // Stream the summary response
@@ -116,7 +121,7 @@ impl Middleware for SmartCompact {
                 while let Some(chunk) = stream.next().await {
                     match chunk {
                         Ok(StreamChunk::Text { text }) => summary_text.push_str(&text),
-                        Ok(StreamChunk::Done) => break,
+                        Ok(StreamChunk::Done { .. }) => break,
                         Err(e) => {
                             tracing::warn!(error = %e, "summarization stream error, falling back to truncation");
                             compact_messages(&mut ctx.messages, self.keep_last);

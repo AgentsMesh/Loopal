@@ -16,6 +16,7 @@ fn temp_file(name: &str, content: &str) -> (std::path::PathBuf, ToolContext) {
     let ctx = ToolContext {
         cwd: tmp_dir,
         session_id: format!("test-{name}"),
+        shared: None,
     };
     (path, ctx)
 }

@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use crate::error::LoopAgentError;
 use crate::permission::PermissionLevel;
@@ -25,6 +26,8 @@ pub struct ToolContext {
     pub cwd: PathBuf,
     /// Session ID
     pub session_id: String,
+    /// Opaque shared state passed to tools — tools downcast via `Any`.
+    pub shared: Option<Arc<dyn std::any::Any + Send + Sync>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

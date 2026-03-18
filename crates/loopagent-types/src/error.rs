@@ -49,6 +49,9 @@ pub enum ProviderError {
 
     #[error("Stream ended unexpectedly")]
     StreamEnded,
+
+    #[error("Context overflow: {message}")]
+    ContextOverflow { message: String },
 }
 
 #[derive(Debug, Error)]
@@ -119,10 +122,64 @@ pub enum McpError {
 
 pub type Result<T> = std::result::Result<T, LoopAgentError>;
 
+/// Why the agent loop terminated.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TerminateReason {
+    /// Agent completed its task (called AttemptCompletion or natural finish).
+    Goal,
+    /// LLM or system error.
+    Error,
+    /// Reached max_turns limit.
+    MaxTurns,
+    /// Cancelled by parent or user.
+    Aborted,
+}
+
+/// Structured output from an agent loop execution.
+#[derive(Debug, Clone)]
+pub struct AgentOutput {
+    /// Best-effort result text (may be non-empty even on Error/MaxTurns).
+    pub result: String,
+    /// Why the loop stopped.
+    pub terminate_reason: TerminateReason,
+}
+
 impl ProviderError {
     /// Check if this is a rate limit error
     pub fn is_rate_limited(&self) -> bool {
         matches!(self, ProviderError::RateLimited { .. })
+    }
+
+    /// Check if this error is retryable (rate limit, server errors, etc.)
+    pub fn is_retryable(&self) -> bool {
+        match self {
+            ProviderError::RateLimited { .. } => true,
+            ProviderError::Api { status, message } => {
+                // 400 with context overflow keywords is deterministic — never retryable
+                if *status == 400
+                    && (message.contains("invalid_request_error")
+                        || message.contains("prompt is too long")
+                        || message.contains("maximum context length"))
+                {
+                    return false;
+                }
+                matches!(status, 429 | 500 | 502 | 503 | 529)
+            }
+            ProviderError::ContextOverflow { .. } => false,
+            _ => false,
+        }
+    }
+
+    /// Check if this error indicates the prompt exceeded the model's context window.
+    pub fn is_context_overflow(&self) -> bool {
+        match self {
+            ProviderError::ContextOverflow { .. } => true,
+            ProviderError::Api { status, message } if *status == 400 => {
+                message.contains("prompt is too long")
+                    || message.contains("maximum context length")
+            }
+            _ => false,
+        }
     }
 
     /// Get the retry-after duration in milliseconds, if this is a rate limit error
@@ -140,6 +197,11 @@ impl LoopAgentError {
         matches!(self, LoopAgentError::Provider(ProviderError::RateLimited { .. }))
     }
 
+    /// Check if this error is retryable (rate limit, server errors, etc.)
+    pub fn is_retryable(&self) -> bool {
+        matches!(self, LoopAgentError::Provider(e) if e.is_retryable())
+    }
+
     /// Get the retry-after duration in milliseconds, if this is a rate limit error
     pub fn retry_after_ms(&self) -> Option<u64> {
         match self {
@@ -148,5 +210,10 @@ impl LoopAgentError {
             }
             _ => None,
         }
+    }
+
+    /// Check if this error indicates the prompt exceeded the model's context window.
+    pub fn is_context_overflow(&self) -> bool {
+        matches!(self, LoopAgentError::Provider(e) if e.is_context_overflow())
     }
 }

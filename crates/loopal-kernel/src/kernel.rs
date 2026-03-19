@@ -7,6 +7,7 @@ use loopal_tools::ToolRegistry;
 use loopal_types::config::Settings;
 use loopal_types::error::Result;
 use loopal_types::hook::HookEvent;
+use loopal_types::sandbox::ResolvedPolicy;
 use loopal_types::tool::ToolDefinition;
 use tokio::sync::RwLock;
 use tracing::info;
@@ -19,6 +20,7 @@ pub struct Kernel {
     hook_registry: HookRegistry,
     mcp_manager: Arc<RwLock<McpManager>>,
     settings: Settings,
+    sandbox_policy: Option<ResolvedPolicy>,
 }
 
 impl Kernel {
@@ -45,6 +47,7 @@ impl Kernel {
             hook_registry,
             mcp_manager,
             settings,
+            sandbox_policy: None,
         })
     }
 
@@ -83,6 +86,33 @@ impl Kernel {
     /// Access settings
     pub fn settings(&self) -> &Settings {
         &self.settings
+    }
+
+    /// Initialize sandbox policy and wrap all registered tools with the decorator.
+    pub fn init_sandbox(&mut self, cwd: &std::path::Path) {
+        use loopal_types::sandbox::SandboxPolicy;
+        if self.settings.sandbox.policy != SandboxPolicy::Disabled {
+            let resolved = loopal_sandbox::resolve_policy(
+                &self.settings.sandbox,
+                cwd,
+            );
+            info!(
+                policy = ?resolved.policy,
+                writable_paths = resolved.writable_paths.len(),
+                "sandbox initialized"
+            );
+            // Wrap all tools (builtins + MCP) with the sandbox decorator
+            let policy = resolved.clone();
+            self.tool_registry.wrap_all(move |inner| {
+                Box::new(loopal_sandbox::SandboxedTool::new(inner, policy.clone()))
+            });
+            self.sandbox_policy = Some(resolved);
+        }
+    }
+
+    /// Get the resolved sandbox policy, if sandboxing is enabled.
+    pub fn sandbox_policy(&self) -> Option<&ResolvedPolicy> {
+        self.sandbox_policy.as_ref()
     }
 
     // --- Convenience methods ---

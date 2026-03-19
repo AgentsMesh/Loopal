@@ -18,6 +18,7 @@ members = [
     "crates/loopal-context",
     "crates/loopal-kernel",
     "crates/loopal-runtime",
+    "crates/loopal-sandbox",
     "crates/loopal-agent",
     "crates/loopal-session",
     "crates/loopal-tui",
@@ -90,6 +91,7 @@ loopal-hooks = { path = "crates/loopal-hooks" }
 loopal-context = { path = "crates/loopal-context" }
 loopal-kernel = { path = "crates/loopal-kernel" }
 loopal-runtime = { path = "crates/loopal-runtime" }
+loopal-sandbox = { path = "crates/loopal-sandbox" }
 loopal-agent = { path = "crates/loopal-agent" }
 loopal-session = { path = "crates/loopal-session" }
 loopal-tui = { path = "crates/loopal-tui" }

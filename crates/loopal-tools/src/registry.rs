@@ -30,6 +30,16 @@ impl ToolRegistry {
         self.tools.values().map(|t| t.as_ref()).collect()
     }
 
+    /// Wrap every registered tool with a decorator function.
+    /// Used by sandbox to wrap all tools in `SandboxedTool`.
+    pub fn wrap_all(&mut self, wrapper: impl Fn(Box<dyn Tool>) -> Box<dyn Tool>) {
+        let old = std::mem::take(&mut self.tools);
+        for (name, tool) in old {
+            let wrapped = wrapper(tool);
+            self.tools.insert(name, wrapped);
+        }
+    }
+
     /// Convert all tools to definitions suitable for sending to an LLM.
     pub fn to_definitions(&self) -> Vec<ToolDefinition> {
         let mut defs: Vec<ToolDefinition> = self

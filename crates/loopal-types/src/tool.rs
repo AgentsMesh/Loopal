@@ -13,6 +13,12 @@ pub trait Tool: Send + Sync {
     fn parameters_schema(&self) -> serde_json::Value;
     fn permission(&self) -> PermissionLevel;
 
+    /// Pre-execution validation. Returns `Some(reason)` to block, `None` to allow.
+    /// Called before permission prompt. Default: always allow.
+    fn precheck(&self, _input: &serde_json::Value) -> Option<String> {
+        None
+    }
+
     async fn execute(
         &self,
         input: serde_json::Value,

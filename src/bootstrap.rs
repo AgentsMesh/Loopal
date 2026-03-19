@@ -43,6 +43,7 @@ pub async fn run() -> anyhow::Result<()> {
     // Build kernel — register agent tools before wrapping in Arc
     let mut kernel = Kernel::new(settings)?;
     kernel.start_mcp().await?;
+    kernel.init_sandbox(&cwd);
     loopal_agent::tools::register_all(&mut kernel);
     let kernel = Arc::new(kernel);
 
@@ -159,6 +160,9 @@ fn apply_cli_overrides(cli: &Cli, settings: &mut loopal_types::config::Settings)
             "bypass" | "yolo" => loopal_types::permission::PermissionMode::Bypass,
             _ => loopal_types::permission::PermissionMode::Supervised,
         };
+    }
+    if cli.no_sandbox {
+        settings.sandbox.policy = loopal_types::sandbox::SandboxPolicy::Disabled;
     }
 }
 

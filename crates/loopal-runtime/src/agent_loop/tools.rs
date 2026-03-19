@@ -16,18 +16,37 @@ use super::runner::AgentLoopRunner;
 
 impl AgentLoopRunner {
     /// Execute tool calls with parallel execution.
-    /// Phase 1: Sequential permission checks (requires user interaction).
+    /// Phase 1: Sandbox precheck + sequential permission checks.
     /// Phase 2: Parallel execution of approved tools via JoinSet.
     /// Returns `Some(result)` if AttemptCompletion was called, `None` otherwise.
     pub async fn execute_tools(
         &mut self,
         tool_uses: Vec<(String, String, serde_json::Value)>,
     ) -> Result<Option<String>> {
-        // Phase 1: Sequential permission checks
+        // Phase 1: Sandbox precheck then permission checks
         let mut approved: Vec<(String, String, serde_json::Value)> = Vec::new();
         let mut denied_results: Vec<(usize, ContentBlock)> = Vec::new();
 
         for (idx, (id, name, input)) in tool_uses.iter().enumerate() {
+            // Sandbox check via tool decorator — blocks before asking user
+            let precheck_reason = self.params.kernel
+                .get_tool(name)
+                .and_then(|tool| tool.precheck(input));
+
+            if let Some(reason) = precheck_reason {
+                info!(tool = name.as_str(), reason = %reason, "sandbox rejected");
+                denied_results.push((idx, ContentBlock::ToolResult {
+                    tool_use_id: id.clone(),
+                    content: format!("Sandbox: {reason}"),
+                    is_error: true,
+                }));
+                self.emit(AgentEventPayload::ToolResult {
+                    id: id.clone(), name: name.clone(),
+                    result: format!("Sandbox: {reason}"), is_error: true,
+                }).await?;
+                continue;
+            }
+
             let decision = self.check_permission(id, name, input).await?;
 
             if decision == PermissionDecision::Deny {
@@ -38,12 +57,9 @@ impl AgentLoopRunner {
                     is_error: true,
                 }));
                 self.emit(AgentEventPayload::ToolResult {
-                    id: id.clone(),
-                    name: name.clone(),
-                    result: "Permission denied".to_string(),
-                    is_error: true,
-                })
-                .await?;
+                    id: id.clone(), name: name.clone(),
+                    result: "Permission denied".to_string(), is_error: true,
+                }).await?;
             } else {
                 approved.push((id.clone(), name.clone(), input.clone()));
             }

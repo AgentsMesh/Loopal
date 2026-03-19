@@ -1521,6 +1521,7 @@ dependencies = [
  "loopal-hooks",
  "loopal-mcp",
  "loopal-provider",
+ "loopal-sandbox",
  "loopal-tools",
  "loopal-types",
  "thiserror 2.0.18",
@@ -1580,6 +1581,23 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+]
+
+[[package]]
+name = "loopal-sandbox"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "globset",
+ "loopal-types",
+ "regex",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "walkdir",
 ]
 
 [[package]]

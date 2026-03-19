@@ -13,5 +13,6 @@ pub mod message_normalize;
 pub mod middleware;
 pub mod permission;
 pub mod provider;
+pub mod sandbox;
 pub mod tool;
 pub mod truncate;

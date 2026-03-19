@@ -1,0 +1,19 @@
+[package]
+name = "loopal-sandbox"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+loopal-types = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+globset = { workspace = true }
+regex = { workspace = true }
+walkdir = { workspace = true }
+async-trait = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

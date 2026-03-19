@@ -52,6 +52,10 @@ fn apply_env_overrides(value: &mut serde_json::Value) {
     if let Ok(mode) = std::env::var("LOOPAL_PERMISSION_MODE") {
         value["permission_mode"] = serde_json::Value::String(mode);
     }
+
+    if let Ok(sandbox) = std::env::var("LOOPAL_SANDBOX") {
+        value["sandbox"]["policy"] = serde_json::Value::String(sandbox);
+    }
 }
 
 /// Load settings with 5-layer merge:

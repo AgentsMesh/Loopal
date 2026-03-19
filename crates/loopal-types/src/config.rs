@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::hook::HookConfig;
 use crate::permission::PermissionMode;
+use crate::sandbox::SandboxConfig;
 
 /// Application settings (merged from 5 layers)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,6 +34,10 @@ pub struct Settings {
     /// MCP server configurations
     #[serde(default)]
     pub mcp_servers: Vec<McpServerConfig>,
+
+    /// Sandbox configuration
+    #[serde(default)]
+    pub sandbox: SandboxConfig,
 }
 
 impl Default for Settings {
@@ -46,6 +51,7 @@ impl Default for Settings {
             providers: ProvidersConfig::default(),
             hooks: Vec::new(),
             mcp_servers: Vec::new(),
+            sandbox: SandboxConfig::default(),
         }
     }
 }

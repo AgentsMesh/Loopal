@@ -19,6 +19,10 @@ pub struct Cli {
     #[arg(long)]
     pub plan: bool,
 
+    /// Disable sandbox enforcement
+    #[arg(long)]
+    pub no_sandbox: bool,
+
     /// Initial prompt (non-interactive)
     pub prompt: Vec<String>,
 }

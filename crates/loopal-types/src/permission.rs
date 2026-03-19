@@ -13,12 +13,15 @@ pub enum PermissionLevel {
 
 /// Permission mode set by user.
 ///
-/// Two modes only — agent work-mode (Plan/Act) is separate from permission policy.
+/// Two modes only — controls user interaction policy.
+/// Sandbox enforcement is a separate, orthogonal layer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PermissionMode {
     /// All tools auto-allowed, no approval needed.
+    /// Sandbox still blocks dangerous operations.
     Bypass,
     /// ReadOnly auto-allowed; Supervised and Dangerous require human approval.
+    /// Sandbox checks run first; denied operations never reach the user prompt.
     Supervised,
 }
 

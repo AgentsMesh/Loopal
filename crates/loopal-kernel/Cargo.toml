@@ -10,6 +10,7 @@ loopal-provider = { workspace = true }
 loopal-hooks = { workspace = true }
 loopal-mcp = { workspace = true }
 loopal-config = { workspace = true }
+loopal-sandbox = { workspace = true }
 tokio = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

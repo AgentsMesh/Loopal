@@ -8,6 +8,7 @@ const KNOWN_KEYS: &[&str] = &[
     "providers",
     "hooks",
     "mcp_servers",
+    "sandbox",
 ];
 
 /// Log warnings for any unrecognised top-level keys in the merged config.

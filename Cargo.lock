@@ -639,9 +639,9 @@ dependencies = [
 
 [[package]]
 name = "euclid"
-version = "0.22.13"
+version = "0.22.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df61bf483e837f88d5c2291dcf55c67be7e676b3a51acc48db3a7b163b91ed63"
+checksum = "f1a05365e3b1c6d1650318537c7460c6923f1abdd272ad6842baa2b509957a06"
 dependencies = [
  "num-traits",
 ]
@@ -1266,9 +1266,9 @@ dependencies = [
 
 [[package]]
 name = "instability"
-version = "0.3.11"
+version = "0.3.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "357b7205c6cd18dd2c86ed312d1e70add149aea98e7ef72b9fdf0270e555c11d"
+checksum = "5eb2d60ef19920a3a9193c3e371f726ec1dafc045dac788d0fb3704272458971"
 dependencies = [
  "darling",
  "indoc",
@@ -1426,26 +1426,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 
 [[package]]
-name = "loopagent"
+name = "loopal"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
  "clap",
  "dirs",
- "loopagent-agent",
- "loopagent-config",
- "loopagent-context",
- "loopagent-hooks",
- "loopagent-kernel",
- "loopagent-mcp",
- "loopagent-provider",
- "loopagent-runtime",
- "loopagent-session",
- "loopagent-storage",
- "loopagent-tools",
- "loopagent-tui",
- "loopagent-types",
+ "loopal-agent",
+ "loopal-config",
+ "loopal-context",
+ "loopal-hooks",
+ "loopal-kernel",
+ "loopal-mcp",
+ "loopal-provider",
+ "loopal-runtime",
+ "loopal-session",
+ "loopal-storage",
+ "loopal-tools",
+ "loopal-tui",
+ "loopal-types",
  "tokio",
  "tracing",
  "tracing-appender",
@@ -1453,17 +1453,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "loopagent-agent"
+name = "loopal-agent"
 version = "0.1.0"
 dependencies = [
  "async-trait",
  "chrono",
- "loopagent-config",
- "loopagent-context",
- "loopagent-kernel",
- "loopagent-runtime",
- "loopagent-storage",
- "loopagent-types",
+ "loopal-config",
+ "loopal-context",
+ "loopal-kernel",
+ "loopal-runtime",
+ "loopal-storage",
+ "loopal-types",
  "serde",
  "serde_json",
  "tempfile",
@@ -1474,25 +1474,26 @@ dependencies = [
 ]
 
 [[package]]
-name = "loopagent-config"
+name = "loopal-config"
 version = "0.1.0"
 dependencies = [
  "dirs",
  "filetime",
- "loopagent-types",
+ "loopal-types",
  "serde",
  "serde_json",
  "tempfile",
  "thiserror 2.0.18",
+ "tracing",
 ]
 
 [[package]]
-name = "loopagent-context"
+name = "loopal-context"
 version = "0.1.0"
 dependencies = [
  "async-trait",
  "futures",
- "loopagent-types",
+ "loopal-types",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -1501,10 +1502,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "loopagent-hooks"
+name = "loopal-hooks"
 version = "0.1.0"
 dependencies = [
- "loopagent-types",
+ "loopal-types",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -1513,26 +1514,26 @@ dependencies = [
 ]
 
 [[package]]
-name = "loopagent-kernel"
+name = "loopal-kernel"
 version = "0.1.0"
 dependencies = [
- "loopagent-config",
- "loopagent-hooks",
- "loopagent-mcp",
- "loopagent-provider",
- "loopagent-tools",
- "loopagent-types",
+ "loopal-config",
+ "loopal-hooks",
+ "loopal-mcp",
+ "loopal-provider",
+ "loopal-tools",
+ "loopal-types",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
 ]
 
 [[package]]
-name = "loopagent-mcp"
+name = "loopal-mcp"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "loopagent-types",
+ "loopal-types",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -1541,13 +1542,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "loopagent-provider"
+name = "loopal-provider"
 version = "0.1.0"
 dependencies = [
  "async-trait",
  "eventsource-stream",
  "futures",
- "loopagent-types",
+ "loopal-types",
  "pin-project-lite",
  "reqwest",
  "serde",
@@ -1559,20 +1560,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "loopagent-runtime"
+name = "loopal-runtime"
 version = "0.1.0"
 dependencies = [
  "async-trait",
  "chrono",
  "futures",
- "loopagent-config",
- "loopagent-context",
- "loopagent-hooks",
- "loopagent-kernel",
- "loopagent-provider",
- "loopagent-storage",
- "loopagent-tools",
- "loopagent-types",
+ "loopal-config",
+ "loopal-context",
+ "loopal-hooks",
+ "loopal-kernel",
+ "loopal-provider",
+ "loopal-storage",
+ "loopal-types",
  "serde",
  "serde_json",
  "tempfile",
@@ -1583,23 +1583,23 @@ dependencies = [
 ]
 
 [[package]]
-name = "loopagent-session"
+name = "loopal-session"
 version = "0.1.0"
 dependencies = [
  "chrono",
  "indexmap",
- "loopagent-types",
+ "loopal-types",
  "serde_json",
  "tokio",
 ]
 
 [[package]]
-name = "loopagent-storage"
+name = "loopal-storage"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "loopagent-config",
- "loopagent-types",
+ "loopal-config",
+ "loopal-types",
  "serde",
  "serde_json",
  "tempfile",
@@ -1609,13 +1609,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "loopagent-tools"
+name = "loopal-tools"
 version = "0.1.0"
 dependencies = [
  "async-trait",
  "futures",
  "globset",
- "loopagent-types",
+ "loopal-types",
  "regex",
  "reqwest",
  "serde",
@@ -1628,18 +1628,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "loopagent-tui"
+name = "loopal-tui"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "crossterm 0.28.1",
  "indexmap",
- "loopagent-agent",
- "loopagent-config",
- "loopagent-provider",
- "loopagent-runtime",
- "loopagent-session",
- "loopagent-types",
+ "loopal-agent",
+ "loopal-config",
+ "loopal-provider",
+ "loopal-runtime",
+ "loopal-session",
+ "loopal-types",
  "pulldown-cmark",
  "ratatui",
  "serde_json",
@@ -1653,7 +1653,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "loopagent-types"
+name = "loopal-types"
 version = "0.1.0"
 dependencies = [
  "async-trait",
@@ -3268,9 +3268,9 @@ dependencies = [
 
 [[package]]
 name = "unicode-width"
-version = "0.2.0"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1fc81956842c57dac11422a97c3b8195a1ff727f06e85c84ed2e8aa277c9a0fd"
+checksum = "b4ac048d71ede7ee76d585517add45da530660ef4390e49b098733c6e897f254"
 
 [[package]]
 name = "unicode-xid"

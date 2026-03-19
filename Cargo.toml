@@ -1,5 +1,5 @@
 [package]
-name = "loopagent"
+name = "loopal"
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
@@ -8,19 +8,19 @@ license = "MIT"
 resolver = "2"
 members = [
     ".",
-    "crates/loopagent-types",
-    "crates/loopagent-config",
-    "crates/loopagent-storage",
-    "crates/loopagent-provider",
-    "crates/loopagent-tools",
-    "crates/loopagent-mcp",
-    "crates/loopagent-hooks",
-    "crates/loopagent-context",
-    "crates/loopagent-kernel",
-    "crates/loopagent-runtime",
-    "crates/loopagent-agent",
-    "crates/loopagent-session",
-    "crates/loopagent-tui",
+    "crates/loopal-types",
+    "crates/loopal-config",
+    "crates/loopal-storage",
+    "crates/loopal-provider",
+    "crates/loopal-tools",
+    "crates/loopal-mcp",
+    "crates/loopal-hooks",
+    "crates/loopal-context",
+    "crates/loopal-kernel",
+    "crates/loopal-runtime",
+    "crates/loopal-agent",
+    "crates/loopal-session",
+    "crates/loopal-tui",
 ]
 
 [workspace.package]
@@ -80,38 +80,38 @@ two-face = "0.5"
 wiremock = "0.6"
 
 # Workspace crates
-loopagent-types = { path = "crates/loopagent-types" }
-loopagent-config = { path = "crates/loopagent-config" }
-loopagent-storage = { path = "crates/loopagent-storage" }
-loopagent-provider = { path = "crates/loopagent-provider" }
-loopagent-tools = { path = "crates/loopagent-tools" }
-loopagent-mcp = { path = "crates/loopagent-mcp" }
-loopagent-hooks = { path = "crates/loopagent-hooks" }
-loopagent-context = { path = "crates/loopagent-context" }
-loopagent-kernel = { path = "crates/loopagent-kernel" }
-loopagent-runtime = { path = "crates/loopagent-runtime" }
-loopagent-agent = { path = "crates/loopagent-agent" }
-loopagent-session = { path = "crates/loopagent-session" }
-loopagent-tui = { path = "crates/loopagent-tui" }
+loopal-types = { path = "crates/loopal-types" }
+loopal-config = { path = "crates/loopal-config" }
+loopal-storage = { path = "crates/loopal-storage" }
+loopal-provider = { path = "crates/loopal-provider" }
+loopal-tools = { path = "crates/loopal-tools" }
+loopal-mcp = { path = "crates/loopal-mcp" }
+loopal-hooks = { path = "crates/loopal-hooks" }
+loopal-context = { path = "crates/loopal-context" }
+loopal-kernel = { path = "crates/loopal-kernel" }
+loopal-runtime = { path = "crates/loopal-runtime" }
+loopal-agent = { path = "crates/loopal-agent" }
+loopal-session = { path = "crates/loopal-session" }
+loopal-tui = { path = "crates/loopal-tui" }
 
 [[bin]]
-name = "loopagent"
+name = "loopal"
 path = "src/main.rs"
 
 [dependencies]
-loopagent-types = { workspace = true }
-loopagent-config = { workspace = true }
-loopagent-storage = { workspace = true }
-loopagent-provider = { workspace = true }
-loopagent-tools = { workspace = true }
-loopagent-mcp = { workspace = true }
-loopagent-hooks = { workspace = true }
-loopagent-context = { workspace = true }
-loopagent-kernel = { workspace = true }
-loopagent-runtime = { workspace = true }
-loopagent-agent = { workspace = true }
-loopagent-session = { workspace = true }
-loopagent-tui = { workspace = true }
+loopal-types = { workspace = true }
+loopal-config = { workspace = true }
+loopal-storage = { workspace = true }
+loopal-provider = { workspace = true }
+loopal-tools = { workspace = true }
+loopal-mcp = { workspace = true }
+loopal-hooks = { workspace = true }
+loopal-context = { workspace = true }
+loopal-kernel = { workspace = true }
+loopal-runtime = { workspace = true }
+loopal-agent = { workspace = true }
+loopal-session = { workspace = true }
+loopal-tui = { workspace = true }
 tokio = { workspace = true }
 clap = { workspace = true }
 tracing = { workspace = true }

@@ -8,29 +8,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 cargo check --workspace          # Fast compilation check
 cargo build                      # Debug build
 cargo test --workspace           # Run all tests
-cargo test -p loopagent-tui      # Run tests for a single crate
-cargo test -p loopagent-tui --test app_test  # Run a single test file
+cargo test -p loopal-tui      # Run tests for a single crate
+cargo test -p loopal-tui --test app_test  # Run a single test file
 cargo clippy --workspace --tests # Lint (must pass with zero warnings)
-LOOPAGENT_LOG=debug cargo run    # Run with debug logging
+LOOPAL_LOG=debug cargo run    # Run with debug logging
 ```
 
 ## Architecture
 
-LoopAgent is an AI coding agent with a TUI, structured as 11 Rust crates in a layered architecture. Data flows top-down; each layer only depends on layers below it.
+Loopal is an AI coding agent with a TUI, structured as 11 Rust crates in a layered architecture. Data flows top-down; each layer only depends on layers below it.
 
 ```
 src/main.rs (bootstrap + CLI)
-    ├─ loopagent-tui          Terminal UI (ratatui). Event loop, input handling, views.
-    ├─ loopagent-runtime      Agent loop engine. Orchestrates: input → middleware → LLM → tools → repeat.
-    ├─ loopagent-kernel       Central registry. Owns tool/provider/hook registries + MCP manager.
-    ├─ loopagent-context      Context pipeline. Middleware chain for message compaction/limits.
-    ├─ loopagent-provider     LLM providers (Anthropic, OpenAI, Google, OpenAI-compat). SSE streaming.
-    ├─ loopagent-tools        Built-in tools (Read, Write, Edit, Bash, Grep, Glob, Ls, WebFetch).
-    ├─ loopagent-mcp          Model Context Protocol client. Spawns MCP servers, discovers tools.
-    ├─ loopagent-hooks        Pre/post tool-use lifecycle hooks executed as shell commands.
-    ├─ loopagent-storage      Session + message persistence (~/.loopagent/sessions/).
-    ├─ loopagent-config       5-layer config merge: defaults → global → project → local → env vars.
-    └─ loopagent-types        Shared types: Message, AgentEvent, UserCommand, Tool/Provider/Middleware traits.
+    ├─ loopal-tui          Terminal UI (ratatui). Event loop, input handling, views.
+    ├─ loopal-runtime      Agent loop engine. Orchestrates: input → middleware → LLM → tools → repeat.
+    ├─ loopal-kernel       Central registry. Owns tool/provider/hook registries + MCP manager.
+    ├─ loopal-context      Context pipeline. Middleware chain for message compaction/limits.
+    ├─ loopal-provider     LLM providers (Anthropic, OpenAI, Google, OpenAI-compat). SSE streaming.
+    ├─ loopal-tools        Built-in tools (Read, Write, Edit, Bash, Grep, Glob, Ls, WebFetch).
+    ├─ loopal-mcp          Model Context Protocol client. Spawns MCP servers, discovers tools.
+    ├─ loopal-hooks        Pre/post tool-use lifecycle hooks executed as shell commands.
+    ├─ loopal-storage      Session + message persistence (~/.loopal/sessions/).
+    ├─ loopal-config       5-layer config merge: defaults → global → project → local → env vars.
+    └─ loopal-types        Shared types: Message, AgentEvent, UserCommand, Tool/Provider/Middleware traits.
 ```
 
 ### Key data flow
@@ -62,13 +62,13 @@ The TUI has an **Inbox queue** (`VecDeque<String>`) that buffers user messages w
 ## Configuration
 
 ```
-~/.loopagent/settings.json          Global settings
-~/.loopagent/LOOPAGENT.md           Global instructions (injected into system prompt)
-<project>/.loopagent/settings.json  Project settings
-<project>/.loopagent/settings.local.json  Local overrides (gitignored)
+~/.loopal/settings.json          Global settings
+~/.loopal/LOOPAL.md           Global instructions (injected into system prompt)
+<project>/.loopal/settings.json  Project settings
+<project>/.loopal/settings.local.json  Local overrides (gitignored)
 ```
 
-Environment variable overrides use `LOOPAGENT_` prefix. Key settings: `model` (default: `claude-sonnet-4-20250514`), `max_turns` (default: 50), `permission_mode`.
+Environment variable overrides use `LOOPAL_` prefix. Key settings: `model` (default: `claude-sonnet-4-20250514`), `max_turns` (default: 50), `permission_mode`.
 
 ## Code Conventions
 

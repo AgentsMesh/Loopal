@@ -1,0 +1,25 @@
+[package]
+name = "loopal-tui"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+loopal-types = { workspace = true }
+loopal-config = { workspace = true }
+loopal-runtime = { workspace = true }
+loopal-provider = { workspace = true }
+loopal-session = { workspace = true }
+loopal-agent = { workspace = true }
+ratatui = { workspace = true }
+crossterm = { workspace = true }
+tokio = { workspace = true }
+serde_json = { workspace = true }
+indexmap = { workspace = true }
+unicode-width = { workspace = true }
+textwrap = { workspace = true }
+pulldown-cmark = { workspace = true }
+syntect = { workspace = true }
+two-face = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }

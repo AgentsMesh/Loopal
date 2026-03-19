@@ -1,7 +1,7 @@
 use clap::Parser;
 
 #[derive(Parser)]
-#[command(name = "loopagent", about = "AI coding agent")]
+#[command(name = "loopal", about = "AI coding agent")]
 pub struct Cli {
     /// Model to use
     #[arg(short, long)]

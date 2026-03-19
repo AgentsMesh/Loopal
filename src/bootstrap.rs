@@ -3,22 +3,22 @@ use std::sync::Arc;
 use clap::Parser;
 use tokio::sync::mpsc;
 
-use loopagent_agent::registry::AgentRegistry;
-use loopagent_agent::router::MessageRouter;
-use loopagent_agent::shared::AgentShared;
-use loopagent_agent::task_store::TaskStore;
-use loopagent_config::{load_instructions, load_settings, load_skills};
-use loopagent_context::ContextPipeline;
-use loopagent_context::middleware::{ContextGuard, MessageSizeGuard, SmartCompact, TurnLimit};
-use loopagent_context::system_prompt::build_system_prompt;
-use loopagent_kernel::Kernel;
-use loopagent_runtime::{AgentLoopParams, AgentMode, SessionManager, UnifiedFrontend, agent_loop};
-use loopagent_runtime::frontend::tui_permission::TuiPermissionHandler;
-use loopagent_session::SessionController;
-use loopagent_tui::command::merge_commands;
-use loopagent_types::control::ControlCommand;
-use loopagent_types::envelope::Envelope;
-use loopagent_types::event::AgentEvent;
+use loopal_agent::registry::AgentRegistry;
+use loopal_agent::router::MessageRouter;
+use loopal_agent::shared::AgentShared;
+use loopal_agent::task_store::TaskStore;
+use loopal_config::{load_instructions, load_settings, load_skills};
+use loopal_context::ContextPipeline;
+use loopal_context::middleware::{ContextGuard, MessageSizeGuard, SmartCompact, TurnLimit};
+use loopal_context::system_prompt::build_system_prompt;
+use loopal_kernel::Kernel;
+use loopal_runtime::{AgentLoopParams, AgentMode, SessionManager, UnifiedFrontend, agent_loop};
+use loopal_runtime::frontend::tui_permission::TuiPermissionHandler;
+use loopal_session::SessionController;
+use loopal_tui::command::merge_commands;
+use loopal_types::control::ControlCommand;
+use loopal_types::envelope::Envelope;
+use loopal_types::event::AgentEvent;
 
 use crate::cli::Cli;
 
@@ -27,7 +27,7 @@ pub async fn run() -> anyhow::Result<()> {
     let cwd = std::env::current_dir()?;
 
     // Ensure directories exist and clean up expired volatile files
-    loopagent_config::housekeeping::startup_cleanup();
+    loopal_config::housekeeping::startup_cleanup();
 
     let mut settings = load_settings(&cwd)?;
     apply_cli_overrides(&cli, &mut settings);
@@ -43,7 +43,7 @@ pub async fn run() -> anyhow::Result<()> {
     // Build kernel — register agent tools before wrapping in Arc
     let mut kernel = Kernel::new(settings)?;
     kernel.start_mcp().await?;
-    loopagent_agent::tools::register_all(&mut kernel);
+    loopal_agent::tools::register_all(&mut kernel);
     let kernel = Arc::new(kernel);
 
     // Session management
@@ -55,7 +55,7 @@ pub async fn run() -> anyhow::Result<()> {
     };
 
     if !cli.prompt.is_empty() {
-        messages.push(loopagent_types::message::Message::user(&cli.prompt.join(" ")));
+        messages.push(loopal_types::message::Message::user(&cli.prompt.join(" ")));
     }
 
     // Observation channel — runtime → TUI
@@ -86,8 +86,8 @@ pub async fn run() -> anyhow::Result<()> {
     ));
 
     // Build shared agent state (homogeneous with sub-agents)
-    let tasks_dir = loopagent_config::session_tasks_dir(&session.id)
-        .unwrap_or_else(|_| std::env::temp_dir().join("loopagent/tasks"));
+    let tasks_dir = loopal_config::session_tasks_dir(&session.id)
+        .unwrap_or_else(|_| std::env::temp_dir().join("loopal/tasks"));
     let agent_shared = Arc::new(AgentShared {
         kernel: kernel.clone(),
         registry: Arc::new(tokio::sync::Mutex::new(AgentRegistry::new())),
@@ -142,7 +142,7 @@ pub async fn run() -> anyhow::Result<()> {
         }
     });
 
-    loopagent_tui::run_tui(
+    loopal_tui::run_tui(
         session_ctrl, router, "main".to_string(),
         commands, cwd, agent_event_rx,
     ).await?;
@@ -150,19 +150,19 @@ pub async fn run() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn apply_cli_overrides(cli: &Cli, settings: &mut loopagent_types::config::Settings) {
+fn apply_cli_overrides(cli: &Cli, settings: &mut loopal_types::config::Settings) {
     if let Some(model) = &cli.model {
         settings.model = model.clone();
     }
     if let Some(perm) = &cli.permission {
         settings.permission_mode = match perm.as_str() {
-            "bypass" | "yolo" => loopagent_types::permission::PermissionMode::Bypass,
-            _ => loopagent_types::permission::PermissionMode::Supervised,
+            "bypass" | "yolo" => loopal_types::permission::PermissionMode::Bypass,
+            _ => loopal_types::permission::PermissionMode::Supervised,
         };
     }
 }
 
-fn format_skills_summary(skills: &[loopagent_config::Skill]) -> String {
+fn format_skills_summary(skills: &[loopal_config::Skill]) -> String {
     if skills.is_empty() { return String::new(); }
     let mut s = String::from("# Available Skills\nUser can invoke these via /name:\n");
     for skill in skills {

@@ -1,0 +1,15 @@
+[package]
+name = "loopal-kernel"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+loopal-types = { workspace = true }
+loopal-tools = { workspace = true }
+loopal-provider = { workspace = true }
+loopal-hooks = { workspace = true }
+loopal-mcp = { workspace = true }
+loopal-config = { workspace = true }
+tokio = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }

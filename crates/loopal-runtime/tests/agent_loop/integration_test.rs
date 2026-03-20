@@ -133,24 +133,32 @@ async fn test_full_run_with_tool_execution() {
     ));
     std::fs::write(&tmp_file, "test content").unwrap();
 
-    let chunks = vec![
-        Ok(StreamChunk::ToolUse {
-            id: "tc-1".to_string(), name: "Read".to_string(),
-            input: serde_json::json!({"file_path": tmp_file.to_str().unwrap()}),
-        }),
-        Ok(StreamChunk::Usage {
-            input_tokens: 10, output_tokens: 5,
-            cache_creation_input_tokens: 0, cache_read_input_tokens: 0,
-        }),
-        Ok(StreamChunk::Done { stop_reason: StopReason::EndTurn }),
+    // Two LLM calls: first returns Read tool, second ends the turn with text.
+    let calls = vec![
+        vec![
+            Ok(StreamChunk::ToolUse {
+                id: "tc-1".to_string(), name: "Read".to_string(),
+                input: serde_json::json!({"file_path": tmp_file.to_str().unwrap()}),
+            }),
+            Ok(StreamChunk::Usage {
+                input_tokens: 10, output_tokens: 5,
+                cache_creation_input_tokens: 0, cache_read_input_tokens: 0,
+            }),
+            Ok(StreamChunk::Done { stop_reason: StopReason::EndTurn }),
+        ],
+        vec![
+            Ok(StreamChunk::Text { text: "Done.".to_string() }),
+            Ok(StreamChunk::Done { stop_reason: StopReason::EndTurn }),
+        ],
     ];
-    let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx) = make_runner_with_mock_provider(chunks);
-    runner.params.max_turns = 1;
+    let (mut runner, mut event_rx) = super::mock_provider::make_multi_runner(calls);
+    runner.params.max_turns = 5;
 
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 
     let result = runner.run().await;
     assert!(result.is_ok());
+    // user + assistant(tool_use) + user(tool_result) + assistant(text)
     assert!(runner.params.messages.len() >= 3);
 
     let _ = std::fs::remove_file(&tmp_file);

@@ -3,6 +3,7 @@ use loopal_error::LoopalError;
 use loopal_provider_api::{Middleware, MiddlewareContext};
 
 use crate::compaction::truncate_block_content;
+use crate::token_counter::estimate_message_tokens;
 
 /// Truncate any single message that exceeds 25% of the context window.
 /// Targets the largest ToolResult block within oversized messages.
@@ -24,7 +25,7 @@ impl Middleware for MessageSizeGuard {
         let mut truncated_count = 0u32;
 
         for msg in ctx.messages.iter_mut() {
-            let msg_tokens = msg.estimated_token_count();
+            let msg_tokens = estimate_message_tokens(msg);
             if msg_tokens <= threshold {
                 continue;
             }

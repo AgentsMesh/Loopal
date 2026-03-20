@@ -1,8 +1,8 @@
 use loopal_context::middleware::ContextGuard;
+use loopal_context::token_counter::estimate_message_tokens;
 use loopal_message::Message;
 use loopal_provider_api::{Middleware, MiddlewareContext};
 
-/// Helper to build a MiddlewareContext with given messages and max_context_tokens.
 fn make_ctx(messages: Vec<Message>, max_context_tokens: u32) -> MiddlewareContext {
     MiddlewareContext {
         messages,
@@ -15,15 +15,6 @@ fn make_ctx(messages: Vec<Message>, max_context_tokens: u32) -> MiddlewareContex
         summarization_provider: None,
     }
 }
-
-/// Generate a large message with `n` chars of text content.
-fn large_message(n: usize) -> Message {
-    Message::user(&"x".repeat(n))
-}
-
-// =============================================================================
-// ContextGuard tests
-// =============================================================================
 
 #[tokio::test]
 async fn context_guard_under_threshold_no_compaction() {
@@ -44,36 +35,27 @@ async fn context_guard_over_threshold_triggers_compaction() {
     let mw = ContextGuard;
     let mut messages = vec![Message::system("sys")];
     for _ in 0..20 {
-        messages.push(large_message(400));
+        messages.push(Message::user(&"x".repeat(400)));
     }
     let original_len = messages.len();
+    // Low limit ensures total tokens far exceed 80% threshold
     let mut ctx = make_ctx(messages, 100);
     mw.process(&mut ctx).await.unwrap();
     assert!(
         ctx.messages.len() < original_len,
-        "expected compaction to reduce messages from {} but got {}",
-        original_len,
+        "expected compaction from {original_len} but got {}",
         ctx.messages.len()
     );
 }
 
 #[tokio::test]
-async fn context_guard_exactly_at_threshold_no_compaction() {
+async fn context_guard_at_threshold_no_compaction() {
     let mw = ContextGuard;
-    // threshold = max_context_tokens * 0.8 = 1000 * 0.8 = 800
-    // N/4 + 4 = 800 => N = 3184
-    let messages = vec![Message::user(&"a".repeat(3184))];
-    let mut ctx = make_ctx(messages, 1000);
-    mw.process(&mut ctx).await.unwrap();
-    assert_eq!(ctx.messages.len(), 1);
-}
-
-#[tokio::test]
-async fn context_guard_just_below_threshold_no_compaction() {
-    let mw = ContextGuard;
-    // threshold = 800. N/4 + 4 = 799 => N = 3180
-    let messages = vec![Message::user(&"a".repeat(3180))];
-    let mut ctx = make_ctx(messages, 1000);
+    let msg = Message::user("hello world");
+    let msg_tokens = estimate_message_tokens(&msg);
+    // Set max so that msg_tokens is exactly at 80% threshold
+    let max_ctx = (msg_tokens as f64 / 0.8).ceil() as u32;
+    let mut ctx = make_ctx(vec![msg], max_ctx);
     mw.process(&mut ctx).await.unwrap();
     assert_eq!(ctx.messages.len(), 1);
 }
@@ -81,7 +63,7 @@ async fn context_guard_just_below_threshold_no_compaction() {
 #[tokio::test]
 async fn context_guard_just_above_threshold_triggers_compaction() {
     let mw = ContextGuard;
-    // 20 messages, each with text of length 200 => each ~54 tokens => total ~1080 > 800
+    // 20 messages each with enough text to exceed 80% of a small window
     let mut messages = vec![Message::system("s")];
     for _ in 0..20 {
         messages.push(Message::user(&"b".repeat(200)));
@@ -91,8 +73,7 @@ async fn context_guard_just_above_threshold_triggers_compaction() {
     mw.process(&mut ctx).await.unwrap();
     assert!(
         ctx.messages.len() < original_len,
-        "expected compaction above threshold, from {} to {}",
-        original_len,
+        "expected compaction above threshold, from {original_len} to {}",
         ctx.messages.len()
     );
 }

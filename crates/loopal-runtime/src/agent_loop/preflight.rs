@@ -1,6 +1,6 @@
 use loopal_context::compaction::{find_largest_tool_result, truncate_block_content};
 use loopal_context::compact_messages;
-use loopal_context::token_counter::estimate_messages_tokens;
+use loopal_context::token_counter::{estimate_messages_tokens, estimate_tokens};
 use tracing::{debug, info, warn};
 
 use super::runner::AgentLoopRunner;
@@ -19,7 +19,7 @@ impl AgentLoopRunner {
     /// Iteratively truncates the largest ToolResult blocks, then falls back to compact_messages.
     pub fn preflight_context_check(&mut self) {
         // Estimate overhead: system prompt + tool schemas (~2000 tokens heuristic)
-        let system_tokens = self.params.system_prompt.len() as u32 / 4;
+        let system_tokens = estimate_tokens(&self.params.system_prompt);
         let tool_overhead: u32 = 2000;
         let budget = (self.max_context_tokens as f64 * 0.95) as u32;
         let overhead = system_tokens + tool_overhead;

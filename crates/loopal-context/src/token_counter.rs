@@ -1,16 +1,37 @@
-use loopal_message::Message;
+use loopal_message::{ContentBlock, Message};
+use std::sync::LazyLock;
+use tiktoken_rs::CoreBPE;
 
-/// Estimate token count: roughly 1 token per 4 characters.
+/// Global BPE encoder singleton (cl100k_base, closest to Claude's tokenizer).
+static BPE: LazyLock<CoreBPE> = LazyLock::new(|| {
+    tiktoken_rs::cl100k_base().expect("failed to initialize cl100k_base BPE encoder")
+});
+
+/// Count tokens in a text string using BPE encoding.
 pub fn estimate_tokens(text: &str) -> u32 {
-    (text.len() as u32) / 4
+    if text.is_empty() {
+        return 0;
+    }
+    BPE.encode_with_special_tokens(text).len() as u32
 }
 
-/// Estimate total tokens across a slice of messages.
-/// Uses Message::estimated_token_count() which covers all ContentBlock variants
-/// (Text, ToolUse, ToolResult, Image), not just text content.
-pub fn estimate_messages_tokens(messages: &[Message]) -> u32 {
-    messages
+/// Count tokens for a single message across all content blocks.
+pub fn estimate_message_tokens(msg: &Message) -> u32 {
+    let content_tokens: u32 = msg
+        .content
         .iter()
-        .map(|m| m.estimated_token_count())
-        .sum()
+        .map(|block| match block {
+            ContentBlock::Text { text } => estimate_tokens(text),
+            ContentBlock::ToolUse { input, .. } => estimate_tokens(&input.to_string()),
+            ContentBlock::ToolResult { content, .. } => estimate_tokens(content),
+            ContentBlock::Image { .. } => 1000, // fixed estimate for images
+        })
+        .sum();
+    // +4 for role/message framing overhead
+    content_tokens + 4
+}
+
+/// Count total tokens across a slice of messages.
+pub fn estimate_messages_tokens(messages: &[Message]) -> u32 {
+    messages.iter().map(estimate_message_tokens).sum()
 }

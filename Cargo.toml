@@ -85,6 +85,7 @@ two-face = "0.5"
 wiremock = "0.6"
 html2text = "0.12"
 pdf-extract = "0.7"
+tiktoken-rs = "0.6"
 
 # Workspace crates
 loopal-error = { path = "crates/loopal-error" }

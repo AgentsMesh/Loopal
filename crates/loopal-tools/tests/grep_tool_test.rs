@@ -39,7 +39,7 @@ fn test_grep_parameters_schema() {
     assert!(required.contains(&json!("pattern")));
     assert!(schema["properties"]["pattern"].is_object());
     assert!(schema["properties"]["path"].is_object());
-    assert!(schema["properties"]["include"].is_object());
+    assert!(schema["properties"]["glob"].is_object());
     assert!(schema["properties"]["output_mode"].is_object());
     assert!(schema["properties"]["head_limit"].is_object());
 }
@@ -146,7 +146,7 @@ async fn test_grep_with_include_glob_filter() {
         .execute(
             json!({
                 "pattern": "hello",
-                "include": "*.rs",
+                "glob": "*.rs",
                 "output_mode": "content"
             }),
             &ctx,

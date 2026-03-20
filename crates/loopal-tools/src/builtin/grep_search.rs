@@ -1,16 +1,14 @@
+use std::{collections::BTreeSet, path::PathBuf};
+
 use loopal_error::LoopalError;
 use regex::Regex;
-use std::path::PathBuf;
 use walkdir::WalkDir;
 
 /// Output format for grep results.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OutputMode {
-    /// Show matching lines with file:line: prefix (classic grep output).
     Content,
-    /// Show only file paths that contain matches.
     FilesWithMatches,
-    /// Show only per-file match counts.
     Count,
 }
 
@@ -29,129 +27,170 @@ impl OutputMode {
     }
 }
 
-/// Collected grep results ready for formatting.
+/// Parameters controlling search behavior and output formatting.
+#[derive(Default)]
+pub struct SearchOptions {
+    pub context_before: usize,
+    pub context_after: usize,
+    pub multiline: bool,
+    pub type_extensions: Option<Vec<String>>,
+}
+
+/// A single line in search output, either a match or a context line.
+#[derive(Debug, Clone)]
+pub struct MatchLine {
+    pub line_num: usize,
+    pub content: String,
+    pub is_match: bool,
+}
+
+/// Collected grep results.
 pub struct GrepResults {
-    /// (file_path, Vec<(line_number, line_text)>)
-    pub file_matches: Vec<(PathBuf, Vec<(usize, String)>)>,
+    pub file_matches: Vec<(PathBuf, Vec<Vec<MatchLine>>)>,
     pub total_match_count: usize,
 }
 
-/// Walk files, apply glob filter, search with regex, collect results.
+/// Map a type name (e.g. "rust", "js") to file extensions.
+pub fn type_to_extensions(type_name: &str) -> Option<Vec<&'static str>> {
+    Some(match type_name {
+        "js" => vec!["js", "mjs", "cjs", "jsx"],
+        "ts" => vec!["ts", "tsx", "mts", "cts"],
+        "py" => vec!["py", "pyi"],
+        "rust" => vec!["rs"],
+        "go" => vec!["go"],
+        "java" => vec!["java"],
+        "c" => vec!["c", "h"],
+        "cpp" => vec!["cpp", "cc", "cxx", "hpp", "hh", "h"],
+        "rb" => vec!["rb"],
+        "php" => vec!["php"],
+        "swift" => vec!["swift"],
+        "kt" => vec!["kt", "kts"],
+        "md" => vec!["md", "markdown"],
+        "json" => vec!["json"],
+        "yaml" => vec!["yaml", "yml"],
+        "toml" => vec!["toml"],
+        "html" => vec!["html", "htm"],
+        "css" => vec!["css"],
+        _ => return None,
+    })
+}
+
+/// Walk files, apply glob/type filter, search with regex, collect results.
 pub fn search_files(
     search_path: &PathBuf,
     re: &Regex,
     include_glob: Option<&globset::GlobMatcher>,
     max_total_matches: usize,
+    opts: &SearchOptions,
 ) -> GrepResults {
-    let entries: Vec<PathBuf> = if search_path.is_file() {
-        vec![search_path.clone()]
-    } else {
-        WalkDir::new(search_path)
-            .follow_links(true)
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.file_type().is_file())
-            .map(|e| e.into_path())
-            .collect()
-    };
-
+    let entries = collect_file_entries(search_path);
     let mut file_matches = Vec::new();
     let mut total = 0;
 
-    'outer: for path in entries {
-        if let Some(glob_matcher) = include_glob
-            && let Some(name) = path.file_name()
-                && !glob_matcher.is_match(name) {
-                    continue;
-                }
-
-        let content = match std::fs::read_to_string(&path) {
-            Ok(c) => c,
-            Err(_) => continue,
-        };
-
-        let mut hits = Vec::new();
-        for (line_num, line) in content.lines().enumerate() {
-            if re.is_match(line) {
-                hits.push((line_num + 1, line.to_string()));
-                total += 1;
-                if total >= max_total_matches {
-                    file_matches.push((path, hits));
-                    break 'outer;
-                }
-            }
+    for path in entries {
+        if !matches_filters(&path, include_glob, opts.type_extensions.as_deref()) {
+            continue;
         }
-        if !hits.is_empty() {
-            file_matches.push((path, hits));
+        let Ok(content) = std::fs::read_to_string(&path) else { continue };
+        let lines: Vec<&str> = content.lines().collect();
+        let match_indices = find_match_indices(&content, &lines, re, opts.multiline);
+        if match_indices.is_empty() {
+            continue;
+        }
+        total += match_indices.len();
+        let groups =
+            collect_context_groups(&lines, &match_indices, opts.context_before, opts.context_after);
+        file_matches.push((path, groups));
+        if total >= max_total_matches {
+            break;
         }
     }
 
     GrepResults { file_matches, total_match_count: total }
 }
 
-/// Format results according to the requested output mode.
-pub fn format_results(
-    results: &GrepResults,
-    mode: OutputMode,
-    head_limit: usize,
-    max_total_matches: usize,
-) -> String {
-    if results.file_matches.is_empty() {
-        return "No matches found.".to_string();
+fn collect_file_entries(search_path: &PathBuf) -> Vec<PathBuf> {
+    if search_path.is_file() { return vec![search_path.clone()]; }
+    WalkDir::new(search_path)
+        .follow_links(true)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file())
+        .map(|e| e.into_path())
+        .collect()
+}
+
+fn matches_filters(
+    path: &std::path::Path,
+    include_glob: Option<&globset::GlobMatcher>,
+    type_exts: Option<&[String]>,
+) -> bool {
+    if let Some(glob_matcher) = include_glob
+        && let Some(name) = path.file_name()
+        && !glob_matcher.is_match(name)
+    {
+        return false;
     }
-
-    let mut output = String::new();
-    let mut emitted = 0;
-
-    match mode {
-        OutputMode::Content => {
-            for (path, hits) in &results.file_matches {
-                for (line_num, line) in hits {
-                    if emitted >= head_limit { break; }
-                    if emitted > 0 { output.push('\n'); }
-                    output.push_str(&format!("{}:{}:{}", path.display(), line_num, line));
-                    emitted += 1;
-                }
-                if emitted >= head_limit { break; }
-            }
-            if results.total_match_count > head_limit {
-                output.push_str(&format!(
-                    "\n\n(Showing {head_limit} of {} matches. \
-                     Use head_limit or narrow your pattern to see more.)",
-                    results.total_match_count
-                ));
-            }
-        }
-        OutputMode::FilesWithMatches => {
-            let mut file_counts: Vec<(&PathBuf, usize)> = results
-                .file_matches.iter().map(|(p, h)| (p, h.len())).collect();
-            file_counts.sort_by(|a, b| b.1.cmp(&a.1));
-            for (path, count) in &file_counts {
-                if emitted >= head_limit { break; }
-                if emitted > 0 { output.push('\n'); }
-                output.push_str(&format!("{}: {} matches", path.display(), count));
-                emitted += 1;
-            }
-            if results.file_matches.len() > head_limit {
-                output.push_str(&format!(
-                    "\n\n(Showing {head_limit} of {} files.)",
-                    results.file_matches.len()
-                ));
-            }
-        }
-        OutputMode::Count => {
-            let file_count = results.file_matches.len();
-            output = format!(
-                "{} matches across {} files",
-                results.total_match_count, file_count
-            );
+    if let Some(exts) = type_exts {
+        let file_ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if !exts.iter().any(|e| e == file_ext) {
+            return false;
         }
     }
+    true
+}
 
-    if results.total_match_count >= max_total_matches {
-        output.push_str(&format!(
-            "\n... (search stopped at {} matches)", max_total_matches
-        ));
+fn find_match_indices(
+    content: &str,
+    lines: &[&str],
+    re: &Regex,
+    multiline: bool,
+) -> BTreeSet<usize> {
+    let mut indices = BTreeSet::new();
+    if multiline {
+        for mat in re.find_iter(content) {
+            let start_line = content[..mat.start()].matches('\n').count();
+            let end_line = content[..mat.end()].matches('\n').count();
+            for idx in start_line..=end_line.min(lines.len().saturating_sub(1)) {
+                indices.insert(idx);
+            }
+        }
+    } else {
+        for (idx, line) in lines.iter().enumerate() {
+            if re.is_match(line) {
+                indices.insert(idx);
+            }
+        }
     }
-    output
+    indices
+}
+
+fn collect_context_groups(
+    lines: &[&str],
+    match_indices: &BTreeSet<usize>,
+    before: usize,
+    after: usize,
+) -> Vec<Vec<MatchLine>> {
+    let last = lines.len().saturating_sub(1);
+    let ranges: Vec<(usize, usize)> = match_indices
+        .iter()
+        .map(|&i| (i.saturating_sub(before), (i + after).min(last)))
+        .collect();
+
+    let mut merged: Vec<(usize, usize)> = Vec::new();
+    for r in ranges {
+        if let Some(prev) = merged.last_mut()
+            && r.0 <= prev.1 + 1
+        {
+            prev.1 = prev.1.max(r.1);
+            continue;
+        }
+        merged.push(r);
+    }
+
+    merged.iter().map(|&(start, end)| {
+        (start..=end).map(|i| MatchLine {
+            line_num: i + 1, content: lines[i].to_string(), is_match: match_indices.contains(&i),
+        }).collect()
+    }).collect()
 }

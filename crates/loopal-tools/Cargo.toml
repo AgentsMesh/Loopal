@@ -17,6 +17,8 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 reqwest = { workspace = true }
 futures = { workspace = true }
+html2text = { workspace = true }
+pdf-extract = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3"

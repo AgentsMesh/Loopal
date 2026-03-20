@@ -81,7 +81,7 @@ async fn test_grep_invalid_include_glob() {
         .execute(
             json!({
                 "pattern": "hello",
-                "include": "[invalid"
+                "glob": "[invalid"
             }),
             &ctx,
         )

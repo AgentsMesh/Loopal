@@ -126,6 +126,9 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
             flush_streaming(state);
             state.pending_question = Some(super::types::PendingQuestion::new(id, questions));
         }
+        AgentEventPayload::Rewound { remaining_turns } => {
+            crate::rewind::truncate_display_to_turn(state, remaining_turns);
+        }
     }
     None
 }

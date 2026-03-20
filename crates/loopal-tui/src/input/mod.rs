@@ -6,6 +6,7 @@ mod sub_page;
 pub use actions::*;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use std::time::Instant;
 
 use crate::app::App;
 use autocomplete::{handle_autocomplete_key, update_autocomplete};
@@ -162,7 +163,22 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> InputAction {
             }
             InputAction::None
         }
-        KeyCode::Esc => InputAction::None,
+        KeyCode::Esc => {
+            let now = Instant::now();
+            let is_idle = app.session.lock().agent_idle;
+            let is_empty = app.input.is_empty();
+            if is_idle && is_empty {
+                if let Some(last) = app.last_esc_time.take()
+                    && now.duration_since(last).as_millis() < 300
+                {
+                    return InputAction::SlashCommand(
+                        SlashCommandAction::RewindPicker,
+                    );
+                }
+                app.last_esc_time = Some(now);
+            }
+            InputAction::None
+        }
         KeyCode::PageUp => {
             app.scroll_offset = app.scroll_offset.saturating_add(10);
             InputAction::None

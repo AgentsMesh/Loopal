@@ -19,7 +19,6 @@ impl AgentLoopRunner {
             if self.params.messages.is_empty() {
                 if !self.params.interactive { break; }
                 match self.wait_for_input().await? {
-                    Some(WaitResult::Continue) => continue,
                     Some(WaitResult::MessageAdded) => {}
                     None => break,
                 }
@@ -52,7 +51,6 @@ impl AgentLoopRunner {
                         });
                     }
                     match self.wait_for_input().await? {
-                        Some(WaitResult::Continue) => continue,
                         Some(WaitResult::MessageAdded) => { self.turn_count += 1; }
                         None => break,
                     }
@@ -70,7 +68,6 @@ impl AgentLoopRunner {
                     }).await?;
                     match self.wait_for_input().await? {
                         Some(WaitResult::MessageAdded) => { self.turn_count += 1; continue; }
-                        Some(WaitResult::Continue) => continue,
                         None => break,
                     }
                 }

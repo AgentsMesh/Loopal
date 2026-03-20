@@ -52,5 +52,6 @@ pub(crate) fn apply_agent_event(
         AgentEventPayload::MessageRouted { .. } => {}
         AgentEventPayload::ToolPermissionRequest { .. } => {}
         AgentEventPayload::UserQuestionRequest { .. } => {}
+        AgentEventPayload::Rewound { .. } => {}
     }
 }

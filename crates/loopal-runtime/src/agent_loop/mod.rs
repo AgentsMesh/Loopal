@@ -4,6 +4,7 @@ mod llm_record;
 mod middleware;
 mod permission;
 mod preflight;
+pub mod rewind;
 mod run;
 mod runner;
 pub(crate) mod tool_exec;
@@ -70,10 +71,11 @@ pub(crate) fn compact_messages(messages: &mut Vec<Message>, keep_last: usize) {
     }
 }
 
-/// Result of waiting for user input
+/// Result of waiting for user input.
+///
+/// `wait_for_input` handles control commands (clear, compact, mode switch,
+/// rewind, etc.) internally — only a real user message exits the wait.
 pub enum WaitResult {
-    /// A mode switch occurred — caller should `continue` without consuming a turn
-    Continue,
     /// A user message was added to the conversation
     MessageAdded,
 }

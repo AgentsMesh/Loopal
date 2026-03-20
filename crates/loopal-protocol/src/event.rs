@@ -95,4 +95,7 @@ pub enum AgentEventPayload {
         id: String,
         questions: Vec<Question>,
     },
+
+    /// Conversation was rewound; remaining_turns is the count after truncation.
+    Rewound { remaining_turns: usize },
 }

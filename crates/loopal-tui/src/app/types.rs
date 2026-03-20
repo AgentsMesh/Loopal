@@ -65,4 +65,22 @@ impl PickerState {
 pub enum SubPage {
     /// Model picker — user selects from known models.
     ModelPicker(PickerState),
+    /// Rewind picker — user selects a turn to rewind to.
+    RewindPicker(RewindPickerState),
+}
+
+/// State for the rewind turn picker.
+pub struct RewindPickerState {
+    /// Available turns (most recent first for display).
+    pub turns: Vec<RewindTurnItem>,
+    /// Currently selected index within `turns`.
+    pub selected: usize,
+}
+
+/// A single turn entry in the rewind picker.
+pub struct RewindTurnItem {
+    /// Turn index in the runtime (0 = oldest).
+    pub turn_index: usize,
+    /// User message preview (truncated).
+    pub preview: String,
 }

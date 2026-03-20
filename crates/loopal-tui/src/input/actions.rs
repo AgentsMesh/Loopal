@@ -10,6 +10,10 @@ pub enum SlashCommandAction {
     ModelPicker,
     /// A model was selected from the picker.
     ModelSelected(String),
+    /// Open the rewind turn picker.
+    RewindPicker,
+    /// A turn was selected for rewind (turn_index from oldest = 0).
+    RewindConfirmed(usize),
 }
 
 /// Action resulting from input handling.

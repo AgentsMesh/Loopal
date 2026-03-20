@@ -75,3 +75,23 @@ fn message_without_id_omits_field() {
     // id should be skipped when None (skip_serializing_if on Message)
     assert!(!json.contains("\"id\""), "id should be skipped: {json}");
 }
+
+#[test]
+fn rewind_to_marker_roundtrip() {
+    let entry = TaggedEntry::Marker(Marker::RewindTo {
+        message_id: "msg-042".into(),
+        timestamp: "2025-08-01T10:00:00Z".into(),
+    });
+    let json = serde_json::to_string(&entry).unwrap();
+    assert!(json.contains("\"rewind_to\""));
+    assert!(json.contains("\"msg-042\""));
+
+    let decoded: TaggedEntry = serde_json::from_str(&json).unwrap();
+    match decoded {
+        TaggedEntry::Marker(Marker::RewindTo { message_id, timestamp }) => {
+            assert_eq!(message_id, "msg-042");
+            assert_eq!(timestamp, "2025-08-01T10:00:00Z");
+        }
+        other => panic!("expected RewindTo marker, got {other:?}"),
+    }
+}

@@ -34,3 +34,13 @@ fn test_control_command_clone() {
     let cloned = cmd.clone();
     assert!(matches!(cloned, ControlCommand::ModelSwitch(_)));
 }
+
+#[test]
+fn test_control_command_rewind() {
+    let cmd = ControlCommand::Rewind { turn_index: 3 };
+    if let ControlCommand::Rewind { turn_index } = cmd {
+        assert_eq!(turn_index, 3);
+    } else {
+        panic!("expected Rewind");
+    }
+}

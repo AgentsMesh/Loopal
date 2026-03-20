@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use loopal_protocol::ControlCommand;
 use loopal_protocol::Envelope;
@@ -95,7 +96,6 @@ async fn test_handle_control_clear_resets_state() {
     let (mut runner, mut event_rx, _mbox_tx, ctrl_tx, _perm_tx) =
         make_runner_with_channels();
 
-    // Seed some state to verify reset
     runner.params.messages.push(Message::user("msg1"));
     runner.params.messages.push(Message::user("msg2"));
     runner.turn_count = 5;
@@ -103,16 +103,16 @@ async fn test_handle_control_clear_resets_state() {
     runner.total_output_tokens = 500;
 
     ctrl_tx.send(ControlCommand::Clear).await.unwrap();
-    let result = runner.wait_for_input().await.unwrap();
-    assert!(result.is_some());
+    drop(ctrl_tx);
 
-    // State should be fully reset
+    // wait_for_input processes Clear then blocks on the open mailbox; timeout exits.
+    let _ = tokio::time::timeout(Duration::from_millis(100), runner.wait_for_input()).await;
+
     assert!(runner.params.messages.is_empty());
     assert_eq!(runner.turn_count, 0);
     assert_eq!(runner.total_input_tokens, 0);
     assert_eq!(runner.total_output_tokens, 0);
 
-    // Should emit AwaitingInput, then TokenUsage with zeroed counters
     let e1 = event_rx.recv().await.unwrap();
     assert!(matches!(e1.payload, AgentEventPayload::AwaitingInput));
     let e2 = event_rx.recv().await.unwrap();
@@ -126,18 +126,17 @@ async fn test_handle_control_compact_keeps_recent() {
     let (mut runner, _event_rx, _mbox_tx, ctrl_tx, _perm_tx) =
         make_runner_with_channels();
 
-    // Push 15 messages, compact should keep the most recent 10
     for i in 0..15 {
         runner.params.messages.push(Message::user(&format!("msg{i}")));
     }
     assert_eq!(runner.params.messages.len(), 15);
 
     ctrl_tx.send(ControlCommand::Compact).await.unwrap();
-    let result = runner.wait_for_input().await.unwrap();
-    assert!(result.is_some());
+    drop(ctrl_tx);
+
+    let _ = tokio::time::timeout(Duration::from_millis(100), runner.wait_for_input()).await;
 
     assert_eq!(runner.params.messages.len(), 10);
-    // First remaining message should be msg5 (oldest 5 drained)
     assert_eq!(runner.params.messages[0].text_content(), "msg5");
 }
 
@@ -152,8 +151,9 @@ async fn test_handle_control_model_switch_updates_model() {
         .send(ControlCommand::ModelSwitch("claude-opus-4-20250514".into()))
         .await
         .unwrap();
+    drop(ctrl_tx);
 
-    let result = runner.wait_for_input().await.unwrap();
-    assert!(result.is_some());
+    let _ = tokio::time::timeout(Duration::from_millis(100), runner.wait_for_input()).await;
+
     assert_eq!(runner.params.model, "claude-opus-4-20250514");
 }

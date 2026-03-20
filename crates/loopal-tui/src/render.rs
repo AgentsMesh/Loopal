@@ -66,6 +66,9 @@ pub fn draw(f: &mut Frame, app: &mut App) {
             SubPage::ModelPicker(picker) => {
                 views::picker::render_picker(f, picker, picker_area);
             }
+            SubPage::RewindPicker(state) => {
+                views::rewind_picker::render_rewind_picker(f, state, picker_area);
+            }
         }
 
         views::status_bar::render_status_bar(f, &state, status_area);

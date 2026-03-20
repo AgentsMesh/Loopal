@@ -18,4 +18,7 @@ pub enum ControlCommand {
     Compact,
     /// Switch to a different model at runtime.
     ModelSwitch(String),
+    /// Rewind conversation to a specific turn (0-indexed from oldest).
+    /// Discards the target turn and all subsequent messages.
+    Rewind { turn_index: usize },
 }

@@ -3,6 +3,7 @@ mod types;
 pub use types::*;
 
 use std::path::PathBuf;
+use std::time::Instant;
 
 use loopal_session::SessionController;
 
@@ -26,6 +27,8 @@ pub struct App {
     pub commands: Vec<CommandEntry>,
     /// Working directory, used to reload skills on demand.
     pub cwd: PathBuf,
+    /// Timestamp of the last ESC press (for double-ESC rewind trigger).
+    pub last_esc_time: Option<Instant>,
 
     // === Session Controller (observable + interactive) ===
     pub session: SessionController,
@@ -51,6 +54,7 @@ impl App {
             sub_page: None,
             commands,
             cwd,
+            last_esc_time: None,
             session,
             line_cache: LineCache::new(),
         }

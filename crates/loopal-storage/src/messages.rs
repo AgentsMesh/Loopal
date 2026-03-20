@@ -89,7 +89,7 @@ impl MessageStore {
         Ok(entries)
     }
 
-    /// Load messages for a session, replaying any markers (Clear/CompactTo).
+    /// Load messages for a session, replaying any markers (Clear/CompactTo/RewindTo).
     pub fn load_messages(
         &self,
         session_id: &str,

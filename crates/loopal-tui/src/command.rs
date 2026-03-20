@@ -28,6 +28,7 @@ fn all_commands() -> &'static [SlashCommand] {
         SlashCommand { name: "/clear", description: "Clear conversation history", has_arg: false },
         SlashCommand { name: "/compact", description: "Compact old messages", has_arg: false },
         SlashCommand { name: "/model", description: "Switch model", has_arg: false },
+        SlashCommand { name: "/rewind", description: "Rewind to a previous turn", has_arg: false },
         SlashCommand { name: "/status", description: "Show current status", has_arg: false },
         SlashCommand {
             name: "/sessions",

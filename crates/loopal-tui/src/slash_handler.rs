@@ -1,4 +1,4 @@
-use crate::app::{App, PickerItem, PickerState, SubPage};
+use crate::app::{App, PickerItem, PickerState, SubPage, RewindPickerState, RewindTurnItem};
 use crate::input::SlashCommandAction;
 
 /// Handle a slash command action. All interaction goes through `app.session`.
@@ -30,7 +30,54 @@ pub(crate) async fn handle_slash_command(
         SlashCommandAction::Help(name) => {
             show_help(app, name.as_deref());
         }
+        SlashCommandAction::RewindPicker => {
+            open_rewind_picker(app);
+        }
+        SlashCommandAction::RewindConfirmed(turn_index) => {
+            app.session.rewind(turn_index).await;
+        }
     }
+}
+
+fn open_rewind_picker(app: &mut App) {
+    let state = app.session.lock();
+    if !state.agent_idle {
+        drop(state);
+        app.session.push_system_message(
+            "Cannot rewind while the agent is busy.".into(),
+        );
+        return;
+    }
+    let turns: Vec<RewindTurnItem> = state
+        .messages
+        .iter()
+        .enumerate()
+        .filter(|(_, m)| m.role == "user")
+        .enumerate()
+        .map(|(turn_idx, (_, msg))| {
+            let preview = if msg.content.chars().count() > 60 {
+                let truncated: String = msg.content.chars().take(60).collect();
+                format!("{truncated}...")
+            } else {
+                msg.content.clone()
+            };
+            RewindTurnItem { turn_index: turn_idx, preview }
+        })
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+    drop(state);
+
+    if turns.is_empty() {
+        app.session.push_system_message("No turns to rewind to.".into());
+        return;
+    }
+
+    app.sub_page = Some(SubPage::RewindPicker(RewindPickerState {
+        turns,
+        selected: 0,
+    }));
 }
 
 fn open_model_picker(app: &mut App) {

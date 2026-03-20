@@ -100,12 +100,15 @@ async fn test_wait_for_input_mode_switch() {
         .send(ControlCommand::ModeSwitch(loopal_protocol::AgentMode::Plan))
         .await
         .unwrap();
+    drop(ctrl_tx);
 
-    let result = runner.wait_for_input().await.unwrap();
-    assert!(result.is_some());
+    let _ = tokio::time::timeout(
+        std::time::Duration::from_millis(100),
+        runner.wait_for_input(),
+    ).await;
+
     assert_eq!(runner.params.mode, AgentMode::Plan);
 
-    // Should have emitted AwaitingInput, then ModeChanged
     let e1 = event_rx.recv().await.unwrap();
     assert!(matches!(e1.payload, AgentEventPayload::AwaitingInput));
     let e2 = event_rx.recv().await.unwrap();

@@ -129,6 +129,12 @@ impl SessionController {
         let _ = self.control_tx.send(ControlCommand::Compact).await;
     }
 
+    /// Rewind conversation to the given turn index.
+    /// The runtime will truncate messages and emit a Rewound event.
+    pub async fn rewind(&self, turn_index: usize) {
+        let _ = self.control_tx.send(ControlCommand::Rewind { turn_index }).await;
+    }
+
     /// Pop the last inbox message for editing. Returns None if empty.
     pub fn pop_inbox_to_edit(&self) -> Option<String> {
         self.lock().inbox.pop_back()

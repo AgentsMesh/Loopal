@@ -53,6 +53,7 @@ pub(super) fn dispatch_command(name: &str, arg: Option<&str>) -> InputAction {
             arg.map(|s| s.to_string()),
         )),
         "/model" => InputAction::SlashCommand(SlashCommandAction::ModelPicker),
+        "/rewind" => InputAction::SlashCommand(SlashCommandAction::RewindPicker),
         "/exit" => InputAction::Quit,
         _ => InputAction::None,
     }

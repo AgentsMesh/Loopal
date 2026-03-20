@@ -1,6 +1,7 @@
 mod agent_handler;
 pub mod controller;
 pub mod event_handler;
+pub mod rewind;
 pub(crate) mod truncate;
 pub mod inbox;
 pub mod message_log;

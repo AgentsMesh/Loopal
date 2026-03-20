@@ -78,6 +78,18 @@ impl SessionManager {
         Ok(())
     }
 
+    /// Append a RewindTo marker to the event log.
+    /// On next load, the message with `message_id` and everything after it are discarded.
+    pub fn rewind_to(&self, session_id: &str, message_id: &str) -> Result<()> {
+        let entry = TaggedEntry::Marker(Marker::RewindTo {
+            message_id: message_id.to_string(),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+        });
+        self.message_store.append_entry(session_id, &entry)?;
+        info!(session_id = %session_id, message_id = %message_id, "rewind marker written");
+        Ok(())
+    }
+
     /// Update session metadata.
     pub fn update_session(&self, session: &Session) -> Result<()> {
         self.session_store.update_session(session)?;

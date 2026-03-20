@@ -51,5 +51,6 @@ pub(crate) fn apply_agent_event(
         AgentEventPayload::AutoContinuation { .. } => {}
         AgentEventPayload::MessageRouted { .. } => {}
         AgentEventPayload::ToolPermissionRequest { .. } => {}
+        AgentEventPayload::UserQuestionRequest { .. } => {}
     }
 }

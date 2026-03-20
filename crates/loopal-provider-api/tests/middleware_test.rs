@@ -7,7 +7,6 @@ fn test_middleware_context_construction_without_summarization_provider() {
         messages: vec![Message::user("hello")],
         system_prompt: "You are helpful.".to_string(),
         model: "claude-sonnet-4-20250514".to_string(),
-        turn_count: 1,
         total_input_tokens: 100,
         total_output_tokens: 50,
         total_cost: 0.001,
@@ -18,7 +17,6 @@ fn test_middleware_context_construction_without_summarization_provider() {
     assert_eq!(ctx.messages.len(), 1);
     assert_eq!(ctx.system_prompt, "You are helpful.");
     assert_eq!(ctx.model, "claude-sonnet-4-20250514");
-    assert_eq!(ctx.turn_count, 1);
     assert_eq!(ctx.total_input_tokens, 100);
     assert_eq!(ctx.total_output_tokens, 50);
     assert!((ctx.total_cost - 0.001).abs() < f64::EPSILON);
@@ -36,7 +34,6 @@ fn test_middleware_context_with_multiple_messages() {
         ],
         system_prompt: String::new(),
         model: "gpt-4".to_string(),
-        turn_count: 2,
         total_input_tokens: 0,
         total_output_tokens: 0,
         total_cost: 0.0,
@@ -45,7 +42,6 @@ fn test_middleware_context_with_multiple_messages() {
     };
 
     assert_eq!(ctx.messages.len(), 3);
-    assert_eq!(ctx.turn_count, 2);
     assert_eq!(ctx.max_context_tokens, 128_000);
 }
 
@@ -55,7 +51,6 @@ fn test_middleware_context_empty_messages() {
         messages: vec![],
         system_prompt: "system".to_string(),
         model: "model".to_string(),
-        turn_count: 0,
         total_input_tokens: 0,
         total_output_tokens: 0,
         total_cost: 0.0,
@@ -64,5 +59,4 @@ fn test_middleware_context_empty_messages() {
     };
 
     assert!(ctx.messages.is_empty());
-    assert_eq!(ctx.turn_count, 0);
 }

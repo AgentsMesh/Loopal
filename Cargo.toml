@@ -83,6 +83,8 @@ pulldown-cmark = { version = "0.12", default-features = false }
 syntect = { version = "5", default-features = false, features = ["default-fancy"] }
 two-face = "0.5"
 wiremock = "0.6"
+html2text = "0.12"
+pdf-extract = "0.7"
 
 # Workspace crates
 loopal-error = { path = "crates/loopal-error" }

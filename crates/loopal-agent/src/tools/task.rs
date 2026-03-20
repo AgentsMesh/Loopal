@@ -34,7 +34,9 @@ impl Tool for TaskCreateTool {
             "type": "object",
             "properties": {
                 "subject": { "type": "string", "description": "Brief task title" },
-                "description": { "type": "string", "description": "Detailed description" }
+                "description": { "type": "string", "description": "Detailed description" },
+                "activeForm": { "type": "string", "description": "Present continuous form shown in spinner when in_progress (e.g. 'Running tests')" },
+                "metadata": { "type": "object", "description": "Arbitrary metadata to attach to the task" }
             },
             "required": ["subject", "description"]
         })
@@ -47,7 +49,23 @@ impl Tool for TaskCreateTool {
         let shared = extract_shared(ctx)?;
         let subject = input.get("subject").and_then(|v| v.as_str()).unwrap_or("");
         let desc = input.get("description").and_then(|v| v.as_str()).unwrap_or("");
-        let task = shared.task_store.create(subject, desc);
+        let mut task = shared.task_store.create(subject, desc);
+        // Apply optional fields after creation
+        let mut needs_update = false;
+        let mut patch = TaskPatch::default();
+        if let Some(af) = input.get("activeForm").and_then(|v| v.as_str()) {
+            patch.active_form = Some(af.to_string());
+            needs_update = true;
+        }
+        if let Some(meta) = input.get("metadata") {
+            patch.metadata = Some(meta.clone());
+            needs_update = true;
+        }
+        if needs_update
+            && let Some(updated) = shared.task_store.update(&task.id, patch)
+        {
+            task = updated;
+        }
         let json = serde_json::to_string_pretty(&task).unwrap_or_default();
         Ok(ToolResult::success(json))
     }
@@ -71,6 +89,7 @@ impl Tool for TaskUpdateTool {
                 "status": { "type": "string", "enum": ["pending","in_progress","completed","deleted"] },
                 "subject": { "type": "string" },
                 "description": { "type": "string" },
+                "activeForm": { "type": "string", "description": "Present continuous form shown in spinner when in_progress" },
                 "owner": { "type": "string" },
                 "addBlockedBy": { "type": "array", "items": { "type": "string" } },
                 "addBlocks": { "type": "array", "items": { "type": "string" } },
@@ -91,6 +110,7 @@ impl Tool for TaskUpdateTool {
             status: input.get("status").and_then(|v| v.as_str()).and_then(parse_status),
             subject: input.get("subject").and_then(|v| v.as_str()).map(String::from),
             description: input.get("description").and_then(|v| v.as_str()).map(String::from),
+            active_form: input.get("activeForm").and_then(|v| v.as_str()).map(String::from),
             owner: input.get("owner").map(|v| v.as_str().map(String::from)),
             add_blocked_by: parse_string_array(&input, "addBlockedBy"),
             add_blocks: parse_string_array(&input, "addBlocks"),

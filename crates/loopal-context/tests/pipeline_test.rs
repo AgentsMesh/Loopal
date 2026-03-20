@@ -37,7 +37,6 @@ fn make_ctx() -> MiddlewareContext {
         messages: vec![],
         system_prompt: String::new(),
         model: "test".into(),
-        turn_count: 0,
         total_input_tokens: 0,
         total_output_tokens: 0,
         total_cost: 0.0,

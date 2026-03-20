@@ -12,6 +12,7 @@ use crate::frontend::traits::{AgentFrontend, EventEmitter};
 use loopal_tool_api::PermissionDecision;
 
 use super::permission_handler::PermissionHandler;
+use super::question_handler::QuestionHandler;
 use super::emitter::ChannelEventEmitter;
 
 /// Unified frontend merging root (channel-based) and sub-agent (autopilot) behaviour.
@@ -28,6 +29,7 @@ pub struct UnifiedFrontend {
     control_rx: Mutex<mpsc::Receiver<ControlCommand>>,
     cancel_token: Option<CancellationToken>,
     permission_handler: Box<dyn PermissionHandler>,
+    question_handler: Box<dyn QuestionHandler>,
 }
 
 impl UnifiedFrontend {
@@ -38,15 +40,19 @@ impl UnifiedFrontend {
         control_rx: mpsc::Receiver<ControlCommand>,
         cancel_token: Option<CancellationToken>,
         permission_handler: Box<dyn PermissionHandler>,
+        question_handler: Box<dyn QuestionHandler>,
     ) -> Self {
         Self {
-            agent_name,
-            event_tx,
+            agent_name, event_tx,
             mailbox_rx: Mutex::new(mailbox_rx),
             control_rx: Mutex::new(control_rx),
-            cancel_token,
-            permission_handler,
+            cancel_token, permission_handler, question_handler,
         }
+    }
+
+    /// Ask the user a question via the TUI (AskUser tool support).
+    pub async fn ask_user(&self, questions: Vec<loopal_protocol::Question>) -> Vec<String> {
+        self.question_handler.ask(questions).await
     }
 }
 
@@ -115,5 +121,9 @@ impl AgentFrontend for UnifiedFrontend {
             envelopes.push(env);
         }
         envelopes
+    }
+
+    async fn ask_user(&self, questions: Vec<loopal_protocol::Question>) -> Vec<String> {
+        self.question_handler.ask(questions).await
     }
 }

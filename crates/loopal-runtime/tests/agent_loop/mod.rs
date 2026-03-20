@@ -4,7 +4,7 @@ use chrono::Utc;
 use loopal_context::ContextPipeline;
 use loopal_kernel::Kernel;
 use loopal_runtime::agent_loop::AgentLoopRunner;
-use loopal_runtime::frontend::{AutoDenyHandler, TuiPermissionHandler};
+use loopal_runtime::frontend::{AutoDenyHandler, AutoCancelQuestionHandler, TuiPermissionHandler};
 use loopal_runtime::{AgentLoopParams, AgentMode, SessionManager, UnifiedFrontend};
 use loopal_storage::Session;
 use loopal_config::Settings;
@@ -42,6 +42,7 @@ pub fn make_runner() -> (AgentLoopRunner, mpsc::Receiver<AgentEvent>) {
     let frontend = Arc::new(UnifiedFrontend::new(
         None, event_tx, mailbox_rx, control_rx, None,
         Box::new(AutoDenyHandler),
+        Box::new(AutoCancelQuestionHandler),
     ));
 
     let kernel = Arc::new(
@@ -97,6 +98,7 @@ pub fn make_runner_with_channels() -> (
     let frontend = Arc::new(UnifiedFrontend::new(
         None, event_tx.clone(), mailbox_rx, control_rx, None,
         Box::new(TuiPermissionHandler::new(event_tx, permission_rx)),
+        Box::new(AutoCancelQuestionHandler),
     ));
 
     let kernel = Arc::new(

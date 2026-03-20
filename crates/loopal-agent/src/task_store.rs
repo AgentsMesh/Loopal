@@ -37,6 +37,7 @@ impl TaskStore {
             id: id.clone(),
             subject: subject.to_string(),
             description: description.to_string(),
+            active_form: None,
             status: TaskStatus::Pending,
             owner: None,
             blocked_by: Vec::new(),
@@ -104,6 +105,7 @@ pub struct TaskPatch {
     pub status: Option<TaskStatus>,
     pub subject: Option<String>,
     pub description: Option<String>,
+    pub active_form: Option<String>,
     pub owner: Option<Option<String>>,
     pub add_blocked_by: Vec<TaskId>,
     pub add_blocks: Vec<TaskId>,
@@ -120,6 +122,9 @@ impl TaskPatch {
         }
         if let Some(ref d) = self.description {
             task.description = d.clone();
+        }
+        if let Some(ref af) = self.active_form {
+            task.active_form = Some(af.clone());
         }
         if let Some(ref o) = self.owner {
             task.owner = o.clone();

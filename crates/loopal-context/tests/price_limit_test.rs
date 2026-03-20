@@ -8,7 +8,6 @@ fn make_ctx(messages: Vec<Message>, max_context_tokens: u32) -> MiddlewareContex
         messages,
         system_prompt: String::new(),
         model: "test-model".into(),
-        turn_count: 0,
         total_input_tokens: 0,
         total_output_tokens: 0,
         total_cost: 0.0,

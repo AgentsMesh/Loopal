@@ -6,7 +6,7 @@ use futures::stream::Stream as FutStream;
 use loopal_context::ContextPipeline;
 use loopal_kernel::Kernel;
 use loopal_runtime::agent_loop::AgentLoopRunner;
-use loopal_runtime::frontend::AutoDenyHandler;
+use loopal_runtime::frontend::{AutoDenyHandler, AutoCancelQuestionHandler};
 use loopal_runtime::{AgentLoopParams, AgentMode, SessionManager, UnifiedFrontend};
 use loopal_storage::Session;
 use loopal_config::Settings;
@@ -77,6 +77,7 @@ pub fn make_runner_with_mock_provider(
     let (ctrl_tx, control_rx) = mpsc::channel::<ControlCommand>(16);
     let frontend = Arc::new(UnifiedFrontend::new(
         None, event_tx, mailbox_rx, control_rx, None, Box::new(AutoDenyHandler),
+        Box::new(AutoCancelQuestionHandler),
     ));
     let mut kernel = Kernel::new(Settings::default()).unwrap();
     kernel.register_provider(Arc::new(MockProvider::new(chunks)) as Arc<dyn Provider>);
@@ -122,6 +123,7 @@ pub fn make_multi_runner(
     let (_ctrl_tx, control_rx) = mpsc::channel::<ControlCommand>(16);
     let frontend = Arc::new(UnifiedFrontend::new(
         None, event_tx, mailbox_rx, control_rx, None, Box::new(AutoDenyHandler),
+        Box::new(AutoCancelQuestionHandler),
     ));
     let mut kernel = Kernel::new(Settings::default()).unwrap();
     kernel.register_provider(Arc::new(MultiCallProvider::new(calls)) as Arc<dyn Provider>);
@@ -149,6 +151,7 @@ pub fn make_interactive_multi_runner(
     let (ctrl_tx, control_rx) = mpsc::channel::<ControlCommand>(16);
     let frontend = Arc::new(UnifiedFrontend::new(
         None, event_tx, mailbox_rx, control_rx, None, Box::new(AutoDenyHandler),
+        Box::new(AutoCancelQuestionHandler),
     ));
     let mut kernel = Kernel::new(Settings::default()).unwrap();
     kernel.register_provider(Arc::new(MultiCallProvider::new(calls)) as Arc<dyn Provider>);

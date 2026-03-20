@@ -35,6 +35,10 @@ impl Tool for SendMessageTool {
                 "content": {
                     "type": "string",
                     "description": "Message content"
+                },
+                "summary": {
+                    "type": "string",
+                    "description": "A 5-10 word summary shown as preview in the UI"
                 }
             },
             "required": ["type", "content"]

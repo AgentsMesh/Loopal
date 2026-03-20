@@ -14,7 +14,6 @@ impl AgentLoopRunner {
             messages: self.params.messages.clone(),
             system_prompt: self.params.system_prompt.clone(),
             model: self.params.model.clone(),
-            turn_count: self.turn_count,
             total_input_tokens: self.total_input_tokens,
             total_output_tokens: self.total_output_tokens,
             total_cost: 0.0, // no longer tracked, kept for middleware interface compatibility

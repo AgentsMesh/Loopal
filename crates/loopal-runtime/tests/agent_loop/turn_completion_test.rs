@@ -10,7 +10,7 @@ use futures::stream::Stream as FutStream;
 use loopal_context::ContextPipeline;
 use loopal_kernel::Kernel;
 use loopal_runtime::agent_loop::AgentLoopRunner;
-use loopal_runtime::frontend::AutoDenyHandler;
+use loopal_runtime::frontend::{AutoDenyHandler, AutoCancelQuestionHandler};
 use loopal_runtime::{AgentLoopParams, AgentMode, SessionManager, UnifiedFrontend};
 use loopal_storage::Session;
 use loopal_config::Settings;
@@ -76,6 +76,7 @@ fn make_multi_runner(
     let (_ctrl_tx, control_rx) = mpsc::channel::<ControlCommand>(16);
     let frontend = Arc::new(UnifiedFrontend::new(
         None, event_tx, mailbox_rx, control_rx, None, Box::new(AutoDenyHandler),
+        Box::new(AutoCancelQuestionHandler),
     ));
     let mut kernel = Kernel::new(Settings::default()).unwrap();
     kernel.register_provider(Arc::new(MultiCallProvider::new(calls)) as Arc<dyn Provider>);
@@ -114,8 +115,8 @@ async fn test_attempt_completion_exits_turn_immediately() {
     let output = runner.run().await.unwrap();
     assert_eq!(output.terminate_reason, TerminateReason::Goal);
     assert_eq!(output.result, "all tasks done");
-    // Only 1 LLM call — no redundant second call
-    assert_eq!(runner.turn_count, 1);
+    // Tool execution no longer increments turn_count (only user messages do)
+    assert_eq!(runner.turn_count, 0);
 }
 
 /// LLM tool → LLM AttemptCompletion: two LLM calls inside one turn.
@@ -145,8 +146,8 @@ async fn test_tool_then_completion_two_llm_calls() {
     let output = runner.run().await.unwrap();
     assert_eq!(output.terminate_reason, TerminateReason::Goal);
     assert_eq!(output.result, "read done");
-    // Two tool executions = turn_count incremented twice
-    assert_eq!(runner.turn_count, 2);
+    // Tool execution no longer increments turn_count (only user messages do)
+    assert_eq!(runner.turn_count, 0);
     let _ = std::fs::remove_file(&tmp);
 }
 
@@ -169,7 +170,8 @@ async fn test_error_preserves_prior_output() {
     assert_eq!(output.terminate_reason, TerminateReason::Goal);
 }
 
-/// Max turns reached inside execute_turn → outer loop gets non-completed turn.
+/// Tool execution no longer increments turn_count, so max_turns is not hit
+/// inside execute_turn. The non-interactive agent exits after the turn completes.
 #[tokio::test]
 async fn test_max_turns_inside_execute_turn() {
     let tmp = std::env::temp_dir().join(format!("la_mt_{}.txt", std::process::id()));
@@ -186,10 +188,9 @@ async fn test_max_turns_inside_execute_turn() {
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 
     let output = runner.run().await.unwrap();
-    // Non-interactive: turn exits with completed=false due to max_turns,
-    // outer loop breaks → Goal (not MaxTurns, because outer check wasn't hit)
+    // Non-interactive: exits after first turn completes
     assert_eq!(output.terminate_reason, TerminateReason::Goal);
-    assert_eq!(runner.turn_count, 1);
+    assert_eq!(runner.turn_count, 0);
     let _ = std::fs::remove_file(&tmp);
 }
 

@@ -4,7 +4,7 @@ use chrono::Utc;
 use loopal_context::ContextPipeline;
 use loopal_kernel::Kernel;
 use loopal_runtime::agent_loop::AgentLoopRunner;
-use loopal_runtime::frontend::TuiPermissionHandler;
+use loopal_runtime::frontend::{TuiPermissionHandler, AutoCancelQuestionHandler};
 use loopal_runtime::{AgentLoopParams, AgentMode, SessionManager, UnifiedFrontend};
 use loopal_storage::Session;
 use loopal_config::Settings;
@@ -101,6 +101,7 @@ async fn test_check_permission_channel_closed_denies() {
     let frontend = Arc::new(UnifiedFrontend::new(
         None, event_tx.clone(), mailbox_rx, control_rx, None,
         Box::new(TuiPermissionHandler::new(event_tx, permission_rx)),
+        Box::new(AutoCancelQuestionHandler),
     ));
 
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());

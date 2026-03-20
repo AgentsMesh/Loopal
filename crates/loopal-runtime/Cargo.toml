@@ -23,6 +23,7 @@ async-trait = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tokio-util = { workspace = true }
+uuid = { workspace = true }
 
 [dev-dependencies]
 async-trait = { workspace = true }

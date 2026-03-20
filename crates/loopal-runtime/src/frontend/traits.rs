@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
 use crate::agent_input::AgentInput;
-use loopal_protocol::Envelope;
+use loopal_protocol::{Envelope, Question};
 use loopal_error::Result;
 use loopal_protocol::AgentEventPayload;
 use loopal_tool_api::PermissionDecision;
@@ -52,6 +52,12 @@ pub trait AgentFrontend: Send + Sync {
     /// TUI Inbox instead.
     async fn drain_pending(&self) -> Vec<Envelope> {
         Vec::new()
+    }
+
+    /// Ask the user questions via the TUI (AskUser tool interception).
+    /// Default returns "(not supported)" for sub-agents.
+    async fn ask_user(&self, _questions: Vec<Question>) -> Vec<String> {
+        vec!["(not supported)".into()]
     }
 }
 

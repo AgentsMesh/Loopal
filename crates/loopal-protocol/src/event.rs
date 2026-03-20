@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::question::Question;
+
 /// Complete event with agent identity, transported via channel to TUI.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentEvent {
@@ -86,5 +88,11 @@ pub enum AgentEventPayload {
         source: String,
         target: String,
         content_preview: String,
+    },
+
+    /// Tool is requesting user to answer questions via TUI dialog.
+    UserQuestionRequest {
+        id: String,
+        questions: Vec<Question>,
     },
 }

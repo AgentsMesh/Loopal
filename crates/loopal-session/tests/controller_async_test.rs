@@ -2,7 +2,7 @@
 
 use loopal_session::SessionController;
 use loopal_protocol::ControlCommand;
-use loopal_protocol::{AgentEvent, AgentEventPayload};
+use loopal_protocol::{AgentEvent, AgentEventPayload, UserQuestionResponse};
 use tokio::sync::mpsc;
 
 fn make_controller() -> (
@@ -12,11 +12,13 @@ fn make_controller() -> (
 ) {
     let (control_tx, control_rx) = mpsc::channel::<ControlCommand>(16);
     let (perm_tx, perm_rx) = mpsc::channel::<bool>(16);
+    let (question_tx, _question_rx) = mpsc::channel::<UserQuestionResponse>(16);
     let ctrl = SessionController::new(
         "test-model".to_string(),
         "act".to_string(),
         control_tx,
         perm_tx,
+        question_tx,
     );
     (ctrl, control_rx, perm_rx)
 }

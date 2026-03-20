@@ -1,4 +1,4 @@
-use loopal_context::middleware::{ContextGuard, TurnLimit};
+use loopal_context::middleware::ContextGuard;
 use loopal_message::Message;
 use loopal_provider_api::{Middleware, MiddlewareContext};
 
@@ -8,7 +8,6 @@ fn make_ctx(messages: Vec<Message>, max_context_tokens: u32) -> MiddlewareContex
         messages,
         system_prompt: String::new(),
         model: "test-model".into(),
-        turn_count: 0,
         total_input_tokens: 0,
         total_output_tokens: 0,
         total_cost: 0.0,
@@ -20,67 +19,6 @@ fn make_ctx(messages: Vec<Message>, max_context_tokens: u32) -> MiddlewareContex
 /// Generate a large message with `n` chars of text content.
 fn large_message(n: usize) -> Message {
     Message::user(&"x".repeat(n))
-}
-
-// =============================================================================
-// TurnLimit tests
-// =============================================================================
-
-#[tokio::test]
-async fn turn_limit_under_max_returns_ok() {
-    let mw = TurnLimit::new(10);
-    let mut ctx = make_ctx(vec![], 100_000);
-    ctx.turn_count = 5;
-    assert!(mw.process(&mut ctx).await.is_ok());
-}
-
-#[tokio::test]
-async fn turn_limit_at_max_returns_err() {
-    let mw = TurnLimit::new(10);
-    let mut ctx = make_ctx(vec![], 100_000);
-    ctx.turn_count = 10;
-    assert!(mw.process(&mut ctx).await.is_err());
-}
-
-#[tokio::test]
-async fn turn_limit_over_max_returns_err() {
-    let mw = TurnLimit::new(5);
-    let mut ctx = make_ctx(vec![], 100_000);
-    ctx.turn_count = 20;
-    assert!(mw.process(&mut ctx).await.is_err());
-}
-
-#[tokio::test]
-async fn turn_limit_zero_turns_ok() {
-    let mw = TurnLimit::new(10);
-    let mut ctx = make_ctx(vec![], 100_000);
-    ctx.turn_count = 0;
-    assert!(mw.process(&mut ctx).await.is_ok());
-}
-
-#[tokio::test]
-async fn turn_limit_error_message_contains_counts() {
-    let mw = TurnLimit::new(5);
-    let mut ctx = make_ctx(vec![], 100_000);
-    ctx.turn_count = 7;
-    let err = mw.process(&mut ctx).await.unwrap_err();
-    let msg = err.to_string();
-    assert!(
-        msg.contains("7") && msg.contains("5"),
-        "error message should contain turn count (7) and max (5), got: {}",
-        msg
-    );
-    assert!(
-        msg.contains("turn limit"),
-        "error message should mention 'turn limit', got: {}",
-        msg
-    );
-}
-
-#[tokio::test]
-async fn turn_limit_name() {
-    let mw = TurnLimit::new(10);
-    assert_eq!(mw.name(), "turn_limit");
 }
 
 // =============================================================================

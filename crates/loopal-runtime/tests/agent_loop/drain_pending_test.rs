@@ -10,7 +10,7 @@ use chrono::Utc;
 use futures::stream::Stream as FutStream;
 use loopal_context::ContextPipeline;
 use loopal_kernel::Kernel;
-use loopal_runtime::frontend::AutoDenyHandler;
+use loopal_runtime::frontend::{AutoDenyHandler, AutoCancelQuestionHandler};
 use loopal_runtime::{AgentLoopParams, AgentMode, SessionManager, UnifiedFrontend, agent_loop};
 use loopal_storage::Session;
 use loopal_config::Settings;
@@ -81,6 +81,7 @@ async fn test_subagent_drains_pending_before_exit() {
         mailbox_rx, control_rx,
         None,
         Box::new(AutoDenyHandler),
+        Box::new(AutoCancelQuestionHandler),
     ));
 
     let mut kernel = Kernel::new(Settings::default()).unwrap();

@@ -122,6 +122,10 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
         AgentEventPayload::MessageRouted { .. } => {
             // Handled globally in apply_event() before this match.
         }
+        AgentEventPayload::UserQuestionRequest { id, questions } => {
+            flush_streaming(state);
+            state.pending_question = Some(super::types::PendingQuestion::new(id, questions));
+        }
     }
     None
 }
@@ -171,31 +175,23 @@ pub(crate) fn flush_streaming(state: &mut SessionState) {
 
 /// Try forwarding a queued inbox message when agent is idle.
 pub(crate) fn try_forward_inbox(state: &mut SessionState) -> Option<String> {
-    if state.agent_idle
-        && let Some(text) = state.inbox.pop_front()
-    {
-        state.agent_idle = false;
-        state.begin_turn();
-        state.messages.push(DisplayMessage {
-            role: "user".to_string(),
-            content: text.clone(),
-            tool_calls: Vec::new(),
-        });
-        return Some(text);
-    }
-    None
+    if !state.agent_idle { return None; }
+    let text = state.inbox.pop_front()?;
+    state.agent_idle = false;
+    state.begin_turn();
+    state.messages.push(DisplayMessage {
+        role: "user".to_string(), content: text.clone(), tool_calls: Vec::new(),
+    });
+    Some(text)
 }
 
 /// Record a MessageRouted event to the global feed and per-agent logs.
 fn record_message_routed(state: &mut SessionState, source: &str, target: &str, preview: &str) {
     let entry = MessageLogEntry::new(source, target, preview);
     state.message_feed.record(entry.clone());
-    // Record to source agent's log
-    if let Some(agent) = state.agents.get_mut(source) {
-        agent.message_log.push(entry.clone());
-    }
-    // Record to target agent's log
-    if let Some(agent) = state.agents.get_mut(target) {
-        agent.message_log.push(entry);
+    for name in [source, target] {
+        if let Some(agent) = state.agents.get_mut(name) {
+            agent.message_log.push(entry.clone());
+        }
     }
 }

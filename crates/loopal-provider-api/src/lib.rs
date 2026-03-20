@@ -95,7 +95,6 @@ pub struct MiddlewareContext {
     pub messages: Vec<Message>,
     pub system_prompt: String,
     pub model: String,
-    pub turn_count: u32,
     pub total_input_tokens: u32,
     pub total_output_tokens: u32,
     pub total_cost: f64,

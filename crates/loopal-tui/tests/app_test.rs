@@ -2,17 +2,19 @@ use loopal_session::SessionController;
 use loopal_tui::app::App;
 use loopal_tui::command::builtin_entries;
 use loopal_protocol::ControlCommand;
-use loopal_protocol::{AgentEvent, AgentEventPayload};
+use loopal_protocol::{AgentEvent, AgentEventPayload, UserQuestionResponse};
 use tokio::sync::mpsc;
 
 fn make_app() -> (App, mpsc::Receiver<ControlCommand>, mpsc::Receiver<bool>) {
     let (control_tx, control_rx) = mpsc::channel::<ControlCommand>(16);
     let (perm_tx, perm_rx) = mpsc::channel::<bool>(16);
+    let (question_tx, _) = mpsc::channel::<UserQuestionResponse>(16);
     let session = SessionController::new(
         "test-model".to_string(),
         "act".to_string(),
         control_tx,
         perm_tx,
+        question_tx,
     );
     let app = App::new(session, builtin_entries(), std::env::temp_dir());
     (app, control_rx, perm_rx)

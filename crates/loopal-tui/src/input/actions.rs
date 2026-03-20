@@ -32,4 +32,15 @@ pub enum InputAction {
     FocusNextAgent,
     /// Clear agent focus (return to root view)
     UnfocusAgent,
+    // --- Question dialog actions ---
+    /// Navigate up in question options
+    QuestionUp,
+    /// Navigate down in question options
+    QuestionDown,
+    /// Confirm current selection (submit answer)
+    QuestionConfirm,
+    /// Toggle option selection (multi-select)
+    QuestionToggle,
+    /// Cancel question dialog
+    QuestionCancel,
 }

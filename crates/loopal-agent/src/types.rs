@@ -22,6 +22,8 @@ pub struct Task {
     pub id: TaskId,
     pub subject: String,
     pub description: String,
+    #[serde(default)]
+    pub active_form: Option<String>,
     pub status: TaskStatus,
     pub owner: Option<String>,
     pub blocked_by: Vec<TaskId>,

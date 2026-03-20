@@ -8,4 +8,4 @@ pub mod state;
 pub mod types;
 
 pub use controller::SessionController;
-pub use types::{DisplayMessage, DisplayToolCall, PendingPermission};
+pub use types::{DisplayMessage, DisplayToolCall, PendingPermission, PendingQuestion};

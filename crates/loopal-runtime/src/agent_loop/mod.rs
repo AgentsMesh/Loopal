@@ -5,6 +5,7 @@ mod permission;
 mod preflight;
 mod run;
 mod runner;
+pub(crate) mod tool_exec;
 mod tools;
 
 use std::collections::HashSet;

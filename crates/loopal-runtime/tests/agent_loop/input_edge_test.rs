@@ -12,7 +12,7 @@ fn test_model_info_defaults_for_unknown_model() {
     use chrono::Utc;
     use loopal_context::ContextPipeline;
     use loopal_kernel::Kernel;
-    use loopal_runtime::frontend::AutoDenyHandler;
+    use loopal_runtime::frontend::{AutoDenyHandler, AutoCancelQuestionHandler};
     use loopal_runtime::{AgentLoopParams, AgentMode, SessionManager, UnifiedFrontend};
     use loopal_storage::Session;
     use loopal_config::Settings;
@@ -27,6 +27,7 @@ fn test_model_info_defaults_for_unknown_model() {
     let frontend = Arc::new(UnifiedFrontend::new(
         None, event_tx, mailbox_rx, control_rx, None,
         Box::new(AutoDenyHandler),
+        Box::new(AutoCancelQuestionHandler),
     ));
 
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());

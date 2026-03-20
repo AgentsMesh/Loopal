@@ -24,6 +24,18 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> InputAction {
         };
     }
 
+    // Handle question dialog state (AskUser tool)
+    if app.session.lock().pending_question.is_some() {
+        return match key.code {
+            KeyCode::Up => InputAction::QuestionUp,
+            KeyCode::Down => InputAction::QuestionDown,
+            KeyCode::Enter => InputAction::QuestionConfirm,
+            KeyCode::Char(' ') => InputAction::QuestionToggle,
+            KeyCode::Esc => InputAction::QuestionCancel,
+            _ => InputAction::None,
+        };
+    }
+
     // --- Sub-page interception (highest priority after tool confirm) ---
     if app.sub_page.is_some() {
         return handle_sub_page_key(app, &key);

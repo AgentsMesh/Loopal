@@ -6,9 +6,9 @@ use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, info, info_span};
 
 use loopal_context::ContextPipeline;
-use loopal_context::middleware::{ContextGuard, SmartCompact, TurnLimit};
+use loopal_context::middleware::{ContextGuard, SmartCompact};
 use loopal_runtime::{AgentLoopParams, AgentMode, SessionManager, UnifiedFrontend, agent_loop};
-use loopal_runtime::frontend::AutoDenyHandler;
+use loopal_runtime::frontend::{AutoDenyHandler, AutoCancelQuestionHandler};
 use loopal_protocol::ControlCommand;
 use loopal_protocol::Envelope;
 use loopal_message::Message;
@@ -77,6 +77,7 @@ pub async fn spawn_agent(
         control_rx,
         Some(cancel_token.clone()),
         Box::new(AutoDenyHandler),
+        Box::new(AutoCancelQuestionHandler),
     ));
 
     let session_manager = SessionManager::new()
@@ -96,7 +97,6 @@ pub async fn spawn_agent(
 
     let max_turns = params.agent_config.max_turns;
     let mut pipeline = ContextPipeline::new();
-    pipeline.add(Box::new(TurnLimit::new(max_turns)));
     pipeline.add(Box::new(ContextGuard));
     pipeline.add(Box::new(SmartCompact::new(10)));
 

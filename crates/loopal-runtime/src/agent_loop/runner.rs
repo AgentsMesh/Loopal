@@ -121,15 +121,10 @@ impl AgentLoopRunner {
             // Execute tools, check for AttemptCompletion
             let completion_result = self.execute_tools(tool_uses).await?;
             self.inject_pending_messages().await;
-            self.turn_count += 1;
             continuation_count = 0; // Reset after successful tool execution
 
             if let Some(result) = completion_result {
                 return Ok(TurnOutput { output: result });
-            }
-
-            if self.turn_count >= self.params.max_turns {
-                return Ok(TurnOutput { output: last_text });
             }
             // Continue inner loop: call LLM again with tool results
         }

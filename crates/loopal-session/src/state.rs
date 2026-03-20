@@ -7,7 +7,7 @@ use loopal_protocol::ObservableAgentState;
 
 use crate::inbox::Inbox;
 use crate::message_log::{MessageFeed, MessageLogEntry};
-use crate::types::{DisplayMessage, PendingPermission};
+use crate::types::{DisplayMessage, PendingPermission, PendingQuestion};
 
 /// Enhanced agent view state with full observability.
 #[derive(Debug, Clone, Default)]
@@ -33,6 +33,7 @@ pub struct SessionState {
     pub model: String,
     pub mode: String,
     pub pending_permission: Option<PendingPermission>,
+    pub pending_question: Option<PendingQuestion>,
     // === Agent tracking (observation plane) ===
     pub agents: IndexMap<String, AgentViewState>,
     pub focused_agent: Option<String>,
@@ -59,6 +60,7 @@ impl SessionState {
             model,
             mode,
             pending_permission: None,
+            pending_question: None,
             agents: IndexMap::new(),
             focused_agent: None,
             message_feed: MessageFeed::new(200),

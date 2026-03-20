@@ -10,6 +10,7 @@ use tokio::sync::mpsc;
 use loopal_protocol::AgentMode;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::AgentEvent;
+use loopal_protocol::UserQuestionResponse;
 
 use crate::event_handler;
 use crate::state::SessionState;
@@ -24,6 +25,7 @@ pub struct SessionController {
     state: Arc<Mutex<SessionState>>,
     control_tx: mpsc::Sender<ControlCommand>,
     permission_tx: mpsc::Sender<bool>,
+    question_tx: mpsc::Sender<UserQuestionResponse>,
 }
 
 impl SessionController {
@@ -32,11 +34,13 @@ impl SessionController {
         mode: String,
         control_tx: mpsc::Sender<ControlCommand>,
         permission_tx: mpsc::Sender<bool>,
+        question_tx: mpsc::Sender<UserQuestionResponse>,
     ) -> Self {
         Self {
             state: Arc::new(Mutex::new(SessionState::new(model, mode))),
             control_tx,
             permission_tx,
+            question_tx,
         }
     }
 
@@ -69,6 +73,12 @@ impl SessionController {
     pub async fn deny_permission(&self) {
         { self.lock().pending_permission = None; }
         let _ = self.permission_tx.send(false).await;
+    }
+
+    /// Submit answers to a pending question (AskUser tool).
+    pub async fn answer_question(&self, answers: Vec<String>) {
+        { self.lock().pending_question = None; }
+        let _ = self.question_tx.send(UserQuestionResponse { answers }).await;
     }
 
     /// Switch agent mode (Plan / Act).

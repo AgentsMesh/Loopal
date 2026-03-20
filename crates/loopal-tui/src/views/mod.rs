@@ -4,6 +4,7 @@ pub mod input_view;
 pub mod message_log_view;
 pub mod picker;
 pub mod progress;
+pub mod question_dialog;
 pub mod status_bar;
 pub mod subagent_panel;
 pub mod task_summary;

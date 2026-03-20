@@ -9,11 +9,13 @@ use loopal_agent::shared::AgentShared;
 use loopal_agent::task_store::TaskStore;
 use loopal_config::{load_instructions, load_settings, load_skills};
 use loopal_context::ContextPipeline;
-use loopal_context::middleware::{ContextGuard, MessageSizeGuard, SmartCompact, TurnLimit};
+use loopal_context::middleware::{ContextGuard, MessageSizeGuard, SmartCompact};
 use loopal_context::system_prompt::build_system_prompt;
 use loopal_kernel::Kernel;
 use loopal_runtime::{AgentLoopParams, AgentMode, SessionManager, UnifiedFrontend, agent_loop};
 use loopal_runtime::frontend::tui_permission::TuiPermissionHandler;
+use loopal_runtime::frontend::question_handler::TuiQuestionHandler;
+use loopal_protocol::UserQuestionResponse;
 use loopal_session::SessionController;
 use loopal_tui::command::merge_commands;
 use loopal_protocol::ControlCommand;
@@ -65,6 +67,9 @@ pub async fn run() -> anyhow::Result<()> {
     // Permission channel — TUI → runtime
     let (permission_tx, permission_rx) = mpsc::channel::<bool>(16);
 
+    // Question channel — TUI → runtime (AskUser tool)
+    let (question_tx, question_rx) = mpsc::channel::<UserQuestionResponse>(16);
+
     // MessageRouter — unified data plane
     let router = Arc::new(MessageRouter::new(agent_event_tx.clone()));
 
@@ -84,6 +89,7 @@ pub async fn run() -> anyhow::Result<()> {
         control_rx,
         None, // TUI-controlled lifecycle
         Box::new(TuiPermissionHandler::new(agent_event_tx.clone(), permission_rx)),
+        Box::new(TuiQuestionHandler::new(agent_event_tx.clone(), question_rx)),
     ));
 
     // Build shared agent state (homogeneous with sub-agents)
@@ -114,11 +120,10 @@ pub async fn run() -> anyhow::Result<()> {
     );
 
     let session_ctrl = SessionController::new(
-        model.clone(), mode_str, control_tx, permission_tx,
+        model.clone(), mode_str, control_tx, permission_tx, question_tx,
     );
 
     let mut context_pipeline = ContextPipeline::new();
-    context_pipeline.add(Box::new(TurnLimit::new(max_turns)));
     context_pipeline.add(Box::new(MessageSizeGuard));
     context_pipeline.add(Box::new(ContextGuard));
     context_pipeline.add(Box::new(SmartCompact::new(10)));

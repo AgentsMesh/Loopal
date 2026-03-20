@@ -3,7 +3,7 @@ use std::sync::Arc;
 use chrono::Utc;
 use loopal_context::ContextPipeline;
 use loopal_kernel::Kernel;
-use loopal_runtime::frontend::AutoDenyHandler;
+use loopal_runtime::frontend::{AutoDenyHandler, AutoCancelQuestionHandler};
 use loopal_runtime::{AgentLoopParams, AgentMode, SessionManager, UnifiedFrontend, agent_loop};
 use loopal_storage::Session;
 use loopal_config::Settings;
@@ -36,6 +36,7 @@ async fn test_agent_loop_immediate_channel_close() {
 
     let frontend = Arc::new(UnifiedFrontend::new(
         None, event_tx, mailbox_rx, control_rx, None, Box::new(AutoDenyHandler),
+        Box::new(AutoCancelQuestionHandler),
     ));
 
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
@@ -72,6 +73,7 @@ async fn test_agent_loop_max_turns_reached() {
 
     let frontend = Arc::new(UnifiedFrontend::new(
         None, event_tx, mailbox_rx, control_rx, None, Box::new(AutoDenyHandler),
+        Box::new(AutoCancelQuestionHandler),
     ));
 
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());

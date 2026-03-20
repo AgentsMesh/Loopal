@@ -1,4 +1,4 @@
-use loopal_runtime::frontend::{AutoDenyHandler, UnifiedFrontend};
+use loopal_runtime::frontend::{AutoDenyHandler, AutoCancelQuestionHandler, UnifiedFrontend};
 use loopal_runtime::agent_input::AgentInput;
 use loopal_protocol::AgentMode;
 use loopal_protocol::ControlCommand;
@@ -17,7 +17,10 @@ fn make_unified(
     cancel_token: Option<CancellationToken>,
     handler: Box<dyn loopal_runtime::frontend::PermissionHandler>,
 ) -> UnifiedFrontend {
-    UnifiedFrontend::new(agent_name, event_tx, mailbox_rx, control_rx, cancel_token, handler)
+    UnifiedFrontend::new(
+        agent_name, event_tx, mailbox_rx, control_rx, cancel_token, handler,
+        Box::new(AutoCancelQuestionHandler),
+    )
 }
 
 // --- emit ---

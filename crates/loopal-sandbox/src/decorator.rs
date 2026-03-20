@@ -56,7 +56,7 @@ impl Tool for SandboxedTool {
             "Bash" => precheck_bash(&self.policy, input),
             "Write" | "Edit" => precheck_write(&self.policy, input),
             "Read" | "Glob" | "Grep" | "Ls" => precheck_read(&self.policy, input),
-            "WebFetch" => precheck_web(&self.policy, input),
+            "Fetch" => precheck_web(&self.policy, input),
             _ => precheck_generic(&self.policy, input),
         }
     }

@@ -93,12 +93,18 @@ pub fn draw(f: &mut Frame, app: &mut App) {
 
     // Tool confirm popup overlay — clone permission data, then drop lock
     let pending_perm = state.pending_permission.clone();
+    let pending_question = state.pending_question.clone();
     drop(state);
 
     views::input_view::render_input(f, &app.input, app.input_cursor, input_area);
 
     if let Some(ref perm) = pending_perm {
         views::tool_confirm::render_tool_confirm(f, &perm.name, &perm.input, size);
+    }
+
+    // Question dialog overlay (AskUser tool)
+    if let Some(ref question) = pending_question {
+        views::question_dialog::render_question_dialog(f, question, size);
     }
 
     // Autocomplete command menu overlay (above input area)

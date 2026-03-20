@@ -86,6 +86,42 @@ pub async fn run_tui(
                         InputAction::UnfocusAgent => {
                             app.session.lock().focused_agent = None;
                         }
+                        InputAction::QuestionUp => {
+                            if let Some(ref mut q) = app.session.lock().pending_question {
+                                q.cursor_up();
+                            }
+                        }
+                        InputAction::QuestionDown => {
+                            if let Some(ref mut q) = app.session.lock().pending_question {
+                                q.cursor_down();
+                            }
+                        }
+                        InputAction::QuestionToggle => {
+                            if let Some(ref mut q) = app.session.lock().pending_question {
+                                q.toggle();
+                            }
+                        }
+                        InputAction::QuestionConfirm => {
+                            let answers = {
+                                let state = app.session.lock();
+                                state.pending_question.as_ref().map(|q| {
+                                    let answers = q.get_answers();
+                                    if answers.is_empty() && !q.questions[q.current_question].allow_multiple {
+                                        // Single-select: select cursor item
+                                        let opt = &q.questions[q.current_question].options[q.cursor];
+                                        vec![opt.label.clone()]
+                                    } else {
+                                        answers
+                                    }
+                                })
+                            };
+                            if let Some(answers) = answers {
+                                app.session.answer_question(answers).await;
+                            }
+                        }
+                        InputAction::QuestionCancel => {
+                            app.session.answer_question(vec!["(cancelled)".into()]).await;
+                        }
                         InputAction::None => {}
                     }
                 }

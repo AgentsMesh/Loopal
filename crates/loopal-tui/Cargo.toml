@@ -3,6 +3,9 @@ name = "loopal-tui"
 version.workspace = true
 edition.workspace = true
 
+[lib]
+doctest = false
+
 [dependencies]
 loopal-protocol = { workspace = true }
 loopal-config = { workspace = true }

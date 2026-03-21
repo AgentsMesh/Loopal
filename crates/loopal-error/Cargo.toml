@@ -3,5 +3,9 @@ name = "loopal-error"
 version.workspace = true
 edition.workspace = true
 
+[lib]
+doctest = false
+test = false
+
 [dependencies]
 thiserror = { workspace = true }

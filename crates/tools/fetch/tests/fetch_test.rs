@@ -33,6 +33,7 @@ async fn test_fetch_invalid_url_returns_error() {
     let ctx = loopal_tool_api::ToolContext {
         cwd: std::env::temp_dir(), session_id: "t".into(), shared: None,
     };
+    // URL without http(s) scheme is rejected at validation, no network I/O
     let result = FetchTool.execute(serde_json::json!({"url": "not-a-url"}), &ctx).await;
-    assert!(result.is_err() || result.unwrap().is_error);
+    assert!(result.is_err());
 }

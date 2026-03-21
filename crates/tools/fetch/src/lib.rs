@@ -40,6 +40,14 @@ impl Tool for FetchTool {
         let url = input["url"].as_str().ok_or_else(|| {
             LoopalError::Tool(loopal_error::ToolError::InvalidInput("url is required".into()))
         })?;
+
+        // Validate URL format before making a network request
+        if !url.starts_with("http://") && !url.starts_with("https://") {
+            return Err(LoopalError::Tool(loopal_error::ToolError::InvalidInput(
+                format!("invalid URL (must start with http:// or https://): {url}"),
+            )));
+        }
+
         let prompt = input["prompt"].as_str();
 
         let response = reqwest::get(url).await.map_err(|e| {

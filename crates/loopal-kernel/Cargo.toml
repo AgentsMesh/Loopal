@@ -3,6 +3,10 @@ name = "loopal-kernel"
 version.workspace = true
 edition.workspace = true
 
+[lib]
+doctest = false
+test = false
+
 [dependencies]
 loopal-error = { workspace = true }
 loopal-config = { workspace = true }

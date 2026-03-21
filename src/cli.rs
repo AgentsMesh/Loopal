@@ -23,6 +23,10 @@ pub struct Cli {
     #[arg(long)]
     pub no_sandbox: bool,
 
+    /// Run as ACP server for IDE integration (stdin/stdout JSON-RPC)
+    #[arg(long)]
+    pub acp: bool,
+
     /// Initial prompt (non-interactive)
     pub prompt: Vec<String>,
 }

@@ -1500,6 +1500,7 @@ dependencies = [
  "chrono",
  "clap",
  "dirs",
+ "loopal-acp",
  "loopal-agent",
  "loopal-config",
  "loopal-context",
@@ -1519,6 +1520,30 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "loopal-acp"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "loopal-agent",
+ "loopal-config",
+ "loopal-context",
+ "loopal-error",
+ "loopal-kernel",
+ "loopal-message",
+ "loopal-protocol",
+ "loopal-runtime",
+ "loopal-storage",
+ "loopal-tool-api",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]

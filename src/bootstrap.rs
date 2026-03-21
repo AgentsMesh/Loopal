@@ -35,6 +35,11 @@ pub async fn run() -> anyhow::Result<()> {
     let mut settings = load_settings(&cwd)?;
     apply_cli_overrides(&cli, &mut settings);
 
+    // ACP mode — replace TUI with JSON-RPC server
+    if cli.acp {
+        return loopal_acp::run_acp(settings, cwd).await;
+    }
+
     let model = settings.model.clone();
     let max_turns = settings.max_turns;
     let permission_mode = settings.permission_mode;

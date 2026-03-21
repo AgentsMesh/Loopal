@@ -43,6 +43,7 @@ members = [
     "crates/loopal-agent",
     "crates/loopal-session",
     "crates/loopal-tui",
+    "crates/loopal-acp",
 ]
 
 [workspace.package]
@@ -140,6 +141,7 @@ loopal-sandbox = { path = "crates/loopal-sandbox" }
 loopal-agent = { path = "crates/loopal-agent" }
 loopal-session = { path = "crates/loopal-session" }
 loopal-tui = { path = "crates/loopal-tui" }
+loopal-acp = { path = "crates/loopal-acp" }
 
 [[bin]]
 name = "loopal"
@@ -161,6 +163,7 @@ loopal-runtime = { workspace = true }
 loopal-agent = { workspace = true }
 loopal-session = { workspace = true }
 loopal-tui = { workspace = true }
+loopal-acp = { workspace = true }
 tokio = { workspace = true }
 clap = { workspace = true }
 tracing = { workspace = true }

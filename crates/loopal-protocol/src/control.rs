@@ -21,4 +21,6 @@ pub enum ControlCommand {
     /// Rewind conversation to a specific turn (0-indexed from oldest).
     /// Discards the target turn and all subsequent messages.
     Rewind { turn_index: usize },
+    /// Switch thinking config at runtime. JSON string of ThinkingConfig.
+    ThinkingSwitch(String),
 }

@@ -44,3 +44,14 @@ fn test_control_command_rewind() {
         panic!("expected Rewind");
     }
 }
+
+#[test]
+fn test_control_command_thinking_switch() {
+    let json = r#"{"type":"effort","level":"high"}"#.to_string();
+    let cmd = ControlCommand::ThinkingSwitch(json.clone());
+    if let ControlCommand::ThinkingSwitch(val) = cmd {
+        assert_eq!(val, json);
+    } else {
+        panic!("expected ThinkingSwitch");
+    }
+}

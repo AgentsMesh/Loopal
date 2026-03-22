@@ -107,6 +107,22 @@ impl SessionController {
         let _ = self.control_tx.send(ControlCommand::ModelSwitch(model)).await;
     }
 
+    /// Switch the thinking configuration.
+    /// `config_json` is a serialized ThinkingConfig JSON string.
+    pub async fn switch_thinking(&self, config_json: String) {
+        let label = thinking_label_from_json(&config_json);
+        {
+            let mut state = self.lock();
+            state.thinking_config = label.clone();
+            state.messages.push(DisplayMessage {
+                role: "system".to_string(),
+                content: format!("Switched thinking to: {label}"),
+                tool_calls: Vec::new(),
+            });
+        }
+        let _ = self.control_tx.send(ControlCommand::ThinkingSwitch(config_json)).await;
+    }
+
     /// Clear all messages, inbox, streaming buffer and counters.
     pub async fn clear(&self) {
         {
@@ -161,5 +177,21 @@ impl SessionController {
     pub fn handle_event(&self, event: AgentEvent) -> Option<String> {
         let mut state = self.lock();
         event_handler::apply_event(&mut state, event)
+    }
+}
+
+/// Extract a human-readable label from a ThinkingConfig JSON string.
+fn thinking_label_from_json(json: &str) -> String {
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(json) else {
+        return "unknown".to_string();
+    };
+    match v.get("type").and_then(|t| t.as_str()) {
+        Some("auto") => "auto".to_string(),
+        Some("disabled") => "disabled".to_string(),
+        Some("effort") => v.get("level").and_then(|l| l.as_str()).unwrap_or("medium").to_string(),
+        Some("budget") => {
+            format!("budget({})", v.get("tokens").and_then(|t| t.as_u64()).unwrap_or(0))
+        }
+        _ => "unknown".to_string(),
     }
 }

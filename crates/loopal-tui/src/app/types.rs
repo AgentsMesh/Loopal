@@ -19,6 +19,15 @@ pub struct PickerItem {
     pub value: String,
 }
 
+/// A single thinking effort option for ←→ cycling in the model picker.
+#[derive(Debug, Clone)]
+pub struct ThinkingOption {
+    /// Display label: "Auto", "Low", "Medium", "High", "Disabled"
+    pub label: &'static str,
+    /// Serialized ThinkingConfig JSON value.
+    pub value: String,
+}
+
 /// Generic picker (sub-page) state.
 pub struct PickerState {
     /// Title shown at the top of the picker
@@ -31,6 +40,10 @@ pub struct PickerState {
     pub filter_cursor: usize,
     /// Index of the selected item in the *filtered* list
     pub selected: usize,
+    /// Thinking effort options for ←→ cycling. Empty if not applicable.
+    pub thinking_options: Vec<ThinkingOption>,
+    /// Currently selected thinking option index.
+    pub thinking_selected: usize,
 }
 
 impl PickerState {

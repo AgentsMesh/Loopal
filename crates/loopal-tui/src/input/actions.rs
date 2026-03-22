@@ -10,6 +10,8 @@ pub enum SlashCommandAction {
     ModelPicker,
     /// A model was selected from the picker.
     ModelSelected(String),
+    /// Model + thinking selected from the enhanced model picker.
+    ModelAndThinkingSelected { model: String, thinking_json: String },
     /// Open the rewind turn picker.
     RewindPicker,
     /// A turn was selected for rewind (turn_index from oldest = 0).

@@ -1,5 +1,9 @@
-use crate::app::{App, PickerItem, PickerState, SubPage, RewindPickerState, RewindTurnItem};
+use crate::app::{
+    App, PickerItem, PickerState, SubPage, ThinkingOption,
+    RewindPickerState, RewindTurnItem,
+};
 use crate::input::SlashCommandAction;
+use crate::slash_help::show_help;
 
 /// Handle a slash command action. All interaction goes through `app.session`.
 pub(crate) async fn handle_slash_command(
@@ -18,6 +22,10 @@ pub(crate) async fn handle_slash_command(
         }
         SlashCommandAction::ModelSelected(name) => {
             app.session.switch_model(name).await;
+        }
+        SlashCommandAction::ModelAndThinkingSelected { model, thinking_json } => {
+            app.session.switch_model(model).await;
+            app.session.switch_thinking(thinking_json).await;
         }
         SlashCommandAction::Status => {
             show_status(app);
@@ -81,7 +89,11 @@ fn open_rewind_picker(app: &mut App) {
 }
 
 fn open_model_picker(app: &mut App) {
-    let current_model = app.session.lock().model.clone();
+    let state = app.session.lock();
+    let current_model = state.model.clone();
+    let current_thinking = state.thinking_config.clone();
+    drop(state);
+
     let models = loopal_provider::list_all_models();
     let items: Vec<PickerItem> = models
         .into_iter()
@@ -103,13 +115,36 @@ fn open_model_picker(app: &mut App) {
             }
         })
         .collect();
+
+    let (thinking_options, thinking_selected) = build_thinking_options(&current_thinking);
     app.sub_page = Some(SubPage::ModelPicker(PickerState {
         title: "Switch Model".to_string(),
         items,
         filter: String::new(),
         filter_cursor: 0,
         selected: 0,
+        thinking_options,
+        thinking_selected,
     }));
+}
+
+/// Build the 5 thinking options and determine which one is currently selected.
+fn build_thinking_options(current: &str) -> (Vec<ThinkingOption>, usize) {
+    let options = vec![
+        ThinkingOption { label: "Auto", value: r#"{"type":"auto"}"#.to_string() },
+        ThinkingOption { label: "Low", value: r#"{"type":"effort","level":"low"}"#.to_string() },
+        ThinkingOption { label: "Medium", value: r#"{"type":"effort","level":"medium"}"#.to_string() },
+        ThinkingOption { label: "High", value: r#"{"type":"effort","level":"high"}"#.to_string() },
+        ThinkingOption { label: "Disabled", value: r#"{"type":"disabled"}"#.to_string() },
+    ];
+    let idx = match current {
+        "low" => 1,
+        "medium" => 2,
+        "high" => 3,
+        "disabled" => 4,
+        _ => 0, // "auto" or unknown
+    };
+    (options, idx)
 }
 
 fn show_status(app: &mut App) {
@@ -136,51 +171,4 @@ fn show_status(app: &mut App) {
     );
     drop(state);
     app.session.push_system_message(status);
-}
-
-fn show_help(app: &mut App, skill_name: Option<&str>) {
-    let content = if let Some(name) = skill_name {
-        let lookup = if name.starts_with('/') {
-            name.to_string()
-        } else {
-            format!("/{name}")
-        };
-        match app.commands.iter().find(|e| e.name == lookup) {
-            Some(entry) if entry.skill_body.is_some() => {
-                let body = entry.skill_body.as_deref().unwrap_or("");
-                format!("Skill: {}\n{}\n\n{body}", entry.name, entry.description)
-            }
-            Some(entry) => {
-                format!("{}: {}", entry.name, entry.description)
-            }
-            None => format!("Unknown command: {lookup}"),
-        }
-    } else {
-        build_full_help(&app.commands)
-    };
-    app.session.push_system_message(content);
-}
-
-fn build_full_help(commands: &[crate::command::CommandEntry]) -> String {
-    let lines: Vec<String> = commands
-        .iter()
-        .map(|entry| {
-            let arg_hint = if entry.has_arg { " <arg>" } else { "" };
-            let tag = if entry.skill_body.is_some() {
-                " (skill)"
-            } else {
-                ""
-            };
-            format!(
-                "  {:<16} {}{}",
-                format!("{}{arg_hint}", entry.name),
-                entry.description,
-                tag,
-            )
-        })
-        .collect();
-    format!(
-        "Available commands:\n{}\n\nShortcuts:\n  Shift+Tab       Toggle Plan/Act mode\n  Ctrl+C/D        Quit\n  PageUp/Down     Scroll chat\n  Up/Down         Input history",
-        lines.join("\n"),
-    )
 }

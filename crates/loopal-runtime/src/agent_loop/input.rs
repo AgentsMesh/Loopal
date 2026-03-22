@@ -5,6 +5,7 @@ use loopal_protocol::{Envelope, MessageSource};
 use loopal_error::Result;
 use loopal_protocol::AgentEventPayload;
 use loopal_message::Message;
+use loopal_provider_api::ThinkingConfig;
 use tracing::{error, info};
 
 use crate::mode::AgentMode;
@@ -70,9 +71,11 @@ impl AgentLoopRunner {
                 self.total_output_tokens = 0;
                 self.total_cache_creation_tokens = 0;
                 self.total_cache_read_tokens = 0;
+                self.total_thinking_tokens = 0;
                 self.emit(AgentEventPayload::TokenUsage {
                     input_tokens: 0, output_tokens: 0, context_window: self.max_context_tokens,
                     cache_creation_input_tokens: 0, cache_read_input_tokens: 0,
+                    thinking_tokens: 0,
                 }).await?;
             }
             ControlCommand::Compact => {
@@ -92,6 +95,15 @@ impl AgentLoopRunner {
             }
             ControlCommand::Rewind { turn_index } => {
                 self.handle_rewind(turn_index).await?;
+            }
+            ControlCommand::ThinkingSwitch(json) => {
+                match serde_json::from_str::<ThinkingConfig>(&json) {
+                    Ok(config) => {
+                        info!(thinking = ?config, "switching thinking config");
+                        self.thinking_config = config;
+                    }
+                    Err(e) => error!(error = %e, "invalid thinking config"),
+                }
             }
         }
         Ok(())

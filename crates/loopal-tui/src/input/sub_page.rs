@@ -45,13 +45,44 @@ fn handle_model_picker_key(app: &mut App, key: &KeyEvent) -> InputAction {
         KeyCode::Enter => {
             let filtered = picker.filtered_items();
             if let Some(item) = filtered.get(picker.selected) {
-                let value = item.value.clone();
+                let model = item.value.clone();
+                let thinking_json = picker
+                    .thinking_options
+                    .get(picker.thinking_selected)
+                    .map(|o| o.value.clone());
                 app.sub_page = None;
-                InputAction::SlashCommand(SlashCommandAction::ModelSelected(value))
+                match thinking_json {
+                    Some(json) => InputAction::SlashCommand(
+                        SlashCommandAction::ModelAndThinkingSelected {
+                            model,
+                            thinking_json: json,
+                        },
+                    ),
+                    None => InputAction::SlashCommand(
+                        SlashCommandAction::ModelSelected(model),
+                    ),
+                }
             } else {
                 app.sub_page = None;
                 InputAction::None
             }
+        }
+        KeyCode::Left => {
+            if !picker.thinking_options.is_empty() {
+                picker.thinking_selected = if picker.thinking_selected == 0 {
+                    picker.thinking_options.len() - 1
+                } else {
+                    picker.thinking_selected - 1
+                };
+            }
+            InputAction::None
+        }
+        KeyCode::Right => {
+            if !picker.thinking_options.is_empty() {
+                picker.thinking_selected =
+                    (picker.thinking_selected + 1) % picker.thinking_options.len();
+            }
+            InputAction::None
         }
         KeyCode::Char(c) => {
             picker.filter.insert(picker.filter_cursor, c);

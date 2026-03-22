@@ -5,6 +5,7 @@ pub mod input;
 pub mod markdown;
 pub mod render;
 mod slash_handler;
+mod slash_help;
 pub mod terminal;
 mod tui_loop;
 pub mod views;

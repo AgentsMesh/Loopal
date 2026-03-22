@@ -17,11 +17,14 @@ pub fn render_picker(f: &mut Frame, picker: &PickerState, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .title(format!(" {} ", picker.title))
-        .title_bottom(" Esc to go back ")
+        .title_bottom(build_hint_bar(picker))
         .border_style(Style::default().fg(Color::Cyan));
 
     let inner = block.inner(area);
     f.render_widget(block, area);
+
+    // Render thinking indicator overlaid on the top-right of the border
+    render_thinking_indicator(f, picker, area);
 
     if inner.height < 3 {
         return;
@@ -104,4 +107,43 @@ pub fn render_picker(f: &mut Frame, picker: &PickerState, area: Rect) {
 
         f.render_widget(Paragraph::new(line).style(bg), row_area);
     }
+}
+
+/// Render `Thinking: ◀ High ▶` overlaid on the top-right border of the picker.
+fn render_thinking_indicator(f: &mut Frame, picker: &PickerState, area: Rect) {
+    if picker.thinking_options.is_empty() || area.width < 30 {
+        return;
+    }
+    let label = picker
+        .thinking_options
+        .get(picker.thinking_selected)
+        .map(|o| o.label)
+        .unwrap_or("Auto");
+    let indicator = Line::from(vec![
+        Span::styled(" Thinking: ", Style::default().fg(Color::DarkGray)),
+        Span::styled("◀ ", Style::default().fg(Color::Magenta)),
+        Span::styled(label, Style::default().fg(Color::Magenta).bold()),
+        Span::styled(" ▶ ", Style::default().fg(Color::Magenta)),
+    ]);
+    // Estimate width: " Thinking: ◀ {label} ▶ " ~ 18 + label.len()
+    let w = (18 + label.len()).min(area.width as usize - 2) as u16;
+    let x = area.x + area.width - w - 1; // -1 for right border
+    let indicator_area = Rect::new(x, area.y, w, 1);
+    f.render_widget(Paragraph::new(indicator), indicator_area);
+}
+
+/// Build the bottom hint bar text, including thinking hint when applicable.
+fn build_hint_bar(picker: &PickerState) -> Line<'static> {
+    if picker.thinking_options.is_empty() {
+        return Line::from(" Esc to go back ");
+    }
+    Line::from(vec![
+        Span::raw(" Esc to go back  "),
+        Span::styled("◀▶", Style::default().fg(Color::Magenta)),
+        Span::raw(" thinking  "),
+        Span::styled("↑↓", Style::default().fg(Color::Cyan)),
+        Span::raw(" model  "),
+        Span::styled("⏎", Style::default().fg(Color::Green)),
+        Span::raw(" confirm "),
+    ])
 }

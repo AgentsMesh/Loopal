@@ -122,6 +122,9 @@ pub async fn run() -> anyhow::Result<()> {
     );
     if cli.resume.is_some() {
         session_ctrl.load_display_history(project_messages(&messages));
+    } else {
+        let display_path = abbreviate_home(&cwd);
+        session_ctrl.push_welcome(&model, &display_path);
     }
 
     let mut context_pipeline = ContextPipeline::new();
@@ -148,4 +151,14 @@ pub async fn run() -> anyhow::Result<()> {
     ).await?;
     tracing::info!("shutting down");
     Ok(())
+}
+
+/// Replace the home directory prefix with `~` for compact display.
+fn abbreviate_home(path: &std::path::Path) -> String {
+    if let Some(home) = dirs::home_dir()
+        && let Ok(rel) = path.strip_prefix(&home)
+    {
+        return format!("~/{}", rel.display());
+    }
+    path.display().to_string()
 }

@@ -15,6 +15,7 @@ use loopal_protocol::UserContent;
 use loopal_protocol::UserQuestionResponse;
 
 use crate::event_handler;
+use crate::helpers::{push_system_msg, thinking_label_from_json};
 use crate::inbox::try_forward_inbox;
 use crate::state::SessionState;
 use crate::types::DisplayMessage;
@@ -163,6 +164,17 @@ impl SessionController {
         push_system_msg(&mut self.lock(), &content);
     }
 
+    /// Push a welcome banner into the display (model + path).
+    pub fn push_welcome(&self, model: &str, path: &str) {
+        let mut state = self.lock();
+        state.messages.push(DisplayMessage {
+            role: "welcome".into(),
+            content: format!("{model}\n{path}"),
+            tool_calls: Vec::new(),
+            image_count: 0,
+        });
+    }
+
     /// Load historical display messages (e.g., after session resume).
     pub fn load_display_history(&self, display_msgs: Vec<DisplayMessage>) {
         self.lock().messages = display_msgs;
@@ -176,22 +188,4 @@ impl SessionController {
         let mut state = self.lock();
         event_handler::apply_event(&mut state, event)
     }
-}
-
-/// Extract a human-readable label from a ThinkingConfig JSON string.
-fn thinking_label_from_json(json: &str) -> String {
-    let Ok(v) = serde_json::from_str::<serde_json::Value>(json) else { return "unknown".into() };
-    match v.get("type").and_then(|t| t.as_str()) {
-        Some("auto") => "auto".into(),
-        Some("disabled") => "disabled".into(),
-        Some("effort") => v.get("level").and_then(|l| l.as_str()).unwrap_or("medium").into(),
-        Some("budget") => format!("budget({})", v.get("tokens").and_then(|t| t.as_u64()).unwrap_or(0)),
-        _ => "unknown".into(),
-    }
-}
-
-fn push_system_msg(state: &mut crate::state::SessionState, content: &str) {
-    state.messages.push(DisplayMessage {
-        role: "system".into(), content: content.into(), tool_calls: Vec::new(), image_count: 0,
-    });
 }

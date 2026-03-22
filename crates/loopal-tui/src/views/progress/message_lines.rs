@@ -20,6 +20,7 @@ pub fn message_to_lines(msg: &DisplayMessage, width: u16) -> Vec<Line<'static>> 
         "user" => render_user(&mut lines, msg, width),
         "assistant" => render_assistant(&mut lines, msg, width),
         "thinking" => render_thinking(&mut lines, msg),
+        "welcome" => render_welcome(&mut lines, msg),
         "error" => render_prefixed(&mut lines, msg, "Error: ", Color::Red, width),
         "system" => render_prefixed(&mut lines, msg, "System: ", Color::Yellow, width),
         _ => render_prefixed(&mut lines, msg, &format!("{}: ", msg.role), Color::White, width),
@@ -111,6 +112,90 @@ fn render_thinking(lines: &mut Vec<Line<'static>>, msg: &DisplayMessage) {
             .fg(Color::Magenta)
             .add_modifier(Modifier::DIM),
     )));
+}
+
+/// Welcome banner: ASCII art logo + slogan + model/path info.
+///
+/// Content format: "model\npath" (two lines separated by newline).
+fn render_welcome(lines: &mut Vec<Line<'static>>, msg: &DisplayMessage) {
+    let mut parts = msg.content.splitn(2, '\n');
+    let model = parts.next().unwrap_or("");
+    let path = parts.next().unwrap_or("");
+
+    // ASCII art "LOOPAL" — gradient from green to cyan
+    // Each row gets a slightly different color to create a vertical gradient effect
+    let logo_lines: &[&str] = &[
+        r"  _        ___    ___   ____     _     _     ",
+        r" | |      / _ \  / _ \ |  _ \   / \   | |    ",
+        r" | |     | | | || | | || |_) | / _ \  | |    ",
+        r" | |___  | |_| || |_| ||  __/ / ___ \ | |___ ",
+        r" |_____|  \___/  \___/ |_|   /_/   \_\|_____|",
+    ];
+
+    let gradient: &[Color] = &[
+        Color::Rgb(80, 200, 120),   // green
+        Color::Rgb(70, 200, 150),   // green-teal
+        Color::Rgb(60, 195, 180),   // teal
+        Color::Rgb(50, 190, 210),   // teal-cyan
+        Color::Rgb(40, 180, 230),   // cyan
+    ];
+
+    lines.push(Line::from(""));
+    for (i, logo_line) in logo_lines.iter().enumerate() {
+        let color = gradient[i % gradient.len()];
+        lines.push(Line::from(Span::styled(
+            logo_line.to_string(),
+            Style::default().fg(color).bold(),
+        )));
+    }
+
+    // Slogan line
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![
+        Span::styled(
+            "  Rooted in code, Growing with ",
+            Style::default().fg(Color::Rgb(140, 150, 170)),
+        ),
+        Span::styled(
+            "loopal",
+            Style::default().fg(Color::Rgb(60, 195, 180)).bold(),
+        ),
+        Span::styled(
+            ".",
+            Style::default().fg(Color::Rgb(140, 150, 170)),
+        ),
+    ]));
+    lines.push(Line::from(Span::styled(
+        "  Part of AgentsMesh.ai",
+        Style::default().fg(Color::Rgb(100, 110, 130)),
+    )));
+
+    // Info section: model + working directory
+    lines.push(Line::from(""));
+    if !model.is_empty() {
+        lines.push(Line::from(vec![
+            Span::styled(
+                "  model:     ",
+                Style::default().fg(Color::Rgb(100, 110, 130)).add_modifier(Modifier::DIM),
+            ),
+            Span::styled(
+                model.to_string(),
+                Style::default().fg(Color::Cyan),
+            ),
+        ]));
+    }
+    if !path.is_empty() {
+        lines.push(Line::from(vec![
+            Span::styled(
+                "  directory: ",
+                Style::default().fg(Color::Rgb(100, 110, 130)).add_modifier(Modifier::DIM),
+            ),
+            Span::styled(
+                path.to_string(),
+                Style::default().fg(Color::Rgb(160, 170, 190)),
+            ),
+        ]));
+    }
 }
 
 /// Generic prefixed message (error, system, unknown roles).

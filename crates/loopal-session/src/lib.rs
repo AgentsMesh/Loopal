@@ -1,6 +1,7 @@
 mod agent_handler;
 pub mod controller;
 pub mod event_handler;
+mod helpers;
 pub mod rewind;
 pub mod thinking_display;
 mod tool_result_handler;

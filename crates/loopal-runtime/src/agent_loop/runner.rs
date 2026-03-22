@@ -1,8 +1,10 @@
+use std::sync::Arc;
 use loopal_provider::get_model_info;
 use loopal_error::{AgentOutput, Result};
-use loopal_protocol::AgentEventPayload;
+use loopal_protocol::{AgentEventPayload, InterruptSignal};
 use loopal_provider_api::{StopReason, ThinkingConfig};
 use loopal_tool_api::ToolContext;
+use tokio::sync::Notify;
 use tracing::{Instrument, info, info_span, warn};
 
 use super::{AgentLoopParams, MAX_AUTO_CONTINUATIONS, TurnOutput};
@@ -20,6 +22,8 @@ pub struct AgentLoopRunner {
     pub thinking_config: ThinkingConfig,
     pub max_context_tokens: u32,
     pub max_output_tokens: u32,
+    pub interrupt: InterruptSignal,
+    pub interrupt_notify: Arc<Notify>,
 }
 
 impl AgentLoopRunner {
@@ -36,6 +40,8 @@ impl AgentLoopRunner {
         let max_context_tokens = model_info.as_ref().map_or(200_000, |m| m.context_window);
         let max_output_tokens = model_info.as_ref().map_or(16_384, |m| m.max_output_tokens);
         let thinking_config = params.thinking_config.clone();
+        let interrupt = params.interrupt.clone();
+        let interrupt_notify = params.interrupt_notify.clone();
         Self {
             params, tool_ctx, turn_count: 0,
             total_input_tokens: 0, total_output_tokens: 0,
@@ -43,6 +49,7 @@ impl AgentLoopRunner {
             total_thinking_tokens: 0,
             thinking_config,
             max_context_tokens, max_output_tokens,
+            interrupt, interrupt_notify,
         }
     }
 
@@ -83,6 +90,12 @@ impl AgentLoopRunner {
         let mut last_text = String::new();
         let mut continuation_count: u32 = 0;
         loop {
+            // Early exit if interrupted (e.g. tools returned "Interrupted" results
+            // and the loop came back — skip the next LLM call).
+            if self.interrupt.is_signaled() {
+                return Ok(TurnOutput { output: last_text });
+            }
+
             // Clone persistent history → middleware → preflight → send to LLM
             let mut working = self.params.messages.clone();
             if !self.execute_middleware_on(&mut working).await? {

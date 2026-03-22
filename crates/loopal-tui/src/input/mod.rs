@@ -169,10 +169,13 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> InputAction {
             InputAction::None
         }
         KeyCode::Esc => {
-            let now = Instant::now();
             let is_idle = app.session.lock().agent_idle;
+            if !is_idle {
+                return InputAction::Interrupt;
+            }
+            let now = Instant::now();
             let is_empty = app.input.is_empty();
-            if is_idle && is_empty {
+            if is_empty {
                 if let Some(last) = app.last_esc_time.take()
                     && now.duration_since(last).as_millis() < 300
                 {

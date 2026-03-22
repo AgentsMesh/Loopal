@@ -14,7 +14,7 @@ fn make_controller() -> (SessionController, mpsc::Receiver<ControlCommand>, mpsc
         "act".to_string(),
         control_tx,
         perm_tx,
-        question_tx,
+        question_tx, Default::default(), std::sync::Arc::new(tokio::sync::Notify::new()),
     );
     (ctrl, control_rx, perm_rx)
 }

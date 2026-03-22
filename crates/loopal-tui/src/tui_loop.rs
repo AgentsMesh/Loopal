@@ -66,6 +66,9 @@ pub async fn run_tui(
                             app.history_index = None;
                             if let Some(msg) = app.session.enqueue_message(content) {
                                 route_human_message(&router, &target_agent, msg).await;
+                            } else {
+                                // Agent busy — interrupt so queued message gets processed
+                                app.session.interrupt();
                             }
                         }
                         InputAction::PasteRequested => {
@@ -78,6 +81,9 @@ pub async fn run_tui(
                         InputAction::ToolDeny => {
                             let has = app.session.lock().pending_permission.is_some();
                             if has { app.session.deny_permission().await; }
+                        }
+                        InputAction::Interrupt => {
+                            app.session.interrupt();
                         }
                         InputAction::ModeSwitch(mode) => {
                             let m = if mode == "plan" { AgentMode::Plan } else { AgentMode::Act };

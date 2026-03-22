@@ -136,7 +136,7 @@ async fn test_check_permission_channel_closed_denies() {
         tool_filter: None,
         shared: None,
         interactive: true,
-        thinking_config: loopal_provider_api::ThinkingConfig::Auto,
+        thinking_config: loopal_provider_api::ThinkingConfig::Auto, interrupt: Default::default(), interrupt_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
     };
 
     let runner = AgentLoopRunner::new(params);

@@ -64,5 +64,8 @@ pub(crate) fn apply_agent_event(
         AgentEventPayload::ToolPermissionRequest { .. } => {}
         AgentEventPayload::UserQuestionRequest { .. } => {}
         AgentEventPayload::Rewound { .. } => {}
+        AgentEventPayload::Interrupted => {
+            agent.observable.status = AgentStatus::WaitingForInput;
+        }
     }
 }

@@ -107,6 +107,8 @@ impl AcpHandler {
             shared: Some(shared),
             interactive: true,
             thinking_config: self.config.settings.thinking.clone(),
+            interrupt: loopal_protocol::InterruptSignal::new(),
+            interrupt_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
         };
 
         tokio::spawn(async move {

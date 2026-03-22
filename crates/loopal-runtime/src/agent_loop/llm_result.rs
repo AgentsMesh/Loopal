@@ -10,3 +10,17 @@ pub struct LlmStreamResult {
     pub thinking_signature: Option<String>,
     pub thinking_tokens: u32,
 }
+
+impl Default for LlmStreamResult {
+    fn default() -> Self {
+        Self {
+            assistant_text: String::new(),
+            tool_uses: Vec::new(),
+            stream_error: false,
+            stop_reason: StopReason::EndTurn,
+            thinking_text: String::new(),
+            thinking_signature: None,
+            thinking_tokens: 0,
+        }
+    }
+}

@@ -17,6 +17,7 @@ use loopal_runtime::frontend::tui_permission::TuiPermissionHandler;
 use loopal_runtime::frontend::question_handler::TuiQuestionHandler;
 use loopal_runtime::projection::project_messages;
 use loopal_protocol::UserQuestionResponse;
+use loopal_protocol::InterruptSignal;
 use loopal_session::SessionController;
 use loopal_tui::command::merge_commands;
 use loopal_protocol::ControlCommand;
@@ -86,11 +87,14 @@ pub async fn run() -> anyhow::Result<()> {
 
     // Root agent mailbox — registered with router
     let (mailbox_tx, mailbox_rx) = mpsc::channel::<Envelope>(16);
-    router.register("main", mailbox_tx).await
-        .map_err(|e| anyhow::anyhow!(e))?;
+    router.register("main", mailbox_tx).await.map_err(|e| anyhow::anyhow!(e))?;
 
     // Control channel — TUI → runtime (mode switch, clear, compact, model switch)
     let (control_tx, control_rx) = mpsc::channel::<ControlCommand>(16);
+
+    // Shared interrupt signal + async wakeup — TUI sets on ESC / message-while-busy
+    let interrupt = InterruptSignal::new();
+    let interrupt_notify = Arc::new(tokio::sync::Notify::new());
 
     // Build UnifiedFrontend (root agent: no cancel_token, TUI permission handler)
     let frontend = Arc::new(UnifiedFrontend::new(
@@ -132,6 +136,7 @@ pub async fn run() -> anyhow::Result<()> {
 
     let session_ctrl = SessionController::new(
         model.clone(), mode_str, control_tx, permission_tx, question_tx,
+        interrupt.clone(), interrupt_notify.clone(),
     );
 
     // Restore display history when resuming a session
@@ -158,6 +163,8 @@ pub async fn run() -> anyhow::Result<()> {
         shared: Some(shared_any),
         interactive: true,
         thinking_config,
+        interrupt: interrupt.clone(),
+        interrupt_notify: interrupt_notify.clone(),
     };
 
     tokio::spawn(async move {

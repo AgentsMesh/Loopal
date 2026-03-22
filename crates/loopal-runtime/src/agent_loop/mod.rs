@@ -18,6 +18,8 @@ use loopal_context::ContextPipeline;
 use loopal_kernel::Kernel;
 use loopal_storage::Session;
 use loopal_error::{AgentOutput, Result};
+use loopal_protocol::InterruptSignal;
+use tokio::sync::Notify;
 use crate::frontend::traits::AgentFrontend;
 use loopal_message::Message;
 use loopal_provider_api::ThinkingConfig;
@@ -52,6 +54,10 @@ pub struct AgentLoopParams {
     pub interactive: bool,
     /// Thinking/reasoning configuration (default: Auto).
     pub thinking_config: ThinkingConfig,
+    /// Shared interrupt signal — TUI sets it on ESC or message-while-busy.
+    pub interrupt: InterruptSignal,
+    /// Async wakeup companion for `interrupt` — allows `tokio::select!` responsiveness.
+    pub interrupt_notify: Arc<Notify>,
 }
 
 /// Public wrapper function that preserves the existing API.

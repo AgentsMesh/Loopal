@@ -13,7 +13,7 @@ fn make_app() -> App {
     let (perm_tx, _) = mpsc::channel::<bool>(16);
     let (question_tx, _) = mpsc::channel::<UserQuestionResponse>(16);
     let session = SessionController::new(
-        "test-model".into(), "act".into(), control_tx, perm_tx, question_tx,
+        "test-model".into(), "act".into(), control_tx, perm_tx, question_tx, Default::default(), std::sync::Arc::new(tokio::sync::Notify::new()),
     );
     App::new(session, builtin_entries(), std::env::temp_dir())
 }

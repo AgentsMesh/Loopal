@@ -12,8 +12,7 @@ use crate::truncate::truncate_json;
 use crate::state::SessionState;
 use crate::types::{DisplayMessage, DisplayToolCall, PendingPermission};
 
-/// Handle an AgentEvent by mutating SessionState in-place.
-/// Returns `Some(content)` if an inbox message should be forwarded (agent became idle).
+/// Handle an AgentEvent. Returns `Some(content)` if an inbox message should be forwarded.
 pub fn apply_event(state: &mut SessionState, event: AgentEvent) -> Option<UserContent> {
     if let AgentEventPayload::MessageRouted {
         ref source, ref target, ref content_preview,
@@ -50,10 +49,8 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
                 let thinking = std::mem::take(&mut state.streaming_thinking);
                 let summary = format_thinking_summary(&thinking, token_count);
                 state.messages.push(DisplayMessage {
-                    role: "thinking".to_string(),
-                    content: summary,
-                    tool_calls: Vec::new(),
-                    image_count: 0,
+                    role: "thinking".to_string(), content: summary,
+                    tool_calls: Vec::new(), image_count: 0,
                 });
             }
         }
@@ -73,10 +70,8 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
                 return None;
             }
             state.messages.push(DisplayMessage {
-                role: "assistant".to_string(),
-                content: String::new(),
-                tool_calls: vec![tc],
-                image_count: 0,
+                role: "assistant".to_string(), content: String::new(),
+                tool_calls: vec![tc], image_count: 0,
             });
         }
         AgentEventPayload::ToolResult { id: _, name, result, is_error } => {
@@ -89,10 +84,8 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
         AgentEventPayload::Error { message } => {
             flush_streaming(state);
             state.messages.push(DisplayMessage {
-                role: "error".to_string(),
-                content: message,
-                tool_calls: Vec::new(),
-                image_count: 0,
+                role: "error".into(), content: message,
+                tool_calls: Vec::new(), image_count: 0,
             });
         }
         AgentEventPayload::AwaitingInput => {
@@ -104,23 +97,13 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
         }
         AgentEventPayload::MaxTurnsReached { turns } => {
             flush_streaming(state);
-            state.messages.push(DisplayMessage {
-                role: "system".to_string(),
-                content: format!("Max turns reached ({})", turns),
-                tool_calls: Vec::new(),
-                image_count: 0,
-            });
+            state.messages.push(system_msg(&format!("Max turns reached ({})", turns)));
         }
         AgentEventPayload::AutoContinuation { continuation, max_continuations } => {
-            state.messages.push(DisplayMessage {
-                role: "system".to_string(),
-                content: format!(
-                    "Output truncated (max_tokens). Auto-continuing ({}/{})",
-                    continuation, max_continuations
-                ),
-                tool_calls: Vec::new(),
-                image_count: 0,
-            });
+            state.messages.push(system_msg(&format!(
+                "Output truncated (max_tokens). Auto-continuing ({}/{})",
+                continuation, max_continuations
+            )));
         }
         AgentEventPayload::TokenUsage {
             input_tokens, output_tokens, context_window,
@@ -151,6 +134,13 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
         AgentEventPayload::Rewound { remaining_turns } => {
             crate::rewind::truncate_display_to_turn(state, remaining_turns);
         }
+        AgentEventPayload::Interrupted => {
+            flush_streaming(state);
+            state.messages.push(system_msg("Interrupted"));
+            state.end_turn();
+            state.agent_idle = true;
+            return try_forward_inbox(state);
+        }
     }
     None
 }
@@ -162,10 +152,8 @@ pub(crate) fn flush_streaming(state: &mut SessionState) {
         let token_est = thinking.len() as u32 / 4;
         let summary = format_thinking_summary(&thinking, token_est);
         state.messages.push(DisplayMessage {
-            role: "thinking".to_string(),
-            content: summary,
-            tool_calls: Vec::new(),
-            image_count: 0,
+            role: "thinking".to_string(), content: summary,
+            tool_calls: Vec::new(), image_count: 0,
         });
         state.thinking_active = false;
     }
@@ -180,10 +168,15 @@ pub(crate) fn flush_streaming(state: &mut SessionState) {
             return;
         }
         state.messages.push(DisplayMessage {
-            role: "assistant".to_string(),
-            content: text,
-            tool_calls: Vec::new(),
-            image_count: 0,
+            role: "assistant".to_string(), content: text,
+            tool_calls: Vec::new(), image_count: 0,
         });
+    }
+}
+
+fn system_msg(content: &str) -> DisplayMessage {
+    DisplayMessage {
+        role: "system".into(), content: content.into(),
+        tool_calls: Vec::new(), image_count: 0,
     }
 }

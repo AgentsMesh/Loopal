@@ -134,6 +134,8 @@ pub async fn spawn_agent(
         shared: Some(shared_any),
         interactive: false,
         thinking_config: loopal_provider_api::ThinkingConfig::Auto,
+        interrupt: loopal_protocol::InterruptSignal::new(),
+        interrupt_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
     };
 
     let agent_name = params.name.clone();

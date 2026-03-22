@@ -20,6 +20,27 @@ impl AgentLoopRunner {
         &mut self,
         tool_uses: Vec<(String, String, serde_json::Value)>,
     ) -> Result<Option<String>> {
+        // Check interrupt before starting any tool execution
+        if self.interrupt.is_signaled() {
+            info!("interrupt signaled, skipping tool execution");
+            let mut blocks = Vec::with_capacity(tool_uses.len());
+            for (id, name, _) in &tool_uses {
+                self.emit(AgentEventPayload::ToolResult {
+                    id: id.clone(), name: name.clone(),
+                    result: "Interrupted by user".into(), is_error: true,
+                }).await?;
+                blocks.push(ContentBlock::ToolResult {
+                    tool_use_id: id.clone(), content: "Interrupted by user".into(), is_error: true,
+                });
+            }
+            let mut msg = Message { id: None, role: MessageRole::User, content: blocks };
+            if let Err(e) = self.params.session_manager.save_message(&self.params.session.id, &mut msg) {
+                error!(error = %e, "failed to persist message");
+            }
+            self.params.messages.push(msg);
+            return Ok(None);
+        }
+
         // Phase 0: Intercept special tools (EnterPlanMode, ExitPlanMode, AskUser)
         let mut intercepted: Vec<(usize, ContentBlock)> = Vec::new();
         let mut remaining: Vec<(String, String, serde_json::Value)> = Vec::new();

@@ -36,11 +36,17 @@ impl AgentLoopRunner {
             match self.execute_turn().await {
                 Ok(turn) => {
                     if !turn.output.is_empty() { last_output.clone_from(&turn.output); }
-                    // Non-interactive agents (sub-agents) always exit after a turn.
-                    // Interactive agents continue to wait_for_input even after
-                    // AttemptCompletion — "completed" means "turn done", not "exit forever".
+
+                    // Atomically check + clear interrupt (avoids losing a second signal)
+                    if self.interrupt.take() {
+                        self.emit_interrupted().await?;
+                        match self.wait_for_input().await? {
+                            Some(WaitResult::MessageAdded) => { self.turn_count += 1; continue; }
+                            None => break,
+                        }
+                    }
+
                     if !self.params.interactive { break; }
-                    // Check if max turns was reached during execute_turn
                     if self.turn_count >= self.params.max_turns {
                         self.emit(AgentEventPayload::MaxTurnsReached {
                             turns: self.turn_count,
@@ -56,6 +62,14 @@ impl AgentLoopRunner {
                     }
                 }
                 Err(e) => {
+                    // Interrupt during LLM call may surface as a network error — handle gracefully
+                    if self.interrupt.take() {
+                        self.emit_interrupted().await?;
+                        match self.wait_for_input().await? {
+                            Some(WaitResult::MessageAdded) => { self.turn_count += 1; continue; }
+                            None => break,
+                        }
+                    }
                     if !self.params.interactive {
                         return Ok(AgentOutput {
                             result: last_output,
@@ -78,5 +92,11 @@ impl AgentLoopRunner {
             result: if self.params.interactive { String::new() } else { last_output },
             terminate_reason: TerminateReason::Goal,
         })
+    }
+
+    /// Emit Interrupted event to TUI. Signal is already consumed by `take()`.
+    async fn emit_interrupted(&mut self) -> Result<()> {
+        info!("agent interrupted by user");
+        self.emit(AgentEventPayload::Interrupted).await
     }
 }

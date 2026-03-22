@@ -50,7 +50,7 @@ async fn test_agent_loop_immediate_channel_close() {
         frontend, session_manager: SessionManager::with_base_dir(tmp),
         context_pipeline: ContextPipeline::new(),
         tool_filter: None, shared: None, interactive: true,
-        thinking_config: loopal_provider_api::ThinkingConfig::Auto,
+        thinking_config: loopal_provider_api::ThinkingConfig::Auto, interrupt: Default::default(), interrupt_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
     };
 
     // Drop senders to close channels
@@ -88,7 +88,7 @@ async fn test_agent_loop_max_turns_reached() {
         frontend, session_manager: SessionManager::with_base_dir(tmp),
         context_pipeline: ContextPipeline::new(),
         tool_filter: None, shared: None, interactive: true,
-        thinking_config: loopal_provider_api::ThinkingConfig::Auto,
+        thinking_config: loopal_provider_api::ThinkingConfig::Auto, interrupt: Default::default(), interrupt_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
     };
 
     let result = agent_loop(params).await;

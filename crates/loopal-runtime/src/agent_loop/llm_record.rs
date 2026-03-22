@@ -16,8 +16,10 @@ impl AgentLoopRunner {
     ) {
         let mut assistant_content: Vec<ContentBlock> = Vec::new();
 
-        // Thinking block goes first (Anthropic API requires this order)
-        if !thinking_text.is_empty() {
+        // Thinking block goes first (Anthropic API requires this order).
+        // Skip if signature is missing — an unsigned thinking block (e.g. from
+        // an interrupted stream) fails API validation on the next multi-turn call.
+        if !thinking_text.is_empty() && thinking_signature.is_some() {
             assistant_content.push(ContentBlock::Thinking {
                 thinking: thinking_text.to_string(),
                 signature: thinking_signature.map(String::from),

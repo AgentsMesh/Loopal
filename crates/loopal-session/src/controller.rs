@@ -5,11 +5,12 @@
 
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use tokio::sync::mpsc;
+use tokio::sync::{Notify, mpsc};
 
 use loopal_protocol::AgentMode;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::AgentEvent;
+use loopal_protocol::InterruptSignal;
 use loopal_protocol::UserContent;
 use loopal_protocol::UserQuestionResponse;
 
@@ -28,6 +29,8 @@ pub struct SessionController {
     control_tx: mpsc::Sender<ControlCommand>,
     permission_tx: mpsc::Sender<bool>,
     question_tx: mpsc::Sender<UserQuestionResponse>,
+    interrupt: InterruptSignal,
+    interrupt_notify: Arc<Notify>,
 }
 
 impl SessionController {
@@ -37,12 +40,13 @@ impl SessionController {
         control_tx: mpsc::Sender<ControlCommand>,
         permission_tx: mpsc::Sender<bool>,
         question_tx: mpsc::Sender<UserQuestionResponse>,
+        interrupt: InterruptSignal,
+        interrupt_notify: Arc<Notify>,
     ) -> Self {
         Self {
             state: Arc::new(Mutex::new(SessionState::new(model, mode))),
-            control_tx,
-            permission_tx,
-            question_tx,
+            control_tx, permission_tx, question_tx,
+            interrupt, interrupt_notify,
         }
     }
 
@@ -54,6 +58,12 @@ impl SessionController {
     }
 
     // === Interaction (control plane only) ===
+
+    /// Interrupt the agent's current work (ESC or message-while-busy).
+    pub fn interrupt(&self) {
+        self.interrupt.signal();
+        self.interrupt_notify.notify_waiters();
+    }
 
     /// Push a message into inbox. Returns Some(content) if it should be forwarded.
     ///
@@ -100,29 +110,18 @@ impl SessionController {
         {
             let mut state = self.lock();
             state.model = model.clone();
-            state.messages.push(DisplayMessage {
-                role: "system".to_string(),
-                content: format!("Switched model to: {model}"),
-                tool_calls: Vec::new(),
-                image_count: 0,
-            });
+            push_system_msg(&mut state, &format!("Switched model to: {model}"));
         }
         let _ = self.control_tx.send(ControlCommand::ModelSwitch(model)).await;
     }
 
-    /// Switch the thinking configuration.
-    /// `config_json` is a serialized ThinkingConfig JSON string.
+    /// Switch the thinking configuration (`config_json` is serialized ThinkingConfig).
     pub async fn switch_thinking(&self, config_json: String) {
         let label = thinking_label_from_json(&config_json);
         {
             let mut state = self.lock();
             state.thinking_config = label.clone();
-            state.messages.push(DisplayMessage {
-                role: "system".to_string(),
-                content: format!("Switched thinking to: {label}"),
-                tool_calls: Vec::new(),
-                image_count: 0,
-            });
+            push_system_msg(&mut state, &format!("Switched thinking to: {label}"));
         }
         let _ = self.control_tx.send(ControlCommand::ThinkingSwitch(config_json)).await;
     }
@@ -150,7 +149,6 @@ impl SessionController {
     }
 
     /// Rewind conversation to the given turn index.
-    /// The runtime will truncate messages and emit a Rewound event.
     pub async fn rewind(&self, turn_index: usize) {
         let _ = self.control_tx.send(ControlCommand::Rewind { turn_index }).await;
     }
@@ -162,12 +160,7 @@ impl SessionController {
 
     /// Push a system message into the display.
     pub fn push_system_message(&self, content: String) {
-        self.lock().messages.push(DisplayMessage {
-            role: "system".to_string(),
-            content,
-            tool_calls: Vec::new(),
-            image_count: 0,
-        });
+        push_system_msg(&mut self.lock(), &content);
     }
 
     /// Load historical display messages (e.g., after session resume).
@@ -187,16 +180,18 @@ impl SessionController {
 
 /// Extract a human-readable label from a ThinkingConfig JSON string.
 fn thinking_label_from_json(json: &str) -> String {
-    let Ok(v) = serde_json::from_str::<serde_json::Value>(json) else {
-        return "unknown".to_string();
-    };
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(json) else { return "unknown".into() };
     match v.get("type").and_then(|t| t.as_str()) {
-        Some("auto") => "auto".to_string(),
-        Some("disabled") => "disabled".to_string(),
-        Some("effort") => v.get("level").and_then(|l| l.as_str()).unwrap_or("medium").to_string(),
-        Some("budget") => {
-            format!("budget({})", v.get("tokens").and_then(|t| t.as_u64()).unwrap_or(0))
-        }
-        _ => "unknown".to_string(),
+        Some("auto") => "auto".into(),
+        Some("disabled") => "disabled".into(),
+        Some("effort") => v.get("level").and_then(|l| l.as_str()).unwrap_or("medium").into(),
+        Some("budget") => format!("budget({})", v.get("tokens").and_then(|t| t.as_u64()).unwrap_or(0)),
+        _ => "unknown".into(),
     }
+}
+
+fn push_system_msg(state: &mut crate::state::SessionState, content: &str) {
+    state.messages.push(DisplayMessage {
+        role: "system".into(), content: content.into(), tool_calls: Vec::new(), image_count: 0,
+    });
 }

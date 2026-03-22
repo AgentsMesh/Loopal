@@ -32,6 +32,8 @@ pub enum InputAction {
     ToolApprove,
     /// User denied tool use
     ToolDeny,
+    /// Interrupt the agent's current work (ESC while busy)
+    Interrupt,
     /// User wants to switch mode
     ModeSwitch(String),
     /// User executed a slash command

@@ -21,6 +21,9 @@ impl AgentLoopRunner {
     /// handled inline and the wait resumes — only a real user message
     /// or a disconnect exits this function.
     pub async fn wait_for_input(&mut self) -> Result<Option<WaitResult>> {
+        // Discard any stale interrupt signal from the previous turn.
+        // Entering idle means the prior turn's interrupt has been fully handled.
+        self.interrupt.take();
         self.emit(AgentEventPayload::AwaitingInput).await?;
         loop {
             let input = self.params.frontend.recv_input().await;

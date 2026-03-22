@@ -2,6 +2,7 @@ use ratatui::prelude::*;
 
 use crate::app::{App, SubPage};
 use crate::views;
+use crate::views::input_view;
 
 // ---------------------------------------------------------------------------
 // Layout
@@ -9,27 +10,27 @@ use crate::views;
 
 /// Computed frame layout for one render pass.
 ///
-/// Pure function of (terminal size, agent count) → rectangles.
+/// Pure function of (terminal size, agent count, input height) → rectangles.
 /// Separates "where things go" from "what renders there."
 struct FrameLayout {
     content: Rect,   // f₁: workflow output (elastic)
     agents: Rect,    // f₂: agent status panel (dynamic 0-N)
     separator: Rect, // f₃: dim dashed line (1)
-    input: Rect,     // f₄: command prompt (1)
+    input: Rect,     // f₄: command prompt (1..8 rows, dynamic)
     status: Rect,    // f₅: unified status bar (1)
     /// Merged area for sub-page pickers (replaces f₁..f₄).
     picker: Rect,
 }
 
 impl FrameLayout {
-    fn compute(size: Rect, agent_panel_h: u16) -> Self {
+    fn compute(size: Rect, agent_panel_h: u16, input_h: u16) -> Self {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Min(3),
                 Constraint::Length(agent_panel_h),
                 Constraint::Length(1),
-                Constraint::Length(1),
+                Constraint::Length(input_h),
                 Constraint::Length(1),
             ])
             .split(size);
@@ -62,13 +63,23 @@ impl FrameLayout {
 /// f₁    content     messages, streaming, thinking, scroll      Min(3)
 /// f₂    agents      agents, focused_agent                      dynamic
 /// f₃    separator   (none)                                     1
-/// f₄    input       input_text, cursor, inbox_count            1
+/// f₄    input       input_text, cursor, inbox_count            1..8 dynamic
 /// f₅    status      mode, model, tokens, elapsed, thinking     1
 /// ```
 pub fn draw(f: &mut Frame, app: &mut App) {
     let size = f.area();
     let state = app.session.lock();
-    let layout = FrameLayout::compute(size, views::agent_panel::panel_height(&state.agents));
+
+    // Compute dynamic input height based on content
+    let inbox_count = state.inbox.len();
+    let pw = input_view::prefix_width(inbox_count, app.pending_image_count());
+    let input_h = input_view::input_height(&app.input, size.width, pw);
+
+    let layout = FrameLayout::compute(
+        size,
+        views::agent_panel::panel_height(&state.agents),
+        input_h,
+    );
 
     // Sub-page mode: picker replaces f₁..f₄, only f₅ remains
     if let Some(ref sub_page) = app.sub_page {
@@ -95,13 +106,18 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     // Extract overlay data, release domain state lock
     let pending_perm = state.pending_permission.clone();
     let pending_question = state.pending_question.clone();
-    let inbox_count = state.inbox.len();
     drop(state);
 
     // f₄ rendered post-lock (borrows app.input, not SessionState)
     let image_count = app.pending_image_count();
     views::input_view::render_input(
-        f, &app.input, app.input_cursor, inbox_count, image_count, layout.input,
+        f,
+        &app.input,
+        app.input_cursor,
+        inbox_count,
+        image_count,
+        app.input_scroll,
+        layout.input,
     );
 
     // Overlay layer: conditional popups on top of base composition

@@ -2,6 +2,7 @@ mod types;
 
 pub use types::*;
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -32,6 +33,10 @@ pub struct App {
     pub cwd: PathBuf,
     /// Timestamp of the last ESC press (for double-ESC rewind trigger).
     pub last_esc_time: Option<Instant>,
+    /// Vertical scroll offset when input exceeds max visible height.
+    pub input_scroll: usize,
+    /// Paste placeholder → original content map for large paste folding.
+    pub paste_map: HashMap<String, String>,
 
     // === Session Controller (observable + interactive) ===
     pub session: SessionController,
@@ -59,6 +64,8 @@ impl App {
             commands,
             cwd,
             last_esc_time: None,
+            input_scroll: 0,
+            paste_map: HashMap::new(),
             session,
             line_cache: LineCache::new(),
         }
@@ -66,14 +73,21 @@ impl App {
 
     /// Submit the current input with any pending images, returning `UserContent`.
     /// Does NOT add to messages or history — the session controller handles that.
+    /// Paste placeholders are expanded to full content before submission.
     pub fn submit_input(&mut self) -> Option<UserContent> {
         let has_images = !self.pending_images.is_empty();
         if self.input.trim().is_empty() && !has_images {
             return None;
         }
-        let text = std::mem::take(&mut self.input);
+        let mut text = std::mem::take(&mut self.input);
         let images = std::mem::take(&mut self.pending_images);
+        // Expand paste placeholders to full content
+        if !self.paste_map.is_empty() {
+            text = crate::input::paste::expand_paste_placeholders(&text, &self.paste_map);
+            self.paste_map.clear();
+        }
         self.input_cursor = 0;
+        self.input_scroll = 0;
         self.scroll_offset = 0;
         Some(UserContent { text, images })
     }

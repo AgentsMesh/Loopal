@@ -94,7 +94,7 @@ pub fn render_unified_status(f: &mut Frame, state: &SessionState, area: Rect) {
 fn status_icon_and_label(
     state: &SessionState,
     elapsed: std::time::Duration,
-    is_active: bool,
+    _is_active: bool,
 ) -> (String, Style, &'static str) {
     if state.thinking_active {
         let frame = spinner_frame(elapsed);
@@ -104,9 +104,12 @@ fn status_icon_and_label(
         (frame.to_string(), Style::default().fg(Color::Green), "Streaming")
     } else if state.pending_permission.is_some() {
         ("●".to_string(), Style::default().fg(Color::Yellow), "Waiting")
-    } else if is_active {
+    } else if !state.agent_idle {
         let frame = spinner_frame(elapsed);
         (frame.to_string(), Style::default().fg(Color::Cyan), "Working")
+    } else if has_live_subagents(state) {
+        let frame = spinner_frame(elapsed);
+        (frame.to_string(), Style::default().fg(Color::Blue), "Agents")
     } else {
         ("●".to_string(), Style::default().fg(Color::DarkGray), "Idle")
     }
@@ -122,6 +125,16 @@ fn is_agent_active(state: &SessionState) -> bool {
     !state.agent_idle
         || !state.streaming_text.is_empty()
         || state.thinking_active
+        || has_live_subagents(state)
+}
+
+/// True if any sub-agent is still starting or running.
+fn has_live_subagents(state: &SessionState) -> bool {
+    use loopal_protocol::AgentStatus;
+    state.agents.values().any(|a| matches!(
+        a.observable.status,
+        AgentStatus::Starting | AgentStatus::Running
+    ))
 }
 
 fn context_info(state: &SessionState) -> String {

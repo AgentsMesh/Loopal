@@ -18,6 +18,7 @@ fn make_ctx() -> ToolContext {
         backend,
         session_id: "test-session".to_string(),
         shared: None,
+        pending_cwd_switch: Default::default(),
     }
 }
 
@@ -31,6 +32,7 @@ fn make_ctx_for(cwd: PathBuf) -> ToolContext {
         backend,
         session_id: "test-session".to_string(),
         shared: None,
+        pending_cwd_switch: Default::default(),
     }
 }
 

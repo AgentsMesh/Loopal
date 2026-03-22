@@ -22,6 +22,7 @@ fn temp_file(name: &str, content: &str) -> (std::path::PathBuf, ToolContext) {
         backend,
         session_id: format!("test-{name}"),
         shared: None,
+        pending_cwd_switch: Default::default(),
     };
     (path, ctx)
 }

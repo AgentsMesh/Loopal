@@ -30,6 +30,7 @@ impl AgentLoopRunner {
             ),
             session_id: params.session.id.clone(),
             shared: params.shared.clone(),
+            pending_cwd_switch: Default::default(),
         };
         let model_info = get_model_info(&params.model);
         let max_context_tokens = model_info.as_ref().map_or(200_000, |m| m.context_window);
@@ -139,6 +140,7 @@ impl AgentLoopRunner {
 
             // Execute tools → results appended to persistent params.messages
             let completion_result = self.execute_tools(result.tool_uses).await?;
+            self.apply_pending_cwd_switch();
             self.inject_pending_messages().await;
             continuation_count = 0;
 
@@ -151,5 +153,15 @@ impl AgentLoopRunner {
     /// Send an event payload via the frontend.
     pub async fn emit(&self, payload: AgentEventPayload) -> Result<()> {
         self.params.frontend.emit(payload).await
+    }
+
+    /// If a tool (e.g. EnterWorktree) requested a cwd switch, recreate the backend.
+    fn apply_pending_cwd_switch(&mut self) {
+        let new_cwd = self.tool_ctx.pending_cwd_switch.lock().ok()
+            .and_then(|mut guard| guard.take());
+        if let Some(cwd) = new_cwd {
+            info!(new_cwd = %cwd.display(), "applying cwd switch");
+            self.tool_ctx.backend = self.params.kernel.create_backend(&cwd);
+        }
     }
 }

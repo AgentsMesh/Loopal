@@ -13,6 +13,7 @@ fn test_load_layer_from_dir_empty() {
     assert!(layer.skills.is_empty());
     assert!(layer.hooks.is_empty());
     assert!(layer.instructions.is_none());
+    assert!(layer.memory.is_none());
 }
 
 #[test]
@@ -63,6 +64,20 @@ fn test_load_layer_from_dir_full() {
 
     // instructions
     assert_eq!(layer.instructions.as_deref(), Some("# Instructions"));
+
+    // memory — not present
+    assert!(layer.memory.is_none());
+}
+
+#[test]
+fn test_load_layer_with_memory() {
+    let dir = tempfile::tempdir().unwrap();
+    let memory_dir = dir.path().join("memory");
+    fs::create_dir_all(&memory_dir).unwrap();
+    fs::write(memory_dir.join("MEMORY.md"), "## Key Patterns\n- Use DI").unwrap();
+
+    let layer = load_layer_from_dir(dir.path(), LayerSource::Project, None).unwrap();
+    assert_eq!(layer.memory.as_deref(), Some("## Key Patterns\n- Use DI"));
 }
 
 #[test]

@@ -36,6 +36,7 @@ async fn make_shared_and_ctx() -> (Arc<AgentShared>, ToolContext, mpsc::Receiver
         agent_name: "main".to_string(),
         parent_event_tx: None,
         cancel_token: None,
+        worktree_state: Default::default(),
     });
 
     let shared_any: Arc<dyn std::any::Any + Send + Sync> = Arc::new(shared.clone());
@@ -46,6 +47,7 @@ async fn make_shared_and_ctx() -> (Arc<AgentShared>, ToolContext, mpsc::Receiver
         backend,
         session_id: "test".to_string(),
         shared: Some(shared_any),
+        pending_cwd_switch: Default::default(),
     };
 
     (shared, ctx, target_rx)

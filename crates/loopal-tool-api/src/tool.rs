@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use loopal_error::LoopalError;
@@ -37,6 +38,13 @@ pub struct ToolContext {
     pub session_id: String,
     /// Opaque shared state passed to tools — tools downcast via `Any`.
     pub shared: Option<Arc<dyn std::any::Any + Send + Sync>>,
+    /// Pending cwd switch set by tools (e.g. EnterWorktree/ExitWorktree).
+    /// The runner checks this after each tool batch and recreates the backend.
+    ///
+    /// **Concurrency note**: tools in the same batch execute in parallel via
+    /// `JoinSet`. If multiple tools write to this field, last-write-wins.
+    /// Only one cwd-switching tool should appear per batch (enforced by LLM).
+    pub pending_cwd_switch: Arc<std::sync::Mutex<Option<PathBuf>>>,
 }
 
 impl Clone for ToolContext {
@@ -45,6 +53,7 @@ impl Clone for ToolContext {
             backend: self.backend.clone(),
             session_id: self.session_id.clone(),
             shared: self.shared.clone(),
+            pending_cwd_switch: self.pending_cwd_switch.clone(),
         }
     }
 }

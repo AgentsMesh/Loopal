@@ -11,6 +11,14 @@ use crate::registry::AgentRegistry;
 use crate::router::MessageRouter;
 use crate::task_store::TaskStore;
 
+/// Active worktree state — set by EnterWorktree, cleared by ExitWorktree.
+pub struct WorktreeState {
+    pub original_cwd: PathBuf,
+    pub worktree_path: PathBuf,
+    pub worktree_name: String,
+    pub repo_root: PathBuf,
+}
+
 /// Shared runtime context accessible by all agent tools via `ToolContext.shared`.
 ///
 /// Main agent and sub-agents are **homogeneous**: both hold an `AgentShared`
@@ -22,6 +30,9 @@ pub struct AgentShared {
     pub task_store: Arc<TaskStore>,
     /// Unified message router — handles point-to-point, broadcast, and channels.
     pub router: Arc<MessageRouter>,
+    /// Initial working directory. Immutable after construction.
+    /// Tools needing the *current* cwd after a worktree switch should use
+    /// `ctx.backend.cwd()` instead.
     pub cwd: PathBuf,
     /// Current nesting depth (0 = root agent).
     pub depth: u32,
@@ -36,4 +47,6 @@ pub struct AgentShared {
     /// This agent's own cancellation token. `AttemptCompletion` cancels
     /// it to trigger graceful shutdown. `None` for root (TUI-controlled).
     pub cancel_token: Option<CancellationToken>,
+    /// Active worktree state for the current agent.
+    pub worktree_state: Mutex<Option<WorktreeState>>,
 }

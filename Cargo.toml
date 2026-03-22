@@ -45,6 +45,7 @@ members = [
     "crates/loopal-tui",
     "crates/loopal-acp",
     "crates/loopal-backend",
+    "crates/loopal-git",
 ]
 
 [workspace.package]
@@ -144,6 +145,7 @@ loopal-session = { path = "crates/loopal-session" }
 loopal-tui = { path = "crates/loopal-tui" }
 loopal-acp = { path = "crates/loopal-acp" }
 loopal-backend = { path = "crates/loopal-backend" }
+loopal-git = { path = "crates/loopal-git" }
 
 [[bin]]
 name = "loopal"
@@ -166,6 +168,7 @@ loopal-agent = { workspace = true }
 loopal-session = { workspace = true }
 loopal-tui = { workspace = true }
 loopal-acp = { workspace = true }
+loopal-git = { workspace = true }
 tokio = { workspace = true }
 clap = { workspace = true }
 tracing = { workspace = true }

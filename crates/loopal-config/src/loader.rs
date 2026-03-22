@@ -147,5 +147,9 @@ pub fn load_layer_from_dir(
         .unwrap_or_else(|| dir.join("LOOPAL.md"));
     layer.instructions = read_optional_text(&instr_path);
 
+    // memory/MEMORY.md — core memory file (agent writes via Write/Edit tools)
+    let memory_path = dir.join("memory").join("MEMORY.md");
+    layer.memory = read_optional_text(&memory_path);
+
     Ok(layer)
 }

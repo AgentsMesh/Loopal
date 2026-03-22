@@ -3,6 +3,7 @@ pub mod channel;
 pub mod completion;
 pub mod send_message;
 pub mod task;
+pub mod worktree;
 
 use loopal_kernel::Kernel;
 
@@ -19,4 +20,6 @@ pub fn register_all(kernel: &mut Kernel) {
     kernel.register_tool(Box::new(task::TaskListTool));
     kernel.register_tool(Box::new(task::TaskGetTool));
     kernel.register_tool(Box::new(completion::AttemptCompletionTool));
+    kernel.register_tool(Box::new(worktree::EnterWorktreeTool));
+    kernel.register_tool(Box::new(worktree::ExitWorktreeTool));
 }

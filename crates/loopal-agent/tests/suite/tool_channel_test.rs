@@ -31,6 +31,7 @@ async fn make_ctx(agent_name: &str) -> (Arc<AgentShared>, ToolContext) {
         agent_name: agent_name.to_string(),
         parent_event_tx: None,
         cancel_token: None,
+        worktree_state: Default::default(),
     });
 
     let shared_any: Arc<dyn std::any::Any + Send + Sync> = Arc::new(shared.clone());
@@ -41,6 +42,7 @@ async fn make_ctx(agent_name: &str) -> (Arc<AgentShared>, ToolContext) {
         backend,
         session_id: "test".to_string(),
         shared: Some(shared_any),
+        pending_cwd_switch: Default::default(),
     };
     (shared, ctx)
 }

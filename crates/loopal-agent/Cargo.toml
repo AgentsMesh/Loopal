@@ -17,6 +17,7 @@ loopal-provider-api = { workspace = true }
 loopal-kernel = { workspace = true }
 loopal-context = { workspace = true }
 loopal-storage = { workspace = true }
+loopal-git = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }

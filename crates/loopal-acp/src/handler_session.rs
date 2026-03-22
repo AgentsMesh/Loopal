@@ -137,13 +137,13 @@ impl AcpHandler {
         event_tx: mpsc::Sender<loopal_protocol::AgentEvent>,
     ) -> (String, ContextPipeline, Arc<dyn std::any::Any + Send + Sync>) {
         let skills: Vec<_> = self.config.skills.values()
-            .map(|e| &e.skill)
+            .map(|e| e.skill.clone())
             .collect();
-        let skills_summary = format_skills_summary(&skills);
+        let skills_summary = loopal_config::format_skills_summary(&skills);
         let tool_defs = kernel.tool_definitions();
         let system_prompt = build_system_prompt(
             &self.config.instructions, &tool_defs, "",
-            &cwd.to_string_lossy(), &skills_summary,
+            &cwd.to_string_lossy(), &skills_summary, &self.config.memory,
         );
 
         let mut pipeline = ContextPipeline::new();
@@ -151,7 +151,7 @@ impl AcpHandler {
         pipeline.add(Box::new(ContextGuard));
         pipeline.add(Box::new(SmartCompact::new(10)));
 
-        let router = Arc::new(MessageRouter::new(event_tx));
+        let router = Arc::new(MessageRouter::new(event_tx.clone()));
         let tasks_dir = loopal_config::session_tasks_dir(session_id)
             .unwrap_or_else(|_| std::env::temp_dir().join("loopal/tasks"));
 
@@ -164,20 +164,12 @@ impl AcpHandler {
             depth: 0,
             max_depth: 3,
             agent_name: "main".to_string(),
-            parent_event_tx: None,
+            parent_event_tx: Some(event_tx),
             cancel_token: None,
+            worktree_state: Default::default(),
         });
         let shared_any: Arc<dyn std::any::Any + Send + Sync> = Arc::new(shared);
 
         (system_prompt, pipeline, shared_any)
     }
-}
-
-fn format_skills_summary(skills: &[&loopal_config::Skill]) -> String {
-    if skills.is_empty() { return String::new(); }
-    let mut s = String::from("# Available Skills\nUser can invoke these via /name:\n");
-    for skill in skills {
-        s.push_str(&format!("- {}: {}\n", skill.name, skill.description));
-    }
-    s
 }

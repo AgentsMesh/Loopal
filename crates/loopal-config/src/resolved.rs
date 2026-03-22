@@ -18,6 +18,8 @@ pub struct ResolvedConfig {
     pub hooks: Vec<HookEntry>,
     /// Concatenated instruction text from all layers
     pub instructions: String,
+    /// Concatenated memory content from all layers
+    pub memory: String,
     /// Layer sources in merge order (for debugging)
     pub layers: Vec<LayerSource>,
 }

@@ -32,6 +32,11 @@ pub async fn run() -> anyhow::Result<()> {
     // Ensure directories exist and clean up expired volatile files
     loopal_config::housekeeping::startup_cleanup();
 
+    // Clean up orphaned worktrees from previous crashed sessions
+    if let Some(repo_root) = loopal_git::repo_root(&cwd) {
+        loopal_git::cleanup_stale_worktrees(&repo_root);
+    }
+
     let mut config = load_config(&cwd)?;
     apply_cli_overrides(&cli, &mut config.settings);
 
@@ -112,16 +117,17 @@ pub async fn run() -> anyhow::Result<()> {
         agent_name: "main".to_string(),
         parent_event_tx: Some(agent_event_tx.clone()),
         cancel_token: None,
+        worktree_state: Default::default(),
     });
     let shared_any: Arc<dyn std::any::Any + Send + Sync> = Arc::new(agent_shared);
 
     // Build system prompt from resolved config
     let skills: Vec<_> = config.skills.into_values().map(|e| e.skill).collect();
-    let skills_summary = format_skills_summary(&skills);
+    let skills_summary = loopal_config::format_skills_summary(&skills);
     let commands = merge_commands(&skills);
     let tool_defs = kernel.tool_definitions();
     let system_prompt = build_system_prompt(
-        &config.instructions, &tool_defs, "", &cwd.to_string_lossy(), &skills_summary,
+        &config.instructions, &tool_defs, "", &cwd.to_string_lossy(), &skills_summary, &config.memory,
     );
 
     let session_ctrl = SessionController::new(
@@ -181,13 +187,4 @@ fn apply_cli_overrides(cli: &Cli, settings: &mut loopal_config::Settings) {
     if cli.no_sandbox {
         settings.sandbox.policy = loopal_config::SandboxPolicy::Disabled;
     }
-}
-
-fn format_skills_summary(skills: &[loopal_config::Skill]) -> String {
-    if skills.is_empty() { return String::new(); }
-    let mut s = String::from("# Available Skills\nUser can invoke these via /name:\n");
-    for skill in skills {
-        s.push_str(&format!("- {}: {}\n", skill.name, skill.description));
-    }
-    s
 }

@@ -36,6 +36,7 @@ impl ConfigResolver {
         let mut skills: IndexMap<String, SkillEntry> = IndexMap::new();
         let mut hooks: Vec<HookEntry> = Vec::new();
         let mut instruction_parts: Vec<String> = Vec::new();
+        let mut memory_parts: Vec<String> = Vec::new();
         let mut sources: Vec<LayerSource> = Vec::new();
 
         for layer in self.layers {
@@ -82,6 +83,14 @@ impl ConfigResolver {
                     instruction_parts.push(trimmed.to_string());
                 }
             }
+
+            // Memory: concatenate (same semantics as instructions)
+            if let Some(text) = layer.memory {
+                let trimmed = text.trim();
+                if !trimmed.is_empty() {
+                    memory_parts.push(trimmed.to_string());
+                }
+            }
         }
 
         // Warn about unrecognised keys before deserialising
@@ -104,6 +113,7 @@ impl ConfigResolver {
             skills,
             hooks,
             instructions: instruction_parts.join("\n\n"),
+            memory: memory_parts.join("\n\n"),
             layers: sources,
         })
     }

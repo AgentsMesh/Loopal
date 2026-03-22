@@ -10,6 +10,7 @@ pub fn build_system_prompt(
     mode_suffix: &str,
     cwd: &str,
     skills_summary: &str,
+    memory: &str,
 ) -> String {
     let mut parts = Vec::new();
 
@@ -20,6 +21,11 @@ pub fn build_system_prompt(
         "\n\n# Working Directory\nYour current working directory is: {}\nAll relative file paths are resolved from this directory. Use relative paths when possible.",
         cwd
     ));
+
+    // Inject project memory if present
+    if !memory.is_empty() {
+        parts.push(format!("\n\n# Project Memory\n{memory}"));
+    }
 
     if !tools.is_empty() {
         let mut tool_section = String::from("\n\n# Available Tools\n");

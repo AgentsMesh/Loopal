@@ -53,4 +53,6 @@ pub struct ConfigLayer {
     pub hooks: Vec<HookConfig>,
     /// Instruction text (from LOOPAL.md)
     pub instructions: Option<String>,
+    /// Memory content (from memory/MEMORY.md)
+    pub memory: Option<String>,
 }

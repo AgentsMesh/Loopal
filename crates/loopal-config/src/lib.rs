@@ -25,4 +25,4 @@ pub use sandbox::{
 pub use settings::{
     McpServerConfig, OpenAiCompatConfig, ProviderConfig, ProvidersConfig, Settings,
 };
-pub use skills::{Skill, scan_skills_dir};
+pub use skills::{Skill, format_skills_summary, scan_skills_dir};

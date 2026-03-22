@@ -36,3 +36,13 @@ fn load_skills_from_dir(dir: &Path, map: &mut HashMap<String, Skill>) {
         map.insert(name, skill);
     }
 }
+
+/// Format a human-readable skills summary for the system prompt.
+pub fn format_skills_summary(skills: &[Skill]) -> String {
+    if skills.is_empty() { return String::new(); }
+    let mut s = String::from("# Available Skills\nUser can invoke these via /name:\n");
+    for skill in skills {
+        s.push_str(&format!("- {}: {}\n", skill.name, skill.description));
+    }
+    s
+}

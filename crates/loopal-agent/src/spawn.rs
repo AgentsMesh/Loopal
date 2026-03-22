@@ -25,6 +25,8 @@ pub struct SpawnParams {
     pub agent_config: AgentConfig,
     pub parent_model: String,
     pub parent_cancel_token: Option<CancellationToken>,
+    /// Override the working directory (e.g. for worktree isolation).
+    pub cwd_override: Option<std::path::PathBuf>,
 }
 
 /// Spawn result returned to the caller.
@@ -68,7 +70,7 @@ pub async fn spawn_agent(
 
     // Use parent's event_tx directly — no intermediate channel.
     let parent_event_tx = shared.parent_event_tx.clone()
-        .expect("parent_event_tx must be set — root agent sets it in bootstrap");
+        .ok_or_else(|| "parent_event_tx not set — cannot spawn sub-agent".to_string())?;
 
     let frontend = Arc::new(UnifiedFrontend::new(
         Some(params.name.clone()),
@@ -82,14 +84,16 @@ pub async fn spawn_agent(
 
     let session_manager = SessionManager::new()
         .map_err(|e| format!("failed to create session manager: {e}"))?;
-    let session = session_manager.create_session(&shared.cwd, &model)
+
+    let effective_cwd = params.cwd_override.as_deref().unwrap_or(&shared.cwd);
+    let session = session_manager.create_session(effective_cwd, &model)
         .map_err(|e| format!("failed to create session: {e}"))?;
 
     let system_prompt = if params.agent_config.system_prompt.is_empty() {
         format!(
             "You are a sub-agent named '{}'. Your working directory is: {}. \
              Complete the task given to you. When done, call AttemptCompletion with your result.",
-            params.name, shared.cwd.display()
+            params.name, effective_cwd.display()
         )
     } else {
         params.agent_config.system_prompt.clone()
@@ -106,12 +110,13 @@ pub async fn spawn_agent(
         registry: Arc::clone(&shared.registry),
         task_store: Arc::clone(&shared.task_store),
         router: Arc::clone(&shared.router),
-        cwd: shared.cwd.clone(),
+        cwd: effective_cwd.to_path_buf(),
         depth: shared.depth + 1,
         max_depth: shared.max_depth,
         agent_name: params.name.clone(),
         parent_event_tx: Some(parent_event_tx),
         cancel_token: Some(cancel_token.clone()),
+        worktree_state: Default::default(),
     });
     let shared_any: Arc<dyn std::any::Any + Send + Sync> = Arc::new(child_shared);
     let session_id = session.id.clone();

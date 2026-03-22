@@ -55,8 +55,8 @@ async fn test_deny_permission() {
 async fn test_enqueue_message_forwards_when_idle() {
     let (ctrl, _, _) = make_controller();
     ctrl.lock().agent_idle = true;
-    let result = ctrl.enqueue_message("hello".to_string());
-    assert_eq!(result, Some("hello".to_string()));
+    let result = ctrl.enqueue_message("hello".into());
+    assert_eq!(result.map(|c| c.text), Some("hello".to_string()));
 }
 
 #[tokio::test]
@@ -64,7 +64,7 @@ async fn test_enqueue_message_queues_when_busy() {
     let (ctrl, _, _) = make_controller();
     ctrl.lock().agent_idle = false;
 
-    let result = ctrl.enqueue_message("queued".to_string());
+    let result = ctrl.enqueue_message("queued".into());
     assert!(result.is_none());
     assert_eq!(ctrl.lock().inbox.len(), 1);
 }

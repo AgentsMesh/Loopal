@@ -4,7 +4,7 @@ use loopal_protocol::ControlCommand;
 use loopal_protocol::{Envelope, MessageSource};
 use loopal_error::Result;
 use loopal_protocol::AgentEventPayload;
-use loopal_message::Message;
+use loopal_message::{ContentBlock, ImageSource, Message, MessageRole};
 use loopal_provider_api::ThinkingConfig;
 use tracing::{error, info};
 
@@ -26,8 +26,7 @@ impl AgentLoopRunner {
             let input = self.params.frontend.recv_input().await;
             match input {
                 Some(AgentInput::Message(env)) => {
-                    let text = format_envelope_content(&env);
-                    let mut user_msg = Message::user(&text);
+                    let mut user_msg = build_user_message(&env);
                     if let Err(e) = self.params.session_manager.save_message(
                         &self.params.session.id, &mut user_msg,
                     ) {
@@ -38,7 +37,6 @@ impl AgentLoopRunner {
                 }
                 Some(AgentInput::Control(ctrl)) => {
                     self.handle_control(ctrl).await?;
-                    // Control command processed — keep waiting for user input.
                 }
                 None => {
                     info!("input channel closed, ending agent loop");
@@ -129,7 +127,6 @@ impl AgentLoopRunner {
                 error!(error = %e, "failed to persist rewind marker");
             }
         } else {
-            // Message has no id — skip marker; crash-resume restores full history.
             error!(truncate_at, "message at truncate point has no id, skipping marker");
         }
 
@@ -141,17 +138,30 @@ impl AgentLoopRunner {
     }
 }
 
-/// Format an envelope's content for the LLM message history.
+/// Build a user Message from an Envelope, converting UserContent into ContentBlocks.
 ///
-/// - `Human` source: no prefix (LLM naturally treats it as user message).
-/// - `Agent` / `Channel` source: prepend `[from: X]` so the LLM can
-///   distinguish between different message origins.
-pub fn format_envelope_content(env: &Envelope) -> String {
-    match &env.source {
-        MessageSource::Human => env.content.clone(),
-        MessageSource::Agent(name) => format!("[from: {}] {}", name, env.content),
+/// Text gets a source prefix for agent/channel origins. Images are appended as
+/// `ContentBlock::Image` for the LLM provider to serialize.
+pub fn build_user_message(env: &Envelope) -> Message {
+    let text = match &env.source {
+        MessageSource::Human => env.content.text.clone(),
+        MessageSource::Agent(name) => format!("[from: {}] {}", name, env.content.text),
         MessageSource::Channel { channel, from } => {
-            format!("[from: #{}/{}] {}", channel, from, env.content)
+            format!("[from: #{}/{}] {}", channel, from, env.content.text)
         }
+    };
+    let mut blocks: Vec<ContentBlock> = Vec::new();
+    if !text.is_empty() {
+        blocks.push(ContentBlock::Text { text });
     }
+    for img in &env.content.images {
+        blocks.push(ContentBlock::Image {
+            source: ImageSource {
+                source_type: "base64".to_string(),
+                media_type: img.media_type.clone(),
+                data: img.data.clone(),
+            },
+        });
+    }
+    Message { id: None, role: MessageRole::User, content: blocks }
 }

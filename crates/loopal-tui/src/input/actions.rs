@@ -1,3 +1,5 @@
+use loopal_protocol::UserContent;
+
 /// Action triggered by a slash command from the autocomplete menu.
 pub enum SlashCommandAction {
     Clear,
@@ -23,7 +25,7 @@ pub enum InputAction {
     /// No action needed
     None,
     /// User message queued into Inbox for forwarding to agent
-    InboxPush(String),
+    InboxPush(UserContent),
     /// User wants to quit
     Quit,
     /// User approved tool use
@@ -49,4 +51,6 @@ pub enum InputAction {
     QuestionToggle,
     /// Cancel question dialog
     QuestionCancel,
+    /// User pressed Ctrl+V — caller should spawn async clipboard read
+    PasteRequested,
 }

@@ -1,8 +1,10 @@
-/// Inbox queue for buffering user messages when the agent is busy.
+//! Inbox queue for buffering user messages when the agent is busy.
 use std::collections::VecDeque;
 
+use loopal_protocol::UserContent;
+
 pub struct Inbox {
-    queue: VecDeque<String>,
+    queue: VecDeque<UserContent>,
 }
 
 impl Inbox {
@@ -12,15 +14,15 @@ impl Inbox {
         }
     }
 
-    pub fn push(&mut self, text: String) {
-        self.queue.push_back(text);
+    pub fn push(&mut self, content: UserContent) {
+        self.queue.push_back(content);
     }
 
-    pub fn pop_front(&mut self) -> Option<String> {
+    pub fn pop_front(&mut self) -> Option<UserContent> {
         self.queue.pop_front()
     }
 
-    pub fn pop_back(&mut self) -> Option<String> {
+    pub fn pop_back(&mut self) -> Option<UserContent> {
         self.queue.pop_back()
     }
 
@@ -36,7 +38,7 @@ impl Inbox {
         self.queue.len()
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &String> {
+    pub fn iter(&self) -> impl Iterator<Item = &UserContent> {
         self.queue.iter()
     }
 }
@@ -45,4 +47,29 @@ impl Default for Inbox {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Try forwarding a queued inbox message when agent is idle.
+///
+/// Pops the front message, pushes a DisplayMessage for TUI rendering,
+/// and returns the content for routing to the agent.
+pub(crate) fn try_forward_inbox(
+    state: &mut crate::state::SessionState,
+) -> Option<UserContent> {
+    if !state.agent_idle { return None; }
+    let content = state.inbox.pop_front()?;
+    state.agent_idle = false;
+    state.begin_turn();
+    let image_count = content.images.len();
+    let mut display_text = content.text.clone();
+    if image_count > 0 {
+        display_text.push_str(&format!(" [+{} image(s)]", image_count));
+    }
+    state.messages.push(crate::types::DisplayMessage {
+        role: "user".to_string(),
+        content: display_text,
+        tool_calls: Vec::new(),
+        image_count,
+    });
+    Some(content)
 }

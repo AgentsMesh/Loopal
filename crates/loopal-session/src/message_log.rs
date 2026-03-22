@@ -77,3 +77,19 @@ impl MessageFeed {
         self.entries.iter().skip(skip)
     }
 }
+
+/// Record a MessageRouted event to the global feed and per-agent logs.
+pub(crate) fn record_message_routed(
+    state: &mut crate::state::SessionState,
+    source: &str,
+    target: &str,
+    preview: &str,
+) {
+    let entry = MessageLogEntry::new(source, target, preview);
+    state.message_feed.record(entry.clone());
+    for name in [source, target] {
+        if let Some(agent) = state.agents.get_mut(name) {
+            agent.message_log.push(entry.clone());
+        }
+    }
+}

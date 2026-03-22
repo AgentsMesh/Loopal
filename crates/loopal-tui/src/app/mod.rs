@@ -5,6 +5,7 @@ pub use types::*;
 use std::path::PathBuf;
 use std::time::Instant;
 
+use loopal_protocol::{ImageAttachment, UserContent};
 use loopal_session::SessionController;
 
 use crate::command::{CommandEntry, merge_commands};
@@ -19,6 +20,8 @@ pub struct App {
     pub scroll_offset: u16,
     pub input_history: Vec<String>,
     pub history_index: Option<usize>,
+    /// Images attached to the current input (pending submit).
+    pub pending_images: Vec<ImageAttachment>,
     /// Active autocomplete menu, if any.
     pub autocomplete: Option<AutocompleteState>,
     /// Active sub-page (full-screen picker), if any.
@@ -50,6 +53,7 @@ impl App {
             scroll_offset: 0,
             input_history: Vec::new(),
             history_index: None,
+            pending_images: Vec::new(),
             autocomplete: None,
             sub_page: None,
             commands,
@@ -60,28 +64,41 @@ impl App {
         }
     }
 
-    /// Submit the current input, returning the text.
+    /// Submit the current input with any pending images, returning `UserContent`.
     /// Does NOT add to messages or history — the session controller handles that.
-    pub fn submit_input(&mut self) -> Option<String> {
-        if self.input.trim().is_empty() {
+    pub fn submit_input(&mut self) -> Option<UserContent> {
+        let has_images = !self.pending_images.is_empty();
+        if self.input.trim().is_empty() && !has_images {
             return None;
         }
         let text = std::mem::take(&mut self.input);
+        let images = std::mem::take(&mut self.pending_images);
         self.input_cursor = 0;
         self.scroll_offset = 0;
-        Some(text)
+        Some(UserContent { text, images })
     }
 
     /// Pop the last Inbox message back into the input field for editing.
     /// Returns true if a message was popped.
     pub fn pop_inbox_to_input(&mut self) -> bool {
-        if let Some(text) = self.session.pop_inbox_to_edit() {
-            self.input = text;
+        if let Some(content) = self.session.pop_inbox_to_edit() {
+            self.input = content.text;
+            self.pending_images = content.images;
             self.input_cursor = self.input.len();
             true
         } else {
             false
         }
+    }
+
+    /// Attach an image to the current pending input.
+    pub fn attach_image(&mut self, attachment: ImageAttachment) {
+        self.pending_images.push(attachment);
+    }
+
+    /// Number of images attached to the current input.
+    pub fn pending_image_count(&self) -> usize {
+        self.pending_images.len()
     }
 
     /// Reload skills from disk and rebuild the merged command list.

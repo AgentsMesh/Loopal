@@ -19,6 +19,7 @@ mod auto_continue_edge_test;
 mod drain_pending_test;
 mod input_edge_test;
 mod input_test;
+mod input_image_test;
 mod integration_test;
 mod llm_test;
 pub mod mock_provider;

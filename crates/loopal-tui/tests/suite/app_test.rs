@@ -2,7 +2,7 @@ use loopal_session::SessionController;
 use loopal_tui::app::App;
 use loopal_tui::command::builtin_entries;
 use loopal_protocol::ControlCommand;
-use loopal_protocol::{AgentEvent, AgentEventPayload, UserQuestionResponse};
+use loopal_protocol::{AgentEvent, AgentEventPayload, ImageAttachment, UserQuestionResponse};
 use tokio::sync::mpsc;
 
 fn make_app() -> (App, mpsc::Receiver<ControlCommand>, mpsc::Receiver<bool>) {
@@ -54,7 +54,7 @@ fn test_submit_input_returns_text_and_resets() {
     app.input_cursor = 11;
 
     let result = app.submit_input();
-    assert_eq!(result, Some("hello world".to_string()));
+    assert_eq!(result.map(|c| c.text), Some("hello world".to_string()));
     assert!(app.input.is_empty());
     assert_eq!(app.input_cursor, 0);
 }
@@ -72,11 +72,11 @@ fn test_awaiting_input_forwards_inbox_message() {
     let (app, _, _) = make_app();
     {
         let mut state = app.session.lock();
-        state.inbox.push("queued".to_string());
+        state.inbox.push("queued".into());
     }
     // AwaitingInput sets idle=true then tries forward
     let forwarded = app.session.handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
-    assert_eq!(forwarded, Some("queued".to_string()));
+    assert_eq!(forwarded.map(|c| c.text), Some("queued".to_string()));
     let state = app.session.lock();
     assert!(!state.agent_idle); // forwarding clears idle
     assert!(state.inbox.is_empty());
@@ -89,8 +89,8 @@ fn test_pop_inbox_to_input() {
     let (mut app, _, _) = make_app();
     {
         let mut state = app.session.lock();
-        state.inbox.push("first".to_string());
-        state.inbox.push("second".to_string());
+        state.inbox.push("first".into());
+        state.inbox.push("second".into());
     }
     assert!(app.pop_inbox_to_input());
     assert_eq!(app.input, "second");
@@ -102,4 +102,49 @@ fn test_pop_inbox_to_input() {
 fn test_pop_inbox_empty_returns_false() {
     let (mut app, _, _) = make_app();
     assert!(!app.pop_inbox_to_input());
+}
+
+fn sample_image(label: &str) -> ImageAttachment {
+    ImageAttachment {
+        media_type: "image/png".to_string(),
+        data: format!("base64-{label}"),
+    }
+}
+
+#[test]
+fn test_submit_input_with_images() {
+    let (mut app, _, _) = make_app();
+    app.input = "describe this".to_string();
+    app.pending_images = vec![sample_image("a"), sample_image("b")];
+
+    let result = app.submit_input().expect("should return content");
+    assert_eq!(result.text, "describe this");
+    assert_eq!(result.images.len(), 2);
+    assert_eq!(result.images[0].data, "base64-a");
+    assert_eq!(result.images[1].data, "base64-b");
+}
+
+#[test]
+fn test_submit_input_clears_pending_images() {
+    let (mut app, _, _) = make_app();
+    app.input = "check".to_string();
+    app.pending_images = vec![sample_image("x")];
+
+    let _ = app.submit_input();
+    assert!(app.pending_images.is_empty());
+    assert!(app.input.is_empty());
+    assert_eq!(app.input_cursor, 0);
+}
+
+#[test]
+fn test_submit_input_images_only() {
+    let (mut app, _, _) = make_app();
+    app.input = String::new(); // empty text
+    app.pending_images = vec![sample_image("only")];
+
+    let result = app.submit_input();
+    assert!(result.is_some(), "images-only input should not be None");
+    let content = result.unwrap();
+    assert!(content.text.is_empty());
+    assert_eq!(content.images.len(), 1);
 }

@@ -2,7 +2,7 @@
 
 use loopal_session::event_handler::apply_event;
 use loopal_session::state::SessionState;
-use loopal_protocol::{AgentEvent, AgentEventPayload};
+use loopal_protocol::{AgentEvent, AgentEventPayload, ImageAttachment, UserContent};
 
 fn make_state() -> SessionState {
     SessionState::new("test-model".to_string(), "act".to_string())
@@ -58,9 +58,9 @@ fn test_apply_event_records_message_routed_to_agent_logs() {
 #[test]
 fn test_awaiting_input_forwards_inbox() {
     let mut state = make_state();
-    state.inbox.push("queued msg".to_string());
+    state.inbox.push("queued msg".into());
     let forward = apply_event(&mut state, AgentEvent::root(AgentEventPayload::AwaitingInput));
-    assert_eq!(forward, Some("queued msg".to_string()));
+    assert_eq!(forward.map(|c| c.text), Some("queued msg".to_string()));
     assert!(!state.agent_idle); // Immediately busy again
 }
 
@@ -123,4 +123,34 @@ fn test_mode_changed_updates_mode() {
         mode: "plan".into(),
     }));
     assert_eq!(state.mode, "plan");
+}
+
+#[test]
+fn test_try_forward_inbox_with_images() {
+    let mut state = make_state();
+    let content = UserContent {
+        text: "look at this".to_string(),
+        images: vec![ImageAttachment {
+            media_type: "image/png".to_string(),
+            data: "iVBORw0KGgo=".to_string(),
+        }],
+    };
+    state.inbox.push(content);
+
+    let forward = apply_event(
+        &mut state,
+        AgentEvent::root(AgentEventPayload::AwaitingInput),
+    );
+    // Forwarded content preserves the image
+    let forwarded = forward.expect("should forward inbox content");
+    assert_eq!(forwarded.text, "look at this");
+    assert_eq!(forwarded.images.len(), 1);
+    assert_eq!(forwarded.images[0].media_type, "image/png");
+    // Display message includes image annotation
+    let display = state.messages.last().unwrap();
+    assert_eq!(display.role, "user");
+    assert!(display.content.contains("[+1 image(s)]"));
+    assert_eq!(display.image_count, 1);
+    // Agent should be busy again
+    assert!(!state.agent_idle);
 }

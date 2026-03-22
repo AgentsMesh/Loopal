@@ -6,6 +6,7 @@ fn msg(role: &str, content: &str) -> DisplayMessage {
         role: role.to_string(),
         content: content.to_string(),
         tool_calls: Vec::new(),
+        image_count: 0,
     }
 }
 

@@ -11,3 +11,5 @@ mod envelope_test;
 mod event_edge_test;
 #[path = "suite/event_test.rs"]
 mod event_test;
+#[path = "suite/user_content_test.rs"]
+mod user_content_test;

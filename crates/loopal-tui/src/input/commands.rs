@@ -21,7 +21,7 @@ pub(super) fn try_execute_slash_command(
     if let Some(ref body) = entry.skill_body {
         // Skill: expand and push to inbox
         let expanded = expand_skill(body, arg.unwrap_or(""));
-        Some(InputAction::InboxPush(expanded))
+        Some(InputAction::InboxPush(expanded.into()))
     } else {
         // Built-in: dispatch
         Some(dispatch_command(cmd_name, arg))

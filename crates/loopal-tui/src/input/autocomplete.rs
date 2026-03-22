@@ -61,7 +61,7 @@ pub(super) fn handle_autocomplete_key(app: &mut App, key: &KeyEvent) -> Option<I
                     app.input.clear();
                     app.input_cursor = 0;
                     app.autocomplete = None;
-                    Some(InputAction::InboxPush(expanded))
+                    Some(InputAction::InboxPush(expanded.into()))
                 } else {
                     // Built-in command: dispatch immediately
                     let name = entry.name.clone();

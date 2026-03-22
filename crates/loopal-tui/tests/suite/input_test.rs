@@ -110,7 +110,7 @@ fn test_enter_submits_text() {
     app.input = "hello".to_string();
     app.input_cursor = 5;
     let action = handle_key(&mut app, key(KeyCode::Enter));
-    assert!(matches!(action, InputAction::InboxPush(t) if t == "hello"));
+    assert!(matches!(action, InputAction::InboxPush(t) if t.text == "hello"));
     assert!(app.input.is_empty());
 }
 

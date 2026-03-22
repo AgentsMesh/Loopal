@@ -1,19 +1,20 @@
 //! AgentEvent → SessionState update logic. Routes events by `agent_name`:
 //! root → main display, sub-agent → `agent_handler`. `MessageRouted` → global feed.
 
-use loopal_protocol::{AgentEvent, AgentEventPayload};
+use loopal_protocol::{AgentEvent, AgentEventPayload, UserContent};
 
 use crate::agent_handler::apply_agent_event;
+use crate::inbox::try_forward_inbox;
+use crate::message_log::record_message_routed;
 use crate::thinking_display::format_thinking_summary;
 use crate::tool_result_handler::handle_tool_result;
 use crate::truncate::truncate_json;
-use crate::message_log::MessageLogEntry;
 use crate::state::SessionState;
 use crate::types::{DisplayMessage, DisplayToolCall, PendingPermission};
 
 /// Handle an AgentEvent by mutating SessionState in-place.
-/// Returns `Some(text)` if an inbox message should be forwarded (agent became idle).
-pub fn apply_event(state: &mut SessionState, event: AgentEvent) -> Option<String> {
+/// Returns `Some(content)` if an inbox message should be forwarded (agent became idle).
+pub fn apply_event(state: &mut SessionState, event: AgentEvent) -> Option<UserContent> {
     if let AgentEventPayload::MessageRouted {
         ref source, ref target, ref content_preview,
     } = event.payload
@@ -31,7 +32,7 @@ pub fn apply_event(state: &mut SessionState, event: AgentEvent) -> Option<String
 }
 
 /// Handle a root-agent event (main display updates).
-fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Option<String> {
+fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Option<UserContent> {
     match payload {
         AgentEventPayload::Stream { text } => {
             state.begin_turn();
@@ -52,6 +53,7 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
                     role: "thinking".to_string(),
                     content: summary,
                     tool_calls: Vec::new(),
+                    image_count: 0,
                 });
             }
         }
@@ -74,6 +76,7 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
                 role: "assistant".to_string(),
                 content: String::new(),
                 tool_calls: vec![tc],
+                image_count: 0,
             });
         }
         AgentEventPayload::ToolResult { id: _, name, result, is_error } => {
@@ -86,7 +89,10 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
         AgentEventPayload::Error { message } => {
             flush_streaming(state);
             state.messages.push(DisplayMessage {
-                role: "error".to_string(), content: message, tool_calls: Vec::new(),
+                role: "error".to_string(),
+                content: message,
+                tool_calls: Vec::new(),
+                image_count: 0,
             });
         }
         AgentEventPayload::AwaitingInput => {
@@ -102,6 +108,7 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
                 role: "system".to_string(),
                 content: format!("Max turns reached ({})", turns),
                 tool_calls: Vec::new(),
+                image_count: 0,
             });
         }
         AgentEventPayload::AutoContinuation { continuation, max_continuations } => {
@@ -112,19 +119,19 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
                     continuation, max_continuations
                 ),
                 tool_calls: Vec::new(),
+                image_count: 0,
             });
         }
         AgentEventPayload::TokenUsage {
             input_tokens, output_tokens, context_window,
             cache_creation_input_tokens, cache_read_input_tokens,
-            thinking_tokens: _, // accumulated via ThinkingComplete to avoid double-counting
+            thinking_tokens: _,
         } => {
             state.input_tokens = input_tokens;
             state.output_tokens = output_tokens;
             state.context_window = context_window;
             state.cache_creation_tokens = cache_creation_input_tokens;
             state.cache_read_tokens = cache_read_input_tokens;
-            // Reset thinking_tokens on /clear (signaled by all-zero usage)
             if input_tokens == 0 && output_tokens == 0 {
                 state.thinking_tokens = 0;
             }
@@ -150,13 +157,15 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
 
 /// Flush buffered streaming text into a DisplayMessage.
 pub(crate) fn flush_streaming(state: &mut SessionState) {
-    // Flush thinking first
     if !state.streaming_thinking.is_empty() {
         let thinking = std::mem::take(&mut state.streaming_thinking);
         let token_est = thinking.len() as u32 / 4;
         let summary = format_thinking_summary(&thinking, token_est);
         state.messages.push(DisplayMessage {
-            role: "thinking".to_string(), content: summary, tool_calls: Vec::new(),
+            role: "thinking".to_string(),
+            content: summary,
+            tool_calls: Vec::new(),
+            image_count: 0,
         });
         state.thinking_active = false;
     }
@@ -171,30 +180,10 @@ pub(crate) fn flush_streaming(state: &mut SessionState) {
             return;
         }
         state.messages.push(DisplayMessage {
-            role: "assistant".to_string(), content: text, tool_calls: Vec::new(),
+            role: "assistant".to_string(),
+            content: text,
+            tool_calls: Vec::new(),
+            image_count: 0,
         });
-    }
-}
-
-/// Try forwarding a queued inbox message when agent is idle.
-pub(crate) fn try_forward_inbox(state: &mut SessionState) -> Option<String> {
-    if !state.agent_idle { return None; }
-    let text = state.inbox.pop_front()?;
-    state.agent_idle = false;
-    state.begin_turn();
-    state.messages.push(DisplayMessage {
-        role: "user".to_string(), content: text.clone(), tool_calls: Vec::new(),
-    });
-    Some(text)
-}
-
-/// Record a MessageRouted event to the global feed and per-agent logs.
-fn record_message_routed(state: &mut SessionState, source: &str, target: &str, preview: &str) {
-    let entry = MessageLogEntry::new(source, target, preview);
-    state.message_feed.record(entry.clone());
-    for name in [source, target] {
-        if let Some(agent) = state.agents.get_mut(name) {
-            agent.message_log.push(entry.clone());
-        }
     }
 }

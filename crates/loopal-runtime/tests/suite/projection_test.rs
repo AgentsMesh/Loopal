@@ -27,8 +27,10 @@ fn project_plain_text() {
     assert_eq!(display.len(), 2);
     assert_eq!(display[0].role, "user");
     assert_eq!(display[0].content, "hello");
+    assert_eq!(display[0].image_count, 0);
     assert_eq!(display[1].role, "assistant");
     assert_eq!(display[1].content, "hi");
+    assert_eq!(display[1].image_count, 0);
 }
 
 #[test]
@@ -105,6 +107,7 @@ fn project_image_placeholder() {
     };
     let display = project_messages(&[msg]);
     assert_eq!(display[0].content, "[image]");
+    assert_eq!(display[0].image_count, 1);
 }
 
 #[test]
@@ -153,4 +156,42 @@ fn project_skips_empty_messages() {
     };
     let display = project_messages(&[msg]);
     assert!(display.is_empty());
+}
+
+#[test]
+fn project_multiple_images_count() {
+    let msg = Message {
+        id: None,
+        role: MessageRole::User,
+        content: vec![
+            ContentBlock::Text { text: "check these".into() },
+            ContentBlock::Image {
+                source: loopal_message::ImageSource {
+                    source_type: "base64".into(),
+                    media_type: "image/png".into(),
+                    data: "img1".into(),
+                },
+            },
+            ContentBlock::Image {
+                source: loopal_message::ImageSource {
+                    source_type: "base64".into(),
+                    media_type: "image/jpeg".into(),
+                    data: "img2".into(),
+                },
+            },
+            ContentBlock::Image {
+                source: loopal_message::ImageSource {
+                    source_type: "base64".into(),
+                    media_type: "image/png".into(),
+                    data: "img3".into(),
+                },
+            },
+        ],
+    };
+    let display = project_messages(&[msg]);
+    assert_eq!(display.len(), 1);
+    assert_eq!(display[0].image_count, 3);
+    // Text content should include "[image]" placeholders
+    assert!(display[0].content.contains("check these"));
+    assert_eq!(display[0].content.matches("[image]").count(), 3);
 }

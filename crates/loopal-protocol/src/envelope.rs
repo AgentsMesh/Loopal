@@ -2,6 +2,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::user_content::UserContent;
+
 /// Origin of a message in the three-plane architecture.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MessageSource {
@@ -37,15 +39,22 @@ pub struct Envelope {
     pub source: MessageSource,
     /// Target agent name (e.g. "main", "researcher").
     pub target: String,
-    /// Message content.
-    pub content: String,
+    /// Message content (text + optional images).
+    pub content: UserContent,
     /// UTC timestamp when the envelope was created.
     pub timestamp: DateTime<Utc>,
 }
 
 impl Envelope {
     /// Create a new envelope with auto-generated ID and current timestamp.
-    pub fn new(source: MessageSource, target: impl Into<String>, content: impl Into<String>) -> Self {
+    ///
+    /// Accepts `String`, `&str`, or `UserContent` as content thanks to
+    /// `Into<UserContent>` (backward-compatible with text-only callers).
+    pub fn new(
+        source: MessageSource,
+        target: impl Into<String>,
+        content: impl Into<UserContent>,
+    ) -> Self {
         Self {
             id: Uuid::new_v4(),
             source,
@@ -55,18 +64,8 @@ impl Envelope {
         }
     }
 
-    /// Short preview of the content (max ~80 chars, safe for multi-byte).
+    /// Short preview of the text content (max ~80 chars, safe for multi-byte).
     pub fn content_preview(&self) -> &str {
-        let s = self.content.as_str();
-        if s.len() <= 80 {
-            s
-        } else {
-            // Find the nearest char boundary at or before byte 80
-            let mut end = 80;
-            while end > 0 && !s.is_char_boundary(end) {
-                end -= 1;
-            }
-            &s[..end]
-        }
+        self.content.text_preview()
     }
 }

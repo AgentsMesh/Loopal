@@ -23,6 +23,7 @@ pub fn project_messages(messages: &[Message]) -> Vec<DisplayMessage> {
         let role = role_str(&msg.role);
         let mut content_parts: Vec<String> = Vec::new();
         let mut tool_calls: Vec<DisplayToolCall> = Vec::new();
+        let mut image_count: usize = 0;
 
         for block in &msg.content {
             match block {
@@ -48,7 +49,10 @@ pub fn project_messages(messages: &[Message]) -> Vec<DisplayMessage> {
                         tool_use_id, content, *is_error,
                     );
                 }
-                ContentBlock::Image { .. } => content_parts.push("[image]".to_string()),
+                ContentBlock::Image { .. } => {
+                    content_parts.push("[image]".to_string());
+                    image_count += 1;
+                }
                 ContentBlock::Thinking { .. } => {} // Thinking blocks not shown in projection
             }
         }
@@ -57,7 +61,7 @@ pub fn project_messages(messages: &[Message]) -> Vec<DisplayMessage> {
         if content.is_empty() && tool_calls.is_empty() {
             continue;
         }
-        display.push(DisplayMessage { role, content, tool_calls });
+        display.push(DisplayMessage { role, content, tool_calls, image_count });
     }
 
     display
@@ -92,6 +96,7 @@ fn back_patch(
             role: "assistant".to_string(),
             content: content.to_string(),
             tool_calls: Vec::new(),
+            image_count: 0,
         });
     }
 }

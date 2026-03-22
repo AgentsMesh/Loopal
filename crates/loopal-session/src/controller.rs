@@ -10,9 +10,11 @@ use tokio::sync::mpsc;
 use loopal_protocol::AgentMode;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::AgentEvent;
+use loopal_protocol::UserContent;
 use loopal_protocol::UserQuestionResponse;
 
 use crate::event_handler;
+use crate::inbox::try_forward_inbox;
 use crate::state::SessionState;
 use crate::types::DisplayMessage;
 
@@ -53,14 +55,14 @@ impl SessionController {
 
     // === Interaction (control plane only) ===
 
-    /// Push a message into inbox. Returns Some(text) if it should be forwarded.
+    /// Push a message into inbox. Returns Some(content) if it should be forwarded.
     ///
     /// Caller is responsible for actually routing the message to the agent
     /// (e.g., via `MessageRouter::route()`).
-    pub fn enqueue_message(&self, text: String) -> Option<String> {
+    pub fn enqueue_message(&self, content: UserContent) -> Option<UserContent> {
         let mut state = self.lock();
-        state.inbox.push(text);
-        event_handler::try_forward_inbox(&mut state)
+        state.inbox.push(content);
+        try_forward_inbox(&mut state)
     }
 
     /// Approve the current pending permission request.
@@ -102,6 +104,7 @@ impl SessionController {
                 role: "system".to_string(),
                 content: format!("Switched model to: {model}"),
                 tool_calls: Vec::new(),
+                image_count: 0,
             });
         }
         let _ = self.control_tx.send(ControlCommand::ModelSwitch(model)).await;
@@ -118,6 +121,7 @@ impl SessionController {
                 role: "system".to_string(),
                 content: format!("Switched thinking to: {label}"),
                 tool_calls: Vec::new(),
+                image_count: 0,
             });
         }
         let _ = self.control_tx.send(ControlCommand::ThinkingSwitch(config_json)).await;
@@ -152,7 +156,7 @@ impl SessionController {
     }
 
     /// Pop the last inbox message for editing. Returns None if empty.
-    pub fn pop_inbox_to_edit(&self) -> Option<String> {
+    pub fn pop_inbox_to_edit(&self) -> Option<UserContent> {
         self.lock().inbox.pop_back()
     }
 
@@ -162,6 +166,7 @@ impl SessionController {
             role: "system".to_string(),
             content,
             tool_calls: Vec::new(),
+            image_count: 0,
         });
     }
 
@@ -173,8 +178,8 @@ impl SessionController {
     // === Event handling ===
 
     /// Process an AgentEvent by updating internal state.
-    /// Returns `Some(text)` if an inbox message should be forwarded.
-    pub fn handle_event(&self, event: AgentEvent) -> Option<String> {
+    /// Returns `Some(content)` if an inbox message should be forwarded.
+    pub fn handle_event(&self, event: AgentEvent) -> Option<UserContent> {
         let mut state = self.lock();
         event_handler::apply_event(&mut state, event)
     }

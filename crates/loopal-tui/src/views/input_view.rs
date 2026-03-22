@@ -2,6 +2,7 @@
 ///
 /// No border, no title — just a command input channel.
 /// Shows inbox count when messages are queued: `> (2 queued) `.
+/// Shows image count when images are attached: `> [img:2] `.
 use ratatui::prelude::*;
 use ratatui::widgets::Paragraph;
 use unicode_width::UnicodeWidthChar;
@@ -12,17 +13,14 @@ pub fn render_input(
     input: &str,
     cursor: usize,
     inbox_count: usize,
+    image_count: usize,
     area: Rect,
 ) {
     if area.height == 0 {
         return;
     }
 
-    let prefix = if inbox_count > 0 {
-        format!("> ({} queued) ", inbox_count)
-    } else {
-        "> ".to_string()
-    };
+    let prefix = build_prefix(inbox_count, image_count);
     let prefix_width: usize = prefix.chars().map(|c| c.width().unwrap_or(0)).sum();
 
     let line = Line::from(vec![
@@ -38,6 +36,16 @@ pub fn render_input(
         area.x + (prefix_width + input_width) as u16,
         area.y,
     ));
+}
+
+/// Build the prompt prefix string from inbox and image counts.
+fn build_prefix(inbox_count: usize, image_count: usize) -> String {
+    match (inbox_count > 0, image_count > 0) {
+        (true, true) => format!("> [img:{}] ({} queued) ", image_count, inbox_count),
+        (true, false) => format!("> ({} queued) ", inbox_count),
+        (false, true) => format!("> [img:{}] ", image_count),
+        (false, false) => "> ".to_string(),
+    }
 }
 
 /// Calculate the display width of a string up to byte position `pos`.
@@ -58,18 +66,17 @@ mod tests {
 
     #[test]
     fn test_cjk_width() {
-        // Each CJK character is 3 bytes, display width 2
         let s = "你好世界";
-        assert_eq!(display_width_up_to(s, 6), 4); // 2 chars = width 4
-        assert_eq!(display_width_up_to(s, 12), 8); // 4 chars = width 8
+        assert_eq!(display_width_up_to(s, 6), 4);
+        assert_eq!(display_width_up_to(s, 12), 8);
     }
 
     #[test]
     fn test_mixed_width() {
         let s = "hi你好";
-        assert_eq!(display_width_up_to(s, 2), 2); // "hi" = width 2
-        assert_eq!(display_width_up_to(s, 5), 4); // "hi你" = width 4
-        assert_eq!(display_width_up_to(s, 8), 6); // "hi你好" = width 6
+        assert_eq!(display_width_up_to(s, 2), 2);
+        assert_eq!(display_width_up_to(s, 5), 4);
+        assert_eq!(display_width_up_to(s, 8), 6);
     }
 
     #[test]
@@ -80,5 +87,13 @@ mod tests {
     #[test]
     fn test_pos_beyond_length() {
         assert_eq!(display_width_up_to("abc", 100), 3);
+    }
+
+    #[test]
+    fn test_prefix_variants() {
+        assert_eq!(build_prefix(0, 0), "> ");
+        assert_eq!(build_prefix(2, 0), "> (2 queued) ");
+        assert_eq!(build_prefix(0, 1), "> [img:1] ");
+        assert_eq!(build_prefix(3, 2), "> [img:2] (3 queued) ");
     }
 }

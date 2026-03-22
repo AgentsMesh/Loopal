@@ -62,10 +62,10 @@ fn test_awaiting_input_flushes_streaming() {
 #[test]
 fn test_awaiting_input_forwards_inbox() {
     let (ctrl, _, _) = make_controller();
-    ctrl.lock().inbox.push("queued msg".to_string());
+    ctrl.lock().inbox.push("queued msg".into());
 
     let forwarded = ctrl.handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
-    assert_eq!(forwarded, Some("queued msg".to_string()));
+    assert_eq!(forwarded.map(|c| c.text), Some("queued msg".to_string()));
 
     let state = ctrl.lock();
     assert!(!state.agent_idle); // forwarding clears idle
@@ -165,11 +165,11 @@ fn test_push_system_message() {
 #[test]
 fn test_pop_inbox_to_edit() {
     let (ctrl, _, _) = make_controller();
-    ctrl.lock().inbox.push("first".to_string());
-    ctrl.lock().inbox.push("second".to_string());
+    ctrl.lock().inbox.push("first".into());
+    ctrl.lock().inbox.push("second".into());
 
-    assert_eq!(ctrl.pop_inbox_to_edit(), Some("second".to_string()));
+    assert_eq!(ctrl.pop_inbox_to_edit().map(|c| c.text), Some("second".to_string()));
     assert_eq!(ctrl.lock().inbox.len(), 1);
-    assert_eq!(ctrl.pop_inbox_to_edit(), Some("first".to_string()));
+    assert_eq!(ctrl.pop_inbox_to_edit().map(|c| c.text), Some("first".to_string()));
     assert!(ctrl.pop_inbox_to_edit().is_none());
 }

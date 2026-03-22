@@ -9,7 +9,7 @@ use tracing::{error, info};
 use loopal_tool_api::COMPLETION_PREFIX;
 
 use crate::mode::AgentMode;
-use super::input::format_envelope_content;
+use super::input::build_user_message;
 use super::runner::AgentLoopRunner;
 use super::tool_exec::execute_approved_tools;
 
@@ -127,9 +127,8 @@ impl AgentLoopRunner {
     pub async fn inject_pending_messages(&mut self) {
         let pending = self.params.frontend.drain_pending().await;
         for env in pending {
-            let text = format_envelope_content(&env);
-            info!(len = text.len(), "injecting pending message");
-            let mut user_msg = Message::user(&text);
+            let mut user_msg = build_user_message(&env);
+            info!(text_len = env.content.text.len(), "injecting pending message");
             if let Err(e) = self.params.session_manager.save_message(
                 &self.params.session.id,
                 &mut user_msg,

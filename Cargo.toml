@@ -107,6 +107,11 @@ html2text = "0.12"
 pdf-extract = "0.7"
 tiktoken-rs = "0.6"
 
+# Image support
+arboard = { version = "3", features = ["image-data"] }
+base64 = "0.22"
+image = { version = "0.25", default-features = false, features = ["png"] }
+
 # Workspace crates
 loopal-error = { path = "crates/loopal-error" }
 loopal-message = { path = "crates/loopal-message" }

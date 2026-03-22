@@ -73,6 +73,7 @@ fn test_flush_streaming_new_message_when_last_is_not_assistant() {
             role: "user".to_string(),
             content: "hi".to_string(),
             tool_calls: Vec::new(),
+            image_count: 0,
         });
         state.streaming_text = "response".to_string();
     }
@@ -98,6 +99,7 @@ fn test_flush_streaming_new_message_when_assistant_has_tool_calls() {
                 summary: "done".to_string(),
                 result: Some("done".to_string()),
             }],
+            image_count: 0,
         });
         state.streaming_text = "new response".to_string();
     }

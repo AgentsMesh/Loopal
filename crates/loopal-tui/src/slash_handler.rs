@@ -12,6 +12,7 @@ pub(crate) async fn handle_slash_command(
 ) {
     match cmd {
         SlashCommandAction::Clear => {
+            app.pending_images.clear();
             app.session.clear().await;
         }
         SlashCommandAction::Compact => {

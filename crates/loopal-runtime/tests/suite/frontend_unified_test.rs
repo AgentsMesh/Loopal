@@ -85,7 +85,7 @@ async fn test_unified_recv_input_from_envelope() {
     match cmd {
         Some(AgentInput::Message(env)) => {
             assert!(matches!(env.source, MessageSource::Human));
-            assert_eq!(env.content, "hello");
+            assert_eq!(env.content.text, "hello");
         }
         other => panic!("expected AgentInput::Message, got {other:?}"),
     }
@@ -179,9 +179,9 @@ async fn test_unified_drain_pending() {
     let pending = f.drain_pending().await;
     assert_eq!(pending.len(), 2);
     assert_eq!(pending[0].source.label(), "lead");
-    assert_eq!(pending[0].content, "task A");
+    assert_eq!(pending[0].content.text, "task A");
     assert_eq!(pending[1].source.label(), "peer");
-    assert_eq!(pending[1].content, "task B");
+    assert_eq!(pending[1].content.text, "task B");
 }
 
 // --- permission: auto deny ---

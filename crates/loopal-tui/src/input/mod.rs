@@ -1,6 +1,7 @@
 mod actions;
 mod autocomplete;
 mod commands;
+pub(crate) mod paste;
 mod sub_page;
 
 pub use actions::*;
@@ -42,10 +43,11 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> InputAction {
         return handle_sub_page_key(app, &key);
     }
 
-    // Ctrl+C / Ctrl+D to quit
+    // Ctrl+C / Ctrl+D to quit, Ctrl+V to paste (async — handled by tui_loop)
     if key.modifiers.contains(KeyModifiers::CONTROL) {
         match key.code {
             KeyCode::Char('c') | KeyCode::Char('d') => return InputAction::Quit,
+            KeyCode::Char('v') => return InputAction::PasteRequested,
             _ => {}
         }
     }
@@ -77,8 +79,8 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> InputAction {
                 app.autocomplete = None;
                 return cmd_action;
             }
-            if let Some(text) = app.submit_input() {
-                return InputAction::InboxPush(text);
+            if let Some(content) = app.submit_input() {
+                return InputAction::InboxPush(content);
             }
             InputAction::None
         }
@@ -96,6 +98,9 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> InputAction {
                     .unwrap_or(0);
                 app.input.remove(prev);
                 app.input_cursor = prev;
+            } else if !app.pending_images.is_empty() {
+                // Empty input + Backspace: remove last attached image
+                app.pending_images.pop();
             }
             InputAction::None
         }

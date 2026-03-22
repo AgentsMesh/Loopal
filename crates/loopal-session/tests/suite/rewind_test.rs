@@ -2,15 +2,15 @@ use loopal_session::DisplayMessage;
 use loopal_session::state::SessionState;
 
 fn user_msg(text: &str) -> DisplayMessage {
-    DisplayMessage { role: "user".into(), content: text.into(), tool_calls: vec![] }
+    DisplayMessage { role: "user".into(), content: text.into(), tool_calls: vec![], image_count: 0 }
 }
 
 fn asst_msg(text: &str) -> DisplayMessage {
-    DisplayMessage { role: "assistant".into(), content: text.into(), tool_calls: vec![] }
+    DisplayMessage { role: "assistant".into(), content: text.into(), tool_calls: vec![], image_count: 0 }
 }
 
 fn sys_msg(text: &str) -> DisplayMessage {
-    DisplayMessage { role: "system".into(), content: text.into(), tool_calls: vec![] }
+    DisplayMessage { role: "system".into(), content: text.into(), tool_calls: vec![], image_count: 0 }
 }
 
 fn state_with_messages(msgs: Vec<DisplayMessage>) -> SessionState {

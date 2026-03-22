@@ -28,7 +28,7 @@ async fn test_register_and_route_delivers_envelope() {
 
     let received = rx.recv().await.unwrap();
     assert_eq!(received.target, "alice");
-    assert_eq!(received.content, "hello");
+    assert_eq!(received.content.text, "hello");
 }
 
 #[tokio::test]

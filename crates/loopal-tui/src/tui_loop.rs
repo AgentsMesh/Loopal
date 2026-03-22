@@ -7,7 +7,7 @@ use ratatui::prelude::*;
 use loopal_agent::router::MessageRouter;
 use loopal_session::SessionController;
 use loopal_protocol::AgentMode;
-use loopal_protocol::{Envelope, MessageSource};
+use loopal_protocol::{Envelope, MessageSource, UserContent};
 use loopal_protocol::AgentEvent;
 use tokio::sync::mpsc;
 
@@ -15,6 +15,7 @@ use crate::app::App;
 use crate::command::CommandEntry;
 use crate::event::{AppEvent, EventHandler};
 use crate::input::{InputAction, handle_key};
+use crate::input::paste;
 use crate::render::draw;
 use crate::slash_handler::handle_slash_command;
 use crate::terminal::TerminalGuard;
@@ -60,12 +61,15 @@ pub async fn run_tui(
                             should_quit = true;
                             break;
                         }
-                        InputAction::InboxPush(text) => {
-                            app.input_history.push(text.clone());
+                        InputAction::InboxPush(content) => {
+                            app.input_history.push(content.text.clone());
                             app.history_index = None;
-                            if let Some(msg) = app.session.enqueue_message(text) {
+                            if let Some(msg) = app.session.enqueue_message(content) {
                                 route_human_message(&router, &target_agent, msg).await;
                             }
+                        }
+                        InputAction::PasteRequested => {
+                            paste::spawn_paste(&events);
                         }
                         InputAction::ToolApprove => {
                             let has = app.session.lock().pending_permission.is_some();
@@ -102,22 +106,7 @@ pub async fn run_tui(
                             }
                         }
                         InputAction::QuestionConfirm => {
-                            let answers = {
-                                let state = app.session.lock();
-                                state.pending_question.as_ref().map(|q| {
-                                    let answers = q.get_answers();
-                                    if answers.is_empty() && !q.questions[q.current_question].allow_multiple {
-                                        // Single-select: select cursor item
-                                        let opt = &q.questions[q.current_question].options[q.cursor];
-                                        vec![opt.label.clone()]
-                                    } else {
-                                        answers
-                                    }
-                                })
-                            };
-                            if let Some(answers) = answers {
-                                app.session.answer_question(answers).await;
-                            }
+                            handle_question_confirm(&mut app).await;
                         }
                         InputAction::QuestionCancel => {
                             app.session.answer_question(vec!["(cancelled)".into()]).await;
@@ -126,9 +115,12 @@ pub async fn run_tui(
                     }
                 }
                 AppEvent::Agent(agent_event) => {
-                    if let Some(msg) = app.session.handle_event(agent_event) {
-                        route_human_message(&router, &target_agent, msg).await;
+                    if let Some(content) = app.session.handle_event(agent_event) {
+                        route_human_message(&router, &target_agent, content).await;
                     }
+                }
+                AppEvent::Paste(result) => {
+                    paste::apply_paste_result(&mut app, result);
                 }
                 AppEvent::Mouse(mouse) => {
                     use crossterm::event::MouseEventKind;
@@ -155,9 +147,27 @@ pub async fn run_tui(
     Ok(())
 }
 
+async fn handle_question_confirm(app: &mut App) {
+    let answers = {
+        let state = app.session.lock();
+        state.pending_question.as_ref().map(|q| {
+            let answers = q.get_answers();
+            if answers.is_empty() && !q.questions[q.current_question].allow_multiple {
+                let opt = &q.questions[q.current_question].options[q.cursor];
+                vec![opt.label.clone()]
+            } else {
+                answers
+            }
+        })
+    };
+    if let Some(answers) = answers {
+        app.session.answer_question(answers).await;
+    }
+}
+
 /// Route a human message through the data plane.
-async fn route_human_message(router: &MessageRouter, target: &str, text: String) {
-    let envelope = Envelope::new(MessageSource::Human, target, text);
+async fn route_human_message(router: &MessageRouter, target: &str, content: UserContent) {
+    let envelope = Envelope::new(MessageSource::Human, target, content);
     if let Err(e) = router.route(envelope).await {
         tracing::warn!(error = %e, "failed to route human message — agent may have exited");
     }

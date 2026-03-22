@@ -8,6 +8,7 @@ fn msg(role: &str, content: &str) -> DisplayMessage {
         role: role.to_string(),
         content: content.to_string(),
         tool_calls: Vec::new(),
+        image_count: 0,
     }
 }
 
@@ -60,6 +61,7 @@ fn test_tool_call_mutation_detected() {
             summary: "bash(ls)".to_string(),
             result: None,
         }],
+        image_count: 0,
     }];
     let fp1 = cache.update(&msgs, W);
 
@@ -115,6 +117,7 @@ fn test_tool_result_arrival_invalidates_cache() {
             summary: "Read(/tmp/foo.rs)".to_string(),
             result: None,
         }],
+        image_count: 0,
     }];
     let n1 = cache.update(&msgs, W);
 

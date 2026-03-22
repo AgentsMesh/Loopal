@@ -42,6 +42,7 @@ fn test_tool_call_without_prior_assistant_message_creates_one() {
             role: "user".to_string(),
             content: "do something".to_string(),
             tool_calls: Vec::new(),
+            image_count: 0,
         });
     }
     app.session.handle_event(AgentEvent::root(AgentEventPayload::ToolCall {
@@ -109,6 +110,7 @@ fn test_tool_result_with_multibyte_utf8_no_panic() {
                 summary: "Read(...)".to_string(),
                 result: None,
             }],
+            image_count: 0,
         });
     }
 

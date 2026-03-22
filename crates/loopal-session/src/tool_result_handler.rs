@@ -31,6 +31,7 @@ pub(crate) fn handle_tool_result(
             role: "assistant".into(),
             content: content.to_string(),
             tool_calls: Vec::new(),
+            image_count: 0,
         });
     }
 }

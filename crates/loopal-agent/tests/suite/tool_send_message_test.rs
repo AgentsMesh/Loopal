@@ -69,7 +69,7 @@ async fn test_send_message_routes_via_router() {
 
     // Verify envelope was delivered to the target mailbox
     let envelope = target_rx.recv().await.expect("should receive envelope");
-    assert_eq!(envelope.content, "hello from router");
+    assert_eq!(envelope.content.text, "hello from router");
     assert_eq!(envelope.target, "worker");
 }
 
@@ -107,7 +107,7 @@ async fn test_send_message_broadcast_via_router() {
 
     // Both agents should receive (main excluded as sender)
     let e1 = target_rx.recv().await.expect("worker should receive");
-    assert_eq!(e1.content, "attention everyone");
+    assert_eq!(e1.content.text, "attention everyone");
     let e2 = rx2.recv().await.expect("helper should receive");
-    assert_eq!(e2.content, "attention everyone");
+    assert_eq!(e2.content.text, "attention everyone");
 }

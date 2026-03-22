@@ -7,6 +7,7 @@ fn msg(role: &str, content: &str) -> DisplayMessage {
         role: role.to_string(),
         content: content.to_string(),
         tool_calls: Vec::new(),
+        image_count: 0,
     }
 }
 
@@ -83,6 +84,7 @@ fn test_tool_call_single_line_summary() {
             summary: "Read(src/main.rs)".to_string(),
             result: Some("fn main() {}".to_string()),
         }],
+        image_count: 0,
     };
     let lines = message_to_lines(&m, 80);
     let text = all_text(&lines);
@@ -101,6 +103,7 @@ fn test_tool_call_error_shows_cross() {
             summary: "Bash(npm test)".to_string(),
             result: Some("ENOENT: command not found".to_string()),
         }],
+        image_count: 0,
     };
     let lines = message_to_lines(&m, 80);
     let text = all_text(&lines);
@@ -118,6 +121,7 @@ fn test_tool_call_pending_shows_spinner() {
             summary: "Edit(src/lib.rs)".to_string(),
             result: None,
         }],
+        image_count: 0,
     };
     let lines = message_to_lines(&m, 80);
     let text = all_text(&lines);
@@ -135,6 +139,7 @@ fn test_assistant_with_content_and_tools() {
             summary: "Edit(src/lib.rs:42)".to_string(),
             result: Some("applied".to_string()),
         }],
+        image_count: 0,
     };
     let lines = message_to_lines(&m, 80);
     let text = all_text(&lines);

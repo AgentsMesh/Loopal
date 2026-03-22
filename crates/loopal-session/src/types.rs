@@ -11,6 +11,8 @@ pub struct DisplayMessage {
     pub role: String,
     pub content: String,
     pub tool_calls: Vec<DisplayToolCall>,
+    /// Number of images attached to this message (0 for text-only).
+    pub image_count: usize,
 }
 
 /// A tool call to display in the chat view.

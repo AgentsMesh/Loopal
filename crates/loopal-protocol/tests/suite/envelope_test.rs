@@ -16,7 +16,7 @@ fn test_envelope_fields_stored_correctly() {
     );
     assert_eq!(env.source, MessageSource::Agent("researcher".into()));
     assert_eq!(env.target, "main");
-    assert_eq!(env.content, "found results");
+    assert_eq!(env.content.text, "found results");
 }
 
 #[test]
@@ -44,7 +44,7 @@ fn test_envelope_serde_roundtrip() {
     assert_eq!(restored.id, env.id);
     assert_eq!(restored.source, env.source);
     assert_eq!(restored.target, env.target);
-    assert_eq!(restored.content, env.content);
+    assert_eq!(restored.content.text, env.content.text);
 }
 
 #[test]

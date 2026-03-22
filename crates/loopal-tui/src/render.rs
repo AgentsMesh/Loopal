@@ -99,8 +99,9 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     drop(state);
 
     // f₄ rendered post-lock (borrows app.input, not SessionState)
+    let image_count = app.pending_image_count();
     views::input_view::render_input(
-        f, &app.input, app.input_cursor, inbox_count, layout.input,
+        f, &app.input, app.input_cursor, inbox_count, image_count, layout.input,
     );
 
     // Overlay layer: conditional popups on top of base composition

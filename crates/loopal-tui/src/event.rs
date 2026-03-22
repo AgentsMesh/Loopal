@@ -2,6 +2,8 @@ use crossterm::event::{self, Event as CrosstermEvent, KeyEvent, MouseEvent};
 use loopal_protocol::AgentEvent;
 use tokio::sync::mpsc;
 
+use crate::input::paste::PasteResult;
+
 /// Unified event type for the TUI main loop
 #[derive(Debug)]
 pub enum AppEvent {
@@ -13,6 +15,8 @@ pub enum AppEvent {
     Resize(u16, u16),
     /// Agent event from the runtime
     Agent(AgentEvent),
+    /// Clipboard paste completed (from background thread)
+    Paste(PasteResult),
     /// Tick for periodic UI refresh
     Tick,
 }
@@ -20,6 +24,7 @@ pub enum AppEvent {
 /// Merges crossterm terminal events with agent events into a single stream.
 pub struct EventHandler {
     rx: mpsc::Receiver<AppEvent>,
+    tx: mpsc::Sender<AppEvent>,
 }
 
 impl EventHandler {
@@ -90,7 +95,7 @@ impl EventHandler {
         // Spawn tick task for periodic redraws.
         // Use try_send so ticks are dropped when the channel is busy
         // rather than blocking and causing back-pressure.
-        let tick_tx = tx;
+        let tick_tx = tx.clone();
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(std::time::Duration::from_millis(100));
             loop {
@@ -105,7 +110,12 @@ impl EventHandler {
             }
         });
 
-        Self { rx }
+        Self { rx, tx }
+    }
+
+    /// Get a sender handle for injecting events (e.g. paste results).
+    pub fn sender(&self) -> mpsc::Sender<AppEvent> {
+        self.tx.clone()
     }
 
     /// Wait for the next event (blocking).

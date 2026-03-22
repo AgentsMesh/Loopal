@@ -25,7 +25,7 @@ use tokio::sync::Notify;
 use crate::frontend::traits::AgentFrontend;
 use loopal_message::Message;
 use loopal_provider_api::ThinkingConfig;
-use loopal_tool_api::PermissionMode;
+use loopal_tool_api::{MemoryChannel, PermissionMode};
 
 use crate::mode::AgentMode;
 use crate::session::SessionManager;
@@ -60,6 +60,8 @@ pub struct AgentLoopParams {
     pub interrupt: InterruptSignal,
     /// Async wakeup companion for `interrupt` — allows `tokio::select!` responsiveness.
     pub interrupt_notify: Arc<Notify>,
+    /// Memory channel for the Memory tool → Observer sidebar.
+    pub memory_channel: Option<Arc<dyn MemoryChannel>>,
 }
 
 /// Public wrapper function that preserves the existing API.

@@ -1653,6 +1653,7 @@ name = "loopal"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "chrono",
  "clap",
  "dirs",
@@ -1664,6 +1665,7 @@ dependencies = [
  "loopal-hooks",
  "loopal-kernel",
  "loopal-mcp",
+ "loopal-memory",
  "loopal-message",
  "loopal-protocol",
  "loopal-provider",
@@ -1715,6 +1717,7 @@ dependencies = [
  "loopal-error",
  "loopal-git",
  "loopal-kernel",
+ "loopal-memory",
  "loopal-message",
  "loopal-protocol",
  "loopal-provider-api",
@@ -1849,6 +1852,20 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "loopal-memory"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "loopal-backend",
+ "loopal-error",
+ "loopal-tool-api",
+ "serde_json",
+ "tempfile",
  "tokio",
  "tracing",
 ]

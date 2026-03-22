@@ -47,7 +47,7 @@ async fn make_shared_and_ctx() -> (Arc<AgentShared>, ToolContext, mpsc::Receiver
         backend,
         session_id: "test".to_string(),
         shared: Some(shared_any),
-        pending_cwd_switch: Default::default(),
+        pending_cwd_switch: Default::default(), memory_channel: None,
     };
 
     (shared, ctx, target_rx)

@@ -22,4 +22,5 @@ pub fn register_all(kernel: &mut Kernel) {
     kernel.register_tool(Box::new(completion::AttemptCompletionTool));
     kernel.register_tool(Box::new(worktree::EnterWorktreeTool));
     kernel.register_tool(Box::new(worktree::ExitWorktreeTool));
+    kernel.register_tool(Box::new(loopal_memory::MemoryTool));
 }

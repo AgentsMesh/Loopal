@@ -136,6 +136,7 @@ pub async fn spawn_agent(
         thinking_config: loopal_provider_api::ThinkingConfig::Auto,
         interrupt: loopal_protocol::InterruptSignal::new(),
         interrupt_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
+        memory_channel: None, // Sub-agents do not get memory channel
     };
 
     let agent_name = params.name.clone();

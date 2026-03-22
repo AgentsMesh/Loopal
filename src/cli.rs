@@ -30,3 +30,21 @@ pub struct Cli {
     /// Initial prompt (non-interactive)
     pub prompt: Vec<String>,
 }
+
+impl Cli {
+    /// Apply CLI flags to settings, overriding config-file values.
+    pub fn apply_overrides(&self, settings: &mut loopal_config::Settings) {
+        if let Some(model) = &self.model {
+            settings.model = model.clone();
+        }
+        if let Some(perm) = &self.permission {
+            settings.permission_mode = match perm.as_str() {
+                "bypass" | "yolo" => loopal_tool_api::PermissionMode::Bypass,
+                _ => loopal_tool_api::PermissionMode::Supervised,
+            };
+        }
+        if self.no_sandbox {
+            settings.sandbox.policy = loopal_config::SandboxPolicy::Disabled;
+        }
+    }
+}

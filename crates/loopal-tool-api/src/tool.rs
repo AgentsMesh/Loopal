@@ -7,6 +7,7 @@ use std::sync::Arc;
 use loopal_error::LoopalError;
 
 use crate::backend::Backend;
+use crate::memory_channel::MemoryChannel;
 use crate::permission::PermissionLevel;
 
 #[async_trait]
@@ -45,6 +46,9 @@ pub struct ToolContext {
     /// `JoinSet`. If multiple tools write to this field, last-write-wins.
     /// Only one cwd-switching tool should appear per batch (enforced by LLM).
     pub pending_cwd_switch: Arc<std::sync::Mutex<Option<PathBuf>>>,
+    /// Memory channel for sending observations to the Memory Observer sidebar.
+    /// `None` when auto-memory is disabled.
+    pub memory_channel: Option<Arc<dyn MemoryChannel>>,
 }
 
 impl Clone for ToolContext {
@@ -54,6 +58,7 @@ impl Clone for ToolContext {
             session_id: self.session_id.clone(),
             shared: self.shared.clone(),
             pending_cwd_switch: self.pending_cwd_switch.clone(),
+            memory_channel: self.memory_channel.clone(),
         }
     }
 }

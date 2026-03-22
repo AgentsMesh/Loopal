@@ -64,7 +64,7 @@ fn test_model_info_defaults_for_unknown_model() {
         tool_filter: None,
         shared: None,
         interactive: true,
-        thinking_config: loopal_provider_api::ThinkingConfig::Auto, interrupt: Default::default(), interrupt_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
+        thinking_config: loopal_provider_api::ThinkingConfig::Auto, interrupt: Default::default(), interrupt_notify: std::sync::Arc::new(tokio::sync::Notify::new()), memory_channel: None,
     };
 
     let runner = AgentLoopRunner::new(params);

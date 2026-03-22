@@ -36,6 +36,7 @@ impl AgentLoopRunner {
             session_id: params.session.id.clone(),
             shared: params.shared.clone(),
             pending_cwd_switch: Default::default(),
+            memory_channel: params.memory_channel.clone(),
         };
         let model_info = get_model_info(&params.model);
         let max_context_tokens = model_info.as_ref().map_or(200_000, |m| m.context_window);

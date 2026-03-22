@@ -95,7 +95,7 @@ fn make_multi_runner(
         max_turns: 10, frontend, session_manager: SessionManager::with_base_dir(tmp),
         context_pipeline: ContextPipeline::new(),
         tool_filter: None, shared: None, interactive: false,
-        thinking_config: loopal_provider_api::ThinkingConfig::Auto, interrupt: Default::default(), interrupt_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
+        thinking_config: loopal_provider_api::ThinkingConfig::Auto, interrupt: Default::default(), interrupt_notify: std::sync::Arc::new(tokio::sync::Notify::new()), memory_channel: None,
     };
     (AgentLoopRunner::new(params), event_rx)
 }

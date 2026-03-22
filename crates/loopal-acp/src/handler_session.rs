@@ -109,6 +109,7 @@ impl AcpHandler {
             thinking_config: self.config.settings.thinking.clone(),
             interrupt: loopal_protocol::InterruptSignal::new(),
             interrupt_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
+            memory_channel: None, // ACP does not yet support memory observer
         };
 
         tokio::spawn(async move {

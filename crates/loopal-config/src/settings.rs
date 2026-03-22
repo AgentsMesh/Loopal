@@ -46,6 +46,10 @@ pub struct Settings {
     /// Thinking/reasoning configuration (default: Auto)
     #[serde(default)]
     pub thinking: ThinkingConfig,
+
+    /// Auto-memory configuration
+    #[serde(default)]
+    pub memory: MemoryConfig,
 }
 
 impl Default for Settings {
@@ -61,6 +65,7 @@ impl Default for Settings {
             mcp_servers: IndexMap::new(),
             sandbox: SandboxConfig::default(),
             thinking: ThinkingConfig::default(),
+            memory: MemoryConfig::default(),
         }
     }
 }
@@ -123,4 +128,18 @@ fn default_true() -> bool {
 
 fn default_mcp_timeout() -> u64 {
     30_000
+}
+
+/// Auto-memory configuration: controls the Memory tool + Observer sidebar.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct MemoryConfig {
+    /// Enable Memory tool + Observer (default: true)
+    pub enabled: bool,
+}
+
+impl Default for MemoryConfig {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
 }

@@ -42,7 +42,7 @@ async fn make_ctx(agent_name: &str) -> (Arc<AgentShared>, ToolContext) {
         backend,
         session_id: "test".to_string(),
         shared: Some(shared_any),
-        pending_cwd_switch: Default::default(),
+        pending_cwd_switch: Default::default(), memory_channel: None,
     };
     (shared, ctx)
 }

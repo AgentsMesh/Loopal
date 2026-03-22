@@ -82,7 +82,7 @@ pub fn make_runner() -> (AgentLoopRunner, mpsc::Receiver<AgentEvent>) {
         tool_filter: None,
         shared: None,
         interactive: true,
-        thinking_config: loopal_provider_api::ThinkingConfig::Auto, interrupt: Default::default(), interrupt_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
+        thinking_config: loopal_provider_api::ThinkingConfig::Auto, interrupt: Default::default(), interrupt_notify: std::sync::Arc::new(tokio::sync::Notify::new()), memory_channel: None,
     };
 
     (AgentLoopRunner::new(params), event_rx)
@@ -139,7 +139,7 @@ pub fn make_runner_with_channels() -> (
         tool_filter: None,
         shared: None,
         interactive: true,
-        thinking_config: loopal_provider_api::ThinkingConfig::Auto, interrupt: Default::default(), interrupt_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
+        thinking_config: loopal_provider_api::ThinkingConfig::Auto, interrupt: Default::default(), interrupt_notify: std::sync::Arc::new(tokio::sync::Notify::new()), memory_channel: None,
     };
 
     (AgentLoopRunner::new(params), event_rx, mbox_tx, ctrl_tx, perm_tx)

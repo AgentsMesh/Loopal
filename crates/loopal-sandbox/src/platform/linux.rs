@@ -2,6 +2,11 @@ use std::path::Path;
 
 use loopal_config::{ResolvedPolicy, SandboxPolicy};
 
+/// System paths that must be writable for basic CLI tool operation.
+const SYSTEM_WRITABLE_PATHS: &[&str] = &[
+    "/var/tmp", // POSIX /var/tmp (some tools bypass $TMPDIR)
+];
+
 /// Build `bwrap` (bubblewrap) arguments for Linux namespace isolation.
 pub fn build_bwrap_args(policy: &ResolvedPolicy, cwd: &Path) -> Vec<String> {
     let mut args = Vec::new();
@@ -17,6 +22,12 @@ pub fn build_bwrap_args(policy: &ResolvedPolicy, cwd: &Path) -> Vec<String> {
                 "--proc".into(), "/proc".into(),
                 "--dev".into(), "/dev".into(),
             ]);
+            // System paths needed even in read-only mode
+            for path in SYSTEM_WRITABLE_PATHS {
+                args.extend_from_slice(&[
+                    "--bind".into(), (*path).into(), (*path).into(),
+                ]);
+            }
         }
         SandboxPolicy::WorkspaceWrite => {
             // Bind root read-only first
@@ -27,6 +38,12 @@ pub fn build_bwrap_args(policy: &ResolvedPolicy, cwd: &Path) -> Vec<String> {
                 "--proc".into(), "/proc".into(),
                 "--dev".into(), "/dev".into(),
             ]);
+            // System paths
+            for path in SYSTEM_WRITABLE_PATHS {
+                args.extend_from_slice(&[
+                    "--bind".into(), (*path).into(), (*path).into(),
+                ]);
+            }
 
             // Bind writable paths
             for path in &policy.writable_paths {

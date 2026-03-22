@@ -14,6 +14,8 @@ pub enum SlashCommandAction {
     ModelSelected(String),
     /// Model + thinking selected from the enhanced model picker.
     ModelAndThinkingSelected { model: String, thinking_json: String },
+    /// Initialize project config (LOOPAL.md + .loopal/ + memory).
+    Init,
     /// Open the rewind turn picker.
     RewindPicker,
     /// A turn was selected for rewind (turn_index from oldest = 0).

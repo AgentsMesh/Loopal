@@ -22,7 +22,6 @@ members = [
     "crates/tools/filesystem/edit",
     "crates/tools/filesystem/multi-edit",
     "crates/tools/filesystem/apply-patch",
-    "crates/tools/filesystem/diff",
     "crates/tools/filesystem/grep",
     "crates/tools/filesystem/glob",
     "crates/tools/filesystem/ls",
@@ -128,7 +127,6 @@ loopal-tool-write = { path = "crates/tools/filesystem/write" }
 loopal-tool-edit = { path = "crates/tools/filesystem/edit" }
 loopal-tool-multi-edit = { path = "crates/tools/filesystem/multi-edit" }
 loopal-tool-apply-patch = { path = "crates/tools/filesystem/apply-patch" }
-loopal-tool-diff = { path = "crates/tools/filesystem/diff" }
 loopal-tool-grep = { path = "crates/tools/filesystem/grep" }
 loopal-tool-glob = { path = "crates/tools/filesystem/glob" }
 loopal-tool-ls = { path = "crates/tools/filesystem/ls" }

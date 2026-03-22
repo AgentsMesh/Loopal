@@ -39,6 +39,9 @@ mod macos_tests {
         assert!(profile.contains("(deny default)"));
         assert!(profile.contains("(allow file-read*)"));
         assert!(profile.contains(
+            "(allow file-write* (subpath \"/dev\"))"
+        ));
+        assert!(profile.contains(
             "(allow file-write* (subpath \"/home/user/project\"))"
         ));
         assert!(profile.contains(
@@ -47,13 +50,23 @@ mod macos_tests {
     }
 
     #[test]
-    fn readonly_profile_no_write_rules() {
+    fn readonly_profile_only_allows_system_writes() {
         let policy = readonly_policy();
         let profile = generate_seatbelt_profile(&policy);
 
         assert!(profile.contains("(deny default)"));
         assert!(profile.contains("(allow file-read*)"));
-        assert!(!profile.contains("file-write*"));
+        // System writable paths are allowed (device files, /var/tmp)
+        assert!(profile.contains("(allow file-write* (subpath \"/dev\"))"));
+        assert!(profile.contains(
+            "(allow file-write* (subpath \"/private/var/tmp\"))"
+        ));
+        // No workspace write rules beyond system paths
+        let write_count = profile.matches("file-write*").count();
+        assert_eq!(
+            write_count, 2,
+            "only system write rules expected, got: {profile}"
+        );
     }
 
     #[test]

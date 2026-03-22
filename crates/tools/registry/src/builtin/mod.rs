@@ -22,7 +22,6 @@ pub fn register_all(registry: &mut ToolRegistry) {
     registry.register(Box::new(
         loopal_tool_background::task_stop::TaskStopTool,
     ));
-    registry.register(Box::new(loopal_tool_diff::DiffTool));
     registry.register(Box::new(
         loopal_tool_file_ops::move_file::MoveFileTool,
     ));

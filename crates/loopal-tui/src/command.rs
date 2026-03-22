@@ -35,6 +35,7 @@ fn all_commands() -> &'static [SlashCommand] {
             description: "List session history",
             has_arg: false,
         },
+        SlashCommand { name: "/init", description: "Initialize project config", has_arg: false },
         SlashCommand { name: "/help", description: "Show commands and shortcuts", has_arg: false },
         SlashCommand { name: "/exit", description: "Exit the application", has_arg: false },
     ];

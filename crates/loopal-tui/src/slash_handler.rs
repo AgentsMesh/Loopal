@@ -36,6 +36,9 @@ pub(crate) async fn handle_slash_command(
                 "Session listing is not yet available in TUI.".to_string(),
             );
         }
+        SlashCommandAction::Init => {
+            crate::slash_init::run_init(app);
+        }
         SlashCommandAction::Help(name) => {
             show_help(app, name.as_deref());
         }

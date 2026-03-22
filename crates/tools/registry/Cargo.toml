@@ -19,7 +19,6 @@ loopal-tool-write = { workspace = true }
 loopal-tool-edit = { workspace = true }
 loopal-tool-multi-edit = { workspace = true }
 loopal-tool-apply-patch = { workspace = true }
-loopal-tool-diff = { workspace = true }
 loopal-tool-grep = { workspace = true }
 loopal-tool-glob = { workspace = true }
 loopal-tool-ls = { workspace = true }

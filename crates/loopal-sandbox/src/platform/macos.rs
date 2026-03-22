@@ -2,7 +2,21 @@ use std::path::Path;
 
 use loopal_config::{ResolvedPolicy, SandboxPolicy};
 
-/// Generate a Seatbelt profile string for `sandbox-exec -p`.
+/// System paths that must be writable for basic CLI tool operation.
+/// These are platform-invariant safe paths (device files, system temp).
+const SYSTEM_WRITABLE_PATHS: &[&str] = &[
+    "/dev",             // /dev/null, /dev/tty, /dev/urandom etc.
+    "/private/var/tmp", // POSIX /var/tmp (some tools bypass $TMPDIR)
+];
+
+/// Append seatbelt rules for essential system writable paths.
+fn append_system_write_rules(profile: &mut String) {
+    for path in SYSTEM_WRITABLE_PATHS {
+        profile.push_str(&format!(
+            "(allow file-write* (subpath \"{path}\"))\n"
+        ));
+    }
+}
 ///
 /// The profile allows reads everywhere but restricts writes to the
 /// configured writable paths.
@@ -17,6 +31,7 @@ pub fn generate_seatbelt_profile(policy: &ResolvedPolicy) -> String {
             profile.push_str("(allow sysctl-read)\n");
             profile.push_str("(allow file-read*)\n");
             profile.push_str("(allow mach-lookup)\n");
+            append_system_write_rules(&mut profile);
         }
         SandboxPolicy::WorkspaceWrite => {
             profile.push_str("(deny default)\n");
@@ -25,6 +40,7 @@ pub fn generate_seatbelt_profile(policy: &ResolvedPolicy) -> String {
             profile.push_str("(allow sysctl-read)\n");
             profile.push_str("(allow file-read*)\n");
             profile.push_str("(allow mach-lookup)\n");
+            append_system_write_rules(&mut profile);
 
             // Allow writes to configured writable paths
             for path in &policy.writable_paths {

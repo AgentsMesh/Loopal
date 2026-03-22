@@ -2037,20 +2037,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "loopal-tool-diff"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "loopal-backend",
- "loopal-edit-core",
- "loopal-error",
- "loopal-tool-api",
- "serde_json",
- "tempfile",
- "tokio",
-]
-
-[[package]]
 name = "loopal-tool-edit"
 version = "0.1.0"
 dependencies = [
@@ -2216,7 +2202,6 @@ dependencies = [
  "loopal-tool-ask-user",
  "loopal-tool-background",
  "loopal-tool-bash",
- "loopal-tool-diff",
  "loopal-tool-edit",
  "loopal-tool-fetch",
  "loopal-tool-file-ops",
@@ -2252,6 +2237,7 @@ dependencies = [
  "ratatui",
  "serde_json",
  "syntect",
+ "tempfile",
  "textwrap",
  "thiserror 2.0.18",
  "tokio",

@@ -25,8 +25,9 @@ pub struct LocalBackend {
 
 impl LocalBackend {
     pub fn new(cwd: PathBuf, policy: Option<ResolvedPolicy>, limits: ResourceLimits) -> Arc<Self> {
-        // Canonicalize cwd to resolve symlinks (e.g. macOS /tmp → /private/tmp)
-        let cwd = cwd.canonicalize().unwrap_or(cwd);
+        // Canonicalize cwd to resolve symlinks (e.g. macOS /tmp → /private/tmp).
+        // On Windows, strip \\?\ prefix that canonicalize() adds.
+        let cwd = path::strip_win_prefix(cwd.canonicalize().unwrap_or(cwd));
         Arc::new(Self {
             cwd,
             policy,

@@ -5,6 +5,7 @@ mod input;
 mod llm;
 mod llm_record;
 pub(crate) mod llm_result;
+mod llm_retry;
 pub mod loop_detector;
 mod middleware;
 pub(crate) mod model_config;

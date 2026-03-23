@@ -68,6 +68,9 @@ pub enum StopReason {
     EndTurn,
     /// Output was truncated because it hit the max_tokens limit.
     MaxTokens,
+    /// Server-side tool hit iteration limit; client should send assistant
+    /// message back to continue. Currently Anthropic-only (`pause_turn`).
+    PauseTurn,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -95,6 +98,17 @@ pub enum StreamChunk {
     },
     Done {
         stop_reason: StopReason,
+    },
+    /// Server-side tool invocation (e.g. web_search). NOT executed by client.
+    ServerToolUse {
+        id: String,
+        name: String,
+        input: serde_json::Value,
+    },
+    /// Server-side tool result (e.g. web search results from Anthropic).
+    ServerToolResult {
+        tool_use_id: String,
+        content: serde_json::Value,
     },
 }
 

@@ -2,9 +2,9 @@ use loopal_message::{ContentBlock, MessageRole};
 use loopal_provider_api::ChatParams;
 use serde_json::{Value, json};
 
-use super::OpenAiProvider;
+use super::OpenAiCompatProvider;
 
-impl OpenAiProvider {
+impl OpenAiCompatProvider {
     pub fn build_messages(&self, params: &ChatParams) -> Vec<Value> {
         let mut messages = Vec::new();
 

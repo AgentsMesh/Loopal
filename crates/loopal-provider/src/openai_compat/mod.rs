@@ -1,7 +1,5 @@
-mod request;
-pub(crate) mod server_tool;
+mod message_builder;
 mod stream;
-mod thinking;
 
 use async_trait::async_trait;
 use loopal_error::{LoopalError, ProviderError};
@@ -12,15 +10,19 @@ use std::collections::VecDeque;
 use std::time::Duration;
 
 use crate::sse::SseStream;
+use stream::ToolCallAccumulator;
 
-pub struct GoogleProvider {
+/// OpenAI-compatible provider using Chat Completions API (`/v1/chat/completions`).
+/// For services like DeepSeek, Ollama, Together, vLLM, etc.
+pub struct OpenAiCompatProvider {
     client: Client,
     api_key: String,
     base_url: String,
+    provider_name: String,
 }
 
-impl GoogleProvider {
-    pub fn new(api_key: String) -> Self {
+impl OpenAiCompatProvider {
+    pub fn new(api_key: String, base_url: String, name: String) -> Self {
         let client = Client::builder()
             .timeout(Duration::from_secs(300))
             .connect_timeout(Duration::from_secs(10))
@@ -29,70 +31,49 @@ impl GoogleProvider {
         Self {
             client,
             api_key,
-            base_url: "https://generativelanguage.googleapis.com/v1beta".to_string(),
+            base_url,
+            provider_name: name,
         }
-    }
-
-    pub fn with_base_url(mut self, base_url: String) -> Self {
-        self.base_url = base_url;
-        self
     }
 }
 
 #[async_trait]
-impl Provider for GoogleProvider {
+impl Provider for OpenAiCompatProvider {
     fn name(&self) -> &str {
-        "google"
+        &self.provider_name
     }
 
     async fn stream_chat(&self, params: &ChatParams) -> Result<ChatStream, LoopalError> {
-        let normalized = loopal_message::normalize_messages(&params.messages);
-        let normalized_params = ChatParams {
-            messages: normalized,
-            ..params.clone()
-        };
-        let contents = self.build_contents(&normalized_params);
+        let messages = self.build_messages(params);
         let tools = self.build_tools(params);
 
         let mut body = json!({
-            "contents": contents,
-            "generationConfig": {
-                "maxOutputTokens": params.max_tokens,
-            },
+            "model": params.model,
+            "stream": true,
+            "messages": messages,
+            "max_completion_tokens": params.max_tokens,
         });
 
-        if !params.system_prompt.is_empty() {
-            body["systemInstruction"] = json!({
-                "parts": [{"text": params.system_prompt}]
-            });
-        }
         if !tools.is_empty() {
             body["tools"] = json!(tools);
         }
         if let Some(temp) = params.temperature {
-            body["generationConfig"]["temperature"] = json!(temp);
+            body["temperature"] = json!(temp);
         }
-        if let Some(ref thinking_config) = params.thinking {
-            body["generationConfig"]["thinkingConfig"] =
-                thinking::to_google_thinking(thinking_config);
-        }
-
-        let url = format!(
-            "{}/models/{}:streamGenerateContent?alt=sse&key={}",
-            self.base_url, params.model, self.api_key
-        );
+        body["stream_options"] = json!({"include_usage": true});
 
         tracing::info!(
             model = %params.model,
+            url = %format!("{}/v1/chat/completions", self.base_url),
             messages = params.messages.len(),
             tools = params.tools.len(),
-            max_tokens = params.max_tokens,
             "API request"
         );
 
         let response = self
             .client
-            .post(&url)
+            .post(format!("{}/v1/chat/completions", self.base_url))
+            .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
             .json(&body)
             .send()
@@ -110,13 +91,9 @@ impl Provider for GoogleProvider {
                     .and_then(|s| s.parse::<f64>().ok())
                     .map(|secs| (secs * 1000.0) as u64)
                     .unwrap_or(30_000);
-                tracing::warn!(retry_after_ms, "rate limited by API");
                 return Err(ProviderError::RateLimited { retry_after_ms }.into());
             }
-            let text = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "failed to read body".into());
+            let text = response.text().await.unwrap_or_default();
             tracing::error!(status = status.as_u16(), body = %text, "API error");
             return Err(ProviderError::Api {
                 status: status.as_u16(),
@@ -126,10 +103,26 @@ impl Provider for GoogleProvider {
         }
 
         let sse = SseStream::from_response(response);
-        let stream = stream::GoogleStream {
+        let stream = stream::CompatStream {
             inner: Box::pin(sse),
+            state: ToolCallAccumulator::default(),
             buffer: VecDeque::new(),
         };
         Ok(Box::pin(stream))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_name_returns_configured_name() {
+        let provider = OpenAiCompatProvider::new(
+            "key123".to_string(),
+            "http://localhost:11434".to_string(),
+            "ollama".to_string(),
+        );
+        assert_eq!(provider.name(), "ollama");
     }
 }

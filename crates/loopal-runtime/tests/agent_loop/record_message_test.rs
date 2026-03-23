@@ -7,7 +7,7 @@ fn test_record_assistant_message_text_only() {
     let (mut runner, _rx) = make_runner();
     assert!(runner.params.messages.is_empty());
 
-    runner.record_assistant_message("Hello, world!", &[], "", None);
+    runner.record_assistant_message("Hello, world!", &[], "", None, vec![]);
 
     assert_eq!(runner.params.messages.len(), 1);
     let msg = &runner.params.messages[0];
@@ -36,7 +36,7 @@ fn test_record_assistant_message_with_tool_uses() {
         ),
     ];
 
-    runner.record_assistant_message("Let me check that.", &tool_uses, "", None);
+    runner.record_assistant_message("Let me check that.", &tool_uses, "", None, vec![]);
 
     assert_eq!(runner.params.messages.len(), 1);
     let msg = &runner.params.messages[0];
@@ -66,7 +66,7 @@ fn test_record_assistant_message_with_tool_uses() {
 #[test]
 fn test_record_assistant_message_empty_adds_nothing() {
     let (mut runner, _rx) = make_runner();
-    runner.record_assistant_message("", &[], "", None);
+    runner.record_assistant_message("", &[], "", None, vec![]);
 
     assert!(
         runner.params.messages.is_empty(),
@@ -84,7 +84,7 @@ fn test_record_assistant_message_tool_uses_only_no_text() {
         serde_json::json!({"command": "echo hi"}),
     )];
 
-    runner.record_assistant_message("", &tool_uses, "", None);
+    runner.record_assistant_message("", &tool_uses, "", None, vec![]);
 
     assert_eq!(runner.params.messages.len(), 1);
     let msg = &runner.params.messages[0];
@@ -101,7 +101,7 @@ fn test_record_assistant_message_tool_uses_only_no_text() {
 #[tokio::test]
 async fn test_record_assistant_message_saves_to_session() {
     let (mut runner, _rx) = make_runner();
-    runner.record_assistant_message("test message", &[], "", None);
+    runner.record_assistant_message("test message", &[], "", None, vec![]);
     assert_eq!(runner.params.messages.len(), 1);
     assert_eq!(runner.params.messages[0].text_content(), "test message");
 }

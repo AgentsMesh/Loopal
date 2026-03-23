@@ -49,7 +49,17 @@ pub fn project_messages(messages: &[Message]) -> Vec<DisplayMessage> {
                     content_parts.push("[image]".to_string());
                     image_count += 1;
                 }
-                ContentBlock::Thinking { .. } => {} // Thinking blocks not shown in projection
+                ContentBlock::Thinking { .. } => {}
+                ContentBlock::ServerToolUse { name, input, .. } => {
+                    let query = input.get("query").and_then(|v| v.as_str()).unwrap_or("");
+                    tool_calls.push(DisplayToolCall {
+                        name: format!("{name} [server]"),
+                        status: "success".to_string(),
+                        summary: format!("{name}({query})"),
+                        result: None,
+                    });
+                }
+                ContentBlock::WebSearchToolResult { .. } => {}
             }
         }
 

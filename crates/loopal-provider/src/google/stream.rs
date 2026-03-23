@@ -122,18 +122,61 @@ pub(crate) fn parse_google_event(data: &str) -> Vec<Result<StreamChunk, LoopalEr
                 }
                 _ => {}
             }
+
+            // Parse grounding metadata (Google Search Grounding results)
+            if let Some(meta) = candidate.get("groundingMetadata") {
+                parse_grounding_metadata(meta, &mut chunks);
+            }
         }
     }
 
     chunks
 }
 
-/// Simple pseudo-random ID generator (no uuid dep needed).
+/// Simple collision-resistant ID generator (no uuid dep needed).
 pub(crate) fn uuid_v4_simple() -> String {
+    use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_nanos();
-    format!("{nanos:x}")
+    let seq = COUNTER.fetch_add(1, Ordering::Relaxed);
+    format!("{nanos:x}_{seq:x}")
+}
+
+/// Extract grounding metadata from Google Search Grounding and emit as server tool results.
+fn parse_grounding_metadata(meta: &Value, chunks: &mut Vec<Result<StreamChunk, LoopalError>>) {
+    let Some(grounding_chunks) = meta["groundingChunks"].as_array() else {
+        return;
+    };
+    if grounding_chunks.is_empty() {
+        return;
+    }
+
+    // Emit a ServerToolUse to indicate search was performed
+    let search_id = format!("gs_{}", uuid_v4_simple());
+    chunks.push(Ok(StreamChunk::ServerToolUse {
+        id: search_id.clone(),
+        name: "google_search".to_string(),
+        input: json!({}),
+    }));
+
+    // Format sources into a structured result
+    let sources: Vec<Value> = grounding_chunks
+        .iter()
+        .filter_map(|chunk| {
+            let web = chunk.get("web")?;
+            Some(json!({
+                "url": web.get("uri").and_then(|v| v.as_str()).unwrap_or(""),
+                "title": web.get("title").and_then(|v| v.as_str()).unwrap_or(""),
+            }))
+        })
+        .collect();
+
+    chunks.push(Ok(StreamChunk::ServerToolResult {
+        tool_use_id: search_id,
+        content: json!(sources),
+    }));
 }

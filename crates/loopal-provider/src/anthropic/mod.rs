@@ -1,6 +1,8 @@
 mod accumulator;
 mod request;
+pub(crate) mod server_tool;
 mod stream;
+mod stream_parser;
 mod thinking;
 
 use async_trait::async_trait;
@@ -13,7 +15,7 @@ use std::time::Duration;
 use tokio::sync::Semaphore;
 
 use crate::sse::SseStream;
-use stream::{ThinkingAccumulator, ToolUseAccumulator};
+use stream::{ServerToolAccumulator, ThinkingAccumulator, ToolUseAccumulator};
 
 /// Maximum concurrent API requests to avoid overwhelming the upstream proxy/API.
 const MAX_CONCURRENT_REQUESTS: usize = 3;
@@ -108,10 +110,8 @@ impl AnthropicProvider {
         }
 
         tracing::info!(
-            model = %params.model,
-            url = %format!("{}/v1/messages", self.base_url),
-            messages = params.messages.len(),
-            tools = params.tools.len(),
+            model = %params.model, url = %format!("{}/v1/messages", self.base_url),
+            messages = params.messages.len(), tools = params.tools.len(),
             max_tokens = params.max_tokens,
             body_bytes = body.to_string().len(),
             "API request"
@@ -150,6 +150,7 @@ impl AnthropicProvider {
             inner: Box::pin(sse),
             tool_state: ToolUseAccumulator::default(),
             thinking_state: ThinkingAccumulator::default(),
+            server_tool_state: ServerToolAccumulator::default(),
             buffer: VecDeque::new(),
         };
         Ok(Box::pin(stream))

@@ -3,6 +3,7 @@ use loopal_provider_api::ChatParams;
 use serde_json::{Value, json};
 
 use super::GoogleProvider;
+use super::server_tool;
 
 impl GoogleProvider {
     pub fn build_contents(&self, params: &ChatParams) -> Vec<Value> {
@@ -45,6 +46,16 @@ impl GoogleProvider {
                             "text": thinking,
                             "thought": true
                         }),
+                        // Server-side blocks from other providers preserved as text.
+                        // Content is formatted for readability when crossing providers.
+                        ContentBlock::ServerToolUse { name, input, .. } => {
+                            let query = input.get("query").and_then(|v| v.as_str()).unwrap_or("");
+                            json!({"text": format!("[server tool: {name}({query})]")})
+                        }
+                        ContentBlock::WebSearchToolResult { content, .. } => {
+                            let summary = summarize_search_result(content);
+                            json!({"text": format!("[web search result: {summary}]")})
+                        }
                     })
                     .collect();
 
@@ -58,9 +69,20 @@ impl GoogleProvider {
             return vec![];
         }
 
+        let mut tools: Vec<Value> = Vec::new();
+        let mut has_search = false;
+
         let declarations: Vec<Value> = params
             .tools
             .iter()
+            .filter(|tool| {
+                if tool.name == server_tool::WEB_SEARCH_TOOL_NAME {
+                    has_search = true;
+                    false // exclude from function declarations
+                } else {
+                    true
+                }
+            })
             .map(|tool| {
                 json!({
                     "name": tool.name,
@@ -70,6 +92,37 @@ impl GoogleProvider {
             })
             .collect();
 
-        vec![json!({"functionDeclarations": declarations})]
+        if !declarations.is_empty() {
+            tools.push(json!({"functionDeclarations": declarations}));
+        }
+        if has_search {
+            tools.push(server_tool::google_search_tool_definition());
+        }
+
+        tools
     }
+}
+
+/// Extract a concise summary from server-side search result JSON.
+fn summarize_search_result(content: &serde_json::Value) -> String {
+    if let Some(arr) = content.as_array() {
+        let titles: Vec<&str> = arr
+            .iter()
+            .filter_map(|item| item.get("title").and_then(|v| v.as_str()))
+            .take(3)
+            .collect();
+        if !titles.is_empty() {
+            return titles.join(", ");
+        }
+    }
+    let s = content.to_string();
+    if s.len() <= 100 {
+        return s;
+    }
+    // Safe truncation: find a char boundary at or before byte 97
+    let mut end = 97;
+    while end > 0 && !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    format!("{}...", &s[..end])
 }

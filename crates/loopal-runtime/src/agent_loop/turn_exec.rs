@@ -33,14 +33,27 @@ impl AgentLoopRunner {
             self.preflight_check_on(&mut working);
             let result = self.stream_llm_with(&working, &turn_ctx.cancel).await?;
 
-            // max_tokens + tool calls → discard truncated tools
-            if result.stop_reason == StopReason::MaxTokens && !result.tool_uses.is_empty() {
+            // Determine tool list for recording. MaxTokens+tools = truncated args.
+            let truncated =
+                result.stop_reason == StopReason::MaxTokens && !result.tool_uses.is_empty();
+            if truncated {
                 warn!("max_tokens hit with tool calls — discarding truncated tools");
+            }
+            let effective_tools = if truncated {
+                &[][..]
+            } else {
+                &result.tool_uses
+            };
+
+            // Auto-continue triggers: MaxTokens+tools, PauseTurn (server-side limit)
+            let needs_auto_continue = truncated || result.stop_reason == StopReason::PauseTurn;
+            if needs_auto_continue {
                 self.record_assistant_message(
                     &result.assistant_text,
-                    &[],
+                    effective_tools,
                     &result.thinking_text,
                     result.thinking_signature.as_deref(),
+                    result.server_blocks,
                 );
                 if !result.assistant_text.is_empty() {
                     last_text.clone_from(&result.assistant_text);
@@ -62,6 +75,7 @@ impl AgentLoopRunner {
                 &result.tool_uses,
                 &result.thinking_text,
                 result.thinking_signature.as_deref(),
+                result.server_blocks,
             );
             if !result.assistant_text.is_empty() {
                 last_text.clone_from(&result.assistant_text);

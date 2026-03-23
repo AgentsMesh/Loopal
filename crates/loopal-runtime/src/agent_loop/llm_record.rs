@@ -6,13 +6,14 @@ use super::runner::AgentLoopRunner;
 impl AgentLoopRunner {
     /// Record the assistant response as a message in the conversation history.
     /// Writes to both persistent storage and in-memory params.messages.
-    /// Thinking block is placed first (Anthropic multi-turn requirement).
+    /// Block order: thinking → server blocks → text → client tool_uses.
     pub fn record_assistant_message(
         &mut self,
         assistant_text: &str,
         tool_uses: &[(String, String, serde_json::Value)],
         thinking_text: &str,
         thinking_signature: Option<&str>,
+        server_blocks: Vec<ContentBlock>,
     ) {
         let mut assistant_content: Vec<ContentBlock> = Vec::new();
 
@@ -24,6 +25,11 @@ impl AgentLoopRunner {
                 thinking: thinking_text.to_string(),
                 signature: thinking_signature.map(String::from),
             });
+        }
+
+        // Server-side tool blocks (e.g. web_search) in stream order.
+        for block in server_blocks {
+            assistant_content.push(block);
         }
 
         if !assistant_text.is_empty() {

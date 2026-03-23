@@ -134,6 +134,12 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
         AgentEventPayload::Rewound { remaining_turns } => {
             crate::rewind::truncate_display_to_turn(state, remaining_turns);
         }
+        AgentEventPayload::Compacted { kept, removed } => {
+            state.messages.push(system_msg(&format!(
+                "Context compacted: removed {} messages, kept {}.",
+                removed, kept,
+            )));
+        }
         AgentEventPayload::Interrupted => {
             flush_streaming(state);
             // No system message — the status bar transitions to Idle and any

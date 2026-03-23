@@ -124,7 +124,7 @@ async fn test_handle_control_clear_resets_state() {
 
 #[tokio::test]
 async fn test_handle_control_compact_keeps_recent() {
-    let (mut runner, _event_rx, _mbox_tx, ctrl_tx, _perm_tx) =
+    let (mut runner, mut event_rx, _mbox_tx, ctrl_tx, _perm_tx) =
         make_runner_with_channels();
 
     for i in 0..15 {
@@ -139,6 +139,15 @@ async fn test_handle_control_compact_keeps_recent() {
 
     assert_eq!(runner.params.messages.len(), 10);
     assert_eq!(runner.params.messages[0].text_content(), "msg5");
+
+    // Verify Compacted event was emitted (after AwaitingInput)
+    let e1 = event_rx.recv().await.unwrap();
+    assert!(matches!(e1.payload, AgentEventPayload::AwaitingInput));
+    let e2 = event_rx.recv().await.unwrap();
+    assert!(matches!(
+        e2.payload,
+        AgentEventPayload::Compacted { kept: 10, removed: 5 }
+    ));
 }
 
 #[tokio::test]

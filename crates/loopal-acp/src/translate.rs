@@ -54,6 +54,7 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
         | AgentEventPayload::ThinkingStream { .. }
         | AgentEventPayload::ThinkingComplete { .. }
         | AgentEventPayload::Rewound { .. }
+        | AgentEventPayload::Compacted { .. }
         | AgentEventPayload::Interrupted => return None,
     };
 

@@ -106,6 +106,9 @@ pub enum AgentEventPayload {
     /// Conversation was rewound; remaining_turns is the count after truncation.
     Rewound { remaining_turns: usize },
 
+    /// Conversation was compacted; old messages removed to reduce context.
+    Compacted { kept: usize, removed: usize },
+
     /// Agent work was interrupted by user (ESC or new message while busy).
     Interrupted,
 }

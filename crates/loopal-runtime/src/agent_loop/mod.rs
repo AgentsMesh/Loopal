@@ -35,6 +35,9 @@ pub use runner::AgentLoopRunner;
 /// Maximum number of automatic continuations when LLM hits max_tokens.
 pub(crate) const MAX_AUTO_CONTINUATIONS: u32 = 3;
 
+/// Number of recent messages to keep when user triggers `/compact`.
+pub(crate) const COMPACT_KEEP_LAST: usize = 10;
+
 pub struct AgentLoopParams {
     pub kernel: Arc<Kernel>,
     pub session: Session,

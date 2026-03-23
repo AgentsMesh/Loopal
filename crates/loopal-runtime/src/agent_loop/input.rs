@@ -11,7 +11,7 @@ use tracing::{error, info};
 use crate::mode::AgentMode;
 
 use super::rewind::detect_turn_boundaries;
-use super::{compact_messages, WaitResult};
+use super::{compact_messages, COMPACT_KEEP_LAST, WaitResult};
 use super::runner::AgentLoopRunner;
 
 impl AgentLoopRunner {
@@ -80,12 +80,16 @@ impl AgentLoopRunner {
                 }).await?;
             }
             ControlCommand::Compact => {
-                info!(before = self.params.messages.len(), "compacting messages");
-                if let Err(e) = self.params.session_manager.compact_history(&self.params.session.id, 10) {
+                let before = self.params.messages.len();
+                info!(before, "compacting messages");
+                if let Err(e) = self.params.session_manager.compact_history(&self.params.session.id, COMPACT_KEEP_LAST) {
                     error!(error = %e, "failed to persist compact marker");
                 }
-                compact_messages(&mut self.params.messages, 10);
-                info!(after = self.params.messages.len(), "compaction complete");
+                compact_messages(&mut self.params.messages, COMPACT_KEEP_LAST);
+                let after = self.params.messages.len();
+                let removed = before - after;
+                info!(after, removed, "compaction complete");
+                self.emit(AgentEventPayload::Compacted { kept: after, removed }).await?;
             }
             ControlCommand::ModelSwitch(new_model) => {
                 info!(from = %self.params.model, to = %new_model, "switching model");

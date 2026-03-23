@@ -97,16 +97,24 @@ impl Middleware for SmartCompact {
             }
         }
 
-        // Ask LLM to summarize
+        // Ask LLM to summarize with coding-agent-specific preservation rules
         let summary_prompt = format!(
-            "Summarize the following conversation concisely. \
-             Focus on key decisions, findings, file changes, and important context. \
-             Be brief but preserve critical information needed for continuing the conversation.\n\n\
-             ---\n{conversation_text}\n---\n\nProvide a concise summary:"
+            "You are summarizing a coding agent's conversation for context compaction.\n\n\
+             PRESERVE:\n\
+             - The user's original request and current intent\n\
+             - All file paths that were read, created, or modified\n\
+             - Key decisions and their rationale\n\
+             - Error messages encountered and how they were resolved\n\
+             - Current task state: what is done, what remains\n\n\
+             OMIT:\n\
+             - Verbatim file contents (summarize what was found instead)\n\
+             - Redundant tool call details (group similar operations)\n\n\
+             Conversation:\n---\n{conversation_text}\n---\n\n\
+             Provide a structured summary:",
         );
 
         let summary_params = ChatParams {
-            model: ctx.model.clone(),
+            model: ctx.compact_model.as_ref().unwrap_or(&ctx.model).clone(),
             messages: vec![Message::user(&summary_prompt)],
             system_prompt: "You are a conversation summarizer. Be concise and factual.".to_string(),
             tools: vec![],
@@ -166,6 +174,17 @@ impl Middleware for SmartCompact {
                 let mut new_messages = vec![summary_msg];
                 new_messages.extend_from_slice(&ctx.messages[split_at..]);
                 ctx.messages = new_messages;
+
+                // Post-compaction validation: if summary inflated tokens, fall back
+                let post_tokens = estimate_messages_tokens(&ctx.messages);
+                if post_tokens > ctx.max_context_tokens {
+                    tracing::warn!(
+                        post_tokens,
+                        max = ctx.max_context_tokens,
+                        "compaction inflated tokens, falling back to truncation"
+                    );
+                    compact_messages(&mut ctx.messages, self.keep_last);
+                }
             }
             Err(e) => {
                 tracing::warn!(error = %e, "summarization request failed, falling back to truncation");

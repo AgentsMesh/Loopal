@@ -124,6 +124,8 @@ pub struct MiddlewareContext {
     pub total_output_tokens: u32,
     pub total_cost: f64,
     pub max_context_tokens: u32,
+    /// Model for compaction/summarization. If None, uses `model`.
+    pub compact_model: Option<String>,
     /// Optional provider for LLM-based summarization during compaction.
     /// If None, fallback to traditional truncation.
     pub summarization_provider: Option<Arc<dyn Provider>>,

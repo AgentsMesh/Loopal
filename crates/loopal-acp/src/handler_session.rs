@@ -100,6 +100,7 @@ impl AcpHandler {
             session,
             messages: Vec::new(),
             model: model.clone(),
+            compact_model: self.config.settings.compact_model.clone(),
             system_prompt,
             mode: AgentMode::Act,
             permission_mode: self.config.settings.permission_mode,

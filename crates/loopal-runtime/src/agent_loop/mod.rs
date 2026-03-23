@@ -1,17 +1,25 @@
 pub mod cancel;
+pub mod diff_tracker;
+pub mod env_context;
 mod input;
 mod llm;
 mod llm_record;
 pub(crate) mod llm_result;
+pub mod loop_detector;
 mod middleware;
+pub(crate) mod model_config;
 mod permission;
 mod preflight;
 pub mod rewind;
 mod run;
 mod runner;
+pub(crate) mod token_accumulator;
 pub(crate) mod tool_exec;
 mod tools;
 mod tools_util;
+pub mod turn_context;
+mod turn_exec;
+pub mod turn_observer;
 
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -43,6 +51,8 @@ pub struct AgentLoopParams {
     pub session: Session,
     pub messages: Vec<Message>,
     pub model: String,
+    /// Model for compaction/summarization. None = use main model.
+    pub compact_model: Option<String>,
     pub system_prompt: String,
     pub mode: AgentMode,
     pub permission_mode: PermissionMode,
@@ -68,9 +78,14 @@ pub struct AgentLoopParams {
 }
 
 /// Public wrapper function that preserves the existing API.
-/// Returns structured AgentOutput with result text and termination reason.
+/// Constructs default observers (loop detection, diff tracking) and runs the loop.
 pub async fn agent_loop(params: AgentLoopParams) -> Result<AgentOutput> {
+    let observers: Vec<Box<dyn turn_observer::TurnObserver>> = vec![
+        Box::new(loop_detector::LoopDetector::new()),
+        Box::new(diff_tracker::DiffTracker::new(params.frontend.clone())),
+    ];
     let mut runner = AgentLoopRunner::new(params);
+    runner.observers = observers;
     runner.run().await
 }
 

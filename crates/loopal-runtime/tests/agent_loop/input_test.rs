@@ -10,8 +10,8 @@ use super::{make_runner, make_runner_with_channels};
 fn test_agent_loop_runner_construction() {
     let (runner, _rx) = make_runner();
     assert_eq!(runner.turn_count, 0);
-    assert_eq!(runner.total_input_tokens, 0);
-    assert_eq!(runner.total_output_tokens, 0);
+    assert_eq!(runner.tokens.input, 0);
+    assert_eq!(runner.tokens.output, 0);
     assert_eq!(runner.params.model, "claude-sonnet-4-20250514");
     assert_eq!(runner.params.max_turns, 10);
 }

@@ -123,6 +123,7 @@ async fn test_check_permission_channel_closed_denies() {
         session,
         messages: Vec::new(),
         model: "claude-sonnet-4-20250514".to_string(),
+        compact_model: None,
         system_prompt: "test".to_string(),
         mode: AgentMode::Act,
         permission_mode: PermissionMode::Supervised,

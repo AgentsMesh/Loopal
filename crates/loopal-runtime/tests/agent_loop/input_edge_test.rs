@@ -55,6 +55,7 @@ fn test_model_info_defaults_for_unknown_model() {
         session,
         messages: Vec::new(),
         model: "unknown-model-xyz".to_string(),
+        compact_model: None,
         system_prompt: "test".to_string(),
         mode: AgentMode::Act,
         permission_mode: PermissionMode::Supervised,
@@ -73,7 +74,7 @@ fn test_model_info_defaults_for_unknown_model() {
 
     let runner = AgentLoopRunner::new(params);
     // Unknown model should fall back to defaults
-    assert_eq!(runner.max_context_tokens, 200_000);
+    assert_eq!(runner.model_config.max_context_tokens, 200_000);
 }
 
 #[tokio::test]
@@ -111,8 +112,8 @@ async fn test_handle_control_clear_resets_state() {
     runner.params.messages.push(Message::user("msg1"));
     runner.params.messages.push(Message::user("msg2"));
     runner.turn_count = 5;
-    runner.total_input_tokens = 1000;
-    runner.total_output_tokens = 500;
+    runner.tokens.input = 1000;
+    runner.tokens.output = 500;
 
     ctrl_tx.send(ControlCommand::Clear).await.unwrap();
     drop(ctrl_tx);
@@ -122,8 +123,8 @@ async fn test_handle_control_clear_resets_state() {
 
     assert!(runner.params.messages.is_empty());
     assert_eq!(runner.turn_count, 0);
-    assert_eq!(runner.total_input_tokens, 0);
-    assert_eq!(runner.total_output_tokens, 0);
+    assert_eq!(runner.tokens.input, 0);
+    assert_eq!(runner.tokens.output, 0);
 
     let e1 = event_rx.recv().await.unwrap();
     assert!(matches!(e1.payload, AgentEventPayload::AwaitingInput));

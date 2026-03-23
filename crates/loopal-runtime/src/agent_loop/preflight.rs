@@ -28,7 +28,7 @@ impl AgentLoopRunner {
 
         let system_tokens = estimate_tokens(&self.params.system_prompt);
         let tool_overhead: u32 = 2000;
-        let budget = (self.max_context_tokens as f64 * 0.95) as u32;
+        let budget = (self.model_config.max_context_tokens as f64 * 0.95) as u32;
         let overhead = system_tokens + tool_overhead;
 
         for iteration in 0..MAX_ITERATIONS {

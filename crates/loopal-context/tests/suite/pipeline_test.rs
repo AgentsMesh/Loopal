@@ -41,6 +41,7 @@ fn make_ctx() -> MiddlewareContext {
         total_output_tokens: 0,
         total_cost: 0.0,
         max_context_tokens: 100_000,
+        compact_model: None,
         summarization_provider: None,
     }
 }

@@ -120,4 +120,7 @@ pub enum AgentEventPayload {
 
     /// Agent work was interrupted by user (ESC or new message while busy).
     Interrupted,
+
+    /// Files modified during the completed turn.
+    TurnDiffSummary { modified_files: Vec<String> },
 }

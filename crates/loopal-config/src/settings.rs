@@ -15,6 +15,11 @@ pub struct Settings {
     /// Default model identifier
     pub model: String,
 
+    /// Model for auxiliary tasks (compaction, summarization).
+    /// Defaults to the main model when not set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compact_model: Option<String>,
+
     /// Maximum turns per agent loop
     pub max_turns: u32,
 
@@ -56,6 +61,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             model: "claude-sonnet-4-20250514".to_string(),
+            compact_model: None,
             max_turns: 50,
             permission_mode: PermissionMode::Bypass,
             max_context_tokens: 200_000,

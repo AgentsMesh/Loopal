@@ -9,6 +9,7 @@ use tracing::{error, info};
 use super::WaitResult;
 use super::cancel::TurnCancel;
 use super::runner::AgentLoopRunner;
+use super::turn_context::TurnContext;
 
 impl AgentLoopRunner {
     /// Outer loop: user-interaction granularity.
@@ -26,7 +27,9 @@ impl AgentLoopRunner {
                     break;
                 }
                 match self.wait_for_input().await? {
-                    Some(WaitResult::MessageAdded) => {}
+                    Some(WaitResult::MessageAdded) => {
+                        self.notify_observers_user_input();
+                    }
                     None => break,
                 }
             }
@@ -44,18 +47,19 @@ impl AgentLoopRunner {
 
             // Execute one complete turn (LLM → [tools → LLM]* → done)
             let cancel = TurnCancel::new(self.interrupt.clone(), self.interrupt_notify.clone());
-            match self.execute_turn(&cancel).await {
+            let mut turn_ctx = TurnContext::new(self.turn_count, cancel);
+            match self.execute_turn(&mut turn_ctx).await {
                 Ok(turn) => {
                     if !turn.output.is_empty() {
                         last_output.clone_from(&turn.output);
                     }
 
-                    // Atomically check + clear interrupt (avoids losing a second signal)
                     if self.interrupt.take() {
                         self.emit_interrupted().await?;
                         match self.wait_for_input().await? {
                             Some(WaitResult::MessageAdded) => {
                                 self.turn_count += 1;
+                                self.notify_observers_user_input();
                                 continue;
                             }
                             None => break,
@@ -78,17 +82,18 @@ impl AgentLoopRunner {
                     match self.wait_for_input().await? {
                         Some(WaitResult::MessageAdded) => {
                             self.turn_count += 1;
+                            self.notify_observers_user_input();
                         }
                         None => break,
                     }
                 }
                 Err(e) => {
-                    // Interrupt during LLM call may surface as a network error — handle gracefully
                     if self.interrupt.take() {
                         self.emit_interrupted().await?;
                         match self.wait_for_input().await? {
                             Some(WaitResult::MessageAdded) => {
                                 self.turn_count += 1;
+                                self.notify_observers_user_input();
                                 continue;
                             }
                             None => break,
@@ -108,6 +113,7 @@ impl AgentLoopRunner {
                     match self.wait_for_input().await? {
                         Some(WaitResult::MessageAdded) => {
                             self.turn_count += 1;
+                            self.notify_observers_user_input();
                             continue;
                         }
                         None => break,
@@ -124,6 +130,13 @@ impl AgentLoopRunner {
             },
             terminate_reason: TerminateReason::Goal,
         })
+    }
+
+    /// Notify all observers that the user sent new input.
+    fn notify_observers_user_input(&mut self) {
+        for obs in &mut self.observers {
+            obs.on_user_input();
+        }
     }
 
     /// Emit Interrupted event to TUI. Signal is already consumed by `take()`.

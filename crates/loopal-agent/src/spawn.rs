@@ -136,6 +136,7 @@ pub async fn spawn_agent(
         session,
         model,
         system_prompt,
+        compact_model: shared.kernel.settings().compact_model.clone(),
         messages: vec![Message::user(&params.prompt)],
         mode: AgentMode::Act,
         permission_mode: params.agent_config.permission_mode,

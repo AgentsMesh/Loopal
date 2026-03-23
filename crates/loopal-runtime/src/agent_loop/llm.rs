@@ -14,24 +14,33 @@ use super::runner::AgentLoopRunner;
 impl AgentLoopRunner {
     /// Build chat params from a provided message slice (typically a working copy).
     pub fn prepare_chat_params_with(&self, messages: &[Message]) -> Result<ChatParams> {
+        let env_section = super::env_context::build_env_section(
+            self.tool_ctx.backend.cwd(),
+            self.turn_count,
+            self.params.max_turns,
+        );
         let full_system_prompt = format!(
-            "{}{}",
+            "{}{}{}",
             self.params.system_prompt,
-            self.params.mode.system_prompt_suffix()
+            self.params.mode.system_prompt_suffix(),
+            env_section,
         );
         let mut tool_defs = self.params.kernel.tool_definitions();
         if let Some(ref filter) = self.params.tool_filter {
             tool_defs.retain(|t| filter.contains(&t.name));
         }
         let capability = get_thinking_capability(&self.params.model);
-        let resolved_thinking =
-            resolve_thinking_config(&self.thinking_config, capability, self.max_output_tokens);
+        let resolved_thinking = resolve_thinking_config(
+            &self.model_config.thinking,
+            capability,
+            self.model_config.max_output_tokens,
+        );
         Ok(ChatParams {
             model: self.params.model.clone(),
             messages: messages.to_vec(),
             system_prompt: full_system_prompt,
             tools: tool_defs,
-            max_tokens: self.max_output_tokens,
+            max_tokens: self.model_config.max_output_tokens,
             temperature: None,
             thinking: resolved_thinking,
             debug_dump_dir: Some(loopal_config::tmp_dir()),
@@ -171,16 +180,16 @@ impl AgentLoopRunner {
                 cache_read_input_tokens,
                 thinking_tokens,
             }) => {
-                self.total_input_tokens += input_tokens;
-                self.total_output_tokens += output_tokens;
-                self.total_cache_creation_tokens += cache_creation_input_tokens;
-                self.total_cache_read_tokens += cache_read_input_tokens;
-                self.total_thinking_tokens += thinking_tokens;
+                self.tokens.input += input_tokens;
+                self.tokens.output += output_tokens;
+                self.tokens.cache_creation += cache_creation_input_tokens;
+                self.tokens.cache_read += cache_read_input_tokens;
+                self.tokens.thinking += thinking_tokens;
                 result.thinking_tokens += thinking_tokens;
                 self.emit(AgentEventPayload::TokenUsage {
                     input_tokens,
                     output_tokens,
-                    context_window: self.max_context_tokens,
+                    context_window: self.model_config.max_context_tokens,
                     cache_creation_input_tokens,
                     cache_read_input_tokens,
                     thinking_tokens,

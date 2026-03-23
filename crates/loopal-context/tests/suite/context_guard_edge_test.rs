@@ -11,6 +11,7 @@ fn make_ctx(messages: Vec<Message>, max_context_tokens: u32) -> MiddlewareContex
         total_output_tokens: 0,
         total_cost: 0.0,
         max_context_tokens,
+        compact_model: None,
         summarization_provider: None,
     }
 }

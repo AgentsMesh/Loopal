@@ -1933,6 +1933,7 @@ dependencies = [
  "loopal-config",
  "loopal-context",
  "loopal-error",
+ "loopal-git",
  "loopal-hooks",
  "loopal-kernel",
  "loopal-message",
@@ -2046,7 +2047,9 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "loopal-backend",
+ "loopal-config",
  "loopal-error",
+ "loopal-sandbox",
  "loopal-tool-api",
  "serde_json",
  "tempfile",

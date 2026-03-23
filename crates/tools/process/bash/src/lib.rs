@@ -3,6 +3,10 @@ use loopal_error::{LoopalError, ToolIoError};
 use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult, truncate_output};
 use serde_json::{Value, json};
 
+use loopal_config::CommandDecision;
+use loopal_sandbox::command_checker::check_command;
+use loopal_sandbox::security_inspector::{SecurityVerdict, inspect_command};
+
 /// BashTool executes shell commands. OS-level sandbox wrapping is handled
 /// by the SandboxedTool decorator — BashTool itself is a plain executor.
 pub struct BashTool;
@@ -54,6 +58,19 @@ impl Tool for BashTool {
 
     fn permission(&self) -> PermissionLevel {
         PermissionLevel::Dangerous
+    }
+
+    fn precheck(&self, input: &Value) -> Option<String> {
+        let cmd = input.get("command")?.as_str()?;
+        // Structural pattern checks (fork bombs, destructive rm, device writes)
+        if let CommandDecision::Deny(reason) = check_command(cmd) {
+            return Some(reason);
+        }
+        // Semantic security checks (RCE, credential theft, system tampering)
+        if let SecurityVerdict::Block(reason) = inspect_command(cmd) {
+            return Some(reason);
+        }
+        None
     }
 
     async fn execute(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult, LoopalError> {

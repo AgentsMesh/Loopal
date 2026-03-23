@@ -68,5 +68,6 @@ pub(crate) fn apply_agent_event(state: &mut SessionState, name: &str, payload: A
         AgentEventPayload::Interrupted => {
             agent.observable.status = AgentStatus::WaitingForInput;
         }
+        AgentEventPayload::TurnDiffSummary { .. } => {}
     }
 }

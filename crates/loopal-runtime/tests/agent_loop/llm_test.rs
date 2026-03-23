@@ -19,7 +19,7 @@ fn test_prepare_chat_params_act_mode() {
             .system_prompt
             .contains("You are a helpful assistant.")
     );
-    assert_eq!(params.max_tokens, runner.max_output_tokens);
+    assert_eq!(params.max_tokens, runner.model_config.max_output_tokens);
     assert!(params.messages.is_empty());
     // Builtin tools should be present
     assert!(!params.tools.is_empty());
@@ -91,9 +91,9 @@ async fn test_stream_llm_text_response() {
     assert_eq!(text, "Hello world!");
     assert!(tool_uses.is_empty());
     assert!(!stream_error);
-    assert_eq!(runner.total_input_tokens, 10);
-    assert_eq!(runner.total_output_tokens, 5);
-    assert!(runner.total_input_tokens > 0);
+    assert_eq!(runner.tokens.input, 10);
+    assert_eq!(runner.tokens.output, 5);
+    assert!(runner.tokens.input > 0);
 
     // Drain events and verify
     let mut events = Vec::new();

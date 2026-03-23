@@ -88,7 +88,12 @@ async fn test_write_absolute_path_bypasses_traversal_check() {
 
     let tool = WriteTool;
     // cwd is different from where we write, but since path is absolute, it's allowed
-    let ctx = make_ctx(std::path::Path::new("/"));
+    // Use platform root: "/" on Unix, temp dir's drive root on Windows
+    #[cfg(unix)]
+    let root = std::path::Path::new("/");
+    #[cfg(windows)]
+    let root = std::path::Path::new(&tmp.path().to_str().unwrap()[..3]);
+    let ctx = make_ctx(root);
 
     let result = tool
         .execute(

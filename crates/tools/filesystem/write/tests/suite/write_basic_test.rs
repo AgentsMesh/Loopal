@@ -181,7 +181,12 @@ async fn test_write_absolute_path_bypasses_traversal_check() {
     let file = tmp.path().join("absolute_test.txt");
 
     let tool = WriteTool;
-    let ctx = make_ctx(std::path::Path::new("/"));
+    // Use platform root: "/" on Unix, temp dir's drive root on Windows
+    #[cfg(unix)]
+    let root = std::path::Path::new("/");
+    #[cfg(windows)]
+    let root = std::path::Path::new(&tmp.path().to_str().unwrap()[..3]); // e.g. "C:\"
+    let ctx = make_ctx(root);
 
     let result = tool
         .execute(

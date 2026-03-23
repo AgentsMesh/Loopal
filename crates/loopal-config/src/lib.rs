@@ -19,8 +19,8 @@ pub use pipeline::load_config;
 pub use resolved::{HookEntry, McpServerEntry, ResolvedConfig, SkillEntry};
 pub use resolver::ConfigResolver;
 pub use sandbox::{
-    CommandDecision, FileSystemPolicy, NetworkPolicy, PathDecision, ResolvedPolicy,
-    SandboxConfig, SandboxPolicy,
+    CommandDecision, FileSystemPolicy, NetworkPolicy, PathDecision, ResolvedPolicy, SandboxConfig,
+    SandboxPolicy,
 };
 pub use settings::{
     McpServerConfig, OpenAiCompatConfig, ProviderConfig, ProvidersConfig, Settings,

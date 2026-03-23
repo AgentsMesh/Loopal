@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
 use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use loopal_edit_core::patch_apply::apply_file_ops;
 use loopal_edit_core::patch_parser::parse_patch;
@@ -69,29 +69,48 @@ impl Tool for ApplyPatchTool {
                     let existed = w.path.exists();
                     match ctx.backend.write(&path_str, content).await {
                         Ok(_) => {
-                            if existed { updated += 1; } else { created += 1; }
+                            if existed {
+                                updated += 1;
+                            } else {
+                                created += 1;
+                            }
                         }
-                        Err(e) => return Ok(ToolResult::error(
-                            format!("write {}: {e}", w.path.display()),
-                        )),
+                        Err(e) => {
+                            return Ok(ToolResult::error(format!(
+                                "write {}: {e}",
+                                w.path.display()
+                            )));
+                        }
                     }
                 }
-                None => {
-                    match ctx.backend.remove(&path_str).await {
-                        Ok(()) => { deleted += 1; }
-                        Err(e) => return Ok(ToolResult::error(
-                            format!("delete {}: {e}", w.path.display()),
-                        )),
+                None => match ctx.backend.remove(&path_str).await {
+                    Ok(()) => {
+                        deleted += 1;
                     }
-                }
+                    Err(e) => {
+                        return Ok(ToolResult::error(format!(
+                            "delete {}: {e}",
+                            w.path.display()
+                        )));
+                    }
+                },
             }
         }
 
         let mut parts = Vec::new();
-        if updated > 0 { parts.push(format!("{updated} updated")); }
-        if created > 0 { parts.push(format!("{created} created")); }
-        if deleted > 0 { parts.push(format!("{deleted} deleted")); }
-        Ok(ToolResult::success(format!("Applied: {}", parts.join(", "))))
+        if updated > 0 {
+            parts.push(format!("{updated} updated"));
+        }
+        if created > 0 {
+            parts.push(format!("{created} created"));
+        }
+        if deleted > 0 {
+            parts.push(format!("{deleted} deleted"));
+        }
+        Ok(ToolResult::success(format!(
+            "Applied: {}",
+            parts.join(", ")
+        )))
     }
 }
 

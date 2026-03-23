@@ -10,10 +10,13 @@ fn clear_history_marker_persisted() {
         .create_session(std::path::Path::new("/tmp"), "test-model")
         .unwrap();
 
-    mgr.save_message(&session.id, &mut Message::user("msg1")).unwrap();
-    mgr.save_message(&session.id, &mut Message::user("msg2")).unwrap();
+    mgr.save_message(&session.id, &mut Message::user("msg1"))
+        .unwrap();
+    mgr.save_message(&session.id, &mut Message::user("msg2"))
+        .unwrap();
     mgr.clear_history(&session.id).unwrap();
-    mgr.save_message(&session.id, &mut Message::user("msg3")).unwrap();
+    mgr.save_message(&session.id, &mut Message::user("msg3"))
+        .unwrap();
 
     let (_, messages) = mgr.resume_session(&session.id).unwrap();
     assert_eq!(messages.len(), 1);

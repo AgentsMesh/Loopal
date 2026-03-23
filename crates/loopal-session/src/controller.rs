@@ -7,9 +7,9 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use tokio::sync::{Notify, mpsc};
 
+use loopal_protocol::AgentEvent;
 use loopal_protocol::AgentMode;
 use loopal_protocol::ControlCommand;
-use loopal_protocol::AgentEvent;
 use loopal_protocol::InterruptSignal;
 use loopal_protocol::UserContent;
 use loopal_protocol::UserQuestionResponse;
@@ -46,8 +46,11 @@ impl SessionController {
     ) -> Self {
         Self {
             state: Arc::new(Mutex::new(SessionState::new(model, mode))),
-            control_tx, permission_tx, question_tx,
-            interrupt, interrupt_notify,
+            control_tx,
+            permission_tx,
+            question_tx,
+            interrupt,
+            interrupt_notify,
         }
     }
 
@@ -78,20 +81,29 @@ impl SessionController {
 
     /// Approve the current pending permission request.
     pub async fn approve_permission(&self) {
-        { self.lock().pending_permission = None; }
+        {
+            self.lock().pending_permission = None;
+        }
         let _ = self.permission_tx.send(true).await;
     }
 
     /// Deny the current pending permission request.
     pub async fn deny_permission(&self) {
-        { self.lock().pending_permission = None; }
+        {
+            self.lock().pending_permission = None;
+        }
         let _ = self.permission_tx.send(false).await;
     }
 
     /// Submit answers to a pending question (AskUser tool).
     pub async fn answer_question(&self, answers: Vec<String>) {
-        { self.lock().pending_question = None; }
-        let _ = self.question_tx.send(UserQuestionResponse { answers }).await;
+        {
+            self.lock().pending_question = None;
+        }
+        let _ = self
+            .question_tx
+            .send(UserQuestionResponse { answers })
+            .await;
     }
 
     /// Switch agent mode (Plan / Act).
@@ -101,7 +113,8 @@ impl SessionController {
             state.mode = match mode {
                 AgentMode::Plan => "plan",
                 AgentMode::Act => "act",
-            }.to_string();
+            }
+            .to_string();
         }
         let _ = self.control_tx.send(ControlCommand::ModeSwitch(mode)).await;
     }
@@ -113,7 +126,10 @@ impl SessionController {
             state.model = model.clone();
             push_system_msg(&mut state, &format!("Switched model to: {model}"));
         }
-        let _ = self.control_tx.send(ControlCommand::ModelSwitch(model)).await;
+        let _ = self
+            .control_tx
+            .send(ControlCommand::ModelSwitch(model))
+            .await;
     }
 
     /// Switch the thinking configuration (`config_json` is serialized ThinkingConfig).
@@ -124,7 +140,10 @@ impl SessionController {
             state.thinking_config = label.clone();
             push_system_msg(&mut state, &format!("Switched thinking to: {label}"));
         }
-        let _ = self.control_tx.send(ControlCommand::ThinkingSwitch(config_json)).await;
+        let _ = self
+            .control_tx
+            .send(ControlCommand::ThinkingSwitch(config_json))
+            .await;
     }
 
     /// Clear all messages, inbox, streaming buffer and counters.
@@ -151,7 +170,10 @@ impl SessionController {
 
     /// Rewind conversation to the given turn index.
     pub async fn rewind(&self, turn_index: usize) {
-        let _ = self.control_tx.send(ControlCommand::Rewind { turn_index }).await;
+        let _ = self
+            .control_tx
+            .send(ControlCommand::Rewind { turn_index })
+            .await;
     }
 
     /// Pop the last inbox message for editing. Returns None if empty.

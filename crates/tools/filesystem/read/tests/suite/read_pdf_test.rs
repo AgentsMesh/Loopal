@@ -12,7 +12,8 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext {
         session_id: "test".into(),
         shared: None,
-        pending_cwd_switch: Default::default(), memory_channel: None,
+        pending_cwd_switch: Default::default(),
+        memory_channel: None,
         backend,
     }
 }
@@ -148,6 +149,8 @@ fn test_read_schema_includes_pages() {
     let tool = ReadTool;
     let schema = tool.parameters_schema();
     assert!(schema["properties"]["pages"].is_object());
-    let desc = schema["properties"]["pages"]["description"].as_str().unwrap();
+    let desc = schema["properties"]["pages"]["description"]
+        .as_str()
+        .unwrap();
     assert!(desc.contains("PDF"));
 }

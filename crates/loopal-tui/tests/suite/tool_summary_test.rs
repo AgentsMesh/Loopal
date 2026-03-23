@@ -28,7 +28,10 @@ fn test_single_short_line_shown_inline() {
 fn test_single_long_line_truncated_with_ellipsis() {
     let long = "a".repeat(50);
     let s = summarize_result(Some(&long), "success");
-    assert!(s.ends_with("..."), "long single line should be truncated: {s}");
+    assert!(
+        s.ends_with("..."),
+        "long single line should be truncated: {s}"
+    );
     assert!(s.len() <= 40, "truncated result should be ≤40 chars: {s}");
 }
 

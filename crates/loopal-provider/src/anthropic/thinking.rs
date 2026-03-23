@@ -1,5 +1,5 @@
 use loopal_provider_api::{EffortLevel, ThinkingConfig};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// Translate a resolved `ThinkingConfig` into the Anthropic API `thinking` JSON field.
 /// The input must already be resolved (never `Auto`).
@@ -46,7 +46,9 @@ mod tests {
     #[test]
     fn effort_high_maps_to_adaptive() {
         let result = to_anthropic_thinking(
-            &ThinkingConfig::Effort { level: EffortLevel::High },
+            &ThinkingConfig::Effort {
+                level: EffortLevel::High,
+            },
             16_384,
         );
         assert_eq!(result["type"], "adaptive");
@@ -56,7 +58,9 @@ mod tests {
 
     #[test]
     fn effort_output_config_returns_effort() {
-        let config = ThinkingConfig::Effort { level: EffortLevel::Medium };
+        let config = ThinkingConfig::Effort {
+            level: EffortLevel::Medium,
+        };
         let oc = to_anthropic_output_config(&config).unwrap();
         assert_eq!(oc["effort"], "medium");
     }
@@ -69,10 +73,7 @@ mod tests {
 
     #[test]
     fn budget_clamped_below_max_tokens() {
-        let result = to_anthropic_thinking(
-            &ThinkingConfig::Budget { tokens: 20_000 },
-            16_384,
-        );
+        let result = to_anthropic_thinking(&ThinkingConfig::Budget { tokens: 20_000 }, 16_384);
         assert_eq!(result["type"], "enabled");
         assert_eq!(result["budget_tokens"], 16_383);
     }

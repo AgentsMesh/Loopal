@@ -11,7 +11,8 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext {
         session_id: "test".into(),
         shared: None,
-        pending_cwd_switch: Default::default(), memory_channel: None,
+        pending_cwd_switch: Default::default(),
+        memory_channel: None,
         backend,
     }
 }
@@ -61,7 +62,7 @@ async fn test_read_with_line_limit() {
     let tmp = tempfile::tempdir().unwrap();
     let file = tmp.path().join("lines.txt");
     let content = (1..=10)
-        .map(|i| format!("line {}", i))
+        .map(|i| format!("line {i}"))
         .collect::<Vec<_>>()
         .join("\n");
     std::fs::write(&file, &content).unwrap();
@@ -70,7 +71,10 @@ async fn test_read_with_line_limit() {
     let ctx = make_ctx(tmp.path());
 
     let result = tool
-        .execute(json!({"file_path": file.to_str().unwrap(), "limit": 3}), &ctx)
+        .execute(
+            json!({"file_path": file.to_str().unwrap(), "limit": 3}),
+            &ctx,
+        )
         .await
         .unwrap();
 
@@ -88,7 +92,7 @@ async fn test_read_with_offset() {
     let tmp = tempfile::tempdir().unwrap();
     let file = tmp.path().join("lines.txt");
     let content = (1..=5)
-        .map(|i| format!("line {}", i))
+        .map(|i| format!("line {i}"))
         .collect::<Vec<_>>()
         .join("\n");
     std::fs::write(&file, &content).unwrap();

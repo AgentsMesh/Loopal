@@ -1,29 +1,31 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use loopal_context::ContextPipeline;
-use loopal_kernel::Kernel;
-use loopal_runtime::frontend::{AutoDenyHandler, AutoCancelQuestionHandler};
-use loopal_runtime::{AgentLoopParams, AgentMode, SessionManager, UnifiedFrontend, agent_loop};
-use loopal_storage::Session;
 use loopal_config::Settings;
+use loopal_context::ContextPipeline;
+use loopal_error::TerminateReason;
+use loopal_kernel::Kernel;
+use loopal_message::Message;
+use loopal_protocol::AgentEventPayload;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::Envelope;
-use loopal_error::TerminateReason;
-use loopal_protocol::AgentEventPayload;
-use loopal_message::Message;
-use loopal_tool_api::PermissionMode;
 use loopal_provider_api::{StopReason, StreamChunk};
+use loopal_runtime::frontend::{AutoCancelQuestionHandler, AutoDenyHandler};
+use loopal_runtime::{AgentLoopParams, AgentMode, SessionManager, UnifiedFrontend, agent_loop};
+use loopal_storage::Session;
+use loopal_tool_api::PermissionMode;
 use tokio::sync::mpsc;
 
 use super::mock_provider::make_runner_with_mock_provider;
 
 fn make_session(id: &str) -> Session {
     Session {
-        id: id.to_string(), title: "".to_string(),
+        id: id.to_string(),
+        title: "".to_string(),
         model: "claude-sonnet-4-20250514".to_string(),
         cwd: "/tmp".to_string(),
-        created_at: Utc::now(), updated_at: Utc::now(),
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
         mode: "default".to_string(),
     }
 }
@@ -35,22 +37,36 @@ async fn test_agent_loop_immediate_channel_close() {
     let (ctrl_tx, control_rx) = mpsc::channel::<ControlCommand>(16);
 
     let frontend = Arc::new(UnifiedFrontend::new(
-        None, event_tx, mailbox_rx, control_rx, None, Box::new(AutoDenyHandler),
+        None,
+        event_tx,
+        mailbox_rx,
+        control_rx,
+        None,
+        Box::new(AutoDenyHandler),
         Box::new(AutoCancelQuestionHandler),
     ));
 
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
     let tmp = std::env::temp_dir().join(format!("la_loop_{}", std::process::id()));
     let params = AgentLoopParams {
-        kernel, session: make_session("test-loop"),
+        kernel,
+        session: make_session("test-loop"),
         messages: Vec::new(),
         model: "claude-sonnet-4-20250514".to_string(),
         system_prompt: "test".to_string(),
-        mode: AgentMode::Act, permission_mode: PermissionMode::Bypass, max_turns: 10,
-        frontend, session_manager: SessionManager::with_base_dir(tmp),
+        mode: AgentMode::Act,
+        permission_mode: PermissionMode::Bypass,
+        max_turns: 10,
+        frontend,
+        session_manager: SessionManager::with_base_dir(tmp),
         context_pipeline: ContextPipeline::new(),
-        tool_filter: None, shared: None, interactive: true,
-        thinking_config: loopal_provider_api::ThinkingConfig::Auto, interrupt: Default::default(), interrupt_notify: std::sync::Arc::new(tokio::sync::Notify::new()), memory_channel: None,
+        tool_filter: None,
+        shared: None,
+        interactive: true,
+        thinking_config: loopal_provider_api::ThinkingConfig::Auto,
+        interrupt: Default::default(),
+        interrupt_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
+        memory_channel: None,
     };
 
     // Drop senders to close channels
@@ -61,9 +77,19 @@ async fn test_agent_loop_immediate_channel_close() {
     assert!(result.is_ok());
 
     let mut events = Vec::new();
-    while let Ok(e) = event_rx.try_recv() { events.push(e); }
-    assert!(events.iter().any(|e| matches!(e.payload, AgentEventPayload::Started)));
-    assert!(events.iter().any(|e| matches!(e.payload, AgentEventPayload::Finished)));
+    while let Ok(e) = event_rx.try_recv() {
+        events.push(e);
+    }
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e.payload, AgentEventPayload::Started))
+    );
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e.payload, AgentEventPayload::Finished))
+    );
 }
 
 #[tokio::test]
@@ -73,22 +99,36 @@ async fn test_agent_loop_max_turns_reached() {
     let (_ctrl_tx, control_rx) = mpsc::channel::<ControlCommand>(16);
 
     let frontend = Arc::new(UnifiedFrontend::new(
-        None, event_tx, mailbox_rx, control_rx, None, Box::new(AutoDenyHandler),
+        None,
+        event_tx,
+        mailbox_rx,
+        control_rx,
+        None,
+        Box::new(AutoDenyHandler),
         Box::new(AutoCancelQuestionHandler),
     ));
 
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
     let tmp = std::env::temp_dir().join(format!("la_turns_{}", std::process::id()));
     let params = AgentLoopParams {
-        kernel, session: make_session("test-turns"),
+        kernel,
+        session: make_session("test-turns"),
         messages: vec![Message::user("hello")],
         model: "claude-sonnet-4-20250514".to_string(),
         system_prompt: "test".to_string(),
-        mode: AgentMode::Act, permission_mode: PermissionMode::Bypass, max_turns: 0,
-        frontend, session_manager: SessionManager::with_base_dir(tmp),
+        mode: AgentMode::Act,
+        permission_mode: PermissionMode::Bypass,
+        max_turns: 0,
+        frontend,
+        session_manager: SessionManager::with_base_dir(tmp),
         context_pipeline: ContextPipeline::new(),
-        tool_filter: None, shared: None, interactive: true,
-        thinking_config: loopal_provider_api::ThinkingConfig::Auto, interrupt: Default::default(), interrupt_notify: std::sync::Arc::new(tokio::sync::Notify::new()), memory_channel: None,
+        tool_filter: None,
+        shared: None,
+        interactive: true,
+        thinking_config: loopal_provider_api::ThinkingConfig::Auto,
+        interrupt: Default::default(),
+        interrupt_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
+        memory_channel: None,
     };
 
     let result = agent_loop(params).await;
@@ -96,20 +136,32 @@ async fn test_agent_loop_max_turns_reached() {
     assert_eq!(output.terminate_reason, TerminateReason::MaxTurns);
 
     let mut events = Vec::new();
-    while let Ok(e) = event_rx.try_recv() { events.push(e); }
-    assert!(events.iter().any(|e| matches!(e.payload, AgentEventPayload::MaxTurnsReached { .. })));
+    while let Ok(e) = event_rx.try_recv() {
+        events.push(e);
+    }
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e.payload, AgentEventPayload::MaxTurnsReached { .. }))
+    );
 }
 
 #[tokio::test]
 async fn test_full_run_text_only_then_input_close() {
     let chunks = vec![
-        Ok(StreamChunk::Text { text: "Hi there!".to_string() }),
+        Ok(StreamChunk::Text {
+            text: "Hi there!".to_string(),
+        }),
         Ok(StreamChunk::Usage {
-            input_tokens: 5, output_tokens: 3,
-            cache_creation_input_tokens: 0, cache_read_input_tokens: 0,
+            input_tokens: 5,
+            output_tokens: 3,
+            cache_creation_input_tokens: 0,
+            cache_read_input_tokens: 0,
             thinking_tokens: 0,
         }),
-        Ok(StreamChunk::Done { stop_reason: StopReason::EndTurn }),
+        Ok(StreamChunk::Done {
+            stop_reason: StopReason::EndTurn,
+        }),
     ];
     let (mut runner, mut event_rx, mbox_tx, ctrl_tx) = make_runner_with_mock_provider(chunks);
 
@@ -131,28 +183,35 @@ async fn test_full_run_text_only_then_input_close() {
 
 #[tokio::test]
 async fn test_full_run_with_tool_execution() {
-    let tmp_file = std::env::temp_dir().join(format!(
-        "la_run_test_{}.txt", std::process::id()
-    ));
+    let tmp_file = std::env::temp_dir().join(format!("la_run_test_{}.txt", std::process::id()));
     std::fs::write(&tmp_file, "test content").unwrap();
 
     // Two LLM calls: first returns Read tool, second ends the turn with text.
     let calls = vec![
         vec![
             Ok(StreamChunk::ToolUse {
-                id: "tc-1".to_string(), name: "Read".to_string(),
+                id: "tc-1".to_string(),
+                name: "Read".to_string(),
                 input: serde_json::json!({"file_path": tmp_file.to_str().unwrap()}),
             }),
             Ok(StreamChunk::Usage {
-                input_tokens: 10, output_tokens: 5,
-                cache_creation_input_tokens: 0, cache_read_input_tokens: 0,
+                input_tokens: 10,
+                output_tokens: 5,
+                cache_creation_input_tokens: 0,
+                cache_read_input_tokens: 0,
                 thinking_tokens: 0,
             }),
-            Ok(StreamChunk::Done { stop_reason: StopReason::EndTurn }),
+            Ok(StreamChunk::Done {
+                stop_reason: StopReason::EndTurn,
+            }),
         ],
         vec![
-            Ok(StreamChunk::Text { text: "Done.".to_string() }),
-            Ok(StreamChunk::Done { stop_reason: StopReason::EndTurn }),
+            Ok(StreamChunk::Text {
+                text: "Done.".to_string(),
+            }),
+            Ok(StreamChunk::Done {
+                stop_reason: StopReason::EndTurn,
+            }),
         ],
     ];
     let (mut runner, mut event_rx) = super::mock_provider::make_multi_runner(calls);

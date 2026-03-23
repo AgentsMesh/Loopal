@@ -35,12 +35,17 @@ fn test_table_header_separator_line() {
 fn test_table_header_is_bold() {
     let input = "| Head |\n|---|\n| body |";
     let lines = render_markdown(input, 80);
-    let header_span = lines.iter().flat_map(|l| &l.spans).find(|s| {
-        s.content.contains("Head")
-    });
+    let header_span = lines
+        .iter()
+        .flat_map(|l| &l.spans)
+        .find(|s| s.content.contains("Head"));
     assert!(header_span.is_some());
     assert!(
-        header_span.unwrap().style.add_modifier.contains(Modifier::BOLD),
+        header_span
+            .unwrap()
+            .style
+            .add_modifier
+            .contains(Modifier::BOLD),
         "header should be bold"
     );
 }
@@ -71,7 +76,11 @@ fn test_task_list_unchecked() {
     let input = "- [ ] todo item";
     let lines = render_markdown(input, 80);
     let texts = lines_text(&lines);
-    assert!(texts.iter().any(|t| t.contains("[ ]") && t.contains("todo")));
+    assert!(
+        texts
+            .iter()
+            .any(|t| t.contains("[ ]") && t.contains("todo"))
+    );
 }
 
 #[test]
@@ -79,16 +88,21 @@ fn test_task_list_checked() {
     let input = "- [x] done item";
     let lines = render_markdown(input, 80);
     let texts = lines_text(&lines);
-    assert!(texts.iter().any(|t| t.contains("[x]") && t.contains("done")));
+    assert!(
+        texts
+            .iter()
+            .any(|t| t.contains("[x]") && t.contains("done"))
+    );
 }
 
 #[test]
 fn test_task_list_checked_has_green_style() {
     let input = "- [x] completed";
     let lines = render_markdown(input, 80);
-    let span = lines.iter().flat_map(|l| &l.spans).find(|s| {
-        s.content.contains("[x]")
-    });
+    let span = lines
+        .iter()
+        .flat_map(|l| &l.spans)
+        .find(|s| s.content.contains("[x]"));
     assert!(span.is_some());
     assert_eq!(span.unwrap().style.fg, Some(Color::Green));
 }

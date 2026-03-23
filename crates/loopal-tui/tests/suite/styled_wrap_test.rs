@@ -23,7 +23,10 @@ fn test_bold_text_wraps_preserving_style() {
                 .any(|s| s.style.add_modifier.contains(Modifier::BOLD))
         })
         .collect();
-    assert!(bold_lines.len() > 1, "bold text should wrap into multiple lines");
+    assert!(
+        bold_lines.len() > 1,
+        "bold text should wrap into multiple lines"
+    );
 }
 
 #[test]
@@ -39,9 +42,10 @@ fn test_inline_code_in_paragraph_wraps() {
     let lines = render_markdown(&input, 40);
     assert!(lines.len() > 1);
     // Inline code span should be present
-    let has_code = lines.iter().flat_map(|l| &l.spans).any(|s| {
-        s.content.contains("command") && s.style.fg == Some(Color::Cyan)
-    });
+    let has_code = lines
+        .iter()
+        .flat_map(|l| &l.spans)
+        .any(|s| s.content.contains("command") && s.style.fg == Some(Color::Cyan));
     assert!(has_code, "inline code style should be preserved after wrap");
 }
 

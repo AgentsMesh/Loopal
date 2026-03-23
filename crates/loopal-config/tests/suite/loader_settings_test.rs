@@ -105,7 +105,10 @@ fn test_load_settings_all_env_var_scenarios() {
 
         let tmp = TempDir::new().unwrap();
         let settings = load_config(tmp.path()).unwrap().settings;
-        assert_eq!(settings.max_turns, 50, "non-numeric max_turns should be ignored");
+        assert_eq!(
+            settings.max_turns, 50,
+            "non-numeric max_turns should be ignored"
+        );
 
         unsafe {
             std::env::remove_var("LOOPAL_MAX_TURNS");
@@ -189,4 +192,3 @@ fn test_load_settings_invalid_json_returns_error() {
     let err = result.unwrap_err().to_string();
     assert!(err.contains("Parse") || err.contains("parse") || err.contains("settings.json"));
 }
-

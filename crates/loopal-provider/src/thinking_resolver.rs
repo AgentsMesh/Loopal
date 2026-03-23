@@ -41,21 +41,15 @@ mod tests {
 
     #[test]
     fn auto_with_none_capability_returns_none() {
-        let result = resolve_thinking_config(
-            &ThinkingConfig::Auto,
-            ThinkingCapability::None,
-            16_384,
-        );
+        let result =
+            resolve_thinking_config(&ThinkingConfig::Auto, ThinkingCapability::None, 16_384);
         assert!(result.is_none());
     }
 
     #[test]
     fn auto_with_adaptive_returns_high_effort() {
-        let result = resolve_thinking_config(
-            &ThinkingConfig::Auto,
-            ThinkingCapability::Adaptive,
-            16_384,
-        );
+        let result =
+            resolve_thinking_config(&ThinkingConfig::Auto, ThinkingCapability::Adaptive, 16_384);
         match result {
             Some(ThinkingConfig::Effort { level }) => {
                 assert_eq!(level, EffortLevel::High);
@@ -92,7 +86,9 @@ mod tests {
     #[test]
     fn explicit_effort_passes_through() {
         let result = resolve_thinking_config(
-            &ThinkingConfig::Effort { level: EffortLevel::Max },
+            &ThinkingConfig::Effort {
+                level: EffortLevel::Max,
+            },
             ThinkingCapability::Adaptive,
             16_384,
         );

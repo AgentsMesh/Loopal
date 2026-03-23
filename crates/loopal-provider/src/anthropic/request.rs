@@ -1,6 +1,6 @@
 use loopal_message::{ContentBlock, MessageRole};
 use loopal_provider_api::ChatParams;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use super::AnthropicProvider;
 
@@ -49,7 +49,10 @@ impl AnthropicProvider {
                                 "data": source.data
                             }
                         }),
-                        ContentBlock::Thinking { thinking, signature } => json!({
+                        ContentBlock::Thinking {
+                            thinking,
+                            signature,
+                        } => json!({
                             "type": "thinking",
                             "thinking": thinking,
                             "signature": signature.as_deref().unwrap_or("")
@@ -67,8 +70,7 @@ impl AnthropicProvider {
         // Cache breakpoint on last user message for multi-turn prompt caching.
         // Anthropic allows up to 4 breakpoints; system + last tool + this = 3.
         // Next turn, everything before this message hits cache_read (0.1x cost).
-        if let Some(last_user) = messages.iter_mut().rev()
-            .find(|m| m["role"] == "user")
+        if let Some(last_user) = messages.iter_mut().rev().find(|m| m["role"] == "user")
             && let Some(arr) = last_user["content"].as_array_mut()
             && let Some(last_block) = arr.last_mut()
         {

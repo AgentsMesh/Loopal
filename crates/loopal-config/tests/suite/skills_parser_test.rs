@@ -2,7 +2,8 @@ use loopal_config::skills::parse_skill;
 
 #[test]
 fn test_parse_with_frontmatter() {
-    let content = "---\ndescription: Generate a git commit\n---\nReview staged changes.\n$ARGUMENTS\n";
+    let content =
+        "---\ndescription: Generate a git commit\n---\nReview staged changes.\n$ARGUMENTS\n";
     let skill = parse_skill("/commit", content);
     assert_eq!(skill.name, "/commit");
     assert_eq!(skill.description, "Generate a git commit");
@@ -16,7 +17,10 @@ fn test_parse_without_frontmatter() {
     let content = "Review the code and suggest improvements.\nBe thorough.\n";
     let skill = parse_skill("/review", content);
     assert_eq!(skill.name, "/review");
-    assert_eq!(skill.description, "Review the code and suggest improvements.");
+    assert_eq!(
+        skill.description,
+        "Review the code and suggest improvements."
+    );
     assert!(!skill.has_arg);
     assert!(skill.body.contains("Be thorough."));
 }

@@ -16,16 +16,16 @@ mod tools_util;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use loopal_context::ContextPipeline;
-use loopal_kernel::Kernel;
-use loopal_storage::Session;
-use loopal_error::{AgentOutput, Result};
-use loopal_protocol::InterruptSignal;
-use tokio::sync::Notify;
 use crate::frontend::traits::AgentFrontend;
+use loopal_context::ContextPipeline;
+use loopal_error::{AgentOutput, Result};
+use loopal_kernel::Kernel;
 use loopal_message::Message;
+use loopal_protocol::InterruptSignal;
 use loopal_provider_api::ThinkingConfig;
+use loopal_storage::Session;
 use loopal_tool_api::{MemoryChannel, PermissionMode};
+use tokio::sync::Notify;
 
 use crate::mode::AgentMode;
 use crate::session::SessionManager;

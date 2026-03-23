@@ -13,11 +13,7 @@ fn test_scan_skills_dir_basic() {
         "---\ndescription: Generate commit\n---\nReview changes.\n$ARGUMENTS\n",
     )
     .unwrap();
-    fs::write(
-        skills_dir.join("review.md"),
-        "Review the code.\n",
-    )
-    .unwrap();
+    fs::write(skills_dir.join("review.md"), "Review the code.\n").unwrap();
 
     let skills = scan_skills_dir(&skills_dir);
     assert_eq!(skills.len(), 2);

@@ -1,5 +1,5 @@
-use loopal_provider::GoogleProvider;
 use loopal_message::{ContentBlock, ImageSource, Message, MessageRole};
+use loopal_provider::GoogleProvider;
 use loopal_provider_api::ChatParams;
 use loopal_tool_api::ToolDefinition;
 use serde_json::json;
@@ -25,10 +25,7 @@ fn make_params(messages: Vec<Message>, tools: Vec<ToolDefinition>) -> ChatParams
 fn test_build_contents_text() {
     let provider = make_provider();
     let params = make_params(
-        vec![
-            Message::user("Hello"),
-            Message::assistant("Hi there"),
-        ],
+        vec![Message::user("Hello"), Message::assistant("Hi there")],
         vec![],
     );
     let contents = provider.build_contents(&params);
@@ -97,7 +94,10 @@ fn test_build_contents_with_function_response() {
     assert_eq!(contents[0]["role"], "user");
     let part = &contents[0]["parts"][0];
     assert!(part.get("functionResponse").is_some());
-    assert_eq!(part["functionResponse"]["response"]["result"], "file contents");
+    assert_eq!(
+        part["functionResponse"]["response"]["result"],
+        "file contents"
+    );
 }
 
 #[test]

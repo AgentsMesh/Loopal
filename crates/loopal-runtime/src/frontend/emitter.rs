@@ -1,9 +1,9 @@
 use async_trait::async_trait;
 use tokio::sync::mpsc;
 
+use crate::frontend::traits::EventEmitter;
 use loopal_error::{LoopalError, Result};
 use loopal_protocol::{AgentEvent, AgentEventPayload};
-use crate::frontend::traits::EventEmitter;
 
 /// Cloneable event emitter backed by an mpsc sender.
 ///
@@ -28,8 +28,9 @@ impl EventEmitter for ChannelEventEmitter {
             agent_name: self.agent_name.clone(),
             payload,
         };
-        self.tx.send(event).await.map_err(|e| {
-            LoopalError::Other(format!("event channel closed: {e}"))
-        })
+        self.tx
+            .send(event)
+            .await
+            .map_err(|e| LoopalError::Other(format!("event channel closed: {e}")))
     }
 }

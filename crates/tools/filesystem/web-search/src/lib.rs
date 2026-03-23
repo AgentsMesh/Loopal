@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use loopal_error::LoopalError;
 use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 pub struct WebSearchTool;
 
@@ -86,9 +86,9 @@ impl Tool for WebSearchTool {
             .send()
             .await
             .map_err(|e| {
-                LoopalError::Tool(loopal_error::ToolError::ExecutionFailed(
-                    format!("Tavily API request failed: {e}"),
-                ))
+                LoopalError::Tool(loopal_error::ToolError::ExecutionFailed(format!(
+                    "Tavily API request failed: {e}"
+                )))
             })?;
 
         if !response.status().is_success() {
@@ -100,9 +100,9 @@ impl Tool for WebSearchTool {
         }
 
         let tavily: TavilyResponse = response.json().await.map_err(|e| {
-            LoopalError::Tool(loopal_error::ToolError::ExecutionFailed(
-                format!("Failed to parse Tavily response: {e}"),
-            ))
+            LoopalError::Tool(loopal_error::ToolError::ExecutionFailed(format!(
+                "Failed to parse Tavily response: {e}"
+            )))
         })?;
 
         if tavily.results.is_empty() {

@@ -1,15 +1,11 @@
 use crate::app::{
-    App, PickerItem, PickerState, SubPage, ThinkingOption,
-    RewindPickerState, RewindTurnItem,
+    App, PickerItem, PickerState, RewindPickerState, RewindTurnItem, SubPage, ThinkingOption,
 };
 use crate::input::SlashCommandAction;
 use crate::slash_help::show_help;
 
 /// Handle a slash command action. All interaction goes through `app.session`.
-pub(crate) async fn handle_slash_command(
-    app: &mut App,
-    cmd: SlashCommandAction,
-) {
+pub(crate) async fn handle_slash_command(app: &mut App, cmd: SlashCommandAction) {
     match cmd {
         SlashCommandAction::Clear => {
             app.pending_images.clear();
@@ -24,7 +20,10 @@ pub(crate) async fn handle_slash_command(
         SlashCommandAction::ModelSelected(name) => {
             app.session.switch_model(name).await;
         }
-        SlashCommandAction::ModelAndThinkingSelected { model, thinking_json } => {
+        SlashCommandAction::ModelAndThinkingSelected {
+            model,
+            thinking_json,
+        } => {
             app.session.switch_model(model).await;
             app.session.switch_thinking(thinking_json).await;
         }
@@ -32,9 +31,8 @@ pub(crate) async fn handle_slash_command(
             show_status(app);
         }
         SlashCommandAction::Sessions => {
-            app.session.push_system_message(
-                "Session listing is not yet available in TUI.".to_string(),
-            );
+            app.session
+                .push_system_message("Session listing is not yet available in TUI.".to_string());
         }
         SlashCommandAction::Init => {
             crate::slash_init::run_init(app);
@@ -55,9 +53,8 @@ fn open_rewind_picker(app: &mut App) {
     let state = app.session.lock();
     if !state.agent_idle {
         drop(state);
-        app.session.push_system_message(
-            "Cannot rewind while the agent is busy.".into(),
-        );
+        app.session
+            .push_system_message("Cannot rewind while the agent is busy.".into());
         return;
     }
     let turns: Vec<RewindTurnItem> = state
@@ -73,7 +70,10 @@ fn open_rewind_picker(app: &mut App) {
             } else {
                 msg.content.clone()
             };
-            RewindTurnItem { turn_index: turn_idx, preview }
+            RewindTurnItem {
+                turn_index: turn_idx,
+                preview,
+            }
         })
         .collect::<Vec<_>>()
         .into_iter()
@@ -82,7 +82,8 @@ fn open_rewind_picker(app: &mut App) {
     drop(state);
 
     if turns.is_empty() {
-        app.session.push_system_message("No turns to rewind to.".into());
+        app.session
+            .push_system_message("No turns to rewind to.".into());
         return;
     }
 
@@ -135,11 +136,26 @@ fn open_model_picker(app: &mut App) {
 /// Build the 5 thinking options and determine which one is currently selected.
 fn build_thinking_options(current: &str) -> (Vec<ThinkingOption>, usize) {
     let options = vec![
-        ThinkingOption { label: "Auto", value: r#"{"type":"auto"}"#.to_string() },
-        ThinkingOption { label: "Low", value: r#"{"type":"effort","level":"low"}"#.to_string() },
-        ThinkingOption { label: "Medium", value: r#"{"type":"effort","level":"medium"}"#.to_string() },
-        ThinkingOption { label: "High", value: r#"{"type":"effort","level":"high"}"#.to_string() },
-        ThinkingOption { label: "Disabled", value: r#"{"type":"disabled"}"#.to_string() },
+        ThinkingOption {
+            label: "Auto",
+            value: r#"{"type":"auto"}"#.to_string(),
+        },
+        ThinkingOption {
+            label: "Low",
+            value: r#"{"type":"effort","level":"low"}"#.to_string(),
+        },
+        ThinkingOption {
+            label: "Medium",
+            value: r#"{"type":"effort","level":"medium"}"#.to_string(),
+        },
+        ThinkingOption {
+            label: "High",
+            value: r#"{"type":"effort","level":"high"}"#.to_string(),
+        },
+        ThinkingOption {
+            label: "Disabled",
+            value: r#"{"type":"disabled"}"#.to_string(),
+        },
     ];
     let idx = match current {
         "low" => 1,
@@ -155,13 +171,9 @@ fn show_status(app: &mut App) {
     let state = app.session.lock();
     let token_count = state.token_count();
     let context_info = if state.context_window > 0 {
-        format!(
-            "{}k/{}k",
-            token_count / 1000,
-            state.context_window / 1000
-        )
+        format!("{}k/{}k", token_count / 1000, state.context_window / 1000)
     } else {
-        format!("{} tokens", token_count)
+        format!("{token_count} tokens")
     };
     let status = format!(
         "Mode: {} | Model: {} | Context: {} | Turns: {} | CWD: {}",

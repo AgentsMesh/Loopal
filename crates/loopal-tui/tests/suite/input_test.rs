@@ -1,11 +1,11 @@
 /// Input handling tests: key routing priority chain + basic interactions.
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use loopal_session::SessionController;
 use loopal_protocol::{ControlCommand, UserQuestionResponse};
+use loopal_session::SessionController;
 use loopal_tui::app::App;
 use loopal_tui::command::builtin_entries;
-use loopal_tui::input::{handle_key, InputAction};
+use loopal_tui::input::{InputAction, handle_key};
 use tokio::sync::mpsc;
 
 fn make_app() -> App {
@@ -13,7 +13,13 @@ fn make_app() -> App {
     let (perm_tx, _) = mpsc::channel::<bool>(16);
     let (question_tx, _) = mpsc::channel::<UserQuestionResponse>(16);
     let session = SessionController::new(
-        "test-model".into(), "act".into(), control_tx, perm_tx, question_tx, Default::default(), std::sync::Arc::new(tokio::sync::Notify::new()),
+        "test-model".into(),
+        "act".into(),
+        control_tx,
+        perm_tx,
+        question_tx,
+        Default::default(),
+        std::sync::Arc::new(tokio::sync::Notify::new()),
     );
     App::new(session, builtin_entries(), std::env::temp_dir())
 }
@@ -45,7 +51,10 @@ fn test_ctrl_d_quits() {
 #[test]
 fn test_shift_tab_toggles_mode() {
     let mut app = make_app();
-    let action = handle_key(&mut app, KeyEvent::new(KeyCode::BackTab, KeyModifiers::SHIFT));
+    let action = handle_key(
+        &mut app,
+        KeyEvent::new(KeyCode::BackTab, KeyModifiers::SHIFT),
+    );
     assert!(matches!(action, InputAction::ModeSwitch(m) if m == "plan"));
 }
 
@@ -58,7 +67,9 @@ fn test_tool_confirm_y_approves() {
     {
         let mut state = app.session.lock();
         state.pending_permission = Some(loopal_session::types::PendingPermission {
-            id: "1".into(), name: "Bash".into(), input: "ls".into(),
+            id: "1".into(),
+            name: "Bash".into(),
+            input: "ls".into(),
         });
     }
     let action = handle_key(&mut app, key(KeyCode::Char('y')));
@@ -71,7 +82,9 @@ fn test_tool_confirm_n_denies() {
     {
         let mut state = app.session.lock();
         state.pending_permission = Some(loopal_session::types::PendingPermission {
-            id: "1".into(), name: "Bash".into(), input: "rm".into(),
+            id: "1".into(),
+            name: "Bash".into(),
+            input: "rm".into(),
         });
     }
     let action = handle_key(&mut app, key(KeyCode::Char('n')));
@@ -84,7 +97,9 @@ fn test_tool_confirm_esc_denies() {
     {
         let mut state = app.session.lock();
         state.pending_permission = Some(loopal_session::types::PendingPermission {
-            id: "1".into(), name: "Bash".into(), input: "rm".into(),
+            id: "1".into(),
+            name: "Bash".into(),
+            input: "rm".into(),
         });
     }
     let action = handle_key(&mut app, key(KeyCode::Esc));

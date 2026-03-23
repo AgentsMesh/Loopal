@@ -34,8 +34,5 @@ pub fn is_sensitive(name: &str) -> bool {
 
 /// Return the list of sensitive variable names found in the given environment.
 pub fn find_sensitive_vars(env: &HashMap<String, String>) -> Vec<String> {
-    env.keys()
-        .filter(|k| is_sensitive(k))
-        .cloned()
-        .collect()
+    env.keys().filter(|k| is_sensitive(k)).cloned().collect()
 }

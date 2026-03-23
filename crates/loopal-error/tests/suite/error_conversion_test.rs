@@ -7,10 +7,7 @@ use loopal_error::{
 #[test]
 fn test_loopal_error_display_mcp() {
     let err = LoopalError::Mcp(McpError::ServerNotFound("test-server".into()));
-    assert_eq!(
-        format!("{err}"),
-        "MCP error: Server not found: test-server"
-    );
+    assert_eq!(format!("{err}"), "MCP error: Server not found: test-server");
 }
 
 #[test]
@@ -109,10 +106,7 @@ fn test_storage_error_display_home_dir_not_found() {
 #[test]
 fn test_hook_error_display_execution_failed() {
     let err = HookError::ExecutionFailed("command not found".into());
-    assert_eq!(
-        format!("{err}"),
-        "Hook execution failed: command not found"
-    );
+    assert_eq!(format!("{err}"), "Hook execution failed: command not found");
 }
 
 #[test]

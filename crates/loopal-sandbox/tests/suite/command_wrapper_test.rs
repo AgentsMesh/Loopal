@@ -1,9 +1,7 @@
 use std::path::PathBuf;
 
+use loopal_config::{NetworkPolicy, ResolvedPolicy, SandboxPolicy};
 use loopal_sandbox::command_wrapper::wrap_command;
-use loopal_config::{
-    NetworkPolicy, ResolvedPolicy, SandboxPolicy,
-};
 
 fn disabled_policy() -> ResolvedPolicy {
     ResolvedPolicy {
@@ -18,10 +16,7 @@ fn disabled_policy() -> ResolvedPolicy {
 fn workspace_policy() -> ResolvedPolicy {
     ResolvedPolicy {
         policy: SandboxPolicy::WorkspaceWrite,
-        writable_paths: vec![
-            PathBuf::from("/home/user/project"),
-            std::env::temp_dir(),
-        ],
+        writable_paths: vec![PathBuf::from("/home/user/project"), std::env::temp_dir()],
         deny_write_globs: vec![],
         deny_read_globs: vec![],
         network: NetworkPolicy::default(),

@@ -13,11 +13,13 @@ use loopal_context::middleware::{ContextGuard, MessageSizeGuard, SmartCompact};
 use loopal_context::system_prompt::build_system_prompt;
 use loopal_kernel::Kernel;
 use loopal_memory::MemoryObserver;
-use loopal_runtime::{AgentLoopParams, AgentMode, SessionManager, UnifiedFrontend, agent_loop};
-use loopal_runtime::frontend::tui_permission::TuiPermissionHandler;
+use loopal_protocol::{
+    AgentEvent, ControlCommand, Envelope, InterruptSignal, UserQuestionResponse,
+};
 use loopal_runtime::frontend::question_handler::TuiQuestionHandler;
+use loopal_runtime::frontend::tui_permission::TuiPermissionHandler;
 use loopal_runtime::projection::project_messages;
-use loopal_protocol::{AgentEvent, ControlCommand, Envelope, InterruptSignal, UserQuestionResponse};
+use loopal_runtime::{AgentLoopParams, AgentMode, SessionManager, UnifiedFrontend, agent_loop};
 use loopal_session::SessionController;
 use loopal_tool_api::MemoryChannel;
 use loopal_tui::command::merge_commands;
@@ -46,7 +48,11 @@ pub async fn run() -> anyhow::Result<()> {
     let permission_mode = config.settings.permission_mode;
     let thinking_config = config.settings.thinking.clone();
     let memory_enabled = config.settings.memory.enabled;
-    let mode = if cli.plan { AgentMode::Plan } else { AgentMode::Act };
+    let mode = if cli.plan {
+        AgentMode::Plan
+    } else {
+        AgentMode::Act
+    };
     let mode_str = if cli.plan { "plan" } else { "act" }.to_string();
 
     tracing::info!(model = %model, mode = %mode_str, "starting");
@@ -71,14 +77,24 @@ pub async fn run() -> anyhow::Result<()> {
     let (question_tx, question_rx) = mpsc::channel::<UserQuestionResponse>(16);
     let router = Arc::new(MessageRouter::new(agent_event_tx.clone()));
     let (mailbox_tx, mailbox_rx) = mpsc::channel::<Envelope>(16);
-    router.register("main", mailbox_tx).await.map_err(|e| anyhow::anyhow!(e))?;
+    router
+        .register("main", mailbox_tx)
+        .await
+        .map_err(|e| anyhow::anyhow!(e))?;
     let (control_tx, control_rx) = mpsc::channel::<ControlCommand>(16);
     let interrupt = InterruptSignal::new();
     let interrupt_notify = Arc::new(tokio::sync::Notify::new());
 
     let frontend = Arc::new(UnifiedFrontend::new(
-        None, agent_event_tx.clone(), mailbox_rx, control_rx, None,
-        Box::new(TuiPermissionHandler::new(agent_event_tx.clone(), permission_rx)),
+        None,
+        agent_event_tx.clone(),
+        mailbox_rx,
+        control_rx,
+        None,
+        Box::new(TuiPermissionHandler::new(
+            agent_event_tx.clone(),
+            permission_rx,
+        )),
         Box::new(TuiQuestionHandler::new(agent_event_tx.clone(), question_rx)),
     ));
 
@@ -89,16 +105,22 @@ pub async fn run() -> anyhow::Result<()> {
         registry: Arc::new(tokio::sync::Mutex::new(AgentRegistry::new())),
         task_store: Arc::new(TaskStore::new(tasks_dir)),
         router: router.clone(),
-        cwd: cwd.clone(), depth: 0, max_depth: 3,
+        cwd: cwd.clone(),
+        depth: 0,
+        max_depth: 3,
         agent_name: "main".to_string(),
         parent_event_tx: Some(agent_event_tx.clone()),
-        cancel_token: None, worktree_state: Default::default(),
+        cancel_token: None,
+        worktree_state: Default::default(),
     });
 
     // Memory observer sidebar — uses AgentShared to spawn memory-maintainer agents
     let memory_channel: Option<Arc<dyn MemoryChannel>> = if memory_enabled {
         let (tx, rx) = mpsc::channel::<String>(64);
-        let processor = Arc::new(AgentMemoryProcessor::new(agent_shared.clone(), model.clone()));
+        let processor = Arc::new(AgentMemoryProcessor::new(
+            agent_shared.clone(),
+            model.clone(),
+        ));
         tokio::spawn(MemoryObserver::new(rx, processor).run());
         Some(Arc::new(MpscMemoryChannel(tx)))
     } else {
@@ -112,13 +134,22 @@ pub async fn run() -> anyhow::Result<()> {
     let commands = merge_commands(&skills);
     let tool_defs = kernel.tool_definitions();
     let system_prompt = build_system_prompt(
-        &config.instructions, &tool_defs, "", &cwd.to_string_lossy(),
-        &skills_summary, &config.memory,
+        &config.instructions,
+        &tool_defs,
+        "",
+        &cwd.to_string_lossy(),
+        &skills_summary,
+        &config.memory,
     );
 
     let session_ctrl = SessionController::new(
-        model.clone(), mode_str, control_tx, permission_tx, question_tx,
-        interrupt.clone(), interrupt_notify.clone(),
+        model.clone(),
+        mode_str,
+        control_tx,
+        permission_tx,
+        question_tx,
+        interrupt.clone(),
+        interrupt_notify.clone(),
     );
     if cli.resume.is_some() {
         session_ctrl.load_display_history(project_messages(&messages));
@@ -133,11 +164,24 @@ pub async fn run() -> anyhow::Result<()> {
     context_pipeline.add(Box::new(SmartCompact::new(10)));
 
     let agent_params = AgentLoopParams {
-        kernel, session, messages, model, system_prompt,
-        mode, permission_mode, max_turns, frontend,
-        session_manager, context_pipeline, tool_filter: None,
-        shared: Some(shared_any), interactive: true, thinking_config,
-        interrupt, interrupt_notify, memory_channel,
+        kernel,
+        session,
+        messages,
+        model,
+        system_prompt,
+        mode,
+        permission_mode,
+        max_turns,
+        frontend,
+        session_manager,
+        context_pipeline,
+        tool_filter: None,
+        shared: Some(shared_any),
+        interactive: true,
+        thinking_config,
+        interrupt,
+        interrupt_notify,
+        memory_channel,
     };
 
     tokio::spawn(async move {
@@ -147,8 +191,14 @@ pub async fn run() -> anyhow::Result<()> {
     });
 
     loopal_tui::run_tui(
-        session_ctrl, router, "main".to_string(), commands, cwd, agent_event_rx,
-    ).await?;
+        session_ctrl,
+        router,
+        "main".to_string(),
+        commands,
+        cwd,
+        agent_event_rx,
+    )
+    .await?;
     tracing::info!("shutting down");
     Ok(())
 }

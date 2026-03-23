@@ -99,11 +99,7 @@ pub(super) fn update_autocomplete(app: &mut App) {
             if matches.is_empty() {
                 app.autocomplete = None;
             } else {
-                let prev_selected = app
-                    .autocomplete
-                    .as_ref()
-                    .map(|ac| ac.selected)
-                    .unwrap_or(0);
+                let prev_selected = app.autocomplete.as_ref().map(|ac| ac.selected).unwrap_or(0);
                 app.autocomplete = Some(AutocompleteState {
                     selected: prev_selected.min(matches.len().saturating_sub(1)),
                     matches,

@@ -3,9 +3,14 @@ use loopal_tool_grep::GrepTool;
 use serde_json::json;
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
-    let backend =
-        loopal_backend::LocalBackend::new(cwd.to_path_buf(), None, Default::default());
-    ToolContext { backend, session_id: "test".into(), shared: None, pending_cwd_switch: Default::default(), memory_channel: None }
+    let backend = loopal_backend::LocalBackend::new(cwd.to_path_buf(), None, Default::default());
+    ToolContext {
+        backend,
+        session_id: "test".into(),
+        shared: None,
+        pending_cwd_switch: Default::default(),
+        memory_channel: None,
+    }
 }
 
 #[tokio::test]
@@ -61,7 +66,10 @@ async fn test_grep_skips_binary_files() {
     let ctx = make_ctx(tmp.path());
 
     let result = tool
-        .execute(json!({"pattern": "findable", "output_mode": "content"}), &ctx)
+        .execute(
+            json!({"pattern": "findable", "output_mode": "content"}),
+            &ctx,
+        )
         .await
         .unwrap();
 
@@ -117,10 +125,7 @@ async fn test_grep_content_mode() {
     let ctx = make_ctx(tmp.path());
 
     let result = tool
-        .execute(
-            json!({"pattern": "fn", "output_mode": "content"}),
-            &ctx,
-        )
+        .execute(json!({"pattern": "fn", "output_mode": "content"}), &ctx)
         .await
         .unwrap();
 
@@ -138,10 +143,7 @@ async fn test_grep_count_mode() {
     let ctx = make_ctx(tmp.path());
 
     let result = tool
-        .execute(
-            json!({"pattern": "aaa", "output_mode": "count"}),
-            &ctx,
-        )
+        .execute(json!({"pattern": "aaa", "output_mode": "count"}), &ctx)
         .await
         .unwrap();
 
@@ -172,7 +174,9 @@ async fn test_grep_head_limit() {
 
     assert!(!result.is_error);
     assert!(result.content.contains("Showing 5 of"));
-    let match_lines: Vec<_> = result.content.lines()
+    let match_lines: Vec<_> = result
+        .content
+        .lines()
         .filter(|l| l.contains("match_line_"))
         .collect();
     assert_eq!(match_lines.len(), 5);
@@ -185,10 +189,7 @@ async fn test_grep_invalid_output_mode() {
     let ctx = make_ctx(tmp.path());
 
     let result = tool
-        .execute(
-            json!({"pattern": "test", "output_mode": "invalid"}),
-            &ctx,
-        )
+        .execute(json!({"pattern": "test", "output_mode": "invalid"}), &ctx)
         .await;
 
     assert!(result.is_err());

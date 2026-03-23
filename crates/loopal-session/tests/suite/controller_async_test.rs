@@ -1,8 +1,8 @@
 //! Async tests for SessionController interaction methods (channels).
 
-use loopal_session::SessionController;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::{AgentEvent, AgentEventPayload, UserQuestionResponse};
+use loopal_session::SessionController;
 use tokio::sync::mpsc;
 
 fn make_controller() -> (
@@ -18,7 +18,9 @@ fn make_controller() -> (
         "act".to_string(),
         control_tx,
         perm_tx,
-        question_tx, Default::default(), std::sync::Arc::new(tokio::sync::Notify::new()),
+        question_tx,
+        Default::default(),
+        std::sync::Arc::new(tokio::sync::Notify::new()),
     );
     (ctrl, control_rx, perm_rx)
 }
@@ -79,7 +81,7 @@ async fn test_switch_mode() {
         Some(ControlCommand::ModeSwitch(m)) => {
             assert!(matches!(m, loopal_protocol::AgentMode::Plan));
         }
-        other => panic!("expected ModeSwitch, got {:?}", other),
+        other => panic!("expected ModeSwitch, got {other:?}"),
     }
 }
 
@@ -97,7 +99,7 @@ async fn test_switch_model() {
 
     match control_rx.recv().await {
         Some(ControlCommand::ModelSwitch(m)) => assert_eq!(m, "gpt-4"),
-        other => panic!("expected ModelSwitch, got {:?}", other),
+        other => panic!("expected ModelSwitch, got {other:?}"),
     }
 }
 
@@ -105,7 +107,9 @@ async fn test_switch_model() {
 async fn test_clear() {
     let (ctrl, mut control_rx, _) = make_controller();
     ctrl.push_system_message("msg".to_string());
-    ctrl.handle_event(AgentEvent::root(AgentEventPayload::Stream { text: "partial".to_string() }));
+    ctrl.handle_event(AgentEvent::root(AgentEventPayload::Stream {
+        text: "partial".to_string(),
+    }));
     ctrl.handle_event(AgentEvent::root(AgentEventPayload::TokenUsage {
         input_tokens: 100,
         output_tokens: 50,
@@ -129,7 +133,7 @@ async fn test_clear() {
 
     match control_rx.recv().await {
         Some(ControlCommand::Clear) => {}
-        other => panic!("expected Clear, got {:?}", other),
+        other => panic!("expected Clear, got {other:?}"),
     }
 }
 
@@ -140,6 +144,6 @@ async fn test_compact() {
 
     match control_rx.recv().await {
         Some(ControlCommand::Compact) => {}
-        other => panic!("expected Compact, got {:?}", other),
+        other => panic!("expected Compact, got {other:?}"),
     }
 }

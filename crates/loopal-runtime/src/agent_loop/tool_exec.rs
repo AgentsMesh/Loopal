@@ -8,9 +8,9 @@ use loopal_protocol::AgentEventPayload;
 use loopal_tool_api::ToolContext;
 use tracing::{Instrument, error, info};
 
+use crate::frontend::traits::AgentFrontend;
 use crate::mode::AgentMode;
 use crate::tool_pipeline::execute_tool;
-use crate::frontend::traits::AgentFrontend;
 
 use super::cancel::TurnCancel;
 
@@ -45,52 +45,62 @@ pub async fn execute_approved_tools(
             .position(|(tid, _, _)| tid == &id)
             .unwrap_or(0);
 
-        join_set.spawn(async move {
-            let tool_start = Instant::now();
-            let result = execute_tool(&kernel, &name, input, &tool_ctx, &mode).await;
-            let tool_duration = tool_start.elapsed();
+        join_set.spawn(
+            async move {
+                let tool_start = Instant::now();
+                let result = execute_tool(&kernel, &name, input, &tool_ctx, &mode).await;
+                let tool_duration = tool_start.elapsed();
 
-            let (content_block, tool_result_event) = match result {
-                Ok(result) => {
-                    info!(
-                        tool = name.as_str(),
-                        duration_ms = tool_duration.as_millis() as u64,
-                        ok = !result.is_error,
-                        output_len = result.content.len(),
-                        "tool exec (parallel)"
-                    );
-                    let event = AgentEventPayload::ToolResult {
-                        id: id.clone(), name: name.clone(),
-                        result: result.content.clone(), is_error: result.is_error,
-                    };
-                    let block = ContentBlock::ToolResult {
-                        tool_use_id: id,
-                        content: result.content, is_error: result.is_error,
-                    };
-                    (block, event)
-                }
-                Err(e) => {
-                    let err_msg = e.to_string();
-                    info!(
-                        tool = name.as_str(),
-                        duration_ms = tool_duration.as_millis() as u64,
-                        ok = false, error = %err_msg,
-                        "tool exec (parallel)"
-                    );
-                    let event = AgentEventPayload::ToolResult {
-                        id: id.clone(), name: name.clone(),
-                        result: err_msg.clone(), is_error: true,
-                    };
-                    let block = ContentBlock::ToolResult {
-                        tool_use_id: id, content: err_msg, is_error: true,
-                    };
-                    (block, event)
-                }
-            };
+                let (content_block, tool_result_event) = match result {
+                    Ok(result) => {
+                        info!(
+                            tool = name.as_str(),
+                            duration_ms = tool_duration.as_millis() as u64,
+                            ok = !result.is_error,
+                            output_len = result.content.len(),
+                            "tool exec (parallel)"
+                        );
+                        let event = AgentEventPayload::ToolResult {
+                            id: id.clone(),
+                            name: name.clone(),
+                            result: result.content.clone(),
+                            is_error: result.is_error,
+                        };
+                        let block = ContentBlock::ToolResult {
+                            tool_use_id: id,
+                            content: result.content,
+                            is_error: result.is_error,
+                        };
+                        (block, event)
+                    }
+                    Err(e) => {
+                        let err_msg = e.to_string();
+                        info!(
+                            tool = name.as_str(),
+                            duration_ms = tool_duration.as_millis() as u64,
+                            ok = false, error = %err_msg,
+                            "tool exec (parallel)"
+                        );
+                        let event = AgentEventPayload::ToolResult {
+                            id: id.clone(),
+                            name: name.clone(),
+                            result: err_msg.clone(),
+                            is_error: true,
+                        };
+                        let block = ContentBlock::ToolResult {
+                            tool_use_id: id,
+                            content: err_msg,
+                            is_error: true,
+                        };
+                        (block, event)
+                    }
+                };
 
-            let _ = emitter.emit(tool_result_event).await;
-            (original_idx, content_block)
-        }.instrument(span));
+                let _ = emitter.emit(tool_result_event).await;
+                (original_idx, content_block)
+            }
+            .instrument(span),
+        );
     }
 
     // Collect results, racing against cancellation
@@ -138,17 +148,29 @@ pub async fn execute_approved_tools(
     // Synthesise "Interrupted by user" for tools that were not collected
     let emitter = frontend.event_emitter();
     for (id, name, _) in &approved {
-        if collected_ids.contains(id) { continue; }
-        let orig_idx = tool_uses.iter().position(|(tid, _, _)| tid == id).unwrap_or(0);
-        let _ = emitter.emit(AgentEventPayload::ToolResult {
-            id: id.clone(), name: name.clone(),
-            result: "Interrupted by user".into(), is_error: true,
-        }).await;
-        results.push((orig_idx, ContentBlock::ToolResult {
-            tool_use_id: id.clone(),
-            content: "Interrupted by user".into(),
-            is_error: true,
-        }));
+        if collected_ids.contains(id) {
+            continue;
+        }
+        let orig_idx = tool_uses
+            .iter()
+            .position(|(tid, _, _)| tid == id)
+            .unwrap_or(0);
+        let _ = emitter
+            .emit(AgentEventPayload::ToolResult {
+                id: id.clone(),
+                name: name.clone(),
+                result: "Interrupted by user".into(),
+                is_error: true,
+            })
+            .await;
+        results.push((
+            orig_idx,
+            ContentBlock::ToolResult {
+                tool_use_id: id.clone(),
+                content: "Interrupted by user".into(),
+                is_error: true,
+            },
+        ));
     }
 
     results

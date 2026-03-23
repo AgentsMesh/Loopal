@@ -37,7 +37,6 @@ impl OpenAiProvider {
         self.base_url = base_url;
         self
     }
-
 }
 
 #[async_trait]
@@ -64,8 +63,7 @@ impl Provider for OpenAiProvider {
             body["temperature"] = json!(temp);
         }
         if let Some(ref thinking_config) = params.thinking {
-            body["reasoning_effort"] =
-                json!(thinking::to_openai_reasoning_effort(thinking_config));
+            body["reasoning_effort"] = json!(thinking::to_openai_reasoning_effort(thinking_config));
             // Reasoning models don't support temperature
             body.as_object_mut().unwrap().remove("temperature");
         }

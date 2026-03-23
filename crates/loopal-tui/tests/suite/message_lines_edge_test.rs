@@ -14,7 +14,12 @@ fn msg(role: &str, content: &str) -> DisplayMessage {
 fn all_text(lines: &[ratatui::prelude::Line<'_>]) -> String {
     lines
         .iter()
-        .map(|l| l.spans.iter().map(|s| s.content.as_ref()).collect::<String>())
+        .map(|l| {
+            l.spans
+                .iter()
+                .map(|s| s.content.as_ref())
+                .collect::<String>()
+        })
         .collect::<Vec<_>>()
         .join("\n")
 }
@@ -38,7 +43,10 @@ fn test_thinking_empty_shows_ellipsis() {
     let m = msg("thinking", "");
     let lines = message_to_lines(&m, 80);
     let text = all_text(&lines);
-    assert!(text.contains("Thinking..."), "empty thinking shows ellipsis");
+    assert!(
+        text.contains("Thinking..."),
+        "empty thinking shows ellipsis"
+    );
 }
 
 #[test]
@@ -48,7 +56,10 @@ fn test_thinking_small_shows_raw_token_count() {
     let m = msg("thinking", &content);
     let lines = message_to_lines(&m, 80);
     let text = all_text(&lines);
-    assert!(text.contains("100 tokens"), "small thinking should show raw count: {text}");
+    assert!(
+        text.contains("100 tokens"),
+        "small thinking should show raw count: {text}"
+    );
     assert!(!text.contains("0k"), "should NOT show 0k: {text}");
 }
 
@@ -59,7 +70,10 @@ fn test_error_role_has_prefix() {
     let m = msg("error", "something went wrong");
     let lines = message_to_lines(&m, 80);
     let text = all_text(&lines);
-    assert!(text.contains("Error: "), "error should have 'Error: ' prefix");
+    assert!(
+        text.contains("Error: "),
+        "error should have 'Error: ' prefix"
+    );
     assert!(text.contains("something went wrong"));
 }
 
@@ -68,7 +82,10 @@ fn test_system_role_has_prefix() {
     let m = msg("system", "max turns reached");
     let lines = message_to_lines(&m, 80);
     let text = all_text(&lines);
-    assert!(text.contains("System: "), "system should have 'System: ' prefix");
+    assert!(
+        text.contains("System: "),
+        "system should have 'System: ' prefix"
+    );
 }
 
 // --- Tool call integration ---
@@ -89,7 +106,10 @@ fn test_tool_call_single_line_summary() {
     let lines = message_to_lines(&m, 80);
     let text = all_text(&lines);
     assert!(text.contains("✓"), "success tool call should have ✓ icon");
-    assert!(text.contains("Read(src/main.rs)"), "should contain tool summary");
+    assert!(
+        text.contains("Read(src/main.rs)"),
+        "should contain tool summary"
+    );
 }
 
 #[test]

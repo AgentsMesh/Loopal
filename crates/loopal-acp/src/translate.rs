@@ -4,9 +4,7 @@ use loopal_protocol::AgentEventPayload;
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::types::{
-    AcpContentBlock, SessionUpdate, SessionUpdateParams, ToolCallStatus, ToolKind,
-};
+use crate::types::{AcpContentBlock, SessionUpdate, SessionUpdateParams, ToolCallStatus, ToolKind};
 
 /// Convert an `AgentEventPayload` into a JSON-serialised `session/update` params value.
 ///
@@ -24,16 +22,25 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
             tool_call_kind: map_tool_kind(name),
             status: ToolCallStatus::Pending,
         },
-        AgentEventPayload::ToolResult { id, result, is_error, .. } => {
-            SessionUpdate::ToolCallUpdate {
-                tool_call_id: id.clone(),
-                status: if *is_error { ToolCallStatus::Failed } else { ToolCallStatus::Completed },
-                content: Some(result.clone()),
-            }
-        }
+        AgentEventPayload::ToolResult {
+            id,
+            result,
+            is_error,
+            ..
+        } => SessionUpdate::ToolCallUpdate {
+            tool_call_id: id.clone(),
+            status: if *is_error {
+                ToolCallStatus::Failed
+            } else {
+                ToolCallStatus::Completed
+            },
+            content: Some(result.clone()),
+        },
         AgentEventPayload::Error { message } => SessionUpdate::AgentMessageChunk {
             message_id: Uuid::new_v4().to_string(),
-            content: vec![AcpContentBlock::Text { text: format!("[error] {message}") }],
+            content: vec![AcpContentBlock::Text {
+                text: format!("[error] {message}"),
+            }],
         },
         AgentEventPayload::ModeChanged { mode } => SessionUpdate::AgentMessageChunk {
             message_id: Uuid::new_v4().to_string(),
@@ -82,7 +89,9 @@ mod tests {
 
     #[test]
     fn stream_event_translates_to_chunk() {
-        let payload = AgentEventPayload::Stream { text: "hello".into() };
+        let payload = AgentEventPayload::Stream {
+            text: "hello".into(),
+        };
         let val = translate_event(&payload, "sess-1").unwrap();
         let update = val["update"].clone();
         assert_eq!(update["kind"], "agent_message_chunk");

@@ -1,19 +1,22 @@
-use loopal_provider::ProviderRegistry;
 use loopal_config::{ProviderConfig, ProvidersConfig, Settings};
+use loopal_provider::ProviderRegistry;
 
 #[test]
 fn test_register_providers_with_config_api_key() {
     // Test that a direct api_key in settings config registers the provider.
-    let settings = Settings { providers: ProvidersConfig {
-        anthropic: Some(ProviderConfig {
-            api_key: Some("direct-config-key".to_string()),
-            api_key_env: None,
-            base_url: None,
-        }),
-        openai: None,
-        google: None,
-        openai_compat: vec![],
-    }, ..Default::default() };
+    let settings = Settings {
+        providers: ProvidersConfig {
+            anthropic: Some(ProviderConfig {
+                api_key: Some("direct-config-key".to_string()),
+                api_key_env: None,
+                base_url: None,
+            }),
+            openai: None,
+            google: None,
+            openai_compat: vec![],
+        },
+        ..Default::default()
+    };
 
     let mut registry = ProviderRegistry::new();
     loopal_kernel::register_providers(&settings, &mut registry);
@@ -32,16 +35,19 @@ fn test_register_providers_with_config_env_key() {
         std::env::set_var(env_var, "test-key-from-env");
     }
 
-    let settings = Settings { providers: ProvidersConfig {
-        anthropic: Some(ProviderConfig {
-            api_key: None,
-            api_key_env: Some(env_var.to_string()),
-            base_url: None,
-        }),
-        openai: None,
-        google: None,
-        openai_compat: vec![],
-    }, ..Default::default() };
+    let settings = Settings {
+        providers: ProvidersConfig {
+            anthropic: Some(ProviderConfig {
+                api_key: None,
+                api_key_env: Some(env_var.to_string()),
+                base_url: None,
+            }),
+            openai: None,
+            google: None,
+            openai_compat: vec![],
+        },
+        ..Default::default()
+    };
 
     let mut registry = ProviderRegistry::new();
     loopal_kernel::register_providers(&settings, &mut registry);
@@ -58,16 +64,19 @@ fn test_register_providers_with_config_env_key() {
 
 #[test]
 fn test_register_providers_anthropic_with_base_url() {
-    let settings = Settings { providers: ProvidersConfig {
-        anthropic: Some(ProviderConfig {
-            api_key: Some("test-anthro-key-base-url".to_string()),
-            api_key_env: None,
-            base_url: Some("https://custom-anthropic.example.com".to_string()),
-        }),
-        openai: None,
-        google: None,
-        openai_compat: vec![],
-    }, ..Default::default() };
+    let settings = Settings {
+        providers: ProvidersConfig {
+            anthropic: Some(ProviderConfig {
+                api_key: Some("test-anthro-key-base-url".to_string()),
+                api_key_env: None,
+                base_url: Some("https://custom-anthropic.example.com".to_string()),
+            }),
+            openai: None,
+            google: None,
+            openai_compat: vec![],
+        },
+        ..Default::default()
+    };
 
     let mut registry = ProviderRegistry::new();
     loopal_kernel::register_providers(&settings, &mut registry);
@@ -92,12 +101,15 @@ fn test_register_providers_anthropic_from_auth_token_env() {
         std::env::set_var(auth_token_env, "test-auth-token-fallback-value");
     }
 
-    let settings = Settings { providers: ProvidersConfig {
-        anthropic: None, // no explicit config — should fall back to env vars
-        openai: None,
-        google: None,
-        openai_compat: vec![],
-    }, ..Default::default() };
+    let settings = Settings {
+        providers: ProvidersConfig {
+            anthropic: None, // no explicit config — should fall back to env vars
+            openai: None,
+            google: None,
+            openai_compat: vec![],
+        },
+        ..Default::default()
+    };
 
     let mut registry = ProviderRegistry::new();
     loopal_kernel::register_providers(&settings, &mut registry);
@@ -149,12 +161,15 @@ fn test_register_providers_anthropic_env_base_url() {
         std::env::set_var(base_url_env, "https://env-base-url.example.com");
     }
 
-    let settings = Settings { providers: ProvidersConfig {
-        anthropic: None, // no config, rely on env
-        openai: None,
-        google: None,
-        openai_compat: vec![],
-    }, ..Default::default() };
+    let settings = Settings {
+        providers: ProvidersConfig {
+            anthropic: None, // no config, rely on env
+            openai: None,
+            google: None,
+            openai_compat: vec![],
+        },
+        ..Default::default()
+    };
 
     let mut registry = ProviderRegistry::new();
     loopal_kernel::register_providers(&settings, &mut registry);

@@ -46,14 +46,19 @@ impl Middleware for MessageSizeGuard {
                     block_idx = idx,
                     "message_size_guard: truncating oversized ToolResult"
                 );
-                truncate_block_content(&mut msg.content[idx], TRUNCATED_MAX_LINES, TRUNCATED_MAX_BYTES);
+                truncate_block_content(
+                    &mut msg.content[idx],
+                    TRUNCATED_MAX_LINES,
+                    TRUNCATED_MAX_BYTES,
+                );
                 truncated_count += 1;
             }
         }
 
         if truncated_count == 0 {
             tracing::debug!(
-                threshold, messages = ctx.messages.len(),
+                threshold,
+                messages = ctx.messages.len(),
                 "message_size_guard: all messages within budget, no action"
             );
         }

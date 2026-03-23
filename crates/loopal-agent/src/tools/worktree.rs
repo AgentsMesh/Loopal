@@ -16,7 +16,9 @@ pub struct EnterWorktreeTool;
 
 #[async_trait]
 impl Tool for EnterWorktreeTool {
-    fn name(&self) -> &str { "EnterWorktree" }
+    fn name(&self) -> &str {
+        "EnterWorktree"
+    }
     fn description(&self) -> &str {
         "Create a git worktree and switch the session's working directory into it."
     }
@@ -28,20 +30,28 @@ impl Tool for EnterWorktreeTool {
             }
         })
     }
-    fn permission(&self) -> PermissionLevel { PermissionLevel::Supervised }
+    fn permission(&self) -> PermissionLevel {
+        PermissionLevel::Supervised
+    }
 
     async fn execute(
-        &self, input: serde_json::Value, ctx: &ToolContext,
+        &self,
+        input: serde_json::Value,
+        ctx: &ToolContext,
     ) -> Result<ToolResult, LoopalError> {
         let shared = extract_shared(ctx)?;
         if shared.worktree_state.lock().await.is_some() {
-            return Ok(ToolResult::error("Already in a worktree. Call ExitWorktree first."));
+            return Ok(ToolResult::error(
+                "Already in a worktree. Call ExitWorktree first.",
+            ));
         }
         let repo_root = match loopal_git::repo_root(&shared.cwd) {
             Some(r) => r,
             None => return Ok(ToolResult::error("Not inside a git repository.")),
         };
-        let name = input.get("name").and_then(|v| v.as_str())
+        let name = input
+            .get("name")
+            .and_then(|v| v.as_str())
             .map(String::from)
             .unwrap_or_else(|| format!("wt-{}", &uuid::Uuid::new_v4().to_string()[..8]));
 
@@ -63,7 +73,9 @@ impl Tool for EnterWorktreeTool {
 
         Ok(ToolResult::success(format!(
             "Worktree '{}' created at {}.\nBranch: {}\nWorking directory switched.",
-            info.name, info.path.display(), info.branch,
+            info.name,
+            info.path.display(),
+            info.branch,
         )))
     }
 }
@@ -76,7 +88,9 @@ pub struct ExitWorktreeTool;
 
 #[async_trait]
 impl Tool for ExitWorktreeTool {
-    fn name(&self) -> &str { "ExitWorktree" }
+    fn name(&self) -> &str {
+        "ExitWorktree"
+    }
     fn description(&self) -> &str {
         "Exit the current worktree session and return to the original directory."
     }
@@ -96,10 +110,14 @@ impl Tool for ExitWorktreeTool {
             "required": ["action"]
         })
     }
-    fn permission(&self) -> PermissionLevel { PermissionLevel::Supervised }
+    fn permission(&self) -> PermissionLevel {
+        PermissionLevel::Supervised
+    }
 
     async fn execute(
-        &self, input: serde_json::Value, ctx: &ToolContext,
+        &self,
+        input: serde_json::Value,
+        ctx: &ToolContext,
     ) -> Result<ToolResult, LoopalError> {
         let shared = extract_shared(ctx)?;
         execute_exit(&shared, &input, ctx).await
@@ -107,7 +125,9 @@ impl Tool for ExitWorktreeTool {
 }
 
 async fn execute_exit(
-    shared: &Arc<AgentShared>, input: &serde_json::Value, ctx: &ToolContext,
+    shared: &Arc<AgentShared>,
+    input: &serde_json::Value,
+    ctx: &ToolContext,
 ) -> Result<ToolResult, LoopalError> {
     let state = shared.worktree_state.lock().await.take();
     let state = match state {
@@ -115,10 +135,16 @@ async fn execute_exit(
         None => return Ok(ToolResult::success("No active worktree session.")),
     };
 
-    let action = input.get("action").and_then(|v| v.as_str()).unwrap_or("keep");
+    let action = input
+        .get("action")
+        .and_then(|v| v.as_str())
+        .unwrap_or("keep");
 
     if action == "remove" {
-        let force = input.get("discard_changes").and_then(|v| v.as_bool()).unwrap_or(false);
+        let force = input
+            .get("discard_changes")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         if !force {
             match loopal_git::worktree_has_changes(&state.worktree_path) {
                 Ok(true) => {
@@ -129,9 +155,9 @@ async fn execute_exit(
                 }
                 Err(e) => {
                     *shared.worktree_state.lock().await = Some(state);
-                    return Ok(ToolResult::error(
-                        format!("Cannot check worktree status: {e}"),
-                    ));
+                    return Ok(ToolResult::error(format!(
+                        "Cannot check worktree status: {e}"
+                    )));
                 }
                 Ok(false) => {} // clean — proceed with removal
             }
@@ -150,12 +176,15 @@ async fn execute_exit(
     if action == "remove" {
         Ok(ToolResult::success(format!(
             "Worktree '{}' removed. Restored to {}.",
-            state.worktree_name, state.original_cwd.display(),
+            state.worktree_name,
+            state.original_cwd.display(),
         )))
     } else {
         Ok(ToolResult::success(format!(
             "Worktree '{}' kept at {}. Restored to {}.",
-            state.worktree_name, state.worktree_path.display(), state.original_cwd.display(),
+            state.worktree_name,
+            state.worktree_path.display(),
+            state.original_cwd.display(),
         )))
     }
 }

@@ -54,15 +54,13 @@ fn handle_model_picker_key(app: &mut App, key: &KeyEvent) -> InputAction {
                 app.sub_page = None;
                 app.last_esc_time = None;
                 match thinking_json {
-                    Some(json) => InputAction::SlashCommand(
-                        SlashCommandAction::ModelAndThinkingSelected {
+                    Some(json) => {
+                        InputAction::SlashCommand(SlashCommandAction::ModelAndThinkingSelected {
                             model,
                             thinking_json: json,
-                        },
-                    ),
-                    None => InputAction::SlashCommand(
-                        SlashCommandAction::ModelSelected(model),
-                    ),
+                        })
+                    }
+                    None => InputAction::SlashCommand(SlashCommandAction::ModelSelected(model)),
                 }
             } else {
                 app.sub_page = None;

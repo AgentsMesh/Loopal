@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
 use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::require_str;
 
@@ -43,9 +43,7 @@ impl Tool for DeleteTool {
         let kind = if info.is_dir { "directory" } else { "file" };
 
         match ctx.backend.remove(path_raw).await {
-            Ok(()) => Ok(ToolResult::success(format!(
-                "Deleted {path_raw} ({kind})"
-            ))),
+            Ok(()) => Ok(ToolResult::success(format!("Deleted {path_raw} ({kind})"))),
             Err(e) => Ok(ToolResult::error(e.to_string())),
         }
     }

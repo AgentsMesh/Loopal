@@ -1,10 +1,10 @@
 //! Edge cases and regression tests for tool call/result handling.
 
+use loopal_protocol::ControlCommand;
+use loopal_protocol::{AgentEvent, AgentEventPayload, UserQuestionResponse};
 use loopal_session::{DisplayMessage, DisplayToolCall, SessionController};
 use loopal_tui::app::App;
 use loopal_tui::command::builtin_entries;
-use loopal_protocol::ControlCommand;
-use loopal_protocol::{AgentEvent, AgentEventPayload, UserQuestionResponse};
 use tokio::sync::mpsc;
 
 fn make_app() -> App {
@@ -16,7 +16,9 @@ fn make_app() -> App {
         "act".to_string(),
         control_tx,
         perm_tx,
-        question_tx, Default::default(), std::sync::Arc::new(tokio::sync::Notify::new()),
+        question_tx,
+        Default::default(),
+        std::sync::Arc::new(tokio::sync::Notify::new()),
     );
     App::new(session, builtin_entries(), std::env::temp_dir())
 }
@@ -24,12 +26,13 @@ fn make_app() -> App {
 #[test]
 fn test_handle_tool_result_no_matching_pending() {
     let app = make_app();
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::ToolResult {
-        id: "orphan".to_string(),
-        name: "bash".to_string(),
-        result: "orphan result".to_string(),
-        is_error: false,
-    }));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::ToolResult {
+            id: "orphan".to_string(),
+            name: "bash".to_string(),
+            result: "orphan result".to_string(),
+            is_error: false,
+        }));
     // Should not crash
 }
 
@@ -45,11 +48,12 @@ fn test_tool_call_without_prior_assistant_message_creates_one() {
             image_count: 0,
         });
     }
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::ToolCall {
-        id: "tc-new".to_string(),
-        name: "Read".to_string(),
-        input: serde_json::json!({}),
-    }));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::ToolCall {
+            id: "tc-new".to_string(),
+            name: "Read".to_string(),
+            input: serde_json::json!({}),
+        }));
 
     let state = app.session.lock();
     assert_eq!(state.messages.len(), 2);
@@ -60,40 +64,50 @@ fn test_tool_call_without_prior_assistant_message_creates_one() {
 #[test]
 fn test_tool_result_error_updates_matching_tool() {
     let app = make_app();
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::ToolCall {
-        id: "tc-err".to_string(),
-        name: "Write".to_string(),
-        input: serde_json::json!({}),
-    }));
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::ToolResult {
-        id: "tc-err".to_string(),
-        name: "Write".to_string(),
-        result: "failed!".to_string(),
-        is_error: true,
-    }));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::ToolCall {
+            id: "tc-err".to_string(),
+            name: "Write".to_string(),
+            input: serde_json::json!({}),
+        }));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::ToolResult {
+            id: "tc-err".to_string(),
+            name: "Write".to_string(),
+            result: "failed!".to_string(),
+            is_error: true,
+        }));
 
     let state = app.session.lock();
     assert_eq!(state.messages[0].tool_calls[0].status, "error");
-    assert_eq!(state.messages[0].tool_calls[0].result, Some("failed!".into()));
+    assert_eq!(
+        state.messages[0].tool_calls[0].result,
+        Some("failed!".into())
+    );
     assert!(state.messages[0].tool_calls[0].summary.contains("Write"));
 }
 
 #[test]
 fn test_tool_result_not_found_when_different_name() {
     let app = make_app();
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::ToolCall {
-        id: "tc-1".to_string(),
-        name: "bash".to_string(),
-        input: serde_json::json!({}),
-    }));
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::ToolResult {
-        id: "tc-1".to_string(),
-        name: "Read".to_string(),
-        result: "done".to_string(),
-        is_error: false,
-    }));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::ToolCall {
+            id: "tc-1".to_string(),
+            name: "bash".to_string(),
+            input: serde_json::json!({}),
+        }));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::ToolResult {
+            id: "tc-1".to_string(),
+            name: "Read".to_string(),
+            result: "done".to_string(),
+            is_error: false,
+        }));
 
-    assert_eq!(app.session.lock().messages[0].tool_calls[0].status, "pending");
+    assert_eq!(
+        app.session.lock().messages[0].tool_calls[0].status,
+        "pending"
+    );
 }
 
 #[test]
@@ -115,12 +129,13 @@ fn test_tool_result_with_multibyte_utf8_no_panic() {
     }
 
     let chinese_text = "# Coding Agent 架构综合分析与最终建议报告\n\n> 分析日期: 2026-03-13\n> 输入来源: 5 份架构分析报告";
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::ToolResult {
-        id: "tc-1".to_string(),
-        name: "Read".to_string(),
-        result: chinese_text.to_string(),
-        is_error: false,
-    }));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::ToolResult {
+            id: "tc-1".to_string(),
+            name: "Read".to_string(),
+            result: chinese_text.to_string(),
+            is_error: false,
+        }));
 
     let state = app.session.lock();
     let tc = &state.messages[0].tool_calls[0];

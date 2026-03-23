@@ -8,10 +8,10 @@ use loopal_agent::router::MessageRouter;
 use loopal_agent::shared::AgentShared;
 use loopal_agent::task_store::TaskStore;
 use loopal_agent::tools::send_message::SendMessageTool;
-use loopal_kernel::Kernel;
 use loopal_config::Settings;
-use loopal_protocol::Envelope;
+use loopal_kernel::Kernel;
 use loopal_protocol::AgentEvent;
+use loopal_protocol::Envelope;
 use loopal_tool_api::{Tool, ToolContext};
 use tokio::sync::{Mutex, mpsc};
 
@@ -41,13 +41,16 @@ async fn make_shared_and_ctx() -> (Arc<AgentShared>, ToolContext, mpsc::Receiver
 
     let shared_any: Arc<dyn std::any::Any + Send + Sync> = Arc::new(shared.clone());
     let backend = loopal_backend::LocalBackend::new(
-        std::env::temp_dir(), None, loopal_backend::ResourceLimits::default(),
+        std::env::temp_dir(),
+        None,
+        loopal_backend::ResourceLimits::default(),
     );
     let ctx = ToolContext {
         backend,
         session_id: "test".to_string(),
         shared: Some(shared_any),
-        pending_cwd_switch: Default::default(), memory_channel: None,
+        pending_cwd_switch: Default::default(),
+        memory_channel: None,
     };
 
     (shared, ctx, target_rx)
@@ -58,11 +61,17 @@ async fn test_send_message_routes_via_router() {
     let (_shared, ctx, mut target_rx) = make_shared_and_ctx().await;
     let tool = SendMessageTool;
 
-    let result = tool.execute(serde_json::json!({
-        "type": "message",
-        "recipient": "worker",
-        "content": "hello from router"
-    }), &ctx).await.unwrap();
+    let result = tool
+        .execute(
+            serde_json::json!({
+                "type": "message",
+                "recipient": "worker",
+                "content": "hello from router"
+            }),
+            &ctx,
+        )
+        .await
+        .unwrap();
 
     assert!(!result.is_error);
     assert!(result.content.contains("sent to 'worker'"));
@@ -78,11 +87,17 @@ async fn test_send_message_to_unknown_agent() {
     let (_shared, ctx, _) = make_shared_and_ctx().await;
     let tool = SendMessageTool;
 
-    let result = tool.execute(serde_json::json!({
-        "type": "message",
-        "recipient": "nonexistent",
-        "content": "hello"
-    }), &ctx).await.unwrap();
+    let result = tool
+        .execute(
+            serde_json::json!({
+                "type": "message",
+                "recipient": "nonexistent",
+                "content": "hello"
+            }),
+            &ctx,
+        )
+        .await
+        .unwrap();
 
     assert!(result.is_error);
     assert!(result.content.contains("nonexistent"));
@@ -97,10 +112,16 @@ async fn test_send_message_broadcast_via_router() {
     shared.router.register("helper", tx2).await.unwrap();
 
     let tool = SendMessageTool;
-    let result = tool.execute(serde_json::json!({
-        "type": "broadcast",
-        "content": "attention everyone"
-    }), &ctx).await.unwrap();
+    let result = tool
+        .execute(
+            serde_json::json!({
+                "type": "broadcast",
+                "content": "attention everyone"
+            }),
+            &ctx,
+        )
+        .await
+        .unwrap();
 
     assert!(!result.is_error);
     assert!(result.content.contains("agents"));

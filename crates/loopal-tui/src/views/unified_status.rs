@@ -23,7 +23,7 @@ pub fn render_unified_status(f: &mut Frame, state: &SessionState, area: Rect) {
     spans.push(Span::raw(" "));
     let (icon, icon_style, label) = status_icon_and_label(state, elapsed, is_active);
     spans.push(Span::styled(icon, icon_style));
-    spans.push(Span::styled(format!(" {}", label), icon_style));
+    spans.push(Span::styled(format!(" {label}"), icon_style));
     spans.push(Span::raw("  "));
     let time_style = if is_active {
         Style::default().fg(Color::White)
@@ -68,7 +68,7 @@ pub fn render_unified_status(f: &mut Frame, state: &SessionState, area: Rect) {
         let pct = (state.cache_read_tokens as f64 / total as f64 * 100.0) as u32;
         spans.push(Span::raw("  "));
         spans.push(Span::styled(
-            format!("cache:{}%", pct),
+            format!("cache:{pct}%"),
             Style::default().fg(Color::Green),
         ));
     }
@@ -98,20 +98,44 @@ fn status_icon_and_label(
 ) -> (String, Style, &'static str) {
     if state.thinking_active {
         let frame = spinner_frame(elapsed);
-        (frame.to_string(), Style::default().fg(Color::Magenta), "Thinking")
+        (
+            frame.to_string(),
+            Style::default().fg(Color::Magenta),
+            "Thinking",
+        )
     } else if !state.streaming_text.is_empty() {
         let frame = spinner_frame(elapsed);
-        (frame.to_string(), Style::default().fg(Color::Green), "Streaming")
+        (
+            frame.to_string(),
+            Style::default().fg(Color::Green),
+            "Streaming",
+        )
     } else if state.pending_permission.is_some() {
-        ("●".to_string(), Style::default().fg(Color::Yellow), "Waiting")
+        (
+            "●".to_string(),
+            Style::default().fg(Color::Yellow),
+            "Waiting",
+        )
     } else if !state.agent_idle {
         let frame = spinner_frame(elapsed);
-        (frame.to_string(), Style::default().fg(Color::Cyan), "Working")
+        (
+            frame.to_string(),
+            Style::default().fg(Color::Cyan),
+            "Working",
+        )
     } else if has_live_subagents(state) {
         let frame = spinner_frame(elapsed);
-        (frame.to_string(), Style::default().fg(Color::Blue), "Agents")
+        (
+            frame.to_string(),
+            Style::default().fg(Color::Blue),
+            "Agents",
+        )
     } else {
-        ("●".to_string(), Style::default().fg(Color::DarkGray), "Idle")
+        (
+            "●".to_string(),
+            Style::default().fg(Color::DarkGray),
+            "Idle",
+        )
     }
 }
 
@@ -131,10 +155,12 @@ fn is_agent_active(state: &SessionState) -> bool {
 /// True if any sub-agent is still starting or running.
 fn has_live_subagents(state: &SessionState) -> bool {
     use loopal_protocol::AgentStatus;
-    state.agents.values().any(|a| matches!(
-        a.observable.status,
-        AgentStatus::Starting | AgentStatus::Running
-    ))
+    state.agents.values().any(|a| {
+        matches!(
+            a.observable.status,
+            AgentStatus::Starting | AgentStatus::Running
+        )
+    })
 }
 
 fn context_info(state: &SessionState) -> String {
@@ -162,7 +188,7 @@ fn dim_style() -> Style {
 pub fn format_duration(d: std::time::Duration) -> String {
     let secs = d.as_secs();
     if secs < 60 {
-        format!("{}s", secs)
+        format!("{secs}s")
     } else if secs < 3600 {
         format!("{}m{:02}s", secs / 60, secs % 60)
     } else {

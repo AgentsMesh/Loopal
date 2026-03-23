@@ -18,11 +18,9 @@ impl OutputMode {
             None | Some("files_with_matches") => Ok(Self::FilesWithMatches),
             Some("content") => Ok(Self::Content),
             Some("count") => Ok(Self::Count),
-            Some(other) => Err(LoopalError::Tool(
-                loopal_error::ToolError::InvalidInput(format!(
-                    "Invalid output_mode: {other}. Use content, files_with_matches, or count"
-                )),
-            )),
+            Some(other) => Err(LoopalError::Tool(loopal_error::ToolError::InvalidInput(
+                format!("Invalid output_mode: {other}. Use content, files_with_matches, or count"),
+            ))),
         }
     }
 }
@@ -91,26 +89,37 @@ pub fn search_files(
         if !matches_filters(&path, include_glob, opts.type_extensions.as_deref()) {
             continue;
         }
-        let Ok(content) = std::fs::read_to_string(&path) else { continue };
+        let Ok(content) = std::fs::read_to_string(&path) else {
+            continue;
+        };
         let lines: Vec<&str> = content.lines().collect();
         let match_indices = find_match_indices(&content, &lines, re, opts.multiline);
         if match_indices.is_empty() {
             continue;
         }
         total += match_indices.len();
-        let groups =
-            collect_context_groups(&lines, &match_indices, opts.context_before, opts.context_after);
+        let groups = collect_context_groups(
+            &lines,
+            &match_indices,
+            opts.context_before,
+            opts.context_after,
+        );
         file_matches.push((path, groups));
         if total >= max_total_matches {
             break;
         }
     }
 
-    GrepResults { file_matches, total_match_count: total }
+    GrepResults {
+        file_matches,
+        total_match_count: total,
+    }
 }
 
 fn collect_file_entries(search_path: &PathBuf) -> Vec<PathBuf> {
-    if search_path.is_file() { return vec![search_path.clone()]; }
+    if search_path.is_file() {
+        return vec![search_path.clone()];
+    }
     WalkBuilder::new(search_path)
         .follow_links(true)
         .build()
@@ -188,9 +197,16 @@ fn collect_context_groups(
         merged.push(r);
     }
 
-    merged.iter().map(|&(start, end)| {
-        (start..=end).map(|i| MatchLine {
-            line_num: i + 1, content: lines[i].to_string(), is_match: match_indices.contains(&i),
-        }).collect()
-    }).collect()
+    merged
+        .iter()
+        .map(|&(start, end)| {
+            (start..=end)
+                .map(|i| MatchLine {
+                    line_num: i + 1,
+                    content: lines[i].to_string(),
+                    is_match: match_indices.contains(&i),
+                })
+                .collect()
+        })
+        .collect()
 }

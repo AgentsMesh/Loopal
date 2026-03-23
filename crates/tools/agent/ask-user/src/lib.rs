@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
 use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 pub struct AskUserTool;
 

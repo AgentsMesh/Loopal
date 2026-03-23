@@ -35,7 +35,10 @@ fn test_envelope_content_preview_long_truncated() {
 #[test]
 fn test_envelope_serde_roundtrip() {
     let env = Envelope::new(
-        MessageSource::Channel { channel: "general".into(), from: "bot".into() },
+        MessageSource::Channel {
+            channel: "general".into(),
+            from: "bot".into(),
+        },
         "worker-1",
         "task update",
     );

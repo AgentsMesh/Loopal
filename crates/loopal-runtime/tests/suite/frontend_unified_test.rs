@@ -1,10 +1,10 @@
-use loopal_runtime::frontend::{AutoDenyHandler, AutoCancelQuestionHandler, UnifiedFrontend};
-use loopal_runtime::agent_input::AgentInput;
+use loopal_protocol::AgentEventPayload;
 use loopal_protocol::AgentMode;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::{Envelope, MessageSource};
-use loopal_protocol::AgentEventPayload;
+use loopal_runtime::agent_input::AgentInput;
 use loopal_runtime::frontend::AgentFrontend;
+use loopal_runtime::frontend::{AutoCancelQuestionHandler, AutoDenyHandler, UnifiedFrontend};
 use loopal_tool_api::PermissionDecision;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
@@ -18,7 +18,12 @@ fn make_unified(
     handler: Box<dyn loopal_runtime::frontend::PermissionHandler>,
 ) -> UnifiedFrontend {
     UnifiedFrontend::new(
-        agent_name, event_tx, mailbox_rx, control_rx, cancel_token, handler,
+        agent_name,
+        event_tx,
+        mailbox_rx,
+        control_rx,
+        cancel_token,
+        handler,
         Box::new(AutoCancelQuestionHandler),
     )
 }
@@ -31,7 +36,14 @@ async fn test_unified_emit_root_delivers_event() {
     let (_mb_tx, mb_rx) = mpsc::channel(16);
     let (_ctrl_tx, ctrl_rx) = mpsc::channel(16);
 
-    let f = make_unified(None, event_tx, mb_rx, ctrl_rx, None, Box::new(AutoDenyHandler));
+    let f = make_unified(
+        None,
+        event_tx,
+        mb_rx,
+        ctrl_rx,
+        None,
+        Box::new(AutoDenyHandler),
+    );
     f.emit(AgentEventPayload::Started).await.unwrap();
 
     let event = event_rx.recv().await.unwrap();
@@ -46,7 +58,12 @@ async fn test_unified_emit_wraps_agent_name() {
     let (_ctrl_tx, ctrl_rx) = mpsc::channel(16);
 
     let f = make_unified(
-        Some("researcher".into()), event_tx, mb_rx, ctrl_rx, None, Box::new(AutoDenyHandler),
+        Some("researcher".into()),
+        event_tx,
+        mb_rx,
+        ctrl_rx,
+        None,
+        Box::new(AutoDenyHandler),
     );
     f.emit(AgentEventPayload::Finished).await.unwrap();
 
@@ -62,7 +79,12 @@ async fn test_unified_emit_subagent_best_effort() {
     drop(event_rx);
 
     let f = make_unified(
-        Some("sub".into()), event_tx, mb_rx, ctrl_rx, None, Box::new(AutoDenyHandler),
+        Some("sub".into()),
+        event_tx,
+        mb_rx,
+        ctrl_rx,
+        None,
+        Box::new(AutoDenyHandler),
     );
     // Should NOT error — best-effort for sub-agents
     assert!(f.emit(AgentEventPayload::Started).await.is_ok());
@@ -76,7 +98,14 @@ async fn test_unified_recv_input_from_envelope() {
     let (mb_tx, mb_rx) = mpsc::channel(16);
     let (_ctrl_tx, ctrl_rx) = mpsc::channel(16);
 
-    let f = make_unified(None, event_tx, mb_rx, ctrl_rx, None, Box::new(AutoDenyHandler));
+    let f = make_unified(
+        None,
+        event_tx,
+        mb_rx,
+        ctrl_rx,
+        None,
+        Box::new(AutoDenyHandler),
+    );
 
     let env = Envelope::new(MessageSource::Human, "main", "hello");
     mb_tx.send(env).await.unwrap();
@@ -99,13 +128,25 @@ async fn test_unified_recv_input_from_control_mode_switch() {
     let (_mb_tx, mb_rx) = mpsc::channel(16);
     let (ctrl_tx, ctrl_rx) = mpsc::channel(16);
 
-    let f = make_unified(None, event_tx, mb_rx, ctrl_rx, None, Box::new(AutoDenyHandler));
-    ctrl_tx.send(ControlCommand::ModeSwitch(AgentMode::Plan)).await.unwrap();
+    let f = make_unified(
+        None,
+        event_tx,
+        mb_rx,
+        ctrl_rx,
+        None,
+        Box::new(AutoDenyHandler),
+    );
+    ctrl_tx
+        .send(ControlCommand::ModeSwitch(AgentMode::Plan))
+        .await
+        .unwrap();
 
     let cmd = f.recv_input().await;
     assert!(matches!(
         cmd,
-        Some(AgentInput::Control(ControlCommand::ModeSwitch(AgentMode::Plan)))
+        Some(AgentInput::Control(ControlCommand::ModeSwitch(
+            AgentMode::Plan
+        )))
     ));
 }
 
@@ -115,7 +156,14 @@ async fn test_unified_recv_input_from_control_clear() {
     let (_mb_tx, mb_rx) = mpsc::channel(16);
     let (ctrl_tx, ctrl_rx) = mpsc::channel(16);
 
-    let f = make_unified(None, event_tx, mb_rx, ctrl_rx, None, Box::new(AutoDenyHandler));
+    let f = make_unified(
+        None,
+        event_tx,
+        mb_rx,
+        ctrl_rx,
+        None,
+        Box::new(AutoDenyHandler),
+    );
     ctrl_tx.send(ControlCommand::Clear).await.unwrap();
 
     assert!(matches!(
@@ -132,7 +180,14 @@ async fn test_unified_shutdown_returns_none() {
     let (mb_tx, mb_rx) = mpsc::channel(16);
     let (ctrl_tx, ctrl_rx) = mpsc::channel(16);
 
-    let f = make_unified(None, event_tx, mb_rx, ctrl_rx, None, Box::new(AutoDenyHandler));
+    let f = make_unified(
+        None,
+        event_tx,
+        mb_rx,
+        ctrl_rx,
+        None,
+        Box::new(AutoDenyHandler),
+    );
     drop(mb_tx);
     drop(ctrl_tx);
 
@@ -149,7 +204,12 @@ async fn test_unified_cancel_token_breaks_recv() {
     let token = CancellationToken::new();
 
     let f = make_unified(
-        None, event_tx, mb_rx, ctrl_rx, Some(token.clone()), Box::new(AutoDenyHandler),
+        None,
+        event_tx,
+        mb_rx,
+        ctrl_rx,
+        Some(token.clone()),
+        Box::new(AutoDenyHandler),
     );
     tokio::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
@@ -168,7 +228,12 @@ async fn test_unified_drain_pending() {
     let (_ctrl_tx, ctrl_rx) = mpsc::channel(16);
 
     let f = make_unified(
-        Some("sub".into()), event_tx, mb_rx, ctrl_rx, None, Box::new(AutoDenyHandler),
+        Some("sub".into()),
+        event_tx,
+        mb_rx,
+        ctrl_rx,
+        None,
+        Box::new(AutoDenyHandler),
     );
 
     let e1 = Envelope::new(MessageSource::Agent("lead".into()), "sub", "task A");
@@ -193,8 +258,15 @@ async fn test_unified_permission_auto_deny() {
     let (_ctrl_tx, ctrl_rx) = mpsc::channel(16);
 
     let f = make_unified(
-        Some("sub".into()), event_tx, mb_rx, ctrl_rx, None, Box::new(AutoDenyHandler),
+        Some("sub".into()),
+        event_tx,
+        mb_rx,
+        ctrl_rx,
+        None,
+        Box::new(AutoDenyHandler),
     );
-    let d = f.request_permission("id1", "Bash", &serde_json::json!({})).await;
+    let d = f
+        .request_permission("id1", "Bash", &serde_json::json!({}))
+        .await;
     assert_eq!(d, PermissionDecision::Deny);
 }

@@ -27,8 +27,8 @@ pub struct SessionStore {
 impl SessionStore {
     /// Create a store using the default global directory (~/.loopal).
     pub fn new() -> Result<Self, StorageError> {
-        let base_dir = loopal_config::global_config_dir()
-            .map_err(|_| StorageError::HomeDirNotFound)?;
+        let base_dir =
+            loopal_config::global_config_dir().map_err(|_| StorageError::HomeDirNotFound)?;
         Ok(Self { base_dir })
     }
 

@@ -1,7 +1,7 @@
 use futures::StreamExt;
-use loopal_provider::AnthropicProvider;
 use loopal_error::{LoopalError, ProviderError};
 use loopal_message::Message;
+use loopal_provider::AnthropicProvider;
 use loopal_provider_api::{ChatParams, Provider, StreamChunk};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -31,9 +31,7 @@ async fn collect_chunks(
     chunks
 }
 
-fn expect_err(
-    result: Result<loopal_provider_api::ChatStream, LoopalError>,
-) -> LoopalError {
+fn expect_err(result: Result<loopal_provider_api::ChatStream, LoopalError>) -> LoopalError {
     match result {
         Err(e) => e,
         Ok(_) => panic!("expected Err, got Ok"),
@@ -54,15 +52,11 @@ data: {\"type\":\"message_stop\"}\n\n";
 
     Mock::given(method("POST"))
         .and(path("/v1/messages"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_raw(sse_body, "text/event-stream"),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_raw(sse_body, "text/event-stream"))
         .mount(&mock_server)
         .await;
 
-    let provider = AnthropicProvider::new("test-key".to_string())
-        .with_base_url(mock_server.uri());
+    let provider = AnthropicProvider::new("test-key".to_string()).with_base_url(mock_server.uri());
 
     let stream = provider.stream_chat(&test_chat_params()).await.unwrap();
     let chunks = collect_chunks(stream).await;
@@ -77,7 +71,7 @@ data: {\"type\":\"message_stop\"}\n\n";
             }
             Ok(StreamChunk::Done { .. }) => got_done = true,
             Ok(StreamChunk::Usage { .. }) => {}
-            other => panic!("unexpected chunk: {:?}", other),
+            other => panic!("unexpected chunk: {other:?}"),
         }
     }
     assert!(got_text, "expected a Text chunk");
@@ -99,22 +93,18 @@ data: {\"type\":\"message_stop\"}\n\n";
 
     Mock::given(method("POST"))
         .and(path("/v1/messages"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_raw(sse_body, "text/event-stream"),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_raw(sse_body, "text/event-stream"))
         .mount(&mock_server)
         .await;
 
-    let provider = AnthropicProvider::new("test-key".to_string())
-        .with_base_url(mock_server.uri());
+    let provider = AnthropicProvider::new("test-key".to_string()).with_base_url(mock_server.uri());
 
     let stream = provider.stream_chat(&test_chat_params()).await.unwrap();
     let chunks = collect_chunks(stream).await;
 
     let mut got_tool_use = false;
-    for chunk in &chunks {
-        if let Ok(StreamChunk::ToolUse { id, name, input }) = chunk {
+    for chunk in chunks.into_iter().flatten() {
+        if let StreamChunk::ToolUse { id, name, input } = chunk {
             assert_eq!(id, "tool_1");
             assert_eq!(name, "read_file");
             assert_eq!(input["path"], "main.rs");
@@ -138,8 +128,7 @@ async fn test_anthropic_stream_chat_rate_limited() {
         .mount(&mock_server)
         .await;
 
-    let provider = AnthropicProvider::new("test-key".to_string())
-        .with_base_url(mock_server.uri());
+    let provider = AnthropicProvider::new("test-key".to_string()).with_base_url(mock_server.uri());
 
     let result = provider.stream_chat(&test_chat_params()).await;
     let err = expect_err(result);
@@ -147,7 +136,7 @@ async fn test_anthropic_stream_chat_rate_limited() {
         LoopalError::Provider(ProviderError::RateLimited { retry_after_ms }) => {
             assert_eq!(*retry_after_ms, 5000);
         }
-        other => panic!("expected RateLimited error, got: {:?}", other),
+        other => panic!("expected RateLimited error, got: {other:?}"),
     }
 }
 
@@ -158,14 +147,12 @@ async fn test_anthropic_stream_chat_server_error() {
     Mock::given(method("POST"))
         .and(path("/v1/messages"))
         .respond_with(
-            ResponseTemplate::new(500)
-                .set_body_string("{\"error\":\"internal server error\"}"),
+            ResponseTemplate::new(500).set_body_string("{\"error\":\"internal server error\"}"),
         )
         .mount(&mock_server)
         .await;
 
-    let provider = AnthropicProvider::new("test-key".to_string())
-        .with_base_url(mock_server.uri());
+    let provider = AnthropicProvider::new("test-key".to_string()).with_base_url(mock_server.uri());
 
     let result = provider.stream_chat(&test_chat_params()).await;
     match expect_err(result) {
@@ -173,7 +160,6 @@ async fn test_anthropic_stream_chat_server_error() {
             assert_eq!(status, 500);
             assert!(message.contains("internal server error"));
         }
-        other => panic!("expected Api error, got: {:?}", other),
+        other => panic!("expected Api error, got: {other:?}"),
     }
 }
-

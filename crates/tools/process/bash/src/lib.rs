@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use loopal_error::{LoopalError, ToolIoError};
-use loopal_tool_api::{truncate_output, PermissionLevel, Tool, ToolContext, ToolResult};
-use serde_json::{json, Value};
+use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult, truncate_output};
+use serde_json::{Value, json};
 
 /// BashTool executes shell commands. OS-level sandbox wrapping is handled
 /// by the SandboxedTool decorator — BashTool itself is a plain executor.

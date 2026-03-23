@@ -68,15 +68,17 @@ impl Middleware for SmartCompact {
             };
             let content = msg.text_content();
             if !content.is_empty() {
-                conversation_text.push_str(&format!("{}: {}\n\n", role, content));
+                conversation_text.push_str(&format!("{role}: {content}\n\n"));
             }
             // Also summarize tool interactions
             for block in &msg.content {
                 match block {
                     ContentBlock::ToolUse { name, .. } => {
-                        conversation_text.push_str(&format!("[Tool call: {}]\n", name));
+                        conversation_text.push_str(&format!("[Tool call: {name}]\n"));
                     }
-                    ContentBlock::ToolResult { content, is_error, .. } => {
+                    ContentBlock::ToolResult {
+                        content, is_error, ..
+                    } => {
                         let status = if *is_error { "error" } else { "ok" };
                         let preview = if content.len() > 200 {
                             let mut end = 200;
@@ -87,7 +89,8 @@ impl Middleware for SmartCompact {
                         } else {
                             content.clone()
                         };
-                        conversation_text.push_str(&format!("[Tool result ({}): {}]\n", status, preview));
+                        conversation_text
+                            .push_str(&format!("[Tool result ({status}): {preview}]\n"));
                     }
                     _ => {}
                 }
@@ -99,8 +102,7 @@ impl Middleware for SmartCompact {
             "Summarize the following conversation concisely. \
              Focus on key decisions, findings, file changes, and important context. \
              Be brief but preserve critical information needed for continuing the conversation.\n\n\
-             ---\n{}\n---\n\nProvide a concise summary:",
-            conversation_text
+             ---\n{conversation_text}\n---\n\nProvide a concise summary:"
         );
 
         let summary_params = ChatParams {
@@ -127,10 +129,12 @@ impl Middleware for SmartCompact {
                             compact_messages(&mut ctx.messages, self.keep_last);
                             return Ok(());
                         }
-                        Ok(StreamChunk::Thinking { .. }
+                        Ok(
+                            StreamChunk::Thinking { .. }
                             | StreamChunk::ThinkingSignature { .. }
                             | StreamChunk::ToolUse { .. }
-                            | StreamChunk::Usage { .. }) => {}
+                            | StreamChunk::Usage { .. },
+                        ) => {}
                     }
                 }
 

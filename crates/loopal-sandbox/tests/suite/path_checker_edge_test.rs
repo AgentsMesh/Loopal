@@ -1,14 +1,9 @@
 use std::path::PathBuf;
 
+use loopal_config::{NetworkPolicy, PathDecision, ResolvedPolicy, SandboxPolicy};
 use loopal_sandbox::path_checker::check_path;
-use loopal_config::{
-    NetworkPolicy, PathDecision, ResolvedPolicy, SandboxPolicy,
-};
 
-fn workspace_policy_with_deny(
-    cwd: &str,
-    deny_write: Vec<String>,
-) -> ResolvedPolicy {
+fn workspace_policy_with_deny(cwd: &str, deny_write: Vec<String>) -> ResolvedPolicy {
     let cwd_path = PathBuf::from(cwd);
     let cwd_canon = cwd_path.canonicalize().unwrap_or(cwd_path);
     let tmp_canon = std::env::temp_dir()
@@ -41,10 +36,7 @@ fn multiple_deny_globs_checked() {
     let tmp = std::env::temp_dir();
     let policy = workspace_policy_with_deny(
         tmp.to_str().unwrap(),
-        vec![
-            "**/*.pem".to_string(),
-            "**/*.key".to_string(),
-        ],
+        vec!["**/*.pem".to_string(), "**/*.key".to_string()],
     );
 
     let pem_path = tmp.join("cert.pem");
@@ -60,10 +52,7 @@ fn multiple_deny_globs_checked() {
     ));
 
     let txt_path = tmp.join("readme.txt");
-    assert_eq!(
-        check_path(&policy, &txt_path, true),
-        PathDecision::Allow
-    );
+    assert_eq!(check_path(&policy, &txt_path, true), PathDecision::Allow);
 }
 
 #[test]

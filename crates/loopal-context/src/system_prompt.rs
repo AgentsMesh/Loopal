@@ -18,8 +18,7 @@ pub fn build_system_prompt(
 
     // Inject working directory so the LLM knows where it is
     parts.push(format!(
-        "\n\n# Working Directory\nYour current working directory is: {}\nAll relative file paths are resolved from this directory. Use relative paths when possible.",
-        cwd
+        "\n\n# Working Directory\nYour current working directory is: {cwd}\nAll relative file paths are resolved from this directory. Use relative paths when possible."
     ));
 
     // Inject project memory if present

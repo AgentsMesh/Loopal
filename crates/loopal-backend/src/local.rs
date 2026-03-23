@@ -6,11 +6,11 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use loopal_config::ResolvedPolicy;
 use loopal_error::ToolIoError;
+use loopal_tool_api::Backend;
 use loopal_tool_api::backend_types::{
     EditResult, ExecResult, FetchResult, FileInfo, GlobResult, GrepResult, LsEntry, LsResult,
     ReadResult, WriteResult,
 };
-use loopal_tool_api::Backend;
 
 use crate::limits::ResourceLimits;
 use crate::{fs, net, path, search, shell};
@@ -27,7 +27,11 @@ impl LocalBackend {
     pub fn new(cwd: PathBuf, policy: Option<ResolvedPolicy>, limits: ResourceLimits) -> Arc<Self> {
         // Canonicalize cwd to resolve symlinks (e.g. macOS /tmp → /private/tmp)
         let cwd = cwd.canonicalize().unwrap_or(cwd);
-        Arc::new(Self { cwd, policy, limits })
+        Arc::new(Self {
+            cwd,
+            policy,
+            limits,
+        })
     }
 }
 
@@ -98,7 +102,9 @@ impl Backend for LocalBackend {
             let meta = entry.metadata().await?;
             let ft = entry.file_type().await?;
             let modified = meta.modified().ok().and_then(|t| {
-                t.duration_since(std::time::UNIX_EPOCH).ok().map(|d| d.as_secs())
+                t.duration_since(std::time::UNIX_EPOCH)
+                    .ok()
+                    .map(|d| d.as_secs())
             });
             let permissions = extract_permissions(&meta);
             entries.push(LsEntry {
@@ -159,8 +165,14 @@ impl Backend for LocalBackend {
     }
 
     async fn exec(&self, command: &str, timeout_ms: u64) -> Result<ExecResult, ToolIoError> {
-        shell::exec_command(&self.cwd, self.policy.as_ref(), command, timeout_ms, &self.limits)
-            .await
+        shell::exec_command(
+            &self.cwd,
+            self.policy.as_ref(),
+            command,
+            timeout_ms,
+            &self.limits,
+        )
+        .await
     }
 
     async fn exec_background(&self, command: &str, desc: &str) -> Result<String, ToolIoError> {

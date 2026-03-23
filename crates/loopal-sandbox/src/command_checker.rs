@@ -16,9 +16,7 @@ pub fn check_command(command: &str) -> CommandDecision {
     // Check against dangerous command patterns
     for pattern in DANGEROUS_COMMAND_PATTERNS {
         if trimmed.contains(pattern) {
-            return CommandDecision::Deny(format!(
-                "blocked dangerous pattern: {pattern}"
-            ));
+            return CommandDecision::Deny(format!("blocked dangerous pattern: {pattern}"));
         }
     }
 
@@ -29,9 +27,7 @@ pub fn check_command(command: &str) -> CommandDecision {
 
     // Check for destructive rm with force+recursive on system paths
     if is_destructive_rm(trimmed) {
-        return CommandDecision::Deny(
-            "destructive rm targeting system or home directory".into(),
-        );
+        return CommandDecision::Deny("destructive rm targeting system or home directory".into());
     }
 
     // Check for disk/device writes
@@ -62,8 +58,7 @@ fn is_destructive_rm(cmd: &str) -> bool {
     if !rm_cmd.starts_with("rm ") {
         return false;
     }
-    let has_rf = rm_cmd.contains("-rf") || rm_cmd.contains("-r -f")
-        || rm_cmd.contains("-fr");
+    let has_rf = rm_cmd.contains("-rf") || rm_cmd.contains("-r -f") || rm_cmd.contains("-fr");
 
     if !has_rf {
         return false;
@@ -71,14 +66,13 @@ fn is_destructive_rm(cmd: &str) -> bool {
 
     // Check for dangerous target paths
     let dangerous_targets = [
-        "/", "/*", "/home", "/usr", "/etc", "/var", "/bin",
-        "/sbin", "/lib", "/boot", "/sys", "/proc", "/dev",
-        "~", "~/",
+        "/", "/*", "/home", "/usr", "/etc", "/var", "/bin", "/sbin", "/lib", "/boot", "/sys",
+        "/proc", "/dev", "~", "~/",
     ];
 
-    dangerous_targets.iter().any(|target| {
-        rm_cmd.ends_with(target) || rm_cmd.contains(&format!("{target} "))
-    })
+    dangerous_targets
+        .iter()
+        .any(|target| rm_cmd.ends_with(target) || rm_cmd.contains(&format!("{target} ")))
 }
 
 /// Detect direct writes to block devices.

@@ -39,6 +39,12 @@ fn test_load_instructions_local_md_appended() {
     std::fs::write(config_dir.join("LOOPAL.local.md"), "# Local Override").unwrap();
 
     let instructions = load_config(tmp.path()).unwrap().instructions;
-    assert!(instructions.contains("# Project"), "project instructions should be present");
-    assert!(instructions.contains("# Local Override"), "local override should be appended");
+    assert!(
+        instructions.contains("# Project"),
+        "project instructions should be present"
+    );
+    assert!(
+        instructions.contains("# Local Override"),
+        "local override should be appended"
+    );
 }

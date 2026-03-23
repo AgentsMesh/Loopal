@@ -118,7 +118,9 @@ fn project_multi_turn_mixed() {
             id: None,
             role: MessageRole::Assistant,
             content: vec![
-                ContentBlock::Text { text: "doing".into() },
+                ContentBlock::Text {
+                    text: "doing".into(),
+                },
                 ContentBlock::ToolUse {
                     id: "t1".into(),
                     name: "Glob".into(),
@@ -164,7 +166,9 @@ fn project_multiple_images_count() {
         id: None,
         role: MessageRole::User,
         content: vec![
-            ContentBlock::Text { text: "check these".into() },
+            ContentBlock::Text {
+                text: "check these".into(),
+            },
             ContentBlock::Image {
                 source: loopal_message::ImageSource {
                     source_type: "base64".into(),

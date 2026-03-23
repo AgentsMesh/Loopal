@@ -46,7 +46,15 @@ pub fn render_input(
     f.render_widget(para, area);
 
     // Cursor position accounting for wrap and scroll
-    set_cursor(f, input, cursor, prefix_width, content_width, input_scroll, area);
+    set_cursor(
+        f,
+        input,
+        cursor,
+        prefix_width,
+        content_width,
+        input_scroll,
+        area,
+    );
 }
 
 /// Calculate how many rows the input needs (for layout).
@@ -71,12 +79,12 @@ pub fn prefix_width(inbox_count: usize, image_count: usize) -> usize {
 
 /// Build styled lines: first visual line gets the prefix, continuation lines
 /// get padding of the same width. Paste placeholders use a distinct style.
-fn build_styled_lines<'a>(
-    input: &'a str,
-    prefix: &str,
-    content_width: usize,
-) -> Vec<Line<'a>> {
-    let wrap_width = if content_width == 0 { usize::MAX } else { content_width };
+fn build_styled_lines<'a>(input: &'a str, prefix: &str, content_width: usize) -> Vec<Line<'a>> {
+    let wrap_width = if content_width == 0 {
+        usize::MAX
+    } else {
+        content_width
+    };
     let vlines = multiline::visual_lines(input, wrap_width);
     let prefix_pad = " ".repeat(display_width(prefix));
     let prefix_style = Style::default().fg(Color::DarkGray);
@@ -112,7 +120,11 @@ fn set_cursor(
     input_scroll: usize,
     area: Rect,
 ) {
-    let wrap_width = if content_width == 0 { usize::MAX } else { content_width };
+    let wrap_width = if content_width == 0 {
+        usize::MAX
+    } else {
+        content_width
+    };
     let vlines = multiline::visual_lines(input, wrap_width);
     let (row, col) = multiline::cursor_to_row_col(input, cursor, &vlines);
 
@@ -128,9 +140,9 @@ fn set_cursor(
 
 fn build_prefix(inbox_count: usize, image_count: usize) -> String {
     match (inbox_count > 0, image_count > 0) {
-        (true, true) => format!("> [img:{}] ({} queued) ", image_count, inbox_count),
-        (true, false) => format!("> ({} queued) ", inbox_count),
-        (false, true) => format!("> [img:{}] ", image_count),
+        (true, true) => format!("> [img:{image_count}] ({inbox_count} queued) "),
+        (true, false) => format!("> ({inbox_count} queued) "),
+        (false, true) => format!("> [img:{image_count}] "),
         (false, false) => "> ".to_string(),
     }
 }

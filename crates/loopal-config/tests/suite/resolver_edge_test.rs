@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
+use loopal_config::hook::{HookConfig, HookEvent};
 use loopal_config::layer::{ConfigLayer, LayerSource};
 use loopal_config::resolver::ConfigResolver;
 use loopal_config::settings::McpServerConfig;
-use loopal_config::hook::{HookConfig, HookEvent};
 
 fn mcp_config(command: &str) -> McpServerConfig {
     McpServerConfig {
@@ -18,9 +18,15 @@ fn mcp_config(command: &str) -> McpServerConfig {
 #[test]
 fn test_resolve_empty_instructions_skipped() {
     let mut resolver = ConfigResolver::new();
-    let mut layer1 = ConfigLayer { source: LayerSource::Global, ..Default::default() };
+    let mut layer1 = ConfigLayer {
+        source: LayerSource::Global,
+        ..Default::default()
+    };
     layer1.instructions = Some("   ".into());
-    let mut layer2 = ConfigLayer { source: LayerSource::Project, ..Default::default() };
+    let mut layer2 = ConfigLayer {
+        source: LayerSource::Project,
+        ..Default::default()
+    };
     layer2.instructions = Some("Real content".into());
     resolver.add_layer(layer1);
     resolver.add_layer(layer2);
@@ -31,23 +37,36 @@ fn test_resolve_empty_instructions_skipped() {
 #[test]
 fn test_resolve_mcp_written_back_to_settings() {
     let mut resolver = ConfigResolver::new();
-    let mut layer = ConfigLayer { source: LayerSource::Global, ..Default::default() };
-    layer.mcp_servers.insert("test".into(), mcp_config("test-cmd"));
+    let mut layer = ConfigLayer {
+        source: LayerSource::Global,
+        ..Default::default()
+    };
+    layer
+        .mcp_servers
+        .insert("test".into(), mcp_config("test-cmd"));
     resolver.add_layer(layer);
     let config = resolver.resolve().unwrap();
     assert_eq!(config.mcp_servers.len(), 1);
     assert_eq!(config.settings.mcp_servers.len(), 1);
-    assert_eq!(config.settings.mcp_servers.get("test").unwrap().command, "test-cmd");
+    assert_eq!(
+        config.settings.mcp_servers.get("test").unwrap().command,
+        "test-cmd"
+    );
 }
 
 #[test]
 fn test_resolve_hooks_written_back_to_settings() {
     let mut resolver = ConfigResolver::new();
     let hook = HookConfig {
-        event: HookEvent::PreToolUse, command: "echo test".into(),
-        tool_filter: None, timeout_ms: 10_000,
+        event: HookEvent::PreToolUse,
+        command: "echo test".into(),
+        tool_filter: None,
+        timeout_ms: 10_000,
     };
-    let mut layer = ConfigLayer { source: LayerSource::Global, ..Default::default() };
+    let mut layer = ConfigLayer {
+        source: LayerSource::Global,
+        ..Default::default()
+    };
     layer.hooks = vec![hook];
     resolver.add_layer(layer);
     let config = resolver.resolve().unwrap();
@@ -60,9 +79,13 @@ fn test_resolve_hooks_written_back_to_settings() {
 fn test_resolve_layers_tracked() {
     let mut resolver = ConfigResolver::new();
     resolver.add_layer(ConfigLayer {
-        source: LayerSource::Plugin("foo".into()), ..Default::default()
+        source: LayerSource::Plugin("foo".into()),
+        ..Default::default()
     });
-    resolver.add_layer(ConfigLayer { source: LayerSource::Global, ..Default::default() });
+    resolver.add_layer(ConfigLayer {
+        source: LayerSource::Global,
+        ..Default::default()
+    });
     let config = resolver.resolve().unwrap();
     assert_eq!(config.layers.len(), 2);
     assert_eq!(config.layers[0], LayerSource::Plugin("foo".into()));
@@ -102,10 +125,8 @@ fn test_load_layer_invalid_mcp_logs_warning() {
         r#"{"mcp_servers": {"bad": {"command": 123}}}"#,
     )
     .unwrap();
-    let layer = loopal_config::loader::load_layer_from_dir(
-        dir.path(), LayerSource::Global, None,
-    )
-    .unwrap();
+    let layer =
+        loopal_config::loader::load_layer_from_dir(dir.path(), LayerSource::Global, None).unwrap();
     // Invalid MCP config should be skipped
     assert!(layer.mcp_servers.is_empty());
     // The raw JSON still has the key removed
@@ -120,10 +141,8 @@ fn test_load_layer_invalid_hooks_logs_warning() {
         r#"{"hooks": [{"event": "invalid_event", "command": "echo"}]}"#,
     )
     .unwrap();
-    let layer = loopal_config::loader::load_layer_from_dir(
-        dir.path(), LayerSource::Global, None,
-    )
-    .unwrap();
+    let layer =
+        loopal_config::loader::load_layer_from_dir(dir.path(), LayerSource::Global, None).unwrap();
     assert!(layer.hooks.is_empty());
     assert!(layer.settings.get("hooks").is_none());
 }

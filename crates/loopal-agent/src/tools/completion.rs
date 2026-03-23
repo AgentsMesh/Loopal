@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
 use loopal_tool_api::PermissionLevel;
-use loopal_tool_api::{Tool, ToolContext, ToolResult, COMPLETION_PREFIX};
+use loopal_tool_api::{COMPLETION_PREFIX, Tool, ToolContext, ToolResult};
 
 /// Tool for agents to signal task completion.
 ///
@@ -12,7 +12,9 @@ pub struct AttemptCompletionTool;
 
 #[async_trait]
 impl Tool for AttemptCompletionTool {
-    fn name(&self) -> &str { "AttemptCompletion" }
+    fn name(&self) -> &str {
+        "AttemptCompletion"
+    }
 
     fn description(&self) -> &str {
         "Signal that you have completed the assigned task. \
@@ -33,7 +35,9 @@ impl Tool for AttemptCompletionTool {
         })
     }
 
-    fn permission(&self) -> PermissionLevel { PermissionLevel::ReadOnly }
+    fn permission(&self) -> PermissionLevel {
+        PermissionLevel::ReadOnly
+    }
 
     async fn execute(
         &self,
@@ -45,8 +49,6 @@ impl Tool for AttemptCompletionTool {
             .and_then(|v| v.as_str())
             .unwrap_or("Task completed.");
 
-        Ok(ToolResult::success(format!(
-            "{COMPLETION_PREFIX}{result}"
-        )))
+        Ok(ToolResult::success(format!("{COMPLETION_PREFIX}{result}")))
     }
 }

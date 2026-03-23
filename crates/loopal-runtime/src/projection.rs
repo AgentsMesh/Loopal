@@ -36,18 +36,14 @@ pub fn project_messages(messages: &[Message]) -> Vec<DisplayMessage> {
                         summary: format!("{}({})", name, summarize_input(input)),
                         result: None,
                     });
-                    tool_index.insert(
-                        id.clone(),
-                        (display.len(), tc_idx, name.clone()),
-                    );
+                    tool_index.insert(id.clone(), (display.len(), tc_idx, name.clone()));
                 }
                 ContentBlock::ToolResult {
-                    tool_use_id, content, is_error,
+                    tool_use_id,
+                    content,
+                    is_error,
                 } => {
-                    back_patch(
-                        &mut display, &tool_index,
-                        tool_use_id, content, *is_error,
-                    );
+                    back_patch(&mut display, &tool_index, tool_use_id, content, *is_error);
                 }
                 ContentBlock::Image { .. } => {
                     content_parts.push("[image]".to_string());
@@ -61,7 +57,12 @@ pub fn project_messages(messages: &[Message]) -> Vec<DisplayMessage> {
         if content.is_empty() && tool_calls.is_empty() {
             continue;
         }
-        display.push(DisplayMessage { role, content, tool_calls, image_count });
+        display.push(DisplayMessage {
+            role,
+            content,
+            tool_calls,
+            image_count,
+        });
     }
 
     display
@@ -103,7 +104,11 @@ fn back_patch(
 
 fn summarize_input(input: &serde_json::Value) -> String {
     let s = input.to_string();
-    if s.len() <= 60 { s } else { format!("{}...", &s[..57]) }
+    if s.len() <= 60 {
+        s
+    } else {
+        format!("{}...", &s[..57])
+    }
 }
 
 fn truncate_for_display(s: &str) -> String {

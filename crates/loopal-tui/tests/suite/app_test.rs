@@ -1,8 +1,8 @@
+use loopal_protocol::ControlCommand;
+use loopal_protocol::{AgentEvent, AgentEventPayload, ImageAttachment, UserQuestionResponse};
 use loopal_session::SessionController;
 use loopal_tui::app::App;
 use loopal_tui::command::builtin_entries;
-use loopal_protocol::ControlCommand;
-use loopal_protocol::{AgentEvent, AgentEventPayload, ImageAttachment, UserQuestionResponse};
 use tokio::sync::mpsc;
 
 fn make_app() -> (App, mpsc::Receiver<ControlCommand>, mpsc::Receiver<bool>) {
@@ -14,7 +14,9 @@ fn make_app() -> (App, mpsc::Receiver<ControlCommand>, mpsc::Receiver<bool>) {
         "act".to_string(),
         control_tx,
         perm_tx,
-        question_tx, Default::default(), std::sync::Arc::new(tokio::sync::Notify::new()),
+        question_tx,
+        Default::default(),
+        std::sync::Arc::new(tokio::sync::Notify::new()),
     );
     let app = App::new(session, builtin_entries(), std::env::temp_dir());
     (app, control_rx, perm_rx)
@@ -63,7 +65,8 @@ fn test_submit_input_returns_text_and_resets() {
 fn test_awaiting_input_sets_idle() {
     let (app, _, _) = make_app();
     assert!(!app.session.lock().agent_idle);
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
     assert!(app.session.lock().agent_idle);
 }
 
@@ -75,7 +78,9 @@ fn test_awaiting_input_forwards_inbox_message() {
         state.inbox.push("queued".into());
     }
     // AwaitingInput sets idle=true then tries forward
-    let forwarded = app.session.handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
+    let forwarded = app
+        .session
+        .handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
     assert_eq!(forwarded.map(|c| c.text), Some("queued".to_string()));
     let state = app.session.lock();
     assert!(!state.agent_idle); // forwarding clears idle

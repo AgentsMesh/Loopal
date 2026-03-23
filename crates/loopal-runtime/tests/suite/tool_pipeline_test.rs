@@ -1,6 +1,6 @@
+use loopal_config::Settings;
 use loopal_kernel::Kernel;
 use loopal_runtime::tool_pipeline::execute_tool;
-use loopal_config::Settings;
 use loopal_tool_api::ToolContext;
 use std::path::PathBuf;
 
@@ -18,21 +18,20 @@ fn make_ctx() -> ToolContext {
         backend,
         session_id: "test-session".to_string(),
         shared: None,
-        pending_cwd_switch: Default::default(), memory_channel: None,
+        pending_cwd_switch: Default::default(),
+        memory_channel: None,
     }
 }
 
 fn make_ctx_for(cwd: PathBuf) -> ToolContext {
-    let backend = loopal_backend::LocalBackend::new(
-        cwd,
-        None,
-        loopal_backend::ResourceLimits::default(),
-    );
+    let backend =
+        loopal_backend::LocalBackend::new(cwd, None, loopal_backend::ResourceLimits::default());
     ToolContext {
         backend,
         session_id: "test-session".to_string(),
         shared: None,
-        pending_cwd_switch: Default::default(), memory_channel: None,
+        pending_cwd_switch: Default::default(),
+        memory_channel: None,
     }
 }
 
@@ -92,7 +91,9 @@ async fn test_execute_read_tool_missing_file() {
     )
     .await;
 
-    if let Ok(r) = result { assert!(r.is_error, "reading missing file should set is_error=true") }
+    if let Ok(r) = result {
+        assert!(r.is_error, "reading missing file should set is_error=true")
+    }
 }
 
 #[tokio::test]
@@ -124,7 +125,10 @@ async fn test_large_tool_output_is_truncated_and_saved() {
     let test_file = tmp_dir.join("loopal_test_tool_pipeline_large.txt");
 
     let long_line = "X".repeat(5000);
-    let content: String = (0..100).map(|_| long_line.as_str()).collect::<Vec<_>>().join("\n");
+    let content: String = (0..100)
+        .map(|_| long_line.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
     std::fs::write(&test_file, &content).unwrap();
 
     let ctx = make_ctx_for(tmp_dir.clone());
@@ -140,8 +144,14 @@ async fn test_large_tool_output_is_truncated_and_saved() {
     let _ = std::fs::remove_file(&test_file);
     let result = result.expect("Read tool should succeed");
     assert!(!result.is_error);
-    assert!(result.content.len() <= 500_000, "output should be truncated");
-    assert!(result.content.contains("truncated"), "should contain truncation notice");
+    assert!(
+        result.content.len() <= 500_000,
+        "output should be truncated"
+    );
+    assert!(
+        result.content.contains("truncated"),
+        "should contain truncation notice"
+    );
     assert!(
         result.content.contains("[Full output saved to:"),
         "should contain saved file path"
@@ -152,6 +162,9 @@ async fn test_large_tool_output_is_truncated_and_saved() {
     let end = result.content[start..].find(']').unwrap() + start;
     let saved_path = &result.content[start..end];
     let saved = std::fs::read_to_string(saved_path).expect("saved file should exist");
-    assert!(saved.len() > 400_000, "saved file should contain full output");
+    assert!(
+        saved.len() > 400_000,
+        "saved file should contain full output"
+    );
     let _ = std::fs::remove_file(saved_path);
 }

@@ -3,7 +3,7 @@ pub(crate) use super::accumulator::{ThinkingAccumulator, ToolUseAccumulator};
 use futures::stream::Stream;
 use loopal_error::{LoopalError, ProviderError};
 use loopal_provider_api::{StopReason, StreamChunk};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::VecDeque;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -27,11 +27,8 @@ impl Stream for AnthropicStream {
 
         match this.inner.as_mut().poll_next(cx) {
             Poll::Ready(Some(Ok(data))) => {
-                let chunks = parse_anthropic_event(
-                    &data,
-                    &mut this.tool_state,
-                    &mut this.thinking_state,
-                );
+                let chunks =
+                    parse_anthropic_event(&data, &mut this.tool_state, &mut this.thinking_state);
                 let mut iter = chunks.into_iter();
                 if let Some(first) = iter.next() {
                     this.buffer.extend(iter);
@@ -63,7 +60,7 @@ pub(crate) fn parse_anthropic_event(
             return vec![Err(ProviderError::SseParse(format!(
                 "invalid JSON: {e}: {data}"
             ))
-            .into())]
+            .into())];
         }
     };
 
@@ -129,10 +126,9 @@ pub(crate) fn parse_anthropic_event(
                     chunks.push(Ok(StreamChunk::ThinkingSignature { signature }));
                 }
                 thinking.active = false;
-            } else if let (Some(id), Some(name)) = (
-                tool.current_tool_id.take(),
-                tool.current_tool_name.take(),
-            ) {
+            } else if let (Some(id), Some(name)) =
+                (tool.current_tool_id.take(), tool.current_tool_name.take())
+            {
                 let input: Value = if tool.json_fragments.is_empty() {
                     json!({})
                 } else {
@@ -146,7 +142,9 @@ pub(crate) fn parse_anthropic_event(
         "message_start" => parse_message_start_usage(&parsed, &mut chunks),
         "message_stop" => {
             let reason = tool.stop_reason.take().unwrap_or(StopReason::EndTurn);
-            chunks.push(Ok(StreamChunk::Done { stop_reason: reason }));
+            chunks.push(Ok(StreamChunk::Done {
+                stop_reason: reason,
+            }));
         }
         _ => {}
     }
@@ -168,10 +166,7 @@ fn parse_usage_and_stop(
     }
 }
 
-fn parse_message_start_usage(
-    parsed: &Value,
-    chunks: &mut Vec<Result<StreamChunk, LoopalError>>,
-) {
+fn parse_message_start_usage(parsed: &Value, chunks: &mut Vec<Result<StreamChunk, LoopalError>>) {
     push_usage_from(&parsed["message"]["usage"], chunks);
 }
 
@@ -180,10 +175,8 @@ fn push_usage_from(usage: &Value, chunks: &mut Vec<Result<StreamChunk, LoopalErr
         usage["input_tokens"].as_u64(),
         usage["output_tokens"].as_u64(),
     ) {
-        let cache_creation = usage["cache_creation_input_tokens"]
-            .as_u64().unwrap_or(0) as u32;
-        let cache_read = usage["cache_read_input_tokens"]
-            .as_u64().unwrap_or(0) as u32;
+        let cache_creation = usage["cache_creation_input_tokens"].as_u64().unwrap_or(0) as u32;
+        let cache_read = usage["cache_read_input_tokens"].as_u64().unwrap_or(0) as u32;
         chunks.push(Ok(StreamChunk::Usage {
             input_tokens: input as u32,
             output_tokens: output as u32,

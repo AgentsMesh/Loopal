@@ -72,9 +72,7 @@ impl MdWriter {
         // Collect pending spans and apply heading style
         let spans: Vec<Span<'static>> = std::mem::take(&mut self.pending_spans)
             .into_iter()
-            .map(|s| {
-                Span::styled(s.content.into_owned(), s.style.patch(heading_style))
-            })
+            .map(|s| Span::styled(s.content.into_owned(), s.style.patch(heading_style)))
             .collect();
 
         let line = Line::from(spans);
@@ -87,9 +85,10 @@ impl MdWriter {
     }
 
     fn indent_width_calc(&self) -> u16 {
-        self.indent_stack.iter().map(|ctx| {
-            ctx.prefix.iter().map(|s| s.content.len()).sum::<usize>() as u16
-        }).sum()
+        self.indent_stack
+            .iter()
+            .map(|ctx| ctx.prefix.iter().map(|s| s.content.len()).sum::<usize>() as u16)
+            .sum()
     }
 
     // ---- Code blocks ----
@@ -101,7 +100,11 @@ impl MdWriter {
         self.code_lang = match kind {
             CodeBlockKind::Fenced(lang) => {
                 let l = lang.split(',').next().unwrap_or("").trim();
-                if l.is_empty() { None } else { Some(l.to_string()) }
+                if l.is_empty() {
+                    None
+                } else {
+                    Some(l.to_string())
+                }
             }
             CodeBlockKind::Indented => None,
         };
@@ -143,7 +146,7 @@ impl MdWriter {
         let (marker_text, indent_text) = match self.list_stack.last_mut() {
             Some(ListKind::Unordered) => ("- ".to_string(), "  ".to_string()),
             Some(ListKind::Ordered(n)) => {
-                let m = format!("{}. ", n);
+                let m = format!("{n}. ");
                 let indent = " ".repeat(m.len());
                 *n += 1;
                 (m, indent)
@@ -184,15 +187,20 @@ impl MdWriter {
         self.flush_pending();
         let w = self.width.saturating_sub(self.indent_width_calc()) as usize;
         let rule = "─".repeat(w.clamp(3, 80));
-        self.lines.push(Line::from(Span::styled(
-            rule,
-            self.styles.rule,
-        )));
+        self.lines
+            .push(Line::from(Span::styled(rule, self.styles.rule)));
         self.lines.push(Line::from(""));
     }
 }
 
 fn heading_num(level: pulldown_cmark::HeadingLevel) -> u8 {
     use pulldown_cmark::HeadingLevel::*;
-    match level { H1 => 1, H2 => 2, H3 => 3, H4 => 4, H5 => 5, H6 => 6 }
+    match level {
+        H1 => 1,
+        H2 => 2,
+        H3 => 3,
+        H4 => 4,
+        H5 => 5,
+        H6 => 6,
+    }
 }

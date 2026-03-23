@@ -1,6 +1,6 @@
-use loopal_kernel::Kernel;
-use loopal_config::Settings;
 use loopal_config::HookEvent;
+use loopal_config::Settings;
+use loopal_kernel::Kernel;
 
 fn make_kernel() -> Kernel {
     Kernel::new(Settings::default()).expect("Kernel::new with defaults should succeed")
@@ -64,8 +64,7 @@ async fn test_start_mcp_no_servers() {
 
 #[test]
 fn test_resolve_api_key_direct() {
-    let result =
-        loopal_kernel::resolve_api_key(&Some("my-direct-key".to_string()), &None);
+    let result = loopal_kernel::resolve_api_key(&Some("my-direct-key".to_string()), &None);
     assert_eq!(result, Some("my-direct-key".to_string()));
 }
 
@@ -76,8 +75,7 @@ fn test_resolve_api_key_env_var() {
         std::env::set_var(env_var_name, "env-key-value");
     }
 
-    let result =
-        loopal_kernel::resolve_api_key(&None, &Some(env_var_name.to_string()));
+    let result = loopal_kernel::resolve_api_key(&None, &Some(env_var_name.to_string()));
     assert_eq!(result, Some("env-key-value".to_string()));
 
     unsafe {
@@ -115,8 +113,7 @@ fn test_resolve_api_key_empty() {
     unsafe {
         std::env::set_var(env_var_name, "");
     }
-    let result =
-        loopal_kernel::resolve_api_key(&None, &Some(env_var_name.to_string()));
+    let result = loopal_kernel::resolve_api_key(&None, &Some(env_var_name.to_string()));
     assert_eq!(result, None);
     unsafe {
         std::env::remove_var(env_var_name);

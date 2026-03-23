@@ -48,9 +48,7 @@ impl ChannelStore {
     /// Publish a message to a channel. Returns subscriber names excluding the sender.
     pub fn publish(&mut self, channel: &str, from: &str, content: &str) -> Vec<String> {
         // Ensure channel exists
-        self.subscriptions
-            .entry(channel.to_string())
-            .or_default();
+        self.subscriptions.entry(channel.to_string()).or_default();
 
         let msg = ChannelMessage {
             from: from.to_string(),
@@ -64,12 +62,7 @@ impl ChannelStore {
 
         self.subscriptions
             .get(channel)
-            .map(|subs| {
-                subs.iter()
-                    .filter(|name| *name != from)
-                    .cloned()
-                    .collect()
-            })
+            .map(|subs| subs.iter().filter(|name| *name != from).cloned().collect())
             .unwrap_or_default()
     }
 

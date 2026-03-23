@@ -13,7 +13,11 @@ pub struct FormatOptions {
 
 impl Default for FormatOptions {
     fn default() -> Self {
-        Self { show_line_numbers: true, offset: 0, has_context: false }
+        Self {
+            show_line_numbers: true,
+            offset: 0,
+            has_context: false,
+        }
     }
 }
 
@@ -37,7 +41,11 @@ pub fn format_results(
 
     let mut output = output;
     if results.total_match_count >= max_total_matches {
-        write!(output, "\n... (search stopped at {} matches)", max_total_matches).unwrap();
+        write!(
+            output,
+            "\n... (search stopped at {max_total_matches} matches)"
+        )
+        .unwrap();
     }
     output
 }
@@ -63,14 +71,27 @@ fn format_content(results: &GrepResults, head_limit: usize, opts: &FormatOptions
                 output.push_str("\n--\n");
             }
             first_entry = false;
-            format_group(&mut output, path, group, opts, &mut emitted, &mut skipped, head_limit);
+            format_group(
+                &mut output,
+                path,
+                group,
+                opts,
+                &mut emitted,
+                &mut skipped,
+                head_limit,
+            );
         }
         if emitted >= head_limit {
             break;
         }
     }
 
-    append_content_footer(&mut output, results.total_match_count, head_limit, opts.offset);
+    append_content_footer(
+        &mut output,
+        results.total_match_count,
+        head_limit,
+        opts.offset,
+    );
     output
 }
 
@@ -99,7 +120,14 @@ fn format_group(
         }
         let sep = if line.is_match { ':' } else { '-' };
         if opts.show_line_numbers {
-            write!(output, "{}{sep}{}{sep}{}", path.display(), line.line_num, line.content).unwrap();
+            write!(
+                output,
+                "{}{sep}{}{sep}{}",
+                path.display(),
+                line.line_num,
+                line.content
+            )
+            .unwrap();
         } else {
             write!(output, "{}{sep}{}", path.display(), line.content).unwrap();
         }
@@ -125,7 +153,16 @@ fn format_files(results: &GrepResults, head_limit: usize, offset: usize) -> Stri
     let mut file_counts: Vec<(&PathBuf, usize)> = results
         .file_matches
         .iter()
-        .map(|(p, groups)| (p, groups.iter().flat_map(|g| g.iter()).filter(|l| l.is_match).count()))
+        .map(|(p, groups)| {
+            (
+                p,
+                groups
+                    .iter()
+                    .flat_map(|g| g.iter())
+                    .filter(|l| l.is_match)
+                    .count(),
+            )
+        })
         .collect();
     file_counts.sort_by(|a, b| b.1.cmp(&a.1));
 
@@ -145,7 +182,11 @@ fn format_files(results: &GrepResults, head_limit: usize, offset: usize) -> Stri
     let available = total_files.saturating_sub(offset);
     if available > head_limit {
         let next_offset = offset + head_limit;
-        write!(output, "\n\n(Showing {head_limit} of {available} files. Use offset={next_offset} to see more.)").unwrap();
+        write!(
+            output,
+            "\n\n(Showing {head_limit} of {available} files. Use offset={next_offset} to see more.)"
+        )
+        .unwrap();
     }
     output
 }
@@ -154,13 +195,25 @@ fn format_count(results: &GrepResults, offset: usize) -> String {
     let mut entries: Vec<(&PathBuf, usize)> = results
         .file_matches
         .iter()
-        .map(|(p, groups)| (p, groups.iter().flat_map(|g| g.iter()).filter(|l| l.is_match).count()))
+        .map(|(p, groups)| {
+            (
+                p,
+                groups
+                    .iter()
+                    .flat_map(|g| g.iter())
+                    .filter(|l| l.is_match)
+                    .count(),
+            )
+        })
         .collect();
     entries.sort_by(|a, b| b.1.cmp(&a.1));
 
     if offset == 0 {
         let file_count = entries.len();
-        return format!("{} matches across {} files", results.total_match_count, file_count);
+        return format!(
+            "{} matches across {} files",
+            results.total_match_count, file_count
+        );
     }
     let mut output = String::new();
     for (path, count) in entries.into_iter().skip(offset) {

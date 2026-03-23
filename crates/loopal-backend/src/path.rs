@@ -99,11 +99,7 @@ fn check_with_policy(
 ) -> Result<PathBuf, ToolIoError> {
     match loopal_sandbox::path_checker::check_path(policy, path, is_write) {
         PathDecision::Allow => Ok(path.to_path_buf()),
-        PathDecision::DenyWrite(reason) => {
-            Err(ToolIoError::PermissionDenied(reason))
-        }
-        PathDecision::DenyRead(reason) => {
-            Err(ToolIoError::PermissionDenied(reason))
-        }
+        PathDecision::DenyWrite(reason) => Err(ToolIoError::PermissionDenied(reason)),
+        PathDecision::DenyRead(reason) => Err(ToolIoError::PermissionDenied(reason)),
     }
 }

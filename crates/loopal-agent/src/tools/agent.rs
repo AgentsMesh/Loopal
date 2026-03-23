@@ -15,7 +15,9 @@ pub struct AgentTool;
 
 #[async_trait]
 impl Tool for AgentTool {
-    fn name(&self) -> &str { "Agent" }
+    fn name(&self) -> &str {
+        "Agent"
+    }
 
     fn description(&self) -> &str {
         "Spawn a sub-agent to handle a task autonomously. \
@@ -38,29 +40,45 @@ impl Tool for AgentTool {
         })
     }
 
-    fn permission(&self) -> PermissionLevel { PermissionLevel::Supervised }
+    fn permission(&self) -> PermissionLevel {
+        PermissionLevel::Supervised
+    }
 
     async fn execute(
-        &self, input: serde_json::Value, ctx: &ToolContext,
+        &self,
+        input: serde_json::Value,
+        ctx: &ToolContext,
     ) -> Result<ToolResult, LoopalError> {
         execute_agent(extract_shared(ctx)?, input).await
     }
 }
 
 async fn execute_agent(
-    shared: Arc<AgentShared>, input: serde_json::Value,
+    shared: Arc<AgentShared>,
+    input: serde_json::Value,
 ) -> Result<ToolResult, LoopalError> {
     let prompt = require_str(&input, "prompt")?;
-    let name = input.get("name").and_then(|v| v.as_str())
+    let name = input
+        .get("name")
+        .and_then(|v| v.as_str())
         .map(String::from)
         .unwrap_or_else(|| format!("agent-{}", &uuid::Uuid::new_v4().to_string()[..8]));
     let subagent_type = input.get("subagent_type").and_then(|v| v.as_str());
-    let model_override = input.get("model").and_then(|v| v.as_str()).map(String::from);
-    let background = input.get("run_in_background").and_then(|v| v.as_bool()).unwrap_or(false);
+    let model_override = input
+        .get("model")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+    let background = input
+        .get("run_in_background")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     let isolation = input.get("isolation").and_then(|v| v.as_str());
 
     if shared.depth >= shared.max_depth {
-        return Ok(ToolResult::error(format!("Maximum nesting depth ({}) reached", shared.max_depth)));
+        return Ok(ToolResult::error(format!(
+            "Maximum nesting depth ({}) reached",
+            shared.max_depth
+        )));
     }
     if shared.registry.lock().await.get(&name).is_some() {
         return Ok(ToolResult::error(format!("Agent '{name}' already exists")));
@@ -69,19 +87,30 @@ async fn execute_agent(
     let mut config = subagent_type
         .and_then(|t| load_agent_configs(&shared.cwd).remove(t))
         .unwrap_or_default();
-    if let Some(ref m) = model_override { config.model = Some(m.clone()); }
+    if let Some(ref m) = model_override {
+        config.model = Some(m.clone());
+    }
 
     // Worktree isolation
     let wt = if isolation == Some("worktree") {
         Some(create_agent_worktree(&shared.cwd, &name)?)
-    } else { None };
+    } else {
+        None
+    };
 
     let cwd_override = wt.as_ref().map(|(info, _)| info.path.clone());
-    let result = spawn_agent(&shared, SpawnParams {
-        name: name.clone(), prompt: prompt.to_string(), agent_config: config,
-        parent_model: shared.kernel.settings().model.clone(),
-        parent_cancel_token: None, cwd_override,
-    }).await;
+    let result = spawn_agent(
+        &shared,
+        SpawnParams {
+            name: name.clone(),
+            prompt: prompt.to_string(),
+            agent_config: config,
+            parent_model: shared.kernel.settings().model.clone(),
+            parent_cancel_token: None,
+            cwd_override,
+        },
+    )
+    .await;
 
     match result {
         Ok(sr) => {
@@ -89,14 +118,17 @@ async fn execute_agent(
             handle_spawn_result(sr.agent_id, sr.result_rx, name, background, wt).await
         }
         Err(e) => {
-            if let Some((info, root)) = wt { cleanup_worktree(&root, &info); }
+            if let Some((info, root)) = wt {
+                cleanup_worktree(&root, &info);
+            }
             Ok(ToolResult::error(format!("Failed to spawn agent: {e}")))
         }
     }
 }
 
 fn create_agent_worktree(
-    cwd: &Path, agent_name: &str,
+    cwd: &Path,
+    agent_name: &str,
 ) -> Result<(loopal_git::WorktreeInfo, PathBuf), LoopalError> {
     let root = loopal_git::repo_root(cwd)
         .ok_or_else(|| LoopalError::Other("Not a git repository".into()))?;
@@ -134,7 +166,9 @@ async fn handle_spawn_result(
         Ok(Err(err)) => Ok(ToolResult::error(err)),
         Err(_) => Ok(ToolResult::error("sub-agent terminated unexpectedly")),
     };
-    if let Some((info, root)) = wt { cleanup_worktree(&root, &info); }
+    if let Some((info, root)) = wt {
+        cleanup_worktree(&root, &info);
+    }
     output
 }
 
@@ -148,7 +182,8 @@ fn cleanup_worktree(repo_root: &Path, info: &loopal_git::WorktreeInfo) {
 
 /// Extract `AgentShared` from `ToolContext.shared`.
 pub(crate) fn extract_shared(ctx: &ToolContext) -> Result<Arc<AgentShared>, LoopalError> {
-    ctx.shared.as_ref()
+    ctx.shared
+        .as_ref()
         .and_then(|s| s.downcast_ref::<Arc<AgentShared>>())
         .cloned()
         .ok_or_else(|| LoopalError::Other("AgentShared not available in ToolContext".into()))
@@ -156,6 +191,8 @@ pub(crate) fn extract_shared(ctx: &ToolContext) -> Result<Arc<AgentShared>, Loop
 
 fn require_str<'a>(input: &'a serde_json::Value, key: &str) -> Result<&'a str, LoopalError> {
     input.get(key).and_then(|v| v.as_str()).ok_or_else(|| {
-        LoopalError::Tool(loopal_error::ToolError::InvalidInput(format!("missing '{key}'")))
+        LoopalError::Tool(loopal_error::ToolError::InvalidInput(format!(
+            "missing '{key}'"
+        )))
     })
 }

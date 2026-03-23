@@ -1,7 +1,7 @@
 use futures::StreamExt;
-use loopal_provider::OpenAiProvider;
 use loopal_error::{LoopalError, ProviderError};
 use loopal_message::Message;
+use loopal_provider::OpenAiProvider;
 use loopal_provider_api::{ChatParams, Provider, StreamChunk};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -31,9 +31,7 @@ async fn collect_chunks(
     chunks
 }
 
-fn expect_err(
-    result: Result<loopal_provider_api::ChatStream, LoopalError>,
-) -> LoopalError {
+fn expect_err(result: Result<loopal_provider_api::ChatStream, LoopalError>) -> LoopalError {
     match result {
         Err(e) => e,
         Ok(_) => panic!("expected Err, got Ok"),
@@ -52,15 +50,11 @@ data: [DONE]\n\n";
 
     Mock::given(method("POST"))
         .and(path("/v1/chat/completions"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_raw(sse_body, "text/event-stream"),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_raw(sse_body, "text/event-stream"))
         .mount(&mock_server)
         .await;
 
-    let provider =
-        OpenAiProvider::new("test-key".to_string()).with_base_url(mock_server.uri());
+    let provider = OpenAiProvider::new("test-key".to_string()).with_base_url(mock_server.uri());
 
     let stream = provider.stream_chat(&test_chat_params()).await.unwrap();
     let chunks = collect_chunks(stream).await;
@@ -75,12 +69,16 @@ data: [DONE]\n\n";
                 got_text = true;
             }
             Ok(StreamChunk::Done { .. }) => got_done = true,
-            Ok(StreamChunk::Usage { input_tokens, output_tokens, .. }) => {
+            Ok(StreamChunk::Usage {
+                input_tokens,
+                output_tokens,
+                ..
+            }) => {
                 assert_eq!(*input_tokens, 10);
                 assert_eq!(*output_tokens, 5);
                 got_usage = true;
             }
-            other => panic!("unexpected chunk: {:?}", other),
+            other => panic!("unexpected chunk: {other:?}"),
         }
     }
     assert!(got_text, "expected a Text chunk");
@@ -101,22 +99,18 @@ data: [DONE]\n\n";
 
     Mock::given(method("POST"))
         .and(path("/v1/chat/completions"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_raw(sse_body, "text/event-stream"),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_raw(sse_body, "text/event-stream"))
         .mount(&mock_server)
         .await;
 
-    let provider =
-        OpenAiProvider::new("test-key".to_string()).with_base_url(mock_server.uri());
+    let provider = OpenAiProvider::new("test-key".to_string()).with_base_url(mock_server.uri());
 
     let stream = provider.stream_chat(&test_chat_params()).await.unwrap();
     let chunks = collect_chunks(stream).await;
 
     let mut got_tool_use = false;
-    for chunk in &chunks {
-        if let Ok(StreamChunk::ToolUse { id, name, input }) = chunk {
+    for chunk in chunks.into_iter().flatten() {
+        if let StreamChunk::ToolUse { id, name, input } = chunk {
             assert_eq!(id, "call_abc");
             assert_eq!(name, "bash");
             assert_eq!(input["cmd"], "ls");
@@ -140,15 +134,14 @@ async fn test_openai_stream_chat_rate_limited() {
         .mount(&mock_server)
         .await;
 
-    let provider =
-        OpenAiProvider::new("test-key".to_string()).with_base_url(mock_server.uri());
+    let provider = OpenAiProvider::new("test-key".to_string()).with_base_url(mock_server.uri());
 
     let result = provider.stream_chat(&test_chat_params()).await;
     match expect_err(result) {
         LoopalError::Provider(ProviderError::RateLimited { retry_after_ms }) => {
             assert_eq!(retry_after_ms, 10_000);
         }
-        other => panic!("expected RateLimited error, got: {:?}", other),
+        other => panic!("expected RateLimited error, got: {other:?}"),
     }
 }
 
@@ -165,8 +158,7 @@ async fn test_openai_stream_chat_server_error() {
         .mount(&mock_server)
         .await;
 
-    let provider =
-        OpenAiProvider::new("test-key".to_string()).with_base_url(mock_server.uri());
+    let provider = OpenAiProvider::new("test-key".to_string()).with_base_url(mock_server.uri());
 
     let result = provider.stream_chat(&test_chat_params()).await;
     match expect_err(result) {
@@ -174,7 +166,6 @@ async fn test_openai_stream_chat_server_error() {
             assert_eq!(status, 500);
             assert!(message.contains("internal error"));
         }
-        other => panic!("expected Api error, got: {:?}", other),
+        other => panic!("expected Api error, got: {other:?}"),
     }
 }
-

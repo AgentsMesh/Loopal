@@ -84,9 +84,7 @@ fn test_event_tool_permission_request_serde_roundtrip() {
     });
     let json = serde_json::to_string(&event).unwrap();
     let deserialized: AgentEvent = serde_json::from_str(&json).unwrap();
-    if let AgentEventPayload::ToolPermissionRequest { id, name, input } =
-        deserialized.payload
-    {
+    if let AgentEventPayload::ToolPermissionRequest { id, name, input } = deserialized.payload {
         assert_eq!(id, "tc_3");
         assert_eq!(name, "Write");
         assert_eq!(input["file_path"], "/tmp/out.txt");
@@ -114,7 +112,10 @@ fn test_event_awaiting_input_serde_roundtrip() {
     let event = AgentEvent::root(AgentEventPayload::AwaitingInput);
     let json = serde_json::to_string(&event).unwrap();
     let deserialized: AgentEvent = serde_json::from_str(&json).unwrap();
-    assert!(matches!(deserialized.payload, AgentEventPayload::AwaitingInput));
+    assert!(matches!(
+        deserialized.payload,
+        AgentEventPayload::AwaitingInput
+    ));
 }
 
 #[test]

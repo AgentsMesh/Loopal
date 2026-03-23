@@ -1,6 +1,4 @@
-use loopal_error::{
-    ConfigError, HookError, LoopalError, ProviderError, StorageError, ToolError,
-};
+use loopal_error::{ConfigError, HookError, LoopalError, ProviderError, StorageError, ToolError};
 
 // --- ProviderError ---
 

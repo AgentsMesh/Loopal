@@ -26,22 +26,26 @@ impl AcpHandler {
         let params: NewSessionParams = match serde_json::from_value(params) {
             Ok(p) => p,
             Err(e) => {
-                self.transport.respond_error(
-                    id, crate::jsonrpc::INVALID_REQUEST, &e.to_string(),
-                ).await;
+                self.transport
+                    .respond_error(id, crate::jsonrpc::INVALID_REQUEST, &e.to_string())
+                    .await;
                 return;
             }
         };
 
-        let cwd = if params.cwd.is_absolute() { params.cwd } else { self.cwd.clone() };
+        let cwd = if params.cwd.is_absolute() {
+            params.cwd
+        } else {
+            self.cwd.clone()
+        };
 
         // Bootstrap kernel using resolved config
         let mut kernel = match Kernel::new(self.config.settings.clone()) {
             Ok(k) => k,
             Err(e) => {
-                self.transport.respond_error(
-                    id, crate::jsonrpc::INTERNAL_ERROR, &e.to_string(),
-                ).await;
+                self.transport
+                    .respond_error(id, crate::jsonrpc::INTERNAL_ERROR, &e.to_string())
+                    .await;
                 return;
             }
         };
@@ -55,9 +59,9 @@ impl AcpHandler {
         let session_manager = match SessionManager::new() {
             Ok(sm) => sm,
             Err(e) => {
-                self.transport.respond_error(
-                    id, crate::jsonrpc::INTERNAL_ERROR, &e.to_string(),
-                ).await;
+                self.transport
+                    .respond_error(id, crate::jsonrpc::INTERNAL_ERROR, &e.to_string())
+                    .await;
                 return;
             }
         };
@@ -65,9 +69,9 @@ impl AcpHandler {
         let session = match session_manager.create_session(&cwd, model) {
             Ok(s) => s,
             Err(e) => {
-                self.transport.respond_error(
-                    id, crate::jsonrpc::INTERNAL_ERROR, &e.to_string(),
-                ).await;
+                self.transport
+                    .respond_error(id, crate::jsonrpc::INTERNAL_ERROR, &e.to_string())
+                    .await;
                 return;
             }
         };
@@ -138,15 +142,26 @@ impl AcpHandler {
         session_id: &str,
         cwd: &std::path::Path,
         event_tx: mpsc::Sender<loopal_protocol::AgentEvent>,
-    ) -> (String, ContextPipeline, Arc<dyn std::any::Any + Send + Sync>) {
-        let skills: Vec<_> = self.config.skills.values()
+    ) -> (
+        String,
+        ContextPipeline,
+        Arc<dyn std::any::Any + Send + Sync>,
+    ) {
+        let skills: Vec<_> = self
+            .config
+            .skills
+            .values()
             .map(|e| e.skill.clone())
             .collect();
         let skills_summary = loopal_config::format_skills_summary(&skills);
         let tool_defs = kernel.tool_definitions();
         let system_prompt = build_system_prompt(
-            &self.config.instructions, &tool_defs, "",
-            &cwd.to_string_lossy(), &skills_summary, &self.config.memory,
+            &self.config.instructions,
+            &tool_defs,
+            "",
+            &cwd.to_string_lossy(),
+            &skills_summary,
+            &self.config.memory,
         );
 
         let mut pipeline = ContextPipeline::new();

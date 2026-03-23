@@ -7,16 +7,14 @@ fn parse_event(data: &str) -> (Vec<Result<StreamChunk, LoopalError>>, InlineStat
     (chunks, state)
 }
 
-fn parse_with_state(
-    data: &str,
-    state: &mut InlineState,
-) -> Vec<Result<StreamChunk, LoopalError>> {
+fn parse_with_state(data: &str, state: &mut InlineState) -> Vec<Result<StreamChunk, LoopalError>> {
     let parsed: serde_json::Value = match serde_json::from_str(data) {
         Ok(v) => v,
         Err(e) => {
-            return vec![Err(
-                ProviderError::SseParse(format!("invalid JSON: {e}: {data}")).into(),
-            )]
+            return vec![Err(ProviderError::SseParse(format!(
+                "invalid JSON: {e}: {data}"
+            ))
+            .into())];
         }
     };
 
@@ -37,7 +35,9 @@ fn parse_with_state(
             match delta["type"].as_str().unwrap_or("") {
                 "text_delta" => {
                     if let Some(text) = delta["text"].as_str() {
-                        chunks.push(Ok(StreamChunk::Text { text: text.to_string() }));
+                        chunks.push(Ok(StreamChunk::Text {
+                            text: text.to_string(),
+                        }));
                     }
                 }
                 "input_json_delta" => {
@@ -64,11 +64,17 @@ fn parse_with_state(
                 parsed["usage"]["input_tokens"].as_u64(),
                 parsed["usage"]["output_tokens"].as_u64(),
             ) {
-                let cc = parsed["usage"]["cache_creation_input_tokens"].as_u64().unwrap_or(0) as u32;
-                let cr = parsed["usage"]["cache_read_input_tokens"].as_u64().unwrap_or(0) as u32;
+                let cc = parsed["usage"]["cache_creation_input_tokens"]
+                    .as_u64()
+                    .unwrap_or(0) as u32;
+                let cr = parsed["usage"]["cache_read_input_tokens"]
+                    .as_u64()
+                    .unwrap_or(0) as u32;
                 chunks.push(Ok(StreamChunk::Usage {
-                    input_tokens: i as u32, output_tokens: o as u32,
-                    cache_creation_input_tokens: cc, cache_read_input_tokens: cr,
+                    input_tokens: i as u32,
+                    output_tokens: o as u32,
+                    cache_creation_input_tokens: cc,
+                    cache_read_input_tokens: cr,
                     thinking_tokens: 0,
                 }));
             }
@@ -78,16 +84,24 @@ fn parse_with_state(
                 parsed["message"]["usage"]["input_tokens"].as_u64(),
                 parsed["message"]["usage"]["output_tokens"].as_u64(),
             ) {
-                let cc = parsed["message"]["usage"]["cache_creation_input_tokens"].as_u64().unwrap_or(0) as u32;
-                let cr = parsed["message"]["usage"]["cache_read_input_tokens"].as_u64().unwrap_or(0) as u32;
+                let cc = parsed["message"]["usage"]["cache_creation_input_tokens"]
+                    .as_u64()
+                    .unwrap_or(0) as u32;
+                let cr = parsed["message"]["usage"]["cache_read_input_tokens"]
+                    .as_u64()
+                    .unwrap_or(0) as u32;
                 chunks.push(Ok(StreamChunk::Usage {
-                    input_tokens: i as u32, output_tokens: o as u32,
-                    cache_creation_input_tokens: cc, cache_read_input_tokens: cr,
+                    input_tokens: i as u32,
+                    output_tokens: o as u32,
+                    cache_creation_input_tokens: cc,
+                    cache_read_input_tokens: cr,
                     thinking_tokens: 0,
                 }));
             }
         }
-        "message_stop" => chunks.push(Ok(StreamChunk::Done { stop_reason: StopReason::EndTurn })),
+        "message_stop" => chunks.push(Ok(StreamChunk::Done {
+            stop_reason: StopReason::EndTurn,
+        })),
         _ => {}
     }
     chunks
@@ -102,14 +116,19 @@ struct InlineState {
 
 #[test]
 fn test_message_delta_usage() {
-    let (chunks, _) = parse_event(r#"{"type":"message_delta","usage":{"input_tokens":200,"output_tokens":50}}"#);
+    let (chunks, _) =
+        parse_event(r#"{"type":"message_delta","usage":{"input_tokens":200,"output_tokens":50}}"#);
     assert_eq!(chunks.len(), 1);
     match &chunks[0] {
-        Ok(StreamChunk::Usage { input_tokens, output_tokens, .. }) => {
+        Ok(StreamChunk::Usage {
+            input_tokens,
+            output_tokens,
+            ..
+        }) => {
             assert_eq!(*input_tokens, 200);
             assert_eq!(*output_tokens, 50);
         }
-        other => panic!("expected Usage, got: {:?}", other),
+        other => panic!("expected Usage, got: {other:?}"),
     }
 }
 
@@ -117,7 +136,11 @@ fn test_message_delta_usage() {
 fn test_message_stop() {
     let (chunks, _) = parse_event(r#"{"type":"message_stop"}"#);
     assert_eq!(chunks.len(), 1);
-    assert!(matches!(&chunks[0], Ok(StreamChunk::Done { .. })), "expected Done, got: {:?}", &chunks[0]);
+    assert!(
+        matches!(&chunks[0], Ok(StreamChunk::Done { .. })),
+        "expected Done, got: {:?}",
+        &chunks[0]
+    );
 }
 
 #[test]
@@ -135,7 +158,8 @@ fn test_unknown_event_type() {
 
 #[test]
 fn test_content_block_start_text() {
-    let (chunks, state) = parse_event(r#"{"type":"content_block_start","content_block":{"type":"text","text":""}}"#);
+    let (chunks, state) =
+        parse_event(r#"{"type":"content_block_start","content_block":{"type":"text","text":""}}"#);
     assert!(chunks.is_empty());
     assert!(state.tool_id.is_none());
 }
@@ -168,7 +192,8 @@ fn test_message_start_without_usage() {
 
 #[test]
 fn test_text_delta_missing_text_field() {
-    let (chunks, _) = parse_event(r#"{"type":"content_block_delta","delta":{"type":"text_delta"}}"#);
+    let (chunks, _) =
+        parse_event(r#"{"type":"content_block_delta","delta":{"type":"text_delta"}}"#);
     assert!(chunks.is_empty());
 }
 
@@ -179,25 +204,38 @@ fn test_input_json_delta_missing_partial_json() {
         tool_name: Some("tool".to_string()),
         json_buf: String::new(),
     };
-    let chunks = parse_with_state(r#"{"type":"content_block_delta","delta":{"type":"input_json_delta"}}"#, &mut state);
+    let chunks = parse_with_state(
+        r#"{"type":"content_block_delta","delta":{"type":"input_json_delta"}}"#,
+        &mut state,
+    );
     assert!(chunks.is_empty());
     assert!(state.json_buf.is_empty());
 }
 
 #[test]
 fn test_unknown_delta_type() {
-    let (chunks, _) = parse_event(r#"{"type":"content_block_delta","delta":{"type":"unknown_delta"}}"#);
+    let (chunks, _) =
+        parse_event(r#"{"type":"content_block_delta","delta":{"type":"unknown_delta"}}"#);
     assert!(chunks.is_empty());
 }
 
 #[test]
 fn test_full_tool_use_flow() {
     let mut state = InlineState::default();
-    let c = parse_with_state(r#"{"type":"content_block_start","content_block":{"type":"tool_use","id":"call_abc","name":"bash"}}"#, &mut state);
+    let c = parse_with_state(
+        r#"{"type":"content_block_start","content_block":{"type":"tool_use","id":"call_abc","name":"bash"}}"#,
+        &mut state,
+    );
     assert!(c.is_empty());
-    let c = parse_with_state(r#"{"type":"content_block_delta","delta":{"type":"input_json_delta","partial_json":"{\"cmd\":\"ls"}}"#, &mut state);
+    let c = parse_with_state(
+        r#"{"type":"content_block_delta","delta":{"type":"input_json_delta","partial_json":"{\"cmd\":\"ls"}}"#,
+        &mut state,
+    );
     assert!(c.is_empty());
-    let c = parse_with_state(r#"{"type":"content_block_delta","delta":{"type":"input_json_delta","partial_json":" -la\"}"}}"#, &mut state);
+    let c = parse_with_state(
+        r#"{"type":"content_block_delta","delta":{"type":"input_json_delta","partial_json":" -la\"}"}}"#,
+        &mut state,
+    );
     assert!(c.is_empty());
     let c = parse_with_state(r#"{"type":"content_block_stop"}"#, &mut state);
     assert_eq!(c.len(), 1);
@@ -207,6 +245,6 @@ fn test_full_tool_use_flow() {
             assert_eq!(name, "bash");
             assert_eq!(input["cmd"], "ls -la");
         }
-        other => panic!("expected ToolUse, got: {:?}", other),
+        other => panic!("expected ToolUse, got: {other:?}"),
     }
 }

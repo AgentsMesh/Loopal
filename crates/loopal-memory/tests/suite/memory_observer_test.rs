@@ -48,7 +48,10 @@ async fn test_observer_processes_each_observation() {
     drop(tx); // close channel → observer exits
 
     handle.await.unwrap();
-    assert_eq!(processor.observations(), vec!["preference: bun", "convention: snake_case"]);
+    assert_eq!(
+        processor.observations(),
+        vec!["preference: bun", "convention: snake_case"]
+    );
 }
 
 #[tokio::test]

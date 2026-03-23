@@ -1,6 +1,4 @@
-use loopal_error::{
-    AgentOutput, LoopalError, ProviderError, TerminateReason,
-};
+use loopal_error::{AgentOutput, LoopalError, ProviderError, TerminateReason};
 
 // --- ContextOverflow ---
 

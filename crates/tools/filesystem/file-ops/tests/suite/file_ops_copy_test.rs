@@ -11,7 +11,8 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext {
         session_id: "test".into(),
         shared: None,
-        pending_cwd_switch: Default::default(), memory_channel: None,
+        pending_cwd_switch: Default::default(),
+        memory_channel: None,
         backend,
     }
 }
@@ -22,11 +23,20 @@ async fn copy_basic() {
     std::fs::write(tmp.path().join("a.txt"), "hello").unwrap();
     let tool = CopyFileTool;
     let ctx = make_ctx(tmp.path());
-    let r = tool.execute(json!({"src": "a.txt", "dst": "b.txt"}), &ctx).await.unwrap();
+    let r = tool
+        .execute(json!({"src": "a.txt", "dst": "b.txt"}), &ctx)
+        .await
+        .unwrap();
     assert!(!r.is_error, "unexpected error: {}", r.content);
     assert!(r.content.contains("Copied"));
-    assert_eq!(std::fs::read_to_string(tmp.path().join("a.txt")).unwrap(), "hello");
-    assert_eq!(std::fs::read_to_string(tmp.path().join("b.txt")).unwrap(), "hello");
+    assert_eq!(
+        std::fs::read_to_string(tmp.path().join("a.txt")).unwrap(),
+        "hello"
+    );
+    assert_eq!(
+        std::fs::read_to_string(tmp.path().join("b.txt")).unwrap(),
+        "hello"
+    );
 }
 
 #[tokio::test]
@@ -34,7 +44,10 @@ async fn copy_src_not_found() {
     let tmp = tempfile::tempdir().unwrap();
     let tool = CopyFileTool;
     let ctx = make_ctx(tmp.path());
-    let r = tool.execute(json!({"src": "nope.txt", "dst": "b.txt"}), &ctx).await.unwrap();
+    let r = tool
+        .execute(json!({"src": "nope.txt", "dst": "b.txt"}), &ctx)
+        .await
+        .unwrap();
     assert!(r.is_error);
 }
 
@@ -45,7 +58,10 @@ async fn copy_dst_is_directory() {
     std::fs::create_dir(tmp.path().join("dest")).unwrap();
     let tool = CopyFileTool;
     let ctx = make_ctx(tmp.path());
-    let r = tool.execute(json!({"src": "a.txt", "dst": "dest"}), &ctx).await.unwrap();
+    let r = tool
+        .execute(json!({"src": "a.txt", "dst": "dest"}), &ctx)
+        .await
+        .unwrap();
     assert!(!r.is_error, "unexpected error: {}", r.content);
     assert!(tmp.path().join("dest/a.txt").exists());
 }

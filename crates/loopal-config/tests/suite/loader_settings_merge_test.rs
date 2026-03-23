@@ -143,7 +143,10 @@ fn test_load_settings_invalid_local_json_returns_error() {
     std::fs::write(config_dir.join("settings.local.json"), "NOT_JSON!!").unwrap();
 
     let result = load_config(tmp.path());
-    assert!(result.is_err(), "invalid local JSON should produce an error");
+    assert!(
+        result.is_err(),
+        "invalid local JSON should produce an error"
+    );
 }
 
 #[test]

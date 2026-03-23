@@ -2,17 +2,13 @@
 
 use std::time::Instant;
 
-use loopal_protocol::AgentStatus;
 use loopal_protocol::AgentEventPayload;
+use loopal_protocol::AgentStatus;
 
 use crate::state::SessionState;
 
 /// Handle a sub-agent event by updating its AgentViewState.
-pub(crate) fn apply_agent_event(
-    state: &mut SessionState,
-    name: &str,
-    payload: AgentEventPayload,
-) {
+pub(crate) fn apply_agent_event(state: &mut SessionState, name: &str, payload: AgentEventPayload) {
     let agent = state.agents.entry(name.to_string()).or_default();
 
     // Record first-seen timestamp for elapsed time display
@@ -24,7 +20,9 @@ pub(crate) fn apply_agent_event(
         AgentEventPayload::Started => {
             agent.observable.status = AgentStatus::Running;
         }
-        AgentEventPayload::ToolCall { name: tool_name, .. } => {
+        AgentEventPayload::ToolCall {
+            name: tool_name, ..
+        } => {
             agent.observable.tool_count += 1;
             agent.observable.last_tool = Some(tool_name.clone());
             agent.observable.status = AgentStatus::Running;
@@ -33,7 +31,9 @@ pub(crate) fn apply_agent_event(
             agent.observable.status = AgentStatus::Running;
         }
         AgentEventPayload::TokenUsage {
-            input_tokens, output_tokens, ..
+            input_tokens,
+            output_tokens,
+            ..
         } => {
             agent.observable.input_tokens = *input_tokens;
             agent.observable.output_tokens = *output_tokens;

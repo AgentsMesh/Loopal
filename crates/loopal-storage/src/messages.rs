@@ -17,8 +17,8 @@ pub struct MessageStore {
 impl MessageStore {
     /// Create a store using the default global directory (~/.loopal).
     pub fn new() -> Result<Self, StorageError> {
-        let base_dir = loopal_config::global_config_dir()
-            .map_err(|_| StorageError::HomeDirNotFound)?;
+        let base_dir =
+            loopal_config::global_config_dir().map_err(|_| StorageError::HomeDirNotFound)?;
         Ok(Self { base_dir })
     }
 
@@ -43,35 +43,24 @@ impl MessageStore {
             .create(true)
             .append(true)
             .open(&path)?;
-        writeln!(file, "{}", line)?;
+        writeln!(file, "{line}")?;
         Ok(())
     }
 
     /// Append any entry (message or marker) to the JSONL file.
-    pub fn append_entry(
-        &self,
-        session_id: &str,
-        entry: &TaggedEntry,
-    ) -> Result<(), StorageError> {
-        let line = serde_json::to_string(entry)
-            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+    pub fn append_entry(&self, session_id: &str, entry: &TaggedEntry) -> Result<(), StorageError> {
+        let line =
+            serde_json::to_string(entry).map_err(|e| StorageError::Serialization(e.to_string()))?;
         self.append_line(session_id, &line)
     }
 
     /// Convenience: append a message as a `TaggedEntry::Message`.
-    pub fn append_message(
-        &self,
-        session_id: &str,
-        message: &Message,
-    ) -> Result<(), StorageError> {
+    pub fn append_message(&self, session_id: &str, message: &Message) -> Result<(), StorageError> {
         self.append_entry(session_id, &TaggedEntry::Message(message.clone()))
     }
 
     /// Load raw entries without replay (useful for debugging).
-    pub fn load_entries(
-        &self,
-        session_id: &str,
-    ) -> Result<Vec<TaggedEntry>, StorageError> {
+    pub fn load_entries(&self, session_id: &str) -> Result<Vec<TaggedEntry>, StorageError> {
         let path = self.messages_file(session_id);
         if !path.exists() {
             return Ok(Vec::new());
@@ -90,10 +79,7 @@ impl MessageStore {
     }
 
     /// Load messages for a session, replaying any markers (Clear/CompactTo/RewindTo).
-    pub fn load_messages(
-        &self,
-        session_id: &str,
-    ) -> Result<Vec<Message>, StorageError> {
+    pub fn load_messages(&self, session_id: &str) -> Result<Vec<Message>, StorageError> {
         let entries = self.load_entries(session_id)?;
         Ok(replay::replay(entries))
     }

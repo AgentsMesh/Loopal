@@ -50,9 +50,8 @@ impl MdWriter {
             && !url.is_empty()
         {
             let dim = Style::default().fg(Color::DarkGray);
-            self.pending_spans.push(Span::styled(
-                format!(" ({})", url), dim,
-            ));
+            self.pending_spans
+                .push(Span::styled(format!(" ({url})"), dim));
         }
     }
 
@@ -98,9 +97,8 @@ impl MdWriter {
 
     pub(super) fn on_footnote_ref(&mut self, label: &str) {
         let dim = Style::default().fg(Color::DarkGray);
-        self.pending_spans.push(Span::styled(
-            format!("[^{}]", label), dim,
-        ));
+        self.pending_spans
+            .push(Span::styled(format!("[^{label}]"), dim));
     }
 
     // ---- Text ----
@@ -123,12 +121,12 @@ impl MdWriter {
 
     pub(super) fn on_inline_code(&mut self, code: &str) {
         if self.in_table {
-            self.current_cell.push_str(&format!("`{}`", code));
+            self.current_cell.push_str(&format!("`{code}`"));
             return;
         }
         let style = self.current_style().patch(self.styles.code_inline);
         self.pending_spans
-            .push(Span::styled(format!("`{}`", code), style));
+            .push(Span::styled(format!("`{code}`"), style));
     }
 
     // ---- Breaks ----

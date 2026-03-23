@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use loopal_runtime::frontend::{PermissionHandler, TuiPermissionHandler};
 use loopal_protocol::AgentEventPayload;
+use loopal_runtime::frontend::{PermissionHandler, TuiPermissionHandler};
 use loopal_tool_api::PermissionDecision;
 use tokio::sync::mpsc;
 
@@ -15,11 +15,16 @@ async fn test_tui_permission_handler_approved() {
 
     tokio::spawn(async move {
         let ev = event_rx.recv().await.unwrap();
-        assert!(matches!(ev.payload, AgentEventPayload::ToolPermissionRequest { .. }));
+        assert!(matches!(
+            ev.payload,
+            AgentEventPayload::ToolPermissionRequest { .. }
+        ));
         perm_tx.send(true).await.unwrap();
     });
 
-    let d = handler_clone.decide("id1", "Write", &serde_json::json!({})).await;
+    let d = handler_clone
+        .decide("id1", "Write", &serde_json::json!({}))
+        .await;
     assert_eq!(d, PermissionDecision::Allow);
 }
 

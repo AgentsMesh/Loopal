@@ -1,5 +1,5 @@
 use loopal_provider_api::{EffortLevel, ThinkingConfig};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// Translate a resolved `ThinkingConfig` into Google's thinkingConfig JSON format.
 pub fn to_google_thinking(config: &ThinkingConfig) -> Value {

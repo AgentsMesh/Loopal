@@ -12,9 +12,7 @@ const SYSTEM_WRITABLE_PATHS: &[&str] = &[
 /// Append seatbelt rules for essential system writable paths.
 fn append_system_write_rules(profile: &mut String) {
     for path in SYSTEM_WRITABLE_PATHS {
-        profile.push_str(&format!(
-            "(allow file-write* (subpath \"{path}\"))\n"
-        ));
+        profile.push_str(&format!("(allow file-write* (subpath \"{path}\"))\n"));
     }
 }
 ///
@@ -45,9 +43,7 @@ pub fn generate_seatbelt_profile(policy: &ResolvedPolicy) -> String {
             // Allow writes to configured writable paths
             for path in &policy.writable_paths {
                 let path_str = path.to_string_lossy();
-                profile.push_str(&format!(
-                    "(allow file-write* (subpath \"{path_str}\"))\n"
-                ));
+                profile.push_str(&format!("(allow file-write* (subpath \"{path_str}\"))\n"));
             }
         }
         SandboxPolicy::Disabled => {
@@ -56,9 +52,7 @@ pub fn generate_seatbelt_profile(policy: &ResolvedPolicy) -> String {
     }
 
     // Allow network if not restricted
-    if policy.network.allowed_domains.is_empty()
-        && policy.network.denied_domains.is_empty()
-    {
+    if policy.network.allowed_domains.is_empty() && policy.network.denied_domains.is_empty() {
         profile.push_str("(allow network*)\n");
     }
 
@@ -66,10 +60,7 @@ pub fn generate_seatbelt_profile(policy: &ResolvedPolicy) -> String {
 }
 
 /// Build the `sandbox-exec` command prefix.
-pub fn build_prefix(
-    policy: &ResolvedPolicy,
-    _cwd: &Path,
-) -> (String, Vec<String>) {
+pub fn build_prefix(policy: &ResolvedPolicy, _cwd: &Path) -> (String, Vec<String>) {
     let profile = generate_seatbelt_profile(policy);
     let program = "sandbox-exec".to_string();
     let args = vec!["-p".to_string(), profile];

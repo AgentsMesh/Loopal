@@ -123,4 +123,3 @@ async fn smart_compact_over_limit_no_provider_falls_back_to_truncation() {
         ctx.messages.len()
     );
 }
-

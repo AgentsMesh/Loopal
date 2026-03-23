@@ -7,11 +7,11 @@ use tracing::{Instrument, info, info_span};
 
 use loopal_context::ContextPipeline;
 use loopal_context::middleware::{ContextGuard, SmartCompact};
-use loopal_runtime::{AgentLoopParams, AgentMode, SessionManager, UnifiedFrontend, agent_loop};
-use loopal_runtime::frontend::{AutoDenyHandler, AutoCancelQuestionHandler};
+use loopal_message::Message;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::Envelope;
-use loopal_message::Message;
+use loopal_runtime::frontend::{AutoCancelQuestionHandler, AutoDenyHandler};
+use loopal_runtime::{AgentLoopParams, AgentMode, SessionManager, UnifiedFrontend, agent_loop};
 
 use crate::config::AgentConfig;
 use crate::registry::AgentHandle;
@@ -48,10 +48,16 @@ pub async fn spawn_agent(
     params: SpawnParams,
 ) -> Result<SpawnResult, String> {
     let agent_id = uuid::Uuid::new_v4().to_string();
-    let model = params.agent_config.model.clone()
+    let model = params
+        .agent_config
+        .model
+        .clone()
         .unwrap_or_else(|| params.parent_model.clone());
 
-    let tool_filter = params.agent_config.allowed_tools.as_ref()
+    let tool_filter = params
+        .agent_config
+        .allowed_tools
+        .as_ref()
         .map(|tools| tools.iter().cloned().collect::<HashSet<String>>());
 
     let cancel_token = match params.parent_cancel_token {
@@ -69,7 +75,9 @@ pub async fn spawn_agent(
     }
 
     // Use parent's event_tx directly — no intermediate channel.
-    let parent_event_tx = shared.parent_event_tx.clone()
+    let parent_event_tx = shared
+        .parent_event_tx
+        .clone()
         .ok_or_else(|| "parent_event_tx not set — cannot spawn sub-agent".to_string())?;
 
     let frontend = Arc::new(UnifiedFrontend::new(
@@ -82,18 +90,20 @@ pub async fn spawn_agent(
         Box::new(AutoCancelQuestionHandler),
     ));
 
-    let session_manager = SessionManager::new()
-        .map_err(|e| format!("failed to create session manager: {e}"))?;
+    let session_manager =
+        SessionManager::new().map_err(|e| format!("failed to create session manager: {e}"))?;
 
     let effective_cwd = params.cwd_override.as_deref().unwrap_or(&shared.cwd);
-    let session = session_manager.create_session(effective_cwd, &model)
+    let session = session_manager
+        .create_session(effective_cwd, &model)
         .map_err(|e| format!("failed to create session: {e}"))?;
 
     let system_prompt = if params.agent_config.system_prompt.is_empty() {
         format!(
             "You are a sub-agent named '{}'. Your working directory is: {}. \
              Complete the task given to you. When done, call AttemptCompletion with your result.",
-            params.name, effective_cwd.display()
+            params.name,
+            effective_cwd.display()
         )
     } else {
         params.agent_config.system_prompt.clone()
@@ -123,13 +133,16 @@ pub async fn spawn_agent(
 
     let agent_params = AgentLoopParams {
         kernel: Arc::clone(&shared.kernel),
-        session, model, system_prompt,
+        session,
+        model,
+        system_prompt,
         messages: vec![Message::user(&params.prompt)],
         mode: AgentMode::Act,
         permission_mode: params.agent_config.permission_mode,
         max_turns,
         frontend,
-        session_manager, tool_filter,
+        session_manager,
+        tool_filter,
         context_pipeline: pipeline,
         shared: Some(shared_any),
         interactive: false,
@@ -162,7 +175,8 @@ pub async fn spawn_agent(
             cleanup_router.unregister(&cleanup_name).await;
             reg.lock().await.remove(&cleanup_name);
             info!(agent = %agent_name, "sub-agent cleaned up");
-        }.instrument(span)
+        }
+        .instrument(span)
     });
 
     Ok(SpawnResult {
@@ -171,7 +185,8 @@ pub async fn spawn_agent(
             id: agent_id,
             name: params.name,
             agent_type: params.agent_config.name.clone(),
-            cancel_token, join_handle,
+            cancel_token,
+            join_handle,
         },
         result_rx,
     })

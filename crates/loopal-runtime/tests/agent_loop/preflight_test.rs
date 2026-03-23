@@ -47,9 +47,7 @@ fn preflight_compact_fallback_with_no_tool_results() {
     use loopal_context::compact_messages;
     use loopal_context::compaction::find_largest_tool_result;
 
-    let mut messages: Vec<Message> = (0..20)
-        .map(|_| Message::user(&"y".repeat(1000)))
-        .collect();
+    let mut messages: Vec<Message> = (0..20).map(|_| Message::user(&"y".repeat(1000))).collect();
 
     assert!(find_largest_tool_result(&messages).is_none());
 
@@ -87,7 +85,11 @@ fn preflight_iterative_truncation_handles_multiple_blocks() {
     // All ToolResults should be truncated
     for msg in &messages {
         if let ContentBlock::ToolResult { content, .. } = &msg.content[0] {
-            assert!(content.len() < 5000, "should be truncated: {}", content.len());
+            assert!(
+                content.len() < 5000,
+                "should be truncated: {}",
+                content.len()
+            );
         }
     }
 }

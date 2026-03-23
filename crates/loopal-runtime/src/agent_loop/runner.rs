@@ -1,9 +1,9 @@
-use std::sync::Arc;
-use loopal_provider::get_model_info;
 use loopal_error::{AgentOutput, Result};
 use loopal_protocol::{AgentEventPayload, InterruptSignal};
+use loopal_provider::get_model_info;
 use loopal_provider_api::{StopReason, ThinkingConfig};
 use loopal_tool_api::ToolContext;
+use std::sync::Arc;
 use tokio::sync::Notify;
 use tracing::{Instrument, info, info_span, warn};
 
@@ -30,9 +30,9 @@ pub struct AgentLoopRunner {
 impl AgentLoopRunner {
     pub fn new(params: AgentLoopParams) -> Self {
         let tool_ctx = ToolContext {
-            backend: params.kernel.create_backend(
-                std::path::Path::new(&params.session.cwd),
-            ),
+            backend: params
+                .kernel
+                .create_backend(std::path::Path::new(&params.session.cwd)),
             session_id: params.session.id.clone(),
             shared: params.shared.clone(),
             pending_cwd_switch: Default::default(),
@@ -45,13 +45,19 @@ impl AgentLoopRunner {
         let interrupt = params.interrupt.clone();
         let interrupt_notify = params.interrupt_notify.clone();
         Self {
-            params, tool_ctx, turn_count: 0,
-            total_input_tokens: 0, total_output_tokens: 0,
-            total_cache_creation_tokens: 0, total_cache_read_tokens: 0,
+            params,
+            tool_ctx,
+            turn_count: 0,
+            total_input_tokens: 0,
+            total_output_tokens: 0,
+            total_cache_creation_tokens: 0,
+            total_cache_read_tokens: 0,
             total_thinking_tokens: 0,
             thinking_config,
-            max_context_tokens, max_output_tokens,
-            interrupt, interrupt_notify,
+            max_context_tokens,
+            max_output_tokens,
+            interrupt,
+            interrupt_notify,
         }
     }
 
@@ -72,9 +78,11 @@ impl AgentLoopRunner {
 
         // Surface the fatal error to TUI before finishing
         if let Err(ref e) = result {
-            let _ = self.emit(AgentEventPayload::Error {
-                message: e.to_string(),
-            }).await;
+            let _ = self
+                .emit(AgentEventPayload::Error {
+                    message: e.to_string(),
+                })
+                .await;
         }
 
         // Always emit Finished, even on error — TUI relies on this to exit "Working" state.
@@ -110,16 +118,21 @@ impl AgentLoopRunner {
             if result.stop_reason == StopReason::MaxTokens && !result.tool_uses.is_empty() {
                 warn!("max_tokens hit with tool calls — discarding truncated tools");
                 self.record_assistant_message(
-                    &result.assistant_text, &[],
-                    &result.thinking_text, result.thinking_signature.as_deref(),
+                    &result.assistant_text,
+                    &[],
+                    &result.thinking_text,
+                    result.thinking_signature.as_deref(),
                 );
-                if !result.assistant_text.is_empty() { last_text.clone_from(&result.assistant_text); }
+                if !result.assistant_text.is_empty() {
+                    last_text.clone_from(&result.assistant_text);
+                }
                 if continuation_count < MAX_AUTO_CONTINUATIONS {
                     continuation_count += 1;
                     self.emit(AgentEventPayload::AutoContinuation {
                         continuation: continuation_count,
                         max_continuations: MAX_AUTO_CONTINUATIONS,
-                    }).await?;
+                    })
+                    .await?;
                     continue;
                 }
                 return Ok(TurnOutput { output: last_text });
@@ -127,12 +140,19 @@ impl AgentLoopRunner {
 
             // Record to persistent history (params.messages + storage)
             self.record_assistant_message(
-                &result.assistant_text, &result.tool_uses,
-                &result.thinking_text, result.thinking_signature.as_deref(),
+                &result.assistant_text,
+                &result.tool_uses,
+                &result.thinking_text,
+                result.thinking_signature.as_deref(),
             );
-            if !result.assistant_text.is_empty() { last_text.clone_from(&result.assistant_text); }
+            if !result.assistant_text.is_empty() {
+                last_text.clone_from(&result.assistant_text);
+            }
 
-            if result.stream_error && result.tool_uses.is_empty() && result.assistant_text.is_empty() {
+            if result.stream_error
+                && result.tool_uses.is_empty()
+                && result.assistant_text.is_empty()
+            {
                 return Ok(TurnOutput { output: last_text });
             }
 
@@ -143,14 +163,17 @@ impl AgentLoopRunner {
                     self.emit(AgentEventPayload::AutoContinuation {
                         continuation: continuation_count,
                         max_continuations: MAX_AUTO_CONTINUATIONS,
-                    }).await?;
+                    })
+                    .await?;
                     continue;
                 }
                 return Ok(TurnOutput { output: last_text });
             }
 
             if result.tool_uses.is_empty() {
-                return Ok(TurnOutput { output: result.assistant_text });
+                return Ok(TurnOutput {
+                    output: result.assistant_text,
+                });
             }
 
             // Execute tools → results appended to persistent params.messages
@@ -172,7 +195,11 @@ impl AgentLoopRunner {
 
     /// If a tool (e.g. EnterWorktree) requested a cwd switch, recreate the backend.
     fn apply_pending_cwd_switch(&mut self) {
-        let new_cwd = self.tool_ctx.pending_cwd_switch.lock().ok()
+        let new_cwd = self
+            .tool_ctx
+            .pending_cwd_switch
+            .lock()
+            .ok()
             .and_then(|mut guard| guard.take());
         if let Some(cwd) = new_cwd {
             info!(new_cwd = %cwd.display(), "applying cwd switch");

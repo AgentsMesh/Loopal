@@ -1,8 +1,8 @@
-use loopal_provider::OpenAiProvider;
 use loopal_message::{ContentBlock, Message, MessageRole};
+use loopal_provider::OpenAiProvider;
 use loopal_provider_api::ChatParams;
 use loopal_tool_api::ToolDefinition;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 fn make_provider() -> OpenAiProvider {
     OpenAiProvider::new("test-key".to_string())

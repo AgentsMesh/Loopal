@@ -23,21 +23,61 @@ pub struct CommandEntry {
 /// All built-in slash commands.
 fn all_commands() -> &'static [SlashCommand] {
     static COMMANDS: &[SlashCommand] = &[
-        SlashCommand { name: "/plan", description: "Switch to Plan mode", has_arg: false },
-        SlashCommand { name: "/act", description: "Switch to Act mode", has_arg: false },
-        SlashCommand { name: "/clear", description: "Clear conversation history", has_arg: false },
-        SlashCommand { name: "/compact", description: "Compact old messages", has_arg: false },
-        SlashCommand { name: "/model", description: "Switch model", has_arg: false },
-        SlashCommand { name: "/rewind", description: "Rewind to a previous turn", has_arg: false },
-        SlashCommand { name: "/status", description: "Show current status", has_arg: false },
+        SlashCommand {
+            name: "/plan",
+            description: "Switch to Plan mode",
+            has_arg: false,
+        },
+        SlashCommand {
+            name: "/act",
+            description: "Switch to Act mode",
+            has_arg: false,
+        },
+        SlashCommand {
+            name: "/clear",
+            description: "Clear conversation history",
+            has_arg: false,
+        },
+        SlashCommand {
+            name: "/compact",
+            description: "Compact old messages",
+            has_arg: false,
+        },
+        SlashCommand {
+            name: "/model",
+            description: "Switch model",
+            has_arg: false,
+        },
+        SlashCommand {
+            name: "/rewind",
+            description: "Rewind to a previous turn",
+            has_arg: false,
+        },
+        SlashCommand {
+            name: "/status",
+            description: "Show current status",
+            has_arg: false,
+        },
         SlashCommand {
             name: "/sessions",
             description: "List session history",
             has_arg: false,
         },
-        SlashCommand { name: "/init", description: "Initialize project config", has_arg: false },
-        SlashCommand { name: "/help", description: "Show commands and shortcuts", has_arg: false },
-        SlashCommand { name: "/exit", description: "Exit the application", has_arg: false },
+        SlashCommand {
+            name: "/init",
+            description: "Initialize project config",
+            has_arg: false,
+        },
+        SlashCommand {
+            name: "/help",
+            description: "Show commands and shortcuts",
+            has_arg: false,
+        },
+        SlashCommand {
+            name: "/exit",
+            description: "Exit the application",
+            has_arg: false,
+        },
     ];
     COMMANDS
 }
@@ -58,8 +98,7 @@ pub fn builtin_entries() -> Vec<CommandEntry> {
 /// Merge built-in commands with skills. Built-in commands take priority over same-named skills.
 pub fn merge_commands(skills: &[Skill]) -> Vec<CommandEntry> {
     let mut entries = builtin_entries();
-    let builtin_names: HashSet<String> =
-        entries.iter().map(|e| e.name.clone()).collect();
+    let builtin_names: HashSet<String> = entries.iter().map(|e| e.name.clone()).collect();
     for skill in skills {
         if !builtin_names.contains(&skill.name) {
             entries.push(CommandEntry {

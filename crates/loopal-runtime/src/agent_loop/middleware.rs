@@ -16,12 +16,8 @@ impl AgentLoopRunner {
 
     /// Execute the middleware pipeline on a provided working copy.
     /// The caller owns `working` and decides what to do with the result.
-    pub async fn execute_middleware_on(
-        &mut self,
-        working: &mut Vec<Message>,
-    ) -> Result<bool> {
-        let summarization_provider =
-            self.params.kernel.resolve_provider(&self.params.model).ok();
+    pub async fn execute_middleware_on(&mut self, working: &mut Vec<Message>) -> Result<bool> {
+        let summarization_provider = self.params.kernel.resolve_provider(&self.params.model).ok();
 
         let mut mw_ctx = MiddlewareContext {
             messages: working.clone(),
@@ -48,7 +44,7 @@ impl AgentLoopRunner {
 
         let after = working.len();
         if after < before {
-            let note = format!("[context compacted: {} → {} messages]\n", before, after);
+            let note = format!("[context compacted: {before} → {after} messages]\n");
             self.emit(AgentEventPayload::Stream { text: note }).await?;
         }
 

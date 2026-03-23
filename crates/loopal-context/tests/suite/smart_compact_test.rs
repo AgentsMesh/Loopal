@@ -23,11 +23,7 @@ fn large_message(n: usize) -> Message {
 async fn smart_compact_few_messages_no_change_even_over_limit() {
     let keep_last = 5;
     let mw = SmartCompact::new(keep_last);
-    let messages = vec![
-        large_message(400),
-        large_message(400),
-        large_message(400),
-    ];
+    let messages = vec![large_message(400), large_message(400), large_message(400)];
     let original_len = messages.len();
     let mut ctx = make_ctx(messages, 50);
     mw.process(&mut ctx).await.unwrap();
@@ -129,11 +125,7 @@ async fn smart_compact_with_long_tool_result_truncation() {
 #[tokio::test]
 async fn smart_compact_empty_old_messages_no_change() {
     let mw = SmartCompact::new(10);
-    let messages = vec![
-        large_message(400),
-        large_message(400),
-        large_message(400),
-    ];
+    let messages = vec![large_message(400), large_message(400), large_message(400)];
     let original_len = messages.len();
     let mut ctx = make_ctx(messages, 50);
     mw.process(&mut ctx).await.unwrap();

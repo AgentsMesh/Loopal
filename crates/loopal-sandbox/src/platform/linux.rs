@@ -14,66 +14,53 @@ pub fn build_bwrap_args(policy: &ResolvedPolicy, cwd: &Path) -> Vec<String> {
     match policy.policy {
         SandboxPolicy::ReadOnly => {
             // Bind entire filesystem read-only
-            args.extend_from_slice(&[
-                "--ro-bind".into(), "/".into(), "/".into(),
-            ]);
+            args.extend_from_slice(&["--ro-bind".into(), "/".into(), "/".into()]);
             // Still need proc/dev for basic commands
             args.extend_from_slice(&[
-                "--proc".into(), "/proc".into(),
-                "--dev".into(), "/dev".into(),
+                "--proc".into(),
+                "/proc".into(),
+                "--dev".into(),
+                "/dev".into(),
             ]);
             // System paths needed even in read-only mode
             for path in SYSTEM_WRITABLE_PATHS {
-                args.extend_from_slice(&[
-                    "--bind".into(), (*path).into(), (*path).into(),
-                ]);
+                args.extend_from_slice(&["--bind".into(), (*path).into(), (*path).into()]);
             }
         }
         SandboxPolicy::WorkspaceWrite => {
             // Bind root read-only first
+            args.extend_from_slice(&["--ro-bind".into(), "/".into(), "/".into()]);
             args.extend_from_slice(&[
-                "--ro-bind".into(), "/".into(), "/".into(),
-            ]);
-            args.extend_from_slice(&[
-                "--proc".into(), "/proc".into(),
-                "--dev".into(), "/dev".into(),
+                "--proc".into(),
+                "/proc".into(),
+                "--dev".into(),
+                "/dev".into(),
             ]);
             // System paths
             for path in SYSTEM_WRITABLE_PATHS {
-                args.extend_from_slice(&[
-                    "--bind".into(), (*path).into(), (*path).into(),
-                ]);
+                args.extend_from_slice(&["--bind".into(), (*path).into(), (*path).into()]);
             }
 
             // Bind writable paths
             for path in &policy.writable_paths {
                 let p = path.to_string_lossy().into_owned();
-                args.extend_from_slice(&[
-                    "--bind".into(), p.clone(), p,
-                ]);
+                args.extend_from_slice(&["--bind".into(), p.clone(), p]);
             }
         }
         SandboxPolicy::Disabled => {
             // No sandboxing, bind everything read-write
-            args.extend_from_slice(&[
-                "--bind".into(), "/".into(), "/".into(),
-            ]);
+            args.extend_from_slice(&["--bind".into(), "/".into(), "/".into()]);
         }
     }
 
     // Set working directory
-    args.extend_from_slice(&[
-        "--chdir".into(),
-        cwd.to_string_lossy().into_owned(),
-    ]);
+    args.extend_from_slice(&["--chdir".into(), cwd.to_string_lossy().into_owned()]);
 
     // Unshare namespaces for isolation
     args.push("--unshare-pid".into());
 
     // Disable network if required
-    if !policy.network.allowed_domains.is_empty()
-        || !policy.network.denied_domains.is_empty()
-    {
+    if !policy.network.allowed_domains.is_empty() || !policy.network.denied_domains.is_empty() {
         // Note: bwrap can only fully disable network, not filter by domain.
         // For domain-level filtering, an additional proxy would be needed.
         // Here we only unshare if there's a strict allowlist.
@@ -86,10 +73,7 @@ pub fn build_bwrap_args(policy: &ResolvedPolicy, cwd: &Path) -> Vec<String> {
 }
 
 /// Build the `bwrap` command prefix.
-pub fn build_prefix(
-    policy: &ResolvedPolicy,
-    cwd: &Path,
-) -> (String, Vec<String>) {
+pub fn build_prefix(policy: &ResolvedPolicy, cwd: &Path) -> (String, Vec<String>) {
     let program = "bwrap".to_string();
     let args = build_bwrap_args(policy, cwd);
     (program, args)

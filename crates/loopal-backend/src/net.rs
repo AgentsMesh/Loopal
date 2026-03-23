@@ -32,7 +32,10 @@ pub async fn fetch_url(
         .build()
         .map_err(|e| ToolIoError::Network(e.to_string()))?;
 
-    let response = client.get(url).send().await
+    let response = client
+        .get(url)
+        .send()
+        .await
         .map_err(|e| ToolIoError::Network(format!("HTTP request failed: {e}")))?;
 
     let status = response.status().as_u16();
@@ -40,7 +43,8 @@ pub async fn fetch_url(
         return Err(ToolIoError::Network(format!("HTTP {status}")));
     }
 
-    let content_type = response.headers()
+    let content_type = response
+        .headers()
         .get(reqwest::header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
@@ -59,5 +63,9 @@ pub async fn fetch_url(
     }
 
     let body = String::from_utf8_lossy(&body_bytes).into_owned();
-    Ok(FetchResult { body, content_type, status })
+    Ok(FetchResult {
+        body,
+        content_type,
+        status,
+    })
 }

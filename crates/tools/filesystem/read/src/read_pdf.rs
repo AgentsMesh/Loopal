@@ -6,7 +6,7 @@ use std::path::Path;
 /// formats each page as `--- Page N ---\n{text}\n`.
 pub fn extract_pdf_text(path: &Path, pages: Option<&str>) -> Result<String, String> {
     let all_pages = pdf_extract::extract_text_by_pages(path)
-        .map_err(|e| format!("Failed to extract PDF text: {}", e))?;
+        .map_err(|e| format!("Failed to extract PDF text: {e}"))?;
 
     if all_pages.is_empty() {
         return Ok("No extractable text (PDF may contain only images)".into());
@@ -47,9 +47,13 @@ pub fn parse_page_range(spec: &str, total: usize) -> Result<Vec<usize>, String> 
     }
 
     if let Some((start_s, end_s)) = spec.split_once('-') {
-        let start: usize = start_s.trim().parse()
+        let start: usize = start_s
+            .trim()
+            .parse()
             .map_err(|_| format!("invalid page number: '{}'", start_s.trim()))?;
-        let end: usize = end_s.trim().parse()
+        let end: usize = end_s
+            .trim()
+            .parse()
             .map_err(|_| format!("invalid page number: '{}'", end_s.trim()))?;
 
         if start == 0 || end == 0 {
@@ -64,7 +68,8 @@ pub fn parse_page_range(spec: &str, total: usize) -> Result<Vec<usize>, String> 
         let end = end.min(total);
         Ok((start - 1..end).collect())
     } else {
-        let page: usize = spec.parse()
+        let page: usize = spec
+            .parse()
             .map_err(|_| format!("invalid page number: '{spec}'"))?;
         if page == 0 {
             return Err("page numbers are 1-based".into());

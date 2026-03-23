@@ -125,8 +125,7 @@ impl MdWriter {
         if self.pending_spans.is_empty() {
             return;
         }
-        let spans: Vec<Span<'static>> =
-            std::mem::take(&mut self.pending_spans);
+        let spans: Vec<Span<'static>> = std::mem::take(&mut self.pending_spans);
         let line = Line::from(spans);
         self.emit_wrapped(line);
     }
@@ -167,11 +166,7 @@ impl MdWriter {
         self.indent_stack
             .iter()
             .map(|ctx| {
-                let pw: usize = ctx
-                    .prefix
-                    .iter()
-                    .map(|s| s.content.len())
-                    .sum();
+                let pw: usize = ctx.prefix.iter().map(|s| s.content.len()).sum();
                 pw as u16
             })
             .sum()
@@ -182,9 +177,7 @@ impl MdWriter {
     fn build_prefix(&mut self, first_in_item: bool) -> Vec<Span<'static>> {
         let mut prefix = Vec::new();
         for ctx in &mut self.indent_stack {
-            if first_in_item
-                && let Some(marker) = ctx.marker.take()
-            {
+            if first_in_item && let Some(marker) = ctx.marker.take() {
                 prefix.extend(marker);
                 continue;
             }

@@ -1,11 +1,15 @@
 //! Tests for SessionController event handling and state management.
 
-use loopal_session::SessionController;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::{AgentEvent, AgentEventPayload, UserQuestionResponse};
+use loopal_session::SessionController;
 use tokio::sync::mpsc;
 
-fn make_controller() -> (SessionController, mpsc::Receiver<ControlCommand>, mpsc::Receiver<bool>) {
+fn make_controller() -> (
+    SessionController,
+    mpsc::Receiver<ControlCommand>,
+    mpsc::Receiver<bool>,
+) {
     let (control_tx, control_rx) = mpsc::channel::<ControlCommand>(16);
     let (perm_tx, perm_rx) = mpsc::channel::<bool>(16);
     let (question_tx, _question_rx) = mpsc::channel::<UserQuestionResponse>(16);
@@ -14,7 +18,9 @@ fn make_controller() -> (SessionController, mpsc::Receiver<ControlCommand>, mpsc
         "act".to_string(),
         control_tx,
         perm_tx,
-        question_tx, Default::default(), std::sync::Arc::new(tokio::sync::Notify::new()),
+        question_tx,
+        Default::default(),
+        std::sync::Arc::new(tokio::sync::Notify::new()),
     );
     (ctrl, control_rx, perm_rx)
 }
@@ -37,17 +43,23 @@ fn test_initial_state() {
 #[test]
 fn test_stream_event() {
     let (ctrl, _, _) = make_controller();
-    ctrl.handle_event(AgentEvent::root(AgentEventPayload::Stream { text: "hello".to_string() }));
+    ctrl.handle_event(AgentEvent::root(AgentEventPayload::Stream {
+        text: "hello".to_string(),
+    }));
     assert_eq!(ctrl.lock().streaming_text, "hello");
 
-    ctrl.handle_event(AgentEvent::root(AgentEventPayload::Stream { text: " world".to_string() }));
+    ctrl.handle_event(AgentEvent::root(AgentEventPayload::Stream {
+        text: " world".to_string(),
+    }));
     assert_eq!(ctrl.lock().streaming_text, "hello world");
 }
 
 #[test]
 fn test_awaiting_input_flushes_streaming() {
     let (ctrl, _, _) = make_controller();
-    ctrl.handle_event(AgentEvent::root(AgentEventPayload::Stream { text: "response".to_string() }));
+    ctrl.handle_event(AgentEvent::root(AgentEventPayload::Stream {
+        text: "response".to_string(),
+    }));
     ctrl.handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
 
     let state = ctrl.lock();
@@ -137,14 +149,18 @@ fn test_token_usage() {
 #[test]
 fn test_mode_changed() {
     let (ctrl, _, _) = make_controller();
-    ctrl.handle_event(AgentEvent::root(AgentEventPayload::ModeChanged { mode: "plan".to_string() }));
+    ctrl.handle_event(AgentEvent::root(AgentEventPayload::ModeChanged {
+        mode: "plan".to_string(),
+    }));
     assert_eq!(ctrl.lock().mode, "plan");
 }
 
 #[test]
 fn test_error_event() {
     let (ctrl, _, _) = make_controller();
-    ctrl.handle_event(AgentEvent::root(AgentEventPayload::Error { message: "bad".to_string() }));
+    ctrl.handle_event(AgentEvent::root(AgentEventPayload::Error {
+        message: "bad".to_string(),
+    }));
 
     let state = ctrl.lock();
     assert_eq!(state.messages.len(), 1);
@@ -168,8 +184,14 @@ fn test_pop_inbox_to_edit() {
     ctrl.lock().inbox.push("first".into());
     ctrl.lock().inbox.push("second".into());
 
-    assert_eq!(ctrl.pop_inbox_to_edit().map(|c| c.text), Some("second".to_string()));
+    assert_eq!(
+        ctrl.pop_inbox_to_edit().map(|c| c.text),
+        Some("second".to_string())
+    );
     assert_eq!(ctrl.lock().inbox.len(), 1);
-    assert_eq!(ctrl.pop_inbox_to_edit().map(|c| c.text), Some("first".to_string()));
+    assert_eq!(
+        ctrl.pop_inbox_to_edit().map(|c| c.text),
+        Some("first".to_string())
+    );
     assert!(ctrl.pop_inbox_to_edit().is_none());
 }

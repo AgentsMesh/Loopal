@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
 use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use loopal_edit_core::omission_detector::detect_omissions;
 
@@ -105,7 +105,9 @@ impl Tool for MultiEditTool {
 }
 
 fn require_str<'a>(input: &'a Value, key: &str) -> Result<&'a str, LoopalError> {
-    input[key].as_str().ok_or_else(|| tool_err(&format!("{key} is required")))
+    input[key]
+        .as_str()
+        .ok_or_else(|| tool_err(&format!("{key} is required")))
 }
 
 fn tool_err(msg: &str) -> LoopalError {

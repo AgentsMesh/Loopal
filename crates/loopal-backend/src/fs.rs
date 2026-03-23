@@ -81,6 +81,9 @@ pub async fn read_raw_file(path: &Path, limits: &ResourceLimits) -> Result<Strin
 }
 
 /// Atomic write: write to tmp → fsync → rename.
+///
+/// On Windows, rename-over can fail with `\\?\` extended paths, so we
+/// fall back to remove + rename when we get ACCESS_DENIED.
 pub async fn write_file(path: &Path, content: &str) -> Result<WriteResult, ToolIoError> {
     if let Some(parent) = path.parent() {
         tokio::fs::create_dir_all(parent).await?;
@@ -97,7 +100,19 @@ pub async fn write_file(path: &Path, content: &str) -> Result<WriteResult, ToolI
     f.sync_all().await?;
     drop(f);
 
-    tokio::fs::rename(&tmp_path, path).await?;
+    if let Err(e) = tokio::fs::rename(&tmp_path, path).await {
+        // Windows: rename-over existing file can fail with ACCESS_DENIED (os error 5)
+        // when paths use the \\?\ extended prefix. Fall back to remove + rename.
+        if cfg!(windows) && e.raw_os_error() == Some(5) && path.exists() {
+            tokio::fs::remove_file(path).await?;
+            tokio::fs::rename(&tmp_path, path).await?;
+        } else {
+            // Clean up temp file on failure
+            let _ = tokio::fs::remove_file(&tmp_path).await;
+            return Err(e.into());
+        }
+    }
+
     Ok(WriteResult {
         bytes_written: content.len(),
     })

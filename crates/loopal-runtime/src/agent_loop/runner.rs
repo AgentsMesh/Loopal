@@ -35,9 +35,7 @@ impl AgentLoopRunner {
             pending_cwd_switch: Default::default(),
             memory_channel: params.memory_channel.clone(),
         };
-        let model_config = ModelConfig::from_model(
-            &params.model, params.thinking_config.clone(),
-        );
+        let model_config = ModelConfig::from_model(&params.model, params.thinking_config.clone());
         let interrupt = params.interrupt.clone();
         let interrupt_notify = params.interrupt_notify.clone();
         Self {
@@ -81,10 +79,7 @@ impl AgentLoopRunner {
     /// One complete turn: LLM → [tools → LLM]* → returns when no tool calls.
     ///
     /// Wraps `execute_turn_inner` with observer on_turn_start/on_turn_end.
-    pub(super) async fn execute_turn(
-        &mut self,
-        turn_ctx: &mut TurnContext,
-    ) -> Result<TurnOutput> {
+    pub(super) async fn execute_turn(&mut self, turn_ctx: &mut TurnContext) -> Result<TurnOutput> {
         for obs in &mut self.observers {
             obs.on_turn_start(turn_ctx);
         }

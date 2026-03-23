@@ -16,10 +16,7 @@ impl AgentLoopRunner {
 
     /// Execute the middleware pipeline on a provided working copy.
     /// The caller owns `working` and decides what to do with the result.
-    pub async fn execute_middleware_on(
-        &mut self,
-        working: &mut Vec<Message>,
-    ) -> Result<bool> {
+    pub async fn execute_middleware_on(&mut self, working: &mut Vec<Message>) -> Result<bool> {
         // Resolve summarization provider from compact_model (fallback to main model)
         let compact_model = self
             .params

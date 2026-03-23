@@ -9,14 +9,12 @@ use std::sync::Arc;
 use loopal_message::ContentBlock;
 use loopal_protocol::AgentEventPayload;
 
-use crate::frontend::traits::AgentFrontend;
 use super::turn_context::TurnContext;
 use super::turn_observer::TurnObserver;
+use crate::frontend::traits::AgentFrontend;
 
 /// Tools that are known to modify files.
-const WRITE_TOOLS: &[&str] = &[
-    "Write", "Edit", "MultiEdit", "ApplyPatch", "NotebookEdit",
-];
+const WRITE_TOOLS: &[&str] = &["Write", "Edit", "MultiEdit", "ApplyPatch", "NotebookEdit"];
 
 /// Observes tool calls and records which files were modified.
 pub struct DiffTracker {
@@ -37,20 +35,28 @@ impl TurnObserver for DiffTracker {
         results: &[ContentBlock],
     ) {
         // Build a set of tool_use_ids that succeeded (is_error=false)
-        let succeeded: std::collections::HashSet<&str> = results.iter()
+        let succeeded: std::collections::HashSet<&str> = results
+            .iter()
             .filter_map(|block| match block {
-                ContentBlock::ToolResult { tool_use_id, is_error: false, .. } => {
-                    Some(tool_use_id.as_str())
-                }
+                ContentBlock::ToolResult {
+                    tool_use_id,
+                    is_error: false,
+                    ..
+                } => Some(tool_use_id.as_str()),
                 _ => None,
             })
             .collect();
 
         for (id, name, input) in tool_uses {
-            if !WRITE_TOOLS.contains(&name.as_str()) { continue; }
-            if !succeeded.contains(id.as_str()) { continue; }
+            if !WRITE_TOOLS.contains(&name.as_str()) {
+                continue;
+            }
+            if !succeeded.contains(id.as_str()) {
+                continue;
+            }
 
-            if let Some(path) = input.get("file_path")
+            if let Some(path) = input
+                .get("file_path")
                 .or_else(|| input.get("path"))
                 .or_else(|| input.get("notebook_path"))
                 .and_then(|v| v.as_str())
@@ -81,9 +87,11 @@ impl TurnObserver for DiffTracker {
         );
         // Fire-and-forget: on_turn_end is sync, emit is async
         tokio::spawn(async move {
-            let _ = frontend.emit(AgentEventPayload::TurnDiffSummary {
-                modified_files: files,
-            }).await;
+            let _ = frontend
+                .emit(AgentEventPayload::TurnDiffSummary {
+                    modified_files: files,
+                })
+                .await;
         });
     }
 }

@@ -11,7 +11,7 @@ fn test_middleware_context_construction_without_summarization_provider() {
         total_output_tokens: 50,
         total_cost: 0.001,
         max_context_tokens: 200_000,
-            compact_model: None,
+        compact_model: None,
         summarization_provider: None,
     };
 
@@ -39,7 +39,7 @@ fn test_middleware_context_with_multiple_messages() {
         total_output_tokens: 0,
         total_cost: 0.0,
         max_context_tokens: 128_000,
-            compact_model: None,
+        compact_model: None,
         summarization_provider: None,
     };
 
@@ -57,7 +57,7 @@ fn test_middleware_context_empty_messages() {
         total_output_tokens: 0,
         total_cost: 0.0,
         max_context_tokens: 100_000,
-            compact_model: None,
+        compact_model: None,
         summarization_provider: None,
     };
 

@@ -46,10 +46,7 @@ impl AgentLoopRunner {
             }
 
             // Execute one complete turn (LLM → [tools → LLM]* → done)
-            let cancel = TurnCancel::new(
-                self.interrupt.clone(),
-                self.interrupt_notify.clone(),
-            );
+            let cancel = TurnCancel::new(self.interrupt.clone(), self.interrupt_notify.clone());
             let mut turn_ctx = TurnContext::new(self.turn_count, cancel);
             match self.execute_turn(&mut turn_ctx).await {
                 Ok(turn) => {

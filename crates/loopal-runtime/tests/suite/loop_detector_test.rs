@@ -1,16 +1,13 @@
-use std::sync::Arc;
-use serde_json::json;
 use loopal_protocol::InterruptSignal;
 use loopal_runtime::agent_loop::cancel::TurnCancel;
 use loopal_runtime::agent_loop::loop_detector::LoopDetector;
 use loopal_runtime::agent_loop::turn_context::TurnContext;
 use loopal_runtime::agent_loop::turn_observer::{ObserverAction, TurnObserver};
+use serde_json::json;
+use std::sync::Arc;
 
 fn make_ctx() -> TurnContext {
-    let cancel = TurnCancel::new(
-        InterruptSignal::new(),
-        Arc::new(tokio::sync::Notify::new()),
-    );
+    let cancel = TurnCancel::new(InterruptSignal::new(), Arc::new(tokio::sync::Notify::new()));
     TurnContext::new(0, cancel)
 }
 
@@ -111,7 +108,11 @@ fn loop_detector_different_inputs_independent() {
     let mut ctx = make_ctx();
     // Same tool, different inputs — different signatures
     for i in 0..5 {
-        let call = vec![("id".into(), "Read".into(), json!({"file": format!("/tmp/{i}.rs")}))];
+        let call = vec![(
+            "id".into(),
+            "Read".into(),
+            json!({"file": format!("/tmp/{i}.rs")}),
+        )];
         let action = det.on_before_tools(&mut ctx, &call);
         assert!(
             matches!(action, ObserverAction::Continue),

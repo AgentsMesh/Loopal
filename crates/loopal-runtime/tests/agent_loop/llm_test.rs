@@ -14,7 +14,11 @@ fn test_prepare_chat_params_act_mode() {
         .expect("should succeed");
 
     assert_eq!(params.model, "claude-sonnet-4-20250514");
-    assert!(params.system_prompt.contains("You are a helpful assistant."));
+    assert!(
+        params
+            .system_prompt
+            .contains("You are a helpful assistant.")
+    );
     assert_eq!(params.max_tokens, runner.model_config.max_output_tokens);
     assert!(params.messages.is_empty());
     // Builtin tools should be present

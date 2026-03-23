@@ -180,7 +180,8 @@ impl Middleware for SmartCompact {
                 let post_tokens = estimate_messages_tokens(&ctx.messages);
                 if post_tokens > ctx.max_context_tokens {
                     tracing::warn!(
-                        post_tokens, max = ctx.max_context_tokens,
+                        post_tokens,
+                        max = ctx.max_context_tokens,
                         "compaction inflated tokens, falling back to truncation"
                     );
                     compact_messages(&mut ctx.messages, self.keep_last);

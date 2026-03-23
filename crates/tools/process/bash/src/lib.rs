@@ -5,7 +5,7 @@ use serde_json::{Value, json};
 
 use loopal_config::CommandDecision;
 use loopal_sandbox::command_checker::check_command;
-use loopal_sandbox::security_inspector::{inspect_command, SecurityVerdict};
+use loopal_sandbox::security_inspector::{SecurityVerdict, inspect_command};
 
 /// BashTool executes shell commands. OS-level sandbox wrapping is handled
 /// by the SandboxedTool decorator — BashTool itself is a plain executor.

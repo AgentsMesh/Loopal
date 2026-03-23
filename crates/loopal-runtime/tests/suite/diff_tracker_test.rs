@@ -1,20 +1,17 @@
-use std::sync::Arc;
-use serde_json::json;
 use loopal_message::ContentBlock;
 use loopal_protocol::{AgentEvent, ControlCommand, Envelope, InterruptSignal};
+use loopal_runtime::UnifiedFrontend;
 use loopal_runtime::agent_loop::cancel::TurnCancel;
 use loopal_runtime::agent_loop::diff_tracker::DiffTracker;
 use loopal_runtime::agent_loop::turn_context::TurnContext;
 use loopal_runtime::agent_loop::turn_observer::TurnObserver;
-use loopal_runtime::frontend::{AutoDenyHandler, AutoCancelQuestionHandler};
-use loopal_runtime::UnifiedFrontend;
+use loopal_runtime::frontend::{AutoCancelQuestionHandler, AutoDenyHandler};
+use serde_json::json;
+use std::sync::Arc;
 use tokio::sync::mpsc;
 
 fn make_ctx() -> TurnContext {
-    let cancel = TurnCancel::new(
-        InterruptSignal::new(),
-        Arc::new(tokio::sync::Notify::new()),
-    );
+    let cancel = TurnCancel::new(InterruptSignal::new(), Arc::new(tokio::sync::Notify::new()));
     TurnContext::new(0, cancel)
 }
 
@@ -23,7 +20,11 @@ fn make_tracker() -> DiffTracker {
     let (_mbox_tx, mbox_rx) = mpsc::channel::<Envelope>(16);
     let (_ctrl_tx, ctrl_rx) = mpsc::channel::<ControlCommand>(16);
     let frontend = Arc::new(UnifiedFrontend::new(
-        None, event_tx, mbox_rx, ctrl_rx, None,
+        None,
+        event_tx,
+        mbox_rx,
+        ctrl_rx,
+        None,
         Box::new(AutoDenyHandler),
         Box::new(AutoCancelQuestionHandler),
     ));
@@ -31,11 +32,19 @@ fn make_tracker() -> DiffTracker {
 }
 
 fn write_tool(id: &str, path: &str) -> (String, String, serde_json::Value) {
-    (id.into(), "Write".into(), json!({"file_path": path, "content": "x"}))
+    (
+        id.into(),
+        "Write".into(),
+        json!({"file_path": path, "content": "x"}),
+    )
 }
 
 fn edit_tool(id: &str, path: &str) -> (String, String, serde_json::Value) {
-    (id.into(), "Edit".into(), json!({"file_path": path, "old_string": "a", "new_string": "b"}))
+    (
+        id.into(),
+        "Edit".into(),
+        json!({"file_path": path, "old_string": "a", "new_string": "b"}),
+    )
 }
 
 fn read_tool(id: &str, path: &str) -> (String, String, serde_json::Value) {
@@ -43,11 +52,19 @@ fn read_tool(id: &str, path: &str) -> (String, String, serde_json::Value) {
 }
 
 fn ok_result(id: &str) -> ContentBlock {
-    ContentBlock::ToolResult { tool_use_id: id.into(), content: "ok".into(), is_error: false }
+    ContentBlock::ToolResult {
+        tool_use_id: id.into(),
+        content: "ok".into(),
+        is_error: false,
+    }
 }
 
 fn err_result(id: &str) -> ContentBlock {
-    ContentBlock::ToolResult { tool_use_id: id.into(), content: "err".into(), is_error: true }
+    ContentBlock::ToolResult {
+        tool_use_id: id.into(),
+        content: "err".into(),
+        is_error: true,
+    }
 }
 
 #[test]
@@ -87,7 +104,10 @@ fn ignores_failed_write_tool() {
     let tools = [write_tool("t1", "/tmp/fail.rs")];
     let results = [err_result("t1")];
     tracker.on_after_tools(&mut ctx, &tools, &results);
-    assert!(ctx.modified_files.is_empty(), "failed writes should not be tracked");
+    assert!(
+        ctx.modified_files.is_empty(),
+        "failed writes should not be tracked"
+    );
 }
 
 #[test]
@@ -104,12 +124,16 @@ fn deduplicates_same_file() {
 fn tracks_multi_edit_array() {
     let mut tracker = make_tracker();
     let mut ctx = make_ctx();
-    let multi_edit = ("t1".into(), "MultiEdit".into(), json!({
-        "edits": [
-            {"file_path": "/tmp/a.rs", "old_string": "x", "new_string": "y"},
-            {"file_path": "/tmp/b.rs", "old_string": "x", "new_string": "y"},
-        ]
-    }));
+    let multi_edit = (
+        "t1".into(),
+        "MultiEdit".into(),
+        json!({
+            "edits": [
+                {"file_path": "/tmp/a.rs", "old_string": "x", "new_string": "y"},
+                {"file_path": "/tmp/b.rs", "old_string": "x", "new_string": "y"},
+            ]
+        }),
+    );
     let results = [ok_result("t1")];
     tracker.on_after_tools(&mut ctx, &[multi_edit], &results);
     assert!(ctx.modified_files.contains("/tmp/a.rs"));
@@ -120,10 +144,14 @@ fn tracks_multi_edit_array() {
 fn tracks_notebook_edit() {
     let mut tracker = make_tracker();
     let mut ctx = make_ctx();
-    let nb = ("t1".into(), "NotebookEdit".into(), json!({
-        "notebook_path": "/tmp/nb.ipynb",
-        "new_source": "x"
-    }));
+    let nb = (
+        "t1".into(),
+        "NotebookEdit".into(),
+        json!({
+            "notebook_path": "/tmp/nb.ipynb",
+            "new_source": "x"
+        }),
+    );
     let results = [ok_result("t1")];
     tracker.on_after_tools(&mut ctx, &[nb], &results);
     assert!(ctx.modified_files.contains("/tmp/nb.ipynb"));
@@ -140,7 +168,11 @@ fn on_turn_end_skips_when_no_files() {
 fn tracks_apply_patch() {
     let mut tracker = make_tracker();
     let mut ctx = make_ctx();
-    let patch = ("t1".into(), "ApplyPatch".into(), json!({"file_path": "/tmp/p.rs"}));
+    let patch = (
+        "t1".into(),
+        "ApplyPatch".into(),
+        json!({"file_path": "/tmp/p.rs"}),
+    );
     let results = [ok_result("t1")];
     tracker.on_after_tools(&mut ctx, &[patch], &results);
     assert!(ctx.modified_files.contains("/tmp/p.rs"));

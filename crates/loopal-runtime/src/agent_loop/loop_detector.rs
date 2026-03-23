@@ -23,7 +23,9 @@ pub struct LoopDetector {
 
 impl LoopDetector {
     pub fn new() -> Self {
-        Self { signatures: HashMap::new() }
+        Self {
+            signatures: HashMap::new(),
+        }
     }
 }
 

@@ -1,4 +1,4 @@
-use loopal_sandbox::security_inspector::{inspect_command, SecurityVerdict};
+use loopal_sandbox::security_inspector::{SecurityVerdict, inspect_command};
 
 #[test]
 fn allows_normal_commands() {
@@ -80,10 +80,7 @@ fn allows_safe_curl() {
 #[test]
 fn allows_safe_ssh_operations() {
     // ssh command itself is fine
-    assert_eq!(
-        inspect_command("ssh user@host ls"),
-        SecurityVerdict::Allow
-    );
+    assert_eq!(inspect_command("ssh user@host ls"), SecurityVerdict::Allow);
 }
 
 #[test]

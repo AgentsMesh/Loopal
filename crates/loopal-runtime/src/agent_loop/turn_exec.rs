@@ -16,7 +16,8 @@ use super::{MAX_AUTO_CONTINUATIONS, TurnOutput};
 impl AgentLoopRunner {
     /// Inner loop: LLM → [tools → LLM]* → done.
     pub(super) async fn execute_turn_inner(
-        &mut self, turn_ctx: &mut TurnContext,
+        &mut self,
+        turn_ctx: &mut TurnContext,
     ) -> Result<TurnOutput> {
         let mut last_text = String::new();
         let mut continuation_count: u32 = 0;
@@ -36,8 +37,10 @@ impl AgentLoopRunner {
             if result.stop_reason == StopReason::MaxTokens && !result.tool_uses.is_empty() {
                 warn!("max_tokens hit with tool calls — discarding truncated tools");
                 self.record_assistant_message(
-                    &result.assistant_text, &[],
-                    &result.thinking_text, result.thinking_signature.as_deref(),
+                    &result.assistant_text,
+                    &[],
+                    &result.thinking_text,
+                    result.thinking_signature.as_deref(),
                 );
                 if !result.assistant_text.is_empty() {
                     last_text.clone_from(&result.assistant_text);
@@ -47,15 +50,18 @@ impl AgentLoopRunner {
                     self.emit(AgentEventPayload::AutoContinuation {
                         continuation: continuation_count,
                         max_continuations: MAX_AUTO_CONTINUATIONS,
-                    }).await?;
+                    })
+                    .await?;
                     continue;
                 }
                 return Ok(TurnOutput { output: last_text });
             }
 
             self.record_assistant_message(
-                &result.assistant_text, &result.tool_uses,
-                &result.thinking_text, result.thinking_signature.as_deref(),
+                &result.assistant_text,
+                &result.tool_uses,
+                &result.thinking_text,
+                result.thinking_signature.as_deref(),
             );
             if !result.assistant_text.is_empty() {
                 last_text.clone_from(&result.assistant_text);
@@ -74,14 +80,17 @@ impl AgentLoopRunner {
                     self.emit(AgentEventPayload::AutoContinuation {
                         continuation: continuation_count,
                         max_continuations: MAX_AUTO_CONTINUATIONS,
-                    }).await?;
+                    })
+                    .await?;
                     continue;
                 }
                 return Ok(TurnOutput { output: last_text });
             }
 
             if result.tool_uses.is_empty() {
-                return Ok(TurnOutput { output: result.assistant_text });
+                return Ok(TurnOutput {
+                    output: result.assistant_text,
+                });
             }
 
             // Observer: on_before_tools
@@ -95,8 +104,12 @@ impl AgentLoopRunner {
             self.inject_pending_messages().await;
 
             // Observer: on_after_tools with results from the last message
-            let result_blocks = self.params.messages.last()
-                .map(|m| m.content.as_slice()).unwrap_or(&[]);
+            let result_blocks = self
+                .params
+                .messages
+                .last()
+                .map(|m| m.content.as_slice())
+                .unwrap_or(&[]);
             for obs in &mut self.observers {
                 obs.on_after_tools(turn_ctx, &result.tool_uses, result_blocks);
             }
@@ -126,9 +139,8 @@ impl AgentLoopRunner {
                 }
                 ObserverAction::AbortTurn(reason) => {
                     warn!(%reason, "observer aborted turn");
-                    self.emit(AgentEventPayload::Error {
-                        message: reason,
-                    }).await?;
+                    self.emit(AgentEventPayload::Error { message: reason })
+                        .await?;
                     return Ok(true);
                 }
             }

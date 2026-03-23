@@ -1,5 +1,5 @@
-use std::path::Path;
 use loopal_runtime::agent_loop::env_context::build_env_section;
+use std::path::Path;
 
 #[test]
 fn contains_date_line() {
@@ -19,7 +19,10 @@ fn contains_working_directory() {
 #[test]
 fn contains_turn_progress() {
     let section = build_env_section(Path::new("/tmp"), 3, 50);
-    assert!(section.contains("- Turn: 3/50"), "should contain turn progress");
+    assert!(
+        section.contains("- Turn: 3/50"),
+        "should contain turn progress"
+    );
 }
 
 #[test]

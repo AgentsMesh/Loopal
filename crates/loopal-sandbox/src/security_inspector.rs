@@ -45,9 +45,7 @@ pub fn inspect_command(command: &str) -> SecurityVerdict {
 
     // Write to system config directories
     if has_system_config_write(cmd) {
-        return SecurityVerdict::Block(
-            "write to system configuration directory".into(),
-        );
+        return SecurityVerdict::Block("write to system configuration directory".into());
     }
 
     // Suspicious but not blocked
@@ -66,9 +64,9 @@ fn has_pipe_to_shell(cmd: &str) -> bool {
     // and if ANY preceding segment contains curl/wget.
     for (i, seg) in segments.iter().enumerate().skip(1) {
         let trimmed = seg.trim();
-        let is_shell = shells.iter().any(|s| {
-            trimmed == *s || trimmed.starts_with(&format!("{s} "))
-        });
+        let is_shell = shells
+            .iter()
+            .any(|s| trimmed == *s || trimmed.starts_with(&format!("{s} ")));
         if is_shell {
             let before = segments[..i].join("|");
             if before.contains("curl") || before.contains("wget") {
@@ -81,14 +79,20 @@ fn has_pipe_to_shell(cmd: &str) -> bool {
 
 /// Detect `eval "$(curl ...)"` or `eval "$(wget ...)"`.
 fn has_eval_remote(cmd: &str) -> bool {
-    if !cmd.contains("eval") { return false; }
-    cmd.contains("$(curl") || cmd.contains("$(wget")
-        || cmd.contains("`curl") || cmd.contains("`wget")
+    if !cmd.contains("eval") {
+        return false;
+    }
+    cmd.contains("$(curl")
+        || cmd.contains("$(wget")
+        || cmd.contains("`curl")
+        || cmd.contains("`wget")
 }
 
 /// Detect `base64 -d >> ~/.ssh/authorized_keys` and similar.
 fn has_ssh_injection(cmd: &str) -> bool {
-    if !cmd.contains("base64") { return false; }
+    if !cmd.contains("base64") {
+        return false;
+    }
     cmd.contains(".ssh") || cmd.contains("authorized_keys")
 }
 

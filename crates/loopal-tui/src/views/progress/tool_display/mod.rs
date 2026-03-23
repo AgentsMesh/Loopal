@@ -50,7 +50,7 @@ fn render_header(tc: &DisplayToolCall) -> Line<'static> {
     if !detail.is_empty() {
         spans.push(Span::styled(
             format!("({detail})"),
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(Color::Rgb(130, 135, 145)),
         ));
     }
     Line::from(spans)
@@ -106,10 +106,15 @@ fn render_default_body(tc: &DisplayToolCall) -> Vec<Line<'static>> {
     if result.lines().count() <= 1 && trimmed.len() <= 60 {
         return vec![output_first_line(trimmed)];
     }
-    expand_output(result, EXPAND_MAX_LINES, Style::default().fg(Color::DarkGray))
+    expand_output(result, EXPAND_MAX_LINES, output_style())
 }
 
 // ── Shared helpers (used by sub-modules via `super::`) ──
+
+/// Standard style for tool output text — light enough for dark-mode readability.
+pub(crate) fn output_style() -> Style {
+    Style::default().fg(Color::Rgb(155, 160, 170))
+}
 
 /// Expand output up to `max_lines`, fold the rest.
 pub(crate) fn expand_output(content: &str, max_lines: usize, style: Style) -> Vec<Line<'static>> {
@@ -125,7 +130,7 @@ pub(crate) fn expand_output(content: &str, max_lines: usize, style: Style) -> Ve
     if total > max_lines {
         lines.push(Line::from(Span::styled(
             format!("    … +{} lines", total - max_lines),
-            Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+            Style::default().fg(Color::Rgb(100, 105, 115)),
         )));
     }
     lines
@@ -135,7 +140,7 @@ pub(crate) fn expand_output(content: &str, max_lines: usize, style: Style) -> Ve
 pub(crate) fn output_first_line(text: &str) -> Line<'static> {
     Line::from(Span::styled(
         format!("  ⎿ {text}"),
-        Style::default().fg(Color::DarkGray),
+        output_style(),
     ))
 }
 

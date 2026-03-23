@@ -4,7 +4,7 @@ use ratatui::prelude::*;
 
 use loopal_session::types::DisplayToolCall;
 
-use super::{expand_output, output_first_line, EXPAND_MAX_LINES};
+use super::{expand_output, output_first_line, output_style, EXPAND_MAX_LINES};
 
 /// Header detail: search pattern.
 pub fn extract_detail(input: &serde_json::Value) -> Option<String> {
@@ -17,5 +17,5 @@ pub fn render_body(tc: &DisplayToolCall) -> Vec<Line<'static>> {
     if result.trim().is_empty() {
         return vec![output_first_line("no matches")];
     }
-    expand_output(result, EXPAND_MAX_LINES, Style::default().fg(Color::DarkGray))
+    expand_output(result, EXPAND_MAX_LINES, output_style())
 }

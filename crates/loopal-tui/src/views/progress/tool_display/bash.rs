@@ -4,7 +4,7 @@ use ratatui::prelude::*;
 
 use loopal_session::types::DisplayToolCall;
 
-use super::{expand_output, output_first_line, EXPAND_MAX_LINES};
+use super::{expand_output, output_first_line, output_style, EXPAND_MAX_LINES};
 
 /// Extract Bash command for header: strip `cd ... &&` preamble, collapse whitespace.
 pub fn extract_detail(input: &serde_json::Value) -> Option<String> {
@@ -20,7 +20,7 @@ pub fn extract_detail(input: &serde_json::Value) -> Option<String> {
 
 /// Running Bash: elapsed time + progress tail.
 pub fn render_running_body(tc: &DisplayToolCall) -> Vec<Line<'static>> {
-    let dim = Style::default().fg(Color::DarkGray);
+    let dim = output_style();
     let elapsed = tc
         .started_at
         .map(|t| format!("{:.1}s", t.elapsed().as_secs_f64()))
@@ -47,7 +47,7 @@ pub fn render_running_body(tc: &DisplayToolCall) -> Vec<Line<'static>> {
             }
             lines.push(Line::from(Span::styled(
                 format!("    ({elapsed} / {timeout})"),
-                Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+                Style::default().fg(Color::Rgb(100, 105, 115)),
             )));
             return lines;
         }
@@ -66,5 +66,5 @@ pub fn render_success_body(tc: &DisplayToolCall) -> Vec<Line<'static>> {
     if result.trim().is_empty() {
         return vec![output_first_line("(No output)")];
     }
-    expand_output(result, EXPAND_MAX_LINES, Style::default().fg(Color::DarkGray))
+    expand_output(result, EXPAND_MAX_LINES, output_style())
 }

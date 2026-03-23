@@ -104,9 +104,7 @@ fn render_thinking(lines: &mut Vec<Line<'static>>, msg: &DisplayMessage) {
     };
     lines.push(Line::from(Span::styled(
         label,
-        Style::default()
-            .fg(Color::Magenta)
-            .add_modifier(Modifier::DIM),
+        Style::default().fg(Color::Rgb(180, 130, 210)),
     )));
 }
 

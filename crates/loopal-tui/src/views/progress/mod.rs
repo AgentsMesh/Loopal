@@ -40,9 +40,7 @@ pub fn render_progress(
         let label = format!("Thinking... ({token_est} tokens)");
         vec![Line::from(Span::styled(
             label,
-            Style::default()
-                .fg(Color::Magenta)
-                .add_modifier(Modifier::DIM),
+            Style::default().fg(Color::Rgb(180, 130, 210)),
         ))]
     } else {
         vec![]

@@ -35,7 +35,8 @@ fn disabled_uses_plain_sh() {
 fn disabled_has_sanitized_env() {
     let policy = disabled_policy();
     let cmd = wrap_command(&policy, "echo", "/tmp".as_ref());
-    assert!(cmd.env.contains_key("PATH") || cmd.env.is_empty());
+    let has_path = cmd.env.keys().any(|k| k.eq_ignore_ascii_case("PATH"));
+    assert!(has_path || cmd.env.is_empty());
 }
 
 #[test]

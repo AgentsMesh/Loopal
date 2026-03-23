@@ -76,6 +76,12 @@ impl EventHandler {
                             break;
                         }
                     }
+                    Ok(Some(CrosstermEvent::Paste(text))) => {
+                        let result = PasteResult::Text(text);
+                        if term_tx.send(AppEvent::Paste(result)).await.is_err() {
+                            break;
+                        }
+                    }
                     Ok(_) => {}
                     Err(_) => break,
                 }

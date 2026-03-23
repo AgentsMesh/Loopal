@@ -1,5 +1,5 @@
-use loopal_hooks::HookRegistry;
 use loopal_config::{HookConfig, HookEvent};
+use loopal_hooks::HookRegistry;
 
 fn make_hook(event: HookEvent, tool_filter: Option<Vec<String>>) -> HookConfig {
     HookConfig {
@@ -27,8 +27,14 @@ fn test_match_with_tool_filter() {
         HookEvent::PreToolUse,
         Some(vec!["bash".into(), "write".into()]),
     )]);
-    assert_eq!(reg.match_hooks(HookEvent::PreToolUse, Some("bash")).len(), 1);
-    assert_eq!(reg.match_hooks(HookEvent::PreToolUse, Some("read")).len(), 0);
+    assert_eq!(
+        reg.match_hooks(HookEvent::PreToolUse, Some("bash")).len(),
+        1
+    );
+    assert_eq!(
+        reg.match_hooks(HookEvent::PreToolUse, Some("read")).len(),
+        0
+    );
     assert_eq!(reg.match_hooks(HookEvent::PreToolUse, None).len(), 0);
 }
 
@@ -42,7 +48,8 @@ fn test_no_match_wrong_event() {
 fn test_no_filter_matches_any_tool() {
     let reg = HookRegistry::new(vec![make_hook(HookEvent::PreToolUse, None)]);
     assert_eq!(
-        reg.match_hooks(HookEvent::PreToolUse, Some("anything")).len(),
+        reg.match_hooks(HookEvent::PreToolUse, Some("anything"))
+            .len(),
         1
     );
 }
@@ -61,10 +68,7 @@ fn test_match_hooks_returns_all_matching_for_event() {
 #[test]
 fn test_match_hooks_with_tool_filter_only_matches_specified_tools() {
     let reg = HookRegistry::new(vec![
-        make_hook(
-            HookEvent::PreToolUse,
-            Some(vec!["bash".into()]),
-        ),
+        make_hook(HookEvent::PreToolUse, Some(vec!["bash".into()])),
         make_hook(
             HookEvent::PreToolUse,
             Some(vec!["write".into(), "edit".into()]),
@@ -91,15 +95,16 @@ fn test_match_hooks_with_tool_filter_only_matches_specified_tools() {
 fn test_empty_registry_returns_empty() {
     let reg = HookRegistry::new(vec![]);
     assert!(reg.match_hooks(HookEvent::PreToolUse, None).is_empty());
-    assert!(reg
-        .match_hooks(HookEvent::PreToolUse, Some("bash"))
-        .is_empty());
+    assert!(
+        reg.match_hooks(HookEvent::PreToolUse, Some("bash"))
+            .is_empty()
+    );
 }
 
 #[test]
 fn test_mixed_filtered_and_unfiltered_hooks() {
     let reg = HookRegistry::new(vec![
-        make_hook(HookEvent::PreToolUse, None),           // matches any tool
+        make_hook(HookEvent::PreToolUse, None), // matches any tool
         make_hook(HookEvent::PreToolUse, Some(vec!["bash".into()])), // only bash
     ]);
 

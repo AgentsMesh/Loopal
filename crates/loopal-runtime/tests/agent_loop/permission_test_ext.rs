@@ -1,15 +1,15 @@
 use std::sync::Arc;
 
 use chrono::Utc;
+use loopal_config::Settings;
 use loopal_context::ContextPipeline;
 use loopal_kernel::Kernel;
-use loopal_runtime::agent_loop::AgentLoopRunner;
-use loopal_runtime::frontend::{TuiPermissionHandler, AutoCancelQuestionHandler};
-use loopal_runtime::{AgentLoopParams, AgentMode, SessionManager, UnifiedFrontend};
-use loopal_storage::Session;
-use loopal_config::Settings;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::Envelope;
+use loopal_runtime::agent_loop::AgentLoopRunner;
+use loopal_runtime::frontend::{AutoCancelQuestionHandler, TuiPermissionHandler};
+use loopal_runtime::{AgentLoopParams, AgentMode, SessionManager, UnifiedFrontend};
+use loopal_storage::Session;
 use loopal_tool_api::{PermissionDecision, PermissionMode};
 use tokio::sync::mpsc;
 
@@ -17,8 +17,7 @@ use super::make_runner_with_channels;
 
 #[tokio::test]
 async fn test_check_permission_bypass_mode() {
-    let (mut runner, _event_rx, _mbox_tx, _ctrl_tx, _perm_tx) =
-        make_runner_with_channels();
+    let (mut runner, _event_rx, _mbox_tx, _ctrl_tx, _perm_tx) = make_runner_with_channels();
     runner.params.permission_mode = PermissionMode::Bypass;
 
     let decision = runner
@@ -30,8 +29,7 @@ async fn test_check_permission_bypass_mode() {
 
 #[tokio::test]
 async fn test_check_permission_supervised_mode_allows_read() {
-    let (mut runner, _event_rx, _mbox_tx, _ctrl_tx, _perm_tx) =
-        make_runner_with_channels();
+    let (mut runner, _event_rx, _mbox_tx, _ctrl_tx, _perm_tx) = make_runner_with_channels();
     runner.params.permission_mode = PermissionMode::Supervised;
 
     let decision = runner
@@ -43,8 +41,7 @@ async fn test_check_permission_supervised_mode_allows_read() {
 
 #[tokio::test]
 async fn test_check_permission_ask_mode_approved() {
-    let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx, perm_tx) =
-        make_runner_with_channels();
+    let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx, perm_tx) = make_runner_with_channels();
     runner.params.permission_mode = PermissionMode::Supervised;
 
     let perm_tx_clone = perm_tx.clone();
@@ -62,8 +59,7 @@ async fn test_check_permission_ask_mode_approved() {
 
 #[tokio::test]
 async fn test_check_permission_ask_mode_denied() {
-    let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx, perm_tx) =
-        make_runner_with_channels();
+    let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx, perm_tx) = make_runner_with_channels();
     runner.params.permission_mode = PermissionMode::Supervised;
 
     let perm_tx_clone = perm_tx.clone();
@@ -81,8 +77,7 @@ async fn test_check_permission_ask_mode_denied() {
 
 #[tokio::test]
 async fn test_check_permission_unknown_tool_allows() {
-    let (runner, _event_rx, _mbox_tx, _ctrl_tx, _perm_tx) =
-        make_runner_with_channels();
+    let (runner, _event_rx, _mbox_tx, _ctrl_tx, _perm_tx) = make_runner_with_channels();
 
     let decision = runner
         .check_permission("id1", "NonExistentTool", &serde_json::json!({}))
@@ -99,7 +94,11 @@ async fn test_check_permission_channel_closed_denies() {
     let (_perm_tx, permission_rx) = mpsc::channel::<bool>(16);
 
     let frontend = Arc::new(UnifiedFrontend::new(
-        None, event_tx.clone(), mailbox_rx, control_rx, None,
+        None,
+        event_tx.clone(),
+        mailbox_rx,
+        control_rx,
+        None,
         Box::new(TuiPermissionHandler::new(event_tx, permission_rx)),
         Box::new(AutoCancelQuestionHandler),
     ));
@@ -115,10 +114,8 @@ async fn test_check_permission_channel_closed_denies() {
         mode: "default".to_string(),
     };
 
-    let tmp_dir = std::env::temp_dir().join(format!(
-        "loopal_test_perm_closed_{}",
-        std::process::id()
-    ));
+    let tmp_dir =
+        std::env::temp_dir().join(format!("loopal_test_perm_closed_{}", std::process::id()));
     let session_manager = SessionManager::with_base_dir(tmp_dir);
 
     let params = AgentLoopParams {
@@ -136,7 +133,10 @@ async fn test_check_permission_channel_closed_denies() {
         tool_filter: None,
         shared: None,
         interactive: true,
-        thinking_config: loopal_provider_api::ThinkingConfig::Auto, interrupt: Default::default(), interrupt_notify: std::sync::Arc::new(tokio::sync::Notify::new()), memory_channel: None,
+        thinking_config: loopal_provider_api::ThinkingConfig::Auto,
+        interrupt: Default::default(),
+        interrupt_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
+        memory_channel: None,
     };
 
     let runner = AgentLoopRunner::new(params);
@@ -152,16 +152,13 @@ async fn test_check_permission_channel_closed_denies() {
 
 #[tokio::test]
 async fn test_check_permission_rx_closed_denies() {
-    let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx, perm_tx) =
-        make_runner_with_channels();
+    let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx, perm_tx) = make_runner_with_channels();
     runner.params.permission_mode = PermissionMode::Supervised;
 
     // Drop perm_tx so recv returns None
     drop(perm_tx);
 
-    tokio::spawn(async move {
-        while event_rx.recv().await.is_some() {}
-    });
+    tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 
     let decision = runner
         .check_permission("id1", "Write", &serde_json::json!({}))

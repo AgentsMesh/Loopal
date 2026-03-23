@@ -24,7 +24,10 @@ pub fn parse_patch(input: &str) -> Result<Vec<FileOp>, PatchParseError> {
         let line = lines[i];
         if let Some(path) = line.strip_prefix("*** Add File: ") {
             let (content, next) = parse_add_body(&lines, i + 1);
-            ops.push(FileOp::Add { path: PathBuf::from(path.trim()), content });
+            ops.push(FileOp::Add {
+                path: PathBuf::from(path.trim()),
+                content,
+            });
             i = next;
         } else if let Some(path) = line.strip_prefix("*** Update File: ") {
             let (hunks, next) = parse_update_body(&lines, i + 1)?;
@@ -34,10 +37,15 @@ pub fn parse_patch(input: &str) -> Result<Vec<FileOp>, PatchParseError> {
                     message: "update has no hunks".into(),
                 });
             }
-            ops.push(FileOp::Update { path: PathBuf::from(path.trim()), hunks });
+            ops.push(FileOp::Update {
+                path: PathBuf::from(path.trim()),
+                hunks,
+            });
             i = next;
         } else if let Some(path) = line.strip_prefix("*** Delete File: ") {
-            ops.push(FileOp::Delete { path: PathBuf::from(path.trim()) });
+            ops.push(FileOp::Delete {
+                path: PathBuf::from(path.trim()),
+            });
             i += 1;
         } else if line.trim().is_empty() {
             i += 1;
@@ -70,10 +78,7 @@ fn parse_add_body(lines: &[&str], start: usize) -> (String, usize) {
     (content, i)
 }
 
-fn parse_update_body(
-    lines: &[&str],
-    start: usize,
-) -> Result<(Vec<Hunk>, usize), PatchParseError> {
+fn parse_update_body(lines: &[&str], start: usize) -> Result<(Vec<Hunk>, usize), PatchParseError> {
     let mut hunks = Vec::new();
     let mut i = start;
     while i < lines.len() {
@@ -83,7 +88,10 @@ fn parse_update_body(
         if lines[i].starts_with("@@") {
             let line_hint = parse_line_hint(lines[i]);
             let (hunk_lines, next) = parse_hunk_lines(lines, i + 1)?;
-            hunks.push(Hunk { line_hint, lines: hunk_lines });
+            hunks.push(Hunk {
+                line_hint,
+                lines: hunk_lines,
+            });
             i = next;
         } else if lines[i].trim().is_empty() {
             i += 1;
@@ -98,8 +106,16 @@ fn parse_update_body(
 }
 
 fn parse_line_hint(line: &str) -> Option<usize> {
-    let trimmed = line.trim().trim_start_matches('@').trim_end_matches('@').trim();
-    if trimmed.is_empty() { None } else { trimmed.parse().ok() }
+    let trimmed = line
+        .trim()
+        .trim_start_matches('@')
+        .trim_end_matches('@')
+        .trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        trimmed.parse().ok()
+    }
 }
 
 fn parse_hunk_lines(

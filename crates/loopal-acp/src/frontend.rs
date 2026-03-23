@@ -13,8 +13,8 @@ use tokio_util::sync::CancellationToken;
 
 use loopal_error::{LoopalError, Result};
 use loopal_protocol::{AgentEvent, AgentEventPayload, Question};
-use loopal_runtime::frontend::traits::{AgentFrontend, EventEmitter};
 use loopal_runtime::AgentInput;
+use loopal_runtime::frontend::traits::{AgentFrontend, EventEmitter};
 use loopal_tool_api::PermissionDecision;
 
 use crate::jsonrpc::JsonRpcTransport;
@@ -57,9 +57,10 @@ impl AgentFrontend for AcpFrontend {
             agent_name: self.agent_name.clone(),
             payload,
         };
-        self.event_tx.send(event).await.map_err(|e| {
-            LoopalError::Other(format!("ACP event channel closed: {e}"))
-        })
+        self.event_tx
+            .send(event)
+            .await
+            .map_err(|e| LoopalError::Other(format!("ACP event channel closed: {e}")))
     }
 
     async fn recv_input(&self) -> Option<AgentInput> {
@@ -90,16 +91,18 @@ impl AgentFrontend for AcpFrontend {
             Err(_) => return PermissionDecision::Deny,
         };
 
-        match self.transport.request("session/requestPermission", params_value).await {
-            Ok(value) => {
-                match serde_json::from_value::<RequestPermissionResult>(value) {
-                    Ok(result) => match result.outcome {
-                        PermissionOutcome::Allow => PermissionDecision::Allow,
-                        PermissionOutcome::Deny => PermissionDecision::Deny,
-                    },
-                    Err(_) => PermissionDecision::Deny,
-                }
-            }
+        match self
+            .transport
+            .request("session/requestPermission", params_value)
+            .await
+        {
+            Ok(value) => match serde_json::from_value::<RequestPermissionResult>(value) {
+                Ok(result) => match result.outcome {
+                    PermissionOutcome::Allow => PermissionDecision::Allow,
+                    PermissionOutcome::Deny => PermissionDecision::Deny,
+                },
+                Err(_) => PermissionDecision::Deny,
+            },
             Err(_) => PermissionDecision::Deny,
         }
     }
@@ -130,8 +133,9 @@ impl EventEmitter for AcpEventEmitter {
             agent_name: self.agent_name.clone(),
             payload,
         };
-        self.tx.send(event).await.map_err(|e| {
-            LoopalError::Other(format!("ACP event emitter channel closed: {e}"))
-        })
+        self.tx
+            .send(event)
+            .await
+            .map_err(|e| LoopalError::Other(format!("ACP event emitter channel closed: {e}")))
     }
 }

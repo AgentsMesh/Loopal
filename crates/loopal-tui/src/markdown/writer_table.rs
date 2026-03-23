@@ -65,11 +65,7 @@ impl MdWriter {
 // ---------- free functions ----------
 
 /// Render collected table rows into styled `Line`s.
-fn render_table(
-    rows: &[Vec<String>],
-    alignments: &[Alignment],
-    width: u16,
-) -> Vec<Line<'static>> {
+fn render_table(rows: &[Vec<String>], alignments: &[Alignment], width: u16) -> Vec<Line<'static>> {
     if rows.is_empty() {
         return Vec::new();
     }
@@ -92,11 +88,7 @@ fn render_table(
 }
 
 /// Compute per-column widths, shrinking proportionally if needed.
-fn compute_col_widths(
-    rows: &[Vec<String>],
-    num_cols: usize,
-    width: u16,
-) -> Vec<usize> {
+fn compute_col_widths(rows: &[Vec<String>], num_cols: usize, width: u16) -> Vec<usize> {
     let mut widths: Vec<usize> = vec![3; num_cols];
     for row in rows {
         for (j, cell) in row.iter().enumerate() {

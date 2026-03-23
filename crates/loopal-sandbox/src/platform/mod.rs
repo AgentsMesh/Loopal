@@ -17,10 +17,7 @@ use loopal_config::ResolvedPolicy;
 ///
 /// Returns `(program, args)` to be prepended to the actual command.
 /// On unsupported platforms, returns `None`.
-pub fn build_sandbox_prefix(
-    policy: &ResolvedPolicy,
-    cwd: &Path,
-) -> Option<(String, Vec<String>)> {
+pub fn build_sandbox_prefix(policy: &ResolvedPolicy, cwd: &Path) -> Option<(String, Vec<String>)> {
     #[cfg(target_os = "macos")]
     {
         Some(macos::build_prefix(policy, cwd))

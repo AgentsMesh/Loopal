@@ -28,11 +28,7 @@ pub trait Provider: Send + Sync {
 }
 
 pub type ChatStream = Pin<
-    Box<
-        dyn futures::Stream<Item = std::result::Result<StreamChunk, LoopalError>>
-            + Send
-            + Unpin,
-    >,
+    Box<dyn futures::Stream<Item = std::result::Result<StreamChunk, LoopalError>> + Send + Unpin>,
 >;
 
 #[derive(Debug, Clone)]
@@ -51,11 +47,7 @@ pub struct ChatParams {
 
 impl ChatParams {
     /// Convenience constructor with sensible defaults for optional fields.
-    pub fn new(
-        model: String,
-        messages: Vec<Message>,
-        system_prompt: String,
-    ) -> Self {
+    pub fn new(model: String, messages: Vec<Message>, system_prompt: String) -> Self {
         Self {
             model,
             messages,
@@ -144,8 +136,5 @@ pub trait Middleware: Send + Sync {
 
     /// Process and potentially modify the middleware context.
     /// Return Err to abort the pipeline.
-    async fn process(
-        &self,
-        ctx: &mut MiddlewareContext,
-    ) -> std::result::Result<(), LoopalError>;
+    async fn process(&self, ctx: &mut MiddlewareContext) -> std::result::Result<(), LoopalError>;
 }

@@ -33,7 +33,11 @@ impl TurnCancel {
         if interrupt.is_signaled() {
             token.cancel();
         }
-        Self { token, interrupt, interrupt_notify }
+        Self {
+            token,
+            interrupt,
+            interrupt_notify,
+        }
     }
 
     /// Check if cancellation has been requested (sync, non-blocking).

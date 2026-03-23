@@ -9,9 +9,9 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use tracing::warn;
 
-use loopal_protocol::ImageAttachment;
 use crate::app::App;
 use crate::event::{AppEvent, EventHandler};
+use loopal_protocol::ImageAttachment;
 
 /// Result of an async clipboard read operation.
 #[derive(Debug)]
@@ -41,9 +41,7 @@ pub fn apply_paste_result(app: &mut App, result: PasteResult) {
         PasteResult::Image(attachment) => app.attach_image(attachment),
         PasteResult::Text(text) => {
             let line_count = text.lines().count().max(1);
-            if line_count > LARGE_PASTE_LINE_THRESHOLD
-                || text.len() > LARGE_PASTE_CHAR_THRESHOLD
-            {
+            if line_count > LARGE_PASTE_LINE_THRESHOLD || text.len() > LARGE_PASTE_CHAR_THRESHOLD {
                 let placeholder = generate_placeholder(&text, line_count, &app.paste_map);
                 app.paste_map.insert(placeholder.clone(), text);
                 app.input.insert_str(app.input_cursor, &placeholder);
@@ -55,16 +53,17 @@ pub fn apply_paste_result(app: &mut App, result: PasteResult) {
         }
         PasteResult::Empty => {}
         PasteResult::Unavailable => {
-            app.session.push_system_message(
-                "Clipboard not available (SSH/headless session?)".into(),
-            );
+            app.session
+                .push_system_message("Clipboard not available (SSH/headless session?)".into());
         }
     }
 }
 
 /// Expand all paste placeholders back to their full content.
 pub fn expand_paste_placeholders(text: &str, paste_map: &HashMap<String, String>) -> String {
-    if paste_map.is_empty() { return text.to_string(); }
+    if paste_map.is_empty() {
+        return text.to_string();
+    }
     let mut result = text.to_string();
     for (placeholder, content) in paste_map {
         result = result.replace(placeholder, content);
@@ -78,19 +77,25 @@ pub fn is_paste_placeholder(s: &str) -> bool {
 }
 
 fn generate_placeholder(
-    content: &str, line_count: usize, existing: &HashMap<String, String>,
+    content: &str,
+    line_count: usize,
+    existing: &HashMap<String, String>,
 ) -> String {
     let metric = if line_count > LARGE_PASTE_LINE_THRESHOLD {
-        format!("{} lines", line_count)
+        format!("{line_count} lines")
     } else {
         format!("{} chars", content.len())
     };
-    let base = format!("[Pasted Text: {}]", metric);
-    if !existing.contains_key(&base) { return base; }
+    let base = format!("[Pasted Text: {metric}]");
+    if !existing.contains_key(&base) {
+        return base;
+    }
     let mut suffix = 2;
     loop {
-        let candidate = format!("[Pasted Text: {} #{}]", metric, suffix);
-        if !existing.contains_key(&candidate) { return candidate; }
+        let candidate = format!("[Pasted Text: {metric} #{suffix}]");
+        if !existing.contains_key(&candidate) {
+            return candidate;
+        }
         suffix += 1;
     }
 }
@@ -117,19 +122,33 @@ fn encode_clipboard_image(img_data: arboard::ImageData<'_>) -> Option<ImageAttac
     let (width, height) = (img_data.width as u32, img_data.height as u32);
     let img = image::RgbaImage::from_raw(width, height, img_data.bytes.into_owned())?;
     let img = if width > MAX_DIMENSION || height > MAX_DIMENSION {
-        image::DynamicImage::ImageRgba8(img)
-            .resize(MAX_DIMENSION, MAX_DIMENSION, image::imageops::FilterType::Lanczos3)
+        image::DynamicImage::ImageRgba8(img).resize(
+            MAX_DIMENSION,
+            MAX_DIMENSION,
+            image::imageops::FilterType::Lanczos3,
+        )
     } else {
         image::DynamicImage::ImageRgba8(img)
     };
     let mut png_buf = Vec::new();
-    img.write_to(&mut std::io::Cursor::new(&mut png_buf), image::ImageFormat::Png).ok()?;
+    img.write_to(
+        &mut std::io::Cursor::new(&mut png_buf),
+        image::ImageFormat::Png,
+    )
+    .ok()?;
     let b64 = BASE64.encode(&png_buf);
     if b64.len() > MAX_BASE64_BYTES {
-        warn!(size = b64.len(), max = MAX_BASE64_BYTES, "clipboard image too large");
+        warn!(
+            size = b64.len(),
+            max = MAX_BASE64_BYTES,
+            "clipboard image too large"
+        );
         return None;
     }
-    Some(ImageAttachment { media_type: "image/png".to_string(), data: b64 })
+    Some(ImageAttachment {
+        media_type: "image/png".to_string(),
+        data: b64,
+    })
 }
 
 #[cfg(test)]
@@ -147,20 +166,24 @@ mod tests {
     fn large_paste_generates_placeholder() {
         let text = "line1\nline2\nline3\nline4\nline5\nline6";
         let map = HashMap::new();
-        assert_eq!(generate_placeholder(text, 6, &map), "[Pasted Text: 6 lines]");
+        assert_eq!(
+            generate_placeholder(text, 6, &map),
+            "[Pasted Text: 6 lines]"
+        );
     }
 
     #[test]
     fn placeholder_dedup() {
         let map = HashMap::from([("[Pasted Text: 6 lines]".into(), "x".into())]);
-        assert_eq!(generate_placeholder("x", 6, &map), "[Pasted Text: 6 lines #2]");
+        assert_eq!(
+            generate_placeholder("x", 6, &map),
+            "[Pasted Text: 6 lines #2]"
+        );
     }
 
     #[test]
     fn expand_placeholders() {
-        let map = HashMap::from([
-            ("[Pasted Text: 6 lines]".into(), "full\ncontent".into()),
-        ]);
+        let map = HashMap::from([("[Pasted Text: 6 lines]".into(), "full\ncontent".into())]);
         let expanded = expand_paste_placeholders("before [Pasted Text: 6 lines] after", &map);
         assert_eq!(expanded, "before full\ncontent after");
     }
@@ -168,6 +191,9 @@ mod tests {
     #[test]
     fn char_based_placeholder() {
         let text = "a".repeat(501);
-        assert_eq!(generate_placeholder(&text, 1, &HashMap::new()), "[Pasted Text: 501 chars]");
+        assert_eq!(
+            generate_placeholder(&text, 1, &HashMap::new()),
+            "[Pasted Text: 501 chars]"
+        );
     }
 }

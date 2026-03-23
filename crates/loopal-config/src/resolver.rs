@@ -4,9 +4,7 @@ use loopal_error::{ConfigError, LoopalError};
 
 use crate::layer::{ConfigLayer, LayerSource};
 use crate::loader::deep_merge;
-use crate::resolved::{
-    HookEntry, McpServerEntry, ResolvedConfig, SkillEntry,
-};
+use crate::resolved::{HookEntry, McpServerEntry, ResolvedConfig, SkillEntry};
 use crate::settings::Settings;
 
 /// Merges multiple `ConfigLayer`s into a single `ResolvedConfig`.
@@ -50,10 +48,13 @@ impl ConfigResolver {
             // MCP servers: override by name; enabled=false removes
             for (name, config) in layer.mcp_servers {
                 if config.enabled {
-                    mcp_servers.insert(name, McpServerEntry {
-                        config,
-                        source: layer.source.clone(),
-                    });
+                    mcp_servers.insert(
+                        name,
+                        McpServerEntry {
+                            config,
+                            source: layer.source.clone(),
+                        },
+                    );
                 } else {
                     mcp_servers.shift_remove(&name);
                 }
@@ -62,10 +63,13 @@ impl ConfigResolver {
             // Skills: override by name
             for skill in layer.skills {
                 let name = skill.name.clone();
-                skills.insert(name, SkillEntry {
-                    skill,
-                    source: layer.source.clone(),
-                });
+                skills.insert(
+                    name,
+                    SkillEntry {
+                        skill,
+                        source: layer.source.clone(),
+                    },
+                );
             }
 
             // Hooks: append all, preserving order

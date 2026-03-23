@@ -47,14 +47,14 @@ pub async fn read_file(
         let line_num = start + i + 1;
         result.push_str(&format!("{line_num:>6}\t{line}\n"));
     }
-    Ok(ReadResult { content: result, total_lines })
+    Ok(ReadResult {
+        content: result,
+        total_lines,
+    })
 }
 
 /// Read raw file content with size check and binary detection (no line numbering).
-pub async fn read_raw_file(
-    path: &Path,
-    limits: &ResourceLimits,
-) -> Result<String, ToolIoError> {
+pub async fn read_raw_file(path: &Path, limits: &ResourceLimits) -> Result<String, ToolIoError> {
     let meta = tokio::fs::metadata(path).await.map_err(|e| {
         if e.kind() == std::io::ErrorKind::NotFound {
             ToolIoError::NotFound(format!("{}", path.display()))
@@ -81,6 +81,9 @@ pub async fn read_raw_file(
 }
 
 /// Atomic write: write to tmp → fsync → rename.
+///
+/// On Windows, rename-over can fail with `\\?\` extended paths, so we
+/// fall back to remove + rename when we get ACCESS_DENIED.
 pub async fn write_file(path: &Path, content: &str) -> Result<WriteResult, ToolIoError> {
     if let Some(parent) = path.parent() {
         tokio::fs::create_dir_all(parent).await?;
@@ -92,13 +95,31 @@ pub async fn write_file(path: &Path, content: &str) -> Result<WriteResult, ToolI
     let tmp_path = path.with_file_name(tmp_name);
     tokio::fs::write(&tmp_path, content).await?;
 
-    // fsync the temp file for durability
-    let f = tokio::fs::File::open(&tmp_path).await?;
+    // fsync the temp file for durability.
+    // Must open with write access — Windows FlushFileBuffers requires GENERIC_WRITE.
+    let f = tokio::fs::OpenOptions::new()
+        .write(true)
+        .open(&tmp_path)
+        .await?;
     f.sync_all().await?;
     drop(f);
 
-    tokio::fs::rename(&tmp_path, path).await?;
-    Ok(WriteResult { bytes_written: content.len() })
+    if let Err(e) = tokio::fs::rename(&tmp_path, path).await {
+        // Windows: rename-over existing file can fail with ACCESS_DENIED (os error 5)
+        // when paths use the \\?\ extended prefix. Fall back to remove + rename.
+        if cfg!(windows) && e.raw_os_error() == Some(5) && path.exists() {
+            tokio::fs::remove_file(path).await?;
+            tokio::fs::rename(&tmp_path, path).await?;
+        } else {
+            // Clean up temp file on failure
+            let _ = tokio::fs::remove_file(&tmp_path).await;
+            return Err(e.into());
+        }
+    }
+
+    Ok(WriteResult {
+        bytes_written: content.len(),
+    })
 }
 
 /// Search-and-replace edit using edit-core's search_replace.
@@ -116,7 +137,7 @@ pub async fn edit_file(
         }
     })?;
 
-    use loopal_edit_core::search_replace::{search_replace, SearchReplaceResult};
+    use loopal_edit_core::search_replace::{SearchReplaceResult, search_replace};
     match search_replace(&content, old, new, replace_all) {
         SearchReplaceResult::Ok(new_content) => {
             let count = if replace_all {
@@ -125,16 +146,16 @@ pub async fn edit_file(
                 1
             };
             write_file(path, &new_content).await?;
-            Ok(EditResult { replacements: count })
+            Ok(EditResult {
+                replacements: count,
+            })
         }
         SearchReplaceResult::NotFound => {
             Err(ToolIoError::Other("old_string not found in file".into()))
         }
-        SearchReplaceResult::MultipleMatches(n) => {
-            Err(ToolIoError::Other(format!(
-                "old_string found {n} times — use replace_all or provide more context"
-            )))
-        }
+        SearchReplaceResult::MultipleMatches(n) => Err(ToolIoError::Other(format!(
+            "old_string found {n} times — use replace_all or provide more context"
+        ))),
     }
 }
 
@@ -162,7 +183,9 @@ pub async fn get_file_info(path: &Path) -> Result<FileInfo, ToolIoError> {
     };
 
     let modified = meta.modified().ok().and_then(|t| {
-        t.duration_since(std::time::UNIX_EPOCH).ok().map(|d| d.as_secs())
+        t.duration_since(std::time::UNIX_EPOCH)
+            .ok()
+            .map(|d| d.as_secs())
     });
 
     Ok(FileInfo {

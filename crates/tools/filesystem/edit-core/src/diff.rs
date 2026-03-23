@@ -109,9 +109,16 @@ fn build_hunks(ops: &[DiffOp], context: usize) -> Vec<Hunk> {
         // Count lines before hunk_start to get starting line numbers
         for op in &ops[..hunk_start] {
             match op {
-                DiffOp::Equal(_) => { old_line += 1; new_line += 1; }
-                DiffOp::Delete(_) => { old_line += 1; }
-                DiffOp::Insert(_) => { new_line += 1; }
+                DiffOp::Equal(_) => {
+                    old_line += 1;
+                    new_line += 1;
+                }
+                DiffOp::Delete(_) => {
+                    old_line += 1;
+                }
+                DiffOp::Insert(_) => {
+                    new_line += 1;
+                }
             }
         }
         let old_start = old_line;
@@ -135,7 +142,13 @@ fn build_hunks(ops: &[DiffOp], context: usize) -> Vec<Hunk> {
                 }
             }
         }
-        hunks.push(Hunk { old_start, old_count, new_start, new_count, body });
+        hunks.push(Hunk {
+            old_start,
+            old_count,
+            new_start,
+            new_count,
+            body,
+        });
     }
     hunks
 }

@@ -44,7 +44,10 @@ fn compact_to_marker_roundtrip() {
 
     let decoded: TaggedEntry = serde_json::from_str(&json).unwrap();
     match decoded {
-        TaggedEntry::Marker(Marker::CompactTo { keep_last, timestamp }) => {
+        TaggedEntry::Marker(Marker::CompactTo {
+            keep_last,
+            timestamp,
+        }) => {
             assert_eq!(keep_last, 5);
             assert_eq!(timestamp, "2025-06-15T12:00:00Z");
         }
@@ -88,7 +91,10 @@ fn rewind_to_marker_roundtrip() {
 
     let decoded: TaggedEntry = serde_json::from_str(&json).unwrap();
     match decoded {
-        TaggedEntry::Marker(Marker::RewindTo { message_id, timestamp }) => {
+        TaggedEntry::Marker(Marker::RewindTo {
+            message_id,
+            timestamp,
+        }) => {
             assert_eq!(message_id, "msg-042");
             assert_eq!(timestamp, "2025-08-01T10:00:00Z");
         }

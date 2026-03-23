@@ -1,5 +1,5 @@
-use loopal_runtime::SessionManager;
 use loopal_message::Message;
+use loopal_runtime::SessionManager;
 use std::path::Path;
 use tempfile::TempDir;
 
@@ -73,7 +73,10 @@ fn test_resume_nonexistent_session_fails() {
     let mgr = make_manager(&tmp);
 
     let result = mgr.resume_session("nonexistent-session-id-12345");
-    assert!(result.is_err(), "resuming a nonexistent session should fail");
+    assert!(
+        result.is_err(),
+        "resuming a nonexistent session should fail"
+    );
 }
 
 #[test]

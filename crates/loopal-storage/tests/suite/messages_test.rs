@@ -1,6 +1,6 @@
+use loopal_message::Message;
 use loopal_storage::MessageStore;
 use loopal_storage::TaggedEntry;
-use loopal_message::Message;
 use tempfile::TempDir;
 
 #[test]
@@ -53,9 +53,15 @@ fn test_load_messages_preserves_roles() {
     let store = MessageStore::with_base_dir(tmp.path().to_path_buf());
     let session_id = "role-test-session";
 
-    store.append_message(session_id, &Message::user("question")).unwrap();
-    store.append_message(session_id, &Message::assistant("answer")).unwrap();
-    store.append_message(session_id, &Message::system("notice")).unwrap();
+    store
+        .append_message(session_id, &Message::user("question"))
+        .unwrap();
+    store
+        .append_message(session_id, &Message::assistant("answer"))
+        .unwrap();
+    store
+        .append_message(session_id, &Message::system("notice"))
+        .unwrap();
 
     let messages = store.load_messages(session_id).unwrap();
     assert_eq!(messages.len(), 3);
@@ -72,7 +78,7 @@ fn test_append_multiple_messages_incrementally() {
 
     for i in 0..10 {
         store
-            .append_message(session_id, &Message::user(&format!("msg-{}", i)))
+            .append_message(session_id, &Message::user(&format!("msg-{i}")))
             .unwrap();
     }
 
@@ -94,7 +100,7 @@ fn test_load_messages_handles_empty_lines() {
 
     let entry = TaggedEntry::Message(Message::user("hello"));
     let line = serde_json::to_string(&entry).unwrap();
-    let content = format!("{}\n\n{}\n\n", line, line);
+    let content = format!("{line}\n\n{line}\n\n");
     std::fs::write(session_dir.join("messages.jsonl"), content).unwrap();
 
     let store = MessageStore::with_base_dir(tmp.path().to_path_buf());

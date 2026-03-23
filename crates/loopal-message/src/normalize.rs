@@ -15,11 +15,12 @@ pub fn normalize_messages(messages: &[Message]) -> Vec<Message> {
         }
 
         if let Some(last) = result.last_mut()
-            && last.role == msg.role {
-                // Merge content blocks
-                last.content.extend(msg.content.clone());
-                continue;
-            }
+            && last.role == msg.role
+        {
+            // Merge content blocks
+            last.content.extend(msg.content.clone());
+            continue;
+        }
 
         result.push(msg.clone());
     }

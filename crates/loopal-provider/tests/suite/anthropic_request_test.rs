@@ -1,5 +1,5 @@
-use loopal_provider::AnthropicProvider;
 use loopal_message::{ContentBlock, ImageSource, Message, MessageRole};
+use loopal_provider::AnthropicProvider;
 use loopal_provider_api::ChatParams;
 use loopal_tool_api::ToolDefinition;
 use serde_json::json;
@@ -25,10 +25,7 @@ fn make_params(messages: Vec<Message>, tools: Vec<ToolDefinition>) -> ChatParams
 fn test_build_messages_text_only() {
     let provider = make_provider();
     let params = make_params(
-        vec![
-            Message::user("Hello"),
-            Message::assistant("Hi there"),
-        ],
+        vec![Message::user("Hello"), Message::assistant("Hi there")],
         vec![],
     );
     let msgs = provider.build_messages(&params);
@@ -82,10 +79,7 @@ fn test_build_messages_with_tool_use() {
 fn test_build_messages_filters_system() {
     let provider = make_provider();
     let params = make_params(
-        vec![
-            Message::system("You are helpful"),
-            Message::user("Hello"),
-        ],
+        vec![Message::system("You are helpful"), Message::user("Hello")],
         vec![],
     );
     let msgs = provider.build_messages(&params);
@@ -149,5 +143,8 @@ fn test_build_tools_with_entries() {
     assert_eq!(tools[0]["name"], "read_file");
     assert_eq!(tools[0]["description"], "Read a file");
     assert_eq!(tools[0]["input_schema"]["type"], "object");
-    assert_eq!(tools[0]["input_schema"]["properties"]["path"]["type"], "string");
+    assert_eq!(
+        tools[0]["input_schema"]["properties"]["path"]["type"],
+        "string"
+    );
 }

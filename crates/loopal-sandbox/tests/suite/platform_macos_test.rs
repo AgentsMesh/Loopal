@@ -2,18 +2,13 @@
 mod macos_tests {
     use std::path::PathBuf;
 
+    use loopal_config::{NetworkPolicy, ResolvedPolicy, SandboxPolicy};
     use loopal_sandbox::platform::macos::generate_seatbelt_profile;
-    use loopal_config::{
-        NetworkPolicy, ResolvedPolicy, SandboxPolicy,
-    };
 
     fn workspace_policy() -> ResolvedPolicy {
         ResolvedPolicy {
             policy: SandboxPolicy::WorkspaceWrite,
-            writable_paths: vec![
-                PathBuf::from("/home/user/project"),
-                PathBuf::from("/tmp"),
-            ],
+            writable_paths: vec![PathBuf::from("/home/user/project"), PathBuf::from("/tmp")],
             deny_write_globs: vec![],
             deny_read_globs: vec![],
             network: NetworkPolicy::default(),
@@ -38,15 +33,9 @@ mod macos_tests {
         assert!(profile.contains("(version 1)"));
         assert!(profile.contains("(deny default)"));
         assert!(profile.contains("(allow file-read*)"));
-        assert!(profile.contains(
-            "(allow file-write* (subpath \"/dev\"))"
-        ));
-        assert!(profile.contains(
-            "(allow file-write* (subpath \"/home/user/project\"))"
-        ));
-        assert!(profile.contains(
-            "(allow file-write* (subpath \"/tmp\"))"
-        ));
+        assert!(profile.contains("(allow file-write* (subpath \"/dev\"))"));
+        assert!(profile.contains("(allow file-write* (subpath \"/home/user/project\"))"));
+        assert!(profile.contains("(allow file-write* (subpath \"/tmp\"))"));
     }
 
     #[test]
@@ -58,9 +47,7 @@ mod macos_tests {
         assert!(profile.contains("(allow file-read*)"));
         // System writable paths are allowed (device files, /var/tmp)
         assert!(profile.contains("(allow file-write* (subpath \"/dev\"))"));
-        assert!(profile.contains(
-            "(allow file-write* (subpath \"/private/var/tmp\"))"
-        ));
+        assert!(profile.contains("(allow file-write* (subpath \"/private/var/tmp\"))"));
         // No workspace write rules beyond system paths
         let write_count = profile.matches("file-write*").count();
         assert_eq!(

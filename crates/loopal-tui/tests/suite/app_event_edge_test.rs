@@ -1,10 +1,10 @@
 //! Edge cases for flush_streaming behavior.
 
+use loopal_protocol::ControlCommand;
+use loopal_protocol::{AgentEvent, AgentEventPayload, UserQuestionResponse};
 use loopal_session::{DisplayMessage, DisplayToolCall, SessionController};
 use loopal_tui::app::App;
 use loopal_tui::command::builtin_entries;
-use loopal_protocol::ControlCommand;
-use loopal_protocol::{AgentEvent, AgentEventPayload, UserQuestionResponse};
 use tokio::sync::mpsc;
 
 fn make_app() -> App {
@@ -16,7 +16,9 @@ fn make_app() -> App {
         "act".to_string(),
         control_tx,
         perm_tx,
-        question_tx, Default::default(), std::sync::Arc::new(tokio::sync::Notify::new()),
+        question_tx,
+        Default::default(),
+        std::sync::Arc::new(tokio::sync::Notify::new()),
     );
     App::new(session, builtin_entries(), std::env::temp_dir())
 }
@@ -24,15 +26,19 @@ fn make_app() -> App {
 #[test]
 fn test_flush_streaming_appends_to_existing_assistant_message() {
     let app = make_app();
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::Stream {
-        text: "first chunk".to_string(),
-    }));
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::Stream {
+            text: "first chunk".to_string(),
+        }));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
 
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::Stream {
-        text: " second chunk".to_string(),
-    }));
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::Stream {
+            text: " second chunk".to_string(),
+        }));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
 
     let state = app.session.lock();
     assert_eq!(state.messages.len(), 1);
@@ -42,19 +48,23 @@ fn test_flush_streaming_appends_to_existing_assistant_message() {
 #[test]
 fn test_flush_streaming_creates_new_message_after_tool_call() {
     let app = make_app();
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::Stream {
-        text: "before tool".to_string(),
-    }));
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::ToolCall {
-        id: "tc-1".to_string(),
-        name: "bash".to_string(),
-        input: serde_json::json!({}),
-    }));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::Stream {
+            text: "before tool".to_string(),
+        }));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::ToolCall {
+            id: "tc-1".to_string(),
+            name: "bash".to_string(),
+            input: serde_json::json!({}),
+        }));
 
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::Stream {
-        text: "after tool".to_string(),
-    }));
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::Stream {
+            text: "after tool".to_string(),
+        }));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
 
     let state = app.session.lock();
     assert_eq!(state.messages.len(), 2);
@@ -77,7 +87,8 @@ fn test_flush_streaming_new_message_when_last_is_not_assistant() {
         });
         state.streaming_text = "response".to_string();
     }
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
 
     let state = app.session.lock();
     assert_eq!(state.messages.len(), 2);
@@ -103,7 +114,8 @@ fn test_flush_streaming_new_message_when_assistant_has_tool_calls() {
         });
         state.streaming_text = "new response".to_string();
     }
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
 
     let state = app.session.lock();
     assert_eq!(state.messages.len(), 2);

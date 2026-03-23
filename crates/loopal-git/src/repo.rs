@@ -25,7 +25,11 @@ pub fn repo_root(cwd: &Path) -> Option<PathBuf> {
         return None;
     }
     let root = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if root.is_empty() { None } else { Some(PathBuf::from(root)) }
+    if root.is_empty() {
+        None
+    } else {
+        Some(PathBuf::from(root))
+    }
 }
 
 /// Return the current branch name, or `None` if detached HEAD.
@@ -40,5 +44,9 @@ pub fn current_branch(cwd: &Path) -> Option<String> {
         return None;
     }
     let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if branch.is_empty() || branch == "HEAD" { None } else { Some(branch) }
+    if branch.is_empty() || branch == "HEAD" {
+        None
+    } else {
+        Some(branch)
+    }
 }

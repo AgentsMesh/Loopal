@@ -11,7 +11,8 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext {
         session_id: "test".into(),
         shared: None,
-        pending_cwd_switch: Default::default(), memory_channel: None,
+        pending_cwd_switch: Default::default(),
+        memory_channel: None,
         backend,
     }
 }
@@ -48,10 +49,16 @@ async fn delete_not_found() {
     let tmp = tempfile::tempdir().unwrap();
     let tool = DeleteTool;
     let ctx = make_ctx(tmp.path());
-    let r = tool.execute(json!({"path": "nope.txt"}), &ctx).await.unwrap();
+    let r = tool
+        .execute(json!({"path": "nope.txt"}), &ctx)
+        .await
+        .unwrap();
     assert!(r.is_error);
-    assert!(r.content.contains("not found") || r.content.contains("does not exist"),
-            "unexpected error: {}", r.content);
+    assert!(
+        r.content.contains("not found") || r.content.contains("does not exist"),
+        "unexpected error: {}",
+        r.content
+    );
 }
 
 #[tokio::test]

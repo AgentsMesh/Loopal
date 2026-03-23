@@ -16,7 +16,12 @@ pub struct AutoDenyHandler;
 
 #[async_trait]
 impl PermissionHandler for AutoDenyHandler {
-    async fn decide(&self, _id: &str, _name: &str, _input: &serde_json::Value) -> PermissionDecision {
+    async fn decide(
+        &self,
+        _id: &str,
+        _name: &str,
+        _input: &serde_json::Value,
+    ) -> PermissionDecision {
         PermissionDecision::Deny
     }
 }

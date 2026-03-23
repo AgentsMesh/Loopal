@@ -5,13 +5,22 @@ use crate::types::DisplayMessage;
 
 /// Extract a human-readable label from a ThinkingConfig JSON string.
 pub fn thinking_label_from_json(json: &str) -> String {
-    let Ok(v) = serde_json::from_str::<serde_json::Value>(json) else { return "unknown".into() };
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(json) else {
+        return "unknown".into();
+    };
     match v.get("type").and_then(|t| t.as_str()) {
         Some("auto") => "auto".into(),
         Some("disabled") => "disabled".into(),
-        Some("effort") => v.get("level").and_then(|l| l.as_str()).unwrap_or("medium").into(),
+        Some("effort") => v
+            .get("level")
+            .and_then(|l| l.as_str())
+            .unwrap_or("medium")
+            .into(),
         Some("budget") => {
-            format!("budget({})", v.get("tokens").and_then(|t| t.as_u64()).unwrap_or(0))
+            format!(
+                "budget({})",
+                v.get("tokens").and_then(|t| t.as_u64()).unwrap_or(0)
+            )
         }
         _ => "unknown".into(),
     }

@@ -16,9 +16,21 @@ use tokio::sync::{Mutex, oneshot};
 /// A parsed incoming JSON-RPC message (request, notification, or response).
 #[derive(Debug)]
 pub enum IncomingMessage {
-    Request { id: i64, method: String, params: Value },
-    Notification { method: String, #[allow(dead_code)] params: Value },
-    Response { id: i64, result: Option<Value>, error: Option<JsonRpcError> },
+    Request {
+        id: i64,
+        method: String,
+        params: Value,
+    },
+    Notification {
+        method: String,
+        #[allow(dead_code)]
+        params: Value,
+    },
+    Response {
+        id: i64,
+        result: Option<Value>,
+        error: Option<JsonRpcError>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,15 +66,26 @@ impl RawMessage {
             match self.id {
                 Some(Value::Number(n)) => {
                     let id = n.as_i64().unwrap_or(0);
-                    Some(IncomingMessage::Request { id, method, params: self.params })
+                    Some(IncomingMessage::Request {
+                        id,
+                        method,
+                        params: self.params,
+                    })
                 }
                 Some(_) => None, // non-numeric id: skip
-                None => Some(IncomingMessage::Notification { method, params: self.params }),
+                None => Some(IncomingMessage::Notification {
+                    method,
+                    params: self.params,
+                }),
             }
         } else if let Some(Value::Number(n)) = self.id {
             // Response to an outbound request
             let id = n.as_i64().unwrap_or(0);
-            Some(IncomingMessage::Response { id, result: self.result, error: self.error })
+            Some(IncomingMessage::Response {
+                id,
+                result: self.result,
+                error: self.error,
+            })
         } else {
             None
         }
@@ -146,9 +169,7 @@ impl JsonRpcTransport {
 /// Read one JSON-RPC message from a buffered stdin reader.
 ///
 /// Returns `None` on EOF.
-pub async fn read_message(
-    reader: &mut BufReader<tokio::io::Stdin>,
-) -> Option<IncomingMessage> {
+pub async fn read_message(reader: &mut BufReader<tokio::io::Stdin>) -> Option<IncomingMessage> {
     let mut line = String::new();
     loop {
         line.clear();
@@ -156,7 +177,9 @@ pub async fn read_message(
             Ok(0) => return None, // EOF
             Ok(_) => {
                 let trimmed = line.trim();
-                if trimmed.is_empty() { continue; }
+                if trimmed.is_empty() {
+                    continue;
+                }
                 if let Ok(raw) = serde_json::from_str::<RawMessage>(trimmed)
                     && let Some(msg) = raw.classify()
                 {

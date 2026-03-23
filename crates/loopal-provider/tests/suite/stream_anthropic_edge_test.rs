@@ -1,7 +1,7 @@
 use futures::StreamExt;
-use loopal_provider::AnthropicProvider;
 use loopal_error::LoopalError;
 use loopal_message::Message;
+use loopal_provider::AnthropicProvider;
 use loopal_provider_api::{ChatParams, Provider, StreamChunk};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -43,15 +43,11 @@ data: {\"type\":\"message_stop\"}\n\n";
 
     Mock::given(method("POST"))
         .and(path("/v1/messages"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_raw(sse_body, "text/event-stream"),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_raw(sse_body, "text/event-stream"))
         .mount(&mock_server)
         .await;
 
-    let provider = AnthropicProvider::new("test-key".to_string())
-        .with_base_url(mock_server.uri());
+    let provider = AnthropicProvider::new("test-key".to_string()).with_base_url(mock_server.uri());
 
     let stream = provider.stream_chat(&test_chat_params()).await.unwrap();
     let chunks = collect_chunks(stream).await;

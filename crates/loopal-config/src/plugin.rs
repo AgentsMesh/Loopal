@@ -29,10 +29,7 @@ pub fn load_plugin_layers() -> Result<Vec<ConfigLayer>, LoopalError> {
 
     let mut layers = Vec::new();
     for entry in entries {
-        let name = entry
-            .file_name()
-            .to_string_lossy()
-            .to_string();
+        let name = entry.file_name().to_string_lossy().to_string();
         let dir = entry.path();
         debug!(plugin = %name, "loading plugin layer");
         let layer = load_layer_from_dir(

@@ -1,7 +1,7 @@
+use loopal_context::compact_messages;
 use loopal_context::compaction::{
     find_largest_tool_result, strip_old_thinking, truncate_block_content,
 };
-use loopal_context::compact_messages;
 use loopal_context::token_counter::{estimate_messages_tokens, estimate_tokens};
 use loopal_message::Message;
 use tracing::{debug, info, warn};
@@ -36,23 +36,32 @@ impl AgentLoopRunner {
             let total = msg_tokens + overhead;
 
             if total <= budget {
-                debug!(total, budget, messages = messages.len(), "preflight: within budget");
+                debug!(
+                    total,
+                    budget,
+                    messages = messages.len(),
+                    "preflight: within budget"
+                );
                 return;
             }
 
             if let Some((mi, bi, size)) = find_largest_tool_result(messages) {
                 if size < MIN_TRUNCATABLE_BYTES {
                     info!(
-                        total, budget, iteration,
-                        "preflight: no large ToolResults, emergency compact"
+                        total,
+                        budget, iteration, "preflight: no large ToolResults, emergency compact"
                     );
                     compact_messages(messages, 3);
                     return;
                 }
 
                 warn!(
-                    total, budget, iteration,
-                    msg_idx = mi, block_idx = bi, block_bytes = size,
+                    total,
+                    budget,
+                    iteration,
+                    msg_idx = mi,
+                    block_idx = bi,
+                    block_bytes = size,
                     "preflight: truncating largest ToolResult"
                 );
                 truncate_block_content(
@@ -61,7 +70,10 @@ impl AgentLoopRunner {
                     PREFLIGHT_SUMMARY_MAX_BYTES,
                 );
             } else {
-                info!(total, budget, "preflight: no ToolResults, emergency compact");
+                info!(
+                    total,
+                    budget, "preflight: no ToolResults, emergency compact"
+                );
                 compact_messages(messages, 3);
                 return;
             }

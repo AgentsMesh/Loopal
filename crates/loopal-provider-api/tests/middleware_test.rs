@@ -1,5 +1,5 @@
-use loopal_provider_api::MiddlewareContext;
 use loopal_message::Message;
+use loopal_provider_api::MiddlewareContext;
 
 #[test]
 fn test_middleware_context_construction_without_summarization_provider() {

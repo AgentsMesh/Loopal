@@ -57,8 +57,7 @@ pub fn render_rewind_picker(f: &mut Frame, state: &RewindPickerState, area: Rect
     if state.turns.is_empty() {
         let empty_area = Rect::new(inner.x, list_y, inner.width, 1);
         f.render_widget(
-            Paragraph::new("  No turns available")
-                .style(Style::default().fg(Color::DarkGray)),
+            Paragraph::new("  No turns available").style(Style::default().fg(Color::DarkGray)),
             empty_area,
         );
         return;
@@ -84,10 +83,7 @@ pub fn render_rewind_picker(f: &mut Frame, state: &RewindPickerState, area: Rect
 
         let line = Line::from(vec![
             Span::styled(indicator, Style::default().fg(Color::Yellow)),
-            Span::styled(
-                format!("[{turn_num}] "),
-                Style::default().fg(Color::Cyan),
-            ),
+            Span::styled(format!("[{turn_num}] "), Style::default().fg(Color::Cyan)),
             Span::styled(
                 &item.preview,
                 if is_selected {

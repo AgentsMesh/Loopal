@@ -23,7 +23,13 @@ pub fn message_to_lines(msg: &DisplayMessage, width: u16) -> Vec<Line<'static>> 
         "welcome" => render_welcome(&mut lines, msg),
         "error" => render_prefixed(&mut lines, msg, "Error: ", Color::Red, width),
         "system" => render_prefixed(&mut lines, msg, "System: ", Color::Yellow, width),
-        _ => render_prefixed(&mut lines, msg, &format!("{}: ", msg.role), Color::White, width),
+        _ => render_prefixed(
+            &mut lines,
+            msg,
+            &format!("{}: ", msg.role),
+            Color::White,
+            width,
+        ),
     }
 
     // Tool calls — single-line summaries
@@ -102,7 +108,7 @@ fn render_thinking(lines: &mut Vec<Line<'static>>, msg: &DisplayMessage) {
     let label = if token_est >= 1000 {
         format!("Thinking ({}k tokens)", token_est / 1000)
     } else if token_est > 0 {
-        format!("Thinking ({} tokens)", token_est)
+        format!("Thinking ({token_est} tokens)")
     } else {
         "Thinking...".to_string()
     };
@@ -133,11 +139,11 @@ fn render_welcome(lines: &mut Vec<Line<'static>>, msg: &DisplayMessage) {
     ];
 
     let gradient: &[Color] = &[
-        Color::Rgb(80, 200, 120),   // green
-        Color::Rgb(70, 200, 150),   // green-teal
-        Color::Rgb(60, 195, 180),   // teal
-        Color::Rgb(50, 190, 210),   // teal-cyan
-        Color::Rgb(40, 180, 230),   // cyan
+        Color::Rgb(80, 200, 120), // green
+        Color::Rgb(70, 200, 150), // green-teal
+        Color::Rgb(60, 195, 180), // teal
+        Color::Rgb(50, 190, 210), // teal-cyan
+        Color::Rgb(40, 180, 230), // cyan
     ];
 
     lines.push(Line::from(""));
@@ -160,10 +166,7 @@ fn render_welcome(lines: &mut Vec<Line<'static>>, msg: &DisplayMessage) {
             "loopal",
             Style::default().fg(Color::Rgb(60, 195, 180)).bold(),
         ),
-        Span::styled(
-            ".",
-            Style::default().fg(Color::Rgb(140, 150, 170)),
-        ),
+        Span::styled(".", Style::default().fg(Color::Rgb(140, 150, 170))),
     ]));
     lines.push(Line::from(Span::styled(
         "  Part of AgentsMesh.ai",
@@ -176,19 +179,20 @@ fn render_welcome(lines: &mut Vec<Line<'static>>, msg: &DisplayMessage) {
         lines.push(Line::from(vec![
             Span::styled(
                 "  model:     ",
-                Style::default().fg(Color::Rgb(100, 110, 130)).add_modifier(Modifier::DIM),
+                Style::default()
+                    .fg(Color::Rgb(100, 110, 130))
+                    .add_modifier(Modifier::DIM),
             ),
-            Span::styled(
-                model.to_string(),
-                Style::default().fg(Color::Cyan),
-            ),
+            Span::styled(model.to_string(), Style::default().fg(Color::Cyan)),
         ]));
     }
     if !path.is_empty() {
         lines.push(Line::from(vec![
             Span::styled(
                 "  directory: ",
-                Style::default().fg(Color::Rgb(100, 110, 130)).add_modifier(Modifier::DIM),
+                Style::default()
+                    .fg(Color::Rgb(100, 110, 130))
+                    .add_modifier(Modifier::DIM),
             ),
             Span::styled(
                 path.to_string(),

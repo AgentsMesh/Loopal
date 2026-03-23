@@ -1,7 +1,7 @@
 use std::fs;
 
-use loopal_config::loader::load_layer_from_dir;
 use loopal_config::layer::LayerSource;
+use loopal_config::loader::load_layer_from_dir;
 use loopal_config::plugin::load_plugin_layers;
 
 #[test]
@@ -86,12 +86,7 @@ fn test_load_layer_custom_instructions_path() {
     let instr_path = dir.path().join("CUSTOM.md");
     fs::write(&instr_path, "Custom instructions").unwrap();
 
-    let layer = load_layer_from_dir(
-        dir.path(),
-        LayerSource::Global,
-        Some(&instr_path),
-    )
-    .unwrap();
+    let layer = load_layer_from_dir(dir.path(), LayerSource::Global, Some(&instr_path)).unwrap();
 
     assert_eq!(layer.instructions.as_deref(), Some("Custom instructions"));
 }
@@ -127,22 +122,14 @@ fn test_load_plugin_layers_with_plugins() {
 
     // We can't easily test load_plugin_layers since it reads from ~/.loopal/plugins,
     // but we can test the isomorphic loader on plugin directories directly.
-    let layer_a = load_layer_from_dir(
-        &plugin_a,
-        LayerSource::Plugin("alpha-plugin".into()),
-        None,
-    )
-    .unwrap();
+    let layer_a =
+        load_layer_from_dir(&plugin_a, LayerSource::Plugin("alpha-plugin".into()), None).unwrap();
     assert_eq!(layer_a.mcp_servers.len(), 1);
     assert_eq!(layer_a.skills.len(), 1);
     assert_eq!(layer_a.instructions.as_deref(), Some("Alpha instructions"));
 
-    let layer_b = load_layer_from_dir(
-        &plugin_b,
-        LayerSource::Plugin("beta-plugin".into()),
-        None,
-    )
-    .unwrap();
+    let layer_b =
+        load_layer_from_dir(&plugin_b, LayerSource::Plugin("beta-plugin".into()), None).unwrap();
     assert!(layer_b.mcp_servers.is_empty());
     assert!(layer_b.skills.is_empty());
     assert_eq!(layer_b.instructions.as_deref(), Some("Beta instructions"));

@@ -23,7 +23,7 @@ fn test_rust_code_block_highlighted() {
 fn test_code_block_not_wrapped() {
     // Long code line should NOT be word-wrapped
     let long_line = "x".repeat(200);
-    let input = format!("```\n{}\n```", long_line);
+    let input = format!("```\n{long_line}\n```");
     let lines = render_markdown(&input, 40);
     let texts = lines_text(&lines);
     // At least one line should contain the full 200-char string
@@ -73,9 +73,12 @@ fn test_shell_alias() {
 fn test_huge_code_block_falls_back() {
     // >512KB should fall back to plain text (no panic)
     let big = "x".repeat(600_000);
-    let input = format!("```rust\n{}\n```", big);
+    let input = format!("```rust\n{big}\n```");
     let lines = render_markdown(&input, 80);
-    assert!(!lines.is_empty(), "should produce output even for huge code");
+    assert!(
+        !lines.is_empty(),
+        "should produce output even for huge code"
+    );
 }
 
 // --- Fenced with options ---

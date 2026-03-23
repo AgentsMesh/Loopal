@@ -1,6 +1,5 @@
 use loopal_git::{
-    create_worktree, remove_worktree, worktree_has_changes,
-    cleanup_stale_worktrees, GitError,
+    GitError, cleanup_stale_worktrees, create_worktree, remove_worktree, worktree_has_changes,
 };
 
 use crate::init_repo;

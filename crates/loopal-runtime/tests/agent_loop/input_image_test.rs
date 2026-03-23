@@ -14,8 +14,7 @@ fn sample_image(label: &str) -> ImageAttachment {
 
 #[tokio::test]
 async fn test_wait_for_input_with_images() {
-    let (mut runner, _event_rx, mbox_tx, _ctrl_tx, _perm_tx) =
-        make_runner_with_channels();
+    let (mut runner, _event_rx, mbox_tx, _ctrl_tx, _perm_tx) = make_runner_with_channels();
 
     let content = UserContent {
         text: "describe these".to_string(),
@@ -39,8 +38,7 @@ async fn test_wait_for_input_with_images() {
 
 #[tokio::test]
 async fn test_wait_for_input_empty_text_with_images() {
-    let (mut runner, _event_rx, mbox_tx, _ctrl_tx, _perm_tx) =
-        make_runner_with_channels();
+    let (mut runner, _event_rx, mbox_tx, _ctrl_tx, _perm_tx) = make_runner_with_channels();
 
     let content = UserContent {
         text: String::new(),
@@ -62,8 +60,7 @@ async fn test_wait_for_input_empty_text_with_images() {
 
 #[tokio::test]
 async fn test_wait_for_input_text_only_no_images() {
-    let (mut runner, _event_rx, mbox_tx, _ctrl_tx, _perm_tx) =
-        make_runner_with_channels();
+    let (mut runner, _event_rx, mbox_tx, _ctrl_tx, _perm_tx) = make_runner_with_channels();
 
     mbox_tx
         .send(Envelope::new(MessageSource::Human, "main", "just text"))

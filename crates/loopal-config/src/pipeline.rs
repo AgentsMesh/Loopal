@@ -3,7 +3,9 @@
 use std::path::Path;
 
 use crate::layer::{ConfigLayer, LayerSource};
-use crate::loader::{apply_env_overrides, extract_typed_fields, load_json_file, read_optional_text};
+use crate::loader::{
+    apply_env_overrides, extract_typed_fields, load_json_file, read_optional_text,
+};
 use crate::locations;
 use crate::plugin::load_plugin_layers;
 use crate::resolved::ResolvedConfig;
@@ -30,7 +32,9 @@ pub fn load_config(cwd: &Path) -> Result<ResolvedConfig, LoopalError> {
     if let Ok(global_dir) = locations::global_config_dir() {
         let instr_path = global_dir.join("LOOPAL.md");
         let layer = crate::loader::load_layer_from_dir(
-            &global_dir, LayerSource::Global, Some(&instr_path),
+            &global_dir,
+            LayerSource::Global,
+            Some(&instr_path),
         )?;
         resolver.add_layer(layer);
     }
@@ -39,7 +43,9 @@ pub fn load_config(cwd: &Path) -> Result<ResolvedConfig, LoopalError> {
     let project_dir = locations::project_config_dir(cwd);
     let project_instr = locations::project_instructions_path(cwd);
     let layer = crate::loader::load_layer_from_dir(
-        &project_dir, LayerSource::Project, Some(&project_instr),
+        &project_dir,
+        LayerSource::Project,
+        Some(&project_instr),
     )?;
     resolver.add_layer(layer);
 
@@ -54,7 +60,10 @@ pub fn load_config(cwd: &Path) -> Result<ResolvedConfig, LoopalError> {
 
 /// Load the Local override layer (settings.local.json + LOOPAL.local.md).
 fn load_local_layer(cwd: &Path) -> Result<ConfigLayer, LoopalError> {
-    let mut layer = ConfigLayer { source: LayerSource::Local, ..Default::default() };
+    let mut layer = ConfigLayer {
+        source: LayerSource::Local,
+        ..Default::default()
+    };
 
     let mut settings_value = load_json_file(&locations::project_local_settings_path(cwd))?;
     if !settings_value.is_null() {
@@ -85,5 +94,9 @@ fn load_local_layer(cwd: &Path) -> Result<ConfigLayer, LoopalError> {
 fn load_env_layer() -> ConfigLayer {
     let mut value = serde_json::json!({});
     apply_env_overrides(&mut value);
-    ConfigLayer { source: LayerSource::Env, settings: value, ..Default::default() }
+    ConfigLayer {
+        source: LayerSource::Env,
+        settings: value,
+        ..Default::default()
+    }
 }

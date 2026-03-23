@@ -20,11 +20,7 @@ pub struct SandboxedCommand {
 ///
 /// When the sandbox policy is `Disabled`, returns a plain `sh -c` command
 /// with sanitized env only.
-pub fn wrap_command(
-    policy: &ResolvedPolicy,
-    command: &str,
-    cwd: &Path,
-) -> SandboxedCommand {
+pub fn wrap_command(policy: &ResolvedPolicy, command: &str, cwd: &Path) -> SandboxedCommand {
     let env = sanitize_current_env();
 
     if policy.policy == SandboxPolicy::Disabled {
@@ -39,11 +35,7 @@ pub fn wrap_command(
     // Try OS-level sandbox wrapping
     match platform::build_sandbox_prefix(policy, cwd) {
         Some((program, mut prefix_args)) => {
-            prefix_args.extend_from_slice(&[
-                "sh".into(),
-                "-c".into(),
-                command.into(),
-            ]);
+            prefix_args.extend_from_slice(&["sh".into(), "-c".into(), command.into()]);
             SandboxedCommand {
                 program,
                 args: prefix_args,
@@ -51,13 +43,11 @@ pub fn wrap_command(
                 env,
             }
         }
-        None => {
-            SandboxedCommand {
-                program: "sh".into(),
-                args: vec!["-c".into(), command.into()],
-                cwd: cwd.to_path_buf(),
-                env,
-            }
-        }
+        None => SandboxedCommand {
+            program: "sh".into(),
+            args: vec!["-c".into(), command.into()],
+            cwd: cwd.to_path_buf(),
+            env,
+        },
     }
 }

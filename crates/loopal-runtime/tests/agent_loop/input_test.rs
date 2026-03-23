@@ -1,8 +1,8 @@
-use loopal_runtime::AgentMode;
+use loopal_message::Message;
+use loopal_protocol::AgentEventPayload;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::{Envelope, MessageSource};
-use loopal_protocol::AgentEventPayload;
-use loopal_message::Message;
+use loopal_runtime::AgentMode;
 
 use super::{make_runner, make_runner_with_channels};
 
@@ -21,15 +21,16 @@ fn test_tool_ctx_matches_session() {
     let (runner, _rx) = make_runner();
     assert_eq!(
         runner.tool_ctx.backend.cwd(),
-        std::path::Path::new("/tmp").canonicalize().unwrap_or_else(|_| "/tmp".into())
+        std::path::Path::new("/tmp")
+            .canonicalize()
+            .unwrap_or_else(|_| "/tmp".into())
     );
     assert_eq!(runner.tool_ctx.session_id, "test-session-001");
 }
 
 #[tokio::test]
 async fn test_wait_for_input_human_message_no_prefix() {
-    let (mut runner, mut event_rx, mbox_tx, _ctrl_tx, _perm_tx) =
-        make_runner_with_channels();
+    let (mut runner, mut event_rx, mbox_tx, _ctrl_tx, _perm_tx) = make_runner_with_channels();
 
     mbox_tx
         .send(Envelope::new(MessageSource::Human, "main", "Hello agent"))
@@ -49,8 +50,7 @@ async fn test_wait_for_input_human_message_no_prefix() {
 
 #[tokio::test]
 async fn test_wait_for_input_agent_message_has_prefix() {
-    let (mut runner, _event_rx, mbox_tx, _ctrl_tx, _perm_tx) =
-        make_runner_with_channels();
+    let (mut runner, _event_rx, mbox_tx, _ctrl_tx, _perm_tx) = make_runner_with_channels();
 
     mbox_tx
         .send(Envelope::new(
@@ -71,12 +71,14 @@ async fn test_wait_for_input_agent_message_has_prefix() {
 
 #[tokio::test]
 async fn test_wait_for_input_channel_message_has_channel_prefix() {
-    let (mut runner, _event_rx, mbox_tx, _ctrl_tx, _perm_tx) =
-        make_runner_with_channels();
+    let (mut runner, _event_rx, mbox_tx, _ctrl_tx, _perm_tx) = make_runner_with_channels();
 
     mbox_tx
         .send(Envelope::new(
-            MessageSource::Channel { channel: "general".into(), from: "bot".into() },
+            MessageSource::Channel {
+                channel: "general".into(),
+                from: "bot".into(),
+            },
             "main",
             "new event",
         ))
@@ -93,8 +95,7 @@ async fn test_wait_for_input_channel_message_has_channel_prefix() {
 
 #[tokio::test]
 async fn test_wait_for_input_mode_switch() {
-    let (mut runner, mut event_rx, _mbox_tx, ctrl_tx, _perm_tx) =
-        make_runner_with_channels();
+    let (mut runner, mut event_rx, _mbox_tx, ctrl_tx, _perm_tx) = make_runner_with_channels();
 
     ctrl_tx
         .send(ControlCommand::ModeSwitch(loopal_protocol::AgentMode::Plan))
@@ -105,7 +106,8 @@ async fn test_wait_for_input_mode_switch() {
     let _ = tokio::time::timeout(
         std::time::Duration::from_millis(100),
         runner.wait_for_input(),
-    ).await;
+    )
+    .await;
 
     assert_eq!(runner.params.mode, AgentMode::Plan);
 
@@ -117,8 +119,7 @@ async fn test_wait_for_input_mode_switch() {
 
 #[tokio::test]
 async fn test_wait_for_input_channel_closed() {
-    let (mut runner, _event_rx, mbox_tx, ctrl_tx, _perm_tx) =
-        make_runner_with_channels();
+    let (mut runner, _event_rx, mbox_tx, ctrl_tx, _perm_tx) = make_runner_with_channels();
     drop(mbox_tx);
     drop(ctrl_tx);
 
@@ -128,8 +129,7 @@ async fn test_wait_for_input_channel_closed() {
 
 #[tokio::test]
 async fn test_execute_middleware_empty_pipeline() {
-    let (mut runner, _event_rx, _mbox_tx, _ctrl_tx, _perm_tx) =
-        make_runner_with_channels();
+    let (mut runner, _event_rx, _mbox_tx, _ctrl_tx, _perm_tx) = make_runner_with_channels();
     runner.params.messages.push(Message::user("test"));
 
     let should_continue = runner.execute_middleware().await.unwrap();

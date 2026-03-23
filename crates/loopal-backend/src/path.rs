@@ -58,7 +58,7 @@ pub fn to_absolute(cwd: &Path, raw: &str) -> PathBuf {
 /// walking up the ancestor chain (mirrors sandbox `resolve_canonical`).
 fn resolve_canonical(path: &Path) -> Result<PathBuf, ToolIoError> {
     if let Ok(canonical) = path.canonicalize() {
-        return Ok(canonical);
+        return Ok(strip_win_prefix(canonical));
     }
 
     // Walk up to find deepest existing ancestor, then append the rest
@@ -66,7 +66,7 @@ fn resolve_canonical(path: &Path) -> Result<PathBuf, ToolIoError> {
     let mut current: &Path = path;
     loop {
         if let Ok(canon) = current.canonicalize() {
-            let mut result = canon;
+            let mut result = strip_win_prefix(canon);
             for component in ancestors.iter().rev() {
                 result = result.join(component);
             }
@@ -92,6 +92,23 @@ fn resolve_canonical(path: &Path) -> Result<PathBuf, ToolIoError> {
     Ok(path.to_path_buf())
 }
 
+/// Strip the `\\?\` extended-length prefix that Windows `canonicalize()` adds.
+/// This prefix breaks some file operations and is unnecessary for paths < 260 chars.
+#[cfg(windows)]
+pub fn strip_win_prefix(path: PathBuf) -> PathBuf {
+    let s = path.to_string_lossy();
+    if let Some(stripped) = s.strip_prefix(r"\\?\") {
+        PathBuf::from(stripped)
+    } else {
+        path
+    }
+}
+
+#[cfg(not(windows))]
+pub fn strip_win_prefix(path: PathBuf) -> PathBuf {
+    path
+}
+
 fn check_with_policy(
     policy: &ResolvedPolicy,
     path: &Path,
@@ -99,11 +116,7 @@ fn check_with_policy(
 ) -> Result<PathBuf, ToolIoError> {
     match loopal_sandbox::path_checker::check_path(policy, path, is_write) {
         PathDecision::Allow => Ok(path.to_path_buf()),
-        PathDecision::DenyWrite(reason) => {
-            Err(ToolIoError::PermissionDenied(reason))
-        }
-        PathDecision::DenyRead(reason) => {
-            Err(ToolIoError::PermissionDenied(reason))
-        }
+        PathDecision::DenyWrite(reason) => Err(ToolIoError::PermissionDenied(reason)),
+        PathDecision::DenyRead(reason) => Err(ToolIoError::PermissionDenied(reason)),
     }
 }

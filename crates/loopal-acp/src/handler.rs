@@ -52,11 +52,13 @@ impl AcpHandler {
             "session/prompt" => self.handle_prompt(id, params).await,
             "session/cancel" => self.handle_cancel(id).await,
             _ => {
-                self.transport.respond_error(
-                    id,
-                    crate::jsonrpc::METHOD_NOT_FOUND,
-                    &format!("unknown method: {method}"),
-                ).await;
+                self.transport
+                    .respond_error(
+                        id,
+                        crate::jsonrpc::METHOD_NOT_FOUND,
+                        &format!("unknown method: {method}"),
+                    )
+                    .await;
             }
         }
     }
@@ -65,9 +67,9 @@ impl AcpHandler {
         let _params: InitializeParams = match serde_json::from_value(params) {
             Ok(p) => p,
             Err(e) => {
-                self.transport.respond_error(
-                    id, crate::jsonrpc::INVALID_REQUEST, &e.to_string(),
-                ).await;
+                self.transport
+                    .respond_error(id, crate::jsonrpc::INVALID_REQUEST, &e.to_string())
+                    .await;
                 return;
             }
         };
@@ -91,9 +93,9 @@ impl AcpHandler {
             session.cancel_token.cancel();
             self.transport.respond(id, Value::Null).await;
         } else {
-            self.transport.respond_error(
-                id, crate::jsonrpc::INVALID_REQUEST, "no active session",
-            ).await;
+            self.transport
+                .respond_error(id, crate::jsonrpc::INVALID_REQUEST, "no active session")
+                .await;
         }
     }
 }

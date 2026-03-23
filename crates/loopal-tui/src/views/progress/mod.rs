@@ -37,10 +37,12 @@ pub fn render_progress(
     // Thinking indicator (shown during active thinking)
     let thinking_lines = if state.thinking_active {
         let token_est = state.streaming_thinking.len() as u32 / 4;
-        let label = format!("Thinking... ({} tokens)", token_est);
+        let label = format!("Thinking... ({token_est} tokens)");
         vec![Line::from(Span::styled(
             label,
-            Style::default().fg(Color::Magenta).add_modifier(Modifier::DIM),
+            Style::default()
+                .fg(Color::Magenta)
+                .add_modifier(Modifier::DIM),
         ))]
     } else {
         vec![]
@@ -51,9 +53,7 @@ pub fn render_progress(
     let cached_tail = line_cache.tail(window_size);
 
     // Build the render lines: cached tail + thinking + streaming
-    let mut lines = Vec::with_capacity(
-        cached_tail.len() + thinking_lines.len() + streaming.len(),
-    );
+    let mut lines = Vec::with_capacity(cached_tail.len() + thinking_lines.len() + streaming.len());
     lines.extend_from_slice(cached_tail);
     lines.extend(thinking_lines);
     lines.extend(streaming);

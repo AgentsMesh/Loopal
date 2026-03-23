@@ -17,7 +17,11 @@ impl AgentLoopRunner {
 
         let decision = self.params.permission_mode.check(tool.permission());
         if decision == PermissionDecision::Ask {
-            Ok(self.params.frontend.request_permission(id, name, input).await)
+            Ok(self
+                .params
+                .frontend
+                .request_permission(id, name, input)
+                .await)
         } else {
             Ok(decision)
         }

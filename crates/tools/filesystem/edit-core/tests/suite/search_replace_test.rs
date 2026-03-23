@@ -1,4 +1,4 @@
-use loopal_edit_core::search_replace::{search_replace, SearchReplaceResult};
+use loopal_edit_core::search_replace::{SearchReplaceResult, search_replace};
 
 #[test]
 fn test_single_replace() {

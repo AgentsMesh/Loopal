@@ -1,9 +1,9 @@
 use async_trait::async_trait;
 
 use crate::agent_input::AgentInput;
-use loopal_protocol::{Envelope, Question};
 use loopal_error::Result;
 use loopal_protocol::AgentEventPayload;
+use loopal_protocol::{Envelope, Question};
 use loopal_tool_api::PermissionDecision;
 
 /// Unified abstraction for agent-to-consumer communication.

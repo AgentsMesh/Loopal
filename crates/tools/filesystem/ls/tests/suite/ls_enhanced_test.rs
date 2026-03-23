@@ -11,7 +11,8 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext {
         session_id: "test".into(),
         shared: None,
-        pending_cwd_switch: Default::default(), memory_channel: None,
+        pending_cwd_switch: Default::default(),
+        memory_channel: None,
         backend,
     }
 }
@@ -26,7 +27,8 @@ async fn long_mode_shows_permissions_and_size() {
     let ctx = make_ctx(tmp.path());
     let r = tool.execute(json!({"long": true}), &ctx).await.unwrap();
     assert!(!r.is_error);
-    // Should contain permission string, size, and filename
+    // Permission strings are Unix-only (rw-r--r-- etc.)
+    #[cfg(unix)]
     assert!(r.content.contains("rw"));
     assert!(r.content.contains("hello.txt"));
     // 11 bytes -> "11B"
@@ -91,7 +93,10 @@ async fn path_to_file_shows_stat() {
     std::fs::write(tmp.path().join("info.txt"), "twelve bytes").unwrap();
     let tool = LsTool;
     let ctx = make_ctx(tmp.path());
-    let r = tool.execute(json!({"path": "info.txt"}), &ctx).await.unwrap();
+    let r = tool
+        .execute(json!({"path": "info.txt"}), &ctx)
+        .await
+        .unwrap();
     assert!(!r.is_error);
     assert!(r.content.contains("File:"));
     assert!(r.content.contains("Type: regular file"));
@@ -123,11 +128,16 @@ async fn long_and_all_combined() {
     std::fs::write(tmp.path().join("main.rs"), "fn main(){}").unwrap();
     let tool = LsTool;
     let ctx = make_ctx(tmp.path());
-    let r = tool.execute(json!({"long": true, "all": true}), &ctx).await.unwrap();
+    let r = tool
+        .execute(json!({"long": true, "all": true}), &ctx)
+        .await
+        .unwrap();
     assert!(r.content.contains(".config"));
     assert!(r.content.contains("main.rs"));
     // Both entries should have permission strings
     let lines: Vec<&str> = r.content.lines().collect();
     assert!(lines.len() >= 2);
+    // Permission strings are Unix-only
+    #[cfg(unix)]
     assert!(lines.iter().all(|l| l.contains("rw") || l.contains("r-")));
 }

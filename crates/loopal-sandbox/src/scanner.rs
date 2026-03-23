@@ -9,11 +9,7 @@ use crate::sensitive_patterns::SENSITIVE_FILE_GLOBS;
 ///
 /// Returns a list of relative paths (from `root`) that match.
 /// The scan is bounded to `max_depth` levels and `max_results` matches.
-pub fn scan_sensitive_files(
-    root: &Path,
-    max_depth: usize,
-    max_results: usize,
-) -> Vec<String> {
+pub fn scan_sensitive_files(root: &Path, max_depth: usize, max_results: usize) -> Vec<String> {
     let glob_set = build_sensitive_glob_set();
     let mut results = Vec::new();
 

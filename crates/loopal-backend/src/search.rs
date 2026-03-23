@@ -17,15 +17,20 @@ pub fn glob_search(
     cwd: &Path,
     limits: &ResourceLimits,
 ) -> Result<GlobResult, ToolIoError> {
-    let search_path = base.map(|b| cwd.join(b)).unwrap_or_else(|| cwd.to_path_buf());
-    let glob = Glob::new(pattern)
-        .map_err(|e| ToolIoError::Other(format!("invalid glob: {e}")))?;
+    let search_path = base
+        .map(|b| cwd.join(b))
+        .unwrap_or_else(|| cwd.to_path_buf());
+    let glob = Glob::new(pattern).map_err(|e| ToolIoError::Other(format!("invalid glob: {e}")))?;
     let matcher = glob.compile_matcher();
 
     let mut paths = Vec::new();
     let mut truncated = false;
 
-    for entry in WalkBuilder::new(&search_path).follow_links(true).build().flatten() {
+    for entry in WalkBuilder::new(&search_path)
+        .follow_links(true)
+        .build()
+        .flatten()
+    {
         if !entry.file_type().is_some_and(|ft| ft.is_file()) {
             continue;
         }
@@ -55,8 +60,7 @@ pub fn grep_search(
         .build()
         .map_err(|e| ToolIoError::Other(format!("invalid regex: {e}")))?;
 
-    let glob_matcher = glob_filter
-        .and_then(|g| Glob::new(g).ok().map(|gb| gb.compile_matcher()));
+    let glob_matcher = glob_filter.and_then(|g| Glob::new(g).ok().map(|gb| gb.compile_matcher()));
 
     let entries = collect_files(search_path);
     let mut matches = Vec::new();
@@ -69,7 +73,9 @@ pub fn grep_search(
         {
             continue;
         }
-        let Ok(content) = std::fs::read_to_string(&path) else { continue };
+        let Ok(content) = std::fs::read_to_string(&path) else {
+            continue;
+        };
         for (idx, line) in content.lines().enumerate() {
             if re.is_match(line) {
                 matches.push(GrepMatch {

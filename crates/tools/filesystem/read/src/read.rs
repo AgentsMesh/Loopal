@@ -1,13 +1,15 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
 use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 pub struct ReadTool;
 
 #[async_trait]
 impl Tool for ReadTool {
-    fn name(&self) -> &str { "Read" }
+    fn name(&self) -> &str {
+        "Read"
+    }
 
     fn description(&self) -> &str {
         "Read a file from the filesystem. Returns content with line numbers. \
@@ -39,7 +41,9 @@ impl Tool for ReadTool {
         })
     }
 
-    fn permission(&self) -> PermissionLevel { PermissionLevel::ReadOnly }
+    fn permission(&self) -> PermissionLevel {
+        PermissionLevel::ReadOnly
+    }
 
     async fn execute(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
         let file_path = input["file_path"].as_str().ok_or_else(|| {
@@ -89,9 +93,10 @@ impl Tool for ReadTool {
 
 fn read_html(path: &std::path::Path) -> Result<ToolResult, LoopalError> {
     let raw = std::fs::read_to_string(path).map_err(|e| {
-        LoopalError::Tool(loopal_error::ToolError::ExecutionFailed(
-            format!("Failed to read {}: {e}", path.display()),
-        ))
+        LoopalError::Tool(loopal_error::ToolError::ExecutionFailed(format!(
+            "Failed to read {}: {e}",
+            path.display()
+        )))
     })?;
     let converted = html2text::from_read(raw.as_bytes(), 120);
     Ok(ToolResult::success(converted))

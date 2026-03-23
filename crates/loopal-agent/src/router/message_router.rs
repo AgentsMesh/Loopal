@@ -28,14 +28,10 @@ impl MessageRouter {
     }
 
     /// Register a named mailbox. Returns error if the name is already taken.
-    pub async fn register(
-        &self,
-        name: &str,
-        tx: mpsc::Sender<Envelope>,
-    ) -> Result<(), String> {
+    pub async fn register(&self, name: &str, tx: mpsc::Sender<Envelope>) -> Result<(), String> {
         let mut map = self.mailboxes.lock().await;
         if map.contains_key(name) {
-            return Err(format!("mailbox '{}' already registered", name));
+            return Err(format!("mailbox '{name}' already registered"));
         }
         map.insert(name.to_string(), tx);
         Ok(())
@@ -52,9 +48,7 @@ impl MessageRouter {
             let map = self.mailboxes.lock().await;
             map.get(&envelope.target).cloned()
         };
-        let tx = tx.ok_or_else(|| {
-            format!("no mailbox registered for '{}'", envelope.target)
-        })?;
+        let tx = tx.ok_or_else(|| format!("no mailbox registered for '{}'", envelope.target))?;
 
         let event = build_routed_event(&envelope);
         tx.send(envelope)
@@ -76,9 +70,7 @@ impl MessageRouter {
         let targets: Vec<(String, mpsc::Sender<Envelope>)> = {
             let map = self.mailboxes.lock().await;
             map.iter()
-                .filter(|(name, _)| {
-                    exclude != Some(name.as_str())
-                })
+                .filter(|(name, _)| exclude != Some(name.as_str()))
                 .map(|(name, tx)| (name.clone(), tx.clone()))
                 .collect()
         };
@@ -110,12 +102,7 @@ impl MessageRouter {
     }
 
     /// Publish to a channel. Returns subscriber names excluding sender.
-    pub async fn publish(
-        &self,
-        channel: &str,
-        from: &str,
-        content: &str,
-    ) -> Vec<String> {
+    pub async fn publish(&self, channel: &str, from: &str, content: &str) -> Vec<String> {
         self.channels.lock().await.publish(channel, from, content)
     }
 

@@ -1,7 +1,7 @@
 //! Tests for forwarding specific AgentEvent variants through EventHandler.
 
-use loopal_tui::event::{AppEvent, EventHandler};
 use loopal_protocol::{AgentEvent, AgentEventPayload};
+use loopal_tui::event::{AppEvent, EventHandler};
 use tokio::sync::mpsc;
 
 /// Helper: send an event and wait for a matching AppEvent::Agent variant.
@@ -31,7 +31,7 @@ async fn test_agent_error_event_forwarded() {
 
     match event.payload {
         AgentEventPayload::Error { message } => assert_eq!(message, "test error"),
-        other => panic!("expected Error, got {:?}", other),
+        other => panic!("expected Error, got {other:?}"),
     }
 }
 
@@ -46,7 +46,7 @@ async fn test_agent_tool_call_event_forwarded() {
 
     match event.payload {
         AgentEventPayload::ToolCall { name, .. } => assert_eq!(name, "bash"),
-        other => panic!("expected ToolCall, got {:?}", other),
+        other => panic!("expected ToolCall, got {other:?}"),
     }
 }
 
@@ -66,13 +66,14 @@ async fn test_agent_token_usage_forwarded() {
         AgentEventPayload::TokenUsage {
             input_tokens,
             output_tokens,
-            context_window, ..
+            context_window,
+            ..
         } => {
             assert_eq!(input_tokens, 500);
             assert_eq!(output_tokens, 200);
             assert_eq!(context_window, 200_000);
         }
-        other => panic!("expected TokenUsage, got {:?}", other),
+        other => panic!("expected TokenUsage, got {other:?}"),
     }
 }
 
@@ -85,6 +86,6 @@ async fn test_agent_mode_changed_forwarded() {
 
     match event.payload {
         AgentEventPayload::ModeChanged { mode } => assert_eq!(mode, "plan"),
-        other => panic!("expected ModeChanged, got {:?}", other),
+        other => panic!("expected ModeChanged, got {other:?}"),
     }
 }

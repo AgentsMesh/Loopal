@@ -7,9 +7,7 @@ use std::sync::OnceLock;
 
 use ratatui::prelude::*;
 use syntect::easy::HighlightLines;
-use syntect::highlighting::{
-    FontStyle, Style as SyntectStyle, Theme, ThemeSet,
-};
+use syntect::highlighting::{FontStyle, Style as SyntectStyle, Theme, ThemeSet};
 use syntect::parsing::{SyntaxReference, SyntaxSet};
 use syntect::util::LinesWithEndings;
 
@@ -35,9 +33,7 @@ fn theme() -> &'static Theme {
         ts.themes
             .get("base16-ocean.dark")
             .cloned()
-            .unwrap_or_else(|| {
-                ts.themes.values().next().cloned().unwrap_or_default()
-            })
+            .unwrap_or_else(|| ts.themes.values().next().cloned().unwrap_or_default())
     })
 }
 
@@ -53,10 +49,7 @@ pub fn highlight_code_to_lines(code: &str, lang: &str) -> Vec<Line<'static>> {
     }
 }
 
-fn highlight_inner(
-    code: &str,
-    lang: &str,
-) -> Option<Vec<Vec<Span<'static>>>> {
+fn highlight_inner(code: &str, lang: &str) -> Option<Vec<Vec<Span<'static>>>> {
     if code.is_empty()
         || code.len() > MAX_HIGHLIGHT_BYTES
         || code.lines().count() > MAX_HIGHLIGHT_LINES
@@ -142,8 +135,7 @@ fn ansi_color(idx: u8) -> Color {
 }
 
 fn plain_lines(code: &str) -> Vec<Line<'static>> {
-    let mut lines: Vec<Line<'static>> =
-        code.lines().map(|l| Line::from(l.to_string())).collect();
+    let mut lines: Vec<Line<'static>> = code.lines().map(|l| Line::from(l.to_string())).collect();
     if lines.is_empty() {
         lines.push(Line::from(String::new()));
     }

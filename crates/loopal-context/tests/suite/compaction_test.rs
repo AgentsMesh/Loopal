@@ -42,10 +42,7 @@ fn test_compact_no_system_messages() {
 fn test_compact_exactly_at_limit() {
     // Messages exactly at keep_last + 1, should not compact
     // L5: messages.len() <= keep_last + 1 is true
-    let mut msgs = vec![
-        Message::user("a"),
-        Message::assistant("b"),
-    ];
+    let mut msgs = vec![Message::user("a"), Message::assistant("b")];
     compact_messages(&mut msgs, 2);
     assert_eq!(msgs.len(), 2);
 }
@@ -159,7 +156,10 @@ fn test_truncate_block_content_by_bytes() {
 
 #[test]
 fn test_truncate_block_content_by_lines() {
-    let big = (0..200).map(|i| format!("line {i}")).collect::<Vec<_>>().join("\n");
+    let big = (0..200)
+        .map(|i| format!("line {i}"))
+        .collect::<Vec<_>>()
+        .join("\n");
     let mut block = ContentBlock::ToolResult {
         tool_use_id: "t3".into(),
         content: big,

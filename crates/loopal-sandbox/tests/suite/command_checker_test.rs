@@ -1,5 +1,5 @@
-use loopal_sandbox::command_checker::check_command;
 use loopal_config::CommandDecision;
+use loopal_sandbox::command_checker::check_command;
 
 #[test]
 fn empty_command_allowed() {

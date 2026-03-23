@@ -15,7 +15,7 @@ fn test_record_assistant_message_text_only() {
     assert_eq!(msg.content.len(), 1);
     match &msg.content[0] {
         ContentBlock::Text { text } => assert_eq!(text, "Hello, world!"),
-        other => panic!("expected Text block, got {:?}", other),
+        other => panic!("expected Text block, got {other:?}"),
     }
 }
 
@@ -45,21 +45,21 @@ fn test_record_assistant_message_with_tool_uses() {
 
     match &msg.content[0] {
         ContentBlock::Text { text } => assert_eq!(text, "Let me check that."),
-        other => panic!("expected Text, got {:?}", other),
+        other => panic!("expected Text, got {other:?}"),
     }
     match &msg.content[1] {
         ContentBlock::ToolUse { id, name, .. } => {
             assert_eq!(id, "tc-1");
             assert_eq!(name, "bash");
         }
-        other => panic!("expected ToolUse, got {:?}", other),
+        other => panic!("expected ToolUse, got {other:?}"),
     }
     match &msg.content[2] {
         ContentBlock::ToolUse { id, name, .. } => {
             assert_eq!(id, "tc-2");
             assert_eq!(name, "read");
         }
-        other => panic!("expected ToolUse, got {:?}", other),
+        other => panic!("expected ToolUse, got {other:?}"),
     }
 }
 
@@ -94,7 +94,7 @@ fn test_record_assistant_message_tool_uses_only_no_text() {
             assert_eq!(id, "tc-1");
             assert_eq!(name, "bash");
         }
-        other => panic!("expected ToolUse, got {:?}", other),
+        other => panic!("expected ToolUse, got {other:?}"),
     }
 }
 

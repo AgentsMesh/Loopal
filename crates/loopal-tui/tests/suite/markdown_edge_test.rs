@@ -21,9 +21,10 @@ fn test_empty_input_returns_empty() {
 #[test]
 fn test_bold_italic_nested() {
     let lines = render_markdown("***bold italic***", 80);
-    let span = lines.iter().flat_map(|l| &l.spans).find(|s| {
-        s.content.contains("bold italic")
-    });
+    let span = lines
+        .iter()
+        .flat_map(|l| &l.spans)
+        .find(|s| s.content.contains("bold italic"));
     assert!(span.is_some());
     let s = span.unwrap();
     assert!(s.style.add_modifier.contains(Modifier::BOLD));
@@ -33,9 +34,10 @@ fn test_bold_italic_nested() {
 #[test]
 fn test_strikethrough() {
     let lines = render_markdown("~~deleted~~", 80);
-    let span = lines.iter().flat_map(|l| &l.spans).find(|s| {
-        s.content.contains("deleted")
-    });
+    let span = lines
+        .iter()
+        .flat_map(|l| &l.spans)
+        .find(|s| s.content.contains("deleted"));
     assert!(span.is_some());
     assert!(
         span.unwrap()
@@ -87,9 +89,10 @@ fn test_consecutive_paragraphs() {
 #[test]
 fn test_link_styled() {
     let lines = render_markdown("[click](https://example.com)", 80);
-    let span = lines.iter().flat_map(|l| &l.spans).find(|s| {
-        s.content.contains("click")
-    });
+    let span = lines
+        .iter()
+        .flat_map(|l| &l.spans)
+        .find(|s| s.content.contains("click"));
     assert!(span.is_some());
     assert_eq!(span.unwrap().style.fg, Some(Color::Cyan));
     assert!(
@@ -118,5 +121,8 @@ fn test_nested_list() {
     let input = "- a\n  - b\n  - c\n- d";
     let lines = render_markdown(input, 80);
     let texts = lines_text(&lines);
-    assert!(texts.len() >= 4, "nested list should produce at least 4 lines");
+    assert!(
+        texts.len() >= 4,
+        "nested list should produce at least 4 lines"
+    );
 }

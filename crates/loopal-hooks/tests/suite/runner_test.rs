@@ -1,5 +1,5 @@
-use loopal_hooks::run_hook;
 use loopal_config::HookConfig;
+use loopal_hooks::run_hook;
 
 fn make_hook(command: &str, timeout_ms: u64) -> HookConfig {
     HookConfig {
@@ -30,7 +30,9 @@ async fn test_run_hook_echo_success() {
 async fn test_run_hook_failing_command() {
     let hook = make_hook("exit 42", 5000);
     let data = serde_json::json!({});
-    let result = run_hook(&hook, data).await.expect("hook should not error on non-zero exit");
+    let result = run_hook(&hook, data)
+        .await
+        .expect("hook should not error on non-zero exit");
 
     assert_eq!(result.exit_code, 42);
     assert!(!result.is_success());
@@ -41,7 +43,9 @@ async fn test_run_hook_receives_stdin_data() {
     // The hook reads stdin and writes it to stdout via cat
     let hook = make_hook("cat", 5000);
     let data = serde_json::json!({"tool_name": "Bash", "some_field": 123});
-    let result = run_hook(&hook, data.clone()).await.expect("hook should succeed");
+    let result = run_hook(&hook, data.clone())
+        .await
+        .expect("hook should succeed");
 
     assert_eq!(result.exit_code, 0);
     // The stdout should contain the JSON we sent
@@ -76,8 +80,7 @@ async fn test_run_hook_timeout() {
     let err_msg = err.to_string();
     assert!(
         err_msg.contains("timed out") || err_msg.contains("Timeout") || err_msg.contains("timeout"),
-        "error should mention timeout, got: {}",
-        err_msg
+        "error should mention timeout, got: {err_msg}"
     );
 }
 
@@ -86,7 +89,9 @@ async fn test_run_hook_invalid_command() {
     // A command that doesn't exist — sh -c will still run, but the command fails
     let hook = make_hook("nonexistent_command_xyz_12345", 5000);
     let data = serde_json::json!({});
-    let result = run_hook(&hook, data).await.expect("hook should not error at execution level");
+    let result = run_hook(&hook, data)
+        .await
+        .expect("hook should not error at execution level");
 
     // The exit code should be non-zero (command not found = 127 on most systems)
     assert_ne!(result.exit_code, 0);
@@ -114,7 +119,9 @@ async fn test_run_hook_with_complex_json_data() {
         "empty_array": [],
         "unicode": "\u{1f600} emoji and \u{4e2d}\u{6587}"
     });
-    let result = run_hook(&hook, data.clone()).await.expect("hook should succeed with complex JSON");
+    let result = run_hook(&hook, data.clone())
+        .await
+        .expect("hook should succeed with complex JSON");
 
     assert_eq!(result.exit_code, 0);
     let parsed: serde_json::Value =
@@ -133,12 +140,15 @@ async fn test_run_hook_with_large_stdin_data() {
         .expect("hook should handle large stdin");
 
     assert_eq!(result.exit_code, 0);
-    let byte_count: usize = result.stdout.trim().parse().expect("wc -c should output a number");
+    let byte_count: usize = result
+        .stdout
+        .trim()
+        .parse()
+        .expect("wc -c should output a number");
     // The serialized JSON will be larger than 100_000 bytes due to the key and quoting
     assert!(
         byte_count > 100_000,
-        "byte count should reflect the large payload, got {}",
-        byte_count
+        "byte count should reflect the large payload, got {byte_count}"
     );
 }
 
@@ -146,15 +156,14 @@ async fn test_run_hook_with_large_stdin_data() {
 async fn test_run_hook_exit_code_preserved() {
     // Various exit codes should be preserved
     for code in [0, 1, 2, 42, 127] {
-        let hook = make_hook(&format!("exit {}", code), 5000);
+        let hook = make_hook(&format!("exit {code}"), 5000);
         let data = serde_json::json!({});
         let result = run_hook(&hook, data)
             .await
             .expect("hook should not error at execution level");
         assert_eq!(
             result.exit_code, code,
-            "exit code {} should be preserved",
-            code
+            "exit code {code} should be preserved"
         );
     }
 }
@@ -189,7 +198,9 @@ async fn test_run_hook_post_tool_use_event() {
         timeout_ms: 5000,
     };
     let data = serde_json::json!({"tool_name": "Read", "result": "ok"});
-    let result = run_hook(&hook, data).await.expect("post-hook should succeed");
+    let result = run_hook(&hook, data)
+        .await
+        .expect("post-hook should succeed");
 
     assert_eq!(result.exit_code, 0);
     assert!(result.stdout.contains("post-hook"));

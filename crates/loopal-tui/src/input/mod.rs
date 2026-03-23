@@ -14,8 +14,7 @@ use crate::app::App;
 use autocomplete::{handle_autocomplete_key, update_autocomplete};
 use commands::try_execute_slash_command;
 use navigation::{
-    DEFAULT_WRAP_WIDTH, handle_down, handle_esc, handle_up,
-    move_cursor_left, move_cursor_right,
+    DEFAULT_WRAP_WIDTH, handle_down, handle_esc, handle_up, move_cursor_left, move_cursor_right,
 };
 use sub_page::handle_sub_page_key;
 
@@ -75,7 +74,11 @@ fn handle_global_keys(app: &mut App, key: &KeyEvent) -> Option<InputAction> {
     }
     if key.code == KeyCode::BackTab {
         let current_mode = app.session.lock().mode.clone();
-        let new_mode = if current_mode == "plan" { "act" } else { "plan" };
+        let new_mode = if current_mode == "plan" {
+            "act"
+        } else {
+            "plan"
+        };
         return Some(InputAction::ModeSwitch(new_mode.to_string()));
     }
     None
@@ -103,18 +106,22 @@ fn handle_normal_key(app: &mut App, key: &KeyEvent) -> InputAction {
             }
             InputAction::None
         }
-        KeyCode::Left => { move_cursor_left(app); InputAction::None }
-        KeyCode::Right => { move_cursor_right(app); InputAction::None }
+        KeyCode::Left => {
+            move_cursor_left(app);
+            InputAction::None
+        }
+        KeyCode::Right => {
+            move_cursor_right(app);
+            InputAction::None
+        }
         KeyCode::Home => {
-            app.input_cursor = multiline::line_home(
-                &app.input, app.input_cursor, DEFAULT_WRAP_WIDTH,
-            );
+            app.input_cursor =
+                multiline::line_home(&app.input, app.input_cursor, DEFAULT_WRAP_WIDTH);
             InputAction::None
         }
         KeyCode::End => {
-            app.input_cursor = multiline::line_end(
-                &app.input, app.input_cursor, DEFAULT_WRAP_WIDTH,
-            );
+            app.input_cursor =
+                multiline::line_end(&app.input, app.input_cursor, DEFAULT_WRAP_WIDTH);
             InputAction::None
         }
         KeyCode::Up => handle_up(app),

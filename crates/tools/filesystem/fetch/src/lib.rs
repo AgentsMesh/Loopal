@@ -1,13 +1,15 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
 use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 pub struct FetchTool;
 
 #[async_trait]
 impl Tool for FetchTool {
-    fn name(&self) -> &str { "Fetch" }
+    fn name(&self) -> &str {
+        "Fetch"
+    }
 
     fn description(&self) -> &str {
         "Download a URL. Without prompt: saves to temp file and returns path. \
@@ -31,11 +33,15 @@ impl Tool for FetchTool {
         })
     }
 
-    fn permission(&self) -> PermissionLevel { PermissionLevel::ReadOnly }
+    fn permission(&self) -> PermissionLevel {
+        PermissionLevel::ReadOnly
+    }
 
     async fn execute(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
         let url = input["url"].as_str().ok_or_else(|| {
-            LoopalError::Tool(loopal_error::ToolError::InvalidInput("url is required".into()))
+            LoopalError::Tool(loopal_error::ToolError::InvalidInput(
+                "url is required".into(),
+            ))
         })?;
 
         // Validate URL format before making a network request
@@ -54,7 +60,9 @@ impl Tool for FetchTool {
             return Ok(ToolResult::error(format!("HTTP {}", fetch_result.status)));
         }
 
-        let content_type = fetch_result.content_type.as_deref()
+        let content_type = fetch_result
+            .content_type
+            .as_deref()
             .unwrap_or("application/octet-stream");
         let ext = extension_from_content_type(content_type);
         let prompt = input["prompt"].as_str();
@@ -79,10 +87,18 @@ impl Tool for FetchTool {
         let file_path = tmp_dir.join(format!("fetch_{uuid}.{ext}"));
 
         // Ensure temp directory exists, then write via backend
-        if let Err(e) = ctx.backend.create_dir_all(tmp_dir.to_str().unwrap_or(".")).await {
+        if let Err(e) = ctx
+            .backend
+            .create_dir_all(tmp_dir.to_str().unwrap_or("."))
+            .await
+        {
             return Ok(ToolResult::error(format!("Failed to create temp dir: {e}")));
         }
-        if let Err(e) = ctx.backend.write(file_path.to_str().unwrap_or("."), &fetch_result.body).await {
+        if let Err(e) = ctx
+            .backend
+            .write(file_path.to_str().unwrap_or("."), &fetch_result.body)
+            .await
+        {
             return Ok(ToolResult::error(format!("Failed to write temp file: {e}")));
         }
 
@@ -98,14 +114,23 @@ fn is_success(status: u16) -> bool {
 }
 
 fn extension_from_content_type(ct: &str) -> &str {
-    if ct.contains("text/html") { "html" }
-    else if ct.contains("application/pdf") { "pdf" }
-    else if ct.contains("image/png") { "png" }
-    else if ct.contains("image/jpeg") { "jpg" }
-    else if ct.contains("image/svg") { "svg" }
-    else if ct.contains("application/json") { "json" }
-    else if ct.contains("text/") { "txt" }
-    else { "bin" }
+    if ct.contains("text/html") {
+        "html"
+    } else if ct.contains("application/pdf") {
+        "pdf"
+    } else if ct.contains("image/png") {
+        "png"
+    } else if ct.contains("image/jpeg") {
+        "jpg"
+    } else if ct.contains("image/svg") {
+        "svg"
+    } else if ct.contains("application/json") {
+        "json"
+    } else if ct.contains("text/") {
+        "txt"
+    } else {
+        "bin"
+    }
 }
 
 /// Minimal UUID v4 without external dependency (8 hex chars, good enough for temp files).
@@ -116,5 +141,5 @@ fn simple_uuid() -> String {
         .unwrap_or_default()
         .subsec_nanos();
     let pid = std::process::id();
-    format!("{:08x}{:08x}", nanos, pid)
+    format!("{nanos:08x}{pid:08x}")
 }

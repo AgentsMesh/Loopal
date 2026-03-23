@@ -22,7 +22,10 @@ const MAX_VISIBLE: usize = 5;
 
 /// Compute the height needed for the agent panel.
 pub fn panel_height(agents: &IndexMap<String, AgentViewState>) -> u16 {
-    let live = agents.values().filter(|a| is_live(&a.observable.status)).count();
+    let live = agents
+        .values()
+        .filter(|a| is_live(&a.observable.status))
+        .count();
     if live == 0 {
         return 0;
     }
@@ -60,7 +63,7 @@ pub fn render_agent_panel(
     if live_agents.len() > MAX_VISIBLE {
         let extra = live_agents.len() - MAX_VISIBLE;
         lines.push(Line::from(Span::styled(
-            format!("  +{} more agents", extra),
+            format!("  +{extra} more agents"),
             Style::default().fg(Color::DarkGray),
         )));
     }
@@ -87,7 +90,7 @@ fn render_agent_line(
     spans.push(Span::styled(indicator.to_string(), base_style));
 
     // Name (padded for column alignment)
-    let padded = format!("{:<width$}", name, width = name_width);
+    let padded = format!("{name:<name_width$}");
     let name_style = if is_focused {
         Style::default().fg(Color::Cyan).bold()
     } else {
@@ -99,7 +102,7 @@ fn render_agent_line(
     // Spinner/icon + status label
     let elapsed = agent.elapsed();
     let (icon, label, icon_style) = status_display(&agent.observable.status, elapsed);
-    spans.push(Span::styled(format!("{} {:<8}", icon, label), icon_style));
+    spans.push(Span::styled(format!("{icon} {label:<8}"), icon_style));
     spans.push(Span::raw(" "));
 
     // Elapsed time
@@ -109,7 +112,7 @@ fn render_agent_line(
         "-".to_string()
     };
     spans.push(Span::styled(
-        format!("{:>6}", time_str),
+        format!("{time_str:>6}"),
         Style::default().fg(Color::DarkGray),
     ));
     spans.push(Span::raw("  "));
@@ -117,7 +120,7 @@ fn render_agent_line(
     // Token count
     let tok = (agent.observable.input_tokens + agent.observable.output_tokens) / 1000;
     spans.push(Span::styled(
-        format!("{}k tok", tok),
+        format!("{tok}k tok"),
         Style::default().fg(Color::DarkGray),
     ));
 
@@ -148,15 +151,9 @@ fn status_display(
             let frame = spinner_frame(elapsed);
             (frame, "Working", Style::default().fg(Color::Green))
         }
-        AgentStatus::WaitingForInput => {
-            ("●", "Idle", Style::default().fg(Color::DarkGray))
-        }
-        AgentStatus::Finished => {
-            ("✓", "Done", Style::default().fg(Color::Green))
-        }
-        AgentStatus::Error => {
-            ("✗", "Error", Style::default().fg(Color::Red))
-        }
+        AgentStatus::WaitingForInput => ("●", "Idle", Style::default().fg(Color::DarkGray)),
+        AgentStatus::Finished => ("✓", "Done", Style::default().fg(Color::Green)),
+        AgentStatus::Error => ("✗", "Error", Style::default().fg(Color::Red)),
     }
 }
 

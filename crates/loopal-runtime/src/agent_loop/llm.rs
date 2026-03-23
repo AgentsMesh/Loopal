@@ -1,10 +1,10 @@
-use std::time::Instant;
 use futures::StreamExt;
 use loopal_error::Result;
 use loopal_message::Message;
 use loopal_protocol::AgentEventPayload;
 use loopal_provider::{get_thinking_capability, resolve_thinking_config};
 use loopal_provider_api::{ChatParams, StreamChunk};
+use std::time::Instant;
 use tracing::{error, info, warn};
 
 use super::cancel::TurnCancel;
@@ -24,9 +24,8 @@ impl AgentLoopRunner {
             tool_defs.retain(|t| filter.contains(&t.name));
         }
         let capability = get_thinking_capability(&self.params.model);
-        let resolved_thinking = resolve_thinking_config(
-            &self.thinking_config, capability, self.max_output_tokens,
-        );
+        let resolved_thinking =
+            resolve_thinking_config(&self.thinking_config, capability, self.max_output_tokens);
         Ok(ChatParams {
             model: self.params.model.clone(),
             messages: messages.to_vec(),
@@ -46,7 +45,10 @@ impl AgentLoopRunner {
         cancel: &TurnCancel,
     ) -> Result<LlmStreamResult> {
         if cancel.is_cancelled() {
-            return Ok(LlmStreamResult { stream_error: true, ..Default::default() });
+            return Ok(LlmStreamResult {
+                stream_error: true,
+                ..Default::default()
+            });
         }
 
         let chat_params = self.prepare_chat_params_with(messages)?;
@@ -58,7 +60,9 @@ impl AgentLoopRunner {
             thinking = ?chat_params.thinking, "LLM request"
         );
 
-        let mut stream = self.retry_stream_chat(&chat_params, &*provider, cancel).await?;
+        let mut stream = self
+            .retry_stream_chat(&chat_params, &*provider, cancel)
+            .await?;
         let mut result = LlmStreamResult::default();
 
         loop {
@@ -84,7 +88,8 @@ impl AgentLoopRunner {
             duration_ms = llm_duration.as_millis() as u64,
             tool_calls = result.tool_uses.len(),
             has_text = !result.assistant_text.is_empty(),
-            thinking_tokens = result.thinking_tokens, "LLM complete"
+            thinking_tokens = result.thinking_tokens,
+            "LLM complete"
         );
         Ok(result)
     }
@@ -104,12 +109,19 @@ impl AgentLoopRunner {
                 Ok(s) => return Ok(s),
                 Err(e) if e.is_retryable() && retry_count < MAX_RETRIES => {
                     retry_count += 1;
-                    let wait_ms = e.retry_after_ms().unwrap_or(BASE_WAIT_MS) * (1 << (retry_count - 1));
+                    let wait_ms =
+                        e.retry_after_ms().unwrap_or(BASE_WAIT_MS) * (1 << (retry_count - 1));
                     warn!(retry = retry_count, max_retries = MAX_RETRIES, wait_ms, error = %e, "retrying");
                     self.emit(AgentEventPayload::Error {
-                        message: format!("{}. Retrying in {:.1}s ({}/{})",
-                            e, wait_ms as f64 / 1000.0, retry_count, MAX_RETRIES),
-                    }).await?;
+                        message: format!(
+                            "{}. Retrying in {:.1}s ({}/{})",
+                            e,
+                            wait_ms as f64 / 1000.0,
+                            retry_count,
+                            MAX_RETRIES
+                        ),
+                    })
+                    .await?;
                     // Interruptible sleep via select!
                     tokio::select! {
                         _ = tokio::time::sleep(std::time::Duration::from_millis(wait_ms)) => {}
@@ -137,20 +149,27 @@ impl AgentLoopRunner {
             }
             Ok(StreamChunk::Thinking { text }) => {
                 result.thinking_text.push_str(&text);
-                self.emit(AgentEventPayload::ThinkingStream { text }).await?;
+                self.emit(AgentEventPayload::ThinkingStream { text })
+                    .await?;
             }
             Ok(StreamChunk::ThinkingSignature { signature }) => {
                 result.thinking_signature = Some(signature);
             }
             Ok(StreamChunk::ToolUse { id, name, input }) => {
                 self.emit(AgentEventPayload::ToolCall {
-                    id: id.clone(), name: name.clone(), input: input.clone(),
-                }).await?;
+                    id: id.clone(),
+                    name: name.clone(),
+                    input: input.clone(),
+                })
+                .await?;
                 result.tool_uses.push((id, name, input));
             }
             Ok(StreamChunk::Usage {
-                input_tokens, output_tokens,
-                cache_creation_input_tokens, cache_read_input_tokens, thinking_tokens,
+                input_tokens,
+                output_tokens,
+                cache_creation_input_tokens,
+                cache_read_input_tokens,
+                thinking_tokens,
             }) => {
                 self.total_input_tokens += input_tokens;
                 self.total_output_tokens += output_tokens;
@@ -159,9 +178,14 @@ impl AgentLoopRunner {
                 self.total_thinking_tokens += thinking_tokens;
                 result.thinking_tokens += thinking_tokens;
                 self.emit(AgentEventPayload::TokenUsage {
-                    input_tokens, output_tokens, context_window: self.max_context_tokens,
-                    cache_creation_input_tokens, cache_read_input_tokens, thinking_tokens,
-                }).await?;
+                    input_tokens,
+                    output_tokens,
+                    context_window: self.max_context_tokens,
+                    cache_creation_input_tokens,
+                    cache_read_input_tokens,
+                    thinking_tokens,
+                })
+                .await?;
             }
             Ok(StreamChunk::Done { stop_reason }) => {
                 result.stop_reason = stop_reason;
@@ -169,7 +193,10 @@ impl AgentLoopRunner {
             }
             Err(e) => {
                 error!(error = %e, turn = self.turn_count, model = %self.params.model, "stream error");
-                self.emit(AgentEventPayload::Error { message: e.to_string() }).await?;
+                self.emit(AgentEventPayload::Error {
+                    message: e.to_string(),
+                })
+                .await?;
                 result.stream_error = true;
                 return Ok(false);
             }
@@ -179,12 +206,17 @@ impl AgentLoopRunner {
 
     /// Emit ThinkingComplete if thinking content or tokens were received.
     async fn emit_thinking_complete(&self, result: &LlmStreamResult) -> Result<()> {
-        if result.thinking_text.is_empty() && result.thinking_tokens == 0 { return Ok(()); }
+        if result.thinking_text.is_empty() && result.thinking_tokens == 0 {
+            return Ok(());
+        }
         let token_count = if result.thinking_text.is_empty() {
             result.thinking_tokens
         } else {
-            result.thinking_tokens.max(result.thinking_text.len() as u32 / 4)
+            result
+                .thinking_tokens
+                .max(result.thinking_text.len() as u32 / 4)
         };
-        self.emit(AgentEventPayload::ThinkingComplete { token_count }).await
+        self.emit(AgentEventPayload::ThinkingComplete { token_count })
+            .await
     }
 }

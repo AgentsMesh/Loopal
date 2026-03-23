@@ -20,22 +20,17 @@ impl ProviderRegistry {
 
     /// Register a provider by its name.
     pub fn register(&mut self, provider: Arc<dyn Provider>) {
-        self.providers
-            .insert(provider.name().to_string(), provider);
+        self.providers.insert(provider.name().to_string(), provider);
     }
 
     /// Resolve which provider handles a given model ID.
     pub fn resolve(&self, model: &str) -> Result<Arc<dyn Provider>, LoopalError> {
         let provider_name = model_info::resolve_provider(model);
-        self.providers
-            .get(provider_name)
-            .cloned()
-            .ok_or_else(|| {
-                LoopalError::Provider(ProviderError::ModelNotFound(format!(
-                    "no provider registered for '{}' (resolved to '{}')",
-                    model, provider_name
-                )))
-            })
+        self.providers.get(provider_name).cloned().ok_or_else(|| {
+            LoopalError::Provider(ProviderError::ModelNotFound(format!(
+                "no provider registered for '{model}' (resolved to '{provider_name}')"
+            )))
+        })
     }
 
     /// Get a provider by its name directly.

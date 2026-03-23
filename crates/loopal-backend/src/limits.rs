@@ -28,7 +28,7 @@ impl Default for ResourceLimits {
             max_glob_results: 10_000,
             max_grep_matches: 500,
             max_fetch_bytes: 5 * 1024 * 1024, // 5 MB
-            default_timeout_ms: 300_000,       // 5 min
+            default_timeout_ms: 300_000,      // 5 min
             fetch_timeout_secs: 30,
         }
     }

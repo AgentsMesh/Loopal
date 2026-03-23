@@ -46,11 +46,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(
-        session: SessionController,
-        commands: Vec<CommandEntry>,
-        cwd: PathBuf,
-    ) -> Self {
+    pub fn new(session: SessionController, commands: Vec<CommandEntry>, cwd: PathBuf) -> Self {
         Self {
             exiting: false,
             input: String::new(),

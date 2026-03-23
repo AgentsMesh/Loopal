@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use loopal_error::McpError;
 use serde_json::Value;
@@ -63,20 +63,18 @@ impl McpClient {
                     }
                     Ok(_) => {
                         if let Ok(msg) = serde_json::from_str::<Value>(&line)
-                            && let Some(id) = msg.get("id").and_then(|v| v.as_u64()) {
-                                let mut map = pending_clone.lock().await;
-                                if let Some(tx) = map.remove(&id) {
-                                    if let Some(err) = msg.get("error") {
-                                        let _ = tx.send(Err(McpError::Protocol(
-                                            err.to_string(),
-                                        )));
-                                    } else {
-                                        let result =
-                                            msg.get("result").cloned().unwrap_or(Value::Null);
-                                        let _ = tx.send(Ok(result));
-                                    }
+                            && let Some(id) = msg.get("id").and_then(|v| v.as_u64())
+                        {
+                            let mut map = pending_clone.lock().await;
+                            if let Some(tx) = map.remove(&id) {
+                                if let Some(err) = msg.get("error") {
+                                    let _ = tx.send(Err(McpError::Protocol(err.to_string())));
+                                } else {
+                                    let result = msg.get("result").cloned().unwrap_or(Value::Null);
+                                    let _ = tx.send(Ok(result));
                                 }
                             }
+                        }
                     }
                     Err(e) => {
                         warn!(error = %e, "MCP process read error");
@@ -138,8 +136,8 @@ impl McpClient {
             map.insert(id, tx);
         }
 
-        let mut data = serde_json::to_vec(&request)
-            .map_err(|e| McpError::Protocol(e.to_string()))?;
+        let mut data =
+            serde_json::to_vec(&request).map_err(|e| McpError::Protocol(e.to_string()))?;
         data.push(b'\n');
 
         {
@@ -156,12 +154,20 @@ impl McpClient {
 
         debug!(id, method, "sent request");
 
-        let result = rx.await
+        let result = rx
+            .await
             .map_err(|_| McpError::ConnectionFailed("response channel closed".into()))?;
         let duration = start.elapsed();
         match &result {
-            Ok(_) => info!(id, method, duration_ms = duration.as_millis() as u64, "MCP response"),
-            Err(e) => warn!(id, method, duration_ms = duration.as_millis() as u64, error = %e, "MCP error"),
+            Ok(_) => info!(
+                id,
+                method,
+                duration_ms = duration.as_millis() as u64,
+                "MCP response"
+            ),
+            Err(e) => {
+                warn!(id, method, duration_ms = duration.as_millis() as u64, error = %e, "MCP error")
+            }
         }
         result
     }
@@ -174,8 +180,8 @@ impl McpClient {
             "params": params,
         });
 
-        let mut data = serde_json::to_vec(&notification)
-            .map_err(|e| McpError::Protocol(e.to_string()))?;
+        let mut data =
+            serde_json::to_vec(&notification).map_err(|e| McpError::Protocol(e.to_string()))?;
         data.push(b'\n');
 
         let mut writer = self.writer.lock().await;

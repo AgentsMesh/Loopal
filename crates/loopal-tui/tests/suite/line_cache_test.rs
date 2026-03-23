@@ -77,7 +77,10 @@ fn test_tool_call_mutation_detected() {
         .flat_map(|l| l.spans.iter().map(|s| s.content.to_string()))
         .collect();
     // Single-line summary should contain the status icon change
-    assert!(text.contains("✓"), "should show success icon after mutation");
+    assert!(
+        text.contains("✓"),
+        "should show success icon after mutation"
+    );
     // Fingerprint-triggered rebuild means line counts may differ
     assert!(fp1 > 0 && fp2 > 0, "both updates should produce lines");
 }
@@ -133,6 +136,9 @@ fn test_tool_result_arrival_invalidates_cache() {
         .iter()
         .flat_map(|l| l.spans.iter().map(|s| s.content.to_string()))
         .collect();
-    assert!(text.contains("✓"), "result arrival should update status icon");
+    assert!(
+        text.contains("✓"),
+        "result arrival should update status icon"
+    );
     assert!(n1 > 0 && n2 > 0, "both states should produce lines");
 }

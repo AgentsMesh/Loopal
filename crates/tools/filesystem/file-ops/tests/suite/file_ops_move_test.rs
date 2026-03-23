@@ -11,7 +11,8 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext {
         session_id: "test".into(),
         shared: None,
-        pending_cwd_switch: Default::default(), memory_channel: None,
+        pending_cwd_switch: Default::default(),
+        memory_channel: None,
         backend,
     }
 }
@@ -28,7 +29,10 @@ async fn move_same_directory() {
         .unwrap();
     assert!(!r.is_error);
     assert!(!tmp.path().join("a.txt").exists());
-    assert_eq!(std::fs::read_to_string(tmp.path().join("b.txt")).unwrap(), "hello");
+    assert_eq!(
+        std::fs::read_to_string(tmp.path().join("b.txt")).unwrap(),
+        "hello"
+    );
 }
 
 #[tokio::test]
@@ -56,8 +60,11 @@ async fn move_src_not_found() {
         .await
         .unwrap();
     assert!(r.is_error);
-    assert!(r.content.contains("not found") || r.content.contains("does not exist"),
-            "unexpected error: {}", r.content);
+    assert!(
+        r.content.contains("not found") || r.content.contains("does not exist"),
+        "unexpected error: {}",
+        r.content
+    );
 }
 
 #[tokio::test]

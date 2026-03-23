@@ -1,10 +1,10 @@
 // Single test binary — includes all test modules
 #[path = "suite/repo_test.rs"]
 mod repo_test;
-#[path = "suite/worktree_test.rs"]
-mod worktree_test;
 #[path = "suite/validate_test.rs"]
 mod validate_test;
+#[path = "suite/worktree_test.rs"]
+mod worktree_test;
 
 /// Create a fresh git repo in a tempdir with one initial commit.
 fn init_repo(dir: &std::path::Path) {

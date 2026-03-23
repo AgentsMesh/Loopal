@@ -2,9 +2,9 @@
 
 use std::time::Instant;
 
-use crate::app::App;
 use super::InputAction;
 use super::multiline;
+use crate::app::App;
 
 /// Default wrap width when terminal width is unknown.
 pub(super) const DEFAULT_WRAP_WIDTH: usize = 80;
@@ -32,9 +32,8 @@ pub(super) fn move_cursor_right(app: &mut App) {
 /// Up: multiline navigation first, then history browse.
 pub(super) fn handle_up(app: &mut App) -> InputAction {
     if multiline::is_multiline(&app.input, DEFAULT_WRAP_WIDTH)
-        && let Some(new_cursor) = multiline::cursor_up(
-            &app.input, app.input_cursor, DEFAULT_WRAP_WIDTH,
-        )
+        && let Some(new_cursor) =
+            multiline::cursor_up(&app.input, app.input_cursor, DEFAULT_WRAP_WIDTH)
     {
         app.input_cursor = new_cursor;
         return InputAction::None;
@@ -58,9 +57,8 @@ pub(super) fn handle_up(app: &mut App) -> InputAction {
 /// Down: multiline navigation first, then history browse.
 pub(super) fn handle_down(app: &mut App) -> InputAction {
     if multiline::is_multiline(&app.input, DEFAULT_WRAP_WIDTH)
-        && let Some(new_cursor) = multiline::cursor_down(
-            &app.input, app.input_cursor, DEFAULT_WRAP_WIDTH,
-        )
+        && let Some(new_cursor) =
+            multiline::cursor_down(&app.input, app.input_cursor, DEFAULT_WRAP_WIDTH)
     {
         app.input_cursor = new_cursor;
         return InputAction::None;
@@ -91,9 +89,7 @@ pub(super) fn handle_esc(app: &mut App) -> InputAction {
         if let Some(last) = app.last_esc_time.take()
             && now.duration_since(last).as_millis() < 300
         {
-            return InputAction::SlashCommand(
-                super::SlashCommandAction::RewindPicker,
-            );
+            return InputAction::SlashCommand(super::SlashCommandAction::RewindPicker);
         }
         app.last_esc_time = Some(now);
     }

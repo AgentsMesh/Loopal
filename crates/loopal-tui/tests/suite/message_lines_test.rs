@@ -121,7 +121,10 @@ fn test_user_message_has_prompt_prefix() {
     let m = msg("user", "hello");
     let lines = message_to_lines(&m, 80);
     let texts = lines_text(&lines);
-    assert!(texts[0].starts_with("▎ "), "user msg should start with '▎ '");
+    assert!(
+        texts[0].starts_with("▎ "),
+        "user msg should start with '▎ '"
+    );
 }
 
 #[test]

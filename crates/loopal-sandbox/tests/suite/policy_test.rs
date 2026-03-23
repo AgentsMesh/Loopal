@@ -1,9 +1,7 @@
 use std::path::PathBuf;
 
+use loopal_config::{FileSystemPolicy, NetworkPolicy, SandboxConfig, SandboxPolicy};
 use loopal_sandbox::policy::resolve_policy;
-use loopal_config::{
-    FileSystemPolicy, NetworkPolicy, SandboxConfig, SandboxPolicy,
-};
 
 #[test]
 fn default_policy_is_workspace_write() {
@@ -39,9 +37,11 @@ fn workspace_write_includes_cwd() {
     };
 
     let resolved = resolve_policy(&config, "/home/user/project".as_ref());
-    assert!(resolved
-        .writable_paths
-        .contains(&PathBuf::from("/home/user/project")));
+    assert!(
+        resolved
+            .writable_paths
+            .contains(&PathBuf::from("/home/user/project"))
+    );
 }
 
 #[test]
@@ -72,9 +72,11 @@ fn user_allow_write_paths_included() {
     };
 
     let resolved = resolve_policy(&config, "/home/user/project".as_ref());
-    assert!(resolved
-        .writable_paths
-        .contains(&PathBuf::from("/extra/path")));
+    assert!(
+        resolved
+            .writable_paths
+            .contains(&PathBuf::from("/extra/path"))
+    );
 }
 
 #[test]
@@ -90,9 +92,11 @@ fn relative_allow_write_resolved_against_cwd() {
     };
 
     let resolved = resolve_policy(&config, "/cwd".as_ref());
-    assert!(resolved
-        .writable_paths
-        .contains(&PathBuf::from("/cwd/relative/path")));
+    assert!(
+        resolved
+            .writable_paths
+            .contains(&PathBuf::from("/cwd/relative/path"))
+    );
 }
 
 #[test]
@@ -109,13 +113,13 @@ fn deny_write_globs_include_defaults_and_user() {
 
     let resolved = resolve_policy(&config, "/tmp".as_ref());
     // Should contain default sensitive globs
-    assert!(resolved
-        .deny_write_globs
-        .contains(&"**/.env".to_string()));
+    assert!(resolved.deny_write_globs.contains(&"**/.env".to_string()));
     // Should also contain user-configured deny
-    assert!(resolved
-        .deny_write_globs
-        .contains(&"**/custom_deny".to_string()));
+    assert!(
+        resolved
+            .deny_write_globs
+            .contains(&"**/custom_deny".to_string())
+    );
 }
 
 #[test]

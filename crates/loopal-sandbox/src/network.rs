@@ -3,10 +3,7 @@ use loopal_config::NetworkPolicy;
 /// Check whether a domain is allowed under the given network policy.
 ///
 /// Returns `Ok(())` if the domain is allowed, or `Err(reason)` if blocked.
-pub fn check_domain(
-    policy: &NetworkPolicy,
-    domain: &str,
-) -> Result<(), String> {
+pub fn check_domain(policy: &NetworkPolicy, domain: &str) -> Result<(), String> {
     let domain_lower = domain.to_lowercase();
 
     // If an allowlist is configured, only those domains pass
@@ -16,9 +13,7 @@ pub fn check_domain(
             domain_lower == d_lower || domain_lower.ends_with(&format!(".{d_lower}"))
         });
         if !allowed {
-            return Err(format!(
-                "domain '{domain}' not in allowlist"
-            ));
+            return Err(format!("domain '{domain}' not in allowlist"));
         }
     }
 
@@ -43,11 +38,7 @@ pub fn extract_domain(url: &str) -> Option<String> {
         .unwrap_or(url);
 
     // Take everything before the first '/' or ':'
-    let domain = without_scheme
-        .split('/')
-        .next()?
-        .split(':')
-        .next()?;
+    let domain = without_scheme.split('/').next()?.split(':').next()?;
 
     if domain.is_empty() {
         return None;

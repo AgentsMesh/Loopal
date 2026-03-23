@@ -1,7 +1,7 @@
 use futures::stream::Stream;
 use loopal_error::{LoopalError, ProviderError};
 use loopal_provider_api::{StopReason, StreamChunk};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::VecDeque;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -50,7 +50,7 @@ pub(crate) fn parse_google_event(data: &str) -> Vec<Result<StreamChunk, LoopalEr
             return vec![Err(ProviderError::SseParse(format!(
                 "invalid JSON: {e}: {data}"
             ))
-            .into())]
+            .into())];
         }
     };
 
@@ -80,17 +80,22 @@ pub(crate) fn parse_google_event(data: &str) -> Vec<Result<StreamChunk, LoopalEr
             if let Some(parts) = candidate["content"]["parts"].as_array() {
                 for part in parts {
                     if let Some(text) = part["text"].as_str()
-                        && !text.is_empty() {
-                            if part.get("thought").and_then(|v| v.as_bool()).unwrap_or(false) {
-                                chunks.push(Ok(StreamChunk::Thinking {
-                                    text: text.to_string(),
-                                }));
-                            } else {
-                                chunks.push(Ok(StreamChunk::Text {
-                                    text: text.to_string(),
-                                }));
-                            }
+                        && !text.is_empty()
+                    {
+                        if part
+                            .get("thought")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false)
+                        {
+                            chunks.push(Ok(StreamChunk::Thinking {
+                                text: text.to_string(),
+                            }));
+                        } else {
+                            chunks.push(Ok(StreamChunk::Text {
+                                text: text.to_string(),
+                            }));
                         }
+                    }
 
                     if let Some(fc) = part.get("functionCall") {
                         let name = fc["name"].as_str().unwrap_or("").to_string();
@@ -106,10 +111,14 @@ pub(crate) fn parse_google_event(data: &str) -> Vec<Result<StreamChunk, LoopalEr
 
             match finish_reason {
                 Some("MAX_TOKENS") => {
-                    chunks.push(Ok(StreamChunk::Done { stop_reason: StopReason::MaxTokens }));
+                    chunks.push(Ok(StreamChunk::Done {
+                        stop_reason: StopReason::MaxTokens,
+                    }));
                 }
                 Some("STOP") => {
-                    chunks.push(Ok(StreamChunk::Done { stop_reason: StopReason::EndTurn }));
+                    chunks.push(Ok(StreamChunk::Done {
+                        stop_reason: StopReason::EndTurn,
+                    }));
                 }
                 _ => {}
             }
@@ -126,5 +135,5 @@ pub(crate) fn uuid_v4_simple() -> String {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_nanos();
-    format!("{:x}", nanos)
+    format!("{nanos:x}")
 }

@@ -1,9 +1,7 @@
 use std::path::PathBuf;
 
+use loopal_config::{NetworkPolicy, PathDecision, ResolvedPolicy, SandboxPolicy};
 use loopal_sandbox::path_checker::check_path;
-use loopal_config::{
-    NetworkPolicy, PathDecision, ResolvedPolicy, SandboxPolicy,
-};
 
 fn workspace_policy(cwd: &str) -> ResolvedPolicy {
     let cwd_path = PathBuf::from(cwd);

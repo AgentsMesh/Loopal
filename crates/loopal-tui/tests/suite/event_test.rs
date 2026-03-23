@@ -1,5 +1,5 @@
-use loopal_tui::event::{AppEvent, EventHandler};
 use loopal_protocol::{AgentEvent, AgentEventPayload};
+use loopal_tui::event::{AppEvent, EventHandler};
 use tokio::sync::mpsc;
 
 #[tokio::test]
@@ -15,7 +15,10 @@ async fn test_try_next_returns_none_when_empty() {
     let mut handler = EventHandler::new(agent_rx);
 
     let result = handler.try_next();
-    assert!(result.is_none(), "try_next should return None when no events are queued");
+    assert!(
+        result.is_none(),
+        "try_next should return None when no events are queued"
+    );
 }
 
 #[tokio::test]
@@ -35,7 +38,7 @@ async fn test_agent_events_come_through() {
 
     match event {
         AppEvent::Agent(e) => assert!(matches!(e.payload, AgentEventPayload::Started)),
-        other => panic!("expected Agent(Started), got {:?}", other),
+        other => panic!("expected Agent(Started), got {other:?}"),
     }
 }
 
@@ -59,9 +62,9 @@ async fn test_agent_stream_event_forwarded() {
     match event {
         AppEvent::Agent(e) => match e.payload {
             AgentEventPayload::Stream { text } => assert_eq!(text, "hello"),
-            other => panic!("expected Stream, got {:?}", other),
+            other => panic!("expected Stream, got {other:?}"),
         },
-        other => panic!("expected Agent(Stream), got {:?}", other),
+        other => panic!("expected Agent(Stream), got {other:?}"),
     }
 }
 
@@ -103,9 +106,7 @@ async fn test_dropping_sender_closes_agent_forwarding() {
     let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(2);
     while tokio::time::Instant::now() < deadline {
         match tokio::time::timeout(std::time::Duration::from_millis(300), handler.next()).await {
-            Ok(Some(AppEvent::Agent(e)))
-                if matches!(e.payload, AgentEventPayload::Finished) =>
-            {
+            Ok(Some(AppEvent::Agent(e))) if matches!(e.payload, AgentEventPayload::Finished) => {
                 got_finished = true;
                 break;
             }
@@ -115,7 +116,10 @@ async fn test_dropping_sender_closes_agent_forwarding() {
         }
     }
 
-    assert!(got_finished, "should receive the Finished event before channel closes");
+    assert!(
+        got_finished,
+        "should receive the Finished event before channel closes"
+    );
 }
 
 #[tokio::test]
@@ -151,7 +155,14 @@ async fn test_multiple_agent_events_ordering() {
     }
 
     assert_eq!(agent_events.len(), 3, "should receive all 3 agent events");
-    assert!(matches!(agent_events[0].payload, AgentEventPayload::Started));
-    assert!(matches!(&agent_events[1].payload, AgentEventPayload::Stream { text } if text == "first"));
-    assert!(matches!(&agent_events[2].payload, AgentEventPayload::Stream { text } if text == "second"));
+    assert!(matches!(
+        agent_events[0].payload,
+        AgentEventPayload::Started
+    ));
+    assert!(
+        matches!(&agent_events[1].payload, AgentEventPayload::Stream { text } if text == "first")
+    );
+    assert!(
+        matches!(&agent_events[2].payload, AgentEventPayload::Stream { text } if text == "second")
+    );
 }

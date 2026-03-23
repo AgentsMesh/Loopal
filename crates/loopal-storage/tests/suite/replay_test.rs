@@ -62,7 +62,11 @@ fn clear_at_end_yields_empty() {
 #[test]
 fn compact_keeps_last_n() {
     let entries = vec![
-        msg("1"), msg("2"), msg("3"), msg("4"), msg("5"),
+        msg("1"),
+        msg("2"),
+        msg("3"),
+        msg("4"),
+        msg("5"),
         compact_marker(2),
     ];
     let result = replay(entries);
@@ -82,9 +86,12 @@ fn compact_with_more_keep_than_messages() {
 #[test]
 fn interleaved_markers() {
     let entries = vec![
-        msg("a"), msg("b"),
+        msg("a"),
+        msg("b"),
         clear_marker(),
-        msg("c"), msg("d"), msg("e"),
+        msg("c"),
+        msg("d"),
+        msg("e"),
         compact_marker(1),
         msg("f"),
     ];

@@ -1,9 +1,9 @@
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
+use loopal_config::HookEvent;
+use loopal_error::{LoopalError, Result};
 use loopal_hooks::run_hook;
 use loopal_kernel::Kernel;
-use loopal_error::{LoopalError, Result};
-use loopal_config::HookEvent;
 use loopal_tool_api::{ToolContext, ToolResult, needs_truncation, truncate_output};
 use serde_json::Value;
 use tracing::{debug, info, warn};
@@ -37,9 +37,14 @@ pub async fn execute_tool(
         match run_hook(hook_config, hook_data).await {
             Ok(result) => {
                 if !result.is_success() {
-                    warn!(tool = name, exit_code = result.exit_code, "pre-hook rejected");
+                    warn!(
+                        tool = name,
+                        exit_code = result.exit_code,
+                        "pre-hook rejected"
+                    );
                     return Ok(ToolResult::error(format!(
-                        "Pre-hook rejected: {}", result.stderr.trim()
+                        "Pre-hook rejected: {}",
+                        result.stderr.trim()
                     )));
                 }
             }
@@ -95,13 +100,19 @@ fn truncate_result(result: ToolResult, tool_name: &str) -> ToolResult {
         truncated_bytes = truncated.len(),
         "tool result truncated by pipeline"
     );
-    ToolResult { content: truncated, is_error: result.is_error }
+    ToolResult {
+        content: truncated,
+        is_error: result.is_error,
+    }
 }
 
 fn save_full_output(content: &str, tool_name: &str) -> Option<String> {
     let tmp_dir = loopal_config::tmp_dir();
     std::fs::create_dir_all(&tmp_dir).ok()?;
-    let ts = SystemTime::now().duration_since(UNIX_EPOCH).ok()?.as_millis();
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .ok()?
+        .as_millis();
     let filename = format!("tool_{tool_name}_{ts}.txt");
     let path = tmp_dir.join(&filename);
     std::fs::write(&path, content).ok()?;

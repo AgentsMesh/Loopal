@@ -3,9 +3,14 @@ use loopal_tool_grep::GrepTool;
 use serde_json::json;
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
-    let backend =
-        loopal_backend::LocalBackend::new(cwd.to_path_buf(), None, Default::default());
-    ToolContext { backend, session_id: "test".into(), shared: None, pending_cwd_switch: Default::default(), memory_channel: None }
+    let backend = loopal_backend::LocalBackend::new(cwd.to_path_buf(), None, Default::default());
+    ToolContext {
+        backend,
+        session_id: "test".into(),
+        shared: None,
+        pending_cwd_switch: Default::default(),
+        memory_channel: None,
+    }
 }
 
 #[test]
@@ -97,7 +102,10 @@ async fn test_grep_regex_pattern() {
     let ctx = make_ctx(tmp.path());
 
     let result = tool
-        .execute(json!({"pattern": "fn \\w+\\(", "output_mode": "content"}), &ctx)
+        .execute(
+            json!({"pattern": "fn \\w+\\(", "output_mode": "content"}),
+            &ctx,
+        )
         .await
         .unwrap();
 
@@ -124,9 +132,7 @@ async fn test_grep_invalid_regex_returns_error() {
     let tool = GrepTool;
     let ctx = make_ctx(tmp.path());
 
-    let result = tool
-        .execute(json!({"pattern": "(unclosed"}), &ctx)
-        .await;
+    let result = tool.execute(json!({"pattern": "(unclosed"}), &ctx).await;
 
     assert!(result.is_err());
 }

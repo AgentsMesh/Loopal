@@ -25,7 +25,10 @@ pub struct ImageAttachment {
 impl UserContent {
     /// Create text-only content (no images).
     pub fn text_only(text: impl Into<String>) -> Self {
-        Self { text: text.into(), images: Vec::new() }
+        Self {
+            text: text.into(),
+            images: Vec::new(),
+        }
     }
 
     /// Whether this content contains any images.
@@ -50,12 +53,18 @@ impl UserContent {
 
 impl From<String> for UserContent {
     fn from(text: String) -> Self {
-        Self { text, images: Vec::new() }
+        Self {
+            text,
+            images: Vec::new(),
+        }
     }
 }
 
 impl From<&str> for UserContent {
     fn from(text: &str) -> Self {
-        Self { text: text.to_string(), images: Vec::new() }
+        Self {
+            text: text.to_string(),
+            images: Vec::new(),
+        }
     }
 }

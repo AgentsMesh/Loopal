@@ -72,9 +72,10 @@ fn test_load_nonexistent_session_error_message() {
     let err = result.unwrap_err();
     let err_msg = err.to_string();
     assert!(
-        err_msg.contains("does-not-exist-xyz") || err_msg.contains("not found") || err_msg.contains("NotFound"),
-        "error should reference the session id, got: {}",
-        err_msg
+        err_msg.contains("does-not-exist-xyz")
+            || err_msg.contains("not found")
+            || err_msg.contains("NotFound"),
+        "error should reference the session id, got: {err_msg}"
     );
 }
 
@@ -94,12 +95,14 @@ fn test_update_nonexistent_session_returns_error() {
     };
 
     let result = store.update_session(&session);
-    assert!(result.is_err(), "updating a nonexistent session should fail");
+    assert!(
+        result.is_err(),
+        "updating a nonexistent session should fail"
+    );
     let err_msg = result.unwrap_err().to_string();
     assert!(
         err_msg.contains("nonexistent-session-id") || err_msg.contains("not found"),
-        "error should mention session id, got: {}",
-        err_msg
+        "error should mention session id, got: {err_msg}"
     );
 }
 
@@ -125,11 +128,16 @@ fn test_create_session_fields() {
     let tmp = TempDir::new().unwrap();
     let store = SessionStore::with_base_dir(tmp.path().to_path_buf());
 
-    let session = store.create_session(Path::new("/home/user/project"), "claude-3").unwrap();
+    let session = store
+        .create_session(Path::new("/home/user/project"), "claude-3")
+        .unwrap();
     assert!(!session.id.is_empty());
     assert_eq!(session.model, "claude-3");
     assert_eq!(session.cwd, "/home/user/project");
-    assert!(session.title.is_empty(), "new session title should be empty");
+    assert!(
+        session.title.is_empty(),
+        "new session title should be empty"
+    );
     assert_eq!(session.mode, "default");
     assert!(session.created_at <= session.updated_at);
 }
@@ -163,7 +171,10 @@ fn test_list_sessions_ignores_dirs_without_session_json() {
     std::fs::write(orphan_dir.join("other.txt"), "not a session").unwrap();
 
     let sessions = store.list_sessions().unwrap();
-    assert!(sessions.is_empty(), "directory without session.json should be ignored");
+    assert!(
+        sessions.is_empty(),
+        "directory without session.json should be ignored"
+    );
 }
 
 #[test]
@@ -180,4 +191,3 @@ fn test_list_sessions_ignores_files_in_sessions_dir() {
     let sessions = store.list_sessions().unwrap();
     assert!(sessions.is_empty(), "plain files should be ignored");
 }
-

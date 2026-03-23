@@ -1,6 +1,6 @@
 use indexmap::IndexMap;
-use loopal_mcp::McpManager;
 use loopal_error::McpError;
+use loopal_mcp::McpManager;
 
 #[test]
 fn test_new_creates_empty_manager() {
@@ -42,7 +42,7 @@ fn test_call_tool_unknown_server_returns_error() {
             McpError::ServerNotFound(msg) => {
                 assert_eq!(msg, "nonexistent");
             }
-            other => panic!("expected ServerNotFound, got {:?}", other),
+            other => panic!("expected ServerNotFound, got {other:?}"),
         }
     });
 }
@@ -63,7 +63,7 @@ fn test_call_tool_by_name_unknown_tool_returns_error() {
             McpError::ServerNotFound(msg) => {
                 assert!(msg.contains("unknown_tool"));
             }
-            other => panic!("expected ServerNotFound, got {:?}", other),
+            other => panic!("expected ServerNotFound, got {other:?}"),
         }
     });
 }
@@ -107,7 +107,10 @@ fn test_start_all_empty_configs_succeeds() {
         let mut manager = McpManager::new();
         // Starting with no configs should succeed (no-op)
         let result = manager.start_all(&IndexMap::new()).await;
-        assert!(result.is_ok(), "start_all with empty configs should succeed");
+        assert!(
+            result.is_ok(),
+            "start_all with empty configs should succeed"
+        );
     });
 }
 

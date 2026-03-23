@@ -45,7 +45,14 @@ impl FrameLayout {
             content.height + agents.height + separator.height + input.height,
         );
 
-        Self { content, agents, separator, input, status, picker }
+        Self {
+            content,
+            agents,
+            separator,
+            input,
+            status,
+            picker,
+        }
     }
 }
 
@@ -95,10 +102,17 @@ pub fn draw(f: &mut Frame, app: &mut App) {
 
     // --- Σ f_i(state_i) ---
     views::progress::render_progress(
-        f, &state, app.scroll_offset, &mut app.line_cache, layout.content,
+        f,
+        &state,
+        app.scroll_offset,
+        &mut app.line_cache,
+        layout.content,
     );
     views::agent_panel::render_agent_panel(
-        f, &state.agents, state.focused_agent.as_deref(), layout.agents,
+        f,
+        &state.agents,
+        state.focused_agent.as_deref(),
+        layout.agents,
     );
     views::separator::render_separator(f, layout.separator);
     views::unified_status::render_unified_status(f, &state, layout.status);

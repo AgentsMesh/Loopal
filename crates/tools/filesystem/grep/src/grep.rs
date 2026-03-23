@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use loopal_error::LoopalError;
 use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
 use regex::RegexBuilder;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::path::PathBuf;
 
 use crate::grep_format::{FormatOptions, format_results};
@@ -113,7 +113,11 @@ impl Tool for GrepTool {
         let include_glob = parse_include_glob(&input)?;
 
         let results = search_files(
-            &search_path, &re, include_glob.as_ref(), MAX_TOTAL_MATCHES, &search_opts,
+            &search_path,
+            &re,
+            include_glob.as_ref(),
+            MAX_TOTAL_MATCHES,
+            &search_opts,
         );
         let output = format_results(&results, mode, head_limit, MAX_TOTAL_MATCHES, &fmt_opts);
         Ok(ToolResult::success(output))
@@ -124,14 +128,24 @@ fn parse_params(
     input: &Value,
     pattern: &str,
 ) -> Result<
-    (regex::Regex, SearchOptions, OutputMode, usize, FormatOptions),
+    (
+        regex::Regex,
+        SearchOptions,
+        OutputMode,
+        usize,
+        FormatOptions,
+    ),
     LoopalError,
 > {
     let case_insensitive = input["-i"].as_bool().unwrap_or(false);
     let multiline = input["multiline"].as_bool().unwrap_or(false);
     let fixed_strings = input["fixed_strings"].as_bool().unwrap_or(false);
 
-    let effective_pattern = if fixed_strings { regex::escape(pattern) } else { pattern.to_string() };
+    let effective_pattern = if fixed_strings {
+        regex::escape(pattern)
+    } else {
+        pattern.to_string()
+    };
     let re = RegexBuilder::new(&effective_pattern)
         .case_insensitive(case_insensitive)
         .multi_line(multiline)
@@ -145,8 +159,16 @@ fn parse_params(
         })?;
 
     let ctx_c = input["-C"].as_u64().map(|n| n as usize);
-    let ctx_after = input["-A"].as_u64().map(|n| n as usize).or(ctx_c).unwrap_or(0);
-    let ctx_before = input["-B"].as_u64().map(|n| n as usize).or(ctx_c).unwrap_or(0);
+    let ctx_after = input["-A"]
+        .as_u64()
+        .map(|n| n as usize)
+        .or(ctx_c)
+        .unwrap_or(0);
+    let ctx_before = input["-B"]
+        .as_u64()
+        .map(|n| n as usize)
+        .or(ctx_c)
+        .unwrap_or(0);
 
     let type_exts = input["type"].as_str().map(|t| {
         type_to_extensions(t)
@@ -162,7 +184,10 @@ fn parse_params(
     };
 
     let mode = OutputMode::from_str_opt(input["output_mode"].as_str())?;
-    let head_limit = input["head_limit"].as_u64().map(|n| n as usize).unwrap_or(DEFAULT_HEAD_LIMIT);
+    let head_limit = input["head_limit"]
+        .as_u64()
+        .map(|n| n as usize)
+        .unwrap_or(DEFAULT_HEAD_LIMIT);
     let fmt_opts = FormatOptions {
         show_line_numbers: input["-n"].as_bool().unwrap_or(true),
         offset: input["offset"].as_u64().map(|n| n as usize).unwrap_or(0),

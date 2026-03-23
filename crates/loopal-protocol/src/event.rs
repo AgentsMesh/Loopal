@@ -123,4 +123,17 @@ pub enum AgentEventPayload {
 
     /// Files modified during the completed turn.
     TurnDiffSummary { modified_files: Vec<String> },
+
+    /// Server-side tool invoked (e.g. web_search). Informational for TUI display.
+    ServerToolUse {
+        id: String,
+        name: String,
+        input: serde_json::Value,
+    },
+
+    /// Server-side tool result received. Informational for TUI display.
+    ServerToolResult {
+        tool_use_id: String,
+        content: serde_json::Value,
+    },
 }

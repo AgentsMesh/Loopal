@@ -15,3 +15,16 @@ pub(crate) struct ThinkingAccumulator {
     pub(crate) active: bool,
     pub(crate) signature_fragments: String,
 }
+
+/// Accumulates server-side tool blocks (e.g. web_search) across streamed events.
+#[derive(Default)]
+pub(crate) struct ServerToolAccumulator {
+    /// Active server tool use: (id, name, input).
+    pub(crate) current: Option<(String, String, serde_json::Value)>,
+    /// Whether current block is a result (vs. tool_use).
+    pub(crate) is_result: bool,
+    /// For result blocks, the associated tool_use_id.
+    pub(crate) result_tool_use_id: Option<String>,
+    /// Raw content Value captured from `content_block_start` for result blocks.
+    pub(crate) result_content: Option<serde_json::Value>,
+}

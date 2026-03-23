@@ -4,6 +4,7 @@
 use loopal_protocol::{AgentEvent, AgentEventPayload, UserContent};
 
 use crate::agent_handler::apply_agent_event;
+use crate::helpers::{flush_streaming, push_system_msg};
 use crate::inbox::try_forward_inbox;
 use crate::message_log::record_message_routed;
 use crate::state::SessionState;
@@ -113,17 +114,18 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
         }
         AgentEventPayload::MaxTurnsReached { turns } => {
             flush_streaming(state);
-            state
-                .messages
-                .push(system_msg(&format!("Max turns reached ({turns})")));
+            push_system_msg(state, &format!("Max turns reached ({turns})"));
         }
         AgentEventPayload::AutoContinuation {
             continuation,
             max_continuations,
         } => {
-            state.messages.push(system_msg(&format!(
-                "Output truncated (max_tokens). Auto-continuing ({continuation}/{max_continuations})"
-            )));
+            push_system_msg(
+                state,
+                &format!(
+                    "Output truncated (max_tokens). Auto-continuing ({continuation}/{max_continuations})"
+                ),
+            );
         }
         AgentEventPayload::TokenUsage {
             input_tokens,
@@ -160,9 +162,10 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
             crate::rewind::truncate_display_to_turn(state, remaining_turns);
         }
         AgentEventPayload::Compacted { kept, removed } => {
-            state.messages.push(system_msg(&format!(
-                "Context compacted: removed {removed} messages, kept {kept}.",
-            )));
+            push_system_msg(
+                state,
+                &format!("Context compacted: removed {removed} messages, kept {kept}.",),
+            );
         }
         AgentEventPayload::Interrupted => {
             flush_streaming(state);
@@ -173,48 +176,12 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
         AgentEventPayload::TurnDiffSummary { .. } => {
             // Informational — TUI can display file diff summary in status bar.
         }
+        AgentEventPayload::ServerToolUse { id: _, name, input } => {
+            crate::server_tool_display::handle_server_tool_use(state, name, &input);
+        }
+        AgentEventPayload::ServerToolResult { tool_use_id: _, .. } => {
+            crate::server_tool_display::handle_server_tool_result(state);
+        }
     }
     None
-}
-
-/// Flush buffered streaming text into a DisplayMessage.
-pub(crate) fn flush_streaming(state: &mut SessionState) {
-    if !state.streaming_thinking.is_empty() {
-        let thinking = std::mem::take(&mut state.streaming_thinking);
-        let token_est = thinking.len() as u32 / 4;
-        let summary = format_thinking_summary(&thinking, token_est);
-        state.messages.push(DisplayMessage {
-            role: "thinking".to_string(),
-            content: summary,
-            tool_calls: Vec::new(),
-            image_count: 0,
-        });
-        state.thinking_active = false;
-    }
-
-    if !state.streaming_text.is_empty() {
-        let text = std::mem::take(&mut state.streaming_text);
-        if let Some(last) = state.messages.last_mut()
-            && last.role == "assistant"
-            && last.tool_calls.is_empty()
-        {
-            last.content.push_str(&text);
-            return;
-        }
-        state.messages.push(DisplayMessage {
-            role: "assistant".to_string(),
-            content: text,
-            tool_calls: Vec::new(),
-            image_count: 0,
-        });
-    }
-}
-
-fn system_msg(content: &str) -> DisplayMessage {
-    DisplayMessage {
-        role: "system".into(),
-        content: content.into(),
-        tool_calls: Vec::new(),
-        image_count: 0,
-    }
 }

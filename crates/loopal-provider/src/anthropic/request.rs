@@ -3,6 +3,7 @@ use loopal_provider_api::ChatParams;
 use serde_json::{Value, json};
 
 use super::AnthropicProvider;
+use super::server_tool;
 
 impl AnthropicProvider {
     pub fn build_messages(&self, params: &ChatParams) -> Vec<Value> {
@@ -57,13 +58,24 @@ impl AnthropicProvider {
                             "thinking": thinking,
                             "signature": signature.as_deref().unwrap_or("")
                         }),
+                        ContentBlock::ServerToolUse { id, name, input } => json!({
+                            "type": "server_tool_use",
+                            "id": id,
+                            "name": name,
+                            "input": input
+                        }),
+                        ContentBlock::WebSearchToolResult {
+                            tool_use_id,
+                            content,
+                        } => json!({
+                            "type": "web_search_tool_result",
+                            "tool_use_id": tool_use_id,
+                            "content": content
+                        }),
                     })
                     .collect();
 
-                json!({
-                    "role": role,
-                    "content": content
-                })
+                json!({ "role": role, "content": content })
             })
             .collect();
 
@@ -81,21 +93,26 @@ impl AnthropicProvider {
     }
 
     pub fn build_tools(&self, params: &ChatParams) -> Vec<Value> {
-        let mut tools: Vec<Value> = params
-            .tools
-            .iter()
-            .map(|tool| {
-                json!({
+        let mut tools: Vec<Value> = Vec::new();
+        let mut last_client_idx: Option<usize> = None;
+
+        for tool in &params.tools {
+            if tool.name == server_tool::WEB_SEARCH_TOOL_NAME {
+                // Replace client-side WebSearch with server-side declaration
+                tools.push(server_tool::web_search_tool_definition(&params.model));
+            } else {
+                last_client_idx = Some(tools.len());
+                tools.push(json!({
                     "name": tool.name,
                     "description": tool.description,
                     "input_schema": tool.input_schema
-                })
-            })
-            .collect();
+                }));
+            }
+        }
 
-        // Place cache_control on the last tool for prompt caching
-        if let Some(last) = tools.last_mut() {
-            last["cache_control"] = json!({"type": "ephemeral"});
+        // Place cache_control on the last client-side tool (not server tools)
+        if let Some(idx) = last_client_idx {
+            tools[idx]["cache_control"] = json!({"type": "ephemeral"});
         }
 
         tools

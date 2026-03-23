@@ -1,3 +1,4 @@
+use loopal_message::ContentBlock;
 use loopal_provider_api::StopReason;
 
 /// Structured result from `stream_llm_with()`, replacing the previous 4-element tuple.
@@ -9,6 +10,8 @@ pub struct LlmStreamResult {
     pub thinking_text: String,
     pub thinking_signature: Option<String>,
     pub thinking_tokens: u32,
+    /// Server-side tool blocks (e.g. web_search), preserved in stream order.
+    pub server_blocks: Vec<ContentBlock>,
 }
 
 impl Default for LlmStreamResult {
@@ -21,6 +24,7 @@ impl Default for LlmStreamResult {
             thinking_text: String::new(),
             thinking_signature: None,
             thinking_tokens: 0,
+            server_blocks: Vec::new(),
         }
     }
 }

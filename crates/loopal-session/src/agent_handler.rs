@@ -69,5 +69,8 @@ pub(crate) fn apply_agent_event(state: &mut SessionState, name: &str, payload: A
             agent.observable.status = AgentStatus::WaitingForInput;
         }
         AgentEventPayload::TurnDiffSummary { .. } => {}
+        AgentEventPayload::ServerToolUse { .. } | AgentEventPayload::ServerToolResult { .. } => {
+            agent.observable.status = AgentStatus::Running;
+        }
     }
 }

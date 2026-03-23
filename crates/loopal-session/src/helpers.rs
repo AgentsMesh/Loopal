@@ -1,6 +1,7 @@
 //! Small helper functions used by the session controller.
 
 use crate::state::SessionState;
+use crate::thinking_display::format_thinking_summary;
 use crate::types::DisplayMessage;
 
 /// Extract a human-readable label from a ThinkingConfig JSON string.
@@ -34,4 +35,37 @@ pub fn push_system_msg(state: &mut SessionState, content: &str) {
         tool_calls: Vec::new(),
         image_count: 0,
     });
+}
+
+/// Flush buffered streaming text into a DisplayMessage.
+pub fn flush_streaming(state: &mut SessionState) {
+    if !state.streaming_thinking.is_empty() {
+        let thinking = std::mem::take(&mut state.streaming_thinking);
+        let token_est = thinking.len() as u32 / 4;
+        let summary = format_thinking_summary(&thinking, token_est);
+        state.messages.push(DisplayMessage {
+            role: "thinking".to_string(),
+            content: summary,
+            tool_calls: Vec::new(),
+            image_count: 0,
+        });
+        state.thinking_active = false;
+    }
+
+    if !state.streaming_text.is_empty() {
+        let text = std::mem::take(&mut state.streaming_text);
+        if let Some(last) = state.messages.last_mut()
+            && last.role == "assistant"
+            && last.tool_calls.is_empty()
+        {
+            last.content.push_str(&text);
+            return;
+        }
+        state.messages.push(DisplayMessage {
+            role: "assistant".to_string(),
+            content: text,
+            tool_calls: Vec::new(),
+            image_count: 0,
+        });
+    }
 }

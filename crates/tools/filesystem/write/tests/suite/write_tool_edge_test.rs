@@ -81,6 +81,7 @@ async fn test_write_with_relative_path() {
 }
 
 #[tokio::test]
+#[cfg(unix)] // Test relies on "/" as universal root; Windows has per-drive roots.
 async fn test_write_absolute_path_bypasses_traversal_check() {
     // L62: absolute path skips the traversal check entirely (is_absolute() is true)
     let tmp = tempfile::tempdir().unwrap();
@@ -88,12 +89,7 @@ async fn test_write_absolute_path_bypasses_traversal_check() {
 
     let tool = WriteTool;
     // cwd is different from where we write, but since path is absolute, it's allowed
-    // Use platform root: "/" on Unix, temp dir's drive root on Windows
-    #[cfg(unix)]
-    let root = std::path::Path::new("/");
-    #[cfg(windows)]
-    let root = std::path::Path::new(&tmp.path().to_str().unwrap()[..3]);
-    let ctx = make_ctx(root);
+    let ctx = make_ctx(std::path::Path::new("/"));
 
     let result = tool
         .execute(

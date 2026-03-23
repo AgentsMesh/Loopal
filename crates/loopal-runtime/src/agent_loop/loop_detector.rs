@@ -16,6 +16,7 @@ const ABORT_THRESHOLD: u32 = 5;
 const SIGNATURE_INPUT_LIMIT: usize = 200;
 
 /// Tracks tool call signatures and their cumulative occurrence count.
+#[derive(Default)]
 pub struct LoopDetector {
     /// (signature → cumulative count across the turn)
     signatures: HashMap<String, u32>,
@@ -23,9 +24,7 @@ pub struct LoopDetector {
 
 impl LoopDetector {
     pub fn new() -> Self {
-        Self {
-            signatures: HashMap::new(),
-        }
+        Self::default()
     }
 }
 
@@ -44,17 +43,15 @@ impl TurnObserver for LoopDetector {
 
             if *count >= ABORT_THRESHOLD {
                 return ObserverAction::AbortTurn(format!(
-                    "Loop detected: tool '{}' called {} consecutive times \
+                    "Loop detected: tool '{name}' called {count} cumulative times \
                      with similar arguments. Aborting to prevent waste.",
-                    name, count,
                 ));
             }
             if *count >= WARN_THRESHOLD {
                 worst = ObserverAction::InjectWarning(format!(
-                    "[WARNING: Tool '{}' has been called {} times with similar \
+                    "[WARNING: Tool '{name}' has been called {count} times with similar \
                      arguments. You may be stuck in a loop. Try a different \
                      approach or ask the user for help.]",
-                    name, count,
                 ));
             }
         }
@@ -77,5 +74,5 @@ fn tool_signature(name: &str, input: &serde_json::Value) -> String {
     };
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     truncated.hash(&mut hasher);
-    format!("{}|{:x}", name, hasher.finish())
+    format!("{name}|{:x}", hasher.finish())
 }

@@ -1,5 +1,5 @@
 /// Message lines edge tests: thinking role, error/system prefixes, tool call integration.
-use loopal_session::types::{DisplayMessage, DisplayToolCall};
+use loopal_session::types::{DisplayMessage, DisplayToolCall, ToolCallStatus};
 use loopal_tui::views::progress::message_to_lines;
 
 fn msg(role: &str, content: &str) -> DisplayMessage {
@@ -97,9 +97,15 @@ fn test_tool_call_single_line_summary() {
         content: String::new(),
         tool_calls: vec![DisplayToolCall {
             name: "Read".to_string(),
-            status: "success".to_string(),
+            id: String::new(),
+            status: ToolCallStatus::Success,
             summary: "Read(src/main.rs)".to_string(),
             result: Some("fn main() {}".to_string()),
+            tool_input: None,
+            batch_id: None,
+            started_at: None,
+            duration_ms: None,
+            progress_tail: None,
         }],
         image_count: 0,
     };
@@ -119,9 +125,15 @@ fn test_tool_call_error_shows_cross() {
         content: String::new(),
         tool_calls: vec![DisplayToolCall {
             name: "Bash".to_string(),
-            status: "error".to_string(),
+            id: String::new(),
+            status: ToolCallStatus::Error,
             summary: "Bash(npm test)".to_string(),
             result: Some("ENOENT: command not found".to_string()),
+            tool_input: None,
+            batch_id: None,
+            started_at: None,
+            duration_ms: None,
+            progress_tail: None,
         }],
         image_count: 0,
     };
@@ -137,9 +149,15 @@ fn test_tool_call_pending_shows_spinner() {
         content: String::new(),
         tool_calls: vec![DisplayToolCall {
             name: "Edit".to_string(),
-            status: "pending".to_string(),
+            id: String::new(),
+            status: ToolCallStatus::Pending,
             summary: "Edit(src/lib.rs)".to_string(),
             result: None,
+            tool_input: None,
+            batch_id: None,
+            started_at: None,
+            duration_ms: None,
+            progress_tail: None,
         }],
         image_count: 0,
     };
@@ -155,9 +173,15 @@ fn test_assistant_with_content_and_tools() {
         content: "Let me fix this.".to_string(),
         tool_calls: vec![DisplayToolCall {
             name: "Edit".to_string(),
-            status: "success".to_string(),
+            id: String::new(),
+            status: ToolCallStatus::Success,
             summary: "Edit(src/lib.rs:42)".to_string(),
             result: Some("applied".to_string()),
+            tool_input: None,
+            batch_id: None,
+            started_at: None,
+            duration_ms: None,
+            progress_tail: None,
         }],
         image_count: 0,
     };

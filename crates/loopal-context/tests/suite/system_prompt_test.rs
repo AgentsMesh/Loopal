@@ -118,12 +118,12 @@ fn report_token_usage() {
 
     eprintln!("\n=== System Prompt Token Analysis ===");
     eprintln!("Fragments only:              {} tokens ({} chars)", t_bare, bare.len());
-    eprintln!("Fragments + 21 tool schemas: {} tokens", t_tools);
+    eprintln!("Fragments + 21 tool schemas: {t_tools} tokens");
     eprintln!("Full (act, 21 tools):        {} tokens ({} chars)", t_act, full_act.len());
     eprintln!("Full (plan, 21 tools):       {} tokens ({} chars)", t_plan, full_plan.len());
     eprintln!("Plan overhead:               +{} tokens", t_plan - t_act);
     eprintln!("--- Breakdown ---");
-    eprintln!("  Behavior fragments: {} tokens", t_bare);
+    eprintln!("  Behavior fragments: {t_bare} tokens");
     eprintln!("  Tool schemas:       {} tokens", t_tools - t_bare);
     eprintln!("  Instructions:       {} tokens", estimate_tokens(instr));
     eprintln!("  Skills:             {} tokens", estimate_tokens(skills));

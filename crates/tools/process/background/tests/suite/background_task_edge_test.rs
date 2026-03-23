@@ -14,8 +14,7 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext {
         session_id: "test".into(),
         shared: None,
-        pending_cwd_switch: Default::default(),
-        memory_channel: None,
+        pending_cwd_switch: Default::default(), memory_channel: None, output_tail: None,
         backend,
     }
 }
@@ -75,7 +74,10 @@ async fn test_task_output_non_blocking() {
 
     let output_tool = TaskOutputTool;
     let output = output_tool
-        .execute(json!({ "task_id": task_id, "block": false }), &ctx)
+        .execute(
+            json!({ "task_id": task_id, "block": false }),
+            &ctx,
+        )
         .await
         .unwrap();
 
@@ -85,7 +87,9 @@ async fn test_task_output_non_blocking() {
 
     // Clean up: stop the long-running task
     let stop_tool = TaskStopTool;
-    let _ = stop_tool.execute(json!({ "task_id": task_id }), &ctx).await;
+    let _ = stop_tool
+        .execute(json!({ "task_id": task_id }), &ctx)
+        .await;
 }
 
 #[tokio::test]
@@ -125,5 +129,7 @@ async fn test_task_output_timeout_while_running() {
 
     // Clean up
     let stop_tool = TaskStopTool;
-    let _ = stop_tool.execute(json!({ "task_id": task_id }), &ctx).await;
+    let _ = stop_tool
+        .execute(json!({ "task_id": task_id }), &ctx)
+        .await;
 }

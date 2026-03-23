@@ -10,8 +10,7 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext {
         session_id: "t".into(),
         shared: None,
-        pending_cwd_switch: Default::default(),
-        memory_channel: None,
+        pending_cwd_switch: Default::default(), memory_channel: None, output_tail: None,
         backend,
     }
 }
@@ -37,16 +36,8 @@ async fn test_read_html_converts_to_text() {
 
     assert!(!result.is_error);
     // html2text converts HTML to plain text — should contain "Hello" and "World"
-    assert!(
-        result.content.contains("Hello"),
-        "content: {}",
-        result.content
-    );
-    assert!(
-        result.content.contains("World"),
-        "content: {}",
-        result.content
-    );
+    assert!(result.content.contains("Hello"), "content: {}", result.content);
+    assert!(result.content.contains("World"), "content: {}", result.content);
     // Should NOT contain HTML tags
     assert!(!result.content.contains("<h1>"));
 }

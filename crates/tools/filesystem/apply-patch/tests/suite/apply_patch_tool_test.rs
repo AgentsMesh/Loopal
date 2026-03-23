@@ -11,8 +11,7 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext {
         session_id: "test".into(),
         shared: None,
-        pending_cwd_switch: Default::default(),
-        memory_channel: None,
+        pending_cwd_switch: Default::default(), memory_channel: None, output_tail: None,
         backend,
     }
 }
@@ -73,10 +72,7 @@ async fn test_delete_file() {
     let tool = ApplyPatchTool;
     let ctx = make_ctx(tmp.path());
 
-    let r = tool
-        .execute(json!({"patch": "*** Delete File: old.txt\n"}), &ctx)
-        .await
-        .unwrap();
+    let r = tool.execute(json!({"patch": "*** Delete File: old.txt\n"}), &ctx).await.unwrap();
     assert!(!r.is_error, "unexpected error: {}", r.content);
     assert!(r.content.contains("1 deleted"));
     assert!(!file.exists());
@@ -110,10 +106,7 @@ async fn test_multi_file_atomic() {
     assert!(r.content.contains("1 created"));
     assert!(r.content.contains("1 deleted"));
 
-    assert_eq!(
-        std::fs::read_to_string(tmp.path().join("c.rs")).unwrap(),
-        "new file\n"
-    );
+    assert_eq!(std::fs::read_to_string(tmp.path().join("c.rs")).unwrap(), "new file\n");
     assert_eq!(std::fs::read_to_string(&existing).unwrap(), "updated\n");
     assert!(!to_delete.exists());
 }

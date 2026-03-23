@@ -1,5 +1,6 @@
 use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_runtime::projection::project_messages;
+use loopal_session::ToolCallStatus;
 
 fn text_msg(role: MessageRole, text: &str) -> Message {
     Message {
@@ -64,7 +65,7 @@ fn project_tool_use_and_result() {
     assert_eq!(display[0].content, "Let me read that.");
     assert_eq!(display[0].tool_calls.len(), 1);
     assert_eq!(display[0].tool_calls[0].name, "Read");
-    assert_eq!(display[0].tool_calls[0].status, "success");
+    assert_eq!(display[0].tool_calls[0].status, ToolCallStatus::Success);
     assert!(display[0].tool_calls[0].result.is_some());
 }
 
@@ -89,7 +90,7 @@ fn project_tool_use_error() {
         }],
     };
     let display = project_messages(&[assistant_msg, user_msg]);
-    assert_eq!(display[0].tool_calls[0].status, "error");
+    assert_eq!(display[0].tool_calls[0].status, ToolCallStatus::Error);
 }
 
 #[test]
@@ -144,7 +145,7 @@ fn project_multi_turn_mixed() {
     assert_eq!(display.len(), 4);
     assert_eq!(display[0].role, "user");
     assert_eq!(display[1].tool_calls.len(), 1);
-    assert_eq!(display[1].tool_calls[0].status, "success");
+    assert_eq!(display[1].tool_calls[0].status, ToolCallStatus::Success);
     assert_eq!(display[2].content, "done");
     assert_eq!(display[3].content, "q2");
 }

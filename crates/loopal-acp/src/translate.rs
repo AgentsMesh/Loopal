@@ -62,6 +62,8 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
         | AgentEventPayload::ThinkingComplete { .. }
         | AgentEventPayload::Rewound { .. }
         | AgentEventPayload::Compacted { .. }
+        | AgentEventPayload::ToolBatchStart { .. }
+        | AgentEventPayload::ToolProgress { .. }
         | AgentEventPayload::Interrupted
         | AgentEventPayload::TurnDiffSummary { .. }
         | AgentEventPayload::ServerToolUse { .. }
@@ -122,6 +124,7 @@ mod tests {
             name: "Read".into(),
             result: "file contents".into(),
             is_error: false,
+            duration_ms: None,
         };
         let val = translate_event(&payload, "sess-1").unwrap();
         assert_eq!(val["update"]["status"], "completed");
@@ -134,6 +137,7 @@ mod tests {
             name: "Read".into(),
             result: "not found".into(),
             is_error: true,
+            duration_ms: None,
         };
         let val = translate_event(&payload, "sess-1").unwrap();
         assert_eq!(val["update"]["status"], "failed");

@@ -11,8 +11,7 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext {
         session_id: "test".into(),
         shared: None,
-        pending_cwd_switch: Default::default(),
-        memory_channel: None,
+        pending_cwd_switch: Default::default(), memory_channel: None, output_tail: None,
         backend,
     }
 }
@@ -176,7 +175,6 @@ async fn test_write_with_relative_path() {
 }
 
 #[tokio::test]
-#[cfg(unix)] // Test relies on "/" as universal root; Windows has per-drive roots.
 async fn test_write_absolute_path_bypasses_traversal_check() {
     let tmp = tempfile::tempdir().unwrap();
     let file = tmp.path().join("absolute_test.txt");

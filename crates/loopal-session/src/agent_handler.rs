@@ -20,14 +20,15 @@ pub(crate) fn apply_agent_event(state: &mut SessionState, name: &str, payload: A
         AgentEventPayload::Started => {
             agent.observable.status = AgentStatus::Running;
         }
-        AgentEventPayload::ToolCall {
-            name: tool_name, ..
-        } => {
+        AgentEventPayload::ToolCall { name: tool_name, input, .. } => {
             agent.observable.tool_count += 1;
-            agent.observable.last_tool = Some(tool_name.clone());
+            agent.observable.tools_in_flight += 1;
+            agent.observable.last_tool = Some(extract_key_param(tool_name, input));
             agent.observable.status = AgentStatus::Running;
         }
         AgentEventPayload::ToolResult { .. } => {
+            agent.observable.tools_in_flight =
+                agent.observable.tools_in_flight.saturating_sub(1);
             agent.observable.status = AgentStatus::Running;
         }
         AgentEventPayload::TokenUsage {
@@ -65,6 +66,8 @@ pub(crate) fn apply_agent_event(state: &mut SessionState, name: &str, payload: A
         AgentEventPayload::UserQuestionRequest { .. } => {}
         AgentEventPayload::Rewound { .. } => {}
         AgentEventPayload::Compacted { .. } => {}
+        AgentEventPayload::ToolProgress { .. } => {}
+        AgentEventPayload::ToolBatchStart { .. } => {}
         AgentEventPayload::Interrupted => {
             agent.observable.status = AgentStatus::WaitingForInput;
         }
@@ -73,4 +76,26 @@ pub(crate) fn apply_agent_event(state: &mut SessionState, name: &str, payload: A
             agent.observable.status = AgentStatus::Running;
         }
     }
+}
+
+/// Extract the most informative parameter from a tool call for display.
+fn extract_key_param(tool_name: &str, input: &serde_json::Value) -> String {
+    let key = match tool_name {
+        "Read" | "Write" | "Edit" | "MultiEdit" => "file_path",
+        "Bash" => "command",
+        "Grep" => "pattern",
+        "Glob" => "pattern",
+        _ => return tool_name.to_string(),
+    };
+    input.get(key)
+        .and_then(|v| v.as_str())
+        .map(|s| {
+            if s.len() > 40 {
+                let truncated: String = s.chars().take(37).collect();
+                format!("{tool_name}({truncated}...)")
+            } else {
+                format!("{tool_name}({s})")
+            }
+        })
+        .unwrap_or_else(|| tool_name.to_string())
 }

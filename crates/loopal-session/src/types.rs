@@ -3,6 +3,8 @@
 //! These types represent the presentation-layer view of agent messages,
 //! tool calls, and pending permission requests.
 
+use std::time::Instant;
+
 use loopal_protocol::Question;
 
 /// A message to display in the chat view.
@@ -15,17 +17,39 @@ pub struct DisplayMessage {
     pub image_count: usize,
 }
 
+/// Lifecycle status of a single tool call.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum ToolCallStatus {
+    Pending = 0,
+    Running = 1,
+    Success = 2,
+    Error   = 3,
+}
+
+impl ToolCallStatus {
+    /// Still executing (Pending or Running).
+    pub fn is_active(self) -> bool { matches!(self, Self::Pending | Self::Running) }
+    /// Finished (Success or Error).
+    pub fn is_done(self) -> bool { matches!(self, Self::Success | Self::Error) }
+}
+
 /// A tool call to display in the chat view.
 #[derive(Debug, Clone)]
 pub struct DisplayToolCall {
+    pub id: String,
     pub name: String,
-    /// "pending", "success", "error"
-    pub status: String,
+    pub status: ToolCallStatus,
     /// Call description, e.g. "Read(/tmp/foo.rs)". Not overwritten by ToolResult.
     pub summary: String,
     /// Full tool output (None while pending).
     /// Session layer applies loose storage-protection truncation (200 lines / 10 KB).
     pub result: Option<String>,
+    pub tool_input: Option<serde_json::Value>,
+    pub batch_id: Option<String>,
+    pub started_at: Option<Instant>,
+    pub duration_ms: Option<u64>,
+    pub progress_tail: Option<String>,
 }
 
 /// A pending tool permission request awaiting user approval.

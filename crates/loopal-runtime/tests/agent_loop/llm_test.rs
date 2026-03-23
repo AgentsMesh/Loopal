@@ -211,6 +211,6 @@ fn report_real_system_prompt_tokens() {
     eprintln!("\n=== Real System Prompt Token Report ===");
     eprintln!("Total system prompt: {} tokens ({} chars)", tokens, params.system_prompt.len());
     eprintln!("Tool count:          {}", tool_defs.len());
-    eprintln!("Behavior fragments:  {} tokens", fragment_tokens);
+    eprintln!("Behavior fragments:  {fragment_tokens} tokens");
     eprintln!("Tool schemas:        {} tokens", tokens - fragment_tokens);
 }

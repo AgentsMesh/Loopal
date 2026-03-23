@@ -10,6 +10,8 @@ use crate::backend::Backend;
 use crate::memory_channel::MemoryChannel;
 use crate::permission::PermissionLevel;
 
+use crate::output_tail::OutputTail;
+
 #[async_trait]
 pub trait Tool: Send + Sync {
     fn name(&self) -> &str;
@@ -49,6 +51,9 @@ pub struct ToolContext {
     /// Memory channel for sending observations to the Memory Observer sidebar.
     /// `None` when auto-memory is disabled.
     pub memory_channel: Option<Arc<dyn MemoryChannel>>,
+    /// Shared output tail for streaming progress (set by tool_exec for Bash).
+    /// Bash reads this to decide whether to use `exec_streaming` vs `exec`.
+    pub output_tail: Option<Arc<OutputTail>>,
 }
 
 impl Clone for ToolContext {
@@ -59,6 +64,7 @@ impl Clone for ToolContext {
             shared: self.shared.clone(),
             pending_cwd_switch: self.pending_cwd_switch.clone(),
             memory_channel: self.memory_channel.clone(),
+            output_tail: self.output_tail.clone(),
         }
     }
 }

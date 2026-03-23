@@ -101,8 +101,12 @@ fn render_agent_line(
 
     // Spinner/icon + status label
     let elapsed = agent.elapsed();
-    let (icon, label, icon_style) = status_display(&agent.observable.status, elapsed);
-    spans.push(Span::styled(format!("{icon} {label:<8}"), icon_style));
+    let (icon, label, icon_style) = status_display(
+        &agent.observable.status,
+        agent.observable.tools_in_flight,
+        elapsed,
+    );
+    spans.push(Span::styled(format!("{icon} {label:<12}"), icon_style));
     spans.push(Span::raw(" "));
 
     // Elapsed time
@@ -127,9 +131,9 @@ fn render_agent_line(
     // Last tool (truncated)
     if let Some(ref tool) = agent.observable.last_tool {
         spans.push(Span::raw("  "));
-        let display = if tool.len() > 20 { &tool[..20] } else { tool };
+        let display: String = tool.chars().take(20).collect();
         spans.push(Span::styled(
-            display.to_string(),
+            display,
             Style::default().fg(Color::Rgb(80, 80, 80)),
         ));
     }
@@ -140,20 +144,34 @@ fn render_agent_line(
 /// Map agent status to (icon, label, style) for display.
 fn status_display(
     status: &AgentStatus,
+    tools_in_flight: u32,
     elapsed: std::time::Duration,
-) -> (&'static str, &'static str, Style) {
+) -> (&'static str, String, Style) {
     match status {
         AgentStatus::Starting => {
             let frame = spinner_frame(elapsed);
-            (frame, "Starting", Style::default().fg(Color::DarkGray))
+            (frame, "Starting".to_string(), Style::default().fg(Color::DarkGray))
         }
         AgentStatus::Running => {
             let frame = spinner_frame(elapsed);
-            (frame, "Working", Style::default().fg(Color::Green))
+            let label = if tools_in_flight > 1 {
+                format!("Working ({tools_in_flight})")
+            } else if tools_in_flight == 0 {
+                "Thinking".to_string()
+            } else {
+                "Working".to_string()
+            };
+            (frame, label, Style::default().fg(Color::Green))
         }
-        AgentStatus::WaitingForInput => ("●", "Idle", Style::default().fg(Color::DarkGray)),
-        AgentStatus::Finished => ("✓", "Done", Style::default().fg(Color::Green)),
-        AgentStatus::Error => ("✗", "Error", Style::default().fg(Color::Red)),
+        AgentStatus::WaitingForInput => {
+            ("●", "Idle".to_string(), Style::default().fg(Color::DarkGray))
+        }
+        AgentStatus::Finished => {
+            ("✓", "Done".to_string(), Style::default().fg(Color::Green))
+        }
+        AgentStatus::Error => {
+            ("✗", "Error".to_string(), Style::default().fg(Color::Red))
+        }
     }
 }
 

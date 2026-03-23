@@ -13,4 +13,4 @@ pub(crate) mod truncate;
 pub mod types;
 
 pub use controller::SessionController;
-pub use types::{DisplayMessage, DisplayToolCall, PendingPermission, PendingQuestion};
+pub use types::{DisplayMessage, DisplayToolCall, PendingPermission, PendingQuestion, ToolCallStatus};

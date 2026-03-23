@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use loopal_error::ToolIoError;
@@ -7,6 +8,7 @@ use crate::backend_types::{
     EditResult, ExecResult, FetchResult, FileInfo, GlobResult, GrepResult, LsResult, ReadResult,
     WriteResult,
 };
+use crate::output_tail::OutputTail;
 
 /// Capability-based I/O abstraction injected into tools via `ToolContext`.
 ///
@@ -86,6 +88,19 @@ pub trait Backend: Send + Sync {
 
     /// Execute a shell command synchronously (with timeout).
     async fn exec(&self, command: &str, timeout_ms: u64) -> Result<ExecResult, ToolIoError>;
+
+    /// Execute a shell command with streaming output capture.
+    ///
+    /// Like `exec`, but feeds stdout/stderr lines into `tail` in real time.
+    /// Default implementation ignores `tail` and delegates to `exec`.
+    async fn exec_streaming(
+        &self,
+        command: &str,
+        timeout_ms: u64,
+        _tail: Arc<OutputTail>,
+    ) -> Result<ExecResult, ToolIoError> {
+        self.exec(command, timeout_ms).await
+    }
 
     /// Spawn a command in the background; returns a task ID.
     async fn exec_background(&self, command: &str, desc: &str) -> Result<String, ToolIoError>;

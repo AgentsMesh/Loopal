@@ -48,22 +48,11 @@ fn test_tool_call_increments_count() {
 #[test]
 fn test_tool_result_keeps_running() {
     let mut state = make_state();
-    apply_event(
-        &mut state,
-        AgentEvent::named("w1", AgentEventPayload::Started),
-    );
-    apply_event(
-        &mut state,
-        AgentEvent::named(
-            "w1",
-            AgentEventPayload::ToolResult {
-                id: "tc1".into(),
-                name: "Read".into(),
-                result: "ok".into(),
-                is_error: false,
-            },
-        ),
-    );
+    apply_event(&mut state, AgentEvent::named("w1", AgentEventPayload::Started));
+    apply_event(&mut state, AgentEvent::named("w1", AgentEventPayload::ToolResult {
+        id: "tc1".into(), name: "Read".into(), result: "ok".into(), is_error: false,
+        duration_ms: None,
+    }));
     assert_eq!(state.agents["w1"].observable.status, AgentStatus::Running);
 }
 

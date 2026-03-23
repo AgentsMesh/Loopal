@@ -1,14 +1,11 @@
-use loopal_config::Settings;
-use loopal_config::{HookConfig, HookEvent};
 use loopal_kernel::Kernel;
 use loopal_runtime::tool_pipeline::execute_tool;
+use loopal_config::Settings;
+use loopal_config::{HookConfig, HookEvent};
 use loopal_tool_api::ToolContext;
 
 fn make_kernel_with_hooks(hooks: Vec<HookConfig>) -> Kernel {
-    let settings = Settings {
-        hooks,
-        ..Default::default()
-    };
+    let settings = Settings { hooks, ..Default::default() };
     Kernel::new(settings).expect("Kernel::new with hooks should succeed")
 }
 
@@ -25,8 +22,7 @@ fn temp_file(name: &str, content: &str) -> (std::path::PathBuf, ToolContext) {
         backend,
         session_id: format!("test-{name}"),
         shared: None,
-        pending_cwd_switch: Default::default(),
-        memory_channel: None,
+        pending_cwd_switch: Default::default(), memory_channel: None, output_tail: None,
     };
     (path, ctx)
 }
@@ -41,13 +37,10 @@ async fn test_passing_pre_hook() {
     }]);
     let (path, ctx) = temp_file("tool_pre_hook_pass.txt", "pre-hook pass content");
     let result = execute_tool(
-        &kernel,
-        "Read",
+        &kernel, "Read",
         serde_json::json!({"file_path": path.to_str().unwrap()}),
-        &ctx,
-        &loopal_runtime::mode::AgentMode::Act,
-    )
-    .await;
+        &ctx, &loopal_runtime::mode::AgentMode::Act,
+    ).await;
     let _ = std::fs::remove_file(&path);
     let result = result.expect("passing pre-hook should succeed");
     assert!(!result.is_error);
@@ -64,13 +57,10 @@ async fn test_failing_pre_hook() {
     }]);
     let (path, ctx) = temp_file("tool_pre_hook_fail.txt", "should not read this");
     let result = execute_tool(
-        &kernel,
-        "Read",
+        &kernel, "Read",
         serde_json::json!({"file_path": path.to_str().unwrap()}),
-        &ctx,
-        &loopal_runtime::mode::AgentMode::Act,
-    )
-    .await;
+        &ctx, &loopal_runtime::mode::AgentMode::Act,
+    ).await;
     let _ = std::fs::remove_file(&path);
     let result = result.expect("failing pre-hook should return Ok(error)");
     assert!(result.is_error);
@@ -87,13 +77,10 @@ async fn test_post_hook_failure_ignored() {
     }]);
     let (path, ctx) = temp_file("tool_post_hook_fail.txt", "post hook test content");
     let result = execute_tool(
-        &kernel,
-        "Read",
+        &kernel, "Read",
         serde_json::json!({"file_path": path.to_str().unwrap()}),
-        &ctx,
-        &loopal_runtime::mode::AgentMode::Act,
-    )
-    .await;
+        &ctx, &loopal_runtime::mode::AgentMode::Act,
+    ).await;
     let _ = std::fs::remove_file(&path);
     let result = result.expect("post-hook failure should not prevent result");
     assert!(!result.is_error);
@@ -110,13 +97,10 @@ async fn test_filtered_pre_hook_not_matching() {
     }]);
     let (path, ctx) = temp_file("tool_filtered_hook.txt", "filtered hook content");
     let result = execute_tool(
-        &kernel,
-        "Read",
+        &kernel, "Read",
         serde_json::json!({"file_path": path.to_str().unwrap()}),
-        &ctx,
-        &loopal_runtime::mode::AgentMode::Act,
-    )
-    .await;
+        &ctx, &loopal_runtime::mode::AgentMode::Act,
+    ).await;
     let _ = std::fs::remove_file(&path);
     let result = result.expect("filtered hook should not block unmatched tool");
     assert!(!result.is_error);
@@ -140,13 +124,10 @@ async fn test_both_pre_and_post_hooks() {
     ]);
     let (path, ctx) = temp_file("tool_both_hooks.txt", "both hooks content");
     let result = execute_tool(
-        &kernel,
-        "Read",
+        &kernel, "Read",
         serde_json::json!({"file_path": path.to_str().unwrap()}),
-        &ctx,
-        &loopal_runtime::mode::AgentMode::Act,
-    )
-    .await;
+        &ctx, &loopal_runtime::mode::AgentMode::Act,
+    ).await;
     let _ = std::fs::remove_file(&path);
     let result = result.expect("both hooks passing should allow execution");
     assert!(!result.is_error);

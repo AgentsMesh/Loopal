@@ -1,4 +1,4 @@
-use loopal_tool_api::{PermissionLevel, Tool, ToolContext};
+use loopal_tool_api::{Tool, PermissionLevel, ToolContext};
 use loopal_tool_fetch::FetchTool;
 
 fn make_ctx() -> ToolContext {
@@ -11,8 +11,7 @@ fn make_ctx() -> ToolContext {
         backend,
         session_id: "t".into(),
         shared: None,
-        pending_cwd_switch: Default::default(),
-        memory_channel: None,
+        pending_cwd_switch: Default::default(), memory_channel: None, output_tail: None,
     }
 }
 
@@ -45,8 +44,6 @@ async fn test_fetch_missing_url_returns_error() {
 async fn test_fetch_invalid_url_returns_error() {
     let ctx = make_ctx();
     // URL without http(s) scheme is rejected at validation, no network I/O
-    let result = FetchTool
-        .execute(serde_json::json!({"url": "not-a-url"}), &ctx)
-        .await;
+    let result = FetchTool.execute(serde_json::json!({"url": "not-a-url"}), &ctx).await;
     assert!(result.is_err());
 }

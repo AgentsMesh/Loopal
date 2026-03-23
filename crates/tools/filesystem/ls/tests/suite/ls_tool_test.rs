@@ -11,8 +11,7 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext {
         session_id: "test".into(),
         shared: None,
-        pending_cwd_switch: Default::default(),
-        memory_channel: None,
+        pending_cwd_switch: Default::default(), memory_channel: None, output_tail: None,
         backend,
     }
 }
@@ -55,7 +54,10 @@ async fn test_ls_directory_with_files() {
     let tool = LsTool;
     let ctx = make_ctx(tmp.path());
 
-    let result = tool.execute(json!({}), &ctx).await.unwrap();
+    let result = tool
+        .execute(json!({}), &ctx)
+        .await
+        .unwrap();
 
     assert!(!result.is_error);
     assert!(result.content.contains("alpha.txt"));
@@ -70,7 +72,10 @@ async fn test_ls_empty_directory() {
     let tool = LsTool;
     let ctx = make_ctx(tmp.path());
 
-    let result = tool.execute(json!({}), &ctx).await.unwrap();
+    let result = tool
+        .execute(json!({}), &ctx)
+        .await
+        .unwrap();
 
     assert!(!result.is_error);
     assert!(result.content.contains("(empty directory)"));
@@ -105,7 +110,10 @@ async fn test_ls_with_explicit_absolute_path() {
     let ctx = make_ctx(tmp.path());
 
     let result = tool
-        .execute(json!({"path": sub.to_str().unwrap()}), &ctx)
+        .execute(
+            json!({"path": sub.to_str().unwrap()}),
+            &ctx,
+        )
         .await
         .unwrap();
 
@@ -123,7 +131,10 @@ async fn test_ls_with_relative_path() {
     let tool = LsTool;
     let ctx = make_ctx(tmp.path());
 
-    let result = tool.execute(json!({"path": "reldir"}), &ctx).await.unwrap();
+    let result = tool
+        .execute(json!({"path": "reldir"}), &ctx)
+        .await
+        .unwrap();
 
     assert!(!result.is_error);
     assert!(result.content.contains("rel.txt"));
@@ -139,7 +150,10 @@ async fn test_ls_entries_are_sorted() {
     let tool = LsTool;
     let ctx = make_ctx(tmp.path());
 
-    let result = tool.execute(json!({}), &ctx).await.unwrap();
+    let result = tool
+        .execute(json!({}), &ctx)
+        .await
+        .unwrap();
 
     assert!(!result.is_error);
     let lines: Vec<&str> = result.content.lines().collect();
@@ -157,7 +171,10 @@ async fn test_ls_default_uses_cwd() {
     let ctx = make_ctx(tmp.path());
 
     // No path parameter means use cwd
-    let result = tool.execute(json!({}), &ctx).await.unwrap();
+    let result = tool
+        .execute(json!({}), &ctx)
+        .await
+        .unwrap();
 
     assert!(!result.is_error);
     assert!(result.content.contains("cwdfile.txt"));

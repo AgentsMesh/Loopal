@@ -96,10 +96,15 @@ fn fingerprint(msg: &DisplayMessage) -> u64 {
     h = mix(h, msg.content.len() as u64);
     h = mix(h, msg.tool_calls.len() as u64);
     for tc in &msg.tool_calls {
-        h = mix(h, tc.status.len() as u64);
+        h = mix(h, tc.status as u64);
         h = mix(h, tc.summary.len() as u64);
-        h = mix(h, tc.status.as_bytes().first().copied().unwrap_or(0) as u64);
         h = mix(h, tc.result.as_ref().map_or(0, |r| r.len()) as u64);
+        h = mix(h, tc.duration_ms.unwrap_or(0));
+        h = mix(h, tc.progress_tail.as_ref().map_or(0, |t| t.len()) as u64);
+        // Running/pending tools: include sub-second elapsed for timer refresh.
+        if tc.status.is_active() {
+            h = mix(h, tc.started_at.map_or(0, |t| t.elapsed().as_millis() as u64 / 500));
+        }
     }
     h
 }

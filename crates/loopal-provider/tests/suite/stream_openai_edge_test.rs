@@ -32,16 +32,17 @@ async fn collect_chunks(
 }
 
 #[tokio::test]
-async fn test_sse_done_sentinel_filtered() {
+async fn test_responses_api_incomplete_event() {
     let mock_server = MockServer::start().await;
 
     let sse_body = "\
-data: {\"choices\":[{\"delta\":{\"content\":\"X\"},\"finish_reason\":null}]}\n\n\
-data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n\
-data: [DONE]\n\n";
+event: response.output_text.delta\n\
+data: {\"type\":\"response.output_text.delta\",\"delta\":\"X\"}\n\n\
+event: response.incomplete\n\
+data: {\"type\":\"response.incomplete\",\"response\":{\"id\":\"resp_1\",\"incomplete_details\":{\"reason\":\"max_output_tokens\"}}}\n\n";
 
     Mock::given(method("POST"))
-        .and(path("/v1/chat/completions"))
+        .and(path("/v1/responses"))
         .respond_with(ResponseTemplate::new(200).set_body_raw(sse_body, "text/event-stream"))
         .mount(&mock_server)
         .await;
@@ -58,7 +59,9 @@ data: [DONE]\n\n";
         other => panic!("expected Text, got: {other:?}"),
     }
     match ok_chunks[1] {
-        StreamChunk::Done { .. } => {}
-        other => panic!("expected Done, got: {other:?}"),
+        StreamChunk::Done { stop_reason } => {
+            assert_eq!(*stop_reason, loopal_provider_api::StopReason::MaxTokens);
+        }
+        other => panic!("expected Done with MaxTokens, got: {other:?}"),
     }
 }

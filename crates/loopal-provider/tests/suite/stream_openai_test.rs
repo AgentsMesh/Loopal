@@ -42,14 +42,15 @@ fn expect_err(result: Result<loopal_provider_api::ChatStream, LoopalError>) -> L
 async fn test_openai_stream_chat_success() {
     let mock_server = MockServer::start().await;
 
+    // Faithful to real OpenAI Responses API wire format: event: prefix + data: JSON
     let sse_body = "\
-data: {\"choices\":[{\"delta\":{\"role\":\"assistant\",\"content\":\"Hi\"},\"finish_reason\":null}]}\n\n\
-data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n\
-data: {\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":5},\"choices\":[]}\n\n\
-data: [DONE]\n\n";
+event: response.output_text.delta\n\
+data: {\"type\":\"response.output_text.delta\",\"delta\":\"Hi\"}\n\n\
+event: response.completed\n\
+data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_1\",\"usage\":{\"input_tokens\":10,\"output_tokens\":5,\"total_tokens\":15}}}\n\n";
 
     Mock::given(method("POST"))
-        .and(path("/v1/chat/completions"))
+        .and(path("/v1/responses"))
         .respond_with(ResponseTemplate::new(200).set_body_raw(sse_body, "text/event-stream"))
         .mount(&mock_server)
         .await;
@@ -90,15 +91,15 @@ data: [DONE]\n\n";
 async fn test_openai_stream_chat_tool_calls() {
     let mock_server = MockServer::start().await;
 
+    // Responses API: function_call comes as output_item.done
     let sse_body = "\
-data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_abc\",\"function\":{\"name\":\"bash\",\"arguments\":\"\"}}]},\"finish_reason\":null}]}\n\n\
-data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"cmd\\\":\"}}]},\"finish_reason\":null}]}\n\n\
-data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\\\"ls\\\"}\"}}]},\"finish_reason\":null}]}\n\n\
-data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n\n\
-data: [DONE]\n\n";
+event: response.output_item.done\n\
+data: {\"type\":\"response.output_item.done\",\"item\":{\"type\":\"function_call\",\"call_id\":\"call_abc\",\"name\":\"bash\",\"arguments\":\"{\\\"cmd\\\":\\\"ls\\\"}\"}}\n\n\
+event: response.completed\n\
+data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_1\",\"usage\":{\"input_tokens\":10,\"output_tokens\":5,\"total_tokens\":15}}}\n\n";
 
     Mock::given(method("POST"))
-        .and(path("/v1/chat/completions"))
+        .and(path("/v1/responses"))
         .respond_with(ResponseTemplate::new(200).set_body_raw(sse_body, "text/event-stream"))
         .mount(&mock_server)
         .await;
@@ -125,7 +126,7 @@ async fn test_openai_stream_chat_rate_limited() {
     let mock_server = MockServer::start().await;
 
     Mock::given(method("POST"))
-        .and(path("/v1/chat/completions"))
+        .and(path("/v1/responses"))
         .respond_with(
             ResponseTemplate::new(429)
                 .insert_header("retry-after", "10")
@@ -150,7 +151,7 @@ async fn test_openai_stream_chat_server_error() {
     let mock_server = MockServer::start().await;
 
     Mock::given(method("POST"))
-        .and(path("/v1/chat/completions"))
+        .and(path("/v1/responses"))
         .respond_with(
             ResponseTemplate::new(500)
                 .set_body_string("{\"error\":{\"message\":\"internal error\"}}"),

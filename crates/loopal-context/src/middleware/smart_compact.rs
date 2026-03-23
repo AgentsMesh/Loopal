@@ -141,6 +141,8 @@ impl Middleware for SmartCompact {
                             StreamChunk::Thinking { .. }
                             | StreamChunk::ThinkingSignature { .. }
                             | StreamChunk::ToolUse { .. }
+                            | StreamChunk::ServerToolUse { .. }
+                            | StreamChunk::ServerToolResult { .. }
                             | StreamChunk::Usage { .. },
                         ) => {}
                     }

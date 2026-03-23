@@ -76,6 +76,10 @@ impl Message {
                 ContentBlock::ToolResult { content, .. } => content.len() as u32 / 4,
                 ContentBlock::Image { .. } => 1000, // fixed estimate for images
                 ContentBlock::Thinking { thinking, .. } => thinking.len() as u32 / 4,
+                ContentBlock::ServerToolUse { input, .. } => input.to_string().len() as u32 / 4,
+                ContentBlock::WebSearchToolResult { content, .. } => {
+                    content.to_string().len() as u32 / 4
+                }
             })
             .sum();
         // +4 for role/message overhead
@@ -106,6 +110,18 @@ pub enum ContentBlock {
         thinking: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         signature: Option<String>,
+    },
+    /// Server-side tool invocation (preserved for multi-turn, not executed by client).
+    ServerToolUse {
+        id: String,
+        name: String,
+        input: serde_json::Value,
+    },
+    /// Web search result from server-side tool (Anthropic/OpenAI/Google).
+    #[serde(rename = "web_search_tool_result")]
+    WebSearchToolResult {
+        tool_use_id: String,
+        content: serde_json::Value,
     },
 }
 

@@ -6,15 +6,8 @@ use std::collections::VecDeque;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-#[derive(Default)]
-pub(crate) struct ToolCallAccumulator {
-    /// Maps tool call index -> (id, name, arguments_json)
-    pub(super) calls: Vec<(String, String, String)>,
-}
-
 pub(crate) struct OpenAiStream {
     pub(crate) inner: Pin<Box<dyn Stream<Item = Result<String, LoopalError>> + Send>>,
-    pub(crate) state: ToolCallAccumulator,
     pub(crate) buffer: VecDeque<Result<StreamChunk, LoopalError>>,
 }
 
@@ -30,7 +23,7 @@ impl Stream for OpenAiStream {
 
         match this.inner.as_mut().poll_next(cx) {
             Poll::Ready(Some(Ok(data))) => {
-                let chunks = parse_openai_event(&data, &mut this.state);
+                let chunks = parse_responses_event(&data);
                 let mut iter = chunks.into_iter();
                 if let Some(first) = iter.next() {
                     this.buffer.extend(iter);
@@ -50,10 +43,8 @@ impl Stream for OpenAiStream {
 unsafe impl Send for OpenAiStream {}
 impl Unpin for OpenAiStream {}
 
-pub(crate) fn parse_openai_event(
-    data: &str,
-    state: &mut ToolCallAccumulator,
-) -> Vec<Result<StreamChunk, LoopalError>> {
+/// Parse a single SSE event from the OpenAI Responses API.
+pub(crate) fn parse_responses_event(data: &str) -> Vec<Result<StreamChunk, LoopalError>> {
     let parsed: Value = match serde_json::from_str(data) {
         Ok(v) => v,
         Err(e) => {
@@ -64,95 +55,136 @@ pub(crate) fn parse_openai_event(
         }
     };
 
+    let event_type = parsed["type"].as_str().unwrap_or("");
     let mut chunks = Vec::new();
 
-    // Handle usage (final chunk with usage stats)
-    if let Some(usage) = parsed.get("usage").filter(|u| !u.is_null())
-        && let (Some(input), Some(output)) = (
-            usage["prompt_tokens"].as_u64(),
-            usage["completion_tokens"].as_u64(),
-        )
-    {
-        let thinking_tokens = usage["completion_tokens_details"]["reasoning_tokens"]
-            .as_u64()
-            .unwrap_or(0) as u32;
-        chunks.push(Ok(StreamChunk::Usage {
-            input_tokens: input as u32,
-            output_tokens: output as u32,
-            cache_creation_input_tokens: 0,
-            cache_read_input_tokens: 0,
-            thinking_tokens,
-        }));
-    }
+    match event_type {
+        "response.output_text.delta" => {
+            if let Some(delta) = parsed["delta"].as_str()
+                && !delta.is_empty()
+            {
+                chunks.push(Ok(StreamChunk::Text {
+                    text: delta.to_string(),
+                }));
+            }
+        }
+        "response.reasoning_summary_text.delta" => {
+            if let Some(delta) = parsed["delta"].as_str() {
+                chunks.push(Ok(StreamChunk::Thinking {
+                    text: delta.to_string(),
+                }));
+            }
+        }
+        "response.output_item.done" => {
+            parse_output_item_done(&parsed["item"], &mut chunks);
+        }
+        "response.completed" => {
+            parse_completed(&parsed["response"], &mut chunks);
+        }
+        "response.failed" => {
+            if let Some(err) = parsed["response"]["error"].as_object() {
+                let code = err
+                    .get("code")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown");
+                let message = err
+                    .get("message")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown error");
 
-    let choices = match parsed["choices"].as_array() {
-        Some(c) => c,
-        None => return chunks,
-    };
-
-    for choice in choices {
-        let delta = &choice["delta"];
-        let finish_reason = choice["finish_reason"].as_str();
-
-        // Text content
-        if let Some(content) = delta["content"].as_str()
-            && !content.is_empty()
-        {
-            chunks.push(Ok(StreamChunk::Text {
-                text: content.to_string(),
+                if code == "rate_limit_exceeded" {
+                    chunks.push(Err(ProviderError::RateLimited {
+                        retry_after_ms: 30_000,
+                    }
+                    .into()));
+                } else if code == "context_length_exceeded" {
+                    chunks.push(Err(ProviderError::ContextOverflow {
+                        message: format!("{code}: {message}"),
+                    }
+                    .into()));
+                } else {
+                    chunks.push(Err(ProviderError::Api {
+                        status: 400,
+                        message: format!("{code}: {message}"),
+                    }
+                    .into()));
+                }
+            } else {
+                // Unrecognized error structure -- emit generic error
+                chunks.push(Err(ProviderError::Api {
+                    status: 400,
+                    message: format!("response.failed: {}", parsed["response"]),
+                }
+                .into()));
+            }
+        }
+        "response.incomplete" => {
+            chunks.push(Ok(StreamChunk::Done {
+                stop_reason: StopReason::MaxTokens,
             }));
         }
-
-        // Tool calls
-        if let Some(tool_calls) = delta["tool_calls"].as_array() {
-            for tc in tool_calls {
-                let index = tc["index"].as_u64().unwrap_or(0) as usize;
-
-                // Reject unreasonably large indices to prevent unbounded allocation
-                if index > 128 {
-                    continue;
-                }
-
-                // Grow the accumulator
-                while state.calls.len() <= index {
-                    state
-                        .calls
-                        .push((String::new(), String::new(), String::new()));
-                }
-
-                if let Some(id) = tc["id"].as_str() {
-                    state.calls[index].0 = id.to_string();
-                }
-                if let Some(name) = tc["function"]["name"].as_str() {
-                    state.calls[index].1 = name.to_string();
-                }
-                if let Some(args) = tc["function"]["arguments"].as_str() {
-                    state.calls[index].2.push_str(args);
-                }
-            }
-        }
-
-        // On finish, emit accumulated tool calls
-        if finish_reason == Some("tool_calls")
-            || finish_reason == Some("stop")
-            || finish_reason == Some("length")
-        {
-            for (id, name, args) in state.calls.drain(..) {
-                if !id.is_empty() && !name.is_empty() {
-                    let input: Value = serde_json::from_str(&args).unwrap_or(json!({}));
-                    chunks.push(Ok(StreamChunk::ToolUse { id, name, input }));
-                }
-            }
-            if finish_reason == Some("stop") || finish_reason == Some("length") {
-                let stop_reason = if finish_reason == Some("length") {
-                    StopReason::MaxTokens
-                } else {
-                    StopReason::EndTurn
-                };
-                chunks.push(Ok(StreamChunk::Done { stop_reason }));
-            }
-        }
+        _ => {} // Ignore other events (response.created, response.output_item.added, etc.)
     }
 
     chunks
+}
+
+/// Parse a completed output item (function_call, web_search_call, message, etc.).
+fn parse_output_item_done(item: &Value, chunks: &mut Vec<Result<StreamChunk, LoopalError>>) {
+    let item_type = item["type"].as_str().unwrap_or("");
+    match item_type {
+        "function_call" => {
+            let call_id = item["call_id"].as_str().unwrap_or("").to_string();
+            let name = item["name"].as_str().unwrap_or("").to_string();
+            let args_str = item["arguments"].as_str().unwrap_or("{}");
+            let input = serde_json::from_str(args_str).unwrap_or(json!({}));
+            if !call_id.is_empty() && !name.is_empty() {
+                chunks.push(Ok(StreamChunk::ToolUse {
+                    id: call_id,
+                    name,
+                    input,
+                }));
+            }
+        }
+        "web_search_call" => {
+            let id = item["id"].as_str().unwrap_or("").to_string();
+            let query = item["action"]["query"].as_str().unwrap_or("").to_string();
+            chunks.push(Ok(StreamChunk::ServerToolUse {
+                id: id.clone(),
+                name: "web_search".to_string(),
+                input: json!({"query": query}),
+            }));
+            // OpenAI server-side search results are implicit (not streamed separately).
+            // Emit a synthetic result to close the TUI pending state.
+            chunks.push(Ok(StreamChunk::ServerToolResult {
+                tool_use_id: id,
+                content: json!({"status": "completed"}),
+            }));
+        }
+        _ => {}
+    }
+}
+
+/// Parse the response.completed event for usage stats.
+fn parse_completed(response: &Value, chunks: &mut Vec<Result<StreamChunk, LoopalError>>) {
+    if let Some(usage) = response.get("usage") {
+        let input_tokens = usage["input_tokens"].as_u64().unwrap_or(0) as u32;
+        let output_tokens = usage["output_tokens"].as_u64().unwrap_or(0) as u32;
+        let cache_read = usage["input_tokens_details"]["cached_tokens"]
+            .as_u64()
+            .unwrap_or(0) as u32;
+        let thinking_tokens = usage["output_tokens_details"]["reasoning_tokens"]
+            .as_u64()
+            .unwrap_or(0) as u32;
+        chunks.push(Ok(StreamChunk::Usage {
+            input_tokens,
+            output_tokens,
+            cache_creation_input_tokens: 0,
+            cache_read_input_tokens: cache_read,
+            thinking_tokens,
+        }));
+    }
+    chunks.push(Ok(StreamChunk::Done {
+        stop_reason: StopReason::EndTurn,
+    }));
 }

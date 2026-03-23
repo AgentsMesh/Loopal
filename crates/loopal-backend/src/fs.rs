@@ -95,8 +95,12 @@ pub async fn write_file(path: &Path, content: &str) -> Result<WriteResult, ToolI
     let tmp_path = path.with_file_name(tmp_name);
     tokio::fs::write(&tmp_path, content).await?;
 
-    // fsync the temp file for durability
-    let f = tokio::fs::File::open(&tmp_path).await?;
+    // fsync the temp file for durability.
+    // Must open with write access — Windows FlushFileBuffers requires GENERIC_WRITE.
+    let f = tokio::fs::OpenOptions::new()
+        .write(true)
+        .open(&tmp_path)
+        .await?;
     f.sync_all().await?;
     drop(f);
 

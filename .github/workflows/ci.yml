@@ -40,18 +40,23 @@ jobs:
       - run: cargo clippy --workspace --tests -- -D warnings
 
   test:
-    name: Test
-    runs-on: ubuntu-latest
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
-      - name: Install system dependencies
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libssl-dev pkg-config
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: "1.88.0"
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: ci
+          shared-key: ci-${{ matrix.os }}
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo check --workspace
       - run: cargo test --workspace

@@ -156,12 +156,8 @@ impl AcpHandler {
         let skills_summary = loopal_config::format_skills_summary(&skills);
         let tool_defs = kernel.tool_definitions();
         let system_prompt = build_system_prompt(
-            &self.config.instructions,
-            &tool_defs,
-            "",
-            &cwd.to_string_lossy(),
-            &skills_summary,
-            &self.config.memory,
+            &self.config.instructions, &tool_defs, "act",
+            &cwd.to_string_lossy(), &skills_summary, &self.config.memory,
         );
 
         let pipeline = ContextPipeline::new();

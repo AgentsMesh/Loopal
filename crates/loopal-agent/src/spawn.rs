@@ -98,12 +98,22 @@ pub async fn spawn_agent(
         .map_err(|e| format!("failed to create session: {e}"))?;
 
     let system_prompt = if params.agent_config.system_prompt.is_empty() {
-        format!(
-            "You are a sub-agent named '{}'. Your working directory is: {}. \
-             Complete the task given to you. When done, call AttemptCompletion with your result.",
-            params.name,
-            effective_cwd.display()
-        )
+        // Use fragment-based prompt: try specific agent type, fall back to default-subagent
+        let agent_type = if params.agent_config.name.is_empty() {
+            "default-subagent"
+        } else {
+            &params.agent_config.name
+        };
+        let ctx = loopal_prompt::PromptContext {
+            cwd: effective_cwd.display().to_string(),
+            agent_name: Some(params.name.clone()),
+            agent_type: Some(agent_type.to_string()),
+            ..Default::default()
+        };
+        let frags = loopal_prompt_system::system_fragments();
+        let registry = loopal_prompt::FragmentRegistry::new(frags);
+        let builder = loopal_prompt::PromptBuilder::new(registry);
+        builder.build_agent_prompt(agent_type, &ctx)
     } else {
         params.agent_config.system_prompt.clone()
     };

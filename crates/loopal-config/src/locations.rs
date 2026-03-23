@@ -114,3 +114,13 @@ pub fn global_agents_dir() -> Result<PathBuf, ConfigError> {
 pub fn project_agents_dir(cwd: &Path) -> PathBuf {
     project_config_dir(cwd).join("agents")
 }
+
+/// Returns the global prompts override directory: ~/.loopal/prompts/
+pub fn global_prompts_dir() -> Result<PathBuf, ConfigError> {
+    Ok(global_config_dir()?.join("prompts"))
+}
+
+/// Returns the project prompts override directory: <cwd>/.loopal/prompts/
+pub fn project_prompts_dir(cwd: &Path) -> PathBuf {
+    project_config_dir(cwd).join("prompts")
+}

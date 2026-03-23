@@ -34,7 +34,7 @@ use loopal_protocol::InterruptSignal;
 use loopal_provider_api::ThinkingConfig;
 use loopal_storage::Session;
 use loopal_tool_api::{MemoryChannel, PermissionMode};
-use tokio::sync::Notify;
+use tokio::sync::watch;
 
 use crate::mode::AgentMode;
 use crate::session::SessionManager;
@@ -72,8 +72,8 @@ pub struct AgentLoopParams {
     pub thinking_config: ThinkingConfig,
     /// Shared interrupt signal — TUI sets it on ESC or message-while-busy.
     pub interrupt: InterruptSignal,
-    /// Async wakeup companion for `interrupt` — allows `tokio::select!` responsiveness.
-    pub interrupt_notify: Arc<Notify>,
+    /// Watch channel for interrupt wakeup — level-triggered, no signal loss.
+    pub interrupt_tx: Arc<watch::Sender<u64>>,
     /// Memory channel for the Memory tool → Observer sidebar.
     pub memory_channel: Option<Arc<dyn MemoryChannel>>,
 }

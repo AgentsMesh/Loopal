@@ -5,7 +5,7 @@
 
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use tokio::sync::{Notify, mpsc};
+use tokio::sync::{mpsc, watch};
 
 use loopal_protocol::AgentEvent;
 use loopal_protocol::AgentMode;
@@ -31,7 +31,7 @@ pub struct SessionController {
     permission_tx: mpsc::Sender<bool>,
     question_tx: mpsc::Sender<UserQuestionResponse>,
     interrupt: InterruptSignal,
-    interrupt_notify: Arc<Notify>,
+    interrupt_tx: Arc<watch::Sender<u64>>,
 }
 
 impl SessionController {
@@ -42,7 +42,7 @@ impl SessionController {
         permission_tx: mpsc::Sender<bool>,
         question_tx: mpsc::Sender<UserQuestionResponse>,
         interrupt: InterruptSignal,
-        interrupt_notify: Arc<Notify>,
+        interrupt_tx: Arc<watch::Sender<u64>>,
     ) -> Self {
         Self {
             state: Arc::new(Mutex::new(SessionState::new(model, mode))),
@@ -50,7 +50,7 @@ impl SessionController {
             permission_tx,
             question_tx,
             interrupt,
-            interrupt_notify,
+            interrupt_tx,
         }
     }
 
@@ -66,7 +66,7 @@ impl SessionController {
     /// Interrupt the agent's current work (ESC or message-while-busy).
     pub fn interrupt(&self) {
         self.interrupt.signal();
-        self.interrupt_notify.notify_waiters();
+        self.interrupt_tx.send_modify(|v| *v = v.wrapping_add(1));
     }
 
     /// Push a message into inbox. Returns Some(content) if it should be forwarded.

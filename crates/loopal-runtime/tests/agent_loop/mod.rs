@@ -16,7 +16,10 @@ use tokio::sync::mpsc;
 
 /// Create a no-op TurnCancel for tests (never cancelled).
 pub fn make_cancel() -> TurnCancel {
-    TurnCancel::new(Default::default(), Arc::new(tokio::sync::Notify::new()))
+    TurnCancel::new(
+        Default::default(),
+        Arc::new(tokio::sync::watch::channel(0u64).0),
+    )
 }
 
 mod auto_continue_edge_test;
@@ -29,9 +32,11 @@ mod integration_test;
 mod llm_test;
 pub mod mock_provider;
 pub use mock_provider::make_runner_with_mock_provider;
+mod cancel_test;
 mod permission_test_ext;
 mod preflight_test;
 mod record_message_test;
+mod retry_cancel_test;
 mod run_test;
 mod tools_completion_test;
 mod tools_test;
@@ -89,7 +94,7 @@ pub fn make_runner() -> (AgentLoopRunner, mpsc::Receiver<AgentEvent>) {
         interactive: true,
         thinking_config: loopal_provider_api::ThinkingConfig::Auto,
         interrupt: Default::default(),
-        interrupt_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
+        interrupt_tx: std::sync::Arc::new(tokio::sync::watch::channel(0u64).0),
         memory_channel: None,
     };
 
@@ -154,7 +159,7 @@ pub fn make_runner_with_channels() -> (
         interactive: true,
         thinking_config: loopal_provider_api::ThinkingConfig::Auto,
         interrupt: Default::default(),
-        interrupt_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
+        interrupt_tx: std::sync::Arc::new(tokio::sync::watch::channel(0u64).0),
         memory_channel: None,
     };
 

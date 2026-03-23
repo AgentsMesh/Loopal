@@ -20,7 +20,7 @@ fn make_controller() -> (
         perm_tx,
         question_tx,
         Default::default(),
-        std::sync::Arc::new(tokio::sync::Notify::new()),
+        std::sync::Arc::new(tokio::sync::watch::channel(0u64).0),
     );
     (ctrl, control_rx, perm_rx)
 }

@@ -1,6 +1,7 @@
 use loopal_tool_api::{Tool, ToolContext};
 use loopal_tool_background::task_output::TaskOutputTool;
 use loopal_tool_background::task_stop::TaskStopTool;
+#[cfg(not(windows))]
 use loopal_tool_bash::BashTool;
 use serde_json::json;
 
@@ -50,6 +51,7 @@ async fn test_task_stop_nonexistent_task() {
 }
 
 #[tokio::test]
+#[cfg(not(windows))] // cmd.exe child processes become orphans on kill, blocking pipe reads
 async fn test_task_output_non_blocking() {
     let tmp = tempfile::tempdir().unwrap();
     let bash = BashTool;
@@ -87,6 +89,7 @@ async fn test_task_output_non_blocking() {
 }
 
 #[tokio::test]
+#[cfg(not(windows))] // cmd.exe child processes become orphans on kill, blocking pipe reads
 async fn test_task_output_timeout_while_running() {
     let tmp = tempfile::tempdir().unwrap();
     let bash = BashTool;

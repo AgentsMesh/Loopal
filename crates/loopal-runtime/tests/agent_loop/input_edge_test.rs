@@ -68,7 +68,7 @@ fn test_model_info_defaults_for_unknown_model() {
         interactive: true,
         thinking_config: loopal_provider_api::ThinkingConfig::Auto,
         interrupt: Default::default(),
-        interrupt_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
+        interrupt_tx: std::sync::Arc::new(tokio::sync::watch::channel(0u64).0),
         memory_channel: None,
     };
 

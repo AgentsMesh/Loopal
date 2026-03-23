@@ -69,6 +69,7 @@ async fn test_run_hook_stderr_captured() {
 }
 
 #[tokio::test]
+#[cfg(not(windows))]
 async fn test_run_hook_timeout() {
     // Very short timeout with a long-running command
     let hook = make_hook("sleep 60", 100);

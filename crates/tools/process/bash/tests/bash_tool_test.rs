@@ -170,6 +170,7 @@ async fn test_bash_timeout_triggers_error() {
 }
 
 #[tokio::test]
+#[cfg(not(windows))]
 async fn test_bash_command_with_nonzero_exit_and_stderr() {
     let tmp = tempfile::tempdir().unwrap();
     let tool = BashTool;

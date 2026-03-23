@@ -109,9 +109,8 @@ impl Middleware for SmartCompact {
              OMIT:\n\
              - Verbatim file contents (summarize what was found instead)\n\
              - Redundant tool call details (group similar operations)\n\n\
-             Conversation:\n---\n{}\n---\n\n\
+             Conversation:\n---\n{conversation_text}\n---\n\n\
              Provide a structured summary:",
-            conversation_text
         );
 
         let summary_params = ChatParams {

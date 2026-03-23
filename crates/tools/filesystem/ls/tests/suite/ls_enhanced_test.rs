@@ -27,7 +27,8 @@ async fn long_mode_shows_permissions_and_size() {
     let ctx = make_ctx(tmp.path());
     let r = tool.execute(json!({"long": true}), &ctx).await.unwrap();
     assert!(!r.is_error);
-    // Should contain permission string, size, and filename
+    // Permission strings are Unix-only (rw-r--r-- etc.)
+    #[cfg(unix)]
     assert!(r.content.contains("rw"));
     assert!(r.content.contains("hello.txt"));
     // 11 bytes -> "11B"
@@ -136,5 +137,7 @@ async fn long_and_all_combined() {
     // Both entries should have permission strings
     let lines: Vec<&str> = r.content.lines().collect();
     assert!(lines.len() >= 2);
+    // Permission strings are Unix-only
+    #[cfg(unix)]
     assert!(lines.iter().all(|l| l.contains("rw") || l.contains("r-")));
 }

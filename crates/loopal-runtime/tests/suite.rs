@@ -23,3 +23,9 @@ mod session_test;
 mod tool_pipeline_hooks_test;
 #[path = "suite/tool_pipeline_test.rs"]
 mod tool_pipeline_test;
+#[path = "suite/loop_detector_test.rs"]
+mod loop_detector_test;
+#[path = "suite/diff_tracker_test.rs"]
+mod diff_tracker_test;
+#[path = "suite/env_context_test.rs"]
+mod env_context_test;

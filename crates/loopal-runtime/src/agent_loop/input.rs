@@ -4,8 +4,6 @@ use loopal_message::{ContentBlock, ImageSource, Message, MessageRole};
 use loopal_protocol::AgentEventPayload;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::{Envelope, MessageSource};
-use loopal_provider::get_model_info;
-use loopal_provider_api::ThinkingConfig;
 use tracing::{error, info};
 
 use crate::mode::AgentMode;
@@ -77,15 +75,11 @@ impl AgentLoopRunner {
                 }
                 self.params.messages.clear();
                 self.turn_count = 0;
-                self.total_input_tokens = 0;
-                self.total_output_tokens = 0;
-                self.total_cache_creation_tokens = 0;
-                self.total_cache_read_tokens = 0;
-                self.total_thinking_tokens = 0;
+                self.tokens.reset();
                 self.emit(AgentEventPayload::TokenUsage {
                     input_tokens: 0,
                     output_tokens: 0,
-                    context_window: self.max_context_tokens,
+                    context_window: self.model_config.max_context_tokens,
                     cache_creation_input_tokens: 0,
                     cache_read_input_tokens: 0,
                     thinking_tokens: 0,
@@ -114,20 +108,17 @@ impl AgentLoopRunner {
             }
             ControlCommand::ModelSwitch(new_model) => {
                 info!(from = %self.params.model, to = %new_model, "switching model");
-                let model_info = get_model_info(&new_model);
-                self.max_context_tokens = model_info.as_ref().map_or(200_000, |m| m.context_window);
-                self.max_output_tokens =
-                    model_info.as_ref().map_or(16_384, |m| m.max_output_tokens);
+                self.model_config.update_model(&new_model);
                 self.params.model = new_model;
             }
             ControlCommand::Rewind { turn_index } => {
                 self.handle_rewind(turn_index).await?;
             }
             ControlCommand::ThinkingSwitch(json) => {
-                match serde_json::from_str::<ThinkingConfig>(&json) {
+                match serde_json::from_str::<loopal_provider_api::ThinkingConfig>(&json) {
                     Ok(config) => {
                         info!(thinking = ?config, "switching thinking config");
-                        self.thinking_config = config;
+                        self.model_config.thinking = config;
                     }
                     Err(e) => error!(error = %e, "invalid thinking config"),
                 }

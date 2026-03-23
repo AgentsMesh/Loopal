@@ -19,3 +19,5 @@ mod platform_macos_test;
 mod policy_test;
 #[path = "suite/scanner_test.rs"]
 mod scanner_test;
+#[path = "suite/security_inspector_test.rs"]
+mod security_inspector_test;

@@ -123,6 +123,7 @@ fn make_multi_runner(
         messages: vec![loopal_message::Message::user("go")],
         model: "claude-sonnet-4-20250514".into(),
         system_prompt: "t".into(),
+        compact_model: None,
         mode: AgentMode::Act,
         permission_mode: PermissionMode::Bypass,
         max_turns: 10,

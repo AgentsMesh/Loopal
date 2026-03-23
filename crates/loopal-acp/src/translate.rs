@@ -62,7 +62,8 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
         | AgentEventPayload::ThinkingComplete { .. }
         | AgentEventPayload::Rewound { .. }
         | AgentEventPayload::Compacted { .. }
-        | AgentEventPayload::Interrupted => return None,
+        | AgentEventPayload::Interrupted
+        | AgentEventPayload::TurnDiffSummary { .. } => return None,
     };
 
     let params = SessionUpdateParams {

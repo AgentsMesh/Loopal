@@ -119,6 +119,7 @@ async fn test_subagent_drains_pending_before_exit() {
         session,
         messages: vec![loopal_message::Message::user("run task")],
         model: "claude-sonnet-4-20250514".into(),
+        compact_model: None,
         system_prompt: "test".into(),
         mode: AgentMode::Act,
         permission_mode: PermissionMode::Bypass,

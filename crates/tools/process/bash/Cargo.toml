@@ -9,7 +9,9 @@ doctest = false
 test = false
 
 [dependencies]
+loopal-config = { workspace = true }
 loopal-error = { workspace = true }
+loopal-sandbox = { workspace = true }
 loopal-tool-api = { workspace = true }
 serde_json = { workspace = true }
 async-trait = { workspace = true }

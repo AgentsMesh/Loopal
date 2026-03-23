@@ -44,6 +44,7 @@ pub async fn run() -> anyhow::Result<()> {
     }
 
     let model = config.settings.model.clone();
+    let compact_model = config.settings.compact_model.clone();
     let max_turns = config.settings.max_turns;
     let permission_mode = config.settings.permission_mode;
     let thinking_config = config.settings.thinking.clone();
@@ -168,6 +169,7 @@ pub async fn run() -> anyhow::Result<()> {
         session,
         messages,
         model,
+        compact_model,
         system_prompt,
         mode,
         permission_mode,

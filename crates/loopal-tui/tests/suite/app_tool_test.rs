@@ -16,7 +16,7 @@ fn make_app() -> App {
         perm_tx,
         question_tx,
         Default::default(),
-        std::sync::Arc::new(tokio::sync::Notify::new()),
+        std::sync::Arc::new(tokio::sync::watch::channel(0u64).0),
     );
     App::new(session, builtin_entries(), std::env::temp_dir())
 }

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use loopal_error::{AgentOutput, Result};
 use loopal_protocol::{AgentEventPayload, InterruptSignal};
 use loopal_tool_api::ToolContext;
-use tokio::sync::Notify;
+use tokio::sync::watch;
 use tracing::{Instrument, info, info_span};
 
 use super::model_config::ModelConfig;
@@ -20,7 +20,7 @@ pub struct AgentLoopRunner {
     pub tokens: TokenAccumulator,
     pub model_config: ModelConfig,
     pub interrupt: InterruptSignal,
-    pub interrupt_notify: Arc<Notify>,
+    pub interrupt_tx: Arc<watch::Sender<u64>>,
     pub observers: Vec<Box<dyn TurnObserver>>,
 }
 
@@ -37,7 +37,7 @@ impl AgentLoopRunner {
         };
         let model_config = ModelConfig::from_model(&params.model, params.thinking_config.clone());
         let interrupt = params.interrupt.clone();
-        let interrupt_notify = params.interrupt_notify.clone();
+        let interrupt_tx = params.interrupt_tx.clone();
         Self {
             params,
             tool_ctx,
@@ -45,7 +45,7 @@ impl AgentLoopRunner {
             tokens: TokenAccumulator::new(),
             model_config,
             interrupt,
-            interrupt_notify,
+            interrupt_tx,
             observers: Vec::new(),
         }
     }

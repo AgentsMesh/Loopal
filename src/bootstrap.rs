@@ -84,7 +84,7 @@ pub async fn run() -> anyhow::Result<()> {
         .map_err(|e| anyhow::anyhow!(e))?;
     let (control_tx, control_rx) = mpsc::channel::<ControlCommand>(16);
     let interrupt = InterruptSignal::new();
-    let interrupt_notify = Arc::new(tokio::sync::Notify::new());
+    let interrupt_tx = Arc::new(tokio::sync::watch::channel(0u64).0);
 
     let frontend = Arc::new(UnifiedFrontend::new(
         None,
@@ -150,7 +150,7 @@ pub async fn run() -> anyhow::Result<()> {
         permission_tx,
         question_tx,
         interrupt.clone(),
-        interrupt_notify.clone(),
+        interrupt_tx.clone(),
     );
     if cli.resume.is_some() {
         session_ctrl.load_display_history(project_messages(&messages));
@@ -182,7 +182,7 @@ pub async fn run() -> anyhow::Result<()> {
         interactive: true,
         thinking_config,
         interrupt,
-        interrupt_notify,
+        interrupt_tx,
         memory_channel,
     };
 

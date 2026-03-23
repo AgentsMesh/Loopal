@@ -132,7 +132,7 @@ async fn test_subagent_drains_pending_before_exit() {
         interactive: false, // Sub-agent mode — exits after first LLM response
         thinking_config: loopal_provider_api::ThinkingConfig::Auto,
         interrupt: Default::default(),
-        interrupt_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
+        interrupt_tx: std::sync::Arc::new(tokio::sync::watch::channel(0u64).0),
         memory_channel: None,
     };
 

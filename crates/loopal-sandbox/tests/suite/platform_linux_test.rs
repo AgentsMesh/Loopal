@@ -42,9 +42,11 @@ mod linux_tests {
     #[test]
     fn readonly_no_bind_writable() {
         let args = build_bwrap_args(&readonly_policy(), "/tmp".as_ref());
-        // Should have --ro-bind but not --bind
+        // Should have --ro-bind, and only system-writable --bind entries (e.g. /var/tmp),
+        // not user-specified writable paths (which are empty in readonly_policy).
         let bind_count = args.iter().filter(|a| *a == "--bind").count();
-        assert_eq!(bind_count, 0);
+        // 1 = /var/tmp (the single system-writable path)
+        assert_eq!(bind_count, 1);
     }
 
     #[test]

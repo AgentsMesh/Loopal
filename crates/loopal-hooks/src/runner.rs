@@ -22,14 +22,15 @@ pub async fn run_hook(
         .spawn()
         .map_err(|e| HookError::ExecutionFailed(e.to_string()))?;
 
-    // Write JSON to stdin
+    // Write JSON to stdin — ignore BrokenPipe (child may exit without reading).
     if let Some(mut stdin) = child.stdin.take() {
         let data = serde_json::to_vec(&stdin_data)
             .map_err(|e| HookError::ExecutionFailed(e.to_string()))?;
-        stdin
-            .write_all(&data)
-            .await
-            .map_err(|e| HookError::ExecutionFailed(e.to_string()))?;
+        if let Err(e) = stdin.write_all(&data).await {
+            if e.kind() != std::io::ErrorKind::BrokenPipe {
+                return Err(HookError::ExecutionFailed(e.to_string()));
+            }
+        }
         drop(stdin);
     }
 

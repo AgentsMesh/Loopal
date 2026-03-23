@@ -108,6 +108,7 @@ async fn test_bash_stdout_and_stderr_combined() {
 }
 
 #[tokio::test]
+#[cfg(not(windows))]
 async fn test_bash_runs_in_cwd() {
     let tmp = tempfile::tempdir().unwrap();
     let tool = BashTool;
@@ -147,6 +148,7 @@ async fn test_bash_with_custom_timeout() {
 }
 
 #[tokio::test]
+#[cfg(not(windows))]
 async fn test_bash_timeout_triggers_error() {
     let tmp = tempfile::tempdir().unwrap();
     let tool = BashTool;

@@ -52,16 +52,26 @@ impl PendingQuestion {
             .iter()
             .map(|q| vec![false; q.options.len()])
             .collect();
-        Self { id, questions, selected, current_question: 0, cursor: 0 }
+        Self {
+            id,
+            questions,
+            selected,
+            current_question: 0,
+            cursor: 0,
+        }
     }
 
     pub fn cursor_up(&mut self) {
-        if self.cursor > 0 { self.cursor -= 1; }
+        if self.cursor > 0 {
+            self.cursor -= 1;
+        }
     }
 
     pub fn cursor_down(&mut self) {
         let q = &self.questions[self.current_question];
-        if self.cursor + 1 < q.options.len() { self.cursor += 1; }
+        if self.cursor + 1 < q.options.len() {
+            self.cursor += 1;
+        }
     }
 
     pub fn toggle(&mut self) {
@@ -73,7 +83,9 @@ impl PendingQuestion {
     pub fn get_answers(&self) -> Vec<String> {
         let q = &self.questions[self.current_question];
         let sel = &self.selected[self.current_question];
-        q.options.iter().zip(sel.iter())
+        q.options
+            .iter()
+            .zip(sel.iter())
             .filter(|(_, s)| **s)
             .map(|(opt, _)| opt.label.clone())
             .collect()

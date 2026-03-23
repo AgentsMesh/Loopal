@@ -17,10 +17,7 @@ pub struct TuiPermissionHandler {
 }
 
 impl TuiPermissionHandler {
-    pub fn new(
-        event_tx: mpsc::Sender<AgentEvent>,
-        permission_rx: mpsc::Receiver<bool>,
-    ) -> Self {
+    pub fn new(event_tx: mpsc::Sender<AgentEvent>, permission_rx: mpsc::Receiver<bool>) -> Self {
         Self {
             event_tx,
             permission_rx: Mutex::new(permission_rx),
@@ -30,12 +27,7 @@ impl TuiPermissionHandler {
 
 #[async_trait]
 impl PermissionHandler for TuiPermissionHandler {
-    async fn decide(
-        &self,
-        id: &str,
-        name: &str,
-        input: &serde_json::Value,
-    ) -> PermissionDecision {
+    async fn decide(&self, id: &str, name: &str, input: &serde_json::Value) -> PermissionDecision {
         let event = AgentEvent {
             agent_name: None,
             payload: AgentEventPayload::ToolPermissionRequest {

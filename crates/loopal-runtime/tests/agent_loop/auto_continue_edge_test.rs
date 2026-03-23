@@ -14,20 +14,31 @@ async fn test_continuation_resets_after_tools() {
         // 1st LLM call: tool
         vec![
             Ok(StreamChunk::ToolUse {
-                id: "tc-1".into(), name: "Read".into(),
+                id: "tc-1".into(),
+                name: "Read".into(),
                 input: serde_json::json!({"file_path": tmp.to_str().unwrap()}),
             }),
-            Ok(StreamChunk::Done { stop_reason: StopReason::EndTurn }),
+            Ok(StreamChunk::Done {
+                stop_reason: StopReason::EndTurn,
+            }),
         ],
         // 2nd LLM call (after tool): MaxTokens → should continue (counter was reset)
         vec![
-            Ok(StreamChunk::Text { text: "after tool".into() }),
-            Ok(StreamChunk::Done { stop_reason: StopReason::MaxTokens }),
+            Ok(StreamChunk::Text {
+                text: "after tool".into(),
+            }),
+            Ok(StreamChunk::Done {
+                stop_reason: StopReason::MaxTokens,
+            }),
         ],
         // 3rd LLM call: normal end
         vec![
-            Ok(StreamChunk::Text { text: " finished".into() }),
-            Ok(StreamChunk::Done { stop_reason: StopReason::EndTurn }),
+            Ok(StreamChunk::Text {
+                text: " finished".into(),
+            }),
+            Ok(StreamChunk::Done {
+                stop_reason: StopReason::EndTurn,
+            }),
         ],
     ];
     let (mut runner, mut event_rx) = make_multi_runner(calls);
@@ -44,18 +55,24 @@ async fn test_auto_continue_emits_event() {
     let calls = vec![
         vec![
             Ok(StreamChunk::Text { text: "a".into() }),
-            Ok(StreamChunk::Done { stop_reason: StopReason::MaxTokens }),
+            Ok(StreamChunk::Done {
+                stop_reason: StopReason::MaxTokens,
+            }),
         ],
         vec![
             Ok(StreamChunk::Text { text: "b".into() }),
-            Ok(StreamChunk::Done { stop_reason: StopReason::EndTurn }),
+            Ok(StreamChunk::Done {
+                stop_reason: StopReason::EndTurn,
+            }),
         ],
     ];
     let (mut runner, mut event_rx) = make_multi_runner(calls);
 
     let events_handle = tokio::spawn(async move {
         let mut events = Vec::new();
-        while let Some(e) = event_rx.recv().await { events.push(e); }
+        while let Some(e) = event_rx.recv().await {
+            events.push(e);
+        }
         events
     });
 
@@ -63,12 +80,16 @@ async fn test_auto_continue_emits_event() {
     drop(runner); // Close event channel
     let events = events_handle.await.unwrap();
 
-    let ac: Vec<_> = events.iter().filter(|e| {
-        matches!(e.payload, AgentEventPayload::AutoContinuation { .. })
-    }).collect();
+    let ac: Vec<_> = events
+        .iter()
+        .filter(|e| matches!(e.payload, AgentEventPayload::AutoContinuation { .. }))
+        .collect();
     assert_eq!(ac.len(), 1);
     match &ac[0].payload {
-        AgentEventPayload::AutoContinuation { continuation, max_continuations } => {
+        AgentEventPayload::AutoContinuation {
+            continuation,
+            max_continuations,
+        } => {
             assert_eq!(*continuation, 1);
             assert_eq!(*max_continuations, 3);
         }

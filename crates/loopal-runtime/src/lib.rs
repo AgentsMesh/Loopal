@@ -7,7 +7,7 @@ pub mod projection;
 pub mod session;
 pub mod tool_pipeline;
 
-pub use agent_loop::{agent_loop, AgentLoopParams};
+pub use agent_loop::{AgentLoopParams, agent_loop};
 pub use frontend::unified::UnifiedFrontend;
 pub use mode::AgentMode;
 pub use permission::check_permission;

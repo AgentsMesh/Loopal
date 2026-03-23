@@ -32,21 +32,30 @@ pub fn apply_file_ops(
                     return Err(err(path, "file already exists"));
                 }
                 check_omissions(path, content)?;
-                writes.push(FileWrite { path: full, content: Some(content.clone()) });
+                writes.push(FileWrite {
+                    path: full,
+                    content: Some(content.clone()),
+                });
             }
             FileOp::Delete { path } => {
                 let full = resolve(path, cwd);
                 if !full.exists() {
                     return Err(err(path, "file does not exist"));
                 }
-                writes.push(FileWrite { path: full, content: None });
+                writes.push(FileWrite {
+                    path: full,
+                    content: None,
+                });
             }
             FileOp::Update { path, hunks } => {
                 let full = resolve(path, cwd);
-                let original = read_file(&full)
-                    .map_err(|e| err(path, &format!("cannot read: {e}")))?;
+                let original =
+                    read_file(&full).map_err(|e| err(path, &format!("cannot read: {e}")))?;
                 let updated = apply_hunks(path, &original, hunks)?;
-                writes.push(FileWrite { path: full, content: Some(updated) });
+                writes.push(FileWrite {
+                    path: full,
+                    content: Some(updated),
+                });
             }
         }
     }
@@ -84,18 +93,24 @@ fn apply_hunks(path: &Path, original: &str, hunks: &[Hunk]) -> Result<String, Pa
 
 /// Context + Remove lines = the pattern to locate in the file.
 fn search_lines(hunk: &Hunk) -> Vec<String> {
-    hunk.lines.iter().filter_map(|l| match l {
-        HunkLine::Context(s) | HunkLine::Remove(s) => Some(s.clone()),
-        HunkLine::Add(_) => None,
-    }).collect()
+    hunk.lines
+        .iter()
+        .filter_map(|l| match l {
+            HunkLine::Context(s) | HunkLine::Remove(s) => Some(s.clone()),
+            HunkLine::Add(_) => None,
+        })
+        .collect()
 }
 
 /// Context + Add lines = the replacement content.
 fn output_lines(hunk: &Hunk) -> Vec<String> {
-    hunk.lines.iter().filter_map(|l| match l {
-        HunkLine::Context(s) | HunkLine::Add(s) => Some(s.clone()),
-        HunkLine::Remove(_) => None,
-    }).collect()
+    hunk.lines
+        .iter()
+        .filter_map(|l| match l {
+            HunkLine::Context(s) | HunkLine::Add(s) => Some(s.clone()),
+            HunkLine::Remove(_) => None,
+        })
+        .collect()
 }
 
 fn find_match(file_lines: &[String], search: &[String], hint: Option<usize>) -> Option<usize> {
@@ -104,7 +119,12 @@ fn find_match(file_lines: &[String], search: &[String], hint: Option<usize>) -> 
     }
     // Pass 1: exact match
     let exact: Vec<usize> = (0..=file_lines.len().saturating_sub(search.len()))
-        .filter(|&i| file_lines[i..i + search.len()].iter().zip(search).all(|(a, b)| a == b))
+        .filter(|&i| {
+            file_lines[i..i + search.len()]
+                .iter()
+                .zip(search)
+                .all(|(a, b)| a == b)
+        })
         .collect();
     if let Some(pos) = disambiguate(&exact, hint) {
         return Some(pos);
@@ -127,7 +147,12 @@ fn disambiguate(positions: &[usize], hint: Option<usize>) -> Option<usize> {
         1 => Some(positions[0]),
         _ => {
             let target = hint?.saturating_sub(1); // 1-based → 0-based
-            Some(*positions.iter().min_by_key(|&&p| p.abs_diff(target)).unwrap())
+            Some(
+                *positions
+                    .iter()
+                    .min_by_key(|&&p| p.abs_diff(target))
+                    .unwrap(),
+            )
         }
     }
 }
@@ -151,9 +176,16 @@ fn check_omissions_lines(path: &Path, lines: &[String]) -> Result<(), PatchApply
 }
 
 fn resolve(path: &Path, cwd: &Path) -> PathBuf {
-    if path.is_absolute() { path.to_path_buf() } else { cwd.join(path) }
+    if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        cwd.join(path)
+    }
 }
 
 fn err(path: &Path, message: &str) -> PatchApplyError {
-    PatchApplyError { path: path.to_path_buf(), message: message.to_string() }
+    PatchApplyError {
+        path: path.to_path_buf(),
+        message: message.to_string(),
+    }
 }

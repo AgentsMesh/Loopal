@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use loopal_provider::ProviderRegistry;
 use loopal_error::LoopalError;
+use loopal_provider::ProviderRegistry;
 use loopal_provider_api::{ChatParams, ChatStream, Provider};
 
 /// Minimal mock provider for testing the registry.

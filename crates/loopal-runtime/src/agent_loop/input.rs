@@ -1,18 +1,18 @@
-use loopal_provider::get_model_info;
 use crate::agent_input::AgentInput;
+use loopal_error::Result;
+use loopal_message::{ContentBlock, ImageSource, Message, MessageRole};
+use loopal_protocol::AgentEventPayload;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::{Envelope, MessageSource};
-use loopal_error::Result;
-use loopal_protocol::AgentEventPayload;
-use loopal_message::{ContentBlock, ImageSource, Message, MessageRole};
+use loopal_provider::get_model_info;
 use loopal_provider_api::ThinkingConfig;
 use tracing::{error, info};
 
 use crate::mode::AgentMode;
 
 use super::rewind::detect_turn_boundaries;
-use super::{compact_messages, WaitResult};
 use super::runner::AgentLoopRunner;
+use super::{COMPACT_KEEP_LAST, WaitResult, compact_messages};
 
 impl AgentLoopRunner {
     /// Wait for user input via the frontend. Returns None if disconnected.
@@ -30,9 +30,11 @@ impl AgentLoopRunner {
             match input {
                 Some(AgentInput::Message(env)) => {
                     let mut user_msg = build_user_message(&env);
-                    if let Err(e) = self.params.session_manager.save_message(
-                        &self.params.session.id, &mut user_msg,
-                    ) {
+                    if let Err(e) = self
+                        .params
+                        .session_manager
+                        .save_message(&self.params.session.id, &mut user_msg)
+                    {
                         error!(error = %e, "failed to persist message");
                     }
                     self.params.messages.push(user_msg);
@@ -59,11 +61,18 @@ impl AgentLoopRunner {
                     loopal_protocol::AgentMode::Plan => "plan",
                     loopal_protocol::AgentMode::Act => "act",
                 };
-                self.emit(AgentEventPayload::ModeChanged { mode: mode_str.to_string() }).await?;
+                self.emit(AgentEventPayload::ModeChanged {
+                    mode: mode_str.to_string(),
+                })
+                .await?;
             }
             ControlCommand::Clear => {
                 info!("clearing conversation history");
-                if let Err(e) = self.params.session_manager.clear_history(&self.params.session.id) {
+                if let Err(e) = self
+                    .params
+                    .session_manager
+                    .clear_history(&self.params.session.id)
+                {
                     error!(error = %e, "failed to persist clear marker");
                 }
                 self.params.messages.clear();
@@ -74,24 +83,41 @@ impl AgentLoopRunner {
                 self.total_cache_read_tokens = 0;
                 self.total_thinking_tokens = 0;
                 self.emit(AgentEventPayload::TokenUsage {
-                    input_tokens: 0, output_tokens: 0, context_window: self.max_context_tokens,
-                    cache_creation_input_tokens: 0, cache_read_input_tokens: 0,
+                    input_tokens: 0,
+                    output_tokens: 0,
+                    context_window: self.max_context_tokens,
+                    cache_creation_input_tokens: 0,
+                    cache_read_input_tokens: 0,
                     thinking_tokens: 0,
-                }).await?;
+                })
+                .await?;
             }
             ControlCommand::Compact => {
-                info!(before = self.params.messages.len(), "compacting messages");
-                if let Err(e) = self.params.session_manager.compact_history(&self.params.session.id, 10) {
+                let before = self.params.messages.len();
+                info!(before, "compacting messages");
+                if let Err(e) = self
+                    .params
+                    .session_manager
+                    .compact_history(&self.params.session.id, COMPACT_KEEP_LAST)
+                {
                     error!(error = %e, "failed to persist compact marker");
                 }
-                compact_messages(&mut self.params.messages, 10);
-                info!(after = self.params.messages.len(), "compaction complete");
+                compact_messages(&mut self.params.messages, COMPACT_KEEP_LAST);
+                let after = self.params.messages.len();
+                let removed = before - after;
+                info!(after, removed, "compaction complete");
+                self.emit(AgentEventPayload::Compacted {
+                    kept: after,
+                    removed,
+                })
+                .await?;
             }
             ControlCommand::ModelSwitch(new_model) => {
                 info!(from = %self.params.model, to = %new_model, "switching model");
                 let model_info = get_model_info(&new_model);
                 self.max_context_tokens = model_info.as_ref().map_or(200_000, |m| m.context_window);
-                self.max_output_tokens = model_info.as_ref().map_or(16_384, |m| m.max_output_tokens);
+                self.max_output_tokens =
+                    model_info.as_ref().map_or(16_384, |m| m.max_output_tokens);
                 self.params.model = new_model;
             }
             ControlCommand::Rewind { turn_index } => {
@@ -120,23 +146,35 @@ impl AgentLoopRunner {
         info!(turn_index, truncate_at, "rewinding conversation");
 
         if truncate_at == 0 {
-            if let Err(e) = self.params.session_manager.clear_history(&self.params.session.id) {
+            if let Err(e) = self
+                .params
+                .session_manager
+                .clear_history(&self.params.session.id)
+            {
                 error!(error = %e, "failed to persist clear marker for rewind");
             }
         } else if let Some(ref id) = self.params.messages[truncate_at].id {
-            if let Err(e) = self.params.session_manager.rewind_to(
-                &self.params.session.id, id,
-            ) {
+            if let Err(e) = self
+                .params
+                .session_manager
+                .rewind_to(&self.params.session.id, id)
+            {
                 error!(error = %e, "failed to persist rewind marker");
             }
         } else {
-            error!(truncate_at, "message at truncate point has no id, skipping marker");
+            error!(
+                truncate_at,
+                "message at truncate point has no id, skipping marker"
+            );
         }
 
         self.params.messages.truncate(truncate_at);
         self.turn_count = self.turn_count.min(turn_index as u32);
         let remaining = detect_turn_boundaries(&self.params.messages).len();
-        self.emit(AgentEventPayload::Rewound { remaining_turns: remaining }).await?;
+        self.emit(AgentEventPayload::Rewound {
+            remaining_turns: remaining,
+        })
+        .await?;
         Ok(())
     }
 }
@@ -166,5 +204,9 @@ pub fn build_user_message(env: &Envelope) -> Message {
             },
         });
     }
-    Message { id: None, role: MessageRole::User, content: blocks }
+    Message {
+        id: None,
+        role: MessageRole::User,
+        content: blocks,
+    }
 }

@@ -15,9 +15,9 @@ impl AcpHandler {
         let params: PromptParams = match serde_json::from_value(params) {
             Ok(p) => p,
             Err(e) => {
-                self.transport.respond_error(
-                    id, crate::jsonrpc::INVALID_REQUEST, &e.to_string(),
-                ).await;
+                self.transport
+                    .respond_error(id, crate::jsonrpc::INVALID_REQUEST, &e.to_string())
+                    .await;
                 return;
             }
         };
@@ -26,26 +26,38 @@ impl AcpHandler {
         let session = match guard.as_ref() {
             Some(s) if s.id == params.session_id => s,
             _ => {
-                self.transport.respond_error(
-                    id, crate::jsonrpc::INVALID_REQUEST, "session not found",
-                ).await;
+                self.transport
+                    .respond_error(id, crate::jsonrpc::INVALID_REQUEST, "session not found")
+                    .await;
                 return;
             }
         };
 
         // Extract text from ACP content blocks
-        let text: String = params.prompt.iter().map(|block| {
-            match block {
+        let text: String = params
+            .prompt
+            .iter()
+            .map(|block| match block {
                 AcpContentBlock::Text { text } => text.as_str(),
-            }
-        }).collect::<Vec<_>>().join("\n");
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
 
         // Forward as Envelope to the agent loop
         let envelope = Envelope::new(MessageSource::Human, "main", text);
-        if session.input_tx.send(AgentInput::Message(envelope)).await.is_err() {
-            self.transport.respond_error(
-                id, crate::jsonrpc::INTERNAL_ERROR, "agent loop disconnected",
-            ).await;
+        if session
+            .input_tx
+            .send(AgentInput::Message(envelope))
+            .await
+            .is_err()
+        {
+            self.transport
+                .respond_error(
+                    id,
+                    crate::jsonrpc::INTERNAL_ERROR,
+                    "agent loop disconnected",
+                )
+                .await;
             return;
         }
 
@@ -57,10 +69,7 @@ impl AcpHandler {
         self.transport.respond(id, value).await;
     }
 
-    async fn run_event_loop(
-        &self,
-        session: &crate::handler::ActiveSession,
-    ) -> StopReason {
+    async fn run_event_loop(&self, session: &crate::handler::ActiveSession) -> StopReason {
         let mut rx = session.event_rx.lock().await;
         loop {
             match rx.recv().await {

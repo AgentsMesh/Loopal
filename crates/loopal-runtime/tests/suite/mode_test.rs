@@ -1,5 +1,5 @@
-use loopal_runtime::AgentMode;
 use loopal_protocol::AgentMode as TypesAgentMode;
+use loopal_runtime::AgentMode;
 
 #[test]
 fn test_act_mode_empty_suffix() {

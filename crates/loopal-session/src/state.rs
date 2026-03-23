@@ -90,8 +90,7 @@ impl SessionState {
 
     /// Total token count for context usage display.
     pub fn token_count(&self) -> u32 {
-        self.input_tokens + self.output_tokens
-            + self.cache_creation_tokens + self.cache_read_tokens
+        self.input_tokens + self.output_tokens + self.cache_creation_tokens + self.cache_read_tokens
     }
 
     /// Current turn working duration.

@@ -1,17 +1,12 @@
 use std::path::{Path, PathBuf};
 
-use loopal_config::{
-    ResolvedPolicy, SandboxConfig, SandboxPolicy,
-};
+use loopal_config::{ResolvedPolicy, SandboxConfig, SandboxPolicy};
 
 use crate::sensitive_patterns::SENSITIVE_FILE_GLOBS;
 
 /// Resolve a `SandboxConfig` from settings into a `ResolvedPolicy`
 /// by combining user config with defaults and workspace context.
-pub fn resolve_policy(
-    config: &SandboxConfig,
-    cwd: &Path,
-) -> ResolvedPolicy {
+pub fn resolve_policy(config: &SandboxConfig, cwd: &Path) -> ResolvedPolicy {
     if config.policy == SandboxPolicy::Disabled {
         return ResolvedPolicy {
             policy: SandboxPolicy::Disabled,
@@ -49,10 +44,8 @@ pub fn resolve_policy(
     }
 
     // Deny-write globs: defaults + user config
-    let mut deny_write_globs: Vec<String> = SENSITIVE_FILE_GLOBS
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
+    let mut deny_write_globs: Vec<String> =
+        SENSITIVE_FILE_GLOBS.iter().map(|s| s.to_string()).collect();
     deny_write_globs.extend(config.filesystem.deny_write.clone());
 
     // Deny-read globs: user config only (no defaults — reads are open)

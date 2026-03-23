@@ -18,7 +18,9 @@ pub fn scan_skills_dir(dir: &Path) -> Vec<Skill> {
 
 /// Scan a directory for `.md` files and parse each as a skill.
 fn load_skills_from_dir(dir: &Path, map: &mut HashMap<String, Skill>) {
-    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
 
     for entry in entries.flatten() {
         let path = entry.path();
@@ -39,7 +41,9 @@ fn load_skills_from_dir(dir: &Path, map: &mut HashMap<String, Skill>) {
 
 /// Format a human-readable skills summary for the system prompt.
 pub fn format_skills_summary(skills: &[Skill]) -> String {
-    if skills.is_empty() { return String::new(); }
+    if skills.is_empty() {
+        return String::new();
+    }
     let mut s = String::from("# Available Skills\nUser can invoke these via /name:\n");
     for skill in skills {
         s.push_str(&format!("- {}: {}\n", skill.name, skill.description));

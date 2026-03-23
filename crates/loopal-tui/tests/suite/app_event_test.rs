@@ -1,8 +1,8 @@
+use loopal_protocol::ControlCommand;
+use loopal_protocol::{AgentEvent, AgentEventPayload, UserQuestionResponse};
 use loopal_session::SessionController;
 use loopal_tui::app::App;
 use loopal_tui::command::builtin_entries;
-use loopal_protocol::ControlCommand;
-use loopal_protocol::{AgentEvent, AgentEventPayload, UserQuestionResponse};
 use tokio::sync::mpsc;
 
 fn make_app() -> App {
@@ -14,7 +14,9 @@ fn make_app() -> App {
         "act".to_string(),
         control_tx,
         perm_tx,
-        question_tx, Default::default(), std::sync::Arc::new(tokio::sync::Notify::new()),
+        question_tx,
+        Default::default(),
+        std::sync::Arc::new(tokio::sync::Notify::new()),
     );
     App::new(session, builtin_entries(), std::env::temp_dir())
 }
@@ -22,24 +24,28 @@ fn make_app() -> App {
 #[test]
 fn test_handle_stream_event_buffers_text() {
     let app = make_app();
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::Stream {
-        text: "Hello ".to_string(),
-    }));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::Stream {
+            text: "Hello ".to_string(),
+        }));
     assert_eq!(app.session.lock().streaming_text, "Hello ");
 
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::Stream {
-        text: "world".to_string(),
-    }));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::Stream {
+            text: "world".to_string(),
+        }));
     assert_eq!(app.session.lock().streaming_text, "Hello world");
 }
 
 #[test]
 fn test_handle_awaiting_input_flushes_and_increments_turn() {
     let app = make_app();
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::Stream {
-        text: "response text".to_string(),
-    }));
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::Stream {
+            text: "response text".to_string(),
+        }));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
 
     let state = app.session.lock();
     assert!(state.streaming_text.is_empty());
@@ -52,9 +58,10 @@ fn test_handle_awaiting_input_flushes_and_increments_turn() {
 #[test]
 fn test_handle_error_event() {
     let app = make_app();
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::Error {
-        message: "something went wrong".to_string(),
-    }));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::Error {
+            message: "something went wrong".to_string(),
+        }));
 
     let state = app.session.lock();
     assert_eq!(state.messages.len(), 1);
@@ -65,14 +72,15 @@ fn test_handle_error_event() {
 #[test]
 fn test_handle_token_usage() {
     let app = make_app();
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::TokenUsage {
-        input_tokens: 100,
-        output_tokens: 50,
-        context_window: 200_000,
-        cache_creation_input_tokens: 0,
-        cache_read_input_tokens: 0,
-        thinking_tokens: 0,
-    }));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::TokenUsage {
+            input_tokens: 100,
+            output_tokens: 50,
+            context_window: 200_000,
+            cache_creation_input_tokens: 0,
+            cache_read_input_tokens: 0,
+            thinking_tokens: 0,
+        }));
 
     let state = app.session.lock();
     assert_eq!(state.token_count(), 150);
@@ -82,9 +90,10 @@ fn test_handle_token_usage() {
 #[test]
 fn test_handle_mode_changed() {
     let app = make_app();
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::ModeChanged {
-        mode: "plan".to_string(),
-    }));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::ModeChanged {
+            mode: "plan".to_string(),
+        }));
     assert_eq!(app.session.lock().mode, "plan");
 }
 
@@ -92,7 +101,9 @@ fn test_handle_mode_changed() {
 fn test_handle_max_turns_reached() {
     let app = make_app();
     app.session
-        .handle_event(AgentEvent::root(AgentEventPayload::MaxTurnsReached { turns: 50 }));
+        .handle_event(AgentEvent::root(AgentEventPayload::MaxTurnsReached {
+            turns: 50,
+        }));
 
     let state = app.session.lock();
     assert_eq!(state.messages.len(), 1);
@@ -103,7 +114,8 @@ fn test_handle_max_turns_reached() {
 #[test]
 fn test_handle_started_event() {
     let app = make_app();
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::Started));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::Started));
     let state = app.session.lock();
     assert!(state.messages.is_empty());
     assert!(state.streaming_text.is_empty());
@@ -112,10 +124,12 @@ fn test_handle_started_event() {
 #[test]
 fn test_handle_finished_event_flushes_streaming() {
     let app = make_app();
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::Stream {
-        text: "final text".to_string(),
-    }));
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::Finished));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::Stream {
+            text: "final text".to_string(),
+        }));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::Finished));
 
     let state = app.session.lock();
     assert!(state.streaming_text.is_empty());
@@ -126,7 +140,8 @@ fn test_handle_finished_event_flushes_streaming() {
 #[test]
 fn test_flush_streaming_empty_is_noop() {
     let app = make_app();
-    app.session.handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
     let state = app.session.lock();
     assert!(state.messages.is_empty());
     assert_eq!(state.turn_count, 1);

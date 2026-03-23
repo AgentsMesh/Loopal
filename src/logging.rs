@@ -12,7 +12,9 @@ pub fn init_logging() -> tracing_appender::non_blocking::WorkerGuard {
 
     // Read log level from LOOPAL_LOG env var, default to "info"
     let env_filter = std::env::var("LOOPAL_LOG").unwrap_or_else(|_| "info".to_string());
-    let filter = format!("loopal={env_filter},loopal_runtime={env_filter},loopal_provider={env_filter},loopal_kernel={env_filter},loopal_mcp={env_filter},loopal_tools={env_filter},loopal_context={env_filter},loopal_hooks={env_filter},loopal_storage={env_filter},loopal_config={env_filter}");
+    let filter = format!(
+        "loopal={env_filter},loopal_runtime={env_filter},loopal_provider={env_filter},loopal_kernel={env_filter},loopal_mcp={env_filter},loopal_tools={env_filter},loopal_context={env_filter},loopal_hooks={env_filter},loopal_storage={env_filter},loopal_config={env_filter}"
+    );
 
     tracing_subscriber::fmt()
         .with_env_filter(filter)

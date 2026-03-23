@@ -129,6 +129,11 @@ mod tests {
         ]);
         let result = styled_wrap(&line, 80);
         assert_eq!(result.len(), 1);
-        assert!(result[0].spans[0].style.add_modifier.contains(Modifier::BOLD));
+        assert!(
+            result[0].spans[0]
+                .style
+                .add_modifier
+                .contains(Modifier::BOLD)
+        );
     }
 }

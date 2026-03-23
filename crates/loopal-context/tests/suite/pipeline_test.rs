@@ -48,12 +48,8 @@ fn make_ctx() -> MiddlewareContext {
 #[tokio::test]
 async fn test_pipeline_executes_in_order() {
     let mut pipeline = ContextPipeline::new();
-    pipeline.add(Box::new(AppendMiddleware {
-        suffix: "A".into(),
-    }));
-    pipeline.add(Box::new(AppendMiddleware {
-        suffix: "B".into(),
-    }));
+    pipeline.add(Box::new(AppendMiddleware { suffix: "A".into() }));
+    pipeline.add(Box::new(AppendMiddleware { suffix: "B".into() }));
     let mut ctx = make_ctx();
     pipeline.execute(&mut ctx).await.unwrap();
     assert_eq!(ctx.system_prompt, "AB");
@@ -63,9 +59,7 @@ async fn test_pipeline_executes_in_order() {
 async fn test_pipeline_stops_on_error() {
     let mut pipeline = ContextPipeline::new();
     pipeline.add(Box::new(FailMiddleware));
-    pipeline.add(Box::new(AppendMiddleware {
-        suffix: "X".into(),
-    }));
+    pipeline.add(Box::new(AppendMiddleware { suffix: "X".into() }));
     let mut ctx = make_ctx();
     assert!(pipeline.execute(&mut ctx).await.is_err());
     assert_eq!(ctx.system_prompt, ""); // second middleware never ran

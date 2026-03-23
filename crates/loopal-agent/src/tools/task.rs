@@ -25,7 +25,9 @@ pub struct TaskCreateTool;
 
 #[async_trait]
 impl Tool for TaskCreateTool {
-    fn name(&self) -> &str { "TaskCreate" }
+    fn name(&self) -> &str {
+        "TaskCreate"
+    }
     fn description(&self) -> &str {
         "Create a new task in the shared task list."
     }
@@ -41,14 +43,21 @@ impl Tool for TaskCreateTool {
             "required": ["subject", "description"]
         })
     }
-    fn permission(&self) -> PermissionLevel { PermissionLevel::ReadOnly }
+    fn permission(&self) -> PermissionLevel {
+        PermissionLevel::ReadOnly
+    }
 
     async fn execute(
-        &self, input: serde_json::Value, ctx: &ToolContext,
+        &self,
+        input: serde_json::Value,
+        ctx: &ToolContext,
     ) -> Result<ToolResult, LoopalError> {
         let shared = extract_shared(ctx)?;
         let subject = input.get("subject").and_then(|v| v.as_str()).unwrap_or("");
-        let desc = input.get("description").and_then(|v| v.as_str()).unwrap_or("");
+        let desc = input
+            .get("description")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
         let mut task = shared.task_store.create(subject, desc);
         // Apply optional fields after creation
         let mut needs_update = false;
@@ -61,9 +70,7 @@ impl Tool for TaskCreateTool {
             patch.metadata = Some(meta.clone());
             needs_update = true;
         }
-        if needs_update
-            && let Some(updated) = shared.task_store.update(&task.id, patch)
-        {
+        if needs_update && let Some(updated) = shared.task_store.update(&task.id, patch) {
             task = updated;
         }
         let json = serde_json::to_string_pretty(&task).unwrap_or_default();
@@ -77,7 +84,9 @@ pub struct TaskUpdateTool;
 
 #[async_trait]
 impl Tool for TaskUpdateTool {
-    fn name(&self) -> &str { "TaskUpdate" }
+    fn name(&self) -> &str {
+        "TaskUpdate"
+    }
     fn description(&self) -> &str {
         "Update an existing task (status, owner, dependencies, etc.)."
     }
@@ -98,19 +107,35 @@ impl Tool for TaskUpdateTool {
             "required": ["taskId"]
         })
     }
-    fn permission(&self) -> PermissionLevel { PermissionLevel::ReadOnly }
+    fn permission(&self) -> PermissionLevel {
+        PermissionLevel::ReadOnly
+    }
 
     async fn execute(
-        &self, input: serde_json::Value, ctx: &ToolContext,
+        &self,
+        input: serde_json::Value,
+        ctx: &ToolContext,
     ) -> Result<ToolResult, LoopalError> {
         let shared = extract_shared(ctx)?;
         let id = input.get("taskId").and_then(|v| v.as_str()).unwrap_or("");
 
         let patch = TaskPatch {
-            status: input.get("status").and_then(|v| v.as_str()).and_then(parse_status),
-            subject: input.get("subject").and_then(|v| v.as_str()).map(String::from),
-            description: input.get("description").and_then(|v| v.as_str()).map(String::from),
-            active_form: input.get("activeForm").and_then(|v| v.as_str()).map(String::from),
+            status: input
+                .get("status")
+                .and_then(|v| v.as_str())
+                .and_then(parse_status),
+            subject: input
+                .get("subject")
+                .and_then(|v| v.as_str())
+                .map(String::from),
+            description: input
+                .get("description")
+                .and_then(|v| v.as_str())
+                .map(String::from),
+            active_form: input
+                .get("activeForm")
+                .and_then(|v| v.as_str())
+                .map(String::from),
             owner: input.get("owner").map(|v| v.as_str().map(String::from)),
             add_blocked_by: parse_string_array(&input, "addBlockedBy"),
             add_blocks: parse_string_array(&input, "addBlocks"),
@@ -133,15 +158,23 @@ pub struct TaskListTool;
 
 #[async_trait]
 impl Tool for TaskListTool {
-    fn name(&self) -> &str { "TaskList" }
-    fn description(&self) -> &str { "List all tasks in the shared task list." }
+    fn name(&self) -> &str {
+        "TaskList"
+    }
+    fn description(&self) -> &str {
+        "List all tasks in the shared task list."
+    }
     fn parameters_schema(&self) -> serde_json::Value {
         serde_json::json!({ "type": "object", "properties": {} })
     }
-    fn permission(&self) -> PermissionLevel { PermissionLevel::ReadOnly }
+    fn permission(&self) -> PermissionLevel {
+        PermissionLevel::ReadOnly
+    }
 
     async fn execute(
-        &self, _input: serde_json::Value, ctx: &ToolContext,
+        &self,
+        _input: serde_json::Value,
+        ctx: &ToolContext,
     ) -> Result<ToolResult, LoopalError> {
         let shared = extract_shared(ctx)?;
         let tasks = shared.task_store.list();
@@ -156,8 +189,12 @@ pub struct TaskGetTool;
 
 #[async_trait]
 impl Tool for TaskGetTool {
-    fn name(&self) -> &str { "TaskGet" }
-    fn description(&self) -> &str { "Get full details of a task by ID." }
+    fn name(&self) -> &str {
+        "TaskGet"
+    }
+    fn description(&self) -> &str {
+        "Get full details of a task by ID."
+    }
     fn parameters_schema(&self) -> serde_json::Value {
         serde_json::json!({
             "type": "object",
@@ -167,10 +204,14 @@ impl Tool for TaskGetTool {
             "required": ["taskId"]
         })
     }
-    fn permission(&self) -> PermissionLevel { PermissionLevel::ReadOnly }
+    fn permission(&self) -> PermissionLevel {
+        PermissionLevel::ReadOnly
+    }
 
     async fn execute(
-        &self, input: serde_json::Value, ctx: &ToolContext,
+        &self,
+        input: serde_json::Value,
+        ctx: &ToolContext,
     ) -> Result<ToolResult, LoopalError> {
         let shared = extract_shared(ctx)?;
         let id = input.get("taskId").and_then(|v| v.as_str()).unwrap_or("");

@@ -18,10 +18,17 @@ pub struct VisualLine {
 /// display columns. A `wrap_width` of 0 disables wrapping.
 pub fn visual_lines(text: &str, wrap_width: usize) -> Vec<VisualLine> {
     let mut lines = Vec::new();
-    let wrap = if wrap_width == 0 { usize::MAX } else { wrap_width };
+    let wrap = if wrap_width == 0 {
+        usize::MAX
+    } else {
+        wrap_width
+    };
     for (hard_start, hard_line) in split_newlines(text) {
         if hard_line.is_empty() {
-            lines.push(VisualLine { byte_start: hard_start, byte_len: 0 });
+            lines.push(VisualLine {
+                byte_start: hard_start,
+                byte_len: 0,
+            });
             continue;
         }
         let mut col = 0usize;
@@ -45,7 +52,10 @@ pub fn visual_lines(text: &str, wrap_width: usize) -> Vec<VisualLine> {
         });
     }
     if lines.is_empty() {
-        lines.push(VisualLine { byte_start: 0, byte_len: 0 });
+        lines.push(VisualLine {
+            byte_start: 0,
+            byte_len: 0,
+        });
     }
     lines
 }
@@ -67,7 +77,9 @@ pub fn cursor_to_row_col(text: &str, cursor: usize, lines: &[VisualLine]) -> (us
 pub fn cursor_up(text: &str, cursor: usize, wrap_width: usize) -> Option<usize> {
     let lines = visual_lines(text, wrap_width);
     let (row, col) = cursor_to_row_col(text, cursor, &lines);
-    if row == 0 { return None; }
+    if row == 0 {
+        return None;
+    }
     Some(col_to_byte(&lines[row - 1], text, col))
 }
 
@@ -75,7 +87,9 @@ pub fn cursor_up(text: &str, cursor: usize, wrap_width: usize) -> Option<usize> 
 pub fn cursor_down(text: &str, cursor: usize, wrap_width: usize) -> Option<usize> {
     let lines = visual_lines(text, wrap_width);
     let (row, col) = cursor_to_row_col(text, cursor, &lines);
-    if row + 1 >= lines.len() { return None; }
+    if row + 1 >= lines.len() {
+        return None;
+    }
     Some(col_to_byte(&lines[row + 1], text, col))
 }
 

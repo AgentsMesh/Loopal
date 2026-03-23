@@ -20,16 +20,13 @@ pub(super) struct MarkdownStyles {
 impl Default for MarkdownStyles {
     fn default() -> Self {
         Self {
-            h1: Style::default()
-                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+            h1: Style::default().add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
             h2: Style::default().add_modifier(Modifier::BOLD),
-            h3: Style::default()
-                .add_modifier(Modifier::BOLD | Modifier::ITALIC),
+            h3: Style::default().add_modifier(Modifier::BOLD | Modifier::ITALIC),
             h4_h6: Style::default().add_modifier(Modifier::ITALIC),
             emphasis: Style::default().add_modifier(Modifier::ITALIC),
             strong: Style::default().add_modifier(Modifier::BOLD),
-            strikethrough: Style::default()
-                .add_modifier(Modifier::CROSSED_OUT),
+            strikethrough: Style::default().add_modifier(Modifier::CROSSED_OUT),
             code_inline: Style::default().fg(Color::Cyan),
             link: Style::default()
                 .fg(Color::Cyan)

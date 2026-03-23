@@ -15,7 +15,7 @@ fn test_agent_status_all_variants_debug() {
         AgentStatus::Error,
     ];
     for v in &variants {
-        let debug = format!("{:?}", v);
+        let debug = format!("{v:?}");
         assert!(!debug.is_empty());
     }
 }

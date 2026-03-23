@@ -61,13 +61,11 @@ async fn price_limit_error_message_contains_amounts() {
     let msg = err.to_string();
     assert!(
         msg.contains("7.5") && msg.contains("5.0"),
-        "error message should contain cost ($7.5) and max ($5.0), got: {}",
-        msg
+        "error message should contain cost ($7.5) and max ($5.0), got: {msg}"
     );
     assert!(
         msg.contains("price limit"),
-        "error message should mention 'price limit', got: {}",
-        msg
+        "error message should mention 'price limit', got: {msg}"
     );
 }
 

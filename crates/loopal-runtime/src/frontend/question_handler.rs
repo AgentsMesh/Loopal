@@ -21,7 +21,10 @@ impl TuiQuestionHandler {
         event_tx: mpsc::Sender<AgentEvent>,
         response_rx: mpsc::Receiver<UserQuestionResponse>,
     ) -> Self {
-        Self { event_tx, response_rx: Mutex::new(response_rx) }
+        Self {
+            event_tx,
+            response_rx: Mutex::new(response_rx),
+        }
     }
 }
 
@@ -29,9 +32,7 @@ impl TuiQuestionHandler {
 impl QuestionHandler for TuiQuestionHandler {
     async fn ask(&self, questions: Vec<Question>) -> Vec<String> {
         let id = uuid::Uuid::new_v4().to_string();
-        let event = AgentEvent::root(AgentEventPayload::UserQuestionRequest {
-            id, questions,
-        });
+        let event = AgentEvent::root(AgentEventPayload::UserQuestionRequest { id, questions });
         if self.event_tx.send(event).await.is_err() {
             warn!("question event channel closed");
             return vec!["(channel closed)".into()];

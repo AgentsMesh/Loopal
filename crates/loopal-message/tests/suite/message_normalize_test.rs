@@ -44,11 +44,7 @@ fn test_normalize_system_messages_filtered_out() {
 
 #[test]
 fn test_normalize_merges_user_after_system_removal() {
-    let messages = vec![
-        Message::user("a"),
-        Message::system("s"),
-        Message::user("b"),
-    ];
+    let messages = vec![Message::user("a"), Message::system("s"), Message::user("b")];
     let normalized = normalize_messages(&messages);
     assert_eq!(normalized.len(), 1);
     assert_eq!(normalized[0].role, MessageRole::User);

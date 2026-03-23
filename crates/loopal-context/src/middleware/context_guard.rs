@@ -31,7 +31,9 @@ impl Middleware for ContextGuard {
             let estimated = estimate_messages_tokens(&ctx.messages);
             if estimated <= threshold {
                 tracing::debug!(
-                    estimated, threshold, messages = ctx.messages.len(),
+                    estimated,
+                    threshold,
+                    messages = ctx.messages.len(),
                     "context guard: within budget, no action"
                 );
                 return Ok(());
@@ -42,7 +44,9 @@ impl Middleware for ContextGuard {
                 if size < MIN_TRUNCATABLE_BYTES {
                     // No large ToolResults left — fall back to message compaction
                     tracing::info!(
-                        estimated, threshold, iteration,
+                        estimated,
+                        threshold,
+                        iteration,
                         "context guard: no large ToolResults, falling back to compact"
                     );
                     compact_messages(&mut ctx.messages, 5);
@@ -50,8 +54,12 @@ impl Middleware for ContextGuard {
                 }
 
                 tracing::info!(
-                    estimated, threshold, iteration,
-                    msg_idx = mi, block_idx = bi, block_bytes = size,
+                    estimated,
+                    threshold,
+                    iteration,
+                    msg_idx = mi,
+                    block_idx = bi,
+                    block_bytes = size,
                     "context guard: truncating largest ToolResult"
                 );
                 truncate_block_content(
@@ -62,7 +70,8 @@ impl Middleware for ContextGuard {
             } else {
                 // No ToolResults at all — compact messages
                 tracing::info!(
-                    estimated, threshold,
+                    estimated,
+                    threshold,
                     "context guard: no ToolResults found, compacting messages"
                 );
                 compact_messages(&mut ctx.messages, 5);

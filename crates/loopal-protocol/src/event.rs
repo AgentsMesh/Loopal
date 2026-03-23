@@ -13,12 +13,18 @@ pub struct AgentEvent {
 impl AgentEvent {
     /// Convenience: create a root-agent event.
     pub fn root(payload: AgentEventPayload) -> Self {
-        Self { agent_name: None, payload }
+        Self {
+            agent_name: None,
+            payload,
+        }
     }
 
     /// Convenience: create a named sub-agent event.
     pub fn named(name: impl Into<String>, payload: AgentEventPayload) -> Self {
-        Self { agent_name: Some(name.into()), payload }
+        Self {
+            agent_name: Some(name.into()),
+            payload,
+        }
     }
 }
 
@@ -66,7 +72,10 @@ pub enum AgentEventPayload {
     MaxTurnsReached { turns: u32 },
 
     /// LLM output truncated by max_tokens; auto-continuing.
-    AutoContinuation { continuation: u32, max_continuations: u32 },
+    AutoContinuation {
+        continuation: u32,
+        max_continuations: u32,
+    },
 
     /// Token usage update
     TokenUsage {
@@ -105,6 +114,9 @@ pub enum AgentEventPayload {
 
     /// Conversation was rewound; remaining_turns is the count after truncation.
     Rewound { remaining_turns: usize },
+
+    /// Conversation was compacted; old messages removed to reduce context.
+    Compacted { kept: usize, removed: usize },
 
     /// Agent work was interrupted by user (ESC or new message while busy).
     Interrupted,

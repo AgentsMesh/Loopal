@@ -1,7 +1,7 @@
 use futures::stream::Stream;
 use loopal_error::{LoopalError, ProviderError};
 use loopal_provider_api::{StopReason, StreamChunk};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::VecDeque;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -60,7 +60,7 @@ pub(crate) fn parse_openai_event(
             return vec![Err(ProviderError::SseParse(format!(
                 "invalid JSON: {e}: {data}"
             ))
-            .into())]
+            .into())];
         }
     };
 
@@ -71,17 +71,19 @@ pub(crate) fn parse_openai_event(
         && let (Some(input), Some(output)) = (
             usage["prompt_tokens"].as_u64(),
             usage["completion_tokens"].as_u64(),
-        ) {
-            let thinking_tokens = usage["completion_tokens_details"]["reasoning_tokens"]
-                .as_u64().unwrap_or(0) as u32;
-            chunks.push(Ok(StreamChunk::Usage {
-                input_tokens: input as u32,
-                output_tokens: output as u32,
-                cache_creation_input_tokens: 0,
-                cache_read_input_tokens: 0,
-                thinking_tokens,
-            }));
-        }
+        )
+    {
+        let thinking_tokens = usage["completion_tokens_details"]["reasoning_tokens"]
+            .as_u64()
+            .unwrap_or(0) as u32;
+        chunks.push(Ok(StreamChunk::Usage {
+            input_tokens: input as u32,
+            output_tokens: output as u32,
+            cache_creation_input_tokens: 0,
+            cache_read_input_tokens: 0,
+            thinking_tokens,
+        }));
+    }
 
     let choices = match parsed["choices"].as_array() {
         Some(c) => c,
@@ -94,11 +96,12 @@ pub(crate) fn parse_openai_event(
 
         // Text content
         if let Some(content) = delta["content"].as_str()
-            && !content.is_empty() {
-                chunks.push(Ok(StreamChunk::Text {
-                    text: content.to_string(),
-                }));
-            }
+            && !content.is_empty()
+        {
+            chunks.push(Ok(StreamChunk::Text {
+                text: content.to_string(),
+            }));
+        }
 
         // Tool calls
         if let Some(tool_calls) = delta["tool_calls"].as_array() {
@@ -112,7 +115,9 @@ pub(crate) fn parse_openai_event(
 
                 // Grow the accumulator
                 while state.calls.len() <= index {
-                    state.calls.push((String::new(), String::new(), String::new()));
+                    state
+                        .calls
+                        .push((String::new(), String::new(), String::new()));
                 }
 
                 if let Some(id) = tc["id"].as_str() {
@@ -128,7 +133,8 @@ pub(crate) fn parse_openai_event(
         }
 
         // On finish, emit accumulated tool calls
-        if finish_reason == Some("tool_calls") || finish_reason == Some("stop")
+        if finish_reason == Some("tool_calls")
+            || finish_reason == Some("stop")
             || finish_reason == Some("length")
         {
             for (id, name, args) in state.calls.drain(..) {

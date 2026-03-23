@@ -1,6 +1,6 @@
 use async_trait::async_trait;
-use loopal_protocol::{Envelope, MessageSource};
 use loopal_error::LoopalError;
+use loopal_protocol::{Envelope, MessageSource};
 use loopal_tool_api::PermissionLevel;
 use loopal_tool_api::{Tool, ToolContext, ToolResult};
 
@@ -11,7 +11,9 @@ pub struct SendMessageTool;
 
 #[async_trait]
 impl Tool for SendMessageTool {
-    fn name(&self) -> &str { "SendMessage" }
+    fn name(&self) -> &str {
+        "SendMessage"
+    }
 
     fn description(&self) -> &str {
         "Send a message to another agent. Supports types: \
@@ -45,7 +47,9 @@ impl Tool for SendMessageTool {
         })
     }
 
-    fn permission(&self) -> PermissionLevel { PermissionLevel::ReadOnly }
+    fn permission(&self) -> PermissionLevel {
+        PermissionLevel::ReadOnly
+    }
 
     async fn execute(
         &self,
@@ -54,7 +58,10 @@ impl Tool for SendMessageTool {
     ) -> Result<ToolResult, LoopalError> {
         let shared = extract_shared(ctx)?;
 
-        let msg_type = input.get("type").and_then(|v| v.as_str()).unwrap_or("message");
+        let msg_type = input
+            .get("type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("message");
         let content = input.get("content").and_then(|v| v.as_str()).unwrap_or("");
         let recipient = input.get("recipient").and_then(|v| v.as_str());
 
@@ -77,9 +84,14 @@ impl Tool for SendMessageTool {
                     "", // target filled per-recipient by broadcast()
                     content,
                 );
-                match shared.router.broadcast(envelope, Some(&shared.agent_name)).await {
+                match shared
+                    .router
+                    .broadcast(envelope, Some(&shared.agent_name))
+                    .await
+                {
                     Ok(delivered) => Ok(ToolResult::success(format!(
-                        "Broadcast sent to {} agents", delivered.len()
+                        "Broadcast sent to {} agents",
+                        delivered.len()
                     ))),
                     Err(e) => Ok(ToolResult::error(e)),
                 }
@@ -89,18 +101,24 @@ impl Tool for SendMessageTool {
                 let registry = shared.registry.lock().await;
                 if let Some(handle) = registry.get(target) {
                     handle.cancel_token.cancel();
-                    Ok(ToolResult::success(format!("Shutdown request sent to '{target}'")))
+                    Ok(ToolResult::success(format!(
+                        "Shutdown request sent to '{target}'"
+                    )))
                 } else {
                     Ok(ToolResult::error(format!("Agent '{target}' not found")))
                 }
             }
-            other => Ok(ToolResult::error(format!("Unknown message type: '{other}'"))),
+            other => Ok(ToolResult::error(format!(
+                "Unknown message type: '{other}'"
+            ))),
         }
     }
 }
 
 fn require_recipient(r: Option<&str>) -> Result<&str, LoopalError> {
-    r.ok_or_else(|| LoopalError::Tool(
-        loopal_error::ToolError::InvalidInput("missing 'recipient'".into()),
-    ))
+    r.ok_or_else(|| {
+        LoopalError::Tool(loopal_error::ToolError::InvalidInput(
+            "missing 'recipient'".into(),
+        ))
+    })
 }

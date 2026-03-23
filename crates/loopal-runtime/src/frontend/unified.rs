@@ -1,19 +1,19 @@
 use async_trait::async_trait;
 use tokio::sync::{Mutex, mpsc};
-use tracing::{info, warn};
 use tokio_util::sync::CancellationToken;
+use tracing::{info, warn};
 
 use crate::agent_input::AgentInput;
+use crate::frontend::traits::{AgentFrontend, EventEmitter};
+use loopal_error::Result;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::Envelope;
-use loopal_error::Result;
 use loopal_protocol::{AgentEvent, AgentEventPayload};
-use crate::frontend::traits::{AgentFrontend, EventEmitter};
 use loopal_tool_api::PermissionDecision;
 
+use super::emitter::ChannelEventEmitter;
 use super::permission_handler::PermissionHandler;
 use super::question_handler::QuestionHandler;
-use super::emitter::ChannelEventEmitter;
 
 /// Unified frontend merging root (channel-based) and sub-agent (autopilot) behaviour.
 ///
@@ -43,10 +43,13 @@ impl UnifiedFrontend {
         question_handler: Box<dyn QuestionHandler>,
     ) -> Self {
         Self {
-            agent_name, event_tx,
+            agent_name,
+            event_tx,
             mailbox_rx: Mutex::new(mailbox_rx),
             control_rx: Mutex::new(control_rx),
-            cancel_token, permission_handler, question_handler,
+            cancel_token,
+            permission_handler,
+            question_handler,
         }
     }
 
@@ -71,9 +74,7 @@ impl AgentFrontend for UnifiedFrontend {
             // Root: propagate send errors
             self.event_tx.send(event).await.map_err(|e| {
                 warn!(error = %e, "event channel closed");
-                loopal_error::LoopalError::Other(
-                    "event channel closed".into(),
-                )
+                loopal_error::LoopalError::Other("event channel closed".into())
             })
         }
     }

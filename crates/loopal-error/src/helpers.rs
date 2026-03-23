@@ -31,8 +31,7 @@ impl ProviderError {
         match self {
             ProviderError::ContextOverflow { .. } => true,
             ProviderError::Api { status, message } if *status == 400 => {
-                message.contains("prompt is too long")
-                    || message.contains("maximum context length")
+                message.contains("prompt is too long") || message.contains("maximum context length")
             }
             _ => false,
         }
@@ -50,7 +49,10 @@ impl ProviderError {
 impl LoopalError {
     /// Check if this is a rate limit error
     pub fn is_rate_limited(&self) -> bool {
-        matches!(self, LoopalError::Provider(ProviderError::RateLimited { .. }))
+        matches!(
+            self,
+            LoopalError::Provider(ProviderError::RateLimited { .. })
+        )
     }
 
     /// Check if this error is retryable (rate limit, server errors, etc.)

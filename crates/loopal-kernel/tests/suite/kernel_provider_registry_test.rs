@@ -1,15 +1,18 @@
-use loopal_provider::ProviderRegistry;
 use loopal_config::{OpenAiCompatConfig, ProviderConfig, ProvidersConfig, Settings};
+use loopal_provider::ProviderRegistry;
 
 #[test]
 fn test_register_providers_no_keys_no_crash() {
     // With no config keys, register_providers should not crash.
-    let settings = Settings { providers: ProvidersConfig {
-        anthropic: None,
-        openai: None,
-        google: None,
-        openai_compat: vec![],
-    }, ..Default::default() };
+    let settings = Settings {
+        providers: ProvidersConfig {
+            anthropic: None,
+            openai: None,
+            google: None,
+            openai_compat: vec![],
+        },
+        ..Default::default()
+    };
 
     let mut registry = ProviderRegistry::new();
     // This should not panic regardless of what env vars are set
@@ -30,12 +33,15 @@ fn test_register_providers_no_config_no_env_vars() {
         std::env::remove_var("GOOGLE_API_KEY");
     }
 
-    let settings = Settings { providers: ProvidersConfig {
-        anthropic: None,
-        openai: None,
-        google: None,
-        openai_compat: vec![],
-    }, ..Default::default() };
+    let settings = Settings {
+        providers: ProvidersConfig {
+            anthropic: None,
+            openai: None,
+            google: None,
+            openai_compat: vec![],
+        },
+        ..Default::default()
+    };
 
     let mut registry = ProviderRegistry::new();
     loopal_kernel::register_providers(&settings, &mut registry);
@@ -67,37 +73,49 @@ fn test_register_providers_no_config_no_env_vars() {
 
 #[test]
 fn test_register_providers_multiple() {
-    let settings = Settings { providers: ProvidersConfig {
-        anthropic: Some(ProviderConfig {
-            api_key: Some("multi-test-anthro-key".to_string()),
-            api_key_env: None,
-            base_url: None,
-        }),
-        openai: Some(ProviderConfig {
-            api_key: Some("multi-test-openai-key".to_string()),
-            api_key_env: None,
-            base_url: Some("https://openai.example.com".to_string()),
-        }),
-        google: Some(ProviderConfig {
-            api_key: Some("multi-test-google-key".to_string()),
-            api_key_env: None,
-            base_url: Some("https://google.example.com".to_string()),
-        }),
-        openai_compat: vec![OpenAiCompatConfig {
-            name: "together".to_string(),
-            base_url: "https://api.together.xyz/v1".to_string(),
-            api_key: Some("multi-test-together-key".to_string()),
-            api_key_env: None,
-            model_prefix: None,
-        }],
-    }, ..Default::default() };
+    let settings = Settings {
+        providers: ProvidersConfig {
+            anthropic: Some(ProviderConfig {
+                api_key: Some("multi-test-anthro-key".to_string()),
+                api_key_env: None,
+                base_url: None,
+            }),
+            openai: Some(ProviderConfig {
+                api_key: Some("multi-test-openai-key".to_string()),
+                api_key_env: None,
+                base_url: Some("https://openai.example.com".to_string()),
+            }),
+            google: Some(ProviderConfig {
+                api_key: Some("multi-test-google-key".to_string()),
+                api_key_env: None,
+                base_url: Some("https://google.example.com".to_string()),
+            }),
+            openai_compat: vec![OpenAiCompatConfig {
+                name: "together".to_string(),
+                base_url: "https://api.together.xyz/v1".to_string(),
+                api_key: Some("multi-test-together-key".to_string()),
+                api_key_env: None,
+                model_prefix: None,
+            }],
+        },
+        ..Default::default()
+    };
 
     let mut registry = ProviderRegistry::new();
     loopal_kernel::register_providers(&settings, &mut registry);
 
-    assert!(registry.get("anthropic").is_some(), "anthropic should be registered");
-    assert!(registry.get("openai").is_some(), "openai should be registered");
-    assert!(registry.get("google").is_some(), "google should be registered");
+    assert!(
+        registry.get("anthropic").is_some(),
+        "anthropic should be registered"
+    );
+    assert!(
+        registry.get("openai").is_some(),
+        "openai should be registered"
+    );
+    assert!(
+        registry.get("google").is_some(),
+        "google should be registered"
+    );
     assert!(
         registry.get("together").is_some(),
         "together (openai-compat) should be registered"

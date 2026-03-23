@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
 use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use loopal_edit_core::omission_detector::detect_omissions;
 
@@ -47,27 +47,21 @@ impl Tool for EditTool {
     }
 
     async fn execute(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
-        let file_path = input["file_path"]
-            .as_str()
-            .ok_or_else(|| {
-                LoopalError::Tool(loopal_error::ToolError::InvalidInput(
-                    "file_path is required".into(),
-                ))
-            })?;
-        let old_string = input["old_string"]
-            .as_str()
-            .ok_or_else(|| {
-                LoopalError::Tool(loopal_error::ToolError::InvalidInput(
-                    "old_string is required".into(),
-                ))
-            })?;
-        let new_string = input["new_string"]
-            .as_str()
-            .ok_or_else(|| {
-                LoopalError::Tool(loopal_error::ToolError::InvalidInput(
-                    "new_string is required".into(),
-                ))
-            })?;
+        let file_path = input["file_path"].as_str().ok_or_else(|| {
+            LoopalError::Tool(loopal_error::ToolError::InvalidInput(
+                "file_path is required".into(),
+            ))
+        })?;
+        let old_string = input["old_string"].as_str().ok_or_else(|| {
+            LoopalError::Tool(loopal_error::ToolError::InvalidInput(
+                "old_string is required".into(),
+            ))
+        })?;
+        let new_string = input["new_string"].as_str().ok_or_else(|| {
+            LoopalError::Tool(loopal_error::ToolError::InvalidInput(
+                "new_string is required".into(),
+            ))
+        })?;
         let replace_all = input["replace_all"].as_bool().unwrap_or(false);
 
         // Check new_string for LLM omission patterns before applying
@@ -80,10 +74,13 @@ impl Tool for EditTool {
         }
 
         // Backend handles: path resolution, traversal check, read, search_replace, atomic write
-        match ctx.backend.edit(file_path, old_string, new_string, replace_all).await {
+        match ctx
+            .backend
+            .edit(file_path, old_string, new_string, replace_all)
+            .await
+        {
             Ok(_result) => Ok(ToolResult::success(format!(
-                "Successfully edited {}",
-                file_path
+                "Successfully edited {file_path}"
             ))),
             Err(e) => Ok(ToolResult::error(e.to_string())),
         }

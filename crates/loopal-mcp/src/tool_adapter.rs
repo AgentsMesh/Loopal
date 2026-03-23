@@ -48,11 +48,7 @@ impl Tool for McpToolAdapter {
         PermissionLevel::Supervised
     }
 
-    async fn execute(
-        &self,
-        input: Value,
-        _ctx: &ToolContext,
-    ) -> Result<ToolResult, LoopalError> {
+    async fn execute(&self, input: Value, _ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
         let mgr = self.manager.read().await;
         let result = mgr
             .call_tool(&self.server_name, &self.definition.name, input)

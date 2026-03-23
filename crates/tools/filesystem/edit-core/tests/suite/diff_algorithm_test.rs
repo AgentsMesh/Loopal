@@ -1,4 +1,4 @@
-use loopal_edit_core::diff::{compute_diff, format_unified, DiffOp};
+use loopal_edit_core::diff::{DiffOp, compute_diff, format_unified};
 
 #[test]
 fn identical_files_no_diff() {
@@ -24,7 +24,10 @@ fn added_lines() {
     let new = vec!["a", "b", "c"];
     let ops = compute_diff(&old, &new);
     assert!(ops.contains(&DiffOp::Insert("b".into())));
-    assert_eq!(ops.iter().filter(|o| matches!(o, DiffOp::Equal(_))).count(), 2);
+    assert_eq!(
+        ops.iter().filter(|o| matches!(o, DiffOp::Equal(_))).count(),
+        2
+    );
 }
 
 #[test]
@@ -33,7 +36,10 @@ fn deleted_lines() {
     let new = vec!["a", "c"];
     let ops = compute_diff(&old, &new);
     assert!(ops.contains(&DiffOp::Delete("b".into())));
-    assert_eq!(ops.iter().filter(|o| matches!(o, DiffOp::Equal(_))).count(), 2);
+    assert_eq!(
+        ops.iter().filter(|o| matches!(o, DiffOp::Equal(_))).count(),
+        2
+    );
 }
 
 #[test]

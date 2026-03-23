@@ -45,10 +45,11 @@ impl AgentLoopRunner {
                 role: MessageRole::Assistant,
                 content: assistant_content,
             };
-            if let Err(e) = self.params.session_manager.save_message(
-                &self.params.session.id,
-                &mut assistant_msg,
-            ) {
+            if let Err(e) = self
+                .params
+                .session_manager
+                .save_message(&self.params.session.id, &mut assistant_msg)
+            {
                 error!(error = %e, "failed to persist message");
             }
             self.params.messages.push(assistant_msg);

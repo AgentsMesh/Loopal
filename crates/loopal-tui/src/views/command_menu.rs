@@ -54,10 +54,7 @@ pub fn render_command_menu(
                     Style::default().fg(Color::Cyan)
                 },
             ),
-            Span::styled(
-                &entry.description,
-                Style::default().fg(Color::DarkGray),
-            ),
+            Span::styled(&entry.description, Style::default().fg(Color::DarkGray)),
         ]);
 
         let line_area = Rect::new(inner.x, inner.y + i as u16, inner.width, 1);

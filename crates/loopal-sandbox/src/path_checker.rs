@@ -7,11 +7,7 @@ use loopal_config::{PathDecision, ResolvedPolicy, SandboxPolicy};
 ///
 /// `is_write` indicates whether the operation modifies the filesystem.
 /// Returns `PathDecision::Allow` when the operation is permitted.
-pub fn check_path(
-    policy: &ResolvedPolicy,
-    path: &Path,
-    is_write: bool,
-) -> PathDecision {
+pub fn check_path(policy: &ResolvedPolicy, path: &Path, is_write: bool) -> PathDecision {
     if policy.policy == SandboxPolicy::Disabled {
         return PathDecision::Allow;
     }
@@ -33,9 +29,7 @@ pub fn check_path(
 
     // Read-only mode blocks all writes
     if policy.policy == SandboxPolicy::ReadOnly {
-        return PathDecision::DenyWrite(
-            "read-only sandbox: all writes are blocked".into(),
-        );
+        return PathDecision::DenyWrite("read-only sandbox: all writes are blocked".into());
     }
 
     // Check explicit write denials
@@ -86,18 +80,14 @@ fn resolve_canonical(path: &Path) -> Result<PathBuf, String> {
     // Fallback: detect obvious `..` traversal
     let path_str = path.to_string_lossy();
     if path_str.contains("..") {
-        return Err(format!("path contains '..': {}", path_str));
+        return Err(format!("path contains '..': {path_str}"));
     }
 
     Ok(path.to_path_buf())
 }
 
 /// Check if a canonical path matches any deny glob patterns.
-fn check_deny_globs(
-    path: &Path,
-    globs: &[String],
-    operation: &str,
-) -> Option<String> {
+fn check_deny_globs(path: &Path, globs: &[String], operation: &str) -> Option<String> {
     let glob_set = build_glob_set(globs);
     let path_str = path.to_string_lossy();
 

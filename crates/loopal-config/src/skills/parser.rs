@@ -25,7 +25,12 @@ pub fn parse_skill(name: &str, content: &str) -> Skill {
 
     let has_arg = body.contains("$ARGUMENTS");
 
-    Skill { name: name.to_string(), description, has_arg, body }
+    Skill {
+        name: name.to_string(),
+        description,
+        has_arg,
+        body,
+    }
 }
 
 /// Extract optional frontmatter `description` and the remaining body.

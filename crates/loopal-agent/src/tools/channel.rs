@@ -17,7 +17,9 @@ pub struct ChannelTool;
 
 #[async_trait]
 impl Tool for ChannelTool {
-    fn name(&self) -> &str { "Channel" }
+    fn name(&self) -> &str {
+        "Channel"
+    }
 
     fn description(&self) -> &str {
         "Named pub/sub channels for group communication (pull-only). Operations: \
@@ -51,7 +53,9 @@ impl Tool for ChannelTool {
         })
     }
 
-    fn permission(&self) -> PermissionLevel { PermissionLevel::ReadOnly }
+    fn permission(&self) -> PermissionLevel {
+        PermissionLevel::ReadOnly
+    }
 
     async fn execute(
         &self,
@@ -59,7 +63,10 @@ impl Tool for ChannelTool {
         ctx: &ToolContext,
     ) -> Result<ToolResult, LoopalError> {
         let shared = extract_shared(ctx)?;
-        let op = input.get("operation").and_then(|v| v.as_str()).unwrap_or("");
+        let op = input
+            .get("operation")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
         let channel = input.get("channel").and_then(|v| v.as_str());
 
         match op {
@@ -73,13 +80,19 @@ impl Tool for ChannelTool {
     }
 }
 
-async fn op_subscribe(shared: &Arc<AgentShared>, channel: Option<&str>) -> Result<ToolResult, LoopalError> {
+async fn op_subscribe(
+    shared: &Arc<AgentShared>,
+    channel: Option<&str>,
+) -> Result<ToolResult, LoopalError> {
     let ch = require_channel(channel)?;
     shared.router.subscribe(ch, &shared.agent_name).await;
     Ok(ToolResult::success(format!("Subscribed to #{ch}")))
 }
 
-async fn op_unsubscribe(shared: &Arc<AgentShared>, channel: Option<&str>) -> Result<ToolResult, LoopalError> {
+async fn op_unsubscribe(
+    shared: &Arc<AgentShared>,
+    channel: Option<&str>,
+) -> Result<ToolResult, LoopalError> {
     let ch = require_channel(channel)?;
     shared.router.unsubscribe(ch, &shared.agent_name).await;
     Ok(ToolResult::success(format!("Unsubscribed from #{ch}")))
@@ -91,10 +104,14 @@ async fn op_publish(
     input: &serde_json::Value,
 ) -> Result<ToolResult, LoopalError> {
     let ch = require_channel(channel)?;
-    let message = input.get("message").and_then(|v| v.as_str())
-        .ok_or_else(|| LoopalError::Tool(
-            loopal_error::ToolError::InvalidInput("missing 'message'".into()),
-        ))?;
+    let message = input
+        .get("message")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| {
+            LoopalError::Tool(loopal_error::ToolError::InvalidInput(
+                "missing 'message'".into(),
+            ))
+        })?;
 
     let subscribers = shared.router.publish(ch, &shared.agent_name, message).await;
 
@@ -113,15 +130,23 @@ async fn op_read(
     let limit = input.get("limit").and_then(|v| v.as_u64()).unwrap_or(20) as usize;
 
     let messages = shared.router.read_channel(ch, 0).await;
-    let items: Vec<serde_json::Value> = messages.iter().rev().take(limit).rev().map(|m| {
-        serde_json::json!({
-            "from": m.from,
-            "content": m.content,
-            "timestamp": m.timestamp.to_rfc3339(),
+    let items: Vec<serde_json::Value> = messages
+        .iter()
+        .rev()
+        .take(limit)
+        .rev()
+        .map(|m| {
+            serde_json::json!({
+                "from": m.from,
+                "content": m.content,
+                "timestamp": m.timestamp.to_rfc3339(),
+            })
         })
-    }).collect();
+        .collect();
 
-    Ok(ToolResult::success(serde_json::to_string_pretty(&items).unwrap_or_default()))
+    Ok(ToolResult::success(
+        serde_json::to_string_pretty(&items).unwrap_or_default(),
+    ))
 }
 
 async fn op_list(shared: &Arc<AgentShared>) -> Result<ToolResult, LoopalError> {
@@ -134,7 +159,9 @@ async fn op_list(shared: &Arc<AgentShared>) -> Result<ToolResult, LoopalError> {
 }
 
 fn require_channel(ch: Option<&str>) -> Result<&str, LoopalError> {
-    ch.ok_or_else(|| LoopalError::Tool(
-        loopal_error::ToolError::InvalidInput("missing 'channel'".into()),
-    ))
+    ch.ok_or_else(|| {
+        LoopalError::Tool(loopal_error::ToolError::InvalidInput(
+            "missing 'channel'".into(),
+        ))
+    })
 }

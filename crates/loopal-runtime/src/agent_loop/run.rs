@@ -15,10 +15,16 @@ impl AgentLoopRunner {
     pub(super) async fn run_loop(&mut self) -> Result<AgentOutput> {
         let mut last_output = String::new();
         loop {
-            info!(turn = self.turn_count, messages = self.params.messages.len(), "turn start");
+            info!(
+                turn = self.turn_count,
+                messages = self.params.messages.len(),
+                "turn start"
+            );
 
             if self.params.messages.is_empty() {
-                if !self.params.interactive { break; }
+                if !self.params.interactive {
+                    break;
+                }
                 match self.wait_for_input().await? {
                     Some(WaitResult::MessageAdded) => {}
                     None => break,
@@ -26,7 +32,10 @@ impl AgentLoopRunner {
             }
 
             if self.turn_count >= self.params.max_turns {
-                self.emit(AgentEventPayload::MaxTurnsReached { turns: self.turn_count }).await?;
+                self.emit(AgentEventPayload::MaxTurnsReached {
+                    turns: self.turn_count,
+                })
+                .await?;
                 return Ok(AgentOutput {
                     result: last_output,
                     terminate_reason: TerminateReason::MaxTurns,
@@ -34,35 +43,42 @@ impl AgentLoopRunner {
             }
 
             // Execute one complete turn (LLM → [tools → LLM]* → done)
-            let cancel = TurnCancel::new(
-                self.interrupt.clone(),
-                self.interrupt_notify.clone(),
-            );
+            let cancel = TurnCancel::new(self.interrupt.clone(), self.interrupt_notify.clone());
             match self.execute_turn(&cancel).await {
                 Ok(turn) => {
-                    if !turn.output.is_empty() { last_output.clone_from(&turn.output); }
+                    if !turn.output.is_empty() {
+                        last_output.clone_from(&turn.output);
+                    }
 
                     // Atomically check + clear interrupt (avoids losing a second signal)
                     if self.interrupt.take() {
                         self.emit_interrupted().await?;
                         match self.wait_for_input().await? {
-                            Some(WaitResult::MessageAdded) => { self.turn_count += 1; continue; }
+                            Some(WaitResult::MessageAdded) => {
+                                self.turn_count += 1;
+                                continue;
+                            }
                             None => break,
                         }
                     }
 
-                    if !self.params.interactive { break; }
+                    if !self.params.interactive {
+                        break;
+                    }
                     if self.turn_count >= self.params.max_turns {
                         self.emit(AgentEventPayload::MaxTurnsReached {
                             turns: self.turn_count,
-                        }).await?;
+                        })
+                        .await?;
                         return Ok(AgentOutput {
                             result: last_output,
                             terminate_reason: TerminateReason::MaxTurns,
                         });
                     }
                     match self.wait_for_input().await? {
-                        Some(WaitResult::MessageAdded) => { self.turn_count += 1; }
+                        Some(WaitResult::MessageAdded) => {
+                            self.turn_count += 1;
+                        }
                         None => break,
                     }
                 }
@@ -71,7 +87,10 @@ impl AgentLoopRunner {
                     if self.interrupt.take() {
                         self.emit_interrupted().await?;
                         match self.wait_for_input().await? {
-                            Some(WaitResult::MessageAdded) => { self.turn_count += 1; continue; }
+                            Some(WaitResult::MessageAdded) => {
+                                self.turn_count += 1;
+                                continue;
+                            }
                             None => break,
                         }
                     }
@@ -84,9 +103,13 @@ impl AgentLoopRunner {
                     error!(error = %e, "LLM request failed");
                     self.emit(AgentEventPayload::Error {
                         message: LoopalError::to_string(&e),
-                    }).await?;
+                    })
+                    .await?;
                     match self.wait_for_input().await? {
-                        Some(WaitResult::MessageAdded) => { self.turn_count += 1; continue; }
+                        Some(WaitResult::MessageAdded) => {
+                            self.turn_count += 1;
+                            continue;
+                        }
                         None => break,
                     }
                 }
@@ -94,7 +117,11 @@ impl AgentLoopRunner {
         }
 
         Ok(AgentOutput {
-            result: if self.params.interactive { String::new() } else { last_output },
+            result: if self.params.interactive {
+                String::new()
+            } else {
+                last_output
+            },
             terminate_reason: TerminateReason::Goal,
         })
     }

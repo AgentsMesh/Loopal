@@ -52,7 +52,11 @@ pub fn create_worktree(repo_root: &Path, name: &str) -> Result<WorktreeInfo, Git
         return Err(GitError::CommandFailed(stderr));
     }
 
-    Ok(WorktreeInfo { path: wt_dir, branch, name: name.to_string() })
+    Ok(WorktreeInfo {
+        path: wt_dir,
+        branch,
+        name: name.to_string(),
+    })
 }
 
 /// Remove a worktree by name.
@@ -112,12 +116,18 @@ pub fn worktree_has_changes(worktree_path: &Path) -> Result<bool, GitError> {
 /// Called at startup to prevent orphan accumulation.
 pub fn cleanup_stale_worktrees(repo_root: &Path) {
     let wt_base = repo_root.join(".loopal").join("worktrees");
-    let Ok(entries) = std::fs::read_dir(&wt_base) else { return };
+    let Ok(entries) = std::fs::read_dir(&wt_base) else {
+        return;
+    };
 
     for entry in entries.flatten() {
         let path = entry.path();
-        if !path.is_dir() { continue; }
-        let Some(name) = path.file_name().and_then(|n| n.to_str()) else { continue };
+        if !path.is_dir() {
+            continue;
+        }
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
 
         // If the directory is not a valid git worktree, clean it up
         let is_valid = Command::new("git")
@@ -162,8 +172,16 @@ fn ensure_gitignore_entry(repo_root: &Path) {
     }
 
     // Append-only write to avoid TOCTOU overwrite of concurrent modifications
-    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&gitignore) {
-        let prefix = if content.is_empty() || content.ends_with('\n') { "" } else { "\n" };
+    if let Ok(mut file) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&gitignore)
+    {
+        let prefix = if content.is_empty() || content.ends_with('\n') {
+            ""
+        } else {
+            "\n"
+        };
         let _ = writeln!(file, "{prefix}{entry}");
     }
 }

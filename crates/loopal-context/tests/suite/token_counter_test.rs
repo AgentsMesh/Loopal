@@ -58,7 +58,9 @@ fn test_estimate_messages_tokens_includes_tool_io() {
             id: None,
             role: MessageRole::Assistant,
             content: vec![
-                ContentBlock::Text { text: "Let me read the file.".into() },
+                ContentBlock::Text {
+                    text: "Let me read the file.".into(),
+                },
                 ContentBlock::ToolUse {
                     id: "call_1".into(),
                     name: "Read".into(),

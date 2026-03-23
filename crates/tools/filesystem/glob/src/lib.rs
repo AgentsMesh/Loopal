@@ -3,7 +3,7 @@ use globset::{Glob, GlobSetBuilder};
 use ignore::WalkBuilder;
 use loopal_error::LoopalError;
 use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::path::PathBuf;
 
 use loopal_tool_grep::grep_search::type_to_extensions;
@@ -58,13 +58,11 @@ impl Tool for GlobTool {
     }
 
     async fn execute(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
-        let pattern = input["pattern"]
-            .as_str()
-            .ok_or_else(|| {
-                LoopalError::Tool(loopal_error::ToolError::InvalidInput(
-                    "pattern is required".into(),
-                ))
-            })?;
+        let pattern = input["pattern"].as_str().ok_or_else(|| {
+            LoopalError::Tool(loopal_error::ToolError::InvalidInput(
+                "pattern is required".into(),
+            ))
+        })?;
 
         let search_path = match input["path"].as_str() {
             Some(p) => match ctx.backend.resolve_path(p, false) {
@@ -78,23 +76,20 @@ impl Tool for GlobTool {
             .as_u64()
             .map(|n| n as usize)
             .unwrap_or(DEFAULT_LIMIT);
-        let offset = input["offset"]
-            .as_u64()
-            .map(|n| n as usize)
-            .unwrap_or(0);
+        let offset = input["offset"].as_u64().map(|n| n as usize).unwrap_or(0);
 
         let glob = Glob::new(pattern).map_err(|e| {
-            LoopalError::Tool(loopal_error::ToolError::InvalidInput(
-                format!("Invalid glob pattern: {}", e),
-            ))
+            LoopalError::Tool(loopal_error::ToolError::InvalidInput(format!(
+                "Invalid glob pattern: {e}"
+            )))
         })?;
 
         let mut builder = GlobSetBuilder::new();
         builder.add(glob);
         let glob_set = builder.build().map_err(|e| {
-            LoopalError::Tool(loopal_error::ToolError::InvalidInput(
-                format!("Failed to build glob set: {}", e),
-            ))
+            LoopalError::Tool(loopal_error::ToolError::InvalidInput(format!(
+                "Failed to build glob set: {e}"
+            )))
         })?;
 
         let type_exts: Option<Vec<&str>> = input["type"].as_str().map(|t| {
@@ -153,9 +148,7 @@ impl Tool for GlobTool {
         );
 
         if page_end < total_found {
-            output.push_str(&format!(
-                "\n\n(Use offset={} to see more.)", page_end
-            ));
+            output.push_str(&format!("\n\n(Use offset={page_end} to see more.)"));
         }
 
         Ok(ToolResult::success(output))

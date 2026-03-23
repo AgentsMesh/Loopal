@@ -42,11 +42,23 @@ pub async fn exec_command(
     let stdout_raw = String::from_utf8_lossy(&output.stdout);
     let stderr_raw = String::from_utf8_lossy(&output.stderr);
 
-    let stdout = truncate_output(&stdout_raw, limits.max_output_lines, limits.max_output_bytes);
-    let stderr = truncate_output(&stderr_raw, limits.max_output_lines, limits.max_output_bytes);
+    let stdout = truncate_output(
+        &stdout_raw,
+        limits.max_output_lines,
+        limits.max_output_bytes,
+    );
+    let stderr = truncate_output(
+        &stderr_raw,
+        limits.max_output_lines,
+        limits.max_output_bytes,
+    );
     let exit_code = output.status.code().unwrap_or(-1);
 
-    Ok(ExecResult { stdout, stderr, exit_code })
+    Ok(ExecResult {
+        stdout,
+        stderr,
+        exit_code,
+    })
 }
 
 /// Spawn a background command under OS sandbox; returns a task ID.
@@ -76,7 +88,8 @@ pub async fn exec_background(
         }
     }
 
-    let child = cmd.spawn()
+    let child = cmd
+        .spawn()
         .map_err(|e| ToolIoError::ExecFailed(e.to_string()))?;
 
     let task_id = loopal_tool_background::generate_task_id();
@@ -93,7 +106,10 @@ pub async fn exec_background(
     };
 
     let child_handle = Arc::clone(&task.child);
-    loopal_tool_background::store().lock().unwrap().insert(task_id.clone(), task);
+    loopal_tool_background::store()
+        .lock()
+        .unwrap()
+        .insert(task_id.clone(), task);
 
     let ob = Arc::clone(&output_buf);
     let eb = Arc::clone(&exit_code_buf);
@@ -103,10 +119,15 @@ pub async fn exec_background(
         let mut stdout = child.stdout.take().unwrap();
         let mut stderr = child.stderr.take().unwrap();
         let (mut out_b, mut err_b) = (Vec::new(), Vec::new());
-        let _ = tokio::join!(stdout.read_to_end(&mut out_b), stderr.read_to_end(&mut err_b));
+        let _ = tokio::join!(
+            stdout.read_to_end(&mut out_b),
+            stderr.read_to_end(&mut err_b)
+        );
         let mut combined = String::from_utf8_lossy(&out_b).into_owned();
         if !err_b.is_empty() {
-            if !combined.is_empty() { combined.push('\n'); }
+            if !combined.is_empty() {
+                combined.push('\n');
+            }
             combined.push_str(&String::from_utf8_lossy(&err_b));
         }
         *ob.lock().unwrap() = combined;

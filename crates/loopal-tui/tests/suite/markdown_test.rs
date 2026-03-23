@@ -21,7 +21,10 @@ fn test_paragraph_wraps_to_width() {
     let input = "word ".repeat(20);
     let lines = render_markdown(&input, 30);
     // Should produce multiple wrapped lines + trailing blank
-    let non_empty: Vec<_> = lines.iter().filter(|l| !lines_text(&[(*l).clone()])[0].is_empty()).collect();
+    let non_empty: Vec<_> = lines
+        .iter()
+        .filter(|l| !lines_text(&[(*l).clone()])[0].is_empty())
+        .collect();
     assert!(non_empty.len() > 1, "long paragraph should wrap");
 }
 
@@ -37,9 +40,9 @@ fn test_short_paragraph_single_line() {
 #[test]
 fn test_h1_bold_underlined() {
     let lines = render_markdown("# Title", 80);
-    let heading = lines.iter().find(|l| {
-        l.spans.iter().any(|s| s.content.contains("Title"))
-    });
+    let heading = lines
+        .iter()
+        .find(|l| l.spans.iter().any(|s| s.content.contains("Title")));
     assert!(heading.is_some(), "heading line should exist");
     let h = heading.unwrap();
     assert!(has_modifier(h, Modifier::BOLD));
@@ -49,9 +52,9 @@ fn test_h1_bold_underlined() {
 #[test]
 fn test_h2_bold() {
     let lines = render_markdown("## Subtitle", 80);
-    let heading = lines.iter().find(|l| {
-        l.spans.iter().any(|s| s.content.contains("Subtitle"))
-    });
+    let heading = lines
+        .iter()
+        .find(|l| l.spans.iter().any(|s| s.content.contains("Subtitle")));
     assert!(heading.is_some());
     assert!(has_modifier(heading.unwrap(), Modifier::BOLD));
 }
@@ -61,19 +64,27 @@ fn test_h2_bold() {
 #[test]
 fn test_bold_text() {
     let lines = render_markdown("some **bold** text", 80);
-    let bold_span = lines.iter().flat_map(|l| &l.spans).find(|s| {
-        s.content.contains("bold")
-    });
+    let bold_span = lines
+        .iter()
+        .flat_map(|l| &l.spans)
+        .find(|s| s.content.contains("bold"));
     assert!(bold_span.is_some());
-    assert!(bold_span.unwrap().style.add_modifier.contains(Modifier::BOLD));
+    assert!(
+        bold_span
+            .unwrap()
+            .style
+            .add_modifier
+            .contains(Modifier::BOLD)
+    );
 }
 
 #[test]
 fn test_italic_text() {
     let lines = render_markdown("some *italic* text", 80);
-    let span = lines.iter().flat_map(|l| &l.spans).find(|s| {
-        s.content.contains("italic")
-    });
+    let span = lines
+        .iter()
+        .flat_map(|l| &l.spans)
+        .find(|s| s.content.contains("italic"));
     assert!(span.is_some());
     assert!(span.unwrap().style.add_modifier.contains(Modifier::ITALIC));
 }
@@ -81,9 +92,10 @@ fn test_italic_text() {
 #[test]
 fn test_inline_code() {
     let lines = render_markdown("use `foo()` here", 80);
-    let span = lines.iter().flat_map(|l| &l.spans).find(|s| {
-        s.content.contains("foo()")
-    });
+    let span = lines
+        .iter()
+        .flat_map(|l| &l.spans)
+        .find(|s| s.content.contains("foo()"));
     assert!(span.is_some());
     assert_eq!(span.unwrap().style.fg, Some(Color::Cyan));
 }
@@ -114,7 +126,11 @@ fn test_ordered_list() {
 fn test_blockquote_prefix() {
     let lines = render_markdown("> quoted text", 80);
     let texts = lines_text(&lines);
-    assert!(texts.iter().any(|t| t.contains(">") && t.contains("quoted")));
+    assert!(
+        texts
+            .iter()
+            .any(|t| t.contains(">") && t.contains("quoted"))
+    );
 }
 
 // --- Horizontal rule ---

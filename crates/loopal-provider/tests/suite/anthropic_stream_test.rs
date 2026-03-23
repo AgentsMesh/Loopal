@@ -15,17 +15,14 @@ fn parse_event(data: &str) -> (Vec<Result<StreamChunk, LoopalError>>, InlineStat
     (chunks, state)
 }
 
-fn parse_with_state(
-    data: &str,
-    state: &mut InlineState,
-) -> Vec<Result<StreamChunk, LoopalError>> {
+fn parse_with_state(data: &str, state: &mut InlineState) -> Vec<Result<StreamChunk, LoopalError>> {
     let parsed: serde_json::Value = match serde_json::from_str(data) {
         Ok(v) => v,
         Err(e) => {
             return vec![Err(ProviderError::SseParse(format!(
                 "invalid JSON: {e}: {data}"
             ))
-            .into())]
+            .into())];
         }
     };
 
@@ -46,7 +43,9 @@ fn parse_with_state(
             match delta["type"].as_str().unwrap_or("") {
                 "text_delta" => {
                     if let Some(text) = delta["text"].as_str() {
-                        chunks.push(Ok(StreamChunk::Text { text: text.to_string() }));
+                        chunks.push(Ok(StreamChunk::Text {
+                            text: text.to_string(),
+                        }));
                     }
                 }
                 "input_json_delta" => {
@@ -73,11 +72,17 @@ fn parse_with_state(
                 parsed["usage"]["input_tokens"].as_u64(),
                 parsed["usage"]["output_tokens"].as_u64(),
             ) {
-                let cc = parsed["usage"]["cache_creation_input_tokens"].as_u64().unwrap_or(0) as u32;
-                let cr = parsed["usage"]["cache_read_input_tokens"].as_u64().unwrap_or(0) as u32;
+                let cc = parsed["usage"]["cache_creation_input_tokens"]
+                    .as_u64()
+                    .unwrap_or(0) as u32;
+                let cr = parsed["usage"]["cache_read_input_tokens"]
+                    .as_u64()
+                    .unwrap_or(0) as u32;
                 chunks.push(Ok(StreamChunk::Usage {
-                    input_tokens: i as u32, output_tokens: o as u32,
-                    cache_creation_input_tokens: cc, cache_read_input_tokens: cr,
+                    input_tokens: i as u32,
+                    output_tokens: o as u32,
+                    cache_creation_input_tokens: cc,
+                    cache_read_input_tokens: cr,
                     thinking_tokens: 0,
                 }));
             }
@@ -87,16 +92,24 @@ fn parse_with_state(
                 parsed["message"]["usage"]["input_tokens"].as_u64(),
                 parsed["message"]["usage"]["output_tokens"].as_u64(),
             ) {
-                let cc = parsed["message"]["usage"]["cache_creation_input_tokens"].as_u64().unwrap_or(0) as u32;
-                let cr = parsed["message"]["usage"]["cache_read_input_tokens"].as_u64().unwrap_or(0) as u32;
+                let cc = parsed["message"]["usage"]["cache_creation_input_tokens"]
+                    .as_u64()
+                    .unwrap_or(0) as u32;
+                let cr = parsed["message"]["usage"]["cache_read_input_tokens"]
+                    .as_u64()
+                    .unwrap_or(0) as u32;
                 chunks.push(Ok(StreamChunk::Usage {
-                    input_tokens: i as u32, output_tokens: o as u32,
-                    cache_creation_input_tokens: cc, cache_read_input_tokens: cr,
+                    input_tokens: i as u32,
+                    output_tokens: o as u32,
+                    cache_creation_input_tokens: cc,
+                    cache_read_input_tokens: cr,
                     thinking_tokens: 0,
                 }));
             }
         }
-        "message_stop" => chunks.push(Ok(StreamChunk::Done { stop_reason: StopReason::EndTurn })),
+        "message_stop" => chunks.push(Ok(StreamChunk::Done {
+            stop_reason: StopReason::EndTurn,
+        })),
         _ => {}
     }
     chunks
@@ -112,7 +125,7 @@ struct InlineState {
 fn assert_text(chunk: &Result<StreamChunk, LoopalError>, expected: &str) {
     match chunk {
         Ok(StreamChunk::Text { text }) => assert_eq!(text, expected),
-        other => panic!("expected Text '{}', got: {:?}", expected, other),
+        other => panic!("expected Text '{expected}', got: {other:?}"),
     }
 }
 
@@ -122,30 +135,38 @@ fn assert_tool(chunk: &Result<StreamChunk, LoopalError>, exp_id: &str, exp_name:
             assert_eq!(id, exp_id);
             assert_eq!(name, exp_name);
         }
-        other => panic!("expected ToolUse, got: {:?}", other),
+        other => panic!("expected ToolUse, got: {other:?}"),
     }
 }
 
 fn assert_usage(chunk: &Result<StreamChunk, LoopalError>, exp_in: u32, exp_out: u32) {
     match chunk {
-        Ok(StreamChunk::Usage { input_tokens, output_tokens, .. }) => {
+        Ok(StreamChunk::Usage {
+            input_tokens,
+            output_tokens,
+            ..
+        }) => {
             assert_eq!(*input_tokens, exp_in);
             assert_eq!(*output_tokens, exp_out);
         }
-        other => panic!("expected Usage, got: {:?}", other),
+        other => panic!("expected Usage, got: {other:?}"),
     }
 }
 
 #[test]
 fn test_text_delta() {
-    let (chunks, _) = parse_event(r#"{"type":"content_block_delta","delta":{"type":"text_delta","text":"Hello"}}"#);
+    let (chunks, _) = parse_event(
+        r#"{"type":"content_block_delta","delta":{"type":"text_delta","text":"Hello"}}"#,
+    );
     assert_eq!(chunks.len(), 1);
     assert_text(&chunks[0], "Hello");
 }
 
 #[test]
 fn test_content_block_start_tool_use() {
-    let (chunks, state) = parse_event(r#"{"type":"content_block_start","content_block":{"type":"tool_use","id":"tool_1","name":"read_file"}}"#);
+    let (chunks, state) = parse_event(
+        r#"{"type":"content_block_start","content_block":{"type":"tool_use","id":"tool_1","name":"read_file"}}"#,
+    );
     assert!(chunks.is_empty());
     assert_eq!(state.tool_id.as_deref(), Some("tool_1"));
     assert_eq!(state.tool_name.as_deref(), Some("read_file"));
@@ -158,9 +179,15 @@ fn test_input_json_delta_accumulation() {
         tool_name: Some("read_file".to_string()),
         json_buf: String::new(),
     };
-    let c1 = parse_with_state(r#"{"type":"content_block_delta","delta":{"type":"input_json_delta","partial_json":"{\"path\":"}}"#, &mut state);
+    let c1 = parse_with_state(
+        r#"{"type":"content_block_delta","delta":{"type":"input_json_delta","partial_json":"{\"path\":"}}"#,
+        &mut state,
+    );
     assert!(c1.is_empty());
-    let c2 = parse_with_state(r#"{"type":"content_block_delta","delta":{"type":"input_json_delta","partial_json":"\"foo.rs\"}"}}"#, &mut state);
+    let c2 = parse_with_state(
+        r#"{"type":"content_block_delta","delta":{"type":"input_json_delta","partial_json":"\"foo.rs\"}"}}"#,
+        &mut state,
+    );
     assert!(c2.is_empty());
     assert_eq!(state.json_buf, r#"{"path":"foo.rs"}"#);
 }
@@ -204,8 +231,9 @@ fn test_content_block_stop_no_tool() {
 
 #[test]
 fn test_message_start_usage() {
-    let (chunks, _) = parse_event(r#"{"type":"message_start","message":{"usage":{"input_tokens":100,"output_tokens":5}}}"#);
+    let (chunks, _) = parse_event(
+        r#"{"type":"message_start","message":{"usage":{"input_tokens":100,"output_tokens":5}}}"#,
+    );
     assert_eq!(chunks.len(), 1);
     assert_usage(&chunks[0], 100, 5);
 }
-

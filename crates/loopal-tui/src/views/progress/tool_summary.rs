@@ -48,10 +48,10 @@ pub fn summarize_result(result: Option<&str>, status: &str) -> String {
                     trimmed.to_string()
                 } else {
                     let preview: String = trimmed.chars().take(37).collect();
-                    format!("{}...", preview)
+                    format!("{preview}...")
                 }
             } else {
-                format!("{} lines", count)
+                format!("{count} lines")
             }
         }
     }

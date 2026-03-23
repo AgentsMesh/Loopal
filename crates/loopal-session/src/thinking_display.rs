@@ -3,7 +3,7 @@ pub fn format_thinking_summary(thinking: &str, token_count: u32) -> String {
     let token_display = if token_count >= 1000 {
         format!("{:.1}k", token_count as f64 / 1000.0)
     } else {
-        format!("{}", token_count)
+        format!("{token_count}")
     };
     // Take first line as preview
     let preview = thinking
@@ -13,7 +13,7 @@ pub fn format_thinking_summary(thinking: &str, token_count: u32) -> String {
         .chars()
         .take(80)
         .collect::<String>();
-    format!("[{} tokens] {}", token_display, preview)
+    format!("[{token_display} tokens] {preview}")
 }
 
 #[cfg(test)]

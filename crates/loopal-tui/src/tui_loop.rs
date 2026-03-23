@@ -5,17 +5,17 @@ use std::sync::Arc;
 use ratatui::prelude::*;
 
 use loopal_agent::router::MessageRouter;
-use loopal_session::SessionController;
+use loopal_protocol::AgentEvent;
 use loopal_protocol::AgentMode;
 use loopal_protocol::{Envelope, MessageSource, UserContent};
-use loopal_protocol::AgentEvent;
+use loopal_session::SessionController;
 use tokio::sync::mpsc;
 
 use crate::app::App;
 use crate::command::CommandEntry;
 use crate::event::{AppEvent, EventHandler};
-use crate::input::{InputAction, handle_key};
 use crate::input::paste;
+use crate::input::{InputAction, handle_key};
 use crate::render::draw;
 use crate::slash_handler::handle_slash_command;
 use crate::terminal::TerminalGuard;
@@ -43,7 +43,9 @@ pub async fn run_tui(
     terminal.draw(|f| draw(f, &mut app))?;
 
     loop {
-        let Some(first) = events.next().await else { break; };
+        let Some(first) = events.next().await else {
+            break;
+        };
 
         let mut batch = vec![first];
         while let Some(event) = events.try_next() {
@@ -76,23 +78,33 @@ pub async fn run_tui(
                         }
                         InputAction::ToolApprove => {
                             let has = app.session.lock().pending_permission.is_some();
-                            if has { app.session.approve_permission().await; }
+                            if has {
+                                app.session.approve_permission().await;
+                            }
                         }
                         InputAction::ToolDeny => {
                             let has = app.session.lock().pending_permission.is_some();
-                            if has { app.session.deny_permission().await; }
+                            if has {
+                                app.session.deny_permission().await;
+                            }
                         }
                         InputAction::Interrupt => {
                             app.session.interrupt();
                         }
                         InputAction::ModeSwitch(mode) => {
-                            let m = if mode == "plan" { AgentMode::Plan } else { AgentMode::Act };
+                            let m = if mode == "plan" {
+                                AgentMode::Plan
+                            } else {
+                                AgentMode::Act
+                            };
                             app.session.switch_mode(m).await;
                         }
                         InputAction::SlashCommand(cmd) => {
                             handle_slash_command(&mut app, cmd).await;
                         }
-                        InputAction::FocusNextAgent => { cycle_focus(&app); }
+                        InputAction::FocusNextAgent => {
+                            cycle_focus(&app);
+                        }
                         InputAction::UnfocusAgent => {
                             app.session.lock().focused_agent = None;
                         }
@@ -115,7 +127,9 @@ pub async fn run_tui(
                             handle_question_confirm(&mut app).await;
                         }
                         InputAction::QuestionCancel => {
-                            app.session.answer_question(vec!["(cancelled)".into()]).await;
+                            app.session
+                                .answer_question(vec!["(cancelled)".into()])
+                                .await;
                         }
                         InputAction::None => {}
                     }
@@ -145,7 +159,9 @@ pub async fn run_tui(
             }
         }
 
-        if should_quit || app.exiting { break; }
+        if should_quit || app.exiting {
+            break;
+        }
         terminal.draw(|f| draw(f, &mut app))?;
     }
 

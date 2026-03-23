@@ -49,9 +49,7 @@ pub(super) fn dispatch_command(name: &str, arg: Option<&str>) -> InputAction {
         "/compact" => InputAction::SlashCommand(SlashCommandAction::Compact),
         "/status" => InputAction::SlashCommand(SlashCommandAction::Status),
         "/sessions" => InputAction::SlashCommand(SlashCommandAction::Sessions),
-        "/help" => InputAction::SlashCommand(SlashCommandAction::Help(
-            arg.map(|s| s.to_string()),
-        )),
+        "/help" => InputAction::SlashCommand(SlashCommandAction::Help(arg.map(|s| s.to_string()))),
         "/init" => InputAction::SlashCommand(SlashCommandAction::Init),
         "/model" => InputAction::SlashCommand(SlashCommandAction::ModelPicker),
         "/rewind" => InputAction::SlashCommand(SlashCommandAction::RewindPicker),

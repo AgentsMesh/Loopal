@@ -17,7 +17,10 @@ fn test_push_and_pop_front() {
     assert_eq!(inbox.len(), 2);
 
     assert_eq!(inbox.pop_front().map(|c| c.text), Some("first".to_string()));
-    assert_eq!(inbox.pop_front().map(|c| c.text), Some("second".to_string()));
+    assert_eq!(
+        inbox.pop_front().map(|c| c.text),
+        Some("second".to_string())
+    );
     assert!(inbox.is_empty());
 }
 

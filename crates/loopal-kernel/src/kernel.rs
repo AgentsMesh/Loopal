@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
+use loopal_config::HookEvent;
+use loopal_config::Settings;
+use loopal_error::Result;
 use loopal_hooks::HookRegistry;
 use loopal_mcp::{McpManager, McpToolAdapter};
 use loopal_provider::ProviderRegistry;
-use loopal_tools::ToolRegistry;
-use loopal_config::Settings;
-use loopal_error::Result;
-use loopal_config::HookEvent;
 use loopal_tool_api::ToolDefinition;
+use loopal_tools::ToolRegistry;
 use tokio::sync::RwLock;
 use tracing::info;
 
@@ -70,11 +70,8 @@ impl Kernel {
 
             for (server_name, tool_def) in tools_with_server {
                 info!(tool = %tool_def.name, server = %server_name, "registering MCP tool");
-                let adapter = McpToolAdapter::new(
-                    tool_def,
-                    server_name,
-                    Arc::clone(&self.mcp_manager),
-                );
+                let adapter =
+                    McpToolAdapter::new(tool_def, server_name, Arc::clone(&self.mcp_manager));
                 self.tool_registry.register(Box::new(adapter));
             }
         }
@@ -87,10 +84,7 @@ impl Kernel {
     ///
     /// Resolves the sandbox policy (if enabled) and bundles it with default
     /// resource limits. The returned `Arc` is injected into `ToolContext.backend`.
-    pub fn create_backend(
-        &self,
-        cwd: &std::path::Path,
-    ) -> Arc<dyn loopal_tool_api::Backend> {
+    pub fn create_backend(&self, cwd: &std::path::Path) -> Arc<dyn loopal_tool_api::Backend> {
         use loopal_config::SandboxPolicy;
         let policy = if self.settings.sandbox.policy != SandboxPolicy::Disabled {
             Some(loopal_sandbox::resolve_policy(&self.settings.sandbox, cwd))
@@ -123,10 +117,8 @@ impl Kernel {
     pub fn resolve_provider(
         &self,
         model: &str,
-    ) -> std::result::Result<
-        Arc<dyn loopal_provider_api::Provider>,
-        loopal_error::LoopalError,
-    > {
+    ) -> std::result::Result<Arc<dyn loopal_provider_api::Provider>, loopal_error::LoopalError>
+    {
         self.provider_registry.resolve(model)
     }
 

@@ -19,7 +19,9 @@ impl AgentMode {
     pub fn system_prompt_suffix(&self) -> &str {
         match self {
             AgentMode::Act => "",
-            AgentMode::Plan => "\n\nYou are in PLAN mode. You can only read files and think. You cannot make any changes. Describe what you would do, but do not execute any write operations.",
+            AgentMode::Plan => {
+                "\n\nYou are in PLAN mode. You can only read files and think. You cannot make any changes. Describe what you would do, but do not execute any write operations."
+            }
         }
     }
 }

@@ -1,6 +1,6 @@
 use loopal_agent::router::MessageRouter;
-use loopal_protocol::{Envelope, MessageSource};
 use loopal_protocol::{AgentEvent, AgentEventPayload};
+use loopal_protocol::{Envelope, MessageSource};
 use tokio::sync::mpsc;
 
 fn make_router() -> (MessageRouter, mpsc::Receiver<AgentEvent>) {
@@ -24,7 +24,9 @@ async fn test_route_emits_message_routed_event() {
     let event = obs_rx.recv().await.unwrap();
     match event.payload {
         AgentEventPayload::MessageRouted {
-            source, target, content_preview,
+            source,
+            target,
+            content_preview,
         } => {
             assert_eq!(source, "bob");
             assert_eq!(target, "alice");
@@ -43,11 +45,7 @@ async fn test_broadcast_emits_events_per_recipient() {
     router.register("alice", tx_a).await.unwrap();
     router.register("bob", tx_b).await.unwrap();
 
-    let env = Envelope::new(
-        MessageSource::Human,
-        "",
-        "broadcast msg",
-    );
+    let env = Envelope::new(MessageSource::Human, "", "broadcast msg");
     let delivered = router.broadcast(env, None).await.unwrap();
     assert_eq!(delivered.len(), 2);
 
@@ -61,7 +59,9 @@ async fn test_broadcast_emits_events_per_recipient() {
     for event in &events {
         match &event.payload {
             AgentEventPayload::MessageRouted {
-                source, content_preview, ..
+                source,
+                content_preview,
+                ..
             } => {
                 assert_eq!(source, "human");
                 assert_eq!(content_preview, "broadcast msg");
@@ -106,7 +106,12 @@ async fn test_route_channel_source_attribution() {
     router.route(env).await.unwrap();
 
     let event = obs_rx.recv().await.unwrap();
-    if let AgentEventPayload::MessageRouted { source, target, content_preview } = event.payload {
+    if let AgentEventPayload::MessageRouted {
+        source,
+        target,
+        content_preview,
+    } = event.payload
+    {
         // Channel source shows the `from` field
         assert_eq!(source, "notifier");
         assert_eq!(target, "worker");
@@ -126,11 +131,7 @@ async fn test_broadcast_excludes_sender() {
     router.register("b", tx_b).await.unwrap();
     router.register("c", tx_c).await.unwrap();
 
-    let env = Envelope::new(
-        MessageSource::Agent("a".to_string()),
-        "",
-        "hello everyone",
-    );
+    let env = Envelope::new(MessageSource::Agent("a".to_string()), "", "hello everyone");
     let delivered = router.broadcast(env, Some("a")).await.unwrap();
 
     // "a" excluded, "b" and "c" receive

@@ -17,7 +17,10 @@ pub fn deep_merge(base: &mut serde_json::Value, overlay: serde_json::Value) {
     match (base, overlay) {
         (serde_json::Value::Object(base_map), serde_json::Value::Object(overlay_map)) => {
             for (key, value) in overlay_map {
-                deep_merge(base_map.entry(key).or_insert(serde_json::Value::Null), value);
+                deep_merge(
+                    base_map.entry(key).or_insert(serde_json::Value::Null),
+                    value,
+                );
             }
         }
         (base, overlay) => {
@@ -72,7 +75,10 @@ pub fn apply_env_overrides(value: &mut serde_json::Value) {
 /// fields, removing them from the raw value to avoid double-counting.
 pub(crate) fn extract_typed_fields(
     value: &mut serde_json::Value,
-) -> (IndexMap<String, McpServerConfig>, Vec<crate::hook::HookConfig>) {
+) -> (
+    IndexMap<String, McpServerConfig>,
+    Vec<crate::hook::HookConfig>,
+) {
     let mut mcp = IndexMap::new();
     let mut hooks = Vec::new();
 
@@ -126,7 +132,10 @@ pub fn load_layer_from_dir(
     source: LayerSource,
     instructions_path: Option<&Path>,
 ) -> Result<ConfigLayer, LoopalError> {
-    let mut layer = ConfigLayer { source, ..Default::default() };
+    let mut layer = ConfigLayer {
+        source,
+        ..Default::default()
+    };
 
     // settings.json — extract mcp_servers and hooks before storing raw JSON
     let mut settings_value = load_json_file(&dir.join("settings.json"))?;

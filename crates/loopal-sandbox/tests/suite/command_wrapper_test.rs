@@ -1,9 +1,7 @@
 use std::path::PathBuf;
 
+use loopal_config::{NetworkPolicy, ResolvedPolicy, SandboxPolicy};
 use loopal_sandbox::command_wrapper::wrap_command;
-use loopal_config::{
-    NetworkPolicy, ResolvedPolicy, SandboxPolicy,
-};
 
 fn disabled_policy() -> ResolvedPolicy {
     ResolvedPolicy {
@@ -18,10 +16,7 @@ fn disabled_policy() -> ResolvedPolicy {
 fn workspace_policy() -> ResolvedPolicy {
     ResolvedPolicy {
         policy: SandboxPolicy::WorkspaceWrite,
-        writable_paths: vec![
-            PathBuf::from("/home/user/project"),
-            std::env::temp_dir(),
-        ],
+        writable_paths: vec![PathBuf::from("/home/user/project"), std::env::temp_dir()],
         deny_write_globs: vec![],
         deny_read_globs: vec![],
         network: NetworkPolicy::default(),
@@ -40,7 +35,8 @@ fn disabled_uses_plain_sh() {
 fn disabled_has_sanitized_env() {
     let policy = disabled_policy();
     let cmd = wrap_command(&policy, "echo", "/tmp".as_ref());
-    assert!(cmd.env.contains_key("PATH") || cmd.env.is_empty());
+    let has_path = cmd.env.keys().any(|k| k.eq_ignore_ascii_case("PATH"));
+    assert!(has_path || cmd.env.is_empty());
 }
 
 #[test]

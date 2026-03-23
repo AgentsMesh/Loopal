@@ -21,7 +21,11 @@ pub fn format_long_from_entry(entry: &LsEntry, indicator: &str) -> String {
 
 /// Format stat-like output from `FileInfo`.
 pub fn format_stat_from_info(path: &std::path::Path, info: &FileInfo) -> String {
-    let file_type = if info.is_dir { "directory" } else { "regular file" };
+    let file_type = if info.is_dir {
+        "directory"
+    } else {
+        "regular file"
+    };
     let mtime = info
         .modified
         .map(format_epoch)

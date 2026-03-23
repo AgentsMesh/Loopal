@@ -55,7 +55,10 @@ impl Provider for AnthropicProvider {
 
     async fn stream_chat(&self, params: &ChatParams) -> Result<ChatStream, LoopalError> {
         // Acquire permit before sending — blocks if too many concurrent requests.
-        let _permit = self.request_semaphore.acquire().await
+        let _permit = self
+            .request_semaphore
+            .acquire()
+            .await
             .map_err(|_| ProviderError::Http("request semaphore closed".into()))?;
 
         let stream = self.do_stream_chat(params).await?;
@@ -68,10 +71,7 @@ impl Provider for AnthropicProvider {
 
 impl AnthropicProvider {
     /// Inner implementation of stream_chat, called after acquiring the semaphore permit.
-    async fn do_stream_chat(
-        &self,
-        params: &ChatParams,
-    ) -> Result<ChatStream, LoopalError> {
+    async fn do_stream_chat(&self, params: &ChatParams) -> Result<ChatStream, LoopalError> {
         let normalized = loopal_message::normalize_messages(&params.messages);
         let normalized_params = ChatParams {
             messages: normalized,
@@ -183,10 +183,7 @@ impl AnthropicProvider {
                 || text.contains("maximum context length")
                 || text.contains("invalid_request_error"))
         {
-            return ProviderError::ContextOverflow {
-                message: text,
-            }
-            .into();
+            return ProviderError::ContextOverflow { message: text }.into();
         }
 
         ProviderError::Api {

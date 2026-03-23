@@ -9,7 +9,12 @@ fn test_event_message_routed_serde_roundtrip() {
     });
     let json = serde_json::to_string(&event).unwrap();
     let deserialized: AgentEvent = serde_json::from_str(&json).unwrap();
-    if let AgentEventPayload::MessageRouted { source, target, content_preview } = deserialized.payload {
+    if let AgentEventPayload::MessageRouted {
+        source,
+        target,
+        content_preview,
+    } = deserialized.payload
+    {
         assert_eq!(source, "agent-a");
         assert_eq!(target, "agent-b");
         assert_eq!(content_preview, "hello world");

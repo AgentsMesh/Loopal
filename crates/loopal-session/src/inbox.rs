@@ -53,17 +53,17 @@ impl Default for Inbox {
 ///
 /// Pops the front message, pushes a DisplayMessage for TUI rendering,
 /// and returns the content for routing to the agent.
-pub(crate) fn try_forward_inbox(
-    state: &mut crate::state::SessionState,
-) -> Option<UserContent> {
-    if !state.agent_idle { return None; }
+pub(crate) fn try_forward_inbox(state: &mut crate::state::SessionState) -> Option<UserContent> {
+    if !state.agent_idle {
+        return None;
+    }
     let content = state.inbox.pop_front()?;
     state.agent_idle = false;
     state.begin_turn();
     let image_count = content.images.len();
     let mut display_text = content.text.clone();
     if image_count > 0 {
-        display_text.push_str(&format!(" [+{} image(s)]", image_count));
+        display_text.push_str(&format!(" [+{image_count} image(s)]"));
     }
     state.messages.push(crate::types::DisplayMessage {
         role: "user".to_string(),

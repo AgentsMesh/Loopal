@@ -23,8 +23,12 @@ pub trait Backend: Send + Sync {
     // --- Filesystem ---
 
     /// Read file content with offset/limit pagination.
-    async fn read(&self, path: &str, offset: usize, limit: usize)
-        -> Result<ReadResult, ToolIoError>;
+    async fn read(
+        &self,
+        path: &str,
+        offset: usize,
+        limit: usize,
+    ) -> Result<ReadResult, ToolIoError>;
 
     /// Write content to a file (atomic: write-tmp → fsync → rename).
     async fn write(&self, path: &str, content: &str) -> Result<WriteResult, ToolIoError>;
@@ -57,11 +61,7 @@ pub trait Backend: Send + Sync {
     async fn ls(&self, path: &str) -> Result<LsResult, ToolIoError>;
 
     /// Glob pattern search from an optional base directory.
-    async fn glob(
-        &self,
-        pattern: &str,
-        base: Option<&str>,
-    ) -> Result<GlobResult, ToolIoError>;
+    async fn glob(&self, pattern: &str, base: Option<&str>) -> Result<GlobResult, ToolIoError>;
 
     /// Regex search over file contents.
     async fn grep(
@@ -88,11 +88,7 @@ pub trait Backend: Send + Sync {
     async fn exec(&self, command: &str, timeout_ms: u64) -> Result<ExecResult, ToolIoError>;
 
     /// Spawn a command in the background; returns a task ID.
-    async fn exec_background(
-        &self,
-        command: &str,
-        desc: &str,
-    ) -> Result<String, ToolIoError>;
+    async fn exec_background(&self, command: &str, desc: &str) -> Result<String, ToolIoError>;
 
     // --- Network ---
 

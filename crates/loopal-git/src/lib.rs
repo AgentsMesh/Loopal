@@ -3,8 +3,7 @@ pub mod worktree;
 
 pub use repo::{current_branch, is_git_repo, repo_root};
 pub use worktree::{
-    WorktreeInfo, cleanup_stale_worktrees, create_worktree,
-    remove_worktree, worktree_has_changes,
+    WorktreeInfo, cleanup_stale_worktrees, create_worktree, remove_worktree, worktree_has_changes,
 };
 
 use std::fmt;

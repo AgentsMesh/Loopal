@@ -33,7 +33,9 @@ impl InterruptSignal {
     /// Uses `compare_exchange` to avoid a race where a second `signal()`
     /// between a plain `is_signaled()` + `reset()` would be lost.
     pub fn take(&self) -> bool {
-        self.0.compare_exchange(true, false, Ordering::AcqRel, Ordering::Relaxed).is_ok()
+        self.0
+            .compare_exchange(true, false, Ordering::AcqRel, Ordering::Relaxed)
+            .is_ok()
     }
 }
 

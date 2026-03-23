@@ -24,5 +24,8 @@ pub enum Marker {
     /// Keep only the last `keep_last` messages during replay.
     CompactTo { keep_last: usize, timestamp: String },
     /// Discard the message with `message_id` and everything after it.
-    RewindTo { message_id: String, timestamp: String },
+    RewindTo {
+        message_id: String,
+        timestamp: String,
+    },
 }

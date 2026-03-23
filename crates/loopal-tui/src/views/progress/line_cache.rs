@@ -34,11 +34,7 @@ impl LineCache {
     }
 
     /// Update the cache and return total line count.
-    pub fn update(
-        &mut self,
-        messages: &[DisplayMessage],
-        width: u16,
-    ) -> usize {
+    pub fn update(&mut self, messages: &[DisplayMessage], width: u16) -> usize {
         let msg_count = messages.len();
 
         // Width changed (terminal resize) — full rebuild

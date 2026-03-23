@@ -37,7 +37,12 @@ pub(crate) fn run_init(app: &mut App) {
 
     // 1. LOOPAL.md at project root
     let instructions_path = cwd.join("LOOPAL.md");
-    write_template(&instructions_path, LOOPAL_MD_TEMPLATE, &mut created, &mut skipped);
+    write_template(
+        &instructions_path,
+        LOOPAL_MD_TEMPLATE,
+        &mut created,
+        &mut skipped,
+    );
 
     // 2. .loopal/ directory
     let dot_dir = cwd.join(".loopal");

@@ -1,8 +1,8 @@
 use async_trait::async_trait;
-use loopal_tools::ToolRegistry;
 use loopal_error::LoopalError;
 use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
-use serde_json::{json, Value};
+use loopal_tools::ToolRegistry;
+use serde_json::{Value, json};
 
 struct MockTool {
     tool_name: String,
@@ -13,7 +13,7 @@ impl MockTool {
     fn new(name: &str) -> Self {
         Self {
             tool_name: name.to_string(),
-            tool_description: format!("Mock tool: {}", name),
+            tool_description: format!("Mock tool: {name}"),
         }
     }
 }
@@ -94,7 +94,7 @@ fn test_to_definitions() {
 fn test_register_multiple_tools() {
     let mut registry = ToolRegistry::new();
     for i in 0..5 {
-        registry.register(Box::new(MockTool::new(&format!("Tool{}", i))));
+        registry.register(Box::new(MockTool::new(&format!("Tool{i}"))));
     }
     assert_eq!(registry.list().len(), 5);
 }

@@ -1,6 +1,6 @@
 use loopal_message::{ContentBlock, MessageRole};
 use loopal_provider_api::ChatParams;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use super::GoogleProvider;
 
@@ -26,7 +26,9 @@ impl GoogleProvider {
                             "functionCall": { "name": name, "args": input }
                         }),
                         ContentBlock::ToolResult {
-                            tool_use_id: _, content, ..
+                            tool_use_id: _,
+                            content,
+                            ..
                         } => json!({
                             "functionResponse": {
                                 "name": "",

@@ -57,7 +57,14 @@ fn test_build_empty_skills_no_section() {
 
 #[test]
 fn test_build_with_memory() {
-    let result = build_system_prompt("Base", &[], "", "/workspace", "", "## Key Patterns\n- Use DI");
+    let result = build_system_prompt(
+        "Base",
+        &[],
+        "",
+        "/workspace",
+        "",
+        "## Key Patterns\n- Use DI",
+    );
     assert!(result.contains("# Project Memory"));
     assert!(result.contains("Key Patterns"));
 }

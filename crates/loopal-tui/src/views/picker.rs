@@ -79,10 +79,7 @@ pub fn render_picker(f: &mut Frame, picker: &PickerState, area: Rect) {
         let indicator = if is_selected { " ▸ " } else { "   " };
 
         let line = Line::from(vec![
-            Span::styled(
-                indicator,
-                Style::default().fg(Color::Cyan),
-            ),
+            Span::styled(indicator, Style::default().fg(Color::Cyan)),
             Span::styled(
                 format!("{:<30}", item.label),
                 if is_selected {
@@ -91,10 +88,7 @@ pub fn render_picker(f: &mut Frame, picker: &PickerState, area: Rect) {
                     Style::default().fg(Color::White)
                 },
             ),
-            Span::styled(
-                &item.description,
-                Style::default().fg(Color::DarkGray),
-            ),
+            Span::styled(&item.description, Style::default().fg(Color::DarkGray)),
         ]);
 
         let row_area = Rect::new(inner.x, list_y + i as u16, inner.width, 1);

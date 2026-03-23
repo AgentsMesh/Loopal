@@ -38,13 +38,11 @@ impl Tool for MemoryTool {
     }
 
     async fn execute(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
-        let observation = input["observation"]
-            .as_str()
-            .ok_or_else(|| {
-                LoopalError::Tool(loopal_error::ToolError::InvalidInput(
-                    "observation is required".into(),
-                ))
-            })?;
+        let observation = input["observation"].as_str().ok_or_else(|| {
+            LoopalError::Tool(loopal_error::ToolError::InvalidInput(
+                "observation is required".into(),
+            ))
+        })?;
 
         if observation.trim().is_empty() {
             return Ok(ToolResult::error("observation must not be empty"));

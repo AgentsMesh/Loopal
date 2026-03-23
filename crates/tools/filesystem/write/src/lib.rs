@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
 use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use loopal_edit_core::omission_detector::detect_omissions;
 
@@ -39,20 +39,16 @@ impl Tool for WriteTool {
     }
 
     async fn execute(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
-        let file_path = input["file_path"]
-            .as_str()
-            .ok_or_else(|| {
-                LoopalError::Tool(loopal_error::ToolError::InvalidInput(
-                    "file_path is required".into(),
-                ))
-            })?;
-        let content = input["content"]
-            .as_str()
-            .ok_or_else(|| {
-                LoopalError::Tool(loopal_error::ToolError::InvalidInput(
-                    "content is required".into(),
-                ))
-            })?;
+        let file_path = input["file_path"].as_str().ok_or_else(|| {
+            LoopalError::Tool(loopal_error::ToolError::InvalidInput(
+                "file_path is required".into(),
+            ))
+        })?;
+        let content = input["content"].as_str().ok_or_else(|| {
+            LoopalError::Tool(loopal_error::ToolError::InvalidInput(
+                "content is required".into(),
+            ))
+        })?;
 
         // Check content for LLM omission patterns before writing
         let omissions = detect_omissions(content);

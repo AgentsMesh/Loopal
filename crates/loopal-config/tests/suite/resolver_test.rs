@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
+use loopal_config::hook::{HookConfig, HookEvent};
 use loopal_config::layer::{ConfigLayer, LayerSource};
 use loopal_config::resolver::ConfigResolver;
 use loopal_config::settings::McpServerConfig;
-use loopal_config::hook::{HookConfig, HookEvent};
 use loopal_config::skills::parse_skill;
 
 fn mcp_config(command: &str) -> McpServerConfig {
@@ -31,10 +31,16 @@ fn test_resolve_empty_produces_defaults() {
 fn test_resolve_settings_deep_merge() {
     let mut resolver = ConfigResolver::new();
 
-    let mut layer1 = ConfigLayer { source: LayerSource::Global, ..Default::default() };
+    let mut layer1 = ConfigLayer {
+        source: LayerSource::Global,
+        ..Default::default()
+    };
     layer1.settings = serde_json::json!({"model": "gpt-4", "max_turns": 100});
 
-    let mut layer2 = ConfigLayer { source: LayerSource::Project, ..Default::default() };
+    let mut layer2 = ConfigLayer {
+        source: LayerSource::Project,
+        ..Default::default()
+    };
     layer2.settings = serde_json::json!({"max_turns": 200});
 
     resolver.add_layer(layer1);
@@ -49,12 +55,24 @@ fn test_resolve_settings_deep_merge() {
 fn test_resolve_mcp_override_by_name() {
     let mut resolver = ConfigResolver::new();
 
-    let mut layer1 = ConfigLayer { source: LayerSource::Global, ..Default::default() };
-    layer1.mcp_servers.insert("github".into(), mcp_config("mcp-github-v1"));
-    layer1.mcp_servers.insert("sqlite".into(), mcp_config("mcp-sqlite"));
+    let mut layer1 = ConfigLayer {
+        source: LayerSource::Global,
+        ..Default::default()
+    };
+    layer1
+        .mcp_servers
+        .insert("github".into(), mcp_config("mcp-github-v1"));
+    layer1
+        .mcp_servers
+        .insert("sqlite".into(), mcp_config("mcp-sqlite"));
 
-    let mut layer2 = ConfigLayer { source: LayerSource::Project, ..Default::default() };
-    layer2.mcp_servers.insert("github".into(), mcp_config("mcp-github-v2"));
+    let mut layer2 = ConfigLayer {
+        source: LayerSource::Project,
+        ..Default::default()
+    };
+    layer2
+        .mcp_servers
+        .insert("github".into(), mcp_config("mcp-github-v2"));
 
     resolver.add_layer(layer1);
     resolver.add_layer(layer2);
@@ -70,12 +88,20 @@ fn test_resolve_mcp_override_by_name() {
 fn test_resolve_mcp_disabled_removes() {
     let mut resolver = ConfigResolver::new();
 
-    let mut layer1 = ConfigLayer { source: LayerSource::Global, ..Default::default() };
-    layer1.mcp_servers.insert("noisy".into(), mcp_config("noisy-server"));
+    let mut layer1 = ConfigLayer {
+        source: LayerSource::Global,
+        ..Default::default()
+    };
+    layer1
+        .mcp_servers
+        .insert("noisy".into(), mcp_config("noisy-server"));
 
     let mut disabled = mcp_config("noisy-server");
     disabled.enabled = false;
-    let mut layer2 = ConfigLayer { source: LayerSource::Project, ..Default::default() };
+    let mut layer2 = ConfigLayer {
+        source: LayerSource::Project,
+        ..Default::default()
+    };
     layer2.mcp_servers.insert("noisy".into(), disabled);
 
     resolver.add_layer(layer1);
@@ -92,9 +118,15 @@ fn test_resolve_skills_override_by_name() {
     let skill1 = parse_skill("/commit", "Global commit skill.");
     let skill2 = parse_skill("/commit", "Project commit skill.");
 
-    let mut layer1 = ConfigLayer { source: LayerSource::Global, ..Default::default() };
+    let mut layer1 = ConfigLayer {
+        source: LayerSource::Global,
+        ..Default::default()
+    };
     layer1.skills = vec![skill1];
-    let mut layer2 = ConfigLayer { source: LayerSource::Project, ..Default::default() };
+    let mut layer2 = ConfigLayer {
+        source: LayerSource::Project,
+        ..Default::default()
+    };
     layer2.skills = vec![skill2];
 
     resolver.add_layer(layer1);
@@ -102,7 +134,10 @@ fn test_resolve_skills_override_by_name() {
 
     let config = resolver.resolve().unwrap();
     assert_eq!(config.skills.len(), 1);
-    assert_eq!(config.skills["/commit"].skill.description, "Project commit skill.");
+    assert_eq!(
+        config.skills["/commit"].skill.description,
+        "Project commit skill."
+    );
     assert_eq!(config.skills["/commit"].source, LayerSource::Project);
 }
 
@@ -111,17 +146,27 @@ fn test_resolve_hooks_append_all() {
     let mut resolver = ConfigResolver::new();
 
     let hook1 = HookConfig {
-        event: HookEvent::PreToolUse, command: "echo global".into(),
-        tool_filter: None, timeout_ms: 10_000,
+        event: HookEvent::PreToolUse,
+        command: "echo global".into(),
+        tool_filter: None,
+        timeout_ms: 10_000,
     };
     let hook2 = HookConfig {
-        event: HookEvent::PostToolUse, command: "echo project".into(),
-        tool_filter: None, timeout_ms: 5_000,
+        event: HookEvent::PostToolUse,
+        command: "echo project".into(),
+        tool_filter: None,
+        timeout_ms: 5_000,
     };
 
-    let mut layer1 = ConfigLayer { source: LayerSource::Global, ..Default::default() };
+    let mut layer1 = ConfigLayer {
+        source: LayerSource::Global,
+        ..Default::default()
+    };
     layer1.hooks = vec![hook1];
-    let mut layer2 = ConfigLayer { source: LayerSource::Project, ..Default::default() };
+    let mut layer2 = ConfigLayer {
+        source: LayerSource::Project,
+        ..Default::default()
+    };
     layer2.hooks = vec![hook2];
 
     resolver.add_layer(layer1);
@@ -137,9 +182,15 @@ fn test_resolve_hooks_append_all() {
 fn test_resolve_instructions_concatenated() {
     let mut resolver = ConfigResolver::new();
 
-    let mut layer1 = ConfigLayer { source: LayerSource::Global, ..Default::default() };
+    let mut layer1 = ConfigLayer {
+        source: LayerSource::Global,
+        ..Default::default()
+    };
     layer1.instructions = Some("Global instructions".into());
-    let mut layer2 = ConfigLayer { source: LayerSource::Project, ..Default::default() };
+    let mut layer2 = ConfigLayer {
+        source: LayerSource::Project,
+        ..Default::default()
+    };
     layer2.instructions = Some("Project instructions".into());
 
     resolver.add_layer(layer1);

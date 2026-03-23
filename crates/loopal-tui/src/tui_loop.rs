@@ -142,18 +142,6 @@ pub async fn run_tui(
                 AppEvent::Paste(result) => {
                     paste::apply_paste_result(&mut app, result);
                 }
-                AppEvent::Mouse(mouse) => {
-                    use crossterm::event::MouseEventKind;
-                    match mouse.kind {
-                        MouseEventKind::ScrollUp => {
-                            app.scroll_offset = app.scroll_offset.saturating_add(3);
-                        }
-                        MouseEventKind::ScrollDown => {
-                            app.scroll_offset = app.scroll_offset.saturating_sub(3);
-                        }
-                        _ => {}
-                    }
-                }
                 AppEvent::Resize(_, _) => {}
                 AppEvent::Tick => {}
             }

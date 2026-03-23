@@ -124,6 +124,16 @@ fn handle_normal_key(app: &mut App, key: &KeyEvent) -> InputAction {
                 multiline::line_end(&app.input, app.input_cursor, DEFAULT_WRAP_WIDTH);
             InputAction::None
         }
+        KeyCode::Up if app.scroll_offset > 0 || !app.session.lock().agent_idle => {
+            // Browsing mode (scrolled away from bottom) or agent running:
+            // scroll content area instead of input navigation.
+            app.scroll_offset = app.scroll_offset.saturating_add(3);
+            InputAction::None
+        }
+        KeyCode::Down if app.scroll_offset > 0 => {
+            app.scroll_offset = app.scroll_offset.saturating_sub(3);
+            InputAction::None
+        }
         KeyCode::Up => handle_up(app),
         KeyCode::Down => handle_down(app),
         KeyCode::Esc => handle_esc(app),

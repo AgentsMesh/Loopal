@@ -16,7 +16,7 @@ fn make_app() -> (App, mpsc::Receiver<ControlCommand>, mpsc::Receiver<bool>) {
         perm_tx,
         question_tx,
         Default::default(),
-        std::sync::Arc::new(tokio::sync::Notify::new()),
+        std::sync::Arc::new(tokio::sync::watch::channel(0u64).0),
     );
     let app = App::new(session, builtin_entries(), std::env::temp_dir());
     (app, control_rx, perm_rx)

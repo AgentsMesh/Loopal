@@ -136,7 +136,7 @@ async fn test_check_permission_channel_closed_denies() {
         interactive: true,
         thinking_config: loopal_provider_api::ThinkingConfig::Auto,
         interrupt: Default::default(),
-        interrupt_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
+        interrupt_tx: std::sync::Arc::new(tokio::sync::watch::channel(0u64).0),
         memory_channel: None,
     };
 

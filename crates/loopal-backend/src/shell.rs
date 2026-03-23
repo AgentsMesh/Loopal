@@ -153,6 +153,9 @@ fn build_command(
     if let Some(pol) = policy {
         let sc = loopal_sandbox::command_wrapper::wrap_command(pol, command, cwd);
         (sc.program, sc.args, Some(sc.env))
+    } else if cfg!(windows) {
+        let comspec = std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".into());
+        (comspec, vec!["/C".into(), command.into()], None)
     } else {
         ("sh".into(), vec!["-c".into(), command.into()], None)
     }

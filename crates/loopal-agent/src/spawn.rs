@@ -149,7 +149,7 @@ pub async fn spawn_agent(
         interactive: false,
         thinking_config: loopal_provider_api::ThinkingConfig::Auto,
         interrupt: loopal_protocol::InterruptSignal::new(),
-        interrupt_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
+        interrupt_tx: std::sync::Arc::new(tokio::sync::watch::channel(0u64).0),
         memory_channel: None, // Sub-agents do not get memory channel
     };
 

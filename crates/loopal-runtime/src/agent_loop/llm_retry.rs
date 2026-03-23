@@ -9,7 +9,9 @@ use super::runner::AgentLoopRunner;
 
 impl AgentLoopRunner {
     /// Retry loop for the initial stream_chat API call.
-    pub(super) async fn retry_stream_chat(
+    ///
+    /// Exposed for integration testing. Production callers use `stream_llm_with`.
+    pub async fn retry_stream_chat(
         &mut self,
         params: &ChatParams,
         provider: &dyn loopal_provider_api::Provider,
@@ -19,7 +21,17 @@ impl AgentLoopRunner {
         const BASE_WAIT_MS: u64 = 2000;
         let mut retry_count = 0;
         loop {
-            match provider.stream_chat(params).await {
+            if cancel.is_cancelled() {
+                return Ok(Box::pin(futures::stream::empty()));
+            }
+            let stream_result = tokio::select! {
+                biased;
+                result = provider.stream_chat(params) => result,
+                _ = cancel.cancelled() => {
+                    return Ok(Box::pin(futures::stream::empty()));
+                }
+            };
+            match stream_result {
                 Ok(s) => return Ok(s),
                 Err(e) if e.is_retryable() && retry_count < MAX_RETRIES => {
                     retry_count += 1;

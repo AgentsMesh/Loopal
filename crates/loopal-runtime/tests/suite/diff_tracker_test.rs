@@ -11,7 +11,10 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 
 fn make_ctx() -> TurnContext {
-    let cancel = TurnCancel::new(InterruptSignal::new(), Arc::new(tokio::sync::Notify::new()));
+    let cancel = TurnCancel::new(
+        InterruptSignal::new(),
+        Arc::new(tokio::sync::watch::channel(0u64).0),
+    );
     TurnContext::new(0, cancel)
 }
 

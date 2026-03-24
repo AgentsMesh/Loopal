@@ -1,5 +1,5 @@
 pub mod grep;
 pub mod grep_format;
-pub mod grep_search;
+mod grep_format_summary;
 
 pub use grep::GrepTool;

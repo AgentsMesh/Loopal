@@ -1,12 +1,9 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
-use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
-use regex::RegexBuilder;
+use loopal_tool_api::{GrepOptions, PermissionLevel, Tool, ToolContext, ToolResult};
 use serde_json::{Value, json};
-use std::path::PathBuf;
 
-use crate::grep_format::{FormatOptions, format_results};
-use crate::grep_search::{OutputMode, SearchOptions, search_files, type_to_extensions};
+use crate::grep_format::{FormatOptions, OutputMode, format_results};
 
 pub struct GrepTool;
 
@@ -108,17 +105,10 @@ impl Tool for GrepTool {
             return Ok(ToolResult::error("pattern too long (max 1000 characters)"));
         }
 
-        let (re, search_opts, mode, head_limit, fmt_opts) = parse_params(&input, pattern)?;
-        let search_path = resolve_path(&input, ctx)?;
-        let include_glob = parse_include_glob(&input)?;
-
-        let results = search_files(
-            &search_path,
-            &re,
-            include_glob.as_ref(),
-            MAX_TOTAL_MATCHES,
-            &search_opts,
-        );
+        let (grep_opts, mode, head_limit, fmt_opts) = parse_params(&input, pattern, ctx)?;
+        let results = ctx.backend.grep(&grep_opts).await.map_err(|e| {
+            LoopalError::Tool(loopal_error::ToolError::ExecutionFailed(e.to_string()))
+        })?;
         let output = format_results(&results, mode, head_limit, MAX_TOTAL_MATCHES, &fmt_opts);
         Ok(ToolResult::success(output))
     }
@@ -127,37 +117,8 @@ impl Tool for GrepTool {
 fn parse_params(
     input: &Value,
     pattern: &str,
-) -> Result<
-    (
-        regex::Regex,
-        SearchOptions,
-        OutputMode,
-        usize,
-        FormatOptions,
-    ),
-    LoopalError,
-> {
-    let case_insensitive = input["-i"].as_bool().unwrap_or(false);
-    let multiline = input["multiline"].as_bool().unwrap_or(false);
-    let fixed_strings = input["fixed_strings"].as_bool().unwrap_or(false);
-
-    let effective_pattern = if fixed_strings {
-        regex::escape(pattern)
-    } else {
-        pattern.to_string()
-    };
-    let re = RegexBuilder::new(&effective_pattern)
-        .case_insensitive(case_insensitive)
-        .multi_line(multiline)
-        .dot_matches_new_line(multiline)
-        .size_limit(1_000_000)
-        .build()
-        .map_err(|e| {
-            LoopalError::Tool(loopal_error::ToolError::InvalidInput(format!(
-                "Invalid regex: {e}"
-            )))
-        })?;
-
+    ctx: &ToolContext,
+) -> Result<(GrepOptions, OutputMode, usize, FormatOptions), LoopalError> {
     let ctx_c = input["-C"].as_u64().map(|n| n as usize);
     let ctx_after = input["-A"]
         .as_u64()
@@ -170,17 +131,30 @@ fn parse_params(
         .or(ctx_c)
         .unwrap_or(0);
 
-    let type_exts = input["type"].as_str().map(|t| {
-        type_to_extensions(t)
-            .map(|exts| exts.into_iter().map(String::from).collect())
-            .unwrap_or_default() // unknown type → empty list → no matches
-    });
+    let search_path = match input["path"].as_str() {
+        Some(p) => Some(
+            ctx.backend
+                .resolve_path(p, false)
+                .map_err(|e| {
+                    LoopalError::Tool(loopal_error::ToolError::ExecutionFailed(e.to_string()))
+                })?
+                .to_string_lossy()
+                .into_owned(),
+        ),
+        None => None,
+    };
 
-    let search_opts = SearchOptions {
+    let grep_opts = GrepOptions {
+        pattern: pattern.to_string(),
+        path: search_path,
+        glob_filter: input["glob"].as_str().map(String::from),
+        case_insensitive: input["-i"].as_bool().unwrap_or(false),
+        multiline: input["multiline"].as_bool().unwrap_or(false),
+        fixed_strings: input["fixed_strings"].as_bool().unwrap_or(false),
         context_before: ctx_before,
         context_after: ctx_after,
-        multiline,
-        type_extensions: type_exts,
+        type_filter: input["type"].as_str().map(String::from),
+        max_matches: MAX_TOTAL_MATCHES,
     };
 
     let mode = OutputMode::from_str_opt(input["output_mode"].as_str())?;
@@ -194,28 +168,5 @@ fn parse_params(
         has_context: ctx_before > 0 || ctx_after > 0,
     };
 
-    Ok((re, search_opts, mode, head_limit, fmt_opts))
-}
-
-fn resolve_path(input: &Value, ctx: &ToolContext) -> Result<PathBuf, LoopalError> {
-    match input["path"].as_str() {
-        Some(p) => ctx.backend.resolve_path(p, false).map_err(|e| {
-            LoopalError::Tool(loopal_error::ToolError::ExecutionFailed(e.to_string()))
-        }),
-        None => Ok(ctx.backend.cwd().to_path_buf()),
-    }
-}
-
-fn parse_include_glob(input: &Value) -> Result<Option<globset::GlobMatcher>, LoopalError> {
-    match input["glob"].as_str() {
-        Some(g) => {
-            let glob = globset::Glob::new(g).map_err(|e| {
-                LoopalError::Tool(loopal_error::ToolError::InvalidInput(format!(
-                    "Invalid include glob: {e}"
-                )))
-            })?;
-            Ok(Some(glob.compile_matcher()))
-        }
-        None => Ok(None),
-    }
+    Ok((grep_opts, mode, head_limit, fmt_opts))
 }

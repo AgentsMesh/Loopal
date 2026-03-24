@@ -1,12 +1,7 @@
 use async_trait::async_trait;
-use globset::{Glob, GlobSetBuilder};
-use ignore::WalkBuilder;
 use loopal_error::LoopalError;
-use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
+use loopal_tool_api::{GlobOptions, PermissionLevel, Tool, ToolContext, ToolResult};
 use serde_json::{Value, json};
-use std::path::PathBuf;
-
-use loopal_tool_grep::grep_search::type_to_extensions;
 
 pub struct GlobTool;
 
@@ -65,11 +60,16 @@ impl Tool for GlobTool {
         })?;
 
         let search_path = match input["path"].as_str() {
-            Some(p) => match ctx.backend.resolve_path(p, false) {
-                Ok(resolved) => resolved,
-                Err(e) => return Ok(ToolResult::error(e.to_string())),
-            },
-            None => ctx.backend.cwd().to_path_buf(),
+            Some(p) => Some(
+                ctx.backend
+                    .resolve_path(p, false)
+                    .map_err(|e| {
+                        LoopalError::Tool(loopal_error::ToolError::ExecutionFailed(e.to_string()))
+                    })?
+                    .to_string_lossy()
+                    .into_owned(),
+            ),
+            None => None,
         };
 
         let limit = input["limit"]
@@ -78,66 +78,32 @@ impl Tool for GlobTool {
             .unwrap_or(DEFAULT_LIMIT);
         let offset = input["offset"].as_u64().map(|n| n as usize).unwrap_or(0);
 
-        let glob = Glob::new(pattern).map_err(|e| {
-            LoopalError::Tool(loopal_error::ToolError::InvalidInput(format!(
-                "Invalid glob pattern: {e}"
-            )))
+        let opts = GlobOptions {
+            pattern: pattern.to_string(),
+            path: search_path,
+            type_filter: input["type"].as_str().map(String::from),
+            max_results: 10_000,
+        };
+
+        let result = ctx.backend.glob(&opts).await.map_err(|e| {
+            LoopalError::Tool(loopal_error::ToolError::ExecutionFailed(e.to_string()))
         })?;
 
-        let mut builder = GlobSetBuilder::new();
-        builder.add(glob);
-        let glob_set = builder.build().map_err(|e| {
-            LoopalError::Tool(loopal_error::ToolError::InvalidInput(format!(
-                "Failed to build glob set: {e}"
-            )))
-        })?;
+        // Sort by modification time, newest first.
+        let mut entries = result.entries;
+        entries.sort_by(|a, b| b.modified_secs.cmp(&a.modified_secs));
 
-        let type_exts: Option<Vec<&str>> = input["type"].as_str().map(|t| {
-            type_to_extensions(t).unwrap_or_default() // unknown type → empty → no matches
-        });
-
-        let mut matches: Vec<(PathBuf, std::time::SystemTime)> = Vec::new();
-
-        for entry in WalkBuilder::new(&search_path)
-            .follow_links(true)
-            .build()
-            .filter_map(|e| e.ok())
-        {
-            let path = entry.path();
-            if let Ok(rel) = path.strip_prefix(&search_path)
-                && glob_set.is_match(rel)
-            {
-                // Apply type extension filter
-                if let Some(ref exts) = type_exts {
-                    let file_ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-                    if !exts.contains(&file_ext) {
-                        continue;
-                    }
-                }
-                let mtime = entry
-                    .metadata()
-                    .ok()
-                    .and_then(|m| m.modified().ok())
-                    .unwrap_or(std::time::UNIX_EPOCH);
-                matches.push((path.to_path_buf(), mtime));
-            }
-        }
-
-        // Sort by modification time, newest first
-        matches.sort_by(|a, b| b.1.cmp(&a.1));
-
-        let total_found = matches.len();
-        let page: Vec<String> = matches
-            .iter()
-            .skip(offset)
-            .take(limit)
-            .map(|(p, _)| p.display().to_string())
-            .collect();
-
+        let total_found = entries.len();
         if total_found == 0 {
             return Ok(ToolResult::success("No files matched the pattern."));
         }
 
+        let page: Vec<&str> = entries
+            .iter()
+            .skip(offset)
+            .take(limit)
+            .map(|e| e.path.as_str())
+            .collect();
         let page_end = (offset + page.len()).min(total_found);
         let mut output = format!(
             "Found {} files. Showing {}-{}:\n{}",

@@ -67,26 +67,73 @@ pub struct LsEntry {
     pub permissions: Option<u32>,
 }
 
+// --- Glob search types ---
+
+/// Options for a glob file search.
+#[derive(Debug, Clone)]
+pub struct GlobOptions {
+    pub pattern: String,
+    pub path: Option<String>,
+    pub type_filter: Option<String>,
+    pub max_results: usize,
+}
+
 /// Result of a glob search.
 #[derive(Debug, Clone)]
-pub struct GlobResult {
-    pub paths: Vec<String>,
+pub struct GlobSearchResult {
+    pub entries: Vec<GlobEntry>,
     /// `true` when results were capped at the configured limit.
     pub truncated: bool,
 }
 
-/// Result of a grep search.
+/// Single entry in a glob search result.
 #[derive(Debug, Clone)]
-pub struct GrepResult {
-    pub matches: Vec<GrepMatch>,
-    /// `true` when results were capped at the configured limit.
-    pub truncated: bool,
-}
-
-/// Single match in a grep result.
-#[derive(Debug, Clone)]
-pub struct GrepMatch {
+pub struct GlobEntry {
     pub path: String,
-    pub line_number: usize,
+    pub modified_secs: Option<u64>,
+}
+
+// --- Grep search types ---
+
+/// Options for a regex content search.
+#[derive(Debug, Clone)]
+pub struct GrepOptions {
+    pub pattern: String,
+    pub path: Option<String>,
+    pub glob_filter: Option<String>,
+    pub case_insensitive: bool,
+    pub multiline: bool,
+    pub fixed_strings: bool,
+    pub context_before: usize,
+    pub context_after: usize,
+    pub type_filter: Option<String>,
+    pub max_matches: usize,
+}
+
+/// Result of a grep content search.
+#[derive(Debug, Clone)]
+pub struct GrepSearchResult {
+    pub file_matches: Vec<FileMatchResult>,
+    pub total_match_count: usize,
+}
+
+/// All matches within a single file.
+#[derive(Debug, Clone)]
+pub struct FileMatchResult {
+    pub path: String,
+    pub groups: Vec<MatchGroup>,
+}
+
+/// A group of contiguous lines (matches + surrounding context).
+#[derive(Debug, Clone)]
+pub struct MatchGroup {
+    pub lines: Vec<MatchLine>,
+}
+
+/// A single line in a match group — either a match or a context line.
+#[derive(Debug, Clone)]
+pub struct MatchLine {
+    pub line_num: usize,
     pub content: String,
+    pub is_match: bool,
 }

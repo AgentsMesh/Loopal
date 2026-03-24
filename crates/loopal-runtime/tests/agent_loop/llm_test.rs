@@ -28,16 +28,17 @@ fn test_prepare_chat_params_act_mode() {
 #[test]
 fn test_prepare_chat_params_plan_mode_passes_through() {
     // Mode is now handled by fragment system at prompt build time,
-    // not appended by llm.rs. Verify system_prompt is passed through unchanged.
+    // not appended by llm.rs. Verify system_prompt starts with the original
+    // (env section is appended dynamically per-turn).
     let (mut runner, _rx) = make_runner();
     runner.params.mode = AgentMode::Plan;
     let params = runner
         .prepare_chat_params_with(&runner.params.messages)
         .expect("should succeed");
 
-    assert_eq!(
-        params.system_prompt, runner.params.system_prompt,
-        "llm.rs should pass system_prompt through without modification"
+    assert!(
+        params.system_prompt.starts_with(&runner.params.system_prompt),
+        "llm.rs should preserve original system_prompt (env section appended)"
     );
 }
 

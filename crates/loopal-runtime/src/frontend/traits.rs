@@ -59,6 +59,15 @@ pub trait AgentFrontend: Send + Sync {
     async fn ask_user(&self, _questions: Vec<Question>) -> Vec<String> {
         vec!["(not supported)".into()]
     }
+
+    /// Non-blocking, synchronous event emission for use in `Drop` guards.
+    ///
+    /// Returns `true` if the event was enqueued, `false` if the channel
+    /// was full or closed. Safe to call from non-async contexts (e.g. panic
+    /// unwinding). Default returns `false`.
+    fn try_emit(&self, _payload: AgentEventPayload) -> bool {
+        false
+    }
 }
 
 /// Lightweight, `Send + Sync` event emitter for parallel tool execution.

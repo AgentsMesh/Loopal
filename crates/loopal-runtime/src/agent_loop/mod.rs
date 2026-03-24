@@ -3,6 +3,7 @@ mod compaction;
 mod context_prep;
 pub mod diff_tracker;
 pub mod env_context;
+mod finished_guard;
 mod input;
 mod llm;
 mod llm_params;
@@ -42,6 +43,8 @@ use tokio::sync::watch;
 use crate::mode::AgentMode;
 use crate::session::SessionManager;
 
+use finished_guard::FinishedGuard;
+
 pub use runner::AgentLoopRunner;
 
 /// Maximum number of automatic continuations when LLM hits max_tokens.
@@ -80,14 +83,19 @@ pub struct AgentLoopParams {
 
 /// Public wrapper function that preserves the existing API.
 /// Constructs default observers (loop detection, diff tracking) and runs the loop.
+///
+/// A `FinishedGuard` ensures `Finished` is always emitted — even on panic.
 pub async fn agent_loop(params: AgentLoopParams) -> Result<AgentOutput> {
+    let mut guard = FinishedGuard::new(params.frontend.clone());
     let observers: Vec<Box<dyn turn_observer::TurnObserver>> = vec![
         Box::new(loop_detector::LoopDetector::new()),
         Box::new(diff_tracker::DiffTracker::new(params.frontend.clone())),
     ];
     let mut runner = AgentLoopRunner::new(params);
     runner.observers = observers;
-    runner.run().await
+    let result = runner.run().await;
+    guard.disarm();
+    result
 }
 
 /// Output from a single turn (LLM → [tools → LLM]* → done).

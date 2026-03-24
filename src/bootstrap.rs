@@ -181,9 +181,15 @@ pub async fn run() -> anyhow::Result<()> {
         memory_channel,
     };
 
-    tokio::spawn(async move {
+    let agent_handle = tokio::spawn(async move {
         if let Err(e) = agent_loop(agent_params).await {
             tracing::error!(error = %e, "agent loop error");
+        }
+    });
+    // Monitor JoinHandle: log panic payload that FinishedGuard cannot capture.
+    tokio::spawn(async move {
+        if let Err(e) = agent_handle.await {
+            tracing::error!("agent loop task failed: {e}");
         }
     });
 

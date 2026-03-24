@@ -71,7 +71,7 @@ fn test_tool_call_mutation_detected() {
     }];
     let fp1 = cache.update(&msgs, W);
 
-    // Mutate: status changes → icon changes from ⋯ to ✓
+    // Mutate: status changes → icon color changes (yellow→green ●)
     msgs[0].tool_calls[0].status = ToolCallStatus::Success;
     msgs[0].tool_calls[0].result = Some("done".to_string());
     let fp2 = cache.update(&msgs, W);
@@ -82,10 +82,10 @@ fn test_tool_call_mutation_detected() {
         .iter()
         .flat_map(|l| l.spans.iter().map(|s| s.content.to_string()))
         .collect();
-    // Single-line summary should contain the status icon change
+    // Single-line summary should contain the status icon
     assert!(
-        text.contains("✓"),
-        "should show success icon after mutation"
+        text.contains("●"),
+        "should show ● icon after mutation"
     );
     // Fingerprint-triggered rebuild means line counts may differ
     assert!(fp1 > 0 && fp2 > 0, "both updates should produce lines");
@@ -149,8 +149,8 @@ fn test_tool_result_arrival_invalidates_cache() {
         .flat_map(|l| l.spans.iter().map(|s| s.content.to_string()))
         .collect();
     assert!(
-        text.contains("✓"),
-        "result arrival should update status icon"
+        text.contains("●"),
+        "result arrival should update to ● icon"
     );
     assert!(n1 > 0 && n2 > 0, "both states should produce lines");
 }

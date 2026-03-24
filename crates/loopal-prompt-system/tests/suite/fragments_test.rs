@@ -88,11 +88,7 @@ fn conditional_tool_fragments() {
 #[test]
 fn fragment_count() {
     let frags = system_fragments();
-    // core/5 + tasks/9 + tools/4 + modes/2 + agents/3 = 23 ... wait
-    // Actually: tasks has 9 (ambitious, avoid-over-engineering, blocked-approach,
-    //   minimize-file-creation, no-compatibility-hacks, no-time-estimates,
-    //   read-before-modifying, root-cause-thinking, security, software-engineering-focus)
-    // That's 10 tasks. 5+10+4+2+3 = 24
-    assert_eq!(frags.len(), 24, "expected 24 fragments, got {}: {:?}",
+    // core/4 + tasks/10 + tools/4 + modes/2 + agents/3 = 23
+    assert_eq!(frags.len(), 23, "expected 23 fragments, got {}: {:?}",
         frags.len(), frags.iter().map(|f| &f.id).collect::<Vec<_>>());
 }

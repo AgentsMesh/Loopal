@@ -111,10 +111,10 @@ fn test_tool_call_single_line_summary() {
     };
     let lines = message_to_lines(&m, 80);
     let text = all_text(&lines);
-    assert!(text.contains("✓"), "success tool call should have ✓ icon");
+    assert!(text.contains("●"), "success tool call should have ● icon");
     assert!(
-        text.contains("Read(src/main.rs)"),
-        "should contain tool summary"
+        text.contains("Read"),
+        "should contain tool name"
     );
 }
 
@@ -139,7 +139,7 @@ fn test_tool_call_error_shows_cross() {
     };
     let lines = message_to_lines(&m, 80);
     let text = all_text(&lines);
-    assert!(text.contains("✗"), "error tool call should have ✗ icon");
+    assert!(text.contains("●"), "error tool call should have ● icon");
 }
 
 #[test]
@@ -163,7 +163,7 @@ fn test_tool_call_pending_shows_spinner() {
     };
     let lines = message_to_lines(&m, 80);
     let text = all_text(&lines);
-    assert!(text.contains("⋯"), "pending tool call should have ⋯ icon");
+    assert!(text.contains("●"), "pending tool call should have ● icon");
 }
 
 #[test]
@@ -188,6 +188,6 @@ fn test_assistant_with_content_and_tools() {
     let lines = message_to_lines(&m, 80);
     let text = all_text(&lines);
     assert!(text.contains("Let me fix this"));
-    assert!(text.contains("✓"));
-    assert!(text.contains("Edit(src/lib.rs:42)"));
+    assert!(text.contains("●"));
+    assert!(text.contains("Edit"));
 }

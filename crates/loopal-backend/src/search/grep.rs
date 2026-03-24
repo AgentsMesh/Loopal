@@ -1,8 +1,8 @@
 //! Parallel regex content search with context lines and binary detection.
 
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use globset::Glob;
 use ignore::WalkState;
@@ -67,7 +67,10 @@ pub fn grep_search(
     let glob_matcher = Arc::new(glob_matcher);
 
     let Some(w) = walker::build_walker(&search_path, opts.type_filter.as_deref()) else {
-        return Ok(GrepSearchResult { file_matches: Vec::new(), total_match_count: 0 });
+        return Ok(GrepSearchResult {
+            file_matches: Vec::new(),
+            total_match_count: 0,
+        });
     };
     w.build_parallel().run(|| {
         let re = re.clone();
@@ -91,9 +94,9 @@ pub fn grep_search(
             if !matches_glob(&path, &search_path, glob_matcher.as_ref().as_ref()) {
                 return WalkState::Continue;
             }
-            if let Some(fm) =
-                search_one_file(&path, &re, multiline, ctx_before, ctx_after, max, &total, &done)
-            {
+            if let Some(fm) = search_one_file(
+                &path, &re, multiline, ctx_before, ctx_after, max, &total, &done,
+            ) {
                 results.lock().push(fm);
             }
             WalkState::Continue
@@ -149,20 +152,29 @@ fn search_single_file(
     path: &Path,
     limits: &ResourceLimits,
 ) -> Result<GrepSearchResult, ToolIoError> {
-    let empty = GrepSearchResult { file_matches: Vec::new(), total_match_count: 0 };
+    let empty = GrepSearchResult {
+        file_matches: Vec::new(),
+        total_match_count: 0,
+    };
     if binary::is_likely_binary(path) {
         return Ok(empty);
     }
     let re = build_regex(opts)?;
-    let Ok(content) = std::fs::read_to_string(path) else { return Ok(empty) };
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return Ok(empty);
+    };
     let lines: Vec<&str> = content.lines().collect();
     let indices = grep_match::find_match_indices(&content, &lines, &re, opts.multiline);
     if indices.is_empty() {
         return Ok(empty);
     }
     let count = indices.len().min(limits.max_grep_matches);
-    let groups =
-        grep_match::collect_context_groups(&lines, &indices, opts.context_before, opts.context_after);
+    let groups = grep_match::collect_context_groups(
+        &lines,
+        &indices,
+        opts.context_before,
+        opts.context_after,
+    );
     Ok(GrepSearchResult {
         total_match_count: count,
         file_matches: vec![FileMatchResult {

@@ -22,13 +22,16 @@ pub fn glob_search(
         .map(|p| cwd.join(p))
         .unwrap_or_else(|| cwd.to_path_buf());
 
-    let glob = Glob::new(&opts.pattern)
-        .map_err(|e| ToolIoError::Other(format!("invalid glob: {e}")))?;
+    let glob =
+        Glob::new(&opts.pattern).map_err(|e| ToolIoError::Other(format!("invalid glob: {e}")))?;
     let matcher = glob.compile_matcher();
 
     let max = opts.max_results.min(limits.max_glob_results);
     let Some(walker) = walker::build_walker(&search_path, opts.type_filter.as_deref()) else {
-        return Ok(GlobSearchResult { entries: Vec::new(), truncated: false });
+        return Ok(GlobSearchResult {
+            entries: Vec::new(),
+            truncated: false,
+        });
     };
 
     let mut entries = Vec::new();

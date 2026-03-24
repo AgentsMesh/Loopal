@@ -72,7 +72,10 @@ impl Tool for GlobTool {
             None => None,
         };
 
-        let limit = input["limit"].as_u64().map(|n| n as usize).unwrap_or(DEFAULT_LIMIT);
+        let limit = input["limit"]
+            .as_u64()
+            .map(|n| n as usize)
+            .unwrap_or(DEFAULT_LIMIT);
         let offset = input["offset"].as_u64().map(|n| n as usize).unwrap_or(0);
 
         let opts = GlobOptions {

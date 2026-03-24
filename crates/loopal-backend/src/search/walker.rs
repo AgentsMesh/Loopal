@@ -2,8 +2,8 @@
 
 use std::path::Path;
 
-use ignore::types::TypesBuilder;
 use ignore::WalkBuilder;
+use ignore::types::TypesBuilder;
 
 /// Build a `WalkBuilder` with shared defaults.
 ///

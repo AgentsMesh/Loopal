@@ -120,8 +120,16 @@ fn parse_params(
     ctx: &ToolContext,
 ) -> Result<(GrepOptions, OutputMode, usize, FormatOptions), LoopalError> {
     let ctx_c = input["-C"].as_u64().map(|n| n as usize);
-    let ctx_after = input["-A"].as_u64().map(|n| n as usize).or(ctx_c).unwrap_or(0);
-    let ctx_before = input["-B"].as_u64().map(|n| n as usize).or(ctx_c).unwrap_or(0);
+    let ctx_after = input["-A"]
+        .as_u64()
+        .map(|n| n as usize)
+        .or(ctx_c)
+        .unwrap_or(0);
+    let ctx_before = input["-B"]
+        .as_u64()
+        .map(|n| n as usize)
+        .or(ctx_c)
+        .unwrap_or(0);
 
     let search_path = match input["path"].as_str() {
         Some(p) => Some(

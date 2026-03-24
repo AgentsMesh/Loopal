@@ -3,9 +3,15 @@ use loopal_tool_grep::GrepTool;
 use serde_json::json;
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
-    let backend =
-        loopal_backend::LocalBackend::new(cwd.to_path_buf(), None, Default::default());
-    ToolContext { backend, session_id: "test".into(), shared: None, pending_cwd_switch: Default::default(), memory_channel: None, output_tail: None }
+    let backend = loopal_backend::LocalBackend::new(cwd.to_path_buf(), None, Default::default());
+    ToolContext {
+        backend,
+        session_id: "test".into(),
+        shared: None,
+        pending_cwd_switch: Default::default(),
+        memory_channel: None,
+        output_tail: None,
+    }
 }
 
 fn make_file(dir: &std::path::Path, name: &str, content: &str) {
@@ -19,8 +25,12 @@ async fn case_insensitive_matches() {
     let tool = GrepTool;
     let ctx = make_ctx(tmp.path());
     let r = tool
-        .execute(json!({"pattern": "hello", "-i": true, "output_mode": "content"}), &ctx)
-        .await.unwrap();
+        .execute(
+            json!({"pattern": "hello", "-i": true, "output_mode": "content"}),
+            &ctx,
+        )
+        .await
+        .unwrap();
     assert!(r.content.contains("Hello World"));
     assert!(r.content.contains("hello world"));
     assert!(r.content.contains("HELLO WORLD"));
@@ -34,7 +44,8 @@ async fn case_insensitive_default_is_sensitive() {
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(json!({"pattern": "hello", "output_mode": "content"}), &ctx)
-        .await.unwrap();
+        .await
+        .unwrap();
     assert!(r.content.contains("hello world"));
     assert!(!r.content.contains("Hello World"));
 }
@@ -50,7 +61,8 @@ async fn multiline_matches_across_lines() {
             json!({"pattern": "hello.world", "multiline": true, "output_mode": "content"}),
             &ctx,
         )
-        .await.unwrap();
+        .await
+        .unwrap();
     // Both lines 2 and 3 should appear as matches
     assert!(r.content.contains("hello"));
     assert!(r.content.contains("world"));
@@ -68,7 +80,8 @@ async fn type_filter_rust_only() {
             json!({"pattern": "fn main", "type": "rust", "output_mode": "content"}),
             &ctx,
         )
-        .await.unwrap();
+        .await
+        .unwrap();
     assert!(r.content.contains("code.rs"));
     assert!(!r.content.contains("script.py"));
 }
@@ -81,7 +94,8 @@ async fn type_filter_unknown_returns_no_results() {
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(json!({"pattern": "fn main", "type": "brainfuck"}), &ctx)
-        .await.unwrap();
+        .await
+        .unwrap();
     assert!(r.content.contains("No matches found"));
 }
 
@@ -97,7 +111,8 @@ async fn offset_skips_results() {
             json!({"pattern": "match_", "output_mode": "content", "offset": 3, "head_limit": 3}),
             &ctx,
         )
-        .await.unwrap();
+        .await
+        .unwrap();
     assert!(r.content.contains("match_3"));
     assert!(r.content.contains("match_5"));
     assert!(!r.content.contains("match_0"));
@@ -116,7 +131,8 @@ async fn offset_with_head_limit_pagination() {
             json!({"pattern": "line_", "output_mode": "content", "offset": 5, "head_limit": 5}),
             &ctx,
         )
-        .await.unwrap();
+        .await
+        .unwrap();
     // Should show pagination hint
     assert!(r.content.contains("offset=10"));
 }
@@ -132,7 +148,8 @@ async fn line_numbers_disabled() {
             json!({"pattern": "hello", "output_mode": "content", "-n": false}),
             &ctx,
         )
-        .await.unwrap();
+        .await
+        .unwrap();
     // Should not have :1: line number prefix
     assert!(!r.content.contains(":1:"));
     assert!(r.content.contains("hello world"));

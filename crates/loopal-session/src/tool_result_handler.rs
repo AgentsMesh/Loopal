@@ -13,7 +13,11 @@ pub(crate) fn handle_tool_result(
     is_error: bool,
     duration_ms: Option<u64>,
 ) {
-    let status = if is_error { ToolCallStatus::Error } else { ToolCallStatus::Success };
+    let status = if is_error {
+        ToolCallStatus::Error
+    } else {
+        ToolCallStatus::Success
+    };
     let is_completion = name == "AttemptCompletion" && !is_error;
     'outer: for msg in state.messages.iter_mut().rev() {
         for tc in msg.tool_calls.iter_mut().rev() {
@@ -58,7 +62,9 @@ pub(crate) fn handle_tool_batch_start(state: &mut SessionState, tool_ids: Vec<St
                 found = true;
             }
         }
-        if found { break; }
+        if found {
+            break;
+        }
     }
 }
 

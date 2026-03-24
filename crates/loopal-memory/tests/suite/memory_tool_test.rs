@@ -35,11 +35,16 @@ impl MemoryChannel for FullChannel {
 
 fn make_ctx(channel: Option<Arc<dyn MemoryChannel>>) -> ToolContext {
     let backend = loopal_backend::LocalBackend::new(
-        std::env::temp_dir(), None, loopal_backend::ResourceLimits::default(),
+        std::env::temp_dir(),
+        None,
+        loopal_backend::ResourceLimits::default(),
     );
     ToolContext {
-        backend, session_id: "test".into(), shared: None,
-        pending_cwd_switch: Default::default(), memory_channel: channel,
+        backend,
+        session_id: "test".into(),
+        shared: None,
+        pending_cwd_switch: Default::default(),
+        memory_channel: channel,
         output_tail: None,
     }
 }
@@ -62,7 +67,10 @@ async fn test_valid_observation_sends_to_channel() {
     let ctx = make_ctx(Some(channel.clone()));
     let tool = MemoryTool;
 
-    let result = tool.execute(json!({"observation": "user prefers bun"}), &ctx).await.unwrap();
+    let result = tool
+        .execute(json!({"observation": "user prefers bun"}), &ctx)
+        .await
+        .unwrap();
     assert!(!result.is_error);
     assert_eq!(result.content, "Noted.");
     assert_eq!(channel.observations(), vec!["user prefers bun"]);
@@ -73,7 +81,10 @@ async fn test_no_channel_returns_error() {
     let ctx = make_ctx(None);
     let tool = MemoryTool;
 
-    let result = tool.execute(json!({"observation": "something"}), &ctx).await.unwrap();
+    let result = tool
+        .execute(json!({"observation": "something"}), &ctx)
+        .await
+        .unwrap();
     assert!(result.is_error);
     assert!(result.content.contains("not enabled"));
 }
@@ -84,7 +95,10 @@ async fn test_empty_observation_returns_error() {
     let ctx = make_ctx(Some(channel.clone()));
     let tool = MemoryTool;
 
-    let result = tool.execute(json!({"observation": "  "}), &ctx).await.unwrap();
+    let result = tool
+        .execute(json!({"observation": "  "}), &ctx)
+        .await
+        .unwrap();
     assert!(result.is_error);
     assert!(result.content.contains("empty"));
     assert!(channel.observations().is_empty());
@@ -105,7 +119,10 @@ async fn test_channel_full_returns_error() {
     let ctx = make_ctx(Some(Arc::new(FullChannel)));
     let tool = MemoryTool;
 
-    let result = tool.execute(json!({"observation": "something"}), &ctx).await.unwrap();
+    let result = tool
+        .execute(json!({"observation": "something"}), &ctx)
+        .await
+        .unwrap();
     assert!(result.is_error);
     assert!(result.content.contains("channel full"));
 }

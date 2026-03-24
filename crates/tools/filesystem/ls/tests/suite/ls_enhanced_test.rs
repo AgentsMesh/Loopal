@@ -11,7 +11,9 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext {
         session_id: "test".into(),
         shared: None,
-        pending_cwd_switch: Default::default(), memory_channel: None, output_tail: None,
+        pending_cwd_switch: Default::default(),
+        memory_channel: None,
+        output_tail: None,
         backend,
     }
 }
@@ -91,7 +93,10 @@ async fn path_to_file_shows_stat() {
     std::fs::write(tmp.path().join("info.txt"), "twelve bytes").unwrap();
     let tool = LsTool;
     let ctx = make_ctx(tmp.path());
-    let r = tool.execute(json!({"path": "info.txt"}), &ctx).await.unwrap();
+    let r = tool
+        .execute(json!({"path": "info.txt"}), &ctx)
+        .await
+        .unwrap();
     assert!(!r.is_error);
     assert!(r.content.contains("File:"));
     assert!(r.content.contains("Type: regular file"));
@@ -123,7 +128,10 @@ async fn long_and_all_combined() {
     std::fs::write(tmp.path().join("main.rs"), "fn main(){}").unwrap();
     let tool = LsTool;
     let ctx = make_ctx(tmp.path());
-    let r = tool.execute(json!({"long": true, "all": true}), &ctx).await.unwrap();
+    let r = tool
+        .execute(json!({"long": true, "all": true}), &ctx)
+        .await
+        .unwrap();
     assert!(r.content.contains(".config"));
     assert!(r.content.contains("main.rs"));
     // Both entries should have permission strings

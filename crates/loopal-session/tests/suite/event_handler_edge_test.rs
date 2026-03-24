@@ -1,9 +1,9 @@
 //! Edge cases for ToolResult handling: summary preservation, AttemptCompletion promotion.
 
 use loopal_protocol::{AgentEvent, AgentEventPayload};
+use loopal_session::ToolCallStatus;
 use loopal_session::event_handler::apply_event;
 use loopal_session::state::SessionState;
-use loopal_session::ToolCallStatus;
 use loopal_tool_api::COMPLETION_PREFIX;
 
 fn make_state() -> SessionState {
@@ -23,13 +23,16 @@ fn test_tool_result_preserves_input_summary() {
     );
     let summary_before = state.messages[0].tool_calls[0].summary.clone();
 
-    apply_event(&mut state, AgentEvent::root(AgentEventPayload::ToolResult {
-        id: "tc-1".into(),
-        name: "Read".into(),
-        result: "file contents here".into(),
-        is_error: false,
-        duration_ms: None,
-    }));
+    apply_event(
+        &mut state,
+        AgentEvent::root(AgentEventPayload::ToolResult {
+            id: "tc-1".into(),
+            name: "Read".into(),
+            result: "file contents here".into(),
+            is_error: false,
+            duration_ms: None,
+        }),
+    );
 
     // summary must NOT be overwritten by the result text
     assert_eq!(state.messages[0].tool_calls[0].summary, summary_before);
@@ -39,18 +42,24 @@ fn test_tool_result_preserves_input_summary() {
 #[test]
 fn test_tool_result_stores_full_content() {
     let mut state = make_state();
-    apply_event(&mut state, AgentEvent::root(AgentEventPayload::ToolCall {
-        id: "tc-2".into(),
-        name: "Bash".into(),
-        input: serde_json::json!({"command": "echo hello"}),
-    }));
-    apply_event(&mut state, AgentEvent::root(AgentEventPayload::ToolResult {
-        id: "tc-2".into(),
-        name: "Bash".into(),
-        result: "hello\nworld".into(),
-        is_error: false,
-        duration_ms: None,
-    }));
+    apply_event(
+        &mut state,
+        AgentEvent::root(AgentEventPayload::ToolCall {
+            id: "tc-2".into(),
+            name: "Bash".into(),
+            input: serde_json::json!({"command": "echo hello"}),
+        }),
+    );
+    apply_event(
+        &mut state,
+        AgentEvent::root(AgentEventPayload::ToolResult {
+            id: "tc-2".into(),
+            name: "Bash".into(),
+            result: "hello\nworld".into(),
+            is_error: false,
+            duration_ms: None,
+        }),
+    );
 
     let tc = &state.messages[0].tool_calls[0];
     assert_eq!(tc.status, ToolCallStatus::Success);
@@ -60,18 +69,24 @@ fn test_tool_result_stores_full_content() {
 #[test]
 fn test_attempt_completion_promotes_to_assistant_message() {
     let mut state = make_state();
-    apply_event(&mut state, AgentEvent::root(AgentEventPayload::ToolCall {
-        id: "tc-ac".into(),
-        name: "AttemptCompletion".into(),
-        input: serde_json::json!({"result": "# Report\n\nDone."}),
-    }));
-    apply_event(&mut state, AgentEvent::root(AgentEventPayload::ToolResult {
-        id: "tc-ac".into(),
-        name: "AttemptCompletion".into(),
-        result: format!("{COMPLETION_PREFIX}# Report\n\nDone."),
-        is_error: false,
-        duration_ms: None,
-    }));
+    apply_event(
+        &mut state,
+        AgentEvent::root(AgentEventPayload::ToolCall {
+            id: "tc-ac".into(),
+            name: "AttemptCompletion".into(),
+            input: serde_json::json!({"result": "# Report\n\nDone."}),
+        }),
+    );
+    apply_event(
+        &mut state,
+        AgentEvent::root(AgentEventPayload::ToolResult {
+            id: "tc-ac".into(),
+            name: "AttemptCompletion".into(),
+            result: format!("{COMPLETION_PREFIX}# Report\n\nDone."),
+            is_error: false,
+            duration_ms: None,
+        }),
+    );
 
     // Tool call should not store result (content promoted)
     let tc = &state.messages[0].tool_calls[0];
@@ -89,18 +104,24 @@ fn test_attempt_completion_promotes_to_assistant_message() {
 #[test]
 fn test_attempt_completion_error_not_promoted() {
     let mut state = make_state();
-    apply_event(&mut state, AgentEvent::root(AgentEventPayload::ToolCall {
-        id: "tc-err".into(),
-        name: "AttemptCompletion".into(),
-        input: serde_json::json!({"result": "oops"}),
-    }));
-    apply_event(&mut state, AgentEvent::root(AgentEventPayload::ToolResult {
-        id: "tc-err".into(),
-        name: "AttemptCompletion".into(),
-        result: "something went wrong".into(),
-        is_error: true,
-        duration_ms: None,
-    }));
+    apply_event(
+        &mut state,
+        AgentEvent::root(AgentEventPayload::ToolCall {
+            id: "tc-err".into(),
+            name: "AttemptCompletion".into(),
+            input: serde_json::json!({"result": "oops"}),
+        }),
+    );
+    apply_event(
+        &mut state,
+        AgentEvent::root(AgentEventPayload::ToolResult {
+            id: "tc-err".into(),
+            name: "AttemptCompletion".into(),
+            result: "something went wrong".into(),
+            is_error: true,
+            duration_ms: None,
+        }),
+    );
 
     // Error result should be stored normally, not promoted
     let tc = &state.messages[0].tool_calls[0];

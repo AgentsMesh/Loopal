@@ -108,7 +108,6 @@ fn render_thinking(lines: &mut Vec<Line<'static>>, msg: &DisplayMessage) {
     )));
 }
 
-
 /// Generic prefixed message (error, system, unknown roles).
 fn render_prefixed(
     lines: &mut Vec<Line<'static>>,

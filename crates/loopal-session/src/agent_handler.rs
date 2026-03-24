@@ -20,15 +20,18 @@ pub(crate) fn apply_agent_event(state: &mut SessionState, name: &str, payload: A
         AgentEventPayload::Started => {
             agent.observable.status = AgentStatus::Running;
         }
-        AgentEventPayload::ToolCall { name: tool_name, input, .. } => {
+        AgentEventPayload::ToolCall {
+            name: tool_name,
+            input,
+            ..
+        } => {
             agent.observable.tool_count += 1;
             agent.observable.tools_in_flight += 1;
             agent.observable.last_tool = Some(extract_key_param(tool_name, input));
             agent.observable.status = AgentStatus::Running;
         }
         AgentEventPayload::ToolResult { .. } => {
-            agent.observable.tools_in_flight =
-                agent.observable.tools_in_flight.saturating_sub(1);
+            agent.observable.tools_in_flight = agent.observable.tools_in_flight.saturating_sub(1);
             agent.observable.status = AgentStatus::Running;
         }
         AgentEventPayload::TokenUsage {
@@ -87,7 +90,8 @@ fn extract_key_param(tool_name: &str, input: &serde_json::Value) -> String {
         "Glob" => "pattern",
         _ => return tool_name.to_string(),
     };
-    input.get(key)
+    input
+        .get(key)
         .and_then(|v| v.as_str())
         .map(|s| {
             if s.len() > 40 {

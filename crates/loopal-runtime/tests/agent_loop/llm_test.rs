@@ -37,7 +37,9 @@ fn test_prepare_chat_params_plan_mode_passes_through() {
         .expect("should succeed");
 
     assert!(
-        params.system_prompt.starts_with(&runner.params.system_prompt),
+        params
+            .system_prompt
+            .starts_with(&runner.params.system_prompt),
         "llm.rs should preserve original system_prompt (env section appended)"
     );
 }
@@ -194,23 +196,37 @@ fn report_real_system_prompt_tokens() {
     // Build a real system prompt using the fragment system with real tool defs
     let tool_defs = runner.params.kernel.tool_definitions();
     let real_prompt = loopal_context::build_system_prompt(
-        "You are a helpful assistant.", &tool_defs, "act",
-        "/Users/dev/project", "", "",
+        "You are a helpful assistant.",
+        &tool_defs,
+        "act",
+        "/Users/dev/project",
+        "",
+        "",
     );
     runner.params.system_prompt = real_prompt.clone();
-    let params = runner.prepare_chat_params_with(&runner.params.messages).unwrap();
+    let params = runner
+        .prepare_chat_params_with(&runner.params.messages)
+        .unwrap();
 
     let tokens = loopal_context::estimate_tokens(&params.system_prompt);
 
     // Count tool schema portion
     let prompt_no_tools = loopal_context::build_system_prompt(
-        "You are a helpful assistant.", &[], "act",
-        "/Users/dev/project", "", "",
+        "You are a helpful assistant.",
+        &[],
+        "act",
+        "/Users/dev/project",
+        "",
+        "",
     );
     let fragment_tokens = loopal_context::estimate_tokens(&prompt_no_tools);
 
     eprintln!("\n=== Real System Prompt Token Report ===");
-    eprintln!("Total system prompt: {} tokens ({} chars)", tokens, params.system_prompt.len());
+    eprintln!(
+        "Total system prompt: {} tokens ({} chars)",
+        tokens,
+        params.system_prompt.len()
+    );
     eprintln!("Tool count:          {}", tool_defs.len());
     eprintln!("Behavior fragments:  {fragment_tokens} tokens");
     eprintln!("Tool schemas:        {} tokens", tokens - fragment_tokens);

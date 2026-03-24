@@ -4,14 +4,18 @@ use ratatui::prelude::*;
 
 use loopal_session::types::DisplayToolCall;
 
-use super::{expand_output, output_first_line, output_style, EXPAND_MAX_LINES};
+use super::{EXPAND_MAX_LINES, expand_output, output_first_line, output_style};
 
 /// Extract Bash command for header: strip `cd ... &&` preamble, collapse whitespace.
 pub fn extract_detail(input: &serde_json::Value) -> Option<String> {
     let cmd = input.get("command").and_then(|v| v.as_str())?;
     let cleaned = if let Some(pos) = cmd.find("&&") {
         let before = cmd[..pos].trim();
-        if before.starts_with("cd ") { cmd[pos + 2..].trim() } else { cmd }
+        if before.starts_with("cd ") {
+            cmd[pos + 2..].trim()
+        } else {
+            cmd
+        }
     } else {
         cmd
     };
@@ -62,7 +66,9 @@ pub fn render_running_body(tc: &DisplayToolCall) -> Vec<Line<'static>> {
 
 /// Completed Bash: expand stdout.
 pub fn render_success_body(tc: &DisplayToolCall) -> Vec<Line<'static>> {
-    let Some(ref result) = tc.result else { return vec![output_first_line("(No output)")] };
+    let Some(ref result) = tc.result else {
+        return vec![output_first_line("(No output)")];
+    };
     if result.trim().is_empty() {
         return vec![output_first_line("(No output)")];
     }

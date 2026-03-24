@@ -1,4 +1,4 @@
-use loopal_prompt::{Fragment, FragmentRegistry, PromptContext, Category, Condition};
+use loopal_prompt::{Category, Condition, Fragment, FragmentRegistry, PromptContext};
 
 fn make_fragment(id: &str, priority: u16, condition: Condition, content: &str) -> Fragment {
     Fragment {
@@ -20,12 +20,26 @@ fn select_filters_by_condition() {
     ];
     let registry = FragmentRegistry::new(frags);
 
-    let ctx = PromptContext { mode: "act".into(), ..Default::default() };
-    let selected: Vec<&str> = registry.select(&ctx).iter().map(|f| f.id.as_str()).collect();
+    let ctx = PromptContext {
+        mode: "act".into(),
+        ..Default::default()
+    };
+    let selected: Vec<&str> = registry
+        .select(&ctx)
+        .iter()
+        .map(|f| f.id.as_str())
+        .collect();
     assert_eq!(selected, vec!["always", "act-only"]);
 
-    let ctx_plan = PromptContext { mode: "plan".into(), ..Default::default() };
-    let selected: Vec<&str> = registry.select(&ctx_plan).iter().map(|f| f.id.as_str()).collect();
+    let ctx_plan = PromptContext {
+        mode: "plan".into(),
+        ..Default::default()
+    };
+    let selected: Vec<&str> = registry
+        .select(&ctx_plan)
+        .iter()
+        .map(|f| f.id.as_str())
+        .collect();
     assert_eq!(selected, vec!["always", "plan-only"]);
 }
 
@@ -38,15 +52,22 @@ fn select_sorts_by_priority() {
     ];
     let registry = FragmentRegistry::new(frags);
     let ctx = PromptContext::default();
-    let ids: Vec<&str> = registry.select(&ctx).iter().map(|f| f.id.as_str()).collect();
+    let ids: Vec<&str> = registry
+        .select(&ctx)
+        .iter()
+        .map(|f| f.id.as_str())
+        .collect();
     assert_eq!(ids, vec!["high", "mid", "low"]);
 }
 
 #[test]
 fn tool_condition() {
-    let frags = vec![
-        make_fragment("bash-guide", 100, Condition::Tool("Bash".into()), "bash stuff"),
-    ];
+    let frags = vec![make_fragment(
+        "bash-guide",
+        100,
+        Condition::Tool("Bash".into()),
+        "bash stuff",
+    )];
     let registry = FragmentRegistry::new(frags);
 
     let ctx_no_bash = PromptContext::default();
@@ -61,11 +82,17 @@ fn tool_condition() {
 
 #[test]
 fn render_with_template() {
-    let frags = vec![
-        make_fragment("tpl", 100, Condition::Always, "CWD: {{ cwd }}"),
-    ];
+    let frags = vec![make_fragment(
+        "tpl",
+        100,
+        Condition::Always,
+        "CWD: {{ cwd }}",
+    )];
     let registry = FragmentRegistry::new(frags);
-    let ctx = PromptContext { cwd: "/home/test".into(), ..Default::default() };
+    let ctx = PromptContext {
+        cwd: "/home/test".into(),
+        ..Default::default()
+    };
     let rendered = registry.render(&registry.fragments()[0], &ctx);
     assert_eq!(rendered, "CWD: /home/test");
 }

@@ -1,9 +1,9 @@
 //! Tests for SessionController event handling and state management.
 
-use loopal_session::SessionController;
-use loopal_session::ToolCallStatus;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::{AgentEvent, AgentEventPayload, UserQuestionResponse};
+use loopal_session::SessionController;
+use loopal_session::ToolCallStatus;
 use tokio::sync::mpsc;
 
 fn make_controller() -> (
@@ -103,7 +103,10 @@ fn test_tool_call_and_result() {
         name: "bash".to_string(),
         input: serde_json::json!({"command": "ls"}),
     }));
-    assert_eq!(ctrl.lock().messages[0].tool_calls[0].status, ToolCallStatus::Pending);
+    assert_eq!(
+        ctrl.lock().messages[0].tool_calls[0].status,
+        ToolCallStatus::Pending
+    );
 
     ctrl.handle_event(AgentEvent::root(AgentEventPayload::ToolResult {
         id: "tc-1".to_string(),
@@ -112,7 +115,10 @@ fn test_tool_call_and_result() {
         is_error: false,
         duration_ms: None,
     }));
-    assert_eq!(ctrl.lock().messages[0].tool_calls[0].status, ToolCallStatus::Success);
+    assert_eq!(
+        ctrl.lock().messages[0].tool_calls[0].status,
+        ToolCallStatus::Success
+    );
 }
 
 #[test]

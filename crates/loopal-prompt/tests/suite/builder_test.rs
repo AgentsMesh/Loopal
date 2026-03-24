@@ -1,4 +1,6 @@
-use loopal_prompt::{Fragment, FragmentRegistry, PromptBuilder, PromptContext, Category, Condition};
+use loopal_prompt::{
+    Category, Condition, Fragment, FragmentRegistry, PromptBuilder, PromptContext,
+};
 
 fn frag(id: &str, priority: u16, content: &str) -> Fragment {
     Fragment {
@@ -75,7 +77,10 @@ fn build_agent_prompt_uses_fragment() {
         content: "You are an explorer in {{ cwd }}.".into(),
     }];
     let builder = PromptBuilder::new(FragmentRegistry::new(frags));
-    let ctx = PromptContext { cwd: "/project".into(), ..Default::default() };
+    let ctx = PromptContext {
+        cwd: "/project".into(),
+        ..Default::default()
+    };
     let prompt = builder.build_agent_prompt("explore", &ctx);
     assert_eq!(prompt, "You are an explorer in /project.");
 }

@@ -24,8 +24,14 @@ fn includes_tool_schemas() {
 fn includes_fragments() {
     let result = build_system_prompt("Base", &[], "act", "/workspace", "", "");
     // Core fragments should be present
-    assert!(result.contains("Output Efficiency"), "output efficiency fragment missing");
-    assert!(result.contains("Executing Actions with Care"), "safety fragment missing");
+    assert!(
+        result.contains("Output Efficiency"),
+        "output efficiency fragment missing"
+    );
+    assert!(
+        result.contains("Executing Actions with Care"),
+        "safety fragment missing"
+    );
 }
 
 #[test]
@@ -44,7 +50,14 @@ fn includes_skills() {
 
 #[test]
 fn includes_memory() {
-    let result = build_system_prompt("Base", &[], "act", "/workspace", "", "## Key Patterns\n- Use DI");
+    let result = build_system_prompt(
+        "Base",
+        &[],
+        "act",
+        "/workspace",
+        "",
+        "## Key Patterns\n- Use DI",
+    );
     assert!(result.contains("# Project Memory"));
     assert!(result.contains("Key Patterns"));
 }
@@ -64,11 +77,17 @@ fn tool_conditional_fragments() {
         input_schema: serde_json::json!({"type": "object"}),
     }];
     let result = build_system_prompt("Base", &tools, "act", "/workspace", "", "");
-    assert!(result.contains("Bash Tool Guidelines"), "bash guidelines missing when Bash tool present");
+    assert!(
+        result.contains("Bash Tool Guidelines"),
+        "bash guidelines missing when Bash tool present"
+    );
 
     // Without Bash tool → no bash guidelines
     let result_no_bash = build_system_prompt("Base", &[], "act", "/workspace", "", "");
-    assert!(!result_no_bash.contains("Bash Tool Guidelines"), "bash guidelines should not appear without Bash");
+    assert!(
+        !result_no_bash.contains("Bash Tool Guidelines"),
+        "bash guidelines should not appear without Bash"
+    );
 }
 
 #[test]
@@ -76,11 +95,20 @@ fn report_token_usage() {
     use loopal_context::estimate_tokens;
 
     let tools: Vec<ToolDefinition> = [
-        ("Read", "Read a file from the filesystem. Returns content with line numbers."),
-        ("Write", "Write content to a file. Creates parent directories if needed."),
+        (
+            "Read",
+            "Read a file from the filesystem. Returns content with line numbers.",
+        ),
+        (
+            "Write",
+            "Write content to a file. Creates parent directories if needed.",
+        ),
         ("Edit", "Perform exact string replacement in a file."),
         ("MultiEdit", "Apply multiple sequential edits atomically."),
-        ("Bash", "Execute a bash command. Captures stdout and stderr."),
+        (
+            "Bash",
+            "Execute a bash command. Captures stdout and stderr.",
+        ),
         ("Glob", "Find files matching a glob pattern."),
         ("Grep", "Search file contents using a regex pattern."),
         ("Ls", "List directory contents."),
@@ -97,10 +125,14 @@ fn report_token_usage() {
         ("SendMessage", "Send a message to another agent."),
         ("EnterWorktree", "Create a git worktree."),
         ("ExitWorktree", "Exit the current worktree."),
-    ].iter().map(|(n, d)| ToolDefinition {
-        name: n.to_string(), description: d.to_string(),
+    ]
+    .iter()
+    .map(|(n, d)| ToolDefinition {
+        name: n.to_string(),
+        description: d.to_string(),
         input_schema: serde_json::json!({"type":"object","properties":{}}),
-    }).collect();
+    })
+    .collect();
 
     let instr = "You are a helpful coding assistant.\n\nAlways respond in Chinese.";
     let mem = "## Architecture\n- 17 Rust crates\n- 200-line limit";
@@ -117,15 +149,30 @@ fn report_token_usage() {
     let t_plan = estimate_tokens(&full_plan);
 
     eprintln!("\n=== System Prompt Token Analysis ===");
-    eprintln!("Fragments only:              {} tokens ({} chars)", t_bare, bare.len());
+    eprintln!(
+        "Fragments only:              {} tokens ({} chars)",
+        t_bare,
+        bare.len()
+    );
     eprintln!("Fragments + 21 tool schemas: {t_tools} tokens");
-    eprintln!("Full (act, 21 tools):        {} tokens ({} chars)", t_act, full_act.len());
-    eprintln!("Full (plan, 21 tools):       {} tokens ({} chars)", t_plan, full_plan.len());
+    eprintln!(
+        "Full (act, 21 tools):        {} tokens ({} chars)",
+        t_act,
+        full_act.len()
+    );
+    eprintln!(
+        "Full (plan, 21 tools):       {} tokens ({} chars)",
+        t_plan,
+        full_plan.len()
+    );
     eprintln!("Plan overhead:               +{} tokens", t_plan - t_act);
     eprintln!("--- Breakdown ---");
     eprintln!("  Behavior fragments: {t_bare} tokens");
     eprintln!("  Tool schemas:       {} tokens", t_tools - t_bare);
     eprintln!("  Instructions:       {} tokens", estimate_tokens(instr));
     eprintln!("  Skills:             {} tokens", estimate_tokens(skills));
-    eprintln!("  Memory:             {} tokens", estimate_tokens(&format!("# Project Memory\n{mem}")));
+    eprintln!(
+        "  Memory:             {} tokens",
+        estimate_tokens(&format!("# Project Memory\n{mem}"))
+    );
 }

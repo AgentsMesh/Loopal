@@ -15,8 +15,8 @@ use loopal_tool_api::truncate_output;
 use tokio::io::{AsyncBufReadExt, BufReader};
 
 use crate::limits::ResourceLimits;
-use loopal_tool_api::OutputTail;
 use crate::shell::build_command;
+use loopal_tool_api::OutputTail;
 
 /// Execute a shell command with streaming output capture.
 ///
@@ -44,26 +44,26 @@ pub async fn exec_command_streaming(
         }
     }
 
-    let mut child = cmd.spawn()
+    let mut child = cmd
+        .spawn()
         .map_err(|e| ToolIoError::ExecFailed(format!("spawn failed: {e}")))?;
 
     let stdout = child.stdout.take().unwrap();
     let stderr = child.stderr.take().unwrap();
 
     let stdout_tail = Arc::clone(&tail);
-    let stdout_task = tokio::spawn(async move {
-        read_lines_into(stdout, Some(&stdout_tail)).await
-    });
-    let stderr_task = tokio::spawn(async move {
-        read_lines_into(stderr, None).await
-    });
+    let stdout_task =
+        tokio::spawn(async move { read_lines_into(stdout, Some(&stdout_tail)).await });
+    let stderr_task = tokio::spawn(async move { read_lines_into(stderr, None).await });
 
     // Wait with timeout
     let result = tokio::time::timeout(Duration::from_millis(timeout_ms), async {
         let (stdout_res, stderr_res) = tokio::join!(stdout_task, stderr_task);
         let stdout_buf = stdout_res.unwrap_or_default();
         let stderr_buf = stderr_res.unwrap_or_default();
-        let status = child.wait().await
+        let status = child
+            .wait()
+            .await
             .map_err(|e| ToolIoError::ExecFailed(format!("wait failed: {e}")))?;
         Ok::<_, ToolIoError>((stdout_buf, stderr_buf, status.code().unwrap_or(-1)))
     })
@@ -74,10 +74,22 @@ pub async fn exec_command_streaming(
     })??;
 
     let (stdout_buf, stderr_buf, exit_code) = result;
-    let stdout = truncate_output(&stdout_buf, limits.max_output_lines, limits.max_output_bytes);
-    let stderr = truncate_output(&stderr_buf, limits.max_output_lines, limits.max_output_bytes);
+    let stdout = truncate_output(
+        &stdout_buf,
+        limits.max_output_lines,
+        limits.max_output_bytes,
+    );
+    let stderr = truncate_output(
+        &stderr_buf,
+        limits.max_output_lines,
+        limits.max_output_bytes,
+    );
 
-    Ok(ExecResult { stdout, stderr, exit_code })
+    Ok(ExecResult {
+        stdout,
+        stderr,
+        exit_code,
+    })
 }
 
 /// Read lines from an async reader, optionally pushing to an OutputTail.

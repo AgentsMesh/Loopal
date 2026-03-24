@@ -65,7 +65,10 @@ impl AgentLoopRunner {
     async fn intercept_special_tools(
         &mut self,
         tool_uses: &[(String, String, serde_json::Value)],
-    ) -> Result<(Vec<(usize, ContentBlock)>, Vec<(String, String, serde_json::Value)>)> {
+    ) -> Result<(
+        Vec<(usize, ContentBlock)>,
+        Vec<(String, String, serde_json::Value)>,
+    )> {
         let mut intercepted = Vec::new();
         let mut remaining = Vec::new();
 
@@ -73,15 +76,23 @@ impl AgentLoopRunner {
             match name.as_str() {
                 "EnterPlanMode" => {
                     self.params.mode = AgentMode::Plan;
-                    self.emit(AgentEventPayload::ModeChanged { mode: "plan".into() })
-                        .await?;
-                    intercepted.push((idx, success_block(id, "Plan mode activated. Only read-only tools allowed.")));
+                    self.emit(AgentEventPayload::ModeChanged {
+                        mode: "plan".into(),
+                    })
+                    .await?;
+                    intercepted.push((
+                        idx,
+                        success_block(id, "Plan mode activated. Only read-only tools allowed."),
+                    ));
                 }
                 "ExitPlanMode" => {
                     self.params.mode = AgentMode::Act;
                     self.emit(AgentEventPayload::ModeChanged { mode: "act".into() })
                         .await?;
-                    intercepted.push((idx, success_block(id, "Returned to Act mode. All tools available.")));
+                    intercepted.push((
+                        idx,
+                        success_block(id, "Returned to Act mode. All tools available."),
+                    ));
                 }
                 "AskUser" => {
                     let questions = parse_questions(input);
@@ -103,15 +114,30 @@ impl AgentLoopRunner {
         let blocks: Vec<ContentBlock> = indexed_results.into_iter().map(|(_, b)| b).collect();
 
         let completion = blocks.iter().find_map(|b| {
-            if let ContentBlock::ToolResult { content, is_error: false, .. } = b {
-                content.strip_prefix(COMPLETION_PREFIX).map(|s| s.to_string())
+            if let ContentBlock::ToolResult {
+                content,
+                is_error: false,
+                ..
+            } = b
+            {
+                content
+                    .strip_prefix(COMPLETION_PREFIX)
+                    .map(|s| s.to_string())
             } else {
                 None
             }
         });
 
-        let mut msg = Message { id: None, role: MessageRole::User, content: blocks };
-        if let Err(e) = self.params.session_manager.save_message(&self.params.session.id, &mut msg) {
+        let mut msg = Message {
+            id: None,
+            role: MessageRole::User,
+            content: blocks,
+        };
+        if let Err(e) = self
+            .params
+            .session_manager
+            .save_message(&self.params.session.id, &mut msg)
+        {
             error!(error = %e, "failed to persist message");
         }
         self.params.messages.push(msg);
@@ -127,15 +153,29 @@ impl AgentLoopRunner {
         let mut blocks = Vec::with_capacity(tool_uses.len());
         for (id, name, _) in tool_uses {
             self.emit(AgentEventPayload::ToolResult {
-                id: id.clone(), name: name.clone(),
-                result: "Interrupted by user".into(), is_error: true, duration_ms: None,
-            }).await?;
+                id: id.clone(),
+                name: name.clone(),
+                result: "Interrupted by user".into(),
+                is_error: true,
+                duration_ms: None,
+            })
+            .await?;
             blocks.push(ContentBlock::ToolResult {
-                tool_use_id: id.clone(), content: "Interrupted by user".into(), is_error: true,
+                tool_use_id: id.clone(),
+                content: "Interrupted by user".into(),
+                is_error: true,
             });
         }
-        let mut msg = Message { id: None, role: MessageRole::User, content: blocks };
-        if let Err(e) = self.params.session_manager.save_message(&self.params.session.id, &mut msg) {
+        let mut msg = Message {
+            id: None,
+            role: MessageRole::User,
+            content: blocks,
+        };
+        if let Err(e) = self
+            .params
+            .session_manager
+            .save_message(&self.params.session.id, &mut msg)
+        {
             error!(error = %e, "failed to persist message");
         }
         self.params.messages.push(msg);
@@ -147,10 +187,15 @@ impl AgentLoopRunner {
         let pending = self.params.frontend.drain_pending().await;
         for env in pending {
             let mut user_msg = build_user_message(&env);
-            info!(text_len = env.content.text.len(), "injecting pending message");
-            if let Err(e) = self.params.session_manager.save_message(
-                &self.params.session.id, &mut user_msg,
-            ) {
+            info!(
+                text_len = env.content.text.len(),
+                "injecting pending message"
+            );
+            if let Err(e) = self
+                .params
+                .session_manager
+                .save_message(&self.params.session.id, &mut user_msg)
+            {
                 error!(error = %e, "failed to persist injected message");
             }
             self.params.messages.push(user_msg);
@@ -160,6 +205,8 @@ impl AgentLoopRunner {
 
 fn success_block(id: &str, content: &str) -> ContentBlock {
     ContentBlock::ToolResult {
-        tool_use_id: id.to_string(), content: content.to_string(), is_error: false,
+        tool_use_id: id.to_string(),
+        content: content.to_string(),
+        is_error: false,
     }
 }

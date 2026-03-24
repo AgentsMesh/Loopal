@@ -150,7 +150,11 @@ fn status_display(
     match status {
         AgentStatus::Starting => {
             let frame = spinner_frame(elapsed);
-            (frame, "Starting".to_string(), Style::default().fg(Color::DarkGray))
+            (
+                frame,
+                "Starting".to_string(),
+                Style::default().fg(Color::DarkGray),
+            )
         }
         AgentStatus::Running => {
             let frame = spinner_frame(elapsed);
@@ -163,15 +167,13 @@ fn status_display(
             };
             (frame, label, Style::default().fg(Color::Green))
         }
-        AgentStatus::WaitingForInput => {
-            ("●", "Idle".to_string(), Style::default().fg(Color::DarkGray))
-        }
-        AgentStatus::Finished => {
-            ("✓", "Done".to_string(), Style::default().fg(Color::Green))
-        }
-        AgentStatus::Error => {
-            ("✗", "Error".to_string(), Style::default().fg(Color::Red))
-        }
+        AgentStatus::WaitingForInput => (
+            "●",
+            "Idle".to_string(),
+            Style::default().fg(Color::DarkGray),
+        ),
+        AgentStatus::Finished => ("✓", "Done".to_string(), Style::default().fg(Color::Green)),
+        AgentStatus::Error => ("✗", "Error".to_string(), Style::default().fg(Color::Red)),
     }
 }
 

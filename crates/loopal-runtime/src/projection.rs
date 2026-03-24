@@ -107,7 +107,11 @@ fn back_patch(
     if let Some(msg) = display.get_mut(di)
         && let Some(tc) = msg.tool_calls.get_mut(ti)
     {
-        tc.status = if is_error { ToolCallStatus::Error } else { ToolCallStatus::Success };
+        tc.status = if is_error {
+            ToolCallStatus::Error
+        } else {
+            ToolCallStatus::Success
+        };
         if !is_completion {
             tc.result = Some(truncate_for_display(result));
         }

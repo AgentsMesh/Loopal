@@ -6,10 +6,22 @@ fn all_fragments_parse() {
     let frags = system_fragments();
     assert!(!frags.is_empty(), "should have at least 1 fragment");
     let ids: Vec<&str> = frags.iter().map(|f| f.id.as_str()).collect();
-    assert!(ids.contains(&"core/identity"), "missing core/identity, got: {ids:?}");
-    assert!(ids.contains(&"core/output-efficiency"), "missing core/output-efficiency");
-    assert!(ids.contains(&"tools/usage-policy"), "missing tools/usage-policy");
-    assert!(ids.contains(&"tasks/avoid-over-engineering"), "missing tasks/avoid-over-engineering");
+    assert!(
+        ids.contains(&"core/identity"),
+        "missing core/identity, got: {ids:?}"
+    );
+    assert!(
+        ids.contains(&"core/output-efficiency"),
+        "missing core/output-efficiency"
+    );
+    assert!(
+        ids.contains(&"tools/usage-policy"),
+        "missing tools/usage-policy"
+    );
+    assert!(
+        ids.contains(&"tasks/avoid-over-engineering"),
+        "missing tasks/avoid-over-engineering"
+    );
 }
 
 #[test]
@@ -22,7 +34,14 @@ fn all_fragments_render() {
         date: "2026-03-22".into(),
         is_git_repo: true,
         git_branch: Some("main".into()),
-        tool_names: vec!["Read".into(), "Write".into(), "Edit".into(), "Bash".into(), "Glob".into(), "Grep".into()],
+        tool_names: vec![
+            "Read".into(),
+            "Write".into(),
+            "Edit".into(),
+            "Bash".into(),
+            "Glob".into(),
+            "Grep".into(),
+        ],
         ..Default::default()
     };
     for frag in registry.fragments() {
@@ -54,11 +73,26 @@ fn full_prompt_build() {
     let prompt = builder.build(&ctx);
 
     // Verify key sections exist
-    assert!(prompt.contains("Always respond in English."), "instructions missing");
-    assert!(prompt.contains("# Project Memory"), "memory section missing");
-    assert!(prompt.contains("User prefers Rust."), "memory content missing");
-    assert!(prompt.contains("Output Efficiency"), "output efficiency fragment missing");
-    assert!(prompt.contains("Executing Actions with Care"), "safety fragment missing");
+    assert!(
+        prompt.contains("Always respond in English."),
+        "instructions missing"
+    );
+    assert!(
+        prompt.contains("# Project Memory"),
+        "memory section missing"
+    );
+    assert!(
+        prompt.contains("User prefers Rust."),
+        "memory content missing"
+    );
+    assert!(
+        prompt.contains("Output Efficiency"),
+        "output efficiency fragment missing"
+    );
+    assert!(
+        prompt.contains("Executing Actions with Care"),
+        "safety fragment missing"
+    );
     assert!(prompt.contains("/home/user/project"), "cwd not rendered");
 }
 
@@ -71,8 +105,14 @@ fn conditional_tool_fragments() {
     let ctx_no_bash = PromptContext::default();
     let selected = registry.select(&ctx_no_bash);
     let ids: Vec<&str> = selected.iter().map(|f| f.id.as_str()).collect();
-    assert!(!ids.contains(&"tools/bash-guidelines"), "bash-guidelines should not appear without Bash tool");
-    assert!(!ids.contains(&"tools/git-workflow"), "git-workflow should not appear without Bash tool");
+    assert!(
+        !ids.contains(&"tools/bash-guidelines"),
+        "bash-guidelines should not appear without Bash tool"
+    );
+    assert!(
+        !ids.contains(&"tools/git-workflow"),
+        "git-workflow should not appear without Bash tool"
+    );
 
     // With Bash tool — both should be included
     let ctx_bash = PromptContext {
@@ -81,14 +121,25 @@ fn conditional_tool_fragments() {
     };
     let selected = registry.select(&ctx_bash);
     let ids: Vec<&str> = selected.iter().map(|f| f.id.as_str()).collect();
-    assert!(ids.contains(&"tools/bash-guidelines"), "bash-guidelines should appear with Bash tool");
-    assert!(ids.contains(&"tools/git-workflow"), "git-workflow should appear with Bash tool");
+    assert!(
+        ids.contains(&"tools/bash-guidelines"),
+        "bash-guidelines should appear with Bash tool"
+    );
+    assert!(
+        ids.contains(&"tools/git-workflow"),
+        "git-workflow should appear with Bash tool"
+    );
 }
 
 #[test]
 fn fragment_count() {
     let frags = system_fragments();
     // core/4 + tasks/10 + tools/4 + modes/2 + agents/3 = 23
-    assert_eq!(frags.len(), 23, "expected 23 fragments, got {}: {:?}",
-        frags.len(), frags.iter().map(|f| &f.id).collect::<Vec<_>>());
+    assert_eq!(
+        frags.len(),
+        23,
+        "expected 23 fragments, got {}: {:?}",
+        frags.len(),
+        frags.iter().map(|f| &f.id).collect::<Vec<_>>()
+    );
 }

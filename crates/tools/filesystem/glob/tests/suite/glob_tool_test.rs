@@ -3,9 +3,15 @@ use loopal_tool_glob::GlobTool;
 use serde_json::json;
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
-    let backend =
-        loopal_backend::LocalBackend::new(cwd.to_path_buf(), None, Default::default());
-    ToolContext { backend, session_id: "test".into(), shared: None, pending_cwd_switch: Default::default(), memory_channel: None, output_tail: None }
+    let backend = loopal_backend::LocalBackend::new(cwd.to_path_buf(), None, Default::default());
+    ToolContext {
+        backend,
+        session_id: "test".into(),
+        shared: None,
+        pending_cwd_switch: Default::default(),
+        memory_channel: None,
+        output_tail: None,
+    }
 }
 
 #[test]
@@ -105,9 +111,7 @@ async fn test_glob_invalid_pattern_returns_error() {
     let tool = GlobTool;
     let ctx = make_ctx(tmp.path());
 
-    let result = tool
-        .execute(json!({"pattern": "[invalid"}), &ctx)
-        .await;
+    let result = tool.execute(json!({"pattern": "[invalid"}), &ctx).await;
 
     assert!(result.is_err());
 }
@@ -118,9 +122,7 @@ async fn test_glob_missing_pattern_returns_error() {
     let tool = GlobTool;
     let ctx = make_ctx(tmp.path());
 
-    let result = tool
-        .execute(json!({}), &ctx)
-        .await;
+    let result = tool.execute(json!({}), &ctx).await;
 
     assert!(result.is_err());
 }

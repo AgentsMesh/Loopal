@@ -61,9 +61,7 @@ fn default_priority() -> u16 {
 /// `id` is typically derived from the file path (e.g. "core/output-efficiency").
 pub fn parse_fragment(id: &str, raw: &str) -> Option<Fragment> {
     let (fm, content) = split_frontmatter(raw)?;
-    let meta: Frontmatter = serde_json::from_value(
-        serde_yaml_value(&fm)?,
-    ).ok()?;
+    let meta: Frontmatter = serde_json::from_value(serde_yaml_value(&fm)?).ok()?;
 
     let category = match meta.category.as_deref() {
         Some("core") => Category::Core,
@@ -74,10 +72,7 @@ pub fn parse_fragment(id: &str, raw: &str) -> Option<Fragment> {
         _ => infer_category(id),
     };
 
-    let condition = parse_condition(
-        meta.condition.as_deref(),
-        meta.condition_value.as_deref(),
-    );
+    let condition = parse_condition(meta.condition.as_deref(), meta.condition_value.as_deref());
 
     Some(Fragment {
         id: id.to_string(),
@@ -134,7 +129,10 @@ fn parse_condition(kind: Option<&str>, value: Option<&str>) -> Condition {
         Some("feature") => Condition::Feature(value.unwrap_or("").to_string()),
         Some("tool") => Condition::Tool(value.unwrap_or("").to_string()),
         Some(other) => {
-            tracing::warn!(condition = other, "unknown condition kind, defaulting to Always");
+            tracing::warn!(
+                condition = other,
+                "unknown condition kind, defaulting to Always"
+            );
             Condition::Always
         }
     }

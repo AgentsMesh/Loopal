@@ -112,10 +112,7 @@ fn test_tool_call_single_line_summary() {
     let lines = message_to_lines(&m, 80);
     let text = all_text(&lines);
     assert!(text.contains("●"), "success tool call should have ● icon");
-    assert!(
-        text.contains("Read"),
-        "should contain tool name"
-    );
+    assert!(text.contains("Read"), "should contain tool name");
 }
 
 #[test]

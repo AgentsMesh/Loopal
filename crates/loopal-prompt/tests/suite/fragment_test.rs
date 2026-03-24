@@ -1,4 +1,4 @@
-use loopal_prompt::{parse_fragment, Category, Condition};
+use loopal_prompt::{Category, Condition, parse_fragment};
 
 #[test]
 fn parse_basic_fragment() {

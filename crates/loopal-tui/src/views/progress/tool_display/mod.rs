@@ -58,7 +58,9 @@ fn render_header(tc: &DisplayToolCall) -> Line<'static> {
 
 /// Dispatch detail extraction to per-tool modules.
 fn extract_detail(tc: &DisplayToolCall) -> String {
-    let Some(ref input) = tc.tool_input else { return String::new() };
+    let Some(ref input) = tc.tool_input else {
+        return String::new();
+    };
     let raw = match tc.name.as_str() {
         "Bash" => bash::extract_detail(input),
         "Read" => read::extract_detail(input),
@@ -66,9 +68,18 @@ fn extract_detail(tc: &DisplayToolCall) -> String {
         "Edit" | "MultiEdit" => edit::extract_detail(input),
         "Grep" => grep::extract_detail(input),
         "Glob" => glob::extract_detail(input),
-        "Ls" => input.get("path").and_then(|v| v.as_str()).map(|s| s.to_string()),
-        "WebFetch" => input.get("url").and_then(|v| v.as_str()).map(|s| s.to_string()),
-        "WebSearch" => input.get("query").and_then(|v| v.as_str()).map(|s| format!("\"{s}\"")),
+        "Ls" => input
+            .get("path")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        "WebFetch" => input
+            .get("url")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        "WebSearch" => input
+            .get("query")
+            .and_then(|v| v.as_str())
+            .map(|s| format!("\"{s}\"")),
         _ => None,
     };
     truncate_chars(&shorten_home(&raw.unwrap_or_default()), 80)
@@ -79,11 +90,17 @@ fn extract_detail(tc: &DisplayToolCall) -> String {
 fn render_body(tc: &DisplayToolCall) -> Vec<Line<'static>> {
     // Active (pending/running)
     if tc.status.is_active() {
-        return if tc.name == "Bash" { bash::render_running_body(tc) } else { Vec::new() };
+        return if tc.name == "Bash" {
+            bash::render_running_body(tc)
+        } else {
+            Vec::new()
+        };
     }
     // Error — shared: expand first N error lines
     if tc.status == ToolCallStatus::Error {
-        let Some(ref result) = tc.result else { return vec![output_first_line("error")] };
+        let Some(ref result) = tc.result else {
+            return vec![output_first_line("error")];
+        };
         return expand_output(result, EXPAND_MAX_LINES, Style::default().fg(Color::Red));
     }
     // Success — per-tool dispatch
@@ -100,9 +117,13 @@ fn render_body(tc: &DisplayToolCall) -> Vec<Line<'static>> {
 
 /// Fallback: short inline or expand.
 fn render_default_body(tc: &DisplayToolCall) -> Vec<Line<'static>> {
-    let Some(ref result) = tc.result else { return Vec::new() };
+    let Some(ref result) = tc.result else {
+        return Vec::new();
+    };
     let trimmed = result.trim();
-    if trimmed.is_empty() { return Vec::new() }
+    if trimmed.is_empty() {
+        return Vec::new();
+    }
     if result.lines().count() <= 1 && trimmed.len() <= 60 {
         return vec![output_first_line(trimmed)];
     }
@@ -138,10 +159,7 @@ pub(crate) fn expand_output(content: &str, max_lines: usize, style: Style) -> Ve
 
 /// Single output line with ⎿ prefix.
 pub(crate) fn output_first_line(text: &str) -> Line<'static> {
-    Line::from(Span::styled(
-        format!("  ⎿ {text}"),
-        output_style(),
-    ))
+    Line::from(Span::styled(format!("  ⎿ {text}"), output_style()))
 }
 
 fn shorten_home(path: &str) -> String {
@@ -156,8 +174,9 @@ fn shorten_home(path: &str) -> String {
 }
 
 fn truncate_chars(s: &str, max: usize) -> String {
-    if s.chars().count() <= max { s.to_string() }
-    else {
+    if s.chars().count() <= max {
+        s.to_string()
+    } else {
         let t: String = s.chars().take(max.saturating_sub(1)).collect();
         format!("{t}…")
     }

@@ -183,7 +183,12 @@ impl Backend for LocalBackend {
         tail: Arc<loopal_tool_api::OutputTail>,
     ) -> Result<ExecResult, ToolIoError> {
         shell_stream::exec_command_streaming(
-            &self.cwd, self.policy.as_ref(), command, timeout_ms, &self.limits, tail,
+            &self.cwd,
+            self.policy.as_ref(),
+            command,
+            timeout_ms,
+            &self.limits,
+            tail,
         )
         .await
     }

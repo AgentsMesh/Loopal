@@ -11,7 +11,9 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext {
         session_id: "test".into(),
         shared: None,
-        pending_cwd_switch: Default::default(), memory_channel: None, output_tail: None,
+        pending_cwd_switch: Default::default(),
+        memory_channel: None,
+        output_tail: None,
         backend,
     }
 }
@@ -84,7 +86,9 @@ async fn test_delete_missing_file_error() {
     let tool = ApplyPatchTool;
     let ctx = make_ctx(tmp.path());
 
-    let r = tool.execute(json!({"patch": "*** Delete File: nope.txt\n"}), &ctx).await;
+    let r = tool
+        .execute(json!({"patch": "*** Delete File: nope.txt\n"}), &ctx)
+        .await;
     assert!(r.is_err());
 }
 

@@ -8,7 +8,10 @@ use super::output_first_line;
 
 /// Header detail: file path.
 pub fn extract_detail(input: &serde_json::Value) -> Option<String> {
-    input.get("file_path").and_then(|v| v.as_str()).map(|s| s.to_string())
+    input
+        .get("file_path")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
 }
 
 /// Body: show bytes written.

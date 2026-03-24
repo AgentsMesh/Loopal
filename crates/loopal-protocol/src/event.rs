@@ -69,9 +69,7 @@ pub enum AgentEventPayload {
     },
 
     /// Marks the start of a parallel tool batch (3+ tools executing concurrently).
-    ToolBatchStart {
-        tool_ids: Vec<String>,
-    },
+    ToolBatchStart { tool_ids: Vec<String> },
 
     /// Tool requires user permission
     ToolPermissionRequest {

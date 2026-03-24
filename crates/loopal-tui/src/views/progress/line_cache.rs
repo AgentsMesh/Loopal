@@ -103,7 +103,11 @@ fn fingerprint(msg: &DisplayMessage) -> u64 {
         h = mix(h, tc.progress_tail.as_ref().map_or(0, |t| t.len()) as u64);
         // Running/pending tools: include sub-second elapsed for timer refresh.
         if tc.status.is_active() {
-            h = mix(h, tc.started_at.map_or(0, |t| t.elapsed().as_millis() as u64 / 500));
+            h = mix(
+                h,
+                tc.started_at
+                    .map_or(0, |t| t.elapsed().as_millis() as u64 / 500),
+            );
         }
     }
     h

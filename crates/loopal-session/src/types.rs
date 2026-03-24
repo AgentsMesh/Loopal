@@ -24,14 +24,18 @@ pub enum ToolCallStatus {
     Pending = 0,
     Running = 1,
     Success = 2,
-    Error   = 3,
+    Error = 3,
 }
 
 impl ToolCallStatus {
     /// Still executing (Pending or Running).
-    pub fn is_active(self) -> bool { matches!(self, Self::Pending | Self::Running) }
+    pub fn is_active(self) -> bool {
+        matches!(self, Self::Pending | Self::Running)
+    }
     /// Finished (Success or Error).
-    pub fn is_done(self) -> bool { matches!(self, Self::Success | Self::Error) }
+    pub fn is_done(self) -> bool {
+        matches!(self, Self::Success | Self::Error)
+    }
 }
 
 /// A tool call to display in the chat view.

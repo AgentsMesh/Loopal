@@ -61,7 +61,9 @@ pub fn render_welcome(lines: &mut Vec<Line<'static>>, msg: &DisplayMessage) {
         lines.push(Line::from(vec![
             Span::styled(
                 "  model:     ",
-                Style::default().fg(Color::Rgb(100, 110, 130)).add_modifier(Modifier::DIM),
+                Style::default()
+                    .fg(Color::Rgb(100, 110, 130))
+                    .add_modifier(Modifier::DIM),
             ),
             Span::styled(model.to_string(), Style::default().fg(Color::Cyan)),
         ]));
@@ -70,7 +72,9 @@ pub fn render_welcome(lines: &mut Vec<Line<'static>>, msg: &DisplayMessage) {
         lines.push(Line::from(vec![
             Span::styled(
                 "  directory: ",
-                Style::default().fg(Color::Rgb(100, 110, 130)).add_modifier(Modifier::DIM),
+                Style::default()
+                    .fg(Color::Rgb(100, 110, 130))
+                    .add_modifier(Modifier::DIM),
             ),
             Span::styled(
                 path.to_string(),

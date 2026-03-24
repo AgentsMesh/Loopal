@@ -24,7 +24,8 @@ pub fn build_system_prompt(
     let builder = PromptBuilder::new(registry);
 
     let tool_names: Vec<String> = tools.iter().map(|t| t.name.clone()).collect();
-    let tool_descriptions: HashMap<String, String> = tools.iter()
+    let tool_descriptions: HashMap<String, String> = tools
+        .iter()
         .map(|t| (t.name.clone(), t.description.clone()))
         .collect();
 
@@ -48,7 +49,11 @@ pub fn build_system_prompt(
         date: today(),
         is_git_repo: false, // caller can improve later
         git_branch: None,
-        mode: if mode.is_empty() { "act".to_string() } else { mode.to_string() },
+        mode: if mode.is_empty() {
+            "act".to_string()
+        } else {
+            mode.to_string()
+        },
         tool_names,
         tool_descriptions,
         instructions: instructions.to_string(),

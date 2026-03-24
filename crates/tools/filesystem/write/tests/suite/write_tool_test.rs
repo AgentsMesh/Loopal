@@ -11,7 +11,9 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext {
         session_id: "test".into(),
         shared: None,
-        pending_cwd_switch: Default::default(), memory_channel: None, output_tail: None,
+        pending_cwd_switch: Default::default(),
+        memory_channel: None,
+        output_tail: None,
         backend,
     }
 }
@@ -182,9 +184,7 @@ async fn test_write_missing_file_path_returns_error() {
     let tool = WriteTool;
     let ctx = make_ctx(tmp.path());
 
-    let result = tool
-        .execute(json!({"content": "something"}), &ctx)
-        .await;
+    let result = tool.execute(json!({"content": "something"}), &ctx).await;
 
     assert!(result.is_err());
 }

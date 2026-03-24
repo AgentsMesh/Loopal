@@ -42,7 +42,9 @@ impl FragmentRegistry {
 
     /// Select fragments that match the given context, sorted by priority.
     pub fn select<'a>(&'a self, ctx: &PromptContext) -> Vec<&'a Fragment> {
-        let mut matched: Vec<&Fragment> = self.fragments.iter()
+        let mut matched: Vec<&Fragment> = self
+            .fragments
+            .iter()
             .filter(|f| condition_matches(&f.condition, ctx))
             .collect();
         matched.sort_by_key(|f| f.priority);

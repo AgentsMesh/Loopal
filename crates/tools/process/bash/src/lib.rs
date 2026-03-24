@@ -95,7 +95,9 @@ impl Tool for BashTool {
         let timeout_ms = input["timeout"].as_u64().unwrap_or(DEFAULT_TIMEOUT_MS);
         // Use streaming exec if output_tail is set (enables real-time progress)
         let exec_result = if let Some(ref tail) = ctx.output_tail {
-            ctx.backend.exec_streaming(command, timeout_ms, tail.clone()).await
+            ctx.backend
+                .exec_streaming(command, timeout_ms, tail.clone())
+                .await
         } else {
             ctx.backend.exec(command, timeout_ms).await
         };

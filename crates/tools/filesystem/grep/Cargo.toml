@@ -13,9 +13,6 @@ loopal-error = { workspace = true }
 loopal-tool-api = { workspace = true }
 serde_json = { workspace = true }
 async-trait = { workspace = true }
-regex = { workspace = true }
-globset = { workspace = true }
-ignore = { workspace = true }
 
 [dev-dependencies]
 loopal-backend = { workspace = true }

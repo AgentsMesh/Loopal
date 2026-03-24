@@ -22,3 +22,4 @@ futures = { workspace = true }
 ignore = { workspace = true }
 globset = { workspace = true }
 regex = { workspace = true }
+parking_lot = { workspace = true }

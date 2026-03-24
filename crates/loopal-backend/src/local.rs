@@ -1,5 +1,4 @@
 //! `LocalBackend` — production `Backend` for local filesystem + OS sandbox.
-
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -8,8 +7,8 @@ use loopal_config::ResolvedPolicy;
 use loopal_error::ToolIoError;
 use loopal_tool_api::Backend;
 use loopal_tool_api::backend_types::{
-    EditResult, ExecResult, FetchResult, FileInfo, GlobResult, GrepResult, LsEntry, LsResult,
-    ReadResult, WriteResult,
+    EditResult, ExecResult, FetchResult, FileInfo, GlobOptions, GlobSearchResult, GrepOptions,
+    GrepSearchResult, LsEntry, LsResult, ReadResult, WriteResult,
 };
 
 use crate::limits::ResourceLimits;
@@ -121,35 +120,22 @@ impl Backend for LocalBackend {
         Ok(LsResult { entries })
     }
 
-    async fn glob(&self, pattern: &str, base: Option<&str>) -> Result<GlobResult, ToolIoError> {
+    async fn glob(&self, opts: &GlobOptions) -> Result<GlobSearchResult, ToolIoError> {
+        let opts = opts.clone();
         let cwd = self.cwd.clone();
-        let pattern = pattern.to_string();
-        let base = base.map(|s| s.to_string());
         let limits = self.limits.clone();
-        tokio::task::spawn_blocking(move || {
-            search::glob_search(&pattern, base.as_deref(), &cwd, &limits)
-        })
-        .await
-        .map_err(|e| ToolIoError::Other(e.to_string()))?
+        tokio::task::spawn_blocking(move || search::glob_search(&opts, &cwd, &limits))
+            .await
+            .map_err(|e| ToolIoError::Other(e.to_string()))?
     }
 
-    async fn grep(
-        &self,
-        pattern: &str,
-        p: Option<&str>,
-        glob_filter: Option<&str>,
-    ) -> Result<GrepResult, ToolIoError> {
-        let search_path = p
-            .map(|s| path::to_absolute(&self.cwd, s))
-            .unwrap_or_else(|| self.cwd.clone());
-        let pattern = pattern.to_string();
-        let glob_filter = glob_filter.map(|s| s.to_string());
+    async fn grep(&self, opts: &GrepOptions) -> Result<GrepSearchResult, ToolIoError> {
+        let opts = opts.clone();
+        let cwd = self.cwd.clone();
         let limits = self.limits.clone();
-        tokio::task::spawn_blocking(move || {
-            search::grep_search(&pattern, &search_path, glob_filter.as_deref(), &limits)
-        })
-        .await
-        .map_err(|e| ToolIoError::Other(e.to_string()))?
+        tokio::task::spawn_blocking(move || search::grep_search(&opts, &cwd, &limits))
+            .await
+            .map_err(|e| ToolIoError::Other(e.to_string()))?
     }
 
     fn resolve_path(&self, raw: &str, is_write: bool) -> Result<PathBuf, ToolIoError> {

@@ -8,8 +8,9 @@ pub mod truncate;
 
 pub use backend::Backend;
 pub use backend_types::{
-    EditResult, ExecResult, FetchResult, FileInfo, GlobResult, GrepMatch, GrepResult, LsEntry,
-    LsResult, ReadResult, WriteResult,
+    EditResult, ExecResult, FetchResult, FileInfo, FileMatchResult, GlobEntry, GlobOptions,
+    GlobSearchResult, GrepOptions, GrepSearchResult, LsEntry, LsResult, MatchGroup, MatchLine,
+    ReadResult, WriteResult,
 };
 pub use memory_channel::MemoryChannel;
 pub use output_tail::OutputTail;

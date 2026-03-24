@@ -1768,6 +1768,7 @@ dependencies = [
  "loopal-sandbox",
  "loopal-tool-api",
  "loopal-tool-background",
+ "parking_lot",
  "regex",
  "reqwest",
  "tokio",
@@ -2147,12 +2148,9 @@ name = "loopal-tool-glob"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "globset",
- "ignore",
  "loopal-backend",
  "loopal-error",
  "loopal-tool-api",
- "loopal-tool-grep",
  "serde_json",
  "tempfile",
  "tokio",
@@ -2163,12 +2161,9 @@ name = "loopal-tool-grep"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "globset",
- "ignore",
  "loopal-backend",
  "loopal-error",
  "loopal-tool-api",
- "regex",
  "serde_json",
  "tempfile",
  "tokio",

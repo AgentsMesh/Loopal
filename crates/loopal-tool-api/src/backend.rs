@@ -5,8 +5,8 @@ use async_trait::async_trait;
 use loopal_error::ToolIoError;
 
 use crate::backend_types::{
-    EditResult, ExecResult, FetchResult, FileInfo, GlobResult, GrepResult, LsResult, ReadResult,
-    WriteResult,
+    EditResult, ExecResult, FetchResult, FileInfo, GlobOptions, GlobSearchResult, GrepOptions,
+    GrepSearchResult, LsResult, ReadResult, WriteResult,
 };
 use crate::output_tail::OutputTail;
 
@@ -63,15 +63,10 @@ pub trait Backend: Send + Sync {
     async fn ls(&self, path: &str) -> Result<LsResult, ToolIoError>;
 
     /// Glob pattern search from an optional base directory.
-    async fn glob(&self, pattern: &str, base: Option<&str>) -> Result<GlobResult, ToolIoError>;
+    async fn glob(&self, opts: &GlobOptions) -> Result<GlobSearchResult, ToolIoError>;
 
-    /// Regex search over file contents.
-    async fn grep(
-        &self,
-        pattern: &str,
-        path: Option<&str>,
-        glob_filter: Option<&str>,
-    ) -> Result<GrepResult, ToolIoError>;
+    /// Regex search over file contents with context, multiline, and type filtering.
+    async fn grep(&self, opts: &GrepOptions) -> Result<GrepSearchResult, ToolIoError>;
 
     /// Resolve a user-supplied path to a canonical absolute path.
     /// `is_write` triggers write-permission checks when a sandbox policy is active.

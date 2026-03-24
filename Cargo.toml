@@ -91,6 +91,7 @@ walkdir = "2"
 rmcp = { version = "0.1", features = ["client", "transport-child-process"] }
 
 # Utilities
+parking_lot = "0.12"
 dirs = "6"
 indexmap = "2"
 uuid = { version = "1", features = ["v4", "serde"] }

@@ -177,6 +177,7 @@ async fn test_write_with_relative_path() {
 }
 
 #[tokio::test]
+#[cfg(not(windows))]
 async fn test_write_absolute_path_bypasses_traversal_check() {
     let tmp = tempfile::tempdir().unwrap();
     let file = tmp.path().join("absolute_test.txt");

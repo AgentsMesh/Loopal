@@ -5,47 +5,11 @@ use futures::StreamExt;
 use loopal_error::Result;
 use loopal_message::{ContentBlock, Message};
 use loopal_protocol::AgentEventPayload;
-use loopal_provider::{get_thinking_capability, resolve_thinking_config};
-use loopal_provider_api::{ChatParams, StreamChunk};
+use loopal_provider_api::StreamChunk;
 use std::time::Instant;
 use tracing::{error, info};
 
 impl AgentLoopRunner {
-    /// Build chat params from a provided message slice (typically a working copy).
-    pub fn prepare_chat_params_with(&self, messages: &[Message]) -> Result<ChatParams> {
-        let env_section = super::env_context::build_env_section(
-            self.tool_ctx.backend.cwd(),
-            self.turn_count,
-            self.params.max_turns,
-        );
-        let full_system_prompt = format!(
-            "{}{}{}",
-            self.params.system_prompt,
-            self.params.mode.system_prompt_suffix(),
-            env_section,
-        );
-        let mut tool_defs = self.params.kernel.tool_definitions();
-        if let Some(ref filter) = self.params.tool_filter {
-            tool_defs.retain(|t| filter.contains(&t.name));
-        }
-        let capability = get_thinking_capability(&self.params.model);
-        let resolved_thinking = resolve_thinking_config(
-            &self.model_config.thinking,
-            capability,
-            self.model_config.max_output_tokens,
-        );
-        Ok(ChatParams {
-            model: self.params.model.clone(),
-            messages: messages.to_vec(),
-            system_prompt: full_system_prompt,
-            tools: tool_defs,
-            max_tokens: self.model_config.max_output_tokens,
-            temperature: None,
-            thinking: resolved_thinking,
-            debug_dump_dir: Some(loopal_config::tmp_dir()),
-        })
-    }
-
     /// Stream the LLM response using a provided working copy of messages.
     pub async fn stream_llm_with(
         &mut self,
@@ -143,6 +107,7 @@ impl AgentLoopRunner {
                     .push(ContentBlock::ServerToolUse { id, name, input });
             }
             Ok(StreamChunk::ServerToolResult {
+                block_type,
                 tool_use_id,
                 content,
             }) => {
@@ -151,12 +116,11 @@ impl AgentLoopRunner {
                     content: content.clone(),
                 })
                 .await?;
-                result
-                    .server_blocks
-                    .push(ContentBlock::WebSearchToolResult {
-                        tool_use_id,
-                        content,
-                    });
+                result.server_blocks.push(ContentBlock::ServerToolResult {
+                    block_type,
+                    tool_use_id,
+                    content,
+                });
             }
             Ok(StreamChunk::Usage {
                 input_tokens,

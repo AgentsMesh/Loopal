@@ -116,7 +116,14 @@ pub enum AgentEventPayload {
     Rewound { remaining_turns: usize },
 
     /// Conversation was compacted; old messages removed to reduce context.
-    Compacted { kept: usize, removed: usize },
+    Compacted {
+        kept: usize,
+        removed: usize,
+        tokens_before: u32,
+        tokens_after: u32,
+        /// "smart" (LLM summarization) or "emergency" (blind truncation).
+        strategy: String,
+    },
 
     /// Agent work was interrupted by user (ESC or new message while busy).
     Interrupted,

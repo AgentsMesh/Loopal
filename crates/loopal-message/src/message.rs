@@ -77,7 +77,7 @@ impl Message {
                 ContentBlock::Image { .. } => 1000, // fixed estimate for images
                 ContentBlock::Thinking { thinking, .. } => thinking.len() as u32 / 4,
                 ContentBlock::ServerToolUse { input, .. } => input.to_string().len() as u32 / 4,
-                ContentBlock::WebSearchToolResult { content, .. } => {
+                ContentBlock::ServerToolResult { content, .. } => {
                     content.to_string().len() as u32 / 4
                 }
             })
@@ -117,9 +117,11 @@ pub enum ContentBlock {
         name: String,
         input: serde_json::Value,
     },
-    /// Web search result from server-side tool (Anthropic/OpenAI/Google).
-    #[serde(rename = "web_search_tool_result")]
-    WebSearchToolResult {
+    /// Server-side tool result (Anthropic/OpenAI/Google).
+    /// `block_type` is the original API type string, e.g. "web_search_tool_result",
+    /// "code_execution_tool_result". Used to serialize back the correct `"type"` field.
+    ServerToolResult {
+        block_type: String,
         tool_use_id: String,
         content: serde_json::Value,
     },

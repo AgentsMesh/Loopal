@@ -59,7 +59,7 @@ pub fn project_messages(messages: &[Message]) -> Vec<DisplayMessage> {
                         result: None,
                     });
                 }
-                ContentBlock::WebSearchToolResult { .. } => {}
+                ContentBlock::ServerToolResult { .. } => {}
             }
         }
 

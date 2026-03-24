@@ -64,11 +64,12 @@ impl AnthropicProvider {
                             "name": name,
                             "input": input
                         }),
-                        ContentBlock::WebSearchToolResult {
+                        ContentBlock::ServerToolResult {
+                            block_type,
                             tool_use_id,
                             content,
                         } => json!({
-                            "type": "web_search_tool_result",
+                            "type": block_type,
                             "tool_use_id": tool_use_id,
                             "content": content
                         }),

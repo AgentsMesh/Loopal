@@ -176,6 +176,7 @@ fn parse_grounding_metadata(meta: &Value, chunks: &mut Vec<Result<StreamChunk, L
         .collect();
 
     chunks.push(Ok(StreamChunk::ServerToolResult {
+        block_type: "web_search_tool_result".to_string(),
         tool_use_id: search_id,
         content: json!(sources),
     }));

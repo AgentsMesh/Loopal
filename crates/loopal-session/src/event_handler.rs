@@ -161,10 +161,25 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
         AgentEventPayload::Rewound { remaining_turns } => {
             crate::rewind::truncate_display_to_turn(state, remaining_turns);
         }
-        AgentEventPayload::Compacted { kept, removed } => {
+        AgentEventPayload::Compacted {
+            kept,
+            removed,
+            tokens_before,
+            tokens_after,
+            strategy,
+        } => {
+            let freed = tokens_before.saturating_sub(tokens_after);
+            let pct = if tokens_before > 0 {
+                freed * 100 / tokens_before
+            } else {
+                0
+            };
             push_system_msg(
                 state,
-                &format!("Context compacted: removed {removed} messages, kept {kept}.",),
+                &format!(
+                    "Context compacted ({strategy}): {removed} messages removed, \
+                     {kept} kept. {tokens_before}→{tokens_after} tokens ({pct}% freed).",
+                ),
             );
         }
         AgentEventPayload::Interrupted => {

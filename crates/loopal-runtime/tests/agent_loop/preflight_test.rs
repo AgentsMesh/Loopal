@@ -17,7 +17,7 @@ fn big_tool_result_message(size: usize) -> Message {
 
 #[test]
 fn preflight_truncation_reduces_token_estimate() {
-    use loopal_context::compaction::{find_largest_tool_result, truncate_block_content};
+    use loopal_context::compaction::{find_largest_result_block, truncate_block_content};
     use loopal_context::token_counter::estimate_messages_tokens;
 
     let mut messages = vec![
@@ -29,7 +29,7 @@ fn preflight_truncation_reduces_token_estimate() {
     let before = estimate_messages_tokens(&messages);
     assert!(before > 5000, "should be large: {before}");
 
-    let (mi, bi, size) = find_largest_tool_result(&messages).unwrap();
+    let (mi, bi, size) = find_largest_result_block(&messages).unwrap();
     assert_eq!(mi, 1);
     assert_eq!(size, 40_000);
 
@@ -45,11 +45,11 @@ fn preflight_truncation_reduces_token_estimate() {
 #[test]
 fn preflight_compact_fallback_with_no_tool_results() {
     use loopal_context::compact_messages;
-    use loopal_context::compaction::find_largest_tool_result;
+    use loopal_context::compaction::find_largest_result_block;
 
     let mut messages: Vec<Message> = (0..20).map(|_| Message::user(&"y".repeat(1000))).collect();
 
-    assert!(find_largest_tool_result(&messages).is_none());
+    assert!(find_largest_result_block(&messages).is_none());
 
     compact_messages(&mut messages, 3);
     assert_eq!(messages.len(), 3);
@@ -57,7 +57,7 @@ fn preflight_compact_fallback_with_no_tool_results() {
 
 #[test]
 fn preflight_iterative_truncation_handles_multiple_blocks() {
-    use loopal_context::compaction::{find_largest_tool_result, truncate_block_content};
+    use loopal_context::compaction::{find_largest_result_block, truncate_block_content};
     use loopal_context::token_counter::estimate_messages_tokens;
 
     let mut messages = vec![
@@ -72,7 +72,7 @@ fn preflight_iterative_truncation_handles_multiple_blocks() {
         if tokens < 500 {
             break;
         }
-        if let Some((mi, bi, size)) = find_largest_tool_result(&messages) {
+        if let Some((mi, bi, size)) = find_largest_result_block(&messages) {
             if size < 1000 {
                 break;
             }

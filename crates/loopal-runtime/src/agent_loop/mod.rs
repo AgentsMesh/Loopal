@@ -1,16 +1,17 @@
 pub mod cancel;
+mod compaction;
+mod context_prep;
 pub mod diff_tracker;
 pub mod env_context;
 mod input;
 mod llm;
+mod llm_params;
 mod llm_record;
 pub(crate) mod llm_result;
 mod llm_retry;
 pub mod loop_detector;
-mod middleware;
 pub(crate) mod model_config;
 mod permission;
-mod preflight;
 pub mod rewind;
 mod run;
 mod runner;
@@ -43,9 +44,6 @@ pub use runner::AgentLoopRunner;
 
 /// Maximum number of automatic continuations when LLM hits max_tokens.
 pub(crate) const MAX_AUTO_CONTINUATIONS: u32 = 3;
-
-/// Number of recent messages to keep when user triggers `/compact`.
-pub(crate) const COMPACT_KEEP_LAST: usize = 10;
 
 pub struct AgentLoopParams {
     pub kernel: Arc<Kernel>,
@@ -94,14 +92,6 @@ pub async fn agent_loop(params: AgentLoopParams) -> Result<AgentOutput> {
 pub(crate) struct TurnOutput {
     /// The final assistant text of this turn.
     pub output: String,
-}
-
-/// Compact messages by keeping only the most recent `keep_last` messages.
-pub(crate) fn compact_messages(messages: &mut Vec<Message>, keep_last: usize) {
-    if messages.len() > keep_last {
-        let drain_end = messages.len() - keep_last;
-        messages.drain(..drain_end);
-    }
 }
 
 /// Result of waiting for user input.

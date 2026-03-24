@@ -9,7 +9,6 @@ use loopal_agent::shared::AgentShared;
 use loopal_agent::task_store::TaskStore;
 use loopal_config::load_config;
 use loopal_context::ContextPipeline;
-use loopal_context::middleware::{ContextGuard, MessageSizeGuard, SmartCompact};
 use loopal_context::system_prompt::build_system_prompt;
 use loopal_kernel::Kernel;
 use loopal_memory::MemoryObserver;
@@ -159,10 +158,10 @@ pub async fn run() -> anyhow::Result<()> {
         session_ctrl.push_welcome(&model, &display_path);
     }
 
-    let mut context_pipeline = ContextPipeline::new();
-    context_pipeline.add(Box::new(MessageSizeGuard));
-    context_pipeline.add(Box::new(ContextGuard));
-    context_pipeline.add(Box::new(SmartCompact::new(10)));
+    // Context pipeline: empty — compaction is now a persistent lifecycle event
+    // (check_and_compact), and per-message truncation is in prepare_llm_context.
+    // The pipeline remains as an extension point for future middleware.
+    let context_pipeline = ContextPipeline::new();
 
     let agent_params = AgentLoopParams {
         kernel,

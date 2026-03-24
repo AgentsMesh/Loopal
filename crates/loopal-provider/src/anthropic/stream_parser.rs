@@ -69,9 +69,10 @@ fn handle_block_start(
             ));
             server.is_result = false;
         }
-        server_tool::WEB_SEARCH_RESULT_TYPE => {
+        // Any server-side tool result: web_search_tool_result, code_execution_tool_result, etc.
+        other if other.ends_with("_tool_result") && other != "tool_result" => {
+            server.result_block_type = Some(other.to_string());
             server.result_tool_use_id = block["tool_use_id"].as_str().map(String::from);
-            // Capture the full content from the start block (results may not stream)
             server.result_content = Some(block["content"].clone());
             server.is_result = true;
         }
@@ -136,7 +137,12 @@ fn handle_block_stop(
         // Emit server tool result
         if let Some(tool_use_id) = server.result_tool_use_id.take() {
             let content = server.result_content.take().unwrap_or(json!(null));
+            let block_type = server
+                .result_block_type
+                .take()
+                .unwrap_or_else(|| "unknown_tool_result".to_string());
             chunks.push(Ok(StreamChunk::ServerToolResult {
+                block_type,
                 tool_use_id,
                 content,
             }));
@@ -176,7 +182,6 @@ fn parse_usage_and_stop(
 fn parse_message_start_usage(parsed: &Value, chunks: &mut Vec<Result<StreamChunk, LoopalError>>) {
     push_usage_from(&parsed["message"]["usage"], chunks);
 }
-
 fn push_usage_from(usage: &Value, chunks: &mut Vec<Result<StreamChunk, LoopalError>>) {
     if let (Some(input), Some(output)) = (
         usage["input_tokens"].as_u64(),

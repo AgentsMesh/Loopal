@@ -27,9 +27,7 @@ pub fn estimate_message_tokens(msg: &Message) -> u32 {
             ContentBlock::Image { .. } => 1000, // fixed estimate for images
             ContentBlock::Thinking { thinking, .. } => estimate_tokens(thinking),
             ContentBlock::ServerToolUse { input, .. } => estimate_tokens(&input.to_string()),
-            ContentBlock::WebSearchToolResult { content, .. } => {
-                estimate_tokens(&content.to_string())
-            }
+            ContentBlock::ServerToolResult { content, .. } => estimate_tokens(&content.to_string()),
         })
         .sum();
     // +4 for role/message framing overhead

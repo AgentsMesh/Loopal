@@ -52,9 +52,9 @@ impl GoogleProvider {
                             let query = input.get("query").and_then(|v| v.as_str()).unwrap_or("");
                             json!({"text": format!("[server tool: {name}({query})]")})
                         }
-                        ContentBlock::WebSearchToolResult { content, .. } => {
+                        ContentBlock::ServerToolResult { content, .. } => {
                             let summary = summarize_search_result(content);
-                            json!({"text": format!("[web search result: {summary}]")})
+                            json!({"text": format!("[server tool result: {summary}]")})
                         }
                     })
                     .collect();

@@ -12,7 +12,6 @@ use loopal_agent::router::MessageRouter;
 use loopal_agent::shared::AgentShared;
 use loopal_agent::task_store::TaskStore;
 use loopal_context::ContextPipeline;
-use loopal_context::middleware::{ContextGuard, MessageSizeGuard, SmartCompact};
 use loopal_context::system_prompt::build_system_prompt;
 use loopal_kernel::Kernel;
 use loopal_runtime::{AgentLoopParams, AgentMode, SessionManager};
@@ -165,10 +164,7 @@ impl AcpHandler {
             &self.config.memory,
         );
 
-        let mut pipeline = ContextPipeline::new();
-        pipeline.add(Box::new(MessageSizeGuard));
-        pipeline.add(Box::new(ContextGuard));
-        pipeline.add(Box::new(SmartCompact::new(10)));
+        let pipeline = ContextPipeline::new();
 
         let router = Arc::new(MessageRouter::new(event_tx.clone()));
         let tasks_dir = loopal_config::session_tasks_dir(session_id)

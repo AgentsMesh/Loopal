@@ -1,199 +1,184 @@
-use async_trait::async_trait;
-use futures::StreamExt;
+//! LLM-based summarization for context compaction.
+
 use loopal_error::LoopalError;
 use loopal_message::{ContentBlock, Message, MessageRole};
-use loopal_provider_api::{ChatParams, Middleware, MiddlewareContext, StreamChunk};
+use loopal_provider_api::Provider;
 
-use crate::compaction::compact_messages;
-use crate::token_counter::estimate_messages_tokens;
+use super::smart_compact_llm::call_summarization_llm;
 
-/// Smart context compaction that uses LLM summarization instead of
-/// simply truncating old messages. Falls back to traditional compaction
-/// if no summarization provider is available.
-pub struct SmartCompact {
-    pub keep_last: usize,
-}
-
-impl SmartCompact {
-    pub fn new(keep_last: usize) -> Self {
-        Self { keep_last }
+/// Summarize old messages via LLM and replace them with a working state summary.
+///
+/// Splits `messages` at `messages.len() - keep_last`, summarizes the older portion,
+/// and replaces the full vec with `[summary_msg, ...kept_messages]`.
+///
+/// Returns `Ok(true)` if summarization succeeded, `Ok(false)` if nothing to do,
+/// `Err` if the LLM call failed.
+pub async fn summarize_old_messages(
+    messages: &mut Vec<Message>,
+    provider: &dyn Provider,
+    model: &str,
+    keep_last: usize,
+) -> Result<bool, LoopalError> {
+    if messages.len() <= keep_last {
+        return Ok(false);
     }
-}
-
-#[async_trait]
-impl Middleware for SmartCompact {
-    fn name(&self) -> &str {
-        "smart_compact"
+    let split_at = messages.len() - keep_last;
+    let old_messages = &messages[..split_at];
+    if old_messages.is_empty() {
+        return Ok(false);
     }
 
-    async fn process(&self, ctx: &mut MiddlewareContext) -> Result<(), LoopalError> {
-        let estimated = estimate_messages_tokens(&ctx.messages);
+    let conversation_text = build_conversation_text(old_messages);
+    let touched_files = extract_touched_files(old_messages);
+    let summary_text = call_summarization_llm(provider, model, &conversation_text).await?;
 
-        if estimated <= ctx.max_context_tokens {
-            return Ok(());
+    if summary_text.is_empty() {
+        return Err(LoopalError::Provider(loopal_error::ProviderError::Api {
+            status: 0,
+            message: "empty summary response".to_string(),
+        }));
+    }
+
+    tracing::info!(
+        summary_len = summary_text.len(),
+        old_messages = old_messages.len(),
+        touched_files = touched_files.len(),
+        "generated working state summary"
+    );
+
+    // Build summary with file list for rehydration
+    let mut summary_body = format!(
+        "[Working state summary of {} earlier messages]\n\n{}",
+        old_messages.len(),
+        summary_text
+    );
+    if !touched_files.is_empty() {
+        summary_body.push_str("\n\n## Recently Touched Files\n");
+        for file in &touched_files {
+            summary_body.push_str(&format!("- {file}\n"));
         }
+        summary_body.push_str("\nThese files may have changed. Re-read before editing.");
+    }
 
-        tracing::info!(
-            estimated,
-            max = ctx.max_context_tokens,
-            messages = ctx.messages.len(),
-            "context exceeds limit, attempting smart compaction"
-        );
+    let summary_msg = Message {
+        id: None,
+        role: MessageRole::User,
+        content: vec![ContentBlock::Text { text: summary_body }],
+    };
+    // Assistant acknowledgment prevents normalize_messages from merging the summary
+    // with the next user message (both would be User role).
+    let ack_msg = Message {
+        id: None,
+        role: MessageRole::Assistant,
+        content: vec![ContentBlock::Text {
+            text: "Understood. I'll continue from this working state.".to_string(),
+        }],
+    };
 
-        // If no provider available, fall back to traditional compaction
-        let Some(provider) = &ctx.summarization_provider else {
-            tracing::info!("no summarization provider, falling back to truncation");
-            compact_messages(&mut ctx.messages, self.keep_last);
-            return Ok(());
+    let mut new_messages = vec![summary_msg, ack_msg];
+    new_messages.extend_from_slice(&messages[split_at..]);
+    *messages = new_messages;
+
+    Ok(true)
+}
+
+/// Build a text representation of messages for the summarization prompt.
+fn build_conversation_text(messages: &[Message]) -> String {
+    let mut text = String::new();
+    for msg in messages {
+        let role = match msg.role {
+            MessageRole::User => "User",
+            MessageRole::Assistant => "Assistant",
+            MessageRole::System => "System",
         };
-
-        // Split messages: messages to summarize vs. messages to keep
-        if ctx.messages.len() <= self.keep_last {
-            return Ok(());
+        let content = msg.text_content();
+        if !content.is_empty() {
+            text.push_str(&format!("{role}: {content}\n\n"));
         }
-        let split_at = ctx.messages.len() - self.keep_last;
-        let old_messages = &ctx.messages[..split_at];
-
-        if old_messages.is_empty() {
-            return Ok(());
-        }
-
-        // Build a summary prompt from old messages
-        let mut conversation_text = String::new();
-        for msg in old_messages {
-            let role = match msg.role {
-                MessageRole::User => "User",
-                MessageRole::Assistant => "Assistant",
-                MessageRole::System => "System",
-            };
-            let content = msg.text_content();
-            if !content.is_empty() {
-                conversation_text.push_str(&format!("{role}: {content}\n\n"));
-            }
-            // Also summarize tool interactions
-            for block in &msg.content {
-                match block {
-                    ContentBlock::ToolUse { name, .. } => {
-                        conversation_text.push_str(&format!("[Tool call: {name}]\n"));
-                    }
-                    ContentBlock::ToolResult {
-                        content, is_error, ..
-                    } => {
-                        let status = if *is_error { "error" } else { "ok" };
-                        let preview = if content.len() > 200 {
-                            let mut end = 200;
-                            while end > 0 && !content.is_char_boundary(end) {
-                                end -= 1;
-                            }
-                            format!("{}...[truncated]", &content[..end])
-                        } else {
-                            content.clone()
-                        };
-                        conversation_text
-                            .push_str(&format!("[Tool result ({status}): {preview}]\n"));
-                    }
-                    _ => {}
+        for block in &msg.content {
+            match block {
+                ContentBlock::ToolUse { name, input, .. } => {
+                    // Include key params so LLM knows what was operated on
+                    let args = extract_tool_args(name, input);
+                    text.push_str(&format!("[Tool call: {name}({args})]\n"));
                 }
+                ContentBlock::ToolResult {
+                    content, is_error, ..
+                } => {
+                    let status = if *is_error { "error" } else { "ok" };
+                    let preview = truncate_preview(content, 200);
+                    text.push_str(&format!("[Tool result ({status}): {preview}]\n"));
+                }
+                ContentBlock::ServerToolUse { name, .. } => {
+                    text.push_str(&format!("[Server tool: {name}]\n"));
+                }
+                ContentBlock::ServerToolResult { .. } => {
+                    text.push_str("[Server tool result received]\n");
+                }
+                _ => {}
             }
         }
+    }
+    text
+}
 
-        // Ask LLM to summarize with coding-agent-specific preservation rules
-        let summary_prompt = format!(
-            "You are summarizing a coding agent's conversation for context compaction.\n\n\
-             PRESERVE:\n\
-             - The user's original request and current intent\n\
-             - All file paths that were read, created, or modified\n\
-             - Key decisions and their rationale\n\
-             - Error messages encountered and how they were resolved\n\
-             - Current task state: what is done, what remains\n\n\
-             OMIT:\n\
-             - Verbatim file contents (summarize what was found instead)\n\
-             - Redundant tool call details (group similar operations)\n\n\
-             Conversation:\n---\n{conversation_text}\n---\n\n\
-             Provide a structured summary:",
-        );
+/// Truncate a string to `max_bytes` on a char boundary.
+fn truncate_preview(s: &str, max_bytes: usize) -> String {
+    if s.len() <= max_bytes {
+        return s.to_string();
+    }
+    let mut end = max_bytes;
+    while end > 0 && !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    format!("{}...[truncated]", &s[..end])
+}
 
-        let summary_params = ChatParams {
-            model: ctx.compact_model.as_ref().unwrap_or(&ctx.model).clone(),
-            messages: vec![Message::user(&summary_prompt)],
-            system_prompt: "You are a conversation summarizer. Be concise and factual.".to_string(),
-            tools: vec![],
-            max_tokens: 1024,
-            temperature: Some(0.0),
-            thinking: None,
-            debug_dump_dir: None,
-        };
+/// Extract key arguments from a tool call for the summarization prompt.
+/// Preserves file paths and commands — the most important context for decisions.
+fn extract_tool_args(name: &str, input: &serde_json::Value) -> String {
+    match name {
+        "Read" | "Write" | "Edit" | "MultiEdit" => input
+            .get("file_path")
+            .or_else(|| input.get("path"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        "Bash" => input
+            .get("command")
+            .and_then(|v| v.as_str())
+            .map(|c| truncate_preview(c, 80))
+            .unwrap_or_default(),
+        "Grep" | "Glob" => input
+            .get("pattern")
+            .and_then(|v| v.as_str())
+            .map(|p| truncate_preview(p, 60))
+            .unwrap_or_default(),
+        _ => String::new(),
+    }
+}
 
-        // Stream the summary response
-        match provider.stream_chat(&summary_params).await {
-            Ok(mut stream) => {
-                let mut summary_text = String::new();
-                while let Some(chunk) = stream.next().await {
-                    match chunk {
-                        Ok(StreamChunk::Text { text }) => summary_text.push_str(&text),
-                        Ok(StreamChunk::Done { .. }) => break,
-                        Err(e) => {
-                            tracing::warn!(error = %e, "summarization stream error, falling back to truncation");
-                            compact_messages(&mut ctx.messages, self.keep_last);
-                            return Ok(());
+/// Extract deduplicated file paths from ToolUse blocks (Read/Write/Edit/MultiEdit).
+/// Used for rehydration hints in the summary.
+fn extract_touched_files(messages: &[Message]) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    let mut files = Vec::new();
+    for msg in messages {
+        for block in &msg.content {
+            if let ContentBlock::ToolUse { name, input, .. } = block {
+                if matches!(name.as_str(), "Read" | "Write" | "Edit" | "MultiEdit") {
+                    let path = input
+                        .get("file_path")
+                        .or_else(|| input.get("path"))
+                        .and_then(|v| v.as_str());
+                    if let Some(p) = path {
+                        if seen.insert(p.to_string()) {
+                            files.push(p.to_string());
                         }
-                        Ok(
-                            StreamChunk::Thinking { .. }
-                            | StreamChunk::ThinkingSignature { .. }
-                            | StreamChunk::ToolUse { .. }
-                            | StreamChunk::ServerToolUse { .. }
-                            | StreamChunk::ServerToolResult { .. }
-                            | StreamChunk::Usage { .. },
-                        ) => {}
                     }
                 }
-
-                if summary_text.is_empty() {
-                    tracing::warn!("empty summary response, falling back to truncation");
-                    compact_messages(&mut ctx.messages, self.keep_last);
-                    return Ok(());
-                }
-
-                tracing::info!(
-                    summary_len = summary_text.len(),
-                    old_messages = old_messages.len(),
-                    "generated conversation summary"
-                );
-
-                // Replace old messages with a summary system message + kept messages
-                let summary_msg = Message {
-                    id: None,
-                    role: MessageRole::User,
-                    content: vec![ContentBlock::Text {
-                        text: format!(
-                            "[Conversation summary of {} earlier messages]\n\n{}",
-                            old_messages.len(),
-                            summary_text
-                        ),
-                    }],
-                };
-
-                let mut new_messages = vec![summary_msg];
-                new_messages.extend_from_slice(&ctx.messages[split_at..]);
-                ctx.messages = new_messages;
-
-                // Post-compaction validation: if summary inflated tokens, fall back
-                let post_tokens = estimate_messages_tokens(&ctx.messages);
-                if post_tokens > ctx.max_context_tokens {
-                    tracing::warn!(
-                        post_tokens,
-                        max = ctx.max_context_tokens,
-                        "compaction inflated tokens, falling back to truncation"
-                    );
-                    compact_messages(&mut ctx.messages, self.keep_last);
-                }
-            }
-            Err(e) => {
-                tracing::warn!(error = %e, "summarization request failed, falling back to truncation");
-                compact_messages(&mut ctx.messages, self.keep_last);
             }
         }
-
-        Ok(())
     }
+    files
 }

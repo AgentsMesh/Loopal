@@ -1,16 +1,13 @@
 use crate::agent_input::AgentInput;
+use crate::mode::AgentMode;
 use loopal_error::Result;
 use loopal_message::{ContentBlock, ImageSource, Message, MessageRole};
-use loopal_protocol::AgentEventPayload;
-use loopal_protocol::ControlCommand;
-use loopal_protocol::{Envelope, MessageSource};
+use loopal_protocol::{AgentEventPayload, ControlCommand, Envelope, MessageSource};
 use tracing::{error, info};
 
-use crate::mode::AgentMode;
-
+use super::WaitResult;
 use super::rewind::detect_turn_boundaries;
 use super::runner::AgentLoopRunner;
-use super::{COMPACT_KEEP_LAST, WaitResult, compact_messages};
 
 impl AgentLoopRunner {
     /// Wait for user input via the frontend. Returns None if disconnected.
@@ -49,8 +46,7 @@ impl AgentLoopRunner {
         }
     }
 
-    /// Handle a control command. Returns `Ok(())` when done.
-    /// The caller (`wait_for_input`) continues waiting for user input.
+    /// Handle a control command; caller resumes waiting for user input.
     async fn handle_control(&mut self, ctrl: ControlCommand) -> Result<()> {
         match ctrl {
             ControlCommand::ModeSwitch(new_mode) => {
@@ -87,24 +83,7 @@ impl AgentLoopRunner {
                 .await?;
             }
             ControlCommand::Compact => {
-                let before = self.params.messages.len();
-                info!(before, "compacting messages");
-                if let Err(e) = self
-                    .params
-                    .session_manager
-                    .compact_history(&self.params.session.id, COMPACT_KEEP_LAST)
-                {
-                    error!(error = %e, "failed to persist compact marker");
-                }
-                compact_messages(&mut self.params.messages, COMPACT_KEEP_LAST);
-                let after = self.params.messages.len();
-                let removed = before - after;
-                info!(after, removed, "compaction complete");
-                self.emit(AgentEventPayload::Compacted {
-                    kept: after,
-                    removed,
-                })
-                .await?;
+                self.force_compact().await?;
             }
             ControlCommand::ModelSwitch(new_model) => {
                 info!(from = %self.params.model, to = %new_model, "switching model");
@@ -135,7 +114,6 @@ impl AgentLoopRunner {
         }
         let truncate_at = boundaries[turn_index];
         info!(turn_index, truncate_at, "rewinding conversation");
-
         if truncate_at == 0 {
             if let Err(e) = self
                 .params
@@ -158,7 +136,6 @@ impl AgentLoopRunner {
                 "message at truncate point has no id, skipping marker"
             );
         }
-
         self.params.messages.truncate(truncate_at);
         self.turn_count = self.turn_count.min(turn_index as u32);
         let remaining = detect_turn_boundaries(&self.params.messages).len();
@@ -171,9 +148,6 @@ impl AgentLoopRunner {
 }
 
 /// Build a user Message from an Envelope, converting UserContent into ContentBlocks.
-///
-/// Text gets a source prefix for agent/channel origins. Images are appended as
-/// `ContentBlock::Image` for the LLM provider to serialize.
 pub fn build_user_message(env: &Envelope) -> Message {
     let text = match &env.source {
         MessageSource::Human => env.content.text.clone(),

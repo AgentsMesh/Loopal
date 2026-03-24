@@ -28,7 +28,15 @@ impl Tool for BashTool {
     }
 
     fn description(&self) -> &str {
-        "Execute a bash command. Captures stdout and stderr."
+        "Execute a bash command. Captures stdout and stderr.\n\n\
+         IMPORTANT: Avoid using this tool to run `find`, `grep`, `cat`, `head`, \
+         `tail`, `sed`, `awk`, or `echo` commands unless explicitly instructed. \
+         Instead, use the appropriate dedicated tool:\n\
+         - File search: Use Glob (NOT find or ls)\n\
+         - Content search: Use Grep (NOT grep or rg)\n\
+         - Read files: Use Read (NOT cat/head/tail)\n\
+         - Edit files: Use Edit (NOT sed/awk)\n\
+         - Write files: Use Write (NOT echo/cat with redirection)"
     }
 
     fn parameters_schema(&self) -> Value {

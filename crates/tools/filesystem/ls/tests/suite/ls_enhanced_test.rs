@@ -21,6 +21,7 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
 // --- long mode ---
 
 #[tokio::test]
+#[cfg(not(windows))]
 async fn long_mode_shows_permissions_and_size() {
     let tmp = tempfile::tempdir().unwrap();
     std::fs::write(tmp.path().join("hello.txt"), "hello world").unwrap();
@@ -122,6 +123,7 @@ async fn stat_directory_path() {
 // --- combined modes ---
 
 #[tokio::test]
+#[cfg(not(windows))]
 async fn long_and_all_combined() {
     let tmp = tempfile::tempdir().unwrap();
     std::fs::write(tmp.path().join(".config"), "cfg").unwrap();

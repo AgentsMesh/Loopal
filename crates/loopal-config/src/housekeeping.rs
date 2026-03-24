@@ -2,15 +2,16 @@ use std::fs;
 use std::path::Path;
 use std::time::{Duration, SystemTime};
 
-use crate::locations::{global_plugins_dir, logs_dir, sessions_dir, tmp_dir};
+use crate::locations::{global_plugins_dir, sessions_dir, tmp_dir};
 
 /// Ensure volatile and persistent directories exist, then clean up expired files.
 /// Called once at process startup; errors are silently ignored (best-effort).
+///
+/// Note: logs directory cleanup is handled by `log_writer::cleanup_old_logs`
+/// in the binary crate, which applies both file-count and size limits.
 pub fn startup_cleanup() {
     // Ensure volatile directories exist
-    for dir in [logs_dir(), tmp_dir()] {
-        let _ = fs::create_dir_all(&dir);
-    }
+    let _ = fs::create_dir_all(tmp_dir());
     // Ensure persistent directories exist
     if let Ok(d) = sessions_dir() {
         let _ = fs::create_dir_all(&d);
@@ -18,8 +19,7 @@ pub fn startup_cleanup() {
     if let Ok(d) = global_plugins_dir() {
         let _ = fs::create_dir_all(&d);
     }
-    // Clean up expired files
-    cleanup_expired_files(&logs_dir(), 7);
+    // Clean up expired temp files
     cleanup_expired_files(&tmp_dir(), 1);
 }
 

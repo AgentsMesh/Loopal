@@ -1,5 +1,6 @@
 mod bootstrap;
 mod cli;
+mod log_writer;
 mod logging;
 mod memory_adapter;
 
@@ -10,6 +11,6 @@ async fn main() -> anyhow::Result<()> {
         // SAFETY: called before any threads are spawned (single-threaded main entry).
         unsafe { std::env::set_var("RUST_BACKTRACE", "1") };
     }
-    let _log_guard = logging::init_logging();
+    let (_log_path, _log_guard) = logging::init_logging();
     bootstrap::run().await
 }

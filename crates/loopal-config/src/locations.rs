@@ -78,17 +78,20 @@ pub fn volatile_dir() -> PathBuf {
     std::env::temp_dir().join("loopal")
 }
 
-/// Returns the log directory: {temp_dir}/loopal/logs/
-pub fn logs_dir() -> PathBuf {
-    volatile_dir().join("logs")
-}
-
 /// Returns the temp file directory: {temp_dir}/loopal/tmp/
 pub fn tmp_dir() -> PathBuf {
     volatile_dir().join("tmp")
 }
 
 // === Persistent data directories ===
+
+/// Returns the log directory: ~/.loopal/logs/
+/// Fallback to {temp_dir}/loopal/logs/ if home directory is unavailable.
+pub fn logs_dir() -> PathBuf {
+    global_config_dir()
+        .map(|d| d.join("logs"))
+        .unwrap_or_else(|_| volatile_dir().join("logs"))
+}
 
 /// Returns the sessions root: ~/.loopal/sessions/
 pub fn sessions_dir() -> Result<PathBuf, ConfigError> {

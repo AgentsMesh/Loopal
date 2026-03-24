@@ -34,10 +34,7 @@ impl RotatingFileWriter {
     pub fn new(log_dir: &Path) -> Self {
         let now = chrono::Local::now();
         let pid = std::process::id();
-        let base_stem = format!(
-            "{LOG_PREFIX}{}-{pid}",
-            now.format("%Y%m%d-%H%M%S"),
-        );
+        let base_stem = format!("{LOG_PREFIX}{}-{pid}", now.format("%Y%m%d-%H%M%S"),);
         let path = log_dir.join(format!("{base_stem}{LOG_EXT}"));
         let file = OpenOptions::new()
             .create(true)
@@ -76,10 +73,7 @@ impl Write for RotatingFileWriter {
             s.seq += 1;
             let name = format!("{}.{}{LOG_EXT}", s.base_stem, s.seq);
             let path = s.dir.join(name);
-            s.file = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(path)?;
+            s.file = OpenOptions::new().create(true).append(true).open(path)?;
             s.written = 0;
         }
         let n = s.file.write(buf)?;

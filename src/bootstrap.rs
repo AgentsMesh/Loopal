@@ -134,8 +134,12 @@ pub async fn run() -> anyhow::Result<()> {
     let commands = merge_commands(&skills);
     let tool_defs = kernel.tool_definitions();
     let system_prompt = build_system_prompt(
-        &config.instructions, &tool_defs, &mode_str, &cwd.to_string_lossy(),
-        &skills_summary, &config.memory,
+        &config.instructions,
+        &tool_defs,
+        &mode_str,
+        &cwd.to_string_lossy(),
+        &skills_summary,
+        &config.memory,
     );
 
     let session_ctrl = SessionController::new(

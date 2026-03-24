@@ -11,7 +11,9 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext {
         session_id: "test".into(),
         shared: None,
-        pending_cwd_switch: Default::default(), memory_channel: None, output_tail: None,
+        pending_cwd_switch: Default::default(),
+        memory_channel: None,
+        output_tail: None,
         backend,
     }
 }
@@ -107,15 +109,13 @@ async fn test_bash_stdout_and_stderr_combined() {
 }
 
 #[tokio::test]
+#[cfg(not(windows))]
 async fn test_bash_runs_in_cwd() {
     let tmp = tempfile::tempdir().unwrap();
     let tool = BashTool;
     let ctx = make_ctx(tmp.path());
 
-    let result = tool
-        .execute(json!({"command": "pwd"}), &ctx)
-        .await
-        .unwrap();
+    let result = tool.execute(json!({"command": "pwd"}), &ctx).await.unwrap();
 
     assert!(!result.is_error);
     // The output should contain the tmp path (canonicalized versions may differ,

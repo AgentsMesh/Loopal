@@ -3,7 +3,7 @@
 use crate::helpers::flush_streaming;
 use crate::state::SessionState;
 use crate::truncate::truncate_json;
-use crate::types::{DisplayMessage, DisplayToolCall};
+use crate::types::{DisplayMessage, DisplayToolCall, ToolCallStatus};
 
 /// Handle a ServerToolUse event — add a pending tool call entry with [server] label.
 pub(crate) fn handle_server_tool_use(
@@ -13,10 +13,16 @@ pub(crate) fn handle_server_tool_use(
 ) {
     flush_streaming(state);
     let tc = DisplayToolCall {
+        id: String::new(),
         name: format!("{name} [server]"),
-        status: "pending".to_string(),
+        status: ToolCallStatus::Pending,
         summary: format!("{}({})", name, truncate_json(input, 60)),
         result: None,
+        tool_input: None,
+        batch_id: None,
+        started_at: None,
+        duration_ms: None,
+        progress_tail: None,
     };
     if let Some(last) = state.messages.last_mut()
         && last.role == "assistant"
@@ -38,8 +44,8 @@ pub(crate) fn handle_server_tool_result(state: &mut SessionState) {
         return;
     };
     for tc in msg.tool_calls.iter_mut().rev() {
-        if tc.status == "pending" && tc.name.contains("[server]") {
-            tc.status = "success".to_string();
+        if tc.status == ToolCallStatus::Pending && tc.name.contains("[server]") {
+            tc.status = ToolCallStatus::Success;
             tc.result = Some("Server-side search complete".to_string());
             return;
         }

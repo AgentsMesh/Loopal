@@ -46,6 +46,7 @@ fn test_observable_agent_state_default() {
     assert_eq!(state.output_tokens, 0);
     assert!(state.model.is_empty());
     assert_eq!(state.mode, "act");
+    assert_eq!(state.tools_in_flight, 0);
 }
 
 #[test]
@@ -59,6 +60,7 @@ fn test_observable_agent_state_serde_roundtrip() {
         output_tokens: 500,
         model: "claude-sonnet".to_string(),
         mode: "plan".to_string(),
+        tools_in_flight: 0,
     };
     let json = serde_json::to_string(&state).unwrap();
     let restored: ObservableAgentState = serde_json::from_str(&json).unwrap();

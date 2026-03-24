@@ -123,3 +123,19 @@ fn loop_detector_different_inputs_independent() {
         );
     }
 }
+
+#[test]
+fn loop_detector_multibyte_utf8_input_does_not_panic() {
+    let mut det = LoopDetector::new();
+    let mut ctx = make_ctx();
+    // Large CJK input — byte-slicing at SIGNATURE_INPUT_LIMIT (200) could land
+    // mid-character. This must not panic.
+    let cjk = "中".repeat(200); // 600 bytes, well over the 200-byte limit
+    let call = vec![(
+        "id".into(),
+        "AttemptCompletion".into(),
+        json!({"result": cjk}),
+    )];
+    let action = det.on_before_tools(&mut ctx, &call);
+    assert!(matches!(action, ObserverAction::Continue));
+}

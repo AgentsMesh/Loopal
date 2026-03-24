@@ -2,7 +2,7 @@
 
 use loopal_protocol::ControlCommand;
 use loopal_protocol::{AgentEvent, AgentEventPayload, UserQuestionResponse};
-use loopal_session::{DisplayMessage, DisplayToolCall, SessionController};
+use loopal_session::{DisplayMessage, DisplayToolCall, SessionController, ToolCallStatus};
 use loopal_tui::app::App;
 use loopal_tui::command::builtin_entries;
 use tokio::sync::mpsc;
@@ -32,6 +32,7 @@ fn test_handle_tool_result_no_matching_pending() {
             name: "bash".to_string(),
             result: "orphan result".to_string(),
             is_error: false,
+            duration_ms: None,
         }));
     // Should not crash
 }
@@ -76,10 +77,14 @@ fn test_tool_result_error_updates_matching_tool() {
             name: "Write".to_string(),
             result: "failed!".to_string(),
             is_error: true,
+            duration_ms: None,
         }));
 
     let state = app.session.lock();
-    assert_eq!(state.messages[0].tool_calls[0].status, "error");
+    assert_eq!(
+        state.messages[0].tool_calls[0].status,
+        ToolCallStatus::Error
+    );
     assert_eq!(
         state.messages[0].tool_calls[0].result,
         Some("failed!".into())
@@ -102,11 +107,13 @@ fn test_tool_result_not_found_when_different_name() {
             name: "Read".to_string(),
             result: "done".to_string(),
             is_error: false,
+            duration_ms: None,
         }));
 
+    // Now matches by id (not name), so the tool call IS updated
     assert_eq!(
         app.session.lock().messages[0].tool_calls[0].status,
-        "pending"
+        ToolCallStatus::Success
     );
 }
 
@@ -120,9 +127,15 @@ fn test_tool_result_with_multibyte_utf8_no_panic() {
             content: String::new(),
             tool_calls: vec![DisplayToolCall {
                 name: "Read".to_string(),
-                status: "pending".to_string(),
+                id: "tc-1".to_string(),
+                status: ToolCallStatus::Pending,
                 summary: "Read(...)".to_string(),
                 result: None,
+                tool_input: None,
+                batch_id: None,
+                started_at: None,
+                duration_ms: None,
+                progress_tail: None,
             }],
             image_count: 0,
         });
@@ -135,11 +148,12 @@ fn test_tool_result_with_multibyte_utf8_no_panic() {
             name: "Read".to_string(),
             result: chinese_text.to_string(),
             is_error: false,
+            duration_ms: None,
         }));
 
     let state = app.session.lock();
     let tc = &state.messages[0].tool_calls[0];
-    assert_eq!(tc.status, "success");
+    assert_eq!(tc.status, ToolCallStatus::Success);
     assert!(tc.result.is_some());
     assert!(tc.summary.contains("Read"));
 }

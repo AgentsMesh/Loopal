@@ -45,6 +45,7 @@ async fn make_ctx(agent_name: &str) -> (Arc<AgentShared>, ToolContext) {
         shared: Some(shared_any),
         pending_cwd_switch: Default::default(),
         memory_channel: None,
+        output_tail: None,
     };
     (shared, ctx)
 }

@@ -1,6 +1,7 @@
 use loopal_protocol::ControlCommand;
 use loopal_protocol::{AgentEvent, AgentEventPayload, UserQuestionResponse};
 use loopal_session::SessionController;
+use loopal_session::ToolCallStatus;
 use loopal_tui::app::App;
 use loopal_tui::command::builtin_entries;
 use tokio::sync::mpsc;
@@ -76,7 +77,10 @@ fn test_handle_tool_call_event() {
     assert_eq!(state.messages[0].role, "assistant");
     assert_eq!(state.messages[0].tool_calls.len(), 1);
     assert_eq!(state.messages[0].tool_calls[0].name, "bash");
-    assert_eq!(state.messages[0].tool_calls[0].status, "pending");
+    assert_eq!(
+        state.messages[0].tool_calls[0].status,
+        ToolCallStatus::Pending
+    );
 }
 
 #[test]
@@ -94,11 +98,12 @@ fn test_handle_tool_result_updates_status() {
             name: "bash".to_string(),
             result: "file1.txt\nfile2.txt".to_string(),
             is_error: false,
+            duration_ms: None,
         }));
 
     assert_eq!(
         app.session.lock().messages[0].tool_calls[0].status,
-        "success"
+        ToolCallStatus::Success
     );
 }
 
@@ -117,9 +122,13 @@ fn test_handle_tool_result_error_status() {
             name: "bash".to_string(),
             result: "command failed".to_string(),
             is_error: true,
+            duration_ms: None,
         }));
 
-    assert_eq!(app.session.lock().messages[0].tool_calls[0].status, "error");
+    assert_eq!(
+        app.session.lock().messages[0].tool_calls[0].status,
+        ToolCallStatus::Error
+    );
 }
 
 #[test]

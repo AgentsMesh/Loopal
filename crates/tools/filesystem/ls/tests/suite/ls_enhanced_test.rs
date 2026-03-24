@@ -13,6 +13,7 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
         shared: None,
         pending_cwd_switch: Default::default(),
         memory_channel: None,
+        output_tail: None,
         backend,
     }
 }
@@ -20,6 +21,7 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
 // --- long mode ---
 
 #[tokio::test]
+#[cfg(not(windows))]
 async fn long_mode_shows_permissions_and_size() {
     let tmp = tempfile::tempdir().unwrap();
     std::fs::write(tmp.path().join("hello.txt"), "hello world").unwrap();
@@ -27,8 +29,7 @@ async fn long_mode_shows_permissions_and_size() {
     let ctx = make_ctx(tmp.path());
     let r = tool.execute(json!({"long": true}), &ctx).await.unwrap();
     assert!(!r.is_error);
-    // Permission strings are Unix-only (rw-r--r-- etc.)
-    #[cfg(unix)]
+    // Should contain permission string, size, and filename
     assert!(r.content.contains("rw"));
     assert!(r.content.contains("hello.txt"));
     // 11 bytes -> "11B"
@@ -122,6 +123,7 @@ async fn stat_directory_path() {
 // --- combined modes ---
 
 #[tokio::test]
+#[cfg(not(windows))]
 async fn long_and_all_combined() {
     let tmp = tempfile::tempdir().unwrap();
     std::fs::write(tmp.path().join(".config"), "cfg").unwrap();
@@ -137,7 +139,5 @@ async fn long_and_all_combined() {
     // Both entries should have permission strings
     let lines: Vec<&str> = r.content.lines().collect();
     assert!(lines.len() >= 2);
-    // Permission strings are Unix-only
-    #[cfg(unix)]
     assert!(lines.iter().all(|l| l.contains("rw") || l.contains("r-")));
 }

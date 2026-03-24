@@ -1,6 +1,8 @@
 //! AgentEvent → SessionState update logic. Routes events by `agent_name`:
 //! root → main display, sub-agent → `agent_handler`. `MessageRouted` → global feed.
 
+use std::time::Instant;
+
 use loopal_protocol::{AgentEvent, AgentEventPayload, UserContent};
 
 use crate::agent_handler::apply_agent_event;
@@ -9,9 +11,11 @@ use crate::inbox::try_forward_inbox;
 use crate::message_log::record_message_routed;
 use crate::state::SessionState;
 use crate::thinking_display::format_thinking_summary;
-use crate::tool_result_handler::handle_tool_result;
+use crate::tool_result_handler::{
+    handle_tool_batch_start, handle_tool_progress, handle_tool_result,
+};
 use crate::truncate::truncate_json;
-use crate::types::{DisplayMessage, DisplayToolCall, PendingPermission};
+use crate::types::{DisplayMessage, DisplayToolCall, PendingPermission, ToolCallStatus};
 
 /// Handle an AgentEvent. Returns `Some(content)` if an inbox message should be forwarded.
 pub fn apply_event(state: &mut SessionState, event: AgentEvent) -> Option<UserContent> {
@@ -59,17 +63,23 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
                 });
             }
         }
-        AgentEventPayload::ToolCall { id: _, name, input } => {
+        AgentEventPayload::ToolCall { id, name, input } => {
             flush_streaming(state);
             let tc = DisplayToolCall {
+                id: id.clone(),
                 name: name.clone(),
-                status: "pending".to_string(),
+                status: ToolCallStatus::Pending,
                 summary: if name == "AttemptCompletion" {
                     name.clone()
                 } else {
                     format!("{}({})", name, truncate_json(&input, 60))
                 },
                 result: None,
+                tool_input: Some(input),
+                batch_id: None,
+                started_at: Some(Instant::now()),
+                duration_ms: None,
+                progress_tail: None,
             };
             if let Some(last) = state.messages.last_mut()
                 && last.role == "assistant"
@@ -85,12 +95,13 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
             });
         }
         AgentEventPayload::ToolResult {
-            id: _,
+            id,
             name,
             result,
             is_error,
+            duration_ms,
         } => {
-            handle_tool_result(state, name, result, is_error);
+            handle_tool_result(state, id, name, result, is_error, duration_ms);
         }
         AgentEventPayload::ToolPermissionRequest { id, name, input } => {
             flush_streaming(state);
@@ -181,6 +192,14 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
                      {kept} kept. {tokens_before}→{tokens_after} tokens ({pct}% freed).",
                 ),
             );
+        }
+        AgentEventPayload::ToolBatchStart { tool_ids } => {
+            handle_tool_batch_start(state, tool_ids);
+        }
+        AgentEventPayload::ToolProgress {
+            id, output_tail, ..
+        } => {
+            handle_tool_progress(state, id, output_tail);
         }
         AgentEventPayload::Interrupted => {
             flush_streaming(state);

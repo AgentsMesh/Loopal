@@ -6,7 +6,7 @@ use loopal_error::Result;
 use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::StopReason;
-use tracing::warn;
+use tracing::{debug, warn};
 
 use super::runner::AgentLoopRunner;
 use super::turn_context::TurnContext;
@@ -107,10 +107,12 @@ impl AgentLoopRunner {
             }
 
             // Observer: on_before_tools
+            debug!(tool_count = result.tool_uses.len(), "pre-tool phase");
             if self.run_before_tools(turn_ctx, &result.tool_uses).await? {
                 return Ok(TurnOutput { output: last_text });
             }
 
+            debug!(tool_count = result.tool_uses.len(), "executing tools");
             let cancel = &turn_ctx.cancel;
             let completion = self.execute_tools(result.tool_uses.clone(), cancel).await?;
             self.apply_pending_cwd_switch();

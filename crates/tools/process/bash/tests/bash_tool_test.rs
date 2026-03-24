@@ -13,6 +13,7 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
         shared: None,
         pending_cwd_switch: Default::default(),
         memory_channel: None,
+        output_tail: None,
         backend,
     }
 }
@@ -148,7 +149,6 @@ async fn test_bash_with_custom_timeout() {
 }
 
 #[tokio::test]
-#[cfg(not(windows))]
 async fn test_bash_timeout_triggers_error() {
     let tmp = tempfile::tempdir().unwrap();
     let tool = BashTool;

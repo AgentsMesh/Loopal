@@ -8,7 +8,7 @@ use std::path::Path;
 
 /// Build a dynamic environment section (~100 tokens).
 pub fn build_env_section(cwd: &Path, turn_count: u32, max_turns: u32) -> String {
-    let mut parts = Vec::with_capacity(4);
+    let mut parts = Vec::with_capacity(5);
 
     // Date/time
     let now = chrono::Local::now();
@@ -16,6 +16,9 @@ pub fn build_env_section(cwd: &Path, turn_count: u32, max_turns: u32) -> String 
 
     // Working directory
     parts.push(format!("- Working directory: {}", cwd.display()));
+
+    // Platform
+    parts.push(format!("- Platform: {}", std::env::consts::OS));
 
     // Git branch (fail silently if not in a repo)
     if let Some(branch) = loopal_git::current_branch(cwd) {

@@ -38,6 +38,9 @@ pub struct ObservableAgentState {
     pub model: String,
     /// Current operating mode (e.g. "act", "plan").
     pub mode: String,
+    /// Number of tools currently executing in parallel.
+    #[serde(default)]
+    pub tools_in_flight: u32,
 }
 
 impl Default for ObservableAgentState {
@@ -51,6 +54,7 @@ impl Default for ObservableAgentState {
             output_tokens: 0,
             model: String::new(),
             mode: "act".to_string(),
+            tools_in_flight: 0,
         }
     }
 }

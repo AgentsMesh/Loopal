@@ -31,5 +31,3 @@ mod message_lines_edge_test;
 mod message_lines_test;
 #[path = "suite/styled_wrap_test.rs"]
 mod styled_wrap_test;
-#[path = "suite/tool_summary_test.rs"]
-mod tool_summary_test;

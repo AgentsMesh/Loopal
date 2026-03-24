@@ -17,6 +17,7 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
         shared: None,
         pending_cwd_switch: Default::default(),
         memory_channel: None,
+        output_tail: None,
         backend,
     }
 }

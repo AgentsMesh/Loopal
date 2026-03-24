@@ -13,6 +13,7 @@ fn make_ctx() -> ToolContext {
         shared: None,
         pending_cwd_switch: Default::default(),
         memory_channel: None,
+        output_tail: None,
     }
 }
 

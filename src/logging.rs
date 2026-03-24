@@ -1,21 +1,31 @@
-/// Initialize file-based logging under `{temp_dir}/loopal/logs/`.
-/// Returns a guard that must be held until the process exits to flush buffered logs.
-pub fn init_logging() -> tracing_appender::non_blocking::WorkerGuard {
+/// Initialize file-based logging under `~/.loopal/logs/`.
+///
+/// Each program run gets its own log file: `loopal-{timestamp}-{pid}.log`.
+/// Old log files are cleaned up to keep total directory size bounded.
+///
+/// Returns the log file path and a guard — hold the guard until process exit to
+/// flush buffered logs.
+pub fn init_logging() -> (String, tracing_appender::non_blocking::WorkerGuard) {
     let log_dir = loopal_config::logs_dir();
-
-    // Ensure the directory exists
     std::fs::create_dir_all(&log_dir).expect("failed to create log directory");
 
-    // Daily-rotating file appender: loopal.log.YYYY-MM-DD
-    let file_appender = tracing_appender::rolling::daily(&log_dir, "loopal.log");
-    let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
+    // Housekeep: remove old logs exceeding the retention policy
+    crate::log_writer::cleanup_old_logs(&log_dir);
 
-    // Read log level from LOOPAL_LOG env var, default to "info"
+    let writer = crate::log_writer::RotatingFileWriter::new(&log_dir);
+    let log_path = writer.current_path();
+    let (non_blocking, guard) = tracing_appender::non_blocking(writer);
+
     let env_filter = std::env::var("LOOPAL_LOG").unwrap_or_else(|_| "info".to_string());
     let filter = format!(
-        "loopal={env_filter},loopal_runtime={env_filter},loopal_provider={env_filter},loopal_kernel={env_filter},loopal_mcp={env_filter},loopal_tools={env_filter},loopal_context={env_filter},loopal_hooks={env_filter},loopal_storage={env_filter},loopal_config={env_filter}"
+        "loopal={env_filter},loopal_runtime={env_filter},\
+         loopal_provider={env_filter},loopal_kernel={env_filter},\
+         loopal_mcp={env_filter},loopal_tools={env_filter},\
+         loopal_context={env_filter},loopal_hooks={env_filter},\
+         loopal_storage={env_filter},loopal_config={env_filter}"
     );
 
+    // NonBlocking implements MakeWriter — pass it directly.
     tracing_subscriber::fmt()
         .with_env_filter(filter)
         .with_writer(non_blocking)
@@ -24,5 +34,7 @@ pub fn init_logging() -> tracing_appender::non_blocking::WorkerGuard {
         .with_span_events(tracing_subscriber::fmt::format::FmtSpan::NONE)
         .init();
 
-    guard
+    tracing::info!(path = %log_path, "logging initialized");
+
+    (log_path, guard)
 }

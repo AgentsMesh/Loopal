@@ -2,7 +2,7 @@
 
 use loopal_protocol::ControlCommand;
 use loopal_protocol::{AgentEvent, AgentEventPayload, UserQuestionResponse};
-use loopal_session::{DisplayMessage, DisplayToolCall, SessionController};
+use loopal_session::{DisplayMessage, DisplayToolCall, SessionController, ToolCallStatus};
 use loopal_tui::app::App;
 use loopal_tui::command::builtin_entries;
 use tokio::sync::mpsc;
@@ -106,9 +106,15 @@ fn test_flush_streaming_new_message_when_assistant_has_tool_calls() {
             content: "let me do that".to_string(),
             tool_calls: vec![DisplayToolCall {
                 name: "bash".to_string(),
-                status: "success".to_string(),
+                id: String::new(),
+                status: ToolCallStatus::Success,
                 summary: "done".to_string(),
                 result: Some("done".to_string()),
+                tool_input: None,
+                batch_id: None,
+                started_at: None,
+                duration_ms: None,
+                progress_tail: None,
             }],
             image_count: 0,
         });

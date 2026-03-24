@@ -17,6 +17,8 @@ loopal-runtime = { workspace = true }
 loopal-provider-api = { workspace = true }
 loopal-kernel = { workspace = true }
 loopal-context = { workspace = true }
+loopal-prompt = { workspace = true }
+loopal-prompt-system = { workspace = true }
 loopal-storage = { workspace = true }
 loopal-git = { workspace = true }
 loopal-memory = { workspace = true }

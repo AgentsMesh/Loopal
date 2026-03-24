@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 
 use loopal_message::{ContentBlock, Message, MessageRole};
-use loopal_session::types::{DisplayMessage, DisplayToolCall};
+use loopal_session::types::{DisplayMessage, DisplayToolCall, ToolCallStatus};
 use loopal_tool_api::COMPLETION_PREFIX;
 
 /// Project a slice of Messages into DisplayMessages suitable for TUI rendering.
@@ -31,10 +31,16 @@ pub fn project_messages(messages: &[Message]) -> Vec<DisplayMessage> {
                 ContentBlock::ToolUse { id, name, input } => {
                     let tc_idx = tool_calls.len();
                     tool_calls.push(DisplayToolCall {
+                        id: id.clone(),
                         name: name.clone(),
-                        status: "pending".to_string(),
+                        status: ToolCallStatus::Pending,
                         summary: format!("{}({})", name, summarize_input(input)),
                         result: None,
+                        tool_input: Some(input.clone()),
+                        batch_id: None,
+                        started_at: None,
+                        duration_ms: None,
+                        progress_tail: None,
                     });
                     tool_index.insert(id.clone(), (display.len(), tc_idx, name.clone()));
                 }
@@ -53,10 +59,16 @@ pub fn project_messages(messages: &[Message]) -> Vec<DisplayMessage> {
                 ContentBlock::ServerToolUse { name, input, .. } => {
                     let query = input.get("query").and_then(|v| v.as_str()).unwrap_or("");
                     tool_calls.push(DisplayToolCall {
+                        id: String::new(),
                         name: format!("{name} [server]"),
-                        status: "success".to_string(),
+                        status: ToolCallStatus::Success,
                         summary: format!("{name}({query})"),
                         result: None,
+                        tool_input: None,
+                        batch_id: None,
+                        started_at: None,
+                        duration_ms: None,
+                        progress_tail: None,
                     });
                 }
                 ContentBlock::ServerToolResult { .. } => {}
@@ -95,7 +107,11 @@ fn back_patch(
     if let Some(msg) = display.get_mut(di)
         && let Some(tc) = msg.tool_calls.get_mut(ti)
     {
-        tc.status = if is_error { "error" } else { "success" }.to_string();
+        tc.status = if is_error {
+            ToolCallStatus::Error
+        } else {
+            ToolCallStatus::Success
+        };
         if !is_completion {
             tc.result = Some(truncate_for_display(result));
         }
@@ -128,7 +144,11 @@ fn truncate_for_display(s: &str) -> String {
     if line_limited.len() <= MAX_BYTES {
         line_limited
     } else {
-        line_limited[..MAX_BYTES].to_string()
+        let mut end = MAX_BYTES;
+        while end > 0 && !line_limited.is_char_boundary(end) {
+            end -= 1;
+        }
+        line_limited[..end].to_string()
     }
 }
 

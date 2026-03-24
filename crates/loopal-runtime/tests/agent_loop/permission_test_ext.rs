@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use loopal_config::Settings;
-use loopal_context::ContextPipeline;
+use loopal_context::{ContextBudget, ContextPipeline, ContextStore};
 use loopal_kernel::Kernel;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::Envelope;
@@ -12,6 +12,17 @@ use loopal_runtime::{AgentLoopParams, AgentMode, SessionManager, UnifiedFrontend
 use loopal_storage::Session;
 use loopal_tool_api::{PermissionDecision, PermissionMode};
 use tokio::sync::mpsc;
+
+fn make_test_budget() -> ContextBudget {
+    ContextBudget {
+        context_window: 200_000,
+        system_tokens: 0,
+        tool_tokens: 0,
+        output_reserve: 16_384,
+        safety_margin: 10_000,
+        message_budget: 173_616,
+    }
+}
 
 use super::make_runner_with_channels;
 
@@ -121,7 +132,7 @@ async fn test_check_permission_channel_closed_denies() {
     let params = AgentLoopParams {
         kernel,
         session,
-        messages: Vec::new(),
+        store: ContextStore::new(make_test_budget()),
         model: "claude-sonnet-4-20250514".to_string(),
         compact_model: None,
         system_prompt: "test".to_string(),

@@ -6,26 +6,26 @@ use loopal_provider_api::Provider;
 
 use super::smart_compact_llm::call_summarization_llm;
 
-/// Summarize old messages via LLM and replace them with a working state summary.
+/// Summarize old messages via LLM, returning the new compacted message list.
 ///
 /// Splits `messages` at `messages.len() - keep_last`, summarizes the older portion,
-/// and replaces the full vec with `[summary_msg, ...kept_messages]`.
+/// and returns `[summary_msg, ack_msg, ...kept_messages]`.
 ///
-/// Returns `Ok(true)` if summarization succeeded, `Ok(false)` if nothing to do,
+/// Returns `Ok(Some(new_messages))` on success, `Ok(None)` if nothing to do,
 /// `Err` if the LLM call failed.
 pub async fn summarize_old_messages(
-    messages: &mut Vec<Message>,
+    messages: &[Message],
     provider: &dyn Provider,
     model: &str,
     keep_last: usize,
-) -> Result<bool, LoopalError> {
+) -> Result<Option<Vec<Message>>, LoopalError> {
     if messages.len() <= keep_last {
-        return Ok(false);
+        return Ok(None);
     }
     let split_at = messages.len() - keep_last;
     let old_messages = &messages[..split_at];
     if old_messages.is_empty() {
-        return Ok(false);
+        return Ok(None);
     }
 
     let conversation_text = build_conversation_text(old_messages);
@@ -65,8 +65,6 @@ pub async fn summarize_old_messages(
         role: MessageRole::User,
         content: vec![ContentBlock::Text { text: summary_body }],
     };
-    // Assistant acknowledgment prevents normalize_messages from merging the summary
-    // with the next user message (both would be User role).
     let ack_msg = Message {
         id: None,
         role: MessageRole::Assistant,
@@ -77,9 +75,8 @@ pub async fn summarize_old_messages(
 
     let mut new_messages = vec![summary_msg, ack_msg];
     new_messages.extend_from_slice(&messages[split_at..]);
-    *messages = new_messages;
 
-    Ok(true)
+    Ok(Some(new_messages))
 }
 
 /// Build a text representation of messages for the summarization prompt.

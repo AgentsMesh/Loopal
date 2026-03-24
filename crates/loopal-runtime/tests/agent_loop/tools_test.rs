@@ -34,8 +34,8 @@ async fn test_execute_tools_bypass_mode() {
     );
 
     // Should have added tool result message
-    assert_eq!(runner.params.messages.len(), 1);
-    let msg = &runner.params.messages[0];
+    assert_eq!(runner.params.store.len(), 1);
+    let msg = &runner.params.store.messages()[0];
     assert_eq!(msg.role, MessageRole::User);
     assert!(!msg.content.is_empty());
 
@@ -74,8 +74,8 @@ async fn test_execute_tools_supervised_denies_without_approval() {
         .unwrap();
 
     // Should have added a denied tool result message
-    assert_eq!(runner.params.messages.len(), 1);
-    let msg = &runner.params.messages[0];
+    assert_eq!(runner.params.store.len(), 1);
+    let msg = &runner.params.store.messages()[0];
     match &msg.content[0] {
         ContentBlock::ToolResult {
             content, is_error, ..
@@ -126,8 +126,8 @@ async fn test_execute_tools_read_allowed_write_denied_in_supervised() {
         .unwrap();
 
     // Should have 1 message with 2 tool results
-    assert_eq!(runner.params.messages.len(), 1);
-    let msg = &runner.params.messages[0];
+    assert_eq!(runner.params.store.len(), 1);
+    let msg = &runner.params.store.messages()[0];
     assert_eq!(msg.content.len(), 2);
 
     // tc-1 (Read) should succeed, tc-2 (Write) should be denied

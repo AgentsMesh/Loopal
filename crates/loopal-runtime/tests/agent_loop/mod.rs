@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use loopal_config::Settings;
-use loopal_context::ContextPipeline;
+use loopal_context::{ContextBudget, ContextPipeline, ContextStore};
 use loopal_kernel::Kernel;
 use loopal_protocol::AgentEvent;
 use loopal_protocol::ControlCommand;
@@ -20,6 +20,17 @@ pub fn make_cancel() -> TurnCancel {
         Default::default(),
         Arc::new(tokio::sync::watch::channel(0u64).0),
     )
+}
+
+pub fn make_test_budget() -> ContextBudget {
+    ContextBudget {
+        context_window: 200_000,
+        system_tokens: 0,
+        tool_tokens: 0,
+        output_reserve: 16_384,
+        safety_margin: 10_000,
+        message_budget: 173_616,
+    }
 }
 
 mod auto_continue_edge_test;
@@ -79,7 +90,7 @@ pub fn make_runner() -> (AgentLoopRunner, mpsc::Receiver<AgentEvent>) {
     let params = AgentLoopParams {
         kernel,
         session,
-        messages: Vec::new(),
+        store: ContextStore::new(make_test_budget()),
         model: "claude-sonnet-4-20250514".to_string(),
         compact_model: None,
         system_prompt: "You are a helpful assistant.".to_string(),
@@ -144,7 +155,7 @@ pub fn make_runner_with_channels() -> (
     let params = AgentLoopParams {
         kernel,
         session,
-        messages: Vec::new(),
+        store: ContextStore::new(make_test_budget()),
         model: "claude-sonnet-4-20250514".to_string(),
         compact_model: None,
         system_prompt: "Test prompt.".to_string(),

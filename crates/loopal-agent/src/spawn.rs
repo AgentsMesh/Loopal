@@ -5,7 +5,7 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, info, info_span};
 
-use loopal_context::ContextPipeline;
+use loopal_context::{ContextBudget, ContextPipeline, ContextStore};
 use loopal_message::Message;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::Envelope;
@@ -138,13 +138,15 @@ pub async fn spawn_agent(
     let shared_any: Arc<dyn std::any::Any + Send + Sync> = Arc::new(child_shared);
     let session_id = session.id.clone();
 
+    let budget = ContextBudget::calculate(200_000, &system_prompt, 0, 16_384);
+
     let agent_params = AgentLoopParams {
         kernel: Arc::clone(&shared.kernel),
         session,
         model,
         system_prompt,
         compact_model: shared.kernel.settings().compact_model.clone(),
-        messages: vec![Message::user(&params.prompt)],
+        store: ContextStore::from_messages(vec![Message::user(&params.prompt)], budget),
         mode: AgentMode::Act,
         permission_mode: params.agent_config.permission_mode,
         max_turns,

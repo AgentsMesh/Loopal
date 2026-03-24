@@ -5,7 +5,7 @@ use super::runner::AgentLoopRunner;
 
 impl AgentLoopRunner {
     /// Record the assistant response as a message in the conversation history.
-    /// Writes to both persistent storage and in-memory params.messages.
+    /// Writes to both persistent storage and in-memory store.
     /// Block order: thinking → server blocks → text → client tool_uses.
     pub fn record_assistant_message(
         &mut self,
@@ -58,7 +58,7 @@ impl AgentLoopRunner {
             {
                 error!(error = %e, "failed to persist message");
             }
-            self.params.messages.push(assistant_msg);
+            self.params.store.push_assistant(assistant_msg);
         }
     }
 }

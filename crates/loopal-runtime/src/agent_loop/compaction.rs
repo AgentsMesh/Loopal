@@ -1,77 +1,64 @@
-//! Persistent compaction — modifies params.messages in place + writes CompactTo marker.
+//! Persistent compaction — LLM summarization + emergency truncation.
+//!
+//! The ContextStore handles sync degradation (strip, truncate) automatically.
+//! This module handles the async Layer 2 (LLM summarization) that the store
+//! cannot do on its own (requires Provider access).
 
-use loopal_context::budget::ContextBudget;
-use loopal_context::compaction::{compact_messages, sanitize_tool_pairs};
-use loopal_context::token_counter::estimate_messages_tokens;
 use loopal_error::Result;
 use loopal_protocol::AgentEventPayload;
 use tracing::{info, warn};
 
 use super::runner::AgentLoopRunner;
 
-/// Number of recent messages to keep during smart compaction.
-const SMART_COMPACT_KEEP_LAST: usize = 10;
-/// Number of recent messages to keep during emergency compaction.
+/// Minimum messages to keep during emergency compaction.
 const EMERGENCY_KEEP_LAST: usize = 5;
 
 impl AgentLoopRunner {
-    /// Check if compaction is needed and apply it persistently.
+    /// Check if LLM summarization is needed and apply it.
     ///
-    /// This is a **lifecycle event**, not a per-turn filter:
-    /// - Computes a precise budget (subtracting system prompt, tools, output reserve)
-    /// - If messages exceed 75% of budget → LLM summarization (smart compact)
-    /// - If messages exceed 95% of budget → emergency truncation
-    /// - Writes a CompactTo marker to disk for session reload consistency
+    /// The ContextStore's sync degradation (layers 0, 1, 3) already runs on
+    /// every push. This method handles Layer 2: async LLM summarization
+    /// when messages exceed 75% of budget.
     pub async fn check_and_compact(&mut self) -> Result<()> {
-        let tool_defs = self.params.kernel.tool_definitions();
-        let tool_tokens = ContextBudget::estimate_tool_tokens(&tool_defs);
-        let budget = ContextBudget::calculate(
-            self.model_config.max_context_tokens,
-            &self.params.system_prompt,
-            tool_tokens,
-            self.model_config.max_output_tokens,
-        );
-        let msg_tokens = estimate_messages_tokens(&self.params.messages);
-
-        if !budget.needs_compaction(msg_tokens) {
+        if !self.params.store.needs_summarization() {
             return Ok(());
         }
+
+        let msg_tokens = self.params.store.current_tokens();
+        let budget = self.params.store.budget().clone();
 
         info!(
             msg_tokens,
             message_budget = budget.message_budget,
-            messages = self.params.messages.len(),
+            messages = self.params.store.len(),
             "compaction triggered"
         );
 
-        // Notify user that compaction is starting (LLM summarization may take seconds)
         self.emit(AgentEventPayload::Stream {
             text: "[compacting context...]\n".to_string(),
         })
         .await?;
 
-        let before = self.params.messages.len();
+        let before = self.params.store.len();
         let tokens_before = msg_tokens;
 
         // Try LLM summarization first, fall back to emergency truncation
         if !budget.needs_emergency(msg_tokens) {
-            if self.try_smart_compact(&budget).await {
+            if self.try_smart_compact().await {
                 self.post_compact(before, tokens_before, "smart").await?;
                 return Ok(());
             }
-            // Smart compact failed — fall through to emergency
             warn!("smart compact failed, falling back to emergency truncation");
         }
 
-        compact_messages(&mut self.params.messages, EMERGENCY_KEEP_LAST);
+        self.params.store.emergency_compact(EMERGENCY_KEEP_LAST);
         self.post_compact(before, tokens_before, "emergency")
             .await?;
         Ok(())
     }
 
     /// Attempt LLM-based summarization. Returns true if successful.
-    /// On failure or inflation, params.messages is reverted to pre-summarization state.
-    async fn try_smart_compact(&mut self, budget: &ContextBudget) -> bool {
+    async fn try_smart_compact(&mut self) -> bool {
         let compact_model = self
             .params
             .compact_model
@@ -82,11 +69,9 @@ impl AgentLoopRunner {
             return false;
         };
 
-        // Snapshot before mutation — revert if summarization produces bad results
-        let snapshot = self.params.messages.clone();
-        let keep_last = SMART_COMPACT_KEEP_LAST.min(self.params.messages.len());
+        let keep_last = self.params.store.token_aware_keep_count();
         let result = loopal_context::middleware::smart_compact::summarize_old_messages(
-            &mut self.params.messages,
+            self.params.store.messages(), // &[Message] — read only
             &*provider,
             compact_model,
             keep_last,
@@ -94,37 +79,35 @@ impl AgentLoopRunner {
         .await;
 
         match result {
-            Ok(true) => {
-                // Validate: if summary inflated tokens, revert to snapshot
-                let post_tokens = estimate_messages_tokens(&self.params.messages);
-                if budget.needs_emergency(post_tokens) {
-                    warn!(post_tokens, "summary inflated tokens, reverting");
-                    self.params.messages = snapshot;
-                    return false;
+            Ok(Some(new_messages)) => {
+                // apply_summary validates tokens, reverts if inflated
+                if self.params.store.apply_summary(new_messages) {
+                    true
+                } else {
+                    warn!("summary inflated tokens, reverted");
+                    false
                 }
-                true
             }
-            Ok(false) => false,
+            Ok(None) => false,
             Err(e) => {
                 warn!(error = %e, "summarization failed");
-                self.params.messages = snapshot;
                 false
             }
         }
     }
 
     /// Force compaction unconditionally (user-triggered `/compact`).
-    /// Tries LLM summarization first, falls back to blind truncation.
     pub async fn force_compact(&mut self) -> Result<()> {
-        let before = self.params.messages.len();
-        if before <= SMART_COMPACT_KEEP_LAST {
+        let before = self.params.store.len();
+        let keep_last = self.params.store.token_aware_keep_count();
+        if before <= keep_last {
             self.emit(AgentEventPayload::Stream {
                 text: "[nothing to compact — conversation is short]\n".to_string(),
             })
             .await?;
             return Ok(());
         }
-        let tokens_before = estimate_messages_tokens(&self.params.messages);
+        let tokens_before = self.params.store.current_tokens();
 
         self.emit(AgentEventPayload::Stream {
             text: "[compacting context...]\n".to_string(),
@@ -137,43 +120,29 @@ impl AgentLoopRunner {
             "manual compaction triggered"
         );
 
-        let tool_defs = self.params.kernel.tool_definitions();
-        let tool_tokens = ContextBudget::estimate_tool_tokens(&tool_defs);
-        let budget = ContextBudget::calculate(
-            self.model_config.max_context_tokens,
-            &self.params.system_prompt,
-            tool_tokens,
-            self.model_config.max_output_tokens,
-        );
-
-        if self.try_smart_compact(&budget).await {
+        if self.try_smart_compact().await {
             self.post_compact(before, tokens_before, "manual-smart")
                 .await?;
         } else {
-            warn!("smart compact failed for manual /compact, falling back to truncation");
-            compact_messages(&mut self.params.messages, SMART_COMPACT_KEEP_LAST);
+            warn!("smart compact failed for manual /compact, falling back");
+            self.params.store.emergency_compact(keep_last);
             self.post_compact(before, tokens_before, "manual-emergency")
                 .await?;
         }
         Ok(())
     }
 
-    /// Post-compaction: sanitize pairs, write marker, emit event with metrics.
+    /// Post-compaction: write marker, emit event with metrics.
     async fn post_compact(
         &mut self,
         before: usize,
         tokens_before: u32,
         strategy: &str,
     ) -> Result<()> {
-        sanitize_tool_pairs(&mut self.params.messages);
-
-        let after = self.params.messages.len();
+        let after = self.params.store.len();
         let removed = before.saturating_sub(after);
-        let tokens_after = estimate_messages_tokens(&self.params.messages);
+        let tokens_after = self.params.store.current_tokens();
 
-        // Write marker to disk for session reload consistency.
-        // `after` is the new total message count (including any system messages);
-        // on reload, replay keeps the last `after` entries from the JSONL log.
         if let Err(e) = self
             .params
             .session_manager

@@ -28,7 +28,7 @@ async fn test_wait_for_input_with_images() {
     let result = runner.wait_for_input().await.unwrap();
     assert!(result.is_some());
 
-    let msg = &runner.params.messages[0];
+    let msg = &runner.params.store.messages()[0];
     // Text block + 2 Image blocks
     assert_eq!(msg.content.len(), 3);
     assert!(matches!(&msg.content[0], ContentBlock::Text { text } if text == "describe these"));
@@ -52,7 +52,7 @@ async fn test_wait_for_input_empty_text_with_images() {
     let result = runner.wait_for_input().await.unwrap();
     assert!(result.is_some());
 
-    let msg = &runner.params.messages[0];
+    let msg = &runner.params.store.messages()[0];
     // Empty text is skipped; only 1 Image block
     assert_eq!(msg.content.len(), 1);
     assert!(matches!(&msg.content[0], ContentBlock::Image { .. }));
@@ -70,7 +70,7 @@ async fn test_wait_for_input_text_only_no_images() {
     let result = runner.wait_for_input().await.unwrap();
     assert!(result.is_some());
 
-    let msg = &runner.params.messages[0];
+    let msg = &runner.params.store.messages()[0];
     // Only 1 Text block, no images
     assert_eq!(msg.content.len(), 1);
     assert!(matches!(&msg.content[0], ContentBlock::Text { .. }));

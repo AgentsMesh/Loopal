@@ -26,10 +26,10 @@ impl AgentLoopRunner {
                 return Ok(TurnOutput { output: last_text });
             }
 
-            // Persistent compaction (modifies params.messages if over budget)
+            // Persistent compaction (LLM summarization if over budget)
             self.check_and_compact().await?;
-            // Ephemeral context prep (clone + strip + safety net)
-            let working = self.prepare_llm_context();
+            // Prepare context for LLM (clone + strip old thinking)
+            let working = self.params.store.prepare_for_llm();
             let result = self.stream_llm_with(&working, &turn_ctx.cancel).await?;
 
             // Determine tool list for recording. MaxTokens+tools = truncated args.
@@ -121,7 +121,8 @@ impl AgentLoopRunner {
             // Observer: on_after_tools with results from the last message
             let result_blocks = self
                 .params
-                .messages
+                .store
+                .messages()
                 .last()
                 .map(|m| m.content.as_slice())
                 .unwrap_or(&[]);
@@ -146,7 +147,7 @@ impl AgentLoopRunner {
             match obs.on_before_tools(turn_ctx, tool_uses) {
                 ObserverAction::Continue => {}
                 ObserverAction::InjectWarning(msg) => {
-                    self.params.messages.push(Message {
+                    self.params.store.push_user(Message {
                         id: None,
                         role: MessageRole::User,
                         content: vec![ContentBlock::Text { text: msg }],

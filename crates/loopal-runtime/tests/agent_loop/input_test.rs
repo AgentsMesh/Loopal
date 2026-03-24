@@ -38,9 +38,12 @@ async fn test_wait_for_input_human_message_no_prefix() {
 
     let result = runner.wait_for_input().await.unwrap();
     assert!(result.is_some());
-    assert_eq!(runner.params.messages.len(), 1);
+    assert_eq!(runner.params.store.len(), 1);
     // Human source: no prefix — content passed through directly
-    assert_eq!(runner.params.messages[0].text_content(), "Hello agent");
+    assert_eq!(
+        runner.params.store.messages()[0].text_content(),
+        "Hello agent"
+    );
 
     // Should have emitted AwaitingInput
     let event = event_rx.recv().await.unwrap();
@@ -63,7 +66,7 @@ async fn test_wait_for_input_agent_message_has_prefix() {
     let result = runner.wait_for_input().await.unwrap();
     assert!(result.is_some());
     assert_eq!(
-        runner.params.messages[0].text_content(),
+        runner.params.store.messages()[0].text_content(),
         "[from: researcher] found the answer"
     );
 }
@@ -87,7 +90,7 @@ async fn test_wait_for_input_channel_message_has_channel_prefix() {
     let result = runner.wait_for_input().await.unwrap();
     assert!(result.is_some());
     assert_eq!(
-        runner.params.messages[0].text_content(),
+        runner.params.store.messages()[0].text_content(),
         "[from: #general/bot] new event"
     );
 }

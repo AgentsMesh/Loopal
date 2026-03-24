@@ -1,8 +1,7 @@
+use loopal_context::ingestion::safe_truncate_tool_result;
+use loopal_context::token_counter::estimate_messages_tokens;
 use loopal_message::{ContentBlock, Message, MessageRole};
 
-/// Verify the preflight helper functions from the compaction module
-/// (which preflight.rs delegates to) work correctly in the context
-/// they'd be used during a preflight check.
 fn big_tool_result_message(size: usize) -> Message {
     Message {
         id: None,
@@ -16,24 +15,17 @@ fn big_tool_result_message(size: usize) -> Message {
 }
 
 #[test]
-fn preflight_truncation_reduces_token_estimate() {
-    use loopal_context::compaction::{find_largest_result_block, truncate_block_content};
-    use loopal_context::token_counter::estimate_messages_tokens;
-
+fn safe_truncation_reduces_token_estimate() {
     let mut messages = vec![
         Message::user("hello"),
-        big_tool_result_message(40_000), // ~10k tokens
+        big_tool_result_message(40_000),
         Message::assistant("ok"),
     ];
 
     let before = estimate_messages_tokens(&messages);
     assert!(before > 5000, "should be large: {before}");
 
-    let (mi, bi, size) = find_largest_result_block(&messages).unwrap();
-    assert_eq!(mi, 1);
-    assert_eq!(size, 40_000);
-
-    truncate_block_content(&mut messages[mi].content[bi], 20, 500);
+    safe_truncate_tool_result(&mut messages[1].content[0], 20, 500);
     let after = estimate_messages_tokens(&messages);
 
     assert!(
@@ -43,46 +35,46 @@ fn preflight_truncation_reduces_token_estimate() {
 }
 
 #[test]
-fn preflight_compact_fallback_with_no_tool_results() {
+fn safe_truncation_skips_server_tool_result() {
+    let mut block = ContentBlock::ServerToolResult {
+        block_type: "web_search_tool_result".into(),
+        tool_use_id: "ws_1".into(),
+        content: serde_json::json!({"results": "x".repeat(5000)}),
+    };
+
+    safe_truncate_tool_result(&mut block, 20, 500);
+
+    // Must still be ServerToolResult with valid JSON — never corrupted
+    assert!(matches!(block, ContentBlock::ServerToolResult { .. }));
+    if let ContentBlock::ServerToolResult { content, .. } = &block {
+        assert!(content.is_object(), "JSON structure must be preserved");
+    }
+}
+
+#[test]
+fn compact_fallback_with_no_tool_results() {
     use loopal_context::compact_messages;
-    use loopal_context::compaction::find_largest_result_block;
 
     let mut messages: Vec<Message> = (0..20).map(|_| Message::user(&"y".repeat(1000))).collect();
-
-    assert!(find_largest_result_block(&messages).is_none());
-
     compact_messages(&mut messages, 3);
     assert_eq!(messages.len(), 3);
 }
 
 #[test]
-fn preflight_iterative_truncation_handles_multiple_blocks() {
-    use loopal_context::compaction::{find_largest_result_block, truncate_block_content};
-    use loopal_context::token_counter::estimate_messages_tokens;
-
+fn iterative_safe_truncation_handles_multiple_blocks() {
     let mut messages = vec![
         big_tool_result_message(20_000),
         big_tool_result_message(15_000),
         big_tool_result_message(10_000),
     ];
 
-    // Simulate iterative truncation like preflight does
-    for _ in 0..5 {
-        let tokens = estimate_messages_tokens(&messages);
-        if tokens < 500 {
-            break;
-        }
-        if let Some((mi, bi, size)) = find_largest_result_block(&messages) {
-            if size < 1000 {
-                break;
-            }
-            truncate_block_content(&mut messages[mi].content[bi], 20, 500);
+    for msg in &mut messages {
+        for block in &mut msg.content {
+            safe_truncate_tool_result(block, 20, 500);
         }
     }
 
-    // All messages should still exist
     assert_eq!(messages.len(), 3);
-    // All ToolResults should be truncated
     for msg in &messages {
         if let ContentBlock::ToolResult { content, .. } = &msg.content[0] {
             assert!(

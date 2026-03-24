@@ -18,11 +18,11 @@ impl AgentLoopRunner {
         loop {
             info!(
                 turn = self.turn_count,
-                messages = self.params.messages.len(),
+                messages = self.params.store.len(),
                 "turn start"
             );
 
-            if self.params.messages.is_empty() {
+            if self.params.store.is_empty() {
                 if !self.params.interactive {
                     break;
                 }

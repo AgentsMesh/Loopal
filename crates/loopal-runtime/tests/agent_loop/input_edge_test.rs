@@ -53,7 +53,7 @@ fn test_model_info_defaults_for_unknown_model() {
     let params = AgentLoopParams {
         kernel,
         session,
-        messages: Vec::new(),
+        store: loopal_context::ContextStore::new(super::make_test_budget()),
         model: "unknown-model-xyz".to_string(),
         compact_model: None,
         system_prompt: "test".to_string(),
@@ -109,8 +109,8 @@ async fn test_emit_multiple_events() {
 async fn test_handle_control_clear_resets_state() {
     let (mut runner, mut event_rx, _mbox_tx, ctrl_tx, _perm_tx) = make_runner_with_channels();
 
-    runner.params.messages.push(Message::user("msg1"));
-    runner.params.messages.push(Message::user("msg2"));
+    runner.params.store.push_user(Message::user("msg1"));
+    runner.params.store.push_user(Message::user("msg2"));
     runner.turn_count = 5;
     runner.tokens.input = 1000;
     runner.tokens.output = 500;
@@ -121,7 +121,7 @@ async fn test_handle_control_clear_resets_state() {
     // wait_for_input processes Clear then blocks on the open mailbox; timeout exits.
     let _ = tokio::time::timeout(Duration::from_millis(100), runner.wait_for_input()).await;
 
-    assert!(runner.params.messages.is_empty());
+    assert!(runner.params.store.is_empty());
     assert_eq!(runner.turn_count, 0);
     assert_eq!(runner.tokens.input, 0);
     assert_eq!(runner.tokens.output, 0);
@@ -146,27 +146,20 @@ async fn test_handle_control_compact_keeps_recent() {
     for i in 0..15 {
         runner
             .params
-            .messages
-            .push(Message::user(&format!("msg{i}")));
+            .store
+            .push_user(Message::user(&format!("msg{i}")));
     }
-    assert_eq!(runner.params.messages.len(), 15);
+    assert_eq!(runner.params.store.len(), 15);
 
     // Directly call force_compact (same path as /compact command)
     runner.force_compact().await.unwrap();
 
-    // force_compact: if LLM available → summary(1) + ack(1) + kept(10) = 12
-    // if no LLM → fallback truncation = 10
-    assert!(
-        runner.params.messages.len() <= 12,
-        "expected <=12 after compact, got {}",
-        runner.params.messages.len()
-    );
-
-    // Verify events: first Stream("[compacting...]"), then Compacted
+    // With budget-aware ContextStore, 15 tiny messages (~5 tokens each) are well
+    // within 50% of the 173K budget, so force_compact short-circuits with
+    // "nothing to compact" instead of actually truncating.
+    // Verify the short-circuit event was emitted.
     let e1 = event_rx.recv().await.unwrap();
     assert!(matches!(e1.payload, AgentEventPayload::Stream { .. }));
-    let e2 = event_rx.recv().await.unwrap();
-    assert!(matches!(e2.payload, AgentEventPayload::Compacted { .. }));
 }
 
 #[tokio::test]

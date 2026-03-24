@@ -75,69 +75,6 @@ pub fn sanitize_tool_pairs(messages: &mut Vec<Message>) {
     messages.retain(|m| m.role == MessageRole::System || !m.content.is_empty());
 }
 
-/// Find the largest ToolResult or ServerToolResult content block across all messages.
-/// Returns `(message_index, block_index, byte_size)`.
-pub fn find_largest_result_block(messages: &[Message]) -> Option<(usize, usize, usize)> {
-    let mut best: Option<(usize, usize, usize)> = None;
-    for (mi, msg) in messages.iter().enumerate() {
-        for (bi, block) in msg.content.iter().enumerate() {
-            let size = match block {
-                ContentBlock::ToolResult { content, .. } => content.len(),
-                ContentBlock::ServerToolResult { content, .. } => content.to_string().len(),
-                _ => continue,
-            };
-            if best.is_none_or(|(_, _, s)| size > s) {
-                best = Some((mi, bi, size));
-            }
-        }
-    }
-    best
-}
-
-/// Truncate a ToolResult or ServerToolResult content block in place.
-pub fn truncate_block_content(block: &mut ContentBlock, max_lines: usize, max_bytes: usize) {
-    let text = match block {
-        ContentBlock::ToolResult { content, .. } => content,
-        ContentBlock::ServerToolResult { content, .. } => {
-            // Convert JSON to string for truncation
-            let s = content.to_string();
-            *content = serde_json::Value::String(s);
-            match content {
-                serde_json::Value::String(s) => s,
-                _ => unreachable!(),
-            }
-        }
-        _ => return,
-    };
-    if text.len() <= max_bytes && text.lines().count() <= max_lines {
-        return;
-    }
-
-    let original_bytes = text.len();
-    let original_lines = text.lines().count();
-    let mut result = String::new();
-    let mut byte_count = 0;
-
-    for (i, line) in text.lines().enumerate() {
-        let line_bytes = line.len() + 1;
-        if i >= max_lines || byte_count + line_bytes > max_bytes {
-            break;
-        }
-        if i > 0 {
-            result.push('\n');
-        }
-        result.push_str(line);
-        byte_count += line_bytes;
-    }
-
-    result.push_str(&format!(
-        "\n\n[Truncated: kept {byte_count}/{original_bytes} bytes, \
-         {}/{original_lines} lines]",
-        result.lines().count()
-    ));
-    *text = result;
-}
-
 /// Strip `ContentBlock::Thinking` blocks from all assistant messages except the last one.
 /// The last assistant message's thinking block must be preserved for Anthropic signature
 /// verification in multi-turn conversations. Older thinking blocks waste context tokens.
@@ -155,43 +92,5 @@ pub fn strip_old_thinking(messages: &mut [Message]) {
         }
         msg.content
             .retain(|block| !matches!(block, ContentBlock::Thinking { .. }));
-    }
-}
-
-/// Strip server tool blocks (ServerToolUse + ServerToolResult) from all assistant messages
-/// except the last one. Old search results waste context tokens — the text response already
-/// summarized the key findings.
-pub fn strip_old_server_tool_content(messages: &mut [Message]) {
-    let last_assistant_idx = messages
-        .iter()
-        .rposition(|m| m.role == MessageRole::Assistant);
-
-    for (i, msg) in messages.iter_mut().enumerate() {
-        if msg.role != MessageRole::Assistant || Some(i) == last_assistant_idx {
-            continue;
-        }
-        msg.content.retain(|block| {
-            !matches!(
-                block,
-                ContentBlock::ServerToolUse { .. } | ContentBlock::ServerToolResult { .. }
-            )
-        });
-    }
-}
-
-/// Strip `ContentBlock::Image` blocks from all messages except those in the last
-/// user-assistant exchange. Old screenshots waste ~1000 tokens each.
-pub fn strip_old_images(messages: &mut [Message]) {
-    if messages.len() <= 2 {
-        return;
-    }
-    // Preserve images only in the last 2 messages (last user + last assistant)
-    let preserve_from = messages.len().saturating_sub(2);
-    for (i, msg) in messages.iter_mut().enumerate() {
-        if i >= preserve_from {
-            continue;
-        }
-        msg.content
-            .retain(|block| !matches!(block, ContentBlock::Image { .. }));
     }
 }

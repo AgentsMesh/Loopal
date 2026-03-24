@@ -10,10 +10,8 @@ use super::{make_cancel, make_runner, make_runner_with_mock_provider};
 fn test_prepare_chat_params_act_mode() {
     let (runner, _rx) = make_runner();
     let params = runner
-        .prepare_chat_params_with(&runner.params.messages)
+        .prepare_chat_params_with(runner.params.store.messages())
         .expect("should succeed");
-
-    assert_eq!(params.model, "claude-sonnet-4-20250514");
     assert!(
         params
             .system_prompt
@@ -33,7 +31,7 @@ fn test_prepare_chat_params_plan_mode_passes_through() {
     let (mut runner, _rx) = make_runner();
     runner.params.mode = AgentMode::Plan;
     let params = runner
-        .prepare_chat_params_with(&runner.params.messages)
+        .prepare_chat_params_with(runner.params.store.messages())
         .expect("should succeed");
 
     assert!(
@@ -49,11 +47,14 @@ fn test_prepare_chat_params_with_messages() {
     use loopal_message::Message;
 
     let (mut runner, _rx) = make_runner();
-    runner.params.messages.push(Message::user("Hello"));
-    runner.params.messages.push(Message::assistant("Hi there!"));
+    runner.params.store.push_user(Message::user("Hello"));
+    runner
+        .params
+        .store
+        .push_assistant(Message::assistant("Hi there!"));
 
     let params = runner
-        .prepare_chat_params_with(&runner.params.messages)
+        .prepare_chat_params_with(runner.params.store.messages())
         .expect("should succeed");
     assert_eq!(params.messages.len(), 2);
     assert_eq!(params.messages[0].role, MessageRole::User);
@@ -82,7 +83,7 @@ async fn test_stream_llm_text_response() {
     ];
     let (mut runner, mut event_rx, _input_tx, _ctrl_tx) = make_runner_with_mock_provider(chunks);
 
-    let msgs = runner.params.messages.clone();
+    let msgs = runner.params.store.messages().to_vec();
     let cancel = make_cancel();
     let result = runner.stream_llm_with(&msgs, &cancel).await.unwrap();
     let text = result.assistant_text;
@@ -136,7 +137,7 @@ async fn test_stream_llm_tool_use_response() {
     ];
     let (mut runner, _event_rx, _input_tx, _ctrl_tx) = make_runner_with_mock_provider(chunks);
 
-    let msgs = runner.params.messages.clone();
+    let msgs = runner.params.store.messages().to_vec();
     let cancel = make_cancel();
     let result = runner.stream_llm_with(&msgs, &cancel).await.unwrap();
     let text = result.assistant_text;
@@ -161,7 +162,7 @@ async fn test_stream_llm_error_in_stream() {
     ];
     let (mut runner, _event_rx, _input_tx, _ctrl_tx) = make_runner_with_mock_provider(chunks);
 
-    let msgs = runner.params.messages.clone();
+    let msgs = runner.params.store.messages().to_vec();
     let cancel = make_cancel();
     let result = runner.stream_llm_with(&msgs, &cancel).await.unwrap();
     let text = result.assistant_text;
@@ -178,7 +179,7 @@ async fn test_stream_llm_empty_stream() {
     let chunks = vec![];
     let (mut runner, _event_rx, _input_tx, _ctrl_tx) = make_runner_with_mock_provider(chunks);
 
-    let msgs = runner.params.messages.clone();
+    let msgs = runner.params.store.messages().to_vec();
     let cancel = make_cancel();
     let result = runner.stream_llm_with(&msgs, &cancel).await.unwrap();
     let text = result.assistant_text;
@@ -205,7 +206,7 @@ fn report_real_system_prompt_tokens() {
     );
     runner.params.system_prompt = real_prompt.clone();
     let params = runner
-        .prepare_chat_params_with(&runner.params.messages)
+        .prepare_chat_params_with(runner.params.store.messages())
         .unwrap();
 
     let tokens = loopal_context::estimate_tokens(&params.system_prompt);

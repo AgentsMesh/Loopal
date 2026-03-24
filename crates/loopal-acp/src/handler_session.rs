@@ -11,8 +11,8 @@ use loopal_agent::registry::AgentRegistry;
 use loopal_agent::router::MessageRouter;
 use loopal_agent::shared::AgentShared;
 use loopal_agent::task_store::TaskStore;
-use loopal_context::ContextPipeline;
 use loopal_context::system_prompt::build_system_prompt;
+use loopal_context::{ContextBudget, ContextPipeline, ContextStore};
 use loopal_kernel::Kernel;
 use loopal_runtime::{AgentLoopParams, AgentMode, SessionManager};
 
@@ -94,10 +94,12 @@ impl AcpHandler {
         let (system_prompt, context_pipeline, shared) =
             self.build_agent_context(&kernel, &session_id, &cwd, event_tx.clone());
 
+        let budget = ContextBudget::calculate(200_000, &system_prompt, 0, 16_384);
+
         let agent_params = AgentLoopParams {
             kernel: kernel.clone(),
             session,
-            messages: Vec::new(),
+            store: ContextStore::from_messages(Vec::new(), budget),
             model: model.clone(),
             compact_model: self.config.settings.compact_model.clone(),
             system_prompt,

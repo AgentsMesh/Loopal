@@ -65,7 +65,7 @@ async fn test_turn_tool_then_text_non_interactive() {
 
     let output = runner.run().await.unwrap();
     // Tool executed, then max_turns hit inside execute_turn → outer loop breaks
-    assert!(runner.params.messages.len() >= 3);
+    assert!(runner.params.store.len() >= 3);
     // Result may be empty since LLM text was empty (only tool use in the stream)
     assert_eq!(output.terminate_reason, TerminateReason::Goal);
 

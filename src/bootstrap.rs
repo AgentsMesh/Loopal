@@ -8,8 +8,8 @@ use loopal_agent::router::MessageRouter;
 use loopal_agent::shared::AgentShared;
 use loopal_agent::task_store::TaskStore;
 use loopal_config::load_config;
-use loopal_context::ContextPipeline;
 use loopal_context::system_prompt::build_system_prompt;
+use loopal_context::{ContextBudget, ContextPipeline, ContextStore};
 use loopal_kernel::Kernel;
 use loopal_memory::MemoryObserver;
 use loopal_protocol::{
@@ -163,10 +163,13 @@ pub async fn run() -> anyhow::Result<()> {
     // The pipeline remains as an extension point for future middleware.
     let context_pipeline = ContextPipeline::new();
 
+    let tool_tokens = ContextBudget::estimate_tool_tokens(&tool_defs);
+    let budget = ContextBudget::calculate(200_000, &system_prompt, tool_tokens, 16_384);
+
     let agent_params = AgentLoopParams {
         kernel,
         session,
-        messages,
+        store: ContextStore::from_messages(messages, budget),
         model,
         compact_model,
         system_prompt,

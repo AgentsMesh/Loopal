@@ -32,7 +32,7 @@ impl AgentLoopRunner {
                     {
                         error!(error = %e, "failed to persist message");
                     }
-                    self.params.messages.push(user_msg);
+                    self.params.store.push_user(user_msg);
                     return Ok(Some(WaitResult::MessageAdded));
                 }
                 Some(AgentInput::Control(ctrl)) => {
@@ -69,7 +69,7 @@ impl AgentLoopRunner {
                 {
                     error!(error = %e, "failed to persist clear marker");
                 }
-                self.params.messages.clear();
+                self.params.store.clear();
                 self.turn_count = 0;
                 self.tokens.reset();
                 self.emit(AgentEventPayload::TokenUsage {
@@ -107,7 +107,7 @@ impl AgentLoopRunner {
     }
 
     async fn handle_rewind(&mut self, turn_index: usize) -> Result<()> {
-        let boundaries = detect_turn_boundaries(&self.params.messages);
+        let boundaries = detect_turn_boundaries(self.params.store.messages());
         if turn_index >= boundaries.len() {
             error!(turn_index, total = boundaries.len(), "invalid turn index");
             return Ok(());
@@ -122,7 +122,7 @@ impl AgentLoopRunner {
             {
                 error!(error = %e, "failed to persist clear marker for rewind");
             }
-        } else if let Some(ref id) = self.params.messages[truncate_at].id {
+        } else if let Some(ref id) = self.params.store.messages()[truncate_at].id {
             if let Err(e) = self
                 .params
                 .session_manager
@@ -136,9 +136,9 @@ impl AgentLoopRunner {
                 "message at truncate point has no id, skipping marker"
             );
         }
-        self.params.messages.truncate(truncate_at);
+        self.params.store.truncate(truncate_at);
         self.turn_count = self.turn_count.min(turn_index as u32);
-        let remaining = detect_turn_boundaries(&self.params.messages).len();
+        let remaining = detect_turn_boundaries(self.params.store.messages()).len();
         self.emit(AgentEventPayload::Rewound {
             remaining_turns: remaining,
         })

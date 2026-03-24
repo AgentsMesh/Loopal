@@ -101,8 +101,8 @@ async fn test_execute_tools_completion_mixed_with_normal_tool() {
     assert_eq!(completion, Some("all done".to_string()));
 
     // Both tool results should be in messages
-    assert_eq!(runner.params.messages.len(), 1);
-    assert_eq!(runner.params.messages[0].content.len(), 2);
+    assert_eq!(runner.params.store.len(), 1);
+    assert_eq!(runner.params.store.messages()[0].content.len(), 2);
 
     let _ = std::fs::remove_file(&tmp);
 }
@@ -132,7 +132,7 @@ async fn test_execute_tools_error_result_not_detected_as_completion() {
     );
 
     // Verify tool result is error
-    let msg = &runner.params.messages[0];
+    let msg = &runner.params.store.messages()[0];
     match &msg.content[0] {
         ContentBlock::ToolResult { is_error, .. } => assert!(is_error),
         other => panic!("expected ToolResult, got {other:?}"),

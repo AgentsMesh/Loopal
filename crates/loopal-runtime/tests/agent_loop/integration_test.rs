@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use loopal_config::Settings;
-use loopal_context::ContextPipeline;
+use loopal_context::{ContextBudget, ContextPipeline, ContextStore};
 use loopal_error::TerminateReason;
 use loopal_kernel::Kernel;
 use loopal_message::Message;
@@ -17,6 +17,17 @@ use loopal_tool_api::PermissionMode;
 use tokio::sync::mpsc;
 
 use super::mock_provider::make_runner_with_mock_provider;
+
+fn make_test_budget() -> ContextBudget {
+    ContextBudget {
+        context_window: 200_000,
+        system_tokens: 0,
+        tool_tokens: 0,
+        output_reserve: 16_384,
+        safety_margin: 10_000,
+        message_budget: 173_616,
+    }
+}
 
 fn make_session(id: &str) -> Session {
     Session {
@@ -51,7 +62,7 @@ async fn test_agent_loop_immediate_channel_close() {
     let params = AgentLoopParams {
         kernel,
         session: make_session("test-loop"),
-        messages: Vec::new(),
+        store: ContextStore::new(make_test_budget()),
         model: "claude-sonnet-4-20250514".to_string(),
         compact_model: None,
         system_prompt: "test".to_string(),
@@ -114,7 +125,7 @@ async fn test_agent_loop_max_turns_reached() {
     let params = AgentLoopParams {
         kernel,
         session: make_session("test-turns"),
-        messages: vec![Message::user("hello")],
+        store: ContextStore::from_messages(vec![Message::user("hello")], make_test_budget()),
         model: "claude-sonnet-4-20250514".to_string(),
         compact_model: None,
         system_prompt: "test".to_string(),
@@ -180,7 +191,7 @@ async fn test_full_run_text_only_then_input_close() {
 
     let result = runner.run().await;
     assert!(result.is_ok());
-    assert!(runner.params.messages.len() >= 2);
+    assert!(runner.params.store.len() >= 2);
 }
 
 #[tokio::test]
@@ -224,7 +235,7 @@ async fn test_full_run_with_tool_execution() {
     let result = runner.run().await;
     assert!(result.is_ok());
     // user + assistant(tool_use) + user(tool_result) + assistant(text)
-    assert!(runner.params.messages.len() >= 3);
+    assert!(runner.params.store.len() >= 3);
 
     let _ = std::fs::remove_file(&tmp_file);
 }

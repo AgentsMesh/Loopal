@@ -4,7 +4,7 @@ use std::sync::Arc;
 use chrono::Utc;
 use futures::stream::Stream as FutStream;
 use loopal_config::Settings;
-use loopal_context::ContextPipeline;
+use loopal_context::{ContextBudget, ContextPipeline, ContextStore};
 use loopal_error::LoopalError;
 use loopal_kernel::Kernel;
 use loopal_protocol::AgentEvent;
@@ -73,6 +73,17 @@ fn test_session(id: &str) -> Session {
     }
 }
 
+fn make_test_budget() -> ContextBudget {
+    ContextBudget {
+        context_window: 200_000,
+        system_tokens: 0,
+        tool_tokens: 0,
+        output_reserve: 16_384,
+        safety_margin: 10_000,
+        message_budget: 173_616,
+    }
+}
+
 pub fn make_runner_with_mock_provider(
     chunks: Vec<Result<StreamChunk, LoopalError>>,
 ) -> (
@@ -106,7 +117,10 @@ pub fn make_runner_with_mock_provider(
     let params = AgentLoopParams {
         kernel: Arc::new(kernel),
         session: test_session("test-mock"),
-        messages: vec![loopal_message::Message::user("hello")],
+        store: ContextStore::from_messages(
+            vec![loopal_message::Message::user("hello")],
+            make_test_budget(),
+        ),
         model: "claude-sonnet-4-20250514".into(),
         system_prompt: "test".into(),
         compact_model: None,
@@ -172,7 +186,10 @@ pub fn make_multi_runner(
     let params = AgentLoopParams {
         kernel: Arc::new(kernel),
         session: test_session("test-multi"),
-        messages: vec![loopal_message::Message::user("go")],
+        store: ContextStore::from_messages(
+            vec![loopal_message::Message::user("go")],
+            make_test_budget(),
+        ),
         model: "claude-sonnet-4-20250514".into(),
         system_prompt: "t".into(),
         compact_model: None,
@@ -223,7 +240,10 @@ pub fn make_interactive_multi_runner(
     let params = AgentLoopParams {
         kernel: Arc::new(kernel),
         session: test_session("test-interactive"),
-        messages: vec![loopal_message::Message::user("go")],
+        store: ContextStore::from_messages(
+            vec![loopal_message::Message::user("go")],
+            make_test_budget(),
+        ),
         model: "claude-sonnet-4-20250514".into(),
         system_prompt: "t".into(),
         compact_model: None,

@@ -9,7 +9,7 @@ use std::sync::Arc;
 use chrono::Utc;
 use futures::stream::Stream as FutStream;
 use loopal_config::Settings;
-use loopal_context::ContextPipeline;
+use loopal_context::{ContextBudget, ContextPipeline, ContextStore};
 use loopal_error::LoopalError;
 use loopal_kernel::Kernel;
 use loopal_protocol::AgentEvent;
@@ -71,6 +71,17 @@ impl Provider for TextOnlyProvider {
     }
 }
 
+fn make_test_budget() -> ContextBudget {
+    ContextBudget {
+        context_window: 200_000,
+        system_tokens: 0,
+        tool_tokens: 0,
+        output_reserve: 16_384,
+        safety_margin: 10_000,
+        message_budget: 173_616,
+    }
+}
+
 #[tokio::test]
 async fn test_subagent_drains_pending_before_exit() {
     let (event_tx, mut event_rx) = mpsc::channel::<AgentEvent>(256);
@@ -117,7 +128,10 @@ async fn test_subagent_drains_pending_before_exit() {
     let params = AgentLoopParams {
         kernel,
         session,
-        messages: vec![loopal_message::Message::user("run task")],
+        store: ContextStore::from_messages(
+            vec![loopal_message::Message::user("run task")],
+            make_test_budget(),
+        ),
         model: "claude-sonnet-4-20250514".into(),
         compact_model: None,
         system_prompt: "test".into(),

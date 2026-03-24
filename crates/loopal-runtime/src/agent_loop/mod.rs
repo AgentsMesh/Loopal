@@ -30,10 +30,9 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use crate::frontend::traits::AgentFrontend;
-use loopal_context::ContextPipeline;
+use loopal_context::{ContextPipeline, ContextStore};
 use loopal_error::{AgentOutput, Result};
 use loopal_kernel::Kernel;
-use loopal_message::Message;
 use loopal_protocol::InterruptSignal;
 use loopal_provider_api::ThinkingConfig;
 use loopal_storage::Session;
@@ -53,7 +52,7 @@ pub(crate) const MAX_AUTO_CONTINUATIONS: u32 = 3;
 pub struct AgentLoopParams {
     pub kernel: Arc<Kernel>,
     pub session: Session,
-    pub messages: Vec<Message>,
+    pub store: ContextStore,
     pub model: String,
     /// Model for compaction/summarization. None = use main model.
     pub compact_model: Option<String>,

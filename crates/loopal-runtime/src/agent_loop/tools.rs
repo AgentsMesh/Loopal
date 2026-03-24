@@ -140,7 +140,7 @@ impl AgentLoopRunner {
         {
             error!(error = %e, "failed to persist message");
         }
-        self.params.messages.push(msg);
+        self.params.store.push_tool_results(msg);
         Ok(completion)
     }
 
@@ -178,7 +178,7 @@ impl AgentLoopRunner {
         {
             error!(error = %e, "failed to persist message");
         }
-        self.params.messages.push(msg);
+        self.params.store.push_tool_results(msg);
         Ok(None)
     }
 
@@ -198,7 +198,7 @@ impl AgentLoopRunner {
             {
                 error!(error = %e, "failed to persist injected message");
             }
-            self.params.messages.push(user_msg);
+            self.params.store.push_user(user_msg);
         }
     }
 }

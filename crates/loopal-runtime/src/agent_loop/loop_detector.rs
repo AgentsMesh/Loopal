@@ -68,7 +68,12 @@ impl TurnObserver for LoopDetector {
 fn tool_signature(name: &str, input: &serde_json::Value) -> String {
     let json = input.to_string();
     let truncated = if json.len() > SIGNATURE_INPUT_LIMIT {
-        &json[..SIGNATURE_INPUT_LIMIT]
+        // Floor to a char boundary — byte slicing a multi-byte UTF-8 string panics.
+        let mut end = SIGNATURE_INPUT_LIMIT;
+        while end > 0 && !json.is_char_boundary(end) {
+            end -= 1;
+        }
+        &json[..end]
     } else {
         &json
     };

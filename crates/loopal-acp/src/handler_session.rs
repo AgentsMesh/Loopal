@@ -158,7 +158,7 @@ impl AcpHandler {
         let system_prompt = build_system_prompt(
             &self.config.instructions,
             &tool_defs,
-            "",
+            "act",
             &cwd.to_string_lossy(),
             &skills_summary,
             &self.config.memory,

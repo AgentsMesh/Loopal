@@ -127,4 +127,12 @@ impl AgentFrontend for UnifiedFrontend {
     async fn ask_user(&self, questions: Vec<loopal_protocol::Question>) -> Vec<String> {
         self.question_handler.ask(questions).await
     }
+
+    fn try_emit(&self, payload: AgentEventPayload) -> bool {
+        let event = AgentEvent {
+            agent_name: self.agent_name.clone(),
+            payload,
+        };
+        self.event_tx.try_send(event).is_ok()
+    }
 }

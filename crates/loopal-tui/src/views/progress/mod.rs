@@ -1,7 +1,8 @@
 /// Content area: main agent output region (borderless).
 mod line_cache;
 mod message_lines;
-mod tool_summary;
+mod tool_display;
+mod welcome;
 
 use ratatui::prelude::*;
 use ratatui::widgets::Paragraph;
@@ -10,7 +11,6 @@ use loopal_session::state::SessionState;
 
 pub use line_cache::LineCache;
 pub use message_lines::{message_to_lines, streaming_to_lines};
-pub use tool_summary::summarize_result;
 
 /// Render the content area — no border, no title, content fills the area.
 ///
@@ -40,9 +40,7 @@ pub fn render_progress(
         let label = format!("Thinking... ({token_est} tokens)");
         vec![Line::from(Span::styled(
             label,
-            Style::default()
-                .fg(Color::Magenta)
-                .add_modifier(Modifier::DIM),
+            Style::default().fg(Color::Rgb(180, 130, 210)),
         ))]
     } else {
         vec![]

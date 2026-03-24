@@ -93,7 +93,15 @@ impl Tool for BashTool {
         }
 
         let timeout_ms = input["timeout"].as_u64().unwrap_or(DEFAULT_TIMEOUT_MS);
-        match ctx.backend.exec(command, timeout_ms).await {
+        // Use streaming exec if output_tail is set (enables real-time progress)
+        let exec_result = if let Some(ref tail) = ctx.output_tail {
+            ctx.backend
+                .exec_streaming(command, timeout_ms, tail.clone())
+                .await
+        } else {
+            ctx.backend.exec(command, timeout_ms).await
+        };
+        match exec_result {
             Ok(output) => Ok(format_exec_result(output)),
             Err(ToolIoError::Timeout(ms)) => {
                 Err(LoopalError::Tool(loopal_error::ToolError::Timeout(ms)))

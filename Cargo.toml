@@ -46,6 +46,8 @@ members = [
     "crates/loopal-backend",
     "crates/loopal-git",
     "crates/loopal-memory",
+    "crates/loopal-prompt",
+    "crates/loopal-prompt-system",
 ]
 
 [workspace.package]
@@ -152,6 +154,12 @@ loopal-acp = { path = "crates/loopal-acp" }
 loopal-backend = { path = "crates/loopal-backend" }
 loopal-git = { path = "crates/loopal-git" }
 loopal-memory = { path = "crates/loopal-memory" }
+loopal-prompt = { path = "crates/loopal-prompt" }
+loopal-prompt-system = { path = "crates/loopal-prompt-system" }
+
+# Prompt templates
+minijinja = { version = "2", features = ["loader"] }
+include_dir = "0.7"
 
 [[bin]]
 name = "loopal"

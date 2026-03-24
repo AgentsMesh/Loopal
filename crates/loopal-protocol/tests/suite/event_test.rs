@@ -39,6 +39,7 @@ fn test_event_tool_result_serde_roundtrip() {
         name: "Read".into(),
         result: "file contents".into(),
         is_error: false,
+        duration_ms: None,
     });
     let json = serde_json::to_string(&event).unwrap();
     let deserialized: AgentEvent = serde_json::from_str(&json).unwrap();
@@ -47,6 +48,7 @@ fn test_event_tool_result_serde_roundtrip() {
         name,
         result,
         is_error,
+        ..
     } = deserialized.payload
     {
         assert_eq!(id, "tc_1");
@@ -65,6 +67,7 @@ fn test_event_tool_result_error_serde_roundtrip() {
         name: "Bash".into(),
         result: "command not found".into(),
         is_error: true,
+        duration_ms: None,
     });
     let json = serde_json::to_string(&event).unwrap();
     let deserialized: AgentEvent = serde_json::from_str(&json).unwrap();

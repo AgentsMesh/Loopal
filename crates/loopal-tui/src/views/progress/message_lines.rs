@@ -10,7 +10,8 @@ use unicode_width::UnicodeWidthStr;
 use crate::markdown;
 use loopal_session::types::DisplayMessage;
 
-use super::tool_summary::tool_call_summary;
+use super::tool_display::render_tool_calls;
+use super::welcome::render_welcome;
 
 /// Convert a single DisplayMessage into pre-wrapped styled Lines.
 pub fn message_to_lines(msg: &DisplayMessage, width: u16) -> Vec<Line<'static>> {
@@ -32,20 +33,9 @@ pub fn message_to_lines(msg: &DisplayMessage, width: u16) -> Vec<Line<'static>> 
         ),
     }
 
-    // Tool calls — single-line summaries
-    for tc in &msg.tool_calls {
-        let (summary, color) = tool_call_summary(tc);
-        let style = match color {
-            "green" => Style::default().fg(Color::Green),
-            "red" => Style::default().fg(Color::Red),
-            _ => Style::default().fg(Color::Yellow),
-        };
-        let w = (width as usize).max(1);
-        lines.extend(
-            textwrap::wrap(&summary, w)
-                .into_iter()
-                .map(|cow| Line::from(Span::styled(cow.into_owned(), style))),
-        );
+    // Tool calls — group-aware rendering
+    if !msg.tool_calls.is_empty() {
+        lines.extend(render_tool_calls(&msg.tool_calls, width));
     }
 
     lines.push(Line::from(""));
@@ -114,92 +104,8 @@ fn render_thinking(lines: &mut Vec<Line<'static>>, msg: &DisplayMessage) {
     };
     lines.push(Line::from(Span::styled(
         label,
-        Style::default()
-            .fg(Color::Magenta)
-            .add_modifier(Modifier::DIM),
+        Style::default().fg(Color::Rgb(180, 130, 210)),
     )));
-}
-
-/// Welcome banner: ASCII art logo + slogan + model/path info.
-///
-/// Content format: "model\npath" (two lines separated by newline).
-fn render_welcome(lines: &mut Vec<Line<'static>>, msg: &DisplayMessage) {
-    let mut parts = msg.content.splitn(2, '\n');
-    let model = parts.next().unwrap_or("");
-    let path = parts.next().unwrap_or("");
-
-    // ASCII art "LOOPAL" — gradient from green to cyan
-    // Each row gets a slightly different color to create a vertical gradient effect
-    let logo_lines: &[&str] = &[
-        r"  _        ___    ___   ____     _     _     ",
-        r" | |      / _ \  / _ \ |  _ \   / \   | |    ",
-        r" | |     | | | || | | || |_) | / _ \  | |    ",
-        r" | |___  | |_| || |_| ||  __/ / ___ \ | |___ ",
-        r" |_____|  \___/  \___/ |_|   /_/   \_\|_____|",
-    ];
-
-    let gradient: &[Color] = &[
-        Color::Rgb(80, 200, 120), // green
-        Color::Rgb(70, 200, 150), // green-teal
-        Color::Rgb(60, 195, 180), // teal
-        Color::Rgb(50, 190, 210), // teal-cyan
-        Color::Rgb(40, 180, 230), // cyan
-    ];
-
-    lines.push(Line::from(""));
-    for (i, logo_line) in logo_lines.iter().enumerate() {
-        let color = gradient[i % gradient.len()];
-        lines.push(Line::from(Span::styled(
-            logo_line.to_string(),
-            Style::default().fg(color).bold(),
-        )));
-    }
-
-    // Slogan line
-    lines.push(Line::from(""));
-    lines.push(Line::from(vec![
-        Span::styled(
-            "  Rooted in code, Growing with ",
-            Style::default().fg(Color::Rgb(140, 150, 170)),
-        ),
-        Span::styled(
-            "loopal",
-            Style::default().fg(Color::Rgb(60, 195, 180)).bold(),
-        ),
-        Span::styled(".", Style::default().fg(Color::Rgb(140, 150, 170))),
-    ]));
-    lines.push(Line::from(Span::styled(
-        "  Part of AgentsMesh.ai",
-        Style::default().fg(Color::Rgb(100, 110, 130)),
-    )));
-
-    // Info section: model + working directory
-    lines.push(Line::from(""));
-    if !model.is_empty() {
-        lines.push(Line::from(vec![
-            Span::styled(
-                "  model:     ",
-                Style::default()
-                    .fg(Color::Rgb(100, 110, 130))
-                    .add_modifier(Modifier::DIM),
-            ),
-            Span::styled(model.to_string(), Style::default().fg(Color::Cyan)),
-        ]));
-    }
-    if !path.is_empty() {
-        lines.push(Line::from(vec![
-            Span::styled(
-                "  directory: ",
-                Style::default()
-                    .fg(Color::Rgb(100, 110, 130))
-                    .add_modifier(Modifier::DIM),
-            ),
-            Span::styled(
-                path.to_string(),
-                Style::default().fg(Color::Rgb(160, 170, 190)),
-            ),
-        ]));
-    }
 }
 
 /// Generic prefixed message (error, system, unknown roles).

@@ -51,6 +51,7 @@ async fn make_shared_and_ctx() -> (Arc<AgentShared>, ToolContext, mpsc::Receiver
         shared: Some(shared_any),
         pending_cwd_switch: Default::default(),
         memory_channel: None,
+        output_tail: None,
     };
 
     (shared, ctx, target_rx)

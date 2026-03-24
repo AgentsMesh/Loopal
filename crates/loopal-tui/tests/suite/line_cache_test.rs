@@ -1,4 +1,4 @@
-use loopal_session::types::{DisplayMessage, DisplayToolCall};
+use loopal_session::types::{DisplayMessage, DisplayToolCall, ToolCallStatus};
 use loopal_tui::views::progress::LineCache;
 
 const W: u16 = 80;
@@ -57,16 +57,22 @@ fn test_tool_call_mutation_detected() {
         content: String::new(),
         tool_calls: vec![DisplayToolCall {
             name: "bash".to_string(),
-            status: "pending".to_string(),
+            id: String::new(),
+            status: ToolCallStatus::Pending,
             summary: "bash(ls)".to_string(),
             result: None,
+            tool_input: None,
+            batch_id: None,
+            started_at: None,
+            duration_ms: None,
+            progress_tail: None,
         }],
         image_count: 0,
     }];
     let fp1 = cache.update(&msgs, W);
 
-    // Mutate: status changes → icon changes from ⋯ to ✓
-    msgs[0].tool_calls[0].status = "success".to_string();
+    // Mutate: status changes → icon color changes (yellow→green ●)
+    msgs[0].tool_calls[0].status = ToolCallStatus::Success;
     msgs[0].tool_calls[0].result = Some("done".to_string());
     let fp2 = cache.update(&msgs, W);
 
@@ -76,11 +82,8 @@ fn test_tool_call_mutation_detected() {
         .iter()
         .flat_map(|l| l.spans.iter().map(|s| s.content.to_string()))
         .collect();
-    // Single-line summary should contain the status icon change
-    assert!(
-        text.contains("✓"),
-        "should show success icon after mutation"
-    );
+    // Single-line summary should contain the status icon
+    assert!(text.contains("●"), "should show ● icon after mutation");
     // Fingerprint-triggered rebuild means line counts may differ
     assert!(fp1 > 0 && fp2 > 0, "both updates should produce lines");
 }
@@ -116,16 +119,22 @@ fn test_tool_result_arrival_invalidates_cache() {
         content: String::new(),
         tool_calls: vec![DisplayToolCall {
             name: "Read".to_string(),
-            status: "pending".to_string(),
+            id: String::new(),
+            status: ToolCallStatus::Pending,
             summary: "Read(/tmp/foo.rs)".to_string(),
             result: None,
+            tool_input: None,
+            batch_id: None,
+            started_at: None,
+            duration_ms: None,
+            progress_tail: None,
         }],
         image_count: 0,
     }];
     let n1 = cache.update(&msgs, W);
 
     // Simulate ToolResult arrival — result changes from None to Some
-    msgs[0].tool_calls[0].status = "success".to_string();
+    msgs[0].tool_calls[0].status = ToolCallStatus::Success;
     msgs[0].tool_calls[0].result = Some("file content here".to_string());
     let n2 = cache.update(&msgs, W);
 
@@ -136,9 +145,6 @@ fn test_tool_result_arrival_invalidates_cache() {
         .iter()
         .flat_map(|l| l.spans.iter().map(|s| s.content.to_string()))
         .collect();
-    assert!(
-        text.contains("✓"),
-        "result arrival should update status icon"
-    );
+    assert!(text.contains("●"), "result arrival should update to ● icon");
     assert!(n1 > 0 && n2 > 0, "both states should produce lines");
 }

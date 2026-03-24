@@ -61,6 +61,7 @@ fn test_tool_result_keeps_running() {
                 name: "Read".into(),
                 result: "ok".into(),
                 is_error: false,
+                duration_ms: None,
             },
         ),
     );

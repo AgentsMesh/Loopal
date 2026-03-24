@@ -53,7 +53,23 @@ pub enum AgentEventPayload {
         name: String,
         result: String,
         is_error: bool,
+        /// Wall-clock execution time in milliseconds (filled by runtime).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        duration_ms: Option<u64>,
     },
+
+    /// Periodic progress update for long-running tools (e.g. Bash).
+    ToolProgress {
+        id: String,
+        name: String,
+        /// Latest output tail or status message.
+        output_tail: String,
+        /// Elapsed time in milliseconds since tool started.
+        elapsed_ms: u64,
+    },
+
+    /// Marks the start of a parallel tool batch (3+ tools executing concurrently).
+    ToolBatchStart { tool_ids: Vec<String> },
 
     /// Tool requires user permission
     ToolPermissionRequest {

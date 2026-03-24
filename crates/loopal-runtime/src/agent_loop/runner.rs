@@ -34,6 +34,7 @@ impl AgentLoopRunner {
             shared: params.shared.clone(),
             pending_cwd_switch: Default::default(),
             memory_channel: params.memory_channel.clone(),
+            output_tail: None,
         };
         let model_config = ModelConfig::from_model(&params.model, params.thinking_config.clone());
         let interrupt = params.interrupt.clone();

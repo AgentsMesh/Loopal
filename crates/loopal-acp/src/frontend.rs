@@ -117,6 +117,14 @@ impl AgentFrontend for AcpFrontend {
     async fn ask_user(&self, _questions: Vec<Question>) -> Vec<String> {
         vec!["(not supported in ACP mode)".into()]
     }
+
+    fn try_emit(&self, payload: AgentEventPayload) -> bool {
+        let event = AgentEvent {
+            agent_name: self.agent_name.clone(),
+            payload,
+        };
+        self.event_tx.try_send(event).is_ok()
+    }
 }
 
 /// Cloneable event emitter for use inside `tokio::spawn` blocks.

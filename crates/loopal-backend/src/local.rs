@@ -13,7 +13,7 @@ use loopal_tool_api::backend_types::{
 };
 
 use crate::limits::ResourceLimits;
-use crate::{fs, net, path, search, shell};
+use crate::{fs, net, path, search, shell, shell_stream};
 
 /// Production backend: local disk I/O with path checking, size limits,
 /// atomic writes, OS-level sandbox wrapping, and resource budgets.
@@ -172,6 +172,23 @@ impl Backend for LocalBackend {
             command,
             timeout_ms,
             &self.limits,
+        )
+        .await
+    }
+
+    async fn exec_streaming(
+        &self,
+        command: &str,
+        timeout_ms: u64,
+        tail: Arc<loopal_tool_api::OutputTail>,
+    ) -> Result<ExecResult, ToolIoError> {
+        shell_stream::exec_command_streaming(
+            &self.cwd,
+            self.policy.as_ref(),
+            command,
+            timeout_ms,
+            &self.limits,
+            tail,
         )
         .await
     }

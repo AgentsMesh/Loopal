@@ -145,7 +145,7 @@ pub async fn exec_background(
 
 type EnvMap = std::collections::HashMap<String, String>;
 
-fn build_command(
+pub(crate) fn build_command(
     cwd: &Path,
     policy: Option<&ResolvedPolicy>,
     command: &str,

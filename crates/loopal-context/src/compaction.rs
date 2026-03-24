@@ -42,10 +42,7 @@ pub fn sanitize_tool_pairs(messages: &mut Vec<Message>) {
         .collect();
 
     // Pass 2: remove orphaned ToolResult blocks
-    for msg in messages
-        .iter_mut()
-        .filter(|m| m.role == MessageRole::User)
-    {
+    for msg in messages.iter_mut().filter(|m| m.role == MessageRole::User) {
         msg.content.retain(|b| match b {
             ContentBlock::ToolResult { tool_use_id, .. } => tool_use_ids.contains(tool_use_id),
             _ => true,

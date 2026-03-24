@@ -5,9 +5,9 @@ use loopal_message::{ContentBlock, ImageSource, Message, MessageRole};
 use loopal_protocol::{AgentEventPayload, ControlCommand, Envelope, MessageSource};
 use tracing::{error, info};
 
+use super::WaitResult;
 use super::rewind::detect_turn_boundaries;
 use super::runner::AgentLoopRunner;
-use super::WaitResult;
 
 impl AgentLoopRunner {
     /// Wait for user input via the frontend. Returns None if disconnected.

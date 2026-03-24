@@ -86,9 +86,11 @@ fn compact_then_sanitize_fixes_broken_pairs() {
             if let ContentBlock::ToolResult { tool_use_id, .. } = block {
                 // Verify corresponding tool_use exists
                 let has_use = msgs.iter().any(|m| {
-                    m.content.iter().any(|b| matches!(
-                        b, ContentBlock::ToolUse { id, .. } if id == tool_use_id
-                    ))
+                    m.content.iter().any(|b| {
+                        matches!(
+                            b, ContentBlock::ToolUse { id, .. } if id == tool_use_id
+                        )
+                    })
                 });
                 assert!(has_use, "orphaned tool_result: {tool_use_id}");
             }

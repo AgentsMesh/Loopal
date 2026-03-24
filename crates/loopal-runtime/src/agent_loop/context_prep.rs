@@ -6,8 +6,8 @@
 
 use loopal_context::budget::ContextBudget;
 use loopal_context::compaction::{
-    compact_messages, find_largest_result_block, strip_old_images,
-    strip_old_server_tool_content, strip_old_thinking, truncate_block_content,
+    compact_messages, find_largest_result_block, strip_old_images, strip_old_server_tool_content,
+    strip_old_thinking, truncate_block_content,
 };
 use loopal_context::token_counter::{estimate_message_tokens, estimate_messages_tokens};
 use loopal_message::Message;
@@ -88,17 +88,29 @@ impl AgentLoopRunner {
         for iteration in 0..MAX_ITERATIONS {
             let msg_tokens = estimate_messages_tokens(messages);
             if !budget.needs_emergency(msg_tokens) {
-                debug!(msg_tokens, budget = budget.message_budget, "context prep: within budget");
+                debug!(
+                    msg_tokens,
+                    budget = budget.message_budget,
+                    "context prep: within budget"
+                );
                 return;
             }
 
             if let Some((mi, bi, size)) = find_largest_result_block(messages) {
                 if size < MIN_TRUNCATABLE_BYTES {
-                    info!(iteration, "context prep: no large blocks, emergency compact");
+                    info!(
+                        iteration,
+                        "context prep: no large blocks, emergency compact"
+                    );
                     compact_messages(messages, EMERGENCY_KEEP);
                     return;
                 }
-                info!(iteration, msg_idx = mi, block_bytes = size, "context prep: truncating");
+                info!(
+                    iteration,
+                    msg_idx = mi,
+                    block_bytes = size,
+                    "context prep: truncating"
+                );
                 truncate_block_content(
                     &mut messages[mi].content[bi],
                     SAFETY_MAX_LINES,

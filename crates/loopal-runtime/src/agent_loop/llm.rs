@@ -116,13 +116,11 @@ impl AgentLoopRunner {
                     content: content.clone(),
                 })
                 .await?;
-                result
-                    .server_blocks
-                    .push(ContentBlock::ServerToolResult {
-                        block_type,
-                        tool_use_id,
-                        content,
-                    });
+                result.server_blocks.push(ContentBlock::ServerToolResult {
+                    block_type,
+                    tool_use_id,
+                    content,
+                });
             }
             Ok(StreamChunk::Usage {
                 input_tokens,

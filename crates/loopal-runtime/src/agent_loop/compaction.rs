@@ -63,9 +63,9 @@ impl AgentLoopRunner {
             warn!("smart compact failed, falling back to emergency truncation");
         }
 
-        // Emergency: blind truncation
         compact_messages(&mut self.params.messages, EMERGENCY_KEEP_LAST);
-        self.post_compact(before, tokens_before, "emergency").await?;
+        self.post_compact(before, tokens_before, "emergency")
+            .await?;
         Ok(())
     }
 
@@ -131,7 +131,11 @@ impl AgentLoopRunner {
         })
         .await?;
 
-        info!(tokens_before, messages = before, "manual compaction triggered");
+        info!(
+            tokens_before,
+            messages = before,
+            "manual compaction triggered"
+        );
 
         let tool_defs = self.params.kernel.tool_definitions();
         let tool_tokens = ContextBudget::estimate_tool_tokens(&tool_defs);
@@ -143,11 +147,13 @@ impl AgentLoopRunner {
         );
 
         if self.try_smart_compact(&budget).await {
-            self.post_compact(before, tokens_before, "manual-smart").await?;
+            self.post_compact(before, tokens_before, "manual-smart")
+                .await?;
         } else {
             warn!("smart compact failed for manual /compact, falling back to truncation");
             compact_messages(&mut self.params.messages, SMART_COMPACT_KEEP_LAST);
-            self.post_compact(before, tokens_before, "manual-emergency").await?;
+            self.post_compact(before, tokens_before, "manual-emergency")
+                .await?;
         }
         Ok(())
     }
@@ -168,10 +174,11 @@ impl AgentLoopRunner {
         // Write marker to disk for session reload consistency.
         // `after` is the new total message count (including any system messages);
         // on reload, replay keeps the last `after` entries from the JSONL log.
-        if let Err(e) = self.params.session_manager.compact_history(
-            &self.params.session.id,
-            after,
-        ) {
+        if let Err(e) = self
+            .params
+            .session_manager
+            .compact_history(&self.params.session.id, after)
+        {
             warn!(error = %e, "failed to write compact marker");
         }
 
@@ -186,12 +193,7 @@ impl AgentLoopRunner {
 
         info!(
             before,
-            after,
-            removed,
-            tokens_before,
-            tokens_after,
-            strategy,
-            "compaction complete"
+            after, removed, tokens_before, tokens_after, strategy, "compaction complete"
         );
         Ok(())
     }

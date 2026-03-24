@@ -63,9 +63,7 @@ pub async fn summarize_old_messages(
     let summary_msg = Message {
         id: None,
         role: MessageRole::User,
-        content: vec![ContentBlock::Text {
-            text: summary_body,
-        }],
+        content: vec![ContentBlock::Text { text: summary_body }],
     };
     // Assistant acknowledgment prevents normalize_messages from merging the summary
     // with the next user message (both would be User role).

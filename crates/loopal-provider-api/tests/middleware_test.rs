@@ -9,7 +9,6 @@ fn test_middleware_context_construction_without_summarization_provider() {
         model: "claude-sonnet-4-20250514".to_string(),
         total_input_tokens: 100,
         total_output_tokens: 50,
-        total_cost: 0.001,
         max_context_tokens: 200_000,
         compact_model: None,
         summarization_provider: None,
@@ -20,7 +19,6 @@ fn test_middleware_context_construction_without_summarization_provider() {
     assert_eq!(ctx.model, "claude-sonnet-4-20250514");
     assert_eq!(ctx.total_input_tokens, 100);
     assert_eq!(ctx.total_output_tokens, 50);
-    assert!((ctx.total_cost - 0.001).abs() < f64::EPSILON);
     assert_eq!(ctx.max_context_tokens, 200_000);
     assert!(ctx.summarization_provider.is_none());
 }
@@ -37,7 +35,6 @@ fn test_middleware_context_with_multiple_messages() {
         model: "gpt-4".to_string(),
         total_input_tokens: 0,
         total_output_tokens: 0,
-        total_cost: 0.0,
         max_context_tokens: 128_000,
         compact_model: None,
         summarization_provider: None,
@@ -55,7 +52,6 @@ fn test_middleware_context_empty_messages() {
         model: "model".to_string(),
         total_input_tokens: 0,
         total_output_tokens: 0,
-        total_cost: 0.0,
         max_context_tokens: 100_000,
         compact_model: None,
         summarization_provider: None,

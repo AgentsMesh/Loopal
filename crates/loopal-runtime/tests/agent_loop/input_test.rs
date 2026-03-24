@@ -1,4 +1,3 @@
-use loopal_message::Message;
 use loopal_protocol::AgentEventPayload;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::{Envelope, MessageSource};
@@ -125,16 +124,6 @@ async fn test_wait_for_input_channel_closed() {
 
     let result = runner.wait_for_input().await.unwrap();
     assert!(result.is_none());
-}
-
-#[tokio::test]
-async fn test_execute_middleware_empty_pipeline() {
-    let (mut runner, _event_rx, _mbox_tx, _ctrl_tx, _perm_tx) = make_runner_with_channels();
-    runner.params.messages.push(Message::user("test"));
-
-    let should_continue = runner.execute_middleware().await.unwrap();
-    assert!(should_continue);
-    assert_eq!(runner.params.messages.len(), 1);
 }
 
 #[tokio::test]

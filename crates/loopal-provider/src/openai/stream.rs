@@ -157,6 +157,7 @@ fn parse_output_item_done(item: &Value, chunks: &mut Vec<Result<StreamChunk, Loo
             // OpenAI server-side search results are implicit (not streamed separately).
             // Emit a synthetic result to close the TUI pending state.
             chunks.push(Ok(StreamChunk::ServerToolResult {
+                block_type: "web_search_tool_result".to_string(),
                 tool_use_id: id,
                 content: json!({"status": "completed"}),
             }));

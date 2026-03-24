@@ -6,9 +6,6 @@ pub const WEB_SEARCH_TOOL_NAME: &str = "WebSearch";
 /// Anthropic SSE block type for server-side tool invocations.
 pub const SERVER_TOOL_USE_TYPE: &str = "server_tool_use";
 
-/// Anthropic SSE block type for web search results.
-pub const WEB_SEARCH_RESULT_TYPE: &str = "web_search_tool_result";
-
 /// Build the server-side web search tool declaration for the Anthropic API.
 ///
 /// Claude 4.x models use `web_search_20260209` (with dynamic filtering),

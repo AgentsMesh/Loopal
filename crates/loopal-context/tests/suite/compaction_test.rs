@@ -1,4 +1,4 @@
-use loopal_context::{compact_messages, find_largest_tool_result, truncate_block_content};
+use loopal_context::{compact_messages, find_largest_result_block, truncate_block_content};
 use loopal_message::{ContentBlock, Message, MessageRole};
 
 #[test]
@@ -105,7 +105,7 @@ fn test_find_largest_tool_result_basic() {
         tool_result_message("b", &"x".repeat(5000)),
         tool_result_message("c", "medium text here"),
     ];
-    let (mi, bi, size) = find_largest_tool_result(&msgs).unwrap();
+    let (mi, bi, size) = find_largest_result_block(&msgs).unwrap();
     assert_eq!(mi, 1);
     assert_eq!(bi, 0);
     assert_eq!(size, 5000);
@@ -114,12 +114,12 @@ fn test_find_largest_tool_result_basic() {
 #[test]
 fn test_find_largest_tool_result_empty() {
     let msgs = vec![Message::user("hello")];
-    assert!(find_largest_tool_result(&msgs).is_none());
+    assert!(find_largest_result_block(&msgs).is_none());
 }
 
 #[test]
 fn test_find_largest_tool_result_no_messages() {
-    assert!(find_largest_tool_result(&[]).is_none());
+    assert!(find_largest_result_block(&[]).is_none());
 }
 
 // =============================================================================
@@ -150,7 +150,7 @@ fn test_truncate_block_content_by_bytes() {
     truncate_block_content(&mut block, 1000, 500);
     if let ContentBlock::ToolResult { content, .. } = &block {
         assert!(content.len() < 600);
-        assert!(content.contains("[Truncated by context guard"));
+        assert!(content.contains("[Truncated:"));
     }
 }
 
@@ -167,7 +167,7 @@ fn test_truncate_block_content_by_lines() {
     };
     truncate_block_content(&mut block, 10, 100_000);
     if let ContentBlock::ToolResult { content, .. } = &block {
-        assert!(content.contains("[Truncated by context guard"));
+        assert!(content.contains("[Truncated:"));
         // Should have roughly 10 content lines + 2 truncation lines
         assert!(content.lines().count() <= 14);
     }

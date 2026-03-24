@@ -6,7 +6,6 @@ use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, info, info_span};
 
 use loopal_context::ContextPipeline;
-use loopal_context::middleware::{ContextGuard, SmartCompact};
 use loopal_message::Message;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::Envelope;
@@ -110,9 +109,7 @@ pub async fn spawn_agent(
     };
 
     let max_turns = params.agent_config.max_turns;
-    let mut pipeline = ContextPipeline::new();
-    pipeline.add(Box::new(ContextGuard));
-    pipeline.add(Box::new(SmartCompact::new(10)));
+    let pipeline = ContextPipeline::new();
 
     // Homogeneous: child gets same shared refs with depth+1
     let child_shared = Arc::new(AgentShared {

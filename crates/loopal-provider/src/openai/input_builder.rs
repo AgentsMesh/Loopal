@@ -127,7 +127,7 @@ fn build_assistant_items(blocks: &[ContentBlock], input: &mut Vec<Value>) {
                 }));
             }
             ContentBlock::Thinking { .. }
-            | ContentBlock::WebSearchToolResult { .. }
+            | ContentBlock::ServerToolResult { .. }
             | ContentBlock::Image { .. }
             | ContentBlock::ToolResult { .. } => {}
         }

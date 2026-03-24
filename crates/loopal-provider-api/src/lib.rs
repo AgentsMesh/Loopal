@@ -105,8 +105,10 @@ pub enum StreamChunk {
         name: String,
         input: serde_json::Value,
     },
-    /// Server-side tool result (e.g. web search results from Anthropic).
+    /// Server-side tool result. `block_type` is the original API type string,
+    /// e.g. "web_search_tool_result", "code_execution_tool_result".
     ServerToolResult {
+        block_type: String,
         tool_use_id: String,
         content: serde_json::Value,
     },
@@ -136,7 +138,6 @@ pub struct MiddlewareContext {
     pub model: String,
     pub total_input_tokens: u32,
     pub total_output_tokens: u32,
-    pub total_cost: f64,
     pub max_context_tokens: u32,
     /// Model for compaction/summarization. If None, uses `model`.
     pub compact_model: Option<String>,

@@ -26,11 +26,10 @@ impl AgentLoopRunner {
                 return Ok(TurnOutput { output: last_text });
             }
 
-            let mut working = self.params.messages.clone();
-            if !self.execute_middleware_on(&mut working).await? {
-                return Ok(TurnOutput { output: last_text });
-            }
-            self.preflight_check_on(&mut working);
+            // Persistent compaction (modifies params.messages if over budget)
+            self.check_and_compact().await?;
+            // Ephemeral context prep (clone + strip + safety net)
+            let working = self.prepare_llm_context();
             let result = self.stream_llm_with(&working, &turn_ctx.cancel).await?;
 
             // Determine tool list for recording. MaxTokens+tools = truncated args.

@@ -115,7 +115,10 @@ impl ContextStore {
         self.messages = new_messages;
         sanitize_tool_pairs(&mut self.messages);
 
-        if self.budget.needs_emergency(estimate_messages_tokens(&self.messages)) {
+        if self
+            .budget
+            .needs_emergency(estimate_messages_tokens(&self.messages))
+        {
             self.messages = snapshot;
             return false;
         }

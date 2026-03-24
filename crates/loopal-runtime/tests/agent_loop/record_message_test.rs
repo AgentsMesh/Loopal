@@ -103,5 +103,8 @@ async fn test_record_assistant_message_saves_to_session() {
     let (mut runner, _rx) = make_runner();
     runner.record_assistant_message("test message", &[], "", None, vec![]);
     assert_eq!(runner.params.store.len(), 1);
-    assert_eq!(runner.params.store.messages()[0].text_content(), "test message");
+    assert_eq!(
+        runner.params.store.messages()[0].text_content(),
+        "test message"
+    );
 }

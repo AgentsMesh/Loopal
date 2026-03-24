@@ -41,7 +41,10 @@ fn cap_tool_results_truncates_oversized() {
 
     if let ContentBlock::ToolResult { content, .. } = &msg.content[0] {
         assert!(content.len() < 100_000, "should be truncated");
-        assert!(content.contains("Truncated"), "should have truncation notice");
+        assert!(
+            content.contains("Truncated"),
+            "should have truncation notice"
+        );
     } else {
         panic!("expected ToolResult");
     }
@@ -76,7 +79,11 @@ fn cap_tool_results_skips_errors() {
     };
     cap_tool_results(&mut msg, 1_000);
     if let ContentBlock::ToolResult { content, .. } = &msg.content[0] {
-        assert_eq!(content.len(), big_content.len(), "errors should not be truncated");
+        assert_eq!(
+            content.len(),
+            big_content.len(),
+            "errors should not be truncated"
+        );
     }
 }
 
@@ -89,7 +96,9 @@ fn condense_old_server_blocks_strips_non_last() {
             content: vec![
                 server_tool_use("web_search"),
                 server_tool_result("web_search_tool_result"),
-                ContentBlock::Text { text: "Found results".into() },
+                ContentBlock::Text {
+                    text: "Found results".into(),
+                },
             ],
         },
         Message::user("thanks"),
@@ -115,7 +124,9 @@ fn condense_preserves_last_assistant_server_blocks() {
         content: vec![
             server_tool_use("web_search"),
             server_tool_result("web_search_tool_result"),
-            ContentBlock::Text { text: "Results".into() },
+            ContentBlock::Text {
+                text: "Results".into(),
+            },
         ],
     }];
 

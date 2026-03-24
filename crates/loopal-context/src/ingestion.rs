@@ -118,11 +118,7 @@ pub fn condense_old_server_blocks(messages: &mut [Message]) {
 /// Only operates on `ToolResult`. Returns immediately for any other variant,
 /// including `ServerToolResult` — this is the type-safety guarantee that prevents
 /// JSON corruption.
-pub fn safe_truncate_tool_result(
-    block: &mut ContentBlock,
-    max_lines: usize,
-    max_bytes: usize,
-) {
+pub fn safe_truncate_tool_result(block: &mut ContentBlock, max_lines: usize, max_bytes: usize) {
     let content = match block {
         ContentBlock::ToolResult {
             content, is_error, ..

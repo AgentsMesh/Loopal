@@ -11,8 +11,8 @@ use loopal_agent::registry::AgentRegistry;
 use loopal_agent::router::MessageRouter;
 use loopal_agent::shared::AgentShared;
 use loopal_agent::task_store::TaskStore;
-use loopal_context::{ContextBudget, ContextPipeline, ContextStore};
 use loopal_context::system_prompt::build_system_prompt;
+use loopal_context::{ContextBudget, ContextPipeline, ContextStore};
 use loopal_kernel::Kernel;
 use loopal_runtime::{AgentLoopParams, AgentMode, SessionManager};
 

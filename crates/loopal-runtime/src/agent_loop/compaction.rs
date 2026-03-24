@@ -114,7 +114,11 @@ impl AgentLoopRunner {
         })
         .await?;
 
-        info!(tokens_before, messages = before, "manual compaction triggered");
+        info!(
+            tokens_before,
+            messages = before,
+            "manual compaction triggered"
+        );
 
         if self.try_smart_compact().await {
             self.post_compact(before, tokens_before, "manual-smart")
@@ -157,8 +161,8 @@ impl AgentLoopRunner {
         .await?;
 
         info!(
-            before, after, removed, tokens_before, tokens_after, strategy,
-            "compaction complete"
+            before,
+            after, removed, tokens_before, tokens_after, strategy, "compaction complete"
         );
         Ok(())
     }

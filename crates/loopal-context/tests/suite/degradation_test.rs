@@ -77,10 +77,12 @@ fn layer0_preserves_last_assistant_server_blocks() {
     run_sync_degradation(&mut messages, &budget);
 
     // Only assistant = last, server blocks preserved
-    assert!(messages[0]
-        .content
-        .iter()
-        .any(|b| matches!(b, ContentBlock::ServerToolResult { .. })));
+    assert!(
+        messages[0]
+            .content
+            .iter()
+            .any(|b| matches!(b, ContentBlock::ServerToolResult { .. }))
+    );
 }
 
 #[test]

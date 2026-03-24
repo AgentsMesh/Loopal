@@ -1,5 +1,5 @@
-use loopal_context::compaction::sanitize_tool_pairs;
 use loopal_context::compact_messages;
+use loopal_context::compaction::sanitize_tool_pairs;
 use loopal_message::{ContentBlock, Message, MessageRole};
 
 fn assistant_with_tool_use(id: &str) -> Message {

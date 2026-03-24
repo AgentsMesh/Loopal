@@ -48,7 +48,10 @@ fn test_prepare_chat_params_with_messages() {
 
     let (mut runner, _rx) = make_runner();
     runner.params.store.push_user(Message::user("Hello"));
-    runner.params.store.push_assistant(Message::assistant("Hi there!"));
+    runner
+        .params
+        .store
+        .push_assistant(Message::assistant("Hi there!"));
 
     let params = runner
         .prepare_chat_params_with(runner.params.store.messages())

@@ -7,7 +7,6 @@ use ratatui::prelude::*;
 use loopal_agent::router::MessageRouter;
 use loopal_protocol::AgentEvent;
 use loopal_protocol::AgentMode;
-use loopal_protocol::{Envelope, MessageSource, UserContent};
 use loopal_session::SessionController;
 use tokio::sync::mpsc;
 
@@ -19,6 +18,9 @@ use crate::input::{InputAction, handle_key};
 use crate::render::draw;
 use crate::slash_handler::handle_slash_command;
 use crate::terminal::TerminalGuard;
+use crate::tui_helpers::{
+    cycle_focus, handle_question_confirm, handle_scroll, route_human_message,
+};
 
 /// Run the TUI event loop.
 ///
@@ -57,87 +59,23 @@ pub async fn run_tui(
             match event {
                 AppEvent::Key(key) => {
                     let action = handle_key(&mut app, key);
-                    match action {
-                        InputAction::Quit => {
-                            app.exiting = true;
-                            should_quit = true;
-                            break;
-                        }
-                        InputAction::InboxPush(content) => {
-                            app.input_history.push(content.text.clone());
-                            app.history_index = None;
-                            if let Some(msg) = app.session.enqueue_message(content) {
-                                route_human_message(&router, &target_agent, msg).await;
-                            } else {
-                                // Agent busy — interrupt so queued message gets processed
-                                app.session.interrupt();
-                            }
-                        }
-                        InputAction::PasteRequested => {
-                            paste::spawn_paste(&events);
-                        }
-                        InputAction::ToolApprove => {
-                            let has = app.session.lock().pending_permission.is_some();
-                            if has {
-                                app.session.approve_permission().await;
-                            }
-                        }
-                        InputAction::ToolDeny => {
-                            let has = app.session.lock().pending_permission.is_some();
-                            if has {
-                                app.session.deny_permission().await;
-                            }
-                        }
-                        InputAction::Interrupt => {
-                            app.session.interrupt();
-                        }
-                        InputAction::ModeSwitch(mode) => {
-                            let m = if mode == "plan" {
-                                AgentMode::Plan
-                            } else {
-                                AgentMode::Act
-                            };
-                            app.session.switch_mode(m).await;
-                        }
-                        InputAction::SlashCommand(cmd) => {
-                            handle_slash_command(&mut app, cmd).await;
-                        }
-                        InputAction::FocusNextAgent => {
-                            cycle_focus(&app);
-                        }
-                        InputAction::UnfocusAgent => {
-                            app.session.lock().focused_agent = None;
-                        }
-                        InputAction::QuestionUp => {
-                            if let Some(ref mut q) = app.session.lock().pending_question {
-                                q.cursor_up();
-                            }
-                        }
-                        InputAction::QuestionDown => {
-                            if let Some(ref mut q) = app.session.lock().pending_question {
-                                q.cursor_down();
-                            }
-                        }
-                        InputAction::QuestionToggle => {
-                            if let Some(ref mut q) = app.session.lock().pending_question {
-                                q.toggle();
-                            }
-                        }
-                        InputAction::QuestionConfirm => {
-                            handle_question_confirm(&mut app).await;
-                        }
-                        InputAction::QuestionCancel => {
-                            app.session
-                                .answer_question(vec!["(cancelled)".into()])
-                                .await;
-                        }
-                        InputAction::None => {}
+                    if matches!(action, InputAction::PasteRequested) {
+                        paste::spawn_paste(&events);
+                    } else {
+                        should_quit =
+                            dispatch_action(&mut app, &router, &target_agent, action).await;
+                    }
+                    if should_quit {
+                        break;
                     }
                 }
                 AppEvent::Agent(agent_event) => {
                     if let Some(content) = app.session.handle_event(agent_event) {
                         route_human_message(&router, &target_agent, content).await;
                     }
+                }
+                AppEvent::Scroll(delta) => {
+                    handle_scroll(&mut app, delta);
                 }
                 AppEvent::Paste(result) => {
                     paste::apply_paste_result(&mut app, result);
@@ -157,49 +95,94 @@ pub async fn run_tui(
     Ok(())
 }
 
-async fn handle_question_confirm(app: &mut App) {
-    let answers = {
-        let state = app.session.lock();
-        state.pending_question.as_ref().map(|q| {
-            let answers = q.get_answers();
-            if answers.is_empty() && !q.questions[q.current_question].allow_multiple {
-                let opt = &q.questions[q.current_question].options[q.cursor];
-                vec![opt.label.clone()]
-            } else {
-                answers
-            }
-        })
-    };
-    if let Some(answers) = answers {
-        app.session.answer_question(answers).await;
-    }
-}
-
-/// Route a human message through the data plane.
-async fn route_human_message(router: &MessageRouter, target: &str, content: UserContent) {
-    let envelope = Envelope::new(MessageSource::Human, target, content);
-    if let Err(e) = router.route(envelope).await {
-        tracing::warn!(error = %e, "failed to route human message — agent may have exited");
-    }
-}
-
-/// Cycle focused_agent to the next agent in the agents map.
-fn cycle_focus(app: &App) {
-    let mut state = app.session.lock();
-    let keys: Vec<String> = state.agents.keys().cloned().collect();
-    if keys.is_empty() {
-        state.focused_agent = None;
-        return;
-    }
-    let next = match &state.focused_agent {
-        None => keys[0].clone(),
-        Some(current) => {
-            let pos = keys.iter().position(|k| k == current);
-            match pos {
-                Some(i) if i + 1 < keys.len() => keys[i + 1].clone(),
-                _ => keys[0].clone(),
-            }
+/// Dispatch an InputAction. Returns true if the app should quit.
+async fn dispatch_action(
+    app: &mut App,
+    router: &Arc<MessageRouter>,
+    target_agent: &str,
+    action: InputAction,
+) -> bool {
+    match action {
+        InputAction::Quit => {
+            app.exiting = true;
+            true
         }
-    };
-    state.focused_agent = Some(next);
+        InputAction::InboxPush(content) => {
+            app.input_history.push(content.text.clone());
+            app.history_index = None;
+            if let Some(msg) = app.session.enqueue_message(content) {
+                route_human_message(router, target_agent, msg).await;
+            } else {
+                app.session.interrupt();
+            }
+            false
+        }
+        InputAction::PasteRequested => false, // handled separately via events.sender()
+        InputAction::ToolApprove => {
+            if app.session.lock().pending_permission.is_some() {
+                app.session.approve_permission().await;
+            }
+            false
+        }
+        InputAction::ToolDeny => {
+            if app.session.lock().pending_permission.is_some() {
+                app.session.deny_permission().await;
+            }
+            false
+        }
+        InputAction::Interrupt => {
+            app.session.interrupt();
+            false
+        }
+        InputAction::ModeSwitch(mode) => {
+            let m = if mode == "plan" {
+                AgentMode::Plan
+            } else {
+                AgentMode::Act
+            };
+            app.session.switch_mode(m).await;
+            false
+        }
+        InputAction::SlashCommand(cmd) => {
+            handle_slash_command(app, cmd).await;
+            false
+        }
+        InputAction::FocusNextAgent => {
+            cycle_focus(app);
+            false
+        }
+        InputAction::UnfocusAgent => {
+            app.session.lock().focused_agent = None;
+            false
+        }
+        InputAction::QuestionUp => {
+            if let Some(ref mut q) = app.session.lock().pending_question {
+                q.cursor_up();
+            }
+            false
+        }
+        InputAction::QuestionDown => {
+            if let Some(ref mut q) = app.session.lock().pending_question {
+                q.cursor_down();
+            }
+            false
+        }
+        InputAction::QuestionToggle => {
+            if let Some(ref mut q) = app.session.lock().pending_question {
+                q.toggle();
+            }
+            false
+        }
+        InputAction::QuestionConfirm => {
+            handle_question_confirm(app).await;
+            false
+        }
+        InputAction::QuestionCancel => {
+            app.session
+                .answer_question(vec!["(cancelled)".into()])
+                .await;
+            false
+        }
+        InputAction::None => false,
+    }
 }

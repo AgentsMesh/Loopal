@@ -15,6 +15,8 @@ mod event_forwarding_test;
 mod event_test;
 #[path = "suite/input_test.rs"]
 mod input_test;
+#[path = "suite/input_edge_test.rs"]
+mod input_edge_test;
 #[path = "suite/line_cache_test.rs"]
 mod line_cache_test;
 #[path = "suite/markdown_code_test.rs"]

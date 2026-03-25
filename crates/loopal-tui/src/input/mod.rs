@@ -1,6 +1,7 @@
 mod actions;
 mod autocomplete;
 mod commands;
+mod editing;
 pub(crate) mod multiline;
 mod navigation;
 pub(crate) mod paste;
@@ -12,7 +13,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::app::App;
 use autocomplete::{handle_autocomplete_key, update_autocomplete};
-use commands::try_execute_slash_command;
+use editing::{handle_backspace, handle_ctrl_c, handle_enter};
 use navigation::{
     DEFAULT_WRAP_WIDTH, handle_down, handle_esc, handle_up, move_cursor_left, move_cursor_right,
 };
@@ -40,20 +41,26 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> InputAction {
 /// Handle modal states: tool confirm, question dialog, sub-page.
 fn handle_modal_keys(app: &mut App, key: &KeyEvent) -> Option<InputAction> {
     if app.session.lock().pending_permission.is_some() {
+        let is_ctrl_c =
+            key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c');
         return Some(match key.code {
             KeyCode::Char('y') | KeyCode::Char('Y') => InputAction::ToolApprove,
             KeyCode::Char('n') | KeyCode::Char('N') => InputAction::ToolDeny,
             KeyCode::Esc => InputAction::ToolDeny,
+            _ if is_ctrl_c => InputAction::ToolDeny,
             _ => InputAction::None,
         });
     }
     if app.session.lock().pending_question.is_some() {
+        let is_ctrl_c =
+            key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c');
         return Some(match key.code {
             KeyCode::Up => InputAction::QuestionUp,
             KeyCode::Down => InputAction::QuestionDown,
             KeyCode::Enter => InputAction::QuestionConfirm,
             KeyCode::Char(' ') => InputAction::QuestionToggle,
             KeyCode::Esc => InputAction::QuestionCancel,
+            _ if is_ctrl_c => InputAction::QuestionCancel,
             _ => InputAction::None,
         });
     }
@@ -67,7 +74,8 @@ fn handle_modal_keys(app: &mut App, key: &KeyEvent) -> Option<InputAction> {
 fn handle_global_keys(app: &mut App, key: &KeyEvent) -> Option<InputAction> {
     if key.modifiers.contains(KeyModifiers::CONTROL) {
         match key.code {
-            KeyCode::Char('c') | KeyCode::Char('d') => return Some(InputAction::Quit),
+            KeyCode::Char('c') => return Some(handle_ctrl_c(app)),
+            KeyCode::Char('d') => return Some(InputAction::Quit),
             KeyCode::Char('v') => return Some(InputAction::PasteRequested),
             _ => {}
         }
@@ -131,8 +139,7 @@ fn handle_normal_key(app: &mut App, key: &KeyEvent) -> InputAction {
         }
         KeyCode::Up if app.content_overflows => {
             // Content exceeds viewport: scroll takes priority over history.
-            // Alternate scroll sends ~3 Up arrows per wheel notch, so step=1
-            // yields ~3 lines/notch — matching prior mouse-capture behavior.
+            // Alternate scroll sends ~3 Up arrows per notch, so step=1 ≈ 3 lines/notch.
             app.scroll_offset = app.scroll_offset.saturating_add(1);
             InputAction::None
         }
@@ -153,36 +160,4 @@ fn handle_normal_key(app: &mut App, key: &KeyEvent) -> InputAction {
         }
         _ => InputAction::None,
     }
-}
-
-fn handle_enter(app: &mut App) -> InputAction {
-    let trimmed = app.input.trim().to_string();
-    if trimmed.starts_with('/') {
-        app.refresh_commands();
-    }
-    if let Some(cmd_action) = try_execute_slash_command(&trimmed, &app.commands) {
-        app.input.clear();
-        app.input_cursor = 0;
-        app.autocomplete = None;
-        return cmd_action;
-    }
-    if let Some(content) = app.submit_input() {
-        return InputAction::InboxPush(content);
-    }
-    InputAction::None
-}
-
-fn handle_backspace(app: &mut App) -> InputAction {
-    if app.input_cursor > 0 {
-        let prev = app.input[..app.input_cursor]
-            .char_indices()
-            .next_back()
-            .map(|(i, _)| i)
-            .unwrap_or(0);
-        app.input.remove(prev);
-        app.input_cursor = prev;
-    } else if !app.pending_images.is_empty() {
-        app.pending_images.pop();
-    }
-    InputAction::None
 }

@@ -32,14 +32,38 @@ fn ctrl(c: char) -> KeyEvent {
     KeyEvent::new(KeyCode::Char(c), KeyModifiers::CONTROL)
 }
 
-// --- Priority chain ---
+// --- Ctrl+C three-level behavior ---
 
 #[test]
-fn test_ctrl_c_quits() {
+fn test_ctrl_c_clears_input_when_non_empty() {
     let mut app = make_app();
+    app.input = "hello".to_string();
+    app.input_cursor = 5;
+    app.history_index = Some(2);
     let action = handle_key(&mut app, ctrl('c'));
-    assert!(matches!(action, InputAction::Quit));
+    assert!(matches!(action, InputAction::None));
+    assert!(app.input.is_empty());
+    assert_eq!(app.input_cursor, 0);
+    assert!(app.history_index.is_none(), "history_index should be reset");
 }
+
+#[test]
+fn test_ctrl_c_interrupts_when_agent_busy() {
+    let mut app = make_app();
+    app.session.lock().agent_idle = false;
+    let action = handle_key(&mut app, ctrl('c'));
+    assert!(matches!(action, InputAction::Interrupt));
+}
+
+#[test]
+fn test_ctrl_c_noop_when_idle_and_empty() {
+    let mut app = make_app();
+    app.session.lock().agent_idle = true;
+    let action = handle_key(&mut app, ctrl('c'));
+    assert!(matches!(action, InputAction::None));
+}
+
+// --- Global shortcuts ---
 
 #[test]
 fn test_ctrl_d_quits() {
@@ -63,7 +87,6 @@ fn test_shift_tab_toggles_mode() {
 #[test]
 fn test_tool_confirm_y_approves() {
     let mut app = make_app();
-    // Simulate pending permission
     {
         let mut state = app.session.lock();
         state.pending_permission = Some(loopal_session::types::PendingPermission {
@@ -159,68 +182,4 @@ fn test_home_end_navigation() {
     assert_eq!(app.input_cursor, 0);
     handle_key(&mut app, key(KeyCode::End));
     assert_eq!(app.input_cursor, 5);
-}
-
-// --- Scroll ---
-
-#[test]
-fn test_page_up_down_scroll() {
-    let mut app = make_app();
-    handle_key(&mut app, key(KeyCode::PageUp));
-    assert_eq!(app.scroll_offset, 10);
-    handle_key(&mut app, key(KeyCode::PageDown));
-    assert_eq!(app.scroll_offset, 0);
-}
-
-#[test]
-fn test_up_scrolls_when_content_overflows() {
-    let mut app = make_app();
-    app.content_overflows = true;
-    handle_key(&mut app, key(KeyCode::Up));
-    assert_eq!(app.scroll_offset, 1, "Up should scroll +1 when content overflows");
-    handle_key(&mut app, key(KeyCode::Up));
-    assert_eq!(app.scroll_offset, 2, "repeated Up should keep incrementing");
-}
-
-#[test]
-fn test_down_scrolls_back_when_offset_positive() {
-    let mut app = make_app();
-    app.scroll_offset = 5;
-    handle_key(&mut app, key(KeyCode::Down));
-    assert_eq!(app.scroll_offset, 4, "Down should scroll -1 when offset > 0");
-}
-
-#[test]
-fn test_up_navigates_history_when_content_fits() {
-    let mut app = make_app();
-    app.session.lock().agent_idle = true;
-    app.content_overflows = false;
-    app.input_history.push("previous command".into());
-    let action = handle_key(&mut app, key(KeyCode::Up));
-    assert!(matches!(action, InputAction::None));
-    assert_eq!(app.input, "previous command", "Up should browse history when content fits");
-    assert_eq!(app.scroll_offset, 0, "scroll_offset should stay 0");
-}
-
-// --- ESC clears on sub-page close ---
-
-#[test]
-fn test_esc_time_cleared_on_picker_close() {
-    let mut app = make_app();
-    // Set a stale esc time
-    app.last_esc_time = Some(std::time::Instant::now());
-    // Open and close a rewind picker via sub_page
-    app.sub_page = Some(loopal_tui::app::SubPage::RewindPicker(
-        loopal_tui::app::RewindPickerState {
-            turns: vec![loopal_tui::app::RewindTurnItem {
-                turn_index: 0,
-                preview: "test".into(),
-            }],
-            selected: 0,
-        },
-    ));
-    // Press Esc to close picker
-    let _action = handle_key(&mut app, key(KeyCode::Esc));
-    assert!(app.sub_page.is_none(), "picker should be closed");
-    assert!(app.last_esc_time.is_none(), "esc time should be cleared");
 }

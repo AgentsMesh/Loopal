@@ -42,7 +42,7 @@ fn build_full_help(commands: &[crate::command::CommandEntry]) -> String {
         })
         .collect();
     format!(
-        "Available commands:\n{}\n\nShortcuts:\n  Shift+Tab       Toggle Plan/Act mode\n  Ctrl+C/D        Quit\n  PageUp/Down     Scroll chat\n  Up/Down         Input history",
+        "Available commands:\n{}\n\nShortcuts:\n  Shift+Tab       Toggle Plan/Act mode\n  Ctrl+C          Clear input / interrupt agent\n  Ctrl+D          Quit\n  PageUp/Down     Scroll chat\n  Up/Down         Input history",
         lines.join("\n"),
     )
 }

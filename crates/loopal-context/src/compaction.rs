@@ -28,6 +28,8 @@ pub fn compact_messages(messages: &mut Vec<Message>, keep_last: usize) {
 /// Remove orphaned tool_use/tool_result blocks after compaction.
 ///
 /// Ensures every ToolResult references an existing ToolUse (and vice versa).
+/// Also ensures every ServerToolUse has a matching ServerToolResult within the
+/// same assistant message (both live in the same message, unlike client tools).
 /// Removes empty messages that result from block removal.
 pub fn sanitize_tool_pairs(messages: &mut Vec<Message>) {
     // Pass 1: collect all ToolUse ids from assistant messages
@@ -71,8 +73,47 @@ pub fn sanitize_tool_pairs(messages: &mut Vec<Message>) {
         });
     }
 
-    // Pass 5: remove empty non-system messages
+    // Pass 5: sanitize ServerToolUse/ServerToolResult pairs within each assistant message.
+    // Both block types live in the same message (unlike client ToolUse/ToolResult).
+    sanitize_server_tool_pairs(messages);
+
+    // Pass 6: remove empty non-system messages
     messages.retain(|m| m.role == MessageRole::System || !m.content.is_empty());
+}
+
+/// Remove orphaned ServerToolUse / ServerToolResult blocks within each assistant message.
+///
+/// A ServerToolUse without a matching ServerToolResult (same message, matching id)
+/// is dropped — this happens when the LLM response is truncated mid-server-tool.
+fn sanitize_server_tool_pairs(messages: &mut [Message]) {
+    for msg in messages
+        .iter_mut()
+        .filter(|m| m.role == MessageRole::Assistant)
+    {
+        let result_ids: HashSet<String> = msg
+            .content
+            .iter()
+            .filter_map(|b| match b {
+                ContentBlock::ServerToolResult { tool_use_id, .. } => Some(tool_use_id.clone()),
+                _ => None,
+            })
+            .collect();
+
+        let use_ids: HashSet<String> = msg
+            .content
+            .iter()
+            .filter_map(|b| match b {
+                ContentBlock::ServerToolUse { id, .. } => Some(id.clone()),
+                _ => None,
+            })
+            .collect();
+
+        msg.content.retain(|b| match b {
+            ContentBlock::ServerToolUse { id, .. } => result_ids.contains(id),
+            ContentBlock::ServerToolResult { tool_use_id, .. } => use_ids.contains(tool_use_id),
+            _ => true,
+        });
+    }
 }
 
 /// Strip `ContentBlock::Thinking` blocks from all assistant messages except the last one.

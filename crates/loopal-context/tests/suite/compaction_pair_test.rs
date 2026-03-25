@@ -90,3 +90,77 @@ fn compact_then_sanitize_fixes_broken_pairs() {
         }
     }
 }
+
+// --- ServerToolUse / ServerToolResult pair tests ---
+
+fn assistant_with_server_tool_blocks(blocks: Vec<ContentBlock>) -> Message {
+    Message {
+        id: None,
+        role: MessageRole::Assistant,
+        content: blocks,
+    }
+}
+
+fn server_tool_use(id: &str) -> ContentBlock {
+    ContentBlock::ServerToolUse {
+        id: id.to_string(),
+        name: "code_execution".to_string(),
+        input: serde_json::json!({}),
+    }
+}
+
+fn server_tool_result(tool_use_id: &str) -> ContentBlock {
+    ContentBlock::ServerToolResult {
+        block_type: "code_execution_tool_result".to_string(),
+        tool_use_id: tool_use_id.to_string(),
+        content: serde_json::json!({"output": "ok"}),
+    }
+}
+
+#[test]
+fn sanitize_removes_orphaned_server_tool_use() {
+    let mut msgs = vec![
+        Message::system("sys"),
+        assistant_with_server_tool_blocks(vec![
+            server_tool_use("srv_1"),
+            server_tool_result("srv_1"),
+            server_tool_use("srv_orphan"), // no matching result
+        ]),
+        Message::user("continue"),
+    ];
+    sanitize_tool_pairs(&mut msgs);
+    assert_eq!(msgs.len(), 3);
+    // orphaned ServerToolUse removed, matched pair preserved
+    assert_eq!(msgs[1].content.len(), 2);
+}
+
+#[test]
+fn sanitize_removes_orphaned_server_tool_result() {
+    let mut msgs = vec![
+        Message::system("sys"),
+        assistant_with_server_tool_blocks(vec![
+            server_tool_result("srv_gone"), // no matching use
+        ]),
+        Message::user("next"),
+    ];
+    sanitize_tool_pairs(&mut msgs);
+    // assistant message becomes empty → removed
+    assert_eq!(msgs.len(), 2); // system + user
+}
+
+#[test]
+fn sanitize_preserves_valid_server_tool_pairs() {
+    let mut msgs = vec![
+        Message::system("sys"),
+        assistant_with_server_tool_blocks(vec![
+            server_tool_use("srv_a"),
+            server_tool_use("srv_b"),
+            server_tool_result("srv_b"),
+            server_tool_result("srv_a"),
+        ]),
+        Message::user("done"),
+    ];
+    sanitize_tool_pairs(&mut msgs);
+    assert_eq!(msgs.len(), 3);
+    assert_eq!(msgs[1].content.len(), 4); // all preserved
+}

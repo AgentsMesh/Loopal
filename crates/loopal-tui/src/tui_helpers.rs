@@ -72,11 +72,7 @@ pub async fn handle_question_confirm(app: &mut App) {
 }
 
 /// Route a human message through the data plane.
-pub async fn route_human_message(
-    router: &Arc<MessageRouter>,
-    target: &str,
-    content: UserContent,
-) {
+pub async fn route_human_message(router: &Arc<MessageRouter>, target: &str, content: UserContent) {
     let envelope = Envelope::new(MessageSource::Human, target, content);
     if let Err(e) = router.route(envelope).await {
         tracing::warn!(error = %e, "failed to route human message — agent may have exited");

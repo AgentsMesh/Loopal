@@ -18,7 +18,9 @@ use crate::input::{InputAction, handle_key};
 use crate::render::draw;
 use crate::slash_handler::handle_slash_command;
 use crate::terminal::TerminalGuard;
-use crate::tui_helpers::{cycle_focus, handle_question_confirm, handle_scroll, route_human_message};
+use crate::tui_helpers::{
+    cycle_focus, handle_question_confirm, handle_scroll, route_human_message,
+};
 
 /// Run the TUI event loop.
 ///
@@ -133,7 +135,11 @@ async fn dispatch_action(
             false
         }
         InputAction::ModeSwitch(mode) => {
-            let m = if mode == "plan" { AgentMode::Plan } else { AgentMode::Act };
+            let m = if mode == "plan" {
+                AgentMode::Plan
+            } else {
+                AgentMode::Act
+            };
             app.session.switch_mode(m).await;
             false
         }
@@ -172,7 +178,9 @@ async fn dispatch_action(
             false
         }
         InputAction::QuestionCancel => {
-            app.session.answer_question(vec!["(cancelled)".into()]).await;
+            app.session
+                .answer_question(vec!["(cancelled)".into()])
+                .await;
             false
         }
         InputAction::None => false,

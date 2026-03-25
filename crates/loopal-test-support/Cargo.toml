@@ -1,0 +1,30 @@
+[package]
+name = "loopal-test-support"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+doctest = false
+test = false
+
+[dependencies]
+loopal-error = { workspace = true }
+loopal-message = { workspace = true }
+loopal-protocol = { workspace = true }
+loopal-provider-api = { workspace = true }
+loopal-tool-api = { workspace = true }
+loopal-config = { workspace = true }
+loopal-storage = { workspace = true }
+loopal-kernel = { workspace = true }
+loopal-runtime = { workspace = true }
+loopal-context = { workspace = true }
+loopal-session = { workspace = true }
+loopal-agent = { workspace = true }
+
+async-trait = { workspace = true }
+tokio = { workspace = true }
+futures = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+tempfile = "3"

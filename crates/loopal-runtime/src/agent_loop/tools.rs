@@ -42,16 +42,16 @@ impl AgentLoopRunner {
                 self.emit(AgentEventPayload::ToolBatchStart { tool_ids })
                     .await?;
             }
-            let kernel = std::sync::Arc::clone(&self.params.kernel);
+            let kernel = std::sync::Arc::clone(&self.params.deps.kernel);
             let tool_ctx = self.tool_ctx.clone();
-            let mode = self.params.mode;
+            let mode = self.params.config.mode;
             let parallel = execute_approved_tools(
                 check.approved,
                 &tool_uses,
                 kernel,
                 tool_ctx,
                 mode,
-                &self.params.frontend,
+                &self.params.deps.frontend,
                 cancel,
             )
             .await;
@@ -75,7 +75,7 @@ impl AgentLoopRunner {
         for (idx, (id, name, input)) in tool_uses.iter().enumerate() {
             match name.as_str() {
                 "EnterPlanMode" => {
-                    self.params.mode = AgentMode::Plan;
+                    self.params.config.mode = AgentMode::Plan;
                     self.emit(AgentEventPayload::ModeChanged {
                         mode: "plan".into(),
                     })
@@ -86,7 +86,7 @@ impl AgentLoopRunner {
                     ));
                 }
                 "ExitPlanMode" => {
-                    self.params.mode = AgentMode::Act;
+                    self.params.config.mode = AgentMode::Act;
                     self.emit(AgentEventPayload::ModeChanged { mode: "act".into() })
                         .await?;
                     intercepted.push((
@@ -96,7 +96,7 @@ impl AgentLoopRunner {
                 }
                 "AskUser" => {
                     let questions = parse_questions(input);
-                    let answers = self.params.frontend.ask_user(questions).await;
+                    let answers = self.params.deps.frontend.ask_user(questions).await;
                     intercepted.push((idx, success_block(id, &format_answers(&answers))));
                 }
                 _ => remaining.push((id.clone(), name.clone(), input.clone())),
@@ -135,6 +135,7 @@ impl AgentLoopRunner {
         };
         if let Err(e) = self
             .params
+            .deps
             .session_manager
             .save_message(&self.params.session.id, &mut msg)
         {
@@ -173,6 +174,7 @@ impl AgentLoopRunner {
         };
         if let Err(e) = self
             .params
+            .deps
             .session_manager
             .save_message(&self.params.session.id, &mut msg)
         {
@@ -184,7 +186,7 @@ impl AgentLoopRunner {
 
     /// Drain pending envelopes from the frontend and inject them as user messages.
     pub async fn inject_pending_messages(&mut self) {
-        let pending = self.params.frontend.drain_pending().await;
+        let pending = self.params.deps.frontend.drain_pending().await;
         for env in pending {
             let mut user_msg = build_user_message(&env);
             info!(
@@ -193,6 +195,7 @@ impl AgentLoopRunner {
             );
             if let Err(e) = self
                 .params
+                .deps
                 .session_manager
                 .save_message(&self.params.session.id, &mut user_msg)
             {

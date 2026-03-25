@@ -15,26 +15,26 @@ impl AgentLoopRunner {
         let env_section = super::env_context::build_env_section(
             self.tool_ctx.backend.cwd(),
             self.turn_count,
-            self.params.max_turns,
+            self.params.config.max_turns,
         );
         let full_system_prompt = format!(
             "{}{}{}",
-            self.params.system_prompt,
-            self.params.mode.system_prompt_suffix(),
+            self.params.config.system_prompt,
+            self.params.config.mode.system_prompt_suffix(),
             env_section,
         );
-        let mut tool_defs = self.params.kernel.tool_definitions();
-        if let Some(ref filter) = self.params.tool_filter {
+        let mut tool_defs = self.params.deps.kernel.tool_definitions();
+        if let Some(ref filter) = self.params.config.tool_filter {
             tool_defs.retain(|t| filter.contains(&t.name));
         }
-        let capability = get_thinking_capability(&self.params.model);
+        let capability = get_thinking_capability(&self.params.config.model);
         let resolved_thinking = resolve_thinking_config(
             &self.model_config.thinking,
             capability,
             self.model_config.max_output_tokens,
         );
         Ok(ChatParams {
-            model: self.params.model.clone(),
+            model: self.params.config.model.clone(),
             messages: messages.to_vec(),
             system_prompt: full_system_prompt,
             tools: tool_defs,

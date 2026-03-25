@@ -23,7 +23,7 @@ impl AgentLoopRunner {
             );
 
             if self.params.store.is_empty() {
-                if !self.params.interactive {
+                if !self.params.config.interactive {
                     break;
                 }
                 match self.wait_for_input().await? {
@@ -34,7 +34,7 @@ impl AgentLoopRunner {
                 }
             }
 
-            if self.turn_count >= self.params.max_turns {
+            if self.turn_count >= self.params.config.max_turns {
                 self.emit(AgentEventPayload::MaxTurnsReached {
                     turns: self.turn_count,
                 })
@@ -66,10 +66,10 @@ impl AgentLoopRunner {
                         }
                     }
 
-                    if !self.params.interactive {
+                    if !self.params.config.interactive {
                         break;
                     }
-                    if self.turn_count >= self.params.max_turns {
+                    if self.turn_count >= self.params.config.max_turns {
                         self.emit(AgentEventPayload::MaxTurnsReached {
                             turns: self.turn_count,
                         })
@@ -99,7 +99,7 @@ impl AgentLoopRunner {
                             None => break,
                         }
                     }
-                    if !self.params.interactive {
+                    if !self.params.config.interactive {
                         return Ok(AgentOutput {
                             result: last_output,
                             terminate_reason: TerminateReason::Error,
@@ -123,7 +123,7 @@ impl AgentLoopRunner {
         }
 
         Ok(AgentOutput {
-            result: if self.params.interactive {
+            result: if self.params.config.interactive {
                 String::new()
             } else {
                 last_output

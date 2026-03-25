@@ -1,14 +1,11 @@
-//! JSON-RPC 2.0 types and transport over stdin/stdout.
-//!
-//! Newline-delimited JSON on both directions. The transport is `Send + Sync`
-//! so it can be shared across the ACP handler and the `AcpFrontend`.
+//! JSON-RPC 2.0 transport (newline-delimited JSON, `Send + Sync`).
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI64, Ordering};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
+use tokio::io::{AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufWriter};
 use tokio::sync::{Mutex, oneshot};
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -94,21 +91,31 @@ impl RawMessage {
 
 // ── Transport ───────────────────────────────────────────────────────
 
-/// Newline-delimited JSON-RPC transport over stdout.
-///
-/// Reads are handled externally (the main loop reads stdin line-by-line
-/// and calls `route_response` for responses). Writes go through the
-/// internal buffered stdout writer.
+/// Newline-delimited JSON-RPC transport.
 pub struct JsonRpcTransport {
-    writer: Mutex<BufWriter<tokio::io::Stdout>>,
+    writer: Mutex<BufWriter<Box<dyn AsyncWrite + Unpin + Send>>>,
     pending: Mutex<HashMap<i64, oneshot::Sender<Value>>>,
     next_id: AtomicI64,
 }
 
+impl Default for JsonRpcTransport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl JsonRpcTransport {
+    /// Create a transport writing to stdout (production default).
     pub fn new() -> Self {
+        Self::with_writer(Box::new(tokio::io::stdout()))
+    }
+
+    /// Create a transport writing to an arbitrary async writer.
+    ///
+    /// Used for testing where stdout is not available.
+    pub fn with_writer(writer: Box<dyn AsyncWrite + Unpin + Send>) -> Self {
         Self {
-            writer: Mutex::new(BufWriter::new(tokio::io::stdout())),
+            writer: Mutex::new(BufWriter::new(writer)),
             pending: Mutex::new(HashMap::new()),
             next_id: AtomicI64::new(1),
         }
@@ -166,10 +173,8 @@ impl JsonRpcTransport {
     }
 }
 
-/// Read one JSON-RPC message from a buffered stdin reader.
-///
-/// Returns `None` on EOF.
-pub async fn read_message(reader: &mut BufReader<tokio::io::Stdin>) -> Option<IncomingMessage> {
+/// Read one JSON-RPC message from a buffered reader. Returns `None` on EOF.
+pub async fn read_message(reader: &mut (impl AsyncBufReadExt + Unpin)) -> Option<IncomingMessage> {
     let mut line = String::new();
     loop {
         line.clear();

@@ -8,19 +8,19 @@ mod frontend;
 mod handler;
 mod handler_prompt;
 mod handler_session;
-mod jsonrpc;
+pub mod jsonrpc;
 mod translate;
-mod types;
+pub mod types;
 
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use tokio::io::BufReader;
+use tokio::io::{AsyncBufReadExt, BufReader};
 use tracing::info;
 
 use loopal_config::ResolvedConfig;
 
-use crate::handler::AcpHandler;
+pub use crate::handler::AcpHandler;
 use crate::jsonrpc::{IncomingMessage, JsonRpcTransport, read_message};
 
 /// Run Loopal as an ACP server (stdin/stdout JSON-RPC).
@@ -34,8 +34,21 @@ pub async fn run_acp(config: ResolvedConfig, cwd: PathBuf) -> anyhow::Result<()>
     let handler = Arc::new(AcpHandler::new(transport.clone(), config, cwd));
     let mut reader = BufReader::new(tokio::io::stdin());
 
+    run_acp_loop(&handler, &transport, &mut reader).await
+}
+
+/// Reader-agnostic ACP event loop.
+///
+/// Extracted from [`run_acp`] so that tests can substitute an in-memory
+/// reader for stdin. The `handler` and `transport` are shared across the
+/// loop and all spawned request handlers.
+pub async fn run_acp_loop(
+    handler: &Arc<AcpHandler>,
+    transport: &Arc<JsonRpcTransport>,
+    reader: &mut (impl AsyncBufReadExt + Unpin),
+) -> anyhow::Result<()> {
     loop {
-        match read_message(&mut reader).await {
+        match read_message(reader).await {
             Some(IncomingMessage::Request { id, method, params }) => {
                 let h = handler.clone();
                 tokio::spawn(async move {
@@ -43,7 +56,6 @@ pub async fn run_acp(config: ResolvedConfig, cwd: PathBuf) -> anyhow::Result<()>
                 });
             }
             Some(IncomingMessage::Response { id, result, error }) => {
-                // Route response to a pending outbound request
                 let value = if let Some(r) = result {
                     r
                 } else if let Some(e) = error {
@@ -57,8 +69,7 @@ pub async fn run_acp(config: ResolvedConfig, cwd: PathBuf) -> anyhow::Result<()>
                 info!(method = %method, "received notification (ignored)");
             }
             None => {
-                // EOF — client disconnected
-                info!("stdin closed, shutting down ACP server");
+                info!("reader closed, shutting down ACP server");
                 break;
             }
         }

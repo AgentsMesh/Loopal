@@ -1713,11 +1713,14 @@ dependencies = [
  "loopal-kernel",
  "loopal-message",
  "loopal-protocol",
+ "loopal-provider-api",
  "loopal-runtime",
  "loopal-storage",
+ "loopal-test-support",
  "loopal-tool-api",
  "serde",
  "serde_json",
+ "tempfile",
  "tokio",
  "tokio-util",
  "tracing",
@@ -1988,6 +1991,7 @@ dependencies = [
  "loopal-provider-api",
  "loopal-session",
  "loopal-storage",
+ "loopal-test-support",
  "loopal-tool-api",
  "serde",
  "serde_json",
@@ -2036,6 +2040,30 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "uuid",
+]
+
+[[package]]
+name = "loopal-test-support"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "futures",
+ "loopal-agent",
+ "loopal-config",
+ "loopal-context",
+ "loopal-error",
+ "loopal-kernel",
+ "loopal-message",
+ "loopal-protocol",
+ "loopal-provider-api",
+ "loopal-runtime",
+ "loopal-session",
+ "loopal-storage",
+ "loopal-tool-api",
+ "serde_json",
+ "tempfile",
+ "tokio",
 ]
 
 [[package]]
@@ -2283,16 +2311,24 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "arboard",
+ "async-trait",
  "base64 0.22.1",
  "crossterm 0.28.1",
  "image",
  "indexmap",
  "loopal-agent",
  "loopal-config",
+ "loopal-context",
+ "loopal-error",
+ "loopal-git",
+ "loopal-message",
  "loopal-protocol",
  "loopal-provider",
+ "loopal-provider-api",
  "loopal-runtime",
  "loopal-session",
+ "loopal-test-support",
+ "loopal-tool-api",
  "pulldown-cmark",
  "ratatui",
  "serde_json",
@@ -2304,6 +2340,7 @@ dependencies = [
  "tracing",
  "two-face",
  "unicode-width 0.2.2",
+ "wiremock",
 ]
 
 [[package]]

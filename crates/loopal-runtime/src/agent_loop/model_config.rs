@@ -27,10 +27,11 @@ impl ModelConfig {
         }
     }
 
-    /// Refresh context/output limits after a model switch.
+    /// Refresh context/output limits and re-resolve thinking after a model switch.
+    ///
+    /// When thinking is `Auto`, it must be re-resolved against the new model's
+    /// capabilities. Explicit configs (`Disabled`, `Effort`, `Budget`) are kept.
     pub fn update_model(&mut self, model: &str) {
-        let info = get_model_info(model);
-        self.max_context_tokens = info.as_ref().map_or(200_000, |m| m.context_window);
-        self.max_output_tokens = info.as_ref().map_or(16_384, |m| m.max_output_tokens);
+        *self = Self::from_model(model, self.thinking.clone());
     }
 }

@@ -12,7 +12,7 @@ use loopal_agent::router::MessageRouter;
 use loopal_agent::shared::AgentShared;
 use loopal_agent::task_store::TaskStore;
 use loopal_context::system_prompt::build_system_prompt;
-use loopal_context::{ContextBudget, ContextPipeline, ContextStore};
+use loopal_context::{ContextBudget, ContextStore};
 use loopal_kernel::Kernel;
 use loopal_runtime::{AgentLoopParams, AgentMode, SessionManager};
 
@@ -52,16 +52,24 @@ impl AcpHandler {
             error!(error = %e, "MCP start failed");
         }
         loopal_agent::tools::register_all(&mut kernel);
+        // Inject test provider if configured (for E2E testing).
+        if let Some(ref provider) = self.provider_override {
+            kernel.register_provider(provider.clone());
+        }
         let kernel = Arc::new(kernel);
 
         // Session
-        let session_manager = match SessionManager::new() {
-            Ok(sm) => sm,
-            Err(e) => {
-                self.transport
-                    .respond_error(id, crate::jsonrpc::INTERNAL_ERROR, &e.to_string())
-                    .await;
-                return;
+        let session_manager = if let Some(ref base_dir) = self.session_base_dir {
+            SessionManager::with_base_dir(base_dir.clone())
+        } else {
+            match SessionManager::new() {
+                Ok(sm) => sm,
+                Err(e) => {
+                    self.transport
+                        .respond_error(id, crate::jsonrpc::INTERNAL_ERROR, &e.to_string())
+                        .await;
+                    return;
+                }
             }
         };
         let model = &self.config.settings.model;
@@ -90,32 +98,34 @@ impl AcpHandler {
             cancel_token.clone(),
         ));
 
-        // Build system prompt + context pipeline from resolved config
-        let (system_prompt, context_pipeline, shared) =
+        // Build system prompt + shared context from resolved config
+        let (system_prompt, shared) =
             self.build_agent_context(&kernel, &session_id, &cwd, event_tx.clone());
 
         let budget = ContextBudget::calculate(200_000, &system_prompt, 0, 16_384);
 
         let agent_params = AgentLoopParams {
-            kernel: kernel.clone(),
+            config: loopal_runtime::AgentConfig {
+                model: model.clone(),
+                compact_model: self.config.settings.compact_model.clone(),
+                system_prompt,
+                mode: AgentMode::Act,
+                permission_mode: self.config.settings.permission_mode,
+                max_turns: self.config.settings.max_turns,
+                tool_filter: None,
+                interactive: true,
+                thinking_config: self.config.settings.thinking.clone(),
+            },
+            deps: loopal_runtime::AgentDeps {
+                kernel: kernel.clone(),
+                frontend,
+                session_manager,
+            },
             session,
             store: ContextStore::from_messages(Vec::new(), budget),
-            model: model.clone(),
-            compact_model: self.config.settings.compact_model.clone(),
-            system_prompt,
-            mode: AgentMode::Act,
-            permission_mode: self.config.settings.permission_mode,
-            max_turns: self.config.settings.max_turns,
-            frontend,
-            session_manager,
-            context_pipeline,
-            tool_filter: None,
+            interrupt: loopal_runtime::InterruptHandle::new(),
             shared: Some(shared),
-            interactive: true,
-            thinking_config: self.config.settings.thinking.clone(),
-            interrupt: loopal_protocol::InterruptSignal::new(),
-            interrupt_tx: std::sync::Arc::new(tokio::sync::watch::channel(0u64).0),
-            memory_channel: None, // ACP does not yet support memory observer
+            memory_channel: None,
         };
 
         tokio::spawn(async move {
@@ -144,11 +154,7 @@ impl AcpHandler {
         session_id: &str,
         cwd: &std::path::Path,
         event_tx: mpsc::Sender<loopal_protocol::AgentEvent>,
-    ) -> (
-        String,
-        ContextPipeline,
-        Arc<dyn std::any::Any + Send + Sync>,
-    ) {
+    ) -> (String, Arc<dyn std::any::Any + Send + Sync>) {
         let skills: Vec<_> = self
             .config
             .skills
@@ -165,8 +171,6 @@ impl AcpHandler {
             &skills_summary,
             &self.config.memory,
         );
-
-        let pipeline = ContextPipeline::new();
 
         let router = Arc::new(MessageRouter::new(event_tx.clone()));
         let tasks_dir = loopal_config::session_tasks_dir(session_id)
@@ -187,6 +191,6 @@ impl AcpHandler {
         });
         let shared_any: Arc<dyn std::any::Any + Send + Sync> = Arc::new(shared);
 
-        (system_prompt, pipeline, shared_any)
+        (system_prompt, shared_any)
     }
 }

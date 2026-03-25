@@ -72,9 +72,30 @@ pub fn build_bwrap_args(policy: &ResolvedPolicy, cwd: &Path) -> Vec<String> {
     args
 }
 
-/// Build the `bwrap` command prefix.
-pub fn build_prefix(policy: &ResolvedPolicy, cwd: &Path) -> (String, Vec<String>) {
-    let program = "bwrap".to_string();
+/// Build the `bwrap` command prefix if bubblewrap is available.
+///
+/// Returns `None` when `bwrap` is not installed or lacks user-namespace
+/// permissions (e.g., unprivileged containers, GitHub Actions runners).
+/// The caller falls back to unsandboxed `sh -c` execution.
+pub fn build_prefix(policy: &ResolvedPolicy, cwd: &Path) -> Option<(String, Vec<String>)> {
+    if !is_bwrap_available() {
+        return None;
+    }
     let args = build_bwrap_args(policy, cwd);
-    (program, args)
+    Some(("bwrap".to_string(), args))
+}
+
+/// Quick probe: spawn `bwrap --ro-bind / / /bin/true` to verify both
+/// installation and user-namespace support in a single check.
+fn is_bwrap_available() -> bool {
+    use std::sync::OnceLock;
+    static AVAILABLE: OnceLock<bool> = OnceLock::new();
+    *AVAILABLE.get_or_init(|| {
+        std::process::Command::new("bwrap")
+            .args(["--ro-bind", "/", "/", "/bin/true"])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .is_ok_and(|s| s.success())
+    })
 }

@@ -30,7 +30,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use crate::frontend::traits::AgentFrontend;
-use loopal_context::{ContextPipeline, ContextStore};
+use loopal_context::ContextStore;
 use loopal_error::{AgentOutput, Result};
 use loopal_kernel::Kernel;
 use loopal_protocol::InterruptSignal;
@@ -49,10 +49,10 @@ pub use runner::AgentLoopRunner;
 /// Maximum number of automatic continuations when LLM hits max_tokens.
 pub(crate) const MAX_AUTO_CONTINUATIONS: u32 = 3;
 
-pub struct AgentLoopParams {
-    pub kernel: Arc<Kernel>,
-    pub session: Session,
-    pub store: ContextStore,
+// ── Sub-structs ────────────────────────────────────────────────────
+
+/// Agent configuration — mostly immutable, some fields switchable at runtime.
+pub struct AgentConfig {
     pub model: String,
     /// Model for compaction/summarization. None = use main model.
     pub compact_model: Option<String>,
@@ -60,35 +60,80 @@ pub struct AgentLoopParams {
     pub mode: AgentMode,
     pub permission_mode: PermissionMode,
     pub max_turns: u32,
-    pub frontend: Arc<dyn AgentFrontend>,
-    pub session_manager: SessionManager,
-    pub context_pipeline: ContextPipeline,
-    /// Tool whitelist filter — if `Some`, only tools in this set are exposed to LLM.
+    /// Tool whitelist filter — if `Some`, only tools in this set are exposed.
     pub tool_filter: Option<HashSet<String>>,
-    /// Opaque shared state forwarded to ToolContext for agent tool access.
-    pub shared: Option<Arc<dyn std::any::Any + Send + Sync>>,
     /// Whether this agent waits for user input between turns.
-    /// `true` for root agent (TUI interaction), `false` for sub-agents (exit on no tool calls).
     pub interactive: bool,
     /// Thinking/reasoning configuration (default: Auto).
     pub thinking_config: ThinkingConfig,
-    /// Shared interrupt signal — TUI sets it on ESC or message-while-busy.
-    pub interrupt: InterruptSignal,
-    /// Watch channel for interrupt wakeup — level-triggered, no signal loss.
-    pub interrupt_tx: Arc<watch::Sender<u64>>,
+}
+
+impl Default for AgentConfig {
+    fn default() -> Self {
+        Self {
+            model: "claude-sonnet-4-20250514".into(),
+            compact_model: None,
+            system_prompt: String::new(),
+            mode: AgentMode::Act,
+            permission_mode: PermissionMode::Bypass,
+            max_turns: 50,
+            tool_filter: None,
+            interactive: true,
+            thinking_config: ThinkingConfig::Auto,
+        }
+    }
+}
+
+/// Injected dependencies — set once at construction, never modified.
+pub struct AgentDeps {
+    pub kernel: Arc<Kernel>,
+    pub frontend: Arc<dyn AgentFrontend>,
+    pub session_manager: SessionManager,
+}
+
+/// Interrupt/cancellation signals shared with the TUI.
+pub struct InterruptHandle {
+    pub signal: InterruptSignal,
+    pub tx: Arc<watch::Sender<u64>>,
+}
+
+impl InterruptHandle {
+    pub fn new() -> Self {
+        Self {
+            signal: InterruptSignal::new(),
+            tx: Arc::new(watch::channel(0u64).0),
+        }
+    }
+}
+
+impl Default for InterruptHandle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── AgentLoopParams ────────────────────────────────────────────────
+
+pub struct AgentLoopParams {
+    pub config: AgentConfig,
+    pub deps: AgentDeps,
+    pub session: Session,
+    pub store: ContextStore,
+    pub interrupt: InterruptHandle,
+    /// Opaque shared state forwarded to ToolContext for agent tool access.
+    pub shared: Option<Arc<dyn std::any::Any + Send + Sync>>,
     /// Memory channel for the Memory tool → Observer sidebar.
     pub memory_channel: Option<Arc<dyn MemoryChannel>>,
 }
 
-/// Public wrapper function that preserves the existing API.
-/// Constructs default observers (loop detection, diff tracking) and runs the loop.
+/// Public wrapper — constructs default observers and runs the loop.
 ///
 /// A `FinishedGuard` ensures `Finished` is always emitted — even on panic.
 pub async fn agent_loop(params: AgentLoopParams) -> Result<AgentOutput> {
-    let mut guard = FinishedGuard::new(params.frontend.clone());
+    let mut guard = FinishedGuard::new(params.deps.frontend.clone());
     let observers: Vec<Box<dyn turn_observer::TurnObserver>> = vec![
         Box::new(loop_detector::LoopDetector::new()),
-        Box::new(diff_tracker::DiffTracker::new(params.frontend.clone())),
+        Box::new(diff_tracker::DiffTracker::new(params.deps.frontend.clone())),
     ];
     let mut runner = AgentLoopRunner::new(params);
     runner.observers = observers;
@@ -104,9 +149,6 @@ pub(crate) struct TurnOutput {
 }
 
 /// Result of waiting for user input.
-///
-/// `wait_for_input` handles control commands (clear, compact, mode switch,
-/// rewind, etc.) internally — only a real user message exits the wait.
 pub enum WaitResult {
     /// A user message was added to the conversation
     MessageAdded,

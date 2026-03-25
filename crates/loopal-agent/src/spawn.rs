@@ -5,7 +5,7 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, info, info_span};
 
-use loopal_context::{ContextBudget, ContextPipeline, ContextStore};
+use loopal_context::{ContextBudget, ContextStore};
 use loopal_message::Message;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::Envelope;
@@ -119,7 +119,6 @@ pub async fn spawn_agent(
     };
 
     let max_turns = params.agent_config.max_turns;
-    let pipeline = ContextPipeline::new();
 
     // Homogeneous: child gets same shared refs with depth+1
     let child_shared = Arc::new(AgentShared {
@@ -141,24 +140,26 @@ pub async fn spawn_agent(
     let budget = ContextBudget::calculate(200_000, &system_prompt, 0, 16_384);
 
     let agent_params = AgentLoopParams {
-        kernel: Arc::clone(&shared.kernel),
+        config: loopal_runtime::AgentConfig {
+            model,
+            system_prompt,
+            compact_model: shared.kernel.settings().compact_model.clone(),
+            mode: AgentMode::Act,
+            permission_mode: params.agent_config.permission_mode,
+            max_turns,
+            tool_filter,
+            interactive: false,
+            thinking_config: loopal_provider_api::ThinkingConfig::Auto,
+        },
+        deps: loopal_runtime::AgentDeps {
+            kernel: Arc::clone(&shared.kernel),
+            frontend,
+            session_manager,
+        },
         session,
-        model,
-        system_prompt,
-        compact_model: shared.kernel.settings().compact_model.clone(),
         store: ContextStore::from_messages(vec![Message::user(&params.prompt)], budget),
-        mode: AgentMode::Act,
-        permission_mode: params.agent_config.permission_mode,
-        max_turns,
-        frontend,
-        session_manager,
-        tool_filter,
-        context_pipeline: pipeline,
+        interrupt: loopal_runtime::InterruptHandle::new(),
         shared: Some(shared_any),
-        interactive: false,
-        thinking_config: loopal_provider_api::ThinkingConfig::Auto,
-        interrupt: loopal_protocol::InterruptSignal::new(),
-        interrupt_tx: std::sync::Arc::new(tokio::sync::watch::channel(0u64).0),
         memory_channel: None, // Sub-agents do not get memory channel
     };
 
@@ -188,7 +189,6 @@ pub async fn spawn_agent(
         }
         .instrument(span)
     });
-
     Ok(SpawnResult {
         agent_id: agent_id.clone(),
         handle: AgentHandle {

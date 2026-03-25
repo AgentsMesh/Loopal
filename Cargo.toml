@@ -48,6 +48,7 @@ members = [
     "crates/loopal-memory",
     "crates/loopal-prompt",
     "crates/loopal-prompt-system",
+    "crates/loopal-test-support",
 ]
 
 [workspace.package]
@@ -157,6 +158,7 @@ loopal-git = { path = "crates/loopal-git" }
 loopal-memory = { path = "crates/loopal-memory" }
 loopal-prompt = { path = "crates/loopal-prompt" }
 loopal-prompt-system = { path = "crates/loopal-prompt-system" }
+loopal-test-support = { path = "crates/loopal-test-support" }
 
 # Prompt templates
 minijinja = { version = "2", features = ["loader"] }

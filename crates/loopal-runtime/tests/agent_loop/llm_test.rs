@@ -12,10 +12,12 @@ fn test_prepare_chat_params_act_mode() {
     let params = runner
         .prepare_chat_params_with(runner.params.store.messages())
         .expect("should succeed");
+
+    assert_eq!(params.model, "claude-sonnet-4-20250514");
+    // Default system_prompt is empty; only env section is appended
     assert!(
-        params
-            .system_prompt
-            .contains("You are a helpful assistant.")
+        !params.system_prompt.is_empty(),
+        "env section should be present"
     );
     assert_eq!(params.max_tokens, runner.model_config.max_output_tokens);
     assert!(params.messages.is_empty());
@@ -29,7 +31,7 @@ fn test_prepare_chat_params_plan_mode_passes_through() {
     // not appended by llm.rs. Verify system_prompt starts with the original
     // (env section is appended dynamically per-turn).
     let (mut runner, _rx) = make_runner();
-    runner.params.mode = AgentMode::Plan;
+    runner.params.config.mode = AgentMode::Plan;
     let params = runner
         .prepare_chat_params_with(runner.params.store.messages())
         .expect("should succeed");
@@ -37,7 +39,7 @@ fn test_prepare_chat_params_plan_mode_passes_through() {
     assert!(
         params
             .system_prompt
-            .starts_with(&runner.params.system_prompt),
+            .starts_with(&runner.params.config.system_prompt),
         "llm.rs should preserve original system_prompt (env section appended)"
     );
 }
@@ -195,7 +197,7 @@ fn report_real_system_prompt_tokens() {
     let (mut runner, _rx) = make_runner();
 
     // Build a real system prompt using the fragment system with real tool defs
-    let tool_defs = runner.params.kernel.tool_definitions();
+    let tool_defs = runner.params.deps.kernel.tool_definitions();
     let real_prompt = loopal_context::build_system_prompt(
         "You are a helpful assistant.",
         &tool_defs,
@@ -204,7 +206,7 @@ fn report_real_system_prompt_tokens() {
         "",
         "",
     );
-    runner.params.system_prompt = real_prompt.clone();
+    runner.params.config.system_prompt = real_prompt.clone();
     let params = runner
         .prepare_chat_params_with(runner.params.store.messages())
         .unwrap();

@@ -25,7 +25,7 @@ pub fn build_sandbox_prefix(policy: &ResolvedPolicy, cwd: &Path) -> Option<(Stri
 
     #[cfg(target_os = "linux")]
     {
-        Some(linux::build_prefix(policy, cwd))
+        linux::build_prefix(policy, cwd)
     }
 
     #[cfg(not(any(target_os = "macos", target_os = "linux")))]

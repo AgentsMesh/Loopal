@@ -40,3 +40,4 @@ futures = { workspace = true }
 tempfile = "3"
 chrono = { workspace = true }
 loopal-backend = { workspace = true }
+loopal-test-support = { workspace = true }

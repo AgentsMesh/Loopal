@@ -7,7 +7,7 @@ use super::{make_cancel, make_runner_with_channels};
 #[tokio::test]
 async fn test_execute_tools_bypass_mode() {
     let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx, _perm_tx) = make_runner_with_channels();
-    runner.params.permission_mode = PermissionMode::Bypass;
+    runner.params.config.permission_mode = PermissionMode::Bypass;
 
     // Create a temp file for Read tool
     let tmp = std::env::temp_dir().join("loopal_exec_tools_test.txt");
@@ -55,7 +55,7 @@ async fn test_execute_tools_bypass_mode() {
 async fn test_execute_tools_supervised_denies_without_approval() {
     // Supervised mode sends Ask → no response from perm channel → Deny
     let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx, perm_tx) = make_runner_with_channels();
-    runner.params.permission_mode = PermissionMode::Supervised;
+    runner.params.config.permission_mode = PermissionMode::Supervised;
 
     // Drop perm_tx so the ask returns Deny
     drop(perm_tx);
@@ -91,7 +91,7 @@ async fn test_execute_tools_supervised_denies_without_approval() {
 async fn test_execute_tools_read_allowed_write_denied_in_supervised() {
     // Tests the interleaving: Read (ReadOnly → Allow) and Write (Supervised → Ask → Deny)
     let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx, perm_tx) = make_runner_with_channels();
-    runner.params.permission_mode = PermissionMode::Supervised;
+    runner.params.config.permission_mode = PermissionMode::Supervised;
 
     // Drop perm_tx so the ask returns Deny
     drop(perm_tx);

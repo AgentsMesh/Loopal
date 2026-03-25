@@ -1,4 +1,4 @@
-use crossterm::event::{self, Event as CrosstermEvent, KeyEvent, MouseEventKind};
+use crossterm::event::{self, Event as CrosstermEvent, KeyEvent};
 use loopal_protocol::AgentEvent;
 use tokio::sync::mpsc;
 
@@ -9,8 +9,6 @@ use crate::input::paste::PasteResult;
 pub enum AppEvent {
     /// Keyboard / terminal event
     Key(KeyEvent),
-    /// Mouse scroll: positive = scroll up (toward older content), negative = scroll down.
-    Scroll(i16),
     /// Resize event
     Resize(u16, u16),
     /// Agent event from the runtime
@@ -59,19 +57,6 @@ impl EventHandler {
                             break;
                         }
                     }
-                    Ok(Some(CrosstermEvent::Mouse(mouse))) => match mouse.kind {
-                        MouseEventKind::ScrollUp => {
-                            if term_tx.send(AppEvent::Scroll(3)).await.is_err() {
-                                break;
-                            }
-                        }
-                        MouseEventKind::ScrollDown => {
-                            if term_tx.send(AppEvent::Scroll(-3)).await.is_err() {
-                                break;
-                            }
-                        }
-                        _ => {} // Ignore clicks, drags, moves
-                    },
                     Ok(Some(CrosstermEvent::Resize(w, h))) => {
                         if term_tx.send(AppEvent::Resize(w, h)).await.is_err() {
                             break;

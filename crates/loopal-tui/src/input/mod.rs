@@ -125,13 +125,19 @@ fn handle_normal_key(app: &mut App, key: &KeyEvent) -> InputAction {
             InputAction::None
         }
         KeyCode::Up if app.scroll_offset > 0 || !app.session.lock().agent_idle => {
-            // Browsing mode (scrolled away from bottom) or agent running:
-            // scroll content area instead of input navigation.
-            app.scroll_offset = app.scroll_offset.saturating_add(3);
+            // Browsing mode or agent running: scroll content area.
+            app.scroll_offset = app.scroll_offset.saturating_add(1);
+            InputAction::None
+        }
+        KeyCode::Up if app.content_overflows => {
+            // Content exceeds viewport: scroll takes priority over history.
+            // Alternate scroll sends ~3 Up arrows per wheel notch, so step=1
+            // yields ~3 lines/notch — matching prior mouse-capture behavior.
+            app.scroll_offset = app.scroll_offset.saturating_add(1);
             InputAction::None
         }
         KeyCode::Down if app.scroll_offset > 0 => {
-            app.scroll_offset = app.scroll_offset.saturating_sub(3);
+            app.scroll_offset = app.scroll_offset.saturating_sub(1);
             InputAction::None
         }
         KeyCode::Up => handle_up(app),

@@ -5,53 +5,7 @@ use std::sync::Arc;
 use loopal_agent::router::MessageRouter;
 use loopal_protocol::{Envelope, MessageSource, UserContent};
 
-use crate::app::{App, SubPage};
-
-/// Handle mouse scroll events. Positive delta = scroll up, negative = down.
-pub fn handle_scroll(app: &mut App, delta: i16) {
-    // Sub-page picker: scroll moves selection
-    if let Some(ref mut sub) = app.sub_page {
-        match sub {
-            SubPage::ModelPicker(p) => {
-                if delta > 0 {
-                    p.selected = p.selected.saturating_sub(1);
-                } else {
-                    let count = p.filtered_items().len();
-                    if p.selected + 1 < count {
-                        p.selected += 1;
-                    }
-                }
-            }
-            SubPage::RewindPicker(s) => {
-                if delta > 0 {
-                    s.selected = s.selected.saturating_sub(1);
-                } else if s.selected + 1 < s.turns.len() {
-                    s.selected += 1;
-                }
-            }
-        }
-        return;
-    }
-    // Question dialog: scroll moves cursor
-    {
-        let mut state = app.session.lock();
-        if let Some(ref mut q) = state.pending_question {
-            if delta > 0 {
-                q.cursor_up();
-            } else {
-                q.cursor_down();
-            }
-            return;
-        }
-    }
-    // Content area scroll
-    let abs = delta.unsigned_abs();
-    if delta > 0 {
-        app.scroll_offset = app.scroll_offset.saturating_add(abs);
-    } else {
-        app.scroll_offset = app.scroll_offset.saturating_sub(abs);
-    }
-}
+use crate::app::App;
 
 pub async fn handle_question_confirm(app: &mut App) {
     let answers = {

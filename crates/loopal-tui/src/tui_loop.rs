@@ -19,7 +19,7 @@ use crate::render::draw;
 use crate::slash_handler::handle_slash_command;
 use crate::terminal::TerminalGuard;
 use crate::tui_helpers::{
-    cycle_focus, handle_question_confirm, handle_scroll, route_human_message,
+    cycle_focus, handle_question_confirm, route_human_message,
 };
 
 /// Run the TUI event loop.
@@ -73,9 +73,6 @@ pub async fn run_tui(
                     if let Some(content) = app.session.handle_event(agent_event) {
                         route_human_message(&router, &target_agent, content).await;
                     }
-                }
-                AppEvent::Scroll(delta) => {
-                    handle_scroll(&mut app, delta);
                 }
                 AppEvent::Paste(result) => {
                     paste::apply_paste_result(&mut app, result);

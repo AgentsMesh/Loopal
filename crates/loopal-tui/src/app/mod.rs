@@ -37,6 +37,9 @@ pub struct App {
     pub input_scroll: usize,
     /// Paste placeholder → original content map for large paste folding.
     pub paste_map: HashMap<String, String>,
+    /// Whether the content area overflows the viewport (set by render pass).
+    /// Used by input handler to decide Up/Down = scroll vs history navigation.
+    pub content_overflows: bool,
 
     // === Session Controller (observable + interactive) ===
     pub session: SessionController,
@@ -62,6 +65,7 @@ impl App {
             last_esc_time: None,
             input_scroll: 0,
             paste_map: HashMap::new(),
+            content_overflows: false,
             session,
             line_cache: LineCache::new(),
         }

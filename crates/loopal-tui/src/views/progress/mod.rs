@@ -14,18 +14,19 @@ pub use message_lines::{message_to_lines, streaming_to_lines};
 
 /// Render the content area — no border, no title, content fills the area.
 ///
-/// Lines are pre-wrapped to terminal width via textwrap, so each Line
-/// equals one visual row. `lines.len()` is the exact visual line count.
+/// Returns `true` when total content exceeds the visible viewport height.
+/// The caller stores this flag so the input handler can decide whether
+/// Up/Down should scroll content or navigate input history.
 pub fn render_progress(
     f: &mut Frame,
     state: &SessionState,
     scroll_offset: u16,
     line_cache: &mut LineCache,
     area: Rect,
-) {
+) -> bool {
     let visible_h = area.height as usize;
     if visible_h == 0 {
-        return;
+        return false;
     }
 
     // Update cache with width for pre-wrapping (resize triggers full rebuild)
@@ -51,6 +52,7 @@ pub fn render_progress(
     let cached_tail = line_cache.tail(window_size);
 
     // Build the render lines: cached tail + thinking + streaming
+    let overflows = line_cache.total_lines() + streaming.len() + thinking_lines.len() > visible_h;
     let mut lines = Vec::with_capacity(cached_tail.len() + thinking_lines.len() + streaming.len());
     lines.extend_from_slice(cached_tail);
     lines.extend(thinking_lines);
@@ -64,4 +66,6 @@ pub fn render_progress(
 
     let paragraph = Paragraph::new(lines).scroll((scroll_row, 0));
     f.render_widget(paragraph, area);
+
+    overflows
 }

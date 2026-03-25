@@ -101,7 +101,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     }
 
     // --- Σ f_i(state_i) ---
-    views::progress::render_progress(
+    app.content_overflows = views::progress::render_progress(
         f,
         &state,
         app.scroll_offset,

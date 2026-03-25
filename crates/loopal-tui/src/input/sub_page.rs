@@ -6,10 +6,15 @@ use super::{InputAction, SlashCommandAction};
 
 /// Handle keys when a sub-page (picker) is active. All keys are consumed.
 pub(super) fn handle_sub_page_key(app: &mut App, key: &KeyEvent) -> InputAction {
-    // Ctrl+C still quits even in sub-page
+    // Ctrl+C closes sub-page; Ctrl+D quits
     if key.modifiers.contains(KeyModifiers::CONTROL) {
         match key.code {
-            KeyCode::Char('c') | KeyCode::Char('d') => return InputAction::Quit,
+            KeyCode::Char('c') => {
+                app.sub_page = None;
+                app.last_esc_time = None;
+                return InputAction::None;
+            }
+            KeyCode::Char('d') => return InputAction::Quit,
             _ => {}
         }
     }

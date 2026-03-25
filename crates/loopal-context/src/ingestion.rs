@@ -4,6 +4,8 @@
 //! - `ToolResult` (String content) → safe to truncate text
 //! - `ServerToolResult` (JSON content) → only whole replacement with Text, NEVER truncate
 
+use std::collections::HashSet;
+
 use crate::token_counter::estimate_tokens;
 use loopal_message::{ContentBlock, Message, MessageRole};
 
@@ -46,6 +48,10 @@ pub fn cap_assistant_server_blocks(msg: &mut Message, max_tokens: u32) {
     if msg.role != MessageRole::Assistant {
         return;
     }
+    // Strip orphaned pairs first — a truncated LLM response can leave
+    // a ServerToolUse without its ServerToolResult, which the API rejects.
+    strip_orphaned_server_tool_blocks(msg);
+
     let has_server_blocks = msg
         .content
         .iter()
@@ -60,6 +66,42 @@ pub fn cap_assistant_server_blocks(msg: &mut Message, max_tokens: u32) {
     // Message exceeds budget — condense server blocks unconditionally.
     // Even if text alone is large, stripping server blocks still frees tokens.
     condense_server_blocks_in_message(msg);
+}
+
+/// Strip `ServerToolUse` blocks that have no matching `ServerToolResult`,
+/// and vice versa, within a single assistant message.
+///
+/// This happens when the LLM response is truncated (max_tokens) mid-server-tool.
+/// Called at ingestion time to prevent broken pairs from entering the store.
+fn strip_orphaned_server_tool_blocks(msg: &mut Message) {
+    let result_ids: HashSet<String> = msg
+        .content
+        .iter()
+        .filter_map(|b| match b {
+            ContentBlock::ServerToolResult { tool_use_id, .. } => Some(tool_use_id.clone()),
+            _ => None,
+        })
+        .collect();
+
+    let use_ids: HashSet<String> = msg
+        .content
+        .iter()
+        .filter_map(|b| match b {
+            ContentBlock::ServerToolUse { id, .. } => Some(id.clone()),
+            _ => None,
+        })
+        .collect();
+
+    // Nothing to check if neither type is present
+    if result_ids.is_empty() && use_ids.is_empty() {
+        return;
+    }
+
+    msg.content.retain(|b| match b {
+        ContentBlock::ServerToolUse { id, .. } => result_ids.contains(id),
+        ContentBlock::ServerToolResult { tool_use_id, .. } => use_ids.contains(tool_use_id),
+        _ => true,
+    });
 }
 
 /// Condense server blocks within a single message (internal helper).

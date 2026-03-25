@@ -18,9 +18,7 @@ use crate::input::{InputAction, handle_key};
 use crate::render::draw;
 use crate::slash_handler::handle_slash_command;
 use crate::terminal::TerminalGuard;
-use crate::tui_helpers::{
-    cycle_focus, handle_question_confirm, route_human_message,
-};
+use crate::tui_helpers::{cycle_focus, handle_question_confirm, route_human_message};
 
 /// Run the TUI event loop.
 ///

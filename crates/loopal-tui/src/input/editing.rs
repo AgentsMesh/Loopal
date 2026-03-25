@@ -1,7 +1,7 @@
 use crate::app::App;
 
-use super::commands::try_execute_slash_command;
 use super::InputAction;
+use super::commands::try_execute_slash_command;
 
 pub(super) fn handle_enter(app: &mut App) -> InputAction {
     let trimmed = app.input.trim().to_string();

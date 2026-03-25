@@ -48,7 +48,10 @@ fn test_up_scrolls_when_content_overflows() {
     let mut app = make_app();
     app.content_overflows = true;
     handle_key(&mut app, key(KeyCode::Up));
-    assert_eq!(app.scroll_offset, 1, "Up should scroll +1 when content overflows");
+    assert_eq!(
+        app.scroll_offset, 1,
+        "Up should scroll +1 when content overflows"
+    );
     handle_key(&mut app, key(KeyCode::Up));
     assert_eq!(app.scroll_offset, 2, "repeated Up should keep incrementing");
 }
@@ -58,7 +61,10 @@ fn test_down_scrolls_back_when_offset_positive() {
     let mut app = make_app();
     app.scroll_offset = 5;
     handle_key(&mut app, key(KeyCode::Down));
-    assert_eq!(app.scroll_offset, 4, "Down should scroll -1 when offset > 0");
+    assert_eq!(
+        app.scroll_offset, 4,
+        "Down should scroll -1 when offset > 0"
+    );
 }
 
 #[test]
@@ -69,7 +75,10 @@ fn test_up_navigates_history_when_content_fits() {
     app.input_history.push("previous command".into());
     let action = handle_key(&mut app, key(KeyCode::Up));
     assert!(matches!(action, InputAction::None));
-    assert_eq!(app.input, "previous command", "Up should browse history when content fits");
+    assert_eq!(
+        app.input, "previous command",
+        "Up should browse history when content fits"
+    );
     assert_eq!(app.scroll_offset, 0, "scroll_offset should stay 0");
 }
 
@@ -100,8 +109,14 @@ fn test_ctrl_c_cancels_question() {
             vec![Question {
                 question: "Pick one".into(),
                 options: vec![
-                    QuestionOption { label: "A".into(), description: "Option A".into() },
-                    QuestionOption { label: "B".into(), description: "Option B".into() },
+                    QuestionOption {
+                        label: "A".into(),
+                        description: "Option A".into(),
+                    },
+                    QuestionOption {
+                        label: "B".into(),
+                        description: "Option B".into(),
+                    },
                 ],
                 allow_multiple: false,
             }],

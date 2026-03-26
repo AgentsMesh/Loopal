@@ -43,7 +43,6 @@ fn make_ctx(channel: Option<Arc<dyn MemoryChannel>>) -> ToolContext {
         backend,
         session_id: "test".into(),
         shared: None,
-        pending_cwd_switch: Default::default(),
         memory_channel: channel,
         output_tail: None,
     }

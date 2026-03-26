@@ -121,8 +121,10 @@ async fn push_to_inbox(
     app.input_history.push(content.text.clone());
     app.history_index = None;
     if let Some(msg) = app.session.enqueue_message(content) {
+        tracing::debug!("TUI: message forwarded to agent");
         route_human_message(router, target_agent, msg).await;
     } else {
+        tracing::debug!("TUI: agent busy, message queued + interrupt sent");
         app.session.interrupt();
     }
 }

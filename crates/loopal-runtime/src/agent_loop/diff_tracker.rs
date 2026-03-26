@@ -79,19 +79,15 @@ impl TurnObserver for DiffTracker {
             return;
         }
         let files: Vec<String> = ctx.modified_files.iter().cloned().collect();
-        let frontend = self.frontend.clone();
         tracing::info!(
             files = ?files,
             count = files.len(),
             "turn modified files"
         );
-        // Fire-and-forget: on_turn_end is sync, emit is async
-        tokio::spawn(async move {
-            let _ = frontend
-                .emit(AgentEventPayload::TurnDiffSummary {
-                    modified_files: files,
-                })
-                .await;
+        // Fire-and-forget via try_emit: spawns its own task internally,
+        // avoiding writer-mutex contention with the subsequent AwaitingInput emit.
+        self.frontend.try_emit(AgentEventPayload::TurnDiffSummary {
+            modified_files: files,
         });
     }
 }

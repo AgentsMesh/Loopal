@@ -37,6 +37,7 @@ impl TurnCancel {
         let token = CancellationToken::new();
         let interrupt_rx = interrupt_tx.subscribe();
         if interrupt.is_signaled() {
+            tracing::debug!("TurnCancel: pre-cancelled due to stale interrupt");
             token.cancel();
         }
         Self {

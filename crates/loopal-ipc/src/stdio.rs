@@ -53,6 +53,7 @@ impl Transport for StdioTransport {
         }
         .await;
         if let Err(ref e) = result {
+            tracing::warn!("IPC transport: write failed, disconnecting: {e}");
             self.connected.store(false, Ordering::Release);
             return Err(LoopalError::Ipc(format!("write failed: {e}")));
         }

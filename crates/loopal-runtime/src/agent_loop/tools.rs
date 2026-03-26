@@ -1,7 +1,7 @@
 use loopal_error::Result;
 use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_protocol::AgentEventPayload;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 use loopal_tool_api::COMPLETION_PREFIX;
 
@@ -75,6 +75,7 @@ impl AgentLoopRunner {
         for (idx, (id, name, input)) in tool_uses.iter().enumerate() {
             match name.as_str() {
                 "EnterPlanMode" => {
+                    debug!(tool = name, "intercepted special tool");
                     self.params.config.mode = AgentMode::Plan;
                     self.emit(AgentEventPayload::ModeChanged {
                         mode: "plan".into(),

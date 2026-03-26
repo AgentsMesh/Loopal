@@ -107,6 +107,7 @@ impl Connection {
     /// entry is removed from the map to prevent memory leaks.
     pub async fn send_request(&self, method: &str, params: Value) -> Result<Value, String> {
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
+        debug!(id, method, "IPC send_request");
         let (tx, rx) = oneshot::channel();
         self.pending.lock().await.insert(id, tx);
 
@@ -129,6 +130,7 @@ impl Connection {
 
     /// Send a JSON-RPC notification (fire-and-forget, no response expected).
     pub async fn send_notification(&self, method: &str, params: Value) -> Result<(), String> {
+        debug!(method, "IPC send_notification");
         let data = jsonrpc::encode_notification(method, params);
         self.transport
             .send(&data)
@@ -138,6 +140,7 @@ impl Connection {
 
     /// Send a successful response to an incoming request.
     pub async fn respond(&self, id: i64, result: Value) -> Result<(), String> {
+        debug!(id, "IPC respond ok");
         let data = jsonrpc::encode_response(id, result);
         self.transport
             .send(&data)
@@ -147,6 +150,7 @@ impl Connection {
 
     /// Send an error response to an incoming request.
     pub async fn respond_error(&self, id: i64, code: i64, message: &str) -> Result<(), String> {
+        debug!(id, code, message, "IPC respond_error");
         let data = jsonrpc::encode_error(id, code, message);
         self.transport
             .send(&data)

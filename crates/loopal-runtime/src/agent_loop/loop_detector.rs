@@ -42,12 +42,14 @@ impl TurnObserver for LoopDetector {
             *count += 1;
 
             if *count >= ABORT_THRESHOLD {
+                tracing::warn!(tool = name, count, "loop detected, aborting turn");
                 return ObserverAction::AbortTurn(format!(
                     "Loop detected: tool '{name}' called {count} cumulative times \
                      with similar arguments. Aborting to prevent waste.",
                 ));
             }
             if *count >= WARN_THRESHOLD {
+                tracing::warn!(tool = name, count, "possible loop detected");
                 worst = ObserverAction::InjectWarning(format!(
                     "[WARNING: Tool '{name}' has been called {count} times with similar \
                      arguments. You may be stuck in a loop. Try a different \

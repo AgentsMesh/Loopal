@@ -18,8 +18,12 @@ impl AgentLoopRunner {
     pub async fn wait_for_input(&mut self) -> Result<Option<WaitResult>> {
         // Discard any stale interrupt signal from the previous turn.
         // Entering idle means the prior turn's interrupt has been fully handled.
-        self.interrupt.take();
+        let stale = self.interrupt.take();
+        if stale {
+            info!("cleared stale interrupt before waiting for input");
+        }
         self.emit(AgentEventPayload::AwaitingInput).await?;
+        info!("awaiting user input");
         loop {
             let input = self.params.deps.frontend.recv_input().await;
             match input {

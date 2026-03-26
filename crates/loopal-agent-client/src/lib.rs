@@ -4,6 +4,7 @@
 //! an Agent process. This is the "Browser Process" side in the Chromium analogy.
 
 pub mod bridge;
+mod bridge_handlers;
 mod client;
 mod process;
 

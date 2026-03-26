@@ -11,6 +11,7 @@ pub mod fixture;
 pub mod git_fixture;
 pub mod harness;
 pub mod hook_fixture;
+pub mod ipc_harness;
 pub mod mcp_mock;
 pub mod mock_provider;
 pub mod scenarios;

@@ -43,6 +43,9 @@ members = [
     "crates/loopal-session",
     "crates/loopal-tui",
     "crates/loopal-acp",
+    "crates/loopal-ipc",
+    "crates/loopal-agent-server",
+    "crates/loopal-agent-client",
     "crates/loopal-backend",
     "crates/loopal-git",
     "crates/loopal-memory",
@@ -153,6 +156,9 @@ loopal-agent = { path = "crates/loopal-agent" }
 loopal-session = { path = "crates/loopal-session" }
 loopal-tui = { path = "crates/loopal-tui" }
 loopal-acp = { path = "crates/loopal-acp" }
+loopal-ipc = { path = "crates/loopal-ipc" }
+loopal-agent-server = { path = "crates/loopal-agent-server" }
+loopal-agent-client = { path = "crates/loopal-agent-client" }
 loopal-backend = { path = "crates/loopal-backend" }
 loopal-git = { path = "crates/loopal-git" }
 loopal-memory = { path = "crates/loopal-memory" }
@@ -185,8 +191,12 @@ loopal-agent = { workspace = true }
 loopal-session = { workspace = true }
 loopal-tui = { workspace = true }
 loopal-acp = { workspace = true }
+loopal-agent-server = { workspace = true }
+loopal-agent-client = { workspace = true }
+loopal-ipc = { workspace = true }
 loopal-git = { workspace = true }
 loopal-memory = { workspace = true }
+serde_json = { workspace = true }
 tokio = { workspace = true }
 clap = { workspace = true }
 tracing = { workspace = true }
@@ -196,3 +206,10 @@ chrono = { workspace = true }
 dirs = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+
+[dev-dependencies]
+loopal-ipc = { workspace = true }
+loopal-protocol = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "io-util", "process"] }
+tempfile = "3"

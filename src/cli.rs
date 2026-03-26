@@ -27,6 +27,19 @@ pub struct Cli {
     #[arg(long)]
     pub acp: bool,
 
+    /// Run as agent server for multi-process mode (stdin/stdout IPC)
+    #[arg(long)]
+    pub serve: bool,
+
+    /// Disable multi-process mode (run TUI and agent in same process)
+    #[arg(long)]
+    pub no_ipc: bool,
+
+    /// [Testing] Path to JSON file with mock LLM responses for --serve mode.
+    /// Can also be set via LOOPAL_TEST_PROVIDER env var.
+    #[arg(long, hide = true)]
+    pub test_provider: Option<String>,
+
     /// Initial prompt (non-interactive)
     pub prompt: Vec<String>,
 }

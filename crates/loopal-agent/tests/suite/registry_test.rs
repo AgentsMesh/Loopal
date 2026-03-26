@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use loopal_agent::registry::{AgentHandle, AgentRegistry};
 use tokio_util::sync::CancellationToken;
 
@@ -9,6 +11,7 @@ fn make_handle(name: &str) -> AgentHandle {
         agent_type: "default".to_string(),
         cancel_token: token,
         join_handle: tokio::spawn(async {}),
+        process: Arc::new(tokio::sync::Mutex::new(None)),
     }
 }
 
@@ -41,4 +44,37 @@ async fn test_iter() {
     let mut names: Vec<_> = reg.iter().map(|h| h.name.clone()).collect();
     names.sort();
     assert_eq!(names, vec!["a", "b"]);
+}
+
+#[tokio::test]
+async fn test_shutdown_all_clears_registry() {
+    let mut reg = AgentRegistry::new();
+    let token_a = CancellationToken::new();
+    let token_b = CancellationToken::new();
+    let ta = token_a.clone();
+    let tb = token_b.clone();
+
+    reg.register(AgentHandle {
+        id: "id-a".into(),
+        name: "a".into(),
+        agent_type: "default".into(),
+        cancel_token: token_a,
+        join_handle: tokio::spawn(async {}),
+        process: Arc::new(tokio::sync::Mutex::new(None)),
+    });
+    reg.register(AgentHandle {
+        id: "id-b".into(),
+        name: "b".into(),
+        agent_type: "default".into(),
+        cancel_token: token_b,
+        join_handle: tokio::spawn(async {}),
+        process: Arc::new(tokio::sync::Mutex::new(None)),
+    });
+
+    assert_eq!(reg.len(), 2);
+    reg.shutdown_all().await;
+    assert!(reg.is_empty());
+    // Tokens should be cancelled
+    assert!(ta.is_cancelled());
+    assert!(tb.is_cancelled());
 }

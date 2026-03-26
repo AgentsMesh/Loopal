@@ -6,6 +6,7 @@ pub mod inbox;
 pub mod message_log;
 pub mod rewind;
 mod server_tool_display;
+pub use server_tool_display::format_server_tool_content;
 pub mod state;
 pub mod thinking_display;
 mod tool_result_handler;

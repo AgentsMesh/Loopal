@@ -56,22 +56,32 @@ pub fn project_messages(messages: &[Message]) -> Vec<DisplayMessage> {
                     image_count += 1;
                 }
                 ContentBlock::Thinking { .. } => {}
-                ContentBlock::ServerToolUse { name, input, .. } => {
-                    let query = input.get("query").and_then(|v| v.as_str()).unwrap_or("");
+                ContentBlock::ServerToolUse { id, name, input } => {
                     tool_calls.push(DisplayToolCall {
-                        id: String::new(),
-                        name: format!("{name} [server]"),
+                        id: id.clone(),
+                        name: name.clone(),
                         status: ToolCallStatus::Success,
-                        summary: format!("{name}({query})"),
+                        summary: format!("{}({})", name, summarize_input(input)),
                         result: None,
-                        tool_input: None,
+                        tool_input: Some(input.clone()),
                         batch_id: None,
                         started_at: None,
                         duration_ms: None,
                         progress_tail: None,
                     });
                 }
-                ContentBlock::ServerToolResult { .. } => {}
+                ContentBlock::ServerToolResult {
+                    tool_use_id,
+                    content,
+                    ..
+                } => {
+                    // ServerToolUse and ServerToolResult are in the same message,
+                    // so the current message hasn't been pushed to `display` yet.
+                    // Patch the in-flight `tool_calls` vec directly.
+                    if let Some(tc) = tool_calls.iter_mut().rev().find(|tc| tc.id == *tool_use_id) {
+                        tc.result = Some(loopal_session::format_server_tool_content(content));
+                    }
+                }
             }
         }
 

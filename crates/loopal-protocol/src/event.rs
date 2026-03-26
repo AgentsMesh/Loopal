@@ -81,6 +81,16 @@ pub enum AgentEventPayload {
     /// Error occurred
     Error { message: String },
 
+    /// Transient retry error — displayed as an in-place banner, not in message history.
+    RetryError {
+        message: String,
+        attempt: u32,
+        max_attempts: u32,
+    },
+
+    /// Retry succeeded or cancelled — clear the banner.
+    RetryCleared,
+
     /// Agent is waiting for user input
     AwaitingInput,
 

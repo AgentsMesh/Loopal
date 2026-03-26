@@ -67,7 +67,9 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
         | AgentEventPayload::Interrupted
         | AgentEventPayload::TurnDiffSummary { .. }
         | AgentEventPayload::ServerToolUse { .. }
-        | AgentEventPayload::ServerToolResult { .. } => return None,
+        | AgentEventPayload::ServerToolResult { .. }
+        | AgentEventPayload::RetryError { .. }
+        | AgentEventPayload::RetryCleared => return None,
     };
 
     let params = SessionUpdateParams {
@@ -155,5 +157,20 @@ mod tests {
         assert!(matches!(map_tool_kind("Write"), ToolKind::Edit));
         assert!(matches!(map_tool_kind("WebFetch"), ToolKind::Fetch));
         assert!(matches!(map_tool_kind("CustomTool"), ToolKind::Other));
+    }
+
+    #[test]
+    fn retry_error_returns_none() {
+        let payload = AgentEventPayload::RetryError {
+            message: "502".into(),
+            attempt: 1,
+            max_attempts: 6,
+        };
+        assert!(translate_event(&payload, "s").is_none());
+    }
+
+    #[test]
+    fn retry_cleared_returns_none() {
+        assert!(translate_event(&AgentEventPayload::RetryCleared, "s").is_none());
     }
 }

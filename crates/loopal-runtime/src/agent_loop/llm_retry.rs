@@ -28,11 +28,19 @@ impl AgentLoopRunner {
                 biased;
                 result = provider.stream_chat(params) => result,
                 _ = cancel.cancelled() => {
+                    if retry_count > 0 {
+                        self.emit(AgentEventPayload::RetryCleared).await?;
+                    }
                     return Ok(Box::pin(futures::stream::empty()));
                 }
             };
             match stream_result {
-                Ok(s) => return Ok(s),
+                Ok(s) => {
+                    if retry_count > 0 {
+                        self.emit(AgentEventPayload::RetryCleared).await?;
+                    }
+                    return Ok(s);
+                }
                 Err(e) if e.is_retryable() && retry_count < MAX_RETRIES => {
                     retry_count += 1;
                     let wait_ms =
@@ -41,20 +49,21 @@ impl AgentLoopRunner {
                         retry = retry_count, max_retries = MAX_RETRIES,
                         wait_ms, error = %e, "retrying"
                     );
-                    self.emit(AgentEventPayload::Error {
+                    self.emit(AgentEventPayload::RetryError {
                         message: format!(
-                            "{}. Retrying in {:.1}s ({}/{})",
+                            "{}. Retrying in {:.1}s",
                             e,
                             wait_ms as f64 / 1000.0,
-                            retry_count,
-                            MAX_RETRIES
                         ),
+                        attempt: retry_count,
+                        max_attempts: MAX_RETRIES,
                     })
                     .await?;
                     tokio::select! {
                         _ = tokio::time::sleep(std::time::Duration::from_millis(wait_ms)) => {}
                         _ = cancel.cancelled() => {
                             info!("cancelled during retry wait");
+                            self.emit(AgentEventPayload::RetryCleared).await?;
                             return Ok(Box::pin(futures::stream::empty()));
                         }
                     }

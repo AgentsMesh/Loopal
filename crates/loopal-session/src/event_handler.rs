@@ -6,7 +6,10 @@ use std::time::Instant;
 use loopal_protocol::{AgentEvent, AgentEventPayload, UserContent};
 
 use crate::agent_handler::apply_agent_event;
-use crate::helpers::{flush_streaming, push_system_msg};
+use crate::helpers::{
+    flush_streaming, handle_auto_continuation, handle_compaction, handle_token_usage,
+    push_system_msg,
+};
 use crate::inbox::try_forward_inbox;
 use crate::message_log::record_message_routed;
 use crate::state::SessionState;
@@ -94,13 +97,7 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
                 image_count: 0,
             });
         }
-        AgentEventPayload::ToolResult {
-            id,
-            name,
-            result,
-            is_error,
-            duration_ms,
-        } => {
+        AgentEventPayload::ToolResult { id, name, result, is_error, duration_ms } => {
             handle_tool_result(state, id, name, result, is_error, duration_ms);
         }
         AgentEventPayload::ToolPermissionRequest { id, name, input } => {
@@ -109,6 +106,7 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
         }
         AgentEventPayload::Error { message } => {
             flush_streaming(state);
+            state.retry_banner = None;
             state.messages.push(DisplayMessage {
                 role: "error".into(),
                 content: message,
@@ -116,44 +114,35 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
                 image_count: 0,
             });
         }
+        AgentEventPayload::RetryError { message, attempt, max_attempts } => {
+            state.retry_banner = Some(format!("{message} ({attempt}/{max_attempts})"));
+        }
+        AgentEventPayload::RetryCleared => {
+            state.retry_banner = None;
+        }
         AgentEventPayload::AwaitingInput => {
             flush_streaming(state);
             state.end_turn();
             state.turn_count += 1;
             state.agent_idle = true;
+            state.retry_banner = None;
             return try_forward_inbox(state);
         }
         AgentEventPayload::MaxTurnsReached { turns } => {
             flush_streaming(state);
             push_system_msg(state, &format!("Max turns reached ({turns})"));
         }
-        AgentEventPayload::AutoContinuation {
-            continuation,
-            max_continuations,
-        } => {
-            push_system_msg(
-                state,
-                &format!(
-                    "Output truncated (max_tokens). Auto-continuing ({continuation}/{max_continuations})"
-                ),
-            );
+        AgentEventPayload::AutoContinuation { continuation, max_continuations } => {
+            handle_auto_continuation(state, continuation, max_continuations);
         }
         AgentEventPayload::TokenUsage {
-            input_tokens,
-            output_tokens,
-            context_window,
-            cache_creation_input_tokens,
-            cache_read_input_tokens,
-            thinking_tokens: _,
+            input_tokens, output_tokens, context_window,
+            cache_creation_input_tokens, cache_read_input_tokens, thinking_tokens: _,
         } => {
-            state.input_tokens = input_tokens;
-            state.output_tokens = output_tokens;
-            state.context_window = context_window;
-            state.cache_creation_tokens = cache_creation_input_tokens;
-            state.cache_read_tokens = cache_read_input_tokens;
-            if input_tokens == 0 && output_tokens == 0 {
-                state.thinking_tokens = 0;
-            }
+            handle_token_usage(
+                state, input_tokens, output_tokens, context_window,
+                cache_creation_input_tokens, cache_read_input_tokens,
+            );
         }
         AgentEventPayload::ModeChanged { mode } => {
             state.mode = mode;
@@ -163,6 +152,7 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
             flush_streaming(state);
             state.end_turn();
             state.agent_idle = true;
+            state.retry_banner = None;
         }
         AgentEventPayload::MessageRouted { .. } => {}
         AgentEventPayload::UserQuestionRequest { id, questions } => {
@@ -173,25 +163,9 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
             crate::rewind::truncate_display_to_turn(state, remaining_turns);
         }
         AgentEventPayload::Compacted {
-            kept,
-            removed,
-            tokens_before,
-            tokens_after,
-            strategy,
+            kept, removed, tokens_before, tokens_after, strategy,
         } => {
-            let freed = tokens_before.saturating_sub(tokens_after);
-            let pct = if tokens_before > 0 {
-                freed * 100 / tokens_before
-            } else {
-                0
-            };
-            push_system_msg(
-                state,
-                &format!(
-                    "Context compacted ({strategy}): {removed} messages removed, \
-                     {kept} kept. {tokens_before}→{tokens_after} tokens ({pct}% freed).",
-                ),
-            );
+            handle_compaction(state, kept, removed, tokens_before, tokens_after, &strategy);
         }
         AgentEventPayload::ToolBatchStart { tool_ids } => {
             handle_tool_batch_start(state, tool_ids);
@@ -205,11 +179,10 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
             flush_streaming(state);
             state.end_turn();
             state.agent_idle = true;
+            state.retry_banner = None;
             return try_forward_inbox(state);
         }
-        AgentEventPayload::TurnDiffSummary { .. } => {
-            // Informational — TUI can display file diff summary in status bar.
-        }
+        AgentEventPayload::TurnDiffSummary { .. } => {}
         AgentEventPayload::ServerToolUse { id: _, name, input } => {
             crate::server_tool_display::handle_server_tool_use(state, name, &input);
         }

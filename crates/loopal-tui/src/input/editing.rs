@@ -8,7 +8,7 @@ pub(super) fn handle_enter(app: &mut App) -> InputAction {
     if trimmed.starts_with('/') {
         app.refresh_commands();
     }
-    if let Some(cmd_action) = try_execute_slash_command(&trimmed, &app.commands) {
+    if let Some(cmd_action) = try_execute_slash_command(&trimmed, &app.command_registry.entries()) {
         app.input.clear();
         app.input_cursor = 0;
         app.autocomplete = None;

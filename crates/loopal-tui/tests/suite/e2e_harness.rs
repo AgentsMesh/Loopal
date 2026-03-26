@@ -9,7 +9,7 @@ use ratatui::backend::TestBackend;
 use loopal_test_support::events::{self, DEFAULT_TIMEOUT};
 use loopal_test_support::{HarnessBuilder, SpawnedHarness};
 use loopal_tui::app::App;
-use loopal_tui::command::CommandEntry;
+
 use loopal_tui::render::draw;
 
 /// Full-stack TUI integration test harness.
@@ -33,7 +33,6 @@ pub async fn build_tui_harness(
     let terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
     let app = App::new(
         inner.session_ctrl.clone(),
-        Vec::<CommandEntry>::new(),
         inner.fixture.path().to_path_buf(),
     );
 

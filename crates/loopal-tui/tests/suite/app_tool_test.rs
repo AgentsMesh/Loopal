@@ -3,7 +3,7 @@ use loopal_protocol::{AgentEvent, AgentEventPayload, UserQuestionResponse};
 use loopal_session::SessionController;
 use loopal_session::ToolCallStatus;
 use loopal_tui::app::App;
-use loopal_tui::command::builtin_entries;
+
 use tokio::sync::mpsc;
 
 fn make_app() -> App {
@@ -19,7 +19,7 @@ fn make_app() -> App {
         Default::default(),
         std::sync::Arc::new(tokio::sync::watch::channel(0u64).0),
     );
-    App::new(session, builtin_entries(), std::env::temp_dir())
+    App::new(session, std::env::temp_dir())
 }
 
 #[test]

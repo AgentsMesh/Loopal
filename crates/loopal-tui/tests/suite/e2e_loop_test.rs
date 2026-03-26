@@ -14,7 +14,7 @@ use loopal_protocol::{
 };
 use loopal_session::SessionController;
 use loopal_tui::app::App;
-use loopal_tui::command::CommandEntry;
+
 use loopal_tui::event::{AppEvent, EventHandler};
 use loopal_tui::run_tui_loop;
 
@@ -49,7 +49,6 @@ fn build_loop_rig() -> (
     let terminal = Terminal::new(backend).unwrap();
     let app = App::new(
         session_ctrl,
-        Vec::<CommandEntry>::new(),
         std::env::temp_dir(),
     );
 

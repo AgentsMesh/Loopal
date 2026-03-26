@@ -4,7 +4,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use loopal_protocol::{ControlCommand, UserQuestionResponse};
 use loopal_session::SessionController;
 use loopal_tui::app::App;
-use loopal_tui::command::builtin_entries;
+
 use loopal_tui::input::{InputAction, handle_key};
 use tokio::sync::mpsc;
 
@@ -21,7 +21,7 @@ fn make_app() -> App {
         Default::default(),
         std::sync::Arc::new(tokio::sync::watch::channel(0u64).0),
     );
-    App::new(session, builtin_entries(), std::env::temp_dir())
+    App::new(session, std::env::temp_dir())
 }
 
 fn key(code: KeyCode) -> KeyEvent {

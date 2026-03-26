@@ -47,10 +47,7 @@ fn build_loop_rig() -> (
     let router = Arc::new(MessageRouter::new(agent_tx));
     let backend = TestBackend::new(80, 24);
     let terminal = Terminal::new(backend).unwrap();
-    let app = App::new(
-        session_ctrl,
-        std::env::temp_dir(),
-    );
+    let app = App::new(session_ctrl, std::env::temp_dir());
 
     let (tx, rx) = mpsc::channel::<AppEvent>(256);
     let events = EventHandler::from_channel(tx.clone(), rx);

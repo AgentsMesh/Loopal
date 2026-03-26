@@ -111,7 +111,9 @@ async fn test_rewind_on_idle_opens_sub_page() {
 #[tokio::test]
 async fn test_rewind_on_busy_agent_shows_error() {
     let mut app = make_app();
-    { app.session.lock().agent_idle = false; }
+    {
+        app.session.lock().agent_idle = false;
+    }
     let handler = app.command_registry.find("/rewind").unwrap();
     handler.execute(&mut app, None).await;
     assert!(app.sub_page.is_none());

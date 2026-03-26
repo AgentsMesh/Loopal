@@ -40,7 +40,11 @@ fn show_single(name: &str, app: &App) -> String {
     match app.command_registry.find(&lookup) {
         Some(handler) if handler.is_skill() => {
             let body = handler.skill_body().unwrap_or("");
-            format!("Skill: {}\n{}\n\n{body}", handler.name(), handler.description())
+            format!(
+                "Skill: {}\n{}\n\n{body}",
+                handler.name(),
+                handler.description()
+            )
         }
         Some(handler) => {
             format!("{}: {}", handler.name(), handler.description())

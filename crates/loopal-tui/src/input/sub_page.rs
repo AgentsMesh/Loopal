@@ -59,15 +59,13 @@ fn handle_model_picker_key(app: &mut App, key: &KeyEvent) -> InputAction {
                 app.sub_page = None;
                 app.last_esc_time = None;
                 match thinking_json {
-                    Some(json) => InputAction::SubPageConfirm(
-                        SubPageResult::ModelAndThinkingSelected {
+                    Some(json) => {
+                        InputAction::SubPageConfirm(SubPageResult::ModelAndThinkingSelected {
                             model,
                             thinking_json: json,
-                        },
-                    ),
-                    None => {
-                        InputAction::SubPageConfirm(SubPageResult::ModelSelected(model))
+                        })
                     }
+                    None => InputAction::SubPageConfirm(SubPageResult::ModelSelected(model)),
                 }
             } else {
                 app.sub_page = None;

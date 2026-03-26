@@ -36,8 +36,11 @@ impl AgentLoopRunner {
             memory_channel: params.memory_channel.clone(),
             output_tail: None,
         };
-        let model_config =
-            ModelConfig::from_model(&params.config.model, params.config.thinking_config.clone(), params.config.context_tokens_cap);
+        let model_config = ModelConfig::from_model(
+            &params.config.model,
+            params.config.thinking_config.clone(),
+            params.config.context_tokens_cap,
+        );
         let interrupt = params.interrupt.signal.clone();
         let interrupt_tx = params.interrupt.tx.clone();
         Self {
@@ -103,10 +106,9 @@ impl AgentLoopRunner {
     pub(super) fn recalculate_budget(&mut self) {
         let tool_defs = self.params.deps.kernel.tool_definitions();
         let tool_tokens = loopal_context::ContextBudget::estimate_tool_tokens(&tool_defs);
-        let budget = self.model_config.build_budget(
-            &self.params.config.system_prompt,
-            tool_tokens,
-        );
+        let budget = self
+            .model_config
+            .build_budget(&self.params.config.system_prompt, tool_tokens);
         self.params.store.update_budget(budget);
     }
 }

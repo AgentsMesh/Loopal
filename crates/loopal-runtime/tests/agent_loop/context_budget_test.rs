@@ -52,8 +52,7 @@ fn test_build_budget_uses_effective_window() {
 
 #[tokio::test]
 async fn test_model_switch_updates_budget() {
-    let (mut runner, _event_rx, _mbox_tx, ctrl_tx, _perm_tx) =
-        super::make_runner_with_channels();
+    let (mut runner, _event_rx, _mbox_tx, ctrl_tx, _perm_tx) = super::make_runner_with_channels();
 
     let original_window = runner.params.store.budget().context_window;
 
@@ -75,8 +74,7 @@ async fn test_model_switch_updates_budget() {
 
 #[tokio::test]
 async fn test_model_switch_preserves_cap() {
-    let (mut runner, _event_rx, _mbox_tx, ctrl_tx, _perm_tx) =
-        super::make_runner_with_channels();
+    let (mut runner, _event_rx, _mbox_tx, ctrl_tx, _perm_tx) = super::make_runner_with_channels();
 
     // Simulate a user-configured cap of 300K
     runner.model_config.context_tokens_cap = 300_000;

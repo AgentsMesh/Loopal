@@ -4,7 +4,6 @@ const KNOWN_KEYS: &[&str] = &[
     "max_turns",
     "permission_mode",
     "max_context_tokens",
-    "max_cost",
     "providers",
     "hooks",
     "mcp_servers",

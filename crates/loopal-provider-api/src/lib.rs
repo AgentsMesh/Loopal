@@ -122,8 +122,6 @@ pub struct ModelInfo {
     pub display_name: String,
     pub context_window: u32,
     pub max_output_tokens: u32,
-    pub input_price_per_mtok: f64,
-    pub output_price_per_mtok: f64,
     pub thinking: ThinkingCapability,
 }
 

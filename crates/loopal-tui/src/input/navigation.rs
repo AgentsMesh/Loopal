@@ -89,7 +89,7 @@ pub(super) fn handle_esc(app: &mut App) -> InputAction {
         if let Some(last) = app.last_esc_time.take()
             && now.duration_since(last).as_millis() < 300
         {
-            return InputAction::SlashCommand(super::SlashCommandAction::RewindPicker);
+            return InputAction::RunCommand("/rewind".to_string(), None);
         }
         app.last_esc_time = Some(now);
     }

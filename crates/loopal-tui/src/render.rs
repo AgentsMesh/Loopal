@@ -152,6 +152,6 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         views::question_dialog::render_question_dialog(f, question, size);
     }
     if let Some(ref ac) = app.autocomplete {
-        views::command_menu::render_command_menu(f, ac, &app.commands, layout.input);
+        views::command_menu::render_command_menu(f, ac, layout.input);
     }
 }

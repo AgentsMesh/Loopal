@@ -8,7 +8,7 @@ use loopal_protocol::AgentEventPayload;
 use loopal_test_support::{HarnessBuilder, assertions, chunks};
 use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
 use loopal_tui::app::App;
-use loopal_tui::command::CommandEntry;
+
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 
@@ -75,7 +75,6 @@ fn wrap_tui(inner: loopal_test_support::SpawnedHarness) -> TuiTestHarness {
     let terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
     let app = App::new(
         inner.session_ctrl.clone(),
-        Vec::<CommandEntry>::new(),
         inner.fixture.path().to_path_buf(),
     );
     TuiTestHarness {

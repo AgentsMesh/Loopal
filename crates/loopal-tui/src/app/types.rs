@@ -1,10 +1,15 @@
 // Re-export display types from session crate
 pub use loopal_session::{DisplayMessage, DisplayToolCall, PendingPermission};
 
+use crate::command::CommandEntry;
+
 /// Autocomplete menu state for slash commands.
+///
+/// Stores a snapshot of matched entries (not indices) so that the state
+/// remains consistent even if the registry is reloaded between keystrokes.
 pub struct AutocompleteState {
-    /// Indices into the `App.commands` vec.
-    pub matches: Vec<usize>,
+    /// Matched command entries (snapshot taken when autocomplete was built).
+    pub matches: Vec<CommandEntry>,
     pub selected: usize,
 }
 

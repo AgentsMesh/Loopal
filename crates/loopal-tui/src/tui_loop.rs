@@ -10,7 +10,6 @@ use loopal_session::SessionController;
 use tokio::sync::mpsc;
 
 use crate::app::App;
-use crate::command::CommandEntry;
 use crate::event::{AppEvent, EventHandler};
 use crate::input::paste;
 use crate::key_dispatch::handle_key_action;
@@ -26,7 +25,6 @@ pub async fn run_tui(
     session: SessionController,
     router: Arc<MessageRouter>,
     target_agent: String,
-    commands: Vec<CommandEntry>,
     cwd: PathBuf,
     agent_event_rx: mpsc::Receiver<AgentEvent>,
 ) -> anyhow::Result<()> {
@@ -34,7 +32,7 @@ pub async fn run_tui(
     let backend = CrosstermBackend::new(io::stdout());
     let mut terminal = Terminal::new(backend)?;
     let events = EventHandler::new(agent_event_rx);
-    let mut app = App::new(session, commands, cwd);
+    let mut app = App::new(session, cwd);
 
     run_tui_loop(&mut terminal, events, &mut app, &router, &target_agent).await?;
 

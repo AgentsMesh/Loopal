@@ -1,15 +1,7 @@
 use loopal_protocol::UserContent;
 
-/// Action triggered by a slash command from the autocomplete menu.
-pub enum SlashCommandAction {
-    Clear,
-    Compact,
-    Status,
-    Sessions,
-    /// Show help. `None` = all commands; `Some(name)` = specific skill detail.
-    Help(Option<String>),
-    /// Open the model picker sub-page.
-    ModelPicker,
+/// Result from a sub-page picker confirmation.
+pub enum SubPageResult {
     /// A model was selected from the picker.
     ModelSelected(String),
     /// Model + thinking selected from the enhanced model picker.
@@ -17,10 +9,6 @@ pub enum SlashCommandAction {
         model: String,
         thinking_json: String,
     },
-    /// Initialize project config (LOOPAL.md + .loopal/ + memory).
-    Init,
-    /// Open the rewind turn picker.
-    RewindPicker,
     /// A turn was selected for rewind (turn_index from oldest = 0).
     RewindConfirmed(usize),
 }
@@ -39,10 +27,12 @@ pub enum InputAction {
     ToolDeny,
     /// Interrupt the agent's current work (ESC while busy)
     Interrupt,
-    /// User wants to switch mode
+    /// User wants to switch mode (from Shift+Tab shortcut)
     ModeSwitch(String),
-    /// User executed a slash command
-    SlashCommand(SlashCommandAction),
+    /// Execute a registered slash command by name
+    RunCommand(String, Option<String>),
+    /// Sub-page picker confirmed a result
+    SubPageConfirm(SubPageResult),
     /// Cycle focus to the next agent in the agents map
     FocusNextAgent,
     /// Clear agent focus (return to root view)

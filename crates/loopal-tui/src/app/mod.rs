@@ -9,7 +9,7 @@ use std::time::Instant;
 use loopal_protocol::{ImageAttachment, UserContent};
 use loopal_session::SessionController;
 
-use crate::command::{CommandEntry, merge_commands};
+use crate::command::CommandRegistry;
 use crate::views::progress::LineCache;
 
 /// Main application state — UI-only fields + session controller handle.
@@ -27,8 +27,8 @@ pub struct App {
     pub autocomplete: Option<AutocompleteState>,
     /// Active sub-page (full-screen picker), if any.
     pub sub_page: Option<SubPage>,
-    /// Merged command entries (built-in + skills). Refreshed on demand.
-    pub commands: Vec<CommandEntry>,
+    /// Unified command registry (built-in + skills). Skills refreshed on demand.
+    pub command_registry: CommandRegistry,
     /// Working directory, used to reload skills on demand.
     pub cwd: PathBuf,
     /// Timestamp of the last ESC press (for double-ESC rewind trigger).
@@ -49,7 +49,16 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(session: SessionController, commands: Vec<CommandEntry>, cwd: PathBuf) -> Self {
+    pub fn new(session: SessionController, cwd: PathBuf) -> Self {
+        let mut registry = CommandRegistry::new();
+        // Load initial skills from config
+        let config = loopal_config::load_config(&cwd);
+        let skills: Vec<_> = match config {
+            Ok(c) => c.skills.into_values().map(|e| e.skill).collect(),
+            Err(_) => Vec::new(),
+        };
+        registry.reload_skills(&skills);
+
         Self {
             exiting: false,
             input: String::new(),
@@ -60,7 +69,7 @@ impl App {
             pending_images: Vec::new(),
             autocomplete: None,
             sub_page: None,
-            commands,
+            command_registry: registry,
             cwd,
             last_esc_time: None,
             input_scroll: 0,
@@ -115,13 +124,13 @@ impl App {
         self.pending_images.len()
     }
 
-    /// Reload skills from disk and rebuild the merged command list.
+    /// Reload skills from disk and rebuild the command registry.
     pub fn refresh_commands(&mut self) {
         let config = loopal_config::load_config(&self.cwd);
         let skills: Vec<_> = match config {
             Ok(c) => c.skills.into_values().map(|e| e.skill).collect(),
             Err(_) => Vec::new(),
         };
-        self.commands = merge_commands(&skills);
+        self.command_registry.reload_skills(&skills);
     }
 }

@@ -3,13 +3,13 @@
 use std::sync::Arc;
 
 use loopal_agent::router::MessageRouter;
-use loopal_protocol::AgentMode;
+use loopal_protocol::{AgentMode, UserContent};
 
 use crate::app::App;
+use crate::command::CommandEffect;
 use crate::event::EventHandler;
 use crate::input::paste;
-use crate::input::{InputAction, handle_key};
-use crate::slash_handler::handle_slash_command;
+use crate::input::{InputAction, SubPageResult, handle_key};
 use crate::tui_helpers::{cycle_focus, handle_question_confirm, route_human_message};
 
 /// Process a single key event and return `true` if the TUI should quit.
@@ -27,13 +27,7 @@ pub(crate) async fn handle_key_action(
             true
         }
         InputAction::InboxPush(content) => {
-            app.input_history.push(content.text.clone());
-            app.history_index = None;
-            if let Some(msg) = app.session.enqueue_message(content) {
-                route_human_message(router, target_agent, msg).await;
-            } else {
-                app.session.interrupt();
-            }
+            push_to_inbox(app, content, router, target_agent).await;
             false
         }
         InputAction::PasteRequested => {
@@ -65,8 +59,16 @@ pub(crate) async fn handle_key_action(
             app.session.switch_mode(m).await;
             false
         }
-        InputAction::SlashCommand(cmd) => {
-            handle_slash_command(app, cmd).await;
+        InputAction::RunCommand(name, arg) => {
+            if let Some(handler) = app.command_registry.find(&name) {
+                let effect = handler.execute(app, arg.as_deref()).await;
+                handle_effect(app, effect, router, target_agent).await
+            } else {
+                false
+            }
+        }
+        InputAction::SubPageConfirm(result) => {
+            handle_sub_page_confirm(app, result).await;
             false
         }
         InputAction::FocusNextAgent => {
@@ -106,5 +108,64 @@ pub(crate) async fn handle_key_action(
             false
         }
         InputAction::None => false,
+    }
+}
+
+/// Push content to inbox, record in history, and route to agent.
+async fn push_to_inbox(
+    app: &mut App,
+    content: UserContent,
+    router: &Arc<MessageRouter>,
+    target_agent: &str,
+) {
+    app.input_history.push(content.text.clone());
+    app.history_index = None;
+    if let Some(msg) = app.session.enqueue_message(content) {
+        route_human_message(router, target_agent, msg).await;
+    } else {
+        app.session.interrupt();
+    }
+}
+
+/// Map a CommandEffect to concrete side-effects. Returns true if quitting.
+async fn handle_effect(
+    app: &mut App,
+    effect: CommandEffect,
+    router: &Arc<MessageRouter>,
+    target_agent: &str,
+) -> bool {
+    match effect {
+        CommandEffect::Done => false,
+        CommandEffect::InboxPush(content) => {
+            push_to_inbox(app, content, router, target_agent).await;
+            false
+        }
+        CommandEffect::ModeSwitch(mode) => {
+            app.session.switch_mode(mode).await;
+            false
+        }
+        CommandEffect::Quit => {
+            app.exiting = true;
+            true
+        }
+    }
+}
+
+/// Handle confirmed sub-page picker results.
+async fn handle_sub_page_confirm(app: &mut App, result: SubPageResult) {
+    match result {
+        SubPageResult::ModelSelected(name) => {
+            app.session.switch_model(name).await;
+        }
+        SubPageResult::ModelAndThinkingSelected {
+            model,
+            thinking_json,
+        } => {
+            app.session.switch_model(model).await;
+            app.session.switch_thinking(thinking_json).await;
+        }
+        SubPageResult::RewindConfirmed(turn_index) => {
+            app.session.rewind(turn_index).await;
+        }
     }
 }

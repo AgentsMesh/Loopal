@@ -33,7 +33,6 @@ impl AgentLoopRunner {
                 .create_backend(std::path::Path::new(&params.session.cwd)),
             session_id: params.session.id.clone(),
             shared: params.shared.clone(),
-            pending_cwd_switch: Default::default(),
             memory_channel: params.memory_channel.clone(),
             output_tail: None,
         };
@@ -96,19 +95,5 @@ impl AgentLoopRunner {
     /// Send an event payload via the frontend.
     pub async fn emit(&self, payload: AgentEventPayload) -> Result<()> {
         self.params.deps.frontend.emit(payload).await
-    }
-
-    /// If a tool (e.g. EnterWorktree) requested a cwd switch, recreate the backend.
-    pub(super) fn apply_pending_cwd_switch(&mut self) {
-        let new_cwd = self
-            .tool_ctx
-            .pending_cwd_switch
-            .lock()
-            .ok()
-            .and_then(|mut guard| guard.take());
-        if let Some(cwd) = new_cwd {
-            info!(new_cwd = %cwd.display(), "applying cwd switch");
-            self.tool_ctx.backend = self.params.deps.kernel.create_backend(&cwd);
-        }
     }
 }

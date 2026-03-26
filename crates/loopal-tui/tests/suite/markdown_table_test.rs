@@ -140,6 +140,54 @@ fn test_image_no_alt_shows_placeholder() {
     assert!(full.contains("[image]"), "placeholder for empty alt");
 }
 
+// --- Cell wrapping ---
+
+#[test]
+fn test_table_cell_wraps_when_narrow() {
+    let input = "| H1 | H2 |\n|---|---|\n| short | This is a long cell value that overflows |\n";
+    let lines = render_markdown(input, 30);
+    let texts = lines_text(&lines);
+    // Count data row lines (after separator) — wrapped row produces >= 2.
+    let sep_idx = texts.iter().position(|t| t.contains("─┼─")).unwrap();
+    let data_lines: Vec<_> = texts[sep_idx + 1..]
+        .iter()
+        .take_while(|t| !t.is_empty())
+        .collect();
+    assert!(
+        data_lines.len() >= 2,
+        "long cell should wrap into >= 2 visual lines, got {}: {:?}",
+        data_lines.len(),
+        data_lines,
+    );
+}
+
+#[test]
+fn test_table_wrapped_rows_keep_separators() {
+    let input = "| A | B |\n|---|---|\n| x | This text is very long and must wrap |\n";
+    let lines = render_markdown(input, 30);
+    let texts = lines_text(&lines);
+    let sep_idx = texts.iter().position(|t| t.contains("─┼─")).unwrap();
+    // Every visual line of the data row should have the │ column separator.
+    let data_lines: Vec<_> = texts[sep_idx + 1..]
+        .iter()
+        .take_while(|t| !t.is_empty())
+        .collect();
+    for line in &data_lines {
+        assert!(line.contains("│"), "wrapped row line must keep │: {line:?}");
+    }
+}
+
+#[test]
+fn test_table_no_truncation_of_content() {
+    // Verify all content is present (not truncated) after wrapping.
+    let input = "| Col |\n|---|\n| alpha bravo charlie delta echo foxtrot |\n";
+    let lines = render_markdown(input, 25);
+    let full: String = lines_text(&lines).join(" ");
+    for word in ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot"] {
+        assert!(full.contains(word), "word '{word}' must not be truncated");
+    }
+}
+
 // --- Footnote reference ---
 
 #[test]

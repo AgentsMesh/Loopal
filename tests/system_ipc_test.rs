@@ -8,9 +8,9 @@ use std::io::Write;
 use std::process::Stdio;
 use std::time::Duration;
 
+use loopal_ipc::StdioTransport;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
-use loopal_ipc::StdioTransport;
 
 /// Path to the built binary. Set automatically by `cargo test`.
 fn binary_path() -> String {
@@ -31,7 +31,9 @@ const TIMEOUT: Duration = Duration::from_secs(15);
 
 #[tokio::test]
 async fn system_spawn_and_initialize() {
-    let fixture = write_mock_fixture(r#"[[{"type":"text","text":"Hello!"},{"type":"usage"},{"type":"done"}]]"#);
+    let fixture = write_mock_fixture(
+        r#"[[{"type":"text","text":"Hello!"},{"type":"usage"},{"type":"done"}]]"#,
+    );
 
     let mut child = tokio::process::Command::new(binary_path())
         .arg("--serve")
@@ -47,11 +49,9 @@ async fn system_spawn_and_initialize() {
     let stdin = child.stdin.take().unwrap();
     let stdout = child.stdout.take().unwrap();
 
-    let transport: std::sync::Arc<dyn loopal_ipc::transport::Transport> =
-        std::sync::Arc::new(StdioTransport::new(
-            Box::new(tokio::io::BufReader::new(stdout)),
-            Box::new(stdin),
-        ));
+    let transport: std::sync::Arc<dyn loopal_ipc::transport::Transport> = std::sync::Arc::new(
+        StdioTransport::new(Box::new(tokio::io::BufReader::new(stdout)), Box::new(stdin)),
+    );
     let conn = std::sync::Arc::new(Connection::new(transport));
     let mut rx = conn.start();
 
@@ -88,8 +88,7 @@ async fn system_spawn_and_initialize() {
         match tokio::time::timeout(Duration::from_secs(5), rx.recv()).await {
             Ok(Some(Incoming::Notification { method, params })) => {
                 if method == methods::AGENT_EVENT.name {
-                    if let Ok(event) =
-                        serde_json::from_value::<loopal_protocol::AgentEvent>(params)
+                    if let Ok(event) = serde_json::from_value::<loopal_protocol::AgentEvent>(params)
                     {
                         match &event.payload {
                             loopal_protocol::AgentEventPayload::Stream { text } => {
@@ -111,7 +110,10 @@ async fn system_spawn_and_initialize() {
         }
     }
 
-    assert!(got_stream, "should have received stream events, texts: '{all_texts}'");
+    assert!(
+        got_stream,
+        "should have received stream events, texts: '{all_texts}'"
+    );
     assert!(got_finished, "should have received Finished event");
 
     // Process should exit cleanly

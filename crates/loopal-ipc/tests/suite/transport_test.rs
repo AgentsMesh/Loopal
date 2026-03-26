@@ -64,10 +64,7 @@ async fn eof_returns_none() {
     let (a_tx, _a_rx) = tokio::io::duplex(4096);
     let (_b_tx, b_rx) = tokio::io::duplex(4096);
 
-    let transport = StdioTransport::new(
-        Box::new(tokio::io::BufReader::new(b_rx)),
-        Box::new(a_tx),
-    );
+    let transport = StdioTransport::new(Box::new(tokio::io::BufReader::new(b_rx)), Box::new(a_tx));
 
     // Drop the writer side to cause EOF
     drop(_b_tx);

@@ -66,30 +66,47 @@ impl AgentFrontend for IpcFrontend {
                         m if m == methods::AGENT_MESSAGE.name => {
                             match serde_json::from_value::<Envelope>(params) {
                                 Ok(env) => {
-                                    let _ = self.connection.respond(id, serde_json::json!({"ok": true})).await;
+                                    let _ = self
+                                        .connection
+                                        .respond(id, serde_json::json!({"ok": true}))
+                                        .await;
                                     return Some(AgentInput::Message(env));
                                 }
                                 Err(e) => {
                                     tracing::warn!("malformed agent/message: {e}");
-                                    let _ = self.connection.respond_error(id, err_code, &e.to_string()).await;
+                                    let _ = self
+                                        .connection
+                                        .respond_error(id, err_code, &e.to_string())
+                                        .await;
                                 }
                             }
                         }
                         m if m == methods::AGENT_CONTROL.name => {
                             match serde_json::from_value::<ControlCommand>(params) {
                                 Ok(cmd) => {
-                                    let _ = self.connection.respond(id, serde_json::json!({"ok": true})).await;
+                                    let _ = self
+                                        .connection
+                                        .respond(id, serde_json::json!({"ok": true}))
+                                        .await;
                                     return Some(AgentInput::Control(cmd));
                                 }
                                 Err(e) => {
                                     tracing::warn!("malformed agent/control: {e}");
-                                    let _ = self.connection.respond_error(id, err_code, &e.to_string()).await;
+                                    let _ = self
+                                        .connection
+                                        .respond_error(id, err_code, &e.to_string())
+                                        .await;
                                 }
                             }
                         }
                         _ => {
-                            let _ = self.connection
-                                .respond_error(id, loopal_ipc::jsonrpc::METHOD_NOT_FOUND, &format!("unknown: {method}"))
+                            let _ = self
+                                .connection
+                                .respond_error(
+                                    id,
+                                    loopal_ipc::jsonrpc::METHOD_NOT_FOUND,
+                                    &format!("unknown: {method}"),
+                                )
                                 .await;
                         }
                     }
@@ -139,11 +156,13 @@ impl AgentFrontend for IpcFrontend {
 
     async fn ask_user(&self, questions: Vec<Question>) -> Vec<String> {
         let params = serde_json::json!({ "questions": questions });
-        match self.connection.send_request(methods::AGENT_QUESTION.name, params).await {
+        match self
+            .connection
+            .send_request(methods::AGENT_QUESTION.name, params)
+            .await
+        {
             Ok(value) => {
-                if let Ok(resp) =
-                    serde_json::from_value::<UserQuestionResponse>(value)
-                {
+                if let Ok(resp) = serde_json::from_value::<UserQuestionResponse>(value) {
                     resp.answers
                 } else {
                     vec!["(IPC parse error)".into()]

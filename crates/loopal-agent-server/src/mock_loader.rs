@@ -44,7 +44,9 @@ fn parse_chunk(v: serde_json::Value) -> Result<StreamChunk, LoopalError> {
         "done" => Ok(StreamChunk::Done {
             stop_reason: StopReason::EndTurn,
         }),
-        _ => Ok(StreamChunk::Text { text: String::new() }),
+        _ => Ok(StreamChunk::Text {
+            text: String::new(),
+        }),
     }
 }
 

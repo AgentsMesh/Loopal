@@ -1,23 +1,21 @@
 use std::sync::Arc;
 
-use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::StdioTransport;
+use loopal_ipc::connection::{Connection, Incoming};
 
 /// Create a pair of Connections backed by in-memory duplex streams.
 fn connection_pair() -> (Arc<Connection>, Arc<Connection>) {
     let (a_tx, a_rx) = tokio::io::duplex(4096);
     let (b_tx, b_rx) = tokio::io::duplex(4096);
 
-    let transport_a: Arc<dyn loopal_ipc::transport::Transport> =
-        Arc::new(StdioTransport::new(
-            Box::new(tokio::io::BufReader::new(b_rx)),
-            Box::new(a_tx),
-        ));
-    let transport_b: Arc<dyn loopal_ipc::transport::Transport> =
-        Arc::new(StdioTransport::new(
-            Box::new(tokio::io::BufReader::new(a_rx)),
-            Box::new(b_tx),
-        ));
+    let transport_a: Arc<dyn loopal_ipc::transport::Transport> = Arc::new(StdioTransport::new(
+        Box::new(tokio::io::BufReader::new(b_rx)),
+        Box::new(a_tx),
+    ));
+    let transport_b: Arc<dyn loopal_ipc::transport::Transport> = Arc::new(StdioTransport::new(
+        Box::new(tokio::io::BufReader::new(a_rx)),
+        Box::new(b_tx),
+    ));
 
     (
         Arc::new(Connection::new(transport_a)),
@@ -37,10 +35,7 @@ async fn request_response_roundtrip() {
     let handle = tokio::spawn(async move {
         if let Some(Incoming::Request { id, method, params }) = server_rx.recv().await {
             assert_eq!(method, "test/echo");
-            server_clone
-                .respond(id, params)
-                .await
-                .expect("respond ok");
+            server_clone.respond(id, params).await.expect("respond ok");
         }
     });
 

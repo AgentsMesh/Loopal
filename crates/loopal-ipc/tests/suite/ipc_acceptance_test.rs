@@ -30,7 +30,10 @@ async fn acceptance_non_interactive_completes() {
     assertions::assert_has_stream(&events);
     assertions::assert_has_finished(&events);
     let text = loopal_test_support::events::extract_texts(&events);
-    assert!(text.contains("First reply"), "expected first reply in: {text}");
+    assert!(
+        text.contains("First reply"),
+        "expected first reply in: {text}"
+    );
 }
 
 /// Tool execution: agent calls Read tool → executes → returns result.

@@ -14,8 +14,15 @@ use crate::transport::Transport;
 /// An incoming message dispatched by the reader loop.
 #[derive(Debug)]
 pub enum Incoming {
-    Request { id: i64, method: String, params: Value },
-    Notification { method: String, params: Value },
+    Request {
+        id: i64,
+        method: String,
+        params: Value,
+    },
+    Notification {
+        method: String,
+        params: Value,
+    },
 }
 
 type PendingMap = Arc<Mutex<HashMap<i64, oneshot::Sender<Value>>>>;
@@ -75,14 +82,10 @@ impl Connection {
                         }
                     }
                     IncomingMessage::Request { id, method, params } => {
-                        let _ = tx
-                            .send(Incoming::Request { id, method, params })
-                            .await;
+                        let _ = tx.send(Incoming::Request { id, method, params }).await;
                     }
                     IncomingMessage::Notification { method, params } => {
-                        let _ = tx
-                            .send(Incoming::Notification { method, params })
-                            .await;
+                        let _ = tx.send(Incoming::Notification { method, params }).await;
                     }
                 }
             }
@@ -102,11 +105,7 @@ impl Connection {
     ///
     /// Cancellation-safe: if the future is dropped mid-await, the pending
     /// entry is removed from the map to prevent memory leaks.
-    pub async fn send_request(
-        &self,
-        method: &str,
-        params: Value,
-    ) -> Result<Value, String> {
+    pub async fn send_request(&self, method: &str, params: Value) -> Result<Value, String> {
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         let (tx, rx) = oneshot::channel();
         self.pending.lock().await.insert(id, tx);
@@ -119,18 +118,17 @@ impl Connection {
 
         // Guard: remove pending entry if this future is cancelled (dropped)
         let pending = self.pending.clone();
-        let guard = PendingGuard { id, pending: Some(pending) };
+        let guard = PendingGuard {
+            id,
+            pending: Some(pending),
+        };
         let result = rx.await.map_err(|_| "response channel dropped".to_string());
         guard.disarm();
         result
     }
 
     /// Send a JSON-RPC notification (fire-and-forget, no response expected).
-    pub async fn send_notification(
-        &self,
-        method: &str,
-        params: Value,
-    ) -> Result<(), String> {
+    pub async fn send_notification(&self, method: &str, params: Value) -> Result<(), String> {
         let data = jsonrpc::encode_notification(method, params);
         self.transport
             .send(&data)
@@ -148,12 +146,7 @@ impl Connection {
     }
 
     /// Send an error response to an incoming request.
-    pub async fn respond_error(
-        &self,
-        id: i64,
-        code: i64,
-        message: &str,
-    ) -> Result<(), String> {
+    pub async fn respond_error(&self, id: i64, code: i64, message: &str) -> Result<(), String> {
         let data = jsonrpc::encode_error(id, code, message);
         self.transport
             .send(&data)

@@ -4,9 +4,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::jsonrpc;
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
-use loopal_ipc::jsonrpc;
 use loopal_runtime::agent_loop;
 
 use crate::params::{self, StartParams};
@@ -24,11 +24,15 @@ pub async fn run_server_for_test(
     let mut incoming_rx = connection.start();
     wait_for_initialize(&connection, &mut incoming_rx).await?;
     loop {
-        let Some(msg) = incoming_rx.recv().await else { break };
+        let Some(msg) = incoming_rx.recv().await else {
+            break;
+        };
         match msg {
-            Incoming::Request { id, method, params: p }
-                if method == methods::AGENT_START.name =>
-            {
+            Incoming::Request {
+                id,
+                method,
+                params: p,
+            } if method == methods::AGENT_START.name => {
                 let start = StartParams {
                     cwd: p["cwd"].as_str().map(String::from),
                     model: p["model"].as_str().map(String::from),
@@ -38,10 +42,18 @@ pub async fn run_server_for_test(
                     no_sandbox: p["no_sandbox"].as_bool().unwrap_or(false),
                 };
                 let agent_params = params::build_with_provider(
-                    &cwd, &start, &connection, incoming_rx, provider, &session_dir,
+                    &cwd,
+                    &start,
+                    &connection,
+                    incoming_rx,
+                    provider,
+                    &session_dir,
                 )?;
                 let _ = connection
-                    .respond(id, serde_json::json!({"session_id": agent_params.session.id}))
+                    .respond(
+                        id,
+                        serde_json::json!({"session_id": agent_params.session.id}),
+                    )
                     .await;
                 let _ = agent_loop(agent_params).await;
                 break;

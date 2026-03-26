@@ -3,11 +3,15 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use loopal_ipc::StdioTransport;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
-use loopal_ipc::StdioTransport;
 
-fn ipc_pair() -> (Arc<Connection>, tokio::sync::mpsc::Receiver<Incoming>, Arc<Connection>) {
+fn ipc_pair() -> (
+    Arc<Connection>,
+    tokio::sync::mpsc::Receiver<Incoming>,
+    Arc<Connection>,
+) {
     let (a_tx, a_rx) = tokio::io::duplex(8192);
     let (b_tx, b_rx) = tokio::io::duplex(8192);
     let ta: Arc<dyn loopal_ipc::transport::Transport> = Arc::new(StdioTransport::new(
@@ -28,11 +32,10 @@ fn ipc_pair() -> (Arc<Connection>, tokio::sync::mpsc::Receiver<Incoming>, Arc<Co
 /// Uses the test harness to run a full agent loop with mock provider.
 #[tokio::test]
 async fn model_override_propagated_via_ipc() {
-    let harness =
-        loopal_test_support::ipc_harness::build_ipc_harness(
-            loopal_test_support::scenarios::simple_text("model check"),
-        )
-        .await;
+    let harness = loopal_test_support::ipc_harness::build_ipc_harness(
+        loopal_test_support::scenarios::simple_text("model check"),
+    )
+    .await;
 
     // The harness used default model. If we get events, the model resolved correctly.
     let mut rx = harness.event_rx;
@@ -49,8 +52,7 @@ async fn event_forwarder_delivers_sub_agent_events() {
     let mut client_rx = client_conn.start();
 
     // Simulate what params.rs does: create event channel + forwarder task
-    let (event_tx, mut event_rx) =
-        tokio::sync::mpsc::channel::<loopal_protocol::AgentEvent>(256);
+    let (event_tx, mut event_rx) = tokio::sync::mpsc::channel::<loopal_protocol::AgentEvent>(256);
     let event_conn = server_conn.clone();
     tokio::spawn(async move {
         while let Some(event) = event_rx.recv().await {
@@ -80,8 +82,7 @@ async fn event_forwarder_delivers_sub_agent_events() {
     match msg {
         Incoming::Notification { method, params } => {
             assert_eq!(method, methods::AGENT_EVENT.name);
-            let ev: loopal_protocol::AgentEvent =
-                serde_json::from_value(params).unwrap();
+            let ev: loopal_protocol::AgentEvent = serde_json::from_value(params).unwrap();
             assert_eq!(ev.agent_name.as_deref(), Some("sub-1"));
             match ev.payload {
                 loopal_protocol::AgentEventPayload::Stream { text } => {

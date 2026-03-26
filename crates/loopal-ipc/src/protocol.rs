@@ -15,9 +15,7 @@ pub mod methods {
     // ── Lifecycle ────────────────────────────────────────────────────
 
     /// Handshake: version negotiation and capability exchange.
-    pub const INITIALIZE: Method = Method {
-        name: "initialize",
-    };
+    pub const INITIALIZE: Method = Method { name: "initialize" };
 
     /// Create a session and start the agent loop.
     pub const AGENT_START: Method = Method {

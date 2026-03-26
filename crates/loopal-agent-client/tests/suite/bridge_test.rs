@@ -2,9 +2,9 @@
 
 use std::sync::Arc;
 
+use loopal_ipc::StdioTransport;
 use loopal_ipc::connection::Connection;
 use loopal_ipc::protocol::methods;
-use loopal_ipc::StdioTransport;
 
 fn make_pair() -> (Arc<Connection>, Arc<Connection>) {
     let (a_tx, a_rx) = tokio::io::duplex(8192);

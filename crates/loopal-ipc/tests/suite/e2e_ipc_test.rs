@@ -6,9 +6,9 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use loopal_ipc::StdioTransport;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
-use loopal_ipc::StdioTransport;
 use loopal_protocol::{AgentEvent, AgentEventPayload, ControlCommand};
 
 const TIMEOUT: Duration = Duration::from_secs(5);
@@ -22,16 +22,14 @@ fn ipc_pair() -> (
 ) {
     let (a_tx, a_rx) = tokio::io::duplex(16384);
     let (b_tx, b_rx) = tokio::io::duplex(16384);
-    let client_t: Arc<dyn loopal_ipc::transport::Transport> =
-        Arc::new(StdioTransport::new(
-            Box::new(tokio::io::BufReader::new(b_rx)),
-            Box::new(a_tx),
-        ));
-    let server_t: Arc<dyn loopal_ipc::transport::Transport> =
-        Arc::new(StdioTransport::new(
-            Box::new(tokio::io::BufReader::new(a_rx)),
-            Box::new(b_tx),
-        ));
+    let client_t: Arc<dyn loopal_ipc::transport::Transport> = Arc::new(StdioTransport::new(
+        Box::new(tokio::io::BufReader::new(b_rx)),
+        Box::new(a_tx),
+    ));
+    let server_t: Arc<dyn loopal_ipc::transport::Transport> = Arc::new(StdioTransport::new(
+        Box::new(tokio::io::BufReader::new(a_rx)),
+        Box::new(b_tx),
+    ));
     let server_conn = Arc::new(Connection::new(server_t));
     let server_rx = server_conn.start();
     (client_t, server_conn, server_rx)
@@ -56,7 +54,9 @@ async fn e2e_message_then_event_roundtrip() {
             let _ = sc.respond(id, serde_json::json!({"ok": true})).await;
             let event = AgentEvent {
                 agent_name: None,
-                payload: AgentEventPayload::Stream { text: "reply".into() },
+                payload: AgentEventPayload::Stream {
+                    text: "reply".into(),
+                },
             };
             let _ = sc
                 .send_notification(
@@ -79,7 +79,10 @@ async fn e2e_message_then_event_roundtrip() {
 
     // TUI receives event via bridge
     let mut rx = handles.agent_event_rx;
-    let ev = tokio::time::timeout(TIMEOUT, rx.recv()).await.unwrap().unwrap();
+    let ev = tokio::time::timeout(TIMEOUT, rx.recv())
+        .await
+        .unwrap()
+        .unwrap();
     match ev.payload {
         AgentEventPayload::Stream { text } => assert_eq!(text, "reply"),
         other => panic!("expected Stream, got: {other:?}"),
@@ -112,7 +115,10 @@ async fn e2e_permission_roundtrip_via_bridge() {
 
     // Bridge forwards to TUI channel as ToolPermissionRequest
     let mut rx = handles.agent_event_rx;
-    let ev = tokio::time::timeout(TIMEOUT, rx.recv()).await.unwrap().unwrap();
+    let ev = tokio::time::timeout(TIMEOUT, rx.recv())
+        .await
+        .unwrap()
+        .unwrap();
     match &ev.payload {
         AgentEventPayload::ToolPermissionRequest { name, .. } => {
             assert_eq!(name, "Bash");
@@ -156,7 +162,10 @@ async fn e2e_permission_denied_via_bridge() {
     });
 
     let mut rx = handles.agent_event_rx;
-    let _ = tokio::time::timeout(TIMEOUT, rx.recv()).await.unwrap().unwrap();
+    let _ = tokio::time::timeout(TIMEOUT, rx.recv())
+        .await
+        .unwrap()
+        .unwrap();
 
     // TUI denies
     handles.permission_tx.send(false).await.unwrap();
@@ -179,7 +188,11 @@ async fn e2e_control_command_via_bridge() {
     let (conn, incoming) = client.into_parts();
     let handles = loopal_agent_client::start_bridge(conn, incoming);
 
-    handles.control_tx.send(ControlCommand::Clear).await.unwrap();
+    handles
+        .control_tx
+        .send(ControlCommand::Clear)
+        .await
+        .unwrap();
 
     let msg = tokio::time::timeout(TIMEOUT, server_rx.recv())
         .await
@@ -194,4 +207,3 @@ async fn e2e_control_command_via_bridge() {
         panic!("expected request");
     }
 }
-

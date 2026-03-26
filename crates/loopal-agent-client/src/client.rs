@@ -10,9 +10,7 @@ use tracing::info;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
-use loopal_protocol::{
-    AgentEvent, ControlCommand, Envelope, UserQuestionResponse,
-};
+use loopal_protocol::{AgentEvent, ControlCommand, Envelope, UserQuestionResponse};
 
 /// High-level agent IPC client.
 pub struct AgentClient {
@@ -126,16 +124,10 @@ impl AgentClient {
                 }
                 Incoming::Request { id, method, params } => {
                     if method == methods::AGENT_PERMISSION.name {
-                        return Some(AgentClientEvent::PermissionRequest {
-                            id,
-                            params,
-                        });
+                        return Some(AgentClientEvent::PermissionRequest { id, params });
                     }
                     if method == methods::AGENT_QUESTION.name {
-                        return Some(AgentClientEvent::QuestionRequest {
-                            id,
-                            params,
-                        });
+                        return Some(AgentClientEvent::QuestionRequest { id, params });
                     }
                     // Unknown request — respond with error
                     let _ = self
@@ -152,11 +144,7 @@ impl AgentClient {
     }
 
     /// Respond to a permission request.
-    pub async fn respond_permission(
-        &self,
-        request_id: i64,
-        allow: bool,
-    ) -> anyhow::Result<()> {
+    pub async fn respond_permission(&self, request_id: i64, allow: bool) -> anyhow::Result<()> {
         self.connection
             .respond(request_id, serde_json::json!({"allow": allow}))
             .await

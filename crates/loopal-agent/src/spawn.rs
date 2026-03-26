@@ -73,7 +73,14 @@ pub async fn spawn_agent(
     let effective_cwd = params.cwd_override.as_deref().unwrap_or(&shared.cwd);
     let mode = Some("act");
     if let Err(e) = client
-        .start_agent(effective_cwd, Some(&model), mode, Some(&params.prompt), None, false)
+        .start_agent(
+            effective_cwd,
+            Some(&model),
+            mode,
+            Some(&params.prompt),
+            None,
+            false,
+        )
         .await
     {
         let _ = agent_proc.shutdown().await;

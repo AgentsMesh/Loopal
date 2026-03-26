@@ -13,7 +13,7 @@ use tokio::sync::{Mutex, oneshot};
 
 // Re-export shared types from loopal-ipc
 pub use loopal_ipc::jsonrpc::{
-    IncomingMessage, JsonRpcError, INTERNAL_ERROR, INVALID_REQUEST, METHOD_NOT_FOUND, PARSE_ERROR,
+    INTERNAL_ERROR, INVALID_REQUEST, IncomingMessage, JsonRpcError, METHOD_NOT_FOUND, PARSE_ERROR,
     read_message,
 };
 
@@ -67,8 +67,7 @@ impl JsonRpcTransport {
 
     /// Send a notification (no id) to the client.
     pub async fn notify(&self, method: &str, params: Value) {
-        let msg =
-            serde_json::json!({ "jsonrpc": "2.0", "method": method, "params": params });
+        let msg = serde_json::json!({ "jsonrpc": "2.0", "method": method, "params": params });
         self.write_line(&msg).await;
     }
 

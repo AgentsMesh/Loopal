@@ -2,9 +2,9 @@
 
 use std::sync::Arc;
 
+use loopal_ipc::StdioTransport;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
-use loopal_ipc::StdioTransport;
 use loopal_protocol::{AgentEventPayload, InterruptSignal};
 
 fn ipc_pair() -> (
@@ -39,10 +39,15 @@ async fn emit_sends_agent_event_notification() {
     let interrupt = InterruptSignal::new();
     let frontend = loopal_agent_server::ipc_frontend_for_test(server_conn, server_rx, interrupt);
 
-    frontend.emit(AgentEventPayload::AwaitingInput).await.unwrap();
+    frontend
+        .emit(AgentEventPayload::AwaitingInput)
+        .await
+        .unwrap();
 
     let msg = tokio::time::timeout(std::time::Duration::from_secs(2), client_rx.recv())
-        .await.unwrap().unwrap();
+        .await
+        .unwrap()
+        .unwrap();
     match msg {
         Incoming::Notification { method, params } => {
             assert_eq!(method, methods::AGENT_EVENT.name);
@@ -61,34 +66,38 @@ async fn recv_input_sets_interrupt_on_notification() {
     let (server_conn, server_rx, client_conn, _client_rx) = ipc_pair();
     let interrupt = InterruptSignal::new();
     let interrupt_check = interrupt.clone();
-    let frontend = loopal_agent_server::ipc_frontend_for_test(
-        server_conn, server_rx, interrupt,
-    );
+    let frontend = loopal_agent_server::ipc_frontend_for_test(server_conn, server_rx, interrupt);
 
     // Send interrupt notification first
     client_conn
         .send_notification(methods::AGENT_INTERRUPT.name, serde_json::Value::Null)
-        .await.unwrap();
+        .await
+        .unwrap();
 
     // Then send a message (as request) — recv_input will process interrupt, then message.
     // Must run client request and frontend recv_input in parallel.
     let client_clone = client_conn.clone();
     tokio::spawn(async move {
-        let _ = client_clone.send_request(
-            methods::AGENT_MESSAGE.name,
-            serde_json::json!({
-                "id": "00000000-0000-0000-0000-000000000000",
-                "source": "Human", "target": "main",
-                "content": {"text": "test", "images": []},
-                "timestamp": "2024-01-01T00:00:00Z"
-            }),
-        ).await;
+        let _ = client_clone
+            .send_request(
+                methods::AGENT_MESSAGE.name,
+                serde_json::json!({
+                    "id": "00000000-0000-0000-0000-000000000000",
+                    "source": "Human", "target": "main",
+                    "content": {"text": "test", "images": []},
+                    "timestamp": "2024-01-01T00:00:00Z"
+                }),
+            )
+            .await;
     });
 
     // recv_input processes interrupt notification (sets signal), then returns message
-    let result = tokio::time::timeout(std::time::Duration::from_secs(2), frontend.recv_input())
-        .await;
+    let result =
+        tokio::time::timeout(std::time::Duration::from_secs(2), frontend.recv_input()).await;
 
     assert!(result.is_ok(), "recv_input should not timeout");
-    assert!(interrupt_check.is_signaled(), "interrupt should be signaled");
+    assert!(
+        interrupt_check.is_signaled(),
+        "interrupt should be signaled"
+    );
 }

@@ -41,8 +41,12 @@ impl MemoryProcessor for ServerMemoryProcessor {
             description: "Maintains project memory files".to_string(),
             system_prompt: MEMORY_AGENT_PROMPT.to_string(),
             allowed_tools: Some(vec![
-                "Read".into(), "Write".into(), "Edit".into(),
-                "Grep".into(), "Glob".into(), "Ls".into(),
+                "Read".into(),
+                "Write".into(),
+                "Edit".into(),
+                "Grep".into(),
+                "Glob".into(),
+                "Ls".into(),
             ]),
             max_turns: 10,
             ..Default::default()
@@ -62,7 +66,10 @@ impl MemoryProcessor for ServerMemoryProcessor {
         let result = spawn_agent(&self.shared, params).await?;
         info!("memory-maintainer agent spawned");
         match result.result_rx.await {
-            Ok(Ok(output)) => { info!(output = %output, "memory-maintainer done"); Ok(()) }
+            Ok(Ok(output)) => {
+                info!(output = %output, "memory-maintainer done");
+                Ok(())
+            }
             Ok(Err(e)) => Err(format!("memory-maintainer error: {e}")),
             Err(_) => Err("memory-maintainer channel dropped".into()),
         }

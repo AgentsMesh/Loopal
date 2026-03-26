@@ -37,10 +37,7 @@ fn all_agent_methods_share_prefix() {
         methods::AGENT_QUESTION.name,
     ];
     for m in agent_methods {
-        assert!(
-            m.starts_with("agent/"),
-            "{m} should start with 'agent/'"
-        );
+        assert!(m.starts_with("agent/"), "{m} should start with 'agent/'");
     }
 }
 

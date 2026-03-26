@@ -3,9 +3,9 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use loopal_ipc::StdioTransport;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
-use loopal_ipc::StdioTransport;
 use loopal_protocol::{AgentEvent, AgentEventPayload};
 
 const TIMEOUT: Duration = Duration::from_secs(5);
@@ -18,10 +18,12 @@ fn ipc_pair() -> (
     let (a_tx, a_rx) = tokio::io::duplex(16384);
     let (b_tx, b_rx) = tokio::io::duplex(16384);
     let client_t: Arc<dyn loopal_ipc::transport::Transport> = Arc::new(StdioTransport::new(
-        Box::new(tokio::io::BufReader::new(b_rx)), Box::new(a_tx),
+        Box::new(tokio::io::BufReader::new(b_rx)),
+        Box::new(a_tx),
     ));
     let server_t: Arc<dyn loopal_ipc::transport::Transport> = Arc::new(StdioTransport::new(
-        Box::new(tokio::io::BufReader::new(a_rx)), Box::new(b_tx),
+        Box::new(tokio::io::BufReader::new(a_rx)),
+        Box::new(b_tx),
     ));
     let sc = Arc::new(Connection::new(server_t));
     let sr = sc.start();
@@ -38,20 +40,34 @@ async fn e2e_streaming_events_ordered() {
     for i in 0..5 {
         let event = AgentEvent {
             agent_name: None,
-            payload: AgentEventPayload::Stream { text: format!("chunk-{i}") },
+            payload: AgentEventPayload::Stream {
+                text: format!("chunk-{i}"),
+            },
         };
         server_conn
-            .send_notification(methods::AGENT_EVENT.name, serde_json::to_value(&event).unwrap())
-            .await.unwrap();
+            .send_notification(
+                methods::AGENT_EVENT.name,
+                serde_json::to_value(&event).unwrap(),
+            )
+            .await
+            .unwrap();
     }
 
     let mut rx = handles.agent_event_rx;
     let mut texts = Vec::new();
     for _ in 0..5 {
-        let ev = tokio::time::timeout(TIMEOUT, rx.recv()).await.unwrap().unwrap();
-        if let AgentEventPayload::Stream { text } = ev.payload { texts.push(text); }
+        let ev = tokio::time::timeout(TIMEOUT, rx.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        if let AgentEventPayload::Stream { text } = ev.payload {
+            texts.push(text);
+        }
     }
-    assert_eq!(texts, vec!["chunk-0", "chunk-1", "chunk-2", "chunk-3", "chunk-4"]);
+    assert_eq!(
+        texts,
+        vec!["chunk-0", "chunk-1", "chunk-2", "chunk-3", "chunk-4"]
+    );
 }
 
 #[tokio::test]
@@ -61,9 +77,13 @@ async fn e2e_interrupt_notification() {
     let (conn, _incoming) = client.into_parts();
 
     conn.send_notification(methods::AGENT_INTERRUPT.name, serde_json::Value::Null)
-        .await.unwrap();
+        .await
+        .unwrap();
 
-    let msg = tokio::time::timeout(TIMEOUT, server_rx.recv()).await.unwrap().unwrap();
+    let msg = tokio::time::timeout(TIMEOUT, server_rx.recv())
+        .await
+        .unwrap()
+        .unwrap();
     match msg {
         Incoming::Notification { method, .. } => assert_eq!(method, methods::AGENT_INTERRUPT.name),
         _ => panic!("expected interrupt notification"),
@@ -79,15 +99,22 @@ async fn e2e_question_roundtrip_via_bridge() {
 
     let sc = server_conn.clone();
     let q_handle = tokio::spawn(async move {
-        sc.send_request(methods::AGENT_QUESTION.name, serde_json::json!({
-            "questions": [{"question": "Pick", "options": [
-                {"label": "A", "description": ""}, {"label": "B", "description": ""}
-            ], "allow_multiple": false}]
-        })).await
+        sc.send_request(
+            methods::AGENT_QUESTION.name,
+            serde_json::json!({
+                "questions": [{"question": "Pick", "options": [
+                    {"label": "A", "description": ""}, {"label": "B", "description": ""}
+                ], "allow_multiple": false}]
+            }),
+        )
+        .await
     });
 
     let mut rx = handles.agent_event_rx;
-    let ev = tokio::time::timeout(TIMEOUT, rx.recv()).await.unwrap().unwrap();
+    let ev = tokio::time::timeout(TIMEOUT, rx.recv())
+        .await
+        .unwrap()
+        .unwrap();
     match &ev.payload {
         AgentEventPayload::UserQuestionRequest { questions, .. } => {
             assert_eq!(questions[0].question, "Pick");
@@ -95,11 +122,19 @@ async fn e2e_question_roundtrip_via_bridge() {
         other => panic!("expected UserQuestionRequest, got: {other:?}"),
     }
 
-    handles.question_tx
-        .send(loopal_protocol::UserQuestionResponse { answers: vec!["B".into()] })
-        .await.unwrap();
+    handles
+        .question_tx
+        .send(loopal_protocol::UserQuestionResponse {
+            answers: vec!["B".into()],
+        })
+        .await
+        .unwrap();
 
-    let resp = tokio::time::timeout(TIMEOUT, q_handle).await.unwrap().unwrap().unwrap();
+    let resp = tokio::time::timeout(TIMEOUT, q_handle)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
     assert_eq!(resp["answers"][0], "B");
 }
 
@@ -116,13 +151,19 @@ async fn e2e_bridge_stops_on_incoming_close() {
         agent_name: None,
         payload: AgentEventPayload::Stream { text: "one".into() },
     };
-    fwd_tx.send(Incoming::Notification {
-        method: methods::AGENT_EVENT.name.into(),
-        params: serde_json::to_value(&event).unwrap(),
-    }).await.unwrap();
+    fwd_tx
+        .send(Incoming::Notification {
+            method: methods::AGENT_EVENT.name.into(),
+            params: serde_json::to_value(&event).unwrap(),
+        })
+        .await
+        .unwrap();
 
     let mut rx = handles.agent_event_rx;
-    let ev = tokio::time::timeout(TIMEOUT, rx.recv()).await.unwrap().unwrap();
+    let ev = tokio::time::timeout(TIMEOUT, rx.recv())
+        .await
+        .unwrap()
+        .unwrap();
     assert!(matches!(ev.payload, AgentEventPayload::Stream { .. }));
 
     drop(fwd_tx);

@@ -2,25 +2,21 @@
 
 use std::sync::Arc;
 
+use loopal_ipc::StdioTransport;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
-use loopal_ipc::StdioTransport;
 
 use loopal_agent_client::AgentClient;
 
 fn make_pair() -> (Arc<dyn loopal_ipc::transport::Transport>, Arc<Connection>) {
     let (a_tx, a_rx) = tokio::io::duplex(8192);
     let (b_tx, b_rx) = tokio::io::duplex(8192);
-    let client_transport: Arc<dyn loopal_ipc::transport::Transport> =
-        Arc::new(StdioTransport::new(
-            Box::new(tokio::io::BufReader::new(b_rx)),
-            Box::new(a_tx),
-        ));
-    let server_transport: Arc<dyn loopal_ipc::transport::Transport> =
-        Arc::new(StdioTransport::new(
-            Box::new(tokio::io::BufReader::new(a_rx)),
-            Box::new(b_tx),
-        ));
+    let client_transport: Arc<dyn loopal_ipc::transport::Transport> = Arc::new(
+        StdioTransport::new(Box::new(tokio::io::BufReader::new(b_rx)), Box::new(a_tx)),
+    );
+    let server_transport: Arc<dyn loopal_ipc::transport::Transport> = Arc::new(
+        StdioTransport::new(Box::new(tokio::io::BufReader::new(a_rx)), Box::new(b_tx)),
+    );
     let server_conn = Arc::new(Connection::new(server_transport));
     (client_transport, server_conn)
 }
@@ -64,22 +60,17 @@ async fn recv_delivers_agent_events() {
         .await
         .unwrap();
 
-    let event = tokio::time::timeout(
-        std::time::Duration::from_secs(2),
-        client.recv(),
-    )
-    .await
-    .unwrap();
+    let event = tokio::time::timeout(std::time::Duration::from_secs(2), client.recv())
+        .await
+        .unwrap();
 
     match event {
-        Some(loopal_agent_client::AgentClientEvent::AgentEvent(ev)) => {
-            match ev.payload {
-                loopal_protocol::AgentEventPayload::Stream { text } => {
-                    assert_eq!(text, "hi");
-                }
-                _ => panic!("expected Stream event"),
+        Some(loopal_agent_client::AgentClientEvent::AgentEvent(ev)) => match ev.payload {
+            loopal_protocol::AgentEventPayload::Stream { text } => {
+                assert_eq!(text, "hi");
             }
-        }
+            _ => panic!("expected Stream event"),
+        },
         other => panic!("expected AgentEvent, got: {other:?}"),
     }
 }
@@ -105,12 +96,9 @@ async fn recv_delivers_permission_request() {
             .await
     });
 
-    let event = tokio::time::timeout(
-        std::time::Duration::from_secs(2),
-        client.recv(),
-    )
-    .await
-    .unwrap();
+    let event = tokio::time::timeout(std::time::Duration::from_secs(2), client.recv())
+        .await
+        .unwrap();
 
     match event {
         Some(loopal_agent_client::AgentClientEvent::PermissionRequest { id, params }) => {
@@ -150,4 +138,3 @@ async fn into_parts_transfers_connection() {
         .unwrap();
     assert!(msg.is_some());
 }
-

@@ -42,7 +42,16 @@ pub(crate) async fn build(
     let mut kernel = Kernel::new(config.settings.clone())?;
     kernel.start_mcp().await?;
     loopal_agent::tools::register_all(&mut kernel);
-    build_inner(cwd, &config, start, connection, incoming_rx, Arc::new(kernel), None, true)
+    build_inner(
+        cwd,
+        &config,
+        start,
+        connection,
+        incoming_rx,
+        Arc::new(kernel),
+        None,
+        true,
+    )
 }
 
 /// Build agent params with injected provider (test path).
@@ -67,7 +76,16 @@ pub(crate) fn build_with_provider(
         memory: String::new(),
         layers: Vec::new(),
     };
-    build_inner(cwd, &config, start, connection, incoming_rx, Arc::new(kernel), Some(session_dir), false)
+    build_inner(
+        cwd,
+        &config,
+        start,
+        connection,
+        incoming_rx,
+        Arc::new(kernel),
+        Some(session_dir),
+        false,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -90,7 +108,11 @@ fn build_inner(
         Some("plan") => loopal_runtime::AgentMode::Plan,
         _ => loopal_runtime::AgentMode::Act,
     };
-    let mode_str = if mode == loopal_runtime::AgentMode::Plan { "plan" } else { "act" };
+    let mode_str = if mode == loopal_runtime::AgentMode::Plan {
+        "plan"
+    } else {
+        "act"
+    };
 
     let session_manager = if let Some(dir) = session_dir_override {
         loopal_runtime::SessionManager::with_base_dir(dir.to_path_buf())
@@ -101,7 +123,10 @@ fn build_inner(
 
     let interrupt = InterruptSignal::new();
     let frontend = Arc::new(IpcFrontend::new(
-        connection.clone(), incoming_rx, None, interrupt.clone(),
+        connection.clone(),
+        incoming_rx,
+        None,
+        interrupt.clone(),
     ));
 
     // Event channel for sub-agents: events forwarded to TUI via IPC
@@ -126,9 +151,14 @@ fn build_inner(
         kernel: kernel.clone(),
         registry: Arc::new(tokio::sync::Mutex::new(AgentRegistry::new())),
         task_store: Arc::new(TaskStore::new(tasks_dir)),
-        router, cwd: cwd.to_path_buf(), depth: 0, max_depth: 3,
-        agent_name: "main".into(), parent_event_tx: Some(event_tx),
-        cancel_token: None, worktree_state: Default::default(),
+        router,
+        cwd: cwd.to_path_buf(),
+        depth: 0,
+        max_depth: 3,
+        agent_name: "main".into(),
+        parent_event_tx: Some(event_tx),
+        cancel_token: None,
+        worktree_state: Default::default(),
     });
 
     // Memory observer — only for interactive (root) agents, not sub-agents.
@@ -137,7 +167,8 @@ fn build_inner(
     let memory_channel: Option<Arc<dyn MemoryChannel>> = if memory_enabled {
         let (tx, rx) = tokio::sync::mpsc::channel::<String>(64);
         let processor = Arc::new(crate::memory_adapter::ServerMemoryProcessor::new(
-            agent_shared.clone(), model.clone(),
+            agent_shared.clone(),
+            model.clone(),
         ));
         tokio::spawn(loopal_memory::MemoryObserver::new(rx, processor).run());
         Some(Arc::new(crate::memory_adapter::ServerMemoryChannel(tx)))
@@ -151,8 +182,12 @@ fn build_inner(
     let skills_summary = loopal_config::format_skills_summary(&skills);
     let tool_defs = kernel.tool_definitions();
     let system_prompt = build_system_prompt(
-        &config.instructions, &tool_defs, mode_str,
-        &cwd.to_string_lossy(), &skills_summary, &config.memory,
+        &config.instructions,
+        &tool_defs,
+        mode_str,
+        &cwd.to_string_lossy(),
+        &skills_summary,
+        &config.memory,
     );
     let messages = if let Some(prompt) = &start.prompt {
         vec![loopal_message::Message::user(prompt)]
@@ -166,13 +201,27 @@ fn build_inner(
 
     Ok(AgentLoopParams {
         config: loopal_runtime::AgentConfig {
-            model, compact_model, system_prompt, mode, permission_mode,
-            max_turns, tool_filter: None, interactive, thinking_config,
+            model,
+            compact_model,
+            system_prompt,
+            mode,
+            permission_mode,
+            max_turns,
+            tool_filter: None,
+            interactive,
+            thinking_config,
         },
-        deps: loopal_runtime::AgentDeps { kernel, frontend, session_manager },
+        deps: loopal_runtime::AgentDeps {
+            kernel,
+            frontend,
+            session_manager,
+        },
         session,
         store: ContextStore::from_messages(messages, budget),
-        interrupt: loopal_runtime::InterruptHandle { signal: interrupt, tx: interrupt_tx },
+        interrupt: loopal_runtime::InterruptHandle {
+            signal: interrupt,
+            tx: interrupt_tx,
+        },
         shared: Some(shared_any),
         memory_channel,
     })

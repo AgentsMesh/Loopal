@@ -37,7 +37,11 @@ pub async fn run(
     let permission_mode = config.settings.permission_mode;
     let thinking_config = config.settings.thinking.clone();
     let memory_enabled = config.settings.memory.enabled;
-    let mode = if cli.plan { AgentMode::Plan } else { AgentMode::Act };
+    let mode = if cli.plan {
+        AgentMode::Plan
+    } else {
+        AgentMode::Act
+    };
     let mode_str = if cli.plan { "plan" } else { "act" }.to_string();
 
     tracing::info!(model = %model, mode = %mode_str, "starting (single-process)");
@@ -62,7 +66,10 @@ pub async fn run(
     let (question_tx, question_rx) = mpsc::channel::<UserQuestionResponse>(16);
     let router = Arc::new(MessageRouter::new(agent_event_tx.clone()));
     let (mailbox_tx, mailbox_rx) = mpsc::channel::<Envelope>(16);
-    router.register("main", mailbox_tx).await.map_err(|e| anyhow::anyhow!(e))?;
+    router
+        .register("main", mailbox_tx)
+        .await
+        .map_err(|e| anyhow::anyhow!(e))?;
     let (control_tx, control_rx) = mpsc::channel::<ControlCommand>(16);
     let interrupt = InterruptSignal::new();
     let interrupt_tx = Arc::new(tokio::sync::watch::channel(0u64).0);
@@ -73,7 +80,10 @@ pub async fn run(
         mailbox_rx,
         control_rx,
         None,
-        Box::new(TuiPermissionHandler::new(agent_event_tx.clone(), permission_rx)),
+        Box::new(TuiPermissionHandler::new(
+            agent_event_tx.clone(),
+            permission_rx,
+        )),
         Box::new(TuiQuestionHandler::new(agent_event_tx.clone(), question_rx)),
     ));
 
@@ -95,7 +105,10 @@ pub async fn run(
 
     let memory_channel: Option<Arc<dyn MemoryChannel>> = if memory_enabled {
         let (tx, rx) = mpsc::channel::<String>(64);
-        let processor = Arc::new(AgentMemoryProcessor::new(agent_shared.clone(), model.clone()));
+        let processor = Arc::new(AgentMemoryProcessor::new(
+            agent_shared.clone(),
+            model.clone(),
+        ));
         tokio::spawn(MemoryObserver::new(rx, processor).run());
         Some(Arc::new(MpscMemoryChannel(tx)))
     } else {
@@ -107,13 +120,22 @@ pub async fn run(
     let skills_summary = loopal_config::format_skills_summary(&skills);
     let tool_defs = kernel.tool_definitions();
     let system_prompt = build_system_prompt(
-        &config.instructions, &tool_defs, &mode_str,
-        &cwd.to_string_lossy(), &skills_summary, &config.memory,
+        &config.instructions,
+        &tool_defs,
+        &mode_str,
+        &cwd.to_string_lossy(),
+        &skills_summary,
+        &config.memory,
     );
 
     let session_ctrl = SessionController::new(
-        model.clone(), mode_str, control_tx, permission_tx,
-        question_tx, interrupt.clone(), interrupt_tx.clone(),
+        model.clone(),
+        mode_str,
+        control_tx,
+        permission_tx,
+        question_tx,
+        interrupt.clone(),
+        interrupt_tx.clone(),
     );
     if cli.resume.is_some() {
         session_ctrl.load_display_history(project_messages(&messages));
@@ -126,13 +148,27 @@ pub async fn run(
 
     let agent_params = AgentLoopParams {
         config: loopal_runtime::AgentConfig {
-            model, compact_model, system_prompt, mode, permission_mode,
-            max_turns, tool_filter: None, interactive: true, thinking_config,
+            model,
+            compact_model,
+            system_prompt,
+            mode,
+            permission_mode,
+            max_turns,
+            tool_filter: None,
+            interactive: true,
+            thinking_config,
         },
-        deps: loopal_runtime::AgentDeps { kernel, frontend, session_manager },
+        deps: loopal_runtime::AgentDeps {
+            kernel,
+            frontend,
+            session_manager,
+        },
         session,
         store: ContextStore::from_messages(messages, budget),
-        interrupt: loopal_runtime::InterruptHandle { signal: interrupt, tx: interrupt_tx },
+        interrupt: loopal_runtime::InterruptHandle {
+            signal: interrupt,
+            tx: interrupt_tx,
+        },
         shared: Some(shared_any),
         memory_channel,
     };
@@ -148,8 +184,14 @@ pub async fn run(
         }
     });
 
-    loopal_tui::run_tui(session_ctrl, router, "main".to_string(), cwd, agent_event_rx)
-        .await?;
+    loopal_tui::run_tui(
+        session_ctrl,
+        router,
+        "main".to_string(),
+        cwd,
+        agent_event_rx,
+    )
+    .await?;
     tracing::info!("shutting down");
     Ok(())
 }

@@ -56,12 +56,12 @@ pub async fn build_ipc_harness(
         ));
 
     // Spawn server in background
-    let provider = Arc::new(MultiCallProvider::new(calls)) as Arc<dyn loopal_provider_api::Provider>;
+    let provider =
+        Arc::new(MultiCallProvider::new(calls)) as Arc<dyn loopal_provider_api::Provider>;
     tokio::spawn(async move {
-        let _ = loopal_agent_server::run_server_for_test(
-            server_transport, provider, cwd, session_dir,
-        )
-        .await;
+        let _ =
+            loopal_agent_server::run_server_for_test(server_transport, provider, cwd, session_dir)
+                .await;
     });
 
     // Client handshake — send a dummy prompt so agent starts processing
@@ -90,9 +90,7 @@ pub async fn build_ipc_harness(
 pub const IPC_TEST_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Collect events until AwaitingInput or Finished, with timeout.
-pub async fn collect_ipc_events(
-    rx: &mut mpsc::Receiver<AgentEvent>,
-) -> Vec<AgentEventPayload> {
+pub async fn collect_ipc_events(rx: &mut mpsc::Receiver<AgentEvent>) -> Vec<AgentEventPayload> {
     let mut events = Vec::new();
     loop {
         match tokio::time::timeout(IPC_TEST_TIMEOUT, rx.recv()).await {

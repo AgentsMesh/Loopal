@@ -68,7 +68,11 @@ async fn run_with_agent(
     let interrupt_for_bridge = interrupt.clone();
     let interrupt_rx = interrupt_tx.subscribe();
     let interrupt_conn = connection.clone();
-    tokio::spawn(forward_interrupt(interrupt_for_bridge, interrupt_rx, interrupt_conn));
+    tokio::spawn(forward_interrupt(
+        interrupt_for_bridge,
+        interrupt_rx,
+        interrupt_conn,
+    ));
 
     let model = config.settings.model.clone();
 
@@ -93,7 +97,10 @@ async fn run_with_agent(
     session_ctrl.push_welcome(&model, &display_path);
 
     loopal_tui::run_tui(
-        session_ctrl, router, "main".to_string(), cwd.to_path_buf(),
+        session_ctrl,
+        router,
+        "main".to_string(),
+        cwd.to_path_buf(),
         handles.agent_event_rx,
     )
     .await

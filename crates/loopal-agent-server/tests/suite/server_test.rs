@@ -5,9 +5,9 @@
 
 use std::sync::Arc;
 
+use loopal_ipc::StdioTransport;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
-use loopal_ipc::StdioTransport;
 
 fn pipe_connection_pair() -> (Arc<Connection>, Arc<Connection>) {
     let (a_tx, a_rx) = tokio::io::duplex(8192);
@@ -74,9 +74,7 @@ async fn shutdown_before_start_is_graceful() {
 
     if let Some(Incoming::Request { id, method, .. }) = server_rx.recv().await {
         assert_eq!(method, methods::AGENT_SHUTDOWN.name);
-        let _ = server
-            .respond(id, serde_json::json!({"ok": true}))
-            .await;
+        let _ = server.respond(id, serde_json::json!({"ok": true})).await;
     }
 
     let result = handle.await.unwrap().unwrap();

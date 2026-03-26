@@ -2,9 +2,9 @@
 
 use std::sync::Arc;
 
+use loopal_ipc::StdioTransport;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
-use loopal_ipc::StdioTransport;
 
 use loopal_agent_client::AgentClient;
 
@@ -12,10 +12,12 @@ fn make_pair() -> (Arc<dyn loopal_ipc::transport::Transport>, Arc<Connection>) {
     let (a_tx, a_rx) = tokio::io::duplex(8192);
     let (b_tx, b_rx) = tokio::io::duplex(8192);
     let ct: Arc<dyn loopal_ipc::transport::Transport> = Arc::new(StdioTransport::new(
-        Box::new(tokio::io::BufReader::new(b_rx)), Box::new(a_tx),
+        Box::new(tokio::io::BufReader::new(b_rx)),
+        Box::new(a_tx),
     ));
     let st: Arc<dyn loopal_ipc::transport::Transport> = Arc::new(StdioTransport::new(
-        Box::new(tokio::io::BufReader::new(a_rx)), Box::new(b_tx),
+        Box::new(tokio::io::BufReader::new(a_rx)),
+        Box::new(b_tx),
     ));
     (ct, Arc::new(Connection::new(st)))
 }
@@ -33,7 +35,10 @@ async fn send_control_delivers_to_server() {
         }
     });
 
-    client.send_control(&loopal_protocol::ControlCommand::Compact).await.unwrap();
+    client
+        .send_control(&loopal_protocol::ControlCommand::Compact)
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -45,7 +50,9 @@ async fn send_interrupt_delivers_notification() {
     client.send_interrupt().await.unwrap();
 
     let msg = tokio::time::timeout(std::time::Duration::from_secs(2), server_rx.recv())
-        .await.unwrap().unwrap();
+        .await
+        .unwrap()
+        .unwrap();
     match msg {
         Incoming::Notification { method, .. } => assert_eq!(method, methods::AGENT_INTERRUPT.name),
         _ => panic!("expected notification"),

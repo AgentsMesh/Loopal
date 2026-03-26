@@ -41,8 +41,14 @@ pub fn start_bridge(
     // Bridge: IPC incoming → TUI events + permission/question response routing
     let conn_in = connection.clone();
     tokio::spawn(async move {
-        bridge_incoming(incoming_rx, conn_in, agent_event_tx, &mut permission_rx, &mut question_rx)
-            .await;
+        bridge_incoming(
+            incoming_rx,
+            conn_in,
+            agent_event_tx,
+            &mut permission_rx,
+            &mut question_rx,
+        )
+        .await;
     });
 
     // Bridge: TUI → IPC (control commands)
@@ -50,7 +56,10 @@ pub fn start_bridge(
     tokio::spawn(async move {
         while let Some(cmd) = control_rx.recv().await {
             if let Ok(params) = serde_json::to_value(&cmd) {
-                if let Err(e) = conn_ctrl.send_request(methods::AGENT_CONTROL.name, params).await {
+                if let Err(e) = conn_ctrl
+                    .send_request(methods::AGENT_CONTROL.name, params)
+                    .await
+                {
                     warn!("bridge: control send failed: {e}");
                     break;
                 }
@@ -63,7 +72,10 @@ pub fn start_bridge(
     tokio::spawn(async move {
         while let Some(envelope) = mailbox_rx.recv().await {
             if let Ok(params) = serde_json::to_value(&envelope) {
-                if let Err(e) = conn_msg.send_request(methods::AGENT_MESSAGE.name, params).await {
+                if let Err(e) = conn_msg
+                    .send_request(methods::AGENT_MESSAGE.name, params)
+                    .await
+                {
                     warn!("bridge: message send failed: {e}");
                     break;
                 }
@@ -71,7 +83,13 @@ pub fn start_bridge(
         }
     });
 
-    BridgeHandles { agent_event_rx, control_tx, permission_tx, question_tx, mailbox_tx }
+    BridgeHandles {
+        agent_event_rx,
+        control_tx,
+        permission_tx,
+        question_tx,
+        mailbox_tx,
+    }
 }
 
 async fn bridge_incoming(
@@ -109,7 +127,11 @@ async fn bridge_incoming(
                     handle_question(&connection, &event_tx, question_rx, id, params).await;
                 } else {
                     let _ = connection
-                        .respond_error(id, loopal_ipc::jsonrpc::METHOD_NOT_FOUND, &format!("unknown: {method}"))
+                        .respond_error(
+                            id,
+                            loopal_ipc::jsonrpc::METHOD_NOT_FOUND,
+                            &format!("unknown: {method}"),
+                        )
                         .await;
                 }
             }
@@ -124,22 +146,32 @@ async fn handle_permission(
     request_id: i64,
     params: serde_json::Value,
 ) {
-    let tool_name = params["tool_name"].as_str().unwrap_or("unknown").to_string();
+    let tool_name = params["tool_name"]
+        .as_str()
+        .unwrap_or("unknown")
+        .to_string();
     let tool_input = params.get("tool_input").cloned().unwrap_or_default();
     let tool_id = params["tool_call_id"].as_str().unwrap_or("").to_string();
     let event = AgentEvent {
         agent_name: None,
         payload: loopal_protocol::AgentEventPayload::ToolPermissionRequest {
-            id: tool_id, name: tool_name, input: tool_input,
+            id: tool_id,
+            name: tool_name,
+            input: tool_input,
         },
     };
     let _ = event_tx.send(event).await;
     // Wait with timeout — prevents infinite hang if TUI disappears
     let allow = match tokio::time::timeout(RESPONSE_TIMEOUT, permission_rx.recv()).await {
         Ok(Some(v)) => v,
-        _ => { warn!("permission response timeout/closed, denying"); false }
+        _ => {
+            warn!("permission response timeout/closed, denying");
+            false
+        }
     };
-    let _ = connection.respond(request_id, serde_json::json!({"allow": allow})).await;
+    let _ = connection
+        .respond(request_id, serde_json::json!({"allow": allow}))
+        .await;
 }
 
 async fn handle_question(
@@ -154,20 +186,38 @@ async fn handle_question(
         let event = AgentEvent {
             agent_name: None,
             payload: loopal_protocol::AgentEventPayload::UserQuestionRequest {
-                id: "ipc".into(), questions,
+                id: "ipc".into(),
+                questions,
             },
         };
         let _ = event_tx.send(event).await;
     } else {
         // Parse failed — respond immediately instead of waiting 300s
         warn!("IPC bridge: failed to parse questions, auto-responding");
-        let fallback = UserQuestionResponse { answers: vec!["(parse error)".into()] };
-        let _ = connection.respond(request_id, serde_json::to_value(&fallback).unwrap_or_default()).await;
+        let fallback = UserQuestionResponse {
+            answers: vec!["(parse error)".into()],
+        };
+        let _ = connection
+            .respond(
+                request_id,
+                serde_json::to_value(&fallback).unwrap_or_default(),
+            )
+            .await;
         return;
     }
     let response = match tokio::time::timeout(RESPONSE_TIMEOUT, question_rx.recv()).await {
         Ok(Some(v)) => v,
-        _ => { warn!("question response timeout/closed"); UserQuestionResponse { answers: vec!["(timeout)".into()] } }
+        _ => {
+            warn!("question response timeout/closed");
+            UserQuestionResponse {
+                answers: vec!["(timeout)".into()],
+            }
+        }
     };
-    let _ = connection.respond(request_id, serde_json::to_value(&response).unwrap_or_default()).await;
+    let _ = connection
+        .respond(
+            request_id,
+            serde_json::to_value(&response).unwrap_or_default(),
+        )
+        .await;
 }

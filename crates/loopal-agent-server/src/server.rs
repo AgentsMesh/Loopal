@@ -79,7 +79,9 @@ async fn run_server_loop(
                     handle_agent_start(&connection, incoming_rx, id, params).await?;
                     break;
                 } else if method == methods::AGENT_SHUTDOWN.name {
-                    let _ = connection.respond(id, serde_json::json!({"ok": true})).await;
+                    let _ = connection
+                        .respond(id, serde_json::json!({"ok": true}))
+                        .await;
                     break;
                 } else {
                     let _ = connection
@@ -104,8 +106,10 @@ pub(crate) async fn wait_for_initialize(
         };
         if let Incoming::Request { id, method, params } = msg {
             if method == methods::INITIALIZE.name {
-                let _: InitializeParams = serde_json::from_value(params)
-                    .unwrap_or(InitializeParams { protocol_version: 1 });
+                let _: InitializeParams =
+                    serde_json::from_value(params).unwrap_or(InitializeParams {
+                        protocol_version: 1,
+                    });
                 let result = InitializeResult {
                     protocol_version: 1,
                     agent_info: AgentInfo {
@@ -149,7 +153,10 @@ async fn handle_agent_start(
     let agent_params = params::build(&cwd, &config, &start, connection, incoming_rx).await?;
 
     let _ = connection
-        .respond(request_id, serde_json::json!({"session_id": agent_params.session.id}))
+        .respond(
+            request_id,
+            serde_json::json!({"session_id": agent_params.session.id}),
+        )
         .await;
 
     match agent_loop(agent_params).await {

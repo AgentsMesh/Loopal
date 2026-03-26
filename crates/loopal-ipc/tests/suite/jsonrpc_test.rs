@@ -1,5 +1,5 @@
 use loopal_ipc::jsonrpc::{
-    self, IncomingMessage, INTERNAL_ERROR, INVALID_REQUEST, METHOD_NOT_FOUND, PARSE_ERROR,
+    self, INTERNAL_ERROR, INVALID_REQUEST, IncomingMessage, METHOD_NOT_FOUND, PARSE_ERROR,
 };
 
 #[test]
@@ -44,8 +44,7 @@ fn parse_response_with_result() {
 
 #[test]
 fn parse_response_with_error() {
-    let data =
-        br#"{"jsonrpc":"2.0","id":5,"error":{"code":-32600,"message":"bad request"}}"#;
+    let data = br#"{"jsonrpc":"2.0","id":5,"error":{"code":-32600,"message":"bad request"}}"#;
     let msg = jsonrpc::parse_message(data).expect("should parse");
     match msg {
         IncomingMessage::Response { id, error, .. } => {
@@ -63,10 +62,10 @@ fn parse_malformed_returns_none() {
     assert!(jsonrpc::parse_message(b"not json").is_none());
     assert!(jsonrpc::parse_message(b"{}").is_none());
     // Non-numeric id
-    assert!(jsonrpc::parse_message(
-        br#"{"jsonrpc":"2.0","id":"str","method":"x","params":{}}"#
-    )
-    .is_none());
+    assert!(
+        jsonrpc::parse_message(br#"{"jsonrpc":"2.0","id":"str","method":"x","params":{}}"#)
+            .is_none()
+    );
 }
 
 #[test]

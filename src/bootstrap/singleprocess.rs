@@ -1,13 +1,14 @@
+//! Single-process mode (--no-ipc) — original TUI + agent in one process.
+
+use std::path::PathBuf;
 use std::sync::Arc;
 
-use clap::Parser;
 use tokio::sync::mpsc;
 
 use loopal_agent::registry::AgentRegistry;
 use loopal_agent::router::MessageRouter;
 use loopal_agent::shared::AgentShared;
 use loopal_agent::task_store::TaskStore;
-use loopal_config::load_config;
 use loopal_context::system_prompt::build_system_prompt;
 use loopal_context::{ContextBudget, ContextStore};
 use loopal_kernel::Kernel;
@@ -25,22 +26,11 @@ use loopal_tool_api::MemoryChannel;
 use crate::cli::Cli;
 use crate::memory_adapter::{AgentMemoryProcessor, MpscMemoryChannel};
 
-pub async fn run() -> anyhow::Result<()> {
-    let cli = Cli::parse();
-    let cwd = std::env::current_dir()?;
-
-    loopal_config::housekeeping::startup_cleanup();
-    if let Some(repo_root) = loopal_git::repo_root(&cwd) {
-        loopal_git::cleanup_stale_worktrees(&repo_root);
-    }
-
-    let mut config = load_config(&cwd)?;
-    cli.apply_overrides(&mut config.settings);
-
-    if cli.acp {
-        return loopal_acp::run_acp(config, cwd).await;
-    }
-
+pub async fn run(
+    cli: Cli,
+    cwd: PathBuf,
+    config: loopal_config::ResolvedConfig,
+) -> anyhow::Result<()> {
     let model = config.settings.model.clone();
     let compact_model = config.settings.compact_model.clone();
     let max_turns = config.settings.max_turns;
@@ -54,7 +44,7 @@ pub async fn run() -> anyhow::Result<()> {
     };
     let mode_str = if cli.plan { "plan" } else { "act" }.to_string();
 
-    tracing::info!(model = %model, mode = %mode_str, "starting");
+    tracing::info!(model = %model, mode = %mode_str, "starting (single-process)");
 
     let mut kernel = Kernel::new(config.settings)?;
     kernel.start_mcp().await?;
@@ -62,8 +52,8 @@ pub async fn run() -> anyhow::Result<()> {
     let kernel = Arc::new(kernel);
 
     let session_manager = SessionManager::new()?;
-    let (session, mut messages) = if let Some(ref session_id) = cli.resume {
-        session_manager.resume_session(session_id)?
+    let (session, mut messages) = if let Some(ref sid) = cli.resume {
+        session_manager.resume_session(sid)?
     } else {
         (session_manager.create_session(&cwd, &model)?, Vec::new())
     };
@@ -113,7 +103,6 @@ pub async fn run() -> anyhow::Result<()> {
         worktree_state: Default::default(),
     });
 
-    // Memory observer sidebar — uses AgentShared to spawn memory-maintainer agents
     let memory_channel: Option<Arc<dyn MemoryChannel>> = if memory_enabled {
         let (tx, rx) = mpsc::channel::<String>(64);
         let processor = Arc::new(AgentMemoryProcessor::new(
@@ -127,7 +116,6 @@ pub async fn run() -> anyhow::Result<()> {
     };
 
     let shared_any: Arc<dyn std::any::Any + Send + Sync> = Arc::new(agent_shared);
-
     let skills: Vec<_> = config.skills.into_values().map(|e| e.skill).collect();
     let skills_summary = loopal_config::format_skills_summary(&skills);
     let tool_defs = kernel.tool_definitions();
@@ -152,8 +140,7 @@ pub async fn run() -> anyhow::Result<()> {
     if cli.resume.is_some() {
         session_ctrl.load_display_history(project_messages(&messages));
     } else {
-        let display_path = abbreviate_home(&cwd);
-        session_ctrl.push_welcome(&model, &display_path);
+        session_ctrl.push_welcome(&model, &super::abbreviate_home(&cwd));
     }
 
     let tool_tokens = ContextBudget::estimate_tool_tokens(&tool_defs);
@@ -191,7 +178,6 @@ pub async fn run() -> anyhow::Result<()> {
             tracing::error!(error = %e, "agent loop error");
         }
     });
-    // Monitor JoinHandle: log panic payload that FinishedGuard cannot capture.
     tokio::spawn(async move {
         if let Err(e) = agent_handle.await {
             tracing::error!("agent loop task failed: {e}");
@@ -208,14 +194,4 @@ pub async fn run() -> anyhow::Result<()> {
     .await?;
     tracing::info!("shutting down");
     Ok(())
-}
-
-/// Replace the home directory prefix with `~` for compact display.
-fn abbreviate_home(path: &std::path::Path) -> String {
-    if let Some(home) = dirs::home_dir()
-        && let Ok(rel) = path.strip_prefix(&home)
-    {
-        return format!("~/{}", rel.display());
-    }
-    path.display().to_string()
 }

@@ -23,6 +23,9 @@ pub enum LoopalError {
     #[error("MCP error: {0}")]
     Mcp(#[from] McpError),
 
+    #[error("IPC error: {0}")]
+    Ipc(String),
+
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 

@@ -1678,10 +1678,13 @@ dependencies = [
  "dirs",
  "loopal-acp",
  "loopal-agent",
+ "loopal-agent-client",
+ "loopal-agent-server",
  "loopal-config",
  "loopal-context",
  "loopal-git",
  "loopal-hooks",
+ "loopal-ipc",
  "loopal-kernel",
  "loopal-mcp",
  "loopal-memory",
@@ -1694,6 +1697,8 @@ dependencies = [
  "loopal-tool-api",
  "loopal-tools",
  "loopal-tui",
+ "serde_json",
+ "tempfile",
  "tokio",
  "tracing",
  "tracing-appender",
@@ -1710,6 +1715,7 @@ dependencies = [
  "loopal-config",
  "loopal-context",
  "loopal-error",
+ "loopal-ipc",
  "loopal-kernel",
  "loopal-message",
  "loopal-protocol",
@@ -1733,11 +1739,13 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "chrono",
+ "loopal-agent-client",
  "loopal-backend",
  "loopal-config",
  "loopal-context",
  "loopal-error",
  "loopal-git",
+ "loopal-ipc",
  "loopal-kernel",
  "loopal-memory",
  "loopal-message",
@@ -1755,6 +1763,50 @@ dependencies = [
  "tokio-util",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "loopal-agent-client"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "loopal-error",
+ "loopal-ipc",
+ "loopal-protocol",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "loopal-agent-server"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "futures",
+ "loopal-agent",
+ "loopal-agent-server",
+ "loopal-config",
+ "loopal-context",
+ "loopal-error",
+ "loopal-ipc",
+ "loopal-kernel",
+ "loopal-memory",
+ "loopal-message",
+ "loopal-protocol",
+ "loopal-provider-api",
+ "loopal-runtime",
+ "loopal-storage",
+ "loopal-test-support",
+ "loopal-tool-api",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -1848,6 +1900,23 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "loopal-ipc"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "loopal-agent-client",
+ "loopal-error",
+ "loopal-protocol",
+ "loopal-test-support",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -2050,9 +2119,12 @@ dependencies = [
  "chrono",
  "futures",
  "loopal-agent",
+ "loopal-agent-client",
+ "loopal-agent-server",
  "loopal-config",
  "loopal-context",
  "loopal-error",
+ "loopal-ipc",
  "loopal-kernel",
  "loopal-message",
  "loopal-protocol",

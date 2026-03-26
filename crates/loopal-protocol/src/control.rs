@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::command::AgentMode;
 
 /// Control-plane commands that affect agent behaviour without carrying data.
@@ -8,7 +10,7 @@ use crate::command::AgentMode;
 ///
 /// Shutdown is signalled by dropping the `control_tx` sender — the receiver
 /// in `UnifiedFrontend::recv_input()` returns `None`, terminating the loop.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ControlCommand {
     /// Switch agent operating mode (Act / Plan).
     ModeSwitch(AgentMode),

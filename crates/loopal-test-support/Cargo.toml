@@ -21,6 +21,9 @@ loopal-runtime = { workspace = true }
 loopal-context = { workspace = true }
 loopal-session = { workspace = true }
 loopal-agent = { workspace = true }
+loopal-ipc = { workspace = true }
+loopal-agent-server = { workspace = true }
+loopal-agent-client = { workspace = true }
 
 async-trait = { workspace = true }
 tokio = { workspace = true }

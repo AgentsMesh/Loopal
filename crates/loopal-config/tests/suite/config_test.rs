@@ -26,12 +26,6 @@ fn test_settings_default_max_context_tokens() {
 }
 
 #[test]
-fn test_settings_default_max_cost_none() {
-    let settings = Settings::default();
-    assert!(settings.max_cost.is_none());
-}
-
-#[test]
 fn test_settings_default_hooks_empty() {
     let settings = Settings::default();
     assert!(settings.hooks.is_empty());
@@ -52,7 +46,6 @@ fn test_settings_serde_roundtrip() {
     assert_eq!(deserialized.max_turns, settings.max_turns);
     assert_eq!(deserialized.permission_mode, settings.permission_mode);
     assert_eq!(deserialized.max_context_tokens, settings.max_context_tokens);
-    assert_eq!(deserialized.max_cost, settings.max_cost);
     assert_eq!(deserialized.hooks.len(), settings.hooks.len());
     assert_eq!(deserialized.mcp_servers.len(), settings.mcp_servers.len());
 }

@@ -34,7 +34,6 @@ fn test_get_opus_model() {
     assert_eq!(info.provider, "anthropic");
     assert_eq!(info.context_window, 200_000);
     assert_eq!(info.max_output_tokens, 32_000);
-    assert_eq!(info.input_price_per_mtok, 15.0);
 }
 
 #[test]
@@ -43,7 +42,6 @@ fn test_get_opus_4_6_model() {
     assert_eq!(info.provider, "anthropic");
     assert_eq!(info.context_window, 1_000_000);
     assert_eq!(info.max_output_tokens, 128_000);
-    assert_eq!(info.input_price_per_mtok, 5.0);
 }
 
 #[test]

@@ -29,9 +29,6 @@ pub struct Settings {
     /// Maximum context tokens cap (0 = auto: use model's context_window).
     pub max_context_tokens: u32,
 
-    /// Maximum cost per session (USD)
-    pub max_cost: Option<f64>,
-
     /// Provider configurations
     #[serde(default)]
     pub providers: ProvidersConfig,
@@ -65,7 +62,6 @@ impl Default for Settings {
             max_turns: 50,
             permission_mode: PermissionMode::Bypass,
             max_context_tokens: 0,
-            max_cost: None,
             providers: ProvidersConfig::default(),
             hooks: Vec::new(),
             mcp_servers: IndexMap::new(),

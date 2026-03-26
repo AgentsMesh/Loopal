@@ -23,7 +23,11 @@ pub fn build_initial_budget(
     tool_tokens: u32,
 ) -> loopal_context::ContextBudget {
     use agent_loop::model_config::ModelConfig;
-    let mc = ModelConfig::from_model(model, loopal_provider_api::ThinkingConfig::Auto, context_tokens_cap);
+    let mc = ModelConfig::from_model(
+        model,
+        loopal_provider_api::ThinkingConfig::Auto,
+        context_tokens_cap,
+    );
     mc.build_budget(system_prompt, tool_tokens)
 }
 

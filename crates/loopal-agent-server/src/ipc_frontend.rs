@@ -8,8 +8,7 @@ use loopal_error::{LoopalError, Result};
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
 use loopal_protocol::{
-    AgentEvent, AgentEventPayload, ControlCommand, Envelope, InterruptSignal, Question,
-    UserQuestionResponse,
+    AgentEvent, AgentEventPayload, ControlCommand, Envelope, Question, UserQuestionResponse,
 };
 use loopal_runtime::agent_input::AgentInput;
 use loopal_runtime::frontend::traits::{AgentFrontend, EventEmitter};
@@ -21,7 +20,6 @@ pub struct IpcFrontend {
     connection: Arc<Connection>,
     incoming_rx: Mutex<mpsc::Receiver<Incoming>>,
     agent_name: Option<String>,
-    interrupt: InterruptSignal,
 }
 
 impl IpcFrontend {
@@ -29,13 +27,11 @@ impl IpcFrontend {
         connection: Arc<Connection>,
         incoming_rx: mpsc::Receiver<Incoming>,
         agent_name: Option<String>,
-        interrupt: InterruptSignal,
     ) -> Self {
         Self {
             connection,
             incoming_rx: Mutex::new(incoming_rx),
             agent_name,
-            interrupt,
         }
     }
 }
@@ -111,10 +107,10 @@ impl AgentFrontend for IpcFrontend {
                         }
                     }
                 }
-                Incoming::Notification { method, .. } => {
-                    if method == methods::AGENT_INTERRUPT.name {
-                        self.interrupt.signal();
-                    }
+                Incoming::Notification { .. } => {
+                    // Interrupt notifications are intercepted by the
+                    // interrupt_filter before reaching here. Any remaining
+                    // notifications are silently skipped.
                 }
             }
         }

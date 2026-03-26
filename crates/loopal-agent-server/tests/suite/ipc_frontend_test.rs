@@ -1,11 +1,11 @@
-//! IpcFrontend unit tests — verifies emit and interrupt signal handling.
+//! IpcFrontend unit tests — verifies emit and recv_input behavior.
 
 use std::sync::Arc;
 
 use loopal_ipc::StdioTransport;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
-use loopal_protocol::{AgentEventPayload, InterruptSignal};
+use loopal_protocol::AgentEventPayload;
 
 fn ipc_pair() -> (
     Arc<Connection>,
@@ -36,8 +36,7 @@ async fn emit_sends_agent_event_notification() {
     use loopal_runtime::AgentFrontend;
 
     let (server_conn, server_rx, _client_conn, mut client_rx) = ipc_pair();
-    let interrupt = InterruptSignal::new();
-    let frontend = loopal_agent_server::ipc_frontend_for_test(server_conn, server_rx, interrupt);
+    let frontend = loopal_agent_server::ipc_frontend_for_test(server_conn, server_rx);
 
     frontend
         .emit(AgentEventPayload::AwaitingInput)
@@ -58,24 +57,24 @@ async fn emit_sends_agent_event_notification() {
     }
 }
 
+/// After interrupt_filter is wired in, recv_input no longer sees interrupt
+/// notifications. This test verifies that recv_input skips non-interrupt
+/// notifications and still returns the next request correctly.
 #[tokio::test]
-async fn recv_input_sets_interrupt_on_notification() {
+async fn recv_input_skips_unknown_notifications() {
     #[allow(unused_imports)]
     use loopal_runtime::AgentFrontend;
 
     let (server_conn, server_rx, client_conn, _client_rx) = ipc_pair();
-    let interrupt = InterruptSignal::new();
-    let interrupt_check = interrupt.clone();
-    let frontend = loopal_agent_server::ipc_frontend_for_test(server_conn, server_rx, interrupt);
+    let frontend = loopal_agent_server::ipc_frontend_for_test(server_conn, server_rx);
 
-    // Send interrupt notification first
+    // Send an unknown notification first (simulating a non-interrupt notification)
     client_conn
-        .send_notification(methods::AGENT_INTERRUPT.name, serde_json::Value::Null)
+        .send_notification("unknown/method", serde_json::Value::Null)
         .await
         .unwrap();
 
-    // Then send a message (as request) — recv_input will process interrupt, then message.
-    // Must run client request and frontend recv_input in parallel.
+    // Then send a valid message request
     let client_clone = client_conn.clone();
     tokio::spawn(async move {
         let _ = client_clone
@@ -91,13 +90,12 @@ async fn recv_input_sets_interrupt_on_notification() {
             .await;
     });
 
-    // recv_input processes interrupt notification (sets signal), then returns message
+    // recv_input should skip the notification and return the message
     let result =
         tokio::time::timeout(std::time::Duration::from_secs(2), frontend.recv_input()).await;
-
     assert!(result.is_ok(), "recv_input should not timeout");
     assert!(
-        interrupt_check.is_signaled(),
-        "interrupt should be signaled"
+        result.unwrap().is_some(),
+        "recv_input should return a message"
     );
 }

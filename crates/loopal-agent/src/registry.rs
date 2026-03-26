@@ -1,7 +1,10 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
+
+use loopal_agent_client::AgentProcess;
 
 use crate::types::AgentId;
 
@@ -12,6 +15,8 @@ pub struct AgentHandle {
     pub agent_type: String,
     pub cancel_token: CancellationToken,
     pub join_handle: JoinHandle<()>,
+    /// The child process handle — used for lifecycle management.
+    pub process: Arc<tokio::sync::Mutex<Option<AgentProcess>>>,
 }
 
 /// Registry of all live sub-agents, keyed by name.
@@ -54,6 +59,16 @@ impl AgentRegistry {
     /// Whether the registry is empty.
     pub fn is_empty(&self) -> bool {
         self.agents.is_empty()
+    }
+
+    /// Shutdown all registered agents (graceful process termination).
+    pub async fn shutdown_all(&mut self) {
+        for (_, handle) in self.agents.drain() {
+            handle.cancel_token.cancel();
+            if let Some(proc) = handle.process.lock().await.take() {
+                let _ = proc.shutdown().await;
+            }
+        }
     }
 }
 

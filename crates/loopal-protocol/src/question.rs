@@ -16,7 +16,7 @@ pub struct QuestionOption {
 }
 
 /// User's response to a set of questions.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserQuestionResponse {
     /// Selected option labels.
     pub answers: Vec<String>,

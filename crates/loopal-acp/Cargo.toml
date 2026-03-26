@@ -9,6 +9,7 @@ doctest = false
 
 [dependencies]
 loopal-error = { workspace = true }
+loopal-ipc = { workspace = true }
 loopal-tool-api = { workspace = true }
 loopal-protocol = { workspace = true }
 loopal-message = { workspace = true }

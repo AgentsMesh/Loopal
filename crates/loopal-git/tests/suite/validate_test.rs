@@ -61,6 +61,17 @@ fn test_reject_spaces() {
 }
 
 #[test]
+fn test_reject_too_long_name() {
+    let dir = tempfile::tempdir().unwrap();
+    init_repo(dir.path());
+    let long_name = "a".repeat(201);
+    assert!(matches!(
+        create_worktree(dir.path(), &long_name),
+        Err(GitError::InvalidName(_))
+    ));
+}
+
+#[test]
 fn test_remove_also_validates_name() {
     let dir = tempfile::tempdir().unwrap();
     init_repo(dir.path());

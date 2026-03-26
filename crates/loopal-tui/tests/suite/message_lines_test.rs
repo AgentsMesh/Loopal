@@ -91,7 +91,47 @@ fn test_streaming_empty_returns_nothing() {
     assert!(lines.is_empty());
 }
 
-// --- Edge cases ---
+// --- Streaming markdown rendering ---
+
+#[test]
+fn test_streaming_renders_bold_markdown() {
+    // streaming_to_lines should render markdown, not show raw **markers**.
+    let lines = streaming_to_lines("Hello **bold** world", 80);
+    let texts = lines_text(&lines);
+    let full: String = texts.join("");
+    assert!(full.contains("bold"), "bold text present");
+    assert!(!full.contains("**"), "raw ** markers should not appear");
+}
+
+#[test]
+fn test_streaming_renders_code_block() {
+    let input = "text\n\n```rust\nfn main() {}\n```\n\nmore";
+    let lines = streaming_to_lines(input, 80);
+    let texts = lines_text(&lines);
+    let full = texts.join(" ");
+    assert!(full.contains("fn main()"), "code content present");
+    // Raw ``` fence markers should not appear as content.
+    assert!(!full.contains("```"), "raw fence markers should not appear");
+}
+
+#[test]
+fn test_streaming_renders_heading() {
+    let lines = streaming_to_lines("## Title\n\nBody", 80);
+    // Find the span containing "Title" and verify it has bold style.
+    let title_span = lines
+        .iter()
+        .flat_map(|l| &l.spans)
+        .find(|s| s.content.contains("Title"));
+    assert!(title_span.is_some(), "Title text should be present");
+    assert!(
+        title_span
+            .unwrap()
+            .style
+            .add_modifier
+            .contains(ratatui::prelude::Modifier::BOLD),
+        "heading should be bold"
+    );
+}
 
 #[test]
 fn test_empty_content_produces_only_separator() {

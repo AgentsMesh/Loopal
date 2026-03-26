@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use tokio::sync::mpsc;
@@ -20,7 +21,9 @@ pub struct SpawnParams {
     pub parent_model: String,
     pub parent_cancel_token: Option<CancellationToken>,
     /// Override the working directory (e.g. for worktree isolation).
-    pub cwd_override: Option<std::path::PathBuf>,
+    pub cwd_override: Option<PathBuf>,
+    /// Worktree to clean up when the agent finishes (auto-removed if no changes).
+    pub worktree: Option<(loopal_git::WorktreeInfo, PathBuf)>,
 }
 
 /// Spawn result returned to the caller.
@@ -99,6 +102,7 @@ pub async fn spawn_agent(
         let span = info_span!("agent-process", agent = %agent_name);
         let token = cancel_token.clone();
         let proc_for_cleanup = proc_handle.clone();
+        let wt = params.worktree;
         async move {
             info!(agent = %agent_name, "sub-agent process started");
             let result = bridge_child_events(client, &parent_event_tx, &agent_name, &token).await;
@@ -109,6 +113,13 @@ pub async fn spawn_agent(
             }
             router.unregister(&cleanup_name).await;
             reg.lock().await.remove(&cleanup_name);
+            // Clean up worktree after agent finishes (tracked, not fire-and-forget).
+            // Uses spawn_blocking to avoid blocking the Tokio worker thread.
+            if let Some((info, root)) = wt {
+                let _ =
+                    tokio::task::spawn_blocking(move || loopal_git::cleanup_if_clean(&root, &info))
+                        .await;
+            }
             info!(agent = %agent_name, "sub-agent process cleaned up");
         }
         .instrument(span)

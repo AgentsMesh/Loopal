@@ -59,6 +59,7 @@ impl MemoryProcessor for AgentMemoryProcessor {
             parent_model: self.model.clone(),
             parent_cancel_token: None,
             cwd_override: None,
+            worktree: None,
         };
 
         let result = spawn_agent(&self.shared, params).await?;

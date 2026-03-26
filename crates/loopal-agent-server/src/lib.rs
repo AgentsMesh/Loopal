@@ -6,6 +6,7 @@
 //! This is the "Renderer Process" in the Chromium analogy — it owns the Kernel,
 //! LLM providers, tools, and context pipeline.
 
+mod agent_setup;
 #[doc(hidden)]
 pub mod interrupt_filter;
 mod ipc_emitter;

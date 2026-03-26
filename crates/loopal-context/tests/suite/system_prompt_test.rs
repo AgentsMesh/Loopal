@@ -123,8 +123,6 @@ fn report_token_usage() {
         ("TaskList", "List all tasks."),
         ("TaskGet", "Get task details by ID."),
         ("SendMessage", "Send a message to another agent."),
-        ("EnterWorktree", "Create a git worktree."),
-        ("ExitWorktree", "Exit the current worktree."),
     ]
     .iter()
     .map(|(n, d)| ToolDefinition {

@@ -99,7 +99,6 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         agent_name: "main".to_string(),
         parent_event_tx: Some(event_tx),
         cancel_token: None,
-        worktree_state: Default::default(),
     });
     let shared_any: Arc<dyn std::any::Any + Send + Sync> = Arc::new(shared);
 

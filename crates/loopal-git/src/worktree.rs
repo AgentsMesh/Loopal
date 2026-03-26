@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -27,13 +28,16 @@ pub fn create_worktree(repo_root: &Path, name: &str) -> Result<WorktreeInfo, Git
 
     let branch = format!("loopal-wt-{name}");
 
-    // If the branch already exists (orphaned from a previous run), delete it first
-    let _ = Command::new("git")
-        .args(["branch", "-D", &branch])
-        .current_dir(repo_root)
-        .stderr(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .status();
+    // Only delete orphaned branches — skip if the branch is used by an active worktree.
+    let (_, active_branches) = parse_worktree_list(repo_root);
+    if !active_branches.contains(&branch) {
+        let _ = Command::new("git")
+            .args(["branch", "-D", &branch])
+            .current_dir(repo_root)
+            .stderr(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .status();
+    }
 
     if let Some(parent) = wt_dir.parent() {
         std::fs::create_dir_all(parent)?;
@@ -109,45 +113,54 @@ pub fn worktree_has_changes(worktree_path: &Path) -> Result<bool, GitError> {
     Ok(!stdout.trim().is_empty())
 }
 
-/// Remove stale worktrees from `.loopal/worktrees/` (best-effort).
+/// Remove a worktree if it has no uncommitted changes. Returns `true` if removed.
+/// Canonical cleanup logic shared by bootstrap, agent spawn, and spawn-failure paths.
+pub fn cleanup_if_clean(repo_root: &Path, info: &WorktreeInfo) -> bool {
+    let has_changes = worktree_has_changes(&info.path).unwrap_or(true);
+    if !has_changes {
+        let _ = remove_worktree(repo_root, &info.name, false);
+        return true;
+    }
+    false
+}
+
+/// Parse `git worktree list --porcelain` for active worktree paths and branch names.
 ///
-/// A worktree is considered stale if `git worktree list` no longer references it
-/// (e.g. directory was partially deleted) or the directory is empty.
-/// Called at startup to prevent orphan accumulation.
-pub fn cleanup_stale_worktrees(repo_root: &Path) {
-    let wt_base = repo_root.join(".loopal").join("worktrees");
-    let Ok(entries) = std::fs::read_dir(&wt_base) else {
-        return;
+/// Returns `(canonicalized_paths, branch_names)`. Used by `create_worktree`
+/// (to avoid deleting branches in use) and `cleanup_stale_worktrees`
+/// (to detect directories not tracked by git).
+pub(crate) fn parse_worktree_list(repo_root: &Path) -> (HashSet<PathBuf>, HashSet<String>) {
+    let Ok(output) = Command::new("git")
+        .args(["worktree", "list", "--porcelain"])
+        .current_dir(repo_root)
+        .output()
+    else {
+        return Default::default();
     };
-
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if !path.is_dir() {
-            continue;
-        }
-        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
-            continue;
-        };
-
-        // If the directory is not a valid git worktree, clean it up
-        let is_valid = Command::new("git")
-            .args(["rev-parse", "--is-inside-work-tree"])
-            .current_dir(&path)
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status()
-            .map(|s| s.success())
-            .unwrap_or(false);
-
-        if !is_valid {
-            let _ = remove_worktree(repo_root, name, true);
+    if !output.status.success() {
+        return Default::default();
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    let mut paths = HashSet::new();
+    let mut branches = HashSet::new();
+    for line in text.lines() {
+        if let Some(p) = line.strip_prefix("worktree ") {
+            let raw = PathBuf::from(p);
+            // Canonicalize for symlink resolution (macOS /tmp → /private/tmp).
+            // Fall back to the raw path so active worktrees are never missed.
+            let resolved = raw.canonicalize().unwrap_or(raw);
+            paths.insert(resolved);
+        } else if let Some(b) = line.strip_prefix("branch refs/heads/") {
+            branches.insert(b.to_string());
         }
     }
+    (paths, branches)
 }
 
 /// Reject names that could escape `.loopal/worktrees/` or inject into git commands.
 fn validate_name(name: &str) -> Result<(), GitError> {
     let invalid = name.is_empty()
+        || name.len() > 200
         || name.contains('/')
         || name.contains('\\')
         || name.contains("..")

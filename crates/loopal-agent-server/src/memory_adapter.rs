@@ -62,6 +62,7 @@ impl MemoryProcessor for ServerMemoryProcessor {
             parent_model: self.model.clone(),
             parent_cancel_token: None,
             cwd_override: None,
+            worktree: None,
         };
         let result = spawn_agent(&self.shared, params).await?;
         info!("memory-maintainer agent spawned");

@@ -150,6 +150,12 @@ async fn handle_agent_start(
         no_sandbox: params["no_sandbox"].as_bool().unwrap_or(false),
     };
 
+    info!(
+        cwd = %cwd.display(),
+        model = start.model.as_deref().unwrap_or("default"),
+        mode = start.mode.as_deref().unwrap_or("act"),
+        "starting agent"
+    );
     let agent_params = params::build(&cwd, &config, &start, connection, incoming_rx).await?;
 
     let _ = connection

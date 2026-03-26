@@ -6,7 +6,7 @@ use loopal_error::Result;
 use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::StopReason;
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 use super::runner::AgentLoopRunner;
 use super::turn_context::TurnContext;
@@ -23,6 +23,7 @@ impl AgentLoopRunner {
         let mut continuation_count: u32 = 0;
         loop {
             if turn_ctx.cancel.is_cancelled() {
+                info!("turn cancelled before LLM call");
                 return Ok(TurnOutput { output: last_text });
             }
 

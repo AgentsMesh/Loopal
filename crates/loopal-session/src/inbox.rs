@@ -55,9 +55,11 @@ impl Default for Inbox {
 /// and returns the content for routing to the agent.
 pub(crate) fn try_forward_inbox(state: &mut crate::state::SessionState) -> Option<UserContent> {
     if !state.agent_idle {
+        tracing::debug!("inbox: agent busy, message queued");
         return None;
     }
     let content = state.inbox.pop_front()?;
+    tracing::debug!(text_len = content.text.len(), "inbox: forwarding message");
     state.agent_idle = false;
     state.begin_turn();
     let image_count = content.images.len();

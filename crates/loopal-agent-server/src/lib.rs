@@ -8,6 +8,7 @@
 
 #[doc(hidden)]
 pub mod interrupt_filter;
+mod ipc_emitter;
 mod ipc_frontend;
 mod memory_adapter;
 mod mock_loader;

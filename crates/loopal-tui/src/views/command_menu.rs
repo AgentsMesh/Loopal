@@ -2,18 +2,12 @@ use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Clear};
 
 use crate::app::AutocompleteState;
-use crate::command::CommandEntry;
 
 /// Maximum visible items in the autocomplete dropdown.
 const MAX_MENU_ITEMS: usize = 8;
 
 /// Render the floating command autocomplete menu above the input area.
-pub fn render_command_menu(
-    f: &mut Frame,
-    ac: &AutocompleteState,
-    commands: &[CommandEntry],
-    input_area: Rect,
-) {
+pub fn render_command_menu(f: &mut Frame, ac: &AutocompleteState, input_area: Rect) {
     if ac.matches.is_empty() {
         return;
     }
@@ -38,8 +32,7 @@ pub fn render_command_menu(
     f.render_widget(block, menu_area);
 
     // Render each command line
-    for (i, &idx) in ac.matches.iter().take(item_count as usize).enumerate() {
-        let entry = &commands[idx];
+    for (i, entry) in ac.matches.iter().take(item_count as usize).enumerate() {
         let is_selected = i == ac.selected;
 
         let indicator = if is_selected { "▸" } else { " " };

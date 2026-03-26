@@ -2,7 +2,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::app::{App, SubPage};
 
-use super::{InputAction, SlashCommandAction};
+use super::{InputAction, SubPageResult};
 
 /// Handle keys when a sub-page (picker) is active. All keys are consumed.
 pub(super) fn handle_sub_page_key(app: &mut App, key: &KeyEvent) -> InputAction {
@@ -60,12 +60,12 @@ fn handle_model_picker_key(app: &mut App, key: &KeyEvent) -> InputAction {
                 app.last_esc_time = None;
                 match thinking_json {
                     Some(json) => {
-                        InputAction::SlashCommand(SlashCommandAction::ModelAndThinkingSelected {
+                        InputAction::SubPageConfirm(SubPageResult::ModelAndThinkingSelected {
                             model,
                             thinking_json: json,
                         })
                     }
-                    None => InputAction::SlashCommand(SlashCommandAction::ModelSelected(model)),
+                    None => InputAction::SubPageConfirm(SubPageResult::ModelSelected(model)),
                 }
             } else {
                 app.sub_page = None;
@@ -140,7 +140,7 @@ fn handle_rewind_picker_key(app: &mut App, key: &KeyEvent) -> InputAction {
                 let turn_index = item.turn_index;
                 app.sub_page = None;
                 app.last_esc_time = None;
-                InputAction::SlashCommand(SlashCommandAction::RewindConfirmed(turn_index))
+                InputAction::SubPageConfirm(SubPageResult::RewindConfirmed(turn_index))
             } else {
                 app.sub_page = None;
                 InputAction::None

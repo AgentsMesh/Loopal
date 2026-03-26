@@ -1,6 +1,11 @@
+//! `/init` command — create project config scaffolding.
+
 use std::fs;
 use std::path::Path;
 
+use async_trait::async_trait;
+
+use super::{CommandEffect, CommandHandler};
 use crate::app::App;
 
 const LOOPAL_MD_TEMPLATE: &str = "\
@@ -29,8 +34,24 @@ const MEMORY_MD_TEMPLATE: &str = "\
 This file is managed by Loopal to remember key facts about the project.
 ";
 
+pub struct InitCmd;
+
+#[async_trait]
+impl CommandHandler for InitCmd {
+    fn name(&self) -> &str {
+        "/init"
+    }
+    fn description(&self) -> &str {
+        "Initialize project config"
+    }
+    async fn execute(&self, app: &mut App, _arg: Option<&str>) -> CommandEffect {
+        run_init(app);
+        CommandEffect::Done
+    }
+}
+
 /// Run the `/init` command — create project config scaffolding.
-pub(crate) fn run_init(app: &mut App) {
+fn run_init(app: &mut App) {
     let cwd = &app.cwd;
     let mut created: Vec<String> = Vec::new();
     let mut skipped: Vec<String> = Vec::new();
@@ -103,15 +124,12 @@ fn ensure_dir(path: &Path, created: &mut Vec<String>, skipped: &mut Vec<String>)
 }
 
 /// Extract a short relative-style display name from an absolute path.
-/// Falls back to the full path if it doesn't contain recognizable segments.
 fn display_relative(path: &Path) -> String {
     let s = path.to_string_lossy();
-    // Find the last occurrence of a project-root marker pattern
     if let Some(pos) = s.rfind("/.loopal/") {
-        let root_end = pos + 1; // skip the '/'
+        let root_end = pos + 1;
         return s[root_end..].to_string();
     }
-    // For LOOPAL.md at project root
     path.file_name()
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_else(|| s.to_string())
@@ -156,7 +174,6 @@ mod tests {
         write_template(&file, "new content", &mut created, &mut skipped);
         assert!(created.is_empty());
         assert_eq!(skipped.len(), 1);
-        // Content unchanged
         assert_eq!(fs::read_to_string(&file).unwrap(), "existing");
     }
 

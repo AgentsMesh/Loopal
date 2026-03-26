@@ -21,7 +21,6 @@ use loopal_runtime::projection::project_messages;
 use loopal_runtime::{AgentLoopParams, AgentMode, SessionManager, UnifiedFrontend, agent_loop};
 use loopal_session::SessionController;
 use loopal_tool_api::MemoryChannel;
-use loopal_tui::command::merge_commands;
 
 use crate::cli::Cli;
 use crate::memory_adapter::{AgentMemoryProcessor, MpscMemoryChannel};
@@ -131,7 +130,6 @@ pub async fn run() -> anyhow::Result<()> {
 
     let skills: Vec<_> = config.skills.into_values().map(|e| e.skill).collect();
     let skills_summary = loopal_config::format_skills_summary(&skills);
-    let commands = merge_commands(&skills);
     let tool_defs = kernel.tool_definitions();
     let system_prompt = build_system_prompt(
         &config.instructions,
@@ -204,7 +202,6 @@ pub async fn run() -> anyhow::Result<()> {
         session_ctrl,
         router,
         "main".to_string(),
-        commands,
         cwd,
         agent_event_rx,
     )

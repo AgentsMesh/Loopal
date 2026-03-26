@@ -4,7 +4,6 @@ use crate::app::{App, AutocompleteState};
 use crate::command::filter_entries;
 
 use super::InputAction;
-use super::commands::{dispatch_command, expand_skill};
 
 /// Handle keys when the autocomplete menu is open.
 /// Returns `Some(action)` if the key was consumed, `None` to fall through.
@@ -26,12 +25,11 @@ pub(super) fn handle_autocomplete_key(app: &mut App, key: &KeyEvent) -> Option<I
         }
         KeyCode::Tab => {
             // Tab = autocomplete only: fill command name into input, never execute
-            let selected_idx = app
+            let entry = app
                 .autocomplete
                 .as_ref()
-                .and_then(|ac| ac.matches.get(ac.selected).copied());
-            if let Some(idx) = selected_idx {
-                let entry = &app.commands[idx];
+                .and_then(|ac| ac.matches.get(ac.selected));
+            if let Some(entry) = entry {
                 let suffix = if entry.has_arg { " " } else { "" };
                 let new_input = format!("{}{suffix}", entry.name);
                 app.input_cursor = new_input.len();
@@ -41,13 +39,13 @@ pub(super) fn handle_autocomplete_key(app: &mut App, key: &KeyEvent) -> Option<I
             Some(InputAction::None)
         }
         KeyCode::Enter => {
-            // Enter = execute the selected command
-            let selected_idx = app
+            // Enter = execute the selected command via unified RunCommand
+            let entry = app
                 .autocomplete
                 .as_ref()
-                .and_then(|ac| ac.matches.get(ac.selected).copied());
-            if let Some(idx) = selected_idx {
-                let entry = &app.commands[idx];
+                .and_then(|ac| ac.matches.get(ac.selected))
+                .cloned();
+            if let Some(entry) = entry {
                 if entry.has_arg {
                     // Needs argument: fill command name + space, wait for input
                     let new_input = format!("{} ", entry.name);
@@ -55,20 +53,13 @@ pub(super) fn handle_autocomplete_key(app: &mut App, key: &KeyEvent) -> Option<I
                     app.input = new_input;
                     app.autocomplete = None;
                     Some(InputAction::None)
-                } else if let Some(ref body) = entry.skill_body {
-                    // No-arg skill: expand and push to inbox
-                    let expanded = expand_skill(body, "");
-                    app.input.clear();
-                    app.input_cursor = 0;
-                    app.autocomplete = None;
-                    Some(InputAction::InboxPush(expanded.into()))
                 } else {
-                    // Built-in command: dispatch immediately
-                    let name = entry.name.clone();
+                    // Execute immediately via registry
+                    let name = entry.name;
                     app.input.clear();
                     app.input_cursor = 0;
                     app.autocomplete = None;
-                    Some(dispatch_command(&name, None))
+                    Some(InputAction::RunCommand(name, None))
                 }
             } else {
                 app.autocomplete = None;
@@ -95,13 +86,14 @@ pub(super) fn update_autocomplete(app: &mut App) {
         if first_space.is_none() {
             // Refresh commands from disk so new/changed skills appear immediately
             app.refresh_commands();
-            let matches = filter_entries(&app.commands, &trimmed);
+            let entries = app.command_registry.entries();
+            let matches = filter_entries(&entries, &trimmed);
             if matches.is_empty() {
                 app.autocomplete = None;
             } else {
-                let prev_selected = app.autocomplete.as_ref().map(|ac| ac.selected).unwrap_or(0);
+                let prev = app.autocomplete.as_ref().map(|ac| ac.selected).unwrap_or(0);
                 app.autocomplete = Some(AutocompleteState {
-                    selected: prev_selected.min(matches.len().saturating_sub(1)),
+                    selected: prev.min(matches.len().saturating_sub(1)),
                     matches,
                 });
             }

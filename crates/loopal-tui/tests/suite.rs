@@ -9,6 +9,12 @@ mod app_test;
 mod app_tool_edge_test;
 #[path = "suite/app_tool_test.rs"]
 mod app_tool_test;
+#[path = "suite/command_dispatch_test.rs"]
+mod command_dispatch_test;
+#[path = "suite/command_edge_test.rs"]
+mod command_edge_test;
+#[path = "suite/command_test.rs"]
+mod command_test;
 #[path = "suite/event_forwarding_test.rs"]
 mod event_forwarding_test;
 #[path = "suite/event_test.rs"]

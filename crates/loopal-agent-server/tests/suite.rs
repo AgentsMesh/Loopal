@@ -1,3 +1,5 @@
+#[path = "suite/interrupt_filter_test.rs"]
+mod interrupt_filter_test;
 #[path = "suite/ipc_frontend_test.rs"]
 mod ipc_frontend_test;
 #[path = "suite/params_test.rs"]

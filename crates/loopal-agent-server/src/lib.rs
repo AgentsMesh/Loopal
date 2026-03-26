@@ -6,6 +6,8 @@
 //! This is the "Renderer Process" in the Chromium analogy — it owns the Kernel,
 //! LLM providers, tools, and context pipeline.
 
+#[doc(hidden)]
+pub mod interrupt_filter;
 mod ipc_frontend;
 mod memory_adapter;
 mod mock_loader;
@@ -21,12 +23,10 @@ pub use test_server::run_server_for_test;
 pub fn ipc_frontend_for_test(
     connection: std::sync::Arc<loopal_ipc::connection::Connection>,
     incoming_rx: tokio::sync::mpsc::Receiver<loopal_ipc::connection::Incoming>,
-    interrupt: loopal_protocol::InterruptSignal,
 ) -> std::sync::Arc<dyn loopal_runtime::frontend::traits::AgentFrontend> {
     std::sync::Arc::new(ipc_frontend::IpcFrontend::new(
         connection,
         incoming_rx,
         None,
-        interrupt,
     ))
 }

@@ -122,11 +122,17 @@ fn build_inner(
     let session = session_manager.create_session(cwd, &model)?;
 
     let interrupt = InterruptSignal::new();
+    let interrupt_tx = Arc::new(tokio::sync::watch::channel(0u64).0);
+
+    // Filter interrupt notifications out of the incoming stream so they are
+    // processed immediately — even while the agent loop is executing tools.
+    let filtered_rx =
+        crate::interrupt_filter::spawn(incoming_rx, interrupt.clone(), interrupt_tx.clone());
+
     let frontend = Arc::new(IpcFrontend::new(
         connection.clone(),
-        incoming_rx,
+        filtered_rx,
         None,
-        interrupt.clone(),
     ));
 
     // Event channel for sub-agents: events forwarded to TUI via IPC
@@ -197,7 +203,6 @@ fn build_inner(
 
     let tool_tokens = ContextBudget::estimate_tool_tokens(&tool_defs);
     let budget = ContextBudget::calculate(200_000, &system_prompt, tool_tokens, 16_384);
-    let interrupt_tx = Arc::new(tokio::sync::watch::channel(0u64).0);
 
     Ok(AgentLoopParams {
         config: loopal_runtime::AgentConfig {

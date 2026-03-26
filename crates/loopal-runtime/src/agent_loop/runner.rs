@@ -33,12 +33,11 @@ impl AgentLoopRunner {
                 .create_backend(std::path::Path::new(&params.session.cwd)),
             session_id: params.session.id.clone(),
             shared: params.shared.clone(),
-            pending_cwd_switch: Default::default(),
             memory_channel: params.memory_channel.clone(),
             output_tail: None,
         };
         let model_config =
-            ModelConfig::from_model(&params.config.model, params.config.thinking_config.clone());
+            ModelConfig::from_model(&params.config.model, params.config.thinking_config.clone(), params.config.context_tokens_cap);
         let interrupt = params.interrupt.signal.clone();
         let interrupt_tx = params.interrupt.tx.clone();
         Self {
@@ -98,17 +97,16 @@ impl AgentLoopRunner {
         self.params.deps.frontend.emit(payload).await
     }
 
-    /// If a tool (e.g. EnterWorktree) requested a cwd switch, recreate the backend.
-    pub(super) fn apply_pending_cwd_switch(&mut self) {
-        let new_cwd = self
-            .tool_ctx
-            .pending_cwd_switch
-            .lock()
-            .ok()
-            .and_then(|mut guard| guard.take());
-        if let Some(cwd) = new_cwd {
-            info!(new_cwd = %cwd.display(), "applying cwd switch");
-            self.tool_ctx.backend = self.params.deps.kernel.create_backend(&cwd);
-        }
+    /// Recalculate context budget from current model config.
+    ///
+    /// Called after model switch so the compaction thresholds match the new model.
+    pub(super) fn recalculate_budget(&mut self) {
+        let tool_defs = self.params.deps.kernel.tool_definitions();
+        let tool_tokens = loopal_context::ContextBudget::estimate_tool_tokens(&tool_defs);
+        let budget = self.model_config.build_budget(
+            &self.params.config.system_prompt,
+            tool_tokens,
+        );
+        self.params.store.update_budget(budget);
     }
 }

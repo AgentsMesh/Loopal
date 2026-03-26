@@ -13,7 +13,7 @@ use loopal_agent::router::MessageRouter;
 use loopal_agent::shared::AgentShared;
 use loopal_agent::task_store::TaskStore;
 use loopal_config::Settings;
-use loopal_context::{ContextBudget, ContextStore};
+use loopal_context::ContextStore;
 use loopal_kernel::Kernel;
 use loopal_protocol::{AgentEvent, ControlCommand, Envelope, UserQuestionResponse};
 use loopal_provider_api::Provider;
@@ -113,7 +113,12 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         interrupt.tx.clone(),
     );
 
-    let budget = ContextBudget::calculate(200_000, &builder.system_prompt, 0, 16_384);
+    let budget = loopal_runtime::build_initial_budget(
+        &builder.model,
+        200_000, // fixed cap for deterministic test behavior
+        &builder.system_prompt,
+        0,
+    );
 
     let params = AgentLoopParams {
         config: loopal_runtime::AgentConfig {
@@ -126,6 +131,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
             tool_filter: builder.tool_filter,
             interactive: builder.interactive,
             thinking_config: builder.thinking_config,
+            context_tokens_cap: 200_000,
         },
         deps: loopal_runtime::AgentDeps {
             kernel,

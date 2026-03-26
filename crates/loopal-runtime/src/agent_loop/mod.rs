@@ -66,6 +66,8 @@ pub struct AgentConfig {
     pub interactive: bool,
     /// Thinking/reasoning configuration (default: Auto).
     pub thinking_config: ThinkingConfig,
+    /// Context tokens cap from settings (0 = auto, use model's context_window).
+    pub context_tokens_cap: u32,
 }
 
 impl Default for AgentConfig {
@@ -80,6 +82,7 @@ impl Default for AgentConfig {
             tool_filter: None,
             interactive: true,
             thinking_config: ThinkingConfig::Auto,
+            context_tokens_cap: 0,
         }
     }
 }

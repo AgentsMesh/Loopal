@@ -198,7 +198,12 @@ fn build_inner(
     };
 
     let tool_tokens = ContextBudget::estimate_tool_tokens(&tool_defs);
-    let budget = ContextBudget::calculate(200_000, &system_prompt, tool_tokens, 16_384);
+    let budget = loopal_runtime::build_initial_budget(
+        &model,
+        config.settings.max_context_tokens,
+        &system_prompt,
+        tool_tokens,
+    );
 
     Ok(AgentLoopParams {
         config: loopal_runtime::AgentConfig {
@@ -211,6 +216,7 @@ fn build_inner(
             tool_filter: None,
             interactive,
             thinking_config,
+            context_tokens_cap: config.settings.max_context_tokens,
         },
         deps: loopal_runtime::AgentDeps {
             kernel,

@@ -10,7 +10,7 @@ fn test_act_mode_empty_suffix() {
 fn test_plan_mode_has_suffix() {
     let suffix = AgentMode::Plan.system_prompt_suffix();
     assert!(suffix.contains("PLAN mode"));
-    assert!(suffix.contains("cannot make any changes"));
+    assert!(suffix.contains("Explore the codebase"));
 }
 
 #[test]

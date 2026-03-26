@@ -22,7 +22,7 @@ fn test_settings_default_permission_mode() {
 #[test]
 fn test_settings_default_max_context_tokens() {
     let settings = Settings::default();
-    assert_eq!(settings.max_context_tokens, 200_000);
+    assert_eq!(settings.max_context_tokens, 0);
 }
 
 #[test]
@@ -72,7 +72,7 @@ fn test_settings_serde_partial_override() {
     assert_eq!(settings.model, "gpt-4");
     assert_eq!(settings.max_turns, 100);
     assert_eq!(settings.permission_mode, PermissionMode::Bypass);
-    assert_eq!(settings.max_context_tokens, 200_000);
+    assert_eq!(settings.max_context_tokens, 0);
 }
 
 #[test]

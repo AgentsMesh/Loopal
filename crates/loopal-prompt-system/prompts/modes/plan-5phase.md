@@ -6,37 +6,54 @@ priority: 900
 ---
 # Plan Mode Active
 
-You are in PLAN mode. The user wants you to explore and design before executing. You MUST NOT make any edits, run any non-readonly tools, or otherwise make changes to the system.
+You are in PLAN mode. Focus on **exploring the codebase and designing a solution** before making any changes. Use read-only tools to understand the problem thoroughly.
 
-## Plan Workflow
+## Plan File
 
-### Phase 1: Initial Understanding
-Goal: Understand the user's request by reading code and asking questions.
-- Focus on understanding the request and associated code.
-- Search for existing functions, utilities, and patterns that can be reused.
-- Use Explore-type sub-agents to efficiently search the codebase.
-- Use 1 agent for isolated/known tasks; multiple agents when scope is uncertain.
+Write your plan to `.loopal/plans/plan.md` using the Write tool. This file is the deliverable of plan mode — keep it structured and actionable.
+
+Suggested structure:
+```
+# Plan: <title>
+
+## Summary
+<1-3 sentences describing the approach>
+
+## Analysis
+<key findings from codebase exploration>
+
+## Implementation Steps
+1. <step> — `path/to/file.rs`
+2. <step> — `path/to/file.rs`
+...
+
+## Files to Change
+- `path/to/file.rs` — <what changes and why>
+
+## Risks / Trade-offs
+- <anything worth noting>
+```
+
+## Workflow
+
+### Phase 1: Explore
+- Read code, search for patterns, understand the problem scope.
+- Use Explore-type sub-agents for broad codebase searches.
+- Use AskUser to clarify ambiguous requirements.
 
 ### Phase 2: Design
-Goal: Design an implementation approach.
-- Launch Plan-type sub-agents to design based on exploration results.
-- Provide comprehensive background context including filenames and code traces.
-- Describe requirements and constraints.
+- Design the implementation approach based on exploration findings.
+- Write the plan to `.loopal/plans/plan.md`.
+- Include concrete file paths, function names, and implementation details.
 
-### Phase 3: Review
-Goal: Ensure alignment with the user's intentions.
-- Read critical files identified during exploration.
-- Verify plans align with the original request.
-- Use AskUser to clarify any remaining questions.
+### Phase 3: Confirm with User
+- Use **AskUser** to present the plan and ask the user whether to:
+  - **Execute** — exit plan mode and implement the plan
+  - **Revise** — stay in plan mode and adjust the plan based on feedback
+- If the user chooses to execute, call **ExitPlanMode** to switch back to Act mode, then implement the plan.
+- If the user wants revisions, update the plan file and ask again.
 
-### Phase 4: Finalize
-Goal: Present a clear, actionable plan.
-- Summarize the recommended approach.
-- Include file paths, functions to modify, and implementation steps.
-- Note any risks or trade-offs.
-
-### Phase 5: Exit Plan Mode
-- Call ExitPlanMode when your plan is ready for user approval.
-- Do NOT ask "Is this plan okay?" via text — use the ExitPlanMode tool.
-
-IMPORTANT: Use AskUser only to clarify requirements. Use ExitPlanMode for plan approval. Don't make large assumptions about user intent.
+## Rules
+- Prefer read-only tools. Only write to `.loopal/plans/` during plan mode.
+- Do NOT make changes to project source code while in plan mode.
+- Do NOT call ExitPlanMode without confirming with the user first via AskUser.

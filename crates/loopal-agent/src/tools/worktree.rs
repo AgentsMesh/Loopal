@@ -60,10 +60,7 @@ impl Tool for EnterWorktreeTool {
             Err(e) => return Ok(ToolResult::error(format!("Failed: {e}"))),
         };
 
-        // Signal the runner to switch cwd after this tool batch completes
-        if let Ok(mut guard) = ctx.pending_cwd_switch.lock() {
-            *guard = Some(info.path.clone());
-        }
+        // Store worktree state for ExitWorktree
         *shared.worktree_state.lock().await = Some(WorktreeState {
             original_cwd: shared.cwd.clone(),
             worktree_path: info.path.clone(),
@@ -127,7 +124,7 @@ impl Tool for ExitWorktreeTool {
 async fn execute_exit(
     shared: &Arc<AgentShared>,
     input: &serde_json::Value,
-    ctx: &ToolContext,
+    _ctx: &ToolContext,
 ) -> Result<ToolResult, LoopalError> {
     let state = shared.worktree_state.lock().await.take();
     let state = match state {
@@ -166,11 +163,6 @@ async fn execute_exit(
             *shared.worktree_state.lock().await = Some(state);
             return Ok(ToolResult::error(format!("Failed to remove: {e}")));
         }
-    }
-
-    // Only signal cwd switch on the success path (after validation and removal)
-    if let Ok(mut guard) = ctx.pending_cwd_switch.lock() {
-        *guard = Some(state.original_cwd.clone());
     }
 
     if action == "remove" {

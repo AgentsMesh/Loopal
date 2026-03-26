@@ -166,11 +166,14 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
             return try_forward_inbox(state);
         }
         AgentEventPayload::TurnDiffSummary { .. } => {}
-        AgentEventPayload::ServerToolUse { id: _, name, input } => {
-            crate::server_tool_display::handle_server_tool_use(state, name, &input);
+        AgentEventPayload::ServerToolUse { id, name, input } => {
+            crate::server_tool_display::handle_server_tool_use(state, id, name, &input);
         }
-        AgentEventPayload::ServerToolResult { tool_use_id: _, .. } => {
-            crate::server_tool_display::handle_server_tool_result(state);
+        AgentEventPayload::ServerToolResult {
+            tool_use_id,
+            content,
+        } => {
+            crate::server_tool_display::handle_server_tool_result(state, &tool_use_id, &content);
         }
     }
     None

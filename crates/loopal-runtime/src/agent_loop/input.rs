@@ -77,7 +77,7 @@ impl AgentLoopRunner {
                 self.emit(AgentEventPayload::TokenUsage {
                     input_tokens: 0,
                     output_tokens: 0,
-                    context_window: self.model_config.max_context_tokens,
+                    context_window: self.params.store.budget().context_window,
                     cache_creation_input_tokens: 0,
                     cache_read_input_tokens: 0,
                     thinking_tokens: 0,
@@ -91,6 +91,7 @@ impl AgentLoopRunner {
                 info!(from = %self.params.config.model, to = %new_model, "switching model");
                 self.model_config.update_model(&new_model);
                 self.params.config.model = new_model;
+                self.recalculate_budget();
             }
             ControlCommand::Rewind { turn_index } => {
                 self.handle_rewind(turn_index).await?;

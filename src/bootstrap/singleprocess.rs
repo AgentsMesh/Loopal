@@ -36,6 +36,7 @@ pub async fn run(
     let max_turns = config.settings.max_turns;
     let permission_mode = config.settings.permission_mode;
     let thinking_config = config.settings.thinking.clone();
+    let context_tokens_cap = config.settings.max_context_tokens;
     let memory_enabled = config.settings.memory.enabled;
     let mode = if cli.plan {
         AgentMode::Plan
@@ -144,7 +145,12 @@ pub async fn run(
     }
 
     let tool_tokens = ContextBudget::estimate_tool_tokens(&tool_defs);
-    let budget = ContextBudget::calculate(200_000, &system_prompt, tool_tokens, 16_384);
+    let budget = loopal_runtime::build_initial_budget(
+        &model,
+        context_tokens_cap,
+        &system_prompt,
+        tool_tokens,
+    );
 
     let agent_params = AgentLoopParams {
         config: loopal_runtime::AgentConfig {
@@ -157,6 +163,7 @@ pub async fn run(
             tool_filter: None,
             interactive: true,
             thinking_config,
+            context_tokens_cap,
         },
         deps: loopal_runtime::AgentDeps {
             kernel,

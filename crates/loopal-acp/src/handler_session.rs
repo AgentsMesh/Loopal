@@ -102,7 +102,13 @@ impl AcpHandler {
         let (system_prompt, shared) =
             self.build_agent_context(&kernel, &session_id, &cwd, event_tx.clone());
 
-        let budget = ContextBudget::calculate(200_000, &system_prompt, 0, 16_384);
+        let tool_tokens = ContextBudget::estimate_tool_tokens(&kernel.tool_definitions());
+        let budget = loopal_runtime::build_initial_budget(
+            model,
+            self.config.settings.max_context_tokens,
+            &system_prompt,
+            tool_tokens,
+        );
 
         let agent_params = AgentLoopParams {
             config: loopal_runtime::AgentConfig {
@@ -115,6 +121,7 @@ impl AcpHandler {
                 tool_filter: None,
                 interactive: true,
                 thinking_config: self.config.settings.thinking.clone(),
+                context_tokens_cap: self.config.settings.max_context_tokens,
             },
             deps: loopal_runtime::AgentDeps {
                 kernel: kernel.clone(),

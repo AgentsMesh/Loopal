@@ -43,6 +43,7 @@ mod llm_test;
 pub mod mock_provider;
 pub use mock_provider::make_runner_with_mock_provider;
 mod cancel_test;
+mod context_budget_test;
 mod permission_test_ext;
 mod preflight_test;
 mod record_message_test;

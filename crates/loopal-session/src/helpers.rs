@@ -58,7 +58,10 @@ pub fn handle_token_usage(
 
 /// Handle auto-continuation event.
 pub fn handle_auto_continuation(state: &mut SessionState, cont: u32, max: u32) {
-    push_system_msg(state, &format!("Output truncated (max_tokens). Auto-continuing ({cont}/{max})"));
+    push_system_msg(
+        state,
+        &format!("Output truncated (max_tokens). Auto-continuing ({cont}/{max})"),
+    );
 }
 
 /// Handle context compaction event.

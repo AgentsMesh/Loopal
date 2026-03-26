@@ -1,8 +1,6 @@
 //! AgentEvent → SessionState update logic. Routes events by `agent_name`:
 //! root → main display, sub-agent → `agent_handler`. `MessageRouted` → global feed.
 
-use std::time::Instant;
-
 use loopal_protocol::{AgentEvent, AgentEventPayload, UserContent};
 
 use crate::agent_handler::apply_agent_event;
@@ -13,12 +11,11 @@ use crate::helpers::{
 use crate::inbox::try_forward_inbox;
 use crate::message_log::record_message_routed;
 use crate::state::SessionState;
-use crate::thinking_display::format_thinking_summary;
+use crate::thinking_display::handle_thinking_complete;
 use crate::tool_result_handler::{
-    handle_tool_batch_start, handle_tool_progress, handle_tool_result,
+    handle_tool_batch_start, handle_tool_call, handle_tool_progress, handle_tool_result,
 };
-use crate::truncate::truncate_json;
-use crate::types::{DisplayMessage, DisplayToolCall, PendingPermission, ToolCallStatus};
+use crate::types::{DisplayMessage, PendingPermission};
 
 /// Handle an AgentEvent. Returns `Some(content)` if an inbox message should be forwarded.
 pub fn apply_event(state: &mut SessionState, event: AgentEvent) -> Option<UserContent> {
@@ -53,51 +50,18 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
             state.streaming_thinking.push_str(&text);
         }
         AgentEventPayload::ThinkingComplete { token_count } => {
-            state.thinking_active = false;
-            state.thinking_tokens += token_count;
-            if !state.streaming_thinking.is_empty() {
-                let thinking = std::mem::take(&mut state.streaming_thinking);
-                let summary = format_thinking_summary(&thinking, token_count);
-                state.messages.push(DisplayMessage {
-                    role: "thinking".to_string(),
-                    content: summary,
-                    tool_calls: Vec::new(),
-                    image_count: 0,
-                });
-            }
+            handle_thinking_complete(state, token_count);
         }
         AgentEventPayload::ToolCall { id, name, input } => {
-            flush_streaming(state);
-            let tc = DisplayToolCall {
-                id: id.clone(),
-                name: name.clone(),
-                status: ToolCallStatus::Pending,
-                summary: if name == "AttemptCompletion" {
-                    name.clone()
-                } else {
-                    format!("{}({})", name, truncate_json(&input, 60))
-                },
-                result: None,
-                tool_input: Some(input),
-                batch_id: None,
-                started_at: Some(Instant::now()),
-                duration_ms: None,
-                progress_tail: None,
-            };
-            if let Some(last) = state.messages.last_mut()
-                && last.role == "assistant"
-            {
-                last.tool_calls.push(tc);
-                return None;
-            }
-            state.messages.push(DisplayMessage {
-                role: "assistant".to_string(),
-                content: String::new(),
-                tool_calls: vec![tc],
-                image_count: 0,
-            });
+            handle_tool_call(state, id, name, input);
         }
-        AgentEventPayload::ToolResult { id, name, result, is_error, duration_ms } => {
+        AgentEventPayload::ToolResult {
+            id,
+            name,
+            result,
+            is_error,
+            duration_ms,
+        } => {
             handle_tool_result(state, id, name, result, is_error, duration_ms);
         }
         AgentEventPayload::ToolPermissionRequest { id, name, input } => {
@@ -114,7 +78,11 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
                 image_count: 0,
             });
         }
-        AgentEventPayload::RetryError { message, attempt, max_attempts } => {
+        AgentEventPayload::RetryError {
+            message,
+            attempt,
+            max_attempts,
+        } => {
             state.retry_banner = Some(format!("{message} ({attempt}/{max_attempts})"));
         }
         AgentEventPayload::RetryCleared => {
@@ -132,16 +100,27 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
             flush_streaming(state);
             push_system_msg(state, &format!("Max turns reached ({turns})"));
         }
-        AgentEventPayload::AutoContinuation { continuation, max_continuations } => {
+        AgentEventPayload::AutoContinuation {
+            continuation,
+            max_continuations,
+        } => {
             handle_auto_continuation(state, continuation, max_continuations);
         }
         AgentEventPayload::TokenUsage {
-            input_tokens, output_tokens, context_window,
-            cache_creation_input_tokens, cache_read_input_tokens, thinking_tokens: _,
+            input_tokens,
+            output_tokens,
+            context_window,
+            cache_creation_input_tokens,
+            cache_read_input_tokens,
+            thinking_tokens: _,
         } => {
             handle_token_usage(
-                state, input_tokens, output_tokens, context_window,
-                cache_creation_input_tokens, cache_read_input_tokens,
+                state,
+                input_tokens,
+                output_tokens,
+                context_window,
+                cache_creation_input_tokens,
+                cache_read_input_tokens,
             );
         }
         AgentEventPayload::ModeChanged { mode } => {
@@ -163,7 +142,11 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
             crate::rewind::truncate_display_to_turn(state, remaining_turns);
         }
         AgentEventPayload::Compacted {
-            kept, removed, tokens_before, tokens_after, strategy,
+            kept,
+            removed,
+            tokens_before,
+            tokens_after,
+            strategy,
         } => {
             handle_compaction(state, kept, removed, tokens_before, tokens_after, &strategy);
         }

@@ -50,11 +50,7 @@ impl AgentLoopRunner {
                         wait_ms, error = %e, "retrying"
                     );
                     self.emit(AgentEventPayload::RetryError {
-                        message: format!(
-                            "{}. Retrying in {:.1}s",
-                            e,
-                            wait_ms as f64 / 1000.0,
-                        ),
+                        message: format!("{}. Retrying in {:.1}s", e, wait_ms as f64 / 1000.0,),
                         attempt: retry_count,
                         max_attempts: MAX_RETRIES,
                     })

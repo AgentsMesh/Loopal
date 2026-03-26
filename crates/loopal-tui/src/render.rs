@@ -13,12 +13,12 @@ use crate::views::input_view;
 /// Pure function of (terminal size, agent count, input height) → rectangles.
 /// Separates "where things go" from "what renders there."
 struct FrameLayout {
-    content: Rect,       // f₁: workflow output (elastic)
-    agents: Rect,        // f₂: agent status panel (dynamic 0-N)
-    separator: Rect,     // f₃: dim dashed line (1)
-    retry_banner: Rect,  // f₃b: transient retry error banner (0-1)
-    input: Rect,         // f₄: command prompt (1..8 rows, dynamic)
-    status: Rect,        // f₅: unified status bar (1)
+    content: Rect,      // f₁: workflow output (elastic)
+    agents: Rect,       // f₂: agent status panel (dynamic 0-N)
+    separator: Rect,    // f₃: dim dashed line (1)
+    retry_banner: Rect, // f₃b: transient retry error banner (0-1)
+    input: Rect,        // f₄: command prompt (1..8 rows, dynamic)
+    status: Rect,       // f₅: unified status bar (1)
     /// Merged area for sub-page pickers (replaces f₁..f₄).
     picker: Rect,
 }
@@ -37,18 +37,15 @@ impl FrameLayout {
             ])
             .split(size);
 
-        let [content, agents, separator, retry_banner, input, status] =
-            [chunks[0], chunks[1], chunks[2], chunks[3], chunks[4], chunks[5]];
+        let [content, agents, separator, retry_banner, input, status] = [
+            chunks[0], chunks[1], chunks[2], chunks[3], chunks[4], chunks[5],
+        ];
 
         let picker = Rect::new(
             content.x,
             content.y,
             content.width,
-            content.height
-                + agents.height
-                + separator.height
-                + retry_banner.height
-                + input.height,
+            content.height + agents.height + separator.height + retry_banner.height + input.height,
         );
 
         Self {

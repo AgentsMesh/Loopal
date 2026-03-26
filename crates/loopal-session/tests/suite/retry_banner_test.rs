@@ -37,7 +37,11 @@ fn test_retry_error_does_not_add_message() {
             max_attempts: 6,
         }),
     );
-    assert_eq!(state.messages.len(), before, "RetryError must not append to messages");
+    assert_eq!(
+        state.messages.len(),
+        before,
+        "RetryError must not append to messages"
+    );
 }
 
 #[test]
@@ -107,10 +111,7 @@ fn test_retry_updates_in_place() {
 fn test_finished_clears_retry_banner() {
     let mut state = make_state();
     state.retry_banner = Some("retrying".into());
-    apply_event(
-        &mut state,
-        AgentEvent::root(AgentEventPayload::Finished),
-    );
+    apply_event(&mut state, AgentEvent::root(AgentEventPayload::Finished));
     assert!(state.retry_banner.is_none());
 }
 
@@ -118,9 +119,6 @@ fn test_finished_clears_retry_banner() {
 fn test_interrupted_clears_retry_banner() {
     let mut state = make_state();
     state.retry_banner = Some("retrying".into());
-    apply_event(
-        &mut state,
-        AgentEvent::root(AgentEventPayload::Interrupted),
-    );
+    apply_event(&mut state, AgentEvent::root(AgentEventPayload::Interrupted));
     assert!(state.retry_banner.is_none());
 }

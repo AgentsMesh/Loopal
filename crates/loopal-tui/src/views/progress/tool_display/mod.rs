@@ -1,8 +1,5 @@
-//! Claude Code style tool rendering — each tool independently displayed
-//! with expanded output, folded after N lines.
-//!
-//! Each tool type has its own module exposing `extract_detail()` and
-//! `render_body()`. This module handles the shared header + dispatch.
+//! Tool rendering — each tool independently displayed with expanded output,
+//! folded after N lines.
 //!
 //! ```text
 //! ● Bash(git log --oneline -5)
@@ -76,7 +73,8 @@ fn extract_detail(tc: &DisplayToolCall) -> String {
             .get("url")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string()),
-        "WebSearch" => input
+        // "WebSearch" = built-in client tool, "web_search" = server-side tool
+        "WebSearch" | "web_search" => input
             .get("query")
             .and_then(|v| v.as_str())
             .map(|s| format!("\"{s}\"")),

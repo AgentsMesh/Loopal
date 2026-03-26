@@ -78,12 +78,8 @@ pub fn project_messages(messages: &[Message]) -> Vec<DisplayMessage> {
                     // ServerToolUse and ServerToolResult are in the same message,
                     // so the current message hasn't been pushed to `display` yet.
                     // Patch the in-flight `tool_calls` vec directly.
-                    if let Some(tc) =
-                        tool_calls.iter_mut().rev().find(|tc| tc.id == *tool_use_id)
-                    {
-                        tc.result = Some(
-                            loopal_session::format_server_tool_content(content),
-                        );
+                    if let Some(tc) = tool_calls.iter_mut().rev().find(|tc| tc.id == *tool_use_id) {
+                        tc.result = Some(loopal_session::format_server_tool_content(content));
                     }
                 }
             }

@@ -18,7 +18,8 @@ impl MdWriter {
         self.in_table = false;
         let rows = std::mem::take(&mut self.table_rows);
         let alignments = std::mem::take(&mut self.table_alignments);
-        self.lines.extend(render_table(&rows, &alignments, self.width));
+        self.lines
+            .extend(render_table(&rows, &alignments, self.width));
         self.lines.push(Line::from(""));
     }
 
@@ -140,7 +141,10 @@ fn wrap_cell(text: &str, width: usize) -> Vec<String> {
     if text.is_empty() || width == 0 {
         return vec![String::new()];
     }
-    let v: Vec<String> = textwrap::wrap(text, width).into_iter().map(|c| c.into_owned()).collect();
+    let v: Vec<String> = textwrap::wrap(text, width)
+        .into_iter()
+        .map(|c| c.into_owned())
+        .collect();
     if v.is_empty() { vec![String::new()] } else { v }
 }
 

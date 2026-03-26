@@ -40,12 +40,6 @@ pub struct ToolContext {
     pub session_id: String,
     /// Opaque shared state passed to tools — tools downcast via `Any`.
     pub shared: Option<Arc<dyn std::any::Any + Send + Sync>>,
-    /// Pending cwd switch set by tools (e.g. EnterWorktree/ExitWorktree).
-    /// The runner checks this after each tool batch and recreates the backend.
-    ///
-    /// **Concurrency note**: tools in the same batch execute in parallel via
-    /// `JoinSet`. If multiple tools write to this field, last-write-wins.
-    /// Only one cwd-switching tool should appear per batch (enforced by LLM).
     /// Memory channel for sending observations to the Memory Observer sidebar.
     /// `None` when auto-memory is disabled.
     pub memory_channel: Option<Arc<dyn MemoryChannel>>,

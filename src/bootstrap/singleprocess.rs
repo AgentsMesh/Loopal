@@ -101,7 +101,6 @@ pub async fn run(
         agent_name: "main".to_string(),
         parent_event_tx: Some(agent_event_tx.clone()),
         cancel_token: None,
-        worktree_state: Default::default(),
     });
 
     let memory_channel: Option<Arc<dyn MemoryChannel>> = if memory_enabled {

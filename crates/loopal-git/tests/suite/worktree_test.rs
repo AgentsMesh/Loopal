@@ -117,3 +117,63 @@ fn test_cleanup_noop_on_missing_dir() {
     // No .loopal/worktrees/ exists — should not panic
     cleanup_stale_worktrees(dir.path());
 }
+
+/// Verify that `cleanup_stale_worktrees` uses `git worktree list` to detect stale
+/// entries: a directory that still exists but was pruned from git's bookkeeping
+/// should be cleaned up.
+#[test]
+fn test_cleanup_detects_pruned_worktree() {
+    let dir = tempfile::tempdir().unwrap();
+    init_repo(dir.path());
+
+    let info = create_worktree(dir.path(), "pruned").unwrap();
+    assert!(info.path.exists());
+
+    // Simulate crash: wipe the .git pointer so git no longer recognizes it,
+    // then prune git's internal list. The directory still exists on disk.
+    let git_file = info.path.join(".git");
+    if git_file.exists() {
+        std::fs::remove_file(&git_file).unwrap();
+    }
+    crate::run(dir.path(), &["git", "worktree", "prune"]);
+
+    // Cleanup should detect it's not in the active worktree list and remove it.
+    cleanup_stale_worktrees(dir.path());
+
+    // The stale directory should no longer exist.
+    assert!(
+        !info.path.exists(),
+        "stale worktree directory should be removed"
+    );
+}
+
+/// Verify that `create_worktree` does NOT delete a branch that belongs to an
+/// active worktree (even if the directory name differs).
+#[test]
+fn test_create_preserves_active_worktree_branch() {
+    let dir = tempfile::tempdir().unwrap();
+    init_repo(dir.path());
+
+    // Create worktree "alpha" → branch "loopal-wt-alpha"
+    let info = create_worktree(dir.path(), "alpha").unwrap();
+    assert!(info.path.exists());
+
+    // Attempting to create another worktree called "alpha" should fail (dir exists),
+    // but the existing branch should NOT be deleted.
+    let err = create_worktree(dir.path(), "alpha").unwrap_err();
+    assert!(matches!(err, GitError::WorktreeExists(_)));
+
+    // The original worktree's branch should still be intact.
+    let branch_check = std::process::Command::new("git")
+        .args(["branch", "--list", "loopal-wt-alpha"])
+        .current_dir(dir.path())
+        .output()
+        .unwrap();
+    let output = String::from_utf8_lossy(&branch_check.stdout);
+    assert!(
+        output.contains("loopal-wt-alpha"),
+        "active branch should not be deleted"
+    );
+
+    remove_worktree(dir.path(), "alpha", false).unwrap();
+}

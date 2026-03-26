@@ -81,5 +81,3 @@ mod e2e_test;
 mod e2e_tools_extended_test;
 #[path = "suite/e2e_tools_test.rs"]
 mod e2e_tools_test;
-#[path = "suite/e2e_worktree_test.rs"]
-mod e2e_worktree_test;

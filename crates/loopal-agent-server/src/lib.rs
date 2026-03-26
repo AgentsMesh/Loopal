@@ -8,6 +8,7 @@
 
 #[doc(hidden)]
 pub mod interrupt_filter;
+mod agent_setup;
 mod ipc_emitter;
 mod ipc_frontend;
 mod memory_adapter;

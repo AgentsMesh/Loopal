@@ -1,4 +1,5 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -91,9 +92,10 @@ async fn execute_agent(
         config.model = Some(m.clone());
     }
 
-    // Worktree isolation
+    // Worktree isolation (name includes UUID to avoid collisions across re-spawns)
     let wt = if isolation == Some("worktree") {
-        Some(create_agent_worktree(&shared.cwd, &name)?)
+        let uid = &uuid::Uuid::new_v4().to_string()[..8];
+        Some(create_agent_worktree(&shared.cwd, &name, uid)?)
     } else {
         None
     };
@@ -108,6 +110,7 @@ async fn execute_agent(
             parent_model: shared.kernel.settings().model.clone(),
             parent_cancel_token: None,
             cwd_override,
+            worktree: wt.clone(),
         },
     )
     .await;
@@ -115,11 +118,13 @@ async fn execute_agent(
     match result {
         Ok(sr) => {
             shared.registry.lock().await.register(sr.handle);
-            handle_spawn_result(sr.agent_id, sr.result_rx, name, background, wt).await
+            handle_spawn_result(sr.agent_id, sr.result_rx, name, background, &wt).await
         }
         Err(e) => {
+            // Worktree cleanup is normally handled by spawn's JoinHandle, but if
+            // spawn itself failed, the JoinHandle was never created — clean up here.
             if let Some((info, root)) = wt {
-                cleanup_worktree(&root, &info);
+                loopal_git::cleanup_if_clean(&root, &info);
             }
             Ok(ToolResult::error(format!("Failed to spawn agent: {e}")))
         }
@@ -129,54 +134,40 @@ async fn execute_agent(
 fn create_agent_worktree(
     cwd: &Path,
     agent_name: &str,
+    uid: &str,
 ) -> Result<(loopal_git::WorktreeInfo, PathBuf), LoopalError> {
     let root = loopal_git::repo_root(cwd)
         .ok_or_else(|| LoopalError::Other("Not a git repository".into()))?;
-    let wt_name = format!("agent-{agent_name}");
+    let wt_name = format!("agent-{agent_name}-{uid}");
     let info = loopal_git::create_worktree(&root, &wt_name)
         .map_err(|e| LoopalError::Other(format!("worktree: {e}")))?;
     Ok((info, root))
 }
 
+/// Handle the result of a spawned sub-agent.
+///
+/// Worktree cleanup is handled by the tracked JoinHandle in `spawn.rs`,
+/// not here — avoiding fire-and-forget tasks that could be silently cancelled.
 async fn handle_spawn_result(
     agent_id: String,
     result_rx: tokio::sync::oneshot::Receiver<Result<String, String>>,
     name: String,
     background: bool,
-    wt: Option<(loopal_git::WorktreeInfo, PathBuf)>,
+    wt: &Option<(loopal_git::WorktreeInfo, PathBuf)>,
 ) -> Result<ToolResult, LoopalError> {
     if background {
-        if let Some((info, root)) = wt {
-            let display_path = info.path.display().to_string();
-            let rx = result_rx;
-            tokio::spawn(async move {
-                let _ = rx.await;
-                tokio::task::spawn_blocking(move || cleanup_worktree(&root, &info));
-            });
-            return Ok(ToolResult::success(format!(
-                "Agent '{name}' spawned in background (worktree: {display_path}).\nagentId: {agent_id}",
-            )));
-        }
+        let wt_suffix = wt
+            .as_ref()
+            .map(|(info, _)| format!(" (worktree: {})", info.path.display()))
+            .unwrap_or_default();
         return Ok(ToolResult::success(format!(
-            "Agent '{name}' spawned in background.\nagentId: {agent_id}"
+            "Agent '{name}' spawned in background{wt_suffix}.\nagentId: {agent_id}",
         )));
     }
-    let output = match result_rx.await {
+    match result_rx.await {
         Ok(Ok(out)) => Ok(ToolResult::success(out)),
         Ok(Err(err)) => Ok(ToolResult::error(err)),
         Err(_) => Ok(ToolResult::error("sub-agent terminated unexpectedly")),
-    };
-    if let Some((info, root)) = wt {
-        cleanup_worktree(&root, &info);
-    }
-    output
-}
-
-/// Remove worktree if it has no changes; otherwise keep it.
-fn cleanup_worktree(repo_root: &Path, info: &loopal_git::WorktreeInfo) {
-    let has_changes = loopal_git::worktree_has_changes(&info.path).unwrap_or(true);
-    if !has_changes {
-        let _ = loopal_git::remove_worktree(repo_root, &info.name, false);
     }
 }
 

@@ -35,6 +35,10 @@ pub struct Cli {
     #[arg(long)]
     pub no_ipc: bool,
 
+    /// Run agent in an isolated git worktree
+    #[arg(long)]
+    pub worktree: bool,
+
     /// [Testing] Path to JSON file with mock LLM responses for --serve mode.
     /// Can also be set via LOOPAL_TEST_PROVIDER env var.
     #[arg(long, hide = true)]

@@ -6,8 +6,6 @@ struct ModelEntry {
     display_name: &'static str,
     context_window: u32,
     max_output_tokens: u32,
-    input_price_per_mtok: f64,
-    output_price_per_mtok: f64,
     thinking: ThinkingCapability,
 }
 
@@ -19,8 +17,6 @@ impl ModelEntry {
             display_name: self.display_name.to_string(),
             context_window: self.context_window,
             max_output_tokens: self.max_output_tokens,
-            input_price_per_mtok: self.input_price_per_mtok,
-            output_price_per_mtok: self.output_price_per_mtok,
             thinking: self.thinking,
         }
     }
@@ -33,8 +29,6 @@ static KNOWN_MODELS: &[ModelEntry] = &[
         display_name: "Claude Sonnet 4",
         context_window: 200_000,
         max_output_tokens: 64_000,
-        input_price_per_mtok: 3.0,
-        output_price_per_mtok: 15.0,
         thinking: ThinkingCapability::BudgetRequired,
     },
     ModelEntry {
@@ -43,8 +37,6 @@ static KNOWN_MODELS: &[ModelEntry] = &[
         display_name: "Claude Sonnet 4.6",
         context_window: 1_000_000,
         max_output_tokens: 64_000,
-        input_price_per_mtok: 3.0,
-        output_price_per_mtok: 15.0,
         thinking: ThinkingCapability::Adaptive,
     },
     ModelEntry {
@@ -53,8 +45,6 @@ static KNOWN_MODELS: &[ModelEntry] = &[
         display_name: "Claude Opus 4",
         context_window: 200_000,
         max_output_tokens: 32_000,
-        input_price_per_mtok: 15.0,
-        output_price_per_mtok: 75.0,
         thinking: ThinkingCapability::BudgetRequired,
     },
     ModelEntry {
@@ -63,8 +53,6 @@ static KNOWN_MODELS: &[ModelEntry] = &[
         display_name: "Claude Opus 4.6",
         context_window: 1_000_000,
         max_output_tokens: 128_000,
-        input_price_per_mtok: 5.0,
-        output_price_per_mtok: 25.0,
         thinking: ThinkingCapability::Adaptive,
     },
     ModelEntry {
@@ -73,8 +61,6 @@ static KNOWN_MODELS: &[ModelEntry] = &[
         display_name: "Claude 3.5 Haiku",
         context_window: 200_000,
         max_output_tokens: 8_192,
-        input_price_per_mtok: 0.8,
-        output_price_per_mtok: 4.0,
         thinking: ThinkingCapability::None,
     },
     ModelEntry {
@@ -83,8 +69,6 @@ static KNOWN_MODELS: &[ModelEntry] = &[
         display_name: "GPT-4o",
         context_window: 128_000,
         max_output_tokens: 16_384,
-        input_price_per_mtok: 2.5,
-        output_price_per_mtok: 10.0,
         thinking: ThinkingCapability::None,
     },
     ModelEntry {
@@ -93,8 +77,6 @@ static KNOWN_MODELS: &[ModelEntry] = &[
         display_name: "GPT-4o Mini",
         context_window: 128_000,
         max_output_tokens: 16_384,
-        input_price_per_mtok: 0.15,
-        output_price_per_mtok: 0.6,
         thinking: ThinkingCapability::None,
     },
     ModelEntry {
@@ -103,8 +85,6 @@ static KNOWN_MODELS: &[ModelEntry] = &[
         display_name: "o3-mini",
         context_window: 200_000,
         max_output_tokens: 100_000,
-        input_price_per_mtok: 1.1,
-        output_price_per_mtok: 4.4,
         thinking: ThinkingCapability::ReasoningEffort,
     },
     ModelEntry {
@@ -113,8 +93,6 @@ static KNOWN_MODELS: &[ModelEntry] = &[
         display_name: "Gemini 2.0 Flash",
         context_window: 1_000_000,
         max_output_tokens: 8_192,
-        input_price_per_mtok: 0.075,
-        output_price_per_mtok: 0.3,
         thinking: ThinkingCapability::None,
     },
     ModelEntry {
@@ -123,8 +101,6 @@ static KNOWN_MODELS: &[ModelEntry] = &[
         display_name: "Gemini 2.5 Pro",
         context_window: 1_000_000,
         max_output_tokens: 65_536,
-        input_price_per_mtok: 1.25,
-        output_price_per_mtok: 10.0,
         thinking: ThinkingCapability::ThinkingBudget,
     },
 ];

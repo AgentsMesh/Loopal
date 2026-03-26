@@ -6,6 +6,8 @@ condition_value: Bash
 ---
 # Bash Tool Guidelines
 
+IMPORTANT: Before using Bash, check if a dedicated tool can do the job. NEVER use Bash for: reading files (use Read), editing files (use Edit), creating files (use Write), searching file contents (use Grep), or finding files (use Glob). Bash is reserved for build/test/git/system commands ONLY.
+
 ## Command Execution
 - Always quote file paths containing spaces with double quotes.
 - Try to maintain your current working directory by using absolute paths. You may use `cd` if the user explicitly requests it.

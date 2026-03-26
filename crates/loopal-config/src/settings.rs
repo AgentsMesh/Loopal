@@ -26,7 +26,7 @@ pub struct Settings {
     /// Permission mode
     pub permission_mode: PermissionMode,
 
-    /// Maximum context tokens before compaction
+    /// Maximum context tokens cap (0 = auto: use model's context_window).
     pub max_context_tokens: u32,
 
     /// Maximum cost per session (USD)
@@ -64,7 +64,7 @@ impl Default for Settings {
             compact_model: None,
             max_turns: 50,
             permission_mode: PermissionMode::Bypass,
-            max_context_tokens: 200_000,
+            max_context_tokens: 0,
             max_cost: None,
             providers: ProvidersConfig::default(),
             hooks: Vec::new(),

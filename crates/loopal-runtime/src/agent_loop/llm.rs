@@ -142,7 +142,7 @@ impl AgentLoopRunner {
                 self.emit(AgentEventPayload::TokenUsage {
                     input_tokens,
                     output_tokens,
-                    context_window: self.model_config.max_context_tokens,
+                    context_window: self.params.store.budget().context_window,
                     cache_creation_input_tokens,
                     cache_read_input_tokens,
                     thinking_tokens,

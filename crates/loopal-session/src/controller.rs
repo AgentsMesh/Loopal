@@ -65,6 +65,7 @@ impl SessionController {
 
     /// Interrupt the agent's current work (ESC or message-while-busy).
     pub fn interrupt(&self) {
+        tracing::debug!("session: interrupt signaled");
         self.interrupt.signal();
         self.interrupt_tx.send_modify(|v| *v = v.wrapping_add(1));
     }

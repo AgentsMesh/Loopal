@@ -3,6 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde_json::Value;
 use tokio::sync::Mutex;
+use tracing::debug;
 
 use loopal_error::{LoopalError, Result};
 use loopal_ipc::connection::{Connection, Incoming};
@@ -14,6 +15,8 @@ use loopal_runtime::agent_input::AgentInput;
 use loopal_runtime::frontend::traits::{AgentFrontend, EventEmitter};
 use loopal_tool_api::PermissionDecision;
 use tokio::sync::mpsc;
+
+use crate::ipc_emitter::IpcEventEmitter;
 
 /// Agent frontend that communicates with the TUI via IPC.
 pub struct IpcFrontend {
@@ -62,6 +65,7 @@ impl AgentFrontend for IpcFrontend {
                         m if m == methods::AGENT_MESSAGE.name => {
                             match serde_json::from_value::<Envelope>(params) {
                                 Ok(env) => {
+                                    debug!(target_agent = %env.target, "recv_input: message");
                                     let _ = self
                                         .connection
                                         .respond(id, serde_json::json!({"ok": true}))
@@ -80,6 +84,7 @@ impl AgentFrontend for IpcFrontend {
                         m if m == methods::AGENT_CONTROL.name => {
                             match serde_json::from_value::<ControlCommand>(params) {
                                 Ok(cmd) => {
+                                    debug!(?cmd, "recv_input: control");
                                     let _ = self
                                         .connection
                                         .respond(id, serde_json::json!({"ok": true}))
@@ -122,12 +127,13 @@ impl AgentFrontend for IpcFrontend {
         name: &str,
         input: &serde_json::Value,
     ) -> PermissionDecision {
+        debug!(tool = name, "requesting permission via IPC");
         let params = serde_json::json!({
             "tool_call_id": id,
             "tool_name": name,
             "tool_input": input,
         });
-        match self
+        let decision = match self
             .connection
             .send_request(methods::AGENT_PERMISSION.name, params)
             .await
@@ -140,7 +146,9 @@ impl AgentFrontend for IpcFrontend {
                 }
             }
             Err(_) => PermissionDecision::Deny,
-        }
+        };
+        debug!(tool = name, ?decision, "permission decision");
+        decision
     }
 
     fn event_emitter(&self) -> Box<dyn EventEmitter> {
@@ -151,6 +159,7 @@ impl AgentFrontend for IpcFrontend {
     }
 
     async fn ask_user(&self, questions: Vec<Question>) -> Vec<String> {
+        debug!(count = questions.len(), "asking user via IPC");
         let params = serde_json::json!({ "questions": questions });
         match self
             .connection
@@ -176,7 +185,6 @@ impl AgentFrontend for IpcFrontend {
         let Ok(params) = serde_json::to_value(&event) else {
             return false;
         };
-        // Spawn a fire-and-forget task for the async send
         let conn = self.connection.clone();
         tokio::spawn(async move {
             let _ = conn
@@ -184,27 +192,5 @@ impl AgentFrontend for IpcFrontend {
                 .await;
         });
         true
-    }
-}
-
-#[derive(Clone)]
-struct IpcEventEmitter {
-    connection: Arc<Connection>,
-    agent_name: Option<String>,
-}
-
-#[async_trait]
-impl EventEmitter for IpcEventEmitter {
-    async fn emit(&self, payload: AgentEventPayload) -> Result<()> {
-        let event = AgentEvent {
-            agent_name: self.agent_name.clone(),
-            payload,
-        };
-        let params = serde_json::to_value(&event)
-            .map_err(|e| LoopalError::Ipc(format!("serialize event: {e}")))?;
-        self.connection
-            .send_notification(methods::AGENT_EVENT.name, params)
-            .await
-            .map_err(LoopalError::Ipc)
     }
 }

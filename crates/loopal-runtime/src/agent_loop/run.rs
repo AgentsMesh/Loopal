@@ -28,6 +28,7 @@ impl AgentLoopRunner {
                 }
                 match self.wait_for_input().await? {
                     Some(WaitResult::MessageAdded) => {
+                        self.interrupt.take(); // clear stale interrupt from IPC
                         self.notify_observers_user_input();
                     }
                     None => break,
@@ -59,6 +60,7 @@ impl AgentLoopRunner {
                         match self.wait_for_input().await? {
                             Some(WaitResult::MessageAdded) => {
                                 self.turn_count += 1;
+                                self.interrupt.take(); // clear stale interrupt from IPC
                                 self.notify_observers_user_input();
                                 continue;
                             }
@@ -82,6 +84,7 @@ impl AgentLoopRunner {
                     match self.wait_for_input().await? {
                         Some(WaitResult::MessageAdded) => {
                             self.turn_count += 1;
+                            self.interrupt.take(); // clear stale interrupt from IPC
                             self.notify_observers_user_input();
                         }
                         None => break,
@@ -93,6 +96,7 @@ impl AgentLoopRunner {
                         match self.wait_for_input().await? {
                             Some(WaitResult::MessageAdded) => {
                                 self.turn_count += 1;
+                                self.interrupt.take(); // clear stale interrupt from IPC
                                 self.notify_observers_user_input();
                                 continue;
                             }

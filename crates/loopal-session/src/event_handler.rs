@@ -89,6 +89,7 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
             state.retry_banner = None;
         }
         AgentEventPayload::AwaitingInput => {
+            tracing::debug!("TUI: agent idle (AwaitingInput)");
             flush_streaming(state);
             state.end_turn();
             state.turn_count += 1;
@@ -159,6 +160,7 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
             handle_tool_progress(state, id, output_tail);
         }
         AgentEventPayload::Interrupted => {
+            tracing::debug!("TUI: agent interrupted");
             flush_streaming(state);
             state.end_turn();
             state.agent_idle = true;

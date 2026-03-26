@@ -11,7 +11,6 @@ fn make_ctx() -> ToolContext {
         backend,
         session_id: "t".into(),
         shared: None,
-        pending_cwd_switch: Default::default(),
         memory_channel: None,
         output_tail: None,
     }

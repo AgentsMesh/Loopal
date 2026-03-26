@@ -115,7 +115,6 @@ impl AgentLoopRunner {
             debug!(tool_count = result.tool_uses.len(), "executing tools");
             let cancel = &turn_ctx.cancel;
             let completion = self.execute_tools(result.tool_uses.clone(), cancel).await?;
-            self.apply_pending_cwd_switch();
             self.inject_pending_messages().await;
 
             // Observer: on_after_tools with results from the last message

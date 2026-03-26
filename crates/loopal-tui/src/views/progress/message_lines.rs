@@ -127,17 +127,15 @@ fn render_prefixed(
 
 /// Convert streaming text into pre-wrapped styled Lines.
 ///
-/// Streaming text is **incomplete** markdown — plain textwrap only.
-/// No label prefix (instruction model: agent output IS the content).
+/// Uses full markdown rendering so users see formatted output incrementally,
+/// not raw markup that only resolves after the message completes.
+/// pulldown-cmark handles incomplete markdown gracefully (e.g. unclosed
+/// code fences render trailing content as code — correct during streaming).
 pub fn streaming_to_lines(text: &str, width: u16) -> Vec<Line<'static>> {
     if text.is_empty() {
         return Vec::new();
     }
-    let mut lines = Vec::new();
-    for line in text.lines() {
-        lines.extend(wrap_line(line, width));
-    }
-    lines
+    markdown::render_markdown(text, width)
 }
 
 /// Wrap a single logical line into visual lines using textwrap.

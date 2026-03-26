@@ -4,6 +4,7 @@ pub mod input_view;
 pub mod picker;
 pub mod progress;
 pub mod question_dialog;
+pub mod retry_banner;
 pub mod rewind_picker;
 pub mod separator;
 pub mod tool_confirm;

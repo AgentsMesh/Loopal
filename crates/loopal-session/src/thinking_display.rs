@@ -1,3 +1,22 @@
+use crate::state::SessionState;
+use crate::types::DisplayMessage;
+
+/// Handle ThinkingComplete: flush thinking buffer and create summary message.
+pub fn handle_thinking_complete(state: &mut SessionState, token_count: u32) {
+    state.thinking_active = false;
+    state.thinking_tokens += token_count;
+    if !state.streaming_thinking.is_empty() {
+        let thinking = std::mem::take(&mut state.streaming_thinking);
+        let summary = format_thinking_summary(&thinking, token_count);
+        state.messages.push(DisplayMessage {
+            role: "thinking".to_string(),
+            content: summary,
+            tool_calls: Vec::new(),
+            image_count: 0,
+        });
+    }
+}
+
 /// Format a thinking summary for display.
 pub fn format_thinking_summary(thinking: &str, token_count: u32) -> String {
     let token_display = if token_count >= 1000 {

@@ -78,6 +78,10 @@ pub(crate) fn apply_agent_event(state: &mut SessionState, name: &str, payload: A
         AgentEventPayload::ServerToolUse { .. } | AgentEventPayload::ServerToolResult { .. } => {
             agent.observable.status = AgentStatus::Running;
         }
+        AgentEventPayload::RetryError { .. } => {
+            agent.observable.status = AgentStatus::Running;
+        }
+        AgentEventPayload::RetryCleared => {}
     }
 }
 

@@ -129,11 +129,7 @@ fn build_inner(
     let filtered_rx =
         crate::interrupt_filter::spawn(incoming_rx, interrupt.clone(), interrupt_tx.clone());
 
-    let frontend = Arc::new(IpcFrontend::new(
-        connection.clone(),
-        filtered_rx,
-        None,
-    ));
+    let frontend = Arc::new(IpcFrontend::new(connection.clone(), filtered_rx, None));
 
     // Event channel for sub-agents: events forwarded to TUI via IPC
     let (event_tx, mut event_rx) = tokio::sync::mpsc::channel::<loopal_protocol::AgentEvent>(256);

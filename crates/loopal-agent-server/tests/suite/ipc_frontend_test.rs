@@ -94,5 +94,8 @@ async fn recv_input_skips_unknown_notifications() {
     let result =
         tokio::time::timeout(std::time::Duration::from_secs(2), frontend.recv_input()).await;
     assert!(result.is_ok(), "recv_input should not timeout");
-    assert!(result.unwrap().is_some(), "recv_input should return a message");
+    assert!(
+        result.unwrap().is_some(),
+        "recv_input should return a message"
+    );
 }

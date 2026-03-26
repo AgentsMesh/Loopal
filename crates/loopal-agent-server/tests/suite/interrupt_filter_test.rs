@@ -164,8 +164,11 @@ async fn filter_wakes_turn_cancel_on_interrupt() {
     let interrupt_tx = Arc::new(watch_tx);
 
     // Wire filter with the SAME interrupt + watch that TurnCancel will use
-    let _filtered_rx =
-        loopal_agent_server::interrupt_filter::spawn(raw_rx, interrupt.clone(), interrupt_tx.clone());
+    let _filtered_rx = loopal_agent_server::interrupt_filter::spawn(
+        raw_rx,
+        interrupt.clone(),
+        interrupt_tx.clone(),
+    );
     let cancel = TurnCancel::new(interrupt.clone(), interrupt_tx.clone());
 
     // Simulate: TUI ESC → forward_interrupt → IPC notification arrives

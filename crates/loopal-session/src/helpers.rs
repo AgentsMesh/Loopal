@@ -37,6 +37,57 @@ pub fn push_system_msg(state: &mut SessionState, content: &str) {
     });
 }
 
+/// Handle token usage update event.
+pub fn handle_token_usage(
+    state: &mut SessionState,
+    input: u32,
+    output: u32,
+    context_window: u32,
+    cache_creation: u32,
+    cache_read: u32,
+) {
+    state.input_tokens = input;
+    state.output_tokens = output;
+    state.context_window = context_window;
+    state.cache_creation_tokens = cache_creation;
+    state.cache_read_tokens = cache_read;
+    if input == 0 && output == 0 {
+        state.thinking_tokens = 0;
+    }
+}
+
+/// Handle auto-continuation event.
+pub fn handle_auto_continuation(state: &mut SessionState, cont: u32, max: u32) {
+    push_system_msg(
+        state,
+        &format!("Output truncated (max_tokens). Auto-continuing ({cont}/{max})"),
+    );
+}
+
+/// Handle context compaction event.
+pub fn handle_compaction(
+    state: &mut SessionState,
+    kept: usize,
+    removed: usize,
+    tokens_before: u32,
+    tokens_after: u32,
+    strategy: &str,
+) {
+    let freed = tokens_before.saturating_sub(tokens_after);
+    let pct = if tokens_before > 0 {
+        freed * 100 / tokens_before
+    } else {
+        0
+    };
+    push_system_msg(
+        state,
+        &format!(
+            "Context compacted ({strategy}): {removed} messages removed, \
+             {kept} kept. {tokens_before}→{tokens_after} tokens ({pct}% freed).",
+        ),
+    );
+}
+
 /// Flush buffered streaming text into a DisplayMessage.
 pub fn flush_streaming(state: &mut SessionState) {
     if !state.streaming_thinking.is_empty() {

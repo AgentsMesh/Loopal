@@ -1,8 +1,49 @@
+use std::time::Instant;
+
 use loopal_tool_api::COMPLETION_PREFIX;
 
+use crate::helpers::flush_streaming;
 use crate::state::SessionState;
-use crate::truncate::truncate_result_for_storage;
-use crate::types::{DisplayMessage, ToolCallStatus};
+use crate::truncate::{truncate_json, truncate_result_for_storage};
+use crate::types::{DisplayMessage, DisplayToolCall, ToolCallStatus};
+
+/// Handle ToolCall: create a pending DisplayToolCall and attach to the last assistant message.
+pub(crate) fn handle_tool_call(
+    state: &mut SessionState,
+    id: String,
+    name: String,
+    input: serde_json::Value,
+) {
+    flush_streaming(state);
+    let tc = DisplayToolCall {
+        id: id.clone(),
+        name: name.clone(),
+        status: ToolCallStatus::Pending,
+        summary: if name == "AttemptCompletion" {
+            name.clone()
+        } else {
+            format!("{}({})", name, truncate_json(&input, 60))
+        },
+        result: None,
+        tool_input: Some(input),
+        batch_id: None,
+        started_at: Some(Instant::now()),
+        duration_ms: None,
+        progress_tail: None,
+    };
+    if let Some(last) = state.messages.last_mut()
+        && last.role == "assistant"
+    {
+        last.tool_calls.push(tc);
+        return;
+    }
+    state.messages.push(DisplayMessage {
+        role: "assistant".to_string(),
+        content: String::new(),
+        tool_calls: vec![tc],
+        image_count: 0,
+    });
+}
 
 /// Handle ToolResult: update status, duration, and promote AttemptCompletion.
 pub(crate) fn handle_tool_result(

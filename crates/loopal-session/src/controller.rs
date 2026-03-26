@@ -158,6 +158,7 @@ impl SessionController {
             state.output_tokens = 0;
             state.cache_creation_tokens = 0;
             state.cache_read_tokens = 0;
+            state.retry_banner = None;
             state.reset_timer();
         }
         let _ = self.control_tx.send(ControlCommand::Clear).await;

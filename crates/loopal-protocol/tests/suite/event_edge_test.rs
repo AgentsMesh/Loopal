@@ -39,3 +39,37 @@ fn test_event_root_agent_name_is_none() {
     let deserialized: AgentEvent = serde_json::from_str(&json).unwrap();
     assert!(deserialized.agent_name.is_none());
 }
+
+#[test]
+fn test_event_retry_error_serde_roundtrip() {
+    let event = AgentEvent::root(AgentEventPayload::RetryError {
+        message: "502 Bad Gateway. Retrying in 2.0s".into(),
+        attempt: 1,
+        max_attempts: 6,
+    });
+    let json = serde_json::to_string(&event).unwrap();
+    let deserialized: AgentEvent = serde_json::from_str(&json).unwrap();
+    if let AgentEventPayload::RetryError {
+        message,
+        attempt,
+        max_attempts,
+    } = deserialized.payload
+    {
+        assert_eq!(message, "502 Bad Gateway. Retrying in 2.0s");
+        assert_eq!(attempt, 1);
+        assert_eq!(max_attempts, 6);
+    } else {
+        panic!("expected AgentEventPayload::RetryError");
+    }
+}
+
+#[test]
+fn test_event_retry_cleared_serde_roundtrip() {
+    let event = AgentEvent::root(AgentEventPayload::RetryCleared);
+    let json = serde_json::to_string(&event).unwrap();
+    let deserialized: AgentEvent = serde_json::from_str(&json).unwrap();
+    assert!(matches!(
+        deserialized.payload,
+        AgentEventPayload::RetryCleared
+    ));
+}

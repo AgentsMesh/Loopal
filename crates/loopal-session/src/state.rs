@@ -48,6 +48,8 @@ pub struct SessionState {
     pub thinking_config: String,
     pub pending_permission: Option<PendingPermission>,
     pub pending_question: Option<PendingQuestion>,
+    /// Transient retry error banner — shown in TUI, not in message history.
+    pub retry_banner: Option<String>,
     // === Agent tracking (observation plane) ===
     pub agents: IndexMap<String, AgentViewState>,
     pub focused_agent: Option<String>,
@@ -79,6 +81,7 @@ impl SessionState {
             thinking_config: "auto".to_string(),
             pending_permission: None,
             pending_question: None,
+            retry_banner: None,
             agents: IndexMap::new(),
             focused_agent: None,
             message_feed: MessageFeed::new(200),

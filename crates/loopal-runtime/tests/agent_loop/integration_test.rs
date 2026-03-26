@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
-use chrono::Utc;
 use loopal_config::Settings;
-use loopal_context::{ContextBudget, ContextPipeline, ContextStore};
+use loopal_context::{ContextBudget, ContextStore};
 use loopal_error::TerminateReason;
 use loopal_kernel::Kernel;
 use loopal_message::Message;
@@ -11,9 +10,10 @@ use loopal_protocol::ControlCommand;
 use loopal_protocol::Envelope;
 use loopal_provider_api::{StopReason, StreamChunk};
 use loopal_runtime::frontend::{AutoCancelQuestionHandler, AutoDenyHandler};
-use loopal_runtime::{AgentLoopParams, AgentMode, SessionManager, UnifiedFrontend, agent_loop};
-use loopal_storage::Session;
-use loopal_tool_api::PermissionMode;
+use loopal_runtime::{
+    AgentConfig, AgentDeps, AgentLoopParams, InterruptHandle, UnifiedFrontend, agent_loop,
+};
+use loopal_test_support::TestFixture;
 use tokio::sync::mpsc;
 
 use super::mock_provider::make_runner_with_mock_provider;
@@ -29,20 +29,9 @@ fn make_test_budget() -> ContextBudget {
     }
 }
 
-fn make_session(id: &str) -> Session {
-    Session {
-        id: id.to_string(),
-        title: "".to_string(),
-        model: "claude-sonnet-4-20250514".to_string(),
-        cwd: "/tmp".to_string(),
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-        mode: "default".to_string(),
-    }
-}
-
 #[tokio::test]
 async fn test_agent_loop_immediate_channel_close() {
+    let fixture = TestFixture::new();
     let (event_tx, mut event_rx) = mpsc::channel(16);
     let (mbox_tx, mailbox_rx) = mpsc::channel::<Envelope>(16);
     let (ctrl_tx, control_rx) = mpsc::channel::<ControlCommand>(16);
@@ -58,26 +47,20 @@ async fn test_agent_loop_immediate_channel_close() {
     ));
 
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
-    let tmp = std::env::temp_dir().join(format!("la_loop_{}", std::process::id()));
     let params = AgentLoopParams {
-        kernel,
-        session: make_session("test-loop"),
+        config: AgentConfig {
+            max_turns: 10,
+            ..Default::default()
+        },
+        deps: AgentDeps {
+            kernel,
+            frontend,
+            session_manager: fixture.session_manager(),
+        },
+        session: fixture.test_session("test-loop"),
         store: ContextStore::new(make_test_budget()),
-        model: "claude-sonnet-4-20250514".to_string(),
-        compact_model: None,
-        system_prompt: "test".to_string(),
-        mode: AgentMode::Act,
-        permission_mode: PermissionMode::Bypass,
-        max_turns: 10,
-        frontend,
-        session_manager: SessionManager::with_base_dir(tmp),
-        context_pipeline: ContextPipeline::new(),
-        tool_filter: None,
+        interrupt: InterruptHandle::new(),
         shared: None,
-        interactive: true,
-        thinking_config: loopal_provider_api::ThinkingConfig::Auto,
-        interrupt: Default::default(),
-        interrupt_tx: std::sync::Arc::new(tokio::sync::watch::channel(0u64).0),
         memory_channel: None,
     };
 
@@ -106,6 +89,7 @@ async fn test_agent_loop_immediate_channel_close() {
 
 #[tokio::test]
 async fn test_agent_loop_max_turns_reached() {
+    let fixture = TestFixture::new();
     let (event_tx, mut event_rx) = mpsc::channel(64);
     let (_mbox_tx, mailbox_rx) = mpsc::channel::<Envelope>(16);
     let (_ctrl_tx, control_rx) = mpsc::channel::<ControlCommand>(16);
@@ -121,26 +105,20 @@ async fn test_agent_loop_max_turns_reached() {
     ));
 
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
-    let tmp = std::env::temp_dir().join(format!("la_turns_{}", std::process::id()));
     let params = AgentLoopParams {
-        kernel,
-        session: make_session("test-turns"),
+        config: AgentConfig {
+            max_turns: 0,
+            ..Default::default()
+        },
+        deps: AgentDeps {
+            kernel,
+            frontend,
+            session_manager: fixture.session_manager(),
+        },
+        session: fixture.test_session("test-turns"),
         store: ContextStore::from_messages(vec![Message::user("hello")], make_test_budget()),
-        model: "claude-sonnet-4-20250514".to_string(),
-        compact_model: None,
-        system_prompt: "test".to_string(),
-        mode: AgentMode::Act,
-        permission_mode: PermissionMode::Bypass,
-        max_turns: 0,
-        frontend,
-        session_manager: SessionManager::with_base_dir(tmp),
-        context_pipeline: ContextPipeline::new(),
-        tool_filter: None,
+        interrupt: InterruptHandle::new(),
         shared: None,
-        interactive: true,
-        thinking_config: loopal_provider_api::ThinkingConfig::Auto,
-        interrupt: Default::default(),
-        interrupt_tx: std::sync::Arc::new(tokio::sync::watch::channel(0u64).0),
         memory_channel: None,
     };
 
@@ -228,7 +206,7 @@ async fn test_full_run_with_tool_execution() {
         ],
     ];
     let (mut runner, mut event_rx) = super::mock_provider::make_multi_runner(calls);
-    runner.params.max_turns = 5;
+    runner.params.config.max_turns = 5;
 
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 

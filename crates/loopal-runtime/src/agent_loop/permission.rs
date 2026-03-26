@@ -11,14 +11,15 @@ impl AgentLoopRunner {
         name: &str,
         input: &serde_json::Value,
     ) -> Result<PermissionDecision> {
-        let Some(tool) = self.params.kernel.get_tool(name) else {
+        let Some(tool) = self.params.deps.kernel.get_tool(name) else {
             return Ok(PermissionDecision::Allow);
         };
 
-        let decision = self.params.permission_mode.check(tool.permission());
+        let decision = self.params.config.permission_mode.check(tool.permission());
         if decision == PermissionDecision::Ask {
             Ok(self
                 .params
+                .deps
                 .frontend
                 .request_permission(id, name, input)
                 .await)

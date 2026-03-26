@@ -33,3 +33,47 @@ mod message_lines_edge_test;
 mod message_lines_test;
 #[path = "suite/styled_wrap_test.rs"]
 mod styled_wrap_test;
+
+// E2E tests
+#[path = "suite/e2e_compact_edge_test.rs"]
+mod e2e_compact_edge_test;
+#[path = "suite/e2e_compact_test.rs"]
+mod e2e_compact_test;
+#[path = "suite/e2e_completion_test.rs"]
+mod e2e_completion_test;
+#[path = "suite/e2e_control_test.rs"]
+mod e2e_control_test;
+#[path = "suite/e2e_edge_test.rs"]
+mod e2e_edge_test;
+#[path = "suite/e2e_error_test.rs"]
+mod e2e_error_test;
+#[path = "suite/e2e_fetch_test.rs"]
+mod e2e_fetch_test;
+#[path = "suite/e2e_git_test.rs"]
+mod e2e_git_test;
+#[path = "suite/e2e_harness.rs"]
+mod e2e_harness;
+#[path = "suite/e2e_hooks_test.rs"]
+mod e2e_hooks_test;
+#[path = "suite/e2e_loop_test.rs"]
+mod e2e_loop_test;
+#[path = "suite/e2e_mcp_test.rs"]
+mod e2e_mcp_test;
+#[path = "suite/e2e_multi_turn_test.rs"]
+mod e2e_multi_turn_test;
+#[path = "suite/e2e_permission_test.rs"]
+mod e2e_permission_test;
+#[path = "suite/e2e_session_test.rs"]
+mod e2e_session_test;
+#[path = "suite/e2e_system_test.rs"]
+mod e2e_system_test;
+#[path = "suite/e2e_task_test.rs"]
+mod e2e_task_test;
+#[path = "suite/e2e_test.rs"]
+mod e2e_test;
+#[path = "suite/e2e_tools_extended_test.rs"]
+mod e2e_tools_extended_test;
+#[path = "suite/e2e_tools_test.rs"]
+mod e2e_tools_test;
+#[path = "suite/e2e_worktree_test.rs"]
+mod e2e_worktree_test;

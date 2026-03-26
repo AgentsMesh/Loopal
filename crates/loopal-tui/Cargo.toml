@@ -33,3 +33,14 @@ image = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3"
+async-trait = { workspace = true }
+wiremock = { workspace = true }
+loopal-test-support = { workspace = true }
+loopal-context = { workspace = true }
+loopal-provider-api = { workspace = true }
+loopal-tool-api = { workspace = true }
+loopal-error = { workspace = true }
+loopal-message = { workspace = true }
+loopal-config = { workspace = true }
+loopal-git = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

@@ -21,12 +21,13 @@ impl AgentLoopRunner {
         self.interrupt.take();
         self.emit(AgentEventPayload::AwaitingInput).await?;
         loop {
-            let input = self.params.frontend.recv_input().await;
+            let input = self.params.deps.frontend.recv_input().await;
             match input {
                 Some(AgentInput::Message(env)) => {
                     let mut user_msg = build_user_message(&env);
                     if let Err(e) = self
                         .params
+                        .deps
                         .session_manager
                         .save_message(&self.params.session.id, &mut user_msg)
                     {
@@ -50,7 +51,7 @@ impl AgentLoopRunner {
     async fn handle_control(&mut self, ctrl: ControlCommand) -> Result<()> {
         match ctrl {
             ControlCommand::ModeSwitch(new_mode) => {
-                self.params.mode = AgentMode::from(new_mode);
+                self.params.config.mode = AgentMode::from(new_mode);
                 let mode_str = match new_mode {
                     loopal_protocol::AgentMode::Plan => "plan",
                     loopal_protocol::AgentMode::Act => "act",
@@ -64,6 +65,7 @@ impl AgentLoopRunner {
                 info!("clearing conversation history");
                 if let Err(e) = self
                     .params
+                    .deps
                     .session_manager
                     .clear_history(&self.params.session.id)
                 {
@@ -86,9 +88,9 @@ impl AgentLoopRunner {
                 self.force_compact().await?;
             }
             ControlCommand::ModelSwitch(new_model) => {
-                info!(from = %self.params.model, to = %new_model, "switching model");
+                info!(from = %self.params.config.model, to = %new_model, "switching model");
                 self.model_config.update_model(&new_model);
-                self.params.model = new_model;
+                self.params.config.model = new_model;
             }
             ControlCommand::Rewind { turn_index } => {
                 self.handle_rewind(turn_index).await?;
@@ -117,6 +119,7 @@ impl AgentLoopRunner {
         if truncate_at == 0 {
             if let Err(e) = self
                 .params
+                .deps
                 .session_manager
                 .clear_history(&self.params.session.id)
             {
@@ -125,6 +128,7 @@ impl AgentLoopRunner {
         } else if let Some(ref id) = self.params.store.messages()[truncate_at].id {
             if let Err(e) = self
                 .params
+                .deps
                 .session_manager
                 .rewind_to(&self.params.session.id, id)
             {

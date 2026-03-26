@@ -48,7 +48,12 @@ fn workspace_uses_sandbox_on_supported_platform() {
         assert_eq!(cmd.program, "sandbox-exec");
         assert!(cmd.args.contains(&"-p".to_string()));
     } else if cfg!(target_os = "linux") {
-        assert_eq!(cmd.program, "bwrap");
+        // bwrap if available with user-namespace permissions, otherwise sh fallback
+        assert!(
+            cmd.program == "bwrap" || cmd.program == "sh",
+            "expected bwrap or sh, got: {}",
+            cmd.program
+        );
     } else {
         assert_eq!(cmd.program, "sh");
     }

@@ -60,9 +60,7 @@ impl Provider for RetryableErrorProvider {
                     stop_reason: StopReason::EndTurn,
                 }),
             ];
-            Ok(Box::pin(MockStreamChunks {
-                chunks: VecDeque::from(chunks),
-            }))
+            Ok(Box::pin(MockStreamChunks::new(VecDeque::from(chunks))))
         }
     }
 }
@@ -82,7 +80,7 @@ async fn test_cancel_during_retry_sleep() {
     let cancel = TurnCancel::new(interrupt.clone(), Arc::clone(&tx));
 
     // Register the retryable-error provider (always fails with 502)
-    let kernel = Arc::get_mut(&mut runner.params.kernel).unwrap();
+    let kernel = Arc::get_mut(&mut runner.params.deps.kernel).unwrap();
     kernel.register_provider(Arc::new(RetryableErrorProvider::new(10)) as Arc<dyn Provider>);
 
     // Drain events in background
@@ -93,8 +91,9 @@ async fn test_cancel_during_retry_sleep() {
         .unwrap();
     let provider = runner
         .params
+        .deps
         .kernel
-        .resolve_provider(&runner.params.model)
+        .resolve_provider(&runner.params.config.model)
         .unwrap();
 
     // Signal cancel after a short delay (during retry sleep)
@@ -146,8 +145,9 @@ async fn test_cancel_before_stream_chat_attempt() {
         .unwrap();
     let provider = runner
         .params
+        .deps
         .kernel
-        .resolve_provider(&runner.params.model)
+        .resolve_provider(&runner.params.config.model)
         .unwrap();
 
     let stream = runner

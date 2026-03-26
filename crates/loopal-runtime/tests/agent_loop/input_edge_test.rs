@@ -10,17 +10,18 @@ use super::{make_runner, make_runner_with_channels};
 
 #[test]
 fn test_model_info_defaults_for_unknown_model() {
-    use chrono::Utc;
     use loopal_config::Settings;
-    use loopal_context::ContextPipeline;
     use loopal_kernel::Kernel;
     use loopal_runtime::agent_loop::AgentLoopRunner;
     use loopal_runtime::frontend::{AutoCancelQuestionHandler, AutoDenyHandler};
-    use loopal_runtime::{AgentLoopParams, AgentMode, SessionManager, UnifiedFrontend};
-    use loopal_storage::Session;
+    use loopal_runtime::{
+        AgentConfig, AgentDeps, AgentLoopParams, InterruptHandle, UnifiedFrontend,
+    };
+    use loopal_test_support::TestFixture;
     use loopal_tool_api::PermissionMode;
     use tokio::sync::mpsc;
 
+    let fixture = TestFixture::new();
     let (event_tx, _event_rx) = mpsc::channel(16);
     let (_mbox_tx, mailbox_rx) = mpsc::channel::<Envelope>(16);
     let (_ctrl_tx, control_rx) = mpsc::channel::<ControlCommand>(16);
@@ -36,39 +37,23 @@ fn test_model_info_defaults_for_unknown_model() {
     ));
 
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
-    let session = Session {
-        id: "test".to_string(),
-        title: "".to_string(),
-        model: "unknown-model-xyz".to_string(),
-        cwd: "/tmp".to_string(),
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-        mode: "default".to_string(),
-    };
-
-    let tmp_dir = std::env::temp_dir().join(format!("loopal_test_unknown_{}", std::process::id()));
-    let session_manager = SessionManager::with_base_dir(tmp_dir);
-    let context_pipeline = ContextPipeline::new();
 
     let params = AgentLoopParams {
-        kernel,
-        session,
+        config: AgentConfig {
+            model: "unknown-model-xyz".to_string(),
+            permission_mode: PermissionMode::Supervised,
+            max_turns: 5,
+            ..Default::default()
+        },
+        deps: AgentDeps {
+            kernel,
+            frontend,
+            session_manager: fixture.session_manager(),
+        },
+        session: fixture.test_session("test"),
         store: loopal_context::ContextStore::new(super::make_test_budget()),
-        model: "unknown-model-xyz".to_string(),
-        compact_model: None,
-        system_prompt: "test".to_string(),
-        mode: AgentMode::Act,
-        permission_mode: PermissionMode::Supervised,
-        max_turns: 5,
-        frontend,
-        session_manager,
-        context_pipeline,
-        tool_filter: None,
+        interrupt: InterruptHandle::new(),
         shared: None,
-        interactive: true,
-        thinking_config: loopal_provider_api::ThinkingConfig::Auto,
-        interrupt: Default::default(),
-        interrupt_tx: std::sync::Arc::new(tokio::sync::watch::channel(0u64).0),
         memory_channel: None,
     };
 
@@ -166,7 +151,7 @@ async fn test_handle_control_compact_keeps_recent() {
 async fn test_handle_control_model_switch_updates_model() {
     let (mut runner, _event_rx, _mbox_tx, ctrl_tx, _perm_tx) = make_runner_with_channels();
 
-    assert_eq!(runner.params.model, "claude-sonnet-4-20250514");
+    assert_eq!(runner.params.config.model, "claude-sonnet-4-20250514");
 
     ctrl_tx
         .send(ControlCommand::ModelSwitch("claude-opus-4-20250514".into()))
@@ -176,5 +161,5 @@ async fn test_handle_control_model_switch_updates_model() {
 
     let _ = tokio::time::timeout(Duration::from_millis(100), runner.wait_for_input()).await;
 
-    assert_eq!(runner.params.model, "claude-opus-4-20250514");
+    assert_eq!(runner.params.config.model, "claude-opus-4-20250514");
 }

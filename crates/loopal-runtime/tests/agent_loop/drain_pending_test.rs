@@ -6,10 +6,9 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
 
-use chrono::Utc;
 use futures::stream::Stream as FutStream;
 use loopal_config::Settings;
-use loopal_context::{ContextBudget, ContextPipeline, ContextStore};
+use loopal_context::{ContextBudget, ContextStore};
 use loopal_error::LoopalError;
 use loopal_kernel::Kernel;
 use loopal_protocol::AgentEvent;
@@ -17,9 +16,10 @@ use loopal_protocol::ControlCommand;
 use loopal_protocol::{Envelope, MessageSource};
 use loopal_provider_api::{ChatParams, ChatStream, Provider, StopReason, StreamChunk};
 use loopal_runtime::frontend::{AutoCancelQuestionHandler, AutoDenyHandler};
-use loopal_runtime::{AgentLoopParams, AgentMode, SessionManager, UnifiedFrontend, agent_loop};
-use loopal_storage::Session;
-use loopal_tool_api::PermissionMode;
+use loopal_runtime::{
+    AgentConfig, AgentDeps, AgentLoopParams, InterruptHandle, UnifiedFrontend, agent_loop,
+};
+use loopal_test_support::TestFixture;
 use tokio::sync::mpsc;
 
 struct TextOnlyProvider {
@@ -109,44 +109,30 @@ async fn test_subagent_drains_pending_before_exit() {
         Box::new(AutoCancelQuestionHandler),
     ));
 
+    let fixture = TestFixture::new();
     let mut kernel = Kernel::new(Settings::default()).unwrap();
     let mock = Arc::new(TextOnlyProvider::new("I will do that.")) as Arc<dyn Provider>;
     kernel.register_provider(mock);
     let kernel = Arc::new(kernel);
 
-    let session = Session {
-        id: "drain-test".into(),
-        title: "".into(),
-        model: "claude-sonnet-4-20250514".into(),
-        cwd: "/tmp".into(),
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-        mode: "default".into(),
-    };
-
-    let tmp = std::env::temp_dir().join(format!("la_drain_{}", std::process::id()));
     let params = AgentLoopParams {
-        kernel,
-        session,
+        config: AgentConfig {
+            max_turns: 5,
+            interactive: false, // Sub-agent mode — exits after first LLM response
+            ..Default::default()
+        },
+        deps: AgentDeps {
+            kernel,
+            frontend,
+            session_manager: fixture.session_manager(),
+        },
+        session: fixture.test_session("drain-test"),
         store: ContextStore::from_messages(
             vec![loopal_message::Message::user("run task")],
             make_test_budget(),
         ),
-        model: "claude-sonnet-4-20250514".into(),
-        compact_model: None,
-        system_prompt: "test".into(),
-        mode: AgentMode::Act,
-        permission_mode: PermissionMode::Bypass,
-        max_turns: 5,
-        frontend,
-        session_manager: SessionManager::with_base_dir(tmp),
-        context_pipeline: ContextPipeline::new(),
-        tool_filter: None,
+        interrupt: InterruptHandle::new(),
         shared: None,
-        interactive: false, // Sub-agent mode — exits after first LLM response
-        thinking_config: loopal_provider_api::ThinkingConfig::Auto,
-        interrupt: Default::default(),
-        interrupt_tx: std::sync::Arc::new(tokio::sync::watch::channel(0u64).0),
         memory_channel: None,
     };
 

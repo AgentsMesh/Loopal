@@ -5,10 +5,9 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use chrono::Utc;
 use futures::stream::Stream as FutStream;
 use loopal_config::Settings;
-use loopal_context::{ContextBudget, ContextPipeline, ContextStore};
+use loopal_context::{ContextBudget, ContextStore};
 use loopal_error::{LoopalError, TerminateReason};
 use loopal_kernel::Kernel;
 use loopal_protocol::ControlCommand;
@@ -16,10 +15,10 @@ use loopal_protocol::Envelope;
 use loopal_provider_api::{ChatParams, ChatStream, Provider, StopReason, StreamChunk};
 use loopal_runtime::agent_loop::AgentLoopRunner;
 use loopal_runtime::frontend::{AutoCancelQuestionHandler, AutoDenyHandler};
-use loopal_runtime::{AgentLoopParams, AgentMode, SessionManager, UnifiedFrontend};
-use loopal_storage::Session;
+use loopal_runtime::{AgentConfig, AgentDeps, AgentLoopParams, InterruptHandle, UnifiedFrontend};
+use loopal_test_support::TestFixture;
+use loopal_tool_api::PermissionLevel;
 use loopal_tool_api::{COMPLETION_PREFIX, Tool, ToolContext, ToolResult};
-use loopal_tool_api::{PermissionLevel, PermissionMode};
 use tokio::sync::mpsc;
 
 // --- Multi-call mock provider ---
@@ -101,6 +100,7 @@ fn make_multi_runner(
     calls: Vec<Vec<Result<StreamChunk, LoopalError>>>,
     register_completion: bool,
 ) -> (AgentLoopRunner, mpsc::Receiver<loopal_protocol::AgentEvent>) {
+    let fixture = TestFixture::new();
     let (event_tx, event_rx) = mpsc::channel(64);
     let (_mbox_tx, mailbox_rx) = mpsc::channel::<Envelope>(16);
     let (_ctrl_tx, control_rx) = mpsc::channel::<ControlCommand>(16);
@@ -118,38 +118,24 @@ fn make_multi_runner(
     if register_completion {
         kernel.register_tool(Box::new(FakeCompletionTool));
     }
-    let session = Session {
-        id: "test-multi".into(),
-        title: "".into(),
-        model: "claude-sonnet-4-20250514".into(),
-        cwd: "/tmp".into(),
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-        mode: "default".into(),
-    };
-    let tmp = std::env::temp_dir().join(format!("la_multi_{}", std::process::id()));
     let params = AgentLoopParams {
-        kernel: Arc::new(kernel),
-        session,
+        config: AgentConfig {
+            max_turns: 10,
+            interactive: false,
+            ..Default::default()
+        },
+        deps: AgentDeps {
+            kernel: Arc::new(kernel),
+            frontend,
+            session_manager: fixture.session_manager(),
+        },
+        session: fixture.test_session("test-multi"),
         store: ContextStore::from_messages(
             vec![loopal_message::Message::user("go")],
             make_test_budget(),
         ),
-        model: "claude-sonnet-4-20250514".into(),
-        system_prompt: "t".into(),
-        compact_model: None,
-        mode: AgentMode::Act,
-        permission_mode: PermissionMode::Bypass,
-        max_turns: 10,
-        frontend,
-        session_manager: SessionManager::with_base_dir(tmp),
-        context_pipeline: ContextPipeline::new(),
-        tool_filter: None,
+        interrupt: InterruptHandle::new(),
         shared: None,
-        interactive: false,
-        thinking_config: loopal_provider_api::ThinkingConfig::Auto,
-        interrupt: Default::default(),
-        interrupt_tx: std::sync::Arc::new(tokio::sync::watch::channel(0u64).0),
         memory_channel: None,
     };
     (AgentLoopRunner::new(params), event_rx)
@@ -256,7 +242,7 @@ async fn test_max_turns_inside_execute_turn() {
         }),
     ]];
     let (mut runner, mut event_rx) = make_multi_runner(calls, false);
-    runner.params.max_turns = 1;
+    runner.params.config.max_turns = 1;
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 
     let output = runner.run().await.unwrap();

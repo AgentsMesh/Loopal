@@ -53,6 +53,7 @@ impl AgentLoopRunner {
             };
             if let Err(e) = self
                 .params
+                .deps
                 .session_manager
                 .save_message(&self.params.session.id, &mut assistant_msg)
             {

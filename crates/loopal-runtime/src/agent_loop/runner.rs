@@ -28,6 +28,7 @@ impl AgentLoopRunner {
     pub fn new(params: AgentLoopParams) -> Self {
         let tool_ctx = ToolContext {
             backend: params
+                .deps
                 .kernel
                 .create_backend(std::path::Path::new(&params.session.cwd)),
             session_id: params.session.id.clone(),
@@ -36,9 +37,10 @@ impl AgentLoopRunner {
             memory_channel: params.memory_channel.clone(),
             output_tail: None,
         };
-        let model_config = ModelConfig::from_model(&params.model, params.thinking_config.clone());
-        let interrupt = params.interrupt.clone();
-        let interrupt_tx = params.interrupt_tx.clone();
+        let model_config =
+            ModelConfig::from_model(&params.config.model, params.config.thinking_config.clone());
+        let interrupt = params.interrupt.signal.clone();
+        let interrupt_tx = params.interrupt.tx.clone();
         Self {
             params,
             tool_ctx,
@@ -60,7 +62,7 @@ impl AgentLoopRunner {
 
     /// Actual run logic, executed inside the `agent` span.
     async fn run_instrumented(&mut self) -> Result<AgentOutput> {
-        info!(model = %self.params.model, "agent loop started");
+        info!(model = %self.params.config.model, "agent loop started");
         self.emit(AgentEventPayload::Started).await?;
 
         let result = self.run_loop().await;
@@ -93,7 +95,7 @@ impl AgentLoopRunner {
 
     /// Send an event payload via the frontend.
     pub async fn emit(&self, payload: AgentEventPayload) -> Result<()> {
-        self.params.frontend.emit(payload).await
+        self.params.deps.frontend.emit(payload).await
     }
 
     /// If a tool (e.g. EnterWorktree) requested a cwd switch, recreate the backend.
@@ -106,7 +108,7 @@ impl AgentLoopRunner {
             .and_then(|mut guard| guard.take());
         if let Some(cwd) = new_cwd {
             info!(new_cwd = %cwd.display(), "applying cwd switch");
-            self.tool_ctx.backend = self.params.kernel.create_backend(&cwd);
+            self.tool_ctx.backend = self.params.deps.kernel.create_backend(&cwd);
         }
     }
 }

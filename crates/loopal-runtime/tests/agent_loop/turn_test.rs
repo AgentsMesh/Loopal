@@ -22,7 +22,7 @@ async fn test_turn_text_only_non_interactive() {
         }),
     ];
     let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx) = make_runner_with_mock_provider(chunks);
-    runner.params.interactive = false;
+    runner.params.config.interactive = false;
 
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 
@@ -58,8 +58,8 @@ async fn test_turn_tool_then_text_non_interactive() {
         }),
     ];
     let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx) = make_runner_with_mock_provider(chunks);
-    runner.params.interactive = false;
-    runner.params.max_turns = 1;
+    runner.params.config.interactive = false;
+    runner.params.config.max_turns = 1;
 
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 
@@ -80,7 +80,7 @@ async fn test_turn_stream_error_no_prior_output() {
         loopal_error::ProviderError::StreamEnded,
     ))];
     let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx) = make_runner_with_mock_provider(chunks);
-    runner.params.interactive = false;
+    runner.params.config.interactive = false;
 
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 

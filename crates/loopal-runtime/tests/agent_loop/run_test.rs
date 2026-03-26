@@ -30,7 +30,7 @@ async fn test_full_run_max_turns_with_messages_present() {
     // Tests turn_count >= max_turns with messages already present
     let chunks = vec![];
     let (mut runner, mut event_rx, input_tx, ctrl_tx) = make_runner_with_mock_provider(chunks);
-    runner.params.max_turns = 0;
+    runner.params.config.max_turns = 0;
 
     drop(input_tx);
     drop(ctrl_tx);

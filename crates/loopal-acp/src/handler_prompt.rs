@@ -43,6 +43,15 @@ impl AcpHandler {
             .collect::<Vec<_>>()
             .join("\n");
 
+        // Drain any bootstrap events (Started, AwaitingInput) left in the
+        // channel from session/new.  At this point the agent loop is blocked
+        // on recv_input(), so no real processing events can be present — only
+        // the initial lifecycle events that were emitted before any prompt.
+        {
+            let mut rx = session.event_rx.lock().await;
+            while rx.try_recv().is_ok() {}
+        }
+
         // Forward as Envelope to the agent loop
         let envelope = Envelope::new(MessageSource::Human, "main", text);
         if session

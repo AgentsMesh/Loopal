@@ -119,4 +119,13 @@ impl EventHandler {
     pub fn try_next(&mut self) -> Option<AppEvent> {
         self.rx.try_recv().ok()
     }
+
+    /// Create an EventHandler from a pre-built channel pair.
+    ///
+    /// No background tasks are spawned — the caller controls event injection
+    /// through the returned `tx` handle. Used for headless E2E testing where
+    /// crossterm polling is unavailable.
+    pub fn from_channel(tx: mpsc::Sender<AppEvent>, rx: mpsc::Receiver<AppEvent>) -> Self {
+        Self { rx, tx }
+    }
 }

@@ -9,7 +9,7 @@ use loopal_agent::shared::AgentShared;
 use loopal_agent::task_store::TaskStore;
 use loopal_config::load_config;
 use loopal_context::system_prompt::build_system_prompt;
-use loopal_context::{ContextBudget, ContextPipeline, ContextStore};
+use loopal_context::{ContextBudget, ContextStore};
 use loopal_kernel::Kernel;
 use loopal_memory::MemoryObserver;
 use loopal_protocol::{
@@ -158,33 +158,33 @@ pub async fn run() -> anyhow::Result<()> {
         session_ctrl.push_welcome(&model, &display_path);
     }
 
-    // Context pipeline: empty — compaction is now a persistent lifecycle event
-    // (check_and_compact), and per-message truncation is in prepare_llm_context.
-    // The pipeline remains as an extension point for future middleware.
-    let context_pipeline = ContextPipeline::new();
-
     let tool_tokens = ContextBudget::estimate_tool_tokens(&tool_defs);
     let budget = ContextBudget::calculate(200_000, &system_prompt, tool_tokens, 16_384);
 
     let agent_params = AgentLoopParams {
-        kernel,
+        config: loopal_runtime::AgentConfig {
+            model,
+            compact_model,
+            system_prompt,
+            mode,
+            permission_mode,
+            max_turns,
+            tool_filter: None,
+            interactive: true,
+            thinking_config,
+        },
+        deps: loopal_runtime::AgentDeps {
+            kernel,
+            frontend,
+            session_manager,
+        },
         session,
         store: ContextStore::from_messages(messages, budget),
-        model,
-        compact_model,
-        system_prompt,
-        mode,
-        permission_mode,
-        max_turns,
-        frontend,
-        session_manager,
-        context_pipeline,
-        tool_filter: None,
+        interrupt: loopal_runtime::InterruptHandle {
+            signal: interrupt,
+            tx: interrupt_tx,
+        },
         shared: Some(shared_any),
-        interactive: true,
-        thinking_config,
-        interrupt,
-        interrupt_tx,
         memory_channel,
     };
 

@@ -11,20 +11,19 @@ fn test_agent_loop_runner_construction() {
     assert_eq!(runner.turn_count, 0);
     assert_eq!(runner.tokens.input, 0);
     assert_eq!(runner.tokens.output, 0);
-    assert_eq!(runner.params.model, "claude-sonnet-4-20250514");
-    assert_eq!(runner.params.max_turns, 10);
+    assert_eq!(runner.params.config.model, "claude-sonnet-4-20250514");
+    assert_eq!(runner.params.config.max_turns, 50);
 }
 
 #[test]
 fn test_tool_ctx_matches_session() {
     let (runner, _rx) = make_runner();
-    assert_eq!(
-        runner.tool_ctx.backend.cwd(),
-        std::path::Path::new("/tmp")
-            .canonicalize()
-            .unwrap_or_else(|_| "/tmp".into())
-    );
-    assert_eq!(runner.tool_ctx.session_id, "test-session-001");
+    // Backend cwd should match the session's cwd (canonicalized by LocalBackend)
+    let expected_cwd = std::path::Path::new(&runner.params.session.cwd)
+        .canonicalize()
+        .unwrap_or_else(|_| runner.params.session.cwd.clone().into());
+    assert_eq!(runner.tool_ctx.backend.cwd(), expected_cwd);
+    assert_eq!(runner.tool_ctx.session_id, runner.params.session.id);
 }
 
 #[tokio::test]
@@ -111,7 +110,7 @@ async fn test_wait_for_input_mode_switch() {
     )
     .await;
 
-    assert_eq!(runner.params.mode, AgentMode::Plan);
+    assert_eq!(runner.params.config.mode, AgentMode::Plan);
 
     let e1 = event_rx.recv().await.unwrap();
     assert!(matches!(e1.payload, AgentEventPayload::AwaitingInput));

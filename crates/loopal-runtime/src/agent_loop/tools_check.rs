@@ -43,6 +43,7 @@ impl AgentLoopRunner {
             // Sandbox precheck
             let precheck_reason = self
                 .params
+                .deps
                 .kernel
                 .get_tool(name)
                 .and_then(|tool| tool.precheck(input));

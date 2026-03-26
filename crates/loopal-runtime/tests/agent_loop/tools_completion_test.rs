@@ -41,10 +41,10 @@ impl Tool for FakeCompletionTool {
 #[tokio::test]
 async fn test_execute_tools_detects_attempt_completion() {
     let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx, _perm_tx) = make_runner_with_channels();
-    runner.params.permission_mode = PermissionMode::Bypass;
+    runner.params.config.permission_mode = PermissionMode::Bypass;
 
     // Register fake completion tool
-    let kernel = std::sync::Arc::get_mut(&mut runner.params.kernel).unwrap();
+    let kernel = std::sync::Arc::get_mut(&mut runner.params.deps.kernel).unwrap();
     kernel.register_tool(Box::new(FakeCompletionTool));
 
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
@@ -65,9 +65,9 @@ async fn test_execute_tools_detects_attempt_completion() {
 #[tokio::test]
 async fn test_execute_tools_completion_mixed_with_normal_tool() {
     let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx, _perm_tx) = make_runner_with_channels();
-    runner.params.permission_mode = PermissionMode::Bypass;
+    runner.params.config.permission_mode = PermissionMode::Bypass;
 
-    let kernel = std::sync::Arc::get_mut(&mut runner.params.kernel).unwrap();
+    let kernel = std::sync::Arc::get_mut(&mut runner.params.deps.kernel).unwrap();
     kernel.register_tool(Box::new(FakeCompletionTool));
 
     // Create temp file for Read tool
@@ -110,7 +110,7 @@ async fn test_execute_tools_completion_mixed_with_normal_tool() {
 #[tokio::test]
 async fn test_execute_tools_error_result_not_detected_as_completion() {
     let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx, _perm_tx) = make_runner_with_channels();
-    runner.params.permission_mode = PermissionMode::Bypass;
+    runner.params.config.permission_mode = PermissionMode::Bypass;
 
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 

@@ -61,10 +61,11 @@ impl AgentLoopRunner {
     async fn try_smart_compact(&mut self) -> bool {
         let compact_model = self
             .params
+            .config
             .compact_model
             .as_deref()
-            .unwrap_or(&self.params.model);
-        let Ok(provider) = self.params.kernel.resolve_provider(compact_model) else {
+            .unwrap_or(&self.params.config.model);
+        let Ok(provider) = self.params.deps.kernel.resolve_provider(compact_model) else {
             warn!("no summarization provider available");
             return false;
         };
@@ -145,6 +146,7 @@ impl AgentLoopRunner {
 
         if let Err(e) = self
             .params
+            .deps
             .session_manager
             .compact_history(&self.params.session.id, after)
         {

@@ -78,6 +78,10 @@ fn extract_detail(tc: &DisplayToolCall) -> String {
             .get("query")
             .and_then(|v| v.as_str())
             .map(|s| format!("\"{s}\"")),
+        "Agent" => input
+            .get("description")
+            .and_then(|v| v.as_str())
+            .map(String::from),
         _ => None,
     };
     truncate_chars(&shorten_home(&raw.unwrap_or_default()), 80)

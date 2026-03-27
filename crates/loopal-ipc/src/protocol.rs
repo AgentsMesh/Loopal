@@ -75,4 +75,16 @@ pub mod methods {
     pub const AGENT_QUESTION: Method = Method {
         name: "agent/question",
     };
+
+    // ── Multi-client session sharing ───────────────────────────────
+
+    /// Join an existing session as an observer.
+    pub const AGENT_JOIN: Method = Method {
+        name: "agent/join",
+    };
+
+    /// List active sessions on this server.
+    pub const AGENT_LIST: Method = Method {
+        name: "agent/list",
+    };
 }

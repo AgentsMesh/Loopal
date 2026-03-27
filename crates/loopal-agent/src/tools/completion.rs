@@ -1,13 +1,12 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
 use loopal_tool_api::PermissionLevel;
-use loopal_tool_api::{COMPLETION_PREFIX, Tool, ToolContext, ToolResult};
+use loopal_tool_api::{Tool, ToolContext, ToolResult};
 
 /// Tool for agents to signal task completion.
 ///
-/// Returns a "{COMPLETION_PREFIX}{result}" response that the runner
-/// detects to exit the turn loop. No cancel_token needed — loop exit is
-/// driven by the runner's content-prefix check.
+/// Returns a `ToolResult::completion(result)` that the runner detects
+/// via `is_completion: true` to exit the turn loop.
 pub struct AttemptCompletionTool;
 
 #[async_trait]
@@ -49,6 +48,6 @@ impl Tool for AttemptCompletionTool {
             .and_then(|v| v.as_str())
             .unwrap_or("Task completed.");
 
-        Ok(ToolResult::success(format!("{COMPLETION_PREFIX}{result}")))
+        Ok(ToolResult::completion(result))
     }
 }

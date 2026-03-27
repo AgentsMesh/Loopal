@@ -9,22 +9,26 @@ use loopal_agent::task_store::TaskStore;
 use loopal_config::ResolvedConfig;
 use loopal_context::system_prompt::build_system_prompt;
 use loopal_context::{ContextBudget, ContextStore};
-use loopal_ipc::connection::{Connection, Incoming};
 use loopal_kernel::Kernel;
 use loopal_protocol::InterruptSignal;
+use loopal_runtime::frontend::traits::AgentFrontend;
 use loopal_runtime::AgentLoopParams;
 use loopal_tool_api::MemoryChannel;
 
-use crate::ipc_frontend::IpcFrontend;
 use crate::params::StartParams;
 
+/// Build `AgentLoopParams` with a pre-constructed frontend (HubFrontend or IpcFrontend).
+///
+/// The caller provides the frontend and interrupt signal, decoupling agent setup
+/// from the connection/transport layer.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn build_inner(
+pub(crate) fn build_with_frontend(
     cwd: &std::path::Path,
     config: &ResolvedConfig,
     start: &StartParams,
-    connection: &Arc<Connection>,
-    incoming_rx: tokio::sync::mpsc::Receiver<Incoming>,
+    frontend: Arc<dyn AgentFrontend>,
+    interrupt: InterruptSignal,
+    interrupt_tx: Arc<tokio::sync::watch::Sender<u64>>,
     kernel: Arc<Kernel>,
     session_dir_override: Option<&std::path::Path>,
     interactive: bool,
@@ -51,25 +55,14 @@ pub(crate) fn build_inner(
     };
     let session = session_manager.create_session(cwd, &model)?;
 
-    let interrupt = InterruptSignal::new();
-    let interrupt_tx = Arc::new(tokio::sync::watch::channel(0u64).0);
-
-    // Filter interrupt notifications out of the incoming stream so they are
-    // processed immediately — even while the agent loop is executing tools.
-    let filtered_rx =
-        crate::interrupt_filter::spawn(incoming_rx, interrupt.clone(), interrupt_tx.clone());
-
-    let frontend = Arc::new(IpcFrontend::new(connection.clone(), filtered_rx, None));
-
-    // Event channel for sub-agents: events forwarded to TUI via IPC
+    // Channel for sub-agent lifecycle events (SubAgentSpawned).
+    // Only lifecycle events are forwarded — sub-agent internal events go via TCP.
     let (event_tx, mut event_rx) = tokio::sync::mpsc::channel::<loopal_protocol::AgentEvent>(256);
-    let event_conn = connection.clone();
+    let lifecycle_frontend = frontend.clone();
     tokio::spawn(async move {
         while let Some(event) = event_rx.recv().await {
-            if let Ok(params) = serde_json::to_value(&event) {
-                let _ = event_conn
-                    .send_notification(loopal_ipc::protocol::methods::AGENT_EVENT.name, params)
-                    .await;
+            if matches!(event.payload, loopal_protocol::AgentEventPayload::SubAgentSpawned { .. }) {
+                let _ = lifecycle_frontend.emit(event.payload).await;
             }
         }
     });
@@ -92,8 +85,6 @@ pub(crate) fn build_inner(
         cancel_token: None,
     });
 
-    // Memory observer — only for interactive (root) agents, not sub-agents.
-    // Sub-agent processes (non-interactive) skip memory to avoid recursive spawning.
     let memory_enabled = interactive && config.settings.memory.enabled;
     let memory_channel: Option<Arc<dyn MemoryChannel>> = if memory_enabled {
         let (tx, rx) = tokio::sync::mpsc::channel::<String>(64);
@@ -134,7 +125,7 @@ pub(crate) fn build_inner(
         tool_tokens,
     );
 
-    Ok(AgentLoopParams {
+    let params = AgentLoopParams {
         config: loopal_runtime::AgentConfig {
             model,
             compact_model,
@@ -160,5 +151,6 @@ pub(crate) fn build_inner(
         },
         shared: Some(shared_any),
         memory_channel,
-    })
+    };
+    Ok(params)
 }

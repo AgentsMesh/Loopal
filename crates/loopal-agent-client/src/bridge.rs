@@ -17,6 +17,7 @@ use crate::bridge_handlers::{handle_permission, handle_question};
 /// Handles for the TUI side of the IPC bridge.
 pub struct BridgeHandles {
     pub agent_event_rx: mpsc::Receiver<AgentEvent>,
+    pub agent_event_tx: mpsc::Sender<AgentEvent>,
     pub control_tx: mpsc::Sender<ControlCommand>,
     pub permission_tx: mpsc::Sender<bool>,
     pub question_tx: mpsc::Sender<UserQuestionResponse>,
@@ -31,6 +32,7 @@ pub fn start_bridge(
     incoming_rx: mpsc::Receiver<Incoming>,
 ) -> BridgeHandles {
     let (agent_event_tx, agent_event_rx) = mpsc::channel::<AgentEvent>(256);
+    let agent_event_tx_clone = agent_event_tx.clone();
     let (control_tx, mut control_rx) = mpsc::channel::<ControlCommand>(16);
     let (permission_tx, mut permission_rx) = mpsc::channel::<bool>(16);
     let (question_tx, mut question_rx) = mpsc::channel::<UserQuestionResponse>(16);
@@ -84,6 +86,7 @@ pub fn start_bridge(
 
     BridgeHandles {
         agent_event_rx,
+        agent_event_tx: agent_event_tx_clone,
         control_tx,
         permission_tx,
         question_tx,

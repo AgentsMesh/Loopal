@@ -1,19 +1,20 @@
-//! ACP integration test harness — drives the JSON-RPC server with in-memory I/O.
+//! ACP integration test harness — drives the adapter with an in-memory agent server.
 
 use std::sync::Arc;
 use std::time::Duration;
 
 use loopal_acp::jsonrpc::JsonRpcTransport;
-use loopal_acp::{AcpHandler, run_acp_loop};
-use loopal_config::{ResolvedConfig, Settings};
+use loopal_acp::run_acp_with_transport;
 use loopal_error::LoopalError;
-use loopal_provider_api::{Provider, StreamChunk};
+use loopal_ipc::StdioTransport;
+use loopal_ipc::transport::Transport;
+use loopal_provider_api::StreamChunk;
 use loopal_test_support::TestFixture;
 use loopal_test_support::mock_provider::MultiCallProvider;
 use serde_json::Value;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, DuplexStream};
 
-/// ACP integration test harness with in-memory stdin/stdout simulation.
+/// ACP integration test harness with in-memory I/O.
 pub struct AcpTestHarness {
     pub client_writer: DuplexStream,
     pub client_reader: BufReader<DuplexStream>,
@@ -22,39 +23,53 @@ pub struct AcpTestHarness {
     next_id: i64,
 }
 
-/// Build an ACP harness with mock provider and in-memory I/O pipes.
+/// Build an ACP harness: spawns in-memory agent server + ACP adapter.
 pub fn build_acp_harness(calls: Vec<Vec<Result<StreamChunk, LoopalError>>>) -> AcpTestHarness {
     let fixture = TestFixture::new();
     let cwd = fixture.path().to_path_buf();
 
-    let (client_writer, server_read) = tokio::io::duplex(8192);
-    let (server_write, client_reader) = tokio::io::duplex(8192);
+    // ACP side: duplex for IDE ↔ ACP adapter
+    let (client_writer, acp_read) = tokio::io::duplex(8192);
+    let (acp_write, client_reader) = tokio::io::duplex(8192);
 
-    let transport = Arc::new(JsonRpcTransport::with_writer(Box::new(server_write)));
-    let provider = Arc::new(MultiCallProvider::new(calls)) as Arc<dyn Provider>;
+    // Agent server side: duplex for ACP adapter ↔ agent server
+    let (adapter_to_server, server_read) = tokio::io::duplex(8192);
+    let (server_to_adapter, adapter_from_server) = tokio::io::duplex(8192);
 
-    let config = ResolvedConfig {
-        settings: Settings::default(),
-        mcp_servers: Default::default(),
-        skills: Default::default(),
-        hooks: Vec::new(),
-        instructions: String::new(),
-        memory: String::new(),
-        layers: Vec::new(),
-    };
-
+    let provider = Arc::new(MultiCallProvider::new(calls)) as Arc<dyn loopal_provider_api::Provider>;
     let session_dir = fixture.path().join("sessions");
-    let handler = Arc::new(AcpHandler::with_test_overrides(
-        transport.clone(),
-        config,
-        cwd,
-        provider,
-        session_dir,
+
+    // Build transports — duplex wiring:
+    //   adapter writes to adapter_to_server → server reads from server_read
+    //   server writes to server_to_adapter → adapter reads from adapter_from_server
+    let server_transport: Arc<dyn Transport> = Arc::new(StdioTransport::new(
+        Box::new(BufReader::new(server_read)),
+        Box::new(server_to_adapter),
+    ));
+    let adapter_transport: Arc<dyn Transport> = Arc::new(StdioTransport::new(
+        Box::new(BufReader::new(adapter_from_server)),
+        Box::new(adapter_to_server),
     ));
 
-    let mut reader = BufReader::new(server_read);
+    // Spawn agent server (test mode with mock provider)
+    tokio::spawn({
+        let cwd = cwd.clone();
+        async move {
+            let _ = loopal_agent_server::run_server_for_test_interactive(
+                server_transport,
+                provider,
+                cwd,
+                session_dir,
+            )
+            .await;
+        }
+    });
+
+    // Spawn ACP adapter
+    let acp_out = Arc::new(JsonRpcTransport::with_writer(Box::new(acp_write)));
     tokio::spawn(async move {
-        let _ = run_acp_loop(&handler, &transport, &mut reader).await;
+        let mut reader = BufReader::new(acp_read);
+        let _ = run_acp_with_transport(adapter_transport, acp_out, &mut reader).await;
     });
 
     AcpTestHarness {
@@ -69,9 +84,8 @@ const IO_TIMEOUT: Duration = Duration::from_secs(10);
 
 impl AcpTestHarness {
     /// Send a JSON-RPC request and wait for the matching response.
-    /// Intermediate notifications are silently skipped.
     pub async fn request(&mut self, method: &str, params: Value) -> Value {
-        let (resp, _notifications) = self.request_with_notifications(method, params).await;
+        let (resp, _) = self.request_with_notifications(method, params).await;
         resp
     }
 

@@ -71,7 +71,7 @@ impl Tool for McpToolAdapter {
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
-        Ok(ToolResult { content, is_error })
+        Ok(ToolResult { content, is_error, is_completion: false, metadata: None })
     }
 }
 

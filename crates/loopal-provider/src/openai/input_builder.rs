@@ -30,6 +30,7 @@ impl OpenAiProvider {
                             tool_use_id,
                             content,
                             is_error,
+                            ..
                         } = block
                         {
                             input.push(json!({

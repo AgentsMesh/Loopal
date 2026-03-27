@@ -51,6 +51,8 @@ mod tests {
                     tool_use_id: "t1".into(),
                     content: "ok".into(),
                     is_error: false,
+                    is_completion: false,
+                    metadata: None,
                 }],
             },
             Message::user("second turn"),

@@ -1,7 +1,5 @@
 //! Clipboard paste handler with large-paste folding.
-//!
-//! Large pastes (>5 lines or >500 chars) are folded into `[Pasted Text: N lines]`
-//! placeholders. Full content is stored in `App.paste_map` and expanded on submit.
+//! Large pastes (>5 lines or >500 chars) are folded into placeholders; expanded on submit.
 
 use std::collections::HashMap;
 
@@ -73,26 +71,26 @@ pub fn expand_paste_placeholders(text: &str, paste_map: &HashMap<String, String>
 
 /// Check if a substring looks like a paste placeholder.
 pub fn is_paste_placeholder(s: &str) -> bool {
-    s.starts_with("[Pasted Text: ") && s.ends_with(']')
+    s.starts_with("[paste:") && s.ends_with(']') && s.len() > 8
 }
 
 fn generate_placeholder(
     content: &str,
-    line_count: usize,
+    _line_count: usize,
     existing: &HashMap<String, String>,
 ) -> String {
-    let metric = if line_count > LARGE_PASTE_LINE_THRESHOLD {
-        format!("{line_count} lines")
-    } else {
-        format!("{} chars", content.len())
-    };
-    let base = format!("[Pasted Text: {metric}]");
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    content.hash(&mut hasher);
+    let base = format!("[paste:{:016x}]", hasher.finish());
     if !existing.contains_key(&base) {
         return base;
     }
-    let mut suffix = 2;
+    // Hash collision (extremely rare) — append suffix
+    let mut suffix = 2u64;
     loop {
-        let candidate = format!("[Pasted Text: {metric} #{suffix}]");
+        suffix.hash(&mut hasher);
+        let candidate = format!("[paste:{:016x}]", hasher.finish());
         if !existing.contains_key(&candidate) {
             return candidate;
         }
@@ -163,37 +161,39 @@ mod tests {
     }
 
     #[test]
-    fn large_paste_generates_placeholder() {
+    fn large_paste_generates_hash_placeholder() {
         let text = "line1\nline2\nline3\nline4\nline5\nline6";
         let map = HashMap::new();
-        assert_eq!(
-            generate_placeholder(text, 6, &map),
-            "[Pasted Text: 6 lines]"
-        );
+        let placeholder = generate_placeholder(text, 6, &map);
+        assert!(placeholder.starts_with("[paste:"), "got: {placeholder}");
+        assert!(placeholder.ends_with(']'));
+        assert!(is_paste_placeholder(&placeholder));
     }
 
     #[test]
     fn placeholder_dedup() {
-        let map = HashMap::from([("[Pasted Text: 6 lines]".into(), "x".into())]);
-        assert_eq!(
-            generate_placeholder("x", 6, &map),
-            "[Pasted Text: 6 lines #2]"
-        );
+        let text = "some content";
+        let first = generate_placeholder(text, 1, &HashMap::new());
+        let map = HashMap::from([(first.clone(), text.into())]);
+        let second = generate_placeholder(text, 1, &map);
+        assert_ne!(first, second, "duplicates should get different placeholders");
+        assert!(is_paste_placeholder(&second));
     }
 
     #[test]
     fn expand_placeholders() {
-        let map = HashMap::from([("[Pasted Text: 6 lines]".into(), "full\ncontent".into())]);
-        let expanded = expand_paste_placeholders("before [Pasted Text: 6 lines] after", &map);
+        let text = "line1\nline2\nline3\nline4\nline5\nline6";
+        let placeholder = generate_placeholder(text, 6, &HashMap::new());
+        let map = HashMap::from([(placeholder.clone(), "full\ncontent".into())]);
+        let input = format!("before {placeholder} after");
+        let expanded = expand_paste_placeholders(&input, &map);
         assert_eq!(expanded, "before full\ncontent after");
     }
 
     #[test]
-    fn char_based_placeholder() {
-        let text = "a".repeat(501);
-        assert_eq!(
-            generate_placeholder(&text, 1, &HashMap::new()),
-            "[Pasted Text: 501 chars]"
-        );
+    fn user_text_not_mistaken_for_placeholder() {
+        // Regression: human-readable placeholder format was guessable
+        assert!(!is_paste_placeholder("[Pasted Text: 6 lines]"));
+        assert!(!is_paste_placeholder("hello"));
     }
 }

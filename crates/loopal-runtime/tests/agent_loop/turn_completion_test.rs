@@ -1,6 +1,4 @@
-//! Tests for AttemptCompletion end-to-end flow through execute_turn,
-//! and additional turn-level edge cases.
-
+//! Tests for AttemptCompletion end-to-end flow through execute_turn.
 use std::collections::VecDeque;
 use std::sync::Arc;
 
@@ -8,7 +6,7 @@ use async_trait::async_trait;
 use futures::stream::Stream as FutStream;
 use loopal_config::Settings;
 use loopal_context::{ContextBudget, ContextStore};
-use loopal_error::{LoopalError, TerminateReason};
+use loopal_error::LoopalError;
 use loopal_kernel::Kernel;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::Envelope;
@@ -18,12 +16,11 @@ use loopal_runtime::frontend::{AutoCancelQuestionHandler, AutoDenyHandler};
 use loopal_runtime::{AgentConfig, AgentDeps, AgentLoopParams, InterruptHandle, UnifiedFrontend};
 use loopal_test_support::TestFixture;
 use loopal_tool_api::PermissionLevel;
-use loopal_tool_api::{COMPLETION_PREFIX, Tool, ToolContext, ToolResult};
+use loopal_tool_api::{Tool, ToolContext, ToolResult};
 use tokio::sync::mpsc;
 
 // --- Multi-call mock provider ---
-
-struct MultiMockStream(VecDeque<Result<StreamChunk, LoopalError>>);
+pub(crate) struct MultiMockStream(VecDeque<Result<StreamChunk, LoopalError>>);
 impl FutStream for MultiMockStream {
     type Item = Result<StreamChunk, LoopalError>;
     fn poll_next(
@@ -36,11 +33,11 @@ impl FutStream for MultiMockStream {
 impl Unpin for MultiMockStream {}
 
 /// Provider that returns different chunks on successive calls.
-struct MultiCallProvider {
+pub(crate) struct MultiCallProvider {
     calls: std::sync::Mutex<VecDeque<Vec<Result<StreamChunk, LoopalError>>>>,
 }
 impl MultiCallProvider {
-    fn new(calls: Vec<Vec<Result<StreamChunk, LoopalError>>>) -> Self {
+    pub(crate) fn new(calls: Vec<Vec<Result<StreamChunk, LoopalError>>>) -> Self {
         Self {
             calls: std::sync::Mutex::new(VecDeque::from(calls)),
         }
@@ -81,7 +78,7 @@ impl Tool for FakeCompletionTool {
             .get("result")
             .and_then(|v| v.as_str())
             .unwrap_or("done");
-        Ok(ToolResult::success(format!("{COMPLETION_PREFIX}{r}")))
+        Ok(ToolResult::completion(r))
     }
 }
 
@@ -96,7 +93,7 @@ fn make_test_budget() -> ContextBudget {
     }
 }
 
-fn make_multi_runner(
+pub(crate) fn make_multi_runner(
     calls: Vec<Vec<Result<StreamChunk, LoopalError>>>,
     register_completion: bool,
 ) -> (AgentLoopRunner, mpsc::Receiver<loopal_protocol::AgentEvent>) {
@@ -141,7 +138,7 @@ fn make_multi_runner(
     (AgentLoopRunner::new(params), event_rx)
 }
 
-/// LLM returns AttemptCompletion → turn exits immediately with completed=true.
+/// LLM returns AttemptCompletion -> turn exits immediately with completed=true.
 #[tokio::test]
 async fn test_attempt_completion_exits_turn_immediately() {
     let calls = vec![vec![
@@ -158,13 +155,13 @@ async fn test_attempt_completion_exits_turn_immediately() {
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 
     let output = runner.run().await.unwrap();
-    assert_eq!(output.terminate_reason, TerminateReason::Goal);
+    assert_eq!(output.terminate_reason, loopal_error::TerminateReason::Goal);
     assert_eq!(output.result, "all tasks done");
     // Tool execution no longer increments turn_count (only user messages do)
     assert_eq!(runner.turn_count, 0);
 }
 
-/// LLM tool → LLM AttemptCompletion: two LLM calls inside one turn.
+/// LLM tool -> LLM AttemptCompletion: two LLM calls inside one turn.
 #[tokio::test]
 async fn test_tool_then_completion_two_llm_calls() {
     let tmp = std::env::temp_dir().join(format!("la_e2e_{}.txt", std::process::id()));
@@ -195,98 +192,9 @@ async fn test_tool_then_completion_two_llm_calls() {
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 
     let output = runner.run().await.unwrap();
-    assert_eq!(output.terminate_reason, TerminateReason::Goal);
+    assert_eq!(output.terminate_reason, loopal_error::TerminateReason::Goal);
     assert_eq!(output.result, "read done");
     // Tool execution no longer increments turn_count (only user messages do)
     assert_eq!(runner.turn_count, 0);
-    let _ = std::fs::remove_file(&tmp);
-}
-
-/// First turn succeeds, second turn errors → result preserves first output.
-#[tokio::test]
-async fn test_error_preserves_prior_output() {
-    let calls = vec![
-        vec![
-            Ok(StreamChunk::Text {
-                text: "first output".into(),
-            }),
-            Ok(StreamChunk::Done {
-                stop_reason: StopReason::EndTurn,
-            }),
-        ],
-        // Second LLM call is attempted on next iteration but won't happen
-        // because non-interactive exits after first turn with no tool calls.
-    ];
-    let (mut runner, mut event_rx) = make_multi_runner(calls, false);
-    tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
-
-    let output = runner.run().await.unwrap();
-    assert_eq!(output.result, "first output");
-    assert_eq!(output.terminate_reason, TerminateReason::Goal);
-}
-
-/// Tool execution no longer increments turn_count, so max_turns is not hit
-/// inside execute_turn. The non-interactive agent exits after the turn completes.
-#[tokio::test]
-async fn test_max_turns_inside_execute_turn() {
-    let tmp = std::env::temp_dir().join(format!("la_mt_{}.txt", std::process::id()));
-    std::fs::write(&tmp, "y").unwrap();
-    let calls = vec![vec![
-        Ok(StreamChunk::ToolUse {
-            id: "tc-1".into(),
-            name: "Read".into(),
-            input: serde_json::json!({"file_path": tmp.to_str().unwrap()}),
-        }),
-        Ok(StreamChunk::Done {
-            stop_reason: StopReason::EndTurn,
-        }),
-    ]];
-    let (mut runner, mut event_rx) = make_multi_runner(calls, false);
-    runner.params.config.max_turns = 1;
-    tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
-
-    let output = runner.run().await.unwrap();
-    // Non-interactive: exits after first turn completes
-    assert_eq!(output.terminate_reason, TerminateReason::Goal);
-    assert_eq!(runner.turn_count, 0);
-    let _ = std::fs::remove_file(&tmp);
-}
-
-/// Regression test: tool call with text → next LLM call stream error →
-/// output preserves the text from the successful iteration (not empty).
-/// This was the root cause of sub-agents returning empty results.
-#[tokio::test]
-async fn test_stream_error_after_tool_preserves_last_text() {
-    let tmp = std::env::temp_dir().join(format!("la_se_{}.txt", std::process::id()));
-    std::fs::write(&tmp, "data").unwrap();
-    let calls = vec![
-        // First LLM call: text + tool
-        vec![
-            Ok(StreamChunk::Text {
-                text: "I will read the file.".into(),
-            }),
-            Ok(StreamChunk::ToolUse {
-                id: "tc-1".into(),
-                name: "Read".into(),
-                input: serde_json::json!({"file_path": tmp.to_str().unwrap()}),
-            }),
-            Ok(StreamChunk::Done {
-                stop_reason: StopReason::EndTurn,
-            }),
-        ],
-        // Second LLM call: stream error (simulates 502/connection reset)
-        vec![Err(LoopalError::Provider(
-            loopal_error::ProviderError::StreamEnded,
-        ))],
-    ];
-    let (mut runner, mut event_rx) = make_multi_runner(calls, false);
-    tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
-
-    let output = runner.run().await.unwrap();
-    // The key assertion: even though the second LLM call had a stream error,
-    // the output preserves "I will read the file." from the first iteration.
-    assert_eq!(output.result, "I will read the file.");
-    assert_eq!(output.terminate_reason, TerminateReason::Goal);
-
     let _ = std::fs::remove_file(&tmp);
 }

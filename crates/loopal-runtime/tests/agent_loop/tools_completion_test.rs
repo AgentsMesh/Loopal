@@ -3,12 +3,12 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
 use loopal_message::ContentBlock;
-use loopal_tool_api::{COMPLETION_PREFIX, Tool, ToolContext, ToolResult};
+use loopal_tool_api::{Tool, ToolContext, ToolResult};
 use loopal_tool_api::{PermissionLevel, PermissionMode};
 
 use super::{make_cancel, make_runner_with_channels};
 
-/// Fake tool that returns "{COMPLETION_PREFIX}{input.result}".
+/// Fake tool that returns `ToolResult::completion(input.result)`.
 struct FakeCompletionTool;
 
 #[async_trait]
@@ -34,7 +34,7 @@ impl Tool for FakeCompletionTool {
             .get("result")
             .and_then(|v| v.as_str())
             .unwrap_or("done");
-        Ok(ToolResult::success(format!("{COMPLETION_PREFIX}{result}")))
+        Ok(ToolResult::completion(result))
     }
 }
 

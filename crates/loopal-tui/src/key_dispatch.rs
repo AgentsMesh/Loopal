@@ -1,8 +1,5 @@
 //! Key-action dispatch — maps InputAction → side effects + quit flag.
 
-use std::sync::Arc;
-
-use loopal_agent::router::MessageRouter;
 use loopal_protocol::{AgentMode, UserContent};
 
 use crate::app::App;
@@ -16,8 +13,6 @@ use crate::tui_helpers::{cycle_focus, handle_question_confirm, route_human_messa
 pub(crate) async fn handle_key_action(
     app: &mut App,
     key: crossterm::event::KeyEvent,
-    router: &Arc<MessageRouter>,
-    target_agent: &str,
     events: &EventHandler,
 ) -> bool {
     let action = handle_key(app, key);
@@ -27,7 +22,7 @@ pub(crate) async fn handle_key_action(
             true
         }
         InputAction::InboxPush(content) => {
-            push_to_inbox(app, content, router, target_agent).await;
+            push_to_inbox(app, content).await;
             false
         }
         InputAction::PasteRequested => {
@@ -62,7 +57,7 @@ pub(crate) async fn handle_key_action(
         InputAction::RunCommand(name, arg) => {
             if let Some(handler) = app.command_registry.find(&name) {
                 let effect = handler.execute(app, arg.as_deref()).await;
-                handle_effect(app, effect, router, target_agent).await
+                handle_effect(app, effect).await
             } else {
                 false
             }
@@ -111,35 +106,23 @@ pub(crate) async fn handle_key_action(
     }
 }
 
-/// Push content to inbox, record in history, and route to agent.
-async fn push_to_inbox(
-    app: &mut App,
-    content: UserContent,
-    router: &Arc<MessageRouter>,
-    target_agent: &str,
-) {
+async fn push_to_inbox(app: &mut App, content: UserContent) {
     app.input_history.push(content.text.clone());
     app.history_index = None;
     if let Some(msg) = app.session.enqueue_message(content) {
         tracing::debug!("TUI: message forwarded to agent");
-        route_human_message(router, target_agent, msg).await;
+        route_human_message(app, msg).await;
     } else {
         tracing::debug!("TUI: agent busy, message queued + interrupt sent");
         app.session.interrupt();
     }
 }
 
-/// Map a CommandEffect to concrete side-effects. Returns true if quitting.
-async fn handle_effect(
-    app: &mut App,
-    effect: CommandEffect,
-    router: &Arc<MessageRouter>,
-    target_agent: &str,
-) -> bool {
+async fn handle_effect(app: &mut App, effect: CommandEffect) -> bool {
     match effect {
         CommandEffect::Done => false,
         CommandEffect::InboxPush(content) => {
-            push_to_inbox(app, content, router, target_agent).await;
+            push_to_inbox(app, content).await;
             false
         }
         CommandEffect::ModeSwitch(mode) => {
@@ -153,7 +136,6 @@ async fn handle_effect(
     }
 }
 
-/// Handle confirmed sub-page picker results.
 async fn handle_sub_page_confirm(app: &mut App, result: SubPageResult) {
     match result {
         SubPageResult::ModelSelected(name) => {

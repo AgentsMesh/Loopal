@@ -1,13 +1,13 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, info, info_span};
 
-use loopal_agent_client::{AgentClient, AgentClientEvent, AgentProcess};
-use loopal_protocol::AgentEvent;
+use loopal_agent_client::{AgentClient, AgentProcess};
+use loopal_protocol::{AgentEvent, AgentEventPayload};
 
+use crate::bridge::{bridge_child_events, read_child_server_info};
 use crate::config::AgentConfig;
 use crate::registry::AgentHandle;
 use crate::shared::AgentShared;
@@ -34,10 +34,8 @@ pub struct SpawnResult {
     pub result_rx: tokio::sync::oneshot::Receiver<Result<String, String>>,
 }
 
-/// Spawn a sub-agent as an independent child process (`loopal --serve`).
-///
-/// The child process gets its own Kernel, tools, and LLM provider.
-/// Events are forwarded from the child's IPC to `parent_event_tx`.
+/// Spawn a sub-agent as a child process (`loopal --serve`).
+/// Events are NOT forwarded — TUI connects directly to child's TCP port.
 pub async fn spawn_agent(
     shared: &Arc<AgentShared>,
     params: SpawnParams,
@@ -65,12 +63,16 @@ pub async fn spawn_agent(
         .map_err(|e| format!("failed to spawn agent process: {e}"))?;
     let transport = agent_proc.transport();
 
-    // Initialize IPC connection — shutdown process on error
+    // Initialize IPC connection
     let client = AgentClient::new(transport);
     if let Err(e) = client.initialize().await {
         let _ = agent_proc.shutdown().await;
         return Err(format!("IPC initialize failed: {e}"));
     }
+
+    // Read child's TCP server info for TUI direct connection.
+    let child_pid = agent_proc.pid().unwrap_or(0);
+    let server_tcp = read_child_server_info(child_pid);
 
     // Start agent loop in child process — shutdown process on error
     let effective_cwd = params.cwd_override.as_deref().unwrap_or(&shared.cwd);
@@ -90,7 +92,19 @@ pub async fn spawn_agent(
         return Err(format!("agent/start failed: {e}"));
     }
 
-    // Event bridge: child IPC → parent_event_tx
+    // Notify TUI about the sub-agent so it can connect directly via TCP.
+    if let Some((port, token)) = server_tcp {
+        info!(agent = %params.name, port, "emitting SubAgentSpawned");
+        let event = AgentEvent::root(AgentEventPayload::SubAgentSpawned {
+            name: params.name.clone(),
+            pid: child_pid,
+            port,
+            token,
+        });
+        let _ = parent_event_tx.send(event).await;
+    }
+
+    // Event bridge: track completion + collect result (TUI gets events via TCP).
     let (result_tx, result_rx) = tokio::sync::oneshot::channel();
     let agent_name = params.name.clone();
     let cleanup_name = params.name.clone();
@@ -139,56 +153,3 @@ pub async fn spawn_agent(
     })
 }
 
-/// Bridge events from child IPC to parent's event channel.
-/// Returns the final result text or error when the child finishes.
-async fn bridge_child_events(
-    mut client: AgentClient,
-    parent_tx: &mpsc::Sender<AgentEvent>,
-    agent_name: &str,
-    cancel_token: &CancellationToken,
-) -> Result<String, String> {
-    let mut last_text = String::new();
-    loop {
-        tokio::select! {
-            event = client.recv() => {
-                match event {
-                    Some(AgentClientEvent::AgentEvent(mut ev)) => {
-                        // Tag with sub-agent name for TUI display
-                        if ev.agent_name.is_none() {
-                            ev.agent_name = Some(agent_name.to_string());
-                        }
-                        // Capture last streamed text as result
-                        if let loopal_protocol::AgentEventPayload::Stream { ref text } = ev.payload {
-                            last_text.push_str(text);
-                        }
-                        let _ = parent_tx.send(ev).await;
-                    }
-                    Some(AgentClientEvent::PermissionRequest { id, .. }) => {
-                        // Sub-agents auto-deny permissions
-                        let _ = client.respond_permission(id, false).await;
-                    }
-                    Some(AgentClientEvent::QuestionRequest { id, .. }) => {
-                        // Sub-agents auto-cancel questions
-                        let resp = loopal_protocol::UserQuestionResponse {
-                            answers: vec!["(sub-agent: auto-cancelled)".into()],
-                        };
-                        let _ = client.respond_question(id, &resp).await;
-                    }
-                    None => {
-                        // IPC disconnected — child exited
-                        break;
-                    }
-                }
-            }
-            () = cancel_token.cancelled() => {
-                let _ = client.shutdown().await;
-                break;
-            }
-        }
-    }
-    if last_text.is_empty() {
-        Ok("(sub-agent completed)".into())
-    } else {
-        Ok(last_text)
-    }
-}

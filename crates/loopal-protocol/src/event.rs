@@ -56,6 +56,12 @@ pub enum AgentEventPayload {
         /// Wall-clock execution time in milliseconds (filled by runtime).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         duration_ms: Option<u64>,
+        /// True when this tool signals task completion (AttemptCompletion).
+        #[serde(default)]
+        is_completion: bool,
+        /// Structured data from the tool (e.g. bytes_written for Write).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        metadata: Option<serde_json::Value>,
     },
 
     /// Periodic progress update for long-running tools (e.g. Bash).
@@ -168,5 +174,13 @@ pub enum AgentEventPayload {
     ServerToolResult {
         tool_use_id: String,
         content: serde_json::Value,
+    },
+
+    /// A sub-agent was spawned. TUI should connect directly to its TCP port.
+    SubAgentSpawned {
+        name: String,
+        pid: u32,
+        port: u16,
+        token: String,
     },
 }

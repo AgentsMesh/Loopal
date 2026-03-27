@@ -41,7 +41,6 @@ fn write_tool(id: &str, path: &str) -> (String, String, serde_json::Value) {
         json!({"file_path": path, "content": "x"}),
     )
 }
-
 fn edit_tool(id: &str, path: &str) -> (String, String, serde_json::Value) {
     (
         id.into(),
@@ -53,12 +52,13 @@ fn edit_tool(id: &str, path: &str) -> (String, String, serde_json::Value) {
 fn read_tool(id: &str, path: &str) -> (String, String, serde_json::Value) {
     (id.into(), "Read".into(), json!({"file_path": path}))
 }
-
 fn ok_result(id: &str) -> ContentBlock {
     ContentBlock::ToolResult {
         tool_use_id: id.into(),
         content: "ok".into(),
         is_error: false,
+        is_completion: false,
+        metadata: None,
     }
 }
 
@@ -67,6 +67,8 @@ fn err_result(id: &str) -> ContentBlock {
         tool_use_id: id.into(),
         content: "err".into(),
         is_error: true,
+        is_completion: false,
+        metadata: None,
     }
 }
 

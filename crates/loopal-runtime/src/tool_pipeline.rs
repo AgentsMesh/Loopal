@@ -103,6 +103,8 @@ fn truncate_result(result: ToolResult, tool_name: &str) -> ToolResult {
     ToolResult {
         content: truncated,
         is_error: result.is_error,
+        is_completion: result.is_completion,
+        metadata: result.metadata.clone(),
     }
 }
 

@@ -76,6 +76,14 @@ pub struct ToolResult {
     pub content: String,
     /// Whether the tool execution resulted in an error
     pub is_error: bool,
+    /// Signals task completion (set by AttemptCompletion tool).
+    /// Checked by the runner to exit the turn loop.
+    #[serde(default)]
+    pub is_completion: bool,
+    /// Structured data from the tool (e.g. bytes_written for Write).
+    /// Avoids parsing string content for metadata.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<serde_json::Value>,
 }
 
 impl ToolResult {
@@ -83,6 +91,8 @@ impl ToolResult {
         Self {
             content: content.into(),
             is_error: false,
+            is_completion: false,
+            metadata: None,
         }
     }
 
@@ -90,13 +100,27 @@ impl ToolResult {
         Self {
             content: content.into(),
             is_error: true,
+            is_completion: false,
+            metadata: None,
         }
     }
-}
 
-/// Prefix returned by `AttemptCompletionTool`; used by the runner and session
-/// layer to detect completion results.
-pub const COMPLETION_PREFIX: &str = "Completion acknowledged: ";
+    /// Signal task completion. Content is the result summary.
+    pub fn completion(content: impl Into<String>) -> Self {
+        Self {
+            content: content.into(),
+            is_error: false,
+            is_completion: true,
+            metadata: None,
+        }
+    }
+
+    /// Attach structured metadata (e.g. `{"bytes_written": 1234}`).
+    pub fn with_metadata(mut self, metadata: serde_json::Value) -> Self {
+        self.metadata = Some(metadata);
+        self
+    }
+}
 
 /// Tool definition for sending to LLM
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -2,7 +2,7 @@
 name = "loopal-sandbox"
 version.workspace = true
 edition.workspace = true
-license.workspace = true
+license-file.workspace = true
 
 [lib]
 doctest = false

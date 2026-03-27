@@ -189,4 +189,6 @@ Options:
 
 ## License
 
-MIT
+Proprietary. Copyright (c) 2024-2026 AgentsMesh.ai. All Rights Reserved.
+
+This software is licensed under a proprietary commercial license. See the [LICENSE](./LICENSE) file for the full terms. Unauthorized copying, modification, distribution, or use of this software is strictly prohibited.

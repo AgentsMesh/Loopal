@@ -2,7 +2,8 @@
 name = "loopal-git"
 version.workspace = true
 edition.workspace = true
-license.workspace = true
+license-file.workspace = true
+publish = false
 
 [lib]
 doctest = false

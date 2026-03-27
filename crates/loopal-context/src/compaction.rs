@@ -81,32 +81,42 @@ pub fn sanitize_tool_pairs(messages: &mut Vec<Message>) {
     messages.retain(|m| m.role == MessageRole::System || !m.content.is_empty());
 }
 
+/// Server-side tool name for code execution (mirrors provider constant).
+const CODE_EXECUTION: &str = "code_execution";
+
 /// Remove orphaned ServerToolUse / ServerToolResult blocks within each assistant message.
 ///
 /// A ServerToolUse without a matching ServerToolResult (same message, matching id)
 /// is dropped — this happens when the LLM response is truncated mid-server-tool.
+/// Also strips code_execution blocks with empty input (parser bug artifact).
 fn sanitize_server_tool_pairs(messages: &mut [Message]) {
     for msg in messages
         .iter_mut()
         .filter(|m| m.role == MessageRole::Assistant)
     {
-        let result_ids: HashSet<String> = msg
-            .content
-            .iter()
-            .filter_map(|b| match b {
-                ContentBlock::ServerToolResult { tool_use_id, .. } => Some(tool_use_id.clone()),
-                _ => None,
-            })
-            .collect();
+        // Strip code_execution blocks with empty input (parser bug artifact).
+        // Their orphaned results will be removed by the pair-matching below.
+        msg.content.retain(|b| match b {
+            ContentBlock::ServerToolUse { name, input, .. } => {
+                !(name == CODE_EXECUTION && is_empty_json(input))
+            }
+            _ => true,
+        });
 
-        let use_ids: HashSet<String> = msg
-            .content
-            .iter()
-            .filter_map(|b| match b {
-                ContentBlock::ServerToolUse { id, .. } => Some(id.clone()),
-                _ => None,
-            })
-            .collect();
+        // Single pass: collect both use_ids and result_ids simultaneously.
+        let mut result_ids = HashSet::new();
+        let mut use_ids = HashSet::new();
+        for b in &msg.content {
+            match b {
+                ContentBlock::ServerToolResult { tool_use_id, .. } => {
+                    result_ids.insert(tool_use_id.clone());
+                }
+                ContentBlock::ServerToolUse { id, .. } => {
+                    use_ids.insert(id.clone());
+                }
+                _ => {}
+            }
+        }
 
         msg.content.retain(|b| match b {
             ContentBlock::ServerToolUse { id, .. } => result_ids.contains(id),
@@ -114,6 +124,10 @@ fn sanitize_server_tool_pairs(messages: &mut [Message]) {
             _ => true,
         });
     }
+}
+
+fn is_empty_json(v: &serde_json::Value) -> bool {
+    v.is_null() || v.as_object().is_some_and(|o| o.is_empty())
 }
 
 /// Strip `ContentBlock::Thinking` blocks from all assistant messages except the last one.

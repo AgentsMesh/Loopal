@@ -1,35 +1,9 @@
-use futures::StreamExt;
+use super::stream_helpers::{collect_chunks, test_chat_params};
 use loopal_error::{LoopalError, ProviderError};
-use loopal_message::Message;
 use loopal_provider::GoogleProvider;
-use loopal_provider_api::{ChatParams, Provider, StreamChunk};
+use loopal_provider_api::{Provider, StreamChunk};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
-
-fn test_chat_params() -> ChatParams {
-    ChatParams {
-        model: "test-model".to_string(),
-        messages: vec![Message::user("Hello")],
-        system_prompt: "You are helpful.".to_string(),
-        tools: vec![],
-        max_tokens: 100,
-        temperature: None,
-        thinking: None,
-        debug_dump_dir: None,
-    }
-}
-
-async fn collect_chunks(
-    mut stream: std::pin::Pin<
-        Box<dyn futures::Stream<Item = Result<StreamChunk, LoopalError>> + Send + Unpin>,
-    >,
-) -> Vec<Result<StreamChunk, LoopalError>> {
-    let mut chunks = Vec::new();
-    while let Some(item) = stream.next().await {
-        chunks.push(item);
-    }
-    chunks
-}
 
 fn expect_err(result: Result<loopal_provider_api::ChatStream, LoopalError>) -> LoopalError {
     match result {

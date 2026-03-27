@@ -1,4 +1,6 @@
-use loopal_provider_api::StopReason;
+use loopal_error::LoopalError;
+use loopal_provider_api::{StopReason, StreamChunk};
+use serde_json::Value;
 
 /// Accumulates partial tool-use JSON fragments across streamed deltas.
 #[derive(Default)]
@@ -29,4 +31,31 @@ pub(crate) struct ServerToolAccumulator {
     pub(crate) result_content: Option<serde_json::Value>,
     /// The original block type string, e.g. "web_search_tool_result".
     pub(crate) result_block_type: Option<String>,
+    /// Accumulates `input_json_delta` fragments for server tools (e.g. code_execution).
+    pub(crate) json_fragments: String,
+}
+
+impl ServerToolAccumulator {
+    /// Whether a server tool use block is actively being streamed (not a result block).
+    pub(crate) fn is_tool_use_active(&self) -> bool {
+        self.current.is_some() && !self.is_result
+    }
+}
+
+/// Extract usage tokens from a JSON object and push a `StreamChunk::Usage`.
+pub(crate) fn push_usage_from(usage: &Value, chunks: &mut Vec<Result<StreamChunk, LoopalError>>) {
+    let (Some(inp), Some(out)) = (
+        usage["input_tokens"].as_u64(),
+        usage["output_tokens"].as_u64(),
+    ) else {
+        return;
+    };
+    chunks.push(Ok(StreamChunk::Usage {
+        input_tokens: inp as u32,
+        output_tokens: out as u32,
+        cache_creation_input_tokens: usage["cache_creation_input_tokens"].as_u64().unwrap_or(0)
+            as u32,
+        cache_read_input_tokens: usage["cache_read_input_tokens"].as_u64().unwrap_or(0) as u32,
+        thinking_tokens: 0,
+    }));
 }

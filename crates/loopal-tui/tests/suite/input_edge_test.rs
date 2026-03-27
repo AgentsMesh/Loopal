@@ -82,6 +82,22 @@ fn test_up_navigates_history_when_content_fits() {
     assert_eq!(app.scroll_offset, 0, "scroll_offset should stay 0");
 }
 
+#[test]
+fn test_up_navigates_history_when_content_overflows_and_idle() {
+    let mut app = make_app();
+    app.session.lock().agent_idle = true;
+    app.content_overflows = true;
+    app.input_history.push("older".into());
+    app.input_history.push("recent".into());
+    let action = handle_key(&mut app, key(KeyCode::Up));
+    assert!(matches!(action, InputAction::None));
+    assert_eq!(
+        app.input, "recent",
+        "Up should browse history even when content overflows (agent idle)"
+    );
+    assert_eq!(app.scroll_offset, 0);
+}
+
 // --- Modal Ctrl+C ---
 
 #[test]

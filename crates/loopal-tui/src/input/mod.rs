@@ -137,12 +137,6 @@ fn handle_normal_key(app: &mut App, key: &KeyEvent) -> InputAction {
             app.scroll_offset = app.scroll_offset.saturating_add(1);
             InputAction::None
         }
-        KeyCode::Up if app.content_overflows => {
-            // Content exceeds viewport: scroll takes priority over history.
-            // Alternate scroll sends ~3 Up arrows per notch, so step=1 ≈ 3 lines/notch.
-            app.scroll_offset = app.scroll_offset.saturating_add(1);
-            InputAction::None
-        }
         KeyCode::Down if app.scroll_offset > 0 => {
             app.scroll_offset = app.scroll_offset.saturating_sub(1);
             InputAction::None

@@ -87,6 +87,11 @@ impl AgentFrontend for HubFrontend {
     async fn recv_input(&self) -> Option<AgentInput> {
         let mut rx = self.input_rx.lock().await;
         let mut interrupt_rx = self.interrupt_rx.lock().await;
+        // Consume stale interrupt notification from a previous turn.
+        // By the time the agent loop re-enters recv_input(), the interrupt
+        // has already been handled by TurnCancel. Without this, changed()
+        // fires immediately on the old value and exits the agent loop.
+        interrupt_rx.borrow_and_update();
         loop {
             tokio::select! {
                 msg = rx.recv() => {

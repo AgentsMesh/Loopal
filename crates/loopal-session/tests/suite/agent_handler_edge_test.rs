@@ -44,3 +44,52 @@ fn test_retry_cleared_no_crash() {
     // Status unchanged from Started → Running
     assert_eq!(state.agents["w1"].observable.status, AgentStatus::Running);
 }
+
+#[test]
+fn finished_clears_running_agent() {
+    let mut state = make_state();
+    // Simulate agent in Running state (ThinkingStream sets Running)
+    apply_event(
+        &mut state,
+        AgentEvent::named("sub1", AgentEventPayload::Started),
+    );
+    apply_event(
+        &mut state,
+        AgentEvent::named(
+            "sub1",
+            AgentEventPayload::ThinkingStream { text: "...".into() },
+        ),
+    );
+    assert_eq!(state.agents["sub1"].observable.status, AgentStatus::Running);
+
+    // Simulate disconnect → synthetic Finished event
+    apply_event(
+        &mut state,
+        AgentEvent::named("sub1", AgentEventPayload::Finished),
+    );
+    assert_eq!(
+        state.agents["sub1"].observable.status,
+        AgentStatus::Finished
+    );
+}
+
+#[test]
+fn duplicate_finished_is_idempotent() {
+    let mut state = make_state();
+    apply_event(
+        &mut state,
+        AgentEvent::named("sub1", AgentEventPayload::Started),
+    );
+    apply_event(
+        &mut state,
+        AgentEvent::named("sub1", AgentEventPayload::Finished),
+    );
+    apply_event(
+        &mut state,
+        AgentEvent::named("sub1", AgentEventPayload::Finished),
+    );
+    assert_eq!(
+        state.agents["sub1"].observable.status,
+        AgentStatus::Finished
+    );
+}

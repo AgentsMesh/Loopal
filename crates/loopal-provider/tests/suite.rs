@@ -25,6 +25,8 @@ mod stream_anthropic_edge_test;
 mod stream_anthropic_test;
 #[path = "suite/stream_google_test.rs"]
 mod stream_google_test;
+#[path = "suite/stream_helpers.rs"]
+mod stream_helpers;
 #[path = "suite/stream_openai_edge_test.rs"]
 mod stream_openai_edge_test;
 #[path = "suite/stream_openai_test.rs"]

@@ -93,8 +93,6 @@ fn compact_then_sanitize_fixes_broken_pairs() {
     }
 }
 
-// --- ServerToolUse / ServerToolResult pair tests ---
-
 fn assistant_with_server_tool_blocks(blocks: Vec<ContentBlock>) -> Message {
     Message {
         id: None,
@@ -104,10 +102,14 @@ fn assistant_with_server_tool_blocks(blocks: Vec<ContentBlock>) -> Message {
 }
 
 fn server_tool_use(id: &str) -> ContentBlock {
+    server_tool_use_with_input(id, serde_json::json!({"code": "test()"}))
+}
+
+fn server_tool_use_with_input(id: &str, input: serde_json::Value) -> ContentBlock {
     ContentBlock::ServerToolUse {
         id: id.to_string(),
         name: "code_execution".to_string(),
-        input: serde_json::json!({}),
+        input,
     }
 }
 
@@ -165,4 +167,34 @@ fn sanitize_preserves_valid_server_tool_pairs() {
     sanitize_tool_pairs(&mut msgs);
     assert_eq!(msgs.len(), 3);
     assert_eq!(msgs[1].content.len(), 4); // all preserved
+}
+
+#[test]
+fn sanitize_strips_code_execution_with_empty_input() {
+    let mut msgs = vec![
+        Message::system("sys"),
+        assistant_with_server_tool_blocks(vec![
+            server_tool_use_with_input("ce_empty", serde_json::json!({})), // empty → stripped
+            server_tool_result("ce_empty"),
+        ]),
+        Message::user("continue"),
+    ];
+    sanitize_tool_pairs(&mut msgs);
+    // Both blocks removed: empty-input use stripped, orphaned result follows
+    assert_eq!(msgs.len(), 2); // system + user
+}
+
+#[test]
+fn sanitize_preserves_code_execution_with_valid_input() {
+    let mut msgs = vec![
+        Message::system("sys"),
+        assistant_with_server_tool_blocks(vec![
+            server_tool_use_with_input("ce_valid", serde_json::json!({"code": "print(1)"})),
+            server_tool_result("ce_valid"),
+        ]),
+        Message::user("continue"),
+    ];
+    sanitize_tool_pairs(&mut msgs);
+    assert_eq!(msgs.len(), 3);
+    assert_eq!(msgs[1].content.len(), 2); // pair preserved
 }

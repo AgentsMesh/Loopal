@@ -7,7 +7,7 @@ use loopal_ipc::TcpTransport;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
-use loopal_protocol::AgentEvent;
+use loopal_protocol::{AgentEvent, AgentEventPayload};
 use tracing::info;
 
 use crate::hub::AgentHub;
@@ -169,4 +169,13 @@ async fn read_agent_events(
         }
     }
     info!(agent = agent_name, "sub-agent event stream ended");
+
+    // Emit synthetic Finished so TUI clears the agent's live status.
+    // Idempotent: if the agent already sent Finished, setting it again is a no-op.
+    let cleanup = AgentEvent::named(agent_name, AgentEventPayload::Finished);
+    let send_result =
+        tokio::time::timeout(std::time::Duration::from_secs(1), event_tx.send(cleanup)).await;
+    if send_result.is_err() || matches!(send_result, Ok(Err(_))) {
+        tracing::debug!(agent = agent_name, "cleanup Finished event not delivered");
+    }
 }

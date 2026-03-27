@@ -1,7 +1,5 @@
 use std::time::Instant;
 
-use loopal_tool_api::COMPLETION_PREFIX;
-
 use crate::helpers::flush_streaming;
 use crate::state::SessionState;
 use crate::truncate::{truncate_json, truncate_result_for_storage};
@@ -30,6 +28,7 @@ pub(crate) fn handle_tool_call(
         started_at: Some(Instant::now()),
         duration_ms: None,
         progress_tail: None,
+        metadata: None,
     };
     if let Some(last) = state.messages.last_mut()
         && last.role == "assistant"
@@ -45,44 +44,47 @@ pub(crate) fn handle_tool_call(
     });
 }
 
+/// Parameters for a tool result update.
+pub(crate) struct ToolResultParams {
+    pub id: String,
+    pub name: String,
+    pub result: String,
+    pub is_error: bool,
+    pub duration_ms: Option<u64>,
+    pub is_completion: bool,
+    pub metadata: Option<serde_json::Value>,
+}
+
 /// Handle ToolResult: update status, duration, and promote AttemptCompletion.
-pub(crate) fn handle_tool_result(
-    state: &mut SessionState,
-    id: String,
-    name: String,
-    result: String,
-    is_error: bool,
-    duration_ms: Option<u64>,
-) {
-    let status = if is_error {
+pub(crate) fn handle_tool_result(state: &mut SessionState, p: ToolResultParams) {
+    let status = if p.is_error {
         ToolCallStatus::Error
     } else {
         ToolCallStatus::Success
     };
-    let is_completion = name == "AttemptCompletion" && !is_error;
     'outer: for msg in state.messages.iter_mut().rev() {
         for tc in msg.tool_calls.iter_mut().rev() {
-            let matches = if !id.is_empty() {
-                tc.id == id
+            let matches = if !p.id.is_empty() {
+                tc.id == p.id
             } else {
-                tc.name == name && tc.status == ToolCallStatus::Pending
+                tc.name == p.name && tc.status == ToolCallStatus::Pending
             };
             if matches {
                 tc.status = status;
-                tc.duration_ms = duration_ms;
+                tc.duration_ms = p.duration_ms;
                 tc.progress_tail = None;
-                if !is_completion {
-                    tc.result = Some(truncate_result_for_storage(&result));
+                tc.metadata = p.metadata.clone();
+                if !p.is_completion {
+                    tc.result = Some(truncate_result_for_storage(&p.result));
                 }
                 break 'outer;
             }
         }
     }
-    if is_completion {
-        let content = result.strip_prefix(COMPLETION_PREFIX).unwrap_or(&result);
+    if p.is_completion {
         state.messages.push(DisplayMessage {
             role: "assistant".into(),
-            content: content.to_string(),
+            content: p.result,
             tool_calls: Vec::new(),
             image_count: 0,
         });

@@ -84,6 +84,8 @@ fn test_estimated_token_count_tool_result() {
             tool_use_id: "1".into(),
             content: "a".repeat(400),
             is_error: false,
+            is_completion: false,
+            metadata: None,
         }],
     };
     // 400 / 4 = 100 + 4 overhead

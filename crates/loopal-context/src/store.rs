@@ -99,10 +99,13 @@ impl ContextStore {
 
     // --- LLM preparation ---
 
-    /// Clone messages for an LLM call. All content reduction is already done
-    /// persistently by the degradation pipeline, so this is a pure clone.
+    /// Clone messages for an LLM call. Applies a final sanitization pass
+    /// to guarantee no orphaned ToolUse/ToolResult or ServerToolUse/Result
+    /// pairs leak to the API — regardless of which upstream mutation missed it.
     pub fn prepare_for_llm(&self) -> Vec<Message> {
-        self.messages.clone()
+        let mut msgs = self.messages.clone();
+        sanitize_tool_pairs(&mut msgs);
+        msgs
     }
 
     // --- Compaction operations (encapsulated mutation) ---
@@ -175,13 +178,20 @@ impl ContextStore {
         run_sync_degradation(&mut self.messages, &self.budget);
 
         let mut iterations = 0;
+        let mut dropped_any = false;
         while estimate_messages_tokens(&self.messages) > self.budget.message_budget * 90 / 100
             && iterations < 10
         {
             if drop_oldest_group(&mut self.messages) == 0 {
                 break;
             }
+            dropped_any = true;
             iterations += 1;
+        }
+        // Sanitize after dropping to fix orphaned ToolUse/ToolResult and
+        // ServerToolUse/ServerToolResult pairs (e.g. code_execution blocks).
+        if dropped_any {
+            sanitize_tool_pairs(&mut self.messages);
         }
 
         debug!(

@@ -1,5 +1,6 @@
 //! Unified slash command system — trait-based handlers with registry.
 
+mod agent_cmd;
 mod builtin;
 mod help_cmd;
 mod init_cmd;

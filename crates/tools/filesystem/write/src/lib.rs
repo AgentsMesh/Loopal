@@ -64,7 +64,8 @@ impl Tool for WriteTool {
             Ok(result) => Ok(ToolResult::success(format!(
                 "Successfully wrote {} bytes to {}",
                 result.bytes_written, file_path
-            ))),
+            ))
+            .with_metadata(json!({"bytes_written": result.bytes_written}))),
             Err(e) => Ok(ToolResult::error(e.to_string())),
         }
     }

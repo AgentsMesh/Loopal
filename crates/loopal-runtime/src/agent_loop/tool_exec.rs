@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -6,13 +5,14 @@ use loopal_kernel::Kernel;
 use loopal_message::ContentBlock;
 use loopal_protocol::AgentEventPayload;
 use loopal_tool_api::{OutputTail, ToolContext};
-use tracing::{Instrument, error, info};
+use tracing::{Instrument, info};
 
 use crate::frontend::traits::AgentFrontend;
 use crate::mode::AgentMode;
 use crate::tool_pipeline::execute_tool;
 
 use super::cancel::TurnCancel;
+use super::tool_collect::collect_results;
 use super::tool_progress::maybe_spawn_progress;
 
 /// Execute approved tools in parallel via JoinSet, with cancellation support.
@@ -86,11 +86,15 @@ pub async fn execute_approved_tools(
                             result: result.content.clone(),
                             is_error: result.is_error,
                             duration_ms: Some(tool_duration.as_millis() as u64),
+                            is_completion: result.is_completion,
+                            metadata: result.metadata.clone(),
                         };
                         let block = ContentBlock::ToolResult {
                             tool_use_id: id,
                             content: result.content,
                             is_error: result.is_error,
+                            is_completion: result.is_completion,
+                            metadata: result.metadata,
                         };
                         (block, event)
                     }
@@ -108,11 +112,15 @@ pub async fn execute_approved_tools(
                             result: err_msg.clone(),
                             is_error: true,
                             duration_ms: Some(tool_duration.as_millis() as u64),
+                            is_completion: false,
+                            metadata: None,
                         };
                         let block = ContentBlock::ToolResult {
                             tool_use_id: id,
                             content: err_msg,
                             is_error: true,
+                            is_completion: false,
+                            metadata: None,
                         };
                         (block, event)
                     }
@@ -126,84 +134,4 @@ pub async fn execute_approved_tools(
     }
 
     collect_results(&mut join_set, &approved, tool_uses, frontend, cancel).await
-}
-
-/// Collect results from JoinSet, racing against cancellation.
-async fn collect_results(
-    join_set: &mut tokio::task::JoinSet<(usize, ContentBlock)>,
-    approved: &[(String, String, serde_json::Value)],
-    tool_uses: &[(String, String, serde_json::Value)],
-    frontend: &Arc<dyn AgentFrontend>,
-    cancel: &TurnCancel,
-) -> Vec<(usize, ContentBlock)> {
-    let mut results = Vec::new();
-    let mut collected_ids: HashSet<String> = HashSet::new();
-
-    loop {
-        if cancel.is_cancelled() {
-            info!("cancelled before collecting, aborting remaining tools");
-            join_set.abort_all();
-            break;
-        }
-        tokio::select! {
-            biased;
-            join_result = join_set.join_next() => {
-                let Some(join_result) = join_result else { break; };
-                match join_result {
-                    Ok((idx, block)) => {
-                        if let ContentBlock::ToolResult { ref tool_use_id, .. } = block {
-                            collected_ids.insert(tool_use_id.clone());
-                        }
-                        results.push((idx, block));
-                    }
-                    Err(e) if e.is_cancelled() => {}
-                    Err(e) => error!(error = %e, "tool task panicked"),
-                }
-            }
-            _ = cancel.cancelled() => {
-                info!("cancelled during tool execution, aborting remaining tools");
-                join_set.abort_all();
-                while let Some(join_result) = join_set.join_next().await {
-                    if let Ok((idx, block)) = join_result {
-                        if let ContentBlock::ToolResult { ref tool_use_id, .. } = block {
-                            collected_ids.insert(tool_use_id.clone());
-                        }
-                        results.push((idx, block));
-                    }
-                }
-                break;
-            }
-        }
-    }
-
-    // Synthesise "Interrupted by user" for tools that were not collected
-    let emitter = frontend.event_emitter();
-    for (id, name, _) in approved {
-        if collected_ids.contains(id) {
-            continue;
-        }
-        let orig_idx = tool_uses
-            .iter()
-            .position(|(tid, _, _)| tid == id)
-            .unwrap_or(0);
-        let _ = emitter
-            .emit(AgentEventPayload::ToolResult {
-                id: id.clone(),
-                name: name.clone(),
-                result: "Interrupted by user".into(),
-                is_error: true,
-                duration_ms: None,
-            })
-            .await;
-        results.push((
-            orig_idx,
-            ContentBlock::ToolResult {
-                tool_use_id: id.clone(),
-                content: "Interrupted by user".into(),
-                is_error: true,
-            },
-        ));
-    }
-
-    results
 }

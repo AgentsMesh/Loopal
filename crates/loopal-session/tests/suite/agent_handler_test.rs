@@ -62,6 +62,8 @@ fn test_tool_result_keeps_running() {
                 result: "ok".into(),
                 is_error: false,
                 duration_ms: None,
+                is_completion: false,
+                metadata: None,
             },
         ),
     );

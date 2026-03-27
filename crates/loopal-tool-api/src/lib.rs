@@ -15,5 +15,5 @@ pub use backend_types::{
 pub use memory_channel::MemoryChannel;
 pub use output_tail::OutputTail;
 pub use permission::{PermissionDecision, PermissionLevel, PermissionMode};
-pub use tool::{COMPLETION_PREFIX, Tool, ToolContext, ToolDefinition, ToolResult};
+pub use tool::{Tool, ToolContext, ToolDefinition, ToolResult};
 pub use truncate::{needs_truncation, truncate_output};

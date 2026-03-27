@@ -8,26 +8,21 @@ use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use tokio::sync::{mpsc, watch};
 
-use loopal_agent::router::MessageRouter;
 use loopal_protocol::{
     AgentEvent, AgentEventPayload, ControlCommand, InterruptSignal, UserQuestionResponse,
 };
 use loopal_session::SessionController;
 use loopal_tui::app::App;
-
 use loopal_tui::event::{AppEvent, EventHandler};
 use loopal_tui::run_tui_loop;
 
-/// Build a minimal TUI loop test rig: App + Terminal<TestBackend> + EventHandler.
 fn build_loop_rig() -> (
     Terminal<TestBackend>,
     App,
     EventHandler,
     mpsc::Sender<AppEvent>,
-    Arc<MessageRouter>,
-    mpsc::Receiver<AgentEvent>,
 ) {
-    let (agent_tx, agent_rx) = mpsc::channel::<AgentEvent>(256);
+    let (_agent_tx, _agent_rx) = mpsc::channel::<AgentEvent>(256);
     let (ctrl_tx, _ctrl_rx) = mpsc::channel::<ControlCommand>(16);
     let (perm_tx, _perm_rx) = mpsc::channel::<bool>(16);
     let (q_tx, _q_rx) = mpsc::channel::<UserQuestionResponse>(16);
@@ -44,7 +39,6 @@ fn build_loop_rig() -> (
         interrupt_tx,
     );
 
-    let router = Arc::new(MessageRouter::new(agent_tx));
     let backend = TestBackend::new(80, 24);
     let terminal = Terminal::new(backend).unwrap();
     let app = App::new(session_ctrl, std::env::temp_dir());
@@ -52,14 +46,13 @@ fn build_loop_rig() -> (
     let (tx, rx) = mpsc::channel::<AppEvent>(256);
     let events = EventHandler::from_channel(tx.clone(), rx);
 
-    (terminal, app, events, tx, router, agent_rx)
+    (terminal, app, events, tx)
 }
 
 #[tokio::test]
 async fn test_e2e_loop_quit_on_ctrl_d() {
-    let (mut terminal, mut app, events, tx, router, _agent_rx) = build_loop_rig();
+    let (mut terminal, mut app, events, tx) = build_loop_rig();
 
-    // Inject Ctrl+D after a short delay (Ctrl+C now clears input, Ctrl+D quits)
     tokio::spawn(async move {
         tokio::time::sleep(Duration::from_millis(50)).await;
         let key = KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL);
@@ -68,7 +61,7 @@ async fn test_e2e_loop_quit_on_ctrl_d() {
 
     let result = tokio::time::timeout(
         Duration::from_secs(3),
-        run_tui_loop(&mut terminal, events, &mut app, &router, "main"),
+        run_tui_loop(&mut terminal, events, &mut app),
     )
     .await;
 
@@ -78,9 +71,8 @@ async fn test_e2e_loop_quit_on_ctrl_d() {
 
 #[tokio::test]
 async fn test_e2e_loop_renders_agent_event() {
-    let (mut terminal, mut app, events, tx, router, _agent_rx) = build_loop_rig();
+    let (mut terminal, mut app, events, tx) = build_loop_rig();
 
-    // Inject a stream event then quit
     let tx2 = tx.clone();
     tokio::spawn(async move {
         tokio::time::sleep(Duration::from_millis(30)).await;
@@ -95,11 +87,10 @@ async fn test_e2e_loop_renders_agent_event() {
 
     let _ = tokio::time::timeout(
         Duration::from_secs(3),
-        run_tui_loop(&mut terminal, events, &mut app, &router, "main"),
+        run_tui_loop(&mut terminal, events, &mut app),
     )
     .await;
 
-    // Verify the streaming text was captured in session state
     let state = app.session.lock();
     assert!(
         state.streaming_text.contains("Agent says hi"),
@@ -110,9 +101,8 @@ async fn test_e2e_loop_renders_agent_event() {
 
 #[tokio::test]
 async fn test_e2e_loop_ctrl_d_quits() {
-    let (mut terminal, mut app, events, tx, router, _agent_rx) = build_loop_rig();
+    let (mut terminal, mut app, events, tx) = build_loop_rig();
 
-    // Inject Ctrl+D — should trigger Quit action
     tokio::spawn(async move {
         tokio::time::sleep(Duration::from_millis(30)).await;
         let key = KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL);
@@ -121,7 +111,7 @@ async fn test_e2e_loop_ctrl_d_quits() {
 
     let result = tokio::time::timeout(
         Duration::from_secs(3),
-        run_tui_loop(&mut terminal, events, &mut app, &router, "main"),
+        run_tui_loop(&mut terminal, events, &mut app),
     )
     .await;
 

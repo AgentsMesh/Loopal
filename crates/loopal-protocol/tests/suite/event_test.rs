@@ -40,6 +40,8 @@ fn test_event_tool_result_serde_roundtrip() {
         result: "file contents".into(),
         is_error: false,
         duration_ms: None,
+        is_completion: false,
+        metadata: None,
     });
     let json = serde_json::to_string(&event).unwrap();
     let deserialized: AgentEvent = serde_json::from_str(&json).unwrap();
@@ -68,6 +70,8 @@ fn test_event_tool_result_error_serde_roundtrip() {
         result: "command not found".into(),
         is_error: true,
         duration_ms: None,
+        is_completion: false,
+        metadata: None,
     });
     let json = serde_json::to_string(&event).unwrap();
     let deserialized: AgentEvent = serde_json::from_str(&json).unwrap();
@@ -193,16 +197,4 @@ fn test_event_finished_serde_roundtrip() {
     let json = serde_json::to_string(&event).unwrap();
     let deserialized: AgentEvent = serde_json::from_str(&json).unwrap();
     assert!(matches!(deserialized.payload, AgentEventPayload::Finished));
-}
-
-#[test]
-fn test_event_rewound_serde_roundtrip() {
-    let event = AgentEvent::root(AgentEventPayload::Rewound { remaining_turns: 3 });
-    let json = serde_json::to_string(&event).unwrap();
-    let deserialized: AgentEvent = serde_json::from_str(&json).unwrap();
-    if let AgentEventPayload::Rewound { remaining_turns } = deserialized.payload {
-        assert_eq!(remaining_turns, 3);
-    } else {
-        panic!("expected AgentEventPayload::Rewound");
-    }
 }

@@ -67,6 +67,7 @@ pub async fn run(
     let (question_tx, question_rx) = mpsc::channel::<UserQuestionResponse>(16);
     let router = Arc::new(MessageRouter::new(agent_event_tx.clone()));
     let (mailbox_tx, mailbox_rx) = mpsc::channel::<Envelope>(16);
+    let mailbox_tx_for_primary = mailbox_tx.clone();
     router
         .register("main", mailbox_tx)
         .await
@@ -128,15 +129,16 @@ pub async fn run(
         &config.memory,
     );
 
-    let session_ctrl = SessionController::new(
-        model.clone(),
-        mode_str,
+    let primary = loopal_session::connection_manager::PrimaryConn {
         control_tx,
         permission_tx,
         question_tx,
-        interrupt.clone(),
-        interrupt_tx.clone(),
-    );
+        mailbox_tx: Some(mailbox_tx_for_primary),
+        interrupt: interrupt.clone(),
+        interrupt_tx: interrupt_tx.clone(),
+    };
+    let manager = loopal_session::AgentConnectionManager::new(agent_event_tx.clone());
+    let session_ctrl = SessionController::with_primary(model.clone(), mode_str, primary, manager);
     if cli.resume.is_some() {
         session_ctrl.load_display_history(project_messages(&messages));
     } else {
@@ -190,14 +192,7 @@ pub async fn run(
         }
     });
 
-    loopal_tui::run_tui(
-        session_ctrl,
-        router,
-        "main".to_string(),
-        cwd,
-        agent_event_rx,
-    )
-    .await?;
+    loopal_tui::run_tui(session_ctrl, cwd, agent_event_rx).await?;
     tracing::info!("shutting down");
     Ok(())
 }

@@ -82,6 +82,7 @@ pub(crate) fn apply_agent_event(state: &mut SessionState, name: &str, payload: A
             agent.observable.status = AgentStatus::Running;
         }
         AgentEventPayload::RetryCleared => {}
+        AgentEventPayload::SubAgentSpawned { .. } => {}
     }
 }
 

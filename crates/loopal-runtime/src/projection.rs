@@ -11,7 +11,6 @@ use std::collections::HashMap;
 
 use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_session::types::{DisplayMessage, DisplayToolCall, ToolCallStatus};
-use loopal_tool_api::COMPLETION_PREFIX;
 
 /// Project a slice of Messages into DisplayMessages suitable for TUI rendering.
 pub fn project_messages(messages: &[Message]) -> Vec<DisplayMessage> {
@@ -41,6 +40,7 @@ pub fn project_messages(messages: &[Message]) -> Vec<DisplayMessage> {
                         started_at: None,
                         duration_ms: None,
                         progress_tail: None,
+                        metadata: None,
                     });
                     tool_index.insert(id.clone(), (display.len(), tc_idx, name.clone()));
                 }
@@ -48,8 +48,17 @@ pub fn project_messages(messages: &[Message]) -> Vec<DisplayMessage> {
                     tool_use_id,
                     content,
                     is_error,
+                    is_completion,
+                    ..
                 } => {
-                    back_patch(&mut display, &tool_index, tool_use_id, content, *is_error);
+                    back_patch(
+                        &mut display,
+                        &tool_index,
+                        tool_use_id,
+                        content,
+                        *is_error,
+                        *is_completion,
+                    );
                 }
                 ContentBlock::Image { .. } => {
                     content_parts.push("[image]".to_string());
@@ -68,6 +77,7 @@ pub fn project_messages(messages: &[Message]) -> Vec<DisplayMessage> {
                         started_at: None,
                         duration_ms: None,
                         progress_tail: None,
+                        metadata: None,
                     });
                 }
                 ContentBlock::ServerToolResult {
@@ -109,11 +119,11 @@ fn back_patch(
     tool_use_id: &str,
     result: &str,
     is_error: bool,
+    is_completion: bool,
 ) {
-    let Some(&(di, ti, ref name)) = index.get(tool_use_id) else {
+    let Some(&(di, ti, ref _name)) = index.get(tool_use_id) else {
         return;
     };
-    let is_completion = name == "AttemptCompletion" && !is_error;
     if let Some(msg) = display.get_mut(di)
         && let Some(tc) = msg.tool_calls.get_mut(ti)
     {
@@ -128,10 +138,9 @@ fn back_patch(
     }
     // Promote AttemptCompletion to an assistant message
     if is_completion {
-        let content = result.strip_prefix(COMPLETION_PREFIX).unwrap_or(result);
         display.push(DisplayMessage {
             role: "assistant".to_string(),
-            content: content.to_string(),
+            content: result.to_string(),
             tool_calls: Vec::new(),
             image_count: 0,
         });

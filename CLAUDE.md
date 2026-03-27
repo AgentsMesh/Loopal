@@ -39,12 +39,26 @@ src/main.rs (bootstrap + CLI)
 
 ### Key data flow
 
-Three async channels connect TUI ↔ runtime:
-- `AgentEvent` (256-cap): runtime → TUI (stream text, tool calls, token usage, etc.)
-- `UserCommand` (16-cap): TUI → runtime (messages, mode switch, clear, model switch)
-- `bool` (16-cap): TUI → runtime (permission approve/deny for tool execution)
+**Multi-process architecture (default):**
 
-The TUI has an **Inbox queue** (`VecDeque<String>`) that buffers user messages when the agent is busy. Messages auto-forward when the agent becomes idle (`AwaitingInput` event).
+```
+TUI Process ──stdio IPC──→ Agent Server Process ←──TCP──→ IDE / CLI
+                                    │
+                              Agent Loop + Kernel
+```
+
+- TUI connects to Agent Server via stdio IPC (`loopal-agent-client`)
+- Agent Server also opens a TCP listener for external clients (IDE, CLI)
+- External clients discover the TCP port via `{tmp}/loopal/run/<pid>.json`
+- Multiple clients can join the same session (`agent/join`) or create independent sessions
+- ACP (`--acp` mode) bridges IDE's `session/*` protocol to Agent Server's `agent/*` IPC protocol
+
+**IPC protocol methods** (`agent/*` over JSON-RPC 2.0):
+- Lifecycle: `initialize`, `agent/start`, `agent/shutdown`
+- Data: `agent/message` (Envelope), `agent/control` (ControlCommand)
+- Events: `agent/event` (notification), `agent/interrupt` (notification)
+- Interactive: `agent/permission` (request/response), `agent/question` (request/response)
+- Multi-client: `agent/join` (join existing session), `agent/list` (list sessions)
 
 ### Agent loop cycle (runtime)
 

@@ -1,8 +1,5 @@
 //! Helper functions extracted from the TUI main loop.
 
-use std::sync::Arc;
-
-use loopal_agent::router::MessageRouter;
 use loopal_protocol::{Envelope, MessageSource, UserContent};
 
 use crate::app::App;
@@ -25,11 +22,16 @@ pub async fn handle_question_confirm(app: &mut App) {
     }
 }
 
-/// Route a human message through the data plane.
-pub async fn route_human_message(router: &Arc<MessageRouter>, target: &str, content: UserContent) {
-    let envelope = Envelope::new(MessageSource::Human, target, content);
-    if let Err(e) = router.route(envelope).await {
-        tracing::warn!(error = %e, "failed to route human message — agent may have exited");
+/// Route a human message to the primary agent via mailbox_tx.
+pub async fn route_human_message(app: &App, content: UserContent) {
+    let primary = app.session.primary();
+    if let Some(ref tx) = primary.mailbox_tx {
+        let envelope = Envelope::new(MessageSource::Human, "main", content);
+        if let Err(e) = tx.send(envelope).await {
+            tracing::warn!(error = %e, "failed to route human message");
+        }
+    } else {
+        tracing::warn!("no mailbox_tx configured — message dropped");
     }
 }
 

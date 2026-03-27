@@ -36,6 +36,7 @@ impl AnthropicProvider {
                             tool_use_id,
                             content,
                             is_error,
+                            ..
                         } => json!({
                             "type": "tool_result",
                             "tool_use_id": tool_use_id,

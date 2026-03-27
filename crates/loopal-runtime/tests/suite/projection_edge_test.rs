@@ -1,7 +1,6 @@
 use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_runtime::projection::project_messages;
 use loopal_session::ToolCallStatus;
-use loopal_tool_api::COMPLETION_PREFIX;
 
 #[test]
 fn project_attempt_completion_promoted_to_assistant_message() {
@@ -14,14 +13,15 @@ fn project_attempt_completion_promoted_to_assistant_message() {
             input: serde_json::json!({"result": "All done"}),
         }],
     };
-    let completion_content = format!("{COMPLETION_PREFIX}All done");
     let user_msg = Message {
         id: None,
         role: MessageRole::User,
         content: vec![ContentBlock::ToolResult {
             tool_use_id: "tc-comp".into(),
-            content: completion_content,
+            content: "All done".into(),
             is_error: false,
+            is_completion: true,
+            metadata: None,
         }],
     };
     let display = project_messages(&[assistant_msg, user_msg]);
@@ -57,6 +57,8 @@ fn project_attempt_completion_error_not_promoted() {
             tool_use_id: "tc-fail".into(),
             content: "completion failed".into(),
             is_error: true,
+            is_completion: false,
+            metadata: None,
         }],
     };
     let display = project_messages(&[assistant_msg, user_msg]);
@@ -64,4 +66,44 @@ fn project_attempt_completion_error_not_promoted() {
     assert_eq!(display.len(), 1);
     assert_eq!(display[0].tool_calls[0].status, ToolCallStatus::Error);
     assert!(display[0].tool_calls[0].result.is_some());
+}
+
+#[test]
+fn project_multiple_images_count() {
+    let msg = Message {
+        id: None,
+        role: MessageRole::User,
+        content: vec![
+            ContentBlock::Text {
+                text: "check these".into(),
+            },
+            ContentBlock::Image {
+                source: loopal_message::ImageSource {
+                    source_type: "base64".into(),
+                    media_type: "image/png".into(),
+                    data: "img1".into(),
+                },
+            },
+            ContentBlock::Image {
+                source: loopal_message::ImageSource {
+                    source_type: "base64".into(),
+                    media_type: "image/jpeg".into(),
+                    data: "img2".into(),
+                },
+            },
+            ContentBlock::Image {
+                source: loopal_message::ImageSource {
+                    source_type: "base64".into(),
+                    media_type: "image/png".into(),
+                    data: "img3".into(),
+                },
+            },
+        ],
+    };
+    let display = project_messages(&[msg]);
+    assert_eq!(display.len(), 1);
+    assert_eq!(display[0].image_count, 3);
+    // Text content should include "[image]" placeholders
+    assert!(display[0].content.contains("check these"));
+    assert_eq!(display[0].content.matches("[image]").count(), 3);
 }

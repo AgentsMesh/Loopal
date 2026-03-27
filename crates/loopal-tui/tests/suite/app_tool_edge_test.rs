@@ -33,6 +33,8 @@ fn test_handle_tool_result_no_matching_pending() {
             result: "orphan result".to_string(),
             is_error: false,
             duration_ms: None,
+            is_completion: false,
+            metadata: None,
         }));
     // Should not crash
 }
@@ -78,6 +80,8 @@ fn test_tool_result_error_updates_matching_tool() {
             result: "failed!".to_string(),
             is_error: true,
             duration_ms: None,
+            is_completion: false,
+            metadata: None,
         }));
 
     let state = app.session.lock();
@@ -108,6 +112,8 @@ fn test_tool_result_not_found_when_different_name() {
             result: "done".to_string(),
             is_error: false,
             duration_ms: None,
+            is_completion: false,
+            metadata: None,
         }));
 
     // Now matches by id (not name), so the tool call IS updated
@@ -136,6 +142,7 @@ fn test_tool_result_with_multibyte_utf8_no_panic() {
                 started_at: None,
                 duration_ms: None,
                 progress_tail: None,
+                metadata: None,
             }],
             image_count: 0,
         });
@@ -149,6 +156,8 @@ fn test_tool_result_with_multibyte_utf8_no_panic() {
             result: chinese_text.to_string(),
             is_error: false,
             duration_ms: None,
+            is_completion: false,
+            metadata: None,
         }));
 
     let state = app.session.lock();

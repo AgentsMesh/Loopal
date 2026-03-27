@@ -8,19 +8,17 @@ use loopal_protocol::{
     AgentEvent, AgentMode, ControlCommand, InterruptSignal, UserContent, UserQuestionResponse,
 };
 
-use crate::connection_manager::{AgentConnectionManager, PrimaryConn};
 use crate::event_handler;
-use crate::helpers::{push_system_msg, thinking_label_from_json};
 use crate::inbox::try_forward_inbox;
 use crate::state::SessionState;
-use crate::types::DisplayMessage;
+use loopal_agent_hub::{AgentHub, PrimaryConn};
 
 /// External handle — cheaply cloneable, shareable across consumers.
 #[derive(Clone)]
 pub struct SessionController {
     state: Arc<Mutex<SessionState>>,
     primary: Arc<PrimaryConn>,
-    connections: Arc<tokio::sync::Mutex<AgentConnectionManager>>,
+    connections: Arc<tokio::sync::Mutex<AgentHub>>,
 }
 
 impl SessionController {
@@ -45,21 +43,21 @@ impl SessionController {
         Self {
             state: Arc::new(Mutex::new(SessionState::new(model, mode))),
             primary: Arc::new(primary),
-            connections: Arc::new(tokio::sync::Mutex::new(AgentConnectionManager::noop())),
+            connections: Arc::new(tokio::sync::Mutex::new(AgentHub::noop())),
         }
     }
 
-    /// Create with structured primary connection + connection manager.
+    /// Create with structured primary connection + agent hub.
     pub fn with_primary(
         model: String,
         mode: String,
         primary: PrimaryConn,
-        connections: AgentConnectionManager,
+        hub: Arc<tokio::sync::Mutex<AgentHub>>,
     ) -> Self {
         Self {
             state: Arc::new(Mutex::new(SessionState::new(model, mode))),
             primary: Arc::new(primary),
-            connections: Arc::new(tokio::sync::Mutex::new(connections)),
+            connections: hub,
         }
     }
 
@@ -69,11 +67,11 @@ impl SessionController {
         self.state.lock().expect("session state lock poisoned")
     }
 
-    pub fn connections(&self) -> &Arc<tokio::sync::Mutex<AgentConnectionManager>> {
+    pub(crate) fn connections(&self) -> &Arc<tokio::sync::Mutex<AgentHub>> {
         &self.connections
     }
 
-    pub fn primary(&self) -> &PrimaryConn {
+    pub(crate) fn primary(&self) -> &PrimaryConn {
         &self.primary
     }
 
@@ -138,7 +136,7 @@ impl SessionController {
         {
             let mut s = self.lock();
             s.model = model.clone();
-            push_system_msg(&mut s, &format!("Switched model to: {model}"));
+            crate::helpers::push_system_msg(&mut s, &format!("Switched model to: {model}"));
         }
         let _ = self
             .primary
@@ -148,11 +146,11 @@ impl SessionController {
     }
 
     pub async fn switch_thinking(&self, config_json: String) {
-        let label = thinking_label_from_json(&config_json);
+        let label = crate::helpers::thinking_label_from_json(&config_json);
         {
             let mut s = self.lock();
             s.thinking_config = label.clone();
-            push_system_msg(&mut s, &format!("Switched thinking to: {label}"));
+            crate::helpers::push_system_msg(&mut s, &format!("Switched thinking to: {label}"));
         }
         let _ = self
             .primary
@@ -188,27 +186,6 @@ impl SessionController {
             .control_tx
             .send(ControlCommand::Rewind { turn_index })
             .await;
-    }
-
-    pub fn pop_inbox_to_edit(&self) -> Option<UserContent> {
-        self.lock().inbox.pop_back()
-    }
-
-    pub fn push_system_message(&self, content: String) {
-        push_system_msg(&mut self.lock(), &content);
-    }
-
-    pub fn push_welcome(&self, model: &str, path: &str) {
-        self.lock().messages.push(DisplayMessage {
-            role: "welcome".into(),
-            content: format!("{model}\n{path}"),
-            tool_calls: Vec::new(),
-            image_count: 0,
-        });
-    }
-
-    pub fn load_display_history(&self, display_msgs: Vec<DisplayMessage>) {
-        self.lock().messages = display_msgs;
     }
 
     // === Event handling ===

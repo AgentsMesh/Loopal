@@ -1,6 +1,5 @@
 mod agent_handler;
-pub mod connection_manager;
-mod connection_ops;
+mod agent_ops;
 pub mod controller;
 pub mod event_handler;
 mod helpers;
@@ -9,13 +8,13 @@ pub mod message_log;
 pub mod rewind;
 mod server_tool_display;
 pub use server_tool_display::format_server_tool_content;
+mod session_display;
 pub mod state;
 pub mod thinking_display;
 mod tool_result_handler;
 pub(crate) mod truncate;
 pub mod types;
 
-pub use connection_manager::AgentConnectionManager;
 pub use controller::SessionController;
 pub use types::{
     DisplayMessage, DisplayToolCall, PendingPermission, PendingQuestion, ToolCallStatus,

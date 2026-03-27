@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use ratatui::prelude::*;
 
-use loopal_protocol::{AgentEvent, AgentEventPayload};
+use loopal_protocol::AgentEvent;
 use loopal_session::SessionController;
 use tokio::sync::mpsc;
 
@@ -64,25 +64,6 @@ where
                     }
                 }
                 AppEvent::Agent(agent_event) => {
-                    // Auto-attach to newly spawned sub-agents via TCP
-                    if let AgentEventPayload::SubAgentSpawned {
-                        ref name,
-                        pid,
-                        port,
-                        ref token,
-                    } = agent_event.payload
-                    {
-                        let conns = app.session.connections().clone();
-                        let name = name.clone();
-                        let token = token.clone();
-                        tokio::spawn(async move {
-                            conns
-                                .lock()
-                                .await
-                                .on_sub_agent_spawned(&name, pid, port, &token)
-                                .await;
-                        });
-                    }
                     if let Some(content) = app.session.handle_event(agent_event) {
                         route_human_message(app, content).await;
                     }

@@ -40,6 +40,7 @@ members = [
     "crates/loopal-runtime",
     "crates/loopal-sandbox",
     "crates/loopal-agent",
+    "crates/loopal-agent-hub",
     "crates/loopal-session",
     "crates/loopal-tui",
     "crates/loopal-acp",
@@ -153,6 +154,7 @@ loopal-kernel = { path = "crates/loopal-kernel" }
 loopal-runtime = { path = "crates/loopal-runtime" }
 loopal-sandbox = { path = "crates/loopal-sandbox" }
 loopal-agent = { path = "crates/loopal-agent" }
+loopal-agent-hub = { path = "crates/loopal-agent-hub" }
 loopal-session = { path = "crates/loopal-session" }
 loopal-tui = { path = "crates/loopal-tui" }
 loopal-acp = { path = "crates/loopal-acp" }
@@ -180,6 +182,7 @@ loopal-tool-api = { workspace = true }
 loopal-config = { workspace = true }
 loopal-runtime = { workspace = true }
 loopal-session = { workspace = true }
+loopal-agent-hub = { workspace = true }
 loopal-tui = { workspace = true }
 loopal-acp = { workspace = true }
 loopal-agent-server = { workspace = true }

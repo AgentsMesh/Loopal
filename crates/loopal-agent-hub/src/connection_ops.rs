@@ -1,6 +1,7 @@
-//! Attach/detach/reattach operations for AgentConnectionManager.
+//! Attach/detach/reattach operations for AgentHub.
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use loopal_ipc::TcpTransport;
 use loopal_ipc::connection::{Connection, Incoming};
@@ -9,22 +10,33 @@ use loopal_ipc::transport::Transport;
 use loopal_protocol::AgentEvent;
 use tracing::info;
 
-use crate::connection_manager::{
-    AgentConnectionManager, AgentConnectionState, AttachedConn, ManagedAgent,
-};
+use crate::hub::AgentHub;
+use crate::types::{AgentConnectionState, AttachedConn, ManagedAgent};
 
-impl AgentConnectionManager {
+const ATTACH_TIMEOUT: Duration = Duration::from_secs(5);
+
+impl AgentHub {
     /// Attach to a sub-agent via TCP. Spawns a background task that reads
     /// events from the sub-agent and feeds them into the shared event_tx.
+    ///
+    /// If an agent with the same name is already attached, it is detached
+    /// first to avoid orphaned event reader tasks.
     pub async fn attach(&mut self, name: &str, port: u16, token: &str) -> anyhow::Result<()> {
-        let stream = tokio::net::TcpStream::connect(format!("127.0.0.1:{port}"))
-            .await
-            .map_err(|e| anyhow::anyhow!("TCP connect to sub-agent {name}: {e}"))?;
+        // Clean up existing connection for this name (race protection).
+        self.detach(name);
+
+        let stream = tokio::time::timeout(
+            ATTACH_TIMEOUT,
+            tokio::net::TcpStream::connect(format!("127.0.0.1:{port}")),
+        )
+        .await
+        .map_err(|_| anyhow::anyhow!("TCP connect to sub-agent {name}: timeout"))?
+        .map_err(|e| anyhow::anyhow!("TCP connect to sub-agent {name}: {e}"))?;
+
         let transport: Arc<dyn Transport> = Arc::new(TcpTransport::new(stream));
         let conn = Arc::new(Connection::new(transport));
         let mut rx = conn.start();
 
-        // Initialize with token
         conn.send_request(
             "initialize",
             serde_json::json!({"protocol_version": 1, "token": token}),
@@ -32,18 +44,13 @@ impl AgentConnectionManager {
         .await
         .map_err(|e| anyhow::anyhow!("initialize sub-agent {name}: {e}"))?;
 
-        // Join the active session to receive event broadcasts
         let join_result = conn
-            .send_request(
-                loopal_ipc::protocol::methods::AGENT_JOIN.name,
-                serde_json::json!({}),
-            )
+            .send_request(methods::AGENT_JOIN.name, serde_json::json!({}))
             .await;
         if let Err(e) = join_result {
-            tracing::warn!(agent = name, error = %e, "agent/join failed, events may not flow");
+            tracing::warn!(agent = name, error = %e, "agent/join failed");
         }
 
-        // Spawn event reader task
         let event_tx = self.event_tx.clone();
         let agent_name = name.to_string();
         let event_task = tokio::spawn(async move {
@@ -65,7 +72,7 @@ impl AgentConnectionManager {
         Ok(())
     }
 
-    /// Detach from a sub-agent. Keeps port/token for re-attach. Agent keeps running.
+    /// Detach from a sub-agent. Keeps port/token for re-attach.
     pub fn detach(&mut self, name: &str) {
         if let Some(agent) = self.agents.get_mut(name) {
             if let AgentConnectionState::Attached(conn) = &agent.state {
@@ -78,6 +85,16 @@ impl AgentConnectionManager {
         }
     }
 
+    /// Detach all sub-agents and abort their event reader tasks.
+    /// Primary connections are intentionally skipped — they are managed
+    /// by the bootstrap/process lifecycle, not the hub event loop.
+    pub fn detach_all(&mut self) {
+        let names: Vec<String> = self.agents.keys().cloned().collect();
+        for name in names {
+            self.detach(&name);
+        }
+    }
+
     /// Re-attach to a previously detached sub-agent.
     pub async fn reattach(&mut self, name: &str) -> anyhow::Result<()> {
         let (port, token) = match self.agents.get(name) {
@@ -87,13 +104,6 @@ impl AgentConnectionManager {
             _ => anyhow::bail!("agent {name} is not detached"),
         };
         self.attach(name, port, &token).await
-    }
-
-    /// Handle SubAgentSpawned event — auto-attach to the new sub-agent.
-    pub async fn on_sub_agent_spawned(&mut self, name: &str, _pid: u32, port: u16, token: &str) {
-        if let Err(e) = self.attach(name, port, token).await {
-            tracing::warn!(agent = name, error = %e, "failed to auto-attach");
-        }
     }
 
     /// Send interrupt to a specific agent.
@@ -115,7 +125,7 @@ impl AgentConnectionManager {
         }
     }
 
-    /// Check if an agent is in a given state.
+    /// Check if an agent is attached.
     pub fn is_attached(&self, name: &str) -> bool {
         self.agents
             .get(name)
@@ -138,7 +148,7 @@ impl AgentConnectionManager {
     }
 }
 
-/// Background task: read agent/event notifications and forward to TUI.
+/// Background task: read agent/event notifications and forward to hub.
 async fn read_agent_events(
     rx: &mut tokio::sync::mpsc::Receiver<Incoming>,
     event_tx: &tokio::sync::mpsc::Sender<AgentEvent>,
@@ -148,7 +158,6 @@ async fn read_agent_events(
         if let Incoming::Notification { method, params } = msg {
             if method == methods::AGENT_EVENT.name {
                 if let Ok(mut event) = serde_json::from_value::<AgentEvent>(params) {
-                    // Ensure agent_name is set for proper TUI routing
                     if event.agent_name.is_none() {
                         event.agent_name = Some(agent_name.to_string());
                     }

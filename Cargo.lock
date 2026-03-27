@@ -1677,6 +1677,7 @@ dependencies = [
  "dirs",
  "loopal-acp",
  "loopal-agent-client",
+ "loopal-agent-hub",
  "loopal-agent-server",
  "loopal-config",
  "loopal-git",
@@ -1763,6 +1764,18 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "loopal-agent-hub"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "loopal-ipc",
+ "loopal-protocol",
+ "serde_json",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -2074,7 +2087,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "indexmap",
- "loopal-ipc",
+ "loopal-agent-hub",
  "loopal-protocol",
  "loopal-tool-api",
  "serde_json",

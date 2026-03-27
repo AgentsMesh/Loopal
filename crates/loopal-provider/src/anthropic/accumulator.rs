@@ -29,4 +29,13 @@ pub(crate) struct ServerToolAccumulator {
     pub(crate) result_content: Option<serde_json::Value>,
     /// The original block type string, e.g. "web_search_tool_result".
     pub(crate) result_block_type: Option<String>,
+    /// Accumulates `input_json_delta` fragments for server tools (e.g. code_execution).
+    pub(crate) json_fragments: String,
+}
+
+impl ServerToolAccumulator {
+    /// Whether a server tool use block is actively being streamed (not a result block).
+    pub(crate) fn is_tool_use_active(&self) -> bool {
+        self.current.is_some() && !self.is_result
+    }
 }

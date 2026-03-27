@@ -1,4 +1,6 @@
 // Single test binary — includes all test modules
+#[path = "suite/stream_helpers.rs"]
+mod stream_helpers;
 #[path = "suite/anthropic_request_test.rs"]
 mod anthropic_request_test;
 #[path = "suite/anthropic_stream_edge_test.rs"]

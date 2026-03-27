@@ -1,20 +1,19 @@
 [package]
-name = "loopal-session"
+name = "loopal-agent-hub"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [lib]
 doctest = false
-test = false
 
 [dependencies]
-loopal-agent-hub = { workspace = true }
+loopal-ipc = { workspace = true }
 loopal-protocol = { workspace = true }
-loopal-tool-api = { workspace = true }
 anyhow = { workspace = true }
-indexmap = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
-chrono = { workspace = true }
 tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

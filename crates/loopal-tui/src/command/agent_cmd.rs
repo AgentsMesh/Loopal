@@ -18,8 +18,7 @@ impl CommandHandler for AgentsCmd {
     }
 
     async fn execute(&self, app: &mut App, _arg: Option<&str>) -> CommandEffect {
-        let conns = app.session.connections().lock().await;
-        let agents = conns.list_agents();
+        let agents = app.session.list_agents().await;
         if agents.is_empty() {
             app.session.push_system_message("No sub-agents".into());
         } else {
@@ -49,7 +48,7 @@ impl CommandHandler for DetachCmd {
     async fn execute(&self, app: &mut App, _arg: Option<&str>) -> CommandEffect {
         let focused = app.session.lock().focused_agent.clone();
         if let Some(name) = focused {
-            app.session.connections().lock().await.detach(&name);
+            app.session.detach_agent(&name).await;
             app.session
                 .push_system_message(format!("Detached from {name}"));
         } else {
@@ -84,8 +83,7 @@ impl CommandHandler for AttachCmd {
                 return CommandEffect::Done;
             }
         };
-        let mut conns = app.session.connections().lock().await;
-        match conns.reattach(&name).await {
+        match app.session.reattach_agent(&name).await {
             Ok(()) => {
                 app.session
                     .push_system_message(format!("Re-attached to {name}"));

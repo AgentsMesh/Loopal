@@ -191,8 +191,8 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
         } => {
             crate::server_tool_display::handle_server_tool_result(state, &tool_use_id, &content);
         }
-        // SubAgentSpawned is handled by the TUI event loop for auto-attach,
-        // not by SessionState. We just ignore it here.
+        // SubAgentSpawned is handled by AgentHub's event_router for auto-attach.
+        // SessionState ignores it.
         AgentEventPayload::SubAgentSpawned { .. } => {}
     }
     None

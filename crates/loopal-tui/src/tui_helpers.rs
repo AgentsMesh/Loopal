@@ -1,6 +1,6 @@
 //! Helper functions extracted from the TUI main loop.
 
-use loopal_protocol::{Envelope, MessageSource, UserContent};
+use loopal_protocol::UserContent;
 
 use crate::app::App;
 
@@ -22,17 +22,9 @@ pub async fn handle_question_confirm(app: &mut App) {
     }
 }
 
-/// Route a human message to the primary agent via mailbox_tx.
+/// Route a human message to the primary agent via SessionController.
 pub async fn route_human_message(app: &App, content: UserContent) {
-    let primary = app.session.primary();
-    if let Some(ref tx) = primary.mailbox_tx {
-        let envelope = Envelope::new(MessageSource::Human, "main", content);
-        if let Err(e) = tx.send(envelope).await {
-            tracing::warn!(error = %e, "failed to route human message");
-        }
-    } else {
-        tracing::warn!("no mailbox_tx configured — message dropped");
-    }
+    app.session.route_message(content).await;
 }
 
 /// Cycle focused_agent to the next agent in the agents map.

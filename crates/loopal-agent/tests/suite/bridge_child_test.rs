@@ -165,7 +165,15 @@ async fn bridge_cancel_sends_shutdown() {
     let client = AgentClient::new(client_t);
     client.initialize().await.unwrap();
     client
-        .start_agent(fixture.path(), None, None, Some("slow task"), None, false, None)
+        .start_agent(
+            fixture.path(),
+            None,
+            None,
+            Some("slow task"),
+            None,
+            false,
+            None,
+        )
         .await
         .unwrap();
 

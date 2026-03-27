@@ -60,5 +60,7 @@ pub fn hub_frontend_for_test(
 /// Test-only: re-export internal types for integration tests.
 #[doc(hidden)]
 pub mod testing {
+    pub use crate::agent_setup::build_with_frontend;
+    pub use crate::params::{StartParams, build_kernel_with_provider};
     pub use crate::session_hub::{InputFromClient, SharedSession};
 }

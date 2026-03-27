@@ -59,17 +59,14 @@ impl AcpAdapter {
             match msg {
                 Incoming::Notification { method, params } => {
                     if method == methods::AGENT_EVENT.name {
-                        if let Some(reason) =
-                            self.handle_agent_event(params, session_id).await
-                        {
+                        if let Some(reason) = self.handle_agent_event(params, session_id).await {
                             return reason;
                         }
                     }
                 }
                 Incoming::Request { id, method, params } => {
                     if method == methods::AGENT_PERMISSION.name {
-                        self.handle_permission_request(id, params, session_id)
-                            .await;
+                        self.handle_permission_request(id, params, session_id).await;
                     } else if method == methods::AGENT_QUESTION.name {
                         self.handle_question_request(id, params).await;
                     } else {
@@ -89,11 +86,7 @@ impl AcpAdapter {
 
     /// Handle an agent/event notification. Returns Some(StopReason) if the
     /// event indicates the prompt is complete.
-    async fn handle_agent_event(
-        &self,
-        params: Value,
-        session_id: &str,
-    ) -> Option<StopReason> {
+    async fn handle_agent_event(&self, params: Value, session_id: &str) -> Option<StopReason> {
         let event: AgentEvent = match serde_json::from_value(params) {
             Ok(e) => e,
             Err(_) => return None,
@@ -115,12 +108,7 @@ impl AcpAdapter {
     }
 
     /// Forward agent/permission request to IDE as session/requestPermission.
-    async fn handle_permission_request(
-        &self,
-        request_id: i64,
-        params: Value,
-        session_id: &str,
-    ) {
+    async fn handle_permission_request(&self, request_id: i64, params: Value, session_id: &str) {
         let acp_params = RequestPermissionParams {
             session_id: session_id.to_string(),
             tool_call_id: params["tool_call_id"].as_str().unwrap_or("").into(),
@@ -135,11 +123,9 @@ impl AcpAdapter {
             )
             .await
         {
-            Ok(value) => {
-                serde_json::from_value::<RequestPermissionResult>(value)
-                    .ok()
-                    .is_some_and(|r| matches!(r.outcome, PermissionOutcome::Allow))
-            }
+            Ok(value) => serde_json::from_value::<RequestPermissionResult>(value)
+                .ok()
+                .is_some_and(|r| matches!(r.outcome, PermissionOutcome::Allow)),
             Err(_) => false,
         };
         let _ = self

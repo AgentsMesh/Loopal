@@ -4,14 +4,14 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use loopal_ipc::StdioTransport;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
-use loopal_ipc::StdioTransport;
 use loopal_protocol::{AgentEvent, AgentEventPayload, Envelope, MessageSource};
+use loopal_test_support::TestFixture;
 use loopal_test_support::chunks;
 use loopal_test_support::mock_provider::MultiCallProvider;
-use loopal_test_support::TestFixture;
 
 const T: Duration = Duration::from_secs(10);
 
@@ -52,9 +52,7 @@ async fn drain_until_terminal(rx: &mut tokio::sync::mpsc::Receiver<Incoming>) {
 }
 
 /// Collect agent/event notifications until terminal, return payloads.
-async fn collect_events(
-    rx: &mut tokio::sync::mpsc::Receiver<Incoming>,
-) -> Vec<AgentEventPayload> {
+async fn collect_events(rx: &mut tokio::sync::mpsc::Receiver<Incoming>) -> Vec<AgentEventPayload> {
     let mut events = Vec::new();
     let deadline = tokio::time::Instant::now() + T;
     while tokio::time::Instant::now() < deadline {
@@ -83,10 +81,7 @@ async fn collect_events(
 pub(crate) async fn init_client(conn: &Connection) {
     tokio::time::timeout(
         T,
-        conn.send_request(
-            "initialize",
-            serde_json::json!({"protocol_version": 1}),
-        ),
+        conn.send_request("initialize", serde_json::json!({"protocol_version": 1})),
     )
     .await
     .unwrap()

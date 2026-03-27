@@ -2,10 +2,10 @@
 
 use std::sync::Arc;
 
+use loopal_ipc::TcpTransport;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
-use loopal_ipc::TcpTransport;
 use loopal_protocol::AgentEvent;
 use tracing::info;
 
@@ -16,12 +16,7 @@ use crate::connection_manager::{
 impl AgentConnectionManager {
     /// Attach to a sub-agent via TCP. Spawns a background task that reads
     /// events from the sub-agent and feeds them into the shared event_tx.
-    pub async fn attach(
-        &mut self,
-        name: &str,
-        port: u16,
-        token: &str,
-    ) -> anyhow::Result<()> {
+    pub async fn attach(&mut self, name: &str, port: u16, token: &str) -> anyhow::Result<()> {
         let stream = tokio::net::TcpStream::connect(format!("127.0.0.1:{port}"))
             .await
             .map_err(|e| anyhow::anyhow!("TCP connect to sub-agent {name}: {e}"))?;
@@ -95,13 +90,7 @@ impl AgentConnectionManager {
     }
 
     /// Handle SubAgentSpawned event — auto-attach to the new sub-agent.
-    pub async fn on_sub_agent_spawned(
-        &mut self,
-        name: &str,
-        _pid: u32,
-        port: u16,
-        token: &str,
-    ) {
+    pub async fn on_sub_agent_spawned(&mut self, name: &str, _pid: u32, port: u16, token: &str) {
         if let Err(e) = self.attach(name, port, token).await {
             tracing::warn!(agent = name, error = %e, "failed to auto-attach");
         }

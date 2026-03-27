@@ -41,10 +41,7 @@ pub(crate) fn build_kernel_with_provider(
 }
 
 /// Apply CLI overrides from StartParams to Settings before Kernel creation.
-pub(crate) fn apply_start_overrides(
-    settings: &mut loopal_config::Settings,
-    start: &StartParams,
-) {
+pub(crate) fn apply_start_overrides(settings: &mut loopal_config::Settings, start: &StartParams) {
     if let Some(ref model) = start.model {
         settings.model = model.clone();
     }

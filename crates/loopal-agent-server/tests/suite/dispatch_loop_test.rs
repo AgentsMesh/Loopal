@@ -12,11 +12,16 @@ use loopal_test_support::mock_provider::MultiCallProvider;
 
 async fn start_test_server_with_calls(
     calls: Vec<Vec<Result<loopal_provider_api::StreamChunk, loopal_error::LoopalError>>>,
-) -> (Arc<Connection>, tokio::sync::mpsc::Receiver<Incoming>, TestFixture) {
+) -> (
+    Arc<Connection>,
+    tokio::sync::mpsc::Receiver<Incoming>,
+    TestFixture,
+) {
     let fixture = TestFixture::new();
     let cwd = fixture.path().to_path_buf();
     let session_dir = fixture.path().join("sessions");
-    let provider = Arc::new(MultiCallProvider::new(calls)) as Arc<dyn loopal_provider_api::Provider>;
+    let provider =
+        Arc::new(MultiCallProvider::new(calls)) as Arc<dyn loopal_provider_api::Provider>;
 
     let (a_tx, a_rx) = tokio::io::duplex(8192);
     let (b_tx, b_rx) = tokio::io::duplex(8192);
@@ -45,15 +50,22 @@ async fn init_and_start(
     _rx: &mut tokio::sync::mpsc::Receiver<Incoming>,
     prompt: Option<&str>,
 ) -> String {
-    let _ = tokio::time::timeout(T, conn.send_request("initialize", serde_json::json!({"protocol_version": 1})))
-        .await.unwrap().unwrap();
+    let _ = tokio::time::timeout(
+        T,
+        conn.send_request("initialize", serde_json::json!({"protocol_version": 1})),
+    )
+    .await
+    .unwrap()
+    .unwrap();
 
     let mut params = serde_json::json!({});
     if let Some(p) = prompt {
         params["prompt"] = serde_json::Value::String(p.into());
     }
     let resp = tokio::time::timeout(T, conn.send_request(methods::AGENT_START.name, params))
-        .await.unwrap().unwrap();
+        .await
+        .unwrap()
+        .unwrap();
     resp["session_id"].as_str().unwrap().to_string()
 }
 
@@ -64,7 +76,9 @@ async fn start_only(conn: &Connection, prompt: Option<&str>) -> String {
         params["prompt"] = serde_json::Value::String(p.into());
     }
     let resp = tokio::time::timeout(T, conn.send_request(methods::AGENT_START.name, params))
-        .await.unwrap().unwrap();
+        .await
+        .unwrap()
+        .unwrap();
     resp["session_id"].as_str().unwrap().to_string()
 }
 
@@ -93,11 +107,11 @@ async fn drain_until_idle(rx: &mut tokio::sync::mpsc::Receiver<Incoming>) {
 #[tokio::test]
 async fn dispatch_loop_session_cycling() {
     use loopal_test_support::chunks;
-    let (conn, mut rx, _f) =
-        start_test_server_with_calls(vec![
-            chunks::text_turn("reply-1"),
-            chunks::text_turn("reply-2"),
-        ]).await;
+    let (conn, mut rx, _f) = start_test_server_with_calls(vec![
+        chunks::text_turn("reply-1"),
+        chunks::text_turn("reply-2"),
+    ])
+    .await;
 
     // Session 1 (non-interactive: has prompt → finishes)
     let sid1 = init_and_start(&conn, &mut rx, Some("hello")).await;
@@ -115,11 +129,11 @@ async fn dispatch_loop_session_cycling() {
 #[tokio::test]
 async fn forward_new_start_interrupts_active_session() {
     use loopal_test_support::chunks;
-    let (conn, mut rx, _f) =
-        start_test_server_with_calls(vec![
-            chunks::text_turn("first"),
-            chunks::text_turn("second"),
-        ]).await;
+    let (conn, mut rx, _f) = start_test_server_with_calls(vec![
+        chunks::text_turn("first"),
+        chunks::text_turn("second"),
+    ])
+    .await;
 
     // Start interactive session (no prompt → waits for input)
     let sid1 = init_and_start(&conn, &mut rx, None).await;

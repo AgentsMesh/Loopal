@@ -88,10 +88,7 @@ impl SessionHub {
 
     /// Remove a session when the agent loop completes.
     pub async fn remove_session(&self, id: &str) {
-        self.sessions
-            .lock()
-            .await
-            .retain(|s| s.session_id != id);
+        self.sessions.lock().await.retain(|s| s.session_id != id);
     }
 }
 

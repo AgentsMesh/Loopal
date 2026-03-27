@@ -4,8 +4,8 @@
 //! interrupts. Returns when agent completes or a new agent/start arrives.
 
 use loopal_ipc::connection::{Connection, Incoming};
-use loopal_ipc::protocol::methods;
 use loopal_ipc::jsonrpc;
+use loopal_ipc::protocol::methods;
 use loopal_protocol::{ControlCommand, Envelope};
 
 use crate::session_hub::InputFromClient;
@@ -67,24 +67,26 @@ async fn route_request(
     connection: &Connection,
 ) {
     match method {
-        m if m == methods::AGENT_MESSAGE.name => {
-            match serde_json::from_value::<Envelope>(params) {
-                Ok(env) => {
-                    let _ = session.input_tx.send(InputFromClient::Message(env)).await;
-                    let _ = connection.respond(id, serde_json::json!({"ok": true})).await;
-                }
-                Err(e) => {
-                    let _ = connection
-                        .respond_error(id, jsonrpc::INVALID_REQUEST, &e.to_string())
-                        .await;
-                }
+        m if m == methods::AGENT_MESSAGE.name => match serde_json::from_value::<Envelope>(params) {
+            Ok(env) => {
+                let _ = session.input_tx.send(InputFromClient::Message(env)).await;
+                let _ = connection
+                    .respond(id, serde_json::json!({"ok": true}))
+                    .await;
             }
-        }
+            Err(e) => {
+                let _ = connection
+                    .respond_error(id, jsonrpc::INVALID_REQUEST, &e.to_string())
+                    .await;
+            }
+        },
         m if m == methods::AGENT_CONTROL.name => {
             match serde_json::from_value::<ControlCommand>(params) {
                 Ok(cmd) => {
                     let _ = session.input_tx.send(InputFromClient::Control(cmd)).await;
-                    let _ = connection.respond(id, serde_json::json!({"ok": true})).await;
+                    let _ = connection
+                        .respond(id, serde_json::json!({"ok": true}))
+                        .await;
                 }
                 Err(e) => {
                     let _ = connection
@@ -95,7 +97,9 @@ async fn route_request(
         }
         m if m == methods::AGENT_SHUTDOWN.name => {
             session.interrupt.signal();
-            let _ = connection.respond(id, serde_json::json!({"ok": true})).await;
+            let _ = connection
+                .respond(id, serde_json::json!({"ok": true}))
+                .await;
         }
         _ => {
             let _ = connection

@@ -50,7 +50,10 @@ pub fn hub_frontend_for_test(
     interrupt_rx: tokio::sync::watch::Receiver<u64>,
 ) -> std::sync::Arc<dyn loopal_runtime::frontend::traits::AgentFrontend> {
     std::sync::Arc::new(hub_frontend::HubFrontend::new(
-        session, input_rx, None, interrupt_rx,
+        session,
+        input_rx,
+        None,
+        interrupt_rx,
     ))
 }
 

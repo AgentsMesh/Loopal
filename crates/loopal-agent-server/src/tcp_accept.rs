@@ -4,9 +4,9 @@ use std::sync::Arc;
 
 use tracing::info;
 
+use loopal_ipc::IpcListener;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::transport::Transport;
-use loopal_ipc::IpcListener;
 
 use crate::server_info;
 use crate::session_hub::SessionHub;
@@ -30,10 +30,7 @@ pub(crate) async fn start_tcp_listener() -> Option<IpcListener> {
 }
 
 /// Accept loop: spawns a task per incoming TCP connection.
-pub(crate) async fn accept_loop(
-    listener: IpcListener,
-    hub: Arc<SessionHub>,
-) -> anyhow::Result<()> {
+pub(crate) async fn accept_loop(listener: IpcListener, hub: Arc<SessionHub>) -> anyhow::Result<()> {
     let token = listener.token().to_string();
     loop {
         let (transport, addr) = listener.accept().await?;

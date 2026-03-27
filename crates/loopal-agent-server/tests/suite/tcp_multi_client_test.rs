@@ -12,7 +12,9 @@ const T: Duration = Duration::from_secs(5);
 /// Valid token → initialize succeeds via TCP.
 #[tokio::test]
 async fn tcp_valid_token_accepted() {
-    let listener = IpcListener::bind("127.0.0.1:0".parse().unwrap()).await.unwrap();
+    let listener = IpcListener::bind("127.0.0.1:0".parse().unwrap())
+        .await
+        .unwrap();
     let port = listener.port();
     let token = listener.token().to_string();
 
@@ -36,9 +38,11 @@ async fn tcp_valid_token_accepted() {
     });
 
     // Client side: connect + send token
-    let stream = tokio::net::TcpStream::connect(format!("127.0.0.1:{port}")).await.unwrap();
+    let stream = tokio::net::TcpStream::connect(format!("127.0.0.1:{port}"))
+        .await
+        .unwrap();
     let client = Arc::new(Connection::new(
-        Arc::new(TcpTransport::new(stream)) as Arc<dyn Transport>,
+        Arc::new(TcpTransport::new(stream)) as Arc<dyn Transport>
     ));
     let _rx = client.start();
     let resp = tokio::time::timeout(
@@ -58,7 +62,9 @@ async fn tcp_valid_token_accepted() {
 /// Wrong token → server responds with error.
 #[tokio::test]
 async fn tcp_wrong_token_rejected() {
-    let listener = IpcListener::bind("127.0.0.1:0".parse().unwrap()).await.unwrap();
+    let listener = IpcListener::bind("127.0.0.1:0".parse().unwrap())
+        .await
+        .unwrap();
     let port = listener.port();
     let real_token = listener.token().to_string();
 
@@ -76,9 +82,11 @@ async fn tcp_wrong_token_rejected() {
         }
     });
 
-    let stream = tokio::net::TcpStream::connect(format!("127.0.0.1:{port}")).await.unwrap();
+    let stream = tokio::net::TcpStream::connect(format!("127.0.0.1:{port}"))
+        .await
+        .unwrap();
     let client = Arc::new(Connection::new(
-        Arc::new(TcpTransport::new(stream)) as Arc<dyn Transport>,
+        Arc::new(TcpTransport::new(stream)) as Arc<dyn Transport>
     ));
     let _rx = client.start();
     // send_request with wrong token — server responds with JSON-RPC error
@@ -111,7 +119,9 @@ async fn tcp_wrong_token_rejected() {
 /// Multiple TCP clients can connect to the same listener sequentially.
 #[tokio::test]
 async fn tcp_multiple_clients_sequential() {
-    let listener = IpcListener::bind("127.0.0.1:0".parse().unwrap()).await.unwrap();
+    let listener = IpcListener::bind("127.0.0.1:0".parse().unwrap())
+        .await
+        .unwrap();
     let port = listener.port();
 
     let server = tokio::spawn(async move {
@@ -123,15 +133,19 @@ async fn tcp_multiple_clients_sequential() {
             if let loopal_ipc::connection::Incoming::Request { id, params, .. } = msg {
                 let client_id = params["client_id"].as_i64().unwrap();
                 assert_eq!(client_id, i);
-                conn.respond(id, serde_json::json!({"ok": true})).await.unwrap();
+                conn.respond(id, serde_json::json!({"ok": true}))
+                    .await
+                    .unwrap();
             }
         }
     });
 
     for i in 0..3i64 {
-        let stream = tokio::net::TcpStream::connect(format!("127.0.0.1:{port}")).await.unwrap();
+        let stream = tokio::net::TcpStream::connect(format!("127.0.0.1:{port}"))
+            .await
+            .unwrap();
         let client = Arc::new(Connection::new(
-            Arc::new(TcpTransport::new(stream)) as Arc<dyn Transport>,
+            Arc::new(TcpTransport::new(stream)) as Arc<dyn Transport>
         ));
         let _rx = client.start();
         let resp = tokio::time::timeout(

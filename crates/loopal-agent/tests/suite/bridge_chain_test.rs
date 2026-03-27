@@ -10,9 +10,9 @@ use tokio_util::sync::CancellationToken;
 use loopal_agent::bridge::bridge_child_events;
 use loopal_agent_client::AgentClient;
 use loopal_protocol::AgentEvent;
+use loopal_test_support::TestFixture;
 use loopal_test_support::mock_provider::MultiCallProvider;
 use loopal_test_support::scenarios;
-use loopal_test_support::TestFixture;
 
 use super::bridge_child_test::make_duplex_pair;
 
@@ -26,9 +26,9 @@ async fn full_chain_sub_agent_result_delivered_to_parent() {
     let fixture = TestFixture::new();
     let cwd = fixture.path().to_path_buf();
     let session_dir = fixture.path().join("sessions");
-    let provider = Arc::new(MultiCallProvider::new(
-        scenarios::attempt_completion("# Research Report\n\nFound 42 crates with 200k lines."),
-    )) as Arc<dyn loopal_provider_api::Provider>;
+    let provider = Arc::new(MultiCallProvider::new(scenarios::attempt_completion(
+        "# Research Report\n\nFound 42 crates with 200k lines.",
+    ))) as Arc<dyn loopal_provider_api::Provider>;
 
     let (server_t, client_t) = make_duplex_pair();
     tokio::spawn(async move {

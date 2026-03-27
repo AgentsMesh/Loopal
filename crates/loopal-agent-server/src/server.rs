@@ -29,7 +29,10 @@ struct InitializeResult {
 }
 
 #[derive(Serialize)]
-struct AgentInfo { name: String, version: String }
+struct AgentInfo {
+    name: String,
+    version: String,
+}
 
 // ── Public entry points ──────────────────────────────────────────────
 
@@ -96,24 +99,41 @@ pub(crate) async fn dispatch_loop(
             Incoming::Request { id, method, params } => {
                 if method == methods::AGENT_START.name {
                     let mut session_handle = crate::session_start::start_session(
-                        &connection, id, params, hub, is_production,
+                        &connection,
+                        id,
+                        params,
+                        hub,
+                        is_production,
                     )
                     .await?;
                     let mut forward_result = crate::session_forward::forward_loop(
-                        &mut incoming_rx, &connection, &mut session_handle,
-                    ).await;
+                        &mut incoming_rx,
+                        &connection,
+                        &mut session_handle,
+                    )
+                    .await;
                     hub.remove_session(&session_handle.session_id).await;
                     // Handle chained agent/start (cancel + new session)
                     while let crate::session_forward::ForwardResult::NewStart {
-                        id: new_id, params: new_params,
-                    } = forward_result {
+                        id: new_id,
+                        params: new_params,
+                    } = forward_result
+                    {
                         info!("chained agent/start after session end");
                         session_handle = crate::session_start::start_session(
-                            &connection, new_id, new_params, hub, is_production,
-                        ).await?;
+                            &connection,
+                            new_id,
+                            new_params,
+                            hub,
+                            is_production,
+                        )
+                        .await?;
                         forward_result = crate::session_forward::forward_loop(
-                            &mut incoming_rx, &connection, &mut session_handle,
-                        ).await;
+                            &mut incoming_rx,
+                            &connection,
+                            &mut session_handle,
+                        )
+                        .await;
                         hub.remove_session(&session_handle.session_id).await;
                     }
                     info!("session ended, ready for next");
@@ -124,14 +144,20 @@ pub(crate) async fn dispatch_loop(
                     if let Some(sid) = session_ids.first() {
                         if let Some(session) = hub.find_session(sid).await {
                             let client_id = format!("tcp-{id}");
-                            session.add_client(client_id.clone(), connection.clone()).await;
+                            session
+                                .add_client(client_id.clone(), connection.clone())
+                                .await;
                             let _ = connection
                                 .respond(id, serde_json::json!({"ok": true, "session_id": sid}))
                                 .await;
                             // Observer loop: just forward messages to session, receive events via broadcast
                             crate::session_forward::observer_loop(
-                                &mut incoming_rx, &connection, &session, &client_id,
-                            ).await;
+                                &mut incoming_rx,
+                                &connection,
+                                &session,
+                                &client_id,
+                            )
+                            .await;
                             break;
                         }
                     }
@@ -139,7 +165,9 @@ pub(crate) async fn dispatch_loop(
                         .respond_error(id, jsonrpc::INVALID_REQUEST, "no active session")
                         .await;
                 } else if method == methods::AGENT_SHUTDOWN.name {
-                    let _ = connection.respond(id, serde_json::json!({"ok": true})).await;
+                    let _ = connection
+                        .respond(id, serde_json::json!({"ok": true}))
+                        .await;
                     break;
                 } else {
                     let _ = connection

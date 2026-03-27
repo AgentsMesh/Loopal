@@ -64,7 +64,11 @@ pub(crate) async fn start_session(
     let interrupt_tx = Arc::new(watch_tx);
 
     let frontend_placeholder = Arc::new(HubFrontend::new(
-        Arc::new(SharedSession::placeholder(input_tx.clone(), interrupt.clone(), interrupt_tx.clone())),
+        Arc::new(SharedSession::placeholder(
+            input_tx.clone(),
+            interrupt.clone(),
+            interrupt_tx.clone(),
+        )),
         input_rx,
         None,
         watch_rx,
@@ -75,8 +79,15 @@ pub(crate) async fn start_session(
     let interactive = start.prompt.is_none();
 
     let agent_params = agent_setup::build_with_frontend(
-        &cwd, &config, &start, frontend_placeholder.clone(),
-        interrupt.clone(), interrupt_tx.clone(), kernel, None, interactive,
+        &cwd,
+        &config,
+        &start,
+        frontend_placeholder.clone(),
+        interrupt.clone(),
+        interrupt_tx.clone(),
+        kernel,
+        None,
+        interactive,
     )?;
 
     let session_id = agent_params.session.id.clone();
@@ -104,5 +115,9 @@ pub(crate) async fn start_session(
         }
     });
 
-    Ok(SessionHandle { session_id, session, agent_task })
+    Ok(SessionHandle {
+        session_id,
+        session,
+        agent_task,
+    })
 }

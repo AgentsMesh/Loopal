@@ -3,8 +3,8 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
 use loopal_message::ContentBlock;
-use loopal_tool_api::{Tool, ToolContext, ToolResult};
 use loopal_tool_api::{PermissionLevel, PermissionMode};
+use loopal_tool_api::{Tool, ToolContext, ToolResult};
 
 use super::{make_cancel, make_runner_with_channels};
 

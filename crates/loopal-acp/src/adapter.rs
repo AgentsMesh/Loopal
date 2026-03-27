@@ -36,10 +36,7 @@ impl AcpAdapter {
     }
 
     /// Run the ACP adapter loop: read IDE requests + forward agent events.
-    pub async fn run(
-        &self,
-        reader: &mut (impl AsyncBufReadExt + Unpin),
-    ) -> anyhow::Result<()> {
+    pub async fn run(&self, reader: &mut (impl AsyncBufReadExt + Unpin)) -> anyhow::Result<()> {
         loop {
             match read_message(reader).await {
                 Some(IncomingMessage::Request { id, method, params }) => {
@@ -135,7 +132,10 @@ impl AcpAdapter {
         let envelope = Envelope::new(MessageSource::Human, "main", text);
         if let Err(e) = self
             .agent_conn
-            .send_request(methods::AGENT_MESSAGE.name, serde_json::to_value(&envelope).unwrap())
+            .send_request(
+                methods::AGENT_MESSAGE.name,
+                serde_json::to_value(&envelope).unwrap(),
+            )
             .await
         {
             self.acp_out

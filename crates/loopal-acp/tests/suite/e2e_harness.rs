@@ -36,7 +36,8 @@ pub fn build_acp_harness(calls: Vec<Vec<Result<StreamChunk, LoopalError>>>) -> A
     let (adapter_to_server, server_read) = tokio::io::duplex(8192);
     let (server_to_adapter, adapter_from_server) = tokio::io::duplex(8192);
 
-    let provider = Arc::new(MultiCallProvider::new(calls)) as Arc<dyn loopal_provider_api::Provider>;
+    let provider =
+        Arc::new(MultiCallProvider::new(calls)) as Arc<dyn loopal_provider_api::Provider>;
     let session_dir = fixture.path().join("sessions");
 
     // Build transports — duplex wiring:

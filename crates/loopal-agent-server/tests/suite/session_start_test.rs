@@ -13,11 +13,16 @@ use loopal_test_support::mock_provider::MultiCallProvider;
 /// Build a test server with mock provider and return client connection.
 async fn start_test_server(
     calls: Vec<Vec<Result<loopal_provider_api::StreamChunk, loopal_error::LoopalError>>>,
-) -> (Arc<Connection>, tokio::sync::mpsc::Receiver<Incoming>, TestFixture) {
+) -> (
+    Arc<Connection>,
+    tokio::sync::mpsc::Receiver<Incoming>,
+    TestFixture,
+) {
     let fixture = TestFixture::new();
     let cwd = fixture.path().to_path_buf();
     let session_dir = fixture.path().join("sessions");
-    let provider = Arc::new(MultiCallProvider::new(calls)) as Arc<dyn loopal_provider_api::Provider>;
+    let provider =
+        Arc::new(MultiCallProvider::new(calls)) as Arc<dyn loopal_provider_api::Provider>;
 
     let (a_tx, a_rx) = tokio::io::duplex(8192);
     let (b_tx, b_rx) = tokio::io::duplex(8192);
@@ -32,9 +37,9 @@ async fn start_test_server(
     ));
 
     tokio::spawn(async move {
-        let _ = loopal_agent_server::run_server_for_test(
-            server_transport, provider, cwd, session_dir,
-        ).await;
+        let _ =
+            loopal_agent_server::run_server_for_test(server_transport, provider, cwd, session_dir)
+                .await;
     });
 
     let client = Arc::new(Connection::new(client_transport));
@@ -49,15 +54,16 @@ async fn start_test_server(
 async fn model_override_applied_in_session_start() {
     use loopal_test_support::chunks;
 
-    let (client, mut rx, _fixture) = start_test_server(
-        vec![chunks::text_turn("hello")],
-    ).await;
+    let (client, mut rx, _fixture) = start_test_server(vec![chunks::text_turn("hello")]).await;
 
     // Initialize
     let _ = tokio::time::timeout(
         Duration::from_secs(5),
         client.send_request("initialize", serde_json::json!({"protocol_version": 1})),
-    ).await.unwrap().unwrap();
+    )
+    .await
+    .unwrap()
+    .unwrap();
 
     // Start with model override and a prompt (non-interactive → finishes)
     let resp = tokio::time::timeout(
@@ -66,7 +72,10 @@ async fn model_override_applied_in_session_start() {
             methods::AGENT_START.name,
             serde_json::json!({"model": "claude-opus-4-6", "prompt": "hi"}),
         ),
-    ).await.unwrap().unwrap();
+    )
+    .await
+    .unwrap()
+    .unwrap();
     assert!(resp.get("session_id").is_some());
 
     // Collect events — if model was wrong, we'd get a provider error instead of stream
@@ -94,5 +103,8 @@ async fn model_override_applied_in_session_start() {
             _ => break,
         }
     }
-    assert!(got_stream, "should receive stream events (model override applied)");
+    assert!(
+        got_stream,
+        "should receive stream events (model override applied)"
+    );
 }

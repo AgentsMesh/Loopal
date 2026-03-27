@@ -65,9 +65,18 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
             is_completion,
             metadata,
         } => {
-            handle_tool_result(state, ToolResultParams {
-                id, name, result, is_error, duration_ms, is_completion, metadata,
-            });
+            handle_tool_result(
+                state,
+                ToolResultParams {
+                    id,
+                    name,
+                    result,
+                    is_error,
+                    duration_ms,
+                    is_completion,
+                    metadata,
+                },
+            );
         }
         AgentEventPayload::ToolPermissionRequest { id, name, input } => {
             flush_streaming(state);

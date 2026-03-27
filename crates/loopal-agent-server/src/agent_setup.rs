@@ -11,8 +11,8 @@ use loopal_context::system_prompt::build_system_prompt;
 use loopal_context::{ContextBudget, ContextStore};
 use loopal_kernel::Kernel;
 use loopal_protocol::InterruptSignal;
-use loopal_runtime::frontend::traits::AgentFrontend;
 use loopal_runtime::AgentLoopParams;
+use loopal_runtime::frontend::traits::AgentFrontend;
 use loopal_tool_api::MemoryChannel;
 
 use crate::params::StartParams;
@@ -61,7 +61,10 @@ pub(crate) fn build_with_frontend(
     let lifecycle_frontend = frontend.clone();
     tokio::spawn(async move {
         while let Some(event) = event_rx.recv().await {
-            if matches!(event.payload, loopal_protocol::AgentEventPayload::SubAgentSpawned { .. }) {
+            if matches!(
+                event.payload,
+                loopal_protocol::AgentEventPayload::SubAgentSpawned { .. }
+            ) {
                 let _ = lifecycle_frontend.emit(event.payload).await;
             }
         }

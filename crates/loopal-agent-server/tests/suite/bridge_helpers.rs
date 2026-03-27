@@ -3,13 +3,13 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use loopal_ipc::StdioTransport;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
-use loopal_ipc::StdioTransport;
 use loopal_protocol::{AgentEvent, AgentEventPayload};
-use loopal_test_support::mock_provider::MultiCallProvider;
 use loopal_test_support::TestFixture;
+use loopal_test_support::mock_provider::MultiCallProvider;
 
 pub const T: Duration = Duration::from_secs(10);
 
@@ -52,11 +52,7 @@ pub async fn start_child_server(
 }
 
 /// Initialize + start agent with prompt, return session_id.
-pub async fn init_and_start(
-    conn: &Connection,
-    fixture: &TestFixture,
-    prompt: &str,
-) -> String {
+pub async fn init_and_start(conn: &Connection, fixture: &TestFixture, prompt: &str) -> String {
     init_and_start_with(conn, fixture, prompt, serde_json::json!({})).await
 }
 
@@ -83,13 +79,10 @@ pub async fn init_and_start_with(
             params[k] = v;
         }
     }
-    let resp = tokio::time::timeout(
-        T,
-        conn.send_request(methods::AGENT_START.name, params),
-    )
-    .await
-    .unwrap()
-    .unwrap();
+    let resp = tokio::time::timeout(T, conn.send_request(methods::AGENT_START.name, params))
+        .await
+        .unwrap()
+        .unwrap();
     resp["session_id"].as_str().unwrap().to_string()
 }
 

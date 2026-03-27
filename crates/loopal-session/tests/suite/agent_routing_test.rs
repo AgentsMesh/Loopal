@@ -42,7 +42,10 @@ fn multiple_agents_tracked_independently() {
         AgentStatus::Running
     );
     assert_eq!(state.agents["researcher"].observable.tool_count, 0);
-    assert_eq!(state.agents["coder"].observable.status, AgentStatus::Running);
+    assert_eq!(
+        state.agents["coder"].observable.status,
+        AgentStatus::Running
+    );
     assert_eq!(state.agents["coder"].observable.tool_count, 1);
 
     // Researcher finishes, coder continues
@@ -54,7 +57,10 @@ fn multiple_agents_tracked_independently() {
         state.agents["researcher"].observable.status,
         AgentStatus::Finished
     );
-    assert_eq!(state.agents["coder"].observable.status, AgentStatus::Running);
+    assert_eq!(
+        state.agents["coder"].observable.status,
+        AgentStatus::Running
+    );
 }
 
 // ── Event routing ────────────────────────────────────────────────────
@@ -69,10 +75,7 @@ fn root_events_do_not_create_agent_entry() {
             text: "hello".into(),
         }),
     );
-    apply_event(
-        &mut state,
-        AgentEvent::root(AgentEventPayload::Finished),
-    );
+    apply_event(&mut state, AgentEvent::root(AgentEventPayload::Finished));
     assert!(
         state.agents.is_empty(),
         "root events should not create agent entries"

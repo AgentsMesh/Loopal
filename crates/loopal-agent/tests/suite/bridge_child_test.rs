@@ -9,13 +9,13 @@ use tokio_util::sync::CancellationToken;
 
 use loopal_agent::bridge::bridge_child_events;
 use loopal_agent_client::AgentClient;
-use loopal_ipc::transport::Transport;
 use loopal_ipc::StdioTransport;
+use loopal_ipc::transport::Transport;
 use loopal_protocol::AgentEvent;
+use loopal_test_support::TestFixture;
 use loopal_test_support::chunks;
 use loopal_test_support::mock_provider::MultiCallProvider;
 use loopal_test_support::scenarios;
-use loopal_test_support::TestFixture;
 
 const T: Duration = Duration::from_secs(10);
 
@@ -36,7 +36,12 @@ pub(crate) fn make_duplex_pair() -> (Arc<dyn Transport>, Arc<dyn Transport>) {
 /// Start a mock child server, return an initialized+started AgentClient.
 pub(crate) async fn start_bridge_client(
     calls: Vec<Vec<Result<loopal_provider_api::StreamChunk, loopal_error::LoopalError>>>,
-) -> (AgentClient, mpsc::Sender<AgentEvent>, CancellationToken, TestFixture) {
+) -> (
+    AgentClient,
+    mpsc::Sender<AgentEvent>,
+    CancellationToken,
+    TestFixture,
+) {
     let fixture = TestFixture::new();
     let cwd = fixture.path().to_path_buf();
     let session_dir = fixture.path().join("sessions");
@@ -69,12 +74,9 @@ async fn bridge_returns_stream_text() {
     let (client, event_tx, cancel, _fix) =
         start_bridge_client(scenarios::simple_text("hello from sub-agent")).await;
 
-    let result = tokio::time::timeout(
-        T,
-        bridge_child_events(client, &event_tx, "test", &cancel),
-    )
-    .await
-    .unwrap();
+    let result = tokio::time::timeout(T, bridge_child_events(client, &event_tx, "test", &cancel))
+        .await
+        .unwrap();
 
     let text = result.expect("should succeed");
     assert!(
@@ -86,25 +88,24 @@ async fn bridge_returns_stream_text() {
 /// Sub-agent calls AttemptCompletion -> bridge returns completion result, not stream.
 #[tokio::test]
 async fn bridge_returns_completion_over_stream() {
-    let (client, event_tx, cancel, _fix) =
-        start_bridge_client(scenarios::attempt_completion(
-            "## Full Analysis Report\n\nThe project has 42 crates.",
-        ))
-        .await;
+    let (client, event_tx, cancel, _fix) = start_bridge_client(scenarios::attempt_completion(
+        "## Full Analysis Report\n\nThe project has 42 crates.",
+    ))
+    .await;
 
-    let result = tokio::time::timeout(
-        T,
-        bridge_child_events(client, &event_tx, "test", &cancel),
-    )
-    .await
-    .unwrap();
+    let result = tokio::time::timeout(T, bridge_child_events(client, &event_tx, "test", &cancel))
+        .await
+        .unwrap();
 
     let text = result.expect("should succeed");
     assert!(
         text.contains("Full Analysis Report"),
         "should return AttemptCompletion result, got: {text}"
     );
-    assert!(text.contains("42 crates"), "should contain full completion text");
+    assert!(
+        text.contains("42 crates"),
+        "should contain full completion text"
+    );
     assert!(
         !text.starts_with("<<COMPLETION>>"),
         "result must not contain any legacy prefix"
@@ -121,12 +122,9 @@ async fn bridge_returns_default_when_no_output() {
     )];
     let (client, event_tx, cancel, _fix) = start_bridge_client(calls).await;
 
-    let result = tokio::time::timeout(
-        T,
-        bridge_child_events(client, &event_tx, "test", &cancel),
-    )
-    .await
-    .unwrap();
+    let result = tokio::time::timeout(T, bridge_child_events(client, &event_tx, "test", &cancel))
+        .await
+        .unwrap();
 
     let text = result.expect("should succeed");
     assert!(!text.is_empty(), "should return non-empty text");
@@ -138,11 +136,8 @@ async fn bridge_exits_on_finished() {
     let (client, event_tx, cancel, _fix) =
         start_bridge_client(scenarios::simple_text("done")).await;
 
-    let result = tokio::time::timeout(
-        T,
-        bridge_child_events(client, &event_tx, "test", &cancel),
-    )
-    .await;
+    let result =
+        tokio::time::timeout(T, bridge_child_events(client, &event_tx, "test", &cancel)).await;
 
     assert!(result.is_ok(), "bridge should exit on Finished, not hang");
 }

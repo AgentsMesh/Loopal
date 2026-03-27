@@ -1,9 +1,9 @@
-#[path = "suite/bridge_helpers.rs"]
-mod bridge_helpers;
 #[path = "suite/bridge_basic_test.rs"]
 mod bridge_basic_test;
 #[path = "suite/bridge_edge_test.rs"]
 mod bridge_edge_test;
+#[path = "suite/bridge_helpers.rs"]
+mod bridge_helpers;
 #[path = "suite/dispatch_loop_test.rs"]
 mod dispatch_loop_test;
 #[path = "suite/hub_frontend_test.rs"]

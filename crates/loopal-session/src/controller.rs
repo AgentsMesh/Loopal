@@ -73,14 +73,18 @@ impl SessionController {
         &self.connections
     }
 
-    pub fn primary(&self) -> &PrimaryConn { &self.primary }
+    pub fn primary(&self) -> &PrimaryConn {
+        &self.primary
+    }
 
     // === Root agent control ===
 
     pub fn interrupt(&self) {
         tracing::debug!("session: interrupt signaled");
         self.primary.interrupt.signal();
-        self.primary.interrupt_tx.send_modify(|v| *v = v.wrapping_add(1));
+        self.primary
+            .interrupt_tx
+            .send_modify(|v| *v = v.wrapping_add(1));
     }
 
     pub fn enqueue_message(&self, content: UserContent) -> Option<UserContent> {
@@ -90,18 +94,28 @@ impl SessionController {
     }
 
     pub async fn approve_permission(&self) {
-        { self.lock().pending_permission = None; }
+        {
+            self.lock().pending_permission = None;
+        }
         let _ = self.primary.permission_tx.send(true).await;
     }
 
     pub async fn deny_permission(&self) {
-        { self.lock().pending_permission = None; }
+        {
+            self.lock().pending_permission = None;
+        }
         let _ = self.primary.permission_tx.send(false).await;
     }
 
     pub async fn answer_question(&self, answers: Vec<String>) {
-        { self.lock().pending_question = None; }
-        let _ = self.primary.question_tx.send(UserQuestionResponse { answers }).await;
+        {
+            self.lock().pending_question = None;
+        }
+        let _ = self
+            .primary
+            .question_tx
+            .send(UserQuestionResponse { answers })
+            .await;
     }
 
     pub async fn switch_mode(&self, mode: AgentMode) {
@@ -113,7 +127,11 @@ impl SessionController {
             }
             .to_string();
         }
-        let _ = self.primary.control_tx.send(ControlCommand::ModeSwitch(mode)).await;
+        let _ = self
+            .primary
+            .control_tx
+            .send(ControlCommand::ModeSwitch(mode))
+            .await;
     }
 
     pub async fn switch_model(&self, model: String) {
@@ -122,7 +140,11 @@ impl SessionController {
             s.model = model.clone();
             push_system_msg(&mut s, &format!("Switched model to: {model}"));
         }
-        let _ = self.primary.control_tx.send(ControlCommand::ModelSwitch(model)).await;
+        let _ = self
+            .primary
+            .control_tx
+            .send(ControlCommand::ModelSwitch(model))
+            .await;
     }
 
     pub async fn switch_thinking(&self, config_json: String) {
@@ -132,7 +154,11 @@ impl SessionController {
             s.thinking_config = label.clone();
             push_system_msg(&mut s, &format!("Switched thinking to: {label}"));
         }
-        let _ = self.primary.control_tx.send(ControlCommand::ThinkingSwitch(config_json)).await;
+        let _ = self
+            .primary
+            .control_tx
+            .send(ControlCommand::ThinkingSwitch(config_json))
+            .await;
     }
 
     pub async fn clear(&self) {
@@ -152,13 +178,21 @@ impl SessionController {
         let _ = self.primary.control_tx.send(ControlCommand::Clear).await;
     }
 
-    pub async fn compact(&self) { let _ = self.primary.control_tx.send(ControlCommand::Compact).await; }
-
-    pub async fn rewind(&self, turn_index: usize) {
-        let _ = self.primary.control_tx.send(ControlCommand::Rewind { turn_index }).await;
+    pub async fn compact(&self) {
+        let _ = self.primary.control_tx.send(ControlCommand::Compact).await;
     }
 
-    pub fn pop_inbox_to_edit(&self) -> Option<UserContent> { self.lock().inbox.pop_back() }
+    pub async fn rewind(&self, turn_index: usize) {
+        let _ = self
+            .primary
+            .control_tx
+            .send(ControlCommand::Rewind { turn_index })
+            .await;
+    }
+
+    pub fn pop_inbox_to_edit(&self) -> Option<UserContent> {
+        self.lock().inbox.pop_back()
+    }
 
     pub fn push_system_message(&self, content: String) {
         push_system_msg(&mut self.lock(), &content);

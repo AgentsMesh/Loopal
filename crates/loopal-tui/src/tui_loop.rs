@@ -66,14 +66,19 @@ where
                 AppEvent::Agent(agent_event) => {
                     // Auto-attach to newly spawned sub-agents via TCP
                     if let AgentEventPayload::SubAgentSpawned {
-                        ref name, pid, port, ref token,
+                        ref name,
+                        pid,
+                        port,
+                        ref token,
                     } = agent_event.payload
                     {
                         let conns = app.session.connections().clone();
                         let name = name.clone();
                         let token = token.clone();
                         tokio::spawn(async move {
-                            conns.lock().await
+                            conns
+                                .lock()
+                                .await
                                 .on_sub_agent_spawned(&name, pid, port, &token)
                                 .await;
                         });

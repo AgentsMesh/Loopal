@@ -55,12 +55,12 @@ async fn child_tool_call_events_visible() {
 
     let events = collect_agent_events(&mut rx).await;
 
-    let has_tool_call = events.iter().any(|e| {
-        matches!(e, AgentEventPayload::ToolCall { name, .. } if name == "Glob")
-    });
-    let has_tool_result = events.iter().any(|e| {
-        matches!(e, AgentEventPayload::ToolResult { name, .. } if name == "Glob")
-    });
+    let has_tool_call = events
+        .iter()
+        .any(|e| matches!(e, AgentEventPayload::ToolCall { name, .. } if name == "Glob"));
+    let has_tool_result = events
+        .iter()
+        .any(|e| matches!(e, AgentEventPayload::ToolResult { name, .. } if name == "Glob"));
     let has_finished = events
         .iter()
         .any(|e| matches!(e, AgentEventPayload::Finished));
@@ -105,17 +105,13 @@ async fn child_multi_turn_tool_chain() {
 /// Finished event arrives -> test completes within timeout (no hang regression).
 #[tokio::test]
 async fn child_finished_no_hang() {
-    let (conn, mut rx, fixture, _join) =
-        start_child_server(scenarios::simple_text("final")).await;
+    let (conn, mut rx, fixture, _join) = start_child_server(scenarios::simple_text("final")).await;
     let _sid = init_and_start(&conn, &fixture, "quick task").await;
 
     // This must complete within T (10s). If bridge_child_events didn't exit
     // on Finished, this would hang forever.
-    let result = tokio::time::timeout(
-        super::bridge_helpers::T,
-        collect_agent_events(&mut rx),
-    )
-    .await;
+    let result =
+        tokio::time::timeout(super::bridge_helpers::T, collect_agent_events(&mut rx)).await;
     assert!(result.is_ok(), "should not hang after Finished");
 
     let events = result.unwrap();
@@ -137,9 +133,9 @@ async fn child_attempt_completion_result_visible() {
     let events = collect_agent_events(&mut rx).await;
 
     // Should see AttemptCompletion tool call + result
-    let has_tool_call = events.iter().any(|e| {
-        matches!(e, AgentEventPayload::ToolCall { name, .. } if name == "AttemptCompletion")
-    });
+    let has_tool_call = events.iter().any(
+        |e| matches!(e, AgentEventPayload::ToolCall { name, .. } if name == "AttemptCompletion"),
+    );
     let completion_result: Option<&str> = events.iter().find_map(|e| match e {
         AgentEventPayload::ToolResult {
             name,
@@ -159,5 +155,9 @@ async fn child_attempt_completion_result_visible() {
         completion_result.unwrap().contains("detailed analysis"),
         "ToolResult should contain the completion text"
     );
-    assert!(events.iter().any(|e| matches!(e, AgentEventPayload::Finished)));
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, AgentEventPayload::Finished))
+    );
 }

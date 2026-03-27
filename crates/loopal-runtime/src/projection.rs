@@ -51,7 +51,14 @@ pub fn project_messages(messages: &[Message]) -> Vec<DisplayMessage> {
                     is_completion,
                     ..
                 } => {
-                    back_patch(&mut display, &tool_index, tool_use_id, content, *is_error, *is_completion);
+                    back_patch(
+                        &mut display,
+                        &tool_index,
+                        tool_use_id,
+                        content,
+                        *is_error,
+                        *is_completion,
+                    );
                 }
                 ContentBlock::Image { .. } => {
                     content_parts.push("[image]".to_string());

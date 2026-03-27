@@ -6,10 +6,10 @@ use std::time::Duration;
 
 use tokio::sync::Mutex;
 
+use loopal_ipc::StdioTransport;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
-use loopal_ipc::StdioTransport;
 use loopal_protocol::{AgentEventPayload, InterruptSignal};
 use loopal_runtime::frontend::traits::AgentFrontend;
 
@@ -17,7 +17,11 @@ use loopal_agent_server::session_hub::{InputFromClient, SharedSession};
 
 /// Create a bidirectional Connection pair (like a network socket pair).
 /// Returns (server_conn, client_conn, client_rx).
-fn conn_pair() -> (Arc<Connection>, Arc<Connection>, tokio::sync::mpsc::Receiver<Incoming>) {
+fn conn_pair() -> (
+    Arc<Connection>,
+    Arc<Connection>,
+    tokio::sync::mpsc::Receiver<Incoming>,
+) {
     let (a_tx, a_rx) = tokio::io::duplex(8192);
     let (b_tx, b_rx) = tokio::io::duplex(8192);
     let server_t: Arc<dyn Transport> = Arc::new(StdioTransport::new(
@@ -66,10 +70,14 @@ async fn hub_emit_broadcasts_to_all_clients() {
     session.add_client("a".into(), srv_a).await;
     session.add_client("b".into(), srv_b).await;
 
-    let frontend = loopal_agent_server::hub_frontend::HubFrontend::new(
-        session, input_rx, None, watch_rx,
-    );
-    frontend.emit(AgentEventPayload::Stream { text: "hello".into() }).await.unwrap();
+    let frontend =
+        loopal_agent_server::hub_frontend::HubFrontend::new(session, input_rx, None, watch_rx);
+    frontend
+        .emit(AgentEventPayload::Stream {
+            text: "hello".into(),
+        })
+        .await
+        .unwrap();
 
     // Both clients should receive the notification
     for rx in [&mut rx_a, &mut rx_b] {
@@ -108,7 +116,8 @@ async fn hub_permission_routes_to_primary() {
 
     let f2 = frontend.clone();
     let perm_task = tokio::spawn(async move {
-        f2.request_permission("tc-1", "Bash", &serde_json::json!({"cmd": "ls"})).await
+        f2.request_permission("tc-1", "Bash", &serde_json::json!({"cmd": "ls"}))
+            .await
     });
 
     // Primary should receive permission request
@@ -116,17 +125,26 @@ async fn hub_permission_routes_to_primary() {
     match msg {
         Incoming::Request { id, method, .. } => {
             assert_eq!(method, methods::AGENT_PERMISSION.name);
-            cli_a.respond(id, serde_json::json!({"allow": true})).await.unwrap();
+            cli_a
+                .respond(id, serde_json::json!({"allow": true}))
+                .await
+                .unwrap();
         }
         _ => panic!("expected request on primary"),
     }
 
     let decision = tokio::time::timeout(T, perm_task).await.unwrap().unwrap();
-    assert!(matches!(decision, loopal_tool_api::PermissionDecision::Allow));
+    assert!(matches!(
+        decision,
+        loopal_tool_api::PermissionDecision::Allow
+    ));
 
     // Observer should NOT have received anything
     let obs = tokio::time::timeout(Duration::from_millis(100), rx_b.recv()).await;
-    assert!(obs.is_err(), "observer should not receive permission request");
+    assert!(
+        obs.is_err(),
+        "observer should not receive permission request"
+    );
 }
 
 /// Primary client disconnects → next client promoted.
@@ -156,9 +174,8 @@ async fn hub_interrupt_wakes_recv_input() {
     let (session, input_rx, watch_rx) = make_session();
     let interrupt_tx = session.interrupt_tx.clone();
 
-    let frontend = loopal_agent_server::hub_frontend::HubFrontend::new(
-        session, input_rx, None, watch_rx,
-    );
+    let frontend =
+        loopal_agent_server::hub_frontend::HubFrontend::new(session, input_rx, None, watch_rx);
 
     let recv_task = tokio::spawn(async move { frontend.recv_input().await });
 

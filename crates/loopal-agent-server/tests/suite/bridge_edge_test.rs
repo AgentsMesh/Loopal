@@ -9,9 +9,7 @@ use loopal_protocol::{AgentEvent, AgentEventPayload};
 use loopal_test_support::chunks;
 use loopal_test_support::scenarios;
 
-use super::bridge_helpers::{
-    collect_agent_events, init_and_start_with, start_child_server, T,
-};
+use super::bridge_helpers::{T, collect_agent_events, init_and_start_with, start_child_server};
 
 // ── Tests ────────────────────────────────────────────────────────────
 
@@ -74,8 +72,7 @@ async fn child_permission_request_denied() {
 async fn shutdown_after_session_completes() {
     let (conn, mut rx, fixture, server_join) =
         start_child_server(scenarios::simple_text("done")).await;
-    let _sid =
-        init_and_start_with(&conn, &fixture, "quick", serde_json::json!({})).await;
+    let _sid = init_and_start_with(&conn, &fixture, "quick", serde_json::json!({})).await;
 
     // Wait for session to finish
     let events = collect_agent_events(&mut rx).await;
@@ -102,8 +99,7 @@ async fn shutdown_after_session_completes() {
 async fn child_provider_error_handled() {
     let (conn, mut rx, fixture, _join) =
         start_child_server(scenarios::immediate_error("model overloaded")).await;
-    let _sid =
-        init_and_start_with(&conn, &fixture, "fail", serde_json::json!({})).await;
+    let _sid = init_and_start_with(&conn, &fixture, "fail", serde_json::json!({})).await;
 
     let mut events = Vec::new();
     let deadline = tokio::time::Instant::now() + T;
@@ -147,10 +143,8 @@ async fn two_children_finish_independently() {
     let (conn_b, mut rx_b, fix_b, _jb) =
         start_child_server(scenarios::simple_text("from-child-B")).await;
 
-    let _sid_a =
-        init_and_start_with(&conn_a, &fix_a, "task A", serde_json::json!({})).await;
-    let _sid_b =
-        init_and_start_with(&conn_b, &fix_b, "task B", serde_json::json!({})).await;
+    let _sid_a = init_and_start_with(&conn_a, &fix_a, "task A", serde_json::json!({})).await;
+    let _sid_b = init_and_start_with(&conn_b, &fix_b, "task B", serde_json::json!({})).await;
 
     let (events_a, events_b) = tokio::join!(
         collect_agent_events(&mut rx_a),
@@ -174,6 +168,14 @@ async fn two_children_finish_independently() {
 
     assert!(text_a.contains("from-child-A"), "child A text");
     assert!(text_b.contains("from-child-B"), "child B text");
-    assert!(events_a.iter().any(|e| matches!(e, AgentEventPayload::Finished)));
-    assert!(events_b.iter().any(|e| matches!(e, AgentEventPayload::Finished)));
+    assert!(
+        events_a
+            .iter()
+            .any(|e| matches!(e, AgentEventPayload::Finished))
+    );
+    assert!(
+        events_b
+            .iter()
+            .any(|e| matches!(e, AgentEventPayload::Finished))
+    );
 }

@@ -10,8 +10,12 @@ pub struct AgentsCmd;
 
 #[async_trait]
 impl CommandHandler for AgentsCmd {
-    fn name(&self) -> &str { "/agents" }
-    fn description(&self) -> &str { "List agents and their connection status" }
+    fn name(&self) -> &str {
+        "/agents"
+    }
+    fn description(&self) -> &str {
+        "List agents and their connection status"
+    }
 
     async fn execute(&self, app: &mut App, _arg: Option<&str>) -> CommandEffect {
         let conns = app.session.connections().lock().await;
@@ -35,8 +39,12 @@ pub struct DetachCmd;
 
 #[async_trait]
 impl CommandHandler for DetachCmd {
-    fn name(&self) -> &str { "/detach" }
-    fn description(&self) -> &str { "Detach from focused sub-agent" }
+    fn name(&self) -> &str {
+        "/detach"
+    }
+    fn description(&self) -> &str {
+        "Detach from focused sub-agent"
+    }
 
     async fn execute(&self, app: &mut App, _arg: Option<&str>) -> CommandEffect {
         let focused = app.session.lock().focused_agent.clone();
@@ -57,9 +65,15 @@ pub struct AttachCmd;
 
 #[async_trait]
 impl CommandHandler for AttachCmd {
-    fn name(&self) -> &str { "/attach" }
-    fn description(&self) -> &str { "Re-attach to a detached sub-agent" }
-    fn has_arg(&self) -> bool { true }
+    fn name(&self) -> &str {
+        "/attach"
+    }
+    fn description(&self) -> &str {
+        "Re-attach to a detached sub-agent"
+    }
+    fn has_arg(&self) -> bool {
+        true
+    }
 
     async fn execute(&self, app: &mut App, arg: Option<&str>) -> CommandEffect {
         let name = match arg {

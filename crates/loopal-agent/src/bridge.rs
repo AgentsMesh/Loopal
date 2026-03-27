@@ -60,20 +60,21 @@ pub async fn bridge_child_events(
     // Prefer AttemptCompletion result over accumulated stream text.
     // The content is already clean (no prefix) since the producer uses
     // ToolResult::completion() which sets is_completion: true.
-    let output = completion_result
-        .unwrap_or_else(|| {
-            if stream_text.is_empty() {
-                "(sub-agent completed)".into()
-            } else {
-                stream_text
-            }
-        });
+    let output = completion_result.unwrap_or_else(|| {
+        if stream_text.is_empty() {
+            "(sub-agent completed)".into()
+        } else {
+            stream_text
+        }
+    });
     Ok(output)
 }
 
 /// Read child's TCP server_info (port, token) from well-known location.
 pub(crate) fn read_child_server_info(pid: u32) -> Option<(u16, String)> {
-    let path = loopal_config::locations::volatile_dir().join("run").join(format!("{pid}.json"));
+    let path = loopal_config::locations::volatile_dir()
+        .join("run")
+        .join(format!("{pid}.json"));
     match std::fs::read_to_string(&path) {
         Ok(content) => {
             let v: serde_json::Value = serde_json::from_str(&content).ok()?;

@@ -1,9 +1,9 @@
 //! Tests for SessionController event handling and state management.
 
 use loopal_protocol::{AgentEvent, AgentEventPayload};
+use loopal_protocol::{ControlCommand, UserQuestionResponse};
 use loopal_session::SessionController;
 use loopal_session::ToolCallStatus;
-use loopal_protocol::{ControlCommand, UserQuestionResponse};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 

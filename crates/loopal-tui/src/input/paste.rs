@@ -176,7 +176,10 @@ mod tests {
         let first = generate_placeholder(text, 1, &HashMap::new());
         let map = HashMap::from([(first.clone(), text.into())]);
         let second = generate_placeholder(text, 1, &map);
-        assert_ne!(first, second, "duplicates should get different placeholders");
+        assert_ne!(
+            first, second,
+            "duplicates should get different placeholders"
+        );
         assert!(is_paste_placeholder(&second));
     }
 

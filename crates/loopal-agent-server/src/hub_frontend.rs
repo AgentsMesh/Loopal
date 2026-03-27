@@ -119,7 +119,10 @@ impl AgentFrontend for HubFrontend {
             "tool_name": name,
             "tool_input": input,
         });
-        match conn.send_request(methods::AGENT_PERMISSION.name, params).await {
+        match conn
+            .send_request(methods::AGENT_PERMISSION.name, params)
+            .await
+        {
             Ok(value) => {
                 if value.get("allow").and_then(Value::as_bool).unwrap_or(false) {
                     PermissionDecision::Allow
@@ -146,7 +149,10 @@ impl AgentFrontend for HubFrontend {
             return vec!["(no primary client)".into()];
         };
         let params = serde_json::json!({ "questions": questions });
-        match conn.send_request(methods::AGENT_QUESTION.name, params).await {
+        match conn
+            .send_request(methods::AGENT_QUESTION.name, params)
+            .await
+        {
             Ok(value) => serde_json::from_value::<UserQuestionResponse>(value)
                 .map(|r| r.answers)
                 .unwrap_or_else(|_| vec!["(parse error)".into()]),

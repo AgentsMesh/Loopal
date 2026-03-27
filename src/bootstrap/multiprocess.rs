@@ -5,8 +5,8 @@ use std::sync::Arc;
 use loopal_ipc::connection::Connection;
 use loopal_ipc::protocol::methods;
 use loopal_protocol::InterruptSignal;
-use loopal_session::connection_manager::{AgentConnectionManager, PrimaryConn};
 use loopal_session::SessionController;
+use loopal_session::connection_manager::{AgentConnectionManager, PrimaryConn};
 
 use crate::cli::Cli;
 
@@ -76,12 +76,8 @@ async fn run_with_agent(
 
     let manager = AgentConnectionManager::new(handles.agent_event_tx.clone());
 
-    let session_ctrl = SessionController::with_primary(
-        model.clone(),
-        mode_str.to_string(),
-        primary,
-        manager,
-    );
+    let session_ctrl =
+        SessionController::with_primary(model.clone(), mode_str.to_string(), primary, manager);
 
     let display_path = super::abbreviate_home(cwd);
     session_ctrl.push_welcome(&model, &display_path);

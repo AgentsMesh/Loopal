@@ -85,6 +85,7 @@ pub async fn spawn_agent(
             Some(&params.prompt),
             None,
             false,
+            None,
         )
         .await
     {

@@ -5,6 +5,7 @@ use std::sync::Arc;
 use loopal_ipc::connection::Connection;
 use loopal_ipc::protocol::methods;
 use loopal_protocol::InterruptSignal;
+use loopal_runtime::projection::project_messages;
 use loopal_session::SessionController;
 use loopal_session::connection_manager::{AgentConnectionManager, PrimaryConn};
 
@@ -46,6 +47,7 @@ async fn run_with_agent(
             prompt.as_deref(),
             cli.permission.as_deref(),
             cli.no_sandbox,
+            cli.resume.as_deref(),
         )
         .await?;
 
@@ -79,8 +81,16 @@ async fn run_with_agent(
     let session_ctrl =
         SessionController::with_primary(model.clone(), mode_str.to_string(), primary, manager);
 
-    let display_path = super::abbreviate_home(cwd);
-    session_ctrl.push_welcome(&model, &display_path);
+    if let Some(ref sid) = cli.resume {
+        // Load display history from persisted session for TUI rendering
+        let session_manager = loopal_runtime::SessionManager::new()?;
+        if let Ok((_session, messages)) = session_manager.resume_session(sid) {
+            session_ctrl.load_display_history(project_messages(&messages));
+        }
+    } else {
+        let display_path = super::abbreviate_home(cwd);
+        session_ctrl.push_welcome(&model, &display_path);
+    }
 
     loopal_tui::run_tui(session_ctrl, cwd.to_path_buf(), handles.agent_event_rx).await
 }

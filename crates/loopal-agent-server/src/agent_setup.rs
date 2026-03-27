@@ -53,7 +53,12 @@ pub(crate) fn build_with_frontend(
     } else {
         loopal_runtime::SessionManager::new()?
     };
-    let session = session_manager.create_session(cwd, &model)?;
+    let (session, resume_messages) = if let Some(ref sid) = start.resume {
+        let (s, msgs) = session_manager.resume_session(sid)?;
+        (s, msgs)
+    } else {
+        (session_manager.create_session(cwd, &model)?, Vec::new())
+    };
 
     // Channel for sub-agent lifecycle events (SubAgentSpawned).
     // Only lifecycle events are forwarded — sub-agent internal events go via TCP.
@@ -114,11 +119,10 @@ pub(crate) fn build_with_frontend(
         &skills_summary,
         &config.memory,
     );
-    let messages = if let Some(prompt) = &start.prompt {
-        vec![loopal_message::Message::user(prompt)]
-    } else {
-        Vec::new()
-    };
+    let mut messages = resume_messages;
+    if let Some(prompt) = &start.prompt {
+        messages.push(loopal_message::Message::user(prompt));
+    }
 
     let tool_tokens = ContextBudget::estimate_tool_tokens(&tool_defs);
     let budget = loopal_runtime::build_initial_budget(

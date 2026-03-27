@@ -47,6 +47,7 @@ async fn full_chain_sub_agent_result_delivered_to_parent() {
             Some("research this project"),
             None,
             false,
+            None,
         )
         .await
         .expect("start_agent");

@@ -44,6 +44,7 @@ pub(crate) async fn start_session(
         prompt: params["prompt"].as_str().map(String::from),
         permission_mode: params["permission_mode"].as_str().map(String::from),
         no_sandbox: params["no_sandbox"].as_bool().unwrap_or(false),
+        resume: params["resume"].as_str().map(String::from),
     };
 
     let mut config = load_config(&cwd)?;

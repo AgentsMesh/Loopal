@@ -61,7 +61,7 @@ impl AgentConnectionManager {
         }
     }
 
-    /// Create a no-op manager (for tests and singleprocess mode).
+    /// Create a no-op manager (for tests).
     pub fn noop() -> Self {
         let (tx, _rx) = mpsc::channel(1);
         Self {

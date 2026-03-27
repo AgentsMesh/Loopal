@@ -7,7 +7,6 @@ use loopal_config::load_config;
 use crate::cli::Cli;
 
 mod multiprocess;
-mod singleprocess;
 
 pub async fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
@@ -47,11 +46,7 @@ pub async fn run() -> anyhow::Result<()> {
         .map(|wt| wt.info.path.clone())
         .unwrap_or_else(|| cwd.clone());
 
-    let result = if cli.no_ipc || cli.resume.is_some() {
-        singleprocess::run(cli, effective_cwd, config).await
-    } else {
-        multiprocess::run(&cli, &effective_cwd, &config).await
-    };
+    let result = multiprocess::run(&cli, &effective_cwd, &config).await;
 
     // Clean up worktree: remove if no changes, keep otherwise.
     // Note: If the process is killed by SIGKILL or panics, this cleanup won't run.

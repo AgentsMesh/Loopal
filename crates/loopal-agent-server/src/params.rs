@@ -13,6 +13,7 @@ pub(crate) struct StartParams {
     pub prompt: Option<String>,
     pub permission_mode: Option<String>,
     pub no_sandbox: bool,
+    pub resume: Option<String>,
 }
 
 /// Build a Kernel from config (production path: MCP, tools).

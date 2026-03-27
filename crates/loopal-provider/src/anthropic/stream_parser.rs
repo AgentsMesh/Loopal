@@ -1,4 +1,6 @@
-use super::accumulator::{ServerToolAccumulator, ThinkingAccumulator, ToolUseAccumulator};
+use super::accumulator::{
+    ServerToolAccumulator, ThinkingAccumulator, ToolUseAccumulator, push_usage_from,
+};
 use super::server_tool;
 use loopal_error::{LoopalError, ProviderError};
 use loopal_provider_api::{StopReason, StreamChunk};
@@ -139,9 +141,15 @@ fn handle_block_stop(
     } else if server.is_result {
         if let Some(tool_use_id) = server.result_tool_use_id.take() {
             let content = server.result_content.take().unwrap_or(json!(null));
-            let block_type = server.result_block_type.take()
+            let block_type = server
+                .result_block_type
+                .take()
                 .unwrap_or_else(|| "unknown_tool_result".into());
-            chunks.push(Ok(StreamChunk::ServerToolResult { block_type, tool_use_id, content }));
+            chunks.push(Ok(StreamChunk::ServerToolResult {
+                block_type,
+                tool_use_id,
+                content,
+            }));
         }
         server.is_result = false;
     } else if let Some((id, name, input)) = server.current.take() {
@@ -155,7 +163,11 @@ fn handle_block_stop(
             })
         };
         server.json_fragments.clear();
-        chunks.push(Ok(StreamChunk::ServerToolUse { id, name, input: final_input }));
+        chunks.push(Ok(StreamChunk::ServerToolUse {
+            id,
+            name,
+            input: final_input,
+        }));
     } else if let (Some(id), Some(name)) =
         (tool.current_tool_id.take(), tool.current_tool_name.take())
     {
@@ -182,18 +194,4 @@ fn parse_usage_and_stop(
             _ => Some(StopReason::EndTurn),
         };
     }
-}
-
-fn push_usage_from(usage: &Value, chunks: &mut Vec<Result<StreamChunk, LoopalError>>) {
-    let (Some(inp), Some(out)) = (usage["input_tokens"].as_u64(), usage["output_tokens"].as_u64())
-    else {
-        return;
-    };
-    chunks.push(Ok(StreamChunk::Usage {
-        input_tokens: inp as u32,
-        output_tokens: out as u32,
-        cache_creation_input_tokens: usage["cache_creation_input_tokens"].as_u64().unwrap_or(0) as u32,
-        cache_read_input_tokens: usage["cache_read_input_tokens"].as_u64().unwrap_or(0) as u32,
-        thinking_tokens: 0,
-    }));
 }

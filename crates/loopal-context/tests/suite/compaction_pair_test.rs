@@ -93,10 +93,12 @@ fn compact_then_sanitize_fixes_broken_pairs() {
     }
 }
 
-// --- ServerToolUse / ServerToolResult pair tests ---
-
 fn assistant_with_server_tool_blocks(blocks: Vec<ContentBlock>) -> Message {
-    Message { id: None, role: MessageRole::Assistant, content: blocks }
+    Message {
+        id: None,
+        role: MessageRole::Assistant,
+        content: blocks,
+    }
 }
 
 fn server_tool_use(id: &str) -> ContentBlock {

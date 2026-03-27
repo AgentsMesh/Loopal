@@ -175,19 +175,10 @@ name = "loopal"
 path = "src/main.rs"
 
 [dependencies]
-loopal-message = { workspace = true }
 loopal-protocol = { workspace = true }
 loopal-tool-api = { workspace = true }
 loopal-config = { workspace = true }
-loopal-storage = { workspace = true }
-loopal-provider = { workspace = true }
-loopal-tools = { workspace = true }
-loopal-mcp = { workspace = true }
-loopal-hooks = { workspace = true }
-loopal-context = { workspace = true }
-loopal-kernel = { workspace = true }
 loopal-runtime = { workspace = true }
-loopal-agent = { workspace = true }
 loopal-session = { workspace = true }
 loopal-tui = { workspace = true }
 loopal-acp = { workspace = true }
@@ -195,7 +186,6 @@ loopal-agent-server = { workspace = true }
 loopal-agent-client = { workspace = true }
 loopal-ipc = { workspace = true }
 loopal-git = { workspace = true }
-loopal-memory = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 clap = { workspace = true }
@@ -206,7 +196,6 @@ chrono = { workspace = true }
 dirs = { workspace = true }
 anyhow = { workspace = true }
 uuid = { workspace = true }
-async-trait = { workspace = true }
 
 [dev-dependencies]
 loopal-ipc = { workspace = true }

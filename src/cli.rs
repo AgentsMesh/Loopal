@@ -31,10 +31,6 @@ pub struct Cli {
     #[arg(long)]
     pub serve: bool,
 
-    /// Disable multi-process mode (run TUI and agent in same process)
-    #[arg(long)]
-    pub no_ipc: bool,
-
     /// Run agent in an isolated git worktree
     #[arg(long)]
     pub worktree: bool,

@@ -44,6 +44,7 @@ impl AgentClient {
     }
 
     /// Send `agent/start` to begin the agent loop.
+    #[allow(clippy::too_many_arguments)]
     pub async fn start_agent(
         &self,
         cwd: &Path,

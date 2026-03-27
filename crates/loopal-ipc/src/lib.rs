@@ -7,10 +7,14 @@ pub mod connection;
 pub mod jsonrpc;
 pub mod protocol;
 pub mod stdio;
+pub mod tcp;
+pub mod tcp_listener;
 pub mod transport;
 
 pub use connection::Connection;
 pub use jsonrpc::{IncomingMessage, JsonRpcError, read_message};
 pub use protocol::{Method, methods};
 pub use stdio::StdioTransport;
+pub use tcp::TcpTransport;
+pub use tcp_listener::IpcListener;
 pub use transport::Transport;

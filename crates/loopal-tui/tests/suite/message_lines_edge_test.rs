@@ -106,6 +106,7 @@ fn test_tool_call_single_line_summary() {
             started_at: None,
             duration_ms: None,
             progress_tail: None,
+            metadata: None,
         }],
         image_count: 0,
     };
@@ -131,6 +132,7 @@ fn test_tool_call_error_shows_cross() {
             started_at: None,
             duration_ms: None,
             progress_tail: None,
+            metadata: None,
         }],
         image_count: 0,
     };
@@ -155,6 +157,7 @@ fn test_tool_call_pending_shows_spinner() {
             started_at: None,
             duration_ms: None,
             progress_tail: None,
+            metadata: None,
         }],
         image_count: 0,
     };
@@ -179,6 +182,7 @@ fn test_assistant_with_content_and_tools() {
             started_at: None,
             duration_ms: None,
             progress_tail: None,
+            metadata: None,
         }],
         image_count: 0,
     };

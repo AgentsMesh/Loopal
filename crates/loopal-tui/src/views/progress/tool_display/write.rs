@@ -14,17 +14,23 @@ pub fn extract_detail(input: &serde_json::Value) -> Option<String> {
         .map(|s| s.to_string())
 }
 
-/// Body: show bytes written.
+/// Body: show bytes written (from structured metadata, with string fallback).
 pub fn render_body(tc: &DisplayToolCall) -> Vec<Line<'static>> {
     let msg = tc
-        .result
-        .as_deref()
-        .and_then(|r| {
-            r.trim()
-                .strip_prefix("Successfully wrote ")
-                .and_then(|s| s.split(' ').next())
-                .and_then(|n| n.parse::<u64>().ok())
-                .map(format_bytes)
+        .metadata
+        .as_ref()
+        .and_then(|m| m.get("bytes_written"))
+        .and_then(|v| v.as_u64())
+        .map(format_bytes)
+        .or_else(|| {
+            // Fallback: parse legacy string format for backward compat
+            tc.result.as_deref().and_then(|r| {
+                r.trim()
+                    .strip_prefix("Successfully wrote ")
+                    .and_then(|s| s.split(' ').next())
+                    .and_then(|n| n.parse::<u64>().ok())
+                    .map(format_bytes)
+            })
         })
         .unwrap_or_else(|| "written".to_string());
     vec![output_first_line(&msg)]

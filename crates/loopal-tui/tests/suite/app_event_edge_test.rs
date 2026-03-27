@@ -115,6 +115,7 @@ fn test_flush_streaming_new_message_when_assistant_has_tool_calls() {
                 started_at: None,
                 duration_ms: None,
                 progress_tail: None,
+                metadata: None,
             }],
             image_count: 0,
         });

@@ -13,7 +13,8 @@ use crate::message_log::record_message_routed;
 use crate::state::SessionState;
 use crate::thinking_display::handle_thinking_complete;
 use crate::tool_result_handler::{
-    handle_tool_batch_start, handle_tool_call, handle_tool_progress, handle_tool_result,
+    ToolResultParams, handle_tool_batch_start, handle_tool_call, handle_tool_progress,
+    handle_tool_result,
 };
 use crate::types::{DisplayMessage, PendingPermission};
 
@@ -61,8 +62,21 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
             result,
             is_error,
             duration_ms,
+            is_completion,
+            metadata,
         } => {
-            handle_tool_result(state, id, name, result, is_error, duration_ms);
+            handle_tool_result(
+                state,
+                ToolResultParams {
+                    id,
+                    name,
+                    result,
+                    is_error,
+                    duration_ms,
+                    is_completion,
+                    metadata,
+                },
+            );
         }
         AgentEventPayload::ToolPermissionRequest { id, name, input } => {
             flush_streaming(state);
@@ -177,6 +191,9 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
         } => {
             crate::server_tool_display::handle_server_tool_result(state, &tool_use_id, &content);
         }
+        // SubAgentSpawned is handled by the TUI event loop for auto-attach,
+        // not by SessionState. We just ignore it here.
+        AgentEventPayload::SubAgentSpawned { .. } => {}
     }
     None
 }

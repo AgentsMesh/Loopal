@@ -7,6 +7,9 @@
 //! LLM providers, tools, and context pipeline.
 
 mod agent_setup;
+mod hub_emitter;
+#[doc(hidden)]
+pub mod hub_frontend;
 #[doc(hidden)]
 pub mod interrupt_filter;
 mod ipc_emitter;
@@ -15,10 +18,16 @@ mod memory_adapter;
 mod mock_loader;
 mod params;
 mod server;
+pub mod server_info;
+mod session_forward;
+#[doc(hidden)]
+pub mod session_hub;
+mod session_start;
+mod tcp_accept;
 mod test_server;
 
 pub use server::{run_agent_server, run_agent_server_with_mock};
-pub use test_server::run_server_for_test;
+pub use test_server::{run_server_for_test, run_server_for_test_interactive, run_test_connection};
 
 /// Test-only constructor for IpcFrontend (used by integration tests).
 #[doc(hidden)]
@@ -31,4 +40,25 @@ pub fn ipc_frontend_for_test(
         incoming_rx,
         None,
     ))
+}
+
+/// Test-only: create a HubFrontend with a SharedSession for integration tests.
+#[doc(hidden)]
+pub fn hub_frontend_for_test(
+    session: std::sync::Arc<session_hub::SharedSession>,
+    input_rx: tokio::sync::mpsc::Receiver<session_hub::InputFromClient>,
+    interrupt_rx: tokio::sync::watch::Receiver<u64>,
+) -> std::sync::Arc<dyn loopal_runtime::frontend::traits::AgentFrontend> {
+    std::sync::Arc::new(hub_frontend::HubFrontend::new(
+        session,
+        input_rx,
+        None,
+        interrupt_rx,
+    ))
+}
+
+/// Test-only: re-export internal types for integration tests.
+#[doc(hidden)]
+pub mod testing {
+    pub use crate::session_hub::{InputFromClient, SharedSession};
 }

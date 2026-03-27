@@ -26,6 +26,7 @@ pub(crate) fn handle_server_tool_use(
         started_at: None,
         duration_ms: None,
         progress_tail: None,
+        metadata: None,
     };
     if let Some(last) = state.messages.last_mut()
         && last.role == "assistant"

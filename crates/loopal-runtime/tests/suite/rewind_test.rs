@@ -32,6 +32,8 @@ fn tool_result_only_user_msg_not_a_turn() {
             tool_use_id: "t1".into(),
             content: "result".into(),
             is_error: false,
+            is_completion: false,
+            metadata: None,
         }],
     };
     let messages = vec![

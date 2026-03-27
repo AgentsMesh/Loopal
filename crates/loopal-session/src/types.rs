@@ -54,6 +54,8 @@ pub struct DisplayToolCall {
     pub started_at: Option<Instant>,
     pub duration_ms: Option<u64>,
     pub progress_tail: Option<String>,
+    /// Structured metadata from tool (e.g. `{"bytes_written": 1234}`).
+    pub metadata: Option<serde_json::Value>,
 }
 
 /// A pending tool permission request awaiting user approval.

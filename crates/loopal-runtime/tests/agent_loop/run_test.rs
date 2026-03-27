@@ -3,7 +3,7 @@ use loopal_error::{LoopalError, TerminateReason};
 use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::{StopReason, StreamChunk};
 use loopal_tool_api::PermissionLevel;
-use loopal_tool_api::{COMPLETION_PREFIX, Tool, ToolContext, ToolResult};
+use loopal_tool_api::{Tool, ToolContext, ToolResult};
 
 use super::mock_provider::{make_interactive_multi_runner, make_runner_with_mock_provider};
 
@@ -66,7 +66,7 @@ impl Tool for FakeCompletionTool {
             .get("result")
             .and_then(|v| v.as_str())
             .unwrap_or("done");
-        Ok(ToolResult::success(format!("{COMPLETION_PREFIX}{r}")))
+        Ok(ToolResult::completion(r))
     }
 }
 

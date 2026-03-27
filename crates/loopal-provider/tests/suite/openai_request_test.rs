@@ -48,6 +48,8 @@ fn test_build_input_tool_result_becomes_function_call_output() {
                 tool_use_id: "call_123".to_string(),
                 content: "file contents here".to_string(),
                 is_error: false,
+                is_completion: false,
+                metadata: None,
             }],
         }],
         vec![],

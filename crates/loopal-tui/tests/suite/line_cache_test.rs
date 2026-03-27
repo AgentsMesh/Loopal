@@ -66,6 +66,7 @@ fn test_tool_call_mutation_detected() {
             started_at: None,
             duration_ms: None,
             progress_tail: None,
+            metadata: None,
         }],
         image_count: 0,
     }];
@@ -128,6 +129,7 @@ fn test_tool_result_arrival_invalidates_cache() {
             started_at: None,
             duration_ms: None,
             progress_tail: None,
+            metadata: None,
         }],
         image_count: 0,
     }];

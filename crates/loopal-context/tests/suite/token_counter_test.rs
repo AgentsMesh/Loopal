@@ -75,6 +75,8 @@ fn test_estimate_messages_tokens_includes_tool_io() {
                 tool_use_id: "call_1".into(),
                 content: "fn main() {}".into(),
                 is_error: false,
+                is_completion: false,
+                metadata: None,
             }],
         },
     ];

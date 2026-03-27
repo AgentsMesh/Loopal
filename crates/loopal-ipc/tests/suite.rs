@@ -14,5 +14,9 @@ mod jsonrpc_test;
 mod protocol_test;
 #[path = "suite/regression_test.rs"]
 mod regression_test;
+#[path = "suite/tcp_listener_test.rs"]
+mod tcp_listener_test;
+#[path = "suite/tcp_transport_test.rs"]
+mod tcp_transport_test;
 #[path = "suite/transport_test.rs"]
 mod transport_test;

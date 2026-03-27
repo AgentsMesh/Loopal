@@ -4,7 +4,6 @@ use loopal_protocol::{AgentEvent, AgentEventPayload};
 use loopal_session::ToolCallStatus;
 use loopal_session::event_handler::apply_event;
 use loopal_session::state::SessionState;
-use loopal_tool_api::COMPLETION_PREFIX;
 
 fn make_state() -> SessionState {
     SessionState::new("test-model".to_string(), "act".to_string())
@@ -31,6 +30,8 @@ fn test_tool_result_preserves_input_summary() {
             result: "file contents here".into(),
             is_error: false,
             duration_ms: None,
+            is_completion: false,
+            metadata: None,
         }),
     );
 
@@ -58,6 +59,8 @@ fn test_tool_result_stores_full_content() {
             result: "hello\nworld".into(),
             is_error: false,
             duration_ms: None,
+            is_completion: false,
+            metadata: None,
         }),
     );
 
@@ -82,9 +85,11 @@ fn test_attempt_completion_promotes_to_assistant_message() {
         AgentEvent::root(AgentEventPayload::ToolResult {
             id: "tc-ac".into(),
             name: "AttemptCompletion".into(),
-            result: format!("{COMPLETION_PREFIX}# Report\n\nDone."),
+            result: "# Report\n\nDone.".into(),
             is_error: false,
             duration_ms: None,
+            is_completion: true,
+            metadata: None,
         }),
     );
 
@@ -120,6 +125,8 @@ fn test_attempt_completion_error_not_promoted() {
             result: "something went wrong".into(),
             is_error: true,
             duration_ms: None,
+            is_completion: false,
+            metadata: None,
         }),
     );
 

@@ -1,11 +1,9 @@
 use std::io;
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use ratatui::prelude::*;
 
-use loopal_agent::router::MessageRouter;
-use loopal_protocol::AgentEvent;
+use loopal_protocol::{AgentEvent, AgentEventPayload};
 use loopal_session::SessionController;
 use tokio::sync::mpsc;
 
@@ -18,13 +16,8 @@ use crate::terminal::TerminalGuard;
 use crate::tui_helpers::route_human_message;
 
 /// Run the TUI event loop with a real terminal (production entry point).
-///
-/// Creates a crossterm backend, enters raw mode, and delegates to the
-/// backend-agnostic [`run_tui_loop`].
 pub async fn run_tui(
     session: SessionController,
-    router: Arc<MessageRouter>,
-    target_agent: String,
     cwd: PathBuf,
     agent_event_rx: mpsc::Receiver<AgentEvent>,
 ) -> anyhow::Result<()> {
@@ -34,23 +27,17 @@ pub async fn run_tui(
     let events = EventHandler::new(agent_event_rx);
     let mut app = App::new(session, cwd);
 
-    run_tui_loop(&mut terminal, events, &mut app, &router, &target_agent).await?;
+    run_tui_loop(&mut terminal, events, &mut app).await?;
 
     terminal.show_cursor()?;
     Ok(())
 }
 
 /// Backend-agnostic TUI event loop.
-///
-/// Processes events from `events`, updates `app` state, and renders to
-/// `terminal`. Extracted from [`run_tui`] so that tests can drive the same
-/// loop with a `TestBackend` and programmatic event injection.
 pub async fn run_tui_loop<B: Backend>(
     terminal: &mut Terminal<B>,
     mut events: EventHandler,
     app: &mut App,
-    router: &Arc<MessageRouter>,
-    target_agent: &str,
 ) -> anyhow::Result<()>
 where
     B::Error: Send + Sync + 'static,
@@ -71,14 +58,33 @@ where
         for event in batch {
             match event {
                 AppEvent::Key(key) => {
-                    should_quit = handle_key_action(app, key, router, target_agent, &events).await;
+                    should_quit = handle_key_action(app, key, &events).await;
                     if should_quit {
                         break;
                     }
                 }
                 AppEvent::Agent(agent_event) => {
+                    // Auto-attach to newly spawned sub-agents via TCP
+                    if let AgentEventPayload::SubAgentSpawned {
+                        ref name,
+                        pid,
+                        port,
+                        ref token,
+                    } = agent_event.payload
+                    {
+                        let conns = app.session.connections().clone();
+                        let name = name.clone();
+                        let token = token.clone();
+                        tokio::spawn(async move {
+                            conns
+                                .lock()
+                                .await
+                                .on_sub_agent_spawned(&name, pid, port, &token)
+                                .await;
+                        });
+                    }
                     if let Some(content) = app.session.handle_event(agent_event) {
-                        route_human_message(router, target_agent, content).await;
+                        route_human_message(app, content).await;
                     }
                 }
                 AppEvent::Paste(result) => {

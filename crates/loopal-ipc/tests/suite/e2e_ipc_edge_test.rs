@@ -160,6 +160,7 @@ async fn e2e_bridge_stops_on_incoming_close() {
         .unwrap();
 
     let mut rx = handles.agent_event_rx;
+    drop(handles.agent_event_tx); // Drop clone so bridge shutdown closes channel
     let ev = tokio::time::timeout(TIMEOUT, rx.recv())
         .await
         .unwrap()

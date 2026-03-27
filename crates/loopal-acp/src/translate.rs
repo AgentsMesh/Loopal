@@ -69,7 +69,8 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
         | AgentEventPayload::ServerToolUse { .. }
         | AgentEventPayload::ServerToolResult { .. }
         | AgentEventPayload::RetryError { .. }
-        | AgentEventPayload::RetryCleared => return None,
+        | AgentEventPayload::RetryCleared
+        | AgentEventPayload::SubAgentSpawned { .. } => return None,
     };
 
     let params = SessionUpdateParams {
@@ -127,6 +128,8 @@ mod tests {
             result: "file contents".into(),
             is_error: false,
             duration_ms: None,
+            is_completion: false,
+            metadata: None,
         };
         let val = translate_event(&payload, "sess-1").unwrap();
         assert_eq!(val["update"]["status"], "completed");
@@ -140,6 +143,8 @@ mod tests {
             result: "not found".into(),
             is_error: true,
             duration_ms: None,
+            is_completion: false,
+            metadata: None,
         };
         let val = translate_event(&payload, "sess-1").unwrap();
         assert_eq!(val["update"]["status"], "failed");

@@ -99,6 +99,8 @@ fn test_handle_tool_result_updates_status() {
             result: "file1.txt\nfile2.txt".to_string(),
             is_error: false,
             duration_ms: None,
+            is_completion: false,
+            metadata: None,
         }));
 
     assert_eq!(
@@ -123,6 +125,8 @@ fn test_handle_tool_result_error_status() {
             result: "command failed".to_string(),
             is_error: true,
             duration_ms: None,
+            is_completion: false,
+            metadata: None,
         }));
 
     assert_eq!(

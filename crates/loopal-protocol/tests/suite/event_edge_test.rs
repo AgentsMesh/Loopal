@@ -73,3 +73,15 @@ fn test_event_retry_cleared_serde_roundtrip() {
         AgentEventPayload::RetryCleared
     ));
 }
+
+#[test]
+fn test_event_rewound_serde_roundtrip() {
+    let event = AgentEvent::root(AgentEventPayload::Rewound { remaining_turns: 3 });
+    let json = serde_json::to_string(&event).unwrap();
+    let deserialized: AgentEvent = serde_json::from_str(&json).unwrap();
+    if let AgentEventPayload::Rewound { remaining_turns } = deserialized.payload {
+        assert_eq!(remaining_turns, 3);
+    } else {
+        panic!("expected AgentEventPayload::Rewound");
+    }
+}

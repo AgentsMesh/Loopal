@@ -13,14 +13,14 @@ use loopal_ipc::StdioTransport;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
-use loopal_protocol::{
-    AgentEvent, AgentEventPayload, Envelope, InterruptSignal, MessageSource,
-};
+use loopal_protocol::{AgentEvent, AgentEventPayload, Envelope, InterruptSignal, MessageSource};
 use loopal_test_support::TestFixture;
 use loopal_test_support::mock_provider::MultiCallProvider;
 use loopal_test_support::scenarios::Calls;
 
-use loopal_agent_server::testing::{InputFromClient, SharedSession, StartParams, build_kernel_with_provider};
+use loopal_agent_server::testing::{
+    InputFromClient, SharedSession, StartParams, build_kernel_with_provider,
+};
 
 pub const T: Duration = Duration::from_secs(10);
 
@@ -41,7 +41,9 @@ impl HubTestHarness {
     pub async fn wait_ready(&mut self) {
         let events = self.collect_events().await;
         assert!(
-            events.iter().any(|e| matches!(e, AgentEventPayload::AwaitingInput)),
+            events
+                .iter()
+                .any(|e| matches!(e, AgentEventPayload::AwaitingInput)),
             "agent should reach AwaitingInput on startup"
         );
     }
@@ -187,5 +189,7 @@ pub async fn collect_agent_events(rx: &mut mpsc::Receiver<Incoming>) -> Vec<Agen
 
 /// Check if events contain a Stream event with the given substring.
 pub fn has_stream(events: &[AgentEventPayload], needle: &str) -> bool {
-    events.iter().any(|e| matches!(e, AgentEventPayload::Stream { text } if text.contains(needle)))
+    events
+        .iter()
+        .any(|e| matches!(e, AgentEventPayload::Stream { text } if text.contains(needle)))
 }

@@ -6,16 +6,16 @@ mod bridge_edge_test;
 mod bridge_helpers;
 #[path = "suite/dispatch_loop_test.rs"]
 mod dispatch_loop_test;
-#[path = "suite/hub_frontend_test.rs"]
-mod hub_frontend_test;
 #[path = "suite/hub_frontend_edge_test.rs"]
 mod hub_frontend_edge_test;
+#[path = "suite/hub_frontend_test.rs"]
+mod hub_frontend_test;
 #[path = "suite/hub_harness.rs"]
 mod hub_harness;
-#[path = "suite/hub_interaction_test.rs"]
-mod hub_interaction_test;
 #[path = "suite/hub_interaction_edge_test.rs"]
 mod hub_interaction_edge_test;
+#[path = "suite/hub_interaction_test.rs"]
+mod hub_interaction_test;
 #[path = "suite/interrupt_filter_test.rs"]
 mod interrupt_filter_test;
 #[path = "suite/ipc_frontend_test.rs"]

@@ -16,7 +16,10 @@ async fn hub_awaiting_input_then_message_delivered() {
     h.send_message("hello").await;
     let ev1 = h.collect_events().await;
     assert!(has_stream(&ev1, "first"), "should stream first response");
-    assert!(ev1.iter().any(|e| matches!(e, AgentEventPayload::AwaitingInput)));
+    assert!(
+        ev1.iter()
+            .any(|e| matches!(e, AgentEventPayload::AwaitingInput))
+    );
 
     h.send_message("continue").await;
     let ev2 = h.collect_events().await;
@@ -31,7 +34,10 @@ async fn hub_multi_turn_three_rounds() {
     for (i, expected) in ["r1", "r2", "r3"].iter().enumerate() {
         h.send_message(&format!("msg-{i}")).await;
         let events = h.collect_events().await;
-        assert!(has_stream(&events, expected), "round {i}: expected {expected}");
+        assert!(
+            has_stream(&events, expected),
+            "round {i}: expected {expected}"
+        );
     }
 }
 
@@ -61,14 +67,18 @@ async fn hub_interrupt_during_tool_then_resume() {
     // Collect events from the interrupted turn
     let ev1 = h.collect_events().await;
     assert!(
-        ev1.iter().any(|e| matches!(e, AgentEventPayload::Interrupted)),
+        ev1.iter()
+            .any(|e| matches!(e, AgentEventPayload::Interrupted)),
         "should emit Interrupted event"
     );
 
     // Send new message — agent should resume (stale interrupt consumed)
     h.send_message("new task").await;
     let ev2 = h.collect_events().await;
-    assert!(has_stream(&ev2, "resumed ok"), "should resume after interrupt");
+    assert!(
+        has_stream(&ev2, "resumed ok"),
+        "should resume after interrupt"
+    );
 }
 
 /// Path 8: Three messages sent sequentially, all processed in order.

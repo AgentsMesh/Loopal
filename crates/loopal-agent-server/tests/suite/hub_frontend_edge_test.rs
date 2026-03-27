@@ -53,7 +53,10 @@ async fn stale_interrupt_does_not_exit_recv_input() {
 
     // Give it a moment to ensure it's actually blocking.
     tokio::time::sleep(Duration::from_millis(100)).await;
-    assert!(!recv_task.is_finished(), "recv_input should block, not exit");
+    assert!(
+        !recv_task.is_finished(),
+        "recv_input should block, not exit"
+    );
 
     // Now send a real message — recv_input should return it.
     let env = Envelope::new(MessageSource::Human, "main", "hello after interrupt");
@@ -84,7 +87,10 @@ async fn interrupt_then_continue_cycle() {
     interrupt_tx.send_modify(|v| *v = v.wrapping_add(1));
 
     let result1 = tokio::time::timeout(T, recv1).await.unwrap().unwrap();
-    assert!(result1.is_none(), "round 1: should return None on interrupt");
+    assert!(
+        result1.is_none(),
+        "round 1: should return None on interrupt"
+    );
 
     // ── Round 2: recv_input must NOT exit due to stale interrupt ──
     let f2 = frontend.clone();

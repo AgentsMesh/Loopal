@@ -22,7 +22,8 @@ async fn hub_provider_error_then_new_message_succeeds() {
     h.send_message("first attempt").await;
     let ev1 = h.collect_events().await;
     assert!(
-        ev1.iter().any(|e| matches!(e, AgentEventPayload::Error { .. })),
+        ev1.iter()
+            .any(|e| matches!(e, AgentEventPayload::Error { .. })),
         "should emit error event"
     );
 

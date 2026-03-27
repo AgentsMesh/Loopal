@@ -3,6 +3,7 @@ name = "loopal-agent-server"
 version.workspace = true
 edition.workspace = true
 license-file.workspace = true
+publish = false
 
 [lib]
 doctest = false

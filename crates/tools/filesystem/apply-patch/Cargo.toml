@@ -3,6 +3,7 @@ name = "loopal-tool-apply-patch"
 version.workspace = true
 edition.workspace = true
 license-file.workspace = true
+publish = false
 
 [lib]
 doctest = false

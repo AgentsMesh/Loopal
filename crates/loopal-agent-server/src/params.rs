@@ -5,7 +5,7 @@ use std::sync::Arc;
 use loopal_config::ResolvedConfig;
 use loopal_kernel::Kernel;
 
-pub(crate) struct StartParams {
+pub struct StartParams {
     #[allow(dead_code)]
     pub cwd: Option<String>,
     pub model: Option<String>,
@@ -31,7 +31,7 @@ pub(crate) async fn build_kernel_from_config(
 }
 
 /// Build a Kernel with injected provider (test path).
-pub(crate) fn build_kernel_with_provider(
+pub fn build_kernel_with_provider(
     provider: Arc<dyn loopal_provider_api::Provider>,
 ) -> anyhow::Result<Arc<Kernel>> {
     let settings = loopal_config::Settings::default();

@@ -22,7 +22,7 @@ use crate::params::StartParams;
 /// The caller provides the frontend and interrupt signal, decoupling agent setup
 /// from the connection/transport layer.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn build_with_frontend(
+pub fn build_with_frontend(
     cwd: &std::path::Path,
     config: &ResolvedConfig,
     start: &StartParams,

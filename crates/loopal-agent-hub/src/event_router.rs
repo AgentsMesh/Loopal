@@ -37,9 +37,7 @@ pub fn start_event_loop(
                 let hub_clone = hub.clone();
                 let name = name.clone();
                 let token = token.clone();
-                tokio::spawn(
-                    attach_with_retry(hub_clone, name, pid, port, token),
-                );
+                tokio::spawn(attach_with_retry(hub_clone, name, pid, port, token));
             }
             if frontend_tx.send(event).await.is_err() {
                 break;

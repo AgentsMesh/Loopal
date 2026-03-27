@@ -2,11 +2,11 @@
 
 use std::sync::Arc;
 
+use loopal_agent_hub::{AgentHub, PrimaryConn};
 use loopal_ipc::connection::Connection;
 use loopal_ipc::protocol::methods;
 use loopal_protocol::InterruptSignal;
 use loopal_runtime::projection::project_messages;
-use loopal_agent_hub::{AgentHub, PrimaryConn};
 use loopal_session::SessionController;
 
 use crate::cli::Cli;
@@ -76,24 +76,17 @@ async fn run_with_agent(
         interrupt_tx: interrupt_tx.clone(),
     };
 
-    let hub = Arc::new(tokio::sync::Mutex::new(
-        AgentHub::new(handles.agent_event_tx.clone()),
-    ));
+    let hub = Arc::new(tokio::sync::Mutex::new(AgentHub::new(
+        handles.agent_event_tx.clone(),
+    )));
 
     // Hub event loop: auto-attach on SubAgentSpawned, forward events to frontend
     let (frontend_tx, frontend_rx) = tokio::sync::mpsc::channel(256);
-    let _event_loop = loopal_agent_hub::start_event_loop(
-        hub.clone(),
-        handles.agent_event_rx,
-        frontend_tx,
-    );
+    let _event_loop =
+        loopal_agent_hub::start_event_loop(hub.clone(), handles.agent_event_rx, frontend_tx);
 
-    let session_ctrl = SessionController::with_primary(
-        model.clone(),
-        mode_str.to_string(),
-        primary,
-        hub,
-    );
+    let session_ctrl =
+        SessionController::with_primary(model.clone(), mode_str.to_string(), primary, hub);
 
     if let Some(ref sid) = cli.resume {
         // Load display history from persisted session for TUI rendering

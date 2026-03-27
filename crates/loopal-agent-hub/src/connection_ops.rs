@@ -117,10 +117,7 @@ impl AgentHub {
                 AgentConnectionState::Attached(conn) => {
                     let _ = conn
                         .connection
-                        .send_notification(
-                            methods::AGENT_INTERRUPT.name,
-                            serde_json::json!({}),
-                        )
+                        .send_notification(methods::AGENT_INTERRUPT.name, serde_json::json!({}))
                         .await;
                 }
                 AgentConnectionState::Detached { .. } => {}

@@ -9,9 +9,7 @@ use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
 use loopal_ipc::connection::Connection;
-use loopal_protocol::{
-    ControlCommand, Envelope, InterruptSignal, UserQuestionResponse,
-};
+use loopal_protocol::{ControlCommand, Envelope, InterruptSignal, UserQuestionResponse};
 
 /// Connection state for a managed agent.
 pub(crate) enum AgentConnectionState {

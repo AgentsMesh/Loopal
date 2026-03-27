@@ -1,6 +1,6 @@
 mod agent_handler;
-pub mod controller;
 mod agent_ops;
+pub mod controller;
 pub mod event_handler;
 mod helpers;
 pub mod inbox;

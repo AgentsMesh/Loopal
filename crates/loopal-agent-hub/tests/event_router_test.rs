@@ -3,7 +3,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{Mutex, mpsc};
 
 use loopal_agent_hub::{AgentHub, start_event_loop};
 use loopal_protocol::{AgentEvent, AgentEventPayload};

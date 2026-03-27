@@ -8,10 +8,10 @@ use loopal_protocol::{
     AgentEvent, AgentMode, ControlCommand, InterruptSignal, UserContent, UserQuestionResponse,
 };
 
-use loopal_agent_hub::{AgentHub, PrimaryConn};
 use crate::event_handler;
 use crate::inbox::try_forward_inbox;
 use crate::state::SessionState;
+use loopal_agent_hub::{AgentHub, PrimaryConn};
 
 /// External handle — cheaply cloneable, shareable across consumers.
 #[derive(Clone)]

@@ -90,6 +90,7 @@ pub(crate) async fn init_client(conn: &Connection) {
 
 /// Observer joins active session and receives events from subsequent turns.
 #[tokio::test]
+#[ignore = "agent/join removed: Hub now handles multi-client observation"]
 async fn observer_joins_session_receives_events() {
     let hub = Arc::new(loopal_agent_server::session_hub::SessionHub::new());
     let fixture = TestFixture::new();

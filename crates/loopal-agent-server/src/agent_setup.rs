@@ -2,8 +2,6 @@
 
 use std::sync::Arc;
 
-use loopal_agent::registry::AgentRegistry;
-use loopal_agent::router::MessageRouter;
 use loopal_agent::shared::AgentShared;
 use loopal_agent::task_store::TaskStore;
 use loopal_config::ResolvedConfig;
@@ -30,6 +28,7 @@ pub fn build_with_frontend(
     interrupt: InterruptSignal,
     interrupt_tx: Arc<tokio::sync::watch::Sender<u64>>,
     kernel: Arc<Kernel>,
+    hub_connection: Arc<loopal_ipc::connection::Connection>,
     session_dir_override: Option<&std::path::Path>,
     interactive: bool,
 ) -> anyhow::Result<AgentLoopParams> {
@@ -75,16 +74,13 @@ pub fn build_with_frontend(
         }
     });
 
-    let (observation_tx, _) = tokio::sync::mpsc::channel(256);
-    let router = Arc::new(MessageRouter::new(observation_tx));
     let tasks_dir = loopal_config::session_tasks_dir(&session.id)
         .unwrap_or_else(|_| std::env::temp_dir().join("loopal/tasks"));
 
     let agent_shared = Arc::new(AgentShared {
         kernel: kernel.clone(),
-        registry: Arc::new(tokio::sync::Mutex::new(AgentRegistry::new())),
         task_store: Arc::new(TaskStore::new(tasks_dir)),
-        router,
+        hub_connection,
         cwd: cwd.to_path_buf(),
         depth: 0,
         max_depth: 3,

@@ -4,6 +4,7 @@
 //! protocol for communication between TUI, Agent, and Sub-Agent processes.
 
 pub mod connection;
+pub mod duplex;
 pub mod jsonrpc;
 pub mod protocol;
 pub mod stdio;
@@ -12,6 +13,7 @@ pub mod tcp_listener;
 pub mod transport;
 
 pub use connection::Connection;
+pub use duplex::duplex_pair;
 pub use jsonrpc::{IncomingMessage, JsonRpcError, read_message};
 pub use protocol::{Method, methods};
 pub use stdio::StdioTransport;

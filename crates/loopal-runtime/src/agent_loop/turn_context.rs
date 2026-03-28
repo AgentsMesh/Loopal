@@ -16,6 +16,10 @@ pub struct TurnContext {
     pub started_at: Instant,
     /// File paths modified during this turn (for diff tracking).
     pub modified_files: BTreeSet<String>,
+    /// Warnings collected by observers (e.g. loop detector) to be appended
+    /// to the tool results message. Must NOT be pushed as a separate User
+    /// message — that breaks tool_use/tool_result pairing after normalization.
+    pub pending_warnings: Vec<String>,
 }
 
 impl TurnContext {
@@ -25,6 +29,7 @@ impl TurnContext {
             cancel,
             started_at: Instant::now(),
             modified_files: BTreeSet::new(),
+            pending_warnings: Vec::new(),
         }
     }
 }

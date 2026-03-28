@@ -1,4 +1,4 @@
-use loopal_message::{Message, MessageRole, normalize_messages};
+use loopal_message::{ContentBlock, Message, MessageRole, normalize_messages};
 
 #[test]
 fn test_normalize_merges_consecutive_same_role() {
@@ -111,4 +111,58 @@ fn test_normalize_system_between_different_roles() {
     assert_eq!(normalized.len(), 2);
     assert_eq!(normalized[0].role, MessageRole::User);
     assert_eq!(normalized[1].role, MessageRole::Assistant);
+}
+
+/// Regression test: when a User(Text) message (e.g. loop detector warning)
+/// is followed by a User(ToolResult), merging must place ToolResult before Text.
+/// Otherwise the Anthropic API rejects with "tool_use ids found without tool_result".
+#[test]
+fn test_normalize_tool_result_before_text_after_merge() {
+    let warning = Message {
+        id: None,
+        role: MessageRole::User,
+        content: vec![ContentBlock::Text {
+            text: "[WARNING: loop detected]".into(),
+        }],
+    };
+    let tool_results = Message {
+        id: None,
+        role: MessageRole::User,
+        content: vec![ContentBlock::ToolResult {
+            tool_use_id: "toolu_abc".into(),
+            content: "ok".into(),
+            is_error: false,
+            is_completion: false,
+            metadata: None,
+        }],
+    };
+    let messages = vec![
+        Message::assistant("thinking"),
+        Message {
+            id: None,
+            role: MessageRole::Assistant,
+            content: vec![ContentBlock::ToolUse {
+                id: "toolu_abc".into(),
+                name: "Read".into(),
+                input: serde_json::json!({}),
+            }],
+        },
+        warning,
+        tool_results,
+    ];
+    let normalized = normalize_messages(&messages);
+    assert_eq!(normalized.len(), 2); // merged assistant + merged user
+    let user_msg = &normalized[1];
+    assert_eq!(user_msg.role, MessageRole::User);
+    // ToolResult must come before Text
+    assert!(
+        matches!(&user_msg.content[0], ContentBlock::ToolResult { .. }),
+        "first block should be ToolResult, got {:?}",
+        user_msg.content[0]
+    );
+    assert!(
+        matches!(&user_msg.content[1], ContentBlock::Text { .. }),
+        "second block should be Text, got {:?}",
+        user_msg.content[1]
+    );
 }

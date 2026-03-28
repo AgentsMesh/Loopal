@@ -31,6 +31,14 @@ pub struct Cli {
     #[arg(long)]
     pub serve: bool,
 
+    /// Run as Hub server (headless, no TUI)
+    #[arg(long)]
+    pub hub: bool,
+
+    /// Hub TCP port to connect back to (used by --serve when spawned by Hub)
+    #[arg(long, hide = true)]
+    pub hub_port: Option<u16>,
+
     /// Run agent in an isolated git worktree
     #[arg(long)]
     pub worktree: bool,

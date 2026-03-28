@@ -9,12 +9,16 @@ publish = false
 doctest = false
 
 [dependencies]
+loopal-agent-client = { workspace = true }
 loopal-ipc = { workspace = true }
 loopal-protocol = { workspace = true }
 anyhow = { workspace = true }
+chrono = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
+uuid = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

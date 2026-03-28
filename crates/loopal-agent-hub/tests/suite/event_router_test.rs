@@ -109,9 +109,7 @@ async fn sub_agent_spawned_forwarded_despite_attach_failure() {
 
     let event = AgentEvent::root(AgentEventPayload::SubAgentSpawned {
         name: "test-agent".into(),
-        pid: 12345,
-        port: 1, // invalid port — attach will fail
-        token: "fake-token".into(),
+        agent_id: "test-id".into(),
     });
     raw_tx.send(event).await.unwrap();
 

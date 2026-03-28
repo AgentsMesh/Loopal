@@ -103,7 +103,9 @@ async fn drain_until_idle(rx: &mut tokio::sync::mpsc::Receiver<Incoming>) {
     }
 }
 
-/// dispatch_loop cycles: Session-1 finishes → Session-2 starts on same connection.
+/// dispatch_loop: Interactive session-1 → interrupted by agent/start → Session-2.
+/// Note: non-interactive sessions now exit after completion (Hub architecture),
+/// so session cycling only applies to interactive sessions receiving a new agent/start.
 #[tokio::test]
 async fn dispatch_loop_session_cycling() {
     use loopal_test_support::chunks;
@@ -113,11 +115,11 @@ async fn dispatch_loop_session_cycling() {
     ])
     .await;
 
-    // Session 1 (non-interactive: has prompt → finishes)
-    let sid1 = init_and_start(&conn, &mut rx, Some("hello")).await;
+    // Session 1 (interactive: no prompt → waits for input)
+    let sid1 = init_and_start(&conn, &mut rx, None).await;
     drain_until_idle(&mut rx).await;
 
-    // Session 2 on same connection (no re-initialize needed)
+    // Session 2: agent/start while session-1 is waiting interrupts and chains
     let sid2 = start_only(&conn, Some("world")).await;
     drain_until_idle(&mut rx).await;
 

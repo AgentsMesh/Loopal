@@ -21,6 +21,55 @@ pub struct AgentProcess {
 }
 
 impl AgentProcess {
+    /// Spawn `loopal --serve` with additional arguments and environment variables.
+    pub async fn spawn_with_args(
+        executable: Option<&str>,
+        extra_args: &[&str],
+    ) -> anyhow::Result<Self> {
+        Self::spawn_with_env(executable, extra_args, &[]).await
+    }
+
+    /// Spawn with custom args and env vars.
+    pub async fn spawn_with_env(
+        executable: Option<&str>,
+        extra_args: &[&str],
+        env_vars: &[(&str, &str)],
+    ) -> anyhow::Result<Self> {
+        let exe = executable.unwrap_or("loopal");
+        let exe_path = Self::resolve_executable(exe)?;
+
+        info!(exe = %exe_path.display(), ?extra_args, "spawning agent process");
+
+        let mut cmd = Command::new(&exe_path);
+        cmd.arg("--serve")
+            .args(extra_args)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .kill_on_drop(true);
+        for (key, val) in env_vars {
+            cmd.env(key, val);
+        }
+
+        let mut child = cmd.spawn()?;
+
+        let stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| anyhow::anyhow!("failed to capture child stdin"))?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| anyhow::anyhow!("failed to capture child stdout"))?;
+
+        let transport: Arc<dyn Transport> = Arc::new(StdioTransport::new(
+            Box::new(tokio::io::BufReader::new(stdout)),
+            Box::new(stdin),
+        ));
+
+        Ok(Self { child, transport })
+    }
+
     /// Spawn `loopal --serve` as a child process.
     ///
     /// The child's stdin/stdout are captured for IPC. Stderr is inherited
@@ -104,11 +153,17 @@ impl AgentProcess {
     }
 
     fn resolve_executable(name: &str) -> anyhow::Result<PathBuf> {
+        // If an explicit path is provided and exists, use it directly.
+        let explicit = PathBuf::from(name);
+        if explicit.is_absolute() && explicit.exists() {
+            return Ok(explicit);
+        }
+        // Otherwise, use the current executable (same binary, --serve mode).
         if let Ok(current) = std::env::current_exe() {
             if current.exists() {
                 return Ok(current);
             }
         }
-        Ok(PathBuf::from(name))
+        Ok(explicit)
     }
 }

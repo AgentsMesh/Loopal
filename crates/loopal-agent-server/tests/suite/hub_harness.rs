@@ -131,6 +131,10 @@ pub async fn build_hub_harness_with(
         no_sandbox: true,
         resume: None,
     };
+    // Mock hub connection for tests (in-memory duplex).
+    let (hub_conn, _hub_peer) = loopal_ipc::duplex_pair();
+    let hub_connection = std::sync::Arc::new(loopal_ipc::Connection::new(hub_conn));
+
     let params = loopal_agent_server::testing::build_with_frontend(
         fixture.path(),
         &config,
@@ -139,6 +143,7 @@ pub async fn build_hub_harness_with(
         interrupt.clone(),
         interrupt_tx.clone(),
         kernel,
+        hub_connection,
         Some(fixture.path()),
         interactive,
     )

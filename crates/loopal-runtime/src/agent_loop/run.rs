@@ -15,6 +15,7 @@ impl AgentLoopRunner {
     /// Outer loop: user-interaction granularity.
     pub(super) async fn run_loop(&mut self) -> Result<AgentOutput> {
         let mut last_output = String::new();
+        let mut server_block_retry = false;
         loop {
             info!(
                 turn = self.turn_count,
@@ -91,6 +92,15 @@ impl AgentLoopRunner {
                     }
                 }
                 Err(e) => {
+                    // Defensive: if API rejects code_execution server blocks,
+                    // condense them all and retry immediately (once).
+                    if !server_block_retry && is_server_block_error(&e) {
+                        server_block_retry = true;
+                        info!("condensing server blocks after API rejection, retrying");
+                        self.params.store.condense_server_blocks();
+                        continue;
+                    }
+
                     if self.interrupt.take() {
                         self.emit_interrupted().await?;
                         match self.wait_for_input().await? {
@@ -148,4 +158,13 @@ impl AgentLoopRunner {
         info!("agent interrupted by user");
         self.emit(AgentEventPayload::Interrupted).await
     }
+}
+
+/// Check if an error is caused by API rejecting server tool blocks
+/// (code_execution / web_search). This happens when the API can't validate
+/// server blocks in the conversation history for various reasons.
+fn is_server_block_error(e: &LoopalError) -> bool {
+    let msg = e.to_string();
+    msg.contains("code_execution")
+        && (msg.contains("without a corresponding") || msg.contains("tool_result"))
 }

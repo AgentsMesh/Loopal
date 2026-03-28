@@ -92,9 +92,7 @@ fn sub_agent_spawned_ignored_by_state() {
         &mut state,
         AgentEvent::root(AgentEventPayload::SubAgentSpawned {
             name: "worker".into(),
-            pid: 12345,
-            port: 9999,
-            token: "tok".into(),
+            agent_id: "test-id".into(),
         }),
     );
     assert!(

@@ -1,15 +1,11 @@
 use loopal_tool_api::{Tool, ToolContext};
-use loopal_tool_background::task_output::TaskOutputTool;
-use loopal_tool_background::task_stop::TaskStopTool;
 #[cfg(not(windows))]
 use loopal_tool_bash::BashTool;
 use serde_json::json;
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     let backend = loopal_backend::LocalBackend::new(
-        cwd.to_path_buf(),
-        None,
-        loopal_backend::ResourceLimits::default(),
+        cwd.to_path_buf(), None, loopal_backend::ResourceLimits::default(),
     );
     ToolContext {
         session_id: "test".into(),
@@ -20,110 +16,79 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     }
 }
 
+/// Bash(process_id=nonexistent) returns error.
 #[tokio::test]
-async fn test_task_output_nonexistent_task() {
+async fn test_output_nonexistent_process() {
     let tmp = tempfile::tempdir().unwrap();
-    let tool = TaskOutputTool;
+    let bash = loopal_tool_bash::BashTool;
     let ctx = make_ctx(tmp.path());
 
-    let result = tool
-        .execute(json!({ "task_id": "bg_nonexistent_99999" }), &ctx)
-        .await
-        .unwrap();
-
+    let result = bash.execute(
+        json!({"process_id": "bg_nonexistent_99999"}), &ctx,
+    ).await.unwrap();
     assert!(result.is_error);
-    assert!(result.content.contains("Task not found"));
+    assert!(result.content.contains("not found"));
 }
 
+/// Bash(process_id=nonexistent, stop=true) returns error.
 #[tokio::test]
-async fn test_task_stop_nonexistent_task() {
+async fn test_stop_nonexistent_process() {
     let tmp = tempfile::tempdir().unwrap();
-    let tool = TaskStopTool;
+    let bash = loopal_tool_bash::BashTool;
     let ctx = make_ctx(tmp.path());
 
-    let result = tool
-        .execute(json!({ "task_id": "bg_nonexistent_99999" }), &ctx)
-        .await
-        .unwrap();
-
+    let result = bash.execute(
+        json!({"process_id": "bg_nonexistent_99999", "stop": true}), &ctx,
+    ).await.unwrap();
     assert!(result.is_error);
-    assert!(result.content.contains("Task not found"));
+    assert!(result.content.contains("not found"));
 }
 
+/// Non-blocking output returns Running immediately.
 #[tokio::test]
-#[cfg(not(windows))] // cmd.exe child processes become orphans on kill, blocking pipe reads
-async fn test_task_output_non_blocking() {
+#[cfg(not(windows))]
+async fn test_non_blocking_output() {
     let tmp = tempfile::tempdir().unwrap();
     let bash = BashTool;
     let ctx = make_ctx(tmp.path());
 
-    let result = bash
-        .execute(
-            json!({
-                "command": "sleep 300",
-                "run_in_background": true
-            }),
-            &ctx,
-        )
-        .await
+    let result = bash.execute(
+        json!({"command": "sleep 300", "run_in_background": true}), &ctx,
+    ).await.unwrap();
+    let pid = result.content.lines()
+        .find(|l| l.starts_with("process_id:"))
+        .and_then(|l| l.strip_prefix("process_id: "))
         .unwrap();
 
-    let task_id = result
-        .content
-        .strip_prefix("Background task started: ")
-        .unwrap();
-
-    let output_tool = TaskOutputTool;
-    let output = output_tool
-        .execute(json!({ "task_id": task_id, "block": false }), &ctx)
-        .await
-        .unwrap();
-
-    // Non-blocking should return immediately with Running status
-    assert!(!output.is_error);
+    let output = bash.execute(
+        json!({"process_id": pid, "block": false}), &ctx,
+    ).await.unwrap();
     assert!(output.content.contains("[Status: Running]"));
 
-    // Clean up: stop the long-running task
-    let stop_tool = TaskStopTool;
-    let _ = stop_tool.execute(json!({ "task_id": task_id }), &ctx).await;
+    // Cleanup
+    let _ = bash.execute(json!({"process_id": pid, "stop": true}), &ctx).await;
 }
 
+/// Blocking with short timeout returns timed-out status.
 #[tokio::test]
-#[cfg(not(windows))] // cmd.exe child processes become orphans on kill, blocking pipe reads
-async fn test_task_output_timeout_while_running() {
+#[cfg(not(windows))]
+async fn test_output_timeout() {
     let tmp = tempfile::tempdir().unwrap();
     let bash = BashTool;
     let ctx = make_ctx(tmp.path());
 
-    let result = bash
-        .execute(
-            json!({
-                "command": "sleep 300",
-                "run_in_background": true
-            }),
-            &ctx,
-        )
-        .await
+    let result = bash.execute(
+        json!({"command": "sleep 300", "run_in_background": true}), &ctx,
+    ).await.unwrap();
+    let pid = result.content.lines()
+        .find(|l| l.starts_with("process_id:"))
+        .and_then(|l| l.strip_prefix("process_id: "))
         .unwrap();
 
-    let task_id = result
-        .content
-        .strip_prefix("Background task started: ")
-        .unwrap();
+    let output = bash.execute(
+        json!({"process_id": pid, "block": true, "timeout": 200}), &ctx,
+    ).await.unwrap();
+    assert!(output.content.contains("timed out"));
 
-    let output_tool = TaskOutputTool;
-    let output = output_tool
-        .execute(
-            json!({ "task_id": task_id, "block": true, "timeout": 200 }),
-            &ctx,
-        )
-        .await
-        .unwrap();
-
-    assert!(!output.is_error);
-    assert!(output.content.contains("timed out waiting"));
-
-    // Clean up
-    let stop_tool = TaskStopTool;
-    let _ = stop_tool.execute(json!({ "task_id": task_id }), &ctx).await;
+    let _ = bash.execute(json!({"process_id": pid, "stop": true}), &ctx).await;
 }

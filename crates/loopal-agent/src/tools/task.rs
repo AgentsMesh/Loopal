@@ -3,7 +3,7 @@ use loopal_error::LoopalError;
 use loopal_tool_api::PermissionLevel;
 use loopal_tool_api::{Tool, ToolContext, ToolResult};
 
-use super::agent::extract_shared;
+use super::collaboration::agent::extract_shared;
 use crate::task_store::TaskPatch;
 use crate::types::TaskStatus;
 

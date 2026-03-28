@@ -1856,6 +1856,7 @@ dependencies = [
  "loopal-storage",
  "loopal-test-support",
  "loopal-tool-api",
+ "loopal-tool-background",
  "serde",
  "serde_json",
  "tempfile",
@@ -1886,11 +1887,15 @@ name = "loopal-agent-hub"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
+ "loopal-agent-client",
  "loopal-ipc",
  "loopal-protocol",
+ "serde",
  "serde_json",
  "tokio",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -2212,6 +2217,7 @@ dependencies = [
  "chrono",
  "indexmap",
  "loopal-agent-hub",
+ "loopal-ipc",
  "loopal-protocol",
  "loopal-tool-api",
  "serde_json",
@@ -2322,6 +2328,7 @@ dependencies = [
  "loopal-error",
  "loopal-sandbox",
  "loopal-tool-api",
+ "loopal-tool-background",
  "serde_json",
  "tempfile",
  "tokio",

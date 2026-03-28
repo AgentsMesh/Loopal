@@ -64,7 +64,7 @@ pub async fn exec_command(
 /// Spawn a background command under OS sandbox; returns a task ID.
 ///
 /// Registers the task in the shared `loopal_tool_background` store so that
-/// `TaskOutputTool` and `TaskStopTool` can query it.
+/// `Bash(process_id=...)` can query or stop it.
 pub async fn exec_background(
     cwd: &Path,
     policy: Option<&ResolvedPolicy>,
@@ -97,12 +97,17 @@ pub async fn exec_background(
     let exit_code_buf = Arc::new(Mutex::new(None));
     let status_buf = Arc::new(Mutex::new(loopal_tool_background::TaskStatus::Running));
 
+    let (watch_tx, watch_rx) = tokio::sync::watch::channel(
+        loopal_tool_background::TaskStatus::Running,
+    );
+
     let task = loopal_tool_background::BackgroundTask {
         output: Arc::clone(&output_buf),
         exit_code: Arc::clone(&exit_code_buf),
         status: Arc::clone(&status_buf),
         description: desc.to_string(),
         child: Arc::new(Mutex::new(Some(child))),
+        status_watch: watch_rx,
     };
 
     let child_handle = Arc::clone(&task.child);
@@ -133,11 +138,13 @@ pub async fn exec_background(
         *ob.lock().unwrap() = combined;
         let code = child.wait().await.ok().and_then(|s| s.code());
         *eb.lock().unwrap() = code;
-        *sb.lock().unwrap() = if code == Some(0) {
+        let final_status = if code == Some(0) {
             loopal_tool_background::TaskStatus::Completed
         } else {
             loopal_tool_background::TaskStatus::Failed
         };
+        *sb.lock().unwrap() = final_status.clone();
+        let _ = watch_tx.send(final_status);
     });
 
     Ok(task_id)

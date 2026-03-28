@@ -23,3 +23,5 @@ mod message_log_test;
 mod retry_banner_test;
 #[path = "suite/rewind_test.rs"]
 mod rewind_test;
+#[path = "suite/topology_test.rs"]
+mod topology_test;

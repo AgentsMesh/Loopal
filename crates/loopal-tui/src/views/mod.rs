@@ -8,4 +8,5 @@ pub mod retry_banner;
 pub mod rewind_picker;
 pub mod separator;
 pub mod tool_confirm;
+pub mod topology_overlay;
 pub mod unified_status;

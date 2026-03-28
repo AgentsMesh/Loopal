@@ -191,9 +191,10 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
         } => {
             crate::server_tool_display::handle_server_tool_result(state, &tool_use_id, &content);
         }
-        // SubAgentSpawned is handled by AgentHub's event_router for auto-attach.
-        // SessionState ignores it.
-        AgentEventPayload::SubAgentSpawned { .. } => {}
+        // SubAgentSpawned registers topology (parent/child) in SessionState.
+        AgentEventPayload::SubAgentSpawned { name, parent, model, .. } => {
+            crate::agent_handler::register_spawned_agent(state, &name, parent.as_deref(), model.as_deref());
+        }
     }
     None
 }

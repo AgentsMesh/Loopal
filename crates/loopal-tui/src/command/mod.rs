@@ -8,6 +8,7 @@ mod model_cmd;
 pub mod registry;
 mod rewind_cmd;
 mod skill;
+mod topology_cmd;
 
 use async_trait::async_trait;
 use loopal_protocol::{AgentMode, UserContent};

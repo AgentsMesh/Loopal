@@ -110,6 +110,8 @@ async fn sub_agent_spawned_forwarded_despite_attach_failure() {
     let event = AgentEvent::root(AgentEventPayload::SubAgentSpawned {
         name: "test-agent".into(),
         agent_id: "test-id".into(),
+        parent: None,
+        model: None,
     });
     raw_tx.send(event).await.unwrap();
 

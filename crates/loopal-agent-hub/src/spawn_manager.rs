@@ -94,6 +94,8 @@ pub async fn register_agent_connection(
         let event = AgentEvent::root(AgentEventPayload::SubAgentSpawned {
             name: name.to_string(),
             agent_id: agent_id.clone(),
+            parent: parent.map(String::from),
+            model: model.map(String::from),
         });
         if h.event_sender().try_send(event).is_err() {
             tracing::debug!(agent = %name, "SubAgentSpawned event dropped");

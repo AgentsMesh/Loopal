@@ -54,8 +54,7 @@ impl McpManager {
                 info!(server = %name, "MCP server disabled, skipping");
                 continue;
             }
-            let mut conn =
-                McpConnection::new(name.clone(), config.clone(), self.sampling.clone());
+            let mut conn = McpConnection::new(name.clone(), config.clone(), self.sampling.clone());
             futures.push(async move {
                 conn.connect().await;
                 conn

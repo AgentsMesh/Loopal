@@ -1,9 +1,9 @@
 use std::fs;
 
 use loopal_config::layer::LayerSource;
-use loopal_config::settings::McpServerConfig;
 use loopal_config::loader::load_layer_from_dir;
 use loopal_config::plugin::load_plugin_layers;
+use loopal_config::settings::McpServerConfig;
 
 #[test]
 fn test_load_layer_from_dir_empty() {

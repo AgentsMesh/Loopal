@@ -56,12 +56,16 @@ pub async fn connect_http(
     timeout: Duration,
     sampling: Option<Arc<dyn SamplingCallback>>,
 ) -> Result<McpClient, McpError> {
+    use rmcp::transport::WorkerTransport;
     use rmcp::transport::streamable_http_client::{
         StreamableHttpClientTransportConfig, StreamableHttpClientWorker,
     };
-    use rmcp::transport::WorkerTransport;
 
-    info!(url, header_count = headers.len(), "connecting to MCP HTTP server");
+    info!(
+        url,
+        header_count = headers.len(),
+        "connecting to MCP HTTP server"
+    );
 
     let http_client = build_http_client(headers)?;
     let config = StreamableHttpClientTransportConfig::with_uri(url);

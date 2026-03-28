@@ -31,7 +31,8 @@ impl Default for ReconnectPolicy {
 impl ReconnectPolicy {
     /// Compute delay for a given attempt (0-indexed).
     pub fn delay_for_attempt(&self, attempt: u32) -> Duration {
-        self.base_delay.mul_f64(self.backoff_factor.powi(attempt as i32))
+        self.base_delay
+            .mul_f64(self.backoff_factor.powi(attempt as i32))
     }
 
     /// Whether the config is eligible for reconnection (HTTP only).

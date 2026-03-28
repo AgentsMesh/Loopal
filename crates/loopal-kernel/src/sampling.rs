@@ -36,7 +36,9 @@ impl SamplingCallback for McpSamplingAdapter {
         let mut params = ChatParams::new(
             self.model.clone(),
             llm_messages,
-            system_prompt.unwrap_or("You are a helpful assistant.").to_string(),
+            system_prompt
+                .unwrap_or("You are a helpful assistant.")
+                .to_string(),
         );
         if let Some(max) = max_tokens {
             params.max_tokens = max;

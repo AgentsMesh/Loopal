@@ -3,9 +3,9 @@
 use std::time::Duration;
 
 use loopal_config::McpServerConfig;
+use loopal_mcp::McpClient;
 use loopal_mcp::connection::McpConnection;
 use loopal_mcp::types::ConnectionStatus;
-use loopal_mcp::McpClient;
 use loopal_test_support::mcp_mock::MockMcpServer;
 use serde_json::json;
 
@@ -57,8 +57,7 @@ async fn test_disconnect_clears_state() {
 /// We bypass McpConnection::connect() since it needs real transport config,
 /// and test the McpClient integration directly instead.
 async fn make_connected_client() -> McpClient {
-    let server = MockMcpServer::new()
-        .add_tool("test_tool", "A test tool", json!("ok"));
+    let server = MockMcpServer::new().add_tool("test_tool", "A test tool", json!("ok"));
     let (read, write) = server.start();
     McpClient::connect((read, write), Duration::from_secs(5), None)
         .await

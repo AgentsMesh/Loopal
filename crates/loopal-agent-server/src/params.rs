@@ -26,10 +26,8 @@ pub(crate) async fn build_kernel_from_config(
     if production {
         // Wire up MCP sampling: resolve the default model's provider and inject.
         if let Ok(provider) = kernel.resolve_provider(&config.settings.model) {
-            let adapter = loopal_kernel::McpSamplingAdapter::new(
-                provider,
-                config.settings.model.clone(),
-            );
+            let adapter =
+                loopal_kernel::McpSamplingAdapter::new(provider, config.settings.model.clone());
             kernel
                 .mcp_manager()
                 .write()

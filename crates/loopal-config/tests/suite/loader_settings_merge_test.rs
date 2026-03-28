@@ -116,7 +116,14 @@ fn test_load_settings_mcp_servers_config() {
     let settings = load_config(tmp.path()).unwrap().settings;
     assert_eq!(settings.mcp_servers.len(), 1);
     let mcp = settings.mcp_servers.get("test-mcp").unwrap();
-    let McpServerConfig::Stdio { command, args, env, enabled, .. } = mcp else {
+    let McpServerConfig::Stdio {
+        command,
+        args,
+        env,
+        enabled,
+        ..
+    } = mcp
+    else {
         panic!("expected Stdio config");
     };
     assert_eq!(command, "node");

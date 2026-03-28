@@ -91,11 +91,7 @@ impl Tool for McpToolAdapter {
 /// is represented as descriptive placeholders since Loopal's ToolResult is
 /// text-only.
 fn convert_tool_result(result: &CallToolResult) -> ToolResult {
-    let parts: Vec<String> = result
-        .content
-        .iter()
-        .filter_map(content_to_text)
-        .collect();
+    let parts: Vec<String> = result.content.iter().filter_map(content_to_text).collect();
 
     ToolResult {
         content: parts.join("\n"),
@@ -110,12 +106,11 @@ fn content_to_text(content: &rmcp::model::Content) -> Option<String> {
 
     match &content.raw {
         RawContent::Text(t) => Some(t.text.clone()),
-        RawContent::Image(img) => {
-            Some(format!("![image](data:{};base64,{})", img.mime_type, img.data))
-        }
-        RawContent::Audio(audio) => {
-            Some(format!("[audio: {}]", audio.mime_type))
-        }
+        RawContent::Image(img) => Some(format!(
+            "![image](data:{};base64,{})",
+            img.mime_type, img.data
+        )),
+        RawContent::Audio(audio) => Some(format!("[audio: {}]", audio.mime_type)),
         RawContent::Resource(res) => match &res.resource {
             ResourceContents::TextResourceContents { uri, text, .. } => {
                 Some(format!("[resource {uri}]\n{text}"))

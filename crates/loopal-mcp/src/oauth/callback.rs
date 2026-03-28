@@ -19,8 +19,7 @@ pub struct CallbackParams {
 ///
 /// Returns `(port, receiver)`. The receiver completes when the browser
 /// redirects back with the authorization code.
-pub async fn start_callback_server()
--> std::io::Result<(u16, oneshot::Receiver<CallbackParams>)> {
+pub async fn start_callback_server() -> std::io::Result<(u16, oneshot::Receiver<CallbackParams>)> {
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let port = listener.local_addr()?.port();
     let (tx, rx) = oneshot::channel();
@@ -45,8 +44,7 @@ pub async fn start_callback_server()
                  Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
                 body.len()
             );
-            let _ =
-                tokio::io::AsyncWriteExt::write_all(&mut stream, response.as_bytes()).await;
+            let _ = tokio::io::AsyncWriteExt::write_all(&mut stream, response.as_bytes()).await;
             let _ = tx.send(params);
         } else {
             let body = "Missing code or state";
@@ -55,8 +53,7 @@ pub async fn start_callback_server()
                  Connection: close\r\n\r\n{body}",
                 body.len()
             );
-            let _ =
-                tokio::io::AsyncWriteExt::write_all(&mut stream, response.as_bytes()).await;
+            let _ = tokio::io::AsyncWriteExt::write_all(&mut stream, response.as_bytes()).await;
         }
     });
 

@@ -10,7 +10,7 @@ use rmcp::model::{
     ListToolsResult, PaginatedRequestParams, ReadResourceRequestParams, ReadResourceResult,
     Request, RequestOptionalParam, ServerResult,
 };
-use rmcp::service::{PeerRequestOptions, RoleClient, RunningService, ServiceExt, ServiceError};
+use rmcp::service::{PeerRequestOptions, RoleClient, RunningService, ServiceError, ServiceExt};
 use tracing::info;
 
 use crate::handler::{LoopalClientHandler, SamplingCallback};
@@ -61,7 +61,9 @@ impl McpClient {
         ));
         match self.send(req).await? {
             ServerResult::ListToolsResult(r) => Ok(r),
-            _ => Err(McpError::Protocol("unexpected response to tools/list".into())),
+            _ => Err(McpError::Protocol(
+                "unexpected response to tools/list".into(),
+            )),
         }
     }
 
@@ -75,7 +77,9 @@ impl McpClient {
         let req = ClientRequest::CallToolRequest(Request::new(params));
         match self.send(req).await? {
             ServerResult::CallToolResult(r) => Ok(r),
-            _ => Err(McpError::Protocol("unexpected response to tools/call".into())),
+            _ => Err(McpError::Protocol(
+                "unexpected response to tools/call".into(),
+            )),
         }
     }
 
@@ -94,9 +98,9 @@ impl McpClient {
 
     /// Read a specific resource by URI.
     pub async fn read_resource(&self, uri: &str) -> Result<ReadResourceResult, McpError> {
-        let req = ClientRequest::ReadResourceRequest(Request::new(
-            ReadResourceRequestParams::new(uri.to_string()),
-        ));
+        let req = ClientRequest::ReadResourceRequest(Request::new(ReadResourceRequestParams::new(
+            uri.to_string(),
+        )));
         match self.send(req).await? {
             ServerResult::ReadResourceResult(r) => Ok(r),
             _ => Err(McpError::Protocol(
@@ -143,9 +147,7 @@ impl McpClient {
             ServiceError::Timeout { timeout } => {
                 McpError::Timeout(format!("{}ms", timeout.as_millis()))
             }
-            ServiceError::TransportClosed => {
-                McpError::TransportClosed("transport closed".into())
-            }
+            ServiceError::TransportClosed => McpError::TransportClosed("transport closed".into()),
             other => McpError::Protocol(other.to_string()),
         })
     }

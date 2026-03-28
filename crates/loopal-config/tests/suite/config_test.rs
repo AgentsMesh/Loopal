@@ -100,7 +100,10 @@ fn test_mcp_server_config_map_format() {
     let settings: Settings = serde_json::from_str(json).unwrap();
     assert_eq!(settings.mcp_servers.len(), 2);
     let github = settings.mcp_servers.get("github").unwrap();
-    let McpServerConfig::Stdio { command, enabled, .. } = github else {
+    let McpServerConfig::Stdio {
+        command, enabled, ..
+    } = github
+    else {
         panic!("expected Stdio config");
     };
     assert_eq!(command, "mcp-server-github");

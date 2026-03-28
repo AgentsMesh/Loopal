@@ -152,9 +152,7 @@ impl McpServerConfig {
     /// Connection timeout in milliseconds.
     pub fn timeout_ms(&self) -> u64 {
         match self {
-            Self::Stdio { timeout_ms, .. } | Self::StreamableHttp { timeout_ms, .. } => {
-                *timeout_ms
-            }
+            Self::Stdio { timeout_ms, .. } | Self::StreamableHttp { timeout_ms, .. } => *timeout_ms,
         }
     }
 }

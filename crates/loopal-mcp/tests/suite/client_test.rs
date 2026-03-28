@@ -49,7 +49,10 @@ async fn test_list_tools_returns_tools() {
 async fn test_call_tool_success() {
     let client = connect_mock(vec![("echo", "echoes", json!({"reply": "pong"}))]).await;
     let args = serde_json::Map::new();
-    let result = client.call_tool("echo", args).await.expect("call_tool failed");
+    let result = client
+        .call_tool("echo", args)
+        .await
+        .expect("call_tool failed");
     assert!(result.is_error.is_none() || !result.is_error.unwrap());
     assert!(!result.content.is_empty());
 }

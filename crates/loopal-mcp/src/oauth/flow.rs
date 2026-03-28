@@ -4,11 +4,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use loopal_error::McpError;
+use rmcp::transport::WorkerTransport;
 use rmcp::transport::auth::{AuthClient, AuthorizationManager, CredentialStore, OAuthState};
 use rmcp::transport::streamable_http_client::{
     StreamableHttpClientTransportConfig, StreamableHttpClientWorker,
 };
-use rmcp::transport::WorkerTransport;
 use tracing::{info, warn};
 
 use super::callback;
@@ -37,18 +37,16 @@ pub async fn connect_with_oauth(
 
     // Try cached credentials first.
     match auth_manager.initialize_from_store().await {
-        Ok(true) => {
-            match auth_manager.refresh_token().await {
-                Ok(_) => {
-                    info!("using cached OAuth credentials");
-                    return connect_authed(url, auth_manager, timeout, sampling).await;
-                }
-                Err(e) => {
-                    warn!(error = %e, "OAuth token refresh failed, re-authorizing");
-                    let _ = FileCredentialStore::new(url).clear().await;
-                }
+        Ok(true) => match auth_manager.refresh_token().await {
+            Ok(_) => {
+                info!("using cached OAuth credentials");
+                return connect_authed(url, auth_manager, timeout, sampling).await;
             }
-        }
+            Err(e) => {
+                warn!(error = %e, "OAuth token refresh failed, re-authorizing");
+                let _ = FileCredentialStore::new(url).clear().await;
+            }
+        },
         Ok(false) => {
             info!("no cached OAuth credentials found");
         }

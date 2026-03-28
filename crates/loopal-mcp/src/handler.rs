@@ -96,11 +96,7 @@ impl ClientHandler for LoopalClientHandler {
             )),
             Err(e) => {
                 warn!(error = %e, "sampling callback failed");
-                Err(ErrorData::new(
-                    ErrorCode::INTERNAL_ERROR,
-                    e,
-                    None,
-                ))
+                Err(ErrorData::new(ErrorCode::INTERNAL_ERROR, e, None))
             }
         }
     }

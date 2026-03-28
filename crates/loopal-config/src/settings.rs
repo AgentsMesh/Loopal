@@ -105,23 +105,56 @@ pub struct OpenAiCompatConfig {
     pub model_prefix: Option<String>,
 }
 
-/// MCP server configuration (name is the key in the outer map)
+/// MCP server configuration, tagged by transport type.
+///
+/// # Examples (settings.json)
+/// ```json
+/// {
+///   "my-local": { "type": "stdio", "command": "npx", "args": ["-y", "mcp-server"] },
+///   "my-remote": { "type": "streamable-http", "url": "https://mcp.example.com/v1" }
+/// }
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct McpServerConfig {
-    /// Command to start the server
-    pub command: String,
-    /// Command arguments
-    #[serde(default)]
-    pub args: Vec<String>,
-    /// Environment variables
-    #[serde(default)]
-    pub env: HashMap<String, String>,
-    /// Whether this server is enabled (use false to disable an inherited server)
-    #[serde(default = "default_true")]
-    pub enabled: bool,
-    /// Connection timeout in milliseconds
-    #[serde(default = "default_mcp_timeout")]
-    pub timeout_ms: u64,
+#[serde(tag = "type", rename_all = "kebab-case")]
+pub enum McpServerConfig {
+    /// Local subprocess communicating via stdin/stdout.
+    Stdio {
+        command: String,
+        #[serde(default)]
+        args: Vec<String>,
+        #[serde(default)]
+        env: HashMap<String, String>,
+        #[serde(default = "default_true")]
+        enabled: bool,
+        #[serde(default = "default_mcp_timeout")]
+        timeout_ms: u64,
+    },
+    /// Remote server via Streamable HTTP (with SSE fallback).
+    StreamableHttp {
+        url: String,
+        #[serde(default)]
+        headers: HashMap<String, String>,
+        #[serde(default = "default_true")]
+        enabled: bool,
+        #[serde(default = "default_mcp_timeout")]
+        timeout_ms: u64,
+    },
+}
+
+impl McpServerConfig {
+    /// Whether this server is enabled.
+    pub fn enabled(&self) -> bool {
+        match self {
+            Self::Stdio { enabled, .. } | Self::StreamableHttp { enabled, .. } => *enabled,
+        }
+    }
+
+    /// Connection timeout in milliseconds.
+    pub fn timeout_ms(&self) -> u64 {
+        match self {
+            Self::Stdio { timeout_ms, .. } | Self::StreamableHttp { timeout_ms, .. } => *timeout_ms,
+        }
+    }
 }
 
 fn default_true() -> bool {

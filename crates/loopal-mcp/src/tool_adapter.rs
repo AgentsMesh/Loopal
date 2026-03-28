@@ -1,12 +1,15 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use loopal_error::LoopalError;
+use loopal_error::{LoopalError, McpError};
 use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolDefinition, ToolResult};
+use rmcp::model::CallToolResult;
 use serde_json::Value;
 use tokio::sync::RwLock;
+use tracing::warn;
 
 use crate::manager::McpManager;
+use crate::reconnect::ReconnectPolicy;
 
 /// Wraps an MCP tool as a local Tool trait implementation.
 pub struct McpToolAdapter {
@@ -27,6 +30,13 @@ impl McpToolAdapter {
             manager,
         }
     }
+
+    async fn is_reconnectable(&self) -> bool {
+        let mgr = self.manager.read().await;
+        mgr.connections
+            .get(&self.server_name)
+            .is_some_and(|c| ReconnectPolicy::is_reconnectable(&c.config))
+    }
 }
 
 #[async_trait]
@@ -44,39 +54,72 @@ impl Tool for McpToolAdapter {
     }
 
     fn permission(&self) -> PermissionLevel {
-        // MCP tools are external; treat as supervised by default
         PermissionLevel::Supervised
     }
 
     async fn execute(&self, input: Value, _ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
-        let mgr = self.manager.read().await;
-        let result = mgr
-            .call_tool(&self.server_name, &self.definition.name, input)
-            .await
-            .map_err(LoopalError::Mcp)?;
-
-        // MCP tool results have "content" array; extract text
-        let content = if let Some(content_arr) = result.get("content").and_then(|c| c.as_array()) {
-            content_arr
-                .iter()
-                .filter_map(|item| item.get("text").and_then(|t| t.as_str()))
-                .collect::<Vec<_>>()
-                .join("\n")
-        } else {
-            result.to_string()
+        // Fast path: read lock for normal tool calls (allows concurrency).
+        let result = {
+            let mgr = self.manager.read().await;
+            mgr.call_tool(&self.server_name, &self.definition.name, &input)
+                .await
         };
 
-        let is_error = result
-            .get("isError")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+        let result = match result {
+            Ok(val) => val,
+            Err(McpError::TransportClosed(_)) if self.is_reconnectable().await => {
+                warn!(server = %self.server_name, tool = %self.definition.name, "transport closed, reconnecting");
+                {
+                    let mut mgr = self.manager.write().await;
+                    let _ = mgr.restart_connection(&self.server_name).await;
+                }
+                let mgr = self.manager.read().await;
+                mgr.call_tool(&self.server_name, &self.definition.name, &input)
+                    .await
+                    .map_err(LoopalError::Mcp)?
+            }
+            Err(e) => return Err(LoopalError::Mcp(e)),
+        };
 
-        Ok(ToolResult {
-            content,
-            is_error,
-            is_completion: false,
-            metadata: None,
-        })
+        Ok(convert_tool_result(&result))
+    }
+}
+
+/// Convert rmcp `CallToolResult` to Loopal `ToolResult` without serialization.
+///
+/// Extracts text from all content blocks. Non-text content (images, resources)
+/// is represented as descriptive placeholders since Loopal's ToolResult is
+/// text-only.
+fn convert_tool_result(result: &CallToolResult) -> ToolResult {
+    let parts: Vec<String> = result.content.iter().filter_map(content_to_text).collect();
+
+    ToolResult {
+        content: parts.join("\n"),
+        is_error: result.is_error.unwrap_or(false),
+        is_completion: false,
+        metadata: None,
+    }
+}
+
+fn content_to_text(content: &rmcp::model::Content) -> Option<String> {
+    use rmcp::model::{RawContent, ResourceContents};
+
+    match &content.raw {
+        RawContent::Text(t) => Some(t.text.clone()),
+        RawContent::Image(img) => Some(format!(
+            "![image](data:{};base64,{})",
+            img.mime_type, img.data
+        )),
+        RawContent::Audio(audio) => Some(format!("[audio: {}]", audio.mime_type)),
+        RawContent::Resource(res) => match &res.resource {
+            ResourceContents::TextResourceContents { uri, text, .. } => {
+                Some(format!("[resource {uri}]\n{text}"))
+            }
+            ResourceContents::BlobResourceContents { uri, .. } => {
+                Some(format!("[binary resource: {uri}]"))
+            }
+        },
+        RawContent::ResourceLink(link) => Some(format!("[resource: {}]", link.uri)),
     }
 }
 
@@ -144,9 +187,4 @@ mod tests {
         assert_eq!(adapter.description(), "");
         assert_eq!(adapter.parameters_schema(), serde_json::json!({}));
     }
-
-    // Note: execute() cannot be unit-tested because it requires a real McpManager
-    // with a connected MCP server. The call path goes through
-    // McpManager::call_tool -> McpClient::send_request which needs a running
-    // subprocess. This is best tested via integration tests.
 }

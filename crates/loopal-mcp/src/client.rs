@@ -1,199 +1,154 @@
-use std::collections::HashMap;
+/// MCP client wrapping rmcp's `RunningService`.
+///
+/// Provides typed methods for tools/resources/prompts with timeout enforcement.
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Duration;
 
 use loopal_error::McpError;
-use serde_json::Value;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::process::{Child, Command};
-use tokio::sync::{Mutex, oneshot};
-use tracing::{debug, info, warn};
+use rmcp::model::{
+    CallToolRequestParams, CallToolResult, ClientRequest, ListPromptsResult, ListResourcesResult,
+    ListToolsResult, PaginatedRequestParams, ReadResourceRequestParams, ReadResourceResult,
+    Request, RequestOptionalParam, ServerResult,
+};
+use rmcp::service::{PeerRequestOptions, RoleClient, RunningService, ServiceError, ServiceExt};
+use tracing::info;
 
-type PendingMap = HashMap<u64, oneshot::Sender<Result<Value, McpError>>>;
+use crate::handler::{LoopalClientHandler, SamplingCallback};
 
-/// JSON-RPC stdio client for a single MCP server.
+/// A connected MCP client backed by rmcp.
 pub struct McpClient {
-    writer: Arc<Mutex<tokio::process::ChildStdin>>,
-    pending: Arc<Mutex<PendingMap>>,
-    next_id: AtomicU64,
-    _child: Child,
+    service: RunningService<RoleClient, LoopalClientHandler>,
+    timeout: Duration,
 }
 
 impl McpClient {
-    /// Spawn a child process and start reading its stdout.
-    pub async fn start(
-        command: &str,
-        args: &[String],
-        env: &HashMap<String, String>,
-    ) -> Result<Self, McpError> {
-        let mut child = Command::new(command)
-            .args(args)
-            .envs(env)
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::null())
-            .spawn()
+    /// Connect to an MCP server over any transport.
+    ///
+    /// Performs the MCP handshake (`initialize` / `initialized`) and returns a
+    /// ready-to-use client. Pass a `SamplingCallback` to enable server-initiated
+    /// LLM calls; pass `None` to disable sampling.
+    pub async fn connect<T, E, A>(
+        transport: T,
+        timeout: Duration,
+        sampling: Option<Arc<dyn SamplingCallback>>,
+    ) -> Result<Self, McpError>
+    where
+        T: rmcp::transport::IntoTransport<RoleClient, E, A>,
+        E: std::error::Error + From<std::io::Error> + Send + Sync + 'static,
+    {
+        let handler = LoopalClientHandler::new(sampling);
+        let service = handler
+            .serve(transport)
+            .await
             .map_err(|e| McpError::ConnectionFailed(e.to_string()))?;
 
-        let stdin = child
-            .stdin
-            .take()
-            .ok_or_else(|| McpError::ConnectionFailed("no stdin".into()))?;
-        let stdout = child
-            .stdout
-            .take()
-            .ok_or_else(|| McpError::ConnectionFailed("no stdout".into()))?;
+        if let Some(info) = service.peer_info() {
+            info!(
+                server = %info.server_info.name,
+                version = %info.server_info.version,
+                protocol = ?info.protocol_version,
+                "MCP server connected"
+            );
+        }
 
-        let writer = Arc::new(Mutex::new(stdin));
-        let pending: Arc<Mutex<PendingMap>> = Arc::new(Mutex::new(HashMap::new()));
+        Ok(Self { service, timeout })
+    }
 
-        info!(command = %command, args = ?args, "MCP process started");
+    /// List tools the server exposes.
+    pub async fn list_tools(&self) -> Result<ListToolsResult, McpError> {
+        let req = ClientRequest::ListToolsRequest(RequestOptionalParam::with_param(
+            PaginatedRequestParams::default(),
+        ));
+        match self.send(req).await? {
+            ServerResult::ListToolsResult(r) => Ok(r),
+            _ => Err(McpError::Protocol(
+                "unexpected response to tools/list".into(),
+            )),
+        }
+    }
 
-        // Spawn reader task
-        let pending_clone = pending.clone();
-        tokio::spawn(async move {
-            let mut reader = BufReader::new(stdout);
-            let mut line = String::new();
-            loop {
-                line.clear();
-                match reader.read_line(&mut line).await {
-                    Ok(0) => {
-                        info!("MCP process stdout EOF");
-                        break;
-                    }
-                    Ok(_) => {
-                        if let Ok(msg) = serde_json::from_str::<Value>(&line)
-                            && let Some(id) = msg.get("id").and_then(|v| v.as_u64())
-                        {
-                            let mut map = pending_clone.lock().await;
-                            if let Some(tx) = map.remove(&id) {
-                                if let Some(err) = msg.get("error") {
-                                    let _ = tx.send(Err(McpError::Protocol(err.to_string())));
-                                } else {
-                                    let result = msg.get("result").cloned().unwrap_or(Value::Null);
-                                    let _ = tx.send(Ok(result));
-                                }
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        warn!(error = %e, "MCP process read error");
-                        break;
-                    }
-                }
+    /// Call a tool by name with JSON arguments.
+    pub async fn call_tool(
+        &self,
+        name: &str,
+        args: serde_json::Map<String, serde_json::Value>,
+    ) -> Result<CallToolResult, McpError> {
+        let params = CallToolRequestParams::new(name.to_string()).with_arguments(args);
+        let req = ClientRequest::CallToolRequest(Request::new(params));
+        match self.send(req).await? {
+            ServerResult::CallToolResult(r) => Ok(r),
+            _ => Err(McpError::Protocol(
+                "unexpected response to tools/call".into(),
+            )),
+        }
+    }
+
+    /// List resources the server exposes.
+    pub async fn list_resources(&self) -> Result<ListResourcesResult, McpError> {
+        let req = ClientRequest::ListResourcesRequest(RequestOptionalParam::with_param(
+            PaginatedRequestParams::default(),
+        ));
+        match self.send(req).await? {
+            ServerResult::ListResourcesResult(r) => Ok(r),
+            _ => Err(McpError::Protocol(
+                "unexpected response to resources/list".into(),
+            )),
+        }
+    }
+
+    /// Read a specific resource by URI.
+    pub async fn read_resource(&self, uri: &str) -> Result<ReadResourceResult, McpError> {
+        let req = ClientRequest::ReadResourceRequest(Request::new(ReadResourceRequestParams::new(
+            uri.to_string(),
+        )));
+        match self.send(req).await? {
+            ServerResult::ReadResourceResult(r) => Ok(r),
+            _ => Err(McpError::Protocol(
+                "unexpected response to resources/read".into(),
+            )),
+        }
+    }
+
+    /// List prompts the server exposes.
+    pub async fn list_prompts(&self) -> Result<ListPromptsResult, McpError> {
+        let req = ClientRequest::ListPromptsRequest(RequestOptionalParam::with_param(
+            PaginatedRequestParams::default(),
+        ));
+        match self.send(req).await? {
+            ServerResult::ListPromptsResult(r) => Ok(r),
+            _ => Err(McpError::Protocol(
+                "unexpected response to prompts/list".into(),
+            )),
+        }
+    }
+
+    /// Access the server's capability info from the initialize handshake.
+    pub fn peer_info(&self) -> Option<&rmcp::model::InitializeResult> {
+        self.service.peer_info()
+    }
+
+    /// Check if the underlying transport is closed.
+    pub fn is_closed(&self) -> bool {
+        self.service.is_closed()
+    }
+
+    /// Send a request with timeout. Uses rmcp's built-in timeout on RequestHandle.
+    async fn send(&self, request: ClientRequest) -> Result<ServerResult, McpError> {
+        let mut options = PeerRequestOptions::default();
+        options.timeout = Some(self.timeout);
+
+        let handle = self
+            .service
+            .send_cancellable_request(request, options)
+            .await
+            .map_err(|e| McpError::TransportClosed(e.to_string()))?;
+
+        handle.await_response().await.map_err(|e| match e {
+            ServiceError::Timeout { timeout } => {
+                McpError::Timeout(format!("{}ms", timeout.as_millis()))
             }
-        });
-
-        let client = Self {
-            writer,
-            pending,
-            next_id: AtomicU64::new(1),
-            _child: child,
-        };
-
-        // Perform initialize handshake
-        client.initialize().await?;
-
-        Ok(client)
-    }
-
-    async fn initialize(&self) -> Result<(), McpError> {
-        let _result = self
-            .send_request(
-                "initialize",
-                serde_json::json!({
-                    "protocolVersion": "2024-11-05",
-                    "capabilities": {},
-                    "clientInfo": {
-                        "name": "loopal",
-                        "version": "0.1.0"
-                    }
-                }),
-            )
-            .await?;
-
-        // Send initialized notification (no id, no response expected)
-        self.send_notification("notifications/initialized", serde_json::json!({}))
-            .await?;
-
-        Ok(())
-    }
-
-    /// Send a JSON-RPC request and wait for the response.
-    pub async fn send_request(&self, method: &str, params: Value) -> Result<Value, McpError> {
-        let start = std::time::Instant::now();
-        let id = self.next_id.fetch_add(1, Ordering::SeqCst);
-        let request = serde_json::json!({
-            "jsonrpc": "2.0",
-            "id": id,
-            "method": method,
-            "params": params,
-        });
-
-        let (tx, rx) = oneshot::channel();
-        {
-            let mut map = self.pending.lock().await;
-            map.insert(id, tx);
-        }
-
-        let mut data =
-            serde_json::to_vec(&request).map_err(|e| McpError::Protocol(e.to_string()))?;
-        data.push(b'\n');
-
-        {
-            let mut writer = self.writer.lock().await;
-            writer
-                .write_all(&data)
-                .await
-                .map_err(|e| McpError::ConnectionFailed(e.to_string()))?;
-            writer
-                .flush()
-                .await
-                .map_err(|e| McpError::ConnectionFailed(e.to_string()))?;
-        }
-
-        debug!(id, method, "sent request");
-
-        let result = rx
-            .await
-            .map_err(|_| McpError::ConnectionFailed("response channel closed".into()))?;
-        let duration = start.elapsed();
-        match &result {
-            Ok(_) => info!(
-                id,
-                method,
-                duration_ms = duration.as_millis() as u64,
-                "MCP response"
-            ),
-            Err(e) => {
-                warn!(id, method, duration_ms = duration.as_millis() as u64, error = %e, "MCP error")
-            }
-        }
-        result
-    }
-
-    /// Send a JSON-RPC notification (no response expected).
-    async fn send_notification(&self, method: &str, params: Value) -> Result<(), McpError> {
-        let notification = serde_json::json!({
-            "jsonrpc": "2.0",
-            "method": method,
-            "params": params,
-        });
-
-        let mut data =
-            serde_json::to_vec(&notification).map_err(|e| McpError::Protocol(e.to_string()))?;
-        data.push(b'\n');
-
-        let mut writer = self.writer.lock().await;
-        writer
-            .write_all(&data)
-            .await
-            .map_err(|e| McpError::ConnectionFailed(e.to_string()))?;
-        writer
-            .flush()
-            .await
-            .map_err(|e| McpError::ConnectionFailed(e.to_string()))?;
-
-        Ok(())
+            ServiceError::TransportClosed => McpError::TransportClosed("transport closed".into()),
+            other => McpError::Protocol(other.to_string()),
+        })
     }
 }

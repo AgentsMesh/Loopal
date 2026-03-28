@@ -1,4 +1,5 @@
 use loopal_config::load_config;
+use loopal_config::settings::McpServerConfig;
 use tempfile::TempDir;
 
 #[test]
@@ -102,6 +103,7 @@ fn test_load_settings_mcp_servers_config() {
         r#"{
             "mcp_servers": {
                 "test-mcp": {
+                    "type": "stdio",
                     "command": "node",
                     "args": ["server.js"],
                     "env": {"PORT": "3000"}
@@ -114,10 +116,20 @@ fn test_load_settings_mcp_servers_config() {
     let settings = load_config(tmp.path()).unwrap().settings;
     assert_eq!(settings.mcp_servers.len(), 1);
     let mcp = settings.mcp_servers.get("test-mcp").unwrap();
-    assert_eq!(mcp.command, "node");
-    assert_eq!(mcp.args, vec!["server.js"]);
-    assert_eq!(mcp.env.get("PORT").unwrap(), "3000");
-    assert!(mcp.enabled);
+    let McpServerConfig::Stdio {
+        command,
+        args,
+        env,
+        enabled,
+        ..
+    } = mcp
+    else {
+        panic!("expected Stdio config");
+    };
+    assert_eq!(command, "node");
+    assert_eq!(args, &vec!["server.js"]);
+    assert_eq!(env.get("PORT").unwrap(), "3000");
+    assert!(enabled);
 }
 
 #[test]

@@ -24,6 +24,16 @@ pub(crate) async fn build_kernel_from_config(
 ) -> anyhow::Result<Arc<Kernel>> {
     let mut kernel = Kernel::new(config.settings.clone())?;
     if production {
+        // Wire up MCP sampling: resolve the default model's provider and inject.
+        if let Ok(provider) = kernel.resolve_provider(&config.settings.model) {
+            let adapter =
+                loopal_kernel::McpSamplingAdapter::new(provider, config.settings.model.clone());
+            kernel
+                .mcp_manager()
+                .write()
+                .await
+                .set_sampling(Arc::new(adapter));
+        }
         kernel.start_mcp().await?;
     }
     loopal_agent::tools::register_all(&mut kernel);

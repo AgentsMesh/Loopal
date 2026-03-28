@@ -85,7 +85,7 @@ async fn run_server_loop(
 fn dispatch(method: &str, msg: &Value, tools: &[MockMcpTool]) -> Option<Value> {
     match method {
         "initialize" => Some(json!({
-            "protocolVersion": "2024-11-05",
+            "protocolVersion": "2025-03-26",
             "capabilities": {"tools": {}},
             "serverInfo": {"name": "mock", "version": "0.1"}
         })),

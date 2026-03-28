@@ -1,3 +1,4 @@
+use loopal_config::settings::McpServerConfig;
 use loopal_config::{ProvidersConfig, Settings};
 use loopal_tool_api::PermissionMode;
 
@@ -92,15 +93,21 @@ fn test_providers_config_serde_roundtrip() {
 fn test_mcp_server_config_map_format() {
     let json = r#"{
         "mcp_servers": {
-            "github": {"command": "mcp-server-github", "args": ["--token", "abc"]},
-            "sqlite": {"command": "mcp-sqlite", "enabled": false}
+            "github": {"type": "stdio", "command": "mcp-server-github", "args": ["--token", "abc"]},
+            "sqlite": {"type": "stdio", "command": "mcp-sqlite", "enabled": false}
         }
     }"#;
     let settings: Settings = serde_json::from_str(json).unwrap();
     assert_eq!(settings.mcp_servers.len(), 2);
     let github = settings.mcp_servers.get("github").unwrap();
-    assert_eq!(github.command, "mcp-server-github");
-    assert!(github.enabled);
+    let McpServerConfig::Stdio {
+        command, enabled, ..
+    } = github
+    else {
+        panic!("expected Stdio config");
+    };
+    assert_eq!(command, "mcp-server-github");
+    assert!(enabled);
     let sqlite = settings.mcp_servers.get("sqlite").unwrap();
-    assert!(!sqlite.enabled);
+    assert!(!sqlite.enabled());
 }

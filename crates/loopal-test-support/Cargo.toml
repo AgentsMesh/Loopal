@@ -25,6 +25,7 @@ loopal-agent = { workspace = true }
 loopal-ipc = { workspace = true }
 loopal-agent-server = { workspace = true }
 loopal-agent-client = { workspace = true }
+rmcp = { workspace = true, features = ["server", "macros", "transport-io"] }
 
 async-trait = { workspace = true }
 tokio = { workspace = true }

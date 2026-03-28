@@ -83,9 +83,17 @@ pub(crate) fn extract_typed_fields(
     let mut hooks = Vec::new();
 
     if let Some(mcp_val) = value.get("mcp_servers") {
-        match serde_json::from_value::<IndexMap<String, McpServerConfig>>(mcp_val.clone()) {
-            Ok(map) => mcp = map,
-            Err(e) => tracing::warn!("invalid mcp_servers config, skipping: {e}"),
+        if let Some(obj) = mcp_val.as_object() {
+            for (name, server_val) in obj {
+                match serde_json::from_value::<McpServerConfig>(server_val.clone()) {
+                    Ok(config) => {
+                        mcp.insert(name.clone(), config);
+                    }
+                    Err(e) => {
+                        tracing::warn!(server = %name, "invalid MCP server config, skipping: {e}");
+                    }
+                }
+            }
         }
     }
 

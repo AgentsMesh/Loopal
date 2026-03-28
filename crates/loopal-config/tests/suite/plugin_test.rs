@@ -3,6 +3,7 @@ use std::fs;
 use loopal_config::layer::LayerSource;
 use loopal_config::loader::load_layer_from_dir;
 use loopal_config::plugin::load_plugin_layers;
+use loopal_config::settings::McpServerConfig;
 
 #[test]
 fn test_load_layer_from_dir_empty() {
@@ -26,7 +27,7 @@ fn test_load_layer_from_dir_full() {
         r#"{
             "model": "gpt-4",
             "mcp_servers": {
-                "test": {"command": "test-server"}
+                "test": {"type": "stdio", "command": "test-server"}
             },
             "hooks": [
                 {"event": "pre_tool_use", "command": "echo hook"}
@@ -47,7 +48,10 @@ fn test_load_layer_from_dir_full() {
 
     // mcp_servers extracted
     assert_eq!(layer.mcp_servers.len(), 1);
-    assert_eq!(layer.mcp_servers["test"].command, "test-server");
+    let McpServerConfig::Stdio { command, .. } = &layer.mcp_servers["test"] else {
+        panic!("expected Stdio config");
+    };
+    assert_eq!(command, "test-server");
 
     // hooks extracted
     assert_eq!(layer.hooks.len(), 1);
@@ -110,7 +114,7 @@ fn test_load_plugin_layers_with_plugins() {
     fs::create_dir_all(plugin_a.join("skills")).unwrap();
     fs::write(
         plugin_a.join("settings.json"),
-        r#"{"mcp_servers": {"alpha-mcp": {"command": "alpha-server"}}}"#,
+        r#"{"mcp_servers": {"alpha-mcp": {"type": "stdio", "command": "alpha-server"}}}"#,
     )
     .unwrap();
     fs::write(plugin_a.join("LOOPAL.md"), "Alpha instructions").unwrap();

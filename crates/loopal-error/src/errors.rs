@@ -124,6 +124,15 @@ pub enum McpError {
 
     #[error("Server not found: {0}")]
     ServerNotFound(String),
+
+    #[error("Request timeout: {0}")]
+    Timeout(String),
+
+    #[error("Transport closed: {0}")]
+    TransportClosed(String),
+
+    #[error("Capability not supported: {0}")]
+    CapabilityNotSupported(String),
 }
 
 /// Why the agent loop terminated.

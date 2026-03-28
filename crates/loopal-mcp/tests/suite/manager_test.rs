@@ -5,24 +5,14 @@ use loopal_mcp::McpManager;
 #[test]
 fn test_new_creates_empty_manager() {
     let manager = McpManager::new();
-    let tools = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap()
-        .block_on(manager.get_tools())
-        .unwrap();
+    let tools = manager.get_tools_with_server();
     assert!(tools.is_empty(), "new manager should have no tools");
 }
 
 #[test]
 fn test_default_creates_empty_manager() {
     let manager = McpManager::default();
-    let tools = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap()
-        .block_on(manager.get_tools())
-        .unwrap();
+    let tools = manager.get_tools_with_server();
     assert!(tools.is_empty());
 }
 
@@ -35,7 +25,7 @@ fn test_call_tool_unknown_server_returns_error() {
     rt.block_on(async {
         let manager = McpManager::new();
         let result = manager
-            .call_tool("nonexistent", "some_tool", serde_json::json!({}))
+            .call_tool("nonexistent", "some_tool", &serde_json::json!({}))
             .await;
         assert!(result.is_err());
         match result.unwrap_err() {
@@ -56,7 +46,7 @@ fn test_call_tool_by_name_unknown_tool_returns_error() {
     rt.block_on(async {
         let manager = McpManager::new();
         let result = manager
-            .call_tool_by_name("unknown_tool", serde_json::json!({}))
+            .call_tool_by_name("unknown_tool", &serde_json::json!({}))
             .await;
         assert!(result.is_err());
         match result.unwrap_err() {
@@ -69,32 +59,13 @@ fn test_call_tool_by_name_unknown_tool_returns_error() {
 }
 
 #[test]
-fn test_get_tools_empty_manager_returns_empty() {
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap();
-    rt.block_on(async {
-        let manager = McpManager::new();
-        let tools = manager.get_tools().await.unwrap();
-        assert!(tools.is_empty(), "empty manager should return no tools");
-    });
-}
-
-#[test]
 fn test_get_tools_with_server_empty_manager_returns_empty() {
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap();
-    rt.block_on(async {
-        let manager = McpManager::new();
-        let tools = manager.get_tools_with_server().await.unwrap();
-        assert!(
-            tools.is_empty(),
-            "empty manager should return no tools with server"
-        );
-    });
+    let manager = McpManager::new();
+    let tools = manager.get_tools_with_server();
+    assert!(
+        tools.is_empty(),
+        "empty manager should return no tools with server"
+    );
 }
 
 #[test]
@@ -105,7 +76,6 @@ fn test_start_all_empty_configs_succeeds() {
         .unwrap();
     rt.block_on(async {
         let mut manager = McpManager::new();
-        // Starting with no configs should succeed (no-op)
         let result = manager.start_all(&IndexMap::new()).await;
         assert!(
             result.is_ok(),
@@ -113,7 +83,3 @@ fn test_start_all_empty_configs_succeeds() {
         );
     });
 }
-
-// Note: client.rs tests are skipped because McpClient::start() spawns real
-// subprocesses and requires a running MCP server. This is best tested via
-// integration tests with a mock MCP server binary.

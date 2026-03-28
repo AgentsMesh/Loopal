@@ -4,12 +4,13 @@ use loopal_config::HookEvent;
 use loopal_config::Settings;
 use loopal_error::Result;
 use loopal_hooks::HookRegistry;
+use loopal_mcp::types::{McpPrompt, McpResource};
 use loopal_mcp::{McpManager, McpToolAdapter};
 use loopal_provider::ProviderRegistry;
 use loopal_tool_api::ToolDefinition;
 use loopal_tools::ToolRegistry;
 use tokio::sync::RwLock;
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::provider_registry;
 
@@ -18,6 +19,12 @@ pub struct Kernel {
     provider_registry: ProviderRegistry,
     hook_registry: HookRegistry,
     mcp_manager: Arc<RwLock<McpManager>>,
+    /// MCP server instructions cached at start_mcp() time.
+    mcp_instructions: Vec<(String, String)>,
+    /// MCP resources cached at start_mcp() time.
+    mcp_resources: Vec<(String, McpResource)>,
+    /// MCP prompts cached at start_mcp() time.
+    mcp_prompts: Vec<(String, McpPrompt)>,
     settings: Settings,
 }
 
@@ -39,6 +46,9 @@ impl Kernel {
             provider_registry,
             hook_registry,
             mcp_manager,
+            mcp_instructions: Vec::new(),
+            mcp_resources: Vec::new(),
+            mcp_prompts: Vec::new(),
             settings,
         })
     }
@@ -65,14 +75,37 @@ impl Kernel {
                 "MCP servers started"
             );
 
-            let tools_with_server = mgr.get_tools_with_server().await?;
+            let tools_with_server = mgr.get_tools_with_server();
+            self.mcp_instructions = mgr.get_server_instructions();
+            self.mcp_resources = mgr.get_resources();
+            self.mcp_prompts = mgr.get_prompts();
             drop(mgr);
 
+            let mut skipped_tools = Vec::new();
             for (server_name, tool_def) in tools_with_server {
+                // Prevent MCP tools from shadowing already-registered tools
+                // (built-in, agent, or from a previously loaded MCP server).
+                if self.tool_registry.get(&tool_def.name).is_some() {
+                    warn!(
+                        tool = %tool_def.name,
+                        server = %server_name,
+                        "MCP tool name conflicts with existing tool, skipping"
+                    );
+                    skipped_tools.push(tool_def.name.clone());
+                    continue;
+                }
                 info!(tool = %tool_def.name, server = %server_name, "registering MCP tool");
                 let adapter =
                     McpToolAdapter::new(tool_def, server_name, Arc::clone(&self.mcp_manager));
                 self.tool_registry.register(Box::new(adapter));
+            }
+
+            // Remove skipped tools from manager's tool_map for consistency.
+            if !skipped_tools.is_empty() {
+                let mut mgr = self.mcp_manager.write().await;
+                for name in &skipped_tools {
+                    mgr.remove_tool_mapping(name);
+                }
             }
         }
         Ok(())
@@ -129,5 +162,25 @@ impl Kernel {
         tool_name: Option<&str>,
     ) -> Vec<&loopal_config::HookConfig> {
         self.hook_registry.match_hooks(event, tool_name)
+    }
+
+    /// Get the shared MCP manager for server instructions and other queries.
+    pub fn mcp_manager(&self) -> &Arc<RwLock<McpManager>> {
+        &self.mcp_manager
+    }
+
+    /// Get MCP server instructions cached from the initialize handshake.
+    pub fn mcp_instructions(&self) -> &[(String, String)] {
+        &self.mcp_instructions
+    }
+
+    /// Get MCP resources cached at startup.
+    pub fn mcp_resources(&self) -> &[(String, McpResource)] {
+        &self.mcp_resources
+    }
+
+    /// Get MCP prompts cached at startup.
+    pub fn mcp_prompts(&self) -> &[(String, McpPrompt)] {
+        &self.mcp_prompts
     }
 }

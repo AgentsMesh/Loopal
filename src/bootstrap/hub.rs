@@ -7,8 +7,8 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::info;
 
-use loopal_agent_hub::hub_server;
 use loopal_agent_hub::AgentHub;
+use loopal_agent_hub::hub_server;
 
 use crate::cli::Cli;
 

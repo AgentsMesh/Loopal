@@ -180,5 +180,11 @@ pub enum AgentEventPayload {
     SubAgentSpawned {
         name: String,
         agent_id: String,
+        /// Parent agent name (None for root-spawned agents).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        parent: Option<String>,
+        /// Model used by the spawned agent.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        model: Option<String>,
     },
 }

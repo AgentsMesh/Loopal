@@ -40,6 +40,8 @@ pub struct App {
     /// Whether the content area overflows the viewport (set by render pass).
     /// Used by input handler to decide Up/Down = scroll vs history navigation.
     pub content_overflows: bool,
+    /// Whether the topology overlay is visible (toggled by /topology).
+    pub show_topology: bool,
 
     // === Session Controller (observable + interactive) ===
     pub session: SessionController,
@@ -75,6 +77,7 @@ impl App {
             input_scroll: 0,
             paste_map: HashMap::new(),
             content_overflows: false,
+            show_topology: false,
             session,
             line_cache: LineCache::new(),
         }

@@ -6,7 +6,9 @@ use std::sync::{Arc, Mutex};
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     let backend = loopal_backend::LocalBackend::new(
-        cwd.to_path_buf(), None, loopal_backend::ResourceLimits::default(),
+        cwd.to_path_buf(),
+        None,
+        loopal_backend::ResourceLimits::default(),
     );
     ToolContext {
         session_id: "test".into(),
@@ -51,21 +53,31 @@ async fn test_bash_background_and_output() {
     let ctx = make_ctx(tmp.path());
 
     // Start background process
-    let result = bash.execute(
-        json!({"command": "echo bg_hello", "run_in_background": true}), &ctx,
-    ).await.unwrap();
+    let result = bash
+        .execute(
+            json!({"command": "echo bg_hello", "run_in_background": true}),
+            &ctx,
+        )
+        .await
+        .unwrap();
     assert!(!result.is_error);
     assert!(result.content.contains("process_id:"));
 
-    let pid = result.content.lines()
+    let pid = result
+        .content
+        .lines()
         .find(|l| l.starts_with("process_id:"))
         .and_then(|l| l.strip_prefix("process_id: "))
         .unwrap();
 
     // Get output via Bash(process_id=...)
-    let output = bash.execute(
-        json!({"process_id": pid, "block": true, "timeout": 5000}), &ctx,
-    ).await.unwrap();
+    let output = bash
+        .execute(
+            json!({"process_id": pid, "block": true, "timeout": 5000}),
+            &ctx,
+        )
+        .await
+        .unwrap();
     assert!(!output.is_error);
     assert!(output.content.contains("bg_hello"));
     assert!(output.content.contains("Completed"));
@@ -79,10 +91,16 @@ async fn test_bash_stop_background() {
     let bash = BashTool;
     let ctx = make_ctx(tmp.path());
 
-    let result = bash.execute(
-        json!({"command": "sleep 300", "run_in_background": true}), &ctx,
-    ).await.unwrap();
-    let pid = result.content.lines()
+    let result = bash
+        .execute(
+            json!({"command": "sleep 300", "run_in_background": true}),
+            &ctx,
+        )
+        .await
+        .unwrap();
+    let pid = result
+        .content
+        .lines()
         .find(|l| l.starts_with("process_id:"))
         .and_then(|l| l.strip_prefix("process_id: "))
         .unwrap();
@@ -90,9 +108,10 @@ async fn test_bash_stop_background() {
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
     // Stop via Bash(process_id=..., stop=true)
-    let stop = bash.execute(
-        json!({"process_id": pid, "stop": true}), &ctx,
-    ).await.unwrap();
+    let stop = bash
+        .execute(json!({"process_id": pid, "stop": true}), &ctx)
+        .await
+        .unwrap();
     assert!(!stop.is_error);
     assert!(stop.content.contains("stopped"));
 }

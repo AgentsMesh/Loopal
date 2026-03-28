@@ -97,9 +97,8 @@ pub async fn exec_background(
     let exit_code_buf = Arc::new(Mutex::new(None));
     let status_buf = Arc::new(Mutex::new(loopal_tool_background::TaskStatus::Running));
 
-    let (watch_tx, watch_rx) = tokio::sync::watch::channel(
-        loopal_tool_background::TaskStatus::Running,
-    );
+    let (watch_tx, watch_rx) =
+        tokio::sync::watch::channel(loopal_tool_background::TaskStatus::Running);
 
     let task = loopal_tool_background::BackgroundTask {
         output: Arc::clone(&output_buf),

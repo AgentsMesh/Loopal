@@ -80,7 +80,10 @@ pub async fn handle_spawn_agent(
     params: Value,
     from_agent: &str,
 ) -> Result<Value, String> {
-    let name = params["name"].as_str().ok_or("missing 'name' field")?.to_string();
+    let name = params["name"]
+        .as_str()
+        .ok_or("missing 'name' field")?
+        .to_string();
     let cwd = params["cwd"].as_str().unwrap_or(".").to_string();
     let model = params["model"].as_str().map(String::from);
     let prompt = params["prompt"].as_str().map(String::from);
@@ -90,9 +93,8 @@ pub async fn handle_spawn_agent(
     let hub_clone = hub.clone();
     let name_clone = name.clone();
     let handle = tokio::spawn(async move {
-        crate::spawn_manager::spawn_and_register(
-            hub_clone, name_clone, cwd, model, prompt, parent,
-        ).await
+        crate::spawn_manager::spawn_and_register(hub_clone, name_clone, cwd, model, prompt, parent)
+            .await
     });
 
     let agent_id = handle

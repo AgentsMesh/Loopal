@@ -23,7 +23,8 @@ impl ContextStore {
     }
 
     /// Restore from session replay with normalization.
-    pub fn from_messages(messages: Vec<Message>, budget: ContextBudget) -> Self {        let mut store = Self { messages, budget };
+    pub fn from_messages(messages: Vec<Message>, budget: ContextBudget) -> Self {
+        let mut store = Self { messages, budget };
         store.apply_ingestion_caps();
         run_sync_degradation(&mut store.messages, &store.budget);
         store
@@ -76,13 +77,21 @@ impl ContextStore {
 
     // --- Read access ---
 
-    pub fn messages(&self) -> &[Message] { &self.messages }
+    pub fn messages(&self) -> &[Message] {
+        &self.messages
+    }
 
-    pub fn len(&self) -> usize { self.messages.len() }
+    pub fn len(&self) -> usize {
+        self.messages.len()
+    }
 
-    pub fn is_empty(&self) -> bool { self.messages.is_empty() }
+    pub fn is_empty(&self) -> bool {
+        self.messages.is_empty()
+    }
 
-    pub fn budget(&self) -> &ContextBudget { &self.budget }
+    pub fn budget(&self) -> &ContextBudget {
+        &self.budget
+    }
 
     // --- Lifecycle ---
 
@@ -97,7 +106,8 @@ impl ContextStore {
     // --- LLM preparation ---
 
     /// Clone messages for LLM call with final sanitization.
-    pub fn prepare_for_llm(&self) -> Vec<Message> {        let mut msgs = self.messages.clone();
+    pub fn prepare_for_llm(&self) -> Vec<Message> {
+        let mut msgs = self.messages.clone();
         sanitize_tool_pairs(&mut msgs);
         msgs
     }
@@ -105,7 +115,8 @@ impl ContextStore {
     // --- Compaction operations (encapsulated mutation) ---
 
     /// Apply LLM summarization. Returns false if reverted (tokens inflated).
-    pub fn apply_summary(&mut self, new_messages: Vec<Message>) -> bool {        let snapshot = self.messages.clone();
+    pub fn apply_summary(&mut self, new_messages: Vec<Message>) -> bool {
+        let snapshot = self.messages.clone();
         self.messages = new_messages;
         sanitize_tool_pairs(&mut self.messages);
 
@@ -135,22 +146,27 @@ impl ContextStore {
     // --- Query methods for compaction decisions ---
 
     /// Whether LLM summarization should be attempted (>75% of budget).
-    pub fn needs_summarization(&self) -> bool {        self.budget
+    pub fn needs_summarization(&self) -> bool {
+        self.budget
             .needs_compaction(estimate_messages_tokens(&self.messages))
     }
 
     /// Whether emergency degradation is needed (>95% of budget).
-    pub fn needs_emergency(&self) -> bool {        self.budget
+    pub fn needs_emergency(&self) -> bool {
+        self.budget
             .needs_emergency(estimate_messages_tokens(&self.messages))
     }
 
     /// How many recent messages fit within 50% of budget.
-    pub fn token_aware_keep_count(&self) -> usize {        let half = self.budget.message_budget / 2;
+    pub fn token_aware_keep_count(&self) -> usize {
+        let half = self.budget.message_budget / 2;
         let mut tokens = 0u32;
         let mut count = 0usize;
         for msg in self.messages.iter().rev() {
             let mt = estimate_message_tokens(msg);
-            if tokens + mt > half && count > 0 { break; }
+            if tokens + mt > half && count > 0 {
+                break;
+            }
             tokens += mt;
             count += 1;
         }
@@ -158,7 +174,9 @@ impl ContextStore {
     }
 
     /// Current total message token count.
-    pub fn current_tokens(&self) -> u32 { estimate_messages_tokens(&self.messages) }
+    pub fn current_tokens(&self) -> u32 {
+        estimate_messages_tokens(&self.messages)
+    }
 
     // --- Internal ---
 
@@ -176,7 +194,9 @@ impl ContextStore {
             dropped_any = true;
             iterations += 1;
         }
-        if dropped_any { sanitize_tool_pairs(&mut self.messages); }
+        if dropped_any {
+            sanitize_tool_pairs(&mut self.messages);
+        }
         debug!(
             tokens = estimate_messages_tokens(&self.messages),
             budget = self.budget.message_budget,

@@ -66,10 +66,7 @@ impl AgentHub {
     }
 
     /// Create a completion watcher for a named agent.
-    pub fn watch_completion(
-        &mut self,
-        name: &str,
-    ) -> tokio::sync::watch::Receiver<Option<String>> {
+    pub fn watch_completion(&mut self, name: &str) -> tokio::sync::watch::Receiver<Option<String>> {
         let (tx, rx) = tokio::sync::watch::channel(None);
         self.completions.insert(name.to_string(), tx);
         rx
@@ -80,9 +77,12 @@ impl AgentHub {
         self.agents
             .get(parent)
             .map(|a| {
-                a.info.children.iter()
+                a.info
+                    .children
+                    .iter()
                     .filter(|c| {
-                        self.agents.get(c.as_str())
+                        self.agents
+                            .get(c.as_str())
                             .is_some_and(|a| a.info.lifecycle == AgentLifecycle::Running)
                     })
                     .cloned()
@@ -99,9 +99,9 @@ impl AgentHub {
                 let conn = conn.clone();
                 let n = name.clone();
                 tokio::spawn(async move {
-                    let _ = conn.send_notification(
-                        methods::AGENT_INTERRUPT.name, serde_json::json!({}),
-                    ).await;
+                    let _ = conn
+                        .send_notification(methods::AGENT_INTERRUPT.name, serde_json::json!({}))
+                        .await;
                     tracing::info!(agent = %n, "sent interrupt to orphan");
                 });
             }

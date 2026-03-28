@@ -86,6 +86,29 @@ pub(crate) fn apply_agent_event(state: &mut SessionState, name: &str, payload: A
     }
 }
 
+/// Register a newly spawned agent with parent/child topology.
+pub(crate) fn register_spawned_agent(
+    state: &mut SessionState,
+    name: &str,
+    parent: Option<&str>,
+    model: Option<&str>,
+) {
+    let agent = state.agents.entry(name.to_string()).or_default();
+    agent.parent = parent.map(String::from);
+    if let Some(m) = model {
+        agent.observable.model = m.to_string();
+    }
+    // Register as child of parent
+    if let Some(p) = parent {
+        let child_name = name.to_string();
+        if let Some(parent_agent) = state.agents.get_mut(p) {
+            if !parent_agent.children.contains(&child_name) {
+                parent_agent.children.push(child_name);
+            }
+        }
+    }
+}
+
 /// Extract the most informative parameter from a tool call for display.
 fn extract_key_param(tool_name: &str, input: &serde_json::Value) -> String {
     let key = match tool_name {

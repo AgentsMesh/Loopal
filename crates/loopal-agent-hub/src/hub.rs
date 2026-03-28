@@ -65,11 +65,7 @@ impl AgentHub {
 
     /// Register a connected agent.
     /// `parent` is the spawning agent's name (None for root/TUI).
-    pub fn register_connection(
-        &mut self,
-        name: &str,
-        conn: Arc<Connection>,
-    ) -> Result<(), String> {
+    pub fn register_connection(&mut self, name: &str, conn: Arc<Connection>) -> Result<(), String> {
         self.register_connection_with_parent(name, conn, None, None)
     }
 
@@ -104,8 +100,7 @@ impl AgentHub {
     /// remove cached output and pending watchers.
     pub fn unregister_connection(&mut self, name: &str) {
         // Extract parent name before mutating
-        let parent_name = self.agents.get(name)
-            .and_then(|a| a.info.parent.clone());
+        let parent_name = self.agents.get(name).and_then(|a| a.info.parent.clone());
         if let Some(ref p) = parent_name {
             if let Some(parent) = self.agents.get_mut(p.as_str()) {
                 parent.info.children.retain(|c| c != name);
@@ -127,18 +122,14 @@ impl AgentHub {
 
     /// Get a named agent's IPC Connection (if connected).
     pub fn get_agent_connection(&self, name: &str) -> Option<Arc<Connection>> {
-        self.agents
-            .get(name)
-            .and_then(|a| a.state.connection())
+        self.agents.get(name).and_then(|a| a.state.connection())
     }
 
     /// Collect all connected agents with their Connections.
     pub fn all_agent_connections(&self) -> Vec<(String, Arc<Connection>)> {
         self.agents
             .iter()
-            .filter_map(|(name, agent)| {
-                agent.state.connection().map(|c| (name.clone(), c))
-            })
+            .filter_map(|(name, agent)| agent.state.connection().map(|c| (name.clone(), c)))
             .collect()
     }
 
@@ -166,15 +157,19 @@ impl AgentHub {
 
     /// Build serializable topology snapshot.
     pub fn topology_snapshot(&self) -> serde_json::Value {
-        let agents: Vec<serde_json::Value> = self.agents.iter()
+        let agents: Vec<serde_json::Value> = self
+            .agents
+            .iter()
             .filter(|(n, _)| !n.starts_with('_')) // skip internal (_tui)
-            .map(|(name, a)| serde_json::json!({
-                "name": name,
-                "parent": a.info.parent,
-                "children": a.info.children,
-                "lifecycle": format!("{:?}", a.info.lifecycle),
-                "model": a.info.model,
-            }))
+            .map(|(name, a)| {
+                serde_json::json!({
+                    "name": name,
+                    "parent": a.info.parent,
+                    "children": a.info.children,
+                    "lifecycle": format!("{:?}", a.info.lifecycle),
+                    "model": a.info.model,
+                })
+            })
             .collect();
         serde_json::json!({ "agents": agents })
     }

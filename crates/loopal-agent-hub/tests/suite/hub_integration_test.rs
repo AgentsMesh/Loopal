@@ -89,9 +89,7 @@ async fn agent_a_routes_message_to_agent_b() {
         "content": {"text": "hello from A", "images": []},
         "timestamp": "2026-01-01T00:00:00Z"
     });
-    let result = conn_a
-        .send_request(methods::HUB_ROUTE.name, envelope)
-        .await;
+    let result = conn_a.send_request(methods::HUB_ROUTE.name, envelope).await;
     assert!(result.is_ok(), "hub/route should succeed");
 
     let method = tokio::time::timeout(Duration::from_secs(2), method_rx.recv()).await;
@@ -195,7 +193,10 @@ async fn missing_required_field_returns_error() {
     let result = conn
         .send_request(methods::HUB_AGENT_INFO.name, json!({}))
         .await;
-    assert!(result.is_ok(), "should get error response, not transport failure");
+    assert!(
+        result.is_ok(),
+        "should get error response, not transport failure"
+    );
     let val = result.unwrap();
     assert!(val.get("code").is_some() || val.get("message").is_some());
 }

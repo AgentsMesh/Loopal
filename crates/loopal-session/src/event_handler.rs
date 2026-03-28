@@ -1,5 +1,4 @@
-//! AgentEvent → SessionState update logic. Routes events by `agent_name`:
-//! root → main display, sub-agent → `agent_handler`. `MessageRouted` → global feed.
+//! AgentEvent → SessionState update logic. Routes by `agent_name`.
 
 use loopal_protocol::{AgentEvent, AgentEventPayload, UserContent};
 
@@ -38,7 +37,6 @@ pub fn apply_event(state: &mut SessionState, event: AgentEvent) -> Option<UserCo
     }
 }
 
-/// Handle a root-agent event (main display updates).
 fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Option<UserContent> {
     match payload {
         AgentEventPayload::Stream { text } => {
@@ -99,9 +97,7 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
         } => {
             state.retry_banner = Some(format!("{message} ({attempt}/{max_attempts})"));
         }
-        AgentEventPayload::RetryCleared => {
-            state.retry_banner = None;
-        }
+        AgentEventPayload::RetryCleared => state.retry_banner = None,
         AgentEventPayload::AwaitingInput => {
             tracing::debug!("TUI: agent idle (AwaitingInput)");
             flush_streaming(state);
@@ -138,23 +134,22 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
                 cache_read_input_tokens,
             );
         }
-        AgentEventPayload::ModeChanged { mode } => {
-            state.mode = mode;
-        }
-        AgentEventPayload::Started => {}
+        AgentEventPayload::ModeChanged { mode } => state.mode = mode,
+        AgentEventPayload::MessageRouted { .. }
+        | AgentEventPayload::Started
+        | AgentEventPayload::TurnDiffSummary { .. } => {}
         AgentEventPayload::Finished => {
             flush_streaming(state);
             state.end_turn();
             state.agent_idle = true;
             state.retry_banner = None;
         }
-        AgentEventPayload::MessageRouted { .. } => {}
         AgentEventPayload::UserQuestionRequest { id, questions } => {
             flush_streaming(state);
             state.pending_question = Some(super::types::PendingQuestion::new(id, questions));
         }
         AgentEventPayload::Rewound { remaining_turns } => {
-            crate::rewind::truncate_display_to_turn(state, remaining_turns);
+            crate::rewind::truncate_display_to_turn(state, remaining_turns)
         }
         AgentEventPayload::Compacted {
             kept,
@@ -165,14 +160,10 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
         } => {
             handle_compaction(state, kept, removed, tokens_before, tokens_after, &strategy);
         }
-        AgentEventPayload::ToolBatchStart { tool_ids } => {
-            handle_tool_batch_start(state, tool_ids);
-        }
+        AgentEventPayload::ToolBatchStart { tool_ids } => handle_tool_batch_start(state, tool_ids),
         AgentEventPayload::ToolProgress {
             id, output_tail, ..
-        } => {
-            handle_tool_progress(state, id, output_tail);
-        }
+        } => handle_tool_progress(state, id, output_tail),
         AgentEventPayload::Interrupted => {
             tracing::debug!("TUI: agent interrupted");
             flush_streaming(state);
@@ -181,7 +172,6 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
             state.retry_banner = None;
             return try_forward_inbox(state);
         }
-        AgentEventPayload::TurnDiffSummary { .. } => {}
         AgentEventPayload::ServerToolUse { id, name, input } => {
             crate::server_tool_display::handle_server_tool_use(state, id, name, &input);
         }
@@ -191,9 +181,19 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
         } => {
             crate::server_tool_display::handle_server_tool_result(state, &tool_use_id, &content);
         }
-        // SubAgentSpawned is handled by AgentHub's event_router for auto-attach.
-        // SessionState ignores it.
-        AgentEventPayload::SubAgentSpawned { .. } => {}
+        AgentEventPayload::SubAgentSpawned {
+            name,
+            parent,
+            model,
+            ..
+        } => {
+            crate::agent_handler::register_spawned_agent(
+                state,
+                &name,
+                parent.as_deref(),
+                model.as_deref(),
+            );
+        }
     }
     None
 }

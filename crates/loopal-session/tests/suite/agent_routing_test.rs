@@ -83,22 +83,24 @@ fn root_events_do_not_create_agent_entry() {
     assert!(state.agent_idle);
 }
 
-/// SubAgentSpawned event does NOT create an AgentViewState entry.
-/// It's handled by TUI event loop for auto-attach, not by SessionState.
+/// SubAgentSpawned event creates an AgentViewState entry with topology info.
 #[test]
-fn sub_agent_spawned_ignored_by_state() {
+fn sub_agent_spawned_registers_topology() {
     let mut state = make_state();
     apply_event(
         &mut state,
         AgentEvent::root(AgentEventPayload::SubAgentSpawned {
             name: "worker".into(),
             agent_id: "test-id".into(),
+            parent: None,
+            model: Some("claude-sonnet-4".into()),
         }),
     );
     assert!(
-        state.agents.is_empty(),
-        "SubAgentSpawned should not create entry"
+        state.agents.contains_key("worker"),
+        "SubAgentSpawned should create agent entry"
     );
+    assert_eq!(state.agents["worker"].observable.model, "claude-sonnet-4");
 }
 
 /// First real event from sub-agent creates the AgentViewState entry.

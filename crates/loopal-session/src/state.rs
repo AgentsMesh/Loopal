@@ -18,6 +18,10 @@ pub struct AgentViewState {
     pub message_log: Vec<MessageLogEntry>,
     /// Timestamp when the agent was first observed (for elapsed display).
     pub started_at: Option<Instant>,
+    /// Parent agent name (None for root-spawned agents).
+    pub parent: Option<String>,
+    /// Names of agents spawned by this agent.
+    pub children: Vec<String>,
 }
 
 impl AgentViewState {

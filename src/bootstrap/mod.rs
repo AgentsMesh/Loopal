@@ -6,8 +6,8 @@ use loopal_config::load_config;
 
 use crate::cli::Cli;
 
-mod multiprocess;
 mod hub;
+mod multiprocess;
 
 pub async fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();

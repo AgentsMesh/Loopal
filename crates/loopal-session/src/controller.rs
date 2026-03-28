@@ -86,17 +86,23 @@ impl SessionController {
     }
 
     pub async fn approve_permission(&self) {
-        { self.lock().pending_permission = None; }
+        {
+            self.lock().pending_permission = None;
+        }
         self.backend.approve_permission().await;
     }
 
     pub async fn deny_permission(&self) {
-        { self.lock().pending_permission = None; }
+        {
+            self.lock().pending_permission = None;
+        }
         self.backend.deny_permission().await;
     }
 
     pub async fn answer_question(&self, answers: Vec<String>) {
-        { self.lock().pending_question = None; }
+        {
+            self.lock().pending_question = None;
+        }
         self.backend.answer_question(answers).await;
     }
 
@@ -109,7 +115,9 @@ impl SessionController {
             }
             .to_string();
         }
-        self.backend.send_control(ControlCommand::ModeSwitch(mode)).await;
+        self.backend
+            .send_control(ControlCommand::ModeSwitch(mode))
+            .await;
     }
 
     pub async fn switch_model(&self, model: String) {
@@ -118,7 +126,9 @@ impl SessionController {
             s.model = model.clone();
             crate::helpers::push_system_msg(&mut s, &format!("Switched model to: {model}"));
         }
-        self.backend.send_control(ControlCommand::ModelSwitch(model)).await;
+        self.backend
+            .send_control(ControlCommand::ModelSwitch(model))
+            .await;
     }
 
     pub async fn switch_thinking(&self, config_json: String) {
@@ -128,7 +138,9 @@ impl SessionController {
             s.thinking_config = label.clone();
             crate::helpers::push_system_msg(&mut s, &format!("Switched thinking to: {label}"));
         }
-        self.backend.send_control(ControlCommand::ThinkingSwitch(config_json)).await;
+        self.backend
+            .send_control(ControlCommand::ThinkingSwitch(config_json))
+            .await;
     }
 
     pub async fn clear(&self) {
@@ -153,7 +165,9 @@ impl SessionController {
     }
 
     pub async fn rewind(&self, turn_index: usize) {
-        self.backend.send_control(ControlCommand::Rewind { turn_index }).await;
+        self.backend
+            .send_control(ControlCommand::Rewind { turn_index })
+            .await;
     }
 
     // === Event handling ===

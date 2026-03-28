@@ -27,8 +27,12 @@ async fn dispatch_topology_returns_agents() {
 async fn dispatch_agent_info_not_found() {
     let hub = make_hub();
     let result = dispatch_hub_request(
-        &hub, "hub/agent_info", json!({"name": "ghost"}), "any".into(),
-    ).await;
+        &hub,
+        "hub/agent_info",
+        json!({"name": "ghost"}),
+        "any".into(),
+    )
+    .await;
     assert!(result.is_err());
 }
 

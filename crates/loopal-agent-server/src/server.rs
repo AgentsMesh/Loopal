@@ -79,11 +79,17 @@ pub(crate) async fn dispatch_loop(
             Incoming::Request { id, method, params } => {
                 if method == methods::AGENT_START.name {
                     let mut session_handle = crate::session_start::start_session(
-                        &connection, id, params, hub, is_production,
+                        &connection,
+                        id,
+                        params,
+                        hub,
+                        is_production,
                     )
                     .await?;
                     let mut forward_result = crate::session_forward::forward_loop(
-                        &mut incoming_rx, &connection, &mut session_handle,
+                        &mut incoming_rx,
+                        &connection,
+                        &mut session_handle,
                     )
                     .await;
                     hub.remove_session(&session_handle.session_id).await;
@@ -94,11 +100,17 @@ pub(crate) async fn dispatch_loop(
                     {
                         info!("chained agent/start after session end");
                         session_handle = crate::session_start::start_session(
-                            &connection, new_id, new_params, hub, is_production,
+                            &connection,
+                            new_id,
+                            new_params,
+                            hub,
+                            is_production,
                         )
                         .await?;
                         forward_result = crate::session_forward::forward_loop(
-                            &mut incoming_rx, &connection, &mut session_handle,
+                            &mut incoming_rx,
+                            &connection,
+                            &mut session_handle,
                         )
                         .await;
                         hub.remove_session(&session_handle.session_id).await;

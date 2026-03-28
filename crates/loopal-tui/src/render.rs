@@ -130,6 +130,22 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     // Extract overlay data, release domain state lock
     let pending_perm = state.pending_permission.clone();
     let pending_question = state.pending_question.clone();
+    let topology_data = if app.show_topology {
+        use loopal_protocol::AgentStatus;
+        let root_status = if state.agent_idle {
+            AgentStatus::WaitingForInput
+        } else {
+            AgentStatus::Running
+        };
+        Some(views::topology_overlay::extract_topology(
+            &state.agents,
+            &state.model,
+            root_status,
+            state.turn_elapsed(),
+        ))
+    } else {
+        None
+    };
     drop(state);
 
     // f₄ rendered post-lock (borrows app.input, not SessionState)
@@ -153,5 +169,8 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     }
     if let Some(ref ac) = app.autocomplete {
         views::command_menu::render_command_menu(f, ac, layout.input);
+    }
+    if let Some(ref nodes) = topology_data {
+        views::topology_overlay::render_topology_overlay(f, nodes, size);
     }
 }

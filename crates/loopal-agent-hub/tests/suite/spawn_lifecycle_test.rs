@@ -36,8 +36,15 @@ async fn register_agent_connection_makes_agent_routable() {
     let server_rx = server_conn.start();
 
     // Register via testable API
-    let agent_id =
-        register_agent_connection(hub.clone(), "mock-worker", server_conn, server_rx, None, None).await;
+    let agent_id = register_agent_connection(
+        hub.clone(),
+        "mock-worker",
+        server_conn,
+        server_rx,
+        None,
+        None,
+    )
+    .await;
     assert!(!agent_id.is_empty());
 
     // Should receive SubAgentSpawned event
@@ -53,7 +60,12 @@ async fn register_agent_connection_makes_agent_routable() {
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Agent should be registered and routable
-    assert!(hub.lock().await.get_agent_connection("mock-worker").is_some());
+    assert!(
+        hub.lock()
+            .await
+            .get_agent_connection("mock-worker")
+            .is_some()
+    );
 
     // Mock agent responds to requests
     let ac = agent_conn.clone();

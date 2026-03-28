@@ -7,10 +7,7 @@ use tokio::sync::Mutex;
 
 use crate::hub::AgentHub;
 
-pub async fn handle_agent_info(
-    hub: &Arc<Mutex<AgentHub>>,
-    params: Value,
-) -> Result<Value, String> {
+pub async fn handle_agent_info(hub: &Arc<Mutex<AgentHub>>, params: Value) -> Result<Value, String> {
     let name = params["name"].as_str().ok_or("missing 'name'")?;
     let h = hub.lock().await;
 

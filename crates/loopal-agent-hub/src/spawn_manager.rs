@@ -33,10 +33,18 @@ pub async fn spawn_and_register(
         return Err(format!("agent initialize failed: {e}"));
     }
     info!(agent = %name, "spawn: starting agent");
-    if let Err(e) = client.start_agent(
-        std::path::Path::new(&cwd), model.as_deref(), Some("act"),
-        prompt.as_deref(), None, false, None,
-    ).await {
+    if let Err(e) = client
+        .start_agent(
+            std::path::Path::new(&cwd),
+            model.as_deref(),
+            Some("act"),
+            prompt.as_deref(),
+            None,
+            false,
+            None,
+        )
+        .await
+    {
         warn!(agent = %name, error = %e, "spawn: start failed, killing orphan");
         let _ = agent_proc.shutdown().await;
         return Err(format!("agent/start failed: {e}"));
@@ -44,8 +52,14 @@ pub async fn spawn_and_register(
 
     let (conn, incoming_rx) = client.into_parts();
     let agent_id = register_agent_connection(
-        hub, &name, conn, incoming_rx, parent.as_deref(), model.as_deref(),
-    ).await;
+        hub,
+        &name,
+        conn,
+        incoming_rx,
+        parent.as_deref(),
+        model.as_deref(),
+    )
+    .await;
 
     // Supervised process cleanup: when agent exits, task completes.
     // AgentProcess::drop will kill the child (kill_on_drop) if not exited.
@@ -77,9 +91,7 @@ pub async fn register_agent_connection(
                 warn!(agent = %name, parent = %p, "parent not found, registering as orphan");
             }
         }
-        if let Err(e) = h.register_connection_with_parent(
-            name, conn.clone(), parent, model,
-        ) {
+        if let Err(e) = h.register_connection_with_parent(name, conn.clone(), parent, model) {
             warn!(agent = %name, error = %e, "registration failed");
             return agent_id;
         }
@@ -94,6 +106,8 @@ pub async fn register_agent_connection(
         let event = AgentEvent::root(AgentEventPayload::SubAgentSpawned {
             name: name.to_string(),
             agent_id: agent_id.clone(),
+            parent: parent.map(String::from),
+            model: model.map(String::from),
         });
         if h.event_sender().try_send(event).is_err() {
             tracing::debug!(agent = %name, "SubAgentSpawned event dropped");

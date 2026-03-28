@@ -38,8 +38,14 @@ async fn spawn_and_result_full_chain() {
     let child = Arc::new(Connection::new(ct));
     let child_rx = child.start();
     register_agent_connection(
-        hub.clone(), "worker", child, child_rx, Some("parent"), Some("sonnet"),
-    ).await;
+        hub.clone(),
+        "worker",
+        child,
+        child_rx,
+        Some("parent"),
+        Some("sonnet"),
+    )
+    .await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Parent calls hub/wait_agent (like Agent action=result)
@@ -81,14 +87,21 @@ async fn agent_info_running_and_finished() {
     let child = Arc::new(Connection::new(ct));
     let child_rx = child.start();
     register_agent_connection(
-        hub.clone(), "child-a", child, child_rx, Some("querier"), Some("opus"),
-    ).await;
+        hub.clone(),
+        "child-a",
+        child,
+        child_rx,
+        Some("querier"),
+        Some("opus"),
+    )
+    .await;
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Query running agent
     let info = parent_conn
         .send_request(methods::HUB_AGENT_INFO.name, json!({"name": "child-a"}))
-        .await.unwrap();
+        .await
+        .unwrap();
     assert_eq!(info["lifecycle"].as_str().unwrap(), "Running");
     assert_eq!(info["model"].as_str().unwrap(), "opus");
     assert_eq!(info["parent"].as_str().unwrap(), "querier");
@@ -103,7 +116,8 @@ async fn agent_info_running_and_finished() {
     // Query finished agent — should find cached output
     let info2 = parent_conn
         .send_request(methods::HUB_AGENT_INFO.name, json!({"name": "child-a"}))
-        .await.unwrap();
+        .await
+        .unwrap();
     assert_eq!(info2["lifecycle"].as_str().unwrap(), "Finished");
     assert_eq!(info2["output"].as_str().unwrap(), "done!");
 }
@@ -161,9 +175,7 @@ async fn send_message_running_vs_finished() {
         "content": {"text": "hello", "images": []},
         "timestamp": "2026-01-01T00:00:00Z"
     });
-    let result = sender
-        .send_request(methods::HUB_ROUTE.name, envelope)
-        .await;
+    let result = sender.send_request(methods::HUB_ROUTE.name, envelope).await;
     assert!(result.is_ok(), "route to running agent should succeed");
 
     // Unregister receiver (simulating agent exit)
@@ -201,9 +213,7 @@ async fn cascade_shutdown_interrupts_children() {
     let (_pa, pt) = loopal_ipc::duplex_pair();
     let parent = Arc::new(Connection::new(pt));
     let parent_rx = parent.start();
-    register_agent_connection(
-        hub.clone(), "parent", parent, parent_rx, None, None,
-    ).await;
+    register_agent_connection(hub.clone(), "parent", parent, parent_rx, None, None).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Register child with interrupt capture
@@ -213,8 +223,14 @@ async fn cascade_shutdown_interrupts_children() {
     let client_rx = child_conn.start();
     let server_rx = server_conn.start();
     register_agent_connection(
-        hub.clone(), "child", server_conn, server_rx, Some("parent"), None,
-    ).await;
+        hub.clone(),
+        "child",
+        server_conn,
+        server_rx,
+        Some("parent"),
+        None,
+    )
+    .await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Listen for interrupts on child's client side
@@ -242,9 +258,7 @@ async fn cascade_shutdown_interrupts_children() {
     }
 
     // Child should receive interrupt
-    let got_interrupt = tokio::time::timeout(
-        Duration::from_secs(2), interrupt_rx.recv(),
-    ).await;
+    let got_interrupt = tokio::time::timeout(Duration::from_secs(2), interrupt_rx.recv()).await;
     assert!(
         got_interrupt.is_ok() && got_interrupt.unwrap() == Some(true),
         "child should receive interrupt when parent finishes"

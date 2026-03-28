@@ -38,9 +38,13 @@ async fn wait_agent_after_finish_returns_cached_output() {
 
     // Now call wait_agent — should find cached output, not "not found"
     let result = loopal_agent_hub::dispatch::dispatch_hub_request(
-        &hub, methods::HUB_WAIT_AGENT.name,
-        json!({"name": "fast-agent"}), "caller".into(),
-    ).await.unwrap();
+        &hub,
+        methods::HUB_WAIT_AGENT.name,
+        json!({"name": "fast-agent"}),
+        "caller".into(),
+    )
+    .await
+    .unwrap();
 
     let text = result["output"].as_str().unwrap();
     assert!(
@@ -63,9 +67,12 @@ async fn emit_before_unregister_delivers_output() {
     let hub2 = hub.clone();
     let waiter = tokio::spawn(async move {
         loopal_agent_hub::dispatch::dispatch_hub_request(
-            &hub2, methods::HUB_WAIT_AGENT.name,
-            json!({"name": "normal"}), "parent".into(),
-        ).await
+            &hub2,
+            methods::HUB_WAIT_AGENT.name,
+            json!({"name": "normal"}),
+            "parent".into(),
+        )
+        .await
     });
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -78,6 +85,9 @@ async fn emit_before_unregister_delivers_output() {
 
     let result = tokio::time::timeout(Duration::from_secs(3), waiter).await;
     assert!(result.is_ok(), "waiter should resolve");
-    let text = result.unwrap().unwrap().unwrap()["output"].as_str().unwrap().to_string();
+    let text = result.unwrap().unwrap().unwrap()["output"]
+        .as_str()
+        .unwrap()
+        .to_string();
     assert!(text.contains("real work done"), "got: {text}");
 }

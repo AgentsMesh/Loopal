@@ -64,8 +64,7 @@ async fn shutdown_agent_sends_shutdown_request() {
 async fn tcp_invalid_token_rejected() {
     let (hub, _) = make_hub();
 
-    let (listener, port, _valid_token) =
-        hub_server::start_hub_listener(hub.clone()).await.unwrap();
+    let (listener, port, _valid_token) = hub_server::start_hub_listener(hub.clone()).await.unwrap();
     let hub_bg = hub.clone();
     tokio::spawn(async move {
         hub_server::accept_loop(listener, hub_bg, "correct-token".into()).await;
@@ -74,8 +73,7 @@ async fn tcp_invalid_token_rejected() {
     let stream = tokio::net::TcpStream::connect(format!("127.0.0.1:{port}"))
         .await
         .unwrap();
-    let transport: Arc<dyn loopal_ipc::Transport> =
-        Arc::new(loopal_ipc::TcpTransport::new(stream));
+    let transport: Arc<dyn loopal_ipc::Transport> = Arc::new(loopal_ipc::TcpTransport::new(stream));
     let conn = Arc::new(loopal_ipc::Connection::new(transport));
     let _rx = conn.start();
 

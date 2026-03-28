@@ -1,28 +1,37 @@
-//! Connection types for multi-agent hub.
+//! Connection types for AgentHub.
 //!
-//! Defines the connection states for root agent (Primary) and
-//! sub-agents (Attached/Detached) managed by [`AgentHub`](crate::AgentHub).
+//! In Hub-only gateway architecture, all agents connect via stdio (managed
+//! by Hub) and all clients connect via TCP. No agent-level TCP listeners.
 
 use std::sync::Arc;
 
 use tokio::sync::mpsc;
-use tokio::task::JoinHandle;
 
 use loopal_ipc::connection::Connection;
 use loopal_protocol::{ControlCommand, Envelope, InterruptSignal, UserQuestionResponse};
 
-/// Connection state for a managed agent.
+use crate::topology::AgentInfo;
+
+/// Connection state for a managed agent or client.
 pub(crate) enum AgentConnectionState {
-    /// Root agent — full bidirectional control via IPC Bridge.
-    Primary(PrimaryConn),
-    /// Sub-agent — observing events via TCP.
-    Attached(AttachedConn),
-    /// Disconnected but agent still alive — can re-attach.
-    Detached { port: u16, token: String },
+    /// In-process channels (for unit tests — no real Hub).
+    Local(LocalChannels),
+    /// Hub-mode: uniform IPC connection (agents via stdio, clients via TCP).
+    Connected(Arc<Connection>),
 }
 
-/// Root agent connection — full bidirectional control.
-pub struct PrimaryConn {
+impl AgentConnectionState {
+    /// Extract the IPC Connection if available.
+    pub(crate) fn connection(&self) -> Option<Arc<Connection>> {
+        match self {
+            Self::Connected(conn) => Some(Arc::clone(conn)),
+            Self::Local(_) => None,
+        }
+    }
+}
+
+/// In-process channel bundle — used by tests and local-mode SessionController.
+pub struct LocalChannels {
     pub control_tx: mpsc::Sender<ControlCommand>,
     pub permission_tx: mpsc::Sender<bool>,
     pub question_tx: mpsc::Sender<UserQuestionResponse>,
@@ -31,15 +40,8 @@ pub struct PrimaryConn {
     pub interrupt_tx: Arc<tokio::sync::watch::Sender<u64>>,
 }
 
-/// Sub-agent TCP observer connection.
-pub(crate) struct AttachedConn {
-    pub(crate) connection: Arc<Connection>,
-    pub(crate) event_task: JoinHandle<()>,
-    pub port: u16,
-    pub token: String,
-}
-
-/// Internal wrapper for an agent entry in the hub.
+/// Internal wrapper for an agent/client entry in the hub.
 pub(crate) struct ManagedAgent {
     pub(crate) state: AgentConnectionState,
+    pub(crate) info: AgentInfo,
 }

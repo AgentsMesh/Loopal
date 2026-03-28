@@ -1,7 +1,5 @@
 pub mod bridge;
 pub mod config;
-pub mod registry;
-pub mod router;
 pub mod shared;
 pub mod spawn;
 pub mod task_store;

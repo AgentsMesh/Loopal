@@ -25,6 +25,7 @@ loopal-prompt-system = { workspace = true }
 loopal-storage = { workspace = true }
 loopal-git = { workspace = true }
 loopal-memory = { workspace = true }
+loopal-tool-background = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }

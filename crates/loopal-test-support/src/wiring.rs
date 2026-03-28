@@ -8,8 +8,6 @@ use std::sync::Arc;
 
 use tokio::sync::mpsc;
 
-use loopal_agent::registry::AgentRegistry;
-use loopal_agent::router::MessageRouter;
 use loopal_agent::shared::AgentShared;
 use loopal_agent::task_store::TaskStore;
 use loopal_config::Settings;
@@ -72,7 +70,6 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
     }
     let kernel = Arc::new(kernel);
 
-    // MessageRouter — register "main" mailbox so route("main") works
     let has_cwd_override = builder.cwd.is_some();
     let cwd = builder
         .cwd
@@ -80,19 +77,17 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         .map(|p| p.canonicalize().unwrap_or_else(|_| p.clone()))
         .unwrap_or_else(|| fixture.path().to_path_buf());
     let session_cwd = cwd.clone();
-    let router = Arc::new(MessageRouter::new(event_tx.clone()));
-    router
-        .register("main", mailbox_tx.clone())
-        .await
-        .expect("register main mailbox");
+
+    // Mock hub connection (in-memory duplex — hub side is dropped).
+    let (hub_conn, _hub_peer) = loopal_ipc::duplex_pair();
+    let hub_connection = Arc::new(loopal_ipc::Connection::new(hub_conn));
 
     // AgentShared — mirrors bootstrap.rs:103-115
     let tasks_dir = fixture.path().join("tasks");
     let shared = Arc::new(AgentShared {
         kernel: kernel.clone(),
-        registry: Arc::new(tokio::sync::Mutex::new(AgentRegistry::new())),
         task_store: Arc::new(TaskStore::new(tasks_dir)),
-        router,
+        hub_connection,
         cwd,
         depth: 0,
         max_depth: 3,

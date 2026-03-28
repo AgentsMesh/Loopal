@@ -176,11 +176,9 @@ pub enum AgentEventPayload {
         content: serde_json::Value,
     },
 
-    /// A sub-agent was spawned. TUI should connect directly to its TCP port.
+    /// A sub-agent was spawned by Hub.
     SubAgentSpawned {
         name: String,
-        pid: u32,
-        port: u16,
-        token: String,
+        agent_id: String,
     },
 }

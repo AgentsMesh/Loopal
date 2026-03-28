@@ -3,7 +3,6 @@
 //! Split from runner.rs to keep files under 200 lines.
 
 use loopal_error::Result;
-use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::StopReason;
 use tracing::{debug, info, warn};
@@ -113,9 +112,18 @@ impl AgentLoopRunner {
                 return Ok(TurnOutput { output: last_text });
             }
 
-            debug!(tool_count = result.tool_uses.len(), "executing tools");
+            let tool_names: Vec<&str> = result.tool_uses.iter().map(|(_, n, _)| n.as_str()).collect();
+            info!(tool_count = result.tool_uses.len(), ?tool_names, "tool exec start");
             let cancel = &turn_ctx.cancel;
             let completion = self.execute_tools(result.tool_uses.clone(), cancel).await?;
+            info!("tool exec complete");
+
+            // Append observer warnings (e.g. loop detector) AFTER tool results.
+            // They must come after ToolResult blocks — inserting them before
+            // breaks tool_use/tool_result pairing when normalize_messages merges
+            // consecutive same-role User messages.
+            let warnings = std::mem::take(&mut turn_ctx.pending_warnings);
+            self.params.store.append_warnings_to_last_user(warnings);
 
             self.inject_pending_messages().await;
 
@@ -148,11 +156,11 @@ impl AgentLoopRunner {
             match obs.on_before_tools(turn_ctx, tool_uses) {
                 ObserverAction::Continue => {}
                 ObserverAction::InjectWarning(msg) => {
-                    self.params.store.push_user(Message {
-                        id: None,
-                        role: MessageRole::User,
-                        content: vec![ContentBlock::Text { text: msg }],
-                    });
+                    // Store in context — appended to tool results message later.
+                    // Pushing a separate User(Text) message here would break
+                    // tool_use/tool_result pairing after normalize_messages merges
+                    // consecutive same-role messages.
+                    turn_ctx.pending_warnings.push(msg);
                 }
                 ObserverAction::AbortTurn(reason) => {
                     warn!(%reason, "observer aborted turn");

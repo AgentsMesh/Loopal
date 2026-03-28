@@ -110,7 +110,8 @@ async fn route_request(
 }
 
 /// Observer loop: joined client receives events via HubFrontend broadcast.
-/// Handles incoming requests (messages, interrupts) from the observer.
+/// Only used in integration tests (production no longer has agent/join).
+#[allow(dead_code)]
 pub(crate) async fn observer_loop(
     incoming_rx: &mut tokio::sync::mpsc::Receiver<Incoming>,
     connection: &Connection,

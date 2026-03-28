@@ -23,7 +23,6 @@ mod session_forward;
 #[doc(hidden)]
 pub mod session_hub;
 mod session_start;
-mod tcp_accept;
 mod test_server;
 
 pub use server::{run_agent_server, run_agent_server_with_mock};

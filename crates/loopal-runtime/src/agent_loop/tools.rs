@@ -1,7 +1,7 @@
 use loopal_error::Result;
 use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_protocol::AgentEventPayload;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 use super::cancel::TurnCancel;
 use super::runner::AgentLoopRunner;
@@ -26,7 +26,9 @@ impl AgentLoopRunner {
         let (intercepted, remaining) = self.intercept_special_tools(&tool_uses).await?;
 
         // Phase 1: Sandbox precheck + permission checks
+        info!(remaining = remaining.len(), "check_tools start");
         let check = self.check_tools(&remaining, &tool_uses, cancel).await?;
+        info!(approved = check.approved.len(), denied = check.denied.len(), "check_tools done");
 
         // Phase 2: Parallel execution
         let mut indexed_results: Vec<(usize, ContentBlock)> = Vec::new();

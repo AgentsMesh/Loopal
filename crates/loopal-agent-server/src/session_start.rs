@@ -21,6 +21,8 @@ pub(crate) struct SessionHandle {
     pub session_id: String,
     pub session: Arc<SharedSession>,
     pub agent_task: tokio::task::JoinHandle<()>,
+    /// Non-interactive sessions (with prompt) should exit after completion.
+    pub interactive: bool,
 }
 
 /// Create a session: build Kernel, HubFrontend, spawn agent loop.
@@ -87,6 +89,7 @@ pub(crate) async fn start_session(
         interrupt.clone(),
         interrupt_tx.clone(),
         kernel,
+        connection.clone(),
         None,
         interactive,
     )?;
@@ -120,5 +123,6 @@ pub(crate) async fn start_session(
         session_id,
         session,
         agent_task,
+        interactive,
     })
 }

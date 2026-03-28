@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::Value;
-use tracing::debug;
+use tracing::{debug, info};
 
 use loopal_error::{LoopalError, Result};
 use loopal_ipc::protocol::methods;
@@ -114,9 +114,10 @@ impl AgentFrontend for HubFrontend {
         name: &str,
         input: &serde_json::Value,
     ) -> PermissionDecision {
-        debug!(tool = name, "requesting permission via hub");
+        info!(tool = name, "requesting permission via IPC");
         let session = self.get_session().await;
         let Some(conn) = session.primary_connection().await else {
+            info!(tool = name, "permission denied: no primary connection");
             return PermissionDecision::Deny;
         };
         let params = serde_json::json!({
@@ -129,13 +130,18 @@ impl AgentFrontend for HubFrontend {
             .await
         {
             Ok(value) => {
-                if value.get("allow").and_then(Value::as_bool).unwrap_or(false) {
+                let allow = value.get("allow").and_then(Value::as_bool).unwrap_or(false);
+                info!(tool = name, allow, "permission response received");
+                if allow {
                     PermissionDecision::Allow
                 } else {
                     PermissionDecision::Deny
                 }
             }
-            Err(_) => PermissionDecision::Deny,
+            Err(e) => {
+                info!(tool = name, error = %e, "permission IPC failed");
+                PermissionDecision::Deny
+            }
         }
     }
 

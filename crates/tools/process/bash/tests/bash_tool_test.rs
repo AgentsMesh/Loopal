@@ -26,9 +26,8 @@ fn test_bash_metadata() {
 
     let schema = tool.parameters_schema();
     assert_eq!(schema["type"], "object");
-    let required = schema["required"].as_array().unwrap();
-    assert!(required.contains(&json!("command")));
     assert!(schema["properties"]["command"].is_object());
+    assert!(schema["properties"]["process_id"].is_object());
     assert!(schema["properties"]["timeout"].is_object());
 }
 

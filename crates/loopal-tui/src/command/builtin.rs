@@ -156,6 +156,4 @@ pub fn register_all(registry: &mut CommandRegistry) {
     registry.register(Arc::new(super::help_cmd::HelpCmd));
     registry.register(Arc::new(ExitCmd));
     registry.register(Arc::new(super::agent_cmd::AgentsCmd));
-    registry.register(Arc::new(super::agent_cmd::DetachCmd));
-    registry.register(Arc::new(super::agent_cmd::AttachCmd));
 }

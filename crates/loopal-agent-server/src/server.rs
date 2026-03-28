@@ -1,5 +1,6 @@
-//! Agent server entry point — IPC lifecycle + agent loop.
-//! Activated via `loopal --serve`. Optionally starts a TCP listener.
+//! Agent server entry point — stdio-only IPC lifecycle + agent loop.
+//! Activated via `loopal --serve`. Communicates with Hub via stdin/stdout.
+//! Agent is a pure worker: no TCP listener, no server_info, no external ports.
 
 use std::sync::Arc;
 
@@ -11,9 +12,7 @@ use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
 use loopal_ipc::{StdioTransport, jsonrpc};
 
-use crate::server_info;
 use crate::session_hub::SessionHub;
-use crate::tcp_accept;
 
 #[derive(Deserialize)]
 struct InitializeParams {
@@ -34,30 +33,14 @@ struct AgentInfo {
     version: String,
 }
 
-// ── Public entry points ──────────────────────────────────────────────
-
-/// Run the agent server over stdio + optional TCP listener.
+/// Run the agent server over stdio (pure worker, no TCP listener).
 pub async fn run_agent_server() -> anyhow::Result<()> {
     info!("agent server starting (stdio mode)");
     let transport: Arc<dyn Transport> = Arc::new(StdioTransport::from_std());
     let connection = Arc::new(Connection::new(transport));
     let incoming_rx = connection.start();
     let hub = Arc::new(SessionHub::new());
-
-    let listener = tcp_accept::start_tcp_listener().await;
-
-    let result = if let Some(listener) = listener {
-        let hub2 = hub.clone();
-        tokio::select! {
-            r = run_connection(connection, incoming_rx, &hub) => r,
-            r = tcp_accept::accept_loop(listener, hub2) => r,
-        }
-    } else {
-        run_connection(connection, incoming_rx, &hub).await
-    };
-
-    server_info::remove_server_info();
-    result
+    run_connection(connection, incoming_rx, &hub).await
 }
 
 /// Run the agent server with mock provider (for system tests).
@@ -70,8 +53,6 @@ pub async fn run_agent_server_with_mock(mock_path: &str) -> anyhow::Result<()> {
     crate::test_server::run_server_for_test(transport, provider, cwd, session_dir).await
 }
 
-// ── Connection lifecycle ─────────────────────────────────────────────
-
 async fn run_connection(
     connection: Arc<Connection>,
     mut incoming_rx: tokio::sync::mpsc::Receiver<Incoming>,
@@ -83,7 +64,6 @@ async fn run_connection(
 
 /// Permanent dispatch loop. Routes messages to the active session or
 /// handles lifecycle commands (agent/start, agent/shutdown).
-/// When a session ends, loops back to accept a new agent/start.
 pub(crate) async fn dispatch_loop(
     connection: Arc<Connection>,
     mut incoming_rx: tokio::sync::mpsc::Receiver<Incoming>,
@@ -99,21 +79,14 @@ pub(crate) async fn dispatch_loop(
             Incoming::Request { id, method, params } => {
                 if method == methods::AGENT_START.name {
                     let mut session_handle = crate::session_start::start_session(
-                        &connection,
-                        id,
-                        params,
-                        hub,
-                        is_production,
+                        &connection, id, params, hub, is_production,
                     )
                     .await?;
                     let mut forward_result = crate::session_forward::forward_loop(
-                        &mut incoming_rx,
-                        &connection,
-                        &mut session_handle,
+                        &mut incoming_rx, &connection, &mut session_handle,
                     )
                     .await;
                     hub.remove_session(&session_handle.session_id).await;
-                    // Handle chained agent/start (cancel + new session)
                     while let crate::session_forward::ForwardResult::NewStart {
                         id: new_id,
                         params: new_params,
@@ -121,49 +94,20 @@ pub(crate) async fn dispatch_loop(
                     {
                         info!("chained agent/start after session end");
                         session_handle = crate::session_start::start_session(
-                            &connection,
-                            new_id,
-                            new_params,
-                            hub,
-                            is_production,
+                            &connection, new_id, new_params, hub, is_production,
                         )
                         .await?;
                         forward_result = crate::session_forward::forward_loop(
-                            &mut incoming_rx,
-                            &connection,
-                            &mut session_handle,
+                            &mut incoming_rx, &connection, &mut session_handle,
                         )
                         .await;
                         hub.remove_session(&session_handle.session_id).await;
                     }
-                    info!("session ended, ready for next");
-                    // Loop back to idle — accept new agent/start
-                } else if method == methods::AGENT_JOIN.name {
-                    // Join the first active session as observer
-                    let session_ids = hub.list_session_ids().await;
-                    if let Some(sid) = session_ids.first() {
-                        if let Some(session) = hub.find_session(sid).await {
-                            let client_id = format!("tcp-{id}");
-                            session
-                                .add_client(client_id.clone(), connection.clone())
-                                .await;
-                            let _ = connection
-                                .respond(id, serde_json::json!({"ok": true, "session_id": sid}))
-                                .await;
-                            // Observer loop: just forward messages to session, receive events via broadcast
-                            crate::session_forward::observer_loop(
-                                &mut incoming_rx,
-                                &connection,
-                                &session,
-                                &client_id,
-                            )
-                            .await;
-                            break;
-                        }
+                    if !session_handle.interactive {
+                        info!("non-interactive session complete, server exiting");
+                        break;
                     }
-                    let _ = connection
-                        .respond_error(id, jsonrpc::INVALID_REQUEST, "no active session")
-                        .await;
+                    info!("session ended, ready for next");
                 } else if method == methods::AGENT_SHUTDOWN.name {
                     let _ = connection
                         .respond(id, serde_json::json!({"ok": true}))
@@ -178,6 +122,13 @@ pub(crate) async fn dispatch_loop(
             Incoming::Notification { .. } => {}
         }
     }
+    // Send explicit completion before exiting. Hub uses this as primary signal.
+    let _ = connection
+        .send_notification(
+            methods::AGENT_COMPLETED.name,
+            serde_json::json!({"reason": "shutdown"}),
+        )
+        .await;
     info!("server shutting down");
     Ok(())
 }

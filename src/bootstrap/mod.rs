@@ -7,6 +7,7 @@ use loopal_config::load_config;
 use crate::cli::Cli;
 
 mod multiprocess;
+mod hub;
 
 pub async fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
@@ -33,6 +34,10 @@ pub async fn run() -> anyhow::Result<()> {
             return loopal_agent_server::run_agent_server_with_mock(&path).await;
         }
         return loopal_agent_server::run_agent_server().await;
+    }
+
+    if cli.hub {
+        return hub::run_hub(&cli, &cwd, &config).await;
     }
 
     // Worktree isolation: create worktree before agent starts, clean up after.

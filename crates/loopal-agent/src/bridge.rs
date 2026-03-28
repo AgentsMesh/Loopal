@@ -7,7 +7,9 @@ use loopal_agent_client::{AgentClient, AgentClientEvent};
 use loopal_protocol::{AgentEvent, AgentEventPayload, UserQuestionResponse};
 use tokio_util::sync::CancellationToken;
 
-/// Track child completion and collect result text (no event forwarding).
+/// Track child completion and collect result text.
+/// Used by integration tests; production path uses Hub agent_io_loop.
+#[allow(dead_code)]
 pub async fn bridge_child_events(
     mut client: AgentClient,
     _parent_tx: &mpsc::Sender<AgentEvent>,
@@ -30,10 +32,9 @@ pub async fn bridge_child_events(
                         {
                             completion_result = Some(result.clone());
                         }
-                        // Session finished — child's dispatch_loop goes idle
-                        // but keeps stdio open. We must exit here.
+                        // Session finished — child server will exit on its own
+                        // for non-interactive sessions. Just break.
                         AgentEventPayload::Finished => {
-                            let _ = client.shutdown().await;
                             break;
                         }
                         _ => {}
@@ -70,7 +71,8 @@ pub async fn bridge_child_events(
     Ok(output)
 }
 
-/// Read child's TCP server_info (port, token) from well-known location.
+/// Read child's TCP server_info (port, token) — legacy, kept for tests.
+#[allow(dead_code)]
 pub(crate) fn read_child_server_info(pid: u32) -> Option<(u16, String)> {
     let path = loopal_config::locations::volatile_dir()
         .join("run")

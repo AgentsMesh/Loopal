@@ -1,9 +1,4 @@
 //! ContextStore — budget-constrained message buffer.
-//!
-//! Wraps `Vec<Message>` with enforced invariants:
-//! - Ingestion gate: caps oversized content at entry
-//! - Sync degradation: strips/truncates on every push
-//! - No direct mutable access: all mutations go through typed methods
 
 use crate::budget::ContextBudget;
 use crate::compaction::{compact_messages, sanitize_tool_pairs};
@@ -27,10 +22,8 @@ impl ContextStore {
         }
     }
 
-    /// Restore from session replay. Applies ingestion caps and degradation
-    /// to normalize content that was persisted before capping.
-    pub fn from_messages(messages: Vec<Message>, budget: ContextBudget) -> Self {
-        let mut store = Self { messages, budget };
+    /// Restore from session replay with normalization.
+    pub fn from_messages(messages: Vec<Message>, budget: ContextBudget) -> Self {        let mut store = Self { messages, budget };
         store.apply_ingestion_caps();
         run_sync_degradation(&mut store.messages, &store.budget);
         store
@@ -42,16 +35,14 @@ impl ContextStore {
         self.enforce_budget();
     }
 
-    // --- Push methods (every mutation goes through here) ---
-
-    /// Push a user message (text, images).
+    /// Push a user message.
     pub fn push_user(&mut self, msg: Message) {
         debug_assert!(msg.role == MessageRole::User);
         self.messages.push(msg);
         self.enforce_budget();
     }
 
-    /// Push an assistant message. Caps server blocks if they exceed budget/4.
+    /// Push an assistant message. Caps server blocks exceeding budget/4.
     pub fn push_assistant(&mut self, mut msg: Message) {
         debug_assert!(msg.role == MessageRole::Assistant);
         let max_server_tokens = self.budget.message_budget / 4;
@@ -60,7 +51,7 @@ impl ContextStore {
         self.enforce_budget();
     }
 
-    /// Push a tool-results message. Caps each ToolResult at budget/8 tokens.
+    /// Push tool-results message. Caps each at budget/8 tokens.
     pub fn push_tool_results(&mut self, mut msg: Message) {
         debug_assert!(msg.role == MessageRole::User);
         let max_per_result = self.budget.message_budget / 8;
@@ -69,23 +60,29 @@ impl ContextStore {
         self.enforce_budget();
     }
 
-    // --- Read access (no mutable access exposed) ---
-
-    pub fn messages(&self) -> &[Message] {
-        &self.messages
+    /// Append warning Text blocks to the last User message (after ToolResult blocks).
+    pub fn append_warnings_to_last_user(&mut self, warnings: Vec<String>) {
+        if warnings.is_empty() {
+            return;
+        }
+        if let Some(msg) = self.messages.last_mut() {
+            debug_assert!(msg.role == MessageRole::User);
+            for w in warnings {
+                msg.content
+                    .push(loopal_message::ContentBlock::Text { text: w });
+            }
+        }
     }
 
-    pub fn len(&self) -> usize {
-        self.messages.len()
-    }
+    // --- Read access ---
 
-    pub fn is_empty(&self) -> bool {
-        self.messages.is_empty()
-    }
+    pub fn messages(&self) -> &[Message] { &self.messages }
 
-    pub fn budget(&self) -> &ContextBudget {
-        &self.budget
-    }
+    pub fn len(&self) -> usize { self.messages.len() }
+
+    pub fn is_empty(&self) -> bool { self.messages.is_empty() }
+
+    pub fn budget(&self) -> &ContextBudget { &self.budget }
 
     // --- Lifecycle ---
 
@@ -99,22 +96,16 @@ impl ContextStore {
 
     // --- LLM preparation ---
 
-    /// Clone messages for an LLM call. Applies a final sanitization pass
-    /// to guarantee no orphaned ToolUse/ToolResult or ServerToolUse/Result
-    /// pairs leak to the API — regardless of which upstream mutation missed it.
-    pub fn prepare_for_llm(&self) -> Vec<Message> {
-        let mut msgs = self.messages.clone();
+    /// Clone messages for LLM call with final sanitization.
+    pub fn prepare_for_llm(&self) -> Vec<Message> {        let mut msgs = self.messages.clone();
         sanitize_tool_pairs(&mut msgs);
         msgs
     }
 
     // --- Compaction operations (encapsulated mutation) ---
 
-    /// Apply LLM summarization result. Replaces messages with the new set,
-    /// validates that tokens didn't inflate, and enforces budget.
-    /// Returns `true` on success, `false` if reverted (tokens inflated).
-    pub fn apply_summary(&mut self, new_messages: Vec<Message>) -> bool {
-        let snapshot = self.messages.clone();
+    /// Apply LLM summarization. Returns false if reverted (tokens inflated).
+    pub fn apply_summary(&mut self, new_messages: Vec<Message>) -> bool {        let snapshot = self.messages.clone();
         self.messages = new_messages;
         sanitize_tool_pairs(&mut self.messages);
 
@@ -129,38 +120,37 @@ impl ContextStore {
         true
     }
 
-    /// Emergency compaction: drop oldest messages, keeping last `keep_last`.
-    /// Sanitizes tool pairs and enforces budget afterward.
+    /// Emergency compaction: drop oldest, keep last N.
     pub fn emergency_compact(&mut self, keep_last: usize) {
         compact_messages(&mut self.messages, keep_last);
         sanitize_tool_pairs(&mut self.messages);
         self.enforce_budget();
     }
 
+    /// Defensive: condense all server blocks when API rejects them.
+    pub fn condense_server_blocks(&mut self) {
+        crate::ingestion::condense_all_server_blocks(&mut self.messages);
+    }
+
     // --- Query methods for compaction decisions ---
 
     /// Whether LLM summarization should be attempted (>75% of budget).
-    pub fn needs_summarization(&self) -> bool {
-        self.budget
+    pub fn needs_summarization(&self) -> bool {        self.budget
             .needs_compaction(estimate_messages_tokens(&self.messages))
     }
 
     /// Whether emergency degradation is needed (>95% of budget).
-    pub fn needs_emergency(&self) -> bool {
-        self.budget
+    pub fn needs_emergency(&self) -> bool {        self.budget
             .needs_emergency(estimate_messages_tokens(&self.messages))
     }
 
-    /// How many recent messages fit within 50% of the budget.
-    pub fn token_aware_keep_count(&self) -> usize {
-        let half_budget = self.budget.message_budget / 2;
+    /// How many recent messages fit within 50% of budget.
+    pub fn token_aware_keep_count(&self) -> usize {        let half = self.budget.message_budget / 2;
         let mut tokens = 0u32;
         let mut count = 0usize;
         for msg in self.messages.iter().rev() {
             let mt = estimate_message_tokens(msg);
-            if tokens + mt > half_budget && count > 0 {
-                break;
-            }
+            if tokens + mt > half && count > 0 { break; }
             tokens += mt;
             count += 1;
         }
@@ -168,9 +158,7 @@ impl ContextStore {
     }
 
     /// Current total message token count.
-    pub fn current_tokens(&self) -> u32 {
-        estimate_messages_tokens(&self.messages)
-    }
+    pub fn current_tokens(&self) -> u32 { estimate_messages_tokens(&self.messages) }
 
     // --- Internal ---
 
@@ -188,12 +176,7 @@ impl ContextStore {
             dropped_any = true;
             iterations += 1;
         }
-        // Sanitize after dropping to fix orphaned ToolUse/ToolResult and
-        // ServerToolUse/ServerToolResult pairs (e.g. code_execution blocks).
-        if dropped_any {
-            sanitize_tool_pairs(&mut self.messages);
-        }
-
+        if dropped_any { sanitize_tool_pairs(&mut self.messages); }
         debug!(
             tokens = estimate_messages_tokens(&self.messages),
             budget = self.budget.message_budget,
@@ -205,16 +188,12 @@ impl ContextStore {
     /// Apply ingestion caps to all messages (used on session reload).
     fn apply_ingestion_caps(&mut self) {
         let max_server = self.budget.message_budget / 4;
-        let max_per_result = self.budget.message_budget / 8;
+        let max_result = self.budget.message_budget / 8;
         for msg in &mut self.messages {
-            match msg.role {
-                MessageRole::Assistant => {
-                    cap_assistant_server_blocks(msg, max_server);
-                }
-                MessageRole::User => {
-                    cap_tool_results(msg, max_per_result);
-                }
-                _ => {}
+            if msg.role == MessageRole::Assistant {
+                cap_assistant_server_blocks(msg, max_server);
+            } else if msg.role == MessageRole::User {
+                cap_tool_results(msg, max_result);
             }
         }
     }

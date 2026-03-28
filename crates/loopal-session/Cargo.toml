@@ -11,6 +11,7 @@ test = false
 
 [dependencies]
 loopal-agent-hub = { workspace = true }
+loopal-ipc = { workspace = true }
 loopal-protocol = { workspace = true }
 loopal-tool-api = { workspace = true }
 anyhow = { workspace = true }

@@ -4,25 +4,26 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use tokio::sync::{mpsc, watch};
 
+use loopal_ipc::connection::Connection;
 use loopal_protocol::{
     AgentEvent, AgentMode, ControlCommand, InterruptSignal, UserContent, UserQuestionResponse,
 };
 
+use crate::controller_ops::ControlBackend;
 use crate::event_handler;
-use crate::inbox::try_forward_inbox;
 use crate::state::SessionState;
-use loopal_agent_hub::{AgentHub, PrimaryConn};
+use loopal_agent_hub::{AgentHub, LocalChannels};
 
 /// External handle — cheaply cloneable, shareable across consumers.
 #[derive(Clone)]
 pub struct SessionController {
     state: Arc<Mutex<SessionState>>,
-    primary: Arc<PrimaryConn>,
+    pub(crate) backend: Arc<ControlBackend>,
     connections: Arc<tokio::sync::Mutex<AgentHub>>,
 }
 
 impl SessionController {
-    /// Create with individual channels (backward compat for tests).
+    /// Create with in-process channels (for unit tests — no real Hub).
     pub fn new(
         model: String,
         mode: String,
@@ -32,7 +33,7 @@ impl SessionController {
         interrupt: InterruptSignal,
         interrupt_tx: Arc<watch::Sender<u64>>,
     ) -> Self {
-        let primary = PrimaryConn {
+        let channels = LocalChannels {
             control_tx,
             permission_tx,
             question_tx,
@@ -42,21 +43,21 @@ impl SessionController {
         };
         Self {
             state: Arc::new(Mutex::new(SessionState::new(model, mode))),
-            primary: Arc::new(primary),
+            backend: Arc::new(ControlBackend::Local(Arc::new(channels))),
             connections: Arc::new(tokio::sync::Mutex::new(AgentHub::noop())),
         }
     }
 
-    /// Create with structured primary connection + agent hub.
-    pub fn with_primary(
+    /// Create with Hub Connection (production mode — all agents via Hub).
+    pub fn with_hub(
         model: String,
         mode: String,
-        primary: PrimaryConn,
+        hub_conn: Arc<Connection>,
         hub: Arc<tokio::sync::Mutex<AgentHub>>,
     ) -> Self {
         Self {
             state: Arc::new(Mutex::new(SessionState::new(model, mode))),
-            primary: Arc::new(primary),
+            backend: Arc::new(ControlBackend::Hub(hub_conn)),
             connections: hub,
         }
     }
@@ -71,49 +72,32 @@ impl SessionController {
         &self.connections
     }
 
-    pub(crate) fn primary(&self) -> &PrimaryConn {
-        &self.primary
-    }
-
     // === Root agent control ===
 
     pub fn interrupt(&self) {
         tracing::debug!("session: interrupt signaled");
-        self.primary.interrupt.signal();
-        self.primary
-            .interrupt_tx
-            .send_modify(|v| *v = v.wrapping_add(1));
+        self.backend.interrupt();
     }
 
     pub fn enqueue_message(&self, content: UserContent) -> Option<UserContent> {
         let mut state = self.lock();
         state.inbox.push(content);
-        try_forward_inbox(&mut state)
+        crate::controller_ops::try_forward_from_inbox(&mut state)
     }
 
     pub async fn approve_permission(&self) {
-        {
-            self.lock().pending_permission = None;
-        }
-        let _ = self.primary.permission_tx.send(true).await;
+        { self.lock().pending_permission = None; }
+        self.backend.approve_permission().await;
     }
 
     pub async fn deny_permission(&self) {
-        {
-            self.lock().pending_permission = None;
-        }
-        let _ = self.primary.permission_tx.send(false).await;
+        { self.lock().pending_permission = None; }
+        self.backend.deny_permission().await;
     }
 
     pub async fn answer_question(&self, answers: Vec<String>) {
-        {
-            self.lock().pending_question = None;
-        }
-        let _ = self
-            .primary
-            .question_tx
-            .send(UserQuestionResponse { answers })
-            .await;
+        { self.lock().pending_question = None; }
+        self.backend.answer_question(answers).await;
     }
 
     pub async fn switch_mode(&self, mode: AgentMode) {
@@ -125,11 +109,7 @@ impl SessionController {
             }
             .to_string();
         }
-        let _ = self
-            .primary
-            .control_tx
-            .send(ControlCommand::ModeSwitch(mode))
-            .await;
+        self.backend.send_control(ControlCommand::ModeSwitch(mode)).await;
     }
 
     pub async fn switch_model(&self, model: String) {
@@ -138,11 +118,7 @@ impl SessionController {
             s.model = model.clone();
             crate::helpers::push_system_msg(&mut s, &format!("Switched model to: {model}"));
         }
-        let _ = self
-            .primary
-            .control_tx
-            .send(ControlCommand::ModelSwitch(model))
-            .await;
+        self.backend.send_control(ControlCommand::ModelSwitch(model)).await;
     }
 
     pub async fn switch_thinking(&self, config_json: String) {
@@ -152,11 +128,7 @@ impl SessionController {
             s.thinking_config = label.clone();
             crate::helpers::push_system_msg(&mut s, &format!("Switched thinking to: {label}"));
         }
-        let _ = self
-            .primary
-            .control_tx
-            .send(ControlCommand::ThinkingSwitch(config_json))
-            .await;
+        self.backend.send_control(ControlCommand::ThinkingSwitch(config_json)).await;
     }
 
     pub async fn clear(&self) {
@@ -173,19 +145,15 @@ impl SessionController {
             s.retry_banner = None;
             s.reset_timer();
         }
-        let _ = self.primary.control_tx.send(ControlCommand::Clear).await;
+        self.backend.send_control(ControlCommand::Clear).await;
     }
 
     pub async fn compact(&self) {
-        let _ = self.primary.control_tx.send(ControlCommand::Compact).await;
+        self.backend.send_control(ControlCommand::Compact).await;
     }
 
     pub async fn rewind(&self, turn_index: usize) {
-        let _ = self
-            .primary
-            .control_tx
-            .send(ControlCommand::Rewind { turn_index })
-            .await;
+        self.backend.send_control(ControlCommand::Rewind { turn_index }).await;
     }
 
     // === Event handling ===

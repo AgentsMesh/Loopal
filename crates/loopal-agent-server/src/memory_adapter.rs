@@ -6,9 +6,8 @@ use async_trait::async_trait;
 use tokio::sync::mpsc;
 use tracing::info;
 
-use loopal_agent::config::AgentConfig;
 use loopal_agent::shared::AgentShared;
-use loopal_agent::spawn::{SpawnParams, spawn_agent};
+use loopal_agent::spawn::{SpawnParams, spawn_agent, wait_agent};
 use loopal_memory::{MEMORY_AGENT_PROMPT, MemoryProcessor};
 use loopal_tool_api::MemoryChannel;
 
@@ -21,7 +20,7 @@ impl MemoryChannel for ServerMemoryChannel {
     }
 }
 
-/// Processes memory observations by spawning a memory-maintainer agent.
+/// Processes memory observations by spawning a memory-maintainer agent via Hub.
 pub struct ServerMemoryProcessor {
     shared: Arc<AgentShared>,
     model: String,
@@ -36,43 +35,29 @@ impl ServerMemoryProcessor {
 #[async_trait]
 impl MemoryProcessor for ServerMemoryProcessor {
     async fn process(&self, observation: &str) -> Result<(), String> {
-        let config = AgentConfig {
-            name: "memory-maintainer".to_string(),
-            description: "Maintains project memory files".to_string(),
-            system_prompt: MEMORY_AGENT_PROMPT.to_string(),
-            allowed_tools: Some(vec![
-                "Read".into(),
-                "Write".into(),
-                "Edit".into(),
-                "Grep".into(),
-                "Glob".into(),
-                "Ls".into(),
-            ]),
-            max_turns: 10,
-            ..Default::default()
-        };
         let ts = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .subsec_nanos();
+        let name = format!("memory-{ts:08x}");
         let params = SpawnParams {
-            name: format!("memory-{ts:08x}"),
-            prompt: format!("New observation to incorporate:\n\n{observation}"),
-            agent_config: config,
-            parent_model: self.model.clone(),
-            parent_cancel_token: None,
+            name: name.clone(),
+            prompt: format!(
+                "{MEMORY_AGENT_PROMPT}\n\nNew observation to incorporate:\n\n{observation}"
+            ),
+            model: Some(self.model.clone()),
             cwd_override: None,
-            worktree: None,
         };
-        let result = spawn_agent(&self.shared, params).await?;
-        info!("memory-maintainer agent spawned");
-        match result.result_rx.await {
-            Ok(Ok(output)) => {
+        spawn_agent(&self.shared, params).await?;
+        info!("memory-maintainer agent spawned via Hub");
+
+        // Wait for completion
+        match wait_agent(&self.shared, &name).await {
+            Ok(output) => {
                 info!(output = %output, "memory-maintainer done");
                 Ok(())
             }
-            Ok(Err(e)) => Err(format!("memory-maintainer error: {e}")),
-            Err(_) => Err("memory-maintainer channel dropped".into()),
+            Err(e) => Err(format!("memory-maintainer error: {e}")),
         }
     }
 }

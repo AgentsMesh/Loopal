@@ -52,6 +52,7 @@ impl Connection {
         let pending = self.pending.clone();
 
         tokio::spawn(async move {
+            debug!("IPC reader loop started");
             loop {
                 let data = match transport.recv().await {
                     Ok(Some(data)) => data,
@@ -93,7 +94,7 @@ impl Connection {
             // Cleanup: drop all pending request senders so callers get Err
             let mut map = pending.lock().await;
             if !map.is_empty() {
-                debug!("IPC connection: dropping {} pending requests", map.len());
+                warn!("IPC reader: dropping {} pending requests on exit", map.len());
                 map.clear();
             }
         });

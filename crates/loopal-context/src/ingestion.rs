@@ -155,6 +155,16 @@ pub fn condense_old_server_blocks(messages: &mut [Message]) {
     }
 }
 
+/// Condense server blocks in ALL assistant messages (including the last one).
+/// Defensive recovery for API rejection of server blocks.
+pub fn condense_all_server_blocks(messages: &mut [Message]) {
+    for msg in messages.iter_mut() {
+        if msg.role == MessageRole::Assistant {
+            condense_server_blocks_in_message(msg);
+        }
+    }
+}
+
 /// Safely truncate a `ToolResult` block's String content.
 ///
 /// Only operates on `ToolResult`. Returns immediately for any other variant,

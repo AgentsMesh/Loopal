@@ -6,7 +6,7 @@ use loopal_config::resolver::ConfigResolver;
 use loopal_config::settings::McpServerConfig;
 
 fn mcp_config(command: &str) -> McpServerConfig {
-    McpServerConfig {
+    McpServerConfig::Stdio {
         command: command.to_string(),
         args: Vec::new(),
         env: HashMap::new(),
@@ -48,10 +48,11 @@ fn test_resolve_mcp_written_back_to_settings() {
     let config = resolver.resolve().unwrap();
     assert_eq!(config.mcp_servers.len(), 1);
     assert_eq!(config.settings.mcp_servers.len(), 1);
-    assert_eq!(
-        config.settings.mcp_servers.get("test").unwrap().command,
-        "test-cmd"
-    );
+    let mcp = config.settings.mcp_servers.get("test").unwrap();
+    let McpServerConfig::Stdio { command, .. } = mcp else {
+        panic!("expected Stdio config");
+    };
+    assert_eq!(command, "test-cmd");
 }
 
 #[test]

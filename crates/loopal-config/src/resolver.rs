@@ -47,7 +47,7 @@ impl ConfigResolver {
 
             // MCP servers: override by name; enabled=false removes
             for (name, config) in layer.mcp_servers {
-                if config.enabled {
+                if config.enabled() {
                     mcp_servers.insert(
                         name,
                         McpServerEntry {

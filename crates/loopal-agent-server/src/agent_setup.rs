@@ -111,7 +111,7 @@ pub fn build_with_frontend(
     let skills: Vec<_> = config.skills.values().map(|e| e.skill.clone()).collect();
     let skills_summary = loopal_config::format_skills_summary(&skills);
     let tool_defs = kernel.tool_definitions();
-    let system_prompt = build_system_prompt(
+    let mut system_prompt = build_system_prompt(
         &config.instructions,
         &tool_defs,
         mode_str,
@@ -119,6 +119,34 @@ pub fn build_with_frontend(
         &skills_summary,
         &config.memory,
     );
+
+    // Append MCP server instructions (from initialize handshake).
+    let mcp_instructions = kernel.mcp_instructions();
+    if !mcp_instructions.is_empty() {
+        system_prompt.push_str("\n\n# MCP Server Instructions\n");
+        for (server_name, instructions) in mcp_instructions {
+            system_prompt.push_str(&format!("\n## {server_name}\n{instructions}\n"));
+        }
+    }
+
+    // Append MCP resource and prompt summaries so the LLM knows what's available.
+    let mcp_resources = kernel.mcp_resources();
+    if !mcp_resources.is_empty() {
+        system_prompt.push_str("\n\n# Available MCP Resources\n");
+        for (server, res) in mcp_resources {
+            let desc = res.description.as_deref().unwrap_or("");
+            system_prompt.push_str(&format!("\n- `{}` ({server}): {desc}", res.uri));
+        }
+    }
+
+    let mcp_prompts = kernel.mcp_prompts();
+    if !mcp_prompts.is_empty() {
+        system_prompt.push_str("\n\n# Available MCP Prompts\n");
+        for (server, p) in mcp_prompts {
+            let desc = p.description.as_deref().unwrap_or("");
+            system_prompt.push_str(&format!("\n- `{}` ({server}): {desc}", p.name));
+        }
+    }
     let mut messages = resume_messages;
     if let Some(prompt) = &start.prompt {
         messages.push(loopal_message::Message::user(prompt));

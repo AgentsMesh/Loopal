@@ -7,7 +7,7 @@ use loopal_config::settings::McpServerConfig;
 use loopal_config::skills::parse_skill;
 
 fn mcp_config(command: &str) -> McpServerConfig {
-    McpServerConfig {
+    McpServerConfig::Stdio {
         command: command.to_string(),
         args: Vec::new(),
         env: HashMap::new(),
@@ -79,9 +79,15 @@ fn test_resolve_mcp_override_by_name() {
 
     let config = resolver.resolve().unwrap();
     assert_eq!(config.mcp_servers.len(), 2);
-    assert_eq!(config.mcp_servers["github"].config.command, "mcp-github-v2");
+    let McpServerConfig::Stdio { command, .. } = &config.mcp_servers["github"].config else {
+        panic!("expected Stdio config");
+    };
+    assert_eq!(command, "mcp-github-v2");
     assert_eq!(config.mcp_servers["github"].source, LayerSource::Project);
-    assert_eq!(config.mcp_servers["sqlite"].config.command, "mcp-sqlite");
+    let McpServerConfig::Stdio { command, .. } = &config.mcp_servers["sqlite"].config else {
+        panic!("expected Stdio config");
+    };
+    assert_eq!(command, "mcp-sqlite");
 }
 
 #[test]
@@ -96,8 +102,13 @@ fn test_resolve_mcp_disabled_removes() {
         .mcp_servers
         .insert("noisy".into(), mcp_config("noisy-server"));
 
-    let mut disabled = mcp_config("noisy-server");
-    disabled.enabled = false;
+    let disabled = McpServerConfig::Stdio {
+        command: "noisy-server".to_string(),
+        args: Vec::new(),
+        env: HashMap::new(),
+        enabled: false,
+        timeout_ms: 30_000,
+    };
     let mut layer2 = ConfigLayer {
         source: LayerSource::Project,
         ..Default::default()

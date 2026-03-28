@@ -129,7 +129,8 @@ fn resolve_loopal_binary() -> String {
         .parent() // deps/
         .and_then(|p| p.parent()) // debug/ or release/
         .expect("target dir");
-    let loopal = target_dir.join("loopal");
+    let binary_name = format!("loopal{}", std::env::consts::EXE_SUFFIX);
+    let loopal = target_dir.join(binary_name);
     assert!(
         loopal.exists(),
         "loopal binary not found at {}. Run `cargo build` first.",

@@ -10,11 +10,11 @@ use tracing::info;
 use crate::hub::AgentHub;
 
 /// Wait for an agent to finish. Timeout: 10 minutes.
-pub async fn handle_wait_agent(
-    hub: &Arc<Mutex<AgentHub>>,
-    params: Value,
-) -> Result<Value, String> {
-    let name = params["name"].as_str().ok_or("missing 'name' field")?.to_string();
+pub async fn handle_wait_agent(hub: &Arc<Mutex<AgentHub>>, params: Value) -> Result<Value, String> {
+    let name = params["name"]
+        .as_str()
+        .ok_or("missing 'name' field")?
+        .to_string();
     info!(agent = %name, "handle_wait_agent start");
 
     let mut rx = {

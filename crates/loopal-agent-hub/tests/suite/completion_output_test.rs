@@ -34,9 +34,12 @@ async fn completion_output_passed_through_wait() {
     let hub2 = hub.clone();
     let waiter = tokio::spawn(async move {
         loopal_agent_hub::dispatch::dispatch_hub_request(
-            &hub2, methods::HUB_WAIT_AGENT.name,
-            json!({"name": "worker"}), "parent".into(),
-        ).await
+            &hub2,
+            methods::HUB_WAIT_AGENT.name,
+            json!({"name": "worker"}),
+            "parent".into(),
+        )
+        .await
     });
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -71,9 +74,12 @@ async fn completion_no_output_fallback() {
     let hub2 = hub.clone();
     let waiter = tokio::spawn(async move {
         loopal_agent_hub::dispatch::dispatch_hub_request(
-            &hub2, methods::HUB_WAIT_AGENT.name,
-            json!({"name": "worker2"}), "parent".into(),
-        ).await
+            &hub2,
+            methods::HUB_WAIT_AGENT.name,
+            json!({"name": "worker2"}),
+            "parent".into(),
+        )
+        .await
     });
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -99,8 +105,14 @@ async fn topology_tracks_parent_child() {
     let parent_conn = Arc::new(Connection::new(pt));
     let parent_rx = parent_conn.start();
     register_agent_connection(
-        hub.clone(), "parent", parent_conn, parent_rx, None, Some("opus"),
-    ).await;
+        hub.clone(),
+        "parent",
+        parent_conn,
+        parent_rx,
+        None,
+        Some("opus"),
+    )
+    .await;
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Register child with parent relationship
@@ -108,8 +120,14 @@ async fn topology_tracks_parent_child() {
     let child_conn = Arc::new(Connection::new(ct));
     let child_rx = child_conn.start();
     register_agent_connection(
-        hub.clone(), "child-1", child_conn, child_rx, Some("parent"), Some("sonnet"),
-    ).await;
+        hub.clone(),
+        "child-1",
+        child_conn,
+        child_rx,
+        Some("parent"),
+        Some("sonnet"),
+    )
+    .await;
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Check topology

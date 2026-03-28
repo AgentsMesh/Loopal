@@ -20,10 +20,8 @@ use serde_json::json;
 #[tokio::test]
 async fn full_bootstrap_hub_to_agent_roundtrip() {
     // 1. Create mock provider JSON file
-    let mock_file = std::env::temp_dir().join(format!(
-        "loopal_e2e_mock_{}.json",
-        std::process::id()
-    ));
+    let mock_file =
+        std::env::temp_dir().join(format!("loopal_e2e_mock_{}.json", std::process::id()));
     let mock_data = json!([
         [
             {"type": "text", "text": "Hello from mock agent!"},

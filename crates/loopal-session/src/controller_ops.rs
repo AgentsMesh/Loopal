@@ -4,9 +4,7 @@ use std::sync::Arc;
 
 use loopal_ipc::connection::Connection;
 use loopal_ipc::protocol::methods;
-use loopal_protocol::{
-    ControlCommand, Envelope, MessageSource, UserContent, UserQuestionResponse,
-};
+use loopal_protocol::{ControlCommand, Envelope, MessageSource, UserContent, UserQuestionResponse};
 use serde_json::json;
 
 use crate::inbox::try_forward_inbox;

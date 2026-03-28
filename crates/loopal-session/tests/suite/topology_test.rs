@@ -43,7 +43,11 @@ fn spawned_agent_registered_as_child_of_parent() {
         }),
     );
 
-    assert!(state.agents["researcher"].children.contains(&"coder".into()));
+    assert!(
+        state.agents["researcher"]
+            .children
+            .contains(&"coder".into())
+    );
     assert_eq!(state.agents["coder"].parent.as_deref(), Some("researcher"));
 }
 

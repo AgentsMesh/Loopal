@@ -71,9 +71,10 @@ pub async fn agent_io_loop(
                     spawn_wait_agent(hub.clone(), conn.clone(), id, params, agent_name.clone());
                 } else if method.starts_with("hub/") {
                     info!(agent = %agent_name, %method, "hub request received");
-                    match dispatch_hub_request(&hub, &method, params, agent_name.clone()).await
-                    {
-                        Ok(result) => { let _ = conn.respond(id, result).await; }
+                    match dispatch_hub_request(&hub, &method, params, agent_name.clone()).await {
+                        Ok(result) => {
+                            let _ = conn.respond(id, result).await;
+                        }
                         Err(e) => {
                             warn!(agent = %agent_name, %method, error = %e, "hub request failed");
                             let _ = conn
@@ -102,7 +103,11 @@ pub async fn agent_io_loop(
         }
     }
     // Prefer AttemptCompletion output over accumulated stream text
-    completion_output.or(if last_stream.is_empty() { None } else { Some(last_stream) })
+    completion_output.or(if last_stream.is_empty() {
+        None
+    } else {
+        Some(last_stream)
+    })
 }
 
 /// Spawn hub/wait_agent in a background task so it doesn't block the IO loop.
@@ -115,11 +120,16 @@ fn spawn_wait_agent(
 ) {
     tokio::spawn(async move {
         match crate::dispatch::dispatch_hub_request(
-            &hub, WAIT_AGENT_METHOD, params, agent_name.clone(),
+            &hub,
+            WAIT_AGENT_METHOD,
+            params,
+            agent_name.clone(),
         )
         .await
         {
-            Ok(result) => { let _ = conn.respond(request_id, result).await; }
+            Ok(result) => {
+                let _ = conn.respond(request_id, result).await;
+            }
             Err(e) => {
                 warn!(agent = %agent_name, "background wait_agent failed: {e}");
                 let _ = conn

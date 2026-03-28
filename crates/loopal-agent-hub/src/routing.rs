@@ -14,8 +14,8 @@ pub async fn route_to_agent(
     envelope: &Envelope,
     observation_tx: &mpsc::Sender<AgentEvent>,
 ) -> Result<(), String> {
-    let params = serde_json::to_value(envelope)
-        .map_err(|e| format!("failed to serialize envelope: {e}"))?;
+    let params =
+        serde_json::to_value(envelope).map_err(|e| format!("failed to serialize envelope: {e}"))?;
 
     conn.send_request(methods::AGENT_MESSAGE.name, params)
         .await

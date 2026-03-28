@@ -95,6 +95,31 @@ pub fn abbreviate_model(model: &str) -> String {
     }
 }
 
+pub fn canvas_bounds(placed: &[PlacedNode]) -> (f64, f64, f64, f64) {
+    placed.iter().fold(
+        (f64::MAX, f64::MIN, f64::MAX, f64::MIN),
+        |(xn, xx, yn, yx), p| (xn.min(p.x), xx.max(p.x), yn.min(p.y), yx.max(p.y)),
+    )
+}
+
+/// Width adapts to the widest tree level (max label + spacing per node).
+pub fn compute_overlay_width(placed: &[PlacedNode], max_w: u16) -> u16 {
+    let (x_min, x_max, _, _) = canvas_bounds(placed);
+    let max_label = placed
+        .iter()
+        .map(|p| p.node.name.len() + p.node.model.len() + 6)
+        .max()
+        .unwrap_or(12);
+    let span = ((x_max - x_min) / 4.0).ceil() as u16 + 1;
+    (span.max(max_label as u16) + 4).clamp(24, max_w * 60 / 100)
+}
+
+pub fn compute_overlay_height(placed: &[PlacedNode], max_h: u16) -> u16 {
+    let (_, _, y_min, y_max) = canvas_bounds(placed);
+    let depth = ((y_max - y_min) / 4.0).ceil() as u16 + 1;
+    (depth * 3 + 2).clamp(8, max_h / 2)
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::Duration;

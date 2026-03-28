@@ -14,7 +14,9 @@ pub struct SendMessageTool;
 
 #[async_trait]
 impl Tool for SendMessageTool {
-    fn name(&self) -> &str { "SendMessage" }
+    fn name(&self) -> &str {
+        "SendMessage"
+    }
 
     fn description(&self) -> &str {
         "Send a message to another agent by name. The message is routed through \
@@ -33,7 +35,9 @@ impl Tool for SendMessageTool {
         })
     }
 
-    fn permission(&self) -> PermissionLevel { PermissionLevel::ReadOnly }
+    fn permission(&self) -> PermissionLevel {
+        PermissionLevel::ReadOnly
+    }
 
     async fn execute(
         &self,
@@ -43,9 +47,7 @@ impl Tool for SendMessageTool {
         let shared = extract_shared(ctx)?;
 
         let target = input["to"].as_str().ok_or_else(|| {
-            LoopalError::Tool(loopal_error::ToolError::InvalidInput(
-                "missing 'to'".into(),
-            ))
+            LoopalError::Tool(loopal_error::ToolError::InvalidInput("missing 'to'".into()))
         })?;
         let content = input["message"].as_str().unwrap_or("");
 
@@ -54,9 +56,8 @@ impl Tool for SendMessageTool {
             target,
             content,
         );
-        let params = serde_json::to_value(&envelope).map_err(|e| {
-            LoopalError::Tool(loopal_error::ToolError::InvalidInput(e.to_string()))
-        })?;
+        let params = serde_json::to_value(&envelope)
+            .map_err(|e| LoopalError::Tool(loopal_error::ToolError::InvalidInput(e.to_string())))?;
 
         match shared
             .hub_connection

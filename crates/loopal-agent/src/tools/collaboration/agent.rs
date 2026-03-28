@@ -23,7 +23,9 @@ pub struct AgentTool;
 
 #[async_trait]
 impl Tool for AgentTool {
-    fn name(&self) -> &str { "Agent" }
+    fn name(&self) -> &str {
+        "Agent"
+    }
     fn description(&self) -> &str {
         "Multi-agent collaboration: spawn sub-agents, get results, query status"
     }
@@ -42,7 +44,9 @@ impl Tool for AgentTool {
             "required": ["prompt"]
         })
     }
-    fn permission(&self) -> PermissionLevel { PermissionLevel::Supervised }
+    fn permission(&self) -> PermissionLevel {
+        PermissionLevel::Supervised
+    }
 
     async fn execute(
         &self,
@@ -50,7 +54,10 @@ impl Tool for AgentTool {
         ctx: &ToolContext,
     ) -> Result<ToolResult, LoopalError> {
         let shared = extract_shared(ctx)?;
-        let action = input.get("action").and_then(|v| v.as_str()).unwrap_or("spawn");
+        let action = input
+            .get("action")
+            .and_then(|v| v.as_str())
+            .unwrap_or("spawn");
 
         match action {
             "spawn" => action_spawn(shared, &input).await,
@@ -67,17 +74,26 @@ async fn action_spawn(
     input: &serde_json::Value,
 ) -> Result<ToolResult, LoopalError> {
     let prompt = require_str(input, "prompt")?;
-    let name = input.get("name").and_then(|v| v.as_str())
+    let name = input
+        .get("name")
+        .and_then(|v| v.as_str())
         .map(String::from)
         .unwrap_or_else(|| format!("agent-{}", &uuid::Uuid::new_v4().to_string()[..8]));
     let subagent_type = input.get("subagent_type").and_then(|v| v.as_str());
-    let model_override = input.get("model").and_then(|v| v.as_str()).map(String::from);
-    let background = input.get("run_in_background").and_then(|v| v.as_bool()).unwrap_or(false);
+    let model_override = input
+        .get("model")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+    let background = input
+        .get("run_in_background")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     let isolation = input.get("isolation").and_then(|v| v.as_str());
 
     if shared.depth >= shared.max_depth {
         return Ok(ToolResult::error(format!(
-            "Maximum nesting depth ({}) reached", shared.max_depth
+            "Maximum nesting depth ({}) reached",
+            shared.max_depth
         )));
     }
 
@@ -95,12 +111,20 @@ async fn action_spawn(
         None
     };
     let cwd_override = wt.as_ref().map(|(info, _)| info.path.clone());
-    let model = config.model.unwrap_or_else(|| shared.kernel.settings().model.clone());
+    let model = config
+        .model
+        .unwrap_or_else(|| shared.kernel.settings().model.clone());
 
-    let result = spawn_agent(&shared, SpawnParams {
-        name: name.clone(), prompt: prompt.to_string(),
-        model: Some(model), cwd_override,
-    }).await;
+    let result = spawn_agent(
+        &shared,
+        SpawnParams {
+            name: name.clone(),
+            prompt: prompt.to_string(),
+            model: Some(model),
+            cwd_override,
+        },
+    )
+    .await;
 
     match result {
         Ok(sr) => {
@@ -115,7 +139,8 @@ async fn action_spawn(
                     });
                 }
                 Ok(ToolResult::success(format!(
-                    "Agent '{name}' spawned in background.\nagentId: {}", sr.agent_id,
+                    "Agent '{name}' spawned in background.\nagentId: {}",
+                    sr.agent_id,
                 )))
             } else {
                 let output = wait_agent(&shared, &name).await;
@@ -155,7 +180,8 @@ async fn action_status(
     input: &serde_json::Value,
 ) -> Result<ToolResult, LoopalError> {
     let name = require_str(input, "name")?;
-    match shared.hub_connection
+    match shared
+        .hub_connection
         .send_request(methods::HUB_AGENT_INFO.name, json!({"name": name}))
         .await
     {
@@ -167,7 +193,9 @@ async fn action_status(
 }
 
 fn create_agent_worktree(
-    cwd: &Path, agent_name: &str, uid: &str,
+    cwd: &Path,
+    agent_name: &str,
+    uid: &str,
 ) -> Result<(loopal_git::WorktreeInfo, PathBuf), LoopalError> {
     let root = loopal_git::repo_root(cwd)
         .ok_or_else(|| LoopalError::Other("Not a git repository".into()))?;
@@ -192,8 +220,8 @@ pub(crate) fn extract_shared(ctx: &ToolContext) -> Result<Arc<AgentShared>, Loop
 
 fn require_str<'a>(input: &'a serde_json::Value, field: &str) -> Result<&'a str, LoopalError> {
     input.get(field).and_then(|v| v.as_str()).ok_or_else(|| {
-        LoopalError::Tool(loopal_error::ToolError::InvalidInput(
-            format!("missing '{field}'"),
-        ))
+        LoopalError::Tool(loopal_error::ToolError::InvalidInput(format!(
+            "missing '{field}'"
+        )))
     })
 }

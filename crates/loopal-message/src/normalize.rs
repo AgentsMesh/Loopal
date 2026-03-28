@@ -43,7 +43,9 @@ fn stabilize_user_block_order(blocks: &mut Vec<ContentBlock>) {
     if blocks.len() < 2 {
         return;
     }
-    let has_tool_result = blocks.iter().any(|b| matches!(b, ContentBlock::ToolResult { .. }));
+    let has_tool_result = blocks
+        .iter()
+        .any(|b| matches!(b, ContentBlock::ToolResult { .. }));
     let has_text_before = blocks
         .iter()
         .take_while(|b| !matches!(b, ContentBlock::ToolResult { .. }))

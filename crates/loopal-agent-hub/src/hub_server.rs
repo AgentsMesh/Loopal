@@ -65,7 +65,9 @@ pub async fn accept_loop(listener: TcpListener, hub: Arc<Mutex<AgentHub>>, token
                     let (tx, owned_rx) = tokio::sync::mpsc::channel(256);
                     tokio::spawn(async move {
                         while let Some(msg) = rx.recv().await {
-                            if tx.send(msg).await.is_err() { break; }
+                            if tx.send(msg).await.is_err() {
+                                break;
+                            }
                         }
                     });
                     crate::agent_io::start_agent_io(hub, &name, conn, owned_rx, false);
@@ -102,9 +104,7 @@ async fn wait_for_register(
                     .as_str()
                     .ok_or_else(|| anyhow::anyhow!("hub/register: missing 'name'"))?
                     .to_string();
-                let _ = conn
-                    .respond(id, serde_json::json!({"ok": true}))
-                    .await;
+                let _ = conn.respond(id, serde_json::json!({"ok": true})).await;
                 return Ok(name);
             }
             let _ = conn

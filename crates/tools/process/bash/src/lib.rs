@@ -19,7 +19,9 @@ use loopal_tool_background::TaskStatus;
 pub struct BashTool;
 
 impl Default for BashTool {
-    fn default() -> Self { Self }
+    fn default() -> Self {
+        Self
+    }
 }
 
 const DEFAULT_TIMEOUT_MS: u64 = 300_000;
@@ -30,7 +32,9 @@ const MAX_OUTPUT_BYTES: usize = 512_000;
 
 #[async_trait]
 impl Tool for BashTool {
-    fn name(&self) -> &str { "Bash" }
+    fn name(&self) -> &str {
+        "Bash"
+    }
 
     fn description(&self) -> &str {
         "Execute a bash command, or manage a background process.\n\
@@ -55,7 +59,9 @@ impl Tool for BashTool {
         })
     }
 
-    fn permission(&self) -> PermissionLevel { PermissionLevel::Dangerous }
+    fn permission(&self) -> PermissionLevel {
+        PermissionLevel::Dangerous
+    }
 
     fn precheck(&self, input: &Value) -> Option<String> {
         let cmd = input.get("command")?.as_str()?;
@@ -75,7 +81,9 @@ impl Tool for BashTool {
                 return Ok(bg_stop(pid));
             }
             let block = input["block"].as_bool().unwrap_or(true);
-            let timeout = input["timeout"].as_u64().unwrap_or(DEFAULT_BG_TIMEOUT_MS)
+            let timeout = input["timeout"]
+                .as_u64()
+                .unwrap_or(DEFAULT_BG_TIMEOUT_MS)
                 .min(MAX_TIMEOUT_MS);
             return Ok(bg_output(pid, block, timeout).await);
         }
@@ -98,7 +106,9 @@ impl Tool for BashTool {
 
         let timeout_ms = input["timeout"].as_u64().unwrap_or(DEFAULT_TIMEOUT_MS);
         let exec_result = if let Some(ref tail) = ctx.output_tail {
-            ctx.backend.exec_streaming(command, timeout_ms, tail.clone()).await
+            ctx.backend
+                .exec_streaming(command, timeout_ms, tail.clone())
+                .await
         } else {
             ctx.backend.exec(command, timeout_ms).await
         };
@@ -131,15 +141,17 @@ async fn bg_output(process_id: &str, block: bool, timeout_ms: u64) -> ToolResult
         let deadline = Duration::from_millis(timeout_ms);
         let wait = async {
             loop {
-                if *watch_rx.borrow() != TaskStatus::Running { return; }
-                if watch_rx.changed().await.is_err() { return; }
+                if *watch_rx.borrow() != TaskStatus::Running {
+                    return;
+                }
+                if watch_rx.changed().await.is_err() {
+                    return;
+                }
             }
         };
         if tokio::time::timeout(deadline, wait).await.is_err() {
             let output = output_buf.lock().unwrap().clone();
-            return ToolResult::success(format!(
-                "{output}\n[Status: Running (timed out waiting)]"
-            ));
+            return ToolResult::success(format!("{output}\n[Status: Running (timed out waiting)]"));
         }
     }
 
@@ -179,9 +191,13 @@ fn bg_stop(process_id: &str) -> ToolResult {
 
 fn format_exec_result(output: loopal_tool_api::backend_types::ExecResult) -> ToolResult {
     let mut combined = String::new();
-    if !output.stdout.is_empty() { combined.push_str(&output.stdout); }
+    if !output.stdout.is_empty() {
+        combined.push_str(&output.stdout);
+    }
     if !output.stderr.is_empty() {
-        if !combined.is_empty() { combined.push('\n'); }
+        if !combined.is_empty() {
+            combined.push('\n');
+        }
         combined.push_str(&output.stderr);
     }
     let truncated = truncate_output(&combined, MAX_OUTPUT_LINES, MAX_OUTPUT_BYTES);

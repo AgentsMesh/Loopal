@@ -47,7 +47,12 @@ pub fn extract_topology(
     // Filter out finished/errored agents — they are no longer active.
     let live_agents: IndexMap<&String, &AgentViewState> = agents
         .iter()
-        .filter(|(_, a)| !matches!(a.observable.status, AgentStatus::Finished | AgentStatus::Error))
+        .filter(|(_, a)| {
+            !matches!(
+                a.observable.status,
+                AgentStatus::Finished | AgentStatus::Error
+            )
+        })
         .collect();
 
     // An agent is a direct child of root if its parent is None or not in the agents map.
@@ -83,7 +88,9 @@ pub fn extract_topology(
             elapsed: agent.elapsed(),
             tools_in_flight: agent.observable.tools_in_flight,
             parent,
-            children: agent.children.iter()
+            children: agent
+                .children
+                .iter()
                 .filter(|c| live_agents.contains_key(c))
                 .cloned()
                 .collect(),
@@ -104,8 +111,8 @@ pub fn render_topology_overlay(f: &mut Frame, nodes: &[TopologyNode], area: Rect
     }
 
     // Compute overlay dimensions based on tree shape
-    let overlay_w = compute_overlay_width(&placed, area.width);
-    let overlay_h = compute_overlay_height(&placed, area.height);
+    let overlay_w = layout::compute_overlay_width(&placed, area.width);
+    let overlay_h = layout::compute_overlay_height(&placed, area.height);
     let x = area.x + area.width.saturating_sub(overlay_w + 1);
     let y = area.y + 1;
     let overlay_area = Rect::new(x, y, overlay_w, overlay_h);
@@ -131,7 +138,7 @@ fn render_graph(f: &mut Frame, placed: &[PlacedNode], area: Rect) {
     }
 
     // Canvas coordinate bounds (with padding)
-    let (x_min, x_max, y_min, y_max) = canvas_bounds(placed);
+    let (x_min, x_max, y_min, y_max) = layout::canvas_bounds(placed);
 
     let canvas = Canvas::default()
         .x_bounds([x_min - 2.0, x_max + 2.0])
@@ -171,26 +178,4 @@ fn status_icon(node: &TopologyNode) -> (&'static str, Color) {
         AgentStatus::Finished => ("✓", Color::Green),
         AgentStatus::Error => ("✗", Color::Red),
     }
-}
-
-fn canvas_bounds(placed: &[PlacedNode]) -> (f64, f64, f64, f64) {
-    placed.iter().fold((f64::MAX, f64::MIN, f64::MAX, f64::MIN), |(xn, xx, yn, yx), p| {
-        (xn.min(p.x), xx.max(p.x), yn.min(p.y), yx.max(p.y))
-    })
-}
-
-/// Width adapts to the widest tree level (max label + spacing per node).
-fn compute_overlay_width(placed: &[PlacedNode], max_w: u16) -> u16 {
-    let (x_min, x_max, _, _) = canvas_bounds(placed);
-    // Rough: each canvas unit ≈ 1 char; add padding for labels + borders
-    let max_label = placed.iter().map(|p| p.node.name.len() + p.node.model.len() + 6).max().unwrap_or(12);
-    let span = ((x_max - x_min) / 4.0).ceil() as u16 + 1;
-    let content_w = span.max(max_label as u16) + 4; // +4 for borders+padding
-    content_w.clamp(24, max_w * 60 / 100)
-}
-
-fn compute_overlay_height(placed: &[PlacedNode], max_h: u16) -> u16 {
-    let (_, _, y_min, y_max) = canvas_bounds(placed);
-    let depth = ((y_max - y_min) / 4.0).ceil() as u16 + 1;
-    (depth * 3 + 2).clamp(8, max_h / 2)
 }

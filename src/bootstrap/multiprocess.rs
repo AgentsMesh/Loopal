@@ -8,8 +8,8 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::info;
 
-use loopal_agent_hub::hub_server;
 use loopal_agent_hub::AgentHub;
+use loopal_agent_hub::hub_server;
 use loopal_runtime::projection::project_messages;
 use loopal_session::SessionController;
 
@@ -73,8 +73,7 @@ pub async fn run(
 
     // 5. Event routing: Hub event_tx → frontend → TUI
     let (frontend_tx, frontend_rx) = tokio::sync::mpsc::channel(256);
-    let _event_loop =
-        loopal_agent_hub::start_event_loop(hub.clone(), event_rx, frontend_tx);
+    let _event_loop = loopal_agent_hub::start_event_loop(hub.clone(), event_rx, frontend_tx);
 
     // 6. Build SessionController with Hub backend
     let model = config.settings.model.clone();
@@ -118,16 +117,11 @@ async fn handle_tui_incoming(
         if let Incoming::Request { id, method, .. } = msg {
             if method == loopal_ipc::protocol::methods::AGENT_PERMISSION.name {
                 info!(%method, id, "TUI auto-approving permission");
-                let _ = conn
-                    .respond(id, serde_json::json!({"allow": true}))
-                    .await;
+                let _ = conn.respond(id, serde_json::json!({"allow": true})).await;
             } else if method == loopal_ipc::protocol::methods::AGENT_QUESTION.name {
                 info!(%method, id, "TUI auto-approving question");
                 let _ = conn
-                    .respond(
-                        id,
-                        serde_json::json!({"answers": ["(auto-approved)"]}),
-                    )
+                    .respond(id, serde_json::json!({"answers": ["(auto-approved)"]}))
                     .await;
             }
         }

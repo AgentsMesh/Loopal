@@ -55,13 +55,21 @@ async fn concurrent_permissions_from_two_agents() {
     let a_handle = {
         let c = conn_a.clone();
         tokio::spawn(async move {
-            c.send_request(methods::AGENT_PERMISSION.name, json!({"tool_call_id": "a1", "tool_name": "Bash", "tool_input": {}})).await
+            c.send_request(
+                methods::AGENT_PERMISSION.name,
+                json!({"tool_call_id": "a1", "tool_name": "Bash", "tool_input": {}}),
+            )
+            .await
         })
     };
     let b_handle = {
         let c = conn_b.clone();
         tokio::spawn(async move {
-            c.send_request(methods::AGENT_PERMISSION.name, json!({"tool_call_id": "b1", "tool_name": "Edit", "tool_input": {}})).await
+            c.send_request(
+                methods::AGENT_PERMISSION.name,
+                json!({"tool_call_id": "b1", "tool_name": "Edit", "tool_input": {}}),
+            )
+            .await
         })
     };
 
@@ -97,9 +105,7 @@ async fn route_to_disconnected_agent_returns_error() {
         "content": {"text": "are you there?", "images": []},
         "timestamp": "2026-01-01T00:00:00Z"
     });
-    let result = sender
-        .send_request(methods::HUB_ROUTE.name, envelope)
-        .await;
+    let result = sender.send_request(methods::HUB_ROUTE.name, envelope).await;
     // Should get error response (ghost is gone)
     assert!(result.is_ok());
     let val = result.unwrap();
@@ -172,7 +178,10 @@ async fn wait_already_finished_agent_returns_immediately() {
         ),
     )
     .await;
-    assert!(result.is_ok(), "should return immediately for finished agent");
+    assert!(
+        result.is_ok(),
+        "should return immediately for finished agent"
+    );
     assert!(result.unwrap().is_ok());
 }
 
@@ -192,16 +201,22 @@ async fn multiple_waiters_on_same_agent() {
     let h1 = hub.clone();
     let w1 = tokio::spawn(async move {
         loopal_agent_hub::dispatch::dispatch_hub_request(
-            &h1, methods::HUB_WAIT_AGENT.name,
-            json!({"name": "shared-target"}), "w1".into(),
-        ).await
+            &h1,
+            methods::HUB_WAIT_AGENT.name,
+            json!({"name": "shared-target"}),
+            "w1".into(),
+        )
+        .await
     });
     let h2 = hub.clone();
     let w2 = tokio::spawn(async move {
         loopal_agent_hub::dispatch::dispatch_hub_request(
-            &h2, methods::HUB_WAIT_AGENT.name,
-            json!({"name": "shared-target"}), "w2".into(),
-        ).await
+            &h2,
+            methods::HUB_WAIT_AGENT.name,
+            json!({"name": "shared-target"}),
+            "w2".into(),
+        )
+        .await
     });
 
     tokio::time::sleep(Duration::from_millis(100)).await;
@@ -227,9 +242,7 @@ async fn root_agent_event_preserves_none_agent_name() {
     let server_conn = Arc::new(Connection::new(t2));
     let _agent_rx = agent_conn.start();
     let server_rx = server_conn.start();
-    loopal_agent_hub::agent_io::start_agent_io(
-        hub.clone(), "main", server_conn, server_rx, true,
-    );
+    loopal_agent_hub::agent_io::start_agent_io(hub.clone(), "main", server_conn, server_rx, true);
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Root agent sends event with agent_name=None

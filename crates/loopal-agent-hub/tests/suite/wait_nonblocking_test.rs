@@ -30,10 +30,26 @@ async fn wait_agent_does_not_block_io_loop() {
 
     // Register two mock child agents
     let (_child_a_conn, child_a_server, child_a_rx) = mock_agent();
-    register_agent_connection(hub.clone(), "child-a", child_a_server, child_a_rx, None, None).await;
+    register_agent_connection(
+        hub.clone(),
+        "child-a",
+        child_a_server,
+        child_a_rx,
+        None,
+        None,
+    )
+    .await;
 
     let (_child_b_conn, child_b_server, child_b_rx) = mock_agent();
-    register_agent_connection(hub.clone(), "child-b", child_b_server, child_b_rx, None, None).await;
+    register_agent_connection(
+        hub.clone(),
+        "child-b",
+        child_b_server,
+        child_b_rx,
+        None,
+        None,
+    )
+    .await;
 
     tokio::time::sleep(Duration::from_millis(50)).await;
 
@@ -84,7 +100,10 @@ async fn wait_agent_does_not_block_io_loop() {
     }
 
     let result_a = tokio::time::timeout(Duration::from_secs(2), wait_a).await;
-    assert!(result_a.is_ok(), "wait_a should complete after child-a finishes");
+    assert!(
+        result_a.is_ok(),
+        "wait_a should complete after child-a finishes"
+    );
 }
 
 /// After hub/wait_agent is pending, hub/spawn_agent from the same agent must still work.
@@ -94,7 +113,15 @@ async fn spawn_after_wait_not_blocked() {
 
     // Register a mock child that we'll wait on
     let (_child_conn, child_server, child_rx) = mock_agent();
-    register_agent_connection(hub.clone(), "existing-child", child_server, child_rx, None, None).await;
+    register_agent_connection(
+        hub.clone(),
+        "existing-child",
+        child_server,
+        child_rx,
+        None,
+        None,
+    )
+    .await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Parent connects through IO loop
@@ -118,12 +145,11 @@ async fn spawn_after_wait_not_blocked() {
 
     // Parent sends hub/list_agents — should NOT be blocked
     let pc2 = parent_conn.clone();
-    let list_result =
-        tokio::time::timeout(Duration::from_secs(2), async move {
-            pc2.send_request(methods::HUB_LIST_AGENTS.name, json!({}))
-                .await
-        })
-        .await;
+    let list_result = tokio::time::timeout(Duration::from_secs(2), async move {
+        pc2.send_request(methods::HUB_LIST_AGENTS.name, json!({}))
+            .await
+    })
+    .await;
 
     assert!(
         list_result.is_ok(),
@@ -144,7 +170,9 @@ fn mock_agent() -> (Arc<Connection>, Arc<Connection>, mpsc::Receiver<Incoming>) 
     tokio::spawn(async move {
         let mut srx = server_rx;
         while let Some(msg) = srx.recv().await {
-            if tx.send(msg).await.is_err() { break; }
+            if tx.send(msg).await.is_err() {
+                break;
+            }
         }
     });
     (client_conn, server_conn, rx)

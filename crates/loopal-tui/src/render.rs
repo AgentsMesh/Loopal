@@ -132,9 +132,16 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     let pending_question = state.pending_question.clone();
     let topology_data = if app.show_topology {
         use loopal_protocol::AgentStatus;
-        let root_status = if state.agent_idle { AgentStatus::WaitingForInput } else { AgentStatus::Running };
+        let root_status = if state.agent_idle {
+            AgentStatus::WaitingForInput
+        } else {
+            AgentStatus::Running
+        };
         Some(views::topology_overlay::extract_topology(
-            &state.agents, &state.model, root_status, state.turn_elapsed(),
+            &state.agents,
+            &state.model,
+            root_status,
+            state.turn_elapsed(),
         ))
     } else {
         None

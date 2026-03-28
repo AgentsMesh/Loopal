@@ -63,7 +63,10 @@ async fn chain_routing_a_to_b_to_c() {
 
     // A: send to B
     let (conn_a, ra) = hub_server::connect_local(hub.clone(), "A");
-    tokio::spawn(async move { let mut rx = ra; while rx.recv().await.is_some() {} });
+    tokio::spawn(async move {
+        let mut rx = ra;
+        while rx.recv().await.is_some() {}
+    });
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     let result = conn_a
@@ -170,9 +173,7 @@ async fn concurrent_events_all_reach_hub() {
         let _rx = agent.start();
         let srx = server.start();
         // Register as sub-agent (is_root=false) so agent_name gets tagged
-        loopal_agent_hub::agent_io::start_agent_io(
-            hub.clone(), &name, server, srx, false,
-        );
+        loopal_agent_hub::agent_io::start_agent_io(hub.clone(), &name, server, srx, false);
         agent_conns.push((name, agent));
     }
     tokio::time::sleep(Duration::from_millis(50)).await;

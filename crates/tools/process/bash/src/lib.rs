@@ -229,17 +229,26 @@ mod tests {
     #[test]
     fn parse_timeout_clamps_to_max() {
         // 700 seconds = 700_000ms, exceeds MAX_TIMEOUT_MS (600_000)
-        assert_eq!(parse_timeout_ms(&json!({"timeout": 700}), 0), MAX_TIMEOUT_MS);
+        assert_eq!(
+            parse_timeout_ms(&json!({"timeout": 700}), 0),
+            MAX_TIMEOUT_MS
+        );
     }
 
     #[test]
     fn parse_timeout_uses_default_when_missing() {
-        assert_eq!(parse_timeout_ms(&json!({}), DEFAULT_TIMEOUT_MS), DEFAULT_TIMEOUT_MS);
+        assert_eq!(
+            parse_timeout_ms(&json!({}), DEFAULT_TIMEOUT_MS),
+            DEFAULT_TIMEOUT_MS
+        );
         assert_eq!(parse_timeout_ms(&json!({"command": "ls"}), 42_000), 42_000);
     }
 
     #[test]
     fn parse_timeout_zero_yields_zero() {
-        assert_eq!(parse_timeout_ms(&json!({"timeout": 0}), DEFAULT_TIMEOUT_MS), 0);
+        assert_eq!(
+            parse_timeout_ms(&json!({"timeout": 0}), DEFAULT_TIMEOUT_MS),
+            0
+        );
     }
 }

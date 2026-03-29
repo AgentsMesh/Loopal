@@ -49,7 +49,11 @@ async fn test_init_prompt_contains_cwd() {
     match effect {
         CommandEffect::InboxPush(content) => {
             assert!(content.text.contains("LOOPAL.md"));
-            assert!(content.text.contains(&dir.path().to_string_lossy().to_string()));
+            assert!(
+                content
+                    .text
+                    .contains(&dir.path().to_string_lossy().to_string())
+            );
         }
         _ => panic!("expected InboxPush"),
     }
@@ -89,7 +93,11 @@ async fn test_init_does_not_create_loopal_md_directly() {
 #[tokio::test]
 async fn test_init_includes_existing_content_in_prompt() {
     let dir = tempfile::tempdir().unwrap();
-    fs::write(dir.path().join("LOOPAL.md"), "# Old instructions\nKeep this.").unwrap();
+    fs::write(
+        dir.path().join("LOOPAL.md"),
+        "# Old instructions\nKeep this.",
+    )
+    .unwrap();
 
     let mut app = make_app_in(dir.path().to_path_buf());
     let handler = app.command_registry.find("/init").unwrap();

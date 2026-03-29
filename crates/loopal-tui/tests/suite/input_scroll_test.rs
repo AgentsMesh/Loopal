@@ -90,7 +90,10 @@ fn test_down_absorbed_when_content_overflows_at_bottom() {
     app.input_history.push("cmd".into());
     handle_key(&mut app, key(KeyCode::Down));
     assert_eq!(app.scroll_offset, 0, "scroll_offset stays 0");
-    assert!(app.input.is_empty(), "Down at bottom should not trigger history");
+    assert!(
+        app.input.is_empty(),
+        "Down at bottom should not trigger history"
+    );
 }
 
 // --- Up/Down history (content fits) ---

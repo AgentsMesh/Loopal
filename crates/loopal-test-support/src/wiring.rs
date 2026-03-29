@@ -84,6 +84,11 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
 
     // AgentShared — mirrors bootstrap.rs:103-115
     let tasks_dir = fixture.path().join("tasks");
+    let (scheduler_handle, scheduled_rx) = if let Some(sched) = builder.scheduler {
+        loopal_agent::shared::SchedulerHandle::create_with_scheduler(sched)
+    } else {
+        loopal_agent::shared::SchedulerHandle::create()
+    };
     let shared = Arc::new(AgentShared {
         kernel: kernel.clone(),
         task_store: Arc::new(TaskStore::new(tasks_dir)),
@@ -94,6 +99,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         agent_name: "main".to_string(),
         parent_event_tx: Some(event_tx),
         cancel_token: None,
+        scheduler_handle,
     });
     let shared_any: Arc<dyn std::any::Any + Send + Sync> = Arc::new(shared);
 
@@ -148,6 +154,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         interrupt,
         shared: Some(shared_any),
         memory_channel: None,
+        scheduled_rx: Some(scheduled_rx),
     };
 
     let harness = SpawnedHarness {

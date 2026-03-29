@@ -131,7 +131,6 @@ pub async fn build_hub_harness_with(
         no_sandbox: true,
         resume: None,
     };
-    // Mock hub connection for tests (in-memory duplex).
     let (hub_conn, _hub_peer) = loopal_ipc::duplex_pair();
     let hub_connection = std::sync::Arc::new(loopal_ipc::Connection::new(hub_conn));
 
@@ -148,7 +147,6 @@ pub async fn build_hub_harness_with(
         interactive,
     )
     .unwrap();
-
     let agent_task = tokio::spawn(loopal_runtime::agent_loop(params));
 
     HubTestHarness {

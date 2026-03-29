@@ -11,6 +11,7 @@ mod llm_record;
 pub(crate) mod llm_result;
 mod llm_retry;
 pub mod loop_detector;
+pub(crate) mod message_build;
 pub(crate) mod model_config;
 mod permission;
 pub mod rewind;
@@ -133,6 +134,11 @@ pub struct AgentLoopParams {
     pub shared: Option<Arc<dyn std::any::Any + Send + Sync>>,
     /// Memory channel for the Memory tool → Observer sidebar.
     pub memory_channel: Option<Arc<dyn MemoryChannel>>,
+    /// Receive end for scheduler-injected messages.
+    /// When a cron job fires, an `Envelope` with `MessageSource::Scheduled`
+    /// arrives here and is consumed by `wait_for_input()` alongside normal
+    /// user input.
+    pub scheduled_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
 }
 
 /// Public wrapper — constructs default observers and runs the loop.

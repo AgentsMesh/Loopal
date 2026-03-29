@@ -1,11 +1,11 @@
 use crate::agent_input::AgentInput;
 use crate::mode::AgentMode;
 use loopal_error::Result;
-use loopal_message::{ContentBlock, ImageSource, Message, MessageRole};
 use loopal_protocol::{AgentEventPayload, ControlCommand, Envelope, MessageSource};
 use tracing::{error, info};
 
 use super::WaitResult;
+use super::message_build::build_user_message;
 use super::rewind::detect_turn_boundaries;
 use super::runner::AgentLoopRunner;
 
@@ -25,20 +25,28 @@ impl AgentLoopRunner {
         self.emit(AgentEventPayload::AwaitingInput).await?;
         info!("awaiting user input");
         loop {
-            let input = self.params.deps.frontend.recv_input().await;
+            // Select between frontend input and scheduler triggers.
+            // Triggers only fire here (during idle), not while a turn is executing.
+            let input = if let Some(ref mut rx) = self.trigger_rx {
+                tokio::select! {
+                    input = self.params.deps.frontend.recv_input() => input,
+                    envelope = rx.recv() => {
+                        if let Some(env) = envelope {
+                            return Ok(Some(self.ingest_message(&env)));
+                        }
+                        // Scheduler channel closed — non-fatal, stop listening
+                        // and fall through to wait on frontend only.
+                        info!("scheduler channel closed");
+                        self.trigger_rx = None;
+                        continue;
+                    }
+                }
+            } else {
+                self.params.deps.frontend.recv_input().await
+            };
             match input {
                 Some(AgentInput::Message(env)) => {
-                    let mut user_msg = build_user_message(&env);
-                    if let Err(e) = self
-                        .params
-                        .deps
-                        .session_manager
-                        .save_message(&self.params.session.id, &mut user_msg)
-                    {
-                        error!(error = %e, "failed to persist message");
-                    }
-                    self.params.store.push_user(user_msg);
-                    return Ok(Some(WaitResult::MessageAdded));
+                    return Ok(Some(self.ingest_message(&env)));
                 }
                 Some(AgentInput::Control(ctrl)) => {
                     self.handle_control(ctrl).await?;
@@ -49,6 +57,25 @@ impl AgentLoopRunner {
                 }
             }
         }
+    }
+
+    /// Accept a message envelope: persist (if not scheduled) and push to store.
+    fn ingest_message(&mut self, env: &Envelope) -> WaitResult {
+        let mut user_msg = build_user_message(env);
+        // Skip persisting scheduler-injected messages — they should
+        // not be replayed on session resume or inflate the history.
+        if !matches!(env.source, MessageSource::Scheduled) {
+            if let Err(e) = self
+                .params
+                .deps
+                .session_manager
+                .save_message(&self.params.session.id, &mut user_msg)
+            {
+                error!(error = %e, "failed to persist message");
+            }
+        }
+        self.params.store.push_user(user_msg);
+        WaitResult::MessageAdded
     }
 
     /// Handle a control command; caller resumes waiting for user input.
@@ -153,34 +180,5 @@ impl AgentLoopRunner {
         })
         .await?;
         Ok(())
-    }
-}
-
-/// Build a user Message from an Envelope, converting UserContent into ContentBlocks.
-pub fn build_user_message(env: &Envelope) -> Message {
-    let text = match &env.source {
-        MessageSource::Human => env.content.text.clone(),
-        MessageSource::Agent(name) => format!("[from: {}] {}", name, env.content.text),
-        MessageSource::Channel { channel, from } => {
-            format!("[from: #{}/{}] {}", channel, from, env.content.text)
-        }
-    };
-    let mut blocks: Vec<ContentBlock> = Vec::new();
-    if !text.is_empty() {
-        blocks.push(ContentBlock::Text { text });
-    }
-    for img in &env.content.images {
-        blocks.push(ContentBlock::Image {
-            source: ImageSource {
-                source_type: "base64".to_string(),
-                media_type: img.media_type.clone(),
-                data: img.data.clone(),
-            },
-        });
-    }
-    Message {
-        id: None,
-        role: MessageRole::User,
-        content: blocks,
     }
 }

@@ -47,6 +47,7 @@ fn build_params(
         interrupt: InterruptHandle::new(),
         shared: None,
         memory_channel: None,
+        scheduled_rx: None,
     }
 }
 

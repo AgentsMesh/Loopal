@@ -1,5 +1,6 @@
 pub mod collaboration;
 pub mod completion;
+pub mod cron;
 pub mod task;
 
 use loopal_kernel::Kernel;
@@ -16,4 +17,8 @@ pub fn register_all(kernel: &mut Kernel) {
     kernel.register_tool(Box::new(task::TaskGetTool));
     kernel.register_tool(Box::new(completion::AttemptCompletionTool));
     kernel.register_tool(Box::new(loopal_memory::MemoryTool));
+    // Cron scheduling tools
+    kernel.register_tool(Box::new(cron::CronCreateTool));
+    kernel.register_tool(Box::new(cron::CronDeleteTool));
+    kernel.register_tool(Box::new(cron::CronListTool));
 }

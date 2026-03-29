@@ -3,6 +3,7 @@
 //! Provides mock providers, fixture management, event collectors, assertion
 //! helpers, and a configurable `HarnessBuilder` for wiring agent_loop tests.
 
+pub mod agent_ctx;
 pub mod assertions;
 pub mod captured_provider;
 pub mod chunks;

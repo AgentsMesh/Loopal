@@ -55,6 +55,7 @@ fn test_model_info_defaults_for_unknown_model() {
         interrupt: InterruptHandle::new(),
         shared: None,
         memory_channel: None,
+        scheduled_rx: None,
     };
 
     let runner = AgentLoopRunner::new(params);

@@ -27,6 +27,16 @@ impl Default for BashTool {
 const DEFAULT_TIMEOUT_MS: u64 = 300_000;
 const DEFAULT_BG_TIMEOUT_MS: u64 = 30_000;
 const MAX_TIMEOUT_MS: u64 = 600_000;
+
+/// Convert LLM-provided timeout (seconds) to milliseconds.
+/// LLMs pass values like 120 meaning 120 seconds, not 120ms.
+fn parse_timeout_ms(input: &Value, default_ms: u64) -> u64 {
+    match input["timeout"].as_u64() {
+        Some(v) => (v * 1000).min(MAX_TIMEOUT_MS),
+        None => default_ms,
+    }
+}
+
 const MAX_OUTPUT_LINES: usize = 2000;
 const MAX_OUTPUT_BYTES: usize = 512_000;
 
@@ -49,7 +59,7 @@ impl Tool for BashTool {
             "type": "object",
             "properties": {
                 "command": { "type": "string" },
-                "timeout": { "type": "integer" },
+                "timeout": { "type": "integer", "description": "Timeout in seconds" },
                 "run_in_background": { "type": "boolean" },
                 "description": { "type": "string" },
                 "process_id": { "type": "string" },
@@ -81,10 +91,7 @@ impl Tool for BashTool {
                 return Ok(bg_stop(pid));
             }
             let block = input["block"].as_bool().unwrap_or(true);
-            let timeout = input["timeout"]
-                .as_u64()
-                .unwrap_or(DEFAULT_BG_TIMEOUT_MS)
-                .min(MAX_TIMEOUT_MS);
+            let timeout = parse_timeout_ms(&input, DEFAULT_BG_TIMEOUT_MS);
             return Ok(bg_output(pid, block, timeout).await);
         }
 
@@ -104,7 +111,7 @@ impl Tool for BashTool {
             };
         }
 
-        let timeout_ms = input["timeout"].as_u64().unwrap_or(DEFAULT_TIMEOUT_MS);
+        let timeout_ms = parse_timeout_ms(&input, DEFAULT_TIMEOUT_MS);
         let exec_result = if let Some(ref tail) = ctx.output_tail {
             ctx.backend
                 .exec_streaming(command, timeout_ms, tail.clone())
@@ -205,5 +212,43 @@ fn format_exec_result(output: loopal_tool_api::backend_types::ExecResult) -> Too
         ToolResult::error(format!("Exit code: {}\n{truncated}", output.exit_code))
     } else {
         ToolResult::success(truncated)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_timeout_converts_seconds_to_ms() {
+        assert_eq!(parse_timeout_ms(&json!({"timeout": 120}), 0), 120_000);
+        assert_eq!(parse_timeout_ms(&json!({"timeout": 1}), 0), 1_000);
+        assert_eq!(parse_timeout_ms(&json!({"timeout": 300}), 0), 300_000);
+    }
+
+    #[test]
+    fn parse_timeout_clamps_to_max() {
+        // 700 seconds = 700_000ms, exceeds MAX_TIMEOUT_MS (600_000)
+        assert_eq!(
+            parse_timeout_ms(&json!({"timeout": 700}), 0),
+            MAX_TIMEOUT_MS
+        );
+    }
+
+    #[test]
+    fn parse_timeout_uses_default_when_missing() {
+        assert_eq!(
+            parse_timeout_ms(&json!({}), DEFAULT_TIMEOUT_MS),
+            DEFAULT_TIMEOUT_MS
+        );
+        assert_eq!(parse_timeout_ms(&json!({"command": "ls"}), 42_000), 42_000);
+    }
+
+    #[test]
+    fn parse_timeout_zero_yields_zero() {
+        assert_eq!(
+            parse_timeout_ms(&json!({"timeout": 0}), DEFAULT_TIMEOUT_MS),
+            0
+        );
     }
 }

@@ -25,7 +25,6 @@ remote (web).
 | Crate | Tool(s) | Description |
 |-------|---------|-------------|
 | `fetch` | Fetch | Download a URL; save to temp file or return inline (HTML→markdown) |
-| `web-search` | WebSearch | Search the web via Tavily API, return titles + URLs + snippets |
 
 ## Design principles
 

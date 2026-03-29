@@ -12,7 +12,6 @@ pub fn register_all(registry: &mut ToolRegistry) {
     registry.register(Box::new(loopal_tool_bash::BashTool));
     registry.register(Box::new(loopal_tool_ls::LsTool));
     registry.register(Box::new(loopal_tool_fetch::FetchTool));
-    registry.register(Box::new(loopal_tool_web_search::WebSearchTool));
     registry.register(Box::new(loopal_tool_ask_user::AskUserTool));
     registry.register(Box::new(loopal_tool_plan_mode::EnterPlanModeTool));
     registry.register(Box::new(loopal_tool_plan_mode::ExitPlanModeTool));

@@ -32,8 +32,13 @@ pub fn build_with_frontend(
     session_dir_override: Option<&std::path::Path>,
     interactive: bool,
 ) -> anyhow::Result<AgentLoopParams> {
-    let model = config.settings.model.clone();
-    let compact_model = config.settings.compact_model.clone();
+    let router = loopal_provider_api::ModelRouter::from_parts(
+        config.settings.model.clone(),
+        config.settings.model_routing.clone(),
+    );
+    let model = router
+        .resolve(loopal_provider_api::TaskType::Default)
+        .to_string();
     let max_turns = config.settings.max_turns;
     let permission_mode = config.settings.permission_mode;
     let thinking_config = config.settings.thinking.clone();
@@ -158,8 +163,7 @@ pub fn build_with_frontend(
 
     let params = AgentLoopParams {
         config: loopal_runtime::AgentConfig {
-            model,
-            compact_model,
+            router,
             system_prompt,
             mode,
             permission_mode,

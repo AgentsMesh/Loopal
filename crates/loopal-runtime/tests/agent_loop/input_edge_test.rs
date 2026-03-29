@@ -40,7 +40,7 @@ fn test_model_info_defaults_for_unknown_model() {
 
     let params = AgentLoopParams {
         config: AgentConfig {
-            model: "unknown-model-xyz".to_string(),
+            router: loopal_provider_api::ModelRouter::new("unknown-model-xyz".to_string()),
             permission_mode: PermissionMode::Supervised,
             max_turns: 5,
             ..Default::default()
@@ -151,7 +151,7 @@ async fn test_handle_control_compact_keeps_recent() {
 async fn test_handle_control_model_switch_updates_model() {
     let (mut runner, _event_rx, _mbox_tx, ctrl_tx, _perm_tx) = make_runner_with_channels();
 
-    assert_eq!(runner.params.config.model, "claude-sonnet-4-20250514");
+    assert_eq!(runner.params.config.model(), "claude-sonnet-4-20250514");
 
     ctrl_tx
         .send(ControlCommand::ModelSwitch("claude-opus-4-20250514".into()))
@@ -161,5 +161,5 @@ async fn test_handle_control_model_switch_updates_model() {
 
     let _ = tokio::time::timeout(Duration::from_millis(100), runner.wait_for_input()).await;
 
-    assert_eq!(runner.params.config.model, "claude-opus-4-20250514");
+    assert_eq!(runner.params.config.model(), "claude-opus-4-20250514");
 }

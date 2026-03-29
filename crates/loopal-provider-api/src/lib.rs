@@ -1,3 +1,5 @@
+pub mod model;
+pub mod model_router;
 pub mod thinking;
 
 use std::path::PathBuf;
@@ -11,6 +13,8 @@ use loopal_error::LoopalError;
 use loopal_message::Message;
 use loopal_tool_api::ToolDefinition;
 
+pub use model::*;
+pub use model_router::ModelRouter;
 pub use thinking::*;
 
 // ---------------------------------------------------------------------------
@@ -114,17 +118,6 @@ pub enum StreamChunk {
     },
 }
 
-/// Model metadata
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ModelInfo {
-    pub id: String,
-    pub provider: String,
-    pub display_name: String,
-    pub context_window: u32,
-    pub max_output_tokens: u32,
-    pub thinking: ThinkingCapability,
-}
-
 // ---------------------------------------------------------------------------
 // Middleware trait
 // ---------------------------------------------------------------------------
@@ -137,8 +130,6 @@ pub struct MiddlewareContext {
     pub total_input_tokens: u32,
     pub total_output_tokens: u32,
     pub max_context_tokens: u32,
-    /// Model for compaction/summarization. If None, uses `model`.
-    pub compact_model: Option<String>,
     /// Optional provider for LLM-based summarization during compaction.
     /// If None, fallback to traditional truncation.
     pub summarization_provider: Option<Arc<dyn Provider>>,

@@ -28,10 +28,10 @@ impl AgentLoopRunner {
             .params
             .deps
             .kernel
-            .resolve_provider(&self.params.config.model)?;
+            .resolve_provider(self.params.config.model())?;
         let llm_start = Instant::now();
         info!(
-            model = %self.params.config.model, messages = messages.len(),
+            model = %self.params.config.model(), messages = messages.len(),
             tools = chat_params.tools.len(), max_tokens = chat_params.max_tokens,
             thinking = ?chat_params.thinking, "LLM request"
         );
@@ -154,7 +154,7 @@ impl AgentLoopRunner {
                 return Ok(false);
             }
             Err(e) => {
-                error!(error = %e, turn = self.turn_count, model = %self.params.config.model, "stream error");
+                error!(error = %e, turn = self.turn_count, model = %self.params.config.model(), "stream error");
                 self.emit(AgentEventPayload::Error {
                     message: e.to_string(),
                 })

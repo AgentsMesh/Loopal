@@ -62,9 +62,8 @@ impl AgentLoopRunner {
         let compact_model = self
             .params
             .config
-            .compact_model
-            .as_deref()
-            .unwrap_or(&self.params.config.model);
+            .router
+            .resolve(loopal_provider_api::TaskType::Summarization);
         let Ok(provider) = self.params.deps.kernel.resolve_provider(compact_model) else {
             warn!("no summarization provider available");
             return false;

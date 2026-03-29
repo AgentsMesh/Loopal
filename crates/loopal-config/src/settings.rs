@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::hook::HookConfig;
 use crate::sandbox::SandboxConfig;
-use loopal_provider_api::ThinkingConfig;
+use loopal_provider_api::{ModelOverride, TaskType, ThinkingConfig};
 use loopal_tool_api::PermissionMode;
 
 /// Application settings (merged from multiple layers)
@@ -15,10 +15,13 @@ pub struct Settings {
     /// Default model identifier
     pub model: String,
 
-    /// Model for auxiliary tasks (compaction, summarization).
-    /// Defaults to the main model when not set.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub compact_model: Option<String>,
+    /// Per-task model routing overrides (e.g. summarization → cheap model).
+    #[serde(default)]
+    pub model_routing: HashMap<TaskType, String>,
+
+    /// Custom model metadata — extends or overrides the built-in catalog.
+    #[serde(default)]
+    pub models: HashMap<String, ModelOverride>,
 
     /// Maximum turns per agent loop
     pub max_turns: u32,
@@ -58,7 +61,8 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             model: "claude-sonnet-4-20250514".to_string(),
-            compact_model: None,
+            model_routing: HashMap::new(),
+            models: HashMap::new(),
             max_turns: 50,
             permission_mode: PermissionMode::Bypass,
             max_context_tokens: 0,

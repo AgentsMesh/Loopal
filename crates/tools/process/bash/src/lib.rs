@@ -8,7 +8,9 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use loopal_error::{LoopalError, ToolIoError};
-use loopal_tool_api::{PermissionLevel, TimeoutSecs, Tool, ToolContext, ToolResult, truncate_output};
+use loopal_tool_api::{
+    PermissionLevel, TimeoutSecs, Tool, ToolContext, ToolResult, truncate_output,
+};
 use serde_json::{Value, json};
 
 use loopal_config::CommandDecision;

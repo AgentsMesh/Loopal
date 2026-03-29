@@ -52,6 +52,7 @@ fn make_runner_with_routing(
         interrupt: InterruptHandle::new(),
         shared: None,
         memory_channel: None,
+        scheduled_rx: None,
     };
     (AgentLoopRunner::new(params), event_rx)
 }
@@ -134,6 +135,7 @@ fn test_model_routing_default_override_via_config_model() {
         interrupt: InterruptHandle::new(),
         shared: None,
         memory_channel: None,
+        scheduled_rx: None,
     };
     let (runner, _rx) = (AgentLoopRunner::new(params), event_rx);
 

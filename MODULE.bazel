@@ -35,7 +35,7 @@ crate.spec(package = "serde_json", version = "1")
 crate.spec(package = "schemars", version = "0.8")
 
 # --- Async runtime ---
-crate.spec(package = "tokio", version = "1", features = ["full"])
+crate.spec(package = "tokio", version = "1", features = ["full", "test-util"])
 crate.spec(package = "futures", version = "0.3")
 crate.spec(package = "async-trait", version = "0.1")
 crate.spec(package = "tokio-util", version = "0.7")
@@ -78,6 +78,10 @@ crate.spec(
         "transport-io",
     ],
 )
+
+# --- Scheduling ---
+crate.spec(package = "cron", version = "0.15")
+crate.spec(package = "rand", version = "0.9")
 
 # --- Utilities ---
 crate.spec(package = "parking_lot", version = "0.12")

@@ -5,7 +5,7 @@ use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_protocol::AgentEventPayload;
 use tracing::{error, info};
 
-use super::input::build_user_message;
+use super::message_build::build_user_message;
 use super::runner::AgentLoopRunner;
 
 /// Build a successful ToolResult block.

@@ -62,6 +62,7 @@ async fn test_agent_loop_immediate_channel_close() {
         interrupt: InterruptHandle::new(),
         shared: None,
         memory_channel: None,
+        scheduled_rx: None,
     };
 
     // Drop senders to close channels
@@ -120,6 +121,7 @@ async fn test_agent_loop_max_turns_reached() {
         interrupt: InterruptHandle::new(),
         shared: None,
         memory_channel: None,
+        scheduled_rx: None,
     };
 
     let result = agent_loop(params).await;

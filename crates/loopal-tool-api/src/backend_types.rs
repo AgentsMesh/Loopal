@@ -137,3 +137,38 @@ pub struct MatchLine {
     pub content: String,
     pub is_match: bool,
 }
+
+// --- Timeout ---
+
+/// Timeout in seconds, parsed from LLM tool input.
+///
+/// Centralizes the "seconds → milliseconds" conversion so that consumers
+/// never need to guess the unit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct TimeoutSecs(u64);
+
+impl TimeoutSecs {
+    pub const fn new(secs: u64) -> Self {
+        Self(secs)
+    }
+
+    /// Parse `input["timeout"]` (seconds). Falls back to `default_secs`.
+    pub fn from_tool_input(input: &serde_json::Value, default_secs: u64) -> Self {
+        Self(input["timeout"].as_u64().unwrap_or(default_secs))
+    }
+
+    pub const fn as_secs(&self) -> u64 {
+        self.0
+    }
+
+    /// Convert to milliseconds, clamped to `max_ms`.
+    pub fn to_millis_clamped(&self, max_ms: u64) -> u64 {
+        (self.0.saturating_mul(1000)).min(max_ms)
+    }
+}
+
+impl std::fmt::Display for TimeoutSecs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}s", self.0)
+    }
+}

@@ -10,7 +10,7 @@ pub use backend::Backend;
 pub use backend_types::{
     EditResult, ExecResult, FetchResult, FileInfo, FileMatchResult, GlobEntry, GlobOptions,
     GlobSearchResult, GrepOptions, GrepSearchResult, LsEntry, LsResult, MatchGroup, MatchLine,
-    ReadResult, WriteResult,
+    ReadResult, TimeoutSecs, WriteResult,
 };
 pub use memory_channel::MemoryChannel;
 pub use output_tail::OutputTail;

@@ -7,13 +7,13 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use loopal_protocol::AgentEventPayload;
-use loopal_tool_api::OutputTail;
+use loopal_tool_api::{OutputTail, TimeoutSecs};
 use tokio::task::JoinHandle;
 
 use crate::frontend::traits::EventEmitter;
 
-/// Minimum timeout (ms) to activate progress reporting.
-const PROGRESS_THRESHOLD_MS: u64 = 10_000;
+/// Minimum timeout (seconds) to activate progress reporting.
+const PROGRESS_THRESHOLD_SECS: u64 = 10;
 
 /// Interval between progress reports.
 const REPORT_INTERVAL: Duration = Duration::from_secs(2);
@@ -32,8 +32,8 @@ pub fn maybe_spawn_progress(
     if tool_name != "Bash" {
         return None;
     }
-    let timeout_ms = tool_input["timeout"].as_u64().unwrap_or(300_000);
-    if timeout_ms < PROGRESS_THRESHOLD_MS {
+    let timeout = TimeoutSecs::from_tool_input(tool_input, 300);
+    if timeout.as_secs() < PROGRESS_THRESHOLD_SECS {
         return None;
     }
 

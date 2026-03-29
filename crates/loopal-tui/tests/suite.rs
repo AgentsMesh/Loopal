@@ -17,6 +17,8 @@ mod command_edge_test;
 mod command_test;
 #[path = "suite/event_forwarding_test.rs"]
 mod event_forwarding_test;
+#[path = "suite/init_cmd_test.rs"]
+mod init_cmd_test;
 #[path = "suite/event_test.rs"]
 mod event_test;
 #[path = "suite/input_edge_test.rs"]

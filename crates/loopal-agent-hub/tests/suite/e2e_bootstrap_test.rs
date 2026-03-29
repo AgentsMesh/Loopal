@@ -40,7 +40,6 @@ async fn full_bootstrap_hub_to_agent_roundtrip() {
     let exe = resolve_loopal_binary();
     let agent_proc = AgentProcess::spawn_with_env(
         Some(&exe),
-        &[],
         &[("LOOPAL_TEST_PROVIDER", mock_file.to_str().unwrap())],
     )
     .await

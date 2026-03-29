@@ -3,7 +3,7 @@
 mod agent_cmd;
 mod builtin;
 mod help_cmd;
-mod init_cmd;
+pub(crate) mod init_cmd;
 mod model_cmd;
 pub mod registry;
 mod rewind_cmd;

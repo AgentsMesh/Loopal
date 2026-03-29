@@ -31,11 +31,7 @@ pub(super) fn write_template(
 }
 
 /// Ensure a directory exists, tracking whether it was created or already existed.
-pub(super) fn ensure_dir(
-    path: &Path,
-    created: &mut Vec<String>,
-    skipped: &mut Vec<String>,
-) {
+pub(super) fn ensure_dir(path: &Path, created: &mut Vec<String>, skipped: &mut Vec<String>) {
     let display = format!("{}/", display_relative(path));
     if path.is_dir() {
         skipped.push(display);

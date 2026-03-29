@@ -14,7 +14,7 @@ use async_trait::async_trait;
 use super::{CommandEffect, CommandHandler};
 use crate::app::App;
 use prompt::build_init_prompt;
-use scaffold::{display_relative, ensure_dir, write_template, MEMORY_MD_TEMPLATE};
+use scaffold::{MEMORY_MD_TEMPLATE, display_relative, ensure_dir, write_template};
 
 pub struct InitCmd;
 

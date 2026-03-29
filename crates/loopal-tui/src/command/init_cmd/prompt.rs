@@ -79,10 +79,7 @@ current content:
 ///
 /// When `existing_content` is `Some`, appends the current LOOPAL.md content
 /// so the agent can review and update rather than overwrite blindly.
-pub(super) fn build_init_prompt(
-    cwd: &Path,
-    existing_content: Option<&str>,
-) -> String {
+pub(super) fn build_init_prompt(cwd: &Path, existing_content: Option<&str>) -> String {
     let base = INIT_PROMPT.replace("{path}", &cwd.to_string_lossy());
 
     match existing_content {

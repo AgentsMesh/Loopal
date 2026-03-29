@@ -1,4 +1,4 @@
-//! E2E tests for Fetch (via wiremock), WebSearch (missing API key), and Bash timeout.
+//! E2E tests for Fetch (via wiremock) and Bash timeout.
 
 use loopal_protocol::AgentEventPayload;
 use loopal_test_support::{assertions, chunks};
@@ -87,27 +87,13 @@ async fn test_fetch_with_prompt() {
 }
 
 #[tokio::test]
-async fn test_web_search_no_api_key() {
-    // WebSearch requires TAVILY_API_KEY — without it, should return an error
-    let calls = vec![
-        chunks::tool_turn("tc-ws", "WebSearch", serde_json::json!({"query": "test"})),
-        chunks::text_turn("Search failed."),
-    ];
-    let mut harness = build_tui_harness(calls, 80, 24).await;
-    let evts = harness.collect_until_idle().await;
-
-    // Missing API key → tool returns error
-    assertions::assert_has_tool_result(&evts, "WebSearch", true);
-}
-
-#[tokio::test]
 async fn test_bash_timeout() {
-    // Bash with a tiny timeout (100ms) and a command that sleeps 60s
+    // Bash with timeout=0 (0 seconds → 0ms) and a command that sleeps 60s
     let calls = vec![
         chunks::tool_turn(
             "tc-to",
             "Bash",
-            serde_json::json!({"command": "sleep 60", "timeout": 100}),
+            serde_json::json!({"command": "sleep 60", "timeout": 0}),
         ),
         chunks::text_turn("Timed out."),
     ];

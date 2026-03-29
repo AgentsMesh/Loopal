@@ -130,12 +130,12 @@ async fn test_bash_with_custom_timeout() {
     let tool = BashTool;
     let ctx = make_ctx(tmp.path());
 
-    // Command that finishes quickly with a generous timeout
+    // Command that finishes quickly with a generous timeout (30 seconds)
     let result = tool
         .execute(
             json!({
                 "command": "echo fast",
-                "timeout": 30000
+                "timeout": 30
             }),
             &ctx,
         )
@@ -152,12 +152,14 @@ async fn test_bash_timeout_triggers_error() {
     let tool = BashTool;
     let ctx = make_ctx(tmp.path());
 
-    // Use a very short timeout with a sleep command
+    // Use a very short timeout (< 1 second) with a sleep command.
+    // Minimum effective timeout: 1 second (values < 1 are clamped to 0ms by u64 * 1000).
+    // We pass 0 to force an immediate timeout.
     let result = tool
         .execute(
             json!({
                 "command": "sleep 60",
-                "timeout": 100
+                "timeout": 0
             }),
             &ctx,
         )

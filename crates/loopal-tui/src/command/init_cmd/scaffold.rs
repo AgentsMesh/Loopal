@@ -1,96 +1,16 @@
-//! `/init` command — create project config scaffolding.
+//! Filesystem scaffolding helpers for `/init`.
 
 use std::fs;
 use std::path::Path;
 
-use async_trait::async_trait;
-
-use super::{CommandEffect, CommandHandler};
-use crate::app::App;
-
-const LOOPAL_MD_TEMPLATE: &str = "\
-# LOOPAL.md
-
-This file provides guidance to Loopal when working with code in this repository.
-
-## Build & Test Commands
-
-```bash
-# Add your build/test commands here
-```
-
-## Architecture
-
-Describe your project architecture here.
-
-## Code Conventions
-
-Describe your coding conventions here.
-";
-
-const MEMORY_MD_TEMPLATE: &str = "\
+pub(super) const MEMORY_MD_TEMPLATE: &str = "\
 # Project Memory
 
 This file is managed by Loopal to remember key facts about the project.
 ";
 
-pub struct InitCmd;
-
-#[async_trait]
-impl CommandHandler for InitCmd {
-    fn name(&self) -> &str {
-        "/init"
-    }
-    fn description(&self) -> &str {
-        "Initialize project config"
-    }
-    async fn execute(&self, app: &mut App, _arg: Option<&str>) -> CommandEffect {
-        run_init(app);
-        CommandEffect::Done
-    }
-}
-
-/// Run the `/init` command — create project config scaffolding.
-fn run_init(app: &mut App) {
-    let cwd = &app.cwd;
-    let mut created: Vec<String> = Vec::new();
-    let mut skipped: Vec<String> = Vec::new();
-
-    // 1. LOOPAL.md at project root
-    let instructions_path = cwd.join("LOOPAL.md");
-    write_template(
-        &instructions_path,
-        LOOPAL_MD_TEMPLATE,
-        &mut created,
-        &mut skipped,
-    );
-
-    // 2. .loopal/ directory
-    let dot_dir = cwd.join(".loopal");
-    ensure_dir(&dot_dir, &mut created, &mut skipped);
-
-    // 3. .loopal/memory/MEMORY.md
-    let memory_dir = dot_dir.join("memory");
-    ensure_dir(&memory_dir, &mut created, &mut skipped);
-    let memory_path = memory_dir.join("MEMORY.md");
-    write_template(&memory_path, MEMORY_MD_TEMPLATE, &mut created, &mut skipped);
-
-    // Build summary message
-    let mut lines = vec!["Initialized project:".to_string()];
-    for item in &created {
-        lines.push(format!("  ✓ Created {item}"));
-    }
-    for item in &skipped {
-        lines.push(format!("  · {item} already exists"));
-    }
-    if created.is_empty() {
-        lines.push("  (nothing to create — all files already exist)".to_string());
-    }
-    app.session.push_system_message(lines.join("\n"));
-}
-
 /// Write a template file if it doesn't exist yet.
-fn write_template(
+pub(super) fn write_template(
     path: &Path,
     content: &str,
     created: &mut Vec<String>,
@@ -111,7 +31,7 @@ fn write_template(
 }
 
 /// Ensure a directory exists, tracking whether it was created or already existed.
-fn ensure_dir(path: &Path, created: &mut Vec<String>, skipped: &mut Vec<String>) {
+pub(super) fn ensure_dir(path: &Path, created: &mut Vec<String>, skipped: &mut Vec<String>) {
     let display = format!("{}/", display_relative(path));
     if path.is_dir() {
         skipped.push(display);
@@ -124,7 +44,7 @@ fn ensure_dir(path: &Path, created: &mut Vec<String>, skipped: &mut Vec<String>)
 }
 
 /// Extract a short relative-style display name from an absolute path.
-fn display_relative(path: &Path) -> String {
+pub(super) fn display_relative(path: &Path) -> String {
     let s = path.to_string_lossy();
     if let Some(pos) = s.rfind("/.loopal/") {
         let root_end = pos + 1;
@@ -141,19 +61,19 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
-    fn test_display_relative_loopal_md() {
+    fn display_relative_loopal_md() {
         let p = PathBuf::from("/home/user/project/LOOPAL.md");
         assert_eq!(display_relative(&p), "LOOPAL.md");
     }
 
     #[test]
-    fn test_display_relative_dotdir() {
+    fn display_relative_dotdir() {
         let p = PathBuf::from("/home/user/project/.loopal/memory/MEMORY.md");
         assert_eq!(display_relative(&p), ".loopal/memory/MEMORY.md");
     }
 
     #[test]
-    fn test_write_template_creates_file() {
+    fn write_template_creates_file() {
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("TEST.md");
         let mut created = Vec::new();
@@ -165,7 +85,7 @@ mod tests {
     }
 
     #[test]
-    fn test_write_template_skips_existing() {
+    fn write_template_skips_existing() {
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("TEST.md");
         fs::write(&file, "existing").unwrap();
@@ -178,7 +98,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ensure_dir_creates() {
+    fn ensure_dir_creates() {
         let dir = tempfile::tempdir().unwrap();
         let sub = dir.path().join("sub");
         let mut created = Vec::new();
@@ -189,7 +109,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ensure_dir_skips_existing() {
+    fn ensure_dir_skips_existing() {
         let dir = tempfile::tempdir().unwrap();
         let mut created = Vec::new();
         let mut skipped = Vec::new();

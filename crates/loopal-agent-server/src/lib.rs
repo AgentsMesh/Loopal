@@ -1,6 +1,7 @@
 //! Agent server for multi-process architecture.
 //!
-//! Activated via `loopal --serve`. Runs the agent loop in a dedicated process,
+//! Activated internally via hidden `--serve` flag (set by parent process).
+//! Runs the agent loop in a dedicated process,
 //! communicating with the TUI (or any IPC client) via JSON-RPC over stdio.
 //!
 //! This is the "Renderer Process" in the Chromium analogy — it owns the Kernel,

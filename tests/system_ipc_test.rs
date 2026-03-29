@@ -1,7 +1,7 @@
-//! System integration tests — spawns real `loopal --serve` subprocess.
+//! System integration tests — spawns real agent worker subprocess.
 //!
-//! These tests build the actual binary, spawn it as a child process with
-//! `--test-provider` flag pointing to a JSON fixture, and verify the full
+//! These tests build the actual binary, spawn it with the hidden --serve flag
+//! and --test-provider pointing to a JSON fixture, and verify the full
 //! multi-process IPC pipeline end-to-end.
 
 use std::io::Write;
@@ -47,7 +47,7 @@ async fn system_spawn_and_initialize() {
         .stderr(Stdio::inherit())
         .kill_on_drop(true)
         .spawn()
-        .expect("failed to spawn loopal --serve");
+        .expect("failed to spawn agent worker");
 
     let stdin = child.stdin.take().unwrap();
     let stdout = child.stdout.take().unwrap();
@@ -147,7 +147,7 @@ async fn system_process_isolation_survives_kill() {
         .stderr(Stdio::inherit())
         .kill_on_drop(true)
         .spawn()
-        .expect("failed to spawn");
+        .expect("failed to spawn agent worker");
 
     let pid = child.id().expect("should have pid");
     assert!(pid > 0, "child should have a valid PID");

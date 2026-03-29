@@ -78,7 +78,12 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
         }
         AgentEventPayload::ToolPermissionRequest { id, name, input } => {
             flush_streaming(state);
-            state.pending_permission = Some(PendingPermission { id, name, input });
+            state.pending_permission = Some(PendingPermission {
+                id,
+                name,
+                input,
+                relay_request_id: None,
+            });
         }
         AgentEventPayload::Error { message } => {
             flush_streaming(state);

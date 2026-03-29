@@ -11,8 +11,8 @@ use loopal_ipc::protocol::methods;
 use loopal_protocol::{AgentEvent, AgentEventPayload};
 
 use crate::dispatch::dispatch_hub_request;
-use crate::hub::AgentHub;
-use crate::tui_relay::relay_to_tui;
+use crate::hub::Hub;
+use crate::ui_relay::relay_to_ui_clients;
 
 /// Method name for hub/wait_agent — must not block the IO loop.
 const WAIT_AGENT_METHOD: &str = "hub/wait_agent";
@@ -20,7 +20,7 @@ const WAIT_AGENT_METHOD: &str = "hub/wait_agent";
 /// Run the IO loop for a connected agent. Returns the agent's final output
 /// (from AttemptCompletion or last stream text) for passing to wait_agent watchers.
 pub async fn agent_io_loop(
-    hub: Arc<Mutex<AgentHub>>,
+    hub: Arc<Mutex<Hub>>,
     conn: Arc<Connection>,
     mut rx: tokio::sync::mpsc::Receiver<Incoming>,
     agent_name: String,
@@ -57,7 +57,7 @@ pub async fn agent_io_loop(
                             event.agent_name = Some(agent_name.clone());
                         }
                         let h = hub.lock().await;
-                        if h.event_sender().try_send(event).is_err() {
+                        if h.registry.event_sender().try_send(event).is_err() {
                             tracing::debug!(agent = %agent_name, "event dropped (channel full)");
                         }
                     }
@@ -86,8 +86,8 @@ pub async fn agent_io_loop(
                 } else if method == methods::AGENT_PERMISSION.name
                     || method == methods::AGENT_QUESTION.name
                 {
-                    info!(agent = %agent_name, %method, "relaying to TUI");
-                    relay_to_tui(&hub, &conn, id, &method, params, &agent_name).await;
+                    info!(agent = %agent_name, %method, "relaying to UI clients");
+                    relay_to_ui_clients(&hub, &conn, id, &method, params, &agent_name).await;
                     info!(agent = %agent_name, %method, "relay complete");
                 } else {
                     warn!(agent = %agent_name, %method, "unknown request");
@@ -112,7 +112,7 @@ pub async fn agent_io_loop(
 
 /// Spawn hub/wait_agent in a background task so it doesn't block the IO loop.
 fn spawn_wait_agent(
-    hub: Arc<Mutex<AgentHub>>,
+    hub: Arc<Mutex<Hub>>,
     conn: Arc<Connection>,
     request_id: i64,
     params: serde_json::Value,
@@ -143,7 +143,7 @@ fn spawn_wait_agent(
 
 /// Register agent Connection in Hub and spawn background IO loop.
 pub fn start_agent_io(
-    hub: Arc<Mutex<AgentHub>>,
+    hub: Arc<Mutex<Hub>>,
     name: &str,
     conn: Arc<Connection>,
     rx: tokio::sync::mpsc::Receiver<Incoming>,
@@ -157,7 +157,7 @@ pub fn start_agent_io(
     tokio::spawn(async move {
         {
             let mut h = hub.lock().await;
-            if let Err(e) = h.register_connection(&n, conn2) {
+            if let Err(e) = h.registry.register_connection(&n, conn2) {
                 tracing::warn!(agent = %n, error = %e, "registration failed");
                 return;
             }
@@ -169,15 +169,15 @@ pub fn start_agent_io(
         // wait_agent checks agent existence → if we unregister first, it returns
         // "not found" and misses the output. By emitting first, any pending watcher
         // gets the output before the agent is removed.
-        h.emit_agent_finished(&n2, output);
-        h.unregister_connection(&n2);
+        h.registry.emit_agent_finished(&n2, output);
+        h.registry.unregister_connection(&n2);
         info!(agent = %n2, "agent IO loop ended");
     });
 }
 
 /// Spawn only the IO loop (registration already done by caller).
 pub fn spawn_io_loop(
-    hub: Arc<Mutex<AgentHub>>,
+    hub: Arc<Mutex<Hub>>,
     name: &str,
     conn: Arc<Connection>,
     rx: tokio::sync::mpsc::Receiver<Incoming>,
@@ -189,8 +189,8 @@ pub fn spawn_io_loop(
     tokio::spawn(async move {
         let output = agent_io_loop(hub2, conn, rx, n.clone(), is_root).await;
         let mut h = hub.lock().await;
-        h.emit_agent_finished(&n2, output);
-        h.unregister_connection(&n2);
+        h.registry.emit_agent_finished(&n2, output);
+        h.registry.unregister_connection(&n2);
         info!(agent = %n2, "agent IO loop ended");
     });
 }

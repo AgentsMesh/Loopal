@@ -7,7 +7,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::info;
 
-use loopal_agent_hub::AgentHub;
+use loopal_agent_hub::Hub;
 use loopal_agent_hub::hub_server;
 
 use crate::cli::Cli;
@@ -21,7 +21,7 @@ pub async fn run_hub(
     info!("starting Hub in headless mode");
 
     let (event_tx, _event_rx) = tokio::sync::mpsc::channel(256);
-    let hub = Arc::new(Mutex::new(AgentHub::new(event_tx)));
+    let hub = Arc::new(Mutex::new(Hub::new(event_tx)));
 
     // Start Hub TCP listener
     let (listener, hub_port, token) = hub_server::start_hub_listener(hub.clone()).await?;

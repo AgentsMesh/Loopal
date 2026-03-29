@@ -14,11 +14,11 @@ use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
 
-use crate::hub::AgentHub;
+use crate::hub::Hub;
 
 /// Start the Hub TCP server. Returns the listener, port, and auth token.
 pub async fn start_hub_listener(
-    _hub: Arc<Mutex<AgentHub>>,
+    _hub: Arc<Mutex<Hub>>,
 ) -> anyhow::Result<(TcpListener, u16, String)> {
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let port = listener.local_addr()?.port();
@@ -30,7 +30,7 @@ pub async fn start_hub_listener(
 /// Create an in-process "local" connection to the Hub (no TCP, no auth).
 /// Returns (client_conn, incoming_rx) — caller can receive requests from Hub.
 pub fn connect_local(
-    hub: Arc<Mutex<AgentHub>>,
+    hub: Arc<Mutex<Hub>>,
     name: &str,
 ) -> (Arc<Connection>, tokio::sync::mpsc::Receiver<Incoming>) {
     let (client_transport, server_transport) = loopal_ipc::duplex_pair();
@@ -43,7 +43,7 @@ pub fn connect_local(
 }
 
 /// Accept loop — authenticates TCP clients with token.
-pub async fn accept_loop(listener: TcpListener, hub: Arc<Mutex<AgentHub>>, token: String) {
+pub async fn accept_loop(listener: TcpListener, hub: Arc<Mutex<Hub>>, token: String) {
     loop {
         let (stream, addr) = match listener.accept().await {
             Ok(v) => v,

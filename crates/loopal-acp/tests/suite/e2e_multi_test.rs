@@ -26,7 +26,7 @@ async fn test_two_consecutive_prompts() {
         chunks::text_turn("Response to first prompt."),
         chunks::text_turn("Response to second prompt."),
     ];
-    let mut harness = build_acp_harness(calls);
+    let mut harness = build_acp_harness(calls).await;
     let sid = setup_session(&mut harness).await;
 
     // First prompt
@@ -79,7 +79,7 @@ async fn test_tool_then_text_notification_order() {
         chunks::tool_turn("tc-1", "Read", json!({"file_path": tmp.to_str().unwrap()})),
         chunks::text_turn("Done reading."),
     ];
-    let mut harness = build_acp_harness(calls);
+    let mut harness = build_acp_harness(calls).await;
     let sid = setup_session(&mut harness).await;
 
     let (resp, notifications) = harness
@@ -97,14 +97,14 @@ async fn test_tool_then_text_notification_order() {
     let tool_idx = notifications.iter().position(|n| {
         n.get("params")
             .and_then(|p| p.get("update"))
-            .and_then(|u| u.get("kind"))
+            .and_then(|u| u.get("sessionUpdate"))
             .and_then(|k| k.as_str())
             == Some("tool_call")
     });
     let msg_idx = notifications.iter().position(|n| {
         n.get("params")
             .and_then(|p| p.get("update"))
-            .and_then(|u| u.get("kind"))
+            .and_then(|u| u.get("sessionUpdate"))
             .and_then(|k| k.as_str())
             == Some("agent_message_chunk")
     });
@@ -122,8 +122,8 @@ async fn test_tool_then_text_notification_order() {
 #[tokio::test]
 async fn test_multi_harness_isolation() {
     // Two independent harnesses get different session IDs.
-    let mut h1 = build_acp_harness(vec![chunks::text_turn("S1")]);
-    let mut h2 = build_acp_harness(vec![chunks::text_turn("S2")]);
+    let mut h1 = build_acp_harness(vec![chunks::text_turn("S1")]).await;
+    let mut h2 = build_acp_harness(vec![chunks::text_turn("S2")]).await;
 
     let sid1 = setup_session(&mut h1).await;
     let sid2 = setup_session(&mut h2).await;

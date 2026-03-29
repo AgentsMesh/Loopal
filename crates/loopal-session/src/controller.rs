@@ -4,7 +4,6 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use tokio::sync::{mpsc, watch};
 
-use loopal_ipc::connection::Connection;
 use loopal_protocol::{
     AgentEvent, AgentMode, ControlCommand, InterruptSignal, UserContent, UserQuestionResponse,
 };
@@ -12,14 +11,14 @@ use loopal_protocol::{
 use crate::controller_ops::ControlBackend;
 use crate::event_handler;
 use crate::state::SessionState;
-use loopal_agent_hub::{AgentHub, LocalChannels};
+use loopal_agent_hub::{Hub, HubClient, LocalChannels};
 
 /// External handle — cheaply cloneable, shareable across consumers.
 #[derive(Clone)]
 pub struct SessionController {
     state: Arc<Mutex<SessionState>>,
     pub(crate) backend: Arc<ControlBackend>,
-    connections: Arc<tokio::sync::Mutex<AgentHub>>,
+    connections: Arc<tokio::sync::Mutex<Hub>>,
 }
 
 impl SessionController {
@@ -44,7 +43,7 @@ impl SessionController {
         Self {
             state: Arc::new(Mutex::new(SessionState::new(model, mode))),
             backend: Arc::new(ControlBackend::Local(Arc::new(channels))),
-            connections: Arc::new(tokio::sync::Mutex::new(AgentHub::noop())),
+            connections: Arc::new(tokio::sync::Mutex::new(Hub::noop())),
         }
     }
 
@@ -52,12 +51,12 @@ impl SessionController {
     pub fn with_hub(
         model: String,
         mode: String,
-        hub_conn: Arc<Connection>,
-        hub: Arc<tokio::sync::Mutex<AgentHub>>,
+        client: Arc<HubClient>,
+        hub: Arc<tokio::sync::Mutex<Hub>>,
     ) -> Self {
         Self {
             state: Arc::new(Mutex::new(SessionState::new(model, mode))),
-            backend: Arc::new(ControlBackend::Hub(hub_conn)),
+            backend: Arc::new(ControlBackend::Hub(client)),
             connections: hub,
         }
     }
@@ -68,7 +67,7 @@ impl SessionController {
         self.state.lock().expect("session state lock poisoned")
     }
 
-    pub(crate) fn connections(&self) -> &Arc<tokio::sync::Mutex<AgentHub>> {
+    pub(crate) fn connections(&self) -> &Arc<tokio::sync::Mutex<Hub>> {
         &self.connections
     }
 
@@ -86,24 +85,42 @@ impl SessionController {
     }
 
     pub async fn approve_permission(&self) {
-        {
-            self.lock().pending_permission = None;
-        }
-        self.backend.approve_permission().await;
+        let relay_id = {
+            let mut state = self.lock();
+            let relay_id = state
+                .pending_permission
+                .as_ref()
+                .and_then(|p| p.relay_request_id);
+            state.pending_permission = None;
+            relay_id
+        };
+        self.backend.approve_permission(relay_id).await;
     }
 
     pub async fn deny_permission(&self) {
-        {
-            self.lock().pending_permission = None;
-        }
-        self.backend.deny_permission().await;
+        let relay_id = {
+            let mut state = self.lock();
+            let relay_id = state
+                .pending_permission
+                .as_ref()
+                .and_then(|p| p.relay_request_id);
+            state.pending_permission = None;
+            relay_id
+        };
+        self.backend.deny_permission(relay_id).await;
     }
 
     pub async fn answer_question(&self, answers: Vec<String>) {
-        {
-            self.lock().pending_question = None;
-        }
-        self.backend.answer_question(answers).await;
+        let relay_id = {
+            let mut state = self.lock();
+            let relay_id = state
+                .pending_question
+                .as_ref()
+                .and_then(|q| q.relay_request_id);
+            state.pending_question = None;
+            relay_id
+        };
+        self.backend.answer_question(answers, relay_id).await;
     }
 
     pub async fn switch_mode(&self, mode: AgentMode) {

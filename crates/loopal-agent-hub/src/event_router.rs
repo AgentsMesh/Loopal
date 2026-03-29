@@ -1,7 +1,7 @@
-//! Event routing — consumes raw agent events and forwards to the frontend (TUI).
+//! Event routing — consumes raw agent events and broadcasts to all subscribers.
 //!
-//! In Hub-only gateway mode, SubAgentSpawned no longer triggers TCP attach
-//! (Hub manages all connections). Events are simply forwarded.
+//! Uses broadcast channel for multi-consumer delivery. Each client (TUI, ACP)
+//! subscribes independently via `hub.subscribe_events()`.
 
 use std::sync::Arc;
 
@@ -10,21 +10,22 @@ use tokio::task::JoinHandle;
 
 use loopal_protocol::AgentEvent;
 
-use crate::hub::AgentHub;
+use crate::hub::Hub;
 
-/// Start the hub event loop. Consumes raw events and forwards to frontend.
+/// Start the hub event loop. Consumes raw events and broadcasts to all subscribers.
 pub fn start_event_loop(
-    _hub: Arc<tokio::sync::Mutex<AgentHub>>,
+    hub: Arc<tokio::sync::Mutex<Hub>>,
     mut raw_rx: mpsc::Receiver<AgentEvent>,
-    frontend_tx: mpsc::Sender<AgentEvent>,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
         tracing::info!("hub event loop started");
+        let broadcaster = {
+            let h = hub.lock().await;
+            h.ui.event_broadcaster()
+        };
         while let Some(event) = raw_rx.recv().await {
-            if frontend_tx.send(event).await.is_err() {
-                tracing::info!("hub event loop: frontend closed");
-                break;
-            }
+            // Broadcast to all subscribers. Ignoring error means no active receivers.
+            let _ = broadcaster.send(event);
         }
         tracing::info!("hub event loop exited");
     })

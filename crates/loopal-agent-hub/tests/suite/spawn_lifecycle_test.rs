@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use tokio::sync::{Mutex, mpsc};
 
-use loopal_agent_hub::AgentHub;
+use loopal_agent_hub::Hub;
 use loopal_agent_hub::hub_server;
 use loopal_agent_hub::spawn_manager::register_agent_connection;
 use loopal_ipc::connection::{Connection, Incoming};
@@ -16,9 +16,9 @@ use loopal_ipc::protocol::methods;
 use loopal_protocol::{AgentEvent, AgentEventPayload};
 use serde_json::json;
 
-fn make_hub() -> (Arc<Mutex<AgentHub>>, mpsc::Receiver<AgentEvent>) {
+fn make_hub() -> (Arc<Mutex<Hub>>, mpsc::Receiver<AgentEvent>) {
     let (tx, rx) = mpsc::channel::<AgentEvent>(64);
-    (Arc::new(Mutex::new(AgentHub::new(tx))), rx)
+    (Arc::new(Mutex::new(Hub::new(tx))), rx)
 }
 
 // ── Spawn + register via mock transport ─────────────────────────────
@@ -63,6 +63,7 @@ async fn register_agent_connection_makes_agent_routable() {
     assert!(
         hub.lock()
             .await
+            .registry
             .get_agent_connection("mock-worker")
             .is_some()
     );
@@ -139,7 +140,8 @@ async fn wait_agent_returns_when_agent_disconnects() {
     // Simulate agent completion (in production, this happens when stdio closes)
     {
         let mut h = hub.lock().await;
-        h.emit_agent_finished("ephemeral", Some("test output".into()));
+        h.registry
+            .emit_agent_finished("ephemeral", Some("test output".into()));
     }
 
     // Wait should complete

@@ -71,7 +71,7 @@ impl Drop for SchedulerHandle {
 pub struct AgentShared {
     pub kernel: Arc<Kernel>,
     pub task_store: Arc<TaskStore>,
-    /// Connection to AgentHub for `hub/*` IPC requests (route, broadcast, channels).
+    /// Connection to Hub for `hub/*` IPC requests (route, broadcast, channels).
     pub hub_connection: Arc<Connection>,
     /// Initial working directory. Immutable after construction.
     pub cwd: PathBuf,

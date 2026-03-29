@@ -6,7 +6,7 @@ use loopal_ipc::protocol::methods;
 use serde_json::Value;
 use tokio::sync::Mutex;
 
-use crate::hub::AgentHub;
+use crate::hub::Hub;
 
 mod dispatch_handlers;
 mod topology_handlers;
@@ -14,7 +14,7 @@ mod wait_handler;
 
 /// Dispatch a single `hub/*` request. Returns the JSON response value.
 pub async fn dispatch_hub_request(
-    hub: &Arc<Mutex<AgentHub>>,
+    hub: &Arc<Mutex<Hub>>,
     method: &str,
     params: Value,
     from_agent: String,

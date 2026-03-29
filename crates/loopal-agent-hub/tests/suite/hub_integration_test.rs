@@ -5,16 +5,16 @@ use std::time::Duration;
 
 use tokio::sync::{Mutex, mpsc};
 
-use loopal_agent_hub::AgentHub;
+use loopal_agent_hub::Hub;
 use loopal_agent_hub::hub_server;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
 use loopal_protocol::AgentEvent;
 use serde_json::json;
 
-fn make_hub() -> (Arc<Mutex<AgentHub>>, mpsc::Receiver<AgentEvent>) {
+fn make_hub() -> (Arc<Mutex<Hub>>, mpsc::Receiver<AgentEvent>) {
     let (tx, rx) = mpsc::channel::<AgentEvent>(64);
-    (Arc::new(Mutex::new(AgentHub::new(tx))), rx)
+    (Arc::new(Mutex::new(Hub::new(tx))), rx)
 }
 
 /// Spawn a mock agent that auto-responds to all requests with {"ok": true}.
@@ -38,7 +38,13 @@ async fn agent_registered_and_reachable() {
     spawn_mock_agent(conn, rx);
     tokio::time::sleep(Duration::from_millis(50)).await;
 
-    assert!(hub.lock().await.get_agent_connection("worker-1").is_some());
+    assert!(
+        hub.lock()
+            .await
+            .registry
+            .get_agent_connection("worker-1")
+            .is_some()
+    );
 }
 
 #[tokio::test]
@@ -55,7 +61,13 @@ async fn duplicate_agent_name_rejected() {
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Hub still has exactly one "dup" (the first one)
-    assert!(hub.lock().await.get_agent_connection("dup").is_some());
+    assert!(
+        hub.lock()
+            .await
+            .registry
+            .get_agent_connection("dup")
+            .is_some()
+    );
 }
 
 // ── Message routing ─────────────────────────────────────────────────

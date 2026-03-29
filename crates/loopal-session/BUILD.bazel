@@ -26,8 +26,10 @@ rust_test(
     edition = "2024",
     deps = [
         ":loopal-session",
+        "//crates/loopal-agent-hub",
+        "//crates/loopal-ipc",
+        "//crates/loopal-protocol",
         "@crates//:serde_json",
         "@crates//:tokio",
-        "//crates/loopal-protocol",
     ],
 )

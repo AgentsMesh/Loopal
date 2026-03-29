@@ -1,20 +1,25 @@
-//! ACP integration test harness — drives the adapter with an in-memory agent server.
+//! ACP integration test harness — real Hub + mock agent server.
+//!
+//! Tests exercise the same path as production: ACP → UiSession → Hub → Agent.
 
 use std::sync::Arc;
 use std::time::Duration;
 
+use loopal_acp::AcpAdapter;
 use loopal_acp::jsonrpc::JsonRpcTransport;
-use loopal_acp::run_acp_with_transport;
+use loopal_agent_hub::Hub;
+use loopal_agent_hub::UiSession;
 use loopal_error::LoopalError;
 use loopal_ipc::StdioTransport;
+use loopal_ipc::connection::Connection;
 use loopal_ipc::transport::Transport;
 use loopal_provider_api::StreamChunk;
 use loopal_test_support::TestFixture;
 use loopal_test_support::mock_provider::MultiCallProvider;
 use serde_json::Value;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, DuplexStream};
+use tokio::sync::Mutex;
 
-/// ACP integration test harness with in-memory I/O.
 pub struct AcpTestHarness {
     pub client_writer: DuplexStream,
     pub client_reader: BufReader<DuplexStream>,
@@ -23,36 +28,35 @@ pub struct AcpTestHarness {
     next_id: i64,
 }
 
-/// Build an ACP harness: spawns in-memory agent server + ACP adapter.
-pub fn build_acp_harness(calls: Vec<Vec<Result<StreamChunk, LoopalError>>>) -> AcpTestHarness {
+/// Build a Hub-backed ACP harness with mock agent server.
+pub async fn build_acp_harness(
+    calls: Vec<Vec<Result<StreamChunk, LoopalError>>>,
+) -> AcpTestHarness {
     let fixture = TestFixture::new();
     let cwd = fixture.path().to_path_buf();
 
-    // ACP side: duplex for IDE ↔ ACP adapter
+    // IDE ↔ ACP adapter
     let (client_writer, acp_read) = tokio::io::duplex(8192);
     let (acp_write, client_reader) = tokio::io::duplex(8192);
 
-    // Agent server side: duplex for ACP adapter ↔ agent server
-    let (adapter_to_server, server_read) = tokio::io::duplex(8192);
-    let (server_to_adapter, adapter_from_server) = tokio::io::duplex(8192);
+    // Hub ↔ Agent server
+    let (hub_to_server, server_read) = tokio::io::duplex(8192);
+    let (server_to_hub, hub_from_server) = tokio::io::duplex(8192);
 
     let provider =
         Arc::new(MultiCallProvider::new(calls)) as Arc<dyn loopal_provider_api::Provider>;
     let session_dir = fixture.path().join("sessions");
 
-    // Build transports — duplex wiring:
-    //   adapter writes to adapter_to_server → server reads from server_read
-    //   server writes to server_to_adapter → adapter reads from adapter_from_server
     let server_transport: Arc<dyn Transport> = Arc::new(StdioTransport::new(
         Box::new(BufReader::new(server_read)),
-        Box::new(server_to_adapter),
+        Box::new(server_to_hub),
     ));
-    let adapter_transport: Arc<dyn Transport> = Arc::new(StdioTransport::new(
-        Box::new(BufReader::new(adapter_from_server)),
-        Box::new(adapter_to_server),
+    let agent_transport: Arc<dyn Transport> = Arc::new(StdioTransport::new(
+        Box::new(BufReader::new(hub_from_server)),
+        Box::new(hub_to_server),
     ));
 
-    // Spawn agent server (test mode with mock provider)
+    // 1. Spawn mock agent server
     tokio::spawn({
         let cwd = cwd.clone();
         async move {
@@ -66,11 +70,45 @@ pub fn build_acp_harness(calls: Vec<Vec<Result<StreamChunk, LoopalError>>>) -> A
         }
     });
 
-    // Spawn ACP adapter
+    // 2. Create Hub
+    let (event_tx, event_rx) = tokio::sync::mpsc::channel(256);
+    let hub = Arc::new(Mutex::new(Hub::new(event_tx)));
+
+    // 3. Start event broadcast EARLY (before agent starts)
+    let _event_loop = loopal_agent_hub::start_event_loop(hub.clone(), event_rx);
+
+    // 4. Connect ACP as UI client via UiSession BEFORE agent starts
+    let ui_session = UiSession::connect(hub.clone(), "acp").await;
+
+    // 5. Connect to agent, initialize + start it
+    let agent_conn = Arc::new(Connection::new(agent_transport));
+    let agent_incoming = agent_conn.start();
+    let _ = agent_conn
+        .send_request("initialize", serde_json::json!({"protocol_version": 1}))
+        .await;
+    let _ = agent_conn
+        .send_request("agent/start", serde_json::json!({"cwd": cwd}))
+        .await;
+
+    // 6. Register agent in Hub and spawn IO loop
+    {
+        let mut h = hub.lock().await;
+        let _ = h.registry.register_connection("main", agent_conn.clone());
+    }
+    loopal_agent_hub::agent_io::spawn_io_loop(
+        hub.clone(),
+        "main",
+        agent_conn,
+        agent_incoming,
+        true,
+    );
+
+    // 7. Spawn ACP adapter using UiSession
     let acp_out = Arc::new(JsonRpcTransport::with_writer(Box::new(acp_write)));
     tokio::spawn(async move {
+        let adapter = AcpAdapter::new(ui_session, acp_out);
         let mut reader = BufReader::new(acp_read);
-        let _ = run_acp_with_transport(adapter_transport, acp_out, &mut reader).await;
+        let _ = adapter.run(&mut reader).await;
     });
 
     AcpTestHarness {
@@ -84,13 +122,19 @@ pub fn build_acp_harness(calls: Vec<Vec<Result<StreamChunk, LoopalError>>>) -> A
 const IO_TIMEOUT: Duration = Duration::from_secs(10);
 
 impl AcpTestHarness {
-    /// Send a JSON-RPC request and wait for the matching response.
     pub async fn request(&mut self, method: &str, params: Value) -> Value {
         let (resp, _) = self.request_with_notifications(method, params).await;
         resp
     }
 
-    /// Send a request and return (response, collected_notifications).
+    pub async fn send_notification(&mut self, method: &str, params: Value) {
+        let msg = serde_json::json!({"jsonrpc": "2.0", "method": method, "params": params});
+        let mut bytes = serde_json::to_vec(&msg).unwrap();
+        bytes.push(b'\n');
+        self.client_writer.write_all(&bytes).await.unwrap();
+        self.client_writer.flush().await.unwrap();
+    }
+
     pub async fn request_with_notifications(
         &mut self,
         method: &str,
@@ -98,10 +142,8 @@ impl AcpTestHarness {
     ) -> (Value, Vec<Value>) {
         let id = self.next_id;
         self.next_id += 1;
-
-        let msg = serde_json::json!({
-            "jsonrpc": "2.0", "id": id, "method": method, "params": params,
-        });
+        let msg =
+            serde_json::json!({"jsonrpc": "2.0", "id": id, "method": method, "params": params});
         let mut bytes = serde_json::to_vec(&msg).unwrap();
         bytes.push(b'\n');
         self.client_writer.write_all(&bytes).await.unwrap();

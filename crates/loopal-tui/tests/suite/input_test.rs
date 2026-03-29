@@ -93,6 +93,7 @@ fn test_tool_confirm_y_approves() {
             id: "1".into(),
             name: "Bash".into(),
             input: "ls".into(),
+            relay_request_id: None,
         });
     }
     let action = handle_key(&mut app, key(KeyCode::Char('y')));
@@ -108,6 +109,7 @@ fn test_tool_confirm_n_denies() {
             id: "1".into(),
             name: "Bash".into(),
             input: "rm".into(),
+            relay_request_id: None,
         });
     }
     let action = handle_key(&mut app, key(KeyCode::Char('n')));
@@ -123,6 +125,7 @@ fn test_tool_confirm_esc_denies() {
             id: "1".into(),
             name: "Bash".into(),
             input: "rm".into(),
+            relay_request_id: None,
         });
     }
     let action = handle_key(&mut app, key(KeyCode::Esc));

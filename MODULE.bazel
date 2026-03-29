@@ -32,7 +32,7 @@ crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
 # --- Serialization ---
 crate.spec(package = "serde", version = "1", features = ["derive"])
 crate.spec(package = "serde_json", version = "1")
-crate.spec(package = "schemars", version = "0.8")
+crate.spec(package = "schemars", version = "1")
 
 # --- Async runtime ---
 crate.spec(package = "tokio", version = "1", features = ["full", "test-util"])
@@ -110,6 +110,11 @@ crate.spec(package = "image", version = "0.25", default_features = False, featur
 # --- Templates ---
 crate.spec(package = "minijinja", version = "2", features = ["loader"])
 crate.spec(package = "include_dir", version = "0.7")
+
+# --- ACP (Agent Client Protocol) ---
+crate.spec(package = "agent-client-protocol-schema", version = "0.11")
+crate.spec(package = "strum", version = "0.28", features = ["derive"])
+crate.spec(package = "derive_more", version = "2", features = ["from", "display"])
 
 # --- Testing ---
 crate.spec(package = "tempfile", version = "3")

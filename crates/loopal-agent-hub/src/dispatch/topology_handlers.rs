@@ -5,16 +5,16 @@ use std::sync::Arc;
 use serde_json::{Value, json};
 use tokio::sync::Mutex;
 
-use crate::hub::AgentHub;
+use crate::hub::Hub;
 
-pub async fn handle_agent_info(hub: &Arc<Mutex<AgentHub>>, params: Value) -> Result<Value, String> {
+pub async fn handle_agent_info(hub: &Arc<Mutex<Hub>>, params: Value) -> Result<Value, String> {
     let name = params["name"].as_str().ok_or("missing 'name'")?;
     let h = hub.lock().await;
 
     // Check finished_outputs first (agent may already be unregistered)
-    let output = h.finished_outputs.get(name).cloned();
+    let output = h.registry.finished_outputs.get(name).cloned();
 
-    if let Some(info) = h.agent_info(name) {
+    if let Some(info) = h.registry.agent_info(name) {
         Ok(json!({
             "name": info.name,
             "parent": info.parent,
@@ -35,6 +35,6 @@ pub async fn handle_agent_info(hub: &Arc<Mutex<AgentHub>>, params: Value) -> Res
     }
 }
 
-pub async fn handle_topology(hub: &Arc<Mutex<AgentHub>>) -> Result<Value, String> {
-    Ok(hub.lock().await.topology_snapshot())
+pub async fn handle_topology(hub: &Arc<Mutex<Hub>>) -> Result<Value, String> {
+    Ok(hub.lock().await.registry.topology_snapshot())
 }

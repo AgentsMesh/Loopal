@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use tokio::sync::{Mutex, mpsc};
 
-use loopal_agent_hub::AgentHub;
+use loopal_agent_hub::Hub;
 use loopal_agent_hub::hub_server;
 use loopal_agent_hub::spawn_manager::register_agent_connection;
 use loopal_ipc::connection::{Connection, Incoming};
@@ -14,9 +14,9 @@ use loopal_ipc::protocol::methods;
 use loopal_protocol::AgentEvent;
 use serde_json::json;
 
-fn make_hub() -> (Arc<Mutex<AgentHub>>, mpsc::Receiver<AgentEvent>) {
+fn make_hub() -> (Arc<Mutex<Hub>>, mpsc::Receiver<AgentEvent>) {
     let (tx, rx) = mpsc::channel::<AgentEvent>(64);
-    (Arc::new(Mutex::new(AgentHub::new(tx))), rx)
+    (Arc::new(Mutex::new(Hub::new(tx))), rx)
 }
 
 fn spawn_mock(conn: Arc<Connection>, rx: mpsc::Receiver<Incoming>) {
@@ -36,13 +36,16 @@ fn spawn_mock(conn: Arc<Connection>, rx: mpsc::Receiver<Incoming>) {
 async fn concurrent_permissions_from_two_agents() {
     let (hub, _) = make_hub();
 
-    let (tui_conn, tui_rx) = hub_server::connect_local(hub.clone(), "_tui");
-    let tc = tui_conn.clone();
+    let ui = loopal_agent_hub::UiSession::connect(hub.clone(), "tui").await;
+    let ui_client = ui.client.clone();
     tokio::spawn(async move {
-        let mut rx = tui_rx;
+        let mut rx = ui.relay_rx;
         while let Some(msg) = rx.recv().await {
             if let Incoming::Request { id, .. } = msg {
-                let _ = tc.respond(id, json!({"allow": true})).await;
+                let _ = ui_client
+                    .connection()
+                    .respond(id, json!({"allow": true}))
+                    .await;
             }
         }
     });
@@ -90,8 +93,8 @@ async fn route_to_disconnected_agent_returns_error() {
         let conn = Arc::new(Connection::new(t2));
         let _rx = conn.start();
         let mut h = hub.lock().await;
-        let _ = h.register_connection("ghost", conn);
-        h.unregister_connection("ghost");
+        let _ = h.registry.register_connection("ghost", conn);
+        h.registry.unregister_connection("ghost");
     }
 
     let (sender, sr) = hub_server::connect_local(hub.clone(), "sender");
@@ -164,8 +167,14 @@ async fn wait_already_finished_agent_returns_immediately() {
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Finish it
-    hub.lock().await.unregister_connection("done-agent");
-    hub.lock().await.emit_agent_finished("done-agent", None);
+    hub.lock()
+        .await
+        .registry
+        .unregister_connection("done-agent");
+    hub.lock()
+        .await
+        .registry
+        .emit_agent_finished("done-agent", None);
 
     // Now wait — should return immediately
     let result = tokio::time::timeout(
@@ -220,7 +229,10 @@ async fn multiple_waiters_on_same_agent() {
     });
 
     tokio::time::sleep(Duration::from_millis(100)).await;
-    hub.lock().await.emit_agent_finished("shared-target", None);
+    hub.lock()
+        .await
+        .registry
+        .emit_agent_finished("shared-target", None);
 
     let (r1, r2) = tokio::join!(
         tokio::time::timeout(Duration::from_secs(2), w1),

@@ -23,7 +23,7 @@ async fn test_provider_error_in_prompt() {
     // Provider returns error during streaming — agent loop catches it and
     // emits an Error event.  The prompt should still complete gracefully.
     let calls = vec![vec![chunks::provider_error("network failure")]];
-    let mut harness = build_acp_harness(calls);
+    let mut harness = build_acp_harness(calls).await;
     let sid = setup_session(&mut harness).await;
 
     let (resp, _notifications) = harness
@@ -55,7 +55,7 @@ async fn test_tool_error_recovers() {
         ),
         chunks::text_turn("File not found, sorry."),
     ];
-    let mut harness = build_acp_harness(calls);
+    let mut harness = build_acp_harness(calls).await;
     let sid = setup_session(&mut harness).await;
 
     let (resp, _notifs) = harness
@@ -75,7 +75,7 @@ async fn test_tool_error_recovers() {
 async fn test_malformed_input_then_valid_request() {
     // Sending non-JSON on the wire should be silently skipped by
     // `read_message`; subsequent valid requests still succeed.
-    let mut harness = build_acp_harness(vec![]);
+    let mut harness = build_acp_harness(vec![]).await;
 
     // Write raw garbage via the duplex stream
     use tokio::io::AsyncWriteExt;

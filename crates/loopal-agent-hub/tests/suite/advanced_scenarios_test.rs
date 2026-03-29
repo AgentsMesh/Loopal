@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use tokio::sync::{Mutex, mpsc};
 
-use loopal_agent_hub::AgentHub;
+use loopal_agent_hub::Hub;
 use loopal_agent_hub::hub_server;
 use loopal_agent_hub::spawn_manager::register_agent_connection;
 use loopal_ipc::connection::{Connection, Incoming};
@@ -14,9 +14,9 @@ use loopal_ipc::protocol::methods;
 use loopal_protocol::AgentEvent;
 use serde_json::json;
 
-fn make_hub() -> (Arc<Mutex<AgentHub>>, mpsc::Receiver<AgentEvent>) {
+fn make_hub() -> (Arc<Mutex<Hub>>, mpsc::Receiver<AgentEvent>) {
     let (tx, rx) = mpsc::channel::<AgentEvent>(64);
-    (Arc::new(Mutex::new(AgentHub::new(tx))), rx)
+    (Arc::new(Mutex::new(Hub::new(tx))), rx)
 }
 
 fn envelope(from: &str, target: &str, text: &str) -> serde_json::Value {
@@ -85,13 +85,13 @@ async fn permission_denied_when_tui_disconnects_mid_request() {
     let (hub, _) = make_hub();
 
     // TUI connects but will be dropped before responding
-    let (_tui_conn, _tui_rx) = hub_server::connect_local(hub.clone(), "_tui");
+    let _tui = loopal_agent_hub::UiSession::connect(hub.clone(), "tui").await;
 
     let (agent_conn, _) = hub_server::connect_local(hub.clone(), "requester");
     tokio::time::sleep(Duration::from_millis(50)).await;
 
-    // Unregister TUI from Hub (simulates TUI crash — Hub detects disconnect)
-    hub.lock().await.unregister_connection("_tui");
+    // Unregister TUI from Hub (simulates TUI crash)
+    hub.lock().await.ui.unregister_client("tui");
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Agent requests permission — TUI gone, should get deny quickly

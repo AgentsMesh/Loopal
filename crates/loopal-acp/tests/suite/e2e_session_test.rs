@@ -9,7 +9,7 @@ use super::e2e_harness::build_acp_harness;
 #[tokio::test]
 async fn test_prompt_missing_session_id() {
     // session/prompt with a completely wrong sessionId → error.
-    let mut harness = build_acp_harness(vec![chunks::text_turn("x")]);
+    let mut harness = build_acp_harness(vec![chunks::text_turn("x")]).await;
 
     harness
         .request("initialize", json!({"protocolVersion": 1}))
@@ -35,7 +35,7 @@ async fn test_prompt_missing_session_id() {
 #[tokio::test]
 async fn test_prompt_invalid_content_format() {
     // Prompt with missing `type` field in content block → deserialization error.
-    let mut harness = build_acp_harness(vec![]);
+    let mut harness = build_acp_harness(vec![]).await;
 
     harness
         .request("initialize", json!({"protocolVersion": 1}))
@@ -60,7 +60,7 @@ async fn test_prompt_invalid_content_format() {
 #[tokio::test]
 async fn test_initialize_twice() {
     // Calling initialize a second time should succeed (idempotent).
-    let mut harness = build_acp_harness(vec![]);
+    let mut harness = build_acp_harness(vec![]).await;
 
     let resp1 = harness
         .request("initialize", json!({"protocolVersion": 1}))
@@ -76,7 +76,7 @@ async fn test_initialize_twice() {
 #[tokio::test]
 async fn test_session_new_without_cwd() {
     // session/new with empty params — `cwd` should default.
-    let mut harness = build_acp_harness(vec![]);
+    let mut harness = build_acp_harness(vec![]).await;
 
     harness
         .request("initialize", json!({"protocolVersion": 1}))
@@ -94,7 +94,7 @@ async fn test_session_new_without_cwd() {
 async fn test_cancel_without_active_prompt() {
     // Cancel when there IS a session but no active prompt — should still
     // succeed (the token fires but nothing is listening).
-    let mut harness = build_acp_harness(vec![]);
+    let mut harness = build_acp_harness(vec![]).await;
 
     harness
         .request("initialize", json!({"protocolVersion": 1}))

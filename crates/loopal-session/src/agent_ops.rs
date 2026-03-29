@@ -12,6 +12,6 @@ impl SessionController {
 
     /// List all agents with their connection state labels.
     pub async fn list_agents(&self) -> Vec<(String, &'static str)> {
-        self.connections().lock().await.list_agents()
+        self.connections().lock().await.registry.list_agents()
     }
 }

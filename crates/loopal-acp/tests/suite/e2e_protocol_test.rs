@@ -27,7 +27,7 @@ async fn test_acp_tool_call_notifications() {
         chunks::text_turn("Read done."),
     ];
 
-    let mut harness = build_acp_harness(calls);
+    let mut harness = build_acp_harness(calls).await;
 
     harness
         .request("initialize", json!({"protocolVersion": 1}))
@@ -51,7 +51,7 @@ async fn test_acp_tool_call_notifications() {
 
 #[tokio::test]
 async fn test_acp_no_session_cancel_error() {
-    let mut harness = build_acp_harness(vec![]);
+    let mut harness = build_acp_harness(vec![]).await;
     harness
         .request("initialize", json!({"protocolVersion": 1}))
         .await;
@@ -73,7 +73,7 @@ async fn test_acp_no_session_cancel_error() {
 
 #[tokio::test]
 async fn test_acp_prompt_without_session_error() {
-    let mut harness = build_acp_harness(vec![]);
+    let mut harness = build_acp_harness(vec![]).await;
     harness
         .request("initialize", json!({"protocolVersion": 1}))
         .await;

@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use tokio::sync::{Mutex, mpsc};
 
-use loopal_agent_hub::AgentHub;
+use loopal_agent_hub::Hub;
 use loopal_agent_hub::hub_server;
 use loopal_agent_hub::spawn_manager::register_agent_connection;
 use loopal_ipc::connection::Connection;
@@ -13,9 +13,9 @@ use loopal_ipc::protocol::methods;
 use loopal_protocol::AgentEvent;
 use serde_json::json;
 
-fn make_hub() -> (Arc<Mutex<AgentHub>>, mpsc::Receiver<AgentEvent>) {
+fn make_hub() -> (Arc<Mutex<Hub>>, mpsc::Receiver<AgentEvent>) {
     let (tx, rx) = mpsc::channel::<AgentEvent>(64);
-    (Arc::new(Mutex::new(AgentHub::new(tx))), rx)
+    (Arc::new(Mutex::new(Hub::new(tx))), rx)
 }
 
 /// emit_agent_finished passes actual output (not hardcoded "agent finished").
@@ -46,8 +46,9 @@ async fn completion_output_passed_through_wait() {
     // Simulate agent completion: emit BEFORE unregister (matches production order)
     {
         let mut h = hub.lock().await;
-        h.emit_agent_finished("worker", Some("42 findings in the analysis.".into()));
-        h.unregister_connection("worker");
+        h.registry
+            .emit_agent_finished("worker", Some("42 findings in the analysis.".into()));
+        h.registry.unregister_connection("worker");
     }
 
     let result = tokio::time::timeout(Duration::from_secs(3), waiter).await;
@@ -85,8 +86,8 @@ async fn completion_no_output_fallback() {
 
     {
         let mut h = hub.lock().await;
-        h.emit_agent_finished("worker2", None);
-        h.unregister_connection("worker2");
+        h.registry.emit_agent_finished("worker2", None);
+        h.registry.unregister_connection("worker2");
     }
 
     let result = tokio::time::timeout(Duration::from_secs(3), waiter).await;
@@ -132,15 +133,21 @@ async fn topology_tracks_parent_child() {
 
     // Check topology
     let h = hub.lock().await;
-    let parent_info = h.agent_info("parent").expect("parent should exist");
+    let parent_info = h
+        .registry
+        .agent_info("parent")
+        .expect("parent should exist");
     assert_eq!(parent_info.children, vec!["child-1"]);
     assert_eq!(parent_info.model.as_deref(), Some("opus"));
 
-    let child_info = h.agent_info("child-1").expect("child should exist");
+    let child_info = h
+        .registry
+        .agent_info("child-1")
+        .expect("child should exist");
     assert_eq!(child_info.parent.as_deref(), Some("parent"));
     assert_eq!(child_info.model.as_deref(), Some("sonnet"));
 
-    let descendants = h.descendants("parent");
+    let descendants = h.registry.descendants("parent");
     assert_eq!(descendants, vec!["child-1"]);
 }
 

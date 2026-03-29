@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use tokio::sync::{Mutex, mpsc};
 
-use loopal_agent_hub::AgentHub;
+use loopal_agent_hub::Hub;
 use loopal_agent_hub::hub_server;
 use loopal_agent_hub::spawn_manager::register_agent_connection;
 use loopal_ipc::connection::{Connection, Incoming};
@@ -14,9 +14,9 @@ use loopal_ipc::protocol::methods;
 use loopal_protocol::{AgentEvent, AgentEventPayload};
 use serde_json::json;
 
-fn make_hub() -> (Arc<Mutex<AgentHub>>, mpsc::Receiver<AgentEvent>) {
+fn make_hub() -> (Arc<Mutex<Hub>>, mpsc::Receiver<AgentEvent>) {
     let (tx, rx) = mpsc::channel::<AgentEvent>(64);
-    (Arc::new(Mutex::new(AgentHub::new(tx))), rx)
+    (Arc::new(Mutex::new(Hub::new(tx))), rx)
 }
 
 /// Full chain: spawn agent → agent completes → wait_agent returns real output.
@@ -59,8 +59,9 @@ async fn spawn_and_result_full_chain() {
     // Worker completes with real output
     {
         let mut h = hub.lock().await;
-        h.emit_agent_finished("worker", Some("Analysis: 42 crates found.".into()));
-        h.unregister_connection("worker");
+        h.registry
+            .emit_agent_finished("worker", Some("Analysis: 42 crates found.".into()));
+        h.registry.unregister_connection("worker");
     }
 
     let result = tokio::time::timeout(Duration::from_secs(3), waiter).await;
@@ -109,8 +110,9 @@ async fn agent_info_running_and_finished() {
     // Finish agent
     {
         let mut h = hub.lock().await;
-        h.emit_agent_finished("child-a", Some("done!".into()));
-        h.unregister_connection("child-a");
+        h.registry
+            .emit_agent_finished("child-a", Some("done!".into()));
+        h.registry.unregister_connection("child-a");
     }
 
     // Query finished agent — should find cached output
@@ -181,8 +183,8 @@ async fn send_message_running_vs_finished() {
     // Unregister receiver (simulating agent exit)
     {
         let mut h = hub.lock().await;
-        h.emit_agent_finished("receiver", None);
-        h.unregister_connection("receiver");
+        h.registry.emit_agent_finished("receiver", None);
+        h.registry.unregister_connection("receiver");
     }
 
     // Route to finished agent → should fail
@@ -253,8 +255,9 @@ async fn cascade_shutdown_interrupts_children() {
     // Parent finishes → should cascade interrupt to child
     {
         let mut h = hub.lock().await;
-        h.emit_agent_finished("parent", Some("parent done".into()));
-        h.unregister_connection("parent");
+        h.registry
+            .emit_agent_finished("parent", Some("parent done".into()));
+        h.registry.unregister_connection("parent");
     }
 
     // Child should receive interrupt

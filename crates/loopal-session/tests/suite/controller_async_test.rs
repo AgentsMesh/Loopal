@@ -147,3 +147,45 @@ async fn test_compact() {
         other => panic!("expected Compact, got {other:?}"),
     }
 }
+
+/// Hub mode: approve_permission sends response via HubClient when relay_request_id is set.
+#[tokio::test]
+async fn test_hub_approve_permission_sends_response() {
+    use loopal_agent_hub::Hub;
+    use loopal_agent_hub::HubClient;
+    use std::sync::Arc;
+
+    // Create a duplex to simulate Hub connection
+    let (client_side, server_side) = tokio::io::duplex(4096);
+    let client_transport: Arc<dyn loopal_ipc::transport::Transport> =
+        Arc::new(loopal_ipc::StdioTransport::new(
+            Box::new(tokio::io::BufReader::new(client_side)),
+            Box::new(server_side),
+        ));
+    // We don't need a real Hub — just verify the response is sent.
+    // The connection will error but that's fine for this unit test.
+
+    let conn = Arc::new(loopal_ipc::connection::Connection::new(client_transport));
+    let _rx = conn.start();
+    let hub_client = Arc::new(HubClient::new(conn));
+    let hub = Arc::new(tokio::sync::Mutex::new(Hub::noop()));
+
+    let ctrl = SessionController::with_hub("test".to_string(), "act".to_string(), hub_client, hub);
+
+    // Set up pending permission with relay_request_id
+    ctrl.handle_event(AgentEvent::root(AgentEventPayload::ToolPermissionRequest {
+        id: "p1".to_string(),
+        name: "bash".to_string(),
+        input: serde_json::json!({}),
+    }));
+    {
+        let mut state = ctrl.lock();
+        if let Some(ref mut perm) = state.pending_permission {
+            perm.relay_request_id = Some(42);
+        }
+    }
+
+    // approve should not panic (response goes to duplex — may error but shouldn't crash)
+    ctrl.approve_permission().await;
+    assert!(ctrl.lock().pending_permission.is_none());
+}

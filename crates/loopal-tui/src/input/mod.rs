@@ -77,6 +77,11 @@ fn handle_global_keys(app: &mut App, key: &KeyEvent) -> Option<InputAction> {
             KeyCode::Char('c') => return Some(handle_ctrl_c(app)),
             KeyCode::Char('d') => return Some(InputAction::Quit),
             KeyCode::Char('v') => return Some(InputAction::PasteRequested),
+            // Readline-style history: Ctrl+P/N always navigate history,
+            // independent of scroll state. This avoids the conflict between
+            // xterm alternate scroll (mouse wheel → Up/Down) and history.
+            KeyCode::Char('p') => return Some(handle_up(app)),
+            KeyCode::Char('n') => return Some(handle_down(app)),
             _ => {}
         }
     }
@@ -132,17 +137,44 @@ fn handle_normal_key(app: &mut App, key: &KeyEvent) -> InputAction {
                 multiline::line_end(&app.input, app.input_cursor, DEFAULT_WRAP_WIDTH);
             InputAction::None
         }
-        KeyCode::Up if app.scroll_offset > 0 || !app.session.lock().agent_idle => {
-            // Browsing mode or agent running: scroll content area.
-            app.scroll_offset = app.scroll_offset.saturating_add(1);
-            InputAction::None
+        // Up/Down priority chain:
+        //   1. Multiline cursor navigation (Shift+Enter input)
+        //   2. Content scroll (mouse wheel via xterm alternate scroll)
+        //   3. History navigation (only when content fits on screen)
+        // Ctrl+P/N always navigate history regardless of scroll state.
+        KeyCode::Up => {
+            if multiline::is_multiline(&app.input, DEFAULT_WRAP_WIDTH)
+                && let Some(pos) =
+                    multiline::cursor_up(&app.input, app.input_cursor, DEFAULT_WRAP_WIDTH)
+            {
+                app.input_cursor = pos;
+                InputAction::None
+            } else if app.scroll_offset > 0
+                || !app.session.lock().agent_idle
+                || app.content_overflows
+            {
+                app.scroll_offset = app.scroll_offset.saturating_add(1);
+                InputAction::None
+            } else {
+                handle_up(app)
+            }
         }
-        KeyCode::Down if app.scroll_offset > 0 => {
-            app.scroll_offset = app.scroll_offset.saturating_sub(1);
-            InputAction::None
+        KeyCode::Down => {
+            if multiline::is_multiline(&app.input, DEFAULT_WRAP_WIDTH)
+                && let Some(pos) =
+                    multiline::cursor_down(&app.input, app.input_cursor, DEFAULT_WRAP_WIDTH)
+            {
+                app.input_cursor = pos;
+                InputAction::None
+            } else if app.scroll_offset > 0 {
+                app.scroll_offset = app.scroll_offset.saturating_sub(1);
+                InputAction::None
+            } else if app.content_overflows {
+                InputAction::None
+            } else {
+                handle_down(app)
+            }
         }
-        KeyCode::Up => handle_up(app),
-        KeyCode::Down => handle_down(app),
         KeyCode::Esc => handle_esc(app),
         KeyCode::PageUp => {
             app.scroll_offset = app.scroll_offset.saturating_add(10);

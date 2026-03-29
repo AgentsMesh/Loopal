@@ -120,7 +120,6 @@ fn render_agent_line(
         Style::default().fg(Color::DarkGray),
     ));
 
-
     // Last tool (truncated)
     if let Some(ref tool) = agent.observable.last_tool {
         spans.push(Span::raw("  "));

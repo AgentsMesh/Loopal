@@ -58,7 +58,6 @@ pub fn render_unified_status(f: &mut Frame, state: &SessionState, area: Rect) {
     spans.push(Span::raw("  "));
     spans.push(Span::styled(context_info(state), dim_style()));
 
-
     let bg = if is_plan {
         Style::default().bg(Color::Rgb(50, 20, 50))
     } else {

@@ -4,9 +4,9 @@
 /// Tab cycles focus; focused agent highlighted with `▸`.
 ///
 /// ```text
-///  ▸ researcher   ⠹ Working   12s  3k tok  Read(src/foo.rs)
-///    coder        ● Idle        0s  1k tok
-///    tester       ⠧ Working     5s  2k tok  Bash(npm test)
+///  ▸ researcher   ⠹ Working   12s  Read(src/foo.rs)
+///    coder        ● Idle        0s
+///    tester       ⠧ Working     5s  Bash(npm test)
 /// ```
 use indexmap::IndexMap;
 use ratatui::prelude::*;
@@ -117,14 +117,6 @@ fn render_agent_line(
     };
     spans.push(Span::styled(
         format!("{time_str:>6}"),
-        Style::default().fg(Color::DarkGray),
-    ));
-    spans.push(Span::raw("  "));
-
-    // Token count
-    let tok = (agent.observable.input_tokens + agent.observable.output_tokens) / 1000;
-    spans.push(Span::styled(
-        format!("{tok}k tok"),
         Style::default().fg(Color::DarkGray),
     ));
 

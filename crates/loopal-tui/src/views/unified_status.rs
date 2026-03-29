@@ -58,30 +58,6 @@ pub fn render_unified_status(f: &mut Frame, state: &SessionState, area: Rect) {
     spans.push(Span::raw("  "));
     spans.push(Span::styled(context_info(state), dim_style()));
 
-    // Token I/O
-    spans.push(Span::raw("  "));
-    spans.push(Span::styled(token_io(state), dim_style()));
-
-    // Cache hit rate
-    if state.cache_read_tokens > 0 {
-        let total = state.cache_creation_tokens + state.cache_read_tokens;
-        let pct = (state.cache_read_tokens as f64 / total as f64 * 100.0) as u32;
-        spans.push(Span::raw("  "));
-        spans.push(Span::styled(
-            format!("cache:{pct}%"),
-            Style::default().fg(Color::Green),
-        ));
-    }
-
-    // Thinking tokens
-    if state.thinking_tokens > 0 {
-        spans.push(Span::raw("  "));
-        spans.push(Span::styled(
-            format!("think:{}k", state.thinking_tokens / 1000),
-            Style::default().fg(Color::Magenta),
-        ));
-    }
-
     let bg = if is_plan {
         Style::default().bg(Color::Rgb(50, 20, 50))
     } else {
@@ -170,14 +146,6 @@ fn context_info(state: &SessionState) -> String {
     } else {
         format!("{}k tok", total / 1000)
     }
-}
-
-fn token_io(state: &SessionState) -> String {
-    format!(
-        "↑{}k ↓{}k",
-        state.input_tokens / 1000,
-        state.output_tokens / 1000,
-    )
 }
 
 fn dim_style() -> Style {

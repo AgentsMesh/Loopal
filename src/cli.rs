@@ -27,23 +27,15 @@ pub struct Cli {
     #[arg(long)]
     pub acp: bool,
 
-    /// Run as agent server for multi-process mode (stdin/stdout IPC)
-    #[arg(long)]
-    pub serve: bool,
-
-    /// Run as Hub server (headless, no TUI)
-    #[arg(long)]
-    pub hub: bool,
-
-    /// Hub TCP port to connect back to (used by --serve when spawned by Hub)
+    /// Internal: run as agent worker process (stdin/stdout IPC)
     #[arg(long, hide = true)]
-    pub hub_port: Option<u16>,
+    pub serve: bool,
 
     /// Run agent in an isolated git worktree
     #[arg(long)]
     pub worktree: bool,
 
-    /// [Testing] Path to JSON file with mock LLM responses for --serve mode.
+    /// [Testing] Path to JSON file with mock LLM responses.
     /// Can also be set via LOOPAL_TEST_PROVIDER env var.
     #[arg(long, hide = true)]
     pub test_provider: Option<String>,

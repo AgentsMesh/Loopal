@@ -1,5 +1,5 @@
 //! Agent server entry point — stdio-only IPC lifecycle + agent loop.
-//! Activated via `loopal --serve`. Communicates with Hub via stdin/stdout.
+//! Activated internally via hidden `--serve` flag. Communicates with Hub via stdin/stdout.
 //! Agent is a pure worker: no TCP listener, no server_info, no external ports.
 
 use std::sync::Arc;

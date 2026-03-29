@@ -1,4 +1,4 @@
-.PHONY: build build-all release test test-ci clippy fmt check run debug repin clean \
+.PHONY: build build-all release install test test-ci clippy fmt check run debug repin clean \
        release-macos-arm release-macos-x86 release-linux-arm release-linux-x86 release-windows
 
 # ── Build ────────────────────────────────────────────────────────────────────
@@ -9,8 +9,15 @@ build:
 build-all:
 	bazel build //...
 
+INSTALL_DIR ?= $(HOME)/.local/bin
+
 release:
 	bazel build //:loopal -c opt
+
+install: release
+	@mkdir -p $(INSTALL_DIR)
+	cp -f bazel-bin/loopal $(INSTALL_DIR)/loopal
+	@echo "Installed to $(INSTALL_DIR)/loopal"
 
 # ── Test ─────────────────────────────────────────────────────────────────────
 

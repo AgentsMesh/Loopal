@@ -24,6 +24,7 @@ rust_library(
         "@crates//:serde",
         "@crates//:serde_json",
         "@crates//:tokio",
+        "@crates//:tokio-util",
         "@crates//:tracing",
     ],
     proc_macro_deps = ["@crates//:async-trait"],

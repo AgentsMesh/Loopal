@@ -134,6 +134,7 @@ pub(crate) fn make_multi_runner(
         interrupt: InterruptHandle::new(),
         shared: None,
         memory_channel: None,
+        scheduled_rx: None,
     };
     (AgentLoopRunner::new(params), event_rx)
 }

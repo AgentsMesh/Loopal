@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use loopal_agent::shared::AgentShared;
+use loopal_agent::shared::{AgentShared, SchedulerHandle};
 use loopal_agent::task_store::TaskStore;
 use loopal_config::ResolvedConfig;
 use loopal_context::system_prompt::build_system_prompt;
@@ -14,6 +14,12 @@ use loopal_runtime::frontend::traits::AgentFrontend;
 use loopal_tool_api::MemoryChannel;
 
 use crate::params::StartParams;
+
+const SCHEDULER_PROMPT: &str = "\n\n# Scheduled Messages\n\
+    Messages prefixed with `[scheduled]` are injected by the cron scheduler, \
+    not typed by the user. Treat them as automated prompts and execute the \
+    requested action without asking for confirmation. \
+    Use CronCreate/CronDelete/CronList tools to manage scheduled jobs.";
 
 /// Build `AgentLoopParams` with a pre-constructed frontend (HubFrontend or IpcFrontend).
 ///
@@ -42,14 +48,9 @@ pub fn build_with_frontend(
     let max_turns = config.settings.max_turns;
     let permission_mode = config.settings.permission_mode;
     let thinking_config = config.settings.thinking.clone();
-    let mode = match start.mode.as_deref() {
-        Some("plan") => loopal_runtime::AgentMode::Plan,
-        _ => loopal_runtime::AgentMode::Act,
-    };
-    let mode_str = if mode == loopal_runtime::AgentMode::Plan {
-        "plan"
-    } else {
-        "act"
+    let (mode, mode_str) = match start.mode.as_deref() {
+        Some("plan") => (loopal_runtime::AgentMode::Plan, "plan"),
+        _ => (loopal_runtime::AgentMode::Act, "act"),
     };
 
     let session_manager = if let Some(dir) = session_dir_override {
@@ -82,6 +83,8 @@ pub fn build_with_frontend(
     let tasks_dir = loopal_config::session_tasks_dir(&session.id)
         .unwrap_or_else(|_| std::env::temp_dir().join("loopal/tasks"));
 
+    let (scheduler_handle, scheduled_rx) = SchedulerHandle::create();
+
     let agent_shared = Arc::new(AgentShared {
         kernel: kernel.clone(),
         task_store: Arc::new(TaskStore::new(tasks_dir)),
@@ -92,6 +95,7 @@ pub fn build_with_frontend(
         agent_name: "main".into(),
         parent_event_tx: Some(event_tx),
         cancel_token: None,
+        scheduler_handle,
     });
 
     let memory_enabled = interactive && config.settings.memory.enabled;
@@ -130,6 +134,9 @@ pub fn build_with_frontend(
         }
     }
 
+    // Append scheduler instructions (every agent has cron capability).
+    system_prompt.push_str(SCHEDULER_PROMPT);
+
     // Append MCP resource and prompt summaries so the LLM knows what's available.
     let mcp_resources = kernel.mcp_resources();
     if !mcp_resources.is_empty() {
@@ -139,7 +146,6 @@ pub fn build_with_frontend(
             system_prompt.push_str(&format!("\n- `{}` ({server}): {desc}", res.uri));
         }
     }
-
     let mcp_prompts = kernel.mcp_prompts();
     if !mcp_prompts.is_empty() {
         system_prompt.push_str("\n\n# Available MCP Prompts\n");
@@ -186,6 +192,7 @@ pub fn build_with_frontend(
         },
         shared: Some(shared_any),
         memory_channel,
+        scheduled_rx: Some(scheduled_rx),
     };
     Ok(params)
 }

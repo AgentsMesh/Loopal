@@ -22,10 +22,12 @@ pub struct AgentLoopRunner {
     pub interrupt: InterruptSignal,
     pub interrupt_tx: Arc<watch::Sender<u64>>,
     pub observers: Vec<Box<dyn TurnObserver>>,
+    /// Scheduler message receiver — consumed in `wait_for_input()`.
+    pub trigger_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
 }
 
 impl AgentLoopRunner {
-    pub fn new(params: AgentLoopParams) -> Self {
+    pub fn new(mut params: AgentLoopParams) -> Self {
         let tool_ctx = ToolContext {
             backend: params
                 .deps
@@ -43,6 +45,7 @@ impl AgentLoopRunner {
         );
         let interrupt = params.interrupt.signal.clone();
         let interrupt_tx = params.interrupt.tx.clone();
+        let trigger_rx = params.scheduled_rx.take();
         Self {
             params,
             tool_ctx,
@@ -52,6 +55,7 @@ impl AgentLoopRunner {
             interrupt,
             interrupt_tx,
             observers: Vec::new(),
+            trigger_rx,
         }
     }
 

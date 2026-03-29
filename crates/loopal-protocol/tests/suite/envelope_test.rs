@@ -64,3 +64,17 @@ fn test_message_source_variants() {
     assert_ne!(agent, channel);
     assert_eq!(human, MessageSource::Human);
 }
+
+#[test]
+fn test_scheduled_source_label() {
+    assert_eq!(MessageSource::Scheduled.label(), "scheduled");
+}
+
+#[test]
+fn test_scheduled_source_serde_roundtrip() {
+    let env = Envelope::new(MessageSource::Scheduled, "main", "check deploys");
+    let json = serde_json::to_string(&env).unwrap();
+    let restored: Envelope = serde_json::from_str(&json).unwrap();
+    assert_eq!(restored.source, MessageSource::Scheduled);
+    assert_eq!(restored.content.text, "check deploys");
+}

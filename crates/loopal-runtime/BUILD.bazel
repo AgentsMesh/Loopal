@@ -55,6 +55,7 @@ rust_test(
         "//crates/loopal-protocol",
         "//crates/loopal-provider",
         "//crates/loopal-provider-api",
+        "//crates/loopal-scheduler",
         "//crates/loopal-session",
         "//crates/loopal-tool-api",
     ],

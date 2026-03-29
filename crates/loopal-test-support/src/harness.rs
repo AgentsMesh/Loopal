@@ -5,6 +5,7 @@
 
 use std::collections::HashSet;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use tokio::sync::mpsc;
 
@@ -40,6 +41,7 @@ pub struct HarnessBuilder {
     pub(crate) cwd: Option<PathBuf>,
     #[allow(clippy::type_complexity)]
     pub(crate) kernel_setup: Option<Box<dyn FnOnce(&mut Kernel)>>,
+    pub(crate) scheduler: Option<Arc<loopal_scheduler::CronScheduler>>,
 }
 
 impl Default for HarnessBuilder {
@@ -65,6 +67,7 @@ impl HarnessBuilder {
             hooks: Vec::new(),
             cwd: None,
             kernel_setup: None,
+            scheduler: None,
         }
     }
 
@@ -122,6 +125,10 @@ impl HarnessBuilder {
     }
     pub fn kernel_setup(mut self, f: impl FnOnce(&mut Kernel) + 'static) -> Self {
         self.kernel_setup = Some(Box::new(f));
+        self
+    }
+    pub fn scheduler(mut self, s: Arc<loopal_scheduler::CronScheduler>) -> Self {
+        self.scheduler = Some(s);
         self
     }
 

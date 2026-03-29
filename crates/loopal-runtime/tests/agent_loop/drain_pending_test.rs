@@ -134,6 +134,7 @@ async fn test_subagent_drains_pending_before_exit() {
         interrupt: InterruptHandle::new(),
         shared: None,
         memory_channel: None,
+        scheduled_rx: None,
     };
 
     // Drain events in background so channels don't block

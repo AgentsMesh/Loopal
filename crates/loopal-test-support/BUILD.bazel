@@ -9,6 +9,7 @@ rust_library(
         "//crates/loopal-agent",
         "//crates/loopal-agent-client",
         "//crates/loopal-agent-server",
+        "//crates/loopal-backend",
         "//crates/loopal-config",
         "//crates/loopal-context",
         "//crates/loopal-error",
@@ -18,6 +19,7 @@ rust_library(
         "//crates/loopal-protocol",
         "//crates/loopal-provider-api",
         "//crates/loopal-runtime",
+        "//crates/loopal-scheduler",
         "//crates/loopal-session",
         "//crates/loopal-storage",
         "//crates/loopal-tool-api",
@@ -27,6 +29,7 @@ rust_library(
         "@crates//:serde_json",
         "@crates//:tempfile",
         "@crates//:tokio",
+        "@crates//:tokio-util",
     ],
     proc_macro_deps = ["@crates//:async-trait"],
 )

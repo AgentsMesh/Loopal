@@ -13,6 +13,8 @@ pub enum MessageSource {
     Agent(String),
     /// Message delivered through a pub/sub channel.
     Channel { channel: String, from: String },
+    /// Message injected by the cron scheduler.
+    Scheduled,
 }
 
 impl MessageSource {
@@ -22,6 +24,7 @@ impl MessageSource {
             Self::Human => "human".to_string(),
             Self::Agent(name) => name.clone(),
             Self::Channel { from, .. } => from.clone(),
+            Self::Scheduled => "scheduled".to_string(),
         }
     }
 }

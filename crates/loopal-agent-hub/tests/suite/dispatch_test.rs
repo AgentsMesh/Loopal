@@ -4,14 +4,14 @@ use std::sync::Arc;
 
 use tokio::sync::{Mutex, mpsc};
 
-use loopal_agent_hub::AgentHub;
+use loopal_agent_hub::Hub;
 use loopal_agent_hub::dispatch::dispatch_hub_request;
 use loopal_protocol::AgentEvent;
 use serde_json::json;
 
-fn make_hub() -> Arc<Mutex<AgentHub>> {
+fn make_hub() -> Arc<Mutex<Hub>> {
     let (tx, _rx) = mpsc::channel::<AgentEvent>(16);
-    Arc::new(Mutex::new(AgentHub::new(tx)))
+    Arc::new(Mutex::new(Hub::new(tx)))
 }
 
 #[tokio::test]

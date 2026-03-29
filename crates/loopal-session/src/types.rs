@@ -64,6 +64,9 @@ pub struct PendingPermission {
     pub id: String,
     pub name: String,
     pub input: serde_json::Value,
+    /// IPC request ID from Hub relay (needed to respond via HubClient).
+    /// None in local/test mode (uses channel instead).
+    pub relay_request_id: Option<i64>,
 }
 
 /// A pending user question dialog awaiting selection.
@@ -74,6 +77,8 @@ pub struct PendingQuestion {
     pub selected: Vec<Vec<bool>>,
     pub current_question: usize,
     pub cursor: usize,
+    /// IPC request ID from Hub relay (needed to respond via HubClient).
+    pub relay_request_id: Option<i64>,
 }
 
 impl PendingQuestion {
@@ -88,6 +93,7 @@ impl PendingQuestion {
             selected,
             current_question: 0,
             cursor: 0,
+            relay_request_id: None,
         }
     }
 

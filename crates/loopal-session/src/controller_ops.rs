@@ -2,21 +2,18 @@
 
 use std::sync::Arc;
 
-use loopal_ipc::connection::Connection;
-use loopal_ipc::protocol::methods;
-use loopal_protocol::{ControlCommand, Envelope, MessageSource, UserContent, UserQuestionResponse};
-use serde_json::json;
+use loopal_protocol::{ControlCommand, UserContent, UserQuestionResponse};
 
 use crate::inbox::try_forward_inbox;
 use crate::state::SessionState;
-use loopal_agent_hub::LocalChannels;
+use loopal_agent_hub::{HubClient, LocalChannels};
 
 /// Backend for session control operations.
 pub(crate) enum ControlBackend {
     /// In-process channels — for unit tests (no real Hub).
     Local(Arc<LocalChannels>),
-    /// Hub mode — all operations route through Hub TCP Connection.
-    Hub(Arc<Connection>),
+    /// Hub mode — all operations route through HubClient.
+    Hub(Arc<HubClient>),
 }
 
 impl ControlBackend {
@@ -26,12 +23,10 @@ impl ControlBackend {
                 ch.interrupt.signal();
                 ch.interrupt_tx.send_modify(|v| *v = v.wrapping_add(1));
             }
-            Self::Hub(conn) => {
-                let conn = conn.clone();
+            Self::Hub(client) => {
+                let client = client.clone();
                 tokio::spawn(async move {
-                    let _ = conn
-                        .send_request(methods::HUB_INTERRUPT.name, json!({"target": "main"}))
-                        .await;
+                    client.interrupt().await;
                 });
             }
         }
@@ -42,58 +37,75 @@ impl ControlBackend {
             Self::Local(ch) => {
                 let _ = ch.control_tx.send(cmd).await;
             }
-            Self::Hub(conn) => {
-                let params = json!({
-                    "target": "main",
-                    "command": serde_json::to_value(&cmd).unwrap_or_default(),
-                });
-                let _ = conn.send_request(methods::HUB_CONTROL.name, params).await;
+            Self::Hub(client) => {
+                let _ = client.send_control(&cmd).await;
             }
         }
     }
 
     pub(crate) async fn send_message(&self, content: UserContent) {
-        let envelope = Envelope::new(MessageSource::Human, "main", content);
         match self {
             Self::Local(ch) => {
                 if let Some(tx) = &ch.mailbox_tx {
+                    let envelope = loopal_protocol::Envelope::new(
+                        loopal_protocol::MessageSource::Human,
+                        "main",
+                        content,
+                    );
                     let _ = tx.send(envelope).await;
                 }
             }
-            Self::Hub(conn) => {
-                if let Ok(params) = serde_json::to_value(&envelope) {
-                    let _ = conn.send_request(methods::HUB_ROUTE.name, params).await;
-                }
+            Self::Hub(client) => {
+                client.send_message(content).await;
             }
         }
     }
 
-    pub(crate) async fn approve_permission(&self) {
+    /// Approve a pending permission request.
+    ///
+    /// In Hub mode, sends the response via IPC using the relay request ID.
+    pub(crate) async fn approve_permission(&self, relay_request_id: Option<i64>) {
         match self {
             Self::Local(ch) => {
                 let _ = ch.permission_tx.send(true).await;
             }
-            Self::Hub(_) => {
-                // Hub mode: permission is handled via IPC request/response flow.
+            Self::Hub(client) => {
+                if let Some(id) = relay_request_id {
+                    client.respond_permission(id, true).await;
+                }
             }
         }
     }
 
-    pub(crate) async fn deny_permission(&self) {
+    /// Deny a pending permission request.
+    pub(crate) async fn deny_permission(&self, relay_request_id: Option<i64>) {
         match self {
             Self::Local(ch) => {
                 let _ = ch.permission_tx.send(false).await;
             }
-            Self::Hub(_) => {}
+            Self::Hub(client) => {
+                if let Some(id) = relay_request_id {
+                    client.respond_permission(id, false).await;
+                }
+            }
         }
     }
 
-    pub(crate) async fn answer_question(&self, answers: Vec<String>) {
+    /// Answer a pending question.
+    pub(crate) async fn answer_question(
+        &self,
+        answers: Vec<String>,
+        relay_request_id: Option<i64>,
+    ) {
         match self {
             Self::Local(ch) => {
                 let _ = ch.question_tx.send(UserQuestionResponse { answers }).await;
             }
-            Self::Hub(_) => {}
+            Self::Hub(client) => {
+                if let Some(id) = relay_request_id {
+                    client.respond_question(id, answers).await;
+                }
+            }
         }
     }
 }

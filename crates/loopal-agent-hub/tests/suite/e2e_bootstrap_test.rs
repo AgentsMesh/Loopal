@@ -9,7 +9,7 @@ use std::time::Duration;
 use tokio::sync::{Mutex, mpsc};
 
 use loopal_agent_client::AgentProcess;
-use loopal_agent_hub::AgentHub;
+use loopal_agent_hub::Hub;
 use loopal_agent_hub::agent_io;
 use loopal_ipc::protocol::methods;
 use loopal_protocol::AgentEvent;
@@ -33,7 +33,7 @@ async fn full_bootstrap_hub_to_agent_roundtrip() {
 
     // 2. Start Hub
     let (event_tx, mut event_rx) = mpsc::channel::<AgentEvent>(256);
-    let hub = Arc::new(Mutex::new(AgentHub::new(event_tx)));
+    let hub = Arc::new(Mutex::new(Hub::new(event_tx)));
 
     // 3. Spawn real agent process with mock provider
     // Resolve loopal binary from target directory (same profile as this test)
@@ -92,7 +92,12 @@ async fn full_bootstrap_hub_to_agent_roundtrip() {
         "What is 2+2?",
     );
     let params = serde_json::to_value(&envelope).unwrap();
-    let conn = hub.lock().await.get_agent_connection("main").unwrap();
+    let conn = hub
+        .lock()
+        .await
+        .registry
+        .get_agent_connection("main")
+        .unwrap();
     conn.send_request(methods::AGENT_MESSAGE.name, params)
         .await
         .expect("should deliver message to agent");

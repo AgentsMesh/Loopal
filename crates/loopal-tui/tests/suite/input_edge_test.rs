@@ -43,6 +43,7 @@ fn test_ctrl_c_denies_permission() {
             id: "1".into(),
             name: "Bash".into(),
             input: "rm".into(),
+            relay_request_id: None,
         });
     }
     let action = handle_key(&mut app, ctrl('c'));

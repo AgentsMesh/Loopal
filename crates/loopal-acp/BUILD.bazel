@@ -6,10 +6,10 @@ rust_library(
     edition = "2024",
     visibility = ["//visibility:public"],
     deps = [
-        "//crates/loopal-agent-client",
-        "//crates/loopal-config",
+        "//crates/loopal-agent-hub",
         "//crates/loopal-ipc",
         "//crates/loopal-protocol",
+        "@crates//:agent-client-protocol-schema",
         "@crates//:anyhow",
         "@crates//:serde",
         "@crates//:serde_json",
@@ -27,12 +27,13 @@ rust_test(
     local = True,
     deps = [
         ":loopal-acp",
+        "//crates/loopal-agent-hub",
         "//crates/loopal-agent-server",
         "//crates/loopal-error",
+        "//crates/loopal-ipc",
         "//crates/loopal-provider-api",
         "//crates/loopal-test-support",
         "@crates//:serde_json",
         "@crates//:tokio",
-        "//crates/loopal-ipc",
     ],
 )

@@ -5,16 +5,16 @@ use std::time::Duration;
 
 use tokio::sync::{Mutex, mpsc};
 
-use loopal_agent_hub::AgentHub;
+use loopal_agent_hub::Hub;
 use loopal_agent_hub::hub_server;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
 use loopal_protocol::AgentEvent;
 use serde_json::json;
 
-fn make_hub() -> (Arc<Mutex<AgentHub>>, mpsc::Receiver<AgentEvent>) {
+fn make_hub() -> (Arc<Mutex<Hub>>, mpsc::Receiver<AgentEvent>) {
     let (tx, rx) = mpsc::channel::<AgentEvent>(64);
-    (Arc::new(Mutex::new(AgentHub::new(tx))), rx)
+    (Arc::new(Mutex::new(Hub::new(tx))), rx)
 }
 
 fn spawn_mock_agent(conn: Arc<Connection>, mut rx: mpsc::Receiver<Incoming>) {
@@ -92,5 +92,11 @@ async fn tcp_invalid_token_rejected() {
     );
 
     tokio::time::sleep(Duration::from_millis(50)).await;
-    assert!(hub.lock().await.get_agent_connection("hacker").is_none());
+    assert!(
+        hub.lock()
+            .await
+            .registry
+            .get_agent_connection("hacker")
+            .is_none()
+    );
 }

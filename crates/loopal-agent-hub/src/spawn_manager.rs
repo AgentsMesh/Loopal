@@ -8,11 +8,11 @@ use tracing::{info, warn};
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_protocol::{AgentEvent, AgentEventPayload};
 
-use crate::hub::AgentHub;
+use crate::hub::Hub;
 
 /// Spawn a real agent process, initialize, start, and register in Hub.
 pub async fn spawn_and_register(
-    hub: Arc<Mutex<AgentHub>>,
+    hub: Arc<Mutex<Hub>>,
     name: String,
     cwd: String,
     model: Option<String>,
@@ -74,7 +74,7 @@ pub async fn spawn_and_register(
 /// Register a pre-built Connection as a named agent in Hub.
 /// Registration completes synchronously; IO loop runs in background.
 pub async fn register_agent_connection(
-    hub: Arc<Mutex<AgentHub>>,
+    hub: Arc<Mutex<Hub>>,
     name: &str,
     conn: Arc<Connection>,
     incoming_rx: tokio::sync::mpsc::Receiver<Incoming>,
@@ -87,15 +87,19 @@ pub async fn register_agent_connection(
         let mut h = hub.lock().await;
         // Validate parent exists (if specified)
         if let Some(p) = parent {
-            if !h.agents.contains_key(p) {
+            if !h.registry.agents.contains_key(p) {
                 warn!(agent = %name, parent = %p, "parent not found, registering as orphan");
             }
         }
-        if let Err(e) = h.register_connection_with_parent(name, conn.clone(), parent, model) {
+        if let Err(e) =
+            h.registry
+                .register_connection_with_parent(name, conn.clone(), parent, model)
+        {
             warn!(agent = %name, error = %e, "registration failed");
             return agent_id;
         }
-        h.set_lifecycle(name, crate::AgentLifecycle::Running);
+        h.registry
+            .set_lifecycle(name, crate::AgentLifecycle::Running);
     }
     info!(agent = %name, "agent registered in Hub");
 
@@ -109,7 +113,7 @@ pub async fn register_agent_connection(
             parent: parent.map(String::from),
             model: model.map(String::from),
         });
-        if h.event_sender().try_send(event).is_err() {
+        if h.registry.event_sender().try_send(event).is_err() {
             tracing::debug!(agent = %name, "SubAgentSpawned event dropped");
         }
     }

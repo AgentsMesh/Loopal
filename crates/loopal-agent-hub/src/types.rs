@@ -1,4 +1,4 @@
-//! Connection types for AgentHub.
+//! Connection types for Hub.
 //!
 //! In Hub-only gateway architecture, all agents connect via stdio (managed
 //! by Hub) and all clients connect via TCP. No agent-level TCP listeners.

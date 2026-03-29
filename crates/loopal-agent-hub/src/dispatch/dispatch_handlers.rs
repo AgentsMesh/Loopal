@@ -8,34 +8,36 @@ use serde_json::{Value, json};
 use tokio::sync::Mutex;
 use tracing::info;
 
-use crate::hub::AgentHub;
+use crate::hub::Hub;
 use crate::routing;
 
-pub async fn handle_route(hub: &Arc<Mutex<AgentHub>>, params: Value) -> Result<Value, String> {
+pub async fn handle_route(hub: &Arc<Mutex<Hub>>, params: Value) -> Result<Value, String> {
     let envelope: Envelope =
         serde_json::from_value(params).map_err(|e| format!("invalid envelope: {e}"))?;
     let (conn, event_tx) = {
         let h = hub.lock().await;
         let conn = h
+            .registry
             .get_agent_connection(&envelope.target)
             .ok_or_else(|| format!("no agent registered: '{}'", envelope.target))?;
-        (conn, h.event_sender())
+        (conn, h.registry.event_sender())
     };
     routing::route_to_agent(&conn, &envelope, &event_tx).await?;
     Ok(json!({"ok": true}))
 }
 
-pub async fn handle_list_agents(hub: &Arc<Mutex<AgentHub>>) -> Result<Value, String> {
-    let agents: Vec<String> = hub.lock().await.agents.keys().cloned().collect();
+pub async fn handle_list_agents(hub: &Arc<Mutex<Hub>>) -> Result<Value, String> {
+    let agents: Vec<String> = hub.lock().await.registry.agents.keys().cloned().collect();
     Ok(json!({"agents": agents}))
 }
 
-pub async fn handle_control(hub: &Arc<Mutex<AgentHub>>, params: Value) -> Result<Value, String> {
+pub async fn handle_control(hub: &Arc<Mutex<Hub>>, params: Value) -> Result<Value, String> {
     let target = params["target"].as_str().ok_or("missing 'target' field")?;
     let command = params["command"].clone();
     let conn = {
         let h = hub.lock().await;
-        h.get_agent_connection(target)
+        h.registry
+            .get_agent_connection(target)
             .ok_or_else(|| format!("no agent: '{target}'"))?
     };
     conn.send_request(methods::AGENT_CONTROL.name, command)
@@ -44,11 +46,12 @@ pub async fn handle_control(hub: &Arc<Mutex<AgentHub>>, params: Value) -> Result
     Ok(json!({"ok": true}))
 }
 
-pub async fn handle_interrupt(hub: &Arc<Mutex<AgentHub>>, params: Value) -> Result<Value, String> {
+pub async fn handle_interrupt(hub: &Arc<Mutex<Hub>>, params: Value) -> Result<Value, String> {
     let target = params["target"].as_str().ok_or("missing 'target' field")?;
     let conn = {
         let h = hub.lock().await;
-        h.get_agent_connection(target)
+        h.registry
+            .get_agent_connection(target)
             .ok_or_else(|| format!("no agent: '{target}'"))?
     };
     let _ = conn
@@ -57,14 +60,12 @@ pub async fn handle_interrupt(hub: &Arc<Mutex<AgentHub>>, params: Value) -> Resu
     Ok(json!({"ok": true}))
 }
 
-pub async fn handle_shutdown_agent(
-    hub: &Arc<Mutex<AgentHub>>,
-    params: Value,
-) -> Result<Value, String> {
+pub async fn handle_shutdown_agent(hub: &Arc<Mutex<Hub>>, params: Value) -> Result<Value, String> {
     let target = params["target"].as_str().ok_or("missing 'target' field")?;
     let conn = {
         let h = hub.lock().await;
-        h.get_agent_connection(target)
+        h.registry
+            .get_agent_connection(target)
             .ok_or_else(|| format!("no agent: '{target}'"))?
     };
     // Send shutdown request to the agent — it will close its loop and disconnect.
@@ -76,7 +77,7 @@ pub async fn handle_shutdown_agent(
 
 // ── Spawn + wait ──────────────────────────────────────────────────────
 pub async fn handle_spawn_agent(
-    hub: &Arc<Mutex<AgentHub>>,
+    hub: &Arc<Mutex<Hub>>,
     params: Value,
     from_agent: &str,
 ) -> Result<Value, String> {

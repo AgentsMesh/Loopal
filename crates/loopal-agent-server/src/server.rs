@@ -125,6 +125,13 @@ pub(crate) async fn dispatch_loop(
                         .respond(id, serde_json::json!({"ok": true}))
                         .await;
                     break;
+                } else if method == methods::AGENT_LIST.name {
+                    let ids = hub.list_session_ids().await;
+                    let sessions: Vec<_> = ids
+                        .iter()
+                        .map(|id| serde_json::json!({"session_id": id}))
+                        .collect();
+                    let _ = connection.respond(id, serde_json::json!(sessions)).await;
                 } else {
                     let _ = connection
                         .respond_error(id, jsonrpc::METHOD_NOT_FOUND, "expected agent/start")

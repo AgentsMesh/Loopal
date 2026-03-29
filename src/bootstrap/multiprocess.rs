@@ -1,15 +1,10 @@
 //! Default mode — Hub-first multi-process architecture.
 //!
-//! Flow: Start Hub → spawn root agent (stdio registered as "main") →
-//! start TUI via local Hub connection. All agents communicate through Hub.
+//! Flow: Start Hub → spawn root agent → connect TUI via UiSession.
 
-use std::sync::Arc;
-
-use tokio::sync::Mutex;
 use tracing::info;
 
-use loopal_agent_hub::AgentHub;
-use loopal_agent_hub::hub_server;
+use loopal_agent_hub::UiSession;
 use loopal_runtime::projection::project_messages;
 use loopal_session::SessionController;
 
@@ -22,69 +17,36 @@ pub async fn run(
 ) -> anyhow::Result<()> {
     info!("starting in Hub mode");
 
-    // 1. Create Hub
-    let (event_tx, event_rx) = tokio::sync::mpsc::channel(256);
-    let hub = Arc::new(Mutex::new(AgentHub::new(event_tx)));
+    // 1-3. Create Hub + spawn root agent
+    let ctx = super::common::bootstrap_hub_and_agent(cli, cwd, config).await?;
 
-    // 2. Start Hub TCP listener for external clients
-    let (listener, _hub_port, hub_token) = hub_server::start_hub_listener(hub.clone()).await?;
-    let hub_accept = hub.clone();
-    tokio::spawn(async move {
-        hub_server::accept_loop(listener, hub_accept, hub_token).await;
-    });
+    // 4. Start event broadcast
+    let _event_loop = loopal_agent_hub::start_event_loop(ctx.hub.clone(), ctx.event_rx);
 
-    // 3. Spawn root agent — register its stdio as "main" in Hub
-    let agent_proc = loopal_agent_client::AgentProcess::spawn(None).await?;
-    let client = loopal_agent_client::AgentClient::new(agent_proc.transport());
-    client.initialize().await?;
+    // 5. Connect TUI as UI client (one line — all wiring inside UiSession)
+    let ui_session = UiSession::connect(ctx.hub.clone(), "tui").await;
+    info!("TUI connected to Hub as UI client");
 
-    let mode_str = if cli.plan { "plan" } else { "act" };
-    let prompt = if cli.prompt.is_empty() {
-        None
-    } else {
-        Some(cli.prompt.join(" "))
-    };
-    client
-        .start_agent(
-            cwd,
-            Some(&config.settings.model),
-            Some(mode_str),
-            prompt.as_deref(),
-            cli.permission.as_deref(),
-            cli.no_sandbox,
-            cli.resume.as_deref(),
-        )
-        .await?;
+    // 6. Bridge broadcast → mpsc for TUI event handler
+    let tui_event_rx = bridge_broadcast_to_mpsc(ui_session.event_rx);
 
-    // Register root agent's stdio Connection as "main" in Hub
-    let (root_conn, incoming_rx) = client.into_parts();
-    loopal_agent_hub::agent_io::start_agent_io(hub.clone(), "main", root_conn, incoming_rx, true);
-    info!("root agent registered as 'main' in Hub");
-
-    // 4. Create local Hub Connection for TUI (receives permission/question relays)
-    let (tui_hub_conn, tui_hub_rx) = hub_server::connect_local(hub.clone(), "_tui");
-    info!("TUI connected to Hub as '_tui'");
-
-    // Handle permission/question requests from Hub in background
-    let tui_conn_for_relay = tui_hub_conn.clone();
-    tokio::spawn(async move {
-        handle_tui_incoming(tui_conn_for_relay, tui_hub_rx).await;
-    });
-
-    // 5. Event routing: Hub event_tx → frontend → TUI
-    let (frontend_tx, frontend_rx) = tokio::sync::mpsc::channel(256);
-    let _event_loop = loopal_agent_hub::start_event_loop(hub.clone(), event_rx, frontend_tx);
-
-    // 6. Build SessionController with Hub backend
+    // 7. Build SessionController
     let model = config.settings.model.clone();
+    let mode_str = if cli.plan { "plan" } else { "act" };
     let session_ctrl = SessionController::with_hub(
         model.clone(),
         mode_str.to_string(),
-        tui_hub_conn,
-        hub.clone(),
+        ui_session.client.clone(),
+        ctx.hub.clone(),
     );
 
-    // 7. Load display history or show welcome
+    // 8. Handle permission/question relay from Hub
+    let session_for_relay = session_ctrl.clone();
+    tokio::spawn(async move {
+        handle_tui_incoming(session_for_relay, ui_session.relay_rx).await;
+    });
+
+    // 9. Load display history or show welcome
     if let Some(ref sid) = cli.resume {
         let session_manager = loopal_runtime::SessionManager::new()?;
         if let Ok((_session, messages)) = session_manager.resume_session(sid) {
@@ -95,20 +57,42 @@ pub async fn run(
         session_ctrl.push_welcome(&model, &display_path);
     }
 
-    // 8. Run TUI
-    let result = loopal_tui::run_tui(session_ctrl, cwd.to_path_buf(), frontend_rx).await;
+    // 10. Run TUI
+    let result = loopal_tui::run_tui(session_ctrl, cwd.to_path_buf(), tui_event_rx).await;
 
-    // 9. Cleanup
+    // 11. Cleanup
     info!("shutting down agent process");
-    let _ = agent_proc.shutdown().await;
+    let _ = ctx.agent_proc.shutdown().await;
 
     result
 }
 
-/// Handle incoming requests from Hub on the TUI's local connection.
-/// Auto-approves permissions — real UI permission handling is TODO.
+/// Bridge broadcast::Receiver → mpsc::Receiver for TUI compatibility.
+fn bridge_broadcast_to_mpsc(
+    mut broadcast_rx: tokio::sync::broadcast::Receiver<loopal_protocol::AgentEvent>,
+) -> tokio::sync::mpsc::Receiver<loopal_protocol::AgentEvent> {
+    let (tx, rx) = tokio::sync::mpsc::channel(4096);
+    tokio::spawn(async move {
+        loop {
+            match broadcast_rx.recv().await {
+                Ok(event) => {
+                    if tx.send(event).await.is_err() {
+                        break;
+                    }
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                    tracing::warn!(skipped = n, "TUI event bridge lagged");
+                }
+            }
+        }
+    });
+    rx
+}
+
+/// Handle incoming relay requests from Hub via UiSession.
 async fn handle_tui_incoming(
-    conn: Arc<loopal_ipc::connection::Connection>,
+    session: SessionController,
     mut rx: tokio::sync::mpsc::Receiver<loopal_ipc::connection::Incoming>,
 ) {
     use loopal_ipc::connection::Incoming;
@@ -116,12 +100,24 @@ async fn handle_tui_incoming(
     while let Some(msg) = rx.recv().await {
         if let Incoming::Request { id, method, .. } = msg {
             if method == loopal_ipc::protocol::methods::AGENT_PERMISSION.name {
+                {
+                    let mut state = session.lock();
+                    if let Some(ref mut perm) = state.pending_permission {
+                        perm.relay_request_id = Some(id);
+                    }
+                }
                 info!(%method, id, "TUI auto-approving permission");
-                let _ = conn.respond(id, serde_json::json!({"allow": true})).await;
+                session.approve_permission().await;
             } else if method == loopal_ipc::protocol::methods::AGENT_QUESTION.name {
+                {
+                    let mut state = session.lock();
+                    if let Some(ref mut q) = state.pending_question {
+                        q.relay_request_id = Some(id);
+                    }
+                }
                 info!(%method, id, "TUI auto-approving question");
-                let _ = conn
-                    .respond(id, serde_json::json!({"answers": ["(auto-approved)"]}))
+                session
+                    .answer_question(vec!["(auto-approved)".into()])
                     .await;
             }
         }

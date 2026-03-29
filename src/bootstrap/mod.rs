@@ -6,6 +6,8 @@ use loopal_config::load_config;
 
 use crate::cli::Cli;
 
+mod acp;
+mod common;
 mod hub;
 mod multiprocess;
 
@@ -22,7 +24,7 @@ pub async fn run() -> anyhow::Result<()> {
     cli.apply_overrides(&mut config.settings);
 
     if cli.acp {
-        return loopal_acp::run_acp(config, cwd).await;
+        return acp::run(&cli, &cwd, &config).await;
     }
 
     if cli.serve {

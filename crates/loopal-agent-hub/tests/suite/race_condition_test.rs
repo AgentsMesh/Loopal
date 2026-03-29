@@ -5,16 +5,16 @@ use std::time::Duration;
 
 use tokio::sync::{Mutex, mpsc};
 
-use loopal_agent_hub::AgentHub;
+use loopal_agent_hub::Hub;
 use loopal_agent_hub::spawn_manager::register_agent_connection;
 use loopal_ipc::connection::Connection;
 use loopal_ipc::protocol::methods;
 use loopal_protocol::AgentEvent;
 use serde_json::json;
 
-fn make_hub() -> (Arc<Mutex<AgentHub>>, mpsc::Receiver<AgentEvent>) {
+fn make_hub() -> (Arc<Mutex<Hub>>, mpsc::Receiver<AgentEvent>) {
     let (tx, rx) = mpsc::channel::<AgentEvent>(64);
-    (Arc::new(Mutex::new(AgentHub::new(tx))), rx)
+    (Arc::new(Mutex::new(Hub::new(tx))), rx)
 }
 
 /// Regression: wait_agent AFTER agent already finished returns cached output.
@@ -32,8 +32,9 @@ async fn wait_agent_after_finish_returns_cached_output() {
     // Agent finishes BEFORE any wait_agent call
     {
         let mut h = hub.lock().await;
-        h.emit_agent_finished("fast-agent", Some("early result".into()));
-        h.unregister_connection("fast-agent");
+        h.registry
+            .emit_agent_finished("fast-agent", Some("early result".into()));
+        h.registry.unregister_connection("fast-agent");
     }
 
     // Now call wait_agent — should find cached output, not "not found"
@@ -79,8 +80,9 @@ async fn emit_before_unregister_delivers_output() {
     // emit THEN unregister (correct order)
     {
         let mut h = hub.lock().await;
-        h.emit_agent_finished("normal", Some("real work done".into()));
-        h.unregister_connection("normal");
+        h.registry
+            .emit_agent_finished("normal", Some("real work done".into()));
+        h.registry.unregister_connection("normal");
     }
 
     let result = tokio::time::timeout(Duration::from_secs(3), waiter).await;

@@ -4,6 +4,7 @@
 ///   1. Multiline cursor navigation (Shift+Enter input)
 ///   2. Content scroll
 ///   3. History navigation (only when content fits)
+///
 /// Ctrl+P/N always navigate history regardless of scroll state.
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 

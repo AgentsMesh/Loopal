@@ -8,6 +8,9 @@ use tracing::info;
 
 /// Register all configured providers into the given registry.
 pub fn register_providers(settings: &Settings, registry: &mut ProviderRegistry) {
+    // Initialize user model metadata overlay before any provider resolution.
+    loopal_provider::init_user_models(&settings.models);
+
     let providers = &settings.providers;
 
     // Anthropic — explicit config or auto-detect from env
@@ -94,8 +97,13 @@ pub fn register_providers(settings: &Settings, registry: &mut ProviderRegistry) 
         if let Some(api_key) = resolve_api_key(&compat.api_key, &compat.api_key_env) {
             let provider =
                 OpenAiCompatProvider::new(api_key, compat.base_url.clone(), compat.name.clone());
-            registry.register(Arc::new(provider));
-            info!(name = %compat.name, "registered openai-compat provider");
+            if let Some(ref prefix) = compat.model_prefix {
+                registry.register_with_prefix(Arc::new(provider), prefix);
+                info!(name = %compat.name, prefix, "registered openai-compat provider (prefix)");
+            } else {
+                registry.register(Arc::new(provider));
+                info!(name = %compat.name, "registered openai-compat provider");
+            }
         }
     }
 }

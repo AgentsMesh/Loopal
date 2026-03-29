@@ -92,9 +92,9 @@ impl AgentLoopRunner {
                 self.force_compact().await?;
             }
             ControlCommand::ModelSwitch(new_model) => {
-                info!(from = %self.params.config.model, to = %new_model, "switching model");
+                info!(from = %self.params.config.model(), to = %new_model, "switching model");
                 self.model_config.update_model(&new_model);
-                self.params.config.model = new_model;
+                self.params.config.router.set_default(new_model);
                 self.recalculate_budget();
             }
             ControlCommand::Rewind { turn_index } => {

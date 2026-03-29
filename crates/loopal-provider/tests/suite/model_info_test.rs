@@ -1,4 +1,5 @@
-use loopal_provider::{get_model_info, resolve_provider};
+use loopal_provider::{get_model_info, get_thinking_capability, list_all_models, resolve_provider};
+use loopal_provider_api::{CostTier, QualityTier, SpeedTier, ThinkingCapability};
 
 #[test]
 fn test_get_known_model() {
@@ -73,4 +74,100 @@ fn test_resolve_provider_google() {
 fn test_resolve_provider_unknown_fallback() {
     assert_eq!(resolve_provider("llama-3"), "openai_compat");
     assert_eq!(resolve_provider("mistral-7b"), "openai_compat");
+}
+
+// -- New model tier metadata -----------------------------------------------
+
+#[test]
+fn test_model_info_includes_tier_fields() {
+    let info = get_model_info("claude-haiku-3-5-20241022").unwrap();
+    assert_eq!(info.speed, SpeedTier::Fast);
+    assert_eq!(info.cost, CostTier::Low);
+    assert_eq!(info.quality, QualityTier::Basic);
+    assert!(info.supports_tools);
+    assert!(info.supports_vision);
+}
+
+#[test]
+fn test_opus_is_premium_tier() {
+    let info = get_model_info("claude-opus-4-6").unwrap();
+    assert_eq!(info.speed, SpeedTier::Slow);
+    assert_eq!(info.cost, CostTier::High);
+    assert_eq!(info.quality, QualityTier::Premium);
+}
+
+#[test]
+fn test_new_model_gpt_4_1() {
+    let info = get_model_info("gpt-4.1").unwrap();
+    assert_eq!(info.provider, "openai");
+    assert_eq!(info.speed, SpeedTier::Medium);
+    assert!(info.supports_tools);
+}
+
+#[test]
+fn test_new_model_deepseek_chat() {
+    let info = get_model_info("deepseek-chat").unwrap();
+    assert_eq!(info.provider, "openai_compat");
+    assert_eq!(info.cost, CostTier::Low);
+    assert_eq!(info.display_name, "DeepSeek V3");
+}
+
+#[test]
+fn test_new_model_o4_mini() {
+    let info = get_model_info("o4-mini").unwrap();
+    assert_eq!(info.provider, "openai");
+    assert_eq!(info.thinking, ThinkingCapability::ReasoningEffort);
+}
+
+#[test]
+fn test_new_model_gemini_2_5_flash() {
+    let info = get_model_info("gemini-2.5-flash-preview-04-17").unwrap();
+    assert_eq!(info.provider, "google");
+    assert_eq!(info.speed, SpeedTier::Fast);
+    assert_eq!(info.thinking, ThinkingCapability::ThinkingBudget);
+}
+
+// -- list_all_models -------------------------------------------------------
+
+#[test]
+fn test_list_all_models_has_at_least_18() {
+    let models = list_all_models();
+    assert!(
+        models.len() >= 18,
+        "expected >= 18 models, got {}",
+        models.len()
+    );
+}
+
+// -- get_thinking_capability -----------------------------------------------
+
+#[test]
+fn test_thinking_capability_known_model() {
+    assert_eq!(
+        get_thinking_capability("claude-sonnet-4-6"),
+        ThinkingCapability::Adaptive
+    );
+    assert_eq!(
+        get_thinking_capability("o3-mini"),
+        ThinkingCapability::ReasoningEffort
+    );
+}
+
+#[test]
+fn test_thinking_capability_unknown_model_heuristic() {
+    // o4-something → ReasoningEffort
+    assert_eq!(
+        get_thinking_capability("o4-turbo-xyz"),
+        ThinkingCapability::ReasoningEffort
+    );
+    // gemini-2.5-xxx → ThinkingBudget
+    assert_eq!(
+        get_thinking_capability("gemini-2.5-custom"),
+        ThinkingCapability::ThinkingBudget
+    );
+    // random unknown → None
+    assert_eq!(
+        get_thinking_capability("random-model"),
+        ThinkingCapability::None
+    );
 }

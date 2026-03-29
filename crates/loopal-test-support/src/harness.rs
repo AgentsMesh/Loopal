@@ -27,7 +27,7 @@ use crate::fixture::TestFixture;
 pub struct HarnessBuilder {
     pub(crate) calls: Vec<Vec<Result<StreamChunk, LoopalError>>>,
     pub(crate) model: String,
-    pub(crate) compact_model: Option<String>,
+    pub(crate) summarization_model: Option<String>,
     pub(crate) permission_mode: PermissionMode,
     pub(crate) interactive: bool,
     pub(crate) messages: Vec<Message>,
@@ -53,7 +53,7 @@ impl HarnessBuilder {
         Self {
             calls: Vec::new(),
             model: "claude-sonnet-4-20250514".into(),
-            compact_model: None,
+            summarization_model: None,
             permission_mode: PermissionMode::Bypass,
             interactive: false,
             messages: vec![Message::user("hello")],
@@ -76,8 +76,8 @@ impl HarnessBuilder {
         self.model = m.into();
         self
     }
-    pub fn compact_model(mut self, m: impl Into<String>) -> Self {
-        self.compact_model = Some(m.into());
+    pub fn summarization_model(mut self, m: impl Into<String>) -> Self {
+        self.summarization_model = Some(m.into());
         self
     }
     pub fn permission_mode(mut self, m: PermissionMode) -> Self {

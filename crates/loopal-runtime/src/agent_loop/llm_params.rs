@@ -27,14 +27,14 @@ impl AgentLoopRunner {
         if let Some(ref filter) = self.params.config.tool_filter {
             tool_defs.retain(|t| filter.contains(&t.name));
         }
-        let capability = get_thinking_capability(&self.params.config.model);
+        let capability = get_thinking_capability(self.params.config.model());
         let resolved_thinking = resolve_thinking_config(
             &self.model_config.thinking,
             capability,
             self.model_config.max_output_tokens,
         );
         Ok(ChatParams {
-            model: self.params.config.model.clone(),
+            model: self.params.config.model().to_string(),
             messages: messages.to_vec(),
             system_prompt: full_system_prompt,
             tools: tool_defs,

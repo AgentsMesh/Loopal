@@ -8,7 +8,9 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use loopal_error::{LoopalError, ToolIoError};
-use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult, truncate_output};
+use loopal_tool_api::{
+    PermissionLevel, TimeoutSecs, Tool, ToolContext, ToolResult, truncate_output,
+};
 use serde_json::{Value, json};
 
 use loopal_config::CommandDecision;
@@ -24,18 +26,9 @@ impl Default for BashTool {
     }
 }
 
-const DEFAULT_TIMEOUT_MS: u64 = 300_000;
-const DEFAULT_BG_TIMEOUT_MS: u64 = 30_000;
+const DEFAULT_TIMEOUT_SECS: u64 = 300;
+const DEFAULT_BG_TIMEOUT_SECS: u64 = 30;
 const MAX_TIMEOUT_MS: u64 = 600_000;
-
-/// Convert LLM-provided timeout (seconds) to milliseconds.
-/// LLMs pass values like 120 meaning 120 seconds, not 120ms.
-fn parse_timeout_ms(input: &Value, default_ms: u64) -> u64 {
-    match input["timeout"].as_u64() {
-        Some(v) => (v * 1000).min(MAX_TIMEOUT_MS),
-        None => default_ms,
-    }
-}
 
 const MAX_OUTPUT_LINES: usize = 2000;
 const MAX_OUTPUT_BYTES: usize = 512_000;
@@ -91,8 +84,8 @@ impl Tool for BashTool {
                 return Ok(bg_stop(pid));
             }
             let block = input["block"].as_bool().unwrap_or(true);
-            let timeout = parse_timeout_ms(&input, DEFAULT_BG_TIMEOUT_MS);
-            return Ok(bg_output(pid, block, timeout).await);
+            let timeout = TimeoutSecs::from_tool_input(&input, DEFAULT_BG_TIMEOUT_SECS);
+            return Ok(bg_output(pid, block, timeout.to_millis_clamped(MAX_TIMEOUT_MS)).await);
         }
 
         let command = input["command"].as_str().ok_or_else(|| {
@@ -111,7 +104,8 @@ impl Tool for BashTool {
             };
         }
 
-        let timeout_ms = parse_timeout_ms(&input, DEFAULT_TIMEOUT_MS);
+        let timeout_ms = TimeoutSecs::from_tool_input(&input, DEFAULT_TIMEOUT_SECS)
+            .to_millis_clamped(MAX_TIMEOUT_MS);
         let exec_result = if let Some(ref tail) = ctx.output_tail {
             ctx.backend
                 .exec_streaming(command, timeout_ms, tail.clone())
@@ -220,35 +214,37 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_timeout_converts_seconds_to_ms() {
-        assert_eq!(parse_timeout_ms(&json!({"timeout": 120}), 0), 120_000);
-        assert_eq!(parse_timeout_ms(&json!({"timeout": 1}), 0), 1_000);
-        assert_eq!(parse_timeout_ms(&json!({"timeout": 300}), 0), 300_000);
+    fn timeout_secs_converts_to_millis() {
+        let t = TimeoutSecs::from_tool_input(&json!({"timeout": 120}), 0);
+        assert_eq!(t.as_secs(), 120);
+        assert_eq!(t.to_millis_clamped(MAX_TIMEOUT_MS), 120_000);
     }
 
     #[test]
-    fn parse_timeout_clamps_to_max() {
+    fn timeout_secs_clamps_to_max() {
         // 700 seconds = 700_000ms, exceeds MAX_TIMEOUT_MS (600_000)
-        assert_eq!(
-            parse_timeout_ms(&json!({"timeout": 700}), 0),
-            MAX_TIMEOUT_MS
-        );
+        let t = TimeoutSecs::from_tool_input(&json!({"timeout": 700}), 0);
+        assert_eq!(t.to_millis_clamped(MAX_TIMEOUT_MS), MAX_TIMEOUT_MS);
     }
 
     #[test]
-    fn parse_timeout_uses_default_when_missing() {
-        assert_eq!(
-            parse_timeout_ms(&json!({}), DEFAULT_TIMEOUT_MS),
-            DEFAULT_TIMEOUT_MS
-        );
-        assert_eq!(parse_timeout_ms(&json!({"command": "ls"}), 42_000), 42_000);
+    fn timeout_secs_uses_default_when_missing() {
+        let t = TimeoutSecs::from_tool_input(&json!({}), DEFAULT_TIMEOUT_SECS);
+        assert_eq!(t.as_secs(), DEFAULT_TIMEOUT_SECS);
+        let t2 = TimeoutSecs::from_tool_input(&json!({"command": "ls"}), 42);
+        assert_eq!(t2.as_secs(), 42);
     }
 
     #[test]
-    fn parse_timeout_zero_yields_zero() {
-        assert_eq!(
-            parse_timeout_ms(&json!({"timeout": 0}), DEFAULT_TIMEOUT_MS),
-            0
-        );
+    fn timeout_secs_zero_yields_zero() {
+        let t = TimeoutSecs::from_tool_input(&json!({"timeout": 0}), DEFAULT_TIMEOUT_SECS);
+        assert_eq!(t.as_secs(), 0);
+        assert_eq!(t.to_millis_clamped(MAX_TIMEOUT_MS), 0);
+    }
+
+    #[test]
+    fn timeout_secs_display() {
+        assert_eq!(TimeoutSecs::new(300).to_string(), "300s");
+        assert_eq!(TimeoutSecs::new(0).to_string(), "0s");
     }
 }

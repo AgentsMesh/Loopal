@@ -3,6 +3,7 @@
 use ratatui::prelude::*;
 
 use loopal_session::types::DisplayToolCall;
+use loopal_tool_api::TimeoutSecs;
 
 use super::{EXPAND_MAX_LINES, expand_output, output_first_line, output_style};
 
@@ -29,12 +30,11 @@ pub fn render_running_body(tc: &DisplayToolCall) -> Vec<Line<'static>> {
         .started_at
         .map(|t| format!("{:.1}s", t.elapsed().as_secs_f64()))
         .unwrap_or_else(|| "…".to_string());
-    let timeout_ms = tc
+    let timeout = tc
         .tool_input
         .as_ref()
-        .and_then(|i| i["timeout"].as_u64())
-        .unwrap_or(300_000);
-    let timeout = format!("{:.0}s", timeout_ms as f64 / 1000.0);
+        .map(|i| TimeoutSecs::from_tool_input(i, 300))
+        .unwrap_or(TimeoutSecs::new(300));
 
     let mut lines = Vec::new();
 

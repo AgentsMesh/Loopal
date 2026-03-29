@@ -18,6 +18,12 @@ rust_library(
 )
 
 rust_test(
+    name = "loopal-tool-bash-unit-test",
+    crate = ":loopal-tool-bash",
+    edition = "2024",
+)
+
+rust_test(
     name = "loopal-tool-bash-test",
     srcs = glob(["tests/**/*.rs"]),
     crate_root = "tests/bash_tool_test.rs",

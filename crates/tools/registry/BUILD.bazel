@@ -20,7 +20,6 @@ rust_library(
         "//crates/tools/filesystem/ls:loopal-tool-ls",
         "//crates/tools/filesystem/multi-edit:loopal-tool-multi-edit",
         "//crates/tools/filesystem/read:loopal-tool-read",
-        "//crates/tools/filesystem/web-search:loopal-tool-web-search",
         "//crates/tools/filesystem/write:loopal-tool-write",
         "//crates/tools/process/background:loopal-tool-background",
         "//crates/tools/process/bash:loopal-tool-bash",

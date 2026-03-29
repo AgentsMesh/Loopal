@@ -73,8 +73,8 @@ fn extract_detail(tc: &DisplayToolCall) -> String {
             .get("url")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string()),
-        // "WebSearch" = built-in client tool, "web_search" = server-side tool
-        "WebSearch" | "web_search" => input
+        // "web_search" = server-side search tool provided by LLM provider
+        "web_search" => input
             .get("query")
             .and_then(|v| v.as_str())
             .map(|s| format!("\"{s}\"")),

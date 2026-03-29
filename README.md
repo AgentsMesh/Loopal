@@ -27,7 +27,7 @@
 
 - 🚀 **Terminal-native TUI** — Rich interactive interface powered by [Ratatui](https://ratatui.rs), with Markdown rendering, syntax highlighting, and progress indicators.
 - 🧠 **Multi-provider LLM support** — Works with OpenAI, Anthropic, and any OpenAI-compatible endpoint. Configurable thinking/reasoning modes (auto, effort levels, token budgets).
-- 🔧 **Comprehensive tool suite** — File read/write/edit, multi-edit, apply-patch, grep, glob, ls, bash execution, background tasks, web search, and fetch.
+- 🔧 **Comprehensive tool suite** — File read/write/edit, multi-edit, apply-patch, grep, glob, ls, bash execution, background tasks, and fetch.
 - 🤖 **Multi-agent orchestration** — Spawn sub-agents that run in parallel, communicate via message passing and pub/sub channels, with a shared task store.
 - 🔌 **MCP integration** — First-class [Model Context Protocol](https://modelcontextprotocol.io/) support for connecting external tool servers.
 - 🖥️ **ACP server mode** — Agent Client Protocol over stdin/stdout JSON-RPC for IDE integration (Zed, JetBrains, Neovim, etc.) via `--acp`.
@@ -115,7 +115,7 @@ loopal
 │   ├── loopal-error/           # Error types
 │   └── tools/                  # Built-in tool implementations
 │       ├── filesystem/         # read, write, edit, multi-edit, apply-patch,
-│       │                       # grep, glob, ls, fetch, web-search, file-ops
+│       │                       # grep, glob, ls, fetch, file-ops
 │       ├── process/            # bash, background task execution
 │       └── agent/              # ask-user, plan-mode
 ```

@@ -1,0 +1,52 @@
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_test")
+
+# Main binary
+rust_binary(
+    name = "loopal",
+    srcs = glob(["src/**/*.rs"]),
+    edition = "2024",
+    deps = [
+        "//crates/loopal-protocol",
+        "//crates/loopal-tool-api",
+        "//crates/loopal-config",
+        "//crates/loopal-runtime",
+        "//crates/loopal-session",
+        "//crates/loopal-agent-hub",
+        "//crates/loopal-tui",
+        "//crates/loopal-acp",
+        "//crates/loopal-agent-server",
+        "//crates/loopal-agent-client",
+        "//crates/loopal-ipc",
+        "//crates/loopal-git",
+        "@crates//:serde_json",
+        "@crates//:tokio",
+        "@crates//:clap",
+        "@crates//:tracing",
+        "@crates//:tracing-subscriber",
+        "@crates//:tracing-appender",
+        "@crates//:chrono",
+        "@crates//:dirs",
+        "@crates//:anyhow",
+        "@crates//:uuid",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+# Root integration test (system IPC test) — needs subprocess spawn, bypass sandbox
+rust_test(
+    name = "system_ipc_test",
+    srcs = ["tests/system_ipc_test.rs"],
+    edition = "2024",
+    data = [":loopal"],
+    env = {
+        "LOOPAL_BINARY": "$(rootpath :loopal)",
+    },
+    local = True,
+    deps = [
+        "//crates/loopal-ipc",
+        "//crates/loopal-protocol",
+        "@crates//:serde_json",
+        "@crates//:tokio",
+        "@crates//:tempfile",
+    ],
+)

@@ -1,0 +1,14 @@
+load("@rules_rust//rust:defs.bzl", "rust_library")
+
+rust_library(
+    name = "loopal-tool-plan-mode",
+    srcs = glob(["src/**/*.rs"]),
+    edition = "2024",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//crates/loopal-error:loopal-error",
+        "//crates/loopal-tool-api:loopal-tool-api",
+        "@crates//:serde_json",
+    ],
+    proc_macro_deps = ["@crates//:async-trait"],
+)

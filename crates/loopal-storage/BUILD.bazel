@@ -1,0 +1,33 @@
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+rust_library(
+    name = "loopal-storage",
+    srcs = glob(["src/**/*.rs"]),
+    edition = "2024",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//crates/loopal-config",
+        "//crates/loopal-error",
+        "//crates/loopal-message",
+        "@crates//:chrono",
+        "@crates//:serde",
+        "@crates//:serde_json",
+        "@crates//:thiserror",
+        "@crates//:tokio",
+        "@crates//:uuid",
+    ],
+)
+
+rust_test(
+    name = "loopal-storage_test",
+    srcs = glob(["tests/**/*.rs"]),
+    crate_root = "tests/suite.rs",
+    edition = "2024",
+    deps = [
+        ":loopal-storage",
+        "@crates//:chrono",
+        "@crates//:tempfile",
+        "@crates//:serde_json",
+        "//crates/loopal-message",
+    ],
+)

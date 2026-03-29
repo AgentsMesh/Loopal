@@ -1,0 +1,26 @@
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+rust_library(
+    name = "loopal-prompt",
+    srcs = glob(["src/**/*.rs"]),
+    edition = "2024",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@crates//:include_dir",
+        "@crates//:minijinja",
+        "@crates//:serde",
+        "@crates//:serde_json",
+        "@crates//:tracing",
+    ],
+)
+
+rust_test(
+    name = "loopal-prompt_test",
+    srcs = glob(["tests/**/*.rs"]),
+    crate_root = "tests/suite.rs",
+    edition = "2024",
+    deps = [
+        ":loopal-prompt",
+        "@crates//:tempfile",
+    ],
+)

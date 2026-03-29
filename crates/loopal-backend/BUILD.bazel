@@ -1,0 +1,24 @@
+load("@rules_rust//rust:defs.bzl", "rust_library")
+
+rust_library(
+    name = "loopal-backend",
+    srcs = glob(["src/**/*.rs"]),
+    edition = "2024",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//crates/loopal-config",
+        "//crates/loopal-error",
+        "//crates/loopal-sandbox",
+        "//crates/loopal-tool-api",
+        "//crates/tools/filesystem/edit-core:loopal-edit-core",
+        "//crates/tools/process/background:loopal-tool-background",
+        "@crates//:futures",
+        "@crates//:globset",
+        "@crates//:ignore",
+        "@crates//:parking_lot",
+        "@crates//:regex",
+        "@crates//:reqwest",
+        "@crates//:tokio",
+    ],
+    proc_macro_deps = ["@crates//:async-trait"],
+)

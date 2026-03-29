@@ -122,8 +122,14 @@ async fn full_bootstrap_hub_to_agent_roundtrip() {
     let _ = std::fs::remove_file(&mock_file);
 }
 
-/// Find the loopal binary in the same target directory as this test binary.
+/// Find the loopal binary. Checks LOOPAL_BINARY env var first (set by Bazel),
+/// then falls back to Cargo target directory layout.
 fn resolve_loopal_binary() -> String {
+    if let Ok(path) = std::env::var("LOOPAL_BINARY") {
+        if std::path::Path::new(&path).exists() {
+            return path;
+        }
+    }
     let test_exe = std::env::current_exe().expect("current_exe");
     let target_dir = test_exe
         .parent() // deps/
@@ -133,7 +139,7 @@ fn resolve_loopal_binary() -> String {
     let loopal = target_dir.join(binary_name);
     assert!(
         loopal.exists(),
-        "loopal binary not found at {}. Run `cargo build` first.",
+        "loopal binary not found at {}. Set LOOPAL_BINARY or run `cargo build` first.",
         loopal.display()
     );
     loopal.to_string_lossy().to_string()

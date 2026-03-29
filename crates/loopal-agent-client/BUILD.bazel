@@ -1,0 +1,35 @@
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+rust_library(
+    name = "loopal-agent-client",
+    srcs = glob(["src/**/*.rs"]),
+    edition = "2024",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//crates/loopal-error",
+        "//crates/loopal-ipc",
+        "//crates/loopal-protocol",
+        "@crates//:anyhow",
+        "@crates//:serde",
+        "@crates//:serde_json",
+        "@crates//:tokio",
+        "@crates//:tracing",
+    ],
+)
+
+rust_test(
+    name = "loopal-agent-client_test",
+    srcs = glob(["tests/**/*.rs"]),
+    crate_root = "tests/suite.rs",
+    edition = "2024",
+    deps = [
+        ":loopal-agent-client",
+        "//crates/loopal-ipc",
+        "//crates/loopal-protocol",
+        "@crates//:chrono",
+        "@crates//:serde_json",
+        "@crates//:tokio",
+        "@crates//:uuid",
+        "//crates/loopal-agent",
+    ],
+)

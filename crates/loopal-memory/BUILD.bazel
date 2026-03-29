@@ -1,0 +1,33 @@
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+rust_library(
+    name = "loopal-memory",
+    srcs = glob(["src/**/*.rs"]),
+    compile_data = glob(["agent-prompts/**"]),
+    edition = "2024",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//crates/loopal-error",
+        "//crates/loopal-tool-api",
+        "@crates//:serde_json",
+        "@crates//:tokio",
+        "@crates//:tracing",
+    ],
+    proc_macro_deps = ["@crates//:async-trait"],
+)
+
+rust_test(
+    name = "loopal-memory_test",
+    srcs = glob(["tests/**/*.rs"]),
+    crate_root = "tests/suite.rs",
+    edition = "2024",
+    deps = [
+        ":loopal-memory",
+        "//crates/loopal-backend",
+        "@crates//:serde_json",
+        "@crates//:tempfile",
+        "@crates//:tokio",
+        "//crates/loopal-tool-api",
+    ],
+    proc_macro_deps = ["@crates//:async-trait"],
+)

@@ -12,11 +12,14 @@ use loopal_ipc::StdioTransport;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
 
-/// Path to the built binary. Set automatically by `cargo test`.
+/// Path to the built binary. Checks LOOPAL_BINARY env var (Bazel), then
+/// CARGO_BIN_EXE_loopal (Cargo).
 fn binary_path() -> String {
-    // CARGO_BIN_EXE_loopal is set by cargo for integration tests in the root crate
+    if let Ok(path) = std::env::var("LOOPAL_BINARY") {
+        return path;
+    }
     std::env::var("CARGO_BIN_EXE_loopal")
-        .unwrap_or_else(|_| env!("CARGO_BIN_EXE_loopal").to_string())
+        .expect("Set LOOPAL_BINARY or CARGO_BIN_EXE_loopal to the loopal binary path")
 }
 
 /// Write a mock provider JSON fixture and return the path.

@@ -1,4 +1,3 @@
-/target
 *.db
 *.db-journal
 .env
@@ -7,4 +6,8 @@
 .DS_Store
 .claude/plans
 .claude/worktrees
+
+# Bazel
+/bazel-*
+.bazel_cache/
 

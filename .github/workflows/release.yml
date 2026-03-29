@@ -6,7 +6,6 @@ on:
       - "v*"
 
 env:
-  CARGO_TERM_COLOR: always
   BINARY_NAME: loopal
 
 permissions:
@@ -22,55 +21,49 @@ jobs:
         include:
           - target: x86_64-apple-darwin
             os: macos-14
+            config: macos-x86
             archive: tar.gz
           - target: aarch64-apple-darwin
             os: macos-14
+            config: macos-arm
             archive: tar.gz
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
+            config: linux-x86
             archive: tar.gz
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
+            config: linux-arm
             archive: tar.gz
-            cross: true
           - target: x86_64-pc-windows-msvc
             os: windows-latest
+            config: windows-x86
             archive: zip
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Install system dependencies (Linux)
-        if: runner.os == 'Linux' && !matrix.cross
+        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libssl-dev pkg-config
 
-      - uses: dtolnay/rust-toolchain@master
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@0.14.0
         with:
-          toolchain: "1.88.0"
-          targets: ${{ matrix.target }}
+          bazelisk-cache: true
+          disk-cache: release-${{ matrix.target }}
+          repository-cache: true
 
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: release-${{ matrix.target }}
-
-      - name: Install cross
-        if: matrix.cross
-        run: cargo install cross --locked
-
-      - name: Build (cross)
-        if: matrix.cross
-        run: cross build --release --target ${{ matrix.target }}
-
-      - name: Build (native)
-        if: "!matrix.cross"
-        run: cargo build --release --target ${{ matrix.target }}
+      - name: Build release binary
+        run: bazel build //:loopal -c opt --config=${{ matrix.config }}
 
       - name: Package (Unix)
         if: runner.os != 'Windows'
         run: |
           ARCHIVE_DIR="${BINARY_NAME}-${{ github.ref_name }}-${{ matrix.target }}"
           mkdir -p "${ARCHIVE_DIR}"
-          cp "target/${{ matrix.target }}/release/${BINARY_NAME}" "${ARCHIVE_DIR}/"
+          BIN_PATH=$(bazel cquery --output=files //:loopal -c opt --config=${{ matrix.config }} 2>/dev/null)
+          cp "${BIN_PATH}" "${ARCHIVE_DIR}/"
           cp README.md "${ARCHIVE_DIR}/" 2>/dev/null || true
           cp LICENSE "${ARCHIVE_DIR}/" 2>/dev/null || true
           tar czf "${ARCHIVE_DIR}.tar.gz" "${ARCHIVE_DIR}"
@@ -82,7 +75,8 @@ jobs:
         run: |
           $archiveDir = "$env:BINARY_NAME-${{ github.ref_name }}-${{ matrix.target }}"
           New-Item -ItemType Directory -Path $archiveDir -Force
-          Copy-Item "target/${{ matrix.target }}/release/$env:BINARY_NAME.exe" "$archiveDir/"
+          $binPath = (bazel cquery --output=files //:loopal -c opt --config=${{ matrix.config }} 2>$null).Trim()
+          Copy-Item $binPath "$archiveDir/"
           if (Test-Path "README.md") { Copy-Item "README.md" "$archiveDir/" }
           if (Test-Path "LICENSE") { Copy-Item "LICENSE" "$archiveDir/" }
           Compress-Archive -Path "$archiveDir" -DestinationPath "$archiveDir.zip"

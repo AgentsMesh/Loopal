@@ -1,0 +1,30 @@
+# Common
+common --enable_bzlmod
+
+# Build
+build --jobs=auto
+build --experimental_reuse_sandbox_directories
+
+# Test
+test --test_output=errors
+test --notest_verbose_timeout_warnings
+
+# Platform configs for cross-compilation
+build:linux-x86 --platforms=@rules_rust//rust/platform:x86_64-unknown-linux-gnu
+build:linux-arm --platforms=@rules_rust//rust/platform:aarch64-unknown-linux-gnu
+build:macos-x86 --platforms=@rules_rust//rust/platform:x86_64-apple-darwin
+build:macos-arm --platforms=@rules_rust//rust/platform:aarch64-apple-darwin
+build:windows-x86 --platforms=@rules_rust//rust/platform:x86_64-pc-windows-msvc
+
+# CI config
+build:ci --disk_cache=~/.cache/bazel-disk
+build:ci --repository_cache=~/.cache/bazel-repo
+test:ci --test_output=all
+
+# Clippy
+build:clippy --aspects=@rules_rust//rust:defs.bzl%rust_clippy_aspect
+build:clippy --output_groups=clippy_checks
+
+# Rustfmt
+build:rustfmt --aspects=@rules_rust//rust:defs.bzl%rustfmt_aspect
+build:rustfmt --output_groups=rustfmt_checks

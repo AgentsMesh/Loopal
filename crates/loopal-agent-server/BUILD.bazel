@@ -1,0 +1,52 @@
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+rust_library(
+    name = "loopal-agent-server",
+    srcs = glob(["src/**/*.rs"]),
+    edition = "2024",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//crates/loopal-agent",
+        "//crates/loopal-config",
+        "//crates/loopal-context",
+        "//crates/loopal-error",
+        "//crates/loopal-ipc",
+        "//crates/loopal-kernel",
+        "//crates/loopal-memory",
+        "//crates/loopal-message",
+        "//crates/loopal-protocol",
+        "//crates/loopal-provider-api",
+        "//crates/loopal-runtime",
+        "//crates/loopal-storage",
+        "//crates/loopal-tool-api",
+        "@crates//:anyhow",
+        "@crates//:futures",
+        "@crates//:serde",
+        "@crates//:serde_json",
+        "@crates//:tokio",
+        "@crates//:tracing",
+    ],
+    proc_macro_deps = ["@crates//:async-trait"],
+)
+
+rust_test(
+    name = "loopal-agent-server_test",
+    srcs = glob(["tests/**/*.rs"]),
+    crate_root = "tests/suite.rs",
+    edition = "2024",
+    local = True,
+    deps = [
+        ":loopal-agent-server",
+        "//crates/loopal-ipc",
+        "//crates/loopal-protocol",
+        "//crates/loopal-runtime",
+        "//crates/loopal-test-support",
+        "@crates//:serde_json",
+        "@crates//:tokio",
+        "//crates/loopal-agent",
+        "//crates/loopal-config",
+        "//crates/loopal-error",
+        "//crates/loopal-provider-api",
+        "//crates/loopal-tool-api",
+    ],
+)

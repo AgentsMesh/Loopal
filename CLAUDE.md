@@ -2,16 +2,26 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Build & Test Commands
+## Build & Test Commands (Bazel)
 
 ```bash
-cargo check --workspace          # Fast compilation check
-cargo build                      # Debug build
-cargo test --workspace           # Run all tests
-cargo test -p loopal-tui      # Run tests for a single crate
-cargo test -p loopal-tui --test app_test  # Run a single test file
-cargo clippy --workspace --tests # Lint (must pass with zero warnings)
-LOOPAL_LOG=debug cargo run    # Run with debug logging
+bazel build //:loopal                         # Build main binary
+bazel build //...                             # Build everything
+bazel test //...                              # Run all tests
+bazel test //crates/loopal-tui:suite          # Run tests for a single crate
+bazel build //... --config=clippy             # Clippy lint (must pass with zero warnings)
+bazel build //... --config=rustfmt            # Rustfmt check
+bazel build //:loopal -c opt                  # Optimized release build
+bazel build //:loopal -c opt --config=macos-arm  # Cross-compile for macOS ARM64
+```
+
+### Dependency management
+
+External deps are managed via `crate_universe` from `Cargo.toml` / `Cargo.lock`.
+After adding/updating a dependency in `Cargo.toml`:
+
+```bash
+CARGO_BAZEL_REPIN=1 bazel sync --only=crates   # Re-pin external crates
 ```
 
 ## Architecture

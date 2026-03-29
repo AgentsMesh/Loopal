@@ -1,0 +1,37 @@
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+rust_library(
+    name = "loopal-ipc",
+    srcs = glob(["src/**/*.rs"]),
+    edition = "2024",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//crates/loopal-error",
+        "@crates//:serde",
+        "@crates//:serde_json",
+        "@crates//:tokio",
+        "@crates//:tracing",
+        "@crates//:uuid",
+    ],
+    proc_macro_deps = ["@crates//:async-trait"],
+)
+
+rust_test(
+    name = "loopal-ipc_test",
+    srcs = glob(["tests/**/*.rs"]),
+    crate_root = "tests/suite.rs",
+    edition = "2024",
+    local = True,
+    data = ["//:loopal"],
+    env = {"LOOPAL_BINARY": "$(rootpath //:loopal)"},
+    deps = [
+        ":loopal-ipc",
+        "//crates/loopal-agent-client",
+        "//crates/loopal-protocol",
+        "//crates/loopal-test-support",
+        "@crates//:chrono",
+        "@crates//:serde_json",
+        "@crates//:tokio",
+        "@crates//:uuid",
+    ],
+)

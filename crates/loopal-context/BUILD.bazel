@@ -1,0 +1,45 @@
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+rust_library(
+    name = "loopal-context",
+    srcs = glob(["src/**/*.rs"]),
+    edition = "2024",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//crates/loopal-config",
+        "//crates/loopal-error",
+        "//crates/loopal-message",
+        "//crates/loopal-prompt",
+        "//crates/loopal-prompt-system",
+        "//crates/loopal-provider-api",
+        "//crates/loopal-tool-api",
+        "@crates//:chrono",
+        "@crates//:futures",
+        "@crates//:serde",
+        "@crates//:serde_json",
+        "@crates//:thiserror",
+        "@crates//:tiktoken-rs",
+        "@crates//:tokio",
+        "@crates//:tracing",
+    ],
+    proc_macro_deps = ["@crates//:async-trait"],
+)
+
+rust_test(
+    name = "loopal-context_test",
+    srcs = glob(["tests/**/*.rs"]),
+    crate_root = "tests/suite.rs",
+    edition = "2024",
+    deps = [
+        ":loopal-context",
+        "@crates//:regex",
+        "@crates//:serde_json",
+        "@crates//:tokio",
+        "//crates/loopal-error",
+        "//crates/loopal-message",
+        "//crates/loopal-provider",
+        "//crates/loopal-provider-api",
+        "//crates/loopal-tool-api",
+    ],
+    proc_macro_deps = ["@crates//:async-trait"],
+)

@@ -153,6 +153,13 @@ impl AgentProcess {
     }
 
     fn resolve_executable(name: &str) -> anyhow::Result<PathBuf> {
+        // Check LOOPAL_BINARY env var first (set by Bazel or test harness).
+        if let Ok(path) = std::env::var("LOOPAL_BINARY") {
+            let p = PathBuf::from(&path);
+            if p.exists() {
+                return Ok(p);
+            }
+        }
         // If an explicit path is provided and exists, use it directly.
         let explicit = PathBuf::from(name);
         if explicit.is_absolute() && explicit.exists() {

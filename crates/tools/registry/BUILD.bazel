@@ -1,0 +1,44 @@
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+rust_library(
+    name = "loopal-tools",
+    srcs = glob(["src/**/*.rs"]),
+    edition = "2024",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//crates/loopal-error:loopal-error",
+        "//crates/loopal-tool-api:loopal-tool-api",
+        "//crates/tools/agent/ask-user:loopal-tool-ask-user",
+        "//crates/tools/agent/plan-mode:loopal-tool-plan-mode",
+        "//crates/tools/filesystem/apply-patch:loopal-tool-apply-patch",
+        "//crates/tools/filesystem/edit:loopal-tool-edit",
+        "//crates/tools/filesystem/edit-core:loopal-edit-core",
+        "//crates/tools/filesystem/fetch:loopal-tool-fetch",
+        "//crates/tools/filesystem/file-ops:loopal-tool-file-ops",
+        "//crates/tools/filesystem/glob:loopal-tool-glob",
+        "//crates/tools/filesystem/grep:loopal-tool-grep",
+        "//crates/tools/filesystem/ls:loopal-tool-ls",
+        "//crates/tools/filesystem/multi-edit:loopal-tool-multi-edit",
+        "//crates/tools/filesystem/read:loopal-tool-read",
+        "//crates/tools/filesystem/web-search:loopal-tool-web-search",
+        "//crates/tools/filesystem/write:loopal-tool-write",
+        "//crates/tools/process/background:loopal-tool-background",
+        "//crates/tools/process/bash:loopal-tool-bash",
+        "@crates//:serde_json",
+    ],
+)
+
+rust_test(
+    name = "loopal-tools-test",
+    srcs = glob(["tests/**/*.rs"]),
+    crate_root = "tests/registry_test.rs",
+    edition = "2024",
+    deps = [
+        ":loopal-tools",
+        "//crates/loopal-error:loopal-error",
+        "@crates//:serde_json",
+        "@crates//:tempfile",
+        "//crates/loopal-tool-api",
+    ],
+    proc_macro_deps = ["@crates//:async-trait"],
+)

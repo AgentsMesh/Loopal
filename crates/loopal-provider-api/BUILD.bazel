@@ -1,0 +1,29 @@
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+rust_library(
+    name = "loopal-provider-api",
+    srcs = glob(["src/**/*.rs"]),
+    edition = "2024",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//crates/loopal-error",
+        "//crates/loopal-message",
+        "//crates/loopal-tool-api",
+        "@crates//:futures",
+        "@crates//:serde",
+        "@crates//:serde_json",
+    ],
+    proc_macro_deps = ["@crates//:async-trait"],
+)
+
+rust_test(
+    name = "loopal-provider-api_test",
+    srcs = glob(["tests/**/*.rs"]),
+    crate_root = "tests/middleware_test.rs",
+    edition = "2024",
+    deps = [
+        ":loopal-provider-api",
+        "//crates/loopal-message",
+        "//crates/loopal-provider",
+    ],
+)

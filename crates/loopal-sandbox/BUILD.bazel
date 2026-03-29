@@ -1,0 +1,26 @@
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+rust_library(
+    name = "loopal-sandbox",
+    srcs = glob(["src/**/*.rs"]),
+    edition = "2024",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//crates/loopal-config",
+        "@crates//:globset",
+        "@crates//:regex",
+        "@crates//:walkdir",
+    ],
+)
+
+rust_test(
+    name = "loopal-sandbox_test",
+    srcs = glob(["tests/**/*.rs"]),
+    crate_root = "tests/suite.rs",
+    edition = "2024",
+    deps = [
+        ":loopal-sandbox",
+        "@crates//:tempfile",
+        "//crates/loopal-config",
+    ],
+)

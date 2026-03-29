@@ -1,0 +1,31 @@
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+rust_library(
+    name = "loopal-tool-background",
+    srcs = glob(["src/**/*.rs"]),
+    edition = "2024",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//crates/loopal-error:loopal-error",
+        "//crates/loopal-tool-api:loopal-tool-api",
+        "@crates//:serde_json",
+        "@crates//:tokio",
+    ],
+    proc_macro_deps = ["@crates//:async-trait"],
+)
+
+rust_test(
+    name = "loopal-tool-background-test",
+    srcs = glob(["tests/**/*.rs"]),
+    crate_root = "tests/suite.rs",
+    edition = "2024",
+    deps = [
+        ":loopal-tool-background",
+        "//crates/loopal-backend:loopal-backend",
+        "//crates/tools/process/bash:loopal-tool-bash",
+        "@crates//:tempfile",
+        "@crates//:serde_json",
+        "@crates//:tokio",
+        "//crates/loopal-tool-api",
+    ],
+)

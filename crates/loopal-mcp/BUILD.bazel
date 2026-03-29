@@ -1,0 +1,42 @@
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+rust_library(
+    name = "loopal-mcp",
+    srcs = glob(["src/**/*.rs"]),
+    edition = "2024",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//crates/loopal-config",
+        "//crates/loopal-error",
+        "//crates/loopal-tool-api",
+        "@crates//:dirs",
+        "@crates//:futures",
+        "@crates//:indexmap",
+        "@crates//:opener",
+        "@crates//:reqwest",
+        "@crates//:rmcp",
+        "@crates//:serde",
+        "@crates//:serde_json",
+        "@crates//:thiserror",
+        "@crates//:tokio",
+        "@crates//:tracing",
+    ],
+    proc_macro_deps = ["@crates//:async-trait"],
+)
+
+rust_test(
+    name = "loopal-mcp_test",
+    srcs = glob(["tests/**/*.rs"]),
+    crate_root = "tests/suite.rs",
+    edition = "2024",
+    deps = [
+        ":loopal-mcp",
+        "//crates/loopal-test-support",
+        "@crates//:tokio",
+        "@crates//:indexmap",
+        "@crates//:serde",
+        "@crates//:serde_json",
+        "//crates/loopal-config",
+        "//crates/loopal-error",
+    ],
+)

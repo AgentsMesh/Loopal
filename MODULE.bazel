@@ -1,0 +1,116 @@
+module(
+    name = "loopal",
+    version = "0.1.0",
+)
+
+# Bazel skylib
+bazel_dep(name = "bazel_skylib", version = "1.7.1")
+
+# Rust rules
+bazel_dep(name = "rules_rust", version = "0.69.0")
+
+# Rust toolchain
+rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
+rust.toolchain(
+    edition = "2024",
+    versions = ["1.88.0"],
+    extra_target_triples = [
+        "aarch64-apple-darwin",
+        "x86_64-apple-darwin",
+        "x86_64-unknown-linux-gnu",
+        "aarch64-unknown-linux-gnu",
+        "x86_64-pc-windows-msvc",
+    ],
+)
+use_repo(rust, "rust_toolchains")
+
+register_toolchains("@rust_toolchains//:all")
+
+# crate_universe — all external dependencies declared via crate.spec()
+crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
+
+# --- Serialization ---
+crate.spec(package = "serde", version = "1", features = ["derive"])
+crate.spec(package = "serde_json", version = "1")
+crate.spec(package = "schemars", version = "0.8")
+
+# --- Async runtime ---
+crate.spec(package = "tokio", version = "1", features = ["full"])
+crate.spec(package = "futures", version = "0.3")
+crate.spec(package = "async-trait", version = "0.1")
+crate.spec(package = "tokio-util", version = "0.7")
+crate.spec(package = "tokio-stream", version = "0.1")
+crate.spec(package = "pin-project-lite", version = "0.2")
+
+# --- Error handling ---
+crate.spec(package = "thiserror", version = "2")
+crate.spec(package = "anyhow", version = "1")
+
+# --- HTTP ---
+crate.spec(package = "reqwest", version = "0.13", features = ["json", "stream"])
+crate.spec(package = "eventsource-stream", version = "0.2")
+
+# --- CLI ---
+crate.spec(package = "clap", version = "4", features = ["derive"])
+
+# --- TUI ---
+crate.spec(package = "ratatui", version = "0.30", features = ["crossterm"])
+crate.spec(package = "crossterm", version = "0.28")
+
+# --- File operations ---
+crate.spec(package = "globset", version = "0.4")
+crate.spec(package = "ignore", version = "0.4")
+crate.spec(package = "regex", version = "1")
+crate.spec(package = "walkdir", version = "2")
+
+# --- MCP ---
+# Union of all feature sets used across crates (main + test-support)
+crate.spec(
+    package = "rmcp",
+    version = "1.2",
+    features = [
+        "client",
+        "transport-child-process",
+        "transport-streamable-http-client-reqwest",
+        "auth",
+        "server",
+        "macros",
+        "transport-io",
+    ],
+)
+
+# --- Utilities ---
+crate.spec(package = "parking_lot", version = "0.12")
+crate.spec(package = "dirs", version = "6")
+crate.spec(package = "indexmap", version = "2")
+crate.spec(package = "uuid", version = "1", features = ["v4", "serde"])
+crate.spec(package = "chrono", version = "0.4", features = ["serde"])
+crate.spec(package = "tracing", version = "0.1")
+crate.spec(package = "tracing-subscriber", version = "0.3", features = ["env-filter"])
+crate.spec(package = "tracing-appender", version = "0.2")
+crate.spec(package = "unicode-width", version = "0.2")
+crate.spec(package = "textwrap", version = "0.16")
+crate.spec(package = "pulldown-cmark", version = "0.12", default_features = False)
+crate.spec(package = "syntect", version = "5", default_features = False, features = ["default-fancy"])
+crate.spec(package = "two-face", version = "0.5")
+crate.spec(package = "html2text", version = "0.12")
+crate.spec(package = "pdf-extract", version = "0.7")
+crate.spec(package = "tiktoken-rs", version = "0.6")
+crate.spec(package = "opener", version = "0.7")
+
+# --- Image support ---
+crate.spec(package = "arboard", version = "3", features = ["image-data"])
+crate.spec(package = "base64", version = "0.22")
+crate.spec(package = "image", version = "0.25", default_features = False, features = ["png"])
+
+# --- Templates ---
+crate.spec(package = "minijinja", version = "2", features = ["loader"])
+crate.spec(package = "include_dir", version = "0.7")
+
+# --- Testing ---
+crate.spec(package = "tempfile", version = "3")
+crate.spec(package = "wiremock", version = "0.6")
+crate.spec(package = "filetime", version = "0.2")
+
+crate.from_specs(name = "crates")
+use_repo(crate, "crates")

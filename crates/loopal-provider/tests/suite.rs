@@ -9,6 +9,8 @@ mod anthropic_stream_test;
 mod google_request_test;
 #[path = "suite/google_stream_test.rs"]
 mod google_stream_test;
+#[path = "suite/model_info_overlay_test.rs"]
+mod model_info_overlay_test;
 #[path = "suite/model_info_test.rs"]
 mod model_info_test;
 #[path = "suite/openai_request_test.rs"]

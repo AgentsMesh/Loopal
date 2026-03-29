@@ -98,3 +98,55 @@ fn test_register_overwrites_existing() {
     let provider = registry.resolve("claude-sonnet-4").unwrap();
     assert_eq!(provider.name(), "anthropic");
 }
+
+// -- Prefix routing --------------------------------------------------------
+
+#[test]
+fn test_register_with_prefix_routes_model() {
+    let mut registry = ProviderRegistry::new();
+    registry.register_with_prefix(Arc::new(MockProvider::new("deepseek")), "deepseek-");
+
+    let provider = registry.resolve("deepseek-chat").unwrap();
+    assert_eq!(provider.name(), "deepseek");
+}
+
+#[test]
+fn test_prefix_longest_match_wins() {
+    let mut registry = ProviderRegistry::new();
+    registry.register_with_prefix(Arc::new(MockProvider::new("short")), "my-");
+    registry.register_with_prefix(Arc::new(MockProvider::new("long")), "my-custom-");
+
+    // "my-custom-model" should match "my-custom-" (longer prefix)
+    let provider = registry.resolve("my-custom-model").unwrap();
+    assert_eq!(provider.name(), "long");
+
+    // "my-other" should match "my-" (shorter prefix)
+    let provider = registry.resolve("my-other").unwrap();
+    assert_eq!(provider.name(), "short");
+}
+
+#[test]
+fn test_catalog_takes_priority_over_prefix() {
+    let mut registry = ProviderRegistry::new();
+    // Register a compat provider with "claude-" prefix
+    registry.register_with_prefix(Arc::new(MockProvider::new("compat")), "claude-");
+    // Also register the real anthropic provider
+    registry.register(Arc::new(MockProvider::new("anthropic")));
+
+    // Known model in catalog → should resolve to anthropic (catalog wins)
+    let provider = registry.resolve("claude-sonnet-4-20250514").unwrap();
+    assert_eq!(provider.name(), "anthropic");
+}
+
+#[test]
+fn test_prefix_takes_priority_over_heuristic() {
+    let mut registry = ProviderRegistry::new();
+    // Register a custom provider for "llama-" prefix
+    registry.register_with_prefix(Arc::new(MockProvider::new("ollama")), "llama-");
+    // Also register openai_compat (the heuristic fallback)
+    registry.register(Arc::new(MockProvider::new("openai_compat")));
+
+    // "llama-3" → should hit prefix map, not heuristic fallback
+    let provider = registry.resolve("llama-3").unwrap();
+    assert_eq!(provider.name(), "ollama");
+}

@@ -36,7 +36,7 @@ use loopal_context::ContextStore;
 use loopal_error::{AgentOutput, Result};
 use loopal_kernel::Kernel;
 use loopal_protocol::InterruptSignal;
-use loopal_provider_api::ThinkingConfig;
+use loopal_provider_api::{ModelRouter, ThinkingConfig};
 use loopal_storage::Session;
 use loopal_tool_api::{MemoryChannel, PermissionMode};
 use tokio::sync::watch;
@@ -55,9 +55,7 @@ pub(crate) const MAX_AUTO_CONTINUATIONS: u32 = 3;
 
 /// Agent configuration — mostly immutable, some fields switchable at runtime.
 pub struct AgentConfig {
-    pub model: String,
-    /// Model for compaction/summarization. None = use main model.
-    pub compact_model: Option<String>,
+    pub router: ModelRouter,
     pub system_prompt: String,
     pub mode: AgentMode,
     pub permission_mode: PermissionMode,
@@ -72,11 +70,17 @@ pub struct AgentConfig {
     pub context_tokens_cap: u32,
 }
 
+impl AgentConfig {
+    /// The effective main conversation model (respects model_routing.default override).
+    pub fn model(&self) -> &str {
+        self.router.resolve(loopal_provider_api::TaskType::Default)
+    }
+}
+
 impl Default for AgentConfig {
     fn default() -> Self {
         Self {
-            model: "claude-sonnet-4-20250514".into(),
-            compact_model: None,
+            router: ModelRouter::new("claude-sonnet-4-20250514".into()),
             system_prompt: String::new(),
             mode: AgentMode::Act,
             permission_mode: PermissionMode::Bypass,

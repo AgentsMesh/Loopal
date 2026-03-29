@@ -1,6 +1,8 @@
 /// Known top-level keys in settings.json, derived from `Settings` struct fields.
 const KNOWN_KEYS: &[&str] = &[
     "model",
+    "model_routing",
+    "models",
     "max_turns",
     "permission_mode",
     "max_context_tokens",
@@ -8,6 +10,8 @@ const KNOWN_KEYS: &[&str] = &[
     "hooks",
     "mcp_servers",
     "sandbox",
+    "thinking",
+    "memory",
 ];
 
 /// Log warnings for any unrecognised top-level keys in the merged config.

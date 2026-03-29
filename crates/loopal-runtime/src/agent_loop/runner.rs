@@ -37,7 +37,7 @@ impl AgentLoopRunner {
             output_tail: None,
         };
         let model_config = ModelConfig::from_model(
-            &params.config.model,
+            params.config.model(),
             params.config.thinking_config.clone(),
             params.config.context_tokens_cap,
         );
@@ -64,7 +64,7 @@ impl AgentLoopRunner {
 
     /// Actual run logic, executed inside the `agent` span.
     async fn run_instrumented(&mut self) -> Result<AgentOutput> {
-        info!(model = %self.params.config.model, "agent loop started");
+        info!(model = %self.params.config.model(), "agent loop started");
         self.emit(AgentEventPayload::Started).await?;
 
         let result = self.run_loop().await;

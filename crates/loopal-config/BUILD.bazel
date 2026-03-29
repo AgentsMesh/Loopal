@@ -25,9 +25,10 @@ rust_test(
     edition = "2024",
     deps = [
         ":loopal-config",
-        "@crates//:filetime",
-        "@crates//:tempfile",
-        "@crates//:serde_json",
+        "//crates/loopal-provider-api",
         "//crates/loopal-tool-api",
+        "@crates//:filetime",
+        "@crates//:serde_json",
+        "@crates//:tempfile",
     ],
 )

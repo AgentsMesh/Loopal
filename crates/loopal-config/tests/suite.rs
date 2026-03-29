@@ -19,6 +19,8 @@ mod plugin_test;
 mod resolver_edge_test;
 #[path = "suite/resolver_test.rs"]
 mod resolver_test;
+#[path = "suite/settings_routing_test.rs"]
+mod settings_routing_test;
 #[path = "suite/skills_loader_test.rs"]
 mod skills_loader_test;
 #[path = "suite/skills_parser_test.rs"]

@@ -39,6 +39,8 @@ pub enum TaskType {
     Default,
     /// Context compaction / summarization.
     Summarization,
+    /// Auto-mode permission classification.
+    Classification,
 }
 
 // ---------------------------------------------------------------------------

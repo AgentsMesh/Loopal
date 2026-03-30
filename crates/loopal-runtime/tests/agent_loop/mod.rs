@@ -34,6 +34,10 @@ pub fn make_test_budget() -> ContextBudget {
 
 mod auto_continue_edge_test;
 mod auto_continue_test;
+mod auto_mode_batch_test;
+mod auto_mode_degradation_test;
+pub mod auto_mode_helpers;
+mod auto_mode_test;
 mod cron_e2e_test;
 mod drain_pending_test;
 mod input_edge_test;
@@ -87,6 +91,7 @@ pub fn make_runner() -> (AgentLoopRunner, mpsc::Receiver<AgentEvent>) {
         shared: None,
         memory_channel: None,
         scheduled_rx: None,
+        auto_classifier: None,
     };
     (AgentLoopRunner::new(params), event_rx)
 }
@@ -130,6 +135,7 @@ pub fn make_runner_with_channels() -> (
         shared: None,
         memory_channel: None,
         scheduled_rx: None,
+        auto_classifier: None,
     };
     (
         AgentLoopRunner::new(params),

@@ -25,6 +25,7 @@ mod tool_progress;
 mod tools;
 mod tools_check;
 mod tools_inject;
+mod tools_resolve;
 pub mod turn_context;
 mod turn_exec;
 pub mod turn_observer;
@@ -139,6 +140,8 @@ pub struct AgentLoopParams {
     /// arrives here and is consumed by `wait_for_input()` alongside normal
     /// user input.
     pub scheduled_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
+    /// Auto-mode LLM classifier (active when permission_mode == Auto).
+    pub auto_classifier: Option<Arc<loopal_auto_mode::AutoClassifier>>,
 }
 
 /// Public wrapper — constructs default observers and runs the loop.

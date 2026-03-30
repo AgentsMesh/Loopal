@@ -53,6 +53,7 @@ impl Cli {
         if let Some(perm) = &self.permission {
             settings.permission_mode = match perm.as_str() {
                 "bypass" | "yolo" => loopal_tool_api::PermissionMode::Bypass,
+                "auto" => loopal_tool_api::PermissionMode::Auto,
                 _ => loopal_tool_api::PermissionMode::Supervised,
             };
         }

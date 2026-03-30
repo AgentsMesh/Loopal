@@ -133,6 +133,7 @@ async fn test_check_permission_channel_closed_denies() {
         shared: None,
         memory_channel: None,
         scheduled_rx: None,
+        auto_classifier: None,
     };
 
     let runner = AgentLoopRunner::new(params);

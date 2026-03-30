@@ -155,6 +155,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         shared: Some(shared_any),
         memory_channel: None,
         scheduled_rx: Some(scheduled_rx),
+        auto_classifier: None,
     };
 
     let harness = SpawnedHarness {

@@ -81,7 +81,7 @@ fn test_load_settings_all_env_var_scenarios() {
     // --- Scenario 5: LOOPAL_PERMISSION_MODE override ---
     {
         unsafe {
-            std::env::set_var("LOOPAL_PERMISSION_MODE", "Supervised");
+            std::env::set_var("LOOPAL_PERMISSION_MODE", "supervised");
         }
 
         let tmp = TempDir::new().unwrap();

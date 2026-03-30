@@ -192,4 +192,14 @@ pub enum AgentEventPayload {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         session_id: Option<String>,
     },
+
+    /// Auto-mode classifier made a permission decision.
+    AutoModeDecision {
+        tool_name: String,
+        decision: String,
+        reason: String,
+        /// Classification wall-clock time in milliseconds (0 for cached results).
+        #[serde(default)]
+        duration_ms: u64,
+    },
 }

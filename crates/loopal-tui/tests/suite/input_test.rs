@@ -50,7 +50,7 @@ fn test_ctrl_c_clears_input_when_non_empty() {
 #[test]
 fn test_ctrl_c_interrupts_when_agent_busy() {
     let mut app = make_app();
-    app.session.lock().agent_idle = false;
+    app.session.lock().active_conversation_mut().agent_idle = false;
     let action = handle_key(&mut app, ctrl('c'));
     assert!(matches!(action, InputAction::Interrupt));
 }
@@ -58,7 +58,7 @@ fn test_ctrl_c_interrupts_when_agent_busy() {
 #[test]
 fn test_ctrl_c_noop_when_idle_and_empty() {
     let mut app = make_app();
-    app.session.lock().agent_idle = true;
+    app.session.lock().active_conversation_mut().agent_idle = true;
     let action = handle_key(&mut app, ctrl('c'));
     assert!(matches!(action, InputAction::None));
 }
@@ -89,12 +89,13 @@ fn test_tool_confirm_y_approves() {
     let mut app = make_app();
     {
         let mut state = app.session.lock();
-        state.pending_permission = Some(loopal_session::types::PendingPermission {
-            id: "1".into(),
-            name: "Bash".into(),
-            input: "ls".into(),
-            relay_request_id: None,
-        });
+        state.active_conversation_mut().pending_permission =
+            Some(loopal_session::types::PendingPermission {
+                id: "1".into(),
+                name: "Bash".into(),
+                input: "ls".into(),
+                relay_request_id: None,
+            });
     }
     let action = handle_key(&mut app, key(KeyCode::Char('y')));
     assert!(matches!(action, InputAction::ToolApprove));
@@ -105,12 +106,13 @@ fn test_tool_confirm_n_denies() {
     let mut app = make_app();
     {
         let mut state = app.session.lock();
-        state.pending_permission = Some(loopal_session::types::PendingPermission {
-            id: "1".into(),
-            name: "Bash".into(),
-            input: "rm".into(),
-            relay_request_id: None,
-        });
+        state.active_conversation_mut().pending_permission =
+            Some(loopal_session::types::PendingPermission {
+                id: "1".into(),
+                name: "Bash".into(),
+                input: "rm".into(),
+                relay_request_id: None,
+            });
     }
     let action = handle_key(&mut app, key(KeyCode::Char('n')));
     assert!(matches!(action, InputAction::ToolDeny));
@@ -121,12 +123,13 @@ fn test_tool_confirm_esc_denies() {
     let mut app = make_app();
     {
         let mut state = app.session.lock();
-        state.pending_permission = Some(loopal_session::types::PendingPermission {
-            id: "1".into(),
-            name: "Bash".into(),
-            input: "rm".into(),
-            relay_request_id: None,
-        });
+        state.active_conversation_mut().pending_permission =
+            Some(loopal_session::types::PendingPermission {
+                id: "1".into(),
+                name: "Bash".into(),
+                input: "rm".into(),
+                relay_request_id: None,
+            });
     }
     let action = handle_key(&mut app, key(KeyCode::Esc));
     assert!(matches!(action, InputAction::ToolDeny));

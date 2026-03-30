@@ -115,6 +115,12 @@ async fn action_spawn(
         .model
         .unwrap_or_else(|| shared.kernel.settings().model.clone());
 
+    // Propagate parent's permission_mode to sub-agent.
+    let perm_mode = match shared.kernel.settings().permission_mode {
+        loopal_tool_api::PermissionMode::Bypass => "bypass",
+        loopal_tool_api::PermissionMode::Supervised => "supervised",
+    };
+
     let result = spawn_agent(
         &shared,
         SpawnParams {
@@ -122,6 +128,7 @@ async fn action_spawn(
             prompt: prompt.to_string(),
             model: Some(model),
             cwd_override,
+            permission_mode: Some(perm_mode.to_string()),
         },
     )
     .await;

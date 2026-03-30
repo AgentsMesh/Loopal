@@ -63,7 +63,11 @@ async fn test_status_cmd_pushes_system_message() {
     let effect = handler.execute(&mut app, None).await;
     assert!(matches!(effect, loopal_tui::command::CommandEffect::Done));
     let state = app.session.lock();
-    let last = state.messages.last().expect("expected a status message");
+    let last = state
+        .active_conversation()
+        .messages
+        .last()
+        .expect("expected a status message");
     assert!(last.content.contains("Model:"));
     assert!(last.content.contains("Mode:"));
 }
@@ -75,7 +79,11 @@ async fn test_help_cmd_shows_all_commands() {
     let effect = handler.execute(&mut app, None).await;
     assert!(matches!(effect, loopal_tui::command::CommandEffect::Done));
     let state = app.session.lock();
-    let last = state.messages.last().expect("expected help message");
+    let last = state
+        .active_conversation()
+        .messages
+        .last()
+        .expect("expected help message");
     assert!(last.content.contains("/clear"));
     assert!(last.content.contains("/model"));
     assert!(last.content.contains("Shortcuts:"));
@@ -95,14 +103,17 @@ async fn test_rewind_on_idle_opens_sub_page() {
     let mut app = make_app();
     {
         let mut state = app.session.lock();
-        state.agent_idle = true;
-        state.messages.push(loopal_session::DisplayMessage {
-            role: "user".into(),
-            content: "hello".into(),
-            tool_calls: Vec::new(),
-            image_count: 0,
-            skill_info: None,
-        });
+        state.active_conversation_mut().agent_idle = true;
+        state
+            .active_conversation_mut()
+            .messages
+            .push(loopal_session::DisplayMessage {
+                role: "user".into(),
+                content: "hello".into(),
+                tool_calls: Vec::new(),
+                image_count: 0,
+                skill_info: None,
+            });
     }
     let handler = app.command_registry.find("/rewind").unwrap();
     handler.execute(&mut app, None).await;
@@ -113,13 +124,13 @@ async fn test_rewind_on_idle_opens_sub_page() {
 async fn test_rewind_on_busy_agent_shows_error() {
     let mut app = make_app();
     {
-        app.session.lock().agent_idle = false;
+        app.session.lock().active_conversation_mut().agent_idle = false;
     }
     let handler = app.command_registry.find("/rewind").unwrap();
     handler.execute(&mut app, None).await;
     assert!(app.sub_page.is_none());
     let state = app.session.lock();
-    let last = state.messages.last().unwrap();
+    let last = state.active_conversation().messages.last().unwrap();
     assert!(last.content.contains("Cannot rewind"));
 }
 

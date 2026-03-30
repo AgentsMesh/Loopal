@@ -28,7 +28,12 @@ impl HubClient {
 
     /// Send a user message to the root agent via Hub.
     pub async fn send_message(&self, content: UserContent) {
-        let envelope = Envelope::new(MessageSource::Human, "main", content);
+        self.send_message_to("main", content).await;
+    }
+
+    /// Send a user message to a specific named agent.
+    pub async fn send_message_to(&self, target: &str, content: UserContent) {
+        let envelope = Envelope::new(MessageSource::Human, target, content);
         if let Ok(params) = serde_json::to_value(&envelope) {
             let _ = self
                 .conn
@@ -51,8 +56,17 @@ impl HubClient {
 
     /// Send a control command to the root agent.
     pub async fn send_control(&self, cmd: &ControlCommand) -> Result<Value, String> {
+        self.send_control_to("main", cmd).await
+    }
+
+    /// Send a control command to a specific named agent.
+    pub async fn send_control_to(
+        &self,
+        target: &str,
+        cmd: &ControlCommand,
+    ) -> Result<Value, String> {
         let params = serde_json::json!({
-            "target": "main",
+            "target": target,
             "command": serde_json::to_value(cmd).unwrap_or_default(),
         });
         self.conn
@@ -62,11 +76,16 @@ impl HubClient {
 
     /// Interrupt the root agent.
     pub async fn interrupt(&self) {
+        self.interrupt_target("main").await;
+    }
+
+    /// Interrupt a specific named agent.
+    pub async fn interrupt_target(&self, target: &str) {
         let _ = self
             .conn
             .send_request(
                 methods::HUB_INTERRUPT.name,
-                serde_json::json!({"target": "main"}),
+                serde_json::json!({"target": target}),
             )
             .await;
     }

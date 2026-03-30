@@ -44,6 +44,7 @@ async fn spawn_and_result_full_chain() {
         child_rx,
         Some("parent"),
         Some("sonnet"),
+        None,
     )
     .await;
     tokio::time::sleep(Duration::from_millis(50)).await;
@@ -94,6 +95,7 @@ async fn agent_info_running_and_finished() {
         child_rx,
         Some("querier"),
         Some("opus"),
+        None,
     )
     .await;
     tokio::time::sleep(Duration::from_millis(100)).await;
@@ -215,7 +217,7 @@ async fn cascade_shutdown_interrupts_children() {
     let (_pa, pt) = loopal_ipc::duplex_pair();
     let parent = Arc::new(Connection::new(pt));
     let parent_rx = parent.start();
-    register_agent_connection(hub.clone(), "parent", parent, parent_rx, None, None).await;
+    register_agent_connection(hub.clone(), "parent", parent, parent_rx, None, None, None).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Register child with interrupt capture
@@ -230,6 +232,7 @@ async fn cascade_shutdown_interrupts_children() {
         server_conn,
         server_rx,
         Some("parent"),
+        None,
         None,
     )
     .await;

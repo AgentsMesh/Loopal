@@ -7,10 +7,11 @@ use loopal_tool_api::PermissionDecision;
 
 use super::permission_handler::PermissionHandler;
 
-/// Permission handler that forwards requests to the TUI via event channel.
+/// Permission handler that forwards requests via event channel.
 ///
-/// Used by `UnifiedFrontend` for root agents where a human approves/denies
-/// tool executions through the terminal UI.
+/// Used by `UnifiedFrontend` in the test harness when `PermissionMode::Supervised`
+/// is active. The paired `SessionController` on the test side responds via
+/// a channel to approve/deny tool executions.
 pub struct TuiPermissionHandler {
     event_tx: mpsc::Sender<AgentEvent>,
     permission_rx: Mutex<mpsc::Receiver<bool>>,

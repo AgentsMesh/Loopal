@@ -44,13 +44,16 @@ fn test_tool_call_without_prior_assistant_message_creates_one() {
     let app = make_app();
     {
         let mut state = app.session.lock();
-        state.messages.push(DisplayMessage {
-            role: "user".to_string(),
-            content: "do something".to_string(),
-            tool_calls: Vec::new(),
-            image_count: 0,
-            skill_info: None,
-        });
+        state
+            .active_conversation_mut()
+            .messages
+            .push(DisplayMessage {
+                role: "user".to_string(),
+                content: "do something".to_string(),
+                tool_calls: Vec::new(),
+                image_count: 0,
+                skill_info: None,
+            });
     }
     app.session
         .handle_event(AgentEvent::root(AgentEventPayload::ToolCall {
@@ -60,9 +63,10 @@ fn test_tool_call_without_prior_assistant_message_creates_one() {
         }));
 
     let state = app.session.lock();
-    assert_eq!(state.messages.len(), 2);
-    assert_eq!(state.messages[1].role, "assistant");
-    assert_eq!(state.messages[1].tool_calls.len(), 1);
+    let conv = state.active_conversation();
+    assert_eq!(conv.messages.len(), 2);
+    assert_eq!(conv.messages[1].role, "assistant");
+    assert_eq!(conv.messages[1].tool_calls.len(), 1);
 }
 
 #[test]
@@ -86,15 +90,13 @@ fn test_tool_result_error_updates_matching_tool() {
         }));
 
     let state = app.session.lock();
+    let conv = state.active_conversation();
+    assert_eq!(conv.messages[0].tool_calls[0].status, ToolCallStatus::Error);
     assert_eq!(
-        state.messages[0].tool_calls[0].status,
-        ToolCallStatus::Error
-    );
-    assert_eq!(
-        state.messages[0].tool_calls[0].result,
+        conv.messages[0].tool_calls[0].result,
         Some("failed!".into())
     );
-    assert!(state.messages[0].tool_calls[0].summary.contains("Write"));
+    assert!(conv.messages[0].tool_calls[0].summary.contains("Write"));
 }
 
 #[test]
@@ -119,7 +121,7 @@ fn test_tool_result_not_found_when_different_name() {
 
     // Now matches by id (not name), so the tool call IS updated
     assert_eq!(
-        app.session.lock().messages[0].tool_calls[0].status,
+        app.session.lock().active_conversation().messages[0].tool_calls[0].status,
         ToolCallStatus::Success
     );
 }
@@ -129,25 +131,28 @@ fn test_tool_result_with_multibyte_utf8_no_panic() {
     let app = make_app();
     {
         let mut state = app.session.lock();
-        state.messages.push(DisplayMessage {
-            role: "assistant".to_string(),
-            content: String::new(),
-            tool_calls: vec![DisplayToolCall {
-                name: "Read".to_string(),
-                id: "tc-1".to_string(),
-                status: ToolCallStatus::Pending,
-                summary: "Read(...)".to_string(),
-                result: None,
-                tool_input: None,
-                batch_id: None,
-                started_at: None,
-                duration_ms: None,
-                progress_tail: None,
-                metadata: None,
-            }],
-            image_count: 0,
-            skill_info: None,
-        });
+        state
+            .active_conversation_mut()
+            .messages
+            .push(DisplayMessage {
+                role: "assistant".to_string(),
+                content: String::new(),
+                tool_calls: vec![DisplayToolCall {
+                    name: "Read".to_string(),
+                    id: "tc-1".to_string(),
+                    status: ToolCallStatus::Pending,
+                    summary: "Read(...)".to_string(),
+                    result: None,
+                    tool_input: None,
+                    batch_id: None,
+                    started_at: None,
+                    duration_ms: None,
+                    progress_tail: None,
+                    metadata: None,
+                }],
+                image_count: 0,
+                skill_info: None,
+            });
     }
 
     let chinese_text = "# Coding Agent 架构综合分析与最终建议报告\n\n> 分析日期: 2026-03-13\n> 输入来源: 5 份架构分析报告";
@@ -163,7 +168,8 @@ fn test_tool_result_with_multibyte_utf8_no_panic() {
         }));
 
     let state = app.session.lock();
-    let tc = &state.messages[0].tool_calls[0];
+    let conv = state.active_conversation();
+    let tc = &conv.messages[0].tool_calls[0];
     assert_eq!(tc.status, ToolCallStatus::Success);
     assert!(tc.result.is_some());
     assert!(tc.summary.contains("Read"));
@@ -179,7 +185,8 @@ fn test_tool_call_with_multibyte_json_no_panic() {
     }));
 
     let state = app.session.lock();
-    assert_eq!(state.messages.len(), 1);
-    let tc = &state.messages[0].tool_calls[0];
+    let conv = state.active_conversation();
+    assert_eq!(conv.messages.len(), 1);
+    let tc = &conv.messages[0].tool_calls[0];
     assert!(tc.summary.contains("Read"));
 }

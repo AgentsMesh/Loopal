@@ -95,13 +95,7 @@ pub async fn build_acp_harness(
         let mut h = hub.lock().await;
         let _ = h.registry.register_connection("main", agent_conn.clone());
     }
-    loopal_agent_hub::agent_io::spawn_io_loop(
-        hub.clone(),
-        "main",
-        agent_conn,
-        agent_incoming,
-        true,
-    );
+    loopal_agent_hub::agent_io::spawn_io_loop(hub.clone(), "main", agent_conn, agent_incoming);
 
     // 7. Spawn ACP adapter using UiSession
     let acp_out = Arc::new(JsonRpcTransport::with_writer(Box::new(acp_write)));

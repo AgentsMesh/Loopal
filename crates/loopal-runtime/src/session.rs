@@ -3,7 +3,7 @@ use std::path::Path;
 use loopal_error::Result;
 use loopal_message::Message;
 use loopal_storage::entry::{Marker, TaggedEntry};
-use loopal_storage::{MessageStore, Session, SessionStore};
+use loopal_storage::{MessageStore, Session, SessionStore, SubAgentRef};
 use tracing::info;
 
 /// Manages session creation, resumption, and message persistence.
@@ -42,6 +42,19 @@ impl SessionManager {
         let messages = self.message_store.load_messages(session_id)?;
         info!(session_id = %session_id, message_count = messages.len(), "session resumed");
         Ok((session, messages))
+    }
+
+    /// Load messages for a sub-agent session (by session_id).
+    pub fn load_messages(&self, session_id: &str) -> Result<Vec<Message>> {
+        let messages = self.message_store.load_messages(session_id)?;
+        Ok(messages)
+    }
+
+    /// Record a sub-agent reference in the parent session.
+    pub fn add_sub_agent(&self, parent_session_id: &str, sub_ref: SubAgentRef) -> Result<()> {
+        self.session_store
+            .add_sub_agent(parent_session_id, sub_ref)?;
+        Ok(())
     }
 
     /// Persist a message to the session's message store.

@@ -3,11 +3,12 @@ pub mod command;
 pub mod event;
 pub mod input;
 mod key_dispatch;
+mod key_dispatch_ops;
 pub mod markdown;
 pub mod render;
+mod render_layout;
 pub mod terminal;
 pub(crate) mod text_util;
-mod tui_helpers;
 mod tui_loop;
 pub mod views;
 

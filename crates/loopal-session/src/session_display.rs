@@ -3,7 +3,8 @@
 use loopal_protocol::UserContent;
 
 use crate::controller::SessionController;
-use crate::helpers::push_system_msg;
+use crate::conversation_display::push_system_msg;
+use crate::state::ROOT_AGENT;
 use crate::types::DisplayMessage;
 
 impl SessionController {
@@ -12,11 +13,19 @@ impl SessionController {
     }
 
     pub fn push_system_message(&self, content: String) {
-        push_system_msg(&mut self.lock(), &content);
+        let mut state = self.lock();
+        let conv = state.active_conversation_mut();
+        push_system_msg(conv, &content);
     }
 
     pub fn push_welcome(&self, model: &str, path: &str) {
-        self.lock().messages.push(DisplayMessage {
+        let mut state = self.lock();
+        let conv = &mut state
+            .agents
+            .get_mut(ROOT_AGENT)
+            .expect("main agent missing")
+            .conversation;
+        conv.messages.push(DisplayMessage {
             role: "welcome".into(),
             content: format!("{model}\n{path}"),
             tool_calls: Vec::new(),
@@ -26,6 +35,12 @@ impl SessionController {
     }
 
     pub fn load_display_history(&self, display_msgs: Vec<DisplayMessage>) {
-        self.lock().messages = display_msgs;
+        let mut state = self.lock();
+        let conv = &mut state
+            .agents
+            .get_mut(ROOT_AGENT)
+            .expect("main agent missing")
+            .conversation;
+        conv.messages = display_msgs;
     }
 }

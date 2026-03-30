@@ -3,9 +3,9 @@ use loopal_tool_api::PermissionDecision;
 
 /// Permission handler trait for agent permission decisions.
 ///
-/// `UnifiedFrontend` delegates `request_permission` to this trait,
-/// enabling pluggable strategies: auto-deny for sub-agents, TUI forwarding
-/// for root agents, or custom logic.
+/// `UnifiedFrontend` (test harness) delegates `request_permission` to this
+/// trait, enabling pluggable strategies: auto-deny for bypass mode, or
+/// channel-based TUI forwarding for supervised mode.
 #[async_trait]
 pub trait PermissionHandler: Send + Sync {
     async fn decide(&self, id: &str, name: &str, input: &serde_json::Value) -> PermissionDecision;

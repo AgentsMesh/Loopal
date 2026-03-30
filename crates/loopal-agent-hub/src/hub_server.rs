@@ -38,7 +38,7 @@ pub fn connect_local(
     let server_conn = Arc::new(Connection::new(server_transport));
     let client_rx = client_conn.start();
     let server_rx = server_conn.start();
-    crate::agent_io::start_agent_io(hub, name, server_conn, server_rx, false);
+    crate::agent_io::start_agent_io(hub, name, server_conn, server_rx);
     (client_conn, client_rx)
 }
 
@@ -70,7 +70,7 @@ pub async fn accept_loop(listener: TcpListener, hub: Arc<Mutex<Hub>>, token: Str
                             }
                         }
                     });
-                    crate::agent_io::start_agent_io(hub, &name, conn, owned_rx, false);
+                    crate::agent_io::start_agent_io(hub, &name, conn, owned_rx);
                 }
                 Err(e) => {
                     warn!(%addr, error = %e, "Hub: TCP client rejected");

@@ -43,6 +43,7 @@ async fn register_agent_connection_makes_agent_routable() {
         server_rx,
         None,
         None,
+        None,
     )
     .await;
     assert!(!agent_id.is_empty());
@@ -119,7 +120,16 @@ async fn wait_agent_returns_when_agent_disconnects() {
     let _agent_rx = agent_conn.start();
     let server_rx = server_conn.start();
 
-    register_agent_connection(hub.clone(), "ephemeral", server_conn, server_rx, None, None).await;
+    register_agent_connection(
+        hub.clone(),
+        "ephemeral",
+        server_conn,
+        server_rx,
+        None,
+        None,
+        None,
+    )
+    .await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Start waiting in background
@@ -178,7 +188,16 @@ async fn spawned_agent_routes_message_to_parent() {
 
     let _child_rx = child_conn.start();
     let server_rx = server_conn.start();
-    register_agent_connection(hub.clone(), "child", server_conn, server_rx, None, None).await;
+    register_agent_connection(
+        hub.clone(),
+        "child",
+        server_conn,
+        server_rx,
+        None,
+        None,
+        None,
+    )
+    .await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Child sends hub/route targeting parent

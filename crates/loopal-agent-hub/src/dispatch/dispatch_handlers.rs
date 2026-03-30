@@ -88,14 +88,23 @@ pub async fn handle_spawn_agent(
     let cwd = params["cwd"].as_str().unwrap_or(".").to_string();
     let model = params["model"].as_str().map(String::from);
     let prompt = params["prompt"].as_str().map(String::from);
+    let permission_mode = params["permission_mode"].as_str().map(String::from);
     let parent = Some(from_agent.to_string());
 
     info!(agent = %name, parent = %from_agent, "handle_spawn_agent start");
     let hub_clone = hub.clone();
     let name_clone = name.clone();
     let handle = tokio::spawn(async move {
-        crate::spawn_manager::spawn_and_register(hub_clone, name_clone, cwd, model, prompt, parent)
-            .await
+        crate::spawn_manager::spawn_and_register(
+            hub_clone,
+            name_clone,
+            cwd,
+            model,
+            prompt,
+            parent,
+            permission_mode,
+        )
+        .await
     });
 
     let agent_id = handle

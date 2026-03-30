@@ -39,12 +39,13 @@ fn test_ctrl_c_denies_permission() {
     let mut app = make_app();
     {
         let mut state = app.session.lock();
-        state.pending_permission = Some(loopal_session::types::PendingPermission {
-            id: "1".into(),
-            name: "Bash".into(),
-            input: "rm".into(),
-            relay_request_id: None,
-        });
+        state.active_conversation_mut().pending_permission =
+            Some(loopal_session::types::PendingPermission {
+                id: "1".into(),
+                name: "Bash".into(),
+                input: "rm".into(),
+                relay_request_id: None,
+            });
     }
     let action = handle_key(&mut app, ctrl('c'));
     assert!(matches!(action, InputAction::ToolDeny));
@@ -55,23 +56,24 @@ fn test_ctrl_c_cancels_question() {
     let mut app = make_app();
     {
         let mut state = app.session.lock();
-        state.pending_question = Some(loopal_session::types::PendingQuestion::new(
-            "q1".into(),
-            vec![Question {
-                question: "Pick one".into(),
-                options: vec![
-                    QuestionOption {
-                        label: "A".into(),
-                        description: "Option A".into(),
-                    },
-                    QuestionOption {
-                        label: "B".into(),
-                        description: "Option B".into(),
-                    },
-                ],
-                allow_multiple: false,
-            }],
-        ));
+        state.active_conversation_mut().pending_question =
+            Some(loopal_session::types::PendingQuestion::new(
+                "q1".into(),
+                vec![Question {
+                    question: "Pick one".into(),
+                    options: vec![
+                        QuestionOption {
+                            label: "A".into(),
+                            description: "Option A".into(),
+                        },
+                        QuestionOption {
+                            label: "B".into(),
+                            description: "Option B".into(),
+                        },
+                    ],
+                    allow_multiple: false,
+                }],
+            ));
     }
     let action = handle_key(&mut app, ctrl('c'));
     assert!(matches!(action, InputAction::QuestionCancel));

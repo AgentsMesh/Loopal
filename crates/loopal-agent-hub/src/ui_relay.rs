@@ -29,6 +29,12 @@ pub(crate) async fn relay_to_ui_clients(
     params: serde_json::Value,
     agent_name: &str,
 ) {
+    // Enrich params with agent_name so UI clients know which agent sent the request.
+    let mut enriched = params;
+    if let Some(obj) = enriched.as_object_mut() {
+        obj.insert("agent_name".into(), serde_json::json!(agent_name));
+    }
+
     let ui_conns = {
         let h = hub.lock().await;
         h.ui.get_client_connections()
@@ -45,13 +51,13 @@ pub(crate) async fn relay_to_ui_clients(
     // Single UI client: direct relay (no race overhead)
     if ui_conns.len() == 1 {
         let (name, conn) = &ui_conns[0];
-        let response = relay_single(conn, method, &params, name, agent_name).await;
+        let response = relay_single(conn, method, &enriched, name, agent_name).await;
         let _ = agent_conn.respond(request_id, response).await;
         return;
     }
 
     // Multiple UI clients: race — first response wins
-    let response = race_relay(&ui_conns, method, &params, agent_name).await;
+    let response = race_relay(&ui_conns, method, &enriched, agent_name).await;
     let _ = agent_conn.respond(request_id, response).await;
 }
 

@@ -35,7 +35,12 @@ async fn test_approve_permission() {
     }));
 
     ctrl.approve_permission().await;
-    assert!(ctrl.lock().pending_permission.is_none());
+    assert!(
+        ctrl.lock()
+            .active_conversation()
+            .pending_permission
+            .is_none()
+    );
     assert_eq!(perm_rx.recv().await, Some(true));
 }
 
@@ -49,14 +54,19 @@ async fn test_deny_permission() {
     }));
 
     ctrl.deny_permission().await;
-    assert!(ctrl.lock().pending_permission.is_none());
+    assert!(
+        ctrl.lock()
+            .active_conversation()
+            .pending_permission
+            .is_none()
+    );
     assert_eq!(perm_rx.recv().await, Some(false));
 }
 
 #[tokio::test]
 async fn test_enqueue_message_forwards_when_idle() {
     let (ctrl, _, _) = make_controller();
-    ctrl.lock().agent_idle = true;
+    ctrl.lock().active_conversation_mut().agent_idle = true;
     let result = ctrl.enqueue_message("hello".into());
     assert_eq!(result.map(|c| c.text), Some("hello".to_string()));
 }
@@ -64,7 +74,7 @@ async fn test_enqueue_message_forwards_when_idle() {
 #[tokio::test]
 async fn test_enqueue_message_queues_when_busy() {
     let (ctrl, _, _) = make_controller();
-    ctrl.lock().agent_idle = false;
+    ctrl.lock().active_conversation_mut().agent_idle = false;
 
     let result = ctrl.enqueue_message("queued".into());
     assert!(result.is_none());
@@ -93,8 +103,9 @@ async fn test_switch_model() {
     {
         let state = ctrl.lock();
         assert_eq!(state.model, "gpt-4");
-        assert_eq!(state.messages.len(), 1);
-        assert!(state.messages[0].content.contains("gpt-4"));
+        let conv = state.active_conversation();
+        assert_eq!(conv.messages.len(), 1);
+        assert!(conv.messages[0].content.contains("gpt-4"));
     }
 
     match control_rx.recv().await {
@@ -123,12 +134,13 @@ async fn test_clear() {
 
     {
         let state = ctrl.lock();
-        assert!(state.messages.is_empty());
+        let conv = state.active_conversation();
+        assert!(conv.messages.is_empty());
         assert!(state.inbox.is_empty());
-        assert!(state.streaming_text.is_empty());
-        assert_eq!(state.turn_count, 0);
-        assert_eq!(state.input_tokens, 0);
-        assert_eq!(state.output_tokens, 0);
+        assert!(conv.streaming_text.is_empty());
+        assert_eq!(conv.turn_count, 0);
+        assert_eq!(conv.input_tokens, 0);
+        assert_eq!(conv.output_tokens, 0);
     }
 
     match control_rx.recv().await {
@@ -155,16 +167,12 @@ async fn test_hub_approve_permission_sends_response() {
     use loopal_agent_hub::HubClient;
     use std::sync::Arc;
 
-    // Create a duplex to simulate Hub connection
     let (client_side, server_side) = tokio::io::duplex(4096);
     let client_transport: Arc<dyn loopal_ipc::transport::Transport> =
         Arc::new(loopal_ipc::StdioTransport::new(
             Box::new(tokio::io::BufReader::new(client_side)),
             Box::new(server_side),
         ));
-    // We don't need a real Hub — just verify the response is sent.
-    // The connection will error but that's fine for this unit test.
-
     let conn = Arc::new(loopal_ipc::connection::Connection::new(client_transport));
     let _rx = conn.start();
     let hub_client = Arc::new(HubClient::new(conn));
@@ -172,7 +180,6 @@ async fn test_hub_approve_permission_sends_response() {
 
     let ctrl = SessionController::with_hub("test".to_string(), "act".to_string(), hub_client, hub);
 
-    // Set up pending permission with relay_request_id
     ctrl.handle_event(AgentEvent::root(AgentEventPayload::ToolPermissionRequest {
         id: "p1".to_string(),
         name: "bash".to_string(),
@@ -180,12 +187,17 @@ async fn test_hub_approve_permission_sends_response() {
     }));
     {
         let mut state = ctrl.lock();
-        if let Some(ref mut perm) = state.pending_permission {
+        let conv = state.active_conversation_mut();
+        if let Some(ref mut perm) = conv.pending_permission {
             perm.relay_request_id = Some(42);
         }
     }
 
-    // approve should not panic (response goes to duplex — may error but shouldn't crash)
     ctrl.approve_permission().await;
-    assert!(ctrl.lock().pending_permission.is_none());
+    assert!(
+        ctrl.lock()
+            .active_conversation()
+            .pending_permission
+            .is_none()
+    );
 }

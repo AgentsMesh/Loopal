@@ -60,9 +60,10 @@ impl CommandHandler for StatusCmd {
     }
     async fn execute(&self, app: &mut App, _arg: Option<&str>) -> CommandEffect {
         let state = app.session.lock();
-        let token_count = state.token_count();
-        let context_info = if state.context_window > 0 {
-            format!("{}k/{}k", token_count / 1000, state.context_window / 1000)
+        let conv = state.active_conversation();
+        let token_count = conv.token_count();
+        let context_info = if conv.context_window > 0 {
+            format!("{}k/{}k", token_count / 1000, conv.context_window / 1000)
         } else {
             format!("{token_count} tokens")
         };
@@ -71,7 +72,7 @@ impl CommandHandler for StatusCmd {
             state.mode.to_uppercase(),
             state.model,
             context_info,
-            state.turn_count,
+            conv.turn_count,
             app.cwd.display(),
         );
         drop(state);

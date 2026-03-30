@@ -16,7 +16,8 @@ pub const SPINNER: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", 
 pub fn render_unified_status(f: &mut Frame, state: &SessionState, area: Rect) {
     let is_plan = state.mode == "plan";
     let mut spans: Vec<Span<'static>> = Vec::with_capacity(16);
-    let elapsed = state.turn_elapsed();
+    let conv = state.active_conversation();
+    let elapsed = conv.turn_elapsed();
     let is_active = is_agent_active(state);
 
     // Spinner / status icon + label + elapsed time (primary cluster)
@@ -47,10 +48,16 @@ pub fn render_unified_status(f: &mut Frame, state: &SessionState, area: Rect) {
         ));
     }
 
-    // Model
+    // Model — show viewed agent's model if available, fall back to session model
+    let display_model = state
+        .agents
+        .get(&state.active_view)
+        .map(|a| a.observable.model.as_str())
+        .filter(|m| !m.is_empty())
+        .unwrap_or(&state.model);
     spans.push(Span::raw("  "));
     spans.push(Span::styled(
-        state.model.clone(),
+        display_model.to_string(),
         Style::default().fg(Color::Cyan),
     ));
 
@@ -72,27 +79,28 @@ fn status_icon_and_label(
     elapsed: std::time::Duration,
     _is_active: bool,
 ) -> (String, Style, &'static str) {
-    if state.thinking_active {
+    let conv = state.active_conversation();
+    if conv.thinking_active {
         let frame = spinner_frame(elapsed);
         (
             frame.to_string(),
             Style::default().fg(Color::Magenta),
             "Thinking",
         )
-    } else if !state.streaming_text.is_empty() {
+    } else if !conv.streaming_text.is_empty() {
         let frame = spinner_frame(elapsed);
         (
             frame.to_string(),
             Style::default().fg(Color::Green),
             "Streaming",
         )
-    } else if state.pending_permission.is_some() {
+    } else if conv.pending_permission.is_some() {
         (
             "●".to_string(),
             Style::default().fg(Color::Yellow),
             "Waiting",
         )
-    } else if !state.agent_idle {
+    } else if !conv.agent_idle {
         let frame = spinner_frame(elapsed);
         (
             frame.to_string(),
@@ -122,9 +130,10 @@ pub fn spinner_frame(elapsed: std::time::Duration) -> &'static str {
 }
 
 fn is_agent_active(state: &SessionState) -> bool {
-    !state.agent_idle
-        || !state.streaming_text.is_empty()
-        || state.thinking_active
+    let conv = state.active_conversation();
+    !conv.agent_idle
+        || !conv.streaming_text.is_empty()
+        || conv.thinking_active
         || has_live_subagents(state)
 }
 
@@ -140,9 +149,10 @@ fn has_live_subagents(state: &SessionState) -> bool {
 }
 
 fn context_info(state: &SessionState) -> String {
-    let total = state.token_count();
-    if state.context_window > 0 {
-        format!("ctx:{}k/{}k", total / 1000, state.context_window / 1000)
+    let conv = state.active_conversation();
+    let total = conv.token_count();
+    if conv.context_window > 0 {
+        format!("ctx:{}k/{}k", total / 1000, conv.context_window / 1000)
     } else {
         format!("{}k tok", total / 1000)
     }

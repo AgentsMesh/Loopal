@@ -30,15 +30,17 @@ pub fn render_progress(
         return false;
     }
 
+    let conv = state.active_conversation();
+
     // Update cache with width for pre-wrapping (resize triggers full rebuild)
-    line_cache.update(&state.messages, area.width);
+    line_cache.update(&conv.messages, area.width);
 
     // Streaming lines (pre-wrapped at current width)
-    let streaming = streaming_to_lines(&state.streaming_text, area.width);
+    let streaming = streaming_to_lines(&conv.streaming_text, area.width);
 
     // Thinking indicator (shown during active thinking)
-    let thinking_lines = if state.thinking_active {
-        let token_est = state.streaming_thinking.len() as u32 / 4;
+    let thinking_lines = if conv.thinking_active {
+        let token_est = conv.streaming_thinking.len() as u32 / 4;
         let label = format!("Thinking... ({token_est} tokens)");
         vec![Line::from(Span::styled(
             label,

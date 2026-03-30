@@ -37,6 +37,7 @@ async fn wait_agent_does_not_block_io_loop() {
         child_a_rx,
         None,
         None,
+        None,
     )
     .await;
 
@@ -46,6 +47,7 @@ async fn wait_agent_does_not_block_io_loop() {
         "child-b",
         child_b_server,
         child_b_rx,
+        None,
         None,
         None,
     )
@@ -120,6 +122,7 @@ async fn spawn_after_wait_not_blocked() {
         "existing-child",
         child_server,
         child_rx,
+        None,
         None,
         None,
     )

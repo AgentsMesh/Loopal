@@ -17,10 +17,11 @@ fn test_token_usage() {
     }));
 
     let state = ctrl.lock();
-    assert_eq!(state.input_tokens, 100);
-    assert_eq!(state.output_tokens, 50);
-    assert_eq!(state.context_window, 200_000);
-    assert_eq!(state.token_count(), 150);
+    let conv = state.active_conversation();
+    assert_eq!(conv.input_tokens, 100);
+    assert_eq!(conv.output_tokens, 50);
+    assert_eq!(conv.context_window, 200_000);
+    assert_eq!(conv.token_count(), 150);
 }
 
 #[test]
@@ -29,7 +30,8 @@ fn test_mode_changed() {
     ctrl.handle_event(AgentEvent::root(AgentEventPayload::ModeChanged {
         mode: "plan".to_string(),
     }));
-    assert_eq!(ctrl.lock().mode, "plan");
+    // ModeChanged updates observable.mode on the agent
+    assert_eq!(ctrl.lock().agents["main"].observable.mode, "plan");
 }
 
 #[test]
@@ -40,8 +42,9 @@ fn test_error_event() {
     }));
 
     let state = ctrl.lock();
-    assert_eq!(state.messages.len(), 1);
-    assert_eq!(state.messages[0].role, "error");
+    let conv = state.active_conversation();
+    assert_eq!(conv.messages.len(), 1);
+    assert_eq!(conv.messages[0].role, "error");
 }
 
 #[test]
@@ -50,9 +53,10 @@ fn test_push_system_message() {
     ctrl.push_system_message("hello".to_string());
 
     let state = ctrl.lock();
-    assert_eq!(state.messages.len(), 1);
-    assert_eq!(state.messages[0].role, "system");
-    assert_eq!(state.messages[0].content, "hello");
+    let conv = state.active_conversation();
+    assert_eq!(conv.messages.len(), 1);
+    assert_eq!(conv.messages[0].role, "system");
+    assert_eq!(conv.messages[0].content, "hello");
 }
 
 #[test]

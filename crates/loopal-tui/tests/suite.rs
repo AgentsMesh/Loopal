@@ -45,6 +45,12 @@ mod message_lines_test;
 mod skill_render_test;
 #[path = "suite/styled_wrap_test.rs"]
 mod styled_wrap_test;
+#[path = "suite/view_switch_focus_keys_test.rs"]
+mod view_switch_focus_keys_test;
+#[path = "suite/view_switch_panel_lifecycle_test.rs"]
+mod view_switch_panel_lifecycle_test;
+#[path = "suite/view_switch_test.rs"]
+mod view_switch_test;
 
 // E2E tests
 #[path = "suite/e2e_compact_edge_test.rs"]

@@ -92,6 +92,7 @@ fn test_update_nonexistent_session_returns_error() {
         created_at: chrono::Utc::now(),
         updated_at: chrono::Utc::now(),
         mode: "default".to_string(),
+        sub_agents: Vec::new(),
     };
 
     let result = store.update_session(&session);

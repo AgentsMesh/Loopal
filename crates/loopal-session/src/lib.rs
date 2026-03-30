@@ -1,9 +1,12 @@
+pub mod agent_conversation;
 mod agent_handler;
+mod agent_lifecycle;
 mod agent_ops;
 pub mod controller;
+mod controller_control;
 mod controller_ops;
+mod conversation_display;
 pub mod event_handler;
-mod helpers;
 pub mod inbox;
 pub mod message_log;
 pub mod rewind;
@@ -16,7 +19,9 @@ mod tool_result_handler;
 pub(crate) mod truncate;
 pub mod types;
 
+pub use agent_conversation::AgentConversation;
 pub use controller::SessionController;
+pub use state::{PendingSubAgentRef, ROOT_AGENT};
 pub use types::{
     DisplayMessage, DisplayToolCall, PendingPermission, PendingQuestion, ToolCallStatus,
 };

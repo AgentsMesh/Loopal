@@ -1,25 +1,25 @@
-//! Display-side rewind: truncate SessionState messages to match runtime state.
+//! Display-side rewind: truncate conversation messages to match runtime state.
 
-use crate::state::SessionState;
+use crate::agent_conversation::AgentConversation;
 use crate::types::DisplayMessage;
 
 /// Truncate display messages to retain only the first `remaining_turns` user turns.
 ///
 /// A "turn" in the display layer is a user message followed by its assistant responses
 /// and tool calls. We count user-role display messages to find the truncation point.
-pub fn truncate_display_to_turn(state: &mut SessionState, remaining_turns: usize) {
+pub fn truncate_display_to_turn(conv: &mut AgentConversation, remaining_turns: usize) {
     if remaining_turns == 0 {
-        state.messages.clear();
-        state.streaming_text.clear();
-        state.turn_count = 0;
-        state.reset_timer();
+        conv.messages.clear();
+        conv.streaming_text.clear();
+        conv.turn_count = 0;
+        conv.reset_timer();
         return;
     }
 
-    let cut = find_display_cut_index(&state.messages, remaining_turns);
-    state.messages.truncate(cut);
-    state.streaming_text.clear();
-    state.turn_count = remaining_turns as u32;
+    let cut = find_display_cut_index(&conv.messages, remaining_turns);
+    conv.messages.truncate(cut);
+    conv.streaming_text.clear();
+    conv.turn_count = remaining_turns as u32;
 }
 
 /// Find the index of the first display message belonging to turn N+1

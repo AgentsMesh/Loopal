@@ -4,10 +4,10 @@ use loopal_protocol::AgentEventPayload;
 use tracing::{debug, error, info};
 
 use super::cancel::TurnCancel;
+use super::question_parse::{format_answers, parse_questions};
 use super::runner::AgentLoopRunner;
 use super::tool_exec::execute_approved_tools;
 use super::tools_inject::success_block;
-use super::tools_util::{format_answers, parse_questions};
 use crate::mode::AgentMode;
 
 impl AgentLoopRunner {

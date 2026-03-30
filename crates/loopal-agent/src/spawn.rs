@@ -15,6 +15,8 @@ pub struct SpawnParams {
     pub model: Option<String>,
     /// Override the working directory (e.g. for worktree isolation).
     pub cwd_override: Option<PathBuf>,
+    /// Permission mode to propagate from parent agent.
+    pub permission_mode: Option<String>,
 }
 
 /// Result returned from Hub after spawning.
@@ -40,6 +42,7 @@ pub async fn spawn_agent(
         "cwd": cwd,
         "model": params.model,
         "prompt": params.prompt,
+        "permission_mode": params.permission_mode,
     });
 
     tracing::info!(agent = %params.name, "sending hub/spawn_agent request");

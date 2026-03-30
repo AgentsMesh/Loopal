@@ -47,6 +47,7 @@ impl MemoryProcessor for ServerMemoryProcessor {
             ),
             model: Some(self.model.clone()),
             cwd_override: None,
+            permission_mode: None,
         };
         spawn_agent(&self.shared, params).await?;
         info!("memory-maintainer agent spawned via Hub");

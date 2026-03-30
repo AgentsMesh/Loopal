@@ -41,11 +41,11 @@ check: clippy fmt test
 
 MODEL ?= claude-opus-4-6
 
-run:
-	bazel run //:loopal -- -m $(MODEL) $(ARGS)
+run: build
+	./bazel-bin/loopal -m $(MODEL) $(ARGS)
 
-debug:
-	LOOPAL_LOG=debug bazel run //:loopal -- -m $(MODEL) $(ARGS)
+debug: build
+	LOOPAL_LOG=debug ./bazel-bin/loopal -m $(MODEL) $(ARGS)
 
 # ── Dependencies ─────────────────────────────────────────────────────────────
 

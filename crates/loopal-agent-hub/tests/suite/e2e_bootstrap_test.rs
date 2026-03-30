@@ -64,7 +64,7 @@ async fn full_bootstrap_hub_to_agent_roundtrip() {
 
     // 4. Register root agent stdio in Hub
     let (root_conn, incoming_rx) = client.into_parts();
-    agent_io::start_agent_io(hub.clone(), "main", root_conn.clone(), incoming_rx, true);
+    agent_io::start_agent_io(hub.clone(), "main", root_conn.clone(), incoming_rx);
 
     // 5. Wait for AwaitingInput event (agent is ready for input)
     let mut got_awaiting = false;

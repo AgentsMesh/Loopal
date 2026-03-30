@@ -1,13 +1,16 @@
 //! Key-action dispatch — maps InputAction → side effects + quit flag.
 
-use loopal_protocol::{AgentMode, UserContent};
+use loopal_protocol::AgentMode;
 
 use crate::app::App;
-use crate::command::CommandEffect;
 use crate::event::EventHandler;
 use crate::input::paste;
-use crate::input::{InputAction, SubPageResult, handle_key};
-use crate::tui_helpers::{cycle_focus, handle_question_confirm, route_human_message};
+use crate::input::{InputAction, handle_key};
+use crate::key_dispatch_ops::{
+    cycle_agent_focus, handle_effect, handle_sub_page_confirm, push_to_inbox,
+    terminate_focused_agent,
+};
+use crate::views::progress::LineCache;
 
 /// Process a single key event and return `true` if the TUI should quit.
 pub(crate) async fn handle_key_action(
@@ -30,13 +33,25 @@ pub(crate) async fn handle_key_action(
             false
         }
         InputAction::ToolApprove => {
-            if app.session.lock().pending_permission.is_some() {
+            let has = app
+                .session
+                .lock()
+                .active_conversation()
+                .pending_permission
+                .is_some();
+            if has {
                 app.session.approve_permission().await;
             }
             false
         }
         InputAction::ToolDeny => {
-            if app.session.lock().pending_permission.is_some() {
+            let has = app
+                .session
+                .lock()
+                .active_conversation()
+                .pending_permission
+                .is_some();
+            if has {
                 app.session.deny_permission().await;
             }
             false
@@ -67,33 +82,93 @@ pub(crate) async fn handle_key_action(
             false
         }
         InputAction::FocusNextAgent => {
-            cycle_focus(app);
+            cycle_agent_focus(app, true);
+            false
+        }
+        InputAction::FocusPrevAgent => {
+            cycle_agent_focus(app, false);
             false
         }
         InputAction::UnfocusAgent => {
-            app.session.lock().focused_agent = None;
+            app.focused_agent = None;
+            false
+        }
+        InputAction::TerminateFocusedAgent => {
+            terminate_focused_agent(app).await;
+            false
+        }
+        InputAction::EnterAgentView => {
+            if let Some(name) = app.focused_agent.clone() {
+                if app.session.enter_agent_view(&name) {
+                    app.scroll_offset = 0;
+                    app.line_cache = LineCache::new();
+                    app.last_esc_time = None; // prevent stale double-ESC rewind
+                }
+            }
+            false
+        }
+        InputAction::ExitAgentView => {
+            app.session.exit_agent_view();
+            app.scroll_offset = 0;
+            app.line_cache = LineCache::new();
+            app.last_esc_time = None; // prevent stale double-ESC rewind
             false
         }
         InputAction::QuestionUp => {
-            if let Some(ref mut q) = app.session.lock().pending_question {
+            if let Some(ref mut q) = app
+                .session
+                .lock()
+                .active_conversation_mut()
+                .pending_question
+            {
                 q.cursor_up();
             }
             false
         }
         InputAction::QuestionDown => {
-            if let Some(ref mut q) = app.session.lock().pending_question {
+            if let Some(ref mut q) = app
+                .session
+                .lock()
+                .active_conversation_mut()
+                .pending_question
+            {
                 q.cursor_down();
             }
             false
         }
         InputAction::QuestionToggle => {
-            if let Some(ref mut q) = app.session.lock().pending_question {
+            if let Some(ref mut q) = app
+                .session
+                .lock()
+                .active_conversation_mut()
+                .pending_question
+            {
                 q.toggle();
             }
             false
         }
         InputAction::QuestionConfirm => {
-            handle_question_confirm(app).await;
+            let answers = app
+                .session
+                .lock()
+                .active_conversation()
+                .pending_question
+                .as_ref()
+                .map(|q| {
+                    let ans = q.get_answers();
+                    if ans.is_empty() && !q.questions[q.current_question].allow_multiple {
+                        vec![
+                            q.questions[q.current_question].options[q.cursor]
+                                .label
+                                .clone(),
+                        ]
+                    } else {
+                        ans
+                    }
+                });
+            if let Some(answers) = answers {
+                app.session.answer_question(answers).await;
+            }
             false
         }
         InputAction::QuestionCancel => {
@@ -103,59 +178,5 @@ pub(crate) async fn handle_key_action(
             false
         }
         InputAction::None => false,
-    }
-}
-
-async fn push_to_inbox(app: &mut App, content: UserContent) {
-    // For skill invocations, record the slash command (not the expanded body)
-    let history_text = match &content.skill_info {
-        Some(si) if si.user_args.is_empty() => si.name.clone(),
-        Some(si) => format!("{} {}", si.name, si.user_args),
-        None => content.text.clone(),
-    };
-    app.input_history.push(history_text);
-    app.history_index = None;
-    if let Some(msg) = app.session.enqueue_message(content) {
-        tracing::debug!("TUI: message forwarded to agent");
-        route_human_message(app, msg).await;
-    } else {
-        tracing::debug!("TUI: agent busy, message queued + interrupt sent");
-        app.session.interrupt();
-    }
-}
-
-async fn handle_effect(app: &mut App, effect: CommandEffect) -> bool {
-    match effect {
-        CommandEffect::Done => false,
-        CommandEffect::InboxPush(content) => {
-            push_to_inbox(app, content).await;
-            false
-        }
-        CommandEffect::ModeSwitch(mode) => {
-            app.session.switch_mode(mode).await;
-            false
-        }
-        CommandEffect::Quit => {
-            app.exiting = true;
-            true
-        }
-    }
-}
-
-async fn handle_sub_page_confirm(app: &mut App, result: SubPageResult) {
-    match result {
-        SubPageResult::ModelSelected(name) => {
-            app.session.switch_model(name).await;
-        }
-        SubPageResult::ModelAndThinkingSelected {
-            model,
-            thinking_json,
-        } => {
-            app.session.switch_model(model).await;
-            app.session.switch_thinking(thinking_json).await;
-        }
-        SubPageResult::RewindConfirmed(turn_index) => {
-            app.session.rewind(turn_index).await;
-        }
     }
 }

@@ -10,6 +10,7 @@ rust_binary(
         "//crates/loopal-tool-api",
         "//crates/loopal-config",
         "//crates/loopal-runtime",
+        "//crates/loopal-storage",
         "//crates/loopal-session",
         "//crates/loopal-agent-hub",
         "//crates/loopal-tui",

@@ -1,14 +1,14 @@
-use crate::state::SessionState;
+use crate::agent_conversation::AgentConversation;
 use crate::types::DisplayMessage;
 
 /// Handle ThinkingComplete: flush thinking buffer and create summary message.
-pub fn handle_thinking_complete(state: &mut SessionState, token_count: u32) {
-    state.thinking_active = false;
-    state.thinking_tokens += token_count;
-    if !state.streaming_thinking.is_empty() {
-        let thinking = std::mem::take(&mut state.streaming_thinking);
+pub fn handle_thinking_complete(conv: &mut AgentConversation, token_count: u32) {
+    conv.thinking_active = false;
+    conv.thinking_tokens += token_count;
+    if !conv.streaming_thinking.is_empty() {
+        let thinking = std::mem::take(&mut conv.streaming_thinking);
         let summary = format_thinking_summary(&thinking, token_count);
-        state.messages.push(DisplayMessage {
+        conv.messages.push(DisplayMessage {
             role: "thinking".to_string(),
             content: summary,
             tool_calls: Vec::new(),

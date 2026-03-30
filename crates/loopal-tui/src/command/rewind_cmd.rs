@@ -23,13 +23,14 @@ impl CommandHandler for RewindCmd {
 
 fn open_rewind_picker(app: &mut App) {
     let state = app.session.lock();
-    if !state.agent_idle {
+    let conv = state.active_conversation();
+    if !conv.agent_idle {
         drop(state);
         app.session
             .push_system_message("Cannot rewind while the agent is busy.".into());
         return;
     }
-    let turns: Vec<RewindTurnItem> = state
+    let turns: Vec<RewindTurnItem> = conv
         .messages
         .iter()
         .enumerate()

@@ -120,7 +120,11 @@ async fn test_init_system_message_shows_generate() {
     handler.execute(&mut app, None).await;
 
     let state = app.session.lock();
-    let last = state.messages.last().expect("expected system message");
+    let last = state
+        .active_conversation()
+        .messages
+        .last()
+        .expect("expected system message");
     assert!(last.content.contains("generate LOOPAL.md"));
 }
 
@@ -134,6 +138,10 @@ async fn test_init_system_message_shows_update_when_existing() {
     handler.execute(&mut app, None).await;
 
     let state = app.session.lock();
-    let last = state.messages.last().expect("expected system message");
+    let last = state
+        .active_conversation()
+        .messages
+        .last()
+        .expect("expected system message");
     assert!(last.content.contains("update LOOPAL.md"));
 }

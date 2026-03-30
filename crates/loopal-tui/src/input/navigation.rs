@@ -79,7 +79,11 @@ pub(super) fn handle_down(app: &mut App) -> InputAction {
 }
 
 pub(super) fn handle_esc(app: &mut App) -> InputAction {
-    let is_idle = app.session.lock().agent_idle;
+    // Priority 1: exit agent view
+    if app.session.lock().active_view != loopal_session::ROOT_AGENT {
+        return InputAction::ExitAgentView;
+    }
+    let is_idle = app.session.lock().active_conversation().agent_idle;
     if !is_idle {
         return InputAction::Interrupt;
     }

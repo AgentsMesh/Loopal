@@ -8,6 +8,17 @@ fn make_state() -> SessionState {
     SessionState::new("test-model".to_string(), "act".to_string())
 }
 
+macro_rules! conv {
+    ($state:expr) => {
+        &$state.agents["main"].conversation
+    };
+}
+macro_rules! conv_mut {
+    ($state:expr) => {
+        &mut $state.agents.get_mut("main").unwrap().conversation
+    };
+}
+
 #[test]
 fn test_retry_error_sets_banner() {
     let mut state = make_state();
@@ -20,7 +31,7 @@ fn test_retry_error_sets_banner() {
         }),
     );
     assert_eq!(
-        state.retry_banner.as_deref(),
+        conv!(state).retry_banner.as_deref(),
         Some("502 Bad Gateway. Retrying in 2.0s (1/6)")
     );
 }
@@ -28,7 +39,7 @@ fn test_retry_error_sets_banner() {
 #[test]
 fn test_retry_error_does_not_add_message() {
     let mut state = make_state();
-    let before = state.messages.len();
+    let before = conv!(state).messages.len();
     apply_event(
         &mut state,
         AgentEvent::root(AgentEventPayload::RetryError {
@@ -38,7 +49,7 @@ fn test_retry_error_does_not_add_message() {
         }),
     );
     assert_eq!(
-        state.messages.len(),
+        conv!(state).messages.len(),
         before,
         "RetryError must not append to messages"
     );
@@ -47,36 +58,36 @@ fn test_retry_error_does_not_add_message() {
 #[test]
 fn test_retry_cleared_clears_banner() {
     let mut state = make_state();
-    state.retry_banner = Some("old error".into());
+    conv_mut!(state).retry_banner = Some("old error".into());
     apply_event(
         &mut state,
         AgentEvent::root(AgentEventPayload::RetryCleared),
     );
-    assert!(state.retry_banner.is_none());
+    assert!(conv!(state).retry_banner.is_none());
 }
 
 #[test]
 fn test_error_clears_retry_banner() {
     let mut state = make_state();
-    state.retry_banner = Some("transient".into());
+    conv_mut!(state).retry_banner = Some("transient".into());
     apply_event(
         &mut state,
         AgentEvent::root(AgentEventPayload::Error {
             message: "permanent".into(),
         }),
     );
-    assert!(state.retry_banner.is_none());
+    assert!(conv!(state).retry_banner.is_none());
 }
 
 #[test]
 fn test_awaiting_input_clears_retry_banner() {
     let mut state = make_state();
-    state.retry_banner = Some("retrying".into());
+    conv_mut!(state).retry_banner = Some("retrying".into());
     apply_event(
         &mut state,
         AgentEvent::root(AgentEventPayload::AwaitingInput),
     );
-    assert!(state.retry_banner.is_none());
+    assert!(conv!(state).retry_banner.is_none());
 }
 
 #[test]
@@ -98,27 +109,25 @@ fn test_retry_updates_in_place() {
             max_attempts: 6,
         }),
     );
-    // Only one banner, updated in place
     assert_eq!(
-        state.retry_banner.as_deref(),
+        conv!(state).retry_banner.as_deref(),
         Some("502. Retrying in 4.0s (2/6)")
     );
-    // No messages added
-    assert_eq!(state.messages.len(), 0);
+    assert_eq!(conv!(state).messages.len(), 0);
 }
 
 #[test]
 fn test_finished_clears_retry_banner() {
     let mut state = make_state();
-    state.retry_banner = Some("retrying".into());
+    conv_mut!(state).retry_banner = Some("retrying".into());
     apply_event(&mut state, AgentEvent::root(AgentEventPayload::Finished));
-    assert!(state.retry_banner.is_none());
+    assert!(conv!(state).retry_banner.is_none());
 }
 
 #[test]
 fn test_interrupted_clears_retry_banner() {
     let mut state = make_state();
-    state.retry_banner = Some("retrying".into());
+    conv_mut!(state).retry_banner = Some("retrying".into());
     apply_event(&mut state, AgentEvent::root(AgentEventPayload::Interrupted));
-    assert!(state.retry_banner.is_none());
+    assert!(conv!(state).retry_banner.is_none());
 }

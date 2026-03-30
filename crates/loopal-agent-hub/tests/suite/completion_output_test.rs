@@ -27,7 +27,7 @@ async fn completion_output_passed_through_wait() {
     let (_ca, ct) = loopal_ipc::duplex_pair();
     let conn = Arc::new(Connection::new(ct));
     let rx = conn.start();
-    register_agent_connection(hub.clone(), "worker", conn, rx, None, None).await;
+    register_agent_connection(hub.clone(), "worker", conn, rx, None, None, None).await;
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Set up waiter
@@ -69,7 +69,7 @@ async fn completion_no_output_fallback() {
     let (_ca, ct) = loopal_ipc::duplex_pair();
     let conn = Arc::new(Connection::new(ct));
     let rx = conn.start();
-    register_agent_connection(hub.clone(), "worker2", conn, rx, None, None).await;
+    register_agent_connection(hub.clone(), "worker2", conn, rx, None, None, None).await;
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let hub2 = hub.clone();
@@ -112,6 +112,7 @@ async fn topology_tracks_parent_child() {
         parent_rx,
         None,
         Some("opus"),
+        None,
     )
     .await;
     tokio::time::sleep(Duration::from_millis(100)).await;
@@ -127,6 +128,7 @@ async fn topology_tracks_parent_child() {
         child_rx,
         Some("parent"),
         Some("sonnet"),
+        None,
     )
     .await;
     tokio::time::sleep(Duration::from_millis(100)).await;

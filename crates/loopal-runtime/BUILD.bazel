@@ -57,6 +57,7 @@ rust_test(
         "//crates/loopal-provider-api",
         "//crates/loopal-scheduler",
         "//crates/loopal-session",
+        "//crates/loopal-storage",
         "//crates/loopal-tool-api",
     ],
     proc_macro_deps = ["@crates//:async-trait"],

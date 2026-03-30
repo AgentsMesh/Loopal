@@ -18,6 +18,7 @@ pub async fn spawn_and_register(
     model: Option<String>,
     prompt: Option<String>,
     parent: Option<String>,
+    permission_mode: Option<String>,
 ) -> Result<String, String> {
     info!(agent = %name, parent = ?parent, "spawn: forking process");
     let agent_proc = loopal_agent_client::AgentProcess::spawn(None)
@@ -33,22 +34,25 @@ pub async fn spawn_and_register(
         return Err(format!("agent initialize failed: {e}"));
     }
     info!(agent = %name, "spawn: starting agent");
-    if let Err(e) = client
+    let session_id = match client
         .start_agent(
             std::path::Path::new(&cwd),
             model.as_deref(),
             Some("act"),
             prompt.as_deref(),
-            None,
+            permission_mode.as_deref(),
             false,
             None,
         )
         .await
     {
-        warn!(agent = %name, error = %e, "spawn: start failed, killing orphan");
-        let _ = agent_proc.shutdown().await;
-        return Err(format!("agent/start failed: {e}"));
-    }
+        Ok(sid) => Some(sid),
+        Err(e) => {
+            warn!(agent = %name, error = %e, "spawn: start failed, killing orphan");
+            let _ = agent_proc.shutdown().await;
+            return Err(format!("agent/start failed: {e}"));
+        }
+    };
 
     let (conn, incoming_rx) = client.into_parts();
     let agent_id = register_agent_connection(
@@ -58,6 +62,7 @@ pub async fn spawn_and_register(
         incoming_rx,
         parent.as_deref(),
         model.as_deref(),
+        session_id.as_deref(),
     )
     .await;
 
@@ -80,6 +85,7 @@ pub async fn register_agent_connection(
     incoming_rx: tokio::sync::mpsc::Receiver<Incoming>,
     parent: Option<&str>,
     model: Option<&str>,
+    session_id: Option<&str>,
 ) -> String {
     let agent_id = uuid::Uuid::new_v4().to_string();
 
@@ -103,7 +109,7 @@ pub async fn register_agent_connection(
     }
     info!(agent = %name, "agent registered in Hub");
 
-    crate::agent_io::spawn_io_loop(hub.clone(), name, conn, incoming_rx, false);
+    crate::agent_io::spawn_io_loop(hub.clone(), name, conn, incoming_rx);
 
     {
         let h = hub.lock().await;
@@ -112,6 +118,7 @@ pub async fn register_agent_connection(
             agent_id: agent_id.clone(),
             parent: parent.map(String::from),
             model: model.map(String::from),
+            session_id: session_id.map(String::from),
         });
         if h.registry.event_sender().try_send(event).is_err() {
             tracing::debug!(agent = %name, "SubAgentSpawned event dropped");

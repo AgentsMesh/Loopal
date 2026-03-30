@@ -69,6 +69,7 @@ impl TestFixture {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             mode: "default".into(),
+            sub_agents: Vec::new(),
         }
     }
 

@@ -15,7 +15,7 @@ pub async fn run(
 ) -> anyhow::Result<()> {
     info!("starting in ACP mode (Hub-backed)");
 
-    let ctx = super::common::bootstrap_hub_and_agent(cli, cwd, config).await?;
+    let ctx = super::hub_bootstrap::bootstrap_hub_and_agent(cli, cwd, config).await?;
 
     // Start event broadcast
     let _event_loop = loopal_agent_hub::start_event_loop(ctx.hub.clone(), ctx.event_rx);

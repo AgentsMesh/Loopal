@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use tokio::sync::{mpsc, watch};
 
 use loopal_protocol::{
-    AgentEvent, AgentMode, ControlCommand, InterruptSignal, UserContent, UserQuestionResponse,
+    AgentEvent, ControlCommand, InterruptSignal, UserContent, UserQuestionResponse,
 };
 
 use crate::controller_ops::ControlBackend;
@@ -61,8 +61,7 @@ impl SessionController {
         }
     }
 
-    // === Observability ===
-
+    /// Acquire the session state lock. Panics if the lock is poisoned.
     pub fn lock(&self) -> MutexGuard<'_, SessionState> {
         self.state.lock().expect("session state lock poisoned")
     }
@@ -71,11 +70,20 @@ impl SessionController {
         &self.connections
     }
 
-    // === Root agent control ===
+    pub(crate) fn active_target(&self) -> String {
+        self.lock().active_view.clone()
+    }
 
+    /// Interrupt the currently viewed agent.
     pub fn interrupt(&self) {
         tracing::debug!("session: interrupt signaled");
-        self.backend.interrupt();
+        self.backend.interrupt_target(&self.active_target());
+    }
+
+    /// Interrupt a specific named agent (e.g., to terminate from agent panel).
+    pub fn interrupt_agent(&self, name: &str) {
+        tracing::debug!(agent = %name, "session: interrupt agent");
+        self.backend.interrupt_target(name);
     }
 
     pub fn enqueue_message(&self, content: UserContent) -> Option<UserContent> {
@@ -87,11 +95,12 @@ impl SessionController {
     pub async fn approve_permission(&self) {
         let relay_id = {
             let mut state = self.lock();
-            let relay_id = state
+            let conv = state.active_conversation_mut();
+            let relay_id = conv
                 .pending_permission
                 .as_ref()
                 .and_then(|p| p.relay_request_id);
-            state.pending_permission = None;
+            conv.pending_permission = None;
             relay_id
         };
         self.backend.approve_permission(relay_id).await;
@@ -100,11 +109,12 @@ impl SessionController {
     pub async fn deny_permission(&self) {
         let relay_id = {
             let mut state = self.lock();
-            let relay_id = state
+            let conv = state.active_conversation_mut();
+            let relay_id = conv
                 .pending_permission
                 .as_ref()
                 .and_then(|p| p.relay_request_id);
-            state.pending_permission = None;
+            conv.pending_permission = None;
             relay_id
         };
         self.backend.deny_permission(relay_id).await;
@@ -113,78 +123,28 @@ impl SessionController {
     pub async fn answer_question(&self, answers: Vec<String>) {
         let relay_id = {
             let mut state = self.lock();
-            let relay_id = state
+            let conv = state.active_conversation_mut();
+            let relay_id = conv
                 .pending_question
                 .as_ref()
                 .and_then(|q| q.relay_request_id);
-            state.pending_question = None;
+            conv.pending_question = None;
             relay_id
         };
         self.backend.answer_question(answers, relay_id).await;
     }
 
-    pub async fn switch_mode(&self, mode: AgentMode) {
-        {
-            let mut s = self.lock();
-            s.mode = match mode {
-                AgentMode::Plan => "plan",
-                AgentMode::Act => "act",
-            }
-            .to_string();
-        }
-        self.backend
-            .send_control(ControlCommand::ModeSwitch(mode))
-            .await;
+    // === Direct relay responses (for auto-approve mode) ===
+
+    /// Auto-approve a permission request using the relay ID directly.
+    /// Bypasses pending_permission state — avoids race with event broadcast.
+    pub async fn auto_approve_permission(&self, relay_id: i64) {
+        self.backend.approve_permission(Some(relay_id)).await;
     }
 
-    pub async fn switch_model(&self, model: String) {
-        {
-            let mut s = self.lock();
-            s.model = model.clone();
-            crate::helpers::push_system_msg(&mut s, &format!("Switched model to: {model}"));
-        }
-        self.backend
-            .send_control(ControlCommand::ModelSwitch(model))
-            .await;
-    }
-
-    pub async fn switch_thinking(&self, config_json: String) {
-        let label = crate::helpers::thinking_label_from_json(&config_json);
-        {
-            let mut s = self.lock();
-            s.thinking_config = label.clone();
-            crate::helpers::push_system_msg(&mut s, &format!("Switched thinking to: {label}"));
-        }
-        self.backend
-            .send_control(ControlCommand::ThinkingSwitch(config_json))
-            .await;
-    }
-
-    pub async fn clear(&self) {
-        {
-            let mut s = self.lock();
-            s.messages.clear();
-            s.inbox.clear();
-            s.streaming_text.clear();
-            s.turn_count = 0;
-            s.input_tokens = 0;
-            s.output_tokens = 0;
-            s.cache_creation_tokens = 0;
-            s.cache_read_tokens = 0;
-            s.retry_banner = None;
-            s.reset_timer();
-        }
-        self.backend.send_control(ControlCommand::Clear).await;
-    }
-
-    pub async fn compact(&self) {
-        self.backend.send_control(ControlCommand::Compact).await;
-    }
-
-    pub async fn rewind(&self, turn_index: usize) {
-        self.backend
-            .send_control(ControlCommand::Rewind { turn_index })
-            .await;
+    /// Auto-answer a question using the relay ID directly.
+    pub async fn auto_answer_question(&self, relay_id: i64, answers: Vec<String>) {
+        self.backend.answer_question(answers, Some(relay_id)).await;
     }
 
     // === Event handling ===
@@ -192,5 +152,25 @@ impl SessionController {
     pub fn handle_event(&self, event: AgentEvent) -> Option<UserContent> {
         let mut state = self.lock();
         event_handler::apply_event(&mut state, event)
+    }
+
+    /// Set the root session ID (for sub-agent ref persistence).
+    pub fn set_root_session_id(&self, session_id: &str) {
+        self.lock().root_session_id = Some(session_id.to_string());
+    }
+
+    /// Drain pending sub-agent refs that need to be persisted.
+    /// Returns `(root_session_id, refs)`. The caller is responsible for
+    /// writing them to disk via `SessionManager::add_sub_agent`.
+    pub fn drain_pending_sub_agent_refs(
+        &self,
+    ) -> Option<(String, Vec<crate::state::PendingSubAgentRef>)> {
+        let mut state = self.lock();
+        if state.pending_sub_agent_refs.is_empty() {
+            return None;
+        }
+        let refs = std::mem::take(&mut state.pending_sub_agent_refs);
+        let root_id = state.root_session_id.clone()?;
+        Some((root_id, refs))
     }
 }

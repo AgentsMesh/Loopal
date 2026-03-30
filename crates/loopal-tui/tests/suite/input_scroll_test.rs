@@ -73,7 +73,7 @@ fn test_down_scrolls_back_when_offset_positive() {
 #[test]
 fn test_up_scrolls_when_content_overflows_and_idle() {
     let mut app = make_app();
-    app.session.lock().agent_idle = true;
+    app.session.lock().active_conversation_mut().agent_idle = true;
     app.content_overflows = true;
     app.input_history.push("older".into());
     app.input_history.push("recent".into());
@@ -85,7 +85,7 @@ fn test_up_scrolls_when_content_overflows_and_idle() {
 #[test]
 fn test_down_absorbed_when_content_overflows_at_bottom() {
     let mut app = make_app();
-    app.session.lock().agent_idle = true;
+    app.session.lock().active_conversation_mut().agent_idle = true;
     app.content_overflows = true;
     app.input_history.push("cmd".into());
     handle_key(&mut app, key(KeyCode::Down));
@@ -101,7 +101,7 @@ fn test_down_absorbed_when_content_overflows_at_bottom() {
 #[test]
 fn test_up_navigates_history_when_content_fits() {
     let mut app = make_app();
-    app.session.lock().agent_idle = true;
+    app.session.lock().active_conversation_mut().agent_idle = true;
     app.content_overflows = false;
     app.input_history.push("previous command".into());
     let action = handle_key(&mut app, key(KeyCode::Up));
@@ -115,7 +115,7 @@ fn test_up_navigates_history_when_content_fits() {
 #[test]
 fn test_ctrl_p_navigates_history_when_content_overflows() {
     let mut app = make_app();
-    app.session.lock().agent_idle = true;
+    app.session.lock().active_conversation_mut().agent_idle = true;
     app.content_overflows = true;
     app.input_history.push("first".into());
     app.input_history.push("second".into());
@@ -127,7 +127,7 @@ fn test_ctrl_p_navigates_history_when_content_overflows() {
 #[test]
 fn test_ctrl_n_navigates_history_forward() {
     let mut app = make_app();
-    app.session.lock().agent_idle = true;
+    app.session.lock().active_conversation_mut().agent_idle = true;
     app.input_history.push("first".into());
     app.input_history.push("second".into());
     handle_key(&mut app, ctrl('p'));
@@ -142,7 +142,7 @@ fn test_ctrl_n_navigates_history_forward() {
 #[test]
 fn test_up_multiline_cursor_beats_scroll() {
     let mut app = make_app();
-    app.session.lock().agent_idle = true;
+    app.session.lock().active_conversation_mut().agent_idle = true;
     app.content_overflows = true;
     app.input = "line1\nline2".into();
     app.input_cursor = app.input.len(); // end of line2
@@ -158,7 +158,7 @@ fn test_up_multiline_cursor_beats_scroll() {
 #[test]
 fn test_down_multiline_cursor_beats_absorb() {
     let mut app = make_app();
-    app.session.lock().agent_idle = true;
+    app.session.lock().active_conversation_mut().agent_idle = true;
     app.content_overflows = true;
     app.input = "line1\nline2".into();
     app.input_cursor = 0; // start of line1

@@ -35,8 +35,16 @@ pub enum InputAction {
     SubPageConfirm(SubPageResult),
     /// Cycle focus to the next agent in the agents map
     FocusNextAgent,
-    /// Clear agent focus (return to root view)
+    /// Focus the previous agent in the agents map
+    FocusPrevAgent,
+    /// Clear agent focus
     UnfocusAgent,
+    /// Enter the focused agent's conversation view (drill in)
+    EnterAgentView,
+    /// Return to root/parent view (drill out)
+    ExitAgentView,
+    /// Terminate the focused agent
+    TerminateFocusedAgent,
     // --- Question dialog actions ---
     /// Navigate up in question options
     QuestionUp,

@@ -1,4 +1,5 @@
 pub mod agent_panel;
+pub mod breadcrumb;
 pub mod command_menu;
 pub mod input_view;
 pub mod picker;

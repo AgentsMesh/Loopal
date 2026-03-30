@@ -1,18 +1,17 @@
 use std::time::Instant;
 
-use crate::helpers::flush_streaming;
-use crate::state::SessionState;
+use crate::agent_conversation::AgentConversation;
 use crate::truncate::{truncate_json, truncate_result_for_storage};
 use crate::types::{DisplayMessage, DisplayToolCall, ToolCallStatus};
 
 /// Handle ToolCall: create a pending DisplayToolCall and attach to the last assistant message.
 pub(crate) fn handle_tool_call(
-    state: &mut SessionState,
+    conv: &mut AgentConversation,
     id: String,
     name: String,
     input: serde_json::Value,
 ) {
-    flush_streaming(state);
+    conv.flush_streaming();
     let tc = DisplayToolCall {
         id: id.clone(),
         name: name.clone(),
@@ -30,13 +29,13 @@ pub(crate) fn handle_tool_call(
         progress_tail: None,
         metadata: None,
     };
-    if let Some(last) = state.messages.last_mut()
+    if let Some(last) = conv.messages.last_mut()
         && last.role == "assistant"
     {
         last.tool_calls.push(tc);
         return;
     }
-    state.messages.push(DisplayMessage {
+    conv.messages.push(DisplayMessage {
         role: "assistant".to_string(),
         content: String::new(),
         tool_calls: vec![tc],
@@ -57,13 +56,13 @@ pub(crate) struct ToolResultParams {
 }
 
 /// Handle ToolResult: update status, duration, and promote AttemptCompletion.
-pub(crate) fn handle_tool_result(state: &mut SessionState, p: ToolResultParams) {
+pub(crate) fn handle_tool_result(conv: &mut AgentConversation, p: ToolResultParams) {
     let status = if p.is_error {
         ToolCallStatus::Error
     } else {
         ToolCallStatus::Success
     };
-    'outer: for msg in state.messages.iter_mut().rev() {
+    'outer: for msg in conv.messages.iter_mut().rev() {
         for tc in msg.tool_calls.iter_mut().rev() {
             let matches = if !p.id.is_empty() {
                 tc.id == p.id
@@ -83,7 +82,7 @@ pub(crate) fn handle_tool_result(state: &mut SessionState, p: ToolResultParams) 
         }
     }
     if p.is_completion {
-        state.messages.push(DisplayMessage {
+        conv.messages.push(DisplayMessage {
             role: "assistant".into(),
             content: p.result,
             tool_calls: Vec::new(),
@@ -94,9 +93,9 @@ pub(crate) fn handle_tool_result(state: &mut SessionState, p: ToolResultParams) 
 }
 
 /// Mark pending tools as belonging to a parallel batch.
-pub(crate) fn handle_tool_batch_start(state: &mut SessionState, tool_ids: Vec<String>) {
-    let batch_id = format!("batch-{}", state.turn_count);
-    for msg in state.messages.iter_mut().rev() {
+pub(crate) fn handle_tool_batch_start(conv: &mut AgentConversation, tool_ids: Vec<String>) {
+    let batch_id = format!("batch-{}", conv.turn_count);
+    for msg in conv.messages.iter_mut().rev() {
         if msg.role != "assistant" || msg.tool_calls.is_empty() {
             continue;
         }
@@ -114,8 +113,8 @@ pub(crate) fn handle_tool_batch_start(state: &mut SessionState, tool_ids: Vec<St
 }
 
 /// Update a running tool's progress tail (for long-running Bash commands).
-pub(crate) fn handle_tool_progress(state: &mut SessionState, id: String, output_tail: String) {
-    for msg in state.messages.iter_mut().rev() {
+pub(crate) fn handle_tool_progress(conv: &mut AgentConversation, id: String, output_tail: String) {
+    for msg in conv.messages.iter_mut().rev() {
         for tc in msg.tool_calls.iter_mut().rev() {
             if tc.id == id {
                 if tc.status.is_done() {

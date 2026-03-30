@@ -30,13 +30,14 @@ fn test_app_new_initializes_correctly() {
     assert_eq!(app.input_cursor, 0);
     assert_eq!(app.scroll_offset, 0);
     let state = app.session.lock();
-    assert!(state.messages.is_empty());
+    let conv = state.active_conversation();
+    assert!(conv.messages.is_empty());
     assert_eq!(state.model, "test-model");
     assert_eq!(state.mode, "act");
-    assert_eq!(state.token_count(), 0);
-    assert_eq!(state.context_window, 0);
-    assert_eq!(state.turn_count, 0);
-    assert!(state.streaming_text.is_empty());
+    assert_eq!(conv.token_count(), 0);
+    assert_eq!(conv.context_window, 0);
+    assert_eq!(conv.turn_count, 0);
+    assert!(conv.streaming_text.is_empty());
     drop(state);
     assert!(app.input_history.is_empty());
     assert!(app.history_index.is_none());
@@ -64,10 +65,10 @@ fn test_submit_input_returns_text_and_resets() {
 #[test]
 fn test_awaiting_input_sets_idle() {
     let (app, _, _) = make_app();
-    assert!(!app.session.lock().agent_idle);
+    assert!(!app.session.lock().active_conversation().agent_idle);
     app.session
         .handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
-    assert!(app.session.lock().agent_idle);
+    assert!(app.session.lock().active_conversation().agent_idle);
 }
 
 #[test]
@@ -83,10 +84,11 @@ fn test_awaiting_input_forwards_inbox_message() {
         .handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
     assert_eq!(forwarded.map(|c| c.text), Some("queued".to_string()));
     let state = app.session.lock();
-    assert!(!state.agent_idle); // forwarding clears idle
+    let conv = state.active_conversation();
+    assert!(!conv.agent_idle); // forwarding clears idle
     assert!(state.inbox.is_empty());
-    assert_eq!(state.messages.last().unwrap().role, "user");
-    assert_eq!(state.messages.last().unwrap().content, "queued");
+    assert_eq!(conv.messages.last().unwrap().role, "user");
+    assert_eq!(conv.messages.last().unwrap().content, "queued");
 }
 
 #[test]

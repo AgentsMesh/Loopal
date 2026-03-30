@@ -18,6 +18,8 @@ pub struct BootstrapContext {
     pub hub: Arc<Mutex<Hub>>,
     pub event_rx: mpsc::Receiver<AgentEvent>,
     pub agent_proc: loopal_agent_client::AgentProcess,
+    /// Root agent's session ID (for sub-agent ref persistence).
+    pub root_session_id: String,
 }
 
 /// Create Hub, start TCP listener, spawn root agent, register as "main".
@@ -48,7 +50,7 @@ pub async fn bootstrap_hub_and_agent(
     } else {
         Some(cli.prompt.join(" "))
     };
-    client
+    let root_session_id = client
         .start_agent(
             cwd,
             Some(&config.settings.model),
@@ -62,12 +64,13 @@ pub async fn bootstrap_hub_and_agent(
 
     // Register root agent's stdio as "main" in Hub
     let (root_conn, incoming_rx) = client.into_parts();
-    loopal_agent_hub::agent_io::start_agent_io(hub.clone(), "main", root_conn, incoming_rx, true);
+    loopal_agent_hub::agent_io::start_agent_io(hub.clone(), "main", root_conn, incoming_rx);
     info!("root agent registered as 'main' in Hub");
 
     Ok(BootstrapContext {
         hub,
         event_rx,
         agent_proc,
+        root_session_id,
     })
 }

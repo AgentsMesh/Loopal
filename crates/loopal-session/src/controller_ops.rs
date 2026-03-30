@@ -17,7 +17,8 @@ pub(crate) enum ControlBackend {
 }
 
 impl ControlBackend {
-    pub(crate) fn interrupt(&self) {
+    /// Interrupt a specific named agent.
+    pub(crate) fn interrupt_target(&self, target: &str) {
         match self {
             Self::Local(ch) => {
                 ch.interrupt.signal();
@@ -25,38 +26,40 @@ impl ControlBackend {
             }
             Self::Hub(client) => {
                 let client = client.clone();
+                let target = target.to_string();
                 tokio::spawn(async move {
-                    client.interrupt().await;
+                    client.interrupt_target(&target).await;
                 });
             }
         }
     }
 
-    pub(crate) async fn send_control(&self, cmd: ControlCommand) {
+    pub(crate) async fn send_control_to_agent(&self, target: &str, cmd: ControlCommand) {
         match self {
             Self::Local(ch) => {
                 let _ = ch.control_tx.send(cmd).await;
             }
             Self::Hub(client) => {
-                let _ = client.send_control(&cmd).await;
+                let _ = client.send_control_to(target, &cmd).await;
             }
         }
     }
 
-    pub(crate) async fn send_message(&self, content: UserContent) {
+    /// Route a message to a specific named agent via Hub.
+    pub(crate) async fn route_to_agent(&self, target: &str, content: UserContent) {
         match self {
             Self::Local(ch) => {
                 if let Some(tx) = &ch.mailbox_tx {
                     let envelope = loopal_protocol::Envelope::new(
                         loopal_protocol::MessageSource::Human,
-                        "main",
+                        target,
                         content,
                     );
                     let _ = tx.send(envelope).await;
                 }
             }
             Self::Hub(client) => {
-                client.send_message(content).await;
+                client.send_message_to(target, content).await;
             }
         }
     }

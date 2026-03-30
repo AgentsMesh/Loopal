@@ -92,10 +92,11 @@ async fn test_e2e_loop_renders_agent_event() {
     .await;
 
     let state = app.session.lock();
+    let conv = state.active_conversation();
     assert!(
-        state.streaming_text.contains("Agent says hi"),
+        conv.streaming_text.contains("Agent says hi"),
         "expected streaming_text to contain 'Agent says hi', got: {:?}",
-        state.streaming_text
+        conv.streaming_text
     );
 }
 

@@ -15,6 +15,7 @@ fn spawned_agent_has_parent_set() {
             agent_id: "id-1".into(),
             parent: Some("root-agent".into()),
             model: Some("claude-haiku".into()),
+            session_id: None,
         }),
     );
     assert!(state.agents.contains_key("worker"));
@@ -40,6 +41,7 @@ fn spawned_agent_registered_as_child_of_parent() {
             agent_id: "id-2".into(),
             parent: Some("researcher".into()),
             model: None,
+            session_id: None,
         }),
     );
 
@@ -61,6 +63,7 @@ fn spawned_agent_without_parent_is_root_level() {
             agent_id: "id-3".into(),
             parent: None,
             model: None,
+            session_id: None,
         }),
     );
     assert!(state.agents.contains_key("solo"));
@@ -79,6 +82,7 @@ fn subsequent_events_preserve_topology() {
             agent_id: "id-4".into(),
             parent: Some("boss".into()),
             model: Some("claude-sonnet-4".into()),
+            session_id: None,
         }),
     );
 
@@ -120,6 +124,7 @@ fn duplicate_spawn_does_not_add_child_twice() {
                 agent_id: "id-5".into(),
                 parent: Some("parent".into()),
                 model: None,
+                session_id: None,
             }),
         );
     }

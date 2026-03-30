@@ -49,31 +49,35 @@ impl Default for Inbox {
     }
 }
 
-/// Try forwarding a queued inbox message when agent is idle.
+/// Try forwarding a queued inbox message when the active-view agent is idle.
 ///
-/// Pops the front message, pushes a DisplayMessage for TUI rendering,
-/// and returns the content for routing to the agent.
+/// The inbox is global (session-level): messages are always routed to the
+/// currently active agent, regardless of which agent they were typed for.
 pub(crate) fn try_forward_inbox(state: &mut crate::state::SessionState) -> Option<UserContent> {
-    if !state.agent_idle {
+    let agent = state.agents.get_mut(&state.active_view)?;
+    if !agent.conversation.agent_idle {
         tracing::debug!("inbox: agent busy, message queued");
         return None;
     }
     let content = state.inbox.pop_front()?;
     tracing::debug!(text_len = content.text.len(), "inbox: forwarding message");
-    state.agent_idle = false;
-    state.begin_turn();
     let image_count = content.images.len();
     let mut display_text = content.text.clone();
     if image_count > 0 {
         display_text.push_str(&format!(" [+{image_count} image(s)]"));
     }
     let skill_info = content.skill_info.clone();
-    state.messages.push(crate::types::DisplayMessage {
-        role: "user".to_string(),
-        content: display_text,
-        tool_calls: Vec::new(),
-        image_count,
-        skill_info,
-    });
+    agent.conversation.agent_idle = false;
+    agent.conversation.begin_turn();
+    agent
+        .conversation
+        .messages
+        .push(crate::types::DisplayMessage {
+            role: "user".to_string(),
+            content: display_text,
+            tool_calls: Vec::new(),
+            image_count,
+            skill_info,
+        });
     Some(content)
 }

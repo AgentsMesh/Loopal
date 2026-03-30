@@ -1,130 +1,125 @@
 /// Observable session state — pure data, no channels.
-use std::time::{Duration, Instant};
+///
+/// All agents (including root) share the same `AgentViewState` type
+/// in the `agents` map. `active_view` determines which agent's conversation
+/// is rendered and receives user input.
+use std::time::Instant;
 
 use indexmap::IndexMap;
 
+/// Name of the root agent in the agents map.
+pub const ROOT_AGENT: &str = "main";
+
 use loopal_protocol::ObservableAgentState;
 
+use crate::agent_conversation::AgentConversation;
 use crate::inbox::Inbox;
 use crate::message_log::{MessageFeed, MessageLogEntry};
-use crate::types::{DisplayMessage, PendingPermission, PendingQuestion};
 
 /// Enhanced agent view state with full observability.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub struct AgentViewState {
     /// Rich observable state (status, tokens, model, mode, etc.).
     pub observable: ObservableAgentState,
-    /// Per-agent message log (sent/received messages).
+    /// Full conversation state (messages, streaming, pending interactions).
+    pub conversation: AgentConversation,
+    /// Per-agent message log (sent/received inter-agent messages).
     pub message_log: Vec<MessageLogEntry>,
     /// Timestamp when the agent was first observed (for elapsed display).
     pub started_at: Option<Instant>,
-    /// Parent agent name (None for root-spawned agents).
+    /// Parent agent name (None for root).
     pub parent: Option<String>,
     /// Names of agents spawned by this agent.
     pub children: Vec<String>,
-}
-
-impl AgentViewState {
-    /// Elapsed time since the agent was first observed.
-    pub fn elapsed(&self) -> Duration {
-        self.started_at.map_or(Duration::ZERO, |t| t.elapsed())
-    }
+    /// Sub-agent's own session storage ID (for resume/persistence).
+    pub session_id: Option<String>,
 }
 
 /// All observable state of a session, protected by a Mutex in SessionController.
 pub struct SessionState {
-    // === Observable state ===
-    pub messages: Vec<DisplayMessage>,
-    pub streaming_text: String,
-    pub agent_idle: bool,
-    pub input_tokens: u32,
-    pub output_tokens: u32,
-    pub context_window: u32,
-    pub cache_creation_tokens: u32,
-    pub cache_read_tokens: u32,
-    pub thinking_tokens: u32,
-    pub streaming_thinking: String,
-    pub thinking_active: bool,
-    pub turn_count: u32,
-    pub model: String,
-    pub mode: String,
-    /// Current thinking config label for display ("auto", "low", "medium", "high", "disabled").
-    pub thinking_config: String,
-    pub pending_permission: Option<PendingPermission>,
-    pub pending_question: Option<PendingQuestion>,
-    /// Transient retry error banner — shown in TUI, not in message history.
-    pub retry_banner: Option<String>,
-    // === Agent tracking (observation plane) ===
+    // === All agents (including root "main") ===
     pub agents: IndexMap<String, AgentViewState>,
-    pub focused_agent: Option<String>,
+    /// Which agent's conversation is displayed and receives input. Default: "main".
+    pub active_view: String,
+    // === Session-level display cache (synced from active agent's observable) ===
+    /// Model name shown in status bar. Updated on ModelSwitch or ModeChanged.
+    pub model: String,
+    /// Current mode label ("act" / "plan"). Updated when active agent changes mode.
+    pub mode: String,
+    /// Current thinking config label for display.
+    pub thinking_config: String,
+    /// Root session ID for persisting sub-agent references.
+    pub root_session_id: Option<String>,
+    // === Observation plane ===
     pub message_feed: MessageFeed,
-    // === Turn timer ===
-    turn_start: Option<Instant>,
-    last_turn_duration: Duration,
     // === Interaction state ===
     pub inbox: Inbox,
+    /// Pending sub-agent refs to be persisted (drained by caller).
+    pub pending_sub_agent_refs: Vec<PendingSubAgentRef>,
+}
+
+/// Sub-agent reference awaiting persistence to disk.
+#[derive(Debug, Clone)]
+pub struct PendingSubAgentRef {
+    pub name: String,
+    pub session_id: String,
+    pub parent: Option<String>,
+    pub model: Option<String>,
 }
 
 impl SessionState {
     pub fn new(model: String, mode: String) -> Self {
+        let mut agents = IndexMap::new();
+        // Root agent "main" is a regular entry — no special treatment.
+        let mut main_agent = AgentViewState::default();
+        main_agent.conversation.agent_idle = false;
+        main_agent.started_at = Some(Instant::now());
+        agents.insert(ROOT_AGENT.to_string(), main_agent);
+
         Self {
-            messages: Vec::new(),
-            streaming_text: String::new(),
-            agent_idle: false,
-            input_tokens: 0,
-            output_tokens: 0,
-            context_window: 0,
-            cache_creation_tokens: 0,
-            cache_read_tokens: 0,
-            thinking_tokens: 0,
-            streaming_thinking: String::new(),
-            thinking_active: false,
-            turn_count: 0,
+            agents,
+            active_view: ROOT_AGENT.to_string(),
             model,
             mode,
             thinking_config: "auto".to_string(),
-            pending_permission: None,
-            pending_question: None,
-            retry_banner: None,
-            agents: IndexMap::new(),
-            focused_agent: None,
+            root_session_id: None,
             message_feed: MessageFeed::new(200),
-            turn_start: None,
-            last_turn_duration: Duration::ZERO,
             inbox: Inbox::new(),
+            pending_sub_agent_refs: Vec::new(),
         }
     }
 
-    /// Total token count for context usage display.
-    pub fn token_count(&self) -> u32 {
-        self.input_tokens + self.output_tokens + self.cache_creation_tokens + self.cache_read_tokens
+    // === Active conversation projection (zero branching) ===
+
+    /// Conversation of the currently viewed agent.
+    pub fn active_conversation(&self) -> &AgentConversation {
+        &self.agents[&self.active_view].conversation
     }
 
-    /// Current turn working duration.
-    pub fn turn_elapsed(&self) -> Duration {
-        match self.turn_start {
-            Some(start) => start.elapsed(),
-            None => self.last_turn_duration,
-        }
+    /// Mutable conversation of the currently viewed agent.
+    pub fn active_conversation_mut(&mut self) -> &mut AgentConversation {
+        &mut self
+            .agents
+            .get_mut(&self.active_view)
+            .expect("active agent missing from agents map")
+            .conversation
     }
 
-    /// Mark the start of a new turn (agent begins working).
-    pub fn begin_turn(&mut self) {
-        if self.turn_start.is_none() {
-            self.turn_start = Some(Instant::now());
-        }
+    /// Conversation of a named agent.
+    pub fn agent_conversation(&self, name: &str) -> Option<&AgentConversation> {
+        self.agents.get(name).map(|a| &a.conversation)
     }
 
-    /// Mark the end of a turn (agent became idle).
-    pub fn end_turn(&mut self) {
-        if let Some(start) = self.turn_start.take() {
-            self.last_turn_duration = start.elapsed();
-        }
+    /// Mutable conversation of a named agent.
+    pub fn agent_conversation_mut(&mut self, name: &str) -> Option<&mut AgentConversation> {
+        self.agents.get_mut(name).map(|a| &mut a.conversation)
     }
+}
 
-    /// Reset the turn timer (e.g., after /clear).
-    pub fn reset_timer(&mut self) {
-        self.turn_start = None;
-        self.last_turn_duration = Duration::ZERO;
+impl AgentViewState {
+    /// Elapsed time since the agent was first observed.
+    pub fn elapsed(&self) -> std::time::Duration {
+        self.started_at
+            .map_or(std::time::Duration::ZERO, |t| t.elapsed())
     }
 }

@@ -18,7 +18,8 @@ pub async fn run(
     info!("starting in Hub mode");
 
     // 1-3. Create Hub + spawn root agent
-    let ctx = super::common::bootstrap_hub_and_agent(cli, cwd, config).await?;
+    let ctx = super::hub_bootstrap::bootstrap_hub_and_agent(cli, cwd, config).await?;
+    let root_session_id = ctx.root_session_id.clone();
 
     // 4. Start event broadcast
     let _event_loop = loopal_agent_hub::start_event_loop(ctx.hub.clone(), ctx.event_rx);
@@ -39,6 +40,7 @@ pub async fn run(
         ui_session.client.clone(),
         ctx.hub.clone(),
     );
+    session_ctrl.set_root_session_id(&root_session_id);
 
     // 8. Handle permission/question relay from Hub
     let session_for_relay = session_ctrl.clone();
@@ -46,11 +48,22 @@ pub async fn run(
         handle_tui_incoming(session_for_relay, ui_session.relay_rx).await;
     });
 
+    // 8b. Background task: persist sub-agent refs to root session metadata
+    let persist_ctrl = session_ctrl.clone();
+    tokio::spawn(async move {
+        super::sub_agent_resume::persist_sub_agent_refs_loop(persist_ctrl).await;
+    });
+
     // 9. Load display history or show welcome
+    let session_manager = loopal_runtime::SessionManager::new()?;
     if let Some(ref sid) = cli.resume {
-        let session_manager = loopal_runtime::SessionManager::new()?;
-        if let Ok((_session, messages)) = session_manager.resume_session(sid) {
+        if let Ok((session, messages)) = session_manager.resume_session(sid) {
             session_ctrl.load_display_history(project_messages(&messages));
+            super::sub_agent_resume::load_sub_agent_histories(
+                &session_ctrl,
+                &session,
+                &session_manager,
+            );
         }
     } else {
         let display_path = super::abbreviate_home(cwd);
@@ -91,6 +104,10 @@ fn bridge_broadcast_to_mpsc(
 }
 
 /// Handle incoming relay requests from Hub via UiSession.
+///
+/// In auto-approve mode: respond directly using the relay request ID.
+/// No dependency on pending_permission being set by the event handler first,
+/// avoiding the race between broadcast events and relay requests.
 async fn handle_tui_incoming(
     session: SessionController,
     mut rx: tokio::sync::mpsc::Receiver<loopal_ipc::connection::Incoming>,
@@ -98,26 +115,23 @@ async fn handle_tui_incoming(
     use loopal_ipc::connection::Incoming;
     info!("TUI incoming handler started");
     while let Some(msg) = rx.recv().await {
-        if let Incoming::Request { id, method, .. } = msg {
+        if let Incoming::Request { id, method, params } = msg {
+            let agent_name = params
+                .as_object()
+                .and_then(|o| o.get("agent_name"))
+                .and_then(|v| v.as_str())
+                .unwrap_or(loopal_session::ROOT_AGENT);
+
             if method == loopal_ipc::protocol::methods::AGENT_PERMISSION.name {
-                {
-                    let mut state = session.lock();
-                    if let Some(ref mut perm) = state.pending_permission {
-                        perm.relay_request_id = Some(id);
-                    }
-                }
-                info!(%method, id, "TUI auto-approving permission");
-                session.approve_permission().await;
+                // Auto-approve: respond directly with the relay ID, bypassing
+                // the pending_permission → relay_request_id → approve dance.
+                // This avoids a race where the relay arrives before the event.
+                info!(%method, id, agent = %agent_name, "TUI auto-approving permission");
+                session.auto_approve_permission(id).await;
             } else if method == loopal_ipc::protocol::methods::AGENT_QUESTION.name {
-                {
-                    let mut state = session.lock();
-                    if let Some(ref mut q) = state.pending_question {
-                        q.relay_request_id = Some(id);
-                    }
-                }
-                info!(%method, id, "TUI auto-approving question");
+                info!(%method, id, agent = %agent_name, "TUI auto-approving question");
                 session
-                    .answer_question(vec!["(auto-approved)".into()])
+                    .auto_answer_question(id, vec!["(auto-approved)".into()])
                     .await;
             }
         }

@@ -15,13 +15,16 @@ use super::emitter::ChannelEventEmitter;
 use super::permission_handler::PermissionHandler;
 use super::question_handler::QuestionHandler;
 
-/// Unified frontend merging root (channel-based) and sub-agent (autopilot) behaviour.
+/// In-process channel-based frontend for the test harness.
 ///
-/// Consumes Envelope + ControlCommand channels and returns `AgentInput`
-/// directly — no intermediate `UserCommand` adaptation.
+/// Production code uses `HubFrontend` (IPC-based, in `loopal-agent-server`).
+/// This implementation bridges channel-based Envelope/ControlCommand/Permission
+/// flows into the `AgentInput`-based interface consumed by the agent loop,
+/// making it ideal for integration tests that need deterministic control.
 ///
-/// - Root agent:  `agent_name = None`, uses `TuiPermissionHandler`
-/// - Sub-agent:   `agent_name = Some(name)`, uses `AutoDenyHandler`
+/// Permission decisions are delegated to a pluggable `PermissionHandler`:
+/// - `AutoDenyHandler` for bypass mode (no human in the loop)
+/// - `TuiPermissionHandler` for supervised mode (channel-based approval)
 pub struct UnifiedFrontend {
     agent_name: Option<String>,
     event_tx: mpsc::Sender<AgentEvent>,

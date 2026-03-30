@@ -9,3 +9,5 @@ mod replay_test;
 mod sessions_test;
 #[path = "suite/sessions_update_test.rs"]
 mod sessions_update_test;
+#[path = "suite/sub_agent_ref_test.rs"]
+mod sub_agent_ref_test;

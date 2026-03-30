@@ -107,7 +107,13 @@ pub(crate) async fn handle_key_action(
 }
 
 async fn push_to_inbox(app: &mut App, content: UserContent) {
-    app.input_history.push(content.text.clone());
+    // For skill invocations, record the slash command (not the expanded body)
+    let history_text = match &content.skill_info {
+        Some(si) if si.user_args.is_empty() => si.name.clone(),
+        Some(si) => format!("{} {}", si.name, si.user_args),
+        None => content.text.clone(),
+    };
+    app.input_history.push(history_text);
     app.history_index = None;
     if let Some(msg) = app.session.enqueue_message(content) {
         tracing::debug!("TUI: message forwarded to agent");

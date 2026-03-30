@@ -164,7 +164,7 @@ fn separator_line(col_widths: &[usize]) -> Line<'static> {
 fn align_cell(text: &str, w: usize, align: Alignment) -> String {
     let tw = UnicodeWidthStr::width(text);
     if tw >= w {
-        return truncate_to_width(text, w);
+        return crate::text_util::truncate_to_width(text, w);
     }
     let pad = w - tw;
     match align {
@@ -175,19 +175,4 @@ fn align_cell(text: &str, w: usize, align: Alignment) -> String {
         }
         _ => format!("{}{}", text, " ".repeat(pad)),
     }
-}
-
-/// Truncate to at most `w` display columns (safety net for unbreakable words).
-fn truncate_to_width(text: &str, w: usize) -> String {
-    let mut buf = String::new();
-    let mut col = 0;
-    for ch in text.chars() {
-        let cw = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(0);
-        if col + cw > w {
-            break;
-        }
-        buf.push(ch);
-        col += cw;
-    }
-    buf
 }

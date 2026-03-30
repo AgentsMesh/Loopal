@@ -19,6 +19,7 @@ async fn test_wait_for_input_with_images() {
     let content = UserContent {
         text: "describe these".to_string(),
         images: vec![sample_image("a"), sample_image("b")],
+        skill_info: None,
     };
     mbox_tx
         .send(Envelope::new(MessageSource::Human, "main", content))
@@ -43,6 +44,7 @@ async fn test_wait_for_input_empty_text_with_images() {
     let content = UserContent {
         text: String::new(),
         images: vec![sample_image("only")],
+        skill_info: None,
     };
     mbox_tx
         .send(Envelope::new(MessageSource::Human, "main", content))

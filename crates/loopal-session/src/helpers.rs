@@ -34,6 +34,7 @@ pub fn push_system_msg(state: &mut SessionState, content: &str) {
         content: content.into(),
         tool_calls: Vec::new(),
         image_count: 0,
+        skill_info: None,
     });
 }
 
@@ -99,6 +100,7 @@ pub fn flush_streaming(state: &mut SessionState) {
             content: summary,
             tool_calls: Vec::new(),
             image_count: 0,
+            skill_info: None,
         });
         state.thinking_active = false;
     }
@@ -117,6 +119,7 @@ pub fn flush_streaming(state: &mut SessionState) {
             content: text,
             tool_calls: Vec::new(),
             image_count: 0,
+            skill_info: None,
         });
     }
 }

@@ -41,6 +41,7 @@ pub(crate) fn handle_tool_call(
         content: String::new(),
         tool_calls: vec![tc],
         image_count: 0,
+        skill_info: None,
     });
 }
 
@@ -87,6 +88,7 @@ pub(crate) fn handle_tool_result(state: &mut SessionState, p: ToolResultParams) 
             content: p.result,
             tool_calls: Vec::new(),
             image_count: 0,
+            skill_info: None,
         });
     }
 }

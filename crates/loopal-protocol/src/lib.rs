@@ -14,4 +14,4 @@ pub use envelope::{Envelope, MessageSource};
 pub use event::{AgentEvent, AgentEventPayload};
 pub use interrupt::InterruptSignal;
 pub use question::{Question, QuestionOption, UserQuestionResponse};
-pub use user_content::{ImageAttachment, UserContent};
+pub use user_content::{ImageAttachment, SkillInvocation, UserContent};

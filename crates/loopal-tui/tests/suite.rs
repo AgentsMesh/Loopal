@@ -41,6 +41,8 @@ mod markdown_test;
 mod message_lines_edge_test;
 #[path = "suite/message_lines_test.rs"]
 mod message_lines_test;
+#[path = "suite/skill_render_test.rs"]
+mod skill_render_test;
 #[path = "suite/styled_wrap_test.rs"]
 mod styled_wrap_test;
 

@@ -10,6 +10,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::markdown;
 use loopal_session::types::DisplayMessage;
 
+use super::skill_display::render_skill_invoke;
 use super::tool_display::render_tool_calls;
 use super::welcome::render_welcome;
 
@@ -43,12 +44,13 @@ pub fn message_to_lines(msg: &DisplayMessage, width: u16) -> Vec<Line<'static>> 
 }
 
 /// User message: tinted background block with left accent bar.
-///
-/// ```text
-/// ▎ user message text padded to full width         ██████
-/// ▎ continuation line                              ██████
-/// ```
+/// Skill invocations render as a collapsed summary instead of the full body.
 fn render_user(lines: &mut Vec<Line<'static>>, msg: &DisplayMessage, width: u16) {
+    if let Some(skill) = &msg.skill_info {
+        render_skill_invoke(lines, skill, width);
+        return;
+    }
+
     let w = (width as usize).max(1);
     let accent = Style::default()
         .fg(Color::Rgb(100, 130, 200))

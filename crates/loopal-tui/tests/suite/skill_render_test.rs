@@ -38,7 +38,10 @@ fn line_display_width(line: &ratatui::prelude::Line<'_>) -> usize {
         .iter()
         .map(|s| {
             // Each char: CJK = 2 cols, ASCII = 1 col.
-            s.content.chars().map(|c| if c > '\x7f' { 2 } else { 1 }).sum::<usize>()
+            s.content
+                .chars()
+                .map(|c| if c > '\x7f' { 2 } else { 1 })
+                .sum::<usize>()
         })
         .sum()
 }
@@ -50,9 +53,16 @@ fn test_skill_collapsed_no_args() {
     let text = all_text(&lines);
     assert!(text.contains("▸"), "should show arrow indicator");
     assert!(text.contains("/commit"), "should show skill name");
-    assert!(!text.contains("expanded body"), "expanded body must be hidden");
+    assert!(
+        !text.contains("expanded body"),
+        "expanded body must be hidden"
+    );
     // 1 content line + 1 empty separator = 2
-    assert_eq!(lines.len(), 2, "skill should collapse to single line + separator");
+    assert_eq!(
+        lines.len(),
+        2,
+        "skill should collapse to single line + separator"
+    );
 }
 
 #[test]
@@ -62,7 +72,10 @@ fn test_skill_collapsed_with_args() {
     let text = all_text(&lines);
     assert!(text.contains("/github-pr"), "should show skill name");
     assert!(text.contains("fix the login bug"), "should show user args");
-    assert!(!text.contains("expanded body"), "expanded body must be hidden");
+    assert!(
+        !text.contains("expanded body"),
+        "expanded body must be hidden"
+    );
     assert_eq!(lines.len(), 2);
 }
 
@@ -107,6 +120,9 @@ fn test_non_skill_user_message_unchanged() {
     };
     let lines = message_to_lines(&m, 80);
     let text = all_text(&lines);
-    assert!(text.contains("hello world"), "regular message should show content");
+    assert!(
+        text.contains("hello world"),
+        "regular message should show content"
+    );
     assert!(!text.contains("▸"), "regular message should not show arrow");
 }

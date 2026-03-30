@@ -135,6 +135,7 @@ pub(crate) fn make_multi_runner(
         shared: None,
         memory_channel: None,
         scheduled_rx: None,
+        auto_classifier: None,
     };
     (AgentLoopRunner::new(params), event_rx)
 }

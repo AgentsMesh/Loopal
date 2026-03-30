@@ -119,6 +119,7 @@ async fn action_spawn(
     let perm_mode = match shared.kernel.settings().permission_mode {
         loopal_tool_api::PermissionMode::Bypass => "bypass",
         loopal_tool_api::PermissionMode::Supervised => "supervised",
+        loopal_tool_api::PermissionMode::Auto => "auto",
     };
 
     let result = spawn_agent(

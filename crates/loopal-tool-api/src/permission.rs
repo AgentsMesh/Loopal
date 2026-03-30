@@ -13,16 +13,20 @@ pub enum PermissionLevel {
 
 /// Permission mode set by user.
 ///
-/// Two modes only — controls user interaction policy.
+/// Three modes: Bypass (trust everything), Auto (LLM classifies danger),
+/// Supervised (human approves everything non-readonly).
 /// Sandbox enforcement is a separate, orthogonal layer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum PermissionMode {
     /// All tools auto-allowed, no approval needed.
     /// Sandbox still blocks dangerous operations.
     Bypass,
     /// ReadOnly auto-allowed; Supervised and Dangerous require human approval.
-    /// Sandbox checks run first; denied operations never reach the user prompt.
     Supervised,
+    /// ReadOnly + Supervised auto-allowed; Dangerous goes to LLM classifier.
+    /// Falls back to human approval when classifier is unavailable or degraded.
+    Auto,
 }
 
 /// Decision from permission check
@@ -30,7 +34,7 @@ pub enum PermissionMode {
 pub enum PermissionDecision {
     /// Automatically allowed
     Allow,
-    /// Requires user confirmation
+    /// Requires user confirmation (or classifier in Auto mode)
     Ask,
     /// Denied
     Deny,
@@ -40,6 +44,12 @@ impl PermissionMode {
     pub fn check(&self, level: PermissionLevel) -> PermissionDecision {
         match self {
             PermissionMode::Bypass => PermissionDecision::Allow,
+            PermissionMode::Auto => match level {
+                PermissionLevel::ReadOnly | PermissionLevel::Supervised => {
+                    PermissionDecision::Allow
+                }
+                PermissionLevel::Dangerous => PermissionDecision::Ask,
+            },
             PermissionMode::Supervised => match level {
                 PermissionLevel::ReadOnly => PermissionDecision::Allow,
                 _ => PermissionDecision::Ask,

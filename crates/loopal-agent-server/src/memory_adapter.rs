@@ -62,3 +62,22 @@ impl MemoryProcessor for ServerMemoryProcessor {
         }
     }
 }
+
+/// Build the optional memory channel + observer sidebar.
+pub fn build_memory_channel(
+    interactive: bool,
+    settings: &loopal_config::Settings,
+    shared: &Arc<AgentShared>,
+    model: &str,
+) -> Option<Arc<dyn MemoryChannel>> {
+    if !(interactive && settings.memory.enabled) {
+        return None;
+    }
+    let (tx, rx) = mpsc::channel::<String>(64);
+    let processor = Arc::new(ServerMemoryProcessor::new(
+        shared.clone(),
+        model.to_string(),
+    ));
+    tokio::spawn(loopal_memory::MemoryObserver::new(rx, processor).run());
+    Some(Arc::new(ServerMemoryChannel(tx)))
+}

@@ -6,6 +6,7 @@ rust_library(
     edition = "2024",
     visibility = ["//visibility:public"],
     deps = [
+        "//crates/loopal-auto-mode",
         "//crates/loopal-config",
         "//crates/loopal-context",
         "//crates/loopal-error",
@@ -39,6 +40,7 @@ rust_test(
     edition = "2024",
     deps = [
         ":loopal-runtime",
+        "//crates/loopal-auto-mode",
         "//crates/loopal-backend",
         "//crates/loopal-test-support",
         "@crates//:chrono",

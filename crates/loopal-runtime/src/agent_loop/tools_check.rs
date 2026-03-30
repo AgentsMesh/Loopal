@@ -1,6 +1,7 @@
 //! Tool precheck and permission verification phase.
 //!
 //! Separated from `tools.rs` to keep files under 200 lines.
+//! Parallel classification and human fallback live in `tools_resolve.rs`.
 
 use loopal_message::ContentBlock;
 use loopal_protocol::AgentEventPayload;
@@ -19,7 +20,8 @@ pub(super) struct CheckResult {
 impl AgentLoopRunner {
     /// Phase 1: sandbox precheck + permission check for each tool.
     ///
-    /// Returns approved tools and denied results (with events already emitted).
+    /// When Auto mode is active and multiple tools need classification,
+    /// classifier calls are parallelized to reduce latency.
     pub(super) async fn check_tools(
         &mut self,
         remaining: &[(String, String, serde_json::Value)],
@@ -28,6 +30,7 @@ impl AgentLoopRunner {
     ) -> loopal_error::Result<CheckResult> {
         let mut approved = Vec::new();
         let mut denied = Vec::new();
+        let mut needs_classify = Vec::new();
         let mut processed = 0usize;
 
         for (id, name, input) in remaining {
@@ -56,19 +59,29 @@ impl AgentLoopRunner {
                 continue;
             }
 
-            // Permission check
-            let decision = self.check_permission(id, name, input).await?;
-            if decision == PermissionDecision::Deny {
-                info!(tool = name.as_str(), decision = "deny", "permission");
-                denied.push((
-                    orig_idx,
-                    error_block(id, &format!("Permission denied: tool '{name}' not allowed")),
-                ));
-                self.emit_tool_error(id, name, "Permission denied").await?;
-            } else {
+            // Fast-path permission check (no LLM call)
+            let tool_perm = self
+                .params
+                .deps
+                .kernel
+                .get_tool(name)
+                .map(|t| t.permission());
+            let decision = tool_perm
+                .map(|p| self.params.config.permission_mode.check(p))
+                .unwrap_or(PermissionDecision::Allow);
+
+            if decision != PermissionDecision::Ask {
                 approved.push((id.clone(), name.clone(), input.clone()));
+                continue;
             }
+
+            // Needs further decision — collect for batch or human
+            needs_classify.push((orig_idx, id.clone(), name.clone(), input.clone()));
         }
+
+        // Parallel auto-classification or sequential human approval
+        self.resolve_pending(&mut approved, &mut denied, needs_classify)
+            .await?;
 
         // Mark unprocessed tools as interrupted
         for (id, name, _) in &remaining[processed..] {
@@ -85,7 +98,7 @@ impl AgentLoopRunner {
     }
 
     /// Emit a ToolResult error event (helper for denied/interrupted tools).
-    async fn emit_tool_error(
+    pub(super) async fn emit_tool_error(
         &self,
         id: &str,
         name: &str,
@@ -104,7 +117,7 @@ impl AgentLoopRunner {
     }
 }
 
-fn error_block(id: &str, content: &str) -> ContentBlock {
+pub(super) fn error_block(id: &str, content: &str) -> ContentBlock {
     ContentBlock::ToolResult {
         tool_use_id: id.to_string(),
         content: content.to_string(),

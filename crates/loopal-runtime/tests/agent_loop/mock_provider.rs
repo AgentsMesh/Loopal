@@ -48,6 +48,7 @@ fn build_params(
         shared: None,
         memory_channel: None,
         scheduled_rx: None,
+        auto_classifier: None,
     }
 }
 

@@ -6,7 +6,7 @@ use loopal_session::event_handler::apply_event;
 
 use super::agent_lifecycle_test::{apply_sequence, make_state};
 
-// ── Multi-agent tracking ─────────────────────────────────────────────
+// -- Multi-agent tracking -------------------------------------------------
 
 /// Two sub-agents tracked independently in SessionState.
 #[test]
@@ -36,7 +36,8 @@ fn multiple_agents_tracked_independently() {
         ],
     );
 
-    assert_eq!(state.agents.len(), 2);
+    // "main" + "researcher" + "coder" = 3 agents
+    assert_eq!(state.agents.len(), 3);
     assert_eq!(
         state.agents["researcher"].observable.status,
         AgentStatus::Running
@@ -63,11 +64,11 @@ fn multiple_agents_tracked_independently() {
     );
 }
 
-// ── Event routing ────────────────────────────────────────────────────
+// -- Event routing --------------------------------------------------------
 
-/// Root events (agent_name=None) update main display, not agents map.
+/// Root events (agent_name=None) route to "main" agent in the agents map.
 #[test]
-fn root_events_do_not_create_agent_entry() {
+fn root_events_route_to_main_agent() {
     let mut state = make_state();
     apply_event(
         &mut state,
@@ -76,11 +77,9 @@ fn root_events_do_not_create_agent_entry() {
         }),
     );
     apply_event(&mut state, AgentEvent::root(AgentEventPayload::Finished));
-    assert!(
-        state.agents.is_empty(),
-        "root events should not create agent entries"
-    );
-    assert!(state.agent_idle);
+    // "main" exists (created at init), root events route there
+    assert!(state.agents.contains_key("main"));
+    assert!(state.agents["main"].conversation.agent_idle);
 }
 
 /// SubAgentSpawned event creates an AgentViewState entry with topology info.
@@ -94,6 +93,7 @@ fn sub_agent_spawned_registers_topology() {
             agent_id: "test-id".into(),
             parent: None,
             model: Some("claude-sonnet-4".into()),
+            session_id: None,
         }),
     );
     assert!(

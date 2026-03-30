@@ -28,13 +28,19 @@ fn test_handle_stream_event_buffers_text() {
         .handle_event(AgentEvent::root(AgentEventPayload::Stream {
             text: "Hello ".to_string(),
         }));
-    assert_eq!(app.session.lock().streaming_text, "Hello ");
+    assert_eq!(
+        app.session.lock().active_conversation().streaming_text,
+        "Hello "
+    );
 
     app.session
         .handle_event(AgentEvent::root(AgentEventPayload::Stream {
             text: "world".to_string(),
         }));
-    assert_eq!(app.session.lock().streaming_text, "Hello world");
+    assert_eq!(
+        app.session.lock().active_conversation().streaming_text,
+        "Hello world"
+    );
 }
 
 #[test]
@@ -48,11 +54,12 @@ fn test_handle_awaiting_input_flushes_and_increments_turn() {
         .handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
 
     let state = app.session.lock();
-    assert!(state.streaming_text.is_empty());
-    assert_eq!(state.turn_count, 1);
-    assert_eq!(state.messages.len(), 1);
-    assert_eq!(state.messages[0].role, "assistant");
-    assert_eq!(state.messages[0].content, "response text");
+    let conv = state.active_conversation();
+    assert!(conv.streaming_text.is_empty());
+    assert_eq!(conv.turn_count, 1);
+    assert_eq!(conv.messages.len(), 1);
+    assert_eq!(conv.messages[0].role, "assistant");
+    assert_eq!(conv.messages[0].content, "response text");
 }
 
 #[test]
@@ -64,9 +71,10 @@ fn test_handle_error_event() {
         }));
 
     let state = app.session.lock();
-    assert_eq!(state.messages.len(), 1);
-    assert_eq!(state.messages[0].role, "error");
-    assert_eq!(state.messages[0].content, "something went wrong");
+    let conv = state.active_conversation();
+    assert_eq!(conv.messages.len(), 1);
+    assert_eq!(conv.messages[0].role, "error");
+    assert_eq!(conv.messages[0].content, "something went wrong");
 }
 
 #[test]
@@ -83,8 +91,9 @@ fn test_handle_token_usage() {
         }));
 
     let state = app.session.lock();
-    assert_eq!(state.token_count(), 150);
-    assert_eq!(state.context_window, 200_000);
+    let conv = state.active_conversation();
+    assert_eq!(conv.token_count(), 150);
+    assert_eq!(conv.context_window, 200_000);
 }
 
 #[test]
@@ -106,9 +115,10 @@ fn test_handle_max_turns_reached() {
         }));
 
     let state = app.session.lock();
-    assert_eq!(state.messages.len(), 1);
-    assert_eq!(state.messages[0].role, "system");
-    assert!(state.messages[0].content.contains("50"));
+    let conv = state.active_conversation();
+    assert_eq!(conv.messages.len(), 1);
+    assert_eq!(conv.messages[0].role, "system");
+    assert!(conv.messages[0].content.contains("50"));
 }
 
 #[test]
@@ -117,8 +127,9 @@ fn test_handle_started_event() {
     app.session
         .handle_event(AgentEvent::root(AgentEventPayload::Started));
     let state = app.session.lock();
-    assert!(state.messages.is_empty());
-    assert!(state.streaming_text.is_empty());
+    let conv = state.active_conversation();
+    assert!(conv.messages.is_empty());
+    assert!(conv.streaming_text.is_empty());
 }
 
 #[test]
@@ -132,9 +143,10 @@ fn test_handle_finished_event_flushes_streaming() {
         .handle_event(AgentEvent::root(AgentEventPayload::Finished));
 
     let state = app.session.lock();
-    assert!(state.streaming_text.is_empty());
-    assert_eq!(state.messages.len(), 1);
-    assert_eq!(state.messages[0].content, "final text");
+    let conv = state.active_conversation();
+    assert!(conv.streaming_text.is_empty());
+    assert_eq!(conv.messages.len(), 1);
+    assert_eq!(conv.messages[0].content, "final text");
 }
 
 #[test]
@@ -143,6 +155,7 @@ fn test_flush_streaming_empty_is_noop() {
     app.session
         .handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
     let state = app.session.lock();
-    assert!(state.messages.is_empty());
-    assert_eq!(state.turn_count, 1);
+    let conv = state.active_conversation();
+    assert!(conv.messages.is_empty());
+    assert_eq!(conv.turn_count, 1);
 }

@@ -4,6 +4,15 @@ use super::InputAction;
 use super::commands::try_execute_slash_command;
 
 pub(super) fn handle_enter(app: &mut App) -> InputAction {
+    // Empty Enter with a focused sub-agent → drill into its view
+    if app.input.is_empty() && app.pending_images.is_empty() {
+        if let Some(ref focused) = app.focused_agent {
+            let active = &app.session.lock().active_view;
+            if focused != active {
+                return InputAction::EnterAgentView;
+            }
+        }
+    }
     let trimmed = app.input.trim().to_string();
     if trimmed.starts_with('/') {
         app.refresh_commands();
@@ -35,7 +44,7 @@ pub(super) fn handle_backspace(app: &mut App) -> InputAction {
     InputAction::None
 }
 
-/// Ctrl+C: clear input if non-empty, otherwise interrupt a running agent.
+/// Ctrl+C: clear input if non-empty, clear focus if set, otherwise interrupt agent.
 pub(super) fn handle_ctrl_c(app: &mut App) -> InputAction {
     if !app.input.is_empty() || !app.pending_images.is_empty() {
         app.input.clear();
@@ -45,7 +54,10 @@ pub(super) fn handle_ctrl_c(app: &mut App) -> InputAction {
         app.paste_map.clear();
         app.autocomplete = None;
         InputAction::None
-    } else if !app.session.lock().agent_idle {
+    } else if app.focused_agent.is_some() {
+        app.focused_agent = None;
+        InputAction::None
+    } else if !app.session.lock().active_conversation().agent_idle {
         InputAction::Interrupt
     } else {
         InputAction::None

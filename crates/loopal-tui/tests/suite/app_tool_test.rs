@@ -34,6 +34,7 @@ fn test_handle_tool_permission_request() {
 
     let state = app.session.lock();
     let perm = state
+        .active_conversation()
         .pending_permission
         .as_ref()
         .expect("should have pending permission");
@@ -56,10 +57,11 @@ fn test_handle_tool_permission_flushes_streaming() {
         }));
 
     let state = app.session.lock();
-    assert!(state.streaming_text.is_empty());
-    assert_eq!(state.messages.len(), 1);
-    assert_eq!(state.messages[0].content, "about to call tool");
-    assert!(state.pending_permission.is_some());
+    let conv = state.active_conversation();
+    assert!(conv.streaming_text.is_empty());
+    assert_eq!(conv.messages.len(), 1);
+    assert_eq!(conv.messages[0].content, "about to call tool");
+    assert!(conv.pending_permission.is_some());
 }
 
 #[test]
@@ -73,12 +75,13 @@ fn test_handle_tool_call_event() {
         }));
 
     let state = app.session.lock();
-    assert_eq!(state.messages.len(), 1);
-    assert_eq!(state.messages[0].role, "assistant");
-    assert_eq!(state.messages[0].tool_calls.len(), 1);
-    assert_eq!(state.messages[0].tool_calls[0].name, "bash");
+    let conv = state.active_conversation();
+    assert_eq!(conv.messages.len(), 1);
+    assert_eq!(conv.messages[0].role, "assistant");
+    assert_eq!(conv.messages[0].tool_calls.len(), 1);
+    assert_eq!(conv.messages[0].tool_calls[0].name, "bash");
     assert_eq!(
-        state.messages[0].tool_calls[0].status,
+        conv.messages[0].tool_calls[0].status,
         ToolCallStatus::Pending
     );
 }
@@ -104,7 +107,7 @@ fn test_handle_tool_result_updates_status() {
         }));
 
     assert_eq!(
-        app.session.lock().messages[0].tool_calls[0].status,
+        app.session.lock().active_conversation().messages[0].tool_calls[0].status,
         ToolCallStatus::Success
     );
 }
@@ -130,7 +133,7 @@ fn test_handle_tool_result_error_status() {
         }));
 
     assert_eq!(
-        app.session.lock().messages[0].tool_calls[0].status,
+        app.session.lock().active_conversation().messages[0].tool_calls[0].status,
         ToolCallStatus::Error
     );
 }
@@ -150,10 +153,11 @@ fn test_handle_tool_call_appends_to_existing_assistant_message() {
         }));
 
     let state = app.session.lock();
-    assert_eq!(state.messages.len(), 1);
-    assert_eq!(state.messages[0].role, "assistant");
-    assert_eq!(state.messages[0].content, "Let me run that.");
-    assert_eq!(state.messages[0].tool_calls.len(), 1);
+    let conv = state.active_conversation();
+    assert_eq!(conv.messages.len(), 1);
+    assert_eq!(conv.messages[0].role, "assistant");
+    assert_eq!(conv.messages[0].content, "Let me run that.");
+    assert_eq!(conv.messages[0].tool_calls.len(), 1);
 }
 
 #[test]
@@ -173,8 +177,9 @@ fn test_handle_tool_call_second_tool_on_same_message() {
         }));
 
     let state = app.session.lock();
-    assert_eq!(state.messages.len(), 1);
-    assert_eq!(state.messages[0].tool_calls.len(), 2);
-    assert_eq!(state.messages[0].tool_calls[0].name, "bash");
-    assert_eq!(state.messages[0].tool_calls[1].name, "Read");
+    let conv = state.active_conversation();
+    assert_eq!(conv.messages.len(), 1);
+    assert_eq!(conv.messages[0].tool_calls.len(), 2);
+    assert_eq!(conv.messages[0].tool_calls[0].name, "bash");
+    assert_eq!(conv.messages[0].tool_calls[1].name, "Read");
 }

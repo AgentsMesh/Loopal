@@ -13,7 +13,6 @@ use crate::input::paste;
 use crate::key_dispatch::handle_key_action;
 use crate::render::draw;
 use crate::terminal::TerminalGuard;
-use crate::tui_helpers::route_human_message;
 
 /// Run the TUI event loop with a real terminal (production entry point).
 pub async fn run_tui(
@@ -65,7 +64,7 @@ where
                 }
                 AppEvent::Agent(agent_event) => {
                     if let Some(content) = app.session.handle_event(agent_event) {
-                        route_human_message(app, content).await;
+                        app.session.route_message(content).await;
                     }
                 }
                 AppEvent::Paste(result) => {

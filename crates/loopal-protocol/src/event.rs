@@ -5,7 +5,9 @@ use crate::question::Question;
 /// Complete event with agent identity, transported via channel to TUI.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentEvent {
-    /// `None` = root agent, `Some("name")` = sub-agent.
+    /// Agent that produced this event. Hub fills this in for all agents
+    /// (root = `Some("main")`, sub-agent = `Some("name")`).
+    /// `None` only in the agent process before Hub injection.
     pub agent_name: Option<String>,
     pub payload: AgentEventPayload,
 }
@@ -186,5 +188,8 @@ pub enum AgentEventPayload {
         /// Model used by the spawned agent.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         model: Option<String>,
+        /// Session ID of the sub-agent's persistent session storage.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        session_id: Option<String>,
     },
 }

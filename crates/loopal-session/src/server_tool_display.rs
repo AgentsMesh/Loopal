@@ -2,19 +2,18 @@
 
 use serde_json::Value;
 
-use crate::helpers::flush_streaming;
-use crate::state::SessionState;
+use crate::agent_conversation::AgentConversation;
 use crate::truncate::truncate_json;
 use crate::types::{DisplayMessage, DisplayToolCall, ToolCallStatus};
 
 /// Handle a ServerToolUse event — add a pending tool call entry.
 pub(crate) fn handle_server_tool_use(
-    state: &mut SessionState,
+    conv: &mut AgentConversation,
     id: String,
     name: String,
     input: &Value,
 ) {
-    flush_streaming(state);
+    conv.flush_streaming();
     let tc = DisplayToolCall {
         id,
         name: name.clone(),
@@ -28,13 +27,13 @@ pub(crate) fn handle_server_tool_use(
         progress_tail: None,
         metadata: None,
     };
-    if let Some(last) = state.messages.last_mut()
+    if let Some(last) = conv.messages.last_mut()
         && last.role == "assistant"
     {
         last.tool_calls.push(tc);
         return;
     }
-    state.messages.push(DisplayMessage {
+    conv.messages.push(DisplayMessage {
         role: "assistant".to_string(),
         content: String::new(),
         tool_calls: vec![tc],
@@ -45,11 +44,11 @@ pub(crate) fn handle_server_tool_use(
 
 /// Handle a ServerToolResult event — fill in the actual result content.
 pub(crate) fn handle_server_tool_result(
-    state: &mut SessionState,
+    conv: &mut AgentConversation,
     tool_use_id: &str,
     content: &Value,
 ) {
-    let Some(msg) = state.messages.last_mut() else {
+    let Some(msg) = conv.messages.last_mut() else {
         return;
     };
     if let Some(tc) = msg.tool_calls.iter_mut().rfind(|tc| tc.id == tool_use_id) {

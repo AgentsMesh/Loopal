@@ -21,10 +21,11 @@ use super::unified_status::{format_duration, spinner_frame};
 const MAX_VISIBLE: usize = 5;
 
 /// Compute the height needed for the agent panel.
-pub fn panel_height(agents: &IndexMap<String, AgentViewState>) -> u16 {
+/// Excludes the currently viewed agent — it's the active conversation, not a switchable target.
+pub fn panel_height(agents: &IndexMap<String, AgentViewState>, active_view: &str) -> u16 {
     let live = agents
-        .values()
-        .filter(|a| is_live(&a.observable.status))
+        .iter()
+        .filter(|(name, a)| name.as_str() != active_view && is_live(&a.observable.status))
         .count();
     if live == 0 {
         return 0;
@@ -35,10 +36,13 @@ pub fn panel_height(agents: &IndexMap<String, AgentViewState>) -> u16 {
 }
 
 /// Render the agent panel.
+/// `active_view` is excluded from the list (it's the current conversation).
 pub fn render_agent_panel(
     f: &mut Frame,
     agents: &IndexMap<String, AgentViewState>,
     focused: Option<&str>,
+    viewing: Option<&str>,
+    active_view: &str,
     area: Rect,
 ) {
     if area.height == 0 || agents.is_empty() {
@@ -48,7 +52,7 @@ pub fn render_agent_panel(
     let max_name = agents.keys().map(|n| n.len()).max().unwrap_or(0).max(4);
     let live_agents: Vec<_> = agents
         .iter()
-        .filter(|(_, a)| is_live(&a.observable.status))
+        .filter(|(name, a)| name.as_str() != active_view && is_live(&a.observable.status))
         .collect();
 
     let visible = live_agents.len().min(MAX_VISIBLE);
@@ -56,7 +60,8 @@ pub fn render_agent_panel(
         .iter()
         .map(|(name, agent)| {
             let is_focused = focused == Some(name.as_str());
-            render_agent_line(name, agent, is_focused, max_name)
+            let is_viewing = viewing == Some(name.as_str());
+            render_agent_line(name, agent, is_focused, is_viewing, max_name)
         })
         .collect();
 
@@ -77,12 +82,15 @@ fn render_agent_line(
     name: &str,
     agent: &AgentViewState,
     is_focused: bool,
+    is_viewing: bool,
     name_width: usize,
 ) -> Line<'static> {
     let mut spans: Vec<Span<'static>> = Vec::with_capacity(10);
 
-    // Focus indicator
-    let (indicator, base_style) = if is_focused {
+    // Focus / viewing indicator
+    let (indicator, base_style) = if is_viewing {
+        (" ▶ ", Style::default().fg(Color::Green).bold())
+    } else if is_focused {
         (" ▸ ", Style::default().fg(Color::Cyan).bold())
     } else {
         ("   ", Style::default())
@@ -91,7 +99,9 @@ fn render_agent_line(
 
     // Name (padded for column alignment)
     let padded = format!("{name:<name_width$}");
-    let name_style = if is_focused {
+    let name_style = if is_viewing {
+        Style::default().fg(Color::Green).bold()
+    } else if is_focused {
         Style::default().fg(Color::Cyan).bold()
     } else {
         Style::default().fg(Color::White)

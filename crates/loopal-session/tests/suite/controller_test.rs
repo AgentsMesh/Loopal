@@ -33,12 +33,13 @@ fn test_initial_state() {
     let state = ctrl.lock();
     assert_eq!(state.model, "test-model");
     assert_eq!(state.mode, "act");
-    assert!(state.messages.is_empty());
-    assert!(state.streaming_text.is_empty());
-    assert!(!state.agent_idle);
-    assert_eq!(state.turn_count, 0);
-    assert_eq!(state.token_count(), 0);
-    assert!(state.pending_permission.is_none());
+    let conv = state.active_conversation();
+    assert!(conv.messages.is_empty());
+    assert!(conv.streaming_text.is_empty());
+    assert!(!conv.agent_idle);
+    assert_eq!(conv.turn_count, 0);
+    assert_eq!(conv.token_count(), 0);
+    assert!(conv.pending_permission.is_none());
     assert!(state.inbox.is_empty());
 }
 
@@ -48,12 +49,15 @@ fn test_stream_event() {
     ctrl.handle_event(AgentEvent::root(AgentEventPayload::Stream {
         text: "hello".to_string(),
     }));
-    assert_eq!(ctrl.lock().streaming_text, "hello");
+    assert_eq!(ctrl.lock().active_conversation().streaming_text, "hello");
 
     ctrl.handle_event(AgentEvent::root(AgentEventPayload::Stream {
         text: " world".to_string(),
     }));
-    assert_eq!(ctrl.lock().streaming_text, "hello world");
+    assert_eq!(
+        ctrl.lock().active_conversation().streaming_text,
+        "hello world"
+    );
 }
 
 #[test]
@@ -65,12 +69,13 @@ fn test_awaiting_input_flushes_streaming() {
     ctrl.handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
 
     let state = ctrl.lock();
-    assert!(state.streaming_text.is_empty());
-    assert_eq!(state.messages.len(), 1);
-    assert_eq!(state.messages[0].role, "assistant");
-    assert_eq!(state.messages[0].content, "response");
-    assert_eq!(state.turn_count, 1);
-    assert!(state.agent_idle);
+    let conv = state.active_conversation();
+    assert!(conv.streaming_text.is_empty());
+    assert_eq!(conv.messages.len(), 1);
+    assert_eq!(conv.messages[0].role, "assistant");
+    assert_eq!(conv.messages[0].content, "response");
+    assert_eq!(conv.turn_count, 1);
+    assert!(conv.agent_idle);
 }
 
 #[test]
@@ -82,10 +87,11 @@ fn test_awaiting_input_forwards_inbox() {
     assert_eq!(forwarded.map(|c| c.text), Some("queued msg".to_string()));
 
     let state = ctrl.lock();
-    assert!(!state.agent_idle); // forwarding clears idle
+    let conv = state.active_conversation();
+    assert!(!conv.agent_idle);
     assert!(state.inbox.is_empty());
-    assert_eq!(state.messages.last().unwrap().role, "user");
-    assert_eq!(state.messages.last().unwrap().content, "queued msg");
+    assert_eq!(conv.messages.last().unwrap().role, "user");
+    assert_eq!(conv.messages.last().unwrap().content, "queued msg");
 }
 
 #[test]
@@ -93,7 +99,7 @@ fn test_awaiting_input_no_inbox_stays_idle() {
     let (ctrl, _, _) = make_controller();
     let forwarded = ctrl.handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
     assert!(forwarded.is_none());
-    assert!(ctrl.lock().agent_idle);
+    assert!(ctrl.lock().active_conversation().agent_idle);
 }
 
 #[test]
@@ -105,7 +111,7 @@ fn test_tool_call_and_result() {
         input: serde_json::json!({"command": "ls"}),
     }));
     assert_eq!(
-        ctrl.lock().messages[0].tool_calls[0].status,
+        ctrl.lock().active_conversation().messages[0].tool_calls[0].status,
         ToolCallStatus::Pending
     );
 
@@ -119,7 +125,7 @@ fn test_tool_call_and_result() {
         metadata: None,
     }));
     assert_eq!(
-        ctrl.lock().messages[0].tool_calls[0].status,
+        ctrl.lock().active_conversation().messages[0].tool_calls[0].status,
         ToolCallStatus::Success
     );
 }
@@ -134,6 +140,7 @@ fn test_permission_request() {
     }));
 
     let state = ctrl.lock();
-    assert!(state.pending_permission.is_some());
-    assert_eq!(state.pending_permission.as_ref().unwrap().name, "bash");
+    let conv = state.active_conversation();
+    assert!(conv.pending_permission.is_some());
+    assert_eq!(conv.pending_permission.as_ref().unwrap().name, "bash");
 }

@@ -42,6 +42,8 @@ pub struct App {
     pub content_overflows: bool,
     /// Whether the topology overlay is visible (toggled by /topology).
     pub show_topology: bool,
+    /// Agent panel cursor — Tab cycles through agents. Purely TUI concept.
+    pub focused_agent: Option<String>,
 
     // === Session Controller (observable + interactive) ===
     pub session: SessionController,
@@ -78,6 +80,7 @@ impl App {
             paste_map: HashMap::new(),
             content_overflows: false,
             show_topology: false,
+            focused_agent: None,
             session,
             line_cache: LineCache::new(),
         }

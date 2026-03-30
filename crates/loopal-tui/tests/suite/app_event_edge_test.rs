@@ -41,8 +41,9 @@ fn test_flush_streaming_appends_to_existing_assistant_message() {
         .handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
 
     let state = app.session.lock();
-    assert_eq!(state.messages.len(), 1);
-    assert_eq!(state.messages[0].content, "first chunk second chunk");
+    let conv = state.active_conversation();
+    assert_eq!(conv.messages.len(), 1);
+    assert_eq!(conv.messages[0].content, "first chunk second chunk");
 }
 
 #[test]
@@ -67,11 +68,12 @@ fn test_flush_streaming_creates_new_message_after_tool_call() {
         .handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
 
     let state = app.session.lock();
-    assert_eq!(state.messages.len(), 2);
-    assert_eq!(state.messages[0].content, "before tool");
-    assert!(!state.messages[0].tool_calls.is_empty());
-    assert_eq!(state.messages[1].content, "after tool");
-    assert!(state.messages[1].tool_calls.is_empty());
+    let conv = state.active_conversation();
+    assert_eq!(conv.messages.len(), 2);
+    assert_eq!(conv.messages[0].content, "before tool");
+    assert!(!conv.messages[0].tool_calls.is_empty());
+    assert_eq!(conv.messages[1].content, "after tool");
+    assert!(conv.messages[1].tool_calls.is_empty());
 }
 
 #[test]
@@ -79,22 +81,24 @@ fn test_flush_streaming_new_message_when_last_is_not_assistant() {
     let app = make_app();
     {
         let mut state = app.session.lock();
-        state.messages.push(DisplayMessage {
+        let conv = state.active_conversation_mut();
+        conv.messages.push(DisplayMessage {
             role: "user".to_string(),
             content: "hi".to_string(),
             tool_calls: Vec::new(),
             image_count: 0,
             skill_info: None,
         });
-        state.streaming_text = "response".to_string();
+        conv.streaming_text = "response".to_string();
     }
     app.session
         .handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
 
     let state = app.session.lock();
-    assert_eq!(state.messages.len(), 2);
-    assert_eq!(state.messages[1].role, "assistant");
-    assert_eq!(state.messages[1].content, "response");
+    let conv = state.active_conversation();
+    assert_eq!(conv.messages.len(), 2);
+    assert_eq!(conv.messages[1].role, "assistant");
+    assert_eq!(conv.messages[1].content, "response");
 }
 
 #[test]
@@ -102,7 +106,8 @@ fn test_flush_streaming_new_message_when_assistant_has_tool_calls() {
     let app = make_app();
     {
         let mut state = app.session.lock();
-        state.messages.push(DisplayMessage {
+        let conv = state.active_conversation_mut();
+        conv.messages.push(DisplayMessage {
             role: "assistant".to_string(),
             content: "let me do that".to_string(),
             tool_calls: vec![DisplayToolCall {
@@ -121,13 +126,14 @@ fn test_flush_streaming_new_message_when_assistant_has_tool_calls() {
             image_count: 0,
             skill_info: None,
         });
-        state.streaming_text = "new response".to_string();
+        conv.streaming_text = "new response".to_string();
     }
     app.session
         .handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
 
     let state = app.session.lock();
-    assert_eq!(state.messages.len(), 2);
-    assert_eq!(state.messages[1].role, "assistant");
-    assert_eq!(state.messages[1].content, "new response");
+    let conv = state.active_conversation();
+    assert_eq!(conv.messages.len(), 2);
+    assert_eq!(conv.messages[1].role, "assistant");
+    assert_eq!(conv.messages[1].content, "new response");
 }

@@ -24,9 +24,8 @@ pub async fn agent_io_loop(
     conn: Arc<Connection>,
     mut rx: tokio::sync::mpsc::Receiver<Incoming>,
     agent_name: String,
-    is_root: bool,
 ) -> Option<String> {
-    info!(agent = %agent_name, is_root, "agent IO loop started");
+    info!(agent = %agent_name, "agent IO loop started");
     let mut last_stream = String::new();
     let mut completion_output: Option<String> = None;
 
@@ -53,7 +52,7 @@ pub async fn agent_io_loop(
                             }
                             _ => {}
                         }
-                        if !is_root && event.agent_name.is_none() {
+                        if event.agent_name.is_none() {
                             event.agent_name = Some(agent_name.clone());
                         }
                         let h = hub.lock().await;
@@ -147,7 +146,6 @@ pub fn start_agent_io(
     name: &str,
     conn: Arc<Connection>,
     rx: tokio::sync::mpsc::Receiver<Incoming>,
-    is_root: bool,
 ) {
     // Registration + IO loop in one background task (used by hub_server for TUI/TCP clients)
     let hub2 = hub.clone();
@@ -163,7 +161,7 @@ pub fn start_agent_io(
             }
         }
         info!(agent = %n, "agent registered in Hub");
-        let output = agent_io_loop(hub2, conn, rx, n.clone(), is_root).await;
+        let output = agent_io_loop(hub2, conn, rx, n.clone()).await;
         let mut h = hub.lock().await;
         // Order matters: emit BEFORE unregister to avoid race with wait_agent.
         // wait_agent checks agent existence → if we unregister first, it returns
@@ -181,13 +179,12 @@ pub fn spawn_io_loop(
     name: &str,
     conn: Arc<Connection>,
     rx: tokio::sync::mpsc::Receiver<Incoming>,
-    is_root: bool,
 ) {
     let hub2 = hub.clone();
     let n = name.to_string();
     let n2 = name.to_string();
     tokio::spawn(async move {
-        let output = agent_io_loop(hub2, conn, rx, n.clone(), is_root).await;
+        let output = agent_io_loop(hub2, conn, rx, n.clone()).await;
         let mut h = hub.lock().await;
         h.registry.emit_agent_finished(&n2, output);
         h.registry.unregister_connection(&n2);

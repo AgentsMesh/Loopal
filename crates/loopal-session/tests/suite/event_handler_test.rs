@@ -1,4 +1,4 @@
-//! Tests for event_handler: apply_event, apply_root_event, MessageRouted recording.
+//! Tests for event_handler: apply_event, unified routing, MessageRouted recording.
 
 use loopal_protocol::{AgentEvent, AgentEventPayload, ImageAttachment, UserContent};
 use loopal_session::event_handler::apply_event;
@@ -6,6 +6,18 @@ use loopal_session::state::SessionState;
 
 fn make_state() -> SessionState {
     SessionState::new("test-model".to_string(), "act".to_string())
+}
+
+/// Helper: access root agent's conversation field.
+macro_rules! conv {
+    ($state:expr) => {
+        &$state.agents["main"].conversation
+    };
+}
+macro_rules! conv_mut {
+    ($state:expr) => {
+        &mut $state.agents.get_mut("main").unwrap().conversation
+    };
 }
 
 #[test]
@@ -17,7 +29,7 @@ fn test_apply_event_routes_root_event() {
             text: "hello".into(),
         }),
     );
-    assert_eq!(state.streaming_text, "hello");
+    assert_eq!(conv!(state).streaming_text, "hello");
 }
 
 #[test]
@@ -50,7 +62,6 @@ fn test_apply_event_records_message_routed_to_feed() {
 #[test]
 fn test_apply_event_records_message_routed_to_agent_logs() {
     let mut state = make_state();
-    // Create agent entries first
     apply_event(
         &mut state,
         AgentEvent::named("sender", AgentEventPayload::Started),
@@ -59,7 +70,6 @@ fn test_apply_event_records_message_routed_to_agent_logs() {
         &mut state,
         AgentEvent::named("receiver", AgentEventPayload::Started),
     );
-
     apply_event(
         &mut state,
         AgentEvent::root(AgentEventPayload::MessageRouted {
@@ -68,7 +78,6 @@ fn test_apply_event_records_message_routed_to_agent_logs() {
             content_preview: "hello".into(),
         }),
     );
-
     assert_eq!(state.agents["sender"].message_log.len(), 1);
     assert_eq!(state.agents["receiver"].message_log.len(), 1);
 }
@@ -82,7 +91,7 @@ fn test_awaiting_input_forwards_inbox() {
         AgentEvent::root(AgentEventPayload::AwaitingInput),
     );
     assert_eq!(forward.map(|c| c.text), Some("queued msg".to_string()));
-    assert!(!state.agent_idle); // Immediately busy again
+    assert!(!conv!(state).agent_idle); // Immediately busy again
 }
 
 #[test]
@@ -93,7 +102,7 @@ fn test_awaiting_input_no_inbox_stays_idle() {
         AgentEvent::root(AgentEventPayload::AwaitingInput),
     );
     assert!(forward.is_none());
-    assert!(state.agent_idle);
+    assert!(conv!(state).agent_idle);
 }
 
 #[test]
@@ -105,29 +114,28 @@ fn test_stream_begins_turn() {
             text: "thinking...".into(),
         }),
     );
-    // turn_start should be set (indirectly: turn_elapsed > 0 eventually)
-    assert_eq!(state.streaming_text, "thinking...");
+    assert_eq!(conv!(state).streaming_text, "thinking...");
 }
 
 #[test]
 fn test_error_flushes_streaming() {
     let mut state = make_state();
-    state.streaming_text = "partial".to_string();
+    conv_mut!(state).streaming_text = "partial".to_string();
     apply_event(
         &mut state,
         AgentEvent::root(AgentEventPayload::Error {
             message: "oops".into(),
         }),
     );
-    assert!(state.streaming_text.is_empty());
-    assert_eq!(state.messages.len(), 2); // flushed + error
+    assert!(conv!(state).streaming_text.is_empty());
+    assert_eq!(conv!(state).messages.len(), 2); // flushed + error
 }
 
 #[test]
 fn test_finished_marks_idle() {
     let mut state = make_state();
     apply_event(&mut state, AgentEvent::root(AgentEventPayload::Finished));
-    assert!(state.agent_idle);
+    assert!(conv!(state).agent_idle);
 }
 
 #[test]
@@ -144,9 +152,9 @@ fn test_token_usage_updates_counters() {
             thinking_tokens: 0,
         }),
     );
-    assert_eq!(state.input_tokens, 100);
-    assert_eq!(state.output_tokens, 50);
-    assert_eq!(state.context_window, 200_000);
+    assert_eq!(conv!(state).input_tokens, 100);
+    assert_eq!(conv!(state).output_tokens, 50);
+    assert_eq!(conv!(state).context_window, 200_000);
 }
 
 #[test]
@@ -158,7 +166,8 @@ fn test_mode_changed_updates_mode() {
             mode: "plan".into(),
         }),
     );
-    assert_eq!(state.mode, "plan");
+    // ModeChanged updates the agent's observable.mode, not session-level mode
+    assert_eq!(state.agents["main"].observable.mode, "plan");
 }
 
 #[test]
@@ -173,21 +182,17 @@ fn test_try_forward_inbox_with_images() {
         skill_info: None,
     };
     state.inbox.push(content);
-
     let forward = apply_event(
         &mut state,
         AgentEvent::root(AgentEventPayload::AwaitingInput),
     );
-    // Forwarded content preserves the image
     let forwarded = forward.expect("should forward inbox content");
     assert_eq!(forwarded.text, "look at this");
     assert_eq!(forwarded.images.len(), 1);
     assert_eq!(forwarded.images[0].media_type, "image/png");
-    // Display message includes image annotation
-    let display = state.messages.last().unwrap();
+    let display = conv!(state).messages.last().unwrap();
     assert_eq!(display.role, "user");
     assert!(display.content.contains("[+1 image(s)]"));
     assert_eq!(display.image_count, 1);
-    // Agent should be busy again
-    assert!(!state.agent_idle);
+    assert!(!conv!(state).agent_idle);
 }

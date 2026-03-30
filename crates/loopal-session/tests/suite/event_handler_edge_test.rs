@@ -9,6 +9,12 @@ fn make_state() -> SessionState {
     SessionState::new("test-model".to_string(), "act".to_string())
 }
 
+macro_rules! conv {
+    ($state:expr) => {
+        &$state.agents["main"].conversation
+    };
+}
+
 #[test]
 fn test_tool_result_preserves_input_summary() {
     let mut state = make_state();
@@ -20,7 +26,7 @@ fn test_tool_result_preserves_input_summary() {
             input: serde_json::json!({"file_path": "/tmp/foo.rs"}),
         }),
     );
-    let summary_before = state.messages[0].tool_calls[0].summary.clone();
+    let summary_before = conv!(state).messages[0].tool_calls[0].summary.clone();
 
     apply_event(
         &mut state,
@@ -35,9 +41,15 @@ fn test_tool_result_preserves_input_summary() {
         }),
     );
 
-    // summary must NOT be overwritten by the result text
-    assert_eq!(state.messages[0].tool_calls[0].summary, summary_before);
-    assert!(state.messages[0].tool_calls[0].summary.contains("Read"));
+    assert_eq!(
+        conv!(state).messages[0].tool_calls[0].summary,
+        summary_before
+    );
+    assert!(
+        conv!(state).messages[0].tool_calls[0]
+            .summary
+            .contains("Read")
+    );
 }
 
 #[test]
@@ -64,7 +76,7 @@ fn test_tool_result_stores_full_content() {
         }),
     );
 
-    let tc = &state.messages[0].tool_calls[0];
+    let tc = &conv!(state).messages[0].tool_calls[0];
     assert_eq!(tc.status, ToolCallStatus::Success);
     assert_eq!(tc.result, Some("hello\nworld".into()));
 }
@@ -93,17 +105,15 @@ fn test_attempt_completion_promotes_to_assistant_message() {
         }),
     );
 
-    // Tool call should not store result (content promoted)
-    let tc = &state.messages[0].tool_calls[0];
+    let tc = &conv!(state).messages[0].tool_calls[0];
     assert_eq!(tc.status, ToolCallStatus::Success);
     assert!(tc.result.is_none());
-    assert_eq!(tc.summary, "AttemptCompletion"); // no ugly JSON dump
+    assert_eq!(tc.summary, "AttemptCompletion");
 
-    // Content promoted to a standalone assistant message
-    assert_eq!(state.messages.len(), 2);
-    assert_eq!(state.messages[1].role, "assistant");
-    assert_eq!(state.messages[1].content, "# Report\n\nDone.");
-    assert!(state.messages[1].tool_calls.is_empty());
+    assert_eq!(conv!(state).messages.len(), 2);
+    assert_eq!(conv!(state).messages[1].role, "assistant");
+    assert_eq!(conv!(state).messages[1].content, "# Report\n\nDone.");
+    assert!(conv!(state).messages[1].tool_calls.is_empty());
 }
 
 #[test]
@@ -130,10 +140,8 @@ fn test_attempt_completion_error_not_promoted() {
         }),
     );
 
-    // Error result should be stored normally, not promoted
-    let tc = &state.messages[0].tool_calls[0];
+    let tc = &conv!(state).messages[0].tool_calls[0];
     assert_eq!(tc.status, ToolCallStatus::Error);
     assert!(tc.result.is_some());
-    // No additional assistant message created
-    assert_eq!(state.messages.len(), 1);
+    assert_eq!(conv!(state).messages.len(), 1);
 }

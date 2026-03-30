@@ -6,6 +6,21 @@ use uuid::Uuid;
 
 use loopal_error::StorageError;
 
+/// Reference to a sub-agent session spawned during a parent session.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubAgentRef {
+    /// Display name of the sub-agent.
+    pub name: String,
+    /// Session ID of the sub-agent's own session storage.
+    pub session_id: String,
+    /// Parent agent name (None for agents spawned by root).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent: Option<String>,
+    /// Model used by the sub-agent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+}
+
 /// Session metadata persisted to disk.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Session {
@@ -16,6 +31,9 @@ pub struct Session {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub mode: String,
+    /// Sub-agent sessions spawned during this session.
+    #[serde(default)]
+    pub sub_agents: Vec<SubAgentRef>,
 }
 
 /// File-based session store.
@@ -60,6 +78,7 @@ impl SessionStore {
             created_at: now,
             updated_at: now,
             mode: "default".to_string(),
+            sub_agents: Vec::new(),
         };
 
         let dir = self.session_dir(&session.id);
@@ -97,6 +116,25 @@ impl SessionStore {
         let json = serde_json::to_string_pretty(session)
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
         std::fs::write(self.session_file(&session.id), json)?;
+        Ok(())
+    }
+
+    /// Record a sub-agent reference in the parent session and persist.
+    pub fn add_sub_agent(
+        &self,
+        parent_session_id: &str,
+        sub_ref: SubAgentRef,
+    ) -> Result<(), StorageError> {
+        let mut session = self.load_session(parent_session_id)?;
+        // Avoid duplicates (same sub-agent name + session_id).
+        if !session
+            .sub_agents
+            .iter()
+            .any(|s| s.session_id == sub_ref.session_id)
+        {
+            session.sub_agents.push(sub_ref);
+            self.update_session(&session)?;
+        }
         Ok(())
     }
 

@@ -8,9 +8,10 @@ use loopal_tool_api::PermissionDecision;
 
 /// Unified abstraction for agent-to-consumer communication.
 ///
-/// `UnifiedFrontend` is the sole implementation — it bridges the Data Plane
-/// (Envelope mailbox) and Control Plane (ControlCommand channel) into
-/// the `AgentInput`-based interface consumed by the agent loop.
+/// Production uses `HubFrontend` (in `loopal-agent-server`), which broadcasts
+/// events to IPC clients and routes permissions via the primary connection.
+/// `UnifiedFrontend` (in this crate) is an in-process channel-based
+/// implementation used by the test harness.
 ///
 /// ## Emission semantics
 ///

@@ -163,7 +163,7 @@ async fn wait_already_finished_agent_returns_immediately() {
     let (_t1, t2) = loopal_ipc::duplex_pair();
     let conn = Arc::new(Connection::new(t2));
     let rx = conn.start();
-    register_agent_connection(hub.clone(), "done-agent", conn, rx, None, None).await;
+    register_agent_connection(hub.clone(), "done-agent", conn, rx, None, None, None).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Finish it
@@ -203,7 +203,7 @@ async fn multiple_waiters_on_same_agent() {
     let (_t1, t2) = loopal_ipc::duplex_pair();
     let conn = Arc::new(Connection::new(t2));
     let rx = conn.start();
-    register_agent_connection(hub.clone(), "shared-target", conn, rx, None, None).await;
+    register_agent_connection(hub.clone(), "shared-target", conn, rx, None, None, None).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Two waiters
@@ -242,22 +242,22 @@ async fn multiple_waiters_on_same_agent() {
     assert!(r2.is_ok(), "waiter 2 should complete");
 }
 
-// ── Root agent event has agent_name=None ─────────────────────────────
+// ── Root agent event gets agent_name="main" ─────────────────────────
 
 #[tokio::test]
-async fn root_agent_event_preserves_none_agent_name() {
+async fn root_agent_event_gets_main_agent_name() {
     let (hub, mut event_rx) = make_hub();
 
-    // Register as root (is_root=true)
+    // Register as root (no is_root parameter — all agents are treated equally)
     let (t1, t2) = loopal_ipc::duplex_pair();
     let agent_conn = Arc::new(Connection::new(t1));
     let server_conn = Arc::new(Connection::new(t2));
     let _agent_rx = agent_conn.start();
     let server_rx = server_conn.start();
-    loopal_agent_hub::agent_io::start_agent_io(hub.clone(), "main", server_conn, server_rx, true);
+    loopal_agent_hub::agent_io::start_agent_io(hub.clone(), "main", server_conn, server_rx);
     tokio::time::sleep(Duration::from_millis(50)).await;
 
-    // Root agent sends event with agent_name=None
+    // Root agent sends event with agent_name=None — IO loop fills in "main"
     let event = json!({"agent_name": null, "payload": {"Stream": {"text": "hi"}}});
     agent_conn
         .send_notification(methods::AGENT_EVENT.name, event)
@@ -266,9 +266,10 @@ async fn root_agent_event_preserves_none_agent_name() {
 
     let received = tokio::time::timeout(Duration::from_secs(2), event_rx.recv()).await;
     let evt = received.unwrap().unwrap();
-    assert!(
-        evt.agent_name.is_none(),
-        "root agent event should keep agent_name=None, got {:?}",
+    assert_eq!(
+        evt.agent_name,
+        Some("main".into()),
+        "root agent event should get agent_name='main', got {:?}",
         evt.agent_name
     );
 }

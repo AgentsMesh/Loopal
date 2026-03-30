@@ -67,11 +67,13 @@ pub(crate) fn try_forward_inbox(state: &mut crate::state::SessionState) -> Optio
     if image_count > 0 {
         display_text.push_str(&format!(" [+{image_count} image(s)]"));
     }
+    let skill_info = content.skill_info.clone();
     state.messages.push(crate::types::DisplayMessage {
         role: "user".to_string(),
         content: display_text,
         tool_calls: Vec::new(),
         image_count,
+        skill_info,
     });
     Some(content)
 }

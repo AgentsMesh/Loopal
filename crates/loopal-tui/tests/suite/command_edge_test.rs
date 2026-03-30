@@ -101,6 +101,7 @@ async fn test_rewind_on_idle_opens_sub_page() {
             content: "hello".into(),
             tool_calls: Vec::new(),
             image_count: 0,
+            skill_info: None,
         });
     }
     let handler = app.command_registry.find("/rewind").unwrap();

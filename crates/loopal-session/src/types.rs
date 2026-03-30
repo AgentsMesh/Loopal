@@ -5,7 +5,7 @@
 
 use std::time::Instant;
 
-use loopal_protocol::Question;
+use loopal_protocol::{Question, SkillInvocation};
 
 /// A message to display in the chat view.
 #[derive(Debug, Clone)]
@@ -15,6 +15,8 @@ pub struct DisplayMessage {
     pub tool_calls: Vec<DisplayToolCall>,
     /// Number of images attached to this message (0 for text-only).
     pub image_count: usize,
+    /// Skill invocation origin — when set, TUI renders a collapsed summary.
+    pub skill_info: Option<SkillInvocation>,
 }
 
 /// Lifecycle status of a single tool call.

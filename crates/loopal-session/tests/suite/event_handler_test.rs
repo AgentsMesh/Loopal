@@ -170,6 +170,7 @@ fn test_try_forward_inbox_with_images() {
             media_type: "image/png".to_string(),
             data: "iVBORw0KGgo=".to_string(),
         }],
+        skill_info: None,
     };
     state.inbox.push(content);
 

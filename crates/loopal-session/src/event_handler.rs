@@ -93,6 +93,7 @@ fn apply_root_event(state: &mut SessionState, payload: AgentEventPayload) -> Opt
                 content: message,
                 tool_calls: Vec::new(),
                 image_count: 0,
+                skill_info: None,
             });
         }
         AgentEventPayload::RetryError {

@@ -5,12 +5,24 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Skill invocation metadata (display-only, not serialized).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SkillInvocation {
+    /// Slash-command name, e.g. "/github-pr".
+    pub name: String,
+    /// User-supplied arguments (empty string when none).
+    pub user_args: String,
+}
+
 /// User message content carrying text and optional image attachments.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UserContent {
     pub text: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub images: Vec<ImageAttachment>,
+    /// Skill invocation origin — transient, never serialized over IPC.
+    #[serde(skip)]
+    pub skill_info: Option<SkillInvocation>,
 }
 
 /// A single image attachment encoded as base64.
@@ -28,6 +40,7 @@ impl UserContent {
         Self {
             text: text.into(),
             images: Vec::new(),
+            skill_info: None,
         }
     }
 
@@ -56,6 +69,7 @@ impl From<String> for UserContent {
         Self {
             text,
             images: Vec::new(),
+            skill_info: None,
         }
     }
 }
@@ -65,6 +79,7 @@ impl From<&str> for UserContent {
         Self {
             text: text.to_string(),
             images: Vec::new(),
+            skill_info: None,
         }
     }
 }

@@ -9,6 +9,7 @@ fn msg(role: &str, content: &str) -> DisplayMessage {
         content: content.to_string(),
         tool_calls: Vec::new(),
         image_count: 0,
+        skill_info: None,
     }
 }
 
@@ -69,6 +70,7 @@ fn test_tool_call_mutation_detected() {
             metadata: None,
         }],
         image_count: 0,
+        skill_info: None,
     }];
     let fp1 = cache.update(&msgs, W);
 
@@ -132,6 +134,7 @@ fn test_tool_result_arrival_invalidates_cache() {
             metadata: None,
         }],
         image_count: 0,
+        skill_info: None,
     }];
     let n1 = cache.update(&msgs, W);
 

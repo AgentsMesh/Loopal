@@ -13,6 +13,7 @@ pub fn handle_thinking_complete(state: &mut SessionState, token_count: u32) {
             content: summary,
             tool_calls: Vec::new(),
             image_count: 0,
+            skill_info: None,
         });
     }
 }

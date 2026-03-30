@@ -38,6 +38,7 @@ fn test_has_images() {
     let with_images = UserContent {
         text: "has image".to_string(),
         images: vec![sample_image()],
+        skill_info: None,
     };
     assert!(with_images.has_images());
 }
@@ -71,10 +72,12 @@ fn test_partial_eq() {
     let a = UserContent {
         text: "same".to_string(),
         images: vec![sample_image()],
+        skill_info: None,
     };
     let b = UserContent {
         text: "same".to_string(),
         images: vec![sample_image()],
+        skill_info: None,
     };
     assert_eq!(a, b);
 

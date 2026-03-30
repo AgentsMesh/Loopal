@@ -7,6 +7,7 @@ fn user_msg(text: &str) -> DisplayMessage {
         content: text.into(),
         tool_calls: vec![],
         image_count: 0,
+        skill_info: None,
     }
 }
 
@@ -16,6 +17,7 @@ fn asst_msg(text: &str) -> DisplayMessage {
         content: text.into(),
         tool_calls: vec![],
         image_count: 0,
+        skill_info: None,
     }
 }
 
@@ -25,6 +27,7 @@ fn sys_msg(text: &str) -> DisplayMessage {
         content: text.into(),
         tool_calls: vec![],
         image_count: 0,
+        skill_info: None,
     }
 }
 

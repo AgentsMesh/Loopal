@@ -84,6 +84,7 @@ fn test_flush_streaming_new_message_when_last_is_not_assistant() {
             content: "hi".to_string(),
             tool_calls: Vec::new(),
             image_count: 0,
+            skill_info: None,
         });
         state.streaming_text = "response".to_string();
     }
@@ -118,6 +119,7 @@ fn test_flush_streaming_new_message_when_assistant_has_tool_calls() {
                 metadata: None,
             }],
             image_count: 0,
+            skill_info: None,
         });
         state.streaming_text = "new response".to_string();
     }

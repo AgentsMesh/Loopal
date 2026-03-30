@@ -21,6 +21,7 @@ impl SessionController {
             content: format!("{model}\n{path}"),
             tool_calls: Vec::new(),
             image_count: 0,
+            skill_info: None,
         });
     }
 

@@ -1,6 +1,7 @@
 /// Content area: main agent output region (borderless).
 mod line_cache;
 mod message_lines;
+mod skill_display;
 mod tool_display;
 mod welcome;
 

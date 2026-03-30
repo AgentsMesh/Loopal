@@ -6,6 +6,7 @@ mod key_dispatch;
 pub mod markdown;
 pub mod render;
 pub mod terminal;
+pub(crate) mod text_util;
 mod tui_helpers;
 mod tui_loop;
 pub mod views;

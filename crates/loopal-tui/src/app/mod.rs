@@ -101,7 +101,11 @@ impl App {
         self.input_cursor = 0;
         self.input_scroll = 0;
         self.scroll_offset = 0;
-        Some(UserContent { text, images })
+        Some(UserContent {
+            text,
+            images,
+            skill_info: None,
+        })
     }
 
     /// Pop the last Inbox message back into the input field for editing.

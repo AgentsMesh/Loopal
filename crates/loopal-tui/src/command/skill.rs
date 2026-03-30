@@ -2,6 +2,7 @@
 
 use async_trait::async_trait;
 use loopal_config::Skill;
+use loopal_protocol::SkillInvocation;
 
 use super::{CommandEffect, CommandHandler};
 use crate::app::App;
@@ -43,8 +44,14 @@ impl CommandHandler for SkillHandler {
         Some(&self.body)
     }
     async fn execute(&self, _app: &mut App, arg: Option<&str>) -> CommandEffect {
-        let expanded = expand_skill(&self.body, arg.unwrap_or(""));
-        CommandEffect::InboxPush(expanded.into())
+        let args_str = arg.unwrap_or("");
+        let expanded = expand_skill(&self.body, args_str);
+        let mut content = loopal_protocol::UserContent::from(expanded);
+        content.skill_info = Some(SkillInvocation {
+            name: self.name.clone(),
+            user_args: args_str.trim().to_string(),
+        });
+        CommandEffect::InboxPush(content)
     }
 }
 

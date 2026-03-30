@@ -104,6 +104,7 @@ pub fn project_messages(messages: &[Message]) -> Vec<DisplayMessage> {
             content,
             tool_calls,
             image_count,
+            skill_info: None,
         });
     }
 
@@ -143,6 +144,7 @@ fn back_patch(
             content: result.to_string(),
             tool_calls: Vec::new(),
             image_count: 0,
+            skill_info: None,
         });
     }
 }

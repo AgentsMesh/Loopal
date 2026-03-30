@@ -59,6 +59,7 @@ pub(crate) fn apply_start_overrides(settings: &mut loopal_config::Settings, star
     if let Some(ref perm) = start.permission_mode {
         settings.permission_mode = match perm.as_str() {
             "bypass" | "yolo" => loopal_tool_api::PermissionMode::Bypass,
+            "auto" => loopal_tool_api::PermissionMode::Auto,
             _ => loopal_tool_api::PermissionMode::Supervised,
         };
     }

@@ -195,6 +195,24 @@ pub(crate) fn apply_agent_event(
         AgentEventPayload::SubAgentSpawned { .. }
         | AgentEventPayload::MessageRouted { .. }
         | AgentEventPayload::TurnDiffSummary { .. } => {}
+        AgentEventPayload::AutoModeDecision {
+            tool_name,
+            decision,
+            reason,
+            duration_ms,
+        } => {
+            let label = if decision == "allow" {
+                "auto-allowed"
+            } else {
+                "auto-denied"
+            };
+            let t = if duration_ms > 0 {
+                format!("({duration_ms}ms)")
+            } else {
+                "(cached)".into()
+            };
+            push_system_msg(conv, &format!("[{label}] {tool_name}: {reason} {t}"));
+        }
     }
     crate::agent_lifecycle::auto_return_on_error(state, name);
     None

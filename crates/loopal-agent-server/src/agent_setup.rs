@@ -11,7 +11,6 @@ use loopal_kernel::Kernel;
 use loopal_protocol::InterruptSignal;
 use loopal_runtime::AgentLoopParams;
 use loopal_runtime::frontend::traits::AgentFrontend;
-use loopal_tool_api::MemoryChannel;
 
 use crate::params::StartParams;
 
@@ -98,15 +97,18 @@ pub fn build_with_frontend(
         scheduler_handle,
     });
 
-    let memory_enabled = interactive && config.settings.memory.enabled;
-    let memory_channel: Option<Arc<dyn MemoryChannel>> = if memory_enabled {
-        let (tx, rx) = tokio::sync::mpsc::channel::<String>(64);
-        let processor = Arc::new(crate::memory_adapter::ServerMemoryProcessor::new(
-            agent_shared.clone(),
-            model.clone(),
-        ));
-        tokio::spawn(loopal_memory::MemoryObserver::new(rx, processor).run());
-        Some(Arc::new(crate::memory_adapter::ServerMemoryChannel(tx)))
+    let memory_channel = crate::memory_adapter::build_memory_channel(
+        interactive,
+        &config.settings,
+        &agent_shared,
+        &model,
+    );
+
+    let auto_classifier = if permission_mode == loopal_tool_api::PermissionMode::Auto {
+        Some(Arc::new(loopal_auto_mode::AutoClassifier::new(
+            config.instructions.clone(),
+            cwd.to_string_lossy().into_owned(),
+        )))
     } else {
         None
     };
@@ -193,6 +195,7 @@ pub fn build_with_frontend(
         shared: Some(shared_any),
         memory_channel,
         scheduled_rx: Some(scheduled_rx),
+        auto_classifier,
     };
     Ok(params)
 }

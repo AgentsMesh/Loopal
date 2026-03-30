@@ -63,6 +63,7 @@ async fn test_agent_loop_immediate_channel_close() {
         shared: None,
         memory_channel: None,
         scheduled_rx: None,
+        auto_classifier: None,
     };
 
     // Drop senders to close channels
@@ -122,6 +123,7 @@ async fn test_agent_loop_max_turns_reached() {
         shared: None,
         memory_channel: None,
         scheduled_rx: None,
+        auto_classifier: None,
     };
 
     let result = agent_loop(params).await;

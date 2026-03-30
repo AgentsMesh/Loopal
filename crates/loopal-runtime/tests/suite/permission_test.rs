@@ -68,8 +68,41 @@ fn test_bypass_dangerous_allows() {
 }
 
 // =====================================================
-// Supervised mode tests
+// Auto mode tests (fast-path only — classifier tested separately)
 // =====================================================
+
+#[test]
+fn test_auto_readonly_allows() {
+    let tool = DummyTool {
+        perm: PermissionLevel::ReadOnly,
+    };
+    assert_eq!(
+        check_permission(&PermissionMode::Auto, &tool),
+        PermissionDecision::Allow
+    );
+}
+
+#[test]
+fn test_auto_supervised_allows() {
+    let tool = DummyTool {
+        perm: PermissionLevel::Supervised,
+    };
+    assert_eq!(
+        check_permission(&PermissionMode::Auto, &tool),
+        PermissionDecision::Allow
+    );
+}
+
+#[test]
+fn test_auto_dangerous_asks() {
+    let tool = DummyTool {
+        perm: PermissionLevel::Dangerous,
+    };
+    assert_eq!(
+        check_permission(&PermissionMode::Auto, &tool),
+        PermissionDecision::Ask
+    );
+}
 
 #[test]
 fn test_supervised_readonly_allows() {

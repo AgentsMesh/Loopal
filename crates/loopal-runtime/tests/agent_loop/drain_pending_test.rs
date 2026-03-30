@@ -135,6 +135,7 @@ async fn test_subagent_drains_pending_before_exit() {
         shared: None,
         memory_channel: None,
         scheduled_rx: None,
+        auto_classifier: None,
     };
 
     // Drain events in background so channels don't block

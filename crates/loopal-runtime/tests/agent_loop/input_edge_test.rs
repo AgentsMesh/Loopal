@@ -56,6 +56,7 @@ fn test_model_info_defaults_for_unknown_model() {
         shared: None,
         memory_channel: None,
         scheduled_rx: None,
+        auto_classifier: None,
     };
 
     let runner = AgentLoopRunner::new(params);

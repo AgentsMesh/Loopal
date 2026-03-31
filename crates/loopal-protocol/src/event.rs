@@ -102,9 +102,6 @@ pub enum AgentEventPayload {
     /// Agent is waiting for user input
     AwaitingInput,
 
-    /// Max turns reached
-    MaxTurnsReached { turns: u32 },
-
     /// LLM output truncated by max_tokens; auto-continuing.
     AutoContinuation {
         continuation: u32,

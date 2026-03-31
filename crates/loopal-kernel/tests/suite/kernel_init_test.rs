@@ -37,7 +37,6 @@ fn test_settings_accessor() {
     let kernel = make_kernel();
     let settings = kernel.settings();
     assert_eq!(settings.model, "claude-sonnet-4-20250514");
-    assert_eq!(settings.max_turns, 50);
 }
 
 #[test]

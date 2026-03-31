@@ -6,7 +6,7 @@ use loopal_scheduler::CronScheduler;
 use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
 use serde_json::{Value, json};
 
-use super::collaboration::agent::extract_shared;
+use super::collaboration::shared_extract::extract_shared;
 
 // ---------------------------------------------------------------------------
 // Helper

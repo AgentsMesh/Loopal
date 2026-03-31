@@ -126,18 +126,6 @@ fn test_event_awaiting_input_serde_roundtrip() {
 }
 
 #[test]
-fn test_event_max_turns_reached_serde_roundtrip() {
-    let event = AgentEvent::root(AgentEventPayload::MaxTurnsReached { turns: 50 });
-    let json = serde_json::to_string(&event).unwrap();
-    let deserialized: AgentEvent = serde_json::from_str(&json).unwrap();
-    if let AgentEventPayload::MaxTurnsReached { turns } = deserialized.payload {
-        assert_eq!(turns, 50);
-    } else {
-        panic!("expected AgentEventPayload::MaxTurnsReached");
-    }
-}
-
-#[test]
 fn test_event_token_usage_serde_roundtrip() {
     let event = AgentEvent::root(AgentEventPayload::TokenUsage {
         input_tokens: 1000,

@@ -3,6 +3,7 @@
 //! Routes incoming IPC messages to the session's input channel and signals
 //! interrupts. Returns when agent completes or a new agent/start arrives.
 
+use loopal_error::AgentOutput;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::jsonrpc;
 use loopal_ipc::protocol::methods;
@@ -13,8 +14,8 @@ use crate::session_start::SessionHandle;
 
 /// Result of forward_loop — tells dispatch_loop what happened.
 pub(crate) enum ForwardResult {
-    /// Agent completed or connection closed.
-    Done,
+    /// Agent completed or connection closed. Carries the agent's output (if any).
+    Done(Option<AgentOutput>),
     /// A new agent/start request arrived during active session.
     NewStart { id: i64, params: serde_json::Value },
 }
@@ -31,7 +32,7 @@ pub(crate) async fn forward_loop(
         tokio::select! {
             msg = incoming_rx.recv() => {
                 let Some(msg) = msg else {
-                    return ForwardResult::Done;
+                    return ForwardResult::Done(None);
                 };
                 match msg {
                     Incoming::Request { id, method, params } => {
@@ -44,16 +45,22 @@ pub(crate) async fn forward_loop(
                         }
                         route_request(id, &method, params, session, connection).await;
                     }
-                    Incoming::Notification { method, .. } => {
+                    Incoming::Notification { method, params } => {
                         if method == methods::AGENT_INTERRUPT.name {
                             session.interrupt.signal();
                             session.interrupt_tx.send_modify(|v| *v = v.wrapping_add(1));
+                        } else if method == methods::AGENT_MESSAGE.name {
+                            // Hub-injected message (e.g. sub-agent completion notification).
+                            if let Ok(env) = serde_json::from_value::<Envelope>(params) {
+                                let _ = session.input_tx.send(InputFromClient::Message(env)).await;
+                            }
                         }
                     }
                 }
             }
-            _ = &mut handle.agent_task => {
-                return ForwardResult::Done;
+            result = &mut handle.agent_task => {
+                let output = result.ok().flatten();
+                return ForwardResult::Done(output);
             }
         }
     }

@@ -15,8 +15,7 @@ use loopal_runtime::agent_loop::AgentLoopRunner;
 use loopal_runtime::frontend::{AutoCancelQuestionHandler, AutoDenyHandler};
 use loopal_runtime::{AgentConfig, AgentDeps, AgentLoopParams, InterruptHandle, UnifiedFrontend};
 use loopal_test_support::TestFixture;
-use loopal_tool_api::PermissionLevel;
-use loopal_tool_api::{Tool, ToolContext, ToolResult};
+use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
 use tokio::sync::mpsc;
 
 // --- Multi-call mock provider ---
@@ -117,7 +116,6 @@ pub(crate) fn make_multi_runner(
     }
     let params = AgentLoopParams {
         config: AgentConfig {
-            max_turns: 10,
             ..Default::default()
         },
         deps: AgentDeps {

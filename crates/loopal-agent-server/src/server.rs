@@ -4,7 +4,6 @@
 
 use std::sync::Arc;
 
-use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use loopal_ipc::connection::{Connection, Incoming};
@@ -12,26 +11,8 @@ use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
 use loopal_ipc::{StdioTransport, jsonrpc};
 
+use crate::server_init::wait_for_initialize_with_token;
 use crate::session_hub::SessionHub;
-
-#[derive(Deserialize)]
-struct InitializeParams {
-    #[serde(default)]
-    #[allow(dead_code)]
-    protocol_version: u32,
-}
-
-#[derive(Serialize)]
-struct InitializeResult {
-    protocol_version: u32,
-    agent_info: AgentInfo,
-}
-
-#[derive(Serialize)]
-struct AgentInfo {
-    name: String,
-    version: String,
-}
 
 /// Run the agent server over stdio (pure worker, no TCP listener).
 pub async fn run_agent_server() -> anyhow::Result<()> {
@@ -78,48 +59,20 @@ pub(crate) async fn dispatch_loop(
         match msg {
             Incoming::Request { id, method, params } => {
                 if method == methods::AGENT_START.name {
-                    let mut session_handle = crate::session_start::start_session(
+                    let agent_output = run_session(
                         &connection,
-                        id,
-                        params,
+                        &mut incoming_rx,
                         hub,
                         is_production,
+                        id,
+                        params,
                     )
                     .await?;
-                    let mut forward_result = crate::session_forward::forward_loop(
-                        &mut incoming_rx,
-                        &connection,
-                        &mut session_handle,
-                    )
-                    .await;
-                    hub.remove_session(&session_handle.session_id).await;
-                    while let crate::session_forward::ForwardResult::NewStart {
-                        id: new_id,
-                        params: new_params,
-                    } = forward_result
-                    {
-                        info!("chained agent/start after session end");
-                        session_handle = crate::session_start::start_session(
-                            &connection,
-                            new_id,
-                            new_params,
-                            hub,
-                            is_production,
-                        )
-                        .await?;
-                        forward_result = crate::session_forward::forward_loop(
-                            &mut incoming_rx,
-                            &connection,
-                            &mut session_handle,
-                        )
-                        .await;
-                        hub.remove_session(&session_handle.session_id).await;
-                    }
-                    if session_handle.has_initial_prompt {
-                        info!("prompt-driven session complete, server exiting");
+                    if agent_output.is_some() {
+                        // Prompt-driven session complete — send result and exit.
+                        send_agent_completed(&connection, agent_output.as_ref()).await;
                         break;
                     }
-                    info!("session ended, ready for next");
                 } else if method == methods::AGENT_SHUTDOWN.name {
                     let _ = connection
                         .respond(id, serde_json::json!({"ok": true}))
@@ -141,58 +94,67 @@ pub(crate) async fn dispatch_loop(
             Incoming::Notification { .. } => {}
         }
     }
-    // Send explicit completion before exiting. Hub uses this as primary signal.
-    let _ = connection
-        .send_notification(
-            methods::AGENT_COMPLETED.name,
-            serde_json::json!({"reason": "shutdown"}),
-        )
-        .await;
+    // Send completion for non-prompt sessions (prompt sessions send above).
+    send_agent_completed(&connection, None).await;
     info!("server shutting down");
     Ok(())
 }
 
-pub(crate) async fn wait_for_initialize_with_token(
+/// Run one session (with possible chained restarts). Returns `Some(output)` if
+/// the session was prompt-driven (server should exit), `None` otherwise.
+async fn run_session(
     connection: &Arc<Connection>,
-    rx: &mut tokio::sync::mpsc::Receiver<Incoming>,
-    expected_token: Option<&str>,
-) -> anyhow::Result<()> {
-    loop {
-        let Some(msg) = rx.recv().await else {
-            anyhow::bail!("connection closed before initialize");
-        };
-        if let Incoming::Request { id, method, params } = msg {
-            if method == methods::INITIALIZE.name {
-                if let Some(token) = expected_token {
-                    let client_token = params.get("token").and_then(|v| v.as_str());
-                    if client_token != Some(token) {
-                        let _ = connection
-                            .respond_error(id, jsonrpc::INVALID_REQUEST, "invalid token")
-                            .await;
-                        anyhow::bail!("invalid token");
-                    }
-                }
-                let result = InitializeResult {
-                    protocol_version: 1,
-                    agent_info: AgentInfo {
-                        name: "loopal".into(),
-                        version: env!("CARGO_PKG_VERSION").into(),
-                    },
-                };
-                let _ = connection.respond(id, serde_json::to_value(result)?).await;
-                info!("IPC initialized");
-                return Ok(());
-            }
-            let _ = connection
-                .respond_error(id, jsonrpc::INVALID_REQUEST, "expected initialize first")
-                .await;
-        }
+    incoming_rx: &mut tokio::sync::mpsc::Receiver<Incoming>,
+    hub: &SessionHub,
+    is_production: bool,
+    id: i64,
+    params: serde_json::Value,
+) -> anyhow::Result<Option<loopal_error::AgentOutput>> {
+    let mut handle =
+        crate::session_start::start_session(connection, id, params, hub, is_production).await?;
+    let mut forward_result =
+        crate::session_forward::forward_loop(incoming_rx, connection, &mut handle).await;
+    hub.remove_session(&handle.session_id).await;
+
+    // Handle chained agent/start requests.
+    while let crate::session_forward::ForwardResult::NewStart {
+        id: new_id,
+        params: new_params,
+    } = forward_result
+    {
+        info!("chained agent/start after session end");
+        handle =
+            crate::session_start::start_session(connection, new_id, new_params, hub, is_production)
+                .await?;
+        forward_result =
+            crate::session_forward::forward_loop(incoming_rx, connection, &mut handle).await;
+        hub.remove_session(&handle.session_id).await;
+    }
+
+    let agent_output = match forward_result {
+        crate::session_forward::ForwardResult::Done(output) => output,
+        _ => None,
+    };
+
+    if handle.has_initial_prompt {
+        info!("prompt-driven session complete, server exiting");
+        Ok(agent_output)
+    } else {
+        info!("session ended, ready for next");
+        Ok(None)
     }
 }
 
-pub(crate) async fn wait_for_initialize(
-    connection: &Arc<Connection>,
-    rx: &mut tokio::sync::mpsc::Receiver<Incoming>,
-) -> anyhow::Result<()> {
-    wait_for_initialize_with_token(connection, rx, None).await
+/// Send `agent/completed` with the authoritative agent output.
+async fn send_agent_completed(connection: &Connection, output: Option<&loopal_error::AgentOutput>) {
+    let (reason, result) = match output {
+        Some(o) => (o.terminate_reason.as_str(), serde_json::json!(o.result)),
+        None => ("shutdown", serde_json::Value::Null),
+    };
+    let _ = connection
+        .send_notification(
+            methods::AGENT_COMPLETED.name,
+            serde_json::json!({"reason": reason, "result": result}),
+        )
+        .await;
 }

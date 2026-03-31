@@ -134,10 +134,6 @@ pub(crate) fn apply_agent_event(
         AgentEventPayload::Interrupted => {
             return handle_idle(state, name, AgentStatus::WaitingForInput);
         }
-        AgentEventPayload::MaxTurnsReached { turns } => {
-            conv.flush_streaming();
-            push_system_msg(conv, &format!("Max turns reached ({turns})"));
-        }
         AgentEventPayload::AutoContinuation {
             continuation,
             max_continuations,

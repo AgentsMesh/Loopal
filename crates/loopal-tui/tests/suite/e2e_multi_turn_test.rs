@@ -1,4 +1,4 @@
-//! E2E tests for multi-turn conversations, max_turns, mode switch, and interrupts.
+//! E2E tests for multi-turn conversations, mode switch, and interrupts.
 
 use loopal_protocol::{AgentEventPayload, ControlCommand, Envelope, MessageSource};
 use loopal_test_support::{HarnessBuilder, assertions, chunks, events};
@@ -58,44 +58,6 @@ async fn test_interactive_two_turns() {
     let ev2 = harness.collect_until_idle().await;
     let text2 = events::extract_texts(&ev2);
     assert!(text2.contains("Second response"), "got: {text2}");
-}
-
-#[tokio::test]
-async fn test_max_turns_reached() {
-    // max_turns=1 with interactive mode. First turn is a tool call, then we send
-    // a second message. The loop hits max_turns at the top of the next iteration.
-    let calls = vec![chunks::tool_turn(
-        "tc-1",
-        "Ls",
-        serde_json::json!({"path": "/tmp"}),
-    )];
-    let inner = HarnessBuilder::new()
-        .calls(calls)
-        .messages(vec![])
-        .max_turns(1)
-        .build_spawned()
-        .await;
-    let mut harness = wrap_tui(inner);
-    // Drain initial AwaitingInput (store empty, agent waits for first message)
-    let _ = harness.collect_until_idle().await;
-    harness
-        .inner
-        .mailbox_tx
-        .send(Envelope::new(MessageSource::Human, "main", "hello"))
-        .await
-        .unwrap();
-
-    // First turn: tool executes, then AwaitingInput
-    let ev1 = harness.collect_until_idle().await;
-    assertions::assert_has_tool_call(&ev1, "Ls");
-
-    // Send second message to trigger next iteration
-    let envelope = Envelope::new(MessageSource::Human, "main", "next");
-    harness.inner.mailbox_tx.send(envelope).await.unwrap();
-
-    // Runner should hit max_turns and emit MaxTurnsReached → Finished
-    let ev2 = harness.collect_until_idle().await;
-    assertions::assert_has_max_turns(&ev2);
 }
 
 #[tokio::test]

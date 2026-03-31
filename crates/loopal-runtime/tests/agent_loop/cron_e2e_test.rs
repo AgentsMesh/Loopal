@@ -38,7 +38,6 @@ async fn cron_create_then_trigger_fires() {
     let harness = HarnessBuilder::new()
         .calls(calls)
         .messages(vec![])
-        .max_turns(5)
         .scheduler(scheduler)
         .build()
         .await;

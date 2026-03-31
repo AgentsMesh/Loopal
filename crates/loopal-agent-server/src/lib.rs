@@ -20,6 +20,7 @@ mod mock_loader;
 mod params;
 mod server;
 pub mod server_info;
+mod server_init;
 mod session_forward;
 #[doc(hidden)]
 pub mod session_hub;

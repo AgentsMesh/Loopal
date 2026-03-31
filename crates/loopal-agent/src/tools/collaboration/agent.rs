@@ -1,11 +1,5 @@
-//! Agent tool — self-contained multi-agent collaboration via Hub.
-//!
-//! Actions:
-//! - spawn: create a new sub-agent (foreground blocks, background returns name)
-//! - result: wait for a background agent to finish and return its output
-//! - status: non-blocking query of agent lifecycle and topology
+//! Agent tool — spawn sub-agents (foreground by default, parallel via JoinSet).
 
-use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -15,6 +9,7 @@ use loopal_tool_api::PermissionLevel;
 use loopal_tool_api::{Tool, ToolContext, ToolResult};
 use serde_json::json;
 
+use super::shared_extract::{create_agent_worktree, extract_shared, require_str};
 use crate::config::load_agent_configs;
 use crate::shared::AgentShared;
 use crate::spawn::{SpawnParams, spawn_agent, wait_agent};
@@ -27,7 +22,8 @@ impl Tool for AgentTool {
         "Agent"
     }
     fn description(&self) -> &str {
-        "Multi-agent collaboration: spawn sub-agents, get results, query status"
+        "Spawn a sub-agent to handle a task. Blocks until the agent completes \
+         and returns its result. Multiple Agent calls in one turn run in parallel."
     }
     fn parameters_schema(&self) -> serde_json::Value {
         json!({
@@ -38,7 +34,10 @@ impl Tool for AgentTool {
                 "name": { "type": "string" },
                 "subagent_type": { "type": "string" },
                 "model": { "type": "string" },
-                "run_in_background": { "type": "boolean" },
+                "run_in_background": {
+                    "type": "boolean",
+                    "description": "Default false (foreground). Only set true when you have independent work to do while the agent runs."
+                },
                 "isolation": { "type": "string", "enum": ["worktree"] }
             },
             "required": ["prompt"]
@@ -147,7 +146,8 @@ async fn action_spawn(
                     });
                 }
                 Ok(ToolResult::success(format!(
-                    "Agent '{name}' spawned in background.\nagentId: {}",
+                    "Agent '{name}' spawned in background (agentId: {}).\n\
+                     Result will be injected into your conversation when it completes.",
                     sr.agent_id,
                 )))
             } else {
@@ -170,7 +170,6 @@ async fn action_spawn(
     }
 }
 
-/// Wait for a background agent to finish and return its output.
 async fn action_result(
     shared: Arc<AgentShared>,
     input: &serde_json::Value,
@@ -182,7 +181,7 @@ async fn action_result(
     }
 }
 
-/// Non-blocking query of agent status via Hub topology.
+/// Non-blocking lifecycle query via Hub topology.
 async fn action_status(
     shared: Arc<AgentShared>,
     input: &serde_json::Value,
@@ -198,38 +197,4 @@ async fn action_status(
         )),
         Err(e) => Ok(ToolResult::error(format!("Agent '{name}': {e}"))),
     }
-}
-
-fn create_agent_worktree(
-    cwd: &Path,
-    agent_name: &str,
-    uid: &str,
-) -> Result<(loopal_git::WorktreeInfo, PathBuf), LoopalError> {
-    let root = loopal_git::repo_root(cwd)
-        .ok_or_else(|| LoopalError::Other("Not a git repository".into()))?;
-    let wt_name = format!("agent-{agent_name}-{uid}");
-    let info = loopal_git::create_worktree(&root, &wt_name)
-        .map_err(|e| LoopalError::Other(format!("worktree: {e}")))?;
-    Ok((info, root))
-}
-
-/// Extract `AgentShared` from `ToolContext.shared`.
-pub(crate) fn extract_shared(ctx: &ToolContext) -> Result<Arc<AgentShared>, LoopalError> {
-    ctx.shared
-        .as_ref()
-        .and_then(|s| s.downcast_ref::<Arc<AgentShared>>())
-        .cloned()
-        .ok_or_else(|| {
-            LoopalError::Tool(loopal_error::ToolError::InvalidInput(
-                "AgentShared not available".into(),
-            ))
-        })
-}
-
-fn require_str<'a>(input: &'a serde_json::Value, field: &str) -> Result<&'a str, LoopalError> {
-    input.get(field).and_then(|v| v.as_str()).ok_or_else(|| {
-        LoopalError::Tool(loopal_error::ToolError::InvalidInput(format!(
-            "missing '{field}'"
-        )))
-    })
 }

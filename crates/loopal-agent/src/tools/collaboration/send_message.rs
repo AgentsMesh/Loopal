@@ -7,7 +7,7 @@ use loopal_protocol::{Envelope, MessageSource};
 use loopal_tool_api::PermissionLevel;
 use loopal_tool_api::{Tool, ToolContext, ToolResult};
 
-use super::agent::extract_shared;
+use super::shared_extract::extract_shared;
 
 /// Send a message to a named agent via Hub routing.
 pub struct SendMessageTool;

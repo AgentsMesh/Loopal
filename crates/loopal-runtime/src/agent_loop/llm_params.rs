@@ -12,11 +12,8 @@ use super::runner::AgentLoopRunner;
 impl AgentLoopRunner {
     /// Build chat params from a provided message slice (typically a working copy).
     pub fn prepare_chat_params_with(&self, messages: &[Message]) -> Result<ChatParams> {
-        let env_section = super::env_context::build_env_section(
-            self.tool_ctx.backend.cwd(),
-            self.turn_count,
-            self.params.config.max_turns,
-        );
+        let env_section =
+            super::env_context::build_env_section(self.tool_ctx.backend.cwd(), self.turn_count);
         let full_system_prompt = format!(
             "{}{}{}",
             self.params.config.system_prompt,

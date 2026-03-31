@@ -38,7 +38,6 @@ async fn test_turn_tool_then_text_non_interactive() {
 
     // MockProvider only yields one batch of chunks, so if the runner tries
     // a second LLM call (the old bug), stream_llm would get an empty stream.
-    // The inner loop should: LLM(tool) → execute_tool → hit max_turns → exit.
     let chunks = vec![
         Ok(StreamChunk::ToolUse {
             id: "tc-1".to_string(),
@@ -57,12 +56,11 @@ async fn test_turn_tool_then_text_non_interactive() {
         }),
     ];
     let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx) = make_runner_with_mock_provider(chunks);
-    runner.params.config.max_turns = 1;
 
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 
     let output = runner.run().await.unwrap();
-    // Tool executed, then max_turns hit inside execute_turn → outer loop breaks
+    // Tool executed, non-interactive agent exits after first turn
     assert!(runner.params.store.len() >= 3);
     // Result may be empty since LLM text was empty (only tool use in the stream)
     assert_eq!(output.terminate_reason, TerminateReason::Goal);

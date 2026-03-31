@@ -8,7 +8,7 @@ use tracing::{info, warn};
 
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
-use loopal_protocol::{AgentEvent, AgentEventPayload};
+use loopal_protocol::AgentEvent;
 
 use crate::dispatch::dispatch_hub_request;
 use crate::hub::Hub;
@@ -18,7 +18,7 @@ use crate::ui_relay::relay_to_ui_clients;
 const WAIT_AGENT_METHOD: &str = "hub/wait_agent";
 
 /// Run the IO loop for a connected agent. Returns the agent's final output
-/// (from AttemptCompletion or last stream text) for passing to wait_agent watchers.
+/// extracted from the `agent/completed` notification — the single authoritative source.
 pub async fn agent_io_loop(
     hub: Arc<Mutex<Hub>>,
     conn: Arc<Connection>,
@@ -26,32 +26,21 @@ pub async fn agent_io_loop(
     agent_name: String,
 ) -> Option<String> {
     info!(agent = %agent_name, "agent IO loop started");
-    let mut last_stream = String::new();
-    let mut completion_output: Option<String> = None;
+    let mut agent_result: Option<String> = None;
 
     while let Some(msg) = rx.recv().await {
         match msg {
             Incoming::Notification { method, params } => {
                 if method == methods::AGENT_COMPLETED.name {
-                    // Explicit completion — primary signal (EOF is fallback).
-                    info!(agent = %agent_name, "received agent/completed");
+                    // Extract result from the authoritative completion signal.
+                    agent_result = params
+                        .get("result")
+                        .and_then(|v| v.as_str())
+                        .map(String::from);
+                    info!(agent = %agent_name, has_result = agent_result.is_some(), "received agent/completed");
                     break;
                 } else if method == methods::AGENT_EVENT.name {
                     if let Ok(mut event) = serde_json::from_value::<AgentEvent>(params) {
-                        // Track output for wait_agent result
-                        match &event.payload {
-                            AgentEventPayload::ToolResult {
-                                result,
-                                is_completion: true,
-                                ..
-                            } => {
-                                completion_output = Some(result.clone());
-                            }
-                            AgentEventPayload::Stream { text } => {
-                                last_stream.push_str(text);
-                            }
-                            _ => {}
-                        }
                         if event.agent_name.is_none() {
                             event.agent_name = Some(agent_name.clone());
                         }
@@ -101,12 +90,7 @@ pub async fn agent_io_loop(
             }
         }
     }
-    // Prefer AttemptCompletion output over accumulated stream text
-    completion_output.or(if last_stream.is_empty() {
-        None
-    } else {
-        Some(last_stream)
-    })
+    agent_result
 }
 
 /// Spawn hub/wait_agent in a background task so it doesn't block the IO loop.
@@ -162,13 +146,19 @@ pub fn start_agent_io(
         }
         info!(agent = %n, "agent registered in Hub");
         let output = agent_io_loop(hub2, conn, rx, n.clone()).await;
-        let mut h = hub.lock().await;
-        // Order matters: emit BEFORE unregister to avoid race with wait_agent.
-        // wait_agent checks agent existence → if we unregister first, it returns
-        // "not found" and misses the output. By emitting first, any pending watcher
-        // gets the output before the agent is removed.
-        h.registry.emit_agent_finished(&n2, output);
-        h.registry.unregister_connection(&n2);
+        let pending = {
+            let mut h = hub.lock().await;
+            // Order matters: emit BEFORE unregister to avoid race with wait_agent.
+            let pending = h.registry.emit_agent_finished(&n2, output);
+            h.registry.unregister_connection(&n2);
+            pending
+        }; // Lock released.
+        // Deliver to parent outside the lock — uses async send (no data loss).
+        if let Some((tx, envelope)) = pending {
+            if tx.send(envelope).await.is_err() {
+                tracing::warn!(agent = %n2, "parent completion channel closed");
+            }
+        }
         info!(agent = %n2, "agent IO loop ended");
     });
 }
@@ -185,9 +175,17 @@ pub fn spawn_io_loop(
     let n2 = name.to_string();
     tokio::spawn(async move {
         let output = agent_io_loop(hub2, conn, rx, n.clone()).await;
-        let mut h = hub.lock().await;
-        h.registry.emit_agent_finished(&n2, output);
-        h.registry.unregister_connection(&n2);
+        let pending = {
+            let mut h = hub.lock().await;
+            let pending = h.registry.emit_agent_finished(&n2, output);
+            h.registry.unregister_connection(&n2);
+            pending
+        };
+        if let Some((tx, envelope)) = pending {
+            if tx.send(envelope).await.is_err() {
+                tracing::warn!(agent = %n2, "parent completion channel closed");
+            }
+        }
         info!(agent = %n2, "agent IO loop ended");
     });
 }

@@ -152,7 +152,6 @@ pub const SAFE_ENV_ALLOWLIST: &[&str] = &[
     "WAYLAND_DISPLAY",
     // Loopal's own env vars are always kept
     "LOOPAL_MODEL",
-    "LOOPAL_MAX_TURNS",
     "LOOPAL_PERMISSION_MODE",
     "LOOPAL_LOG",
     "LOOPAL_SANDBOX",

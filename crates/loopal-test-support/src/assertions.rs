@@ -81,14 +81,6 @@ pub fn assert_has_error(events: &[AgentEventPayload]) {
     );
 }
 
-pub fn assert_has_max_turns(events: &[AgentEventPayload]) {
-    assert_event_has(
-        events,
-        |e| matches!(e, AgentEventPayload::MaxTurnsReached { .. }),
-        "expected MaxTurnsReached event",
-    );
-}
-
 pub fn assert_has_tool_result(events: &[AgentEventPayload], tool_name: &str, expect_error: bool) {
     assert_event_has(
         events,

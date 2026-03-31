@@ -96,7 +96,6 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
 
         // ── Events with no ACP counterpart ───────────────────────────
         AgentEventPayload::AwaitingInput
-        | AgentEventPayload::MaxTurnsReached { .. }
         | AgentEventPayload::AutoContinuation { .. }
         | AgentEventPayload::Started
         | AgentEventPayload::Finished

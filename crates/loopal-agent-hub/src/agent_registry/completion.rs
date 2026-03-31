@@ -1,20 +1,30 @@
-//! Agent completion tracking and cascade interrupt.
+//! Agent completion tracking, result delivery, and cascade interrupt.
 
 use loopal_ipc::protocol::methods;
-use loopal_protocol::{AgentEvent, AgentEventPayload};
-use tokio::sync::watch;
+use loopal_protocol::{AgentEvent, AgentEventPayload, Envelope, MessageSource};
+use tokio::sync::{mpsc, watch};
 
 use super::AgentRegistry;
 use crate::topology::AgentLifecycle;
 
 impl AgentRegistry {
-    /// Emit Finished event, cache output, notify watchers, cascade orphans.
-    pub fn emit_agent_finished(&mut self, name: &str, output: Option<String>) {
+    /// Emit Finished event, cache output, deliver result to parent, notify watchers.
+    ///
+    /// Returns an optional `(sender, envelope)` pair for the caller to deliver
+    /// **after releasing the Hub lock**. This avoids holding the lock during IPC.
+    pub fn emit_agent_finished(
+        &mut self,
+        name: &str,
+        output: Option<String>,
+    ) -> Option<(mpsc::Sender<Envelope>, Envelope)> {
         tracing::info!(agent = %name, has_output = output.is_some(), "emitting Finished");
         self.set_lifecycle(name, AgentLifecycle::Finished);
 
         let text = output.unwrap_or_else(|| "(no output)".into());
         self.finished_outputs.insert(name.to_string(), text.clone());
+
+        // Prepare delivery envelope (actual send happens after lock release).
+        let pending_delivery = self.prepare_parent_delivery(name, &text);
 
         let event = AgentEvent::named(name, AgentEventPayload::Finished);
         let _ = self.event_tx.try_send(event);
@@ -28,6 +38,31 @@ impl AgentRegistry {
             tracing::info!(agent = %name, orphans = ?orphans, "cascade interrupt");
             self.interrupt_orphans(&orphans);
         }
+
+        pending_delivery
+    }
+
+    /// Build the delivery envelope and find the parent's completion_tx.
+    /// Returns None if no parent or no completion channel.
+    fn prepare_parent_delivery(
+        &self,
+        child_name: &str,
+        result: &str,
+    ) -> Option<(mpsc::Sender<Envelope>, Envelope)> {
+        let parent_name = self.agents.get(child_name)?.info.parent.as_deref()?;
+        let tx = self
+            .agents
+            .get(parent_name)?
+            .completion_tx
+            .as_ref()?
+            .clone();
+        let content = format!("<agent-result name=\"{child_name}\">\n{result}\n</agent-result>");
+        let envelope = Envelope::new(
+            MessageSource::System("agent-completed".into()),
+            parent_name,
+            content,
+        );
+        Some((tx, envelope))
     }
 
     /// Create a completion watcher for a named agent.

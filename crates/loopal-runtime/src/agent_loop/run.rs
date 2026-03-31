@@ -1,7 +1,6 @@
 //! Outer loop: user-interaction granularity.
 //!
 //! The agent loop runs turns until:
-//! - `max_turns` is reached
 //! - `wait_for_input` returns None (frontend disconnected / channel closed)
 //! - The agent encounters an unrecoverable error
 //!
@@ -44,17 +43,6 @@ impl AgentLoopRunner {
                 }
             }
 
-            if self.turn_count >= self.params.config.max_turns {
-                self.emit(AgentEventPayload::MaxTurnsReached {
-                    turns: self.turn_count,
-                })
-                .await?;
-                return Ok(AgentOutput {
-                    result: last_output,
-                    terminate_reason: TerminateReason::MaxTurns,
-                });
-            }
-
             // Execute one complete turn (LLM → [tools → LLM]* → done)
             let cancel = TurnCancel::new(self.interrupt.clone(), self.interrupt_tx.clone());
             let mut turn_ctx = TurnContext::new(self.turn_count, cancel);
@@ -75,17 +63,6 @@ impl AgentLoopRunner {
                             }
                             None => break,
                         }
-                    }
-
-                    if self.turn_count >= self.params.config.max_turns {
-                        self.emit(AgentEventPayload::MaxTurnsReached {
-                            turns: self.turn_count,
-                        })
-                        .await?;
-                        return Ok(AgentOutput {
-                            result: last_output,
-                            terminate_reason: TerminateReason::MaxTurns,
-                        });
                     }
 
                     // Pre-loaded prompt fully processed — exit without waiting.

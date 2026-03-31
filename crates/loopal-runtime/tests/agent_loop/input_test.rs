@@ -12,7 +12,6 @@ fn test_agent_loop_runner_construction() {
     assert_eq!(runner.tokens.input, 0);
     assert_eq!(runner.tokens.output, 0);
     assert_eq!(runner.params.config.model(), "claude-sonnet-4-20250514");
-    assert_eq!(runner.params.config.max_turns, 50);
 }
 
 #[test]

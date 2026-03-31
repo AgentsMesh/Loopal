@@ -3,7 +3,6 @@ const KNOWN_KEYS: &[&str] = &[
     "model",
     "model_routing",
     "models",
-    "max_turns",
     "permission_mode",
     "max_context_tokens",
     "providers",

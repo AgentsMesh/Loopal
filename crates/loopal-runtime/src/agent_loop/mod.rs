@@ -5,6 +5,7 @@ pub mod diff_tracker;
 pub mod env_context;
 mod finished_guard;
 mod input;
+mod input_control;
 mod llm;
 mod llm_params;
 mod llm_record;
@@ -61,7 +62,6 @@ pub struct AgentConfig {
     pub system_prompt: String,
     pub mode: AgentMode,
     pub permission_mode: PermissionMode,
-    pub max_turns: u32,
     /// Tool whitelist filter — if `Some`, only tools in this set are exposed.
     pub tool_filter: Option<HashSet<String>>,
     /// Thinking/reasoning configuration (default: Auto).
@@ -84,7 +84,6 @@ impl Default for AgentConfig {
             system_prompt: String::new(),
             mode: AgentMode::Act,
             permission_mode: PermissionMode::Bypass,
-            max_turns: 50,
             tool_filter: None,
             thinking_config: ThinkingConfig::Auto,
             context_tokens_cap: 0,

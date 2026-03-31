@@ -1,5 +1,5 @@
 //! Edge-case tests for turn completion behavior.
-//! Covers error recovery, max_turns edge, and stream-error text preservation.
+//! Covers error recovery and stream-error text preservation.
 
 use loopal_error::{LoopalError, TerminateReason};
 use loopal_provider_api::{StopReason, StreamChunk};
@@ -29,10 +29,9 @@ async fn test_error_preserves_prior_output() {
     assert_eq!(output.terminate_reason, TerminateReason::Goal);
 }
 
-/// Tool execution no longer increments turn_count, so max_turns is not hit
-/// inside execute_turn. The non-interactive agent exits after the turn completes.
+/// Non-interactive agent exits after the turn completes.
 #[tokio::test]
-async fn test_max_turns_inside_execute_turn() {
+async fn test_non_interactive_exits_after_tool_turn() {
     let tmp = std::env::temp_dir().join(format!("la_mt_{}.txt", std::process::id()));
     std::fs::write(&tmp, "y").unwrap();
     let calls = vec![vec![
@@ -46,7 +45,6 @@ async fn test_max_turns_inside_execute_turn() {
         }),
     ]];
     let (mut runner, mut event_rx) = make_multi_runner(calls, false);
-    runner.params.config.max_turns = 1;
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 
     let output = runner.run().await.unwrap();

@@ -80,10 +80,16 @@ fn test_context_overflow_display() {
 fn test_terminate_reason_equality() {
     assert_eq!(TerminateReason::Goal, TerminateReason::Goal);
     assert_eq!(TerminateReason::Error, TerminateReason::Error);
-    assert_eq!(TerminateReason::MaxTurns, TerminateReason::MaxTurns);
     assert_eq!(TerminateReason::Aborted, TerminateReason::Aborted);
     assert_ne!(TerminateReason::Goal, TerminateReason::Error);
-    assert_ne!(TerminateReason::MaxTurns, TerminateReason::Aborted);
+    assert_ne!(TerminateReason::Goal, TerminateReason::Aborted);
+}
+
+#[test]
+fn test_terminate_reason_as_str() {
+    assert_eq!(TerminateReason::Goal.as_str(), "goal");
+    assert_eq!(TerminateReason::Error.as_str(), "error");
+    assert_eq!(TerminateReason::Aborted.as_str(), "aborted");
 }
 
 #[test]
@@ -97,7 +103,6 @@ fn test_terminate_reason_clone() {
 fn test_terminate_reason_debug() {
     assert_eq!(format!("{:?}", TerminateReason::Goal), "Goal");
     assert_eq!(format!("{:?}", TerminateReason::Error), "Error");
-    assert_eq!(format!("{:?}", TerminateReason::MaxTurns), "MaxTurns");
     assert_eq!(format!("{:?}", TerminateReason::Aborted), "Aborted");
 }
 
@@ -132,14 +137,4 @@ fn test_agent_output_empty_result_on_error() {
     };
     assert!(output.result.is_empty());
     assert_eq!(output.terminate_reason, TerminateReason::Error);
-}
-
-#[test]
-fn test_agent_output_non_empty_result_on_max_turns() {
-    let output = AgentOutput {
-        result: "partial work".to_string(),
-        terminate_reason: TerminateReason::MaxTurns,
-    };
-    assert_eq!(output.result, "partial work");
-    assert_eq!(output.terminate_reason, TerminateReason::MaxTurns);
 }

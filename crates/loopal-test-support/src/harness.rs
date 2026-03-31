@@ -31,7 +31,6 @@ pub struct HarnessBuilder {
     pub(crate) summarization_model: Option<String>,
     pub(crate) permission_mode: PermissionMode,
     pub(crate) messages: Vec<Message>,
-    pub(crate) max_turns: u32,
     pub(crate) mode: AgentMode,
     pub(crate) system_prompt: String,
     pub(crate) thinking_config: ThinkingConfig,
@@ -57,7 +56,6 @@ impl HarnessBuilder {
             summarization_model: None,
             permission_mode: PermissionMode::Bypass,
             messages: vec![Message::user("hello")],
-            max_turns: 10,
             mode: AgentMode::Act,
             system_prompt: "test".into(),
             thinking_config: ThinkingConfig::Auto,
@@ -87,10 +85,6 @@ impl HarnessBuilder {
     }
     pub fn messages(mut self, m: Vec<Message>) -> Self {
         self.messages = m;
-        self
-    }
-    pub fn max_turns(mut self, t: u32) -> Self {
-        self.max_turns = t;
         self
     }
     pub fn mode(mut self, m: AgentMode) -> Self {

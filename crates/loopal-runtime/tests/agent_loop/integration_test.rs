@@ -2,9 +2,7 @@ use std::sync::Arc;
 
 use loopal_config::Settings;
 use loopal_context::{ContextBudget, ContextStore};
-use loopal_error::TerminateReason;
 use loopal_kernel::Kernel;
-use loopal_message::Message;
 use loopal_protocol::AgentEventPayload;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::Envelope;
@@ -49,7 +47,6 @@ async fn test_agent_loop_immediate_channel_close() {
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
     let params = AgentLoopParams {
         config: AgentConfig {
-            max_turns: 10,
             ..Default::default()
         },
         deps: AgentDeps {
@@ -86,58 +83,6 @@ async fn test_agent_loop_immediate_channel_close() {
         events
             .iter()
             .any(|e| matches!(e.payload, AgentEventPayload::Finished))
-    );
-}
-
-#[tokio::test]
-async fn test_agent_loop_max_turns_reached() {
-    let fixture = TestFixture::new();
-    let (event_tx, mut event_rx) = mpsc::channel(64);
-    let (_mbox_tx, mailbox_rx) = mpsc::channel::<Envelope>(16);
-    let (_ctrl_tx, control_rx) = mpsc::channel::<ControlCommand>(16);
-
-    let frontend = Arc::new(UnifiedFrontend::new(
-        None,
-        event_tx,
-        mailbox_rx,
-        control_rx,
-        None,
-        Box::new(AutoDenyHandler),
-        Box::new(AutoCancelQuestionHandler),
-    ));
-
-    let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
-    let params = AgentLoopParams {
-        config: AgentConfig {
-            max_turns: 0,
-            ..Default::default()
-        },
-        deps: AgentDeps {
-            kernel,
-            frontend,
-            session_manager: fixture.session_manager(),
-        },
-        session: fixture.test_session("test-turns"),
-        store: ContextStore::from_messages(vec![Message::user("hello")], make_test_budget()),
-        interrupt: InterruptHandle::new(),
-        shared: None,
-        memory_channel: None,
-        scheduled_rx: None,
-        auto_classifier: None,
-    };
-
-    let result = agent_loop(params).await;
-    let output = result.unwrap();
-    assert_eq!(output.terminate_reason, TerminateReason::MaxTurns);
-
-    let mut events = Vec::new();
-    while let Ok(e) = event_rx.try_recv() {
-        events.push(e);
-    }
-    assert!(
-        events
-            .iter()
-            .any(|e| matches!(e.payload, AgentEventPayload::MaxTurnsReached { .. }))
     );
 }
 
@@ -210,7 +155,6 @@ async fn test_full_run_with_tool_execution() {
         ],
     ];
     let (mut runner, mut event_rx) = super::mock_provider::make_multi_runner(calls);
-    runner.params.config.max_turns = 5;
 
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 

@@ -117,7 +117,6 @@ async fn test_subagent_drains_pending_before_exit() {
 
     let params = AgentLoopParams {
         config: AgentConfig {
-            max_turns: 5,
             ..Default::default()
         },
         deps: AgentDeps {

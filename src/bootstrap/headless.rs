@@ -83,7 +83,7 @@ async fn consume_events(mut event_rx: tokio::sync::broadcast::Receiver<AgentEven
                     // more input. In headless mode there is none — we're done.
                     break;
                 }
-                AgentEventPayload::Finished | AgentEventPayload::MaxTurnsReached { .. } => {
+                AgentEventPayload::Finished => {
                     break;
                 }
                 AgentEventPayload::Error { message } => {

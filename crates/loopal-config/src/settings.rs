@@ -23,9 +23,6 @@ pub struct Settings {
     #[serde(default)]
     pub models: HashMap<String, ModelOverride>,
 
-    /// Maximum turns per agent loop
-    pub max_turns: u32,
-
     /// Permission mode
     pub permission_mode: PermissionMode,
 
@@ -63,7 +60,6 @@ impl Default for Settings {
             model: "claude-sonnet-4-20250514".to_string(),
             model_routing: HashMap::new(),
             models: HashMap::new(),
-            max_turns: 50,
             permission_mode: PermissionMode::Bypass,
             max_context_tokens: 0,
             providers: ProvidersConfig::default(),

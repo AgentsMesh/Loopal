@@ -1,4 +1,4 @@
-load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 
 rust_library(
     name = "loopal-backend",
@@ -21,4 +21,18 @@ rust_library(
         "@crates//:tokio",
     ],
     proc_macro_deps = ["@crates//:async-trait"],
+)
+
+rust_test(
+    name = "suite",
+    srcs = glob(["tests/**/*.rs"]),
+    crate_root = "tests/suite.rs",
+    edition = "2024",
+    deps = [
+        ":loopal-backend",
+        "//crates/loopal-error",
+        "//crates/loopal-tool-api",
+        "@crates//:tempfile",
+        "@crates//:tokio",
+    ],
 )

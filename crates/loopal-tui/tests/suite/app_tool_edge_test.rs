@@ -33,7 +33,7 @@ fn test_handle_tool_result_no_matching_pending() {
             result: "orphan result".to_string(),
             is_error: false,
             duration_ms: None,
-            is_completion: false,
+
             metadata: None,
         }));
     // Should not crash
@@ -85,7 +85,7 @@ fn test_tool_result_error_updates_matching_tool() {
             result: "failed!".to_string(),
             is_error: true,
             duration_ms: None,
-            is_completion: false,
+
             metadata: None,
         }));
 
@@ -115,7 +115,7 @@ fn test_tool_result_not_found_when_different_name() {
             result: "done".to_string(),
             is_error: false,
             duration_ms: None,
-            is_completion: false,
+
             metadata: None,
         }));
 
@@ -163,7 +163,7 @@ fn test_tool_result_with_multibyte_utf8_no_panic() {
             result: chinese_text.to_string(),
             is_error: false,
             duration_ms: None,
-            is_completion: false,
+
             metadata: None,
         }));
 

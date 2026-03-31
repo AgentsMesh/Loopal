@@ -123,7 +123,7 @@ impl AgentLoopRunner {
                 "tool exec start"
             );
             let cancel = &turn_ctx.cancel;
-            let completion = self.execute_tools(result.tool_uses.clone(), cancel).await?;
+            self.execute_tools(result.tool_uses.clone(), cancel).await?;
             info!("tool exec complete");
 
             // Append observer warnings (e.g. loop detector) AFTER tool results.
@@ -148,9 +148,6 @@ impl AgentLoopRunner {
             }
 
             continuation_count = 0;
-            if let Some(r) = completion {
-                return Ok(TurnOutput { output: r });
-            }
         }
     }
 

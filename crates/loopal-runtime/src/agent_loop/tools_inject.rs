@@ -14,7 +14,6 @@ pub(super) fn success_block(id: &str, content: &str) -> ContentBlock {
         tool_use_id: id.to_string(),
         content: content.to_string(),
         is_error: false,
-        is_completion: false,
         metadata: None,
     }
 }
@@ -24,7 +23,7 @@ impl AgentLoopRunner {
     pub(super) async fn emit_all_interrupted(
         &mut self,
         tool_uses: &[(String, String, serde_json::Value)],
-    ) -> Result<Option<String>> {
+    ) -> Result<()> {
         info!("cancelled, skipping tool execution");
         let mut blocks = Vec::with_capacity(tool_uses.len());
         for (id, name, _) in tool_uses {
@@ -34,7 +33,6 @@ impl AgentLoopRunner {
                 result: "Interrupted by user".into(),
                 is_error: true,
                 duration_ms: None,
-                is_completion: false,
                 metadata: None,
             })
             .await?;
@@ -42,7 +40,6 @@ impl AgentLoopRunner {
                 tool_use_id: id.clone(),
                 content: "Interrupted by user".into(),
                 is_error: true,
-                is_completion: false,
                 metadata: None,
             });
         }
@@ -60,7 +57,7 @@ impl AgentLoopRunner {
             error!(error = %e, "failed to persist message");
         }
         self.params.store.push_tool_results(msg);
-        Ok(None)
+        Ok(())
     }
 
     /// Drain pending envelopes from the frontend and inject them as user messages.

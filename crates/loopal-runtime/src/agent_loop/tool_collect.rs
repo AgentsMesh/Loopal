@@ -76,7 +76,6 @@ pub(super) async fn collect_results(
                 result: "Interrupted by user".into(),
                 is_error: true,
                 duration_ms: None,
-                is_completion: false,
                 metadata: None,
             })
             .await;
@@ -86,7 +85,6 @@ pub(super) async fn collect_results(
                 tool_use_id: id.clone(),
                 content: "Interrupted by user".into(),
                 is_error: true,
-                is_completion: false,
                 metadata: None,
             },
         ));

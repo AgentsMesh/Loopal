@@ -57,9 +57,8 @@ async fn mixed_batch_only_classifies_dangerous() {
 async fn empty_batch_is_noop() {
     let (mut runner, mut event_rx) = make_auto_runner(vec![]);
 
-    let result = runner.execute_tools(vec![], &make_cancel()).await.unwrap();
+    runner.execute_tools(vec![], &make_cancel()).await.unwrap();
 
-    assert!(result.is_none());
     assert!(drain_auto_decisions(&mut event_rx).is_empty());
 }
 

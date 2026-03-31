@@ -35,7 +35,6 @@ fn conversation_text_handles_tool_blocks() {
                 tool_use_id: "t1".to_string(),
                 content: "fn main() {}".to_string(),
                 is_error: false,
-                is_completion: false,
                 metadata: None,
             }],
         },

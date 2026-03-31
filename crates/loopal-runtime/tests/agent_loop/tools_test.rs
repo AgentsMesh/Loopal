@@ -24,14 +24,10 @@ async fn test_execute_tools_bypass_mode() {
         serde_json::json!({"file_path": tmp.to_str().unwrap()}),
     )];
 
-    let completion = runner
+    runner
         .execute_tools(tool_uses, &make_cancel())
         .await
         .unwrap();
-    assert!(
-        completion.is_none(),
-        "Read tool should not trigger completion"
-    );
 
     // Should have added tool result message
     assert_eq!(runner.params.store.len(), 1);

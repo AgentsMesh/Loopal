@@ -57,8 +57,6 @@ mod view_switch_test;
 mod e2e_compact_edge_test;
 #[path = "suite/e2e_compact_test.rs"]
 mod e2e_compact_test;
-#[path = "suite/e2e_completion_test.rs"]
-mod e2e_completion_test;
 #[path = "suite/e2e_control_test.rs"]
 mod e2e_control_test;
 #[path = "suite/e2e_edge_test.rs"]

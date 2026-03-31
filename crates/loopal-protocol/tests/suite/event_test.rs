@@ -40,7 +40,7 @@ fn test_event_tool_result_serde_roundtrip() {
         result: "file contents".into(),
         is_error: false,
         duration_ms: None,
-        is_completion: false,
+
         metadata: None,
     });
     let json = serde_json::to_string(&event).unwrap();
@@ -70,7 +70,7 @@ fn test_event_tool_result_error_serde_roundtrip() {
         result: "command not found".into(),
         is_error: true,
         duration_ms: None,
-        is_completion: false,
+
         metadata: None,
     });
     let json = serde_json::to_string(&event).unwrap();

@@ -102,8 +102,6 @@ pub enum ContentBlock {
         tool_use_id: String,
         content: String,
         is_error: bool,
-        #[serde(default)]
-        is_completion: bool,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         metadata: Option<serde_json::Value>,
     },

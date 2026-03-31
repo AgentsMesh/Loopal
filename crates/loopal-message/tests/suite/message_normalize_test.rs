@@ -132,7 +132,6 @@ fn test_normalize_tool_result_before_text_after_merge() {
             tool_use_id: "toolu_abc".into(),
             content: "ok".into(),
             is_error: false,
-            is_completion: false,
             metadata: None,
         }],
     };

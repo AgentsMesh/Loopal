@@ -56,7 +56,7 @@ fn project_tool_use_and_result() {
             tool_use_id: "tu-1".into(),
             content: "file contents here".into(),
             is_error: false,
-            is_completion: false,
+
             metadata: None,
         }],
     };
@@ -87,7 +87,7 @@ fn project_tool_use_error() {
             tool_use_id: "tu-err".into(),
             content: "command failed".into(),
             is_error: true,
-            is_completion: false,
+
             metadata: None,
         }],
     };
@@ -138,7 +138,7 @@ fn project_multi_turn_mixed() {
                 tool_use_id: "t1".into(),
                 content: "main.rs".into(),
                 is_error: false,
-                is_completion: false,
+    
                 metadata: None,
             }],
         },

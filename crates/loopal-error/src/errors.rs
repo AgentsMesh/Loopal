@@ -138,7 +138,7 @@ pub enum McpError {
 /// Why the agent loop terminated.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TerminateReason {
-    /// Agent completed its task (called AttemptCompletion or natural finish).
+    /// Agent completed its task.
     Goal,
     /// LLM or system error.
     Error,

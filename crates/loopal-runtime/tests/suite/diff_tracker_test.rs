@@ -57,7 +57,6 @@ fn ok_result(id: &str) -> ContentBlock {
         tool_use_id: id.into(),
         content: "ok".into(),
         is_error: false,
-        is_completion: false,
         metadata: None,
     }
 }
@@ -67,7 +66,6 @@ fn err_result(id: &str) -> ContentBlock {
         tool_use_id: id.into(),
         content: "err".into(),
         is_error: true,
-        is_completion: false,
         metadata: None,
     }
 }

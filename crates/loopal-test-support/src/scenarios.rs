@@ -93,15 +93,6 @@ pub fn task_lifecycle(subject: &str) -> Calls {
     ]
 }
 
-/// AttemptCompletion tool call.
-pub fn attempt_completion(result: &str) -> Calls {
-    vec![chunks::tool_turn(
-        "tc-done",
-        "AttemptCompletion",
-        serde_json::json!({ "result": result }),
-    )]
-}
-
 /// Auto-continuation scenario: first call ends with MaxTokens, second completes.
 pub fn auto_continuation(partial: &str, continuation: &str) -> Calls {
     vec![

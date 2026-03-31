@@ -26,7 +26,7 @@ async fn full_chain_sub_agent_result_delivered_to_parent() {
     let fixture = TestFixture::new();
     let cwd = fixture.path().to_path_buf();
     let session_dir = fixture.path().join("sessions");
-    let provider = Arc::new(MultiCallProvider::new(scenarios::attempt_completion(
+    let provider = Arc::new(MultiCallProvider::new(scenarios::simple_text(
         "# Research Report\n\nFound 42 crates with 200k lines.",
     ))) as Arc<dyn loopal_provider_api::Provider>;
 
@@ -69,17 +69,11 @@ async fn full_chain_sub_agent_result_delivered_to_parent() {
         .expect("oneshot channel should not be dropped")
         .expect("bridge should succeed");
 
-    // Parent got the sub-agent's AttemptCompletion output
+    // Parent got the sub-agent's stream output
     assert!(
         result.contains("Research Report"),
-        "parent should receive sub-agent's completion result, got: {}",
+        "parent should receive sub-agent's result, got: {}",
         &result[..result.len().min(100)]
     );
     assert!(result.contains("42 crates"));
-
-    // Content is returned clean (no prefix) since is_completion is a structured field.
-    assert!(
-        !result.starts_with("<<COMPLETION>>"),
-        "result must not contain any legacy prefix"
-    );
 }

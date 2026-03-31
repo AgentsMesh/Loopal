@@ -1,9 +1,6 @@
-use async_trait::async_trait;
 use loopal_error::{LoopalError, TerminateReason};
 use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::{StopReason, StreamChunk};
-use loopal_tool_api::PermissionLevel;
-use loopal_tool_api::{Tool, ToolContext, ToolResult};
 
 use super::mock_provider::{
     make_interactive_multi_runner, make_multi_runner, make_runner_with_mock_provider,
@@ -27,51 +24,20 @@ async fn test_full_run_stream_error_recovery_with_close() {
     assert!(result.is_ok());
 }
 
-struct FakeCompletionTool;
-#[async_trait]
-impl Tool for FakeCompletionTool {
-    fn name(&self) -> &str {
-        "AttemptCompletion"
-    }
-    fn description(&self) -> &str {
-        "test"
-    }
-    fn parameters_schema(&self) -> serde_json::Value {
-        serde_json::json!({})
-    }
-    fn permission(&self) -> PermissionLevel {
-        PermissionLevel::ReadOnly
-    }
-    async fn execute(
-        &self,
-        input: serde_json::Value,
-        _ctx: &ToolContext,
-    ) -> Result<ToolResult, LoopalError> {
-        let r = input
-            .get("result")
-            .and_then(|v| v.as_str())
-            .unwrap_or("done");
-        Ok(ToolResult::completion(r))
-    }
-}
-
-/// Interactive agent must NOT exit after AttemptCompletion — it should
-/// proceed to wait_for_input (emitting AwaitingInput) before finishing.
+/// Interactive agent emits AwaitingInput after responding, then exits when
+/// channels close.
 #[tokio::test]
-async fn test_interactive_completion_emits_awaiting_input() {
+async fn test_interactive_emits_awaiting_input() {
     let calls = vec![vec![
-        Ok(StreamChunk::ToolUse {
-            id: "tc-1".into(),
-            name: "AttemptCompletion".into(),
-            input: serde_json::json!({"result": "all done"}),
+        Ok(StreamChunk::Text {
+            text: "all done".into(),
         }),
         Ok(StreamChunk::Done {
             stop_reason: StopReason::EndTurn,
         }),
     ]];
-    let (mut runner, mut event_rx, mbox_tx, ctrl_tx) = make_interactive_multi_runner(calls, |k| {
-        k.register_tool(Box::new(FakeCompletionTool));
-    });
+    let (mut runner, mut event_rx, mbox_tx, ctrl_tx) =
+        make_interactive_multi_runner(calls, |_k| {});
 
     // Send initial message via mailbox (agent starts with empty store)
     mbox_tx
@@ -83,7 +49,7 @@ async fn test_interactive_completion_emits_awaiting_input() {
         .await
         .unwrap();
 
-    // Drop senders: after AttemptCompletion, wait_for_input sees closed channels → exits
+    // Drop senders: after response, wait_for_input sees closed channels -> exits
     drop(mbox_tx);
     drop(ctrl_tx);
 
@@ -102,12 +68,12 @@ async fn test_interactive_completion_emits_awaiting_input() {
     drop(runner); // Close event channel so the collector finishes
     let payloads = events.await.unwrap();
 
-    // Key assertion: AwaitingInput was emitted AFTER completion (proves loop didn't break)
+    // Key assertion: AwaitingInput was emitted AFTER the turn
     assert!(
         payloads
             .iter()
             .any(|p| matches!(p, AgentEventPayload::AwaitingInput)),
-        "interactive agent should emit AwaitingInput after AttemptCompletion"
+        "interactive agent should emit AwaitingInput after turn"
     );
 }
 
@@ -125,7 +91,7 @@ async fn test_prompt_driven_exits_after_turn() {
         }),
     ]];
     let (mut runner, mut event_rx) = make_multi_runner(calls);
-    // store already has "go" message → initial_prompt = true
+    // store already has "go" message -> initial_prompt = true
 
     let events = tokio::spawn(async move {
         let mut payloads = vec![];
@@ -157,7 +123,7 @@ async fn test_prompt_driven_exits_after_turn() {
     );
 }
 
-/// Prompt-driven session with LLM error → exits cleanly (no hang).
+/// Prompt-driven session with LLM error -> exits cleanly (no hang).
 #[tokio::test]
 async fn test_prompt_driven_error_exits_cleanly() {
     let calls = vec![vec![Err(LoopalError::Provider(

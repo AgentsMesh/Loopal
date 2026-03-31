@@ -61,7 +61,6 @@ pub(crate) fn apply_agent_event(
             result,
             is_error,
             duration_ms,
-            is_completion,
             metadata,
         } => {
             handle_tool_result(
@@ -72,7 +71,6 @@ pub(crate) fn apply_agent_event(
                     result,
                     is_error,
                     duration_ms,
-                    is_completion,
                     metadata,
                 },
             );

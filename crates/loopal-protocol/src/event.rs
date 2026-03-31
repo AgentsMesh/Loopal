@@ -58,9 +58,6 @@ pub enum AgentEventPayload {
         /// Wall-clock execution time in milliseconds (filled by runtime).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         duration_ms: Option<u64>,
-        /// True when this tool signals task completion (AttemptCompletion).
-        #[serde(default)]
-        is_completion: bool,
         /// Structured data from the tool (e.g. bytes_written for Write).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         metadata: Option<serde_json::Value>,

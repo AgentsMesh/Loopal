@@ -22,7 +22,6 @@ fn user_with_tool_result(tool_use_id: &str) -> Message {
             tool_use_id: tool_use_id.to_string(),
             content: "ok".to_string(),
             is_error: false,
-            is_completion: false,
             metadata: None,
         }],
     }

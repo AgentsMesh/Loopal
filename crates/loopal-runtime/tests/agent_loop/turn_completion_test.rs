@@ -1,4 +1,4 @@
-//! Tests for AttemptCompletion end-to-end flow through execute_turn.
+//! Tests for natural turn completion flow through execute_turn.
 use std::collections::VecDeque;
 use std::sync::Arc;
 
@@ -10,12 +10,11 @@ use loopal_error::LoopalError;
 use loopal_kernel::Kernel;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::Envelope;
-use loopal_provider_api::{ChatParams, ChatStream, Provider, StopReason, StreamChunk};
+use loopal_provider_api::{ChatParams, ChatStream, Provider, StreamChunk};
 use loopal_runtime::agent_loop::AgentLoopRunner;
 use loopal_runtime::frontend::{AutoCancelQuestionHandler, AutoDenyHandler};
 use loopal_runtime::{AgentConfig, AgentDeps, AgentLoopParams, InterruptHandle, UnifiedFrontend};
 use loopal_test_support::TestFixture;
-use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
 use tokio::sync::mpsc;
 
 // --- Multi-call mock provider ---
@@ -53,34 +52,6 @@ impl Provider for MultiCallProvider {
     }
 }
 
-struct FakeCompletionTool;
-#[async_trait]
-impl Tool for FakeCompletionTool {
-    fn name(&self) -> &str {
-        "AttemptCompletion"
-    }
-    fn description(&self) -> &str {
-        "test"
-    }
-    fn parameters_schema(&self) -> serde_json::Value {
-        serde_json::json!({})
-    }
-    fn permission(&self) -> PermissionLevel {
-        PermissionLevel::ReadOnly
-    }
-    async fn execute(
-        &self,
-        input: serde_json::Value,
-        _ctx: &ToolContext,
-    ) -> Result<ToolResult, LoopalError> {
-        let r = input
-            .get("result")
-            .and_then(|v| v.as_str())
-            .unwrap_or("done");
-        Ok(ToolResult::completion(r))
-    }
-}
-
 fn make_test_budget() -> ContextBudget {
     ContextBudget {
         context_window: 200_000,
@@ -94,7 +65,7 @@ fn make_test_budget() -> ContextBudget {
 
 pub(crate) fn make_multi_runner(
     calls: Vec<Vec<Result<StreamChunk, LoopalError>>>,
-    register_completion: bool,
+    _unused: bool,
 ) -> (AgentLoopRunner, mpsc::Receiver<loopal_protocol::AgentEvent>) {
     let fixture = TestFixture::new();
     let (event_tx, event_rx) = mpsc::channel(64);
@@ -109,11 +80,9 @@ pub(crate) fn make_multi_runner(
         Box::new(AutoDenyHandler),
         Box::new(AutoCancelQuestionHandler),
     ));
-    let mut kernel = Kernel::new(Settings::default()).unwrap();
+    let kernel = Kernel::new(Settings::default()).unwrap();
+    let mut kernel = kernel;
     kernel.register_provider(Arc::new(MultiCallProvider::new(calls)) as Arc<dyn Provider>);
-    if register_completion {
-        kernel.register_tool(Box::new(FakeCompletionTool));
-    }
     let params = AgentLoopParams {
         config: AgentConfig {
             ..Default::default()
@@ -137,32 +106,31 @@ pub(crate) fn make_multi_runner(
     (AgentLoopRunner::new(params), event_rx)
 }
 
-/// LLM returns AttemptCompletion -> turn exits immediately with completed=true.
+/// LLM returns text-only response -> turn exits with Goal.
 #[tokio::test]
-async fn test_attempt_completion_exits_turn_immediately() {
+async fn test_text_only_exits_turn() {
+    use loopal_provider_api::StopReason;
     let calls = vec![vec![
-        Ok(StreamChunk::ToolUse {
-            id: "tc-1".into(),
-            name: "AttemptCompletion".into(),
-            input: serde_json::json!({"result": "all tasks done"}),
+        Ok(StreamChunk::Text {
+            text: "all tasks done".into(),
         }),
         Ok(StreamChunk::Done {
             stop_reason: StopReason::EndTurn,
         }),
     ]];
-    let (mut runner, mut event_rx) = make_multi_runner(calls, true);
+    let (mut runner, mut event_rx) = make_multi_runner(calls, false);
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 
     let output = runner.run().await.unwrap();
     assert_eq!(output.terminate_reason, loopal_error::TerminateReason::Goal);
     assert_eq!(output.result, "all tasks done");
-    // Tool execution no longer increments turn_count (only user messages do)
     assert_eq!(runner.turn_count, 0);
 }
 
-/// LLM tool -> LLM AttemptCompletion: two LLM calls inside one turn.
+/// LLM tool -> LLM text: two LLM calls inside one run.
 #[tokio::test]
-async fn test_tool_then_completion_two_llm_calls() {
+async fn test_tool_then_text_two_llm_calls() {
+    use loopal_provider_api::StopReason;
     let tmp = std::env::temp_dir().join(format!("la_e2e_{}.txt", std::process::id()));
     std::fs::write(&tmp, "x").unwrap();
     let calls = vec![
@@ -177,23 +145,20 @@ async fn test_tool_then_completion_two_llm_calls() {
             }),
         ],
         vec![
-            Ok(StreamChunk::ToolUse {
-                id: "tc-2".into(),
-                name: "AttemptCompletion".into(),
-                input: serde_json::json!({"result": "read done"}),
+            Ok(StreamChunk::Text {
+                text: "read done".into(),
             }),
             Ok(StreamChunk::Done {
                 stop_reason: StopReason::EndTurn,
             }),
         ],
     ];
-    let (mut runner, mut event_rx) = make_multi_runner(calls, true);
+    let (mut runner, mut event_rx) = make_multi_runner(calls, false);
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 
     let output = runner.run().await.unwrap();
     assert_eq!(output.terminate_reason, loopal_error::TerminateReason::Goal);
     assert_eq!(output.result, "read done");
-    // Tool execution no longer increments turn_count (only user messages do)
     assert_eq!(runner.turn_count, 0);
     let _ = std::fs::remove_file(&tmp);
 }

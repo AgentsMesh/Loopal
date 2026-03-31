@@ -86,14 +86,12 @@ pub async fn execute_approved_tools(
                             result: result.content.clone(),
                             is_error: result.is_error,
                             duration_ms: Some(tool_duration.as_millis() as u64),
-                            is_completion: result.is_completion,
                             metadata: result.metadata.clone(),
                         };
                         let block = ContentBlock::ToolResult {
                             tool_use_id: id,
                             content: result.content,
                             is_error: result.is_error,
-                            is_completion: result.is_completion,
                             metadata: result.metadata,
                         };
                         (block, event)
@@ -112,14 +110,12 @@ pub async fn execute_approved_tools(
                             result: err_msg.clone(),
                             is_error: true,
                             duration_ms: Some(tool_duration.as_millis() as u64),
-                            is_completion: false,
                             metadata: None,
                         };
                         let block = ContentBlock::ToolResult {
                             tool_use_id: id,
                             content: err_msg,
                             is_error: true,
-                            is_completion: false,
                             metadata: None,
                         };
                         (block, event)

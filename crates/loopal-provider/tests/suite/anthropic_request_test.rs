@@ -58,7 +58,6 @@ fn test_build_messages_with_tool_use() {
                     tool_use_id: "tu_1".to_string(),
                     content: "file.txt".to_string(),
                     is_error: false,
-                    is_completion: false,
                     metadata: None,
                 }],
             },

@@ -39,6 +39,8 @@ pub struct FetchResult {
     pub body: String,
     pub content_type: Option<String>,
     pub status: u16,
+    /// Path to an overflow file when body exceeded fetch size limit.
+    pub overflow_path: Option<String>,
 }
 
 /// Metadata about a single file or directory.
@@ -84,6 +86,8 @@ pub struct GlobSearchResult {
     pub entries: Vec<GlobEntry>,
     /// `true` when results were capped at the configured limit.
     pub truncated: bool,
+    /// Path to an overflow file containing all results (set when truncated).
+    pub overflow_path: Option<String>,
 }
 
 /// Single entry in a glob search result.
@@ -115,6 +119,8 @@ pub struct GrepOptions {
 pub struct GrepSearchResult {
     pub file_matches: Vec<FileMatchResult>,
     pub total_match_count: usize,
+    /// Path to an overflow file containing all results (set when truncated).
+    pub overflow_path: Option<String>,
 }
 
 /// All matches within a single file.

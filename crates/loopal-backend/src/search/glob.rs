@@ -6,9 +6,10 @@ use std::time::UNIX_EPOCH;
 use globset::Glob;
 use loopal_error::ToolIoError;
 use loopal_tool_api::backend_types::{GlobEntry, GlobOptions, GlobSearchResult};
+use loopal_tool_api::save_to_overflow_file;
 
 use crate::limits::ResourceLimits;
-use crate::search::walker;
+use crate::search::{overflow_fmt, walker};
 
 /// Execute a glob search and return matching entries.
 pub fn glob_search(
@@ -31,6 +32,7 @@ pub fn glob_search(
         return Ok(GlobSearchResult {
             entries: Vec::new(),
             truncated: false,
+            overflow_path: None,
         });
     };
 
@@ -67,5 +69,18 @@ pub fn glob_search(
         }
     }
 
-    Ok(GlobSearchResult { entries, truncated })
+    let overflow_path = if truncated {
+        Some(save_to_overflow_file(
+            &overflow_fmt::serialize_glob_results(&entries),
+            "glob_results",
+        ))
+    } else {
+        None
+    };
+
+    Ok(GlobSearchResult {
+        entries,
+        truncated,
+        overflow_path,
+    })
 }

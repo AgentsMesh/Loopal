@@ -56,7 +56,13 @@ impl AgentRegistry {
             .completion_tx
             .as_ref()?
             .clone();
-        let content = format!("<agent-result name=\"{child_name}\">\n{result}\n</agent-result>");
+        // Cap large results: save to overflow file, embed path in envelope.
+        let body = if result.len() > MAX_RESULT_BYTES {
+            overflow_agent_result(child_name, result)
+        } else {
+            result.to_string()
+        };
+        let content = format!("<agent-result name=\"{child_name}\">\n{body}\n</agent-result>");
         let envelope = Envelope::new(
             MessageSource::System("agent-completed".into()),
             parent_name,
@@ -121,4 +127,35 @@ impl AgentRegistry {
             }
         }
     }
+}
+
+/// Max agent result bytes before overflow to file (100 KB).
+const MAX_RESULT_BYTES: usize = 100_000;
+
+/// Save oversized agent result to file, return preview + path.
+fn overflow_agent_result(agent_name: &str, result: &str) -> String {
+    let dir = std::env::temp_dir().join("loopal").join("overflow");
+    let _ = std::fs::create_dir_all(&dir);
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    let path = dir.join(format!("agent_{agent_name}_{ts}.txt"));
+    let path_str = path.to_string_lossy().into_owned();
+    if std::fs::write(&path, result).is_err() {
+        return result[..MAX_RESULT_BYTES].to_string();
+    }
+    // Preview: first ~25 KB
+    let preview_end = result
+        .char_indices()
+        .take_while(|(i, _)| *i < MAX_RESULT_BYTES / 4)
+        .last()
+        .map(|(i, c)| i + c.len_utf8())
+        .unwrap_or(0);
+    let kb = result.len() / 1024;
+    format!(
+        "{}\n\n[Agent result too large for context ({kb} KB). Full output saved to: {path_str}]\n\
+         Use the Read tool to access the complete output if needed.",
+        &result[..preview_end]
+    )
 }

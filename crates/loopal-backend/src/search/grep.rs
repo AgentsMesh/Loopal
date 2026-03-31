@@ -8,20 +8,21 @@ use globset::Glob;
 use ignore::WalkState;
 use loopal_error::ToolIoError;
 use loopal_tool_api::backend_types::{FileMatchResult, GrepOptions, GrepSearchResult};
+use loopal_tool_api::save_to_overflow_file;
 use parking_lot::Mutex;
 use regex::RegexBuilder;
 
 use crate::limits::ResourceLimits;
-use crate::search::{binary, grep_match, walker};
+use crate::search::{binary, grep_match, overflow_fmt, walker};
 
 /// Build a compiled regex from `GrepOptions`.
 fn build_regex(opts: &GrepOptions) -> Result<regex::Regex, ToolIoError> {
-    let effective = if opts.fixed_strings {
+    let pat = if opts.fixed_strings {
         regex::escape(&opts.pattern)
     } else {
         opts.pattern.clone()
     };
-    RegexBuilder::new(&effective)
+    RegexBuilder::new(&pat)
         .case_insensitive(opts.case_insensitive)
         .multi_line(opts.multiline)
         .dot_matches_new_line(opts.multiline)
@@ -67,10 +68,7 @@ pub fn grep_search(
     let glob_matcher = Arc::new(glob_matcher);
 
     let Some(w) = walker::build_walker(&search_path, opts.type_filter.as_deref()) else {
-        return Ok(GrepSearchResult {
-            file_matches: Vec::new(),
-            total_match_count: 0,
-        });
+        return Ok(empty_result());
     };
     w.build_parallel().run(|| {
         let re = re.clone();
@@ -104,8 +102,10 @@ pub fn grep_search(
     });
 
     let file_matches = Arc::try_unwrap(results).unwrap().into_inner();
+    let truncated = done.load(Ordering::Relaxed);
     Ok(GrepSearchResult {
         total_match_count: total.load(Ordering::Relaxed),
+        overflow_path: maybe_save_overflow(truncated, &file_matches),
         file_matches,
     })
 }
@@ -147,27 +147,43 @@ fn search_one_file(
     })
 }
 
+fn empty_result() -> GrepSearchResult {
+    GrepSearchResult {
+        file_matches: Vec::new(),
+        total_match_count: 0,
+        overflow_path: None,
+    }
+}
+
+fn maybe_save_overflow(truncated: bool, matches: &[FileMatchResult]) -> Option<String> {
+    if truncated {
+        Some(save_to_overflow_file(
+            &overflow_fmt::serialize_grep_results(matches),
+            "grep_results",
+        ))
+    } else {
+        None
+    }
+}
+
 fn search_single_file(
     opts: &GrepOptions,
     path: &Path,
     limits: &ResourceLimits,
 ) -> Result<GrepSearchResult, ToolIoError> {
-    let empty = GrepSearchResult {
-        file_matches: Vec::new(),
-        total_match_count: 0,
-    };
     if binary::is_likely_binary(path) {
-        return Ok(empty);
+        return Ok(empty_result());
     }
     let re = build_regex(opts)?;
     let Ok(content) = std::fs::read_to_string(path) else {
-        return Ok(empty);
+        return Ok(empty_result());
     };
     let lines: Vec<&str> = content.lines().collect();
     let indices = grep_match::find_match_indices(&content, &lines, &re, opts.multiline);
     if indices.is_empty() {
-        return Ok(empty);
+        return Ok(empty_result());
     }
+    let truncated = indices.len() > limits.max_grep_matches;
     let count = indices.len().min(limits.max_grep_matches);
     let groups = grep_match::collect_context_groups(
         &lines,
@@ -175,11 +191,14 @@ fn search_single_file(
         opts.context_before,
         opts.context_after,
     );
+    let file_matches = vec![FileMatchResult {
+        path: path.to_string_lossy().into_owned(),
+        groups,
+    }];
+    let overflow_path = maybe_save_overflow(truncated, &file_matches);
     Ok(GrepSearchResult {
         total_match_count: count,
-        file_matches: vec![FileMatchResult {
-            path: path.to_string_lossy().into_owned(),
-            groups,
-        }],
+        file_matches,
+        overflow_path,
     })
 }

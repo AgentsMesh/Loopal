@@ -1,10 +1,10 @@
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::Instant;
 
 use loopal_config::HookEvent;
 use loopal_error::{LoopalError, Result};
 use loopal_hooks::run_hook;
 use loopal_kernel::Kernel;
-use loopal_tool_api::{ToolContext, ToolResult, needs_truncation, truncate_output};
+use loopal_tool_api::{ToolContext, ToolResult, handle_overflow};
 use serde_json::Value;
 use tracing::{debug, info, warn};
 
@@ -14,8 +14,7 @@ const MAX_RESULT_LINES: usize = 2000;
 const MAX_RESULT_BYTES: usize = 100_000;
 
 /// Execute a tool through the full pipeline:
-/// pre-hooks -> execute -> truncate -> post-hooks.
-/// Sandbox enforcement is handled by the SandboxedTool decorator (precheck + execute).
+/// pre-hooks -> execute -> overflow-to-file -> post-hooks.
 pub async fn execute_tool(
     kernel: &Kernel,
     name: &str,
@@ -67,7 +66,22 @@ pub async fn execute_tool(
         "tool pipeline exec"
     );
 
-    let result = truncate_result(result, name);
+    // Overflow-to-file: save large outputs to disk, return preview + path.
+    let overflow = handle_overflow(&result.content, MAX_RESULT_LINES, MAX_RESULT_BYTES, name);
+    let result = if overflow.overflowed {
+        warn!(
+            tool = name,
+            original_bytes = result.content.len(),
+            "tool result overflowed to file"
+        );
+        ToolResult {
+            content: overflow.display,
+            is_error: result.is_error,
+            metadata: result.metadata,
+        }
+    } else {
+        result
+    };
 
     let post_hooks = kernel.get_hooks(HookEvent::PostToolUse, Some(name));
     for hook_config in &post_hooks {
@@ -83,39 +97,4 @@ pub async fn execute_tool(
     }
 
     Ok(result)
-}
-
-fn truncate_result(result: ToolResult, tool_name: &str) -> ToolResult {
-    if !needs_truncation(&result.content, MAX_RESULT_LINES, MAX_RESULT_BYTES) {
-        return result;
-    }
-    let saved_path = save_full_output(&result.content, tool_name);
-    let mut truncated = truncate_output(&result.content, MAX_RESULT_LINES, MAX_RESULT_BYTES);
-    if let Some(path) = saved_path {
-        truncated.push_str(&format!("\n\n[Full output saved to: {path}]"));
-    }
-    warn!(
-        tool = tool_name,
-        original_bytes = result.content.len(),
-        truncated_bytes = truncated.len(),
-        "tool result truncated by pipeline"
-    );
-    ToolResult {
-        content: truncated,
-        is_error: result.is_error,
-        metadata: result.metadata.clone(),
-    }
-}
-
-fn save_full_output(content: &str, tool_name: &str) -> Option<String> {
-    let tmp_dir = loopal_config::tmp_dir();
-    std::fs::create_dir_all(&tmp_dir).ok()?;
-    let ts = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .ok()?
-        .as_millis();
-    let filename = format!("tool_{tool_name}_{ts}.txt");
-    let path = tmp_dir.join(&filename);
-    std::fs::write(&path, content).ok()?;
-    Some(path.to_string_lossy().into_owned())
 }

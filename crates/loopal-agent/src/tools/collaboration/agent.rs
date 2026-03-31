@@ -1,5 +1,3 @@
-//! Agent tool — spawn sub-agents (foreground by default, parallel via JoinSet).
-
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -67,7 +65,6 @@ impl Tool for AgentTool {
     }
 }
 
-/// Spawn a new sub-agent. Foreground blocks until done; background returns name.
 async fn action_spawn(
     shared: Arc<AgentShared>,
     input: &serde_json::Value,
@@ -88,7 +85,6 @@ async fn action_spawn(
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
     let isolation = input.get("isolation").and_then(|v| v.as_str());
-
     if shared.depth >= shared.max_depth {
         return Ok(ToolResult::error(format!(
             "Maximum nesting depth ({}) reached",
@@ -102,7 +98,6 @@ async fn action_spawn(
     if let Some(ref m) = model_override {
         config.model = Some(m.clone());
     }
-
     let wt = if isolation == Some("worktree") {
         let uid = &uuid::Uuid::new_v4().to_string()[..8];
         Some(create_agent_worktree(&shared.cwd, &name, uid)?)
@@ -113,14 +108,11 @@ async fn action_spawn(
     let model = config
         .model
         .unwrap_or_else(|| shared.kernel.settings().model.clone());
-
-    // Propagate parent's permission_mode to sub-agent.
     let perm_mode = match shared.kernel.settings().permission_mode {
         loopal_tool_api::PermissionMode::Bypass => "bypass",
         loopal_tool_api::PermissionMode::Supervised => "supervised",
         loopal_tool_api::PermissionMode::Auto => "auto",
     };
-
     let result = spawn_agent(
         &shared,
         SpawnParams {
@@ -132,24 +124,16 @@ async fn action_spawn(
         },
     )
     .await;
-
     match result {
         Ok(sr) => {
             if background {
-                // Worktree cleanup in background
-                if let Some((info, root)) = wt {
-                    let s = shared.clone();
-                    let n = name.clone();
-                    tokio::spawn(async move {
-                        let _ = wait_agent(&s, &n).await;
-                        loopal_git::cleanup_if_clean(&root, &info);
-                    });
-                }
-                Ok(ToolResult::success(format!(
+                spawn_bg_cleanup(shared.clone(), name.clone(), wt);
+                let msg = format!(
                     "Agent '{name}' spawned in background (agentId: {}).\n\
                      Result will be injected into your conversation when it completes.",
                     sr.agent_id,
-                )))
+                );
+                Ok(ToolResult::success(msg))
             } else {
                 let output = wait_agent(&shared, &name).await;
                 if let Some((info, root)) = wt {
@@ -169,7 +153,6 @@ async fn action_spawn(
         }
     }
 }
-
 async fn action_result(
     shared: Arc<AgentShared>,
     input: &serde_json::Value,
@@ -181,7 +164,6 @@ async fn action_result(
     }
 }
 
-/// Non-blocking lifecycle query via Hub topology.
 async fn action_status(
     shared: Arc<AgentShared>,
     input: &serde_json::Value,
@@ -196,5 +178,23 @@ async fn action_status(
             serde_json::to_string_pretty(&info).unwrap_or_default(),
         )),
         Err(e) => Ok(ToolResult::error(format!("Agent '{name}': {e}"))),
+    }
+}
+
+fn spawn_bg_cleanup(
+    shared: Arc<AgentShared>,
+    name: String,
+    wt: Option<(loopal_git::WorktreeInfo, std::path::PathBuf)>,
+) {
+    if let Some((info, root)) = wt {
+        tokio::spawn(async move {
+            let timeout = std::time::Duration::from_secs(3600);
+            match tokio::time::timeout(timeout, wait_agent(&shared, &name)).await {
+                Ok(_) => {
+                    loopal_git::cleanup_if_clean(&root, &info);
+                }
+                Err(_) => tracing::warn!(agent = %name, "background agent timed out"),
+            }
+        });
     }
 }

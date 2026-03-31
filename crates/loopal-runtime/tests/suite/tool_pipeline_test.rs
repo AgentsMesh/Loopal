@@ -153,11 +153,11 @@ async fn test_large_tool_output_is_truncated_and_saved() {
         "should contain truncation notice"
     );
     assert!(
-        result.content.contains("[Full output saved to:"),
+        result.content.contains("Full output saved to:"),
         "should contain saved file path"
     );
 
-    let saved_marker = "[Full output saved to: ";
+    let saved_marker = "Full output saved to: ";
     let start = result.content.find(saved_marker).unwrap() + saved_marker.len();
     let end = result.content[start..].find(']').unwrap() + start;
     let saved_path = &result.content[start..end];

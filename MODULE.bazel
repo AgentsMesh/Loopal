@@ -6,6 +6,9 @@ module(
 # Bazel skylib
 bazel_dep(name = "bazel_skylib", version = "1.7.1")
 
+# Platforms (needed for cross-compilation platform() targets)
+bazel_dep(name = "platforms", version = "1.0.0")
+
 # Rust rules
 bazel_dep(name = "rules_rust", version = "0.69.0")
 

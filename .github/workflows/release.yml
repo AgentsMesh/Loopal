@@ -19,9 +19,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - target: x86_64-apple-darwin
-            os: macos-13
-            archive: tar.gz
           - target: aarch64-apple-darwin
             os: macos-14
             archive: tar.gz
@@ -55,6 +52,11 @@ jobs:
 
       - name: Build release binary
         run: bazel build //:loopal -c opt
+        if: runner.os != 'Windows'
+
+      - name: Build release binary (Windows)
+        if: runner.os == 'Windows'
+        run: bazel build //:loopal -c opt --action_env=PATH
 
       - name: Package (Unix)
         if: runner.os != 'Windows'
@@ -74,7 +76,7 @@ jobs:
         run: |
           $archiveDir = "$env:BINARY_NAME-${{ github.ref_name }}-${{ matrix.target }}"
           New-Item -ItemType Directory -Path $archiveDir -Force
-          $binPath = (bazel cquery --output=files //:loopal -c opt 2>$null).Trim()
+          $binPath = (bazel cquery --output=files //:loopal -c opt --action_env=PATH 2>$null).Trim()
           Copy-Item $binPath "$archiveDir/"
           if (Test-Path "README.md") { Copy-Item "README.md" "$archiveDir/" }
           if (Test-Path "LICENSE") { Copy-Item "LICENSE" "$archiveDir/" }

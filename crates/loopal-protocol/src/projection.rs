@@ -76,8 +76,7 @@ pub fn project_messages(messages: &[Message]) -> Vec<ProjectedMessage> {
                     content,
                     ..
                 } => {
-                    if let Some(tc) = tool_calls.iter_mut().rev().find(|tc| tc.id == *tool_use_id)
-                    {
+                    if let Some(tc) = tool_calls.iter_mut().rev().find(|tc| tc.id == *tool_use_id) {
                         tc.result = Some(format_server_tool_content(content));
                     }
                 }

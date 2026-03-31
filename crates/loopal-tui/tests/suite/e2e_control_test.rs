@@ -34,7 +34,12 @@ async fn test_clear_command() {
     let mut harness = wrap_tui(inner);
     // Drain initial AwaitingInput (store empty, agent waits for first message)
     let _ = harness.collect_until_idle().await;
-    harness.inner.mailbox_tx.send(Envelope::new(MessageSource::Human, "main", "hello")).await.unwrap();
+    harness
+        .inner
+        .mailbox_tx
+        .send(Envelope::new(MessageSource::Human, "main", "hello"))
+        .await
+        .unwrap();
 
     // Collect first turn
     let ev1 = harness.collect_until_idle().await;
@@ -67,7 +72,12 @@ async fn test_compact_command() {
     let mut harness = wrap_tui(inner);
     // Drain initial AwaitingInput (store empty, agent waits for first message)
     let _ = harness.collect_until_idle().await;
-    harness.inner.mailbox_tx.send(Envelope::new(MessageSource::Human, "main", "hello")).await.unwrap();
+    harness
+        .inner
+        .mailbox_tx
+        .send(Envelope::new(MessageSource::Human, "main", "hello"))
+        .await
+        .unwrap();
 
     let _ = harness.collect_until_idle().await;
 
@@ -97,7 +107,12 @@ async fn test_thinking_switch() {
     let mut harness = wrap_tui(inner);
     // Drain initial AwaitingInput (store empty, agent waits for first message)
     let _ = harness.collect_until_idle().await;
-    harness.inner.mailbox_tx.send(Envelope::new(MessageSource::Human, "main", "hello")).await.unwrap();
+    harness
+        .inner
+        .mailbox_tx
+        .send(Envelope::new(MessageSource::Human, "main", "hello"))
+        .await
+        .unwrap();
 
     let _ = harness.collect_until_idle().await;
 
@@ -149,7 +164,12 @@ async fn test_rewind_command() {
     let mut harness = wrap_tui(inner);
     // Drain initial AwaitingInput (store empty, agent waits for first message)
     let _ = harness.collect_until_idle().await;
-    harness.inner.mailbox_tx.send(Envelope::new(MessageSource::Human, "main", "hello")).await.unwrap();
+    harness
+        .inner
+        .mailbox_tx
+        .send(Envelope::new(MessageSource::Human, "main", "hello"))
+        .await
+        .unwrap();
 
     // Complete first turn
     let _ = harness.collect_until_idle().await;

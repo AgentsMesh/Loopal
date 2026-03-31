@@ -33,7 +33,10 @@ pub async fn run(
     info!("headless client connected to Hub");
 
     // 6. Auto-approve all permission/question requests in background
-    tokio::spawn(auto_approve_relay(ui_session.relay_rx, ui_session.client.clone()));
+    tokio::spawn(auto_approve_relay(
+        ui_session.relay_rx,
+        ui_session.client.clone(),
+    ));
 
     // 7. Consume events until agent finishes
     let output = consume_events(ui_session.event_rx).await;
@@ -55,9 +58,7 @@ pub async fn run(
 ///
 /// In headless mode the agent processes one prompt then enters AwaitingInput.
 /// We treat AwaitingInput as "done" since there's no user to provide more input.
-async fn consume_events(
-    mut event_rx: tokio::sync::broadcast::Receiver<AgentEvent>,
-) -> String {
+async fn consume_events(mut event_rx: tokio::sync::broadcast::Receiver<AgentEvent>) -> String {
     let mut last_text = String::new();
     let mut completion_text: Option<String> = None;
     let mut seen_stream = false;
@@ -82,8 +83,7 @@ async fn consume_events(
                     // more input. In headless mode there is none — we're done.
                     break;
                 }
-                AgentEventPayload::Finished
-                | AgentEventPayload::MaxTurnsReached { .. } => {
+                AgentEventPayload::Finished | AgentEventPayload::MaxTurnsReached { .. } => {
                     break;
                 }
                 AgentEventPayload::Error { message } => {
@@ -117,9 +117,7 @@ async fn auto_approve_relay(
                 let _ = client.respond_permission(id, true).await;
             } else if method == loopal_ipc::protocol::methods::AGENT_QUESTION.name {
                 info!(id, "headless: auto-approving question");
-                let _ = client
-                    .respond_question(id, vec!["(auto)".into()])
-                    .await;
+                let _ = client.respond_question(id, vec!["(auto)".into()]).await;
             }
         }
     }

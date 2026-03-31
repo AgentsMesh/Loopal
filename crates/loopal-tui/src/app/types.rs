@@ -1,5 +1,5 @@
 // Re-export display types from session crate
-pub use loopal_session::{SessionMessage, SessionToolCall, PendingPermission};
+pub use loopal_session::{PendingPermission, SessionMessage, SessionToolCall};
 
 use crate::command::CommandEntry;
 

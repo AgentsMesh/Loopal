@@ -17,7 +17,9 @@ use loopal_protocol::{AgentEvent, ControlCommand, Envelope, UserQuestionResponse
 use loopal_provider_api::Provider;
 use loopal_runtime::agent_loop::AgentLoopRunner;
 use loopal_runtime::frontend::PermissionHandler;
-use loopal_runtime::frontend::{AutoCancelQuestionHandler, AutoDenyHandler, RelayPermissionHandler};
+use loopal_runtime::frontend::{
+    AutoCancelQuestionHandler, AutoDenyHandler, RelayPermissionHandler,
+};
 use loopal_runtime::{AgentLoopParams, UnifiedFrontend};
 use loopal_session::SessionController;
 use loopal_tool_api::PermissionMode;

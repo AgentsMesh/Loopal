@@ -37,7 +37,12 @@ async fn test_interactive_two_turns() {
     let mut harness = wrap_tui(inner);
     // Drain initial AwaitingInput (store empty, agent waits for first message)
     let _ = harness.collect_until_idle().await;
-    harness.inner.mailbox_tx.send(Envelope::new(MessageSource::Human, "main", "hello")).await.unwrap();
+    harness
+        .inner
+        .mailbox_tx
+        .send(Envelope::new(MessageSource::Human, "main", "hello"))
+        .await
+        .unwrap();
 
     // First turn
     let ev1 = harness.collect_until_idle().await;
@@ -73,7 +78,12 @@ async fn test_max_turns_reached() {
     let mut harness = wrap_tui(inner);
     // Drain initial AwaitingInput (store empty, agent waits for first message)
     let _ = harness.collect_until_idle().await;
-    harness.inner.mailbox_tx.send(Envelope::new(MessageSource::Human, "main", "hello")).await.unwrap();
+    harness
+        .inner
+        .mailbox_tx
+        .send(Envelope::new(MessageSource::Human, "main", "hello"))
+        .await
+        .unwrap();
 
     // First turn: tool executes, then AwaitingInput
     let ev1 = harness.collect_until_idle().await;
@@ -102,7 +112,12 @@ async fn test_mode_switch_act_to_plan() {
     let mut harness = wrap_tui(inner);
     // Drain initial AwaitingInput (store empty, agent waits for first message)
     let _ = harness.collect_until_idle().await;
-    harness.inner.mailbox_tx.send(Envelope::new(MessageSource::Human, "main", "hello")).await.unwrap();
+    harness
+        .inner
+        .mailbox_tx
+        .send(Envelope::new(MessageSource::Human, "main", "hello"))
+        .await
+        .unwrap();
 
     // First turn
     let ev1 = harness.collect_until_idle().await;
@@ -149,7 +164,12 @@ async fn test_interrupt_stops_processing() {
     let mut harness = wrap_tui(inner);
     // Drain initial AwaitingInput (store empty, agent waits for first message)
     let _ = harness.collect_until_idle().await;
-    harness.inner.mailbox_tx.send(Envelope::new(MessageSource::Human, "main", "hello")).await.unwrap();
+    harness
+        .inner
+        .mailbox_tx
+        .send(Envelope::new(MessageSource::Human, "main", "hello"))
+        .await
+        .unwrap();
 
     let events = harness.collect_until_idle().await;
     assertions::assert_has_stream(&events);

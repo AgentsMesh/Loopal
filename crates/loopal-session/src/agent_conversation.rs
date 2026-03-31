@@ -7,7 +7,7 @@
 use std::time::{Duration, Instant};
 
 use crate::thinking_display::format_thinking_summary;
-use crate::types::{SessionMessage, PendingPermission, PendingQuestion};
+use crate::types::{PendingPermission, PendingQuestion, SessionMessage};
 
 /// Per-agent conversation state — everything needed to render one agent's chat view.
 #[derive(Debug, Default)]

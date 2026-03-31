@@ -1,6 +1,6 @@
 //! Tests for ProjectedMessage → SessionMessage conversion via load_display_history.
 
-use loopal_session::{ToolCallStatus, ROOT_AGENT};
+use loopal_session::{ROOT_AGENT, ToolCallStatus};
 
 use super::controller_test::make_controller;
 
@@ -44,7 +44,10 @@ fn load_display_history_converts_projected_to_session() {
     assert_eq!(msgs[1].tool_calls.len(), 1);
     assert_eq!(msgs[1].tool_calls[0].name, "Read");
     assert_eq!(msgs[1].tool_calls[0].status, ToolCallStatus::Success);
-    assert_eq!(msgs[1].tool_calls[0].result.as_deref(), Some("file contents"));
+    assert_eq!(
+        msgs[1].tool_calls[0].result.as_deref(),
+        Some("file contents")
+    );
 }
 
 #[test]

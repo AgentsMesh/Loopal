@@ -2,7 +2,7 @@
 
 use loopal_protocol::ControlCommand;
 use loopal_protocol::{AgentEvent, AgentEventPayload, UserQuestionResponse};
-use loopal_session::{SessionMessage, SessionToolCall, SessionController, ToolCallStatus};
+use loopal_session::{SessionController, SessionMessage, SessionToolCall, ToolCallStatus};
 use loopal_tui::app::App;
 
 use tokio::sync::mpsc;

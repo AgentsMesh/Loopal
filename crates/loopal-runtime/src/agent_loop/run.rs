@@ -54,7 +54,7 @@ impl AgentLoopRunner {
                 messages = self.params.store.len(),
                 "turn start"
             );
-            self.status = AgentStatus::Running;
+            self.transition(AgentStatus::Running).await?;
 
             let cancel = TurnCancel::new(self.interrupt.clone(), self.interrupt_tx.clone());
             let mut turn_ctx = TurnContext::new(self.turn_count, cancel);
@@ -86,10 +86,7 @@ impl AgentLoopRunner {
                     }
 
                     error!(error = %e, "LLM request failed");
-                    self.emit(AgentEventPayload::Error {
-                        message: LoopalError::to_string(&e),
-                    })
-                    .await?;
+                    self.transition_error(LoopalError::to_string(&e)).await?;
                     // Error → back to idle, wait for recovery input or disconnect.
                 }
             }
@@ -110,6 +107,8 @@ impl AgentLoopRunner {
 
     async fn emit_interrupted(&mut self) -> Result<()> {
         info!("agent interrupted by user");
+        // Interrupted resets to WaitingForInput (agent is idle after interrupt).
+        self.status = AgentStatus::WaitingForInput;
         self.emit(AgentEventPayload::Interrupted).await
     }
 }

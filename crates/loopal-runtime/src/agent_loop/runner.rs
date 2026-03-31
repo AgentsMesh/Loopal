@@ -72,19 +72,18 @@ impl AgentLoopRunner {
     /// Actual run logic, executed inside the `agent` span.
     async fn run_instrumented(&mut self) -> Result<AgentOutput> {
         info!(model = %self.params.config.model(), "agent loop started");
+        // Started is a one-time lifecycle event (not a status transition).
+        // Status moves to Running via transition() before each turn.
+        self.transition(AgentStatus::Running).await?;
         self.emit(AgentEventPayload::Started).await?;
 
         let result = self.run_loop().await;
 
         if let Err(ref e) = result {
-            let _ = self
-                .emit(AgentEventPayload::Error {
-                    message: e.to_string(),
-                })
-                .await;
+            let _ = self.transition_error(e.to_string()).await;
         }
 
-        let _ = self.emit(AgentEventPayload::Finished).await;
+        let _ = self.transition(AgentStatus::Finished).await;
         result
     }
 
@@ -108,15 +107,24 @@ impl AgentLoopRunner {
     }
 
     /// Transition to a new agent status and emit the corresponding event.
+    ///
+    /// **This is the ONLY way to change agent status.** Every status change
+    /// goes through this method, ensuring SSOT and deterministic event emission.
     pub(super) async fn transition(&mut self, new_status: AgentStatus) -> Result<()> {
         self.status = new_status;
         match new_status {
+            AgentStatus::Starting => Ok(()),
+            AgentStatus::Running => Ok(()), // Running is signaled implicitly by Stream/ToolCall events.
             AgentStatus::WaitingForInput => self.emit(AgentEventPayload::AwaitingInput).await,
-            // Started and Finished are emitted by run_instrumented() directly.
-            // Running is implicit (Stream/ToolCall events signal activity).
-            // Error is emitted separately with a message.
-            _ => Ok(()),
+            AgentStatus::Finished => self.emit(AgentEventPayload::Finished).await,
+            AgentStatus::Error => Ok(()), // Error event carries a message; use transition_error().
         }
+    }
+
+    /// Transition to Error status with a message.
+    pub(super) async fn transition_error(&mut self, message: String) -> Result<()> {
+        self.status = AgentStatus::Error;
+        self.emit(AgentEventPayload::Error { message }).await
     }
 
     /// Recalculate context budget from current model config.

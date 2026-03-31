@@ -9,8 +9,8 @@ use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Clear, canvas::Canvas};
 
 use loopal_protocol::AgentStatus;
-use loopal_session::state::AgentViewState;
 use loopal_session::ROOT_AGENT;
+use loopal_session::state::AgentViewState;
 
 use crate::views::unified_status::spinner_frame;
 use layout::abbreviate_model;

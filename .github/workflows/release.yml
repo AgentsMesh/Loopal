@@ -39,10 +39,6 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libssl-dev pkg-config
 
-      - name: Install system dependencies (Windows)
-        if: runner.os == 'Windows'
-        run: choco install cmake nasm -y
-
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@0.14.0
         with:
@@ -52,11 +48,6 @@ jobs:
 
       - name: Build release binary
         run: bazel build //:loopal -c opt
-        if: runner.os != 'Windows'
-
-      - name: Build release binary (Windows)
-        if: runner.os == 'Windows'
-        run: bazel build //:loopal -c opt --action_env=PATH
 
       - name: Package (Unix)
         if: runner.os != 'Windows'
@@ -76,7 +67,7 @@ jobs:
         run: |
           $archiveDir = "$env:BINARY_NAME-${{ github.ref_name }}-${{ matrix.target }}"
           New-Item -ItemType Directory -Path $archiveDir -Force
-          $binPath = (bazel cquery --output=files //:loopal -c opt --action_env=PATH 2>$null).Trim()
+          $binPath = (bazel cquery --output=files //:loopal -c opt 2>$null).Trim()
           Copy-Item $binPath "$archiveDir/"
           if (Test-Path "README.md") { Copy-Item "README.md" "$archiveDir/" }
           if (Test-Path "LICENSE") { Copy-Item "LICENSE" "$archiveDir/" }

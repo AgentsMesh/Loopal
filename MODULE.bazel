@@ -50,7 +50,14 @@ crate.spec(package = "thiserror", version = "2")
 crate.spec(package = "anyhow", version = "1")
 
 # --- HTTP ---
-crate.spec(package = "reqwest", version = "0.13", features = ["json", "stream"])
+crate.spec(package = "reqwest", version = "0.13", default_features = False, features = [
+    "native-tls",
+    "charset",
+    "http2",
+    "json",
+    "stream",
+    "system-proxy",
+])
 crate.spec(package = "eventsource-stream", version = "0.2")
 
 # --- CLI ---

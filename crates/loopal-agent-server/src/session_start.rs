@@ -96,10 +96,21 @@ pub(crate) async fn start_session(
 
     let session_id = agent_params.session.id.clone();
 
+    // For task (prompt-driven) sessions, drop the original sender so the agent's
+    // recv_input() returns None after processing the pre-loaded prompt. The only
+    // remaining "real" sender clone is in the placeholder, which gets dropped when
+    // replace_session() swaps it out → channel closes → agent exits.
+    let session_input_tx = if has_initial_prompt {
+        let (dummy_tx, _) = tokio::sync::mpsc::channel(1);
+        dummy_tx // input_tx dropped here (not moved into SharedSession)
+    } else {
+        input_tx
+    };
+
     let session = Arc::new(SharedSession {
         session_id: session_id.clone(),
         clients: Mutex::new(Vec::new()),
-        input_tx,
+        input_tx: session_input_tx,
         interrupt: interrupt.clone(),
         interrupt_tx: interrupt_tx.clone(),
     });

@@ -2,7 +2,7 @@
 
 use ratatui::prelude::*;
 
-use loopal_session::types::DisplayToolCall;
+use loopal_session::types::SessionToolCall;
 
 use super::output_first_line;
 
@@ -18,7 +18,7 @@ pub fn extract_detail(input: &serde_json::Value) -> Option<String> {
 }
 
 /// Body: show summary + inline diff content.
-pub fn render_body(tc: &DisplayToolCall) -> Vec<Line<'static>> {
+pub fn render_body(tc: &SessionToolCall) -> Vec<Line<'static>> {
     let Some(ref input) = tc.tool_input else {
         return vec![output_first_line("edited")];
     };

@@ -19,6 +19,8 @@ mod event_handler_test;
 mod inbox_test;
 #[path = "suite/message_log_test.rs"]
 mod message_log_test;
+#[path = "suite/projection_convert_test.rs"]
+mod projection_convert_test;
 #[path = "suite/retry_banner_test.rs"]
 mod retry_banner_test;
 #[path = "suite/rewind_test.rs"]

@@ -40,12 +40,8 @@ async fn hub_permission_denied_then_llm_adjusts() {
         chunks::tool_turn("tc-1", "Bash", serde_json::json!({"command": "echo hi"})),
         chunks::text_turn("adjusted approach"),
     ];
-    let mut h = build_hub_harness_with(
-        calls,
-        true,
-        Some(loopal_tool_api::PermissionMode::Supervised),
-    )
-    .await;
+    let mut h =
+        build_hub_harness_with(calls, Some(loopal_tool_api::PermissionMode::Supervised)).await;
     h.wait_ready().await;
     h.send_message("run a command").await;
 

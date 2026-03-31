@@ -1,8 +1,8 @@
-use loopal_session::types::DisplayMessage;
+use loopal_session::types::SessionMessage;
 use loopal_tui::views::progress::{message_to_lines, streaming_to_lines};
 
-fn msg(role: &str, content: &str) -> DisplayMessage {
-    DisplayMessage {
+fn msg(role: &str, content: &str) -> SessionMessage {
+    SessionMessage {
         role: role.to_string(),
         content: content.to_string(),
         tool_calls: Vec::new(),

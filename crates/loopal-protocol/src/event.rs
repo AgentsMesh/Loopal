@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::question::Question;
 
-/// Complete event with agent identity, transported via channel to TUI.
+/// Complete event with agent identity, transported via event channel to consumers.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentEvent {
     /// Agent that produced this event. Hub fills this in for all agents
@@ -89,14 +89,14 @@ pub enum AgentEventPayload {
     /// Error occurred
     Error { message: String },
 
-    /// Transient retry error — displayed as an in-place banner, not in message history.
+    /// Transient retry error — not persisted in message history.
     RetryError {
         message: String,
         attempt: u32,
         max_attempts: u32,
     },
 
-    /// Retry succeeded or cancelled — clear the banner.
+    /// Retry succeeded or cancelled — signal retry resolution.
     RetryCleared,
 
     /// Agent is waiting for user input
@@ -140,7 +140,7 @@ pub enum AgentEventPayload {
         content_preview: String,
     },
 
-    /// Tool is requesting user to answer questions via TUI dialog.
+    /// Tool is requesting user to answer questions.
     UserQuestionRequest {
         id: String,
         questions: Vec<Question>,
@@ -159,20 +159,20 @@ pub enum AgentEventPayload {
         strategy: String,
     },
 
-    /// Agent work was interrupted by user (ESC or new message while busy).
+    /// Agent work was interrupted (cancel signal or new message while busy).
     Interrupted,
 
     /// Files modified during the completed turn.
     TurnDiffSummary { modified_files: Vec<String> },
 
-    /// Server-side tool invoked (e.g. web_search). Informational for TUI display.
+    /// Server-side tool invoked (e.g. web_search). Observational — not user-initiated.
     ServerToolUse {
         id: String,
         name: String,
         input: serde_json::Value,
     },
 
-    /// Server-side tool result received. Informational for TUI display.
+    /// Server-side tool result received. Observational — not user-initiated.
     ServerToolResult {
         tool_use_id: String,
         content: serde_json::Value,

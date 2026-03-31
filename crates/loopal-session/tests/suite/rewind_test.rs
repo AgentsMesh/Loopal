@@ -1,8 +1,8 @@
 use loopal_session::AgentConversation;
-use loopal_session::DisplayMessage;
+use loopal_session::SessionMessage;
 
-fn user_msg(text: &str) -> DisplayMessage {
-    DisplayMessage {
+fn user_msg(text: &str) -> SessionMessage {
+    SessionMessage {
         role: "user".into(),
         content: text.into(),
         tool_calls: vec![],
@@ -11,8 +11,8 @@ fn user_msg(text: &str) -> DisplayMessage {
     }
 }
 
-fn asst_msg(text: &str) -> DisplayMessage {
-    DisplayMessage {
+fn asst_msg(text: &str) -> SessionMessage {
+    SessionMessage {
         role: "assistant".into(),
         content: text.into(),
         tool_calls: vec![],
@@ -21,8 +21,8 @@ fn asst_msg(text: &str) -> DisplayMessage {
     }
 }
 
-fn sys_msg(text: &str) -> DisplayMessage {
-    DisplayMessage {
+fn sys_msg(text: &str) -> SessionMessage {
+    SessionMessage {
         role: "system".into(),
         content: text.into(),
         tool_calls: vec![],
@@ -31,7 +31,7 @@ fn sys_msg(text: &str) -> DisplayMessage {
     }
 }
 
-fn conv_with_messages(msgs: Vec<DisplayMessage>) -> AgentConversation {
+fn conv_with_messages(msgs: Vec<SessionMessage>) -> AgentConversation {
     let mut conv = AgentConversation::default();
     conv.turn_count = msgs.iter().filter(|m| m.role == "user").count() as u32;
     conv.messages = msgs;

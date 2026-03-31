@@ -115,8 +115,8 @@ pub(crate) async fn dispatch_loop(
                         .await;
                         hub.remove_session(&session_handle.session_id).await;
                     }
-                    if !session_handle.interactive {
-                        info!("non-interactive session complete, server exiting");
+                    if session_handle.has_initial_prompt {
+                        info!("prompt-driven session complete, server exiting");
                         break;
                     }
                     info!("session ended, ready for next");

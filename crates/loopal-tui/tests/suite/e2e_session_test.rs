@@ -65,10 +65,18 @@ async fn test_model_switch_mid_session() {
     ];
     let inner = HarnessBuilder::new()
         .calls(calls)
-        .interactive(true)
+        .messages(vec![])
         .build_spawned()
         .await;
     let mut harness = wrap_tui(inner);
+    // Drain initial AwaitingInput (store empty, agent waits for first message)
+    let _ = harness.collect_until_idle().await;
+    harness
+        .inner
+        .mailbox_tx
+        .send(Envelope::new(MessageSource::Human, "main", "hello"))
+        .await
+        .unwrap();
 
     // First turn
     let ev1 = harness.collect_until_idle().await;

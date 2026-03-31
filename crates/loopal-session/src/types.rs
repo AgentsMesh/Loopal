@@ -9,10 +9,10 @@ use loopal_protocol::{Question, SkillInvocation};
 
 /// A message to display in the chat view.
 #[derive(Debug, Clone)]
-pub struct DisplayMessage {
+pub struct SessionMessage {
     pub role: String,
     pub content: String,
-    pub tool_calls: Vec<DisplayToolCall>,
+    pub tool_calls: Vec<SessionToolCall>,
     /// Number of images attached to this message (0 for text-only).
     pub image_count: usize,
     /// Skill invocation origin — when set, TUI renders a collapsed summary.
@@ -42,7 +42,7 @@ impl ToolCallStatus {
 
 /// A tool call to display in the chat view.
 #[derive(Debug, Clone)]
-pub struct DisplayToolCall {
+pub struct SessionToolCall {
     pub id: String,
     pub name: String,
     pub status: ToolCallStatus,
@@ -71,7 +71,7 @@ pub struct PendingPermission {
     pub relay_request_id: Option<i64>,
 }
 
-/// A pending user question dialog awaiting selection.
+/// A pending user question awaiting response.
 #[derive(Debug, Clone)]
 pub struct PendingQuestion {
     pub id: String,

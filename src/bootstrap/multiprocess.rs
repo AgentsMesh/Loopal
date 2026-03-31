@@ -5,7 +5,7 @@
 use tracing::info;
 
 use loopal_agent_hub::UiSession;
-use loopal_runtime::projection::project_messages;
+use loopal_protocol::project_messages;
 use loopal_session::SessionController;
 
 use crate::cli::Cli;

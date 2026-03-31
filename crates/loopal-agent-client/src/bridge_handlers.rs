@@ -8,7 +8,7 @@ use tracing::{debug, warn};
 use loopal_ipc::connection::Connection;
 use loopal_protocol::{AgentEvent, UserQuestionResponse};
 
-/// Timeout for permission/question responses from TUI (prevents infinite hang).
+/// Timeout for permission/question responses from consumer (prevents infinite hang).
 const RESPONSE_TIMEOUT: Duration = Duration::from_secs(300);
 
 pub(crate) async fn handle_permission(
@@ -33,7 +33,7 @@ pub(crate) async fn handle_permission(
         },
     };
     let _ = event_tx.send(event).await;
-    // Wait with timeout — prevents infinite hang if TUI disappears
+    // Wait with timeout — prevents infinite hang if consumer disappears
     let allow = match tokio::time::timeout(RESPONSE_TIMEOUT, permission_rx.recv()).await {
         Ok(Some(v)) => {
             debug!(tool = %tool_name, allow = v, "bridge: permission response");

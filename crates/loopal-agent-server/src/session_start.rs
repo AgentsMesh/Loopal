@@ -21,8 +21,9 @@ pub(crate) struct SessionHandle {
     pub session_id: String,
     pub session: Arc<SharedSession>,
     pub agent_task: tokio::task::JoinHandle<()>,
-    /// Non-interactive sessions (with prompt) should exit after completion.
-    pub interactive: bool,
+    /// When false (prompt-driven session), the server process exits after agent completes.
+    /// When true (no initial prompt), the server stays alive for subsequent messages.
+    pub has_initial_prompt: bool,
 }
 
 /// Create a session: build Kernel, HubFrontend, spawn agent loop.
@@ -77,9 +78,8 @@ pub(crate) async fn start_session(
         watch_rx,
     ));
 
-    // If a prompt was provided in agent/start, run non-interactively (process and exit).
-    // Otherwise, run interactively (wait for messages via session/prompt).
-    let interactive = start.prompt.is_none();
+    // If a prompt was provided, the server process should exit after agent completes.
+    let has_initial_prompt = start.prompt.is_some();
 
     let agent_params = agent_setup::build_with_frontend(
         &cwd,
@@ -91,7 +91,6 @@ pub(crate) async fn start_session(
         kernel,
         connection.clone(),
         None,
-        interactive,
     )?;
 
     let session_id = agent_params.session.id.clone();
@@ -123,6 +122,6 @@ pub(crate) async fn start_session(
         session_id,
         session,
         agent_task,
-        interactive,
+        has_initial_prompt,
     })
 }

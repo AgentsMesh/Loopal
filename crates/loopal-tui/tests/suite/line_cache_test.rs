@@ -1,10 +1,10 @@
-use loopal_session::types::{DisplayMessage, DisplayToolCall, ToolCallStatus};
+use loopal_session::types::{SessionMessage, SessionToolCall, ToolCallStatus};
 use loopal_tui::views::progress::LineCache;
 
 const W: u16 = 80;
 
-fn msg(role: &str, content: &str) -> DisplayMessage {
-    DisplayMessage {
+fn msg(role: &str, content: &str) -> SessionMessage {
+    SessionMessage {
         role: role.to_string(),
         content: content.to_string(),
         tool_calls: Vec::new(),
@@ -53,10 +53,10 @@ fn test_clear_invalidation() {
 #[test]
 fn test_tool_call_mutation_detected() {
     let mut cache = LineCache::new();
-    let mut msgs = vec![DisplayMessage {
+    let mut msgs = vec![SessionMessage {
         role: "assistant".to_string(),
         content: String::new(),
-        tool_calls: vec![DisplayToolCall {
+        tool_calls: vec![SessionToolCall {
             name: "bash".to_string(),
             id: String::new(),
             status: ToolCallStatus::Pending,
@@ -117,10 +117,10 @@ fn test_same_width_preserves_cache() {
 #[test]
 fn test_tool_result_arrival_invalidates_cache() {
     let mut cache = LineCache::new();
-    let mut msgs = vec![DisplayMessage {
+    let mut msgs = vec![SessionMessage {
         role: "assistant".to_string(),
         content: String::new(),
-        tool_calls: vec![DisplayToolCall {
+        tool_calls: vec![SessionToolCall {
             name: "Read".to_string(),
             id: String::new(),
             status: ToolCallStatus::Pending,

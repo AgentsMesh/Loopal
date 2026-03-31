@@ -1,7 +1,7 @@
 //! Display-side rewind: truncate conversation messages to match runtime state.
 
 use crate::agent_conversation::AgentConversation;
-use crate::types::DisplayMessage;
+use crate::types::SessionMessage;
 
 /// Truncate display messages to retain only the first `remaining_turns` user turns.
 ///
@@ -24,7 +24,7 @@ pub fn truncate_display_to_turn(conv: &mut AgentConversation, remaining_turns: u
 
 /// Find the index of the first display message belonging to turn N+1
 /// (i.e., the Nth user message, 0-indexed), so we can truncate there.
-fn find_display_cut_index(messages: &[DisplayMessage], remaining_turns: usize) -> usize {
+fn find_display_cut_index(messages: &[SessionMessage], remaining_turns: usize) -> usize {
     let mut user_count = 0;
     for (i, msg) in messages.iter().enumerate() {
         if msg.role == "user" {

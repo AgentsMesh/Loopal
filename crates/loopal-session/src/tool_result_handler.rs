@@ -2,9 +2,9 @@ use std::time::Instant;
 
 use crate::agent_conversation::AgentConversation;
 use crate::truncate::{truncate_json, truncate_result_for_storage};
-use crate::types::{DisplayMessage, DisplayToolCall, ToolCallStatus};
+use crate::types::{SessionMessage, SessionToolCall, ToolCallStatus};
 
-/// Handle ToolCall: create a pending DisplayToolCall and attach to the last assistant message.
+/// Handle ToolCall: create a pending SessionToolCall and attach to the last assistant message.
 pub(crate) fn handle_tool_call(
     conv: &mut AgentConversation,
     id: String,
@@ -12,7 +12,7 @@ pub(crate) fn handle_tool_call(
     input: serde_json::Value,
 ) {
     conv.flush_streaming();
-    let tc = DisplayToolCall {
+    let tc = SessionToolCall {
         id: id.clone(),
         name: name.clone(),
         status: ToolCallStatus::Pending,
@@ -35,7 +35,7 @@ pub(crate) fn handle_tool_call(
         last.tool_calls.push(tc);
         return;
     }
-    conv.messages.push(DisplayMessage {
+    conv.messages.push(SessionMessage {
         role: "assistant".to_string(),
         content: String::new(),
         tool_calls: vec![tc],
@@ -82,7 +82,7 @@ pub(crate) fn handle_tool_result(conv: &mut AgentConversation, p: ToolResultPara
         }
     }
     if p.is_completion {
-        conv.messages.push(DisplayMessage {
+        conv.messages.push(SessionMessage {
             role: "assistant".into(),
             content: p.result,
             tool_calls: Vec::new(),

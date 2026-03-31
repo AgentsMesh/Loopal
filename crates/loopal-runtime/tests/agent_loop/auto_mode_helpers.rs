@@ -84,9 +84,8 @@ impl Tool for DummyTool {
 /// Registers a "DangerTool" with Dangerous permission by default.
 pub fn make_auto_runner(
     classifier_calls: Vec<Vec<Result<StreamChunk, loopal_error::LoopalError>>>,
-    interactive: bool,
 ) -> (AgentLoopRunner, mpsc::Receiver<AgentEvent>) {
-    make_auto_runner_with_setup(classifier_calls, interactive, |kernel| {
+    make_auto_runner_with_setup(classifier_calls, |kernel| {
         kernel.register_tool(Box::new(DummyTool::dangerous("DangerTool")));
     })
 }
@@ -94,7 +93,6 @@ pub fn make_auto_runner(
 /// Build a runner in Auto mode with custom kernel setup.
 pub fn make_auto_runner_with_setup(
     classifier_calls: Vec<Vec<Result<StreamChunk, loopal_error::LoopalError>>>,
-    interactive: bool,
     setup: impl FnOnce(&mut Kernel),
 ) -> (AgentLoopRunner, mpsc::Receiver<AgentEvent>) {
     let fixture = TestFixture::new();
@@ -118,7 +116,6 @@ pub fn make_auto_runner_with_setup(
     let params = AgentLoopParams {
         config: AgentConfig {
             permission_mode: PermissionMode::Auto,
-            interactive,
             ..Default::default()
         },
         deps: AgentDeps {

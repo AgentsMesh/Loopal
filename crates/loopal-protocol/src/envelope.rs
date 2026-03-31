@@ -7,7 +7,7 @@ use crate::user_content::UserContent;
 /// Origin of a message in the three-plane architecture.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MessageSource {
-    /// Message from a human user (via TUI).
+    /// Message from a human user.
     Human,
     /// Message from a named agent.
     Agent(String),

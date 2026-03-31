@@ -1,4 +1,4 @@
-/// Message lines conversion: DisplayMessage → Vec<Line<'static>>.
+/// Message lines conversion: SessionMessage → Vec<Line<'static>>.
 ///
 /// Instruction model: user messages show in a tinted background block
 /// with a left accent bar for dark-mode readability. Assistant output
@@ -8,14 +8,14 @@ use ratatui::prelude::*;
 use unicode_width::UnicodeWidthStr;
 
 use crate::markdown;
-use loopal_session::types::DisplayMessage;
+use loopal_session::types::SessionMessage;
 
 use super::skill_display::render_skill_invoke;
 use super::tool_display::render_tool_calls;
 use super::welcome::render_welcome;
 
-/// Convert a single DisplayMessage into pre-wrapped styled Lines.
-pub fn message_to_lines(msg: &DisplayMessage, width: u16) -> Vec<Line<'static>> {
+/// Convert a single SessionMessage into pre-wrapped styled Lines.
+pub fn message_to_lines(msg: &SessionMessage, width: u16) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
 
     match msg.role.as_str() {
@@ -45,7 +45,7 @@ pub fn message_to_lines(msg: &DisplayMessage, width: u16) -> Vec<Line<'static>> 
 
 /// User message: tinted background block with left accent bar.
 /// Skill invocations render as a collapsed summary instead of the full body.
-fn render_user(lines: &mut Vec<Line<'static>>, msg: &DisplayMessage, width: u16) {
+fn render_user(lines: &mut Vec<Line<'static>>, msg: &SessionMessage, width: u16) {
     if let Some(skill) = &msg.skill_info {
         render_skill_invoke(lines, skill, width);
         return;
@@ -88,14 +88,14 @@ fn user_line(text: &str, total_width: usize, accent: Style, text_style: Style) -
 }
 
 /// Assistant message: direct output, no label. Markdown rendered.
-fn render_assistant(lines: &mut Vec<Line<'static>>, msg: &DisplayMessage, width: u16) {
+fn render_assistant(lines: &mut Vec<Line<'static>>, msg: &SessionMessage, width: u16) {
     if !msg.content.is_empty() {
         lines.extend(markdown::render_markdown(&msg.content, width));
     }
 }
 
 /// Thinking: collapsed to single-line indicator with token estimate.
-fn render_thinking(lines: &mut Vec<Line<'static>>, msg: &DisplayMessage) {
+fn render_thinking(lines: &mut Vec<Line<'static>>, msg: &SessionMessage) {
     let token_est = msg.content.len() / 4;
     let label = if token_est >= 1000 {
         format!("Thinking ({}k tokens)", token_est / 1000)
@@ -113,7 +113,7 @@ fn render_thinking(lines: &mut Vec<Line<'static>>, msg: &DisplayMessage) {
 /// Generic prefixed message (error, system, unknown roles).
 fn render_prefixed(
     lines: &mut Vec<Line<'static>>,
-    msg: &DisplayMessage,
+    msg: &SessionMessage,
     prefix: &str,
     color: Color,
     width: u16,

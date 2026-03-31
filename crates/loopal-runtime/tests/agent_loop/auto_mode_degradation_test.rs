@@ -9,10 +9,10 @@ use super::make_cancel;
 
 // ── Degradation: circuit breaker tripped ───────────────────────────
 
-/// Degraded + non-interactive → deny all, no hang.
+/// Degraded → falls back to frontend permission handler (AutoDenyHandler → Deny).
 #[tokio::test]
-async fn degraded_non_interactive_denies_all() {
-    let (mut runner, _event_rx) = make_auto_runner(vec![], false);
+async fn degraded_falls_back_to_frontend() {
+    let (mut runner, _event_rx) = make_auto_runner(vec![]);
 
     force_degrade(&runner).await;
 
@@ -28,13 +28,13 @@ async fn degraded_non_interactive_denies_all() {
         runner.execute_tools(tool_uses, &make_cancel()),
     )
     .await;
-    assert!(result.is_ok(), "non-interactive degraded must not hang");
+    assert!(result.is_ok(), "degraded must not hang");
 }
 
-/// Degraded + interactive → human fallback (AutoDenyHandler → Deny).
+/// Degraded + AutoDenyHandler → denied (exercises the human fallback path).
 #[tokio::test]
-async fn degraded_interactive_falls_back_to_human() {
-    let (mut runner, _event_rx) = make_auto_runner(vec![], true);
+async fn degraded_with_auto_deny_handler() {
+    let (mut runner, _event_rx) = make_auto_runner(vec![]);
 
     force_degrade(&runner).await;
 
@@ -101,7 +101,6 @@ async fn no_provider_denies_gracefully() {
     let params = AgentLoopParams {
         config: AgentConfig {
             permission_mode: PermissionMode::Auto,
-            interactive: false,
             ..Default::default()
         },
         deps: AgentDeps {

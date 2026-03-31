@@ -19,7 +19,7 @@ pub enum AgentLifecycle {
 #[derive(Debug, Clone)]
 pub struct AgentInfo {
     pub name: String,
-    /// Who spawned this agent (None for root agent and TUI).
+    /// Who spawned this agent (None for root agent).
     pub parent: Option<String>,
     /// Agents spawned by this agent.
     pub children: Vec<String>,

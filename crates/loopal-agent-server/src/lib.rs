@@ -2,7 +2,7 @@
 //!
 //! Activated internally via hidden `--serve` flag (set by parent process).
 //! Runs the agent loop in a dedicated process,
-//! communicating with the TUI (or any IPC client) via JSON-RPC over stdio.
+//! communicating with consumers via JSON-RPC over stdio.
 //!
 //! This is the "Renderer Process" in the Chromium analogy — it owns the Kernel,
 //! LLM providers, tools, and context pipeline.

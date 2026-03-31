@@ -2,7 +2,7 @@
 
 use loopal_protocol::ControlCommand;
 use loopal_protocol::{AgentEvent, AgentEventPayload, UserQuestionResponse};
-use loopal_session::{DisplayMessage, DisplayToolCall, SessionController, ToolCallStatus};
+use loopal_session::{SessionController, SessionMessage, SessionToolCall, ToolCallStatus};
 use loopal_tui::app::App;
 
 use tokio::sync::mpsc;
@@ -47,7 +47,7 @@ fn test_tool_call_without_prior_assistant_message_creates_one() {
         state
             .active_conversation_mut()
             .messages
-            .push(DisplayMessage {
+            .push(SessionMessage {
                 role: "user".to_string(),
                 content: "do something".to_string(),
                 tool_calls: Vec::new(),
@@ -134,10 +134,10 @@ fn test_tool_result_with_multibyte_utf8_no_panic() {
         state
             .active_conversation_mut()
             .messages
-            .push(DisplayMessage {
+            .push(SessionMessage {
                 role: "assistant".to_string(),
                 content: String::new(),
-                tool_calls: vec![DisplayToolCall {
+                tool_calls: vec![SessionToolCall {
                     name: "Read".to_string(),
                     id: "tc-1".to_string(),
                     status: ToolCallStatus::Pending,

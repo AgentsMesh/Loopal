@@ -7,12 +7,12 @@
 use std::time::{Duration, Instant};
 
 use crate::thinking_display::format_thinking_summary;
-use crate::types::{DisplayMessage, PendingPermission, PendingQuestion};
+use crate::types::{PendingPermission, PendingQuestion, SessionMessage};
 
 /// Per-agent conversation state — everything needed to render one agent's chat view.
 #[derive(Debug, Default)]
 pub struct AgentConversation {
-    pub messages: Vec<DisplayMessage>,
+    pub messages: Vec<SessionMessage>,
     pub streaming_text: String,
     pub streaming_thinking: String,
     pub thinking_active: bool,
@@ -67,13 +67,13 @@ impl AgentConversation {
         self.last_turn_duration = Duration::ZERO;
     }
 
-    /// Flush buffered streaming text and thinking into DisplayMessages.
+    /// Flush buffered streaming text and thinking into SessionMessages.
     pub fn flush_streaming(&mut self) {
         if !self.streaming_thinking.is_empty() {
             let thinking = std::mem::take(&mut self.streaming_thinking);
             let token_est = thinking.len() as u32 / 4;
             let summary = format_thinking_summary(&thinking, token_est);
-            self.messages.push(DisplayMessage {
+            self.messages.push(SessionMessage {
                 role: "thinking".to_string(),
                 content: summary,
                 tool_calls: Vec::new(),
@@ -91,7 +91,7 @@ impl AgentConversation {
                 last.content.push_str(&text);
                 return;
             }
-            self.messages.push(DisplayMessage {
+            self.messages.push(SessionMessage {
                 role: "assistant".to_string(),
                 content: text,
                 tool_calls: Vec::new(),

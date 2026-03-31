@@ -1,6 +1,5 @@
 use loopal_message::{ContentBlock, Message, MessageRole};
-use loopal_runtime::projection::project_messages;
-use loopal_session::ToolCallStatus;
+use loopal_protocol::projection::project_messages;
 
 #[test]
 fn project_attempt_completion_promoted_to_assistant_message() {
@@ -27,7 +26,7 @@ fn project_attempt_completion_promoted_to_assistant_message() {
     let display = project_messages(&[assistant_msg, user_msg]);
     // ToolCall should be status "success" but NO result stored
     assert_eq!(display[0].tool_calls[0].name, "AttemptCompletion");
-    assert_eq!(display[0].tool_calls[0].status, ToolCallStatus::Success);
+    assert!(!display[0].tool_calls[0].is_error);
     assert!(
         display[0].tool_calls[0].result.is_none(),
         "AttemptCompletion should not store result in tool call"
@@ -64,7 +63,7 @@ fn project_attempt_completion_error_not_promoted() {
     let display = project_messages(&[assistant_msg, user_msg]);
     // Error should NOT be promoted — treated as normal tool error
     assert_eq!(display.len(), 1);
-    assert_eq!(display[0].tool_calls[0].status, ToolCallStatus::Error);
+    assert!(display[0].tool_calls[0].is_error);
     assert!(display[0].tool_calls[0].result.is_some());
 }
 

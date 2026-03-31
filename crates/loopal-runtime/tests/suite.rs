@@ -15,10 +15,6 @@ mod loop_detector_test;
 mod mode_test;
 #[path = "suite/permission_test.rs"]
 mod permission_test;
-#[path = "suite/projection_edge_test.rs"]
-mod projection_edge_test;
-#[path = "suite/projection_test.rs"]
-mod projection_test;
 #[path = "suite/rewind_test.rs"]
 mod rewind_test;
 #[path = "suite/session_manager_test.rs"]

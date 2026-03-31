@@ -65,12 +65,12 @@ impl MemoryProcessor for ServerMemoryProcessor {
 
 /// Build the optional memory channel + observer sidebar.
 pub fn build_memory_channel(
-    interactive: bool,
+    long_lived: bool,
     settings: &loopal_config::Settings,
     shared: &Arc<AgentShared>,
     model: &str,
 ) -> Option<Arc<dyn MemoryChannel>> {
-    if !(interactive && settings.memory.enabled) {
+    if !(long_lived && settings.memory.enabled) {
         return None;
     }
     let (tx, rx) = mpsc::channel::<String>(64);

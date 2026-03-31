@@ -1,6 +1,6 @@
 //! Hub UI client — unified interface for UI clients to communicate with Hub.
 //!
-//! Encapsulates all `hub/*` IPC operations. Both TUI (via SessionController)
+//! Encapsulates all `hub/*` IPC operations. Both SessionController
 //! and ACP (via AcpAdapter) use this instead of calling `send_request` directly.
 
 use std::sync::Arc;
@@ -11,7 +11,7 @@ use loopal_protocol::{ControlCommand, Envelope, MessageSource, UserContent, User
 use serde_json::Value;
 use tracing::warn;
 
-/// Client handle for UI clients (TUI, ACP) to communicate with the Hub.
+/// Client handle for UI clients to communicate with the Hub.
 ///
 /// Wraps a Hub `Connection` and provides typed methods for all `hub/*` operations.
 /// All Hub protocol knowledge (method names, parameter shapes) is centralized here.

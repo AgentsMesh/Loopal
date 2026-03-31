@@ -1,6 +1,6 @@
 //! UI Session — client-side handle for a UI client connected to Hub.
 //!
-//! Encapsulates all the wiring needed to connect a UI client (TUI, ACP)
+//! Encapsulates all the wiring needed to connect a UI client
 //! to the Hub: connection, event subscription, permission relay.
 //! Created via `UiSession::connect()` — one line replaces all bootstrap glue.
 

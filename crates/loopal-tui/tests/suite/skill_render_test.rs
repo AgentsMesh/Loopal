@@ -1,10 +1,10 @@
 /// Skill invocation rendering tests: collapsed display, CJK truncation, args handling.
 use loopal_protocol::SkillInvocation;
-use loopal_session::types::DisplayMessage;
+use loopal_session::types::SessionMessage;
 use loopal_tui::views::progress::message_to_lines;
 
-fn skill_msg(name: &str, args: &str) -> DisplayMessage {
-    DisplayMessage {
+fn skill_msg(name: &str, args: &str) -> SessionMessage {
+    SessionMessage {
         role: "user".to_string(),
         content: "expanded body ignored".to_string(),
         tool_calls: Vec::new(),
@@ -111,7 +111,7 @@ fn test_skill_long_ascii_args_truncated() {
 
 #[test]
 fn test_non_skill_user_message_unchanged() {
-    let m = DisplayMessage {
+    let m = SessionMessage {
         role: "user".to_string(),
         content: "hello world".to_string(),
         tool_calls: Vec::new(),

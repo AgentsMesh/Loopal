@@ -1,27 +1,26 @@
-//! Projection: convert `Vec<Message>` → `Vec<DisplayMessage>`.
+//! Projection: convert `Vec<Message>` → `Vec<ProjectedMessage>`.
 //!
-//! Used when restoring a session so the TUI can display historical messages
+//! Used when restoring a session so consumers can render historical messages
 //! without replaying the full agent event stream.
 //!
-//! Must mirror the display semantics of `event_handler.rs` — in particular,
 //! AttemptCompletion tool results are promoted to assistant messages rather
 //! than shown as tool output.
 
 use std::collections::HashMap;
 
 use loopal_message::{ContentBlock, Message, MessageRole};
-use loopal_session::types::{DisplayMessage, DisplayToolCall, ToolCallStatus};
 
-/// Project a slice of Messages into DisplayMessages suitable for TUI rendering.
-pub fn project_messages(messages: &[Message]) -> Vec<DisplayMessage> {
-    let mut display: Vec<DisplayMessage> = Vec::new();
-    // Maps tool_use_id → (display_index, tool_call_index, tool_name)
+use crate::projected::{ProjectedMessage, ProjectedToolCall};
+
+/// Project a slice of Messages into ProjectedMessages.
+pub fn project_messages(messages: &[Message]) -> Vec<ProjectedMessage> {
+    let mut output: Vec<ProjectedMessage> = Vec::new();
     let mut tool_index: HashMap<String, (usize, usize, String)> = HashMap::new();
 
     for msg in messages {
         let role = role_str(&msg.role);
         let mut content_parts: Vec<String> = Vec::new();
-        let mut tool_calls: Vec<DisplayToolCall> = Vec::new();
+        let mut tool_calls: Vec<ProjectedToolCall> = Vec::new();
         let mut image_count: usize = 0;
 
         for block in &msg.content {
@@ -29,20 +28,16 @@ pub fn project_messages(messages: &[Message]) -> Vec<DisplayMessage> {
                 ContentBlock::Text { text } => content_parts.push(text.clone()),
                 ContentBlock::ToolUse { id, name, input } => {
                     let tc_idx = tool_calls.len();
-                    tool_calls.push(DisplayToolCall {
+                    tool_calls.push(ProjectedToolCall {
                         id: id.clone(),
                         name: name.clone(),
-                        status: ToolCallStatus::Pending,
                         summary: format!("{}({})", name, summarize_input(input)),
                         result: None,
-                        tool_input: Some(input.clone()),
-                        batch_id: None,
-                        started_at: None,
-                        duration_ms: None,
-                        progress_tail: None,
+                        is_error: false,
+                        input: Some(input.clone()),
                         metadata: None,
                     });
-                    tool_index.insert(id.clone(), (display.len(), tc_idx, name.clone()));
+                    tool_index.insert(id.clone(), (output.len(), tc_idx, name.clone()));
                 }
                 ContentBlock::ToolResult {
                     tool_use_id,
@@ -52,7 +47,7 @@ pub fn project_messages(messages: &[Message]) -> Vec<DisplayMessage> {
                     ..
                 } => {
                     back_patch(
-                        &mut display,
+                        &mut output,
                         &tool_index,
                         tool_use_id,
                         content,
@@ -66,17 +61,13 @@ pub fn project_messages(messages: &[Message]) -> Vec<DisplayMessage> {
                 }
                 ContentBlock::Thinking { .. } => {}
                 ContentBlock::ServerToolUse { id, name, input } => {
-                    tool_calls.push(DisplayToolCall {
+                    tool_calls.push(ProjectedToolCall {
                         id: id.clone(),
                         name: name.clone(),
-                        status: ToolCallStatus::Success,
                         summary: format!("{}({})", name, summarize_input(input)),
                         result: None,
-                        tool_input: Some(input.clone()),
-                        batch_id: None,
-                        started_at: None,
-                        duration_ms: None,
-                        progress_tail: None,
+                        is_error: false,
+                        input: Some(input.clone()),
                         metadata: None,
                     });
                 }
@@ -85,11 +76,8 @@ pub fn project_messages(messages: &[Message]) -> Vec<DisplayMessage> {
                     content,
                     ..
                 } => {
-                    // ServerToolUse and ServerToolResult are in the same message,
-                    // so the current message hasn't been pushed to `display` yet.
-                    // Patch the in-flight `tool_calls` vec directly.
                     if let Some(tc) = tool_calls.iter_mut().rev().find(|tc| tc.id == *tool_use_id) {
-                        tc.result = Some(loopal_session::format_server_tool_content(content));
+                        tc.result = Some(format_server_tool_content(content));
                     }
                 }
             }
@@ -99,23 +87,20 @@ pub fn project_messages(messages: &[Message]) -> Vec<DisplayMessage> {
         if content.is_empty() && tool_calls.is_empty() {
             continue;
         }
-        display.push(DisplayMessage {
+        output.push(ProjectedMessage {
             role,
             content,
             tool_calls,
             image_count,
-            skill_info: None,
         });
     }
 
-    display
+    output
 }
 
-/// Back-patch a ToolResult into the matching ToolUse's DisplayToolCall.
-/// AttemptCompletion results are promoted to a standalone assistant message
-/// (matching event_handler.rs behavior).
+/// Back-patch a ToolResult into the matching ProjectedToolCall.
 fn back_patch(
-    display: &mut Vec<DisplayMessage>,
+    output: &mut Vec<ProjectedMessage>,
     index: &HashMap<String, (usize, usize, String)>,
     tool_use_id: &str,
     result: &str,
@@ -125,26 +110,20 @@ fn back_patch(
     let Some(&(di, ti, ref _name)) = index.get(tool_use_id) else {
         return;
     };
-    if let Some(msg) = display.get_mut(di)
+    if let Some(msg) = output.get_mut(di)
         && let Some(tc) = msg.tool_calls.get_mut(ti)
     {
-        tc.status = if is_error {
-            ToolCallStatus::Error
-        } else {
-            ToolCallStatus::Success
-        };
+        tc.is_error = is_error;
         if !is_completion {
-            tc.result = Some(truncate_for_display(result));
+            tc.result = Some(truncate_result(result));
         }
     }
-    // Promote AttemptCompletion to an assistant message
     if is_completion {
-        display.push(DisplayMessage {
+        output.push(ProjectedMessage {
             role: "assistant".to_string(),
             content: result.to_string(),
             tool_calls: Vec::new(),
             image_count: 0,
-            skill_info: None,
         });
     }
 }
@@ -158,7 +137,7 @@ fn summarize_input(input: &serde_json::Value) -> String {
     }
 }
 
-fn truncate_for_display(s: &str) -> String {
+fn truncate_result(s: &str) -> String {
     const MAX_LINES: usize = 200;
     const MAX_BYTES: usize = 10_000;
     let line_limited: String = s.lines().take(MAX_LINES).collect::<Vec<_>>().join("\n");
@@ -179,4 +158,12 @@ fn role_str(role: &MessageRole) -> String {
         MessageRole::Assistant => "assistant".to_string(),
         MessageRole::System => "system".to_string(),
     }
+}
+
+/// Format server tool content for projection (simplified from session layer).
+fn format_server_tool_content(content: &serde_json::Value) -> String {
+    if let Some(text) = content.get("text").and_then(|v| v.as_str()) {
+        return text.to_string();
+    }
+    content.to_string()
 }

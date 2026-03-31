@@ -7,17 +7,16 @@ use loopal_tool_api::PermissionDecision;
 
 use super::permission_handler::PermissionHandler;
 
-/// Permission handler that forwards requests via event channel.
+/// Permission handler that relays requests to an external consumer via event channel.
 ///
-/// Used by `UnifiedFrontend` in the test harness when `PermissionMode::Supervised`
-/// is active. The paired `SessionController` on the test side responds via
-/// a channel to approve/deny tool executions.
-pub struct TuiPermissionHandler {
+/// Used by `UnifiedFrontend` for root agents where permission decisions are
+/// made by an external consumer .
+pub struct RelayPermissionHandler {
     event_tx: mpsc::Sender<AgentEvent>,
     permission_rx: Mutex<mpsc::Receiver<bool>>,
 }
 
-impl TuiPermissionHandler {
+impl RelayPermissionHandler {
     pub fn new(event_tx: mpsc::Sender<AgentEvent>, permission_rx: mpsc::Receiver<bool>) -> Self {
         Self {
             event_tx,
@@ -27,7 +26,7 @@ impl TuiPermissionHandler {
 }
 
 #[async_trait]
-impl PermissionHandler for TuiPermissionHandler {
+impl PermissionHandler for RelayPermissionHandler {
     async fn decide(&self, id: &str, name: &str, input: &serde_json::Value) -> PermissionDecision {
         let event = AgentEvent {
             agent_name: None,

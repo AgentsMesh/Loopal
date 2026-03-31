@@ -107,7 +107,7 @@ async fn test_rewind_on_idle_opens_sub_page() {
         state
             .active_conversation_mut()
             .messages
-            .push(loopal_session::DisplayMessage {
+            .push(loopal_session::SessionMessage {
                 role: "user".into(),
                 content: "hello".into(),
                 tool_calls: Vec::new(),

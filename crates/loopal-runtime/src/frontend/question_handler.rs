@@ -4,19 +4,19 @@ use tracing::warn;
 
 use loopal_protocol::{AgentEvent, AgentEventPayload, Question, UserQuestionResponse};
 
-/// Handler for AskUser questions — sends question to TUI, waits for answer.
+/// Handler for AskUser questions — relays to an external consumer, waits for answer.
 #[async_trait]
 pub trait QuestionHandler: Send + Sync {
     async fn ask(&self, questions: Vec<Question>) -> Vec<String>;
 }
 
-/// TUI-backed question handler: emits event, waits on response channel.
-pub struct TuiQuestionHandler {
+/// Relay question handler: emits event, waits on response channel.
+pub struct RelayQuestionHandler {
     event_tx: mpsc::Sender<AgentEvent>,
     response_rx: Mutex<mpsc::Receiver<UserQuestionResponse>>,
 }
 
-impl TuiQuestionHandler {
+impl RelayQuestionHandler {
     pub fn new(
         event_tx: mpsc::Sender<AgentEvent>,
         response_rx: mpsc::Receiver<UserQuestionResponse>,
@@ -29,7 +29,7 @@ impl TuiQuestionHandler {
 }
 
 #[async_trait]
-impl QuestionHandler for TuiQuestionHandler {
+impl QuestionHandler for RelayQuestionHandler {
     async fn ask(&self, questions: Vec<Question>) -> Vec<String> {
         let id = uuid::Uuid::new_v4().to_string();
         let event = AgentEvent::root(AgentEventPayload::UserQuestionRequest { id, questions });

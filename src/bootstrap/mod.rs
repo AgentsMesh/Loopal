@@ -7,6 +7,7 @@ use loopal_config::load_config;
 use crate::cli::Cli;
 
 mod acp;
+mod headless;
 mod hub_bootstrap;
 mod multiprocess;
 mod sub_agent_resume;
@@ -36,6 +37,10 @@ pub async fn run() -> anyhow::Result<()> {
             return loopal_agent_server::run_agent_server_with_mock(&path).await;
         }
         return loopal_agent_server::run_agent_server().await;
+    }
+
+    if cli.headless {
+        return headless::run(&cli, &cwd, &config).await;
     }
 
     // Worktree isolation: create worktree before agent starts, clean up after.

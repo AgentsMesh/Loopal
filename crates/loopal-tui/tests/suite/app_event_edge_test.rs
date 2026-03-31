@@ -2,7 +2,7 @@
 
 use loopal_protocol::ControlCommand;
 use loopal_protocol::{AgentEvent, AgentEventPayload, UserQuestionResponse};
-use loopal_session::{DisplayMessage, DisplayToolCall, SessionController, ToolCallStatus};
+use loopal_session::{SessionController, SessionMessage, SessionToolCall, ToolCallStatus};
 use loopal_tui::app::App;
 
 use tokio::sync::mpsc;
@@ -82,7 +82,7 @@ fn test_flush_streaming_new_message_when_last_is_not_assistant() {
     {
         let mut state = app.session.lock();
         let conv = state.active_conversation_mut();
-        conv.messages.push(DisplayMessage {
+        conv.messages.push(SessionMessage {
             role: "user".to_string(),
             content: "hi".to_string(),
             tool_calls: Vec::new(),
@@ -107,10 +107,10 @@ fn test_flush_streaming_new_message_when_assistant_has_tool_calls() {
     {
         let mut state = app.session.lock();
         let conv = state.active_conversation_mut();
-        conv.messages.push(DisplayMessage {
+        conv.messages.push(SessionMessage {
             role: "assistant".to_string(),
             content: "let me do that".to_string(),
-            tool_calls: vec![DisplayToolCall {
+            tool_calls: vec![SessionToolCall {
                 name: "bash".to_string(),
                 id: String::new(),
                 status: ToolCallStatus::Success,

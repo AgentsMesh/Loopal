@@ -14,3 +14,4 @@
 /bazel-*
 .bazel_cache/
 
+logs/

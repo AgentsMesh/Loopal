@@ -1,7 +1,7 @@
 //! Core channel wiring logic — mirrors `bootstrap.rs:75-186`.
 //!
 //! When `permission_mode == Bypass`, uses `AutoDenyHandler` (no channel needed).
-//! Otherwise, uses `TuiPermissionHandler` with a real permission channel so that
+//! Otherwise, uses `RelayPermissionHandler` with a real permission channel so that
 //! `SessionController.approve_permission()` flows through to the agent loop.
 
 use std::sync::Arc;
@@ -17,7 +17,9 @@ use loopal_protocol::{AgentEvent, ControlCommand, Envelope, UserQuestionResponse
 use loopal_provider_api::Provider;
 use loopal_runtime::agent_loop::AgentLoopRunner;
 use loopal_runtime::frontend::PermissionHandler;
-use loopal_runtime::frontend::{AutoCancelQuestionHandler, AutoDenyHandler, TuiPermissionHandler};
+use loopal_runtime::frontend::{
+    AutoCancelQuestionHandler, AutoDenyHandler, RelayPermissionHandler,
+};
 use loopal_runtime::{AgentLoopParams, UnifiedFrontend};
 use loopal_session::SessionController;
 use loopal_tool_api::PermissionMode;
@@ -44,7 +46,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         if builder.permission_mode == PermissionMode::Bypass {
             Box::new(AutoDenyHandler)
         } else {
-            Box::new(TuiPermissionHandler::new(event_tx.clone(), permission_rx))
+            Box::new(RelayPermissionHandler::new(event_tx.clone(), permission_rx))
         };
 
     let frontend = Arc::new(UnifiedFrontend::new(
@@ -134,7 +136,6 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
             permission_mode: builder.permission_mode,
             max_turns: builder.max_turns,
             tool_filter: builder.tool_filter,
-            interactive: builder.interactive,
             thinking_config: builder.thinking_config,
             context_tokens_cap: 200_000,
         },

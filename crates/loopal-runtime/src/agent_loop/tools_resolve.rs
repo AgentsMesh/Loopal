@@ -43,14 +43,11 @@ impl AgentLoopRunner {
     ) -> loopal_error::Result<()> {
         let classifier = self.params.auto_classifier.as_ref().unwrap();
 
-        // Degraded: fall back to human (interactive) or deny all (headless).
+        // Degraded: fall back to the frontend's permission handler.
+        // The consumer determines the response: TUI prompts a human,
+        // headless auto-approves, sub-agents auto-deny.
         if classifier.is_degraded() {
-            if self.params.config.interactive {
-                return self.ask_human_sequential(approved, denied, pending).await;
-            }
-            return self
-                .deny_all(denied, pending, "Auto-mode degraded (non-interactive)")
-                .await;
+            return self.ask_human_sequential(approved, denied, pending).await;
         }
 
         let context = loopal_auto_mode::prompt::build_recent_context(self.params.store.messages());

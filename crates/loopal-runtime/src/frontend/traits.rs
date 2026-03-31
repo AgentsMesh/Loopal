@@ -16,14 +16,14 @@ use loopal_tool_api::PermissionDecision;
 /// ## Emission semantics
 ///
 /// `emit()` behaviour depends on the agent role:
-/// - **Root agent**: propagates errors (TUI disconnect is fatal).
+/// - **Root agent**: propagates errors (consumer disconnect is fatal).
 /// - **Sub-agent**: best-effort — silently drops events if the parent
 ///   channel is closed, so that a dying parent does not crash children.
 ///
 /// Callers should NOT rely on `emit()` failures for control flow.
 #[async_trait]
 pub trait AgentFrontend: Send + Sync {
-    /// Emit a payload to the observer (TUI or parent agent).
+    /// Emit a payload to the observer (consumer or parent agent).
     ///
     /// Best-effort for sub-agents: may silently succeed even if the
     /// event was not delivered. See trait-level documentation.
@@ -50,12 +50,12 @@ pub trait AgentFrontend: Send + Sync {
     /// Returns raw `Envelope`s preserving full source metadata.
     /// Called between tool executions and before sub-agent exit to
     /// prevent message loss. Default returns empty — root agent uses
-    /// TUI Inbox instead.
+    /// consumer inbox instead.
     async fn drain_pending(&self) -> Vec<Envelope> {
         Vec::new()
     }
 
-    /// Ask the user questions via the TUI (AskUser tool interception).
+    /// Ask the user questions via the frontend (AskUser tool interception).
     /// Default returns "(not supported)" for sub-agents.
     async fn ask_user(&self, _questions: Vec<Question>) -> Vec<String> {
         vec!["(not supported)".into()]
@@ -74,7 +74,7 @@ pub trait AgentFrontend: Send + Sync {
 /// Lightweight, `Send + Sync` event emitter for parallel tool execution.
 ///
 /// Best-effort: errors are logged but not propagated, since tool tasks
-/// may outlive the TUI or parent agent.
+/// may outlive the consumer or parent agent.
 #[async_trait]
 pub trait EventEmitter: Send + Sync {
     /// Emit a payload (best-effort in spawned tasks).

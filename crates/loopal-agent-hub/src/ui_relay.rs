@@ -1,7 +1,7 @@
 //! UI relay — races permission/question requests across all UI clients.
 //!
 //! When an agent requests permission, the Hub broadcasts the request to ALL
-//! registered UI clients (TUI, ACP, etc.) concurrently. The first response
+//! registered UI clients  concurrently. The first response
 //! wins — subsequent responses are discarded.
 
 use std::sync::Arc;

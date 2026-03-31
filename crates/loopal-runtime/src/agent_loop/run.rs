@@ -1,6 +1,12 @@
 //! Outer loop: user-interaction granularity.
 //!
-//! Extracted from runner.rs to keep files under 200 lines.
+//! The agent loop runs turns until:
+//! - `max_turns` is reached
+//! - `wait_for_input` returns None (frontend disconnected / channel closed)
+//! - The agent encounters an unrecoverable error
+//!
+//! The loop always waits for input between turns. The caller (headless,
+//! eval harness) controls lifetime by closing the input channel when done.
 
 use loopal_error::{AgentOutput, LoopalError, Result, TerminateReason};
 use loopal_protocol::AgentEventPayload;
@@ -16,6 +22,11 @@ impl AgentLoopRunner {
     pub(super) async fn run_loop(&mut self) -> Result<AgentOutput> {
         let mut last_output = String::new();
         let mut server_block_retry = false;
+        // If the store already has messages, we're processing a pre-loaded prompt.
+        // After completing all turns for that prompt, exit instead of waiting for
+        // more input. This is a data-flow decision (not UI): the initial message
+        // batch is the complete input; there is no subsequent producer.
+        let initial_prompt = !self.params.store.is_empty();
         loop {
             info!(
                 turn = self.turn_count,
@@ -24,12 +35,9 @@ impl AgentLoopRunner {
             );
 
             if self.params.store.is_empty() {
-                if !self.params.config.interactive {
-                    break;
-                }
                 match self.wait_for_input().await? {
                     Some(WaitResult::MessageAdded) => {
-                        self.interrupt.take(); // clear stale interrupt from IPC
+                        self.interrupt.take();
                         self.notify_observers_user_input();
                     }
                     None => break,
@@ -61,7 +69,7 @@ impl AgentLoopRunner {
                         match self.wait_for_input().await? {
                             Some(WaitResult::MessageAdded) => {
                                 self.turn_count += 1;
-                                self.interrupt.take(); // clear stale interrupt from IPC
+                                self.interrupt.take();
                                 self.notify_observers_user_input();
                                 continue;
                             }
@@ -69,9 +77,6 @@ impl AgentLoopRunner {
                         }
                     }
 
-                    if !self.params.config.interactive {
-                        break;
-                    }
                     if self.turn_count >= self.params.config.max_turns {
                         self.emit(AgentEventPayload::MaxTurnsReached {
                             turns: self.turn_count,
@@ -82,18 +87,22 @@ impl AgentLoopRunner {
                             terminate_reason: TerminateReason::MaxTurns,
                         });
                     }
+
+                    // Pre-loaded prompt fully processed — exit without waiting.
+                    if initial_prompt {
+                        break;
+                    }
+
                     match self.wait_for_input().await? {
                         Some(WaitResult::MessageAdded) => {
                             self.turn_count += 1;
-                            self.interrupt.take(); // clear stale interrupt from IPC
+                            self.interrupt.take();
                             self.notify_observers_user_input();
                         }
                         None => break,
                     }
                 }
                 Err(e) => {
-                    // Defensive: if API rejects code_execution server blocks,
-                    // condense them all and retry immediately (once).
                     if !server_block_retry && is_server_block_error(&e) {
                         server_block_retry = true;
                         info!("condensing server blocks after API rejection, retrying");
@@ -106,14 +115,14 @@ impl AgentLoopRunner {
                         match self.wait_for_input().await? {
                             Some(WaitResult::MessageAdded) => {
                                 self.turn_count += 1;
-                                self.interrupt.take(); // clear stale interrupt from IPC
+                                self.interrupt.take();
                                 self.notify_observers_user_input();
                                 continue;
                             }
                             None => break,
                         }
                     }
-                    if !self.params.config.interactive {
+                    if initial_prompt {
                         return Ok(AgentOutput {
                             result: last_output,
                             terminate_reason: TerminateReason::Error,
@@ -137,32 +146,23 @@ impl AgentLoopRunner {
         }
 
         Ok(AgentOutput {
-            result: if self.params.config.interactive {
-                String::new()
-            } else {
-                last_output
-            },
+            result: last_output,
             terminate_reason: TerminateReason::Goal,
         })
     }
 
-    /// Notify all observers that the user sent new input.
     fn notify_observers_user_input(&mut self) {
         for obs in &mut self.observers {
             obs.on_user_input();
         }
     }
 
-    /// Emit Interrupted event to TUI. Signal is already consumed by `take()`.
     async fn emit_interrupted(&mut self) -> Result<()> {
         info!("agent interrupted by user");
         self.emit(AgentEventPayload::Interrupted).await
     }
 }
 
-/// Check if an error is caused by API rejecting server tool blocks
-/// (code_execution / web_search). This happens when the API can't validate
-/// server blocks in the conversation history for various reasons.
 fn is_server_block_error(e: &LoopalError) -> bool {
     let msg = e.to_string();
     msg.contains("code_execution")

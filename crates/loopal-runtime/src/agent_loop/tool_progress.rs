@@ -46,7 +46,7 @@ pub fn maybe_spawn_progress(
             interval.tick().await;
             let elapsed_ms = start.elapsed().as_millis() as u64;
             // output_tail carries only real stdout content (time info is
-            // rendered independently by the TUI from started_at/tool_input).
+            // rendered independently by the consumer from started_at/tool_input).
             let output_tail = match &tail {
                 Some(t) => t.snapshot(),
                 None => String::new(),

@@ -28,10 +28,18 @@ async fn test_clear_command() {
     let calls = scenarios::n_turn(&["First response.", "After clear."]);
     let inner = HarnessBuilder::new()
         .calls(calls)
-        .interactive(true)
+        .messages(vec![])
         .build_spawned()
         .await;
     let mut harness = wrap_tui(inner);
+    // Drain initial AwaitingInput (store empty, agent waits for first message)
+    let _ = harness.collect_until_idle().await;
+    harness
+        .inner
+        .mailbox_tx
+        .send(Envelope::new(MessageSource::Human, "main", "hello"))
+        .await
+        .unwrap();
 
     // Collect first turn
     let ev1 = harness.collect_until_idle().await;
@@ -58,10 +66,18 @@ async fn test_compact_command() {
     let calls = scenarios::two_turn("First.", "After compact.");
     let inner = HarnessBuilder::new()
         .calls(calls)
-        .interactive(true)
+        .messages(vec![])
         .build_spawned()
         .await;
     let mut harness = wrap_tui(inner);
+    // Drain initial AwaitingInput (store empty, agent waits for first message)
+    let _ = harness.collect_until_idle().await;
+    harness
+        .inner
+        .mailbox_tx
+        .send(Envelope::new(MessageSource::Human, "main", "hello"))
+        .await
+        .unwrap();
 
     let _ = harness.collect_until_idle().await;
 
@@ -85,10 +101,18 @@ async fn test_thinking_switch() {
     let calls = scenarios::two_turn("Before switch.", "After switch.");
     let inner = HarnessBuilder::new()
         .calls(calls)
-        .interactive(true)
+        .messages(vec![])
         .build_spawned()
         .await;
     let mut harness = wrap_tui(inner);
+    // Drain initial AwaitingInput (store empty, agent waits for first message)
+    let _ = harness.collect_until_idle().await;
+    harness
+        .inner
+        .mailbox_tx
+        .send(Envelope::new(MessageSource::Human, "main", "hello"))
+        .await
+        .unwrap();
 
     let _ = harness.collect_until_idle().await;
 
@@ -134,10 +158,18 @@ async fn test_rewind_command() {
     let calls = scenarios::n_turn(&["Turn 1.", "Turn 2.", "Turn 3."]);
     let inner = HarnessBuilder::new()
         .calls(calls)
-        .interactive(true)
+        .messages(vec![])
         .build_spawned()
         .await;
     let mut harness = wrap_tui(inner);
+    // Drain initial AwaitingInput (store empty, agent waits for first message)
+    let _ = harness.collect_until_idle().await;
+    harness
+        .inner
+        .mailbox_tx
+        .send(Envelope::new(MessageSource::Human, "main", "hello"))
+        .await
+        .unwrap();
 
     // Complete first turn
     let _ = harness.collect_until_idle().await;

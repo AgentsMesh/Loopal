@@ -76,10 +76,18 @@ async fn test_rapid_consecutive_inputs() {
     ];
     let inner = HarnessBuilder::new()
         .calls(calls)
-        .interactive(true)
+        .messages(vec![])
         .build_spawned()
         .await;
     let mut harness = wrap_tui(inner);
+    // Drain initial AwaitingInput (store empty, agent waits for first message)
+    let _ = harness.collect_until_idle().await;
+    harness
+        .inner
+        .mailbox_tx
+        .send(Envelope::new(MessageSource::Human, "main", "hello"))
+        .await
+        .unwrap();
 
     // First turn (initial message from builder)
     let ev1 = harness.collect_until_idle().await;

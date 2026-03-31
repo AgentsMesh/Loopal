@@ -4,7 +4,7 @@
 /// Supports windowed access to avoid full-clone of the entire history.
 use ratatui::prelude::*;
 
-use loopal_session::types::DisplayMessage;
+use loopal_session::types::SessionMessage;
 
 use super::message_lines::message_to_lines;
 
@@ -12,7 +12,7 @@ use super::message_lines::message_to_lines;
 pub struct LineCache {
     /// Cached lines from fully-committed messages.
     lines: Vec<Line<'static>>,
-    /// Number of DisplayMessages that have been cached.
+    /// Number of SessionMessages that have been cached.
     cached_count: usize,
     /// Line index where the last cached message starts.
     last_msg_start: usize,
@@ -34,7 +34,7 @@ impl LineCache {
     }
 
     /// Update the cache and return total line count.
-    pub fn update(&mut self, messages: &[DisplayMessage], width: u16) -> usize {
+    pub fn update(&mut self, messages: &[SessionMessage], width: u16) -> usize {
         let msg_count = messages.len();
 
         // Width changed (terminal resize) — full rebuild
@@ -90,8 +90,8 @@ impl LineCache {
     }
 }
 
-/// Cheap fingerprint of a DisplayMessage capturing all mutable parts.
-fn fingerprint(msg: &DisplayMessage) -> u64 {
+/// Cheap fingerprint of a SessionMessage capturing all mutable parts.
+fn fingerprint(msg: &SessionMessage) -> u64 {
     let mut h: u64 = 0xcbf29ce484222325;
     h = mix(h, msg.content.len() as u64);
     h = mix(h, msg.tool_calls.len() as u64);

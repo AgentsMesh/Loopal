@@ -1,12 +1,12 @@
 /// Welcome banner rendering: ASCII art logo + slogan + model/path info.
 use ratatui::prelude::*;
 
-use loopal_session::types::DisplayMessage;
+use loopal_session::types::SessionMessage;
 
 /// Render the welcome banner.
 ///
 /// Content format: `"model\npath"` (two lines separated by newline).
-pub fn render_welcome(lines: &mut Vec<Line<'static>>, msg: &DisplayMessage) {
+pub fn render_welcome(lines: &mut Vec<Line<'static>>, msg: &SessionMessage) {
     let mut parts = msg.content.splitn(2, '\n');
     let model = parts.next().unwrap_or("");
     let path = parts.next().unwrap_or("");

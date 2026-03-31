@@ -18,7 +18,7 @@ use tokio::sync::mpsc;
 
 use crate::ipc_emitter::IpcEventEmitter;
 
-/// Agent frontend that communicates with the TUI via IPC.
+/// Agent frontend that communicates with consumers via IPC.
 pub struct IpcFrontend {
     connection: Arc<Connection>,
     incoming_rx: Mutex<mpsc::Receiver<Incoming>>,

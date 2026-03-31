@@ -21,7 +21,8 @@ pub mod types;
 
 pub use agent_conversation::AgentConversation;
 pub use controller::SessionController;
+pub use session_display::into_session_message;
 pub use state::{PendingSubAgentRef, ROOT_AGENT};
 pub use types::{
-    DisplayMessage, DisplayToolCall, PendingPermission, PendingQuestion, ToolCallStatus,
+    PendingPermission, PendingQuestion, SessionMessage, SessionToolCall, ToolCallStatus,
 };

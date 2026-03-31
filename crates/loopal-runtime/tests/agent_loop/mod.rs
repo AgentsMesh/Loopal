@@ -7,7 +7,9 @@ use loopal_protocol::AgentEvent;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::Envelope;
 use loopal_runtime::agent_loop::{AgentLoopRunner, cancel::TurnCancel};
-use loopal_runtime::frontend::{AutoCancelQuestionHandler, AutoDenyHandler, TuiPermissionHandler};
+use loopal_runtime::frontend::{
+    AutoCancelQuestionHandler, AutoDenyHandler, RelayPermissionHandler,
+};
 use loopal_runtime::{AgentConfig, AgentDeps, AgentLoopParams, InterruptHandle, UnifiedFrontend};
 use loopal_test_support::TestFixture;
 use loopal_tool_api::PermissionMode;
@@ -115,7 +117,7 @@ pub fn make_runner_with_channels() -> (
         mailbox_rx,
         control_rx,
         None,
-        Box::new(TuiPermissionHandler::new(event_tx, permission_rx)),
+        Box::new(RelayPermissionHandler::new(event_tx, permission_rx)),
         Box::new(AutoCancelQuestionHandler),
     ));
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());

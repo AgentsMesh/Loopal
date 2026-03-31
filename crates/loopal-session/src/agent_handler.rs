@@ -14,7 +14,7 @@ use crate::tool_result_handler::{
     ToolResultParams, handle_tool_batch_start, handle_tool_call, handle_tool_progress,
     handle_tool_result,
 };
-use crate::types::{DisplayMessage, PendingPermission, PendingQuestion};
+use crate::types::{PendingPermission, PendingQuestion, SessionMessage};
 
 /// Handle an agent event — writes both observable metrics and conversation state.
 pub(crate) fn apply_agent_event(
@@ -107,7 +107,7 @@ pub(crate) fn apply_agent_event(
         AgentEventPayload::Error { message } => {
             conv.flush_streaming();
             conv.retry_banner = None;
-            conv.messages.push(DisplayMessage {
+            conv.messages.push(SessionMessage {
                 role: "error".into(),
                 content: message,
                 tool_calls: Vec::new(),

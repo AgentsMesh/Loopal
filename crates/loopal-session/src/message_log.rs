@@ -1,6 +1,6 @@
 //! Message log entries for the Observation Plane.
 //!
-//! Captures inter-agent communication for visibility in the TUI.
+//! Captures inter-agent communication for visibility for consumers.
 //! Used both per-agent and in the global message feed.
 
 use std::collections::VecDeque;

@@ -10,6 +10,7 @@ use ratatui::widgets::{Block, Borders, Clear, canvas::Canvas};
 
 use loopal_protocol::AgentStatus;
 use loopal_session::state::AgentViewState;
+use loopal_session::ROOT_AGENT;
 
 use crate::views::unified_status::spinner_frame;
 use layout::abbreviate_model;
@@ -44,14 +45,16 @@ pub fn extract_topology(
     root_status: AgentStatus,
     root_elapsed: Duration,
 ) -> Vec<TopologyNode> {
-    // Filter out finished/errored agents — they are no longer active.
+    // Filter out the root agent (already represented by the virtual "root" node)
+    // and finished/errored agents — they are no longer active.
     let live_agents: IndexMap<&String, &AgentViewState> = agents
         .iter()
-        .filter(|(_, a)| {
-            !matches!(
-                a.observable.status,
-                AgentStatus::Finished | AgentStatus::Error
-            )
+        .filter(|(name, a)| {
+            name.as_str() != ROOT_AGENT
+                && !matches!(
+                    a.observable.status,
+                    AgentStatus::Finished | AgentStatus::Error
+                )
         })
         .collect();
 

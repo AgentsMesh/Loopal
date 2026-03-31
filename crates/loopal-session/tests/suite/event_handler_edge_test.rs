@@ -80,4 +80,3 @@ fn test_tool_result_stores_full_content() {
     assert_eq!(tc.status, ToolCallStatus::Success);
     assert_eq!(tc.result, Some("hello\nworld".into()));
 }
-

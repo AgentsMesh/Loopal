@@ -3,7 +3,7 @@
 
 use crate::agent_input::AgentInput;
 use loopal_error::Result;
-use loopal_protocol::{AgentEventPayload, Envelope, MessageSource};
+use loopal_protocol::{Envelope, MessageSource};
 use tracing::{error, info};
 
 use super::WaitResult;
@@ -11,19 +11,16 @@ use super::message_build::build_user_message;
 use super::runner::AgentLoopRunner;
 
 impl AgentLoopRunner {
-    /// Wait for user input via the frontend. Returns None if disconnected.
+    /// Wait for input from any source. Returns None if all channels closed.
     ///
-    /// Control commands (mode switch, clear, compact, rewind, etc.) are
-    /// handled inline and the wait resumes — only a real user message,
-    /// Hub-injected notification, or a disconnect exits this function.
+    /// Does NOT emit AwaitingInput — that's handled by `run_loop`'s
+    /// state machine via `transition(WaitingForInput)`.
     pub async fn wait_for_input(&mut self) -> Result<Option<WaitResult>> {
-        // Discard any stale interrupt signal from the previous turn.
         let stale = self.interrupt.take();
         if stale {
             info!("cleared stale interrupt before waiting for input");
         }
-        self.emit(AgentEventPayload::AwaitingInput).await?;
-        info!("awaiting user input");
+        info!("awaiting input");
         loop {
             // Select between frontend input and scheduler triggers.
             // Hub-injected notifications (sub-agent completion) arrive via

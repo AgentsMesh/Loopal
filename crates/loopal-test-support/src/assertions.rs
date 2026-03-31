@@ -38,6 +38,22 @@ pub fn assert_has_finished(events: &[AgentEventPayload]) {
     );
 }
 
+/// Assert events contain a terminal event (`AwaitingInput` or `Finished`).
+/// Prompt-driven agents emit `AwaitingInput` before `Finished`, so event
+/// collectors that stop on the first terminal event will see `AwaitingInput`.
+pub fn assert_has_terminal(events: &[AgentEventPayload]) {
+    assert_event_has(
+        events,
+        |e| {
+            matches!(
+                e,
+                AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
+            )
+        },
+        "expected terminal event (Finished or AwaitingInput)",
+    );
+}
+
 /// Assert events contain a `ThinkingStream` payload.
 pub fn assert_has_thinking(events: &[AgentEventPayload]) {
     assert_event_has(

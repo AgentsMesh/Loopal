@@ -20,19 +20,22 @@ async fn test_event_ordering() {
     let usage = evts
         .iter()
         .position(|e| matches!(e, AgentEventPayload::TokenUsage { .. }));
-    let finished = evts
-        .iter()
-        .position(|e| matches!(e, AgentEventPayload::Finished));
+    let terminal = evts.iter().position(|e| {
+        matches!(
+            e,
+            AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
+        )
+    });
 
     assert!(started.is_some(), "should have Started");
     assert!(stream.is_some(), "should have Stream");
-    assert!(finished.is_some(), "should have Finished");
+    assert!(terminal.is_some(), "should have terminal event");
 
     let s = started.unwrap();
     let st = stream.unwrap();
-    let f = finished.unwrap();
+    let t = terminal.unwrap();
     assert!(s < st, "Started({s}) should come before Stream({st})");
-    assert!(st < f, "Stream({st}) should come before Finished({f})");
+    assert!(st < t, "Stream({st}) should come before terminal({t})");
 
     if let Some(u) = usage {
         assert!(st < u, "Stream({st}) should come before TokenUsage({u})");
@@ -103,7 +106,7 @@ async fn test_thinking_stream() {
 
     assertions::assert_has_thinking(&evts);
     assertions::assert_has_stream(&evts);
-    assertions::assert_has_finished(&evts);
+    assertions::assert_has_terminal(&evts);
 
     let streamed = events::extract_texts(&evts);
     assert!(
@@ -117,13 +120,17 @@ async fn test_finished_always_last_meaningful() {
     let mut harness = build_tui_harness(vec![chunks::text_turn("end")], 80, 24).await;
     let evts = harness.collect_until_idle().await;
 
-    // Finished should be at or near the end (terminal event)
-    let finished_pos = evts
-        .iter()
-        .rposition(|e| matches!(e, AgentEventPayload::Finished));
-    assert!(finished_pos.is_some());
-    let last_non_awaiting = evts
-        .iter()
-        .rposition(|e| !matches!(e, AgentEventPayload::AwaitingInput));
-    assert_eq!(finished_pos, last_non_awaiting);
+    // Terminal event (AwaitingInput or Finished) should be at the end
+    let terminal_pos = evts.iter().rposition(|e| {
+        matches!(
+            e,
+            AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
+        )
+    });
+    assert!(terminal_pos.is_some(), "should have terminal event");
+    assert_eq!(
+        terminal_pos.unwrap(),
+        evts.len() - 1,
+        "terminal event should be the last event"
+    );
 }

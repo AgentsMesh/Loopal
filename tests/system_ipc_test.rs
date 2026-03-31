@@ -98,7 +98,10 @@ async fn system_spawn_and_initialize() {
                                 all_texts.push_str(text);
                                 got_stream = true;
                             }
-                            loopal_protocol::AgentEventPayload::Finished => {
+                            // Prompt-driven agents emit AwaitingInput before
+                            // Finished. Either one signals turn completion.
+                            loopal_protocol::AgentEventPayload::AwaitingInput
+                            | loopal_protocol::AgentEventPayload::Finished => {
                                 got_finished = true;
                                 break;
                             }

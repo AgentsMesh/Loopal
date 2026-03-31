@@ -102,8 +102,8 @@ async fn test_max_tokens_with_tools_discards() {
 
     let output = runner.run().await.unwrap();
     assert_eq!(output.result, "read the file.");
-    // Tool was discarded — turn_count stays 0
-    assert_eq!(runner.turn_count, 0);
+    // Tool was discarded — but turn still completes, incrementing turn_count
+    assert_eq!(runner.turn_count, 1);
 }
 
 /// EndTurn → no continuation, normal behavior.

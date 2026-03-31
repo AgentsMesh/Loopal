@@ -42,13 +42,7 @@ pub fn project_messages(messages: &[Message]) -> Vec<ProjectedMessage> {
                     is_error,
                     ..
                 } => {
-                    back_patch(
-                        &mut output,
-                        &tool_index,
-                        tool_use_id,
-                        content,
-                        *is_error,
-                    );
+                    back_patch(&mut output, &tool_index, tool_use_id, content, *is_error);
                 }
                 ContentBlock::Image { .. } => {
                     content_parts.push("[image]".to_string());

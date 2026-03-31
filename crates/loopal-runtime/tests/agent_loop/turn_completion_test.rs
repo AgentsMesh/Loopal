@@ -124,7 +124,7 @@ async fn test_text_only_exits_turn() {
     let output = runner.run().await.unwrap();
     assert_eq!(output.terminate_reason, loopal_error::TerminateReason::Goal);
     assert_eq!(output.result, "all tasks done");
-    assert_eq!(runner.turn_count, 0);
+    assert_eq!(runner.turn_count, 1);
 }
 
 /// LLM tool -> LLM text: two LLM calls inside one run.
@@ -159,6 +159,6 @@ async fn test_tool_then_text_two_llm_calls() {
     let output = runner.run().await.unwrap();
     assert_eq!(output.terminate_reason, loopal_error::TerminateReason::Goal);
     assert_eq!(output.result, "read done");
-    assert_eq!(runner.turn_count, 0);
+    assert_eq!(runner.turn_count, 1);
     let _ = std::fs::remove_file(&tmp);
 }

@@ -133,5 +133,5 @@ async fn test_tool_chain_two_turns() {
     assertions::assert_has_tool_call(&evts, "Read");
     assertions::assert_has_tool_result(&evts, "Read", false);
     assertions::assert_has_stream(&evts);
-    assertions::assert_has_finished(&evts);
+    assertions::assert_has_terminal(&evts);
 }

@@ -21,11 +21,14 @@ async fn child_text_streamed_and_finished() {
     let has_stream = events
         .iter()
         .any(|e| matches!(e, AgentEventPayload::Stream { .. }));
-    let has_finished = events
-        .iter()
-        .any(|e| matches!(e, AgentEventPayload::Finished));
+    let has_terminal = events.iter().any(|e| {
+        matches!(
+            e,
+            AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
+        )
+    });
     assert!(has_stream, "should have Stream event");
-    assert!(has_finished, "should have Finished event");
+    assert!(has_terminal, "should have terminal event");
 
     // Accumulate stream text
     let text: String = events
@@ -61,13 +64,16 @@ async fn child_tool_call_events_visible() {
     let has_tool_result = events
         .iter()
         .any(|e| matches!(e, AgentEventPayload::ToolResult { name, .. } if name == "Glob"));
-    let has_finished = events
-        .iter()
-        .any(|e| matches!(e, AgentEventPayload::Finished));
+    let has_terminal = events.iter().any(|e| {
+        matches!(
+            e,
+            AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
+        )
+    });
 
     assert!(has_tool_call, "should see ToolCall for Glob");
     assert!(has_tool_result, "should see ToolResult for Glob");
-    assert!(has_finished, "should finish");
+    assert!(has_terminal, "should finish");
 }
 
 /// Sub-agent runs multiple tool turns -> all events visible -> final text.
@@ -95,9 +101,10 @@ async fn child_multi_turn_tool_chain() {
     assert!(tool_names.contains(&"Ls"), "should call Ls");
     assert!(tool_names.contains(&"Glob"), "should call Glob");
     assert!(
-        events
-            .iter()
-            .any(|e| matches!(e, AgentEventPayload::Finished)),
+        events.iter().any(|e| matches!(
+            e,
+            AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
+        )),
         "should finish"
     );
 }
@@ -117,7 +124,10 @@ async fn child_finished_no_hang() {
     let events = result.unwrap();
     let last = events.last().expect("should have events");
     assert!(
-        matches!(last, AgentEventPayload::Finished),
-        "last event should be Finished"
+        matches!(
+            last,
+            AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
+        ),
+        "last event should be terminal (Finished or AwaitingInput)"
     );
 }

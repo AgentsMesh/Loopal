@@ -138,7 +138,6 @@ fn project_multi_turn_mixed() {
                 tool_use_id: "t1".into(),
                 content: "main.rs".into(),
                 is_error: false,
-    
                 metadata: None,
             }],
         },

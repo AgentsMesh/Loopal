@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use loopal_error::{AgentOutput, Result};
-use loopal_protocol::{AgentEventPayload, InterruptSignal};
+use loopal_protocol::{AgentEventPayload, AgentStatus, InterruptSignal};
 use loopal_tool_api::ToolContext;
 use tokio::sync::watch;
 use tracing::{Instrument, info, info_span};
@@ -24,6 +24,8 @@ pub struct AgentLoopRunner {
     pub observers: Vec<Box<dyn TurnObserver>>,
     /// Scheduler message receiver — consumed in `wait_for_input()`.
     pub trigger_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
+    /// Explicit agent state — source of truth, propagated via events to Session layer.
+    pub status: AgentStatus,
 }
 
 impl AgentLoopRunner {
@@ -56,6 +58,7 @@ impl AgentLoopRunner {
             interrupt_tx,
             observers: Vec::new(),
             trigger_rx,
+            status: AgentStatus::Starting,
         }
     }
 
@@ -102,6 +105,18 @@ impl AgentLoopRunner {
     /// Send an event payload via the frontend.
     pub async fn emit(&self, payload: AgentEventPayload) -> Result<()> {
         self.params.deps.frontend.emit(payload).await
+    }
+
+    /// Transition to a new agent status and emit the corresponding event.
+    pub(super) async fn transition(&mut self, new_status: AgentStatus) -> Result<()> {
+        self.status = new_status;
+        match new_status {
+            AgentStatus::WaitingForInput => self.emit(AgentEventPayload::AwaitingInput).await,
+            // Started and Finished are emitted by run_instrumented() directly.
+            // Running is implicit (Stream/ToolCall events signal activity).
+            // Error is emitted separately with a message.
+            _ => Ok(()),
+        }
     }
 
     /// Recalculate context budget from current model config.

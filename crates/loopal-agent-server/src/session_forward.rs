@@ -104,6 +104,9 @@ async fn route_request(
         }
         m if m == methods::AGENT_SHUTDOWN.name => {
             session.interrupt.signal();
+            // Also notify the watch channel so recv_input wakes up
+            // when the agent is idle (waiting for input).
+            session.interrupt_tx.send_modify(|v| *v = v.wrapping_add(1));
             let _ = connection
                 .respond(id, serde_json::json!({"ok": true}))
                 .await;

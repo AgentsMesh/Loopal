@@ -164,6 +164,16 @@ impl IntegrationHarness {
             fixture: h.fixture,
         }
     }
+
+    /// Close input channels so the agent exits after processing any pre-loaded
+    /// messages. Call before `runner.run()` for prompt-driven tests.
+    pub fn close_input(&mut self) {
+        // Replace senders with closed channels (drop originals).
+        let (tx, _) = mpsc::channel(1);
+        self.mailbox_tx = tx;
+        let (tx, _) = mpsc::channel(1);
+        self.control_tx = tx;
+    }
 }
 
 /// Harness with `agent_loop` running in a background task.

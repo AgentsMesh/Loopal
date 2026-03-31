@@ -25,9 +25,10 @@ pub async fn bridge_child_events(
                         AgentEventPayload::Stream { text } => {
                             stream_text.push_str(text);
                         }
-                        // Session finished — child server will exit on its own
-                        // for prompt-driven sessions. Just break.
-                        AgentEventPayload::Finished => {
+                        // AwaitingInput = sub-agent finished its prompt and is
+                        // idle. For one-shot sub-agents this is the "done" signal.
+                        AgentEventPayload::AwaitingInput
+                        | AgentEventPayload::Finished => {
                             break;
                         }
                         _ => {}

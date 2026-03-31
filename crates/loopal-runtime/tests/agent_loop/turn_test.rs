@@ -21,7 +21,10 @@ async fn test_turn_text_only_non_interactive() {
             stop_reason: StopReason::EndTurn,
         }),
     ];
-    let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx) = make_runner_with_mock_provider(chunks);
+    let (mut runner, mut event_rx, mbox_tx, ctrl_tx) = make_runner_with_mock_provider(chunks);
+    // Drop senders so recv_input() returns None after the turn completes.
+    drop(mbox_tx);
+    drop(ctrl_tx);
 
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 
@@ -55,7 +58,10 @@ async fn test_turn_tool_then_text_non_interactive() {
             stop_reason: StopReason::EndTurn,
         }),
     ];
-    let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx) = make_runner_with_mock_provider(chunks);
+    let (mut runner, mut event_rx, mbox_tx, ctrl_tx) = make_runner_with_mock_provider(chunks);
+    // Drop senders so recv_input() returns None after the turn completes.
+    drop(mbox_tx);
+    drop(ctrl_tx);
 
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 
@@ -75,7 +81,10 @@ async fn test_turn_stream_error_no_prior_output() {
     let chunks = vec![Err(loopal_error::LoopalError::Provider(
         loopal_error::ProviderError::StreamEnded,
     ))];
-    let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx) = make_runner_with_mock_provider(chunks);
+    let (mut runner, mut event_rx, mbox_tx, ctrl_tx) = make_runner_with_mock_provider(chunks);
+    // Drop senders so recv_input() returns None after the turn completes.
+    drop(mbox_tx);
+    drop(ctrl_tx);
 
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 

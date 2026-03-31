@@ -24,11 +24,11 @@ async fn acceptance_simple_text_response() {
 /// Agent processes prompt and finishes (non-interactive mode).
 #[tokio::test]
 async fn acceptance_non_interactive_completes() {
-    let mut harness = build_ipc_harness(scenarios::two_turn("First reply", "Second reply")).await;
+    let mut harness = build_ipc_harness(scenarios::simple_text("First reply")).await;
     let events = collect_ipc_events(&mut harness.event_rx).await;
 
     assertions::assert_has_stream(&events);
-    assertions::assert_has_finished(&events);
+    assertions::assert_has_terminal(&events);
     let text = loopal_test_support::events::extract_texts(&events);
     assert!(
         text.contains("First reply"),

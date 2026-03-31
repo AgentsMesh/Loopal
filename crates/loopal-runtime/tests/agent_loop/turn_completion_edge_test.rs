@@ -50,7 +50,7 @@ async fn test_non_interactive_exits_after_tool_turn() {
     let output = runner.run().await.unwrap();
     // Non-interactive: exits after first turn completes
     assert_eq!(output.terminate_reason, TerminateReason::Goal);
-    assert_eq!(runner.turn_count, 0);
+    assert_eq!(runner.turn_count, 1);
     let _ = std::fs::remove_file(&tmp);
 }
 

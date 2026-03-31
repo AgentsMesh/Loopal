@@ -20,24 +20,19 @@ jobs:
       matrix:
         include:
           - target: x86_64-apple-darwin
-            os: macos-14
-            config: macos-x86
+            os: macos-13
             archive: tar.gz
           - target: aarch64-apple-darwin
             os: macos-14
-            config: macos-arm
             archive: tar.gz
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-            config: linux-x86
             archive: tar.gz
           - target: aarch64-unknown-linux-gnu
-            os: ubuntu-latest
-            config: linux-arm
+            os: ubuntu-24.04-arm
             archive: tar.gz
           - target: x86_64-pc-windows-msvc
             os: windows-latest
-            config: windows-x86
             archive: zip
 
     steps:
@@ -47,6 +42,10 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libssl-dev pkg-config
 
+      - name: Install system dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: choco install cmake nasm -y
+
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@0.14.0
         with:
@@ -55,14 +54,14 @@ jobs:
           repository-cache: true
 
       - name: Build release binary
-        run: bazel build //:loopal -c opt --config=${{ matrix.config }}
+        run: bazel build //:loopal -c opt
 
       - name: Package (Unix)
         if: runner.os != 'Windows'
         run: |
           ARCHIVE_DIR="${BINARY_NAME}-${{ github.ref_name }}-${{ matrix.target }}"
           mkdir -p "${ARCHIVE_DIR}"
-          BIN_PATH=$(bazel cquery --output=files //:loopal -c opt --config=${{ matrix.config }} 2>/dev/null)
+          BIN_PATH=$(bazel cquery --output=files //:loopal -c opt 2>/dev/null)
           cp "${BIN_PATH}" "${ARCHIVE_DIR}/"
           cp README.md "${ARCHIVE_DIR}/" 2>/dev/null || true
           cp LICENSE "${ARCHIVE_DIR}/" 2>/dev/null || true
@@ -75,7 +74,7 @@ jobs:
         run: |
           $archiveDir = "$env:BINARY_NAME-${{ github.ref_name }}-${{ matrix.target }}"
           New-Item -ItemType Directory -Path $archiveDir -Force
-          $binPath = (bazel cquery --output=files //:loopal -c opt --config=${{ matrix.config }} 2>$null).Trim()
+          $binPath = (bazel cquery --output=files //:loopal -c opt 2>$null).Trim()
           Copy-Item $binPath "$archiveDir/"
           if (Test-Path "README.md") { Copy-Item "README.md" "$archiveDir/" }
           if (Test-Path "LICENSE") { Copy-Item "LICENSE" "$archiveDir/" }

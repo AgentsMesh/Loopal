@@ -1,7 +1,7 @@
 //! JSON-RPC 2.0 message types and parsing (newline-delimited).
 //!
 //! Extracted from `loopal-acp` to serve as the shared JSON-RPC foundation
-//! for all IPC communication (TUI↔Agent, Agent↔SubAgent, IDE↔Agent).
+//! for all IPC communication (consumer↔agent, agent↔sub-agent, IDE↔agent).
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

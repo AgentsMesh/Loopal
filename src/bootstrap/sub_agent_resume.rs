@@ -3,7 +3,7 @@
 //! Records sub-agent session references in the root session metadata so that
 //! sub-agent conversation history can be restored when resuming a session.
 
-use loopal_runtime::projection::project_messages;
+use loopal_protocol::project_messages;
 use loopal_session::SessionController;
 use loopal_storage::SubAgentRef;
 use tracing::warn;
@@ -28,7 +28,10 @@ pub fn load_sub_agent_histories(
         if messages.is_empty() {
             continue;
         }
-        let display_msgs = project_messages(&messages);
+        let display_msgs = project_messages(&messages)
+            .into_iter()
+            .map(loopal_session::into_session_message)
+            .collect();
         let mut state = session_ctrl.lock();
         let agent = state.agents.entry(sub_ref.name.clone()).or_default();
         agent.parent = sub_ref.parent.clone();

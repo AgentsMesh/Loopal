@@ -10,7 +10,7 @@ use loopal_tool_api::PermissionMode;
 #[tokio::test]
 async fn mixed_batch_only_classifies_dangerous() {
     // One classifier call for the single DangerTool in the batch.
-    let (mut runner, mut event_rx) = make_auto_runner(vec![allow_chunks()], true);
+    let (mut runner, mut event_rx) = make_auto_runner(vec![allow_chunks()]);
 
     let tmp = std::env::temp_dir().join(format!("loopal_auto_mix_{}.txt", std::process::id()));
     std::fs::write(&tmp, "test").unwrap();
@@ -55,7 +55,7 @@ async fn mixed_batch_only_classifies_dangerous() {
 /// Empty tool batch is a no-op (no panic, no classification).
 #[tokio::test]
 async fn empty_batch_is_noop() {
-    let (mut runner, mut event_rx) = make_auto_runner(vec![], true);
+    let (mut runner, mut event_rx) = make_auto_runner(vec![]);
 
     let result = runner.execute_tools(vec![], &make_cancel()).await.unwrap();
 

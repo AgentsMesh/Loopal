@@ -4,6 +4,8 @@ pub mod control;
 pub mod envelope;
 pub mod event;
 pub mod interrupt;
+pub mod projected;
+pub mod projection;
 pub mod question;
 pub mod user_content;
 
@@ -13,5 +15,7 @@ pub use control::ControlCommand;
 pub use envelope::{Envelope, MessageSource};
 pub use event::{AgentEvent, AgentEventPayload};
 pub use interrupt::InterruptSignal;
+pub use projected::{ProjectedMessage, ProjectedToolCall};
+pub use projection::project_messages;
 pub use question::{Question, QuestionOption, UserQuestionResponse};
 pub use user_content::{ImageAttachment, SkillInvocation, UserContent};

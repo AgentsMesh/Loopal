@@ -42,7 +42,6 @@ async fn hub_permission_denied_then_llm_adjusts() {
     ];
     let mut h = build_hub_harness_with(
         calls,
-        true,
         Some(loopal_tool_api::PermissionMode::Supervised),
     )
     .await;

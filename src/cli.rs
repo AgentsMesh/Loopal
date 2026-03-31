@@ -27,6 +27,10 @@ pub struct Cli {
     #[arg(long)]
     pub acp: bool,
 
+    /// Run headless — process prompt and exit without TUI (for CI/eval/scripts)
+    #[arg(long)]
+    pub headless: bool,
+
     /// Internal: run as agent worker process (stdin/stdout IPC)
     #[arg(long, hide = true)]
     pub serve: bool,

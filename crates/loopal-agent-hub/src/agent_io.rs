@@ -1,5 +1,5 @@
 //! Shared agent IO loop — handles hub/* requests, forwards events,
-//! and relays permission/question requests to TUI.
+//! and relays permission/question requests to UI clients.
 
 use std::sync::Arc;
 
@@ -147,7 +147,7 @@ pub fn start_agent_io(
     conn: Arc<Connection>,
     rx: tokio::sync::mpsc::Receiver<Incoming>,
 ) {
-    // Registration + IO loop in one background task (used by hub_server for TUI/TCP clients)
+    // Registration + IO loop in one background task (used by hub_server for incoming clients)
     let hub2 = hub.clone();
     let n = name.to_string();
     let n2 = name.to_string();

@@ -2,7 +2,7 @@
 
 use ratatui::prelude::*;
 
-use loopal_session::types::DisplayToolCall;
+use loopal_session::types::SessionToolCall;
 
 use super::{EXPAND_MAX_LINES, expand_output, output_first_line, output_style};
 
@@ -15,7 +15,7 @@ pub fn extract_detail(input: &serde_json::Value) -> Option<String> {
 }
 
 /// Body: expand first N file names.
-pub fn render_body(tc: &DisplayToolCall) -> Vec<Line<'static>> {
+pub fn render_body(tc: &SessionToolCall) -> Vec<Line<'static>> {
     let Some(ref result) = tc.result else {
         return vec![output_first_line("no matches")];
     };

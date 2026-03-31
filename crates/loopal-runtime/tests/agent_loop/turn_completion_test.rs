@@ -118,7 +118,6 @@ pub(crate) fn make_multi_runner(
     let params = AgentLoopParams {
         config: AgentConfig {
             max_turns: 10,
-            interactive: false,
             ..Default::default()
         },
         deps: AgentDeps {

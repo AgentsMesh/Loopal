@@ -72,7 +72,7 @@ pub(crate) fn try_forward_inbox(state: &mut crate::state::SessionState) -> Optio
     agent
         .conversation
         .messages
-        .push(crate::types::DisplayMessage {
+        .push(crate::types::SessionMessage {
             role: "user".to_string(),
             content: display_text,
             tool_calls: Vec::new(),

@@ -35,7 +35,6 @@ pub fn build_with_frontend(
     kernel: Arc<Kernel>,
     hub_connection: Arc<loopal_ipc::connection::Connection>,
     session_dir_override: Option<&std::path::Path>,
-    interactive: bool,
 ) -> anyhow::Result<AgentLoopParams> {
     let router = loopal_provider_api::ModelRouter::from_parts(
         config.settings.model.clone(),
@@ -98,7 +97,7 @@ pub fn build_with_frontend(
     });
 
     let memory_channel = crate::memory_adapter::build_memory_channel(
-        interactive,
+        start.prompt.is_none(), // memory only for long-lived sessions
         &config.settings,
         &agent_shared,
         &model,
@@ -177,7 +176,6 @@ pub fn build_with_frontend(
             permission_mode,
             max_turns,
             tool_filter: None,
-            interactive,
             thinking_config,
             context_tokens_cap: config.settings.max_context_tokens,
         },

@@ -8,7 +8,7 @@ use super::make_cancel;
 /// ReadOnly tool (Read) auto-allowed, no classifier call.
 #[tokio::test]
 async fn readonly_tool_skips_classifier() {
-    let (mut runner, mut event_rx) = make_auto_runner(vec![], true);
+    let (mut runner, mut event_rx) = make_auto_runner(vec![]);
 
     let tmp = std::env::temp_dir().join(format!("loopal_auto_ro_{}.txt", std::process::id()));
     std::fs::write(&tmp, "content").unwrap();
@@ -37,7 +37,7 @@ async fn readonly_tool_skips_classifier() {
 /// Supervised tool (Write) auto-allowed in Auto mode, no classifier call.
 #[tokio::test]
 async fn supervised_tool_skips_classifier() {
-    let (mut runner, mut event_rx) = make_auto_runner(vec![], true);
+    let (mut runner, mut event_rx) = make_auto_runner(vec![]);
 
     let tool_uses = vec![(
         "tc-1".into(),
@@ -59,7 +59,7 @@ async fn supervised_tool_skips_classifier() {
 /// Unknown tool (not registered in Kernel) treated as Allow.
 #[tokio::test]
 async fn unknown_tool_defaults_to_allow() {
-    let (mut runner, mut event_rx) = make_auto_runner(vec![], true);
+    let (mut runner, mut event_rx) = make_auto_runner(vec![]);
 
     let tool_uses = vec![(
         "tc-1".into(),
@@ -80,7 +80,7 @@ async fn unknown_tool_defaults_to_allow() {
 /// Dangerous tool classified as allow → tool executes.
 #[tokio::test]
 async fn dangerous_tool_classified_allow() {
-    let (mut runner, mut event_rx) = make_auto_runner(vec![allow_chunks()], true);
+    let (mut runner, mut event_rx) = make_auto_runner(vec![allow_chunks()]);
 
     let tool_uses = vec![(
         "tc-1".into(),
@@ -111,7 +111,7 @@ async fn dangerous_tool_classified_allow() {
 /// Dangerous tool classified as deny → tool denied with reason.
 #[tokio::test]
 async fn dangerous_tool_classified_deny() {
-    let (mut runner, mut event_rx) = make_auto_runner(vec![deny_chunks()], true);
+    let (mut runner, mut event_rx) = make_auto_runner(vec![deny_chunks()]);
 
     let tool_uses = vec![(
         "tc-1".into(),
@@ -143,7 +143,7 @@ async fn dangerous_tool_classified_deny() {
 /// Two Dangerous tools classified in parallel: one allow, one deny.
 #[tokio::test]
 async fn parallel_classification_mixed_results() {
-    let (mut runner, mut event_rx) = make_auto_runner(vec![allow_chunks(), deny_chunks()], true);
+    let (mut runner, mut event_rx) = make_auto_runner(vec![allow_chunks(), deny_chunks()]);
 
     let tool_uses = vec![
         (

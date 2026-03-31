@@ -27,14 +27,12 @@ fn build_params(
     fixture: &TestFixture,
     messages: Vec<loopal_message::Message>,
     permission_mode: PermissionMode,
-    interactive: bool,
     max_turns: u32,
 ) -> AgentLoopParams {
     AgentLoopParams {
         config: AgentConfig {
             permission_mode,
             max_turns,
-            interactive,
             ..Default::default()
         },
         deps: AgentDeps {
@@ -92,7 +90,6 @@ pub fn make_runner_with_mock_provider(
         &fixture,
         vec![loopal_message::Message::user("hello")],
         PermissionMode::Bypass,
-        true,
         5,
     );
     (AgentLoopRunner::new(params), event_rx, mbox_tx, ctrl_tx)
@@ -122,7 +119,6 @@ pub fn make_multi_runner(
         &fixture,
         vec![loopal_message::Message::user("go")],
         PermissionMode::Bypass,
-        false,
         10,
     );
     (AgentLoopRunner::new(params), event_rx)
@@ -157,9 +153,8 @@ pub fn make_interactive_multi_runner(
         Arc::new(kernel),
         frontend,
         &fixture,
-        vec![loopal_message::Message::user("go")],
+        vec![],
         PermissionMode::Bypass,
-        true,
         10,
     );
     (AgentLoopRunner::new(params), event_rx, mbox_tx, ctrl_tx)

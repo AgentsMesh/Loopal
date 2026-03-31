@@ -4,7 +4,7 @@ use serde_json::Value;
 
 use crate::agent_conversation::AgentConversation;
 use crate::truncate::truncate_json;
-use crate::types::{DisplayMessage, DisplayToolCall, ToolCallStatus};
+use crate::types::{SessionMessage, SessionToolCall, ToolCallStatus};
 
 /// Handle a ServerToolUse event — add a pending tool call entry.
 pub(crate) fn handle_server_tool_use(
@@ -14,7 +14,7 @@ pub(crate) fn handle_server_tool_use(
     input: &Value,
 ) {
     conv.flush_streaming();
-    let tc = DisplayToolCall {
+    let tc = SessionToolCall {
         id,
         name: name.clone(),
         status: ToolCallStatus::Pending,
@@ -33,7 +33,7 @@ pub(crate) fn handle_server_tool_use(
         last.tool_calls.push(tc);
         return;
     }
-    conv.messages.push(DisplayMessage {
+    conv.messages.push(SessionMessage {
         role: "assistant".to_string(),
         content: String::new(),
         tool_calls: vec![tc],

@@ -1,9 +1,9 @@
 /// Message lines edge tests: thinking role, error/system prefixes, tool call integration.
-use loopal_session::types::{DisplayMessage, DisplayToolCall, ToolCallStatus};
+use loopal_session::types::{SessionMessage, SessionToolCall, ToolCallStatus};
 use loopal_tui::views::progress::message_to_lines;
 
-fn msg(role: &str, content: &str) -> DisplayMessage {
-    DisplayMessage {
+fn msg(role: &str, content: &str) -> SessionMessage {
+    SessionMessage {
         role: role.to_string(),
         content: content.to_string(),
         tool_calls: Vec::new(),
@@ -93,10 +93,10 @@ fn test_system_role_has_prefix() {
 
 #[test]
 fn test_tool_call_single_line_summary() {
-    let m = DisplayMessage {
+    let m = SessionMessage {
         role: "assistant".to_string(),
         content: String::new(),
-        tool_calls: vec![DisplayToolCall {
+        tool_calls: vec![SessionToolCall {
             name: "Read".to_string(),
             id: String::new(),
             status: ToolCallStatus::Success,
@@ -120,10 +120,10 @@ fn test_tool_call_single_line_summary() {
 
 #[test]
 fn test_tool_call_error_shows_cross() {
-    let m = DisplayMessage {
+    let m = SessionMessage {
         role: "assistant".to_string(),
         content: String::new(),
-        tool_calls: vec![DisplayToolCall {
+        tool_calls: vec![SessionToolCall {
             name: "Bash".to_string(),
             id: String::new(),
             status: ToolCallStatus::Error,
@@ -146,10 +146,10 @@ fn test_tool_call_error_shows_cross() {
 
 #[test]
 fn test_tool_call_pending_shows_spinner() {
-    let m = DisplayMessage {
+    let m = SessionMessage {
         role: "assistant".to_string(),
         content: String::new(),
-        tool_calls: vec![DisplayToolCall {
+        tool_calls: vec![SessionToolCall {
             name: "Edit".to_string(),
             id: String::new(),
             status: ToolCallStatus::Pending,
@@ -172,10 +172,10 @@ fn test_tool_call_pending_shows_spinner() {
 
 #[test]
 fn test_assistant_with_content_and_tools() {
-    let m = DisplayMessage {
+    let m = SessionMessage {
         role: "assistant".to_string(),
         content: "Let me fix this.".to_string(),
-        tool_calls: vec![DisplayToolCall {
+        tool_calls: vec![SessionToolCall {
             name: "Edit".to_string(),
             id: String::new(),
             status: ToolCallStatus::Success,

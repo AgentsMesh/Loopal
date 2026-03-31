@@ -1,6 +1,6 @@
 //! Rich user input: text + optional attached images.
 //!
-//! Replaces `String` in the TUI → Runtime pipeline. Agent-to-agent
+//! Replaces `String` in the consumer → runtime pipeline. Agent-to-agent
 //! messaging remains text-only thanks to `From<String>` / `From<&str>`.
 
 use serde::{Deserialize, Serialize};

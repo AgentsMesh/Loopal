@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-/// A question to be presented to the user in the TUI.
+/// A question to be presented to the user.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Question {
     pub question: String,

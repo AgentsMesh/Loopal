@@ -37,7 +37,7 @@ async fn cron_create_then_trigger_fires() {
 
     let harness = HarnessBuilder::new()
         .calls(calls)
-        .interactive(true)
+        .messages(vec![])
         .max_turns(5)
         .scheduler(scheduler)
         .build()
@@ -46,6 +46,16 @@ async fn cron_create_then_trigger_fires() {
     let mut event_rx = harness.event_rx;
     let mailbox_tx = harness.mailbox_tx;
     let mut runner = harness.runner;
+
+    // Send initial message via mailbox (store starts empty → no pending prompt)
+    mailbox_tx
+        .send(loopal_protocol::Envelope::new(
+            loopal_protocol::MessageSource::Human,
+            "main",
+            "start",
+        ))
+        .await
+        .unwrap();
 
     let agent_handle = tokio::spawn(async move { runner.run().await });
 

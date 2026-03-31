@@ -33,7 +33,7 @@ pub async fn bridge_child_events(
                             completion_result = Some(result.clone());
                         }
                         // Session finished — child server will exit on its own
-                        // for non-interactive sessions. Just break.
+                        // for prompt-driven sessions. Just break.
                         AgentEventPayload::Finished => {
                             break;
                         }

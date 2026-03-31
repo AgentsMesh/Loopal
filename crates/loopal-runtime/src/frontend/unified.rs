@@ -22,9 +22,8 @@ use super::question_handler::QuestionHandler;
 /// flows into the `AgentInput`-based interface consumed by the agent loop,
 /// making it ideal for integration tests that need deterministic control.
 ///
-/// Permission decisions are delegated to a pluggable `PermissionHandler`:
-/// - `AutoDenyHandler` for bypass mode (no human in the loop)
-/// - `TuiPermissionHandler` for supervised mode (channel-based approval)
+/// - Root agent:  `agent_name = None`, uses `RelayPermissionHandler`
+/// - Sub-agent:   `agent_name = Some(name)`, uses `AutoDenyHandler`
 pub struct UnifiedFrontend {
     agent_name: Option<String>,
     event_tx: mpsc::Sender<AgentEvent>,
@@ -56,7 +55,7 @@ impl UnifiedFrontend {
         }
     }
 
-    /// Ask the user a question via the TUI (AskUser tool support).
+    /// Ask the user a question via the frontend (AskUser tool support).
     pub async fn ask_user(&self, questions: Vec<loopal_protocol::Question>) -> Vec<String> {
         self.question_handler.ask(questions).await
     }

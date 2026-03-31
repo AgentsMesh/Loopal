@@ -64,8 +64,6 @@ pub struct AgentConfig {
     pub max_turns: u32,
     /// Tool whitelist filter — if `Some`, only tools in this set are exposed.
     pub tool_filter: Option<HashSet<String>>,
-    /// Whether this agent waits for user input between turns.
-    pub interactive: bool,
     /// Thinking/reasoning configuration (default: Auto).
     pub thinking_config: ThinkingConfig,
     /// Context tokens cap from settings (0 = auto, use model's context_window).
@@ -88,7 +86,6 @@ impl Default for AgentConfig {
             permission_mode: PermissionMode::Bypass,
             max_turns: 50,
             tool_filter: None,
-            interactive: true,
             thinking_config: ThinkingConfig::Auto,
             context_tokens_cap: 0,
         }
@@ -102,7 +99,7 @@ pub struct AgentDeps {
     pub session_manager: SessionManager,
 }
 
-/// Interrupt/cancellation signals shared with the TUI.
+/// Interrupt/cancellation signals shared with the consumer.
 pub struct InterruptHandle {
     pub signal: InterruptSignal,
     pub tx: Arc<watch::Sender<u64>>,

@@ -63,7 +63,6 @@ async fn test_supervised_approve() {
     let inner = HarnessBuilder::new()
         .calls(calls)
         .permission_mode(loopal_tool_api::PermissionMode::Supervised)
-        .interactive(true)
         .build_spawned()
         .await;
 
@@ -94,7 +93,6 @@ async fn test_supervised_deny() {
     let inner = HarnessBuilder::new()
         .calls(calls)
         .permission_mode(loopal_tool_api::PermissionMode::Supervised)
-        .interactive(true)
         .build_spawned()
         .await;
 
@@ -151,7 +149,6 @@ async fn test_permission_dialog_render() {
     let inner = HarnessBuilder::new()
         .calls(calls)
         .permission_mode(loopal_tool_api::PermissionMode::Supervised)
-        .interactive(true)
         .build_spawned()
         .await;
 

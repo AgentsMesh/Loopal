@@ -1,6 +1,6 @@
 //! Event routing — consumes raw agent events and broadcasts to all subscribers.
 //!
-//! Uses broadcast channel for multi-consumer delivery. Each client (TUI, ACP)
+//! Uses broadcast channel for multi-consumer delivery. Each client
 //! subscribes independently via `hub.subscribe_events()`.
 
 use std::sync::Arc;

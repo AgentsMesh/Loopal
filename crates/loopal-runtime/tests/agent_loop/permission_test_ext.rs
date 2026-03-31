@@ -6,7 +6,7 @@ use loopal_kernel::Kernel;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::Envelope;
 use loopal_runtime::agent_loop::AgentLoopRunner;
-use loopal_runtime::frontend::{AutoCancelQuestionHandler, TuiPermissionHandler};
+use loopal_runtime::frontend::{AutoCancelQuestionHandler, RelayPermissionHandler};
 use loopal_runtime::{AgentConfig, AgentDeps, AgentLoopParams, InterruptHandle, UnifiedFrontend};
 use loopal_test_support::TestFixture;
 use loopal_tool_api::{PermissionDecision, PermissionMode};
@@ -109,7 +109,7 @@ async fn test_check_permission_channel_closed_denies() {
         mailbox_rx,
         control_rx,
         None,
-        Box::new(TuiPermissionHandler::new(event_tx, permission_rx)),
+        Box::new(RelayPermissionHandler::new(event_tx, permission_rx)),
         Box::new(AutoCancelQuestionHandler),
     ));
 

@@ -16,7 +16,7 @@ mod write;
 
 use ratatui::prelude::*;
 
-use loopal_session::types::{DisplayToolCall, ToolCallStatus};
+use loopal_session::types::{SessionToolCall, ToolCallStatus};
 
 /// Max output lines before folding.
 const EXPAND_MAX_LINES: usize = 4;
@@ -24,11 +24,11 @@ const EXPAND_MAX_LINES: usize = 4;
 // ── Public entry ──
 
 /// Render all tool calls — each independently, no grouping.
-pub fn render_tool_calls(tool_calls: &[DisplayToolCall], _width: u16) -> Vec<Line<'static>> {
+pub fn render_tool_calls(tool_calls: &[SessionToolCall], _width: u16) -> Vec<Line<'static>> {
     tool_calls.iter().flat_map(render_one).collect()
 }
 
-fn render_one(tc: &DisplayToolCall) -> Vec<Line<'static>> {
+fn render_one(tc: &SessionToolCall) -> Vec<Line<'static>> {
     let mut lines = vec![render_header(tc)];
     lines.extend(render_body(tc));
     lines
@@ -36,7 +36,7 @@ fn render_one(tc: &DisplayToolCall) -> Vec<Line<'static>> {
 
 // ── Header: ● ToolName(detail) ──
 
-fn render_header(tc: &DisplayToolCall) -> Line<'static> {
+fn render_header(tc: &SessionToolCall) -> Line<'static> {
     let (icon, color) = status_style(tc.status);
     let detail = extract_detail(tc);
 
@@ -54,7 +54,7 @@ fn render_header(tc: &DisplayToolCall) -> Line<'static> {
 }
 
 /// Dispatch detail extraction to per-tool modules.
-fn extract_detail(tc: &DisplayToolCall) -> String {
+fn extract_detail(tc: &SessionToolCall) -> String {
     let Some(ref input) = tc.tool_input else {
         return String::new();
     };
@@ -89,7 +89,7 @@ fn extract_detail(tc: &DisplayToolCall) -> String {
 
 // ── Body: dispatch per tool type ──
 
-fn render_body(tc: &DisplayToolCall) -> Vec<Line<'static>> {
+fn render_body(tc: &SessionToolCall) -> Vec<Line<'static>> {
     // Active (pending/running)
     if tc.status.is_active() {
         return if tc.name == "Bash" {
@@ -118,7 +118,7 @@ fn render_body(tc: &DisplayToolCall) -> Vec<Line<'static>> {
 }
 
 /// Fallback: short inline or expand.
-fn render_default_body(tc: &DisplayToolCall) -> Vec<Line<'static>> {
+fn render_default_body(tc: &SessionToolCall) -> Vec<Line<'static>> {
     let Some(ref result) = tc.result else {
         return Vec::new();
     };

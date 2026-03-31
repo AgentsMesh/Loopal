@@ -18,7 +18,7 @@ use super::tool_progress::maybe_spawn_progress;
 /// Execute approved tools in parallel via JoinSet, with cancellation support.
 ///
 /// Each tool runs concurrently; results are collected and sorted by original index.
-/// When the `cancel` scope fires (ESC / message-while-busy), remaining tasks are
+/// When the `cancel` scope fires (interrupt signal), remaining tasks are
 /// aborted and synthesised "Interrupted by user" results are returned.
 pub async fn execute_approved_tools(
     approved: Vec<(String, String, serde_json::Value)>,

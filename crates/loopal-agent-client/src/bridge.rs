@@ -1,4 +1,4 @@
-//! IPC Bridge — connects in-process channels (TUI side) to IPC (Agent side).
+//! IPC Bridge — connects in-process channels (consumer side) to IPC (Agent side).
 //!
 //! Reuses the Connection from AgentClient (via `into_parts()`) to avoid
 //! creating a second reader loop on the same Transport.
@@ -14,7 +14,7 @@ use loopal_protocol::{AgentEvent, ControlCommand, Envelope, UserQuestionResponse
 
 use crate::bridge_handlers::{handle_permission, handle_question};
 
-/// Handles for the TUI side of the IPC bridge.
+/// Handles for the consumer side of the IPC bridge.
 pub struct BridgeHandles {
     pub agent_event_rx: mpsc::Receiver<AgentEvent>,
     pub agent_event_tx: mpsc::Sender<AgentEvent>,
@@ -38,7 +38,7 @@ pub fn start_bridge(
     let (question_tx, mut question_rx) = mpsc::channel::<UserQuestionResponse>(16);
     let (mailbox_tx, mut mailbox_rx) = mpsc::channel::<Envelope>(16);
 
-    // Bridge: IPC incoming → TUI events + permission/question response routing
+    // Bridge: IPC incoming → consumer events + permission/question response routing
     let conn_in = connection.clone();
     tokio::spawn(async move {
         bridge_incoming(
@@ -51,7 +51,7 @@ pub fn start_bridge(
         .await;
     });
 
-    // Bridge: TUI → IPC (control commands)
+    // Bridge: consumer → IPC (control commands)
     let conn_ctrl = connection.clone();
     tokio::spawn(async move {
         while let Some(cmd) = control_rx.recv().await {
@@ -67,7 +67,7 @@ pub fn start_bridge(
         }
     });
 
-    // Bridge: TUI → IPC (mailbox messages)
+    // Bridge: consumer → IPC (mailbox messages)
     let conn_msg = connection.clone();
     tokio::spawn(async move {
         while let Some(envelope) = mailbox_rx.recv().await {

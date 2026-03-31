@@ -1,7 +1,7 @@
 //! Shared interrupt signal for cancelling in-progress agent work.
 //!
-//! Used by both ESC-to-interrupt and send-message-while-busy flows.
-//! The TUI calls `signal()`, the runtime polls `is_signaled()` at
+//! Used by both cancel-to-interrupt and send-message-while-busy flows.
+//! The consumer calls `signal()`, the runtime polls `is_signaled()` at
 //! key checkpoints (per stream chunk, before tool execution).
 
 use std::sync::Arc;
@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 /// A cheaply cloneable interrupt signal backed by `AtomicBool`.
 ///
-/// Both the TUI and the runtime hold clones of the same instance.
+/// Both the consumer and the runtime hold clones of the same instance.
 #[derive(Clone, Debug)]
 pub struct InterruptSignal(Arc<AtomicBool>);
 
@@ -18,7 +18,7 @@ impl InterruptSignal {
         Self(Arc::new(AtomicBool::new(false)))
     }
 
-    /// Raise the interrupt flag (called by TUI on ESC / message-while-busy).
+    /// Raise the interrupt flag (called by consumer on cancel or new message).
     pub fn signal(&self) {
         self.0.store(true, Ordering::Release);
     }

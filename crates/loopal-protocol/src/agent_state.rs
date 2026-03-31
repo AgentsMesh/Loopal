@@ -18,7 +18,7 @@ pub enum AgentStatus {
 
 /// Observable state snapshot of a single agent.
 ///
-/// Collected on the Observation Plane and consumed by the TUI to render
+/// Collected on the Observation Plane and consumed by the frontend to render
 /// per-agent status panels. All fields are cheap to clone.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ObservableAgentState {

@@ -88,14 +88,13 @@ fn conn_pair() -> (Arc<Connection>, Arc<Connection>, mpsc::Receiver<Incoming>) {
 }
 
 pub async fn build_hub_harness(calls: Calls) -> HubTestHarness {
-    let mut h = build_hub_harness_with(calls, true, None).await;
+    let mut h = build_hub_harness_with(calls, None).await;
     h.wait_ready().await;
     h
 }
 
 pub async fn build_hub_harness_with(
     calls: Calls,
-    interactive: bool,
     permission_mode: Option<loopal_tool_api::PermissionMode>,
 ) -> HubTestHarness {
     let fixture = TestFixture::new();
@@ -144,7 +143,6 @@ pub async fn build_hub_harness_with(
         kernel,
         hub_connection,
         Some(fixture.path()),
-        interactive,
     )
     .unwrap();
     let agent_task = tokio::spawn(loopal_runtime::agent_loop(params));

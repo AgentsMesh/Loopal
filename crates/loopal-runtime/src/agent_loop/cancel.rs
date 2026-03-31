@@ -1,6 +1,6 @@
 //! Per-turn cancellation scope.
 //!
-//! Bridges the cross-boundary `InterruptSignal` (set by TUI on ESC) into
+//! Bridges the cross-boundary `InterruptSignal` (set by any consumer) into
 //! a standard `CancellationToken` for structured async cancellation within
 //! a single turn. All turn-scoped operations receive `&TurnCancel` instead
 //! of raw `(&InterruptSignal, &Arc<watch::Sender<u64>>)`.
@@ -14,7 +14,7 @@ use tokio_util::sync::CancellationToken;
 /// Per-turn cancellation scope.
 ///
 /// Created at the start of each turn in `run_loop`, dropped when the turn ends.
-/// Encapsulates the bridge from `InterruptSignal` (TUI boundary) to
+/// Encapsulates the bridge from `InterruptSignal` (consumer boundary) to
 /// `CancellationToken` (runtime internal).
 ///
 /// Uses `watch::Receiver` for async wakeup — level-triggered, so signals

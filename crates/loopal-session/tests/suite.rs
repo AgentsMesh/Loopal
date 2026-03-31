@@ -25,3 +25,5 @@ mod retry_banner_test;
 mod rewind_test;
 #[path = "suite/topology_test.rs"]
 mod topology_test;
+#[path = "suite/projection_convert_test.rs"]
+mod projection_convert_test;

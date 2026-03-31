@@ -2,7 +2,7 @@
 
 use ratatui::prelude::*;
 
-use loopal_session::types::DisplayToolCall;
+use loopal_session::types::SessionToolCall;
 use loopal_tool_api::TimeoutSecs;
 
 use super::{EXPAND_MAX_LINES, expand_output, output_first_line, output_style};
@@ -24,7 +24,7 @@ pub fn extract_detail(input: &serde_json::Value) -> Option<String> {
 }
 
 /// Running Bash: elapsed time + progress tail.
-pub fn render_running_body(tc: &DisplayToolCall) -> Vec<Line<'static>> {
+pub fn render_running_body(tc: &SessionToolCall) -> Vec<Line<'static>> {
     let dim = output_style();
     let elapsed = tc
         .started_at
@@ -65,7 +65,7 @@ pub fn render_running_body(tc: &DisplayToolCall) -> Vec<Line<'static>> {
 }
 
 /// Completed Bash: expand stdout.
-pub fn render_success_body(tc: &DisplayToolCall) -> Vec<Line<'static>> {
+pub fn render_success_body(tc: &SessionToolCall) -> Vec<Line<'static>> {
     let Some(ref result) = tc.result else {
         return vec![output_first_line("(No output)")];
     };

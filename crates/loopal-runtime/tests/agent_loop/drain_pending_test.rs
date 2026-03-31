@@ -118,7 +118,6 @@ async fn test_subagent_drains_pending_before_exit() {
     let params = AgentLoopParams {
         config: AgentConfig {
             max_turns: 5,
-            interactive: false, // Sub-agent mode — exits after first LLM response
             ..Default::default()
         },
         deps: AgentDeps {

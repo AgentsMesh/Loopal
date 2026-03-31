@@ -1,7 +1,7 @@
 //! IPC transport and protocol layer for Loopal multi-process architecture.
 //!
 //! Provides a platform-abstracted transport layer (Mojo-like) and JSON-RPC 2.0
-//! protocol for communication between TUI, Agent, and Sub-Agent processes.
+//! protocol for communication between consumer, agent, and sub-agent processes.
 
 pub mod connection;
 pub mod duplex;

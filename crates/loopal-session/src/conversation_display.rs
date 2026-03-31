@@ -1,7 +1,7 @@
 //! Display state helpers for conversation rendering.
 
 use crate::agent_conversation::AgentConversation;
-use crate::types::DisplayMessage;
+use crate::types::SessionMessage;
 
 /// Extract a human-readable label from a ThinkingConfig JSON string.
 pub fn thinking_label_from_json(json: &str) -> String {
@@ -28,7 +28,7 @@ pub fn thinking_label_from_json(json: &str) -> String {
 
 /// Push a system-role display message into the agent conversation.
 pub fn push_system_msg(conv: &mut AgentConversation, content: &str) {
-    conv.messages.push(DisplayMessage {
+    conv.messages.push(SessionMessage {
         role: "system".into(),
         content: content.into(),
         tool_calls: Vec::new(),

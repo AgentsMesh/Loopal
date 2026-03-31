@@ -1,5 +1,5 @@
 use crate::agent_conversation::AgentConversation;
-use crate::types::DisplayMessage;
+use crate::types::SessionMessage;
 
 /// Handle ThinkingComplete: flush thinking buffer and create summary message.
 pub fn handle_thinking_complete(conv: &mut AgentConversation, token_count: u32) {
@@ -8,7 +8,7 @@ pub fn handle_thinking_complete(conv: &mut AgentConversation, token_count: u32) 
     if !conv.streaming_thinking.is_empty() {
         let thinking = std::mem::take(&mut conv.streaming_thinking);
         let summary = format_thinking_summary(&thinking, token_count);
-        conv.messages.push(DisplayMessage {
+        conv.messages.push(SessionMessage {
             role: "thinking".to_string(),
             content: summary,
             tool_calls: Vec::new(),

@@ -30,7 +30,6 @@ pub struct HarnessBuilder {
     pub(crate) model: String,
     pub(crate) summarization_model: Option<String>,
     pub(crate) permission_mode: PermissionMode,
-    pub(crate) interactive: bool,
     pub(crate) messages: Vec<Message>,
     pub(crate) max_turns: u32,
     pub(crate) mode: AgentMode,
@@ -57,7 +56,6 @@ impl HarnessBuilder {
             model: "claude-sonnet-4-20250514".into(),
             summarization_model: None,
             permission_mode: PermissionMode::Bypass,
-            interactive: false,
             messages: vec![Message::user("hello")],
             max_turns: 10,
             mode: AgentMode::Act,
@@ -85,10 +83,6 @@ impl HarnessBuilder {
     }
     pub fn permission_mode(mut self, m: PermissionMode) -> Self {
         self.permission_mode = m;
-        self
-    }
-    pub fn interactive(mut self, i: bool) -> Self {
-        self.interactive = i;
         self
     }
     pub fn messages(mut self, m: Vec<Message>) -> Self {

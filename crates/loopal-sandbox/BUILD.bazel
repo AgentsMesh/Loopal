@@ -3,6 +3,7 @@ load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 rust_library(
     name = "loopal-sandbox",
     srcs = glob(["src/**/*.rs"]),
+    compile_data = glob(["src/**/*.sbpl"]),
     edition = "2024",
     visibility = ["//visibility:public"],
     deps = [

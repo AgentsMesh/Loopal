@@ -33,12 +33,14 @@ pub enum InputAction {
     RunCommand(String, Option<String>),
     /// Sub-page picker confirmed a result
     SubPageConfirm(SubPageResult),
-    /// Cycle focus to the next agent in the agents map
-    FocusNextAgent,
-    /// Focus the previous agent in the agents map
-    FocusPrevAgent,
-    /// Clear agent focus
-    UnfocusAgent,
+    /// Enter AgentPanel focus mode (Tab from Input when agents exist)
+    EnterAgentPanel,
+    /// Exit AgentPanel focus mode back to Input
+    ExitAgentPanel,
+    /// Navigate up within agent panel (with scroll)
+    AgentPanelUp,
+    /// Navigate down within agent panel (with scroll)
+    AgentPanelDown,
     /// Enter the focused agent's conversation view (drill in)
     EnterAgentView,
     /// Return to root/parent view (drill out)

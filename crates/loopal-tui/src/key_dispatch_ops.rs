@@ -4,7 +4,7 @@ use loopal_protocol::UserContent;
 
 use loopal_protocol::AgentStatus;
 
-use crate::app::App;
+use crate::app::{App, FocusMode};
 use crate::command::CommandEffect;
 use crate::input::SubPageResult;
 
@@ -62,9 +62,36 @@ pub(crate) async fn handle_sub_page_confirm(app: &mut App, result: SubPageResult
     }
 }
 
+/// Enter AgentPanel focus mode. No-op if no live agents exist.
+pub fn enter_agent_panel(app: &mut App) {
+    let state = app.session.lock();
+    let active = &state.active_view;
+    let live_keys: Vec<String> = state
+        .agents
+        .iter()
+        .filter(|(k, a)| k.as_str() != active && is_agent_live(&a.observable.status))
+        .map(|(k, _)| k.clone())
+        .collect();
+    drop(state);
+    if live_keys.is_empty() {
+        return;
+    }
+    app.focus_mode = FocusMode::AgentPanel;
+    // Re-focus if current focused_agent is None or no longer live
+    let needs_focus = match &app.focused_agent {
+        None => true,
+        Some(name) => !live_keys.contains(name),
+    };
+    if needs_focus {
+        cycle_agent_focus(app, true);
+    }
+}
+
+use crate::views::agent_panel::MAX_VISIBLE;
+
 /// Cycle `focused_agent` in the panel. `forward=true` → next, `false` → prev.
 /// Skips the active_view agent (it's the current conversation).
-pub(crate) fn cycle_agent_focus(app: &mut App, forward: bool) {
+pub fn cycle_agent_focus(app: &mut App, forward: bool) {
     let state = app.session.lock();
     let active = &state.active_view;
     let keys: Vec<String> = state
@@ -76,6 +103,8 @@ pub(crate) fn cycle_agent_focus(app: &mut App, forward: bool) {
     drop(state);
     if keys.is_empty() {
         app.focused_agent = None;
+        app.focus_mode = FocusMode::Input;
+        app.agent_panel_offset = 0;
         return;
     }
     app.focused_agent = Some(match &app.focused_agent {
@@ -100,6 +129,12 @@ pub(crate) fn cycle_agent_focus(app: &mut App, forward: bool) {
             }
         }
     });
+    // Keep focused agent visible in the scroll window
+    if let Some(ref focused) = app.focused_agent {
+        if let Some(idx) = keys.iter().position(|k| k == focused) {
+            adjust_agent_scroll(app, idx, keys.len());
+        }
+    }
 }
 
 /// Terminate (interrupt) the currently focused agent via Hub.
@@ -123,6 +158,34 @@ pub(crate) async fn terminate_focused_agent(app: &mut App) {
         app.line_cache = crate::views::progress::LineCache::new();
     }
     app.focused_agent = None;
+    // If no live agents remain, exit AgentPanel mode
+    let state = app.session.lock();
+    let av = state.active_view.clone();
+    let has_live = state
+        .agents
+        .iter()
+        .any(|(k, a)| k.as_str() != av && is_agent_live(&a.observable.status));
+    drop(state);
+    if !has_live {
+        app.focus_mode = FocusMode::Input;
+        app.agent_panel_offset = 0;
+    }
+}
+
+/// Ensure the focused agent at `focused_idx` is visible within the scroll window.
+fn adjust_agent_scroll(app: &mut App, focused_idx: usize, total: usize) {
+    if total <= MAX_VISIBLE {
+        app.agent_panel_offset = 0;
+        return;
+    }
+    if focused_idx < app.agent_panel_offset {
+        app.agent_panel_offset = focused_idx;
+    } else if focused_idx >= app.agent_panel_offset + MAX_VISIBLE {
+        app.agent_panel_offset = focused_idx + 1 - MAX_VISIBLE;
+    }
+    app.agent_panel_offset = app
+        .agent_panel_offset
+        .min(total.saturating_sub(MAX_VISIBLE));
 }
 
 fn is_agent_live(status: &AgentStatus) -> bool {

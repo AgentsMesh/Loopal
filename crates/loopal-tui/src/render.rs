@@ -26,7 +26,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     let layout = FrameLayout::compute(
         size,
         breadcrumb_h,
-        views::agent_panel::panel_height(&state.agents, &state.active_view),
+        views::agent_panel::panel_height(&state.agents, &state.active_view, app.agent_panel_offset),
         banner_h,
         input_h,
     );
@@ -65,6 +65,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         app.focused_agent.as_deref(),
         viewing,
         &state.active_view,
+        app.agent_panel_offset,
         layout.agents,
     );
     views::separator::render_separator(f, layout.separator);

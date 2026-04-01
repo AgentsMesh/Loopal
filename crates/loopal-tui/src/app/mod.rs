@@ -44,6 +44,10 @@ pub struct App {
     pub show_topology: bool,
     /// Agent panel cursor — Tab cycles through agents. Purely TUI concept.
     pub focused_agent: Option<String>,
+    /// Which UI region owns keyboard focus.
+    pub focus_mode: FocusMode,
+    /// Scroll offset for the agent panel (index of first visible agent).
+    pub agent_panel_offset: usize,
 
     // === Session Controller (observable + interactive) ===
     pub session: SessionController,
@@ -81,6 +85,8 @@ impl App {
             content_overflows: false,
             show_topology: false,
             focused_agent: None,
+            focus_mode: FocusMode::default(),
+            agent_panel_offset: 0,
             session,
             line_cache: LineCache::new(),
         }

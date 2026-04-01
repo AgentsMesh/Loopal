@@ -4,7 +4,7 @@ use std::time::Instant;
 
 use super::InputAction;
 use super::multiline;
-use crate::app::App;
+use crate::app::{App, FocusMode};
 
 /// Default wrap width when terminal width is unknown.
 pub(super) const DEFAULT_WRAP_WIDTH: usize = 80;
@@ -79,6 +79,10 @@ pub(super) fn handle_down(app: &mut App) -> InputAction {
 }
 
 pub(super) fn handle_esc(app: &mut App) -> InputAction {
+    // AgentPanel mode: exit back to Input (don't trigger view exit or rewind)
+    if app.focus_mode == FocusMode::AgentPanel {
+        return InputAction::ExitAgentPanel;
+    }
     // Priority 1: exit agent view
     let active_view = app.session.lock().active_view.clone();
     if active_view != loopal_session::ROOT_AGENT {

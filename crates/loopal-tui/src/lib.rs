@@ -13,3 +13,9 @@ mod tui_loop;
 pub mod views;
 
 pub use tui_loop::{run_tui, run_tui_loop};
+
+/// Re-exports of dispatch functions for integration testing.
+#[doc(hidden)]
+pub mod dispatch_ops {
+    pub use crate::key_dispatch_ops::{cycle_agent_focus, enter_agent_panel};
+}

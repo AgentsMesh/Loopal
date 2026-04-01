@@ -12,7 +12,6 @@ fn test_agent_loop_runner_construction() {
     assert_eq!(runner.tokens.input, 0);
     assert_eq!(runner.tokens.output, 0);
     assert_eq!(runner.params.config.model(), "claude-sonnet-4-20250514");
-    assert_eq!(runner.params.config.max_turns, 50);
 }
 
 #[test]
@@ -28,7 +27,7 @@ fn test_tool_ctx_matches_session() {
 
 #[tokio::test]
 async fn test_wait_for_input_human_message_no_prefix() {
-    let (mut runner, mut event_rx, mbox_tx, _ctrl_tx, _perm_tx) = make_runner_with_channels();
+    let (mut runner, _event_rx, mbox_tx, _ctrl_tx, _perm_tx) = make_runner_with_channels();
 
     mbox_tx
         .send(Envelope::new(MessageSource::Human, "main", "Hello agent"))
@@ -43,10 +42,6 @@ async fn test_wait_for_input_human_message_no_prefix() {
         runner.params.store.messages()[0].text_content(),
         "Hello agent"
     );
-
-    // Should have emitted AwaitingInput
-    let event = event_rx.recv().await.unwrap();
-    assert!(matches!(event.payload, AgentEventPayload::AwaitingInput));
 }
 
 #[tokio::test]
@@ -113,9 +108,7 @@ async fn test_wait_for_input_mode_switch() {
     assert_eq!(runner.params.config.mode, AgentMode::Plan);
 
     let e1 = event_rx.recv().await.unwrap();
-    assert!(matches!(e1.payload, AgentEventPayload::AwaitingInput));
-    let e2 = event_rx.recv().await.unwrap();
-    assert!(matches!(e2.payload, AgentEventPayload::ModeChanged { ref mode } if mode == "plan"));
+    assert!(matches!(e1.payload, AgentEventPayload::ModeChanged { ref mode } if mode == "plan"));
 }
 
 #[tokio::test]

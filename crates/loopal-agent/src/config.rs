@@ -12,7 +12,6 @@ pub struct AgentConfig {
     pub system_prompt: String,
     pub permission_mode: PermissionMode,
     pub allowed_tools: Option<Vec<String>>,
-    pub max_turns: u32,
     pub model: Option<String>,
 }
 
@@ -24,7 +23,6 @@ impl Default for AgentConfig {
             system_prompt: String::new(),
             permission_mode: PermissionMode::Bypass,
             allowed_tools: None,
-            max_turns: 30,
             model: None,
         }
     }
@@ -112,8 +110,6 @@ fn parse_agent_config(name: &str, content: &str) -> AgentConfig {
             config.permission_mode = parse_perm_mode(val.trim());
         } else if let Some(val) = line.strip_prefix("allowed_tools:") {
             config.allowed_tools = Some(parse_list(val.trim()));
-        } else if let Some(val) = line.strip_prefix("max_turns:") {
-            config.max_turns = val.trim().parse().unwrap_or(30);
         } else if let Some(val) = line.strip_prefix("model:") {
             let v = val.trim();
             if !v.is_empty() {
@@ -152,7 +148,6 @@ mod tests {
 description: Read-only explorer
 permission_mode: accept-edits
 allowed_tools: [Read, Glob, Grep, Ls]
-max_turns: 20
 model: claude-sonnet-4-20250514
 ---
 You are a code exploration agent.
@@ -160,7 +155,6 @@ You are a code exploration agent.
         let config = parse_agent_config("explorer", content);
         assert_eq!(config.name, "explorer");
         assert_eq!(config.description, "Read-only explorer");
-        assert_eq!(config.max_turns, 20);
         assert_eq!(
             config.allowed_tools.as_ref().unwrap(),
             &["Read", "Glob", "Grep", "Ls"]

@@ -96,7 +96,6 @@ fn convert_tool_result(result: &CallToolResult) -> ToolResult {
     ToolResult {
         content: parts.join("\n"),
         is_error: result.is_error.unwrap_or(false),
-        is_completion: false,
         metadata: None,
     }
 }

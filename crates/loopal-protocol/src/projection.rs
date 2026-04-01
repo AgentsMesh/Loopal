@@ -2,9 +2,6 @@
 //!
 //! Used when restoring a session so consumers can render historical messages
 //! without replaying the full agent event stream.
-//!
-//! AttemptCompletion tool results are promoted to assistant messages rather
-//! than shown as tool output.
 
 use std::collections::HashMap;
 
@@ -43,17 +40,9 @@ pub fn project_messages(messages: &[Message]) -> Vec<ProjectedMessage> {
                     tool_use_id,
                     content,
                     is_error,
-                    is_completion,
                     ..
                 } => {
-                    back_patch(
-                        &mut output,
-                        &tool_index,
-                        tool_use_id,
-                        content,
-                        *is_error,
-                        *is_completion,
-                    );
+                    back_patch(&mut output, &tool_index, tool_use_id, content, *is_error);
                 }
                 ContentBlock::Image { .. } => {
                     content_parts.push("[image]".to_string());
@@ -100,12 +89,11 @@ pub fn project_messages(messages: &[Message]) -> Vec<ProjectedMessage> {
 
 /// Back-patch a ToolResult into the matching ProjectedToolCall.
 fn back_patch(
-    output: &mut Vec<ProjectedMessage>,
+    output: &mut [ProjectedMessage],
     index: &HashMap<String, (usize, usize, String)>,
     tool_use_id: &str,
     result: &str,
     is_error: bool,
-    is_completion: bool,
 ) {
     let Some(&(di, ti, ref _name)) = index.get(tool_use_id) else {
         return;
@@ -114,17 +102,7 @@ fn back_patch(
         && let Some(tc) = msg.tool_calls.get_mut(ti)
     {
         tc.is_error = is_error;
-        if !is_completion {
-            tc.result = Some(truncate_result(result));
-        }
-    }
-    if is_completion {
-        output.push(ProjectedMessage {
-            role: "assistant".to_string(),
-            content: result.to_string(),
-            tool_calls: Vec::new(),
-            image_count: 0,
-        });
+        tc.result = Some(truncate_result(result));
     }
 }
 

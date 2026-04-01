@@ -42,7 +42,6 @@ fn test_model_info_defaults_for_unknown_model() {
         config: AgentConfig {
             router: loopal_provider_api::ModelRouter::new("unknown-model-xyz".to_string()),
             permission_mode: PermissionMode::Supervised,
-            max_turns: 5,
             ..Default::default()
         },
         deps: AgentDeps {
@@ -114,10 +113,8 @@ async fn test_handle_control_clear_resets_state() {
     assert_eq!(runner.tokens.output, 0);
 
     let e1 = event_rx.recv().await.unwrap();
-    assert!(matches!(e1.payload, AgentEventPayload::AwaitingInput));
-    let e2 = event_rx.recv().await.unwrap();
     assert!(matches!(
-        e2.payload,
+        e1.payload,
         AgentEventPayload::TokenUsage {
             input_tokens: 0,
             output_tokens: 0,

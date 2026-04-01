@@ -85,7 +85,6 @@ fn test_build_contents_with_function_response() {
                 tool_use_id: "call_1".to_string(),
                 content: "file contents".to_string(),
                 is_error: false,
-                is_completion: false,
                 metadata: None,
             }],
         }],

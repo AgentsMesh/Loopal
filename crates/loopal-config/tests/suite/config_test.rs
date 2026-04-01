@@ -9,12 +9,6 @@ fn test_settings_default_model() {
 }
 
 #[test]
-fn test_settings_default_max_turns() {
-    let settings = Settings::default();
-    assert_eq!(settings.max_turns, 50);
-}
-
-#[test]
 fn test_settings_default_permission_mode() {
     let settings = Settings::default();
     assert_eq!(settings.permission_mode, PermissionMode::Bypass);
@@ -44,7 +38,6 @@ fn test_settings_serde_roundtrip() {
     let json = serde_json::to_string(&settings).unwrap();
     let deserialized: Settings = serde_json::from_str(&json).unwrap();
     assert_eq!(deserialized.model, settings.model);
-    assert_eq!(deserialized.max_turns, settings.max_turns);
     assert_eq!(deserialized.permission_mode, settings.permission_mode);
     assert_eq!(deserialized.max_context_tokens, settings.max_context_tokens);
     assert_eq!(deserialized.hooks.len(), settings.hooks.len());
@@ -56,17 +49,15 @@ fn test_settings_serde_from_empty_json() {
     let json = "{}";
     let settings: Settings = serde_json::from_str(json).unwrap();
     assert_eq!(settings.model, "claude-sonnet-4-20250514");
-    assert_eq!(settings.max_turns, 50);
 }
 
 #[test]
 fn test_settings_serde_partial_override() {
-    let json = r#"{"model": "gpt-4", "max_turns": 100}"#;
+    let json = r#"{"model": "gpt-4", "max_context_tokens": 100}"#;
     let settings: Settings = serde_json::from_str(json).unwrap();
     assert_eq!(settings.model, "gpt-4");
-    assert_eq!(settings.max_turns, 100);
+    assert_eq!(settings.max_context_tokens, 100);
     assert_eq!(settings.permission_mode, PermissionMode::Bypass);
-    assert_eq!(settings.max_context_tokens, 0);
 }
 
 #[test]

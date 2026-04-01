@@ -60,7 +60,6 @@ pub async fn run(
 /// We treat AwaitingInput as "done" since there's no user to provide more input.
 async fn consume_events(mut event_rx: tokio::sync::broadcast::Receiver<AgentEvent>) -> String {
     let mut last_text = String::new();
-    let mut completion_text: Option<String> = None;
     let mut seen_stream = false;
 
     loop {
@@ -71,19 +70,12 @@ async fn consume_events(mut event_rx: tokio::sync::broadcast::Receiver<AgentEven
                     last_text.push_str(&text);
                     seen_stream = true;
                 }
-                AgentEventPayload::ToolResult {
-                    is_completion: true,
-                    result,
-                    ..
-                } => {
-                    completion_text = Some(result);
-                }
                 AgentEventPayload::AwaitingInput if seen_stream => {
                     // Agent finished processing our prompt and is waiting for
                     // more input. In headless mode there is none — we're done.
                     break;
                 }
-                AgentEventPayload::Finished | AgentEventPayload::MaxTurnsReached { .. } => {
+                AgentEventPayload::Finished => {
                     break;
                 }
                 AgentEventPayload::Error { message } => {
@@ -100,7 +92,7 @@ async fn consume_events(mut event_rx: tokio::sync::broadcast::Receiver<AgentEven
     }
 
     eprintln!();
-    completion_text.unwrap_or(last_text)
+    last_text
 }
 
 /// Auto-approve all permission and question relay requests.

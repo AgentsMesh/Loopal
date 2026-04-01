@@ -21,7 +21,6 @@ fn big_tool_result_msg(size: usize) -> Message {
             tool_use_id: "t1".into(),
             content: "x".repeat(size),
             is_error: false,
-            is_completion: false,
             metadata: None,
         }],
     }

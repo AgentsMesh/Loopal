@@ -11,7 +11,7 @@ use std::time::Duration;
 use loopal_config::ResolvedPolicy;
 use loopal_error::ToolIoError;
 use loopal_tool_api::backend_types::ExecResult;
-use loopal_tool_api::truncate_output;
+use loopal_tool_api::handle_overflow;
 use tokio::io::{AsyncBufReadExt, BufReader};
 
 use crate::limits::ResourceLimits;
@@ -74,16 +74,20 @@ pub async fn exec_command_streaming(
     })??;
 
     let (stdout_buf, stderr_buf, exit_code) = result;
-    let stdout = truncate_output(
+    let stdout = handle_overflow(
         &stdout_buf,
         limits.max_output_lines,
         limits.max_output_bytes,
-    );
-    let stderr = truncate_output(
+        "bash_stdout",
+    )
+    .display;
+    let stderr = handle_overflow(
         &stderr_buf,
         limits.max_output_lines,
         limits.max_output_bytes,
-    );
+        "bash_stderr",
+    )
+    .display;
 
     Ok(ExecResult {
         stdout,

@@ -52,12 +52,6 @@ pub fn apply_env_overrides(value: &mut serde_json::Value) {
         value["model"] = serde_json::Value::String(model);
     }
 
-    if let Ok(max_turns) = std::env::var("LOOPAL_MAX_TURNS")
-        && let Ok(n) = max_turns.parse::<u32>()
-    {
-        value["max_turns"] = serde_json::json!(n);
-    }
-
     if let Ok(mode) = std::env::var("LOOPAL_PERMISSION_MODE") {
         value["permission_mode"] = serde_json::Value::String(mode);
     }

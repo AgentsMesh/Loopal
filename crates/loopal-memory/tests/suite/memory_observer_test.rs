@@ -92,5 +92,4 @@ fn test_memory_agent_prompt_is_embedded() {
     let prompt = loopal_memory::MEMORY_AGENT_PROMPT;
     assert!(prompt.contains("Memory Maintenance Agent"));
     assert!(prompt.contains("MEMORY.md"));
-    assert!(prompt.contains("AttemptCompletion"));
 }

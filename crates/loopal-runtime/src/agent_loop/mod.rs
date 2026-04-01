@@ -5,6 +5,7 @@ pub mod diff_tracker;
 pub mod env_context;
 mod finished_guard;
 mod input;
+mod input_control;
 mod llm;
 mod llm_params;
 mod llm_record;
@@ -55,13 +56,23 @@ pub(crate) const MAX_AUTO_CONTINUATIONS: u32 = 3;
 
 // ── Sub-structs ────────────────────────────────────────────────────
 
+/// Agent lifecycle mode — determines idle behavior after turn completion.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum LifecycleMode {
+    /// Wait for user input between turns (root agent, TUI, interactive CLI).
+    #[default]
+    Interactive,
+    /// Process prompt, exit when idle with no pending input (sub-agents, headless).
+    Task,
+}
+
 /// Agent configuration — mostly immutable, some fields switchable at runtime.
 pub struct AgentConfig {
+    pub lifecycle: LifecycleMode,
     pub router: ModelRouter,
     pub system_prompt: String,
     pub mode: AgentMode,
     pub permission_mode: PermissionMode,
-    pub max_turns: u32,
     /// Tool whitelist filter — if `Some`, only tools in this set are exposed.
     pub tool_filter: Option<HashSet<String>>,
     /// Thinking/reasoning configuration (default: Auto).
@@ -80,11 +91,11 @@ impl AgentConfig {
 impl Default for AgentConfig {
     fn default() -> Self {
         Self {
+            lifecycle: LifecycleMode::default(),
             router: ModelRouter::new("claude-sonnet-4-20250514".into()),
             system_prompt: String::new(),
             mode: AgentMode::Act,
             permission_mode: PermissionMode::Bypass,
-            max_turns: 50,
             tool_filter: None,
             thinking_config: ThinkingConfig::Auto,
             context_tokens_cap: 0,

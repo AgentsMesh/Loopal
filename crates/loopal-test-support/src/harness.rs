@@ -31,8 +31,8 @@ pub struct HarnessBuilder {
     pub(crate) summarization_model: Option<String>,
     pub(crate) permission_mode: PermissionMode,
     pub(crate) messages: Vec<Message>,
-    pub(crate) max_turns: u32,
     pub(crate) mode: AgentMode,
+    pub(crate) lifecycle: loopal_runtime::LifecycleMode,
     pub(crate) system_prompt: String,
     pub(crate) thinking_config: ThinkingConfig,
     pub(crate) tool_filter: Option<HashSet<String>>,
@@ -57,8 +57,8 @@ impl HarnessBuilder {
             summarization_model: None,
             permission_mode: PermissionMode::Bypass,
             messages: vec![Message::user("hello")],
-            max_turns: 10,
             mode: AgentMode::Act,
+            lifecycle: loopal_runtime::LifecycleMode::Task,
             system_prompt: "test".into(),
             thinking_config: ThinkingConfig::Auto,
             tool_filter: None,
@@ -87,10 +87,6 @@ impl HarnessBuilder {
     }
     pub fn messages(mut self, m: Vec<Message>) -> Self {
         self.messages = m;
-        self
-    }
-    pub fn max_turns(mut self, t: u32) -> Self {
-        self.max_turns = t;
         self
     }
     pub fn mode(mut self, m: AgentMode) -> Self {
@@ -133,7 +129,9 @@ impl HarnessBuilder {
     }
 
     /// Build and spawn `agent_loop` in a background task.
-    pub async fn build_spawned(self) -> SpawnedHarness {
+    /// Forces Interactive lifecycle since spawned tests send messages interactively.
+    pub async fn build_spawned(mut self) -> SpawnedHarness {
+        self.lifecycle = loopal_runtime::LifecycleMode::Interactive;
         let (harness, runner) = self.into_wired().await;
         tokio::spawn(async move {
             let mut runner = runner;

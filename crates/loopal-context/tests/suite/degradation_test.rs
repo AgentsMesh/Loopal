@@ -43,7 +43,6 @@ fn tool_result_msg(content_size: usize) -> Message {
             tool_use_id: "t1".into(),
             content: "x".repeat(content_size),
             is_error: false,
-            is_completion: false,
             metadata: None,
         }],
     }

@@ -86,7 +86,7 @@ fn make_test_budget() -> ContextBudget {
 async fn test_subagent_drains_pending_before_exit() {
     let (event_tx, mut event_rx) = mpsc::channel::<AgentEvent>(256);
     let (mailbox_tx, mailbox_rx) = mpsc::channel::<Envelope>(16);
-    let (_control_tx, control_rx) = mpsc::channel::<ControlCommand>(16);
+    let (control_tx, control_rx) = mpsc::channel::<ControlCommand>(16);
 
     // Push a pending message BEFORE the agent runs —
     // simulates a channel subscription message arriving during LLM processing.
@@ -98,6 +98,10 @@ async fn test_subagent_drains_pending_before_exit() {
         ))
         .await
         .unwrap();
+
+    // Drop senders so recv_input() returns None after the turn completes.
+    drop(mailbox_tx);
+    drop(control_tx);
 
     let frontend = Arc::new(UnifiedFrontend::new(
         Some("worker".into()),
@@ -117,7 +121,6 @@ async fn test_subagent_drains_pending_before_exit() {
 
     let params = AgentLoopParams {
         config: AgentConfig {
-            max_turns: 5,
             ..Default::default()
         },
         deps: AgentDeps {

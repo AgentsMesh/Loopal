@@ -16,11 +16,7 @@ pub(crate) fn handle_tool_call(
         id: id.clone(),
         name: name.clone(),
         status: ToolCallStatus::Pending,
-        summary: if name == "AttemptCompletion" {
-            name.clone()
-        } else {
-            format!("{}({})", name, truncate_json(&input, 60))
-        },
+        summary: format!("{}({})", name, truncate_json(&input, 60)),
         result: None,
         tool_input: Some(input),
         batch_id: None,
@@ -51,11 +47,10 @@ pub(crate) struct ToolResultParams {
     pub result: String,
     pub is_error: bool,
     pub duration_ms: Option<u64>,
-    pub is_completion: bool,
     pub metadata: Option<serde_json::Value>,
 }
 
-/// Handle ToolResult: update status, duration, and promote AttemptCompletion.
+/// Handle ToolResult: update status and duration.
 pub(crate) fn handle_tool_result(conv: &mut AgentConversation, p: ToolResultParams) {
     let status = if p.is_error {
         ToolCallStatus::Error
@@ -74,21 +69,10 @@ pub(crate) fn handle_tool_result(conv: &mut AgentConversation, p: ToolResultPara
                 tc.duration_ms = p.duration_ms;
                 tc.progress_tail = None;
                 tc.metadata = p.metadata.clone();
-                if !p.is_completion {
-                    tc.result = Some(truncate_result_for_storage(&p.result));
-                }
+                tc.result = Some(truncate_result_for_storage(&p.result));
                 break 'outer;
             }
         }
-    }
-    if p.is_completion {
-        conv.messages.push(SessionMessage {
-            role: "assistant".into(),
-            content: p.result,
-            tool_calls: Vec::new(),
-            image_count: 0,
-            skill_info: None,
-        });
     }
 }
 

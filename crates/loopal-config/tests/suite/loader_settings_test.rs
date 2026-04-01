@@ -7,7 +7,6 @@ fn test_load_settings_all_env_var_scenarios() {
     // All subtests that touch LOOPAL_* env vars are serialized here.
     unsafe {
         std::env::remove_var("LOOPAL_MODEL");
-        std::env::remove_var("LOOPAL_MAX_TURNS");
         std::env::remove_var("LOOPAL_PERMISSION_MODE");
     }
 
@@ -15,10 +14,8 @@ fn test_load_settings_all_env_var_scenarios() {
     {
         let tmp = TempDir::new().unwrap();
         let settings = load_config(tmp.path()).unwrap().settings;
-        assert_eq!(settings.max_turns, 50);
         assert_eq!(settings.model, "claude-sonnet-4-20250514");
         assert!(!settings.model.is_empty());
-        assert!(settings.max_turns > 0);
     }
 
     // --- Scenario 2: Project override ---
@@ -26,14 +23,9 @@ fn test_load_settings_all_env_var_scenarios() {
         let tmp = TempDir::new().unwrap();
         let config_dir = tmp.path().join(".loopal");
         std::fs::create_dir_all(&config_dir).unwrap();
-        std::fs::write(
-            config_dir.join("settings.json"),
-            r#"{"max_turns": 100, "model": "gpt-4"}"#,
-        )
-        .unwrap();
+        std::fs::write(config_dir.join("settings.json"), r#"{"model": "gpt-4"}"#).unwrap();
 
         let settings = load_config(tmp.path()).unwrap().settings;
-        assert_eq!(settings.max_turns, 100);
         assert_eq!(settings.model, "gpt-4");
     }
 
@@ -41,17 +33,14 @@ fn test_load_settings_all_env_var_scenarios() {
     {
         unsafe {
             std::env::set_var("LOOPAL_MODEL", "test-model");
-            std::env::set_var("LOOPAL_MAX_TURNS", "10");
         }
 
         let tmp = TempDir::new().unwrap();
         let settings = load_config(tmp.path()).unwrap().settings;
         assert_eq!(settings.model, "test-model");
-        assert_eq!(settings.max_turns, 10);
 
         unsafe {
             std::env::remove_var("LOOPAL_MODEL");
-            std::env::remove_var("LOOPAL_MAX_TURNS");
         }
     }
 
@@ -63,18 +52,21 @@ fn test_load_settings_all_env_var_scenarios() {
 
         std::fs::write(
             config_dir.join("settings.json"),
-            r#"{"max_turns": 100, "model": "gpt-4"}"#,
+            r#"{"max_context_tokens": 100, "model": "gpt-4"}"#,
         )
         .unwrap();
 
         std::fs::write(
             config_dir.join("settings.local.json"),
-            r#"{"max_turns": 200}"#,
+            r#"{"max_context_tokens": 200}"#,
         )
         .unwrap();
 
         let settings = load_config(tmp.path()).unwrap().settings;
-        assert_eq!(settings.max_turns, 200, "local should override project");
+        assert_eq!(
+            settings.max_context_tokens, 200,
+            "local should override project"
+        );
         assert_eq!(settings.model, "gpt-4", "model from project should persist");
     }
 
@@ -97,25 +89,7 @@ fn test_load_settings_all_env_var_scenarios() {
         }
     }
 
-    // --- Scenario 6: Non-numeric LOOPAL_MAX_TURNS is ignored ---
-    {
-        unsafe {
-            std::env::set_var("LOOPAL_MAX_TURNS", "not_a_number");
-        }
-
-        let tmp = TempDir::new().unwrap();
-        let settings = load_config(tmp.path()).unwrap().settings;
-        assert_eq!(
-            settings.max_turns, 50,
-            "non-numeric max_turns should be ignored"
-        );
-
-        unsafe {
-            std::env::remove_var("LOOPAL_MAX_TURNS");
-        }
-    }
-
-    // --- Scenario 7: LOOPAL_SANDBOX override ---
+    // --- Scenario 6: LOOPAL_SANDBOX override ---
     {
         unsafe {
             std::env::set_var("LOOPAL_SANDBOX", "read_only");

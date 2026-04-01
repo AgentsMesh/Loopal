@@ -119,7 +119,6 @@ async fn test_check_permission_channel_closed_denies() {
     let params = AgentLoopParams {
         config: AgentConfig {
             permission_mode: PermissionMode::Supervised,
-            max_turns: 10,
             ..Default::default()
         },
         deps: AgentDeps {

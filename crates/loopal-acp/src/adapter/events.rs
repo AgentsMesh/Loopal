@@ -59,9 +59,6 @@ impl AcpAdapter {
     async fn handle_event(&self, event: &AgentEvent, session_id: &str) -> Option<StopReason> {
         match &event.payload {
             AgentEventPayload::AwaitingInput => return Some(StopReason::EndTurn),
-            AgentEventPayload::MaxTurnsReached { .. } => {
-                return Some(StopReason::MaxTurnRequests);
-            }
             AgentEventPayload::Finished => return Some(StopReason::EndTurn),
             _ => {}
         }

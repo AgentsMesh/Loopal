@@ -7,6 +7,7 @@ use tokio::sync::Mutex;
 use tracing::info;
 
 use loopal_config::load_config;
+use loopal_error::AgentOutput;
 use loopal_ipc::connection::Connection;
 use loopal_protocol::InterruptSignal;
 use loopal_runtime::agent_loop;
@@ -20,7 +21,7 @@ use crate::session_hub::{InputFromClient, SessionHub, SharedSession};
 pub(crate) struct SessionHandle {
     pub session_id: String,
     pub session: Arc<SharedSession>,
-    pub agent_task: tokio::task::JoinHandle<()>,
+    pub agent_task: tokio::task::JoinHandle<Option<AgentOutput>>,
     /// When false (prompt-driven session), the server process exits after agent completes.
     /// When true (no initial prompt), the server stays alive for subsequent messages.
     pub has_initial_prompt: bool,
@@ -113,8 +114,14 @@ pub(crate) async fn start_session(
 
     let agent_task = tokio::spawn(async move {
         match agent_loop(agent_params).await {
-            Ok(output) => info!(reason = ?output.terminate_reason, "agent loop completed"),
-            Err(e) => tracing::error!(error = %e, "agent loop error"),
+            Ok(output) => {
+                info!(reason = ?output.terminate_reason, "agent loop completed");
+                Some(output)
+            }
+            Err(e) => {
+                tracing::error!(error = %e, "agent loop error");
+                None
+            }
         }
     });
 

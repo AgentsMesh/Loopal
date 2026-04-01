@@ -137,9 +137,6 @@ Loopal uses a layered configuration system. Create a `.loopal/config.toml` in yo
 # Default model
 model = "claude-sonnet-4-20250514"
 
-# Max turns per agent loop
-max_turns = 200
-
 # Permission mode: "supervised" or "bypass"
 permission_mode = "supervised"
 

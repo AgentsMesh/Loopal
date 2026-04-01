@@ -58,7 +58,6 @@ mod preflight_test;
 mod record_message_test;
 mod retry_cancel_test;
 mod run_test;
-mod tools_completion_test;
 mod tools_test;
 mod turn_completion_edge_test;
 mod turn_completion_test;

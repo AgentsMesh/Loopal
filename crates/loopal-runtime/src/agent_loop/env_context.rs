@@ -2,12 +2,12 @@
 //!
 //! Appends a lightweight `# Environment` section to the system prompt
 //! on each LLM call, providing the model with current date, working
-//! directory, git branch, and turn progress.
+//! directory, and git branch.
 
 use std::path::Path;
 
 /// Build a dynamic environment section (~100 tokens).
-pub fn build_env_section(cwd: &Path, turn_count: u32, max_turns: u32) -> String {
+pub fn build_env_section(cwd: &Path, turn_count: u32) -> String {
     let mut parts = Vec::with_capacity(5);
 
     // Date/time
@@ -25,8 +25,8 @@ pub fn build_env_section(cwd: &Path, turn_count: u32, max_turns: u32) -> String 
         parts.push(format!("- Git branch: {branch}"));
     }
 
-    // Turn progress
-    parts.push(format!("- Turn: {turn_count}/{max_turns}"));
+    // Turn counter
+    parts.push(format!("- Turn: {turn_count}"));
 
     format!("\n\n# Environment\n{}", parts.join("\n"))
 }

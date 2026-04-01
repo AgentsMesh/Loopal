@@ -76,10 +76,6 @@ pub struct ToolResult {
     pub content: String,
     /// Whether the tool execution resulted in an error
     pub is_error: bool,
-    /// Signals task completion (set by AttemptCompletion tool).
-    /// Checked by the runner to exit the turn loop.
-    #[serde(default)]
-    pub is_completion: bool,
     /// Structured data from the tool (e.g. bytes_written for Write).
     /// Avoids parsing string content for metadata.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -91,7 +87,6 @@ impl ToolResult {
         Self {
             content: content.into(),
             is_error: false,
-            is_completion: false,
             metadata: None,
         }
     }
@@ -100,17 +95,6 @@ impl ToolResult {
         Self {
             content: content.into(),
             is_error: true,
-            is_completion: false,
-            metadata: None,
-        }
-    }
-
-    /// Signal task completion. Content is the result summary.
-    pub fn completion(content: impl Into<String>) -> Self {
-        Self {
-            content: content.into(),
-            is_error: false,
-            is_completion: true,
             metadata: None,
         }
     }

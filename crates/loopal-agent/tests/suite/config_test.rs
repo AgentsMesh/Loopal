@@ -13,7 +13,6 @@ fn test_load_agent_configs_from_dir() {
 description: Code explorer
 permission_mode: accept-edits
 allowed_tools: [Read, Glob, Grep]
-max_turns: 15
 ---
 You explore code.
 "#,
@@ -25,7 +24,6 @@ You explore code.
 
     let config = configs.get("explorer").unwrap();
     assert_eq!(config.description, "Code explorer");
-    assert_eq!(config.max_turns, 15);
     assert_eq!(
         config.allowed_tools.as_ref().unwrap(),
         &["Read", "Glob", "Grep"]
@@ -43,7 +41,6 @@ fn test_load_empty_dir_returns_empty() {
 #[test]
 fn test_default_agent_config() {
     let config = AgentConfig::default();
-    assert_eq!(config.max_turns, 30);
     assert!(config.allowed_tools.is_none());
     assert!(config.model.is_none());
 }

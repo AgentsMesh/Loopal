@@ -1,8 +1,12 @@
 // Single test binary — includes all test modules
 #[path = "suite/advanced_scenarios_test.rs"]
 mod advanced_scenarios_test;
+#[path = "suite/agent_completed_result_test.rs"]
+mod agent_completed_result_test;
 #[path = "suite/collaboration_test.rs"]
 mod collaboration_test;
+#[path = "suite/completion_injection_test.rs"]
+mod completion_injection_test;
 #[path = "suite/completion_output_test.rs"]
 mod completion_output_test;
 #[path = "suite/dispatch_test.rs"]
@@ -17,6 +21,8 @@ mod hub_integration_test;
 mod hub_lifecycle_test;
 #[path = "suite/multi_agent_test.rs"]
 mod multi_agent_test;
+#[path = "suite/parallel_spawn_test.rs"]
+mod parallel_spawn_test;
 #[path = "suite/race_condition_test.rs"]
 mod race_condition_test;
 #[path = "suite/relay_test.rs"]

@@ -5,3 +5,4 @@
 
 pub mod agent;
 pub mod send_message;
+pub(crate) mod shared_extract;

@@ -42,7 +42,6 @@ fn test_load_settings_local_overrides_project_deep_nested() {
     std::fs::write(
         config_dir.join("settings.json"),
         r#"{
-            "max_turns": 30,
             "providers": {
                 "openai": {
                     "api_key": "proj-openai-key",
@@ -59,7 +58,6 @@ fn test_load_settings_local_overrides_project_deep_nested() {
     std::fs::write(
         config_dir.join("settings.local.json"),
         r#"{
-            "max_turns": 75,
             "providers": {
                 "openai": {
                     "api_key": "local-openai-key"
@@ -70,7 +68,6 @@ fn test_load_settings_local_overrides_project_deep_nested() {
     .unwrap();
 
     let settings = load_config(tmp.path()).unwrap().settings;
-    assert_eq!(settings.max_turns, 75, "local should override max_turns");
 
     let openai = settings.providers.openai.as_ref().unwrap();
     assert_eq!(
@@ -141,7 +138,6 @@ fn test_load_settings_empty_json_file_uses_defaults() {
     std::fs::write(config_dir.join("settings.json"), "{}").unwrap();
 
     let settings = load_config(tmp.path()).unwrap().settings;
-    assert_eq!(settings.max_turns, 50);
     assert_eq!(settings.model, "claude-sonnet-4-20250514");
 }
 
@@ -151,7 +147,7 @@ fn test_load_settings_invalid_local_json_returns_error() {
     let config_dir = tmp.path().join(".loopal");
     std::fs::create_dir_all(&config_dir).unwrap();
 
-    std::fs::write(config_dir.join("settings.json"), r#"{"max_turns": 10}"#).unwrap();
+    std::fs::write(config_dir.join("settings.json"), r#"{"model": "gpt-4"}"#).unwrap();
     std::fs::write(config_dir.join("settings.local.json"), "NOT_JSON!!").unwrap();
 
     let result = load_config(tmp.path());

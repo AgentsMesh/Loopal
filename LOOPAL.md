@@ -101,7 +101,7 @@ TUI Process ──stdio IPC──→ Agent Server Process ←──TCP──→ 
 <project>/.loopal/settings.local.json  Local overrides (gitignored)
 ```
 
-Environment variable overrides use `LOOPAL_` prefix. Key settings: `model` (default: `claude-sonnet-4-20250514`), `max_turns` (default: 50), `permission_mode`.
+Environment variable overrides use `LOOPAL_` prefix. Key settings: `model` (default: `claude-sonnet-4-20250514`), `permission_mode`.
 
 ## Code Conventions
 

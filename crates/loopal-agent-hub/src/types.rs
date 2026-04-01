@@ -44,4 +44,8 @@ pub struct LocalChannels {
 pub(crate) struct ManagedAgent {
     pub(crate) state: AgentConnectionState,
     pub(crate) info: AgentInfo,
+    /// Channel for delivering sub-agent completion notifications to this agent.
+    /// When a child of this agent finishes, Hub sends an Envelope here.
+    /// None for agents that don't spawn children (or weren't given a channel).
+    pub(crate) completion_tx: Option<mpsc::Sender<Envelope>>,
 }

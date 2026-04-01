@@ -107,21 +107,6 @@ fn test_handle_mode_changed() {
 }
 
 #[test]
-fn test_handle_max_turns_reached() {
-    let app = make_app();
-    app.session
-        .handle_event(AgentEvent::root(AgentEventPayload::MaxTurnsReached {
-            turns: 50,
-        }));
-
-    let state = app.session.lock();
-    let conv = state.active_conversation();
-    assert_eq!(conv.messages.len(), 1);
-    assert_eq!(conv.messages[0].role, "system");
-    assert!(conv.messages[0].content.contains("50"));
-}
-
-#[test]
 fn test_handle_started_event() {
     let app = make_app();
     app.session

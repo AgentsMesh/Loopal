@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use loopal_error::{AgentOutput, Result};
-use loopal_protocol::{AgentEventPayload, InterruptSignal};
+use loopal_protocol::{AgentEventPayload, AgentStatus, InterruptSignal};
 use loopal_tool_api::ToolContext;
 use tokio::sync::watch;
 use tracing::{Instrument, info, info_span};
@@ -24,6 +24,8 @@ pub struct AgentLoopRunner {
     pub observers: Vec<Box<dyn TurnObserver>>,
     /// Scheduler message receiver — consumed in `wait_for_input()`.
     pub trigger_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
+    /// Explicit agent state — source of truth, propagated via events to Session layer.
+    pub status: AgentStatus,
 }
 
 impl AgentLoopRunner {
@@ -56,6 +58,7 @@ impl AgentLoopRunner {
             interrupt_tx,
             observers: Vec::new(),
             trigger_rx,
+            status: AgentStatus::Starting,
         }
     }
 
@@ -69,19 +72,18 @@ impl AgentLoopRunner {
     /// Actual run logic, executed inside the `agent` span.
     async fn run_instrumented(&mut self) -> Result<AgentOutput> {
         info!(model = %self.params.config.model(), "agent loop started");
+        // Started is a one-time lifecycle event (not a status transition).
+        // Status moves to Running via transition() before each turn.
+        self.transition(AgentStatus::Running).await?;
         self.emit(AgentEventPayload::Started).await?;
 
         let result = self.run_loop().await;
 
         if let Err(ref e) = result {
-            let _ = self
-                .emit(AgentEventPayload::Error {
-                    message: e.to_string(),
-                })
-                .await;
+            let _ = self.transition_error(e.to_string()).await;
         }
 
-        let _ = self.emit(AgentEventPayload::Finished).await;
+        let _ = self.transition(AgentStatus::Finished).await;
         result
     }
 
@@ -102,6 +104,27 @@ impl AgentLoopRunner {
     /// Send an event payload via the frontend.
     pub async fn emit(&self, payload: AgentEventPayload) -> Result<()> {
         self.params.deps.frontend.emit(payload).await
+    }
+
+    /// Transition to a new agent status and emit the corresponding event.
+    ///
+    /// **This is the ONLY way to change agent status.** Every status change
+    /// goes through this method, ensuring SSOT and deterministic event emission.
+    pub(super) async fn transition(&mut self, new_status: AgentStatus) -> Result<()> {
+        self.status = new_status;
+        match new_status {
+            AgentStatus::Starting => Ok(()),
+            AgentStatus::Running => Ok(()), // Running is signaled implicitly by Stream/ToolCall events.
+            AgentStatus::WaitingForInput => self.emit(AgentEventPayload::AwaitingInput).await,
+            AgentStatus::Finished => self.emit(AgentEventPayload::Finished).await,
+            AgentStatus::Error => Ok(()), // Error event carries a message; use transition_error().
+        }
+    }
+
+    /// Transition to Error status with a message.
+    pub(super) async fn transition_error(&mut self, message: String) -> Result<()> {
+        self.status = AgentStatus::Error;
+        self.emit(AgentEventPayload::Error { message }).await
     }
 
     /// Recalculate context budget from current model config.

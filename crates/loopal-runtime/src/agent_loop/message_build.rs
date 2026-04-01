@@ -10,6 +10,7 @@ pub fn build_user_message(env: &Envelope) -> Message {
             format!("[from: #{}/{}] {}", channel, from, env.content.text)
         }
         MessageSource::Scheduled => format!("[scheduled] {}", env.content.text),
+        MessageSource::System(_) => env.content.text.clone(),
     };
     let mut blocks: Vec<ContentBlock> = Vec::new();
     if !text.is_empty() {

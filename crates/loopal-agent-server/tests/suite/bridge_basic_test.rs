@@ -21,11 +21,14 @@ async fn child_text_streamed_and_finished() {
     let has_stream = events
         .iter()
         .any(|e| matches!(e, AgentEventPayload::Stream { .. }));
-    let has_finished = events
-        .iter()
-        .any(|e| matches!(e, AgentEventPayload::Finished));
+    let has_terminal = events.iter().any(|e| {
+        matches!(
+            e,
+            AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
+        )
+    });
     assert!(has_stream, "should have Stream event");
-    assert!(has_finished, "should have Finished event");
+    assert!(has_terminal, "should have terminal event");
 
     // Accumulate stream text
     let text: String = events
@@ -61,13 +64,16 @@ async fn child_tool_call_events_visible() {
     let has_tool_result = events
         .iter()
         .any(|e| matches!(e, AgentEventPayload::ToolResult { name, .. } if name == "Glob"));
-    let has_finished = events
-        .iter()
-        .any(|e| matches!(e, AgentEventPayload::Finished));
+    let has_terminal = events.iter().any(|e| {
+        matches!(
+            e,
+            AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
+        )
+    });
 
     assert!(has_tool_call, "should see ToolCall for Glob");
     assert!(has_tool_result, "should see ToolResult for Glob");
-    assert!(has_finished, "should finish");
+    assert!(has_terminal, "should finish");
 }
 
 /// Sub-agent runs multiple tool turns -> all events visible -> final text.
@@ -95,9 +101,10 @@ async fn child_multi_turn_tool_chain() {
     assert!(tool_names.contains(&"Ls"), "should call Ls");
     assert!(tool_names.contains(&"Glob"), "should call Glob");
     assert!(
-        events
-            .iter()
-            .any(|e| matches!(e, AgentEventPayload::Finished)),
+        events.iter().any(|e| matches!(
+            e,
+            AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
+        )),
         "should finish"
     );
 }
@@ -117,47 +124,10 @@ async fn child_finished_no_hang() {
     let events = result.unwrap();
     let last = events.last().expect("should have events");
     assert!(
-        matches!(last, AgentEventPayload::Finished),
-        "last event should be Finished"
-    );
-}
-
-/// Sub-agent calls AttemptCompletion -> ToolResult contains the full output.
-/// Verifies that bridge_child_events can capture the completion result.
-#[tokio::test]
-async fn child_attempt_completion_result_visible() {
-    let calls = scenarios::attempt_completion("Here is the detailed analysis result.");
-    let (conn, mut rx, fixture, _join) = start_child_server(calls).await;
-    let _sid = init_and_start(&conn, &fixture, "analyze this").await;
-
-    let events = collect_agent_events(&mut rx).await;
-
-    // Should see AttemptCompletion tool call + result
-    let has_tool_call = events.iter().any(
-        |e| matches!(e, AgentEventPayload::ToolCall { name, .. } if name == "AttemptCompletion"),
-    );
-    let completion_result: Option<&str> = events.iter().find_map(|e| match e {
-        AgentEventPayload::ToolResult {
-            name,
-            result,
-            is_error,
-            ..
-        } if name == "AttemptCompletion" && !is_error => Some(result.as_str()),
-        _ => None,
-    });
-
-    assert!(has_tool_call, "should see AttemptCompletion ToolCall");
-    assert!(
-        completion_result.is_some(),
-        "should see AttemptCompletion ToolResult"
-    );
-    assert!(
-        completion_result.unwrap().contains("detailed analysis"),
-        "ToolResult should contain the completion text"
-    );
-    assert!(
-        events
-            .iter()
-            .any(|e| matches!(e, AgentEventPayload::Finished))
+        matches!(
+            last,
+            AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
+        ),
+        "last event should be terminal (Finished or AwaitingInput)"
     );
 }

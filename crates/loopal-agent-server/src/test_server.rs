@@ -5,7 +5,8 @@ use std::sync::Arc;
 use loopal_ipc::connection::Connection;
 use loopal_ipc::transport::Transport;
 
-use crate::server::{dispatch_loop, wait_for_initialize};
+use crate::server::dispatch_loop;
+use crate::server_init::wait_for_initialize;
 use crate::session_hub::SessionHub;
 
 /// Run the server with injected mock provider (for integration tests).

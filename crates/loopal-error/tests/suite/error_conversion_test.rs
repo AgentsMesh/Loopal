@@ -84,12 +84,12 @@ fn test_tool_error_display_timeout() {
 #[test]
 fn test_config_error_display_invalid_value() {
     let err = ConfigError::InvalidValue {
-        field: "max_turns".into(),
-        reason: "must be positive".into(),
+        field: "model".into(),
+        reason: "must not be empty".into(),
     };
     assert_eq!(
         format!("{err}"),
-        "Invalid value for max_turns: must be positive"
+        "Invalid value for model: must not be empty"
     );
 }
 

@@ -25,7 +25,7 @@ async fn test_provider_error_only() {
     let events = harness.collect_until_idle().await;
 
     assertions::assert_has_error(&events);
-    assertions::assert_has_finished(&events);
+    assertions::assert_has_terminal(&events);
 }
 
 #[tokio::test]

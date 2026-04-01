@@ -42,7 +42,7 @@ fn full_lifecycle_started_to_finished() {
                 result: "found 10 files".into(),
                 is_error: false,
                 duration_ms: Some(15),
-                is_completion: false,
+
                 metadata: None,
             },
             AgentEventPayload::ToolCall {
@@ -56,7 +56,7 @@ fn full_lifecycle_started_to_finished() {
                 result: "fn main() {}".into(),
                 is_error: false,
                 duration_ms: Some(3),
-                is_completion: false,
+
                 metadata: None,
             },
             AgentEventPayload::Stream {
@@ -122,7 +122,7 @@ fn tools_in_flight_balances_correctly() {
                 result: "ok".into(),
                 is_error: false,
                 duration_ms: None,
-                is_completion: false,
+
                 metadata: None,
             },
         ),
@@ -140,7 +140,7 @@ fn tools_in_flight_balances_correctly() {
                 result: "ok".into(),
                 is_error: false,
                 duration_ms: None,
-                is_completion: false,
+
                 metadata: None,
             },
         ),

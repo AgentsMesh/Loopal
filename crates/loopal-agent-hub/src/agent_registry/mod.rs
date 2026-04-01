@@ -46,12 +46,13 @@ impl AgentRegistry {
             ManagedAgent {
                 state: AgentConnectionState::Local(channels),
                 info: AgentInfo::new(name, None, None),
+                completion_tx: None,
             },
         );
     }
 
     pub fn register_connection(&mut self, name: &str, conn: Arc<Connection>) -> Result<(), String> {
-        self.register_connection_with_parent(name, conn, None, None)
+        self.register_connection_with_parent(name, conn, None, None, None)
     }
 
     pub fn register_connection_with_parent(
@@ -60,6 +61,7 @@ impl AgentRegistry {
         conn: Arc<Connection>,
         parent: Option<&str>,
         model: Option<&str>,
+        completion_tx: Option<mpsc::Sender<Envelope>>,
     ) -> Result<(), String> {
         if self.agents.contains_key(name) {
             return Err(format!("agent '{name}' already registered"));
@@ -74,6 +76,7 @@ impl AgentRegistry {
             ManagedAgent {
                 state: AgentConnectionState::Connected(conn),
                 info: AgentInfo::new(name, parent, model),
+                completion_tx,
             },
         );
         Ok(())

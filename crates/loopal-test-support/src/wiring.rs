@@ -124,6 +124,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
 
     let params = AgentLoopParams {
         config: loopal_runtime::AgentConfig {
+            lifecycle: builder.lifecycle,
             router: {
                 let mut routing = std::collections::HashMap::new();
                 if let Some(m) = builder.summarization_model {
@@ -134,7 +135,6 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
             system_prompt: builder.system_prompt,
             mode: builder.mode,
             permission_mode: builder.permission_mode,
-            max_turns: builder.max_turns,
             tool_filter: builder.tool_filter,
             thinking_config: builder.thinking_config,
             context_tokens_cap: 200_000,

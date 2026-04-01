@@ -35,20 +35,20 @@ fn test_resolve_settings_deep_merge() {
         source: LayerSource::Global,
         ..Default::default()
     };
-    layer1.settings = serde_json::json!({"model": "gpt-4", "max_turns": 100});
+    layer1.settings = serde_json::json!({"model": "gpt-4", "max_context_tokens": 100});
 
     let mut layer2 = ConfigLayer {
         source: LayerSource::Project,
         ..Default::default()
     };
-    layer2.settings = serde_json::json!({"max_turns": 200});
+    layer2.settings = serde_json::json!({"max_context_tokens": 200});
 
     resolver.add_layer(layer1);
     resolver.add_layer(layer2);
 
     let config = resolver.resolve().unwrap();
     assert_eq!(config.settings.model, "gpt-4");
-    assert_eq!(config.settings.max_turns, 200);
+    assert_eq!(config.settings.max_context_tokens, 200);
 }
 
 #[test]

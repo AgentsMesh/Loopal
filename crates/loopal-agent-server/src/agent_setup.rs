@@ -43,7 +43,6 @@ pub fn build_with_frontend(
     let model = router
         .resolve(loopal_provider_api::TaskType::Default)
         .to_string();
-    let max_turns = config.settings.max_turns;
     let permission_mode = config.settings.permission_mode;
     let thinking_config = config.settings.thinking.clone();
     let (mode, mode_str) = match start.mode.as_deref() {
@@ -168,13 +167,19 @@ pub fn build_with_frontend(
         tool_tokens,
     );
 
+    let lifecycle = if start.prompt.is_some() {
+        loopal_runtime::LifecycleMode::Task
+    } else {
+        loopal_runtime::LifecycleMode::Interactive
+    };
+
     let params = AgentLoopParams {
         config: loopal_runtime::AgentConfig {
+            lifecycle,
             router,
             system_prompt,
             mode,
             permission_mode,
-            max_turns,
             tool_filter: None,
             thinking_config,
             context_tokens_cap: config.settings.max_context_tokens,

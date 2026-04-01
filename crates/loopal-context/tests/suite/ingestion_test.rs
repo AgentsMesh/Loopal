@@ -9,7 +9,6 @@ fn tool_result(id: &str, content: &str) -> ContentBlock {
         tool_use_id: id.to_string(),
         content: content.to_string(),
         is_error: false,
-        is_completion: false,
         metadata: None,
     }
 }
@@ -77,7 +76,6 @@ fn cap_tool_results_skips_errors() {
             tool_use_id: "t1".into(),
             content: big_content.clone(),
             is_error: true,
-            is_completion: false,
             metadata: None,
         }],
     };

@@ -60,9 +60,10 @@ async fn child_permission_request_denied() {
 
     assert!(got_permission_request, "should receive permission request");
     assert!(
-        events
-            .iter()
-            .any(|e| matches!(e, AgentEventPayload::Finished)),
+        events.iter().any(|e| matches!(
+            e,
+            AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
+        )),
         "should finish after permission denial"
     );
 }
@@ -77,9 +78,10 @@ async fn shutdown_after_session_completes() {
     // Wait for session to finish
     let events = collect_agent_events(&mut rx).await;
     assert!(
-        events
-            .iter()
-            .any(|e| matches!(e, AgentEventPayload::Finished)),
+        events.iter().any(|e| matches!(
+            e,
+            AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
+        )),
         "session should finish"
     );
 
@@ -168,14 +170,12 @@ async fn two_children_finish_independently() {
 
     assert!(text_a.contains("from-child-A"), "child A text");
     assert!(text_b.contains("from-child-B"), "child B text");
-    assert!(
-        events_a
-            .iter()
-            .any(|e| matches!(e, AgentEventPayload::Finished))
-    );
-    assert!(
-        events_b
-            .iter()
-            .any(|e| matches!(e, AgentEventPayload::Finished))
-    );
+    assert!(events_a.iter().any(|e| matches!(
+        e,
+        AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
+    )));
+    assert!(events_b.iter().any(|e| matches!(
+        e,
+        AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
+    )));
 }

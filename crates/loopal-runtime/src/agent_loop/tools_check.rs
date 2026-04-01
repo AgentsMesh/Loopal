@@ -110,7 +110,6 @@ impl AgentLoopRunner {
             result: message.to_string(),
             is_error: true,
             duration_ms: None,
-            is_completion: false,
             metadata: None,
         })
         .await
@@ -122,7 +121,6 @@ pub(super) fn error_block(id: &str, content: &str) -> ContentBlock {
         tool_use_id: id.to_string(),
         content: content.to_string(),
         is_error: true,
-        is_completion: false,
         metadata: None,
     }
 }

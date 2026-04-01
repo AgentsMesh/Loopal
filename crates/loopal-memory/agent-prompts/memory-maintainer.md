@@ -32,4 +32,4 @@ Stable knowledge that does NOT change with code:
 - Topic files: unlimited length, one per theme (conventions.md, pitfalls.md, etc.)
 - Merge duplicates, update outdated entries, remove stale info
 
-When done, call AttemptCompletion with a brief summary of what changed (or "no update needed").
+When done, output a brief summary of what changed (or "no update needed").

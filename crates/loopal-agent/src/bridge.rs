@@ -17,7 +17,6 @@ pub async fn bridge_child_events(
     cancel_token: &CancellationToken,
 ) -> Result<String, String> {
     let mut stream_text = String::new();
-    let mut completion_result: Option<String> = None;
     loop {
         tokio::select! {
             event = client.recv() => match event {
@@ -26,15 +25,10 @@ pub async fn bridge_child_events(
                         AgentEventPayload::Stream { text } => {
                             stream_text.push_str(text);
                         }
-                        // Capture AttemptCompletion result — this is the
-                        // sub-agent's primary output, not the Stream text.
-                        AgentEventPayload::ToolResult { result, is_completion: true, .. } =>
-                        {
-                            completion_result = Some(result.clone());
-                        }
-                        // Session finished — child server will exit on its own
-                        // for prompt-driven sessions. Just break.
-                        AgentEventPayload::Finished => {
+                        // AwaitingInput = sub-agent finished its prompt and is
+                        // idle. For one-shot sub-agents this is the "done" signal.
+                        AgentEventPayload::AwaitingInput
+                        | AgentEventPayload::Finished => {
                             break;
                         }
                         _ => {}
@@ -58,16 +52,11 @@ pub async fn bridge_child_events(
         }
     }
     info!(agent = %agent_name, "sub-agent bridge ended");
-    // Prefer AttemptCompletion result over accumulated stream text.
-    // The content is already clean (no prefix) since the producer uses
-    // ToolResult::completion() which sets is_completion: true.
-    let output = completion_result.unwrap_or_else(|| {
-        if stream_text.is_empty() {
-            "(sub-agent completed)".into()
-        } else {
-            stream_text
-        }
-    });
+    let output = if stream_text.is_empty() {
+        "(sub-agent completed)".into()
+    } else {
+        stream_text
+    };
     Ok(output)
 }
 

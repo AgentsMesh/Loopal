@@ -40,7 +40,7 @@ fn test_event_tool_result_serde_roundtrip() {
         result: "file contents".into(),
         is_error: false,
         duration_ms: None,
-        is_completion: false,
+
         metadata: None,
     });
     let json = serde_json::to_string(&event).unwrap();
@@ -70,7 +70,7 @@ fn test_event_tool_result_error_serde_roundtrip() {
         result: "command not found".into(),
         is_error: true,
         duration_ms: None,
-        is_completion: false,
+
         metadata: None,
     });
     let json = serde_json::to_string(&event).unwrap();
@@ -123,18 +123,6 @@ fn test_event_awaiting_input_serde_roundtrip() {
         deserialized.payload,
         AgentEventPayload::AwaitingInput
     ));
-}
-
-#[test]
-fn test_event_max_turns_reached_serde_roundtrip() {
-    let event = AgentEvent::root(AgentEventPayload::MaxTurnsReached { turns: 50 });
-    let json = serde_json::to_string(&event).unwrap();
-    let deserialized: AgentEvent = serde_json::from_str(&json).unwrap();
-    if let AgentEventPayload::MaxTurnsReached { turns } = deserialized.payload {
-        assert_eq!(turns, 50);
-    } else {
-        panic!("expected AgentEventPayload::MaxTurnsReached");
-    }
 }
 
 #[test]

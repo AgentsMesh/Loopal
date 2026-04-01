@@ -25,7 +25,7 @@ fn wrap_tui(inner: loopal_test_support::SpawnedHarness) -> TuiTestHarness {
 #[tokio::test]
 async fn test_session_persistence_roundtrip() {
     // Use IntegrationHarness (not spawned) so we can call runner.run() directly.
-    let harness = HarnessBuilder::new()
+    let mut harness = HarnessBuilder::new()
         .calls(vec![chunks::text_turn("persisted response")])
         .build()
         .await;
@@ -37,8 +37,7 @@ async fn test_session_persistence_roundtrip() {
         .path()
         .join("sessions/sessions/integration-test");
 
-    let mut runner = harness.runner;
-    let _ = runner.run().await;
+    let _ = harness.runner.run().await;
 
     // The runner saves messages via session_manager.save_message().
     // Check that the session directory was created with message files.
@@ -121,5 +120,5 @@ async fn test_empty_user_input() {
 
     let evts = harness.collect_until_idle().await;
     // Should reach idle without panic
-    assertions::assert_has_finished(&evts);
+    assertions::assert_has_terminal(&evts);
 }

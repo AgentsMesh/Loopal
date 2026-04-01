@@ -12,12 +12,11 @@ use crate::mode::AgentMode;
 
 impl AgentLoopRunner {
     /// Execute tool calls: intercept → precheck → permission → parallel execution.
-    /// Returns `Some(result)` if AttemptCompletion was called, `None` otherwise.
     pub async fn execute_tools(
         &mut self,
         tool_uses: Vec<(String, String, serde_json::Value)>,
         cancel: &TurnCancel,
-    ) -> Result<Option<String>> {
+    ) -> Result<()> {
         if cancel.is_cancelled() {
             return self.emit_all_interrupted(&tool_uses).await;
         }
@@ -110,27 +109,13 @@ impl AgentLoopRunner {
         Ok((intercepted, remaining))
     }
 
-    /// Sort results, detect AttemptCompletion, persist message.
+    /// Sort results and persist message.
     fn finalize_tool_results(
         &mut self,
         mut indexed_results: Vec<(usize, ContentBlock)>,
-    ) -> Result<Option<String>> {
+    ) -> Result<()> {
         indexed_results.sort_by_key(|(idx, _)| *idx);
         let blocks: Vec<ContentBlock> = indexed_results.into_iter().map(|(_, b)| b).collect();
-
-        let completion = blocks.iter().find_map(|b| {
-            if let ContentBlock::ToolResult {
-                content,
-                is_error: false,
-                is_completion: true,
-                ..
-            } = b
-            {
-                Some(content.clone())
-            } else {
-                None
-            }
-        });
 
         let mut msg = Message {
             id: None,
@@ -146,6 +131,6 @@ impl AgentLoopRunner {
             error!(error = %e, "failed to persist message");
         }
         self.params.store.push_tool_results(msg);
-        Ok(completion)
+        Ok(())
     }
 }

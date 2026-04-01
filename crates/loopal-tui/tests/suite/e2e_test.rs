@@ -39,5 +39,5 @@ async fn test_tool_call_then_text() {
 async fn test_finished_event() {
     let mut harness = build_tui_harness(vec![chunks::text_turn("Done.")], 80, 24).await;
     let events = harness.collect_until_idle().await;
-    assertions::assert_has_finished(&events);
+    assertions::assert_has_terminal(&events);
 }

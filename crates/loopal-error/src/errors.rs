@@ -138,20 +138,29 @@ pub enum McpError {
 /// Why the agent loop terminated.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TerminateReason {
-    /// Agent completed its task (called AttemptCompletion or natural finish).
+    /// Agent completed its task.
     Goal,
     /// LLM or system error.
     Error,
-    /// Reached max_turns limit.
-    MaxTurns,
     /// Cancelled by parent or user.
     Aborted,
+}
+
+impl TerminateReason {
+    /// Stable string tag for IPC serialization (e.g. `agent/completed` payload).
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Goal => "goal",
+            Self::Error => "error",
+            Self::Aborted => "aborted",
+        }
+    }
 }
 
 /// Structured output from an agent loop execution.
 #[derive(Debug, Clone)]
 pub struct AgentOutput {
-    /// Best-effort result text (may be non-empty even on Error/MaxTurns).
+    /// Best-effort result text (may be non-empty even on Error).
     pub result: String,
     /// Why the loop stopped.
     pub terminate_reason: TerminateReason,

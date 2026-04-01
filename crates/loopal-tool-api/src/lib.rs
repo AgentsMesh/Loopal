@@ -16,4 +16,6 @@ pub use memory_channel::MemoryChannel;
 pub use output_tail::OutputTail;
 pub use permission::{PermissionDecision, PermissionLevel, PermissionMode};
 pub use tool::{Tool, ToolContext, ToolDefinition, ToolResult};
-pub use truncate::{needs_truncation, truncate_output};
+pub use truncate::{
+    OverflowResult, handle_overflow, needs_truncation, save_to_overflow_file, truncate_output,
+};

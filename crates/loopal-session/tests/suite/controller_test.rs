@@ -121,7 +121,7 @@ fn test_tool_call_and_result() {
         result: "file.txt".to_string(),
         is_error: false,
         duration_ms: None,
-        is_completion: false,
+
         metadata: None,
     }));
     assert_eq!(

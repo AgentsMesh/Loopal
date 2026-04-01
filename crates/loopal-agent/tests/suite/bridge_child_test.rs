@@ -85,33 +85,6 @@ async fn bridge_returns_stream_text() {
     );
 }
 
-/// Sub-agent calls AttemptCompletion -> bridge returns completion result, not stream.
-#[tokio::test]
-async fn bridge_returns_completion_over_stream() {
-    let (client, event_tx, cancel, _fix) = start_bridge_client(scenarios::attempt_completion(
-        "## Full Analysis Report\n\nThe project has 42 crates.",
-    ))
-    .await;
-
-    let result = tokio::time::timeout(T, bridge_child_events(client, &event_tx, "test", &cancel))
-        .await
-        .unwrap();
-
-    let text = result.expect("should succeed");
-    assert!(
-        text.contains("Full Analysis Report"),
-        "should return AttemptCompletion result, got: {text}"
-    );
-    assert!(
-        text.contains("42 crates"),
-        "should contain full completion text"
-    );
-    assert!(
-        !text.starts_with("<<COMPLETION>>"),
-        "result must not contain any legacy prefix"
-    );
-}
-
 /// Sub-agent produces no text (tools only, then finish) -> default message.
 #[tokio::test]
 async fn bridge_returns_default_when_no_output() {

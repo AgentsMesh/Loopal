@@ -1,105 +1,81 @@
 //! Outer loop: user-interaction granularity.
 //!
 //! The agent loop runs turns until:
-//! - `max_turns` is reached
-//! - `wait_for_input` returns None (frontend disconnected / channel closed)
-//! - The agent encounters an unrecoverable error
+//! - Task agent: idle with no pending input → exit
+//! - Interactive agent: `wait_for_input` returns None (channel closed)
+//! - Unrecoverable error
 //!
-//! The loop always waits for input between turns. The caller (headless,
-//! eval harness) controls lifetime by closing the input channel when done.
+//! State machine: Starting → Running → WaitingForInput → Running → ... → Finished
 
 use loopal_error::{AgentOutput, LoopalError, Result, TerminateReason};
-use loopal_protocol::AgentEventPayload;
+use loopal_protocol::{AgentEventPayload, AgentStatus};
 use tracing::{error, info};
 
-use super::WaitResult;
 use super::cancel::TurnCancel;
 use super::runner::AgentLoopRunner;
 use super::turn_context::TurnContext;
+use super::{LifecycleMode, WaitResult};
 
 impl AgentLoopRunner {
-    /// Outer loop: user-interaction granularity.
     pub(super) async fn run_loop(&mut self) -> Result<AgentOutput> {
         let mut last_output = String::new();
         let mut server_block_retry = false;
-        // If the store already has messages, we're processing a pre-loaded prompt.
-        // After completing all turns for that prompt, exit instead of waiting for
-        // more input. This is a data-flow decision (not UI): the initial message
-        // batch is the complete input; there is no subsequent producer.
-        let initial_prompt = !self.params.store.is_empty();
+        let mut needs_input = self.params.store.is_empty();
+
         loop {
+            // ── Idle phase ──────────────────────────────────────────
+            if needs_input {
+                self.transition(AgentStatus::WaitingForInput).await?;
+
+                match self.params.config.lifecycle {
+                    LifecycleMode::Task => {
+                        // Task agent: check for pending input. If nothing pending
+                        // after a brief yield, work is done — exit.
+                        // The yield allows in-flight IPC messages (e.g. sub-agent
+                        // completions) to arrive before we decide to exit.
+                        tokio::task::yield_now().await;
+                        let pending = self.drain_pending_input().await;
+                        if pending.is_empty() {
+                            info!("task agent idle with no pending input, exiting");
+                            break;
+                        }
+                        for env in &pending {
+                            self.ingest_message(env);
+                        }
+                    }
+                    LifecycleMode::Interactive => {
+                        // Interactive: block until input arrives or channel closes.
+                        match self.wait_for_input().await? {
+                            Some(WaitResult::MessageAdded) => {
+                                self.interrupt.take();
+                                self.notify_observers_user_input();
+                            }
+                            None => break,
+                        }
+                    }
+                }
+            }
+            needs_input = true;
+
+            // ── Running phase ───────────────────────────────────────
             info!(
                 turn = self.turn_count,
                 messages = self.params.store.len(),
                 "turn start"
             );
+            self.transition(AgentStatus::Running).await?;
 
-            if self.params.store.is_empty() {
-                match self.wait_for_input().await? {
-                    Some(WaitResult::MessageAdded) => {
-                        self.interrupt.take();
-                        self.notify_observers_user_input();
-                    }
-                    None => break,
-                }
-            }
-
-            if self.turn_count >= self.params.config.max_turns {
-                self.emit(AgentEventPayload::MaxTurnsReached {
-                    turns: self.turn_count,
-                })
-                .await?;
-                return Ok(AgentOutput {
-                    result: last_output,
-                    terminate_reason: TerminateReason::MaxTurns,
-                });
-            }
-
-            // Execute one complete turn (LLM → [tools → LLM]* → done)
             let cancel = TurnCancel::new(self.interrupt.clone(), self.interrupt_tx.clone());
             let mut turn_ctx = TurnContext::new(self.turn_count, cancel);
+
             match self.execute_turn(&mut turn_ctx).await {
                 Ok(turn) => {
                     if !turn.output.is_empty() {
                         last_output.clone_from(&turn.output);
                     }
-
+                    self.turn_count += 1;
                     if self.interrupt.take() {
                         self.emit_interrupted().await?;
-                        match self.wait_for_input().await? {
-                            Some(WaitResult::MessageAdded) => {
-                                self.turn_count += 1;
-                                self.interrupt.take();
-                                self.notify_observers_user_input();
-                                continue;
-                            }
-                            None => break,
-                        }
-                    }
-
-                    if self.turn_count >= self.params.config.max_turns {
-                        self.emit(AgentEventPayload::MaxTurnsReached {
-                            turns: self.turn_count,
-                        })
-                        .await?;
-                        return Ok(AgentOutput {
-                            result: last_output,
-                            terminate_reason: TerminateReason::MaxTurns,
-                        });
-                    }
-
-                    // Pre-loaded prompt fully processed — exit without waiting.
-                    if initial_prompt {
-                        break;
-                    }
-
-                    match self.wait_for_input().await? {
-                        Some(WaitResult::MessageAdded) => {
-                            self.turn_count += 1;
-                            self.interrupt.take();
-                            self.notify_observers_user_input();
-                        }
-                        None => break,
                     }
                 }
                 Err(e) => {
@@ -107,42 +83,18 @@ impl AgentLoopRunner {
                         server_block_retry = true;
                         info!("condensing server blocks after API rejection, retrying");
                         self.params.store.condense_server_blocks();
+                        needs_input = false;
                         continue;
                     }
-
                     if self.interrupt.take() {
                         self.emit_interrupted().await?;
-                        match self.wait_for_input().await? {
-                            Some(WaitResult::MessageAdded) => {
-                                self.turn_count += 1;
-                                self.interrupt.take();
-                                self.notify_observers_user_input();
-                                continue;
-                            }
-                            None => break,
-                        }
-                    }
-                    if initial_prompt {
-                        return Ok(AgentOutput {
-                            result: last_output,
-                            terminate_reason: TerminateReason::Error,
-                        });
+                        continue;
                     }
                     error!(error = %e, "LLM request failed");
-                    self.emit(AgentEventPayload::Error {
-                        message: LoopalError::to_string(&e),
-                    })
-                    .await?;
-                    match self.wait_for_input().await? {
-                        Some(WaitResult::MessageAdded) => {
-                            self.turn_count += 1;
-                            self.notify_observers_user_input();
-                            continue;
-                        }
-                        None => break,
-                    }
+                    self.transition_error(LoopalError::to_string(&e)).await?;
                 }
             }
+            server_block_retry = false;
         }
 
         Ok(AgentOutput {
@@ -159,6 +111,7 @@ impl AgentLoopRunner {
 
     async fn emit_interrupted(&mut self) -> Result<()> {
         info!("agent interrupted by user");
+        self.status = AgentStatus::WaitingForInput;
         self.emit(AgentEventPayload::Interrupted).await
     }
 }

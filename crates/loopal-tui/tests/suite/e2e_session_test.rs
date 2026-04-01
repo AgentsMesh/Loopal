@@ -37,8 +37,6 @@ async fn test_session_persistence_roundtrip() {
         .path()
         .join("sessions/sessions/integration-test");
 
-    // Close input channels so agent exits after processing the pre-loaded prompt.
-    harness.close_input();
     let _ = harness.runner.run().await;
 
     // The runner saves messages via session_manager.save_message().

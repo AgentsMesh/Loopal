@@ -56,10 +56,8 @@ impl AgentLoopRunner {
     }
 
     /// Accept a message envelope: persist (if not ephemeral) and push to store.
-    fn ingest_message(&mut self, env: &Envelope) -> WaitResult {
+    pub(super) fn ingest_message(&mut self, env: &Envelope) -> WaitResult {
         let mut user_msg = build_user_message(env);
-        // Skip persisting scheduler-injected and system-generated messages —
-        // they are ephemeral runtime state and should not replay on resume.
         let ephemeral = matches!(
             env.source,
             MessageSource::Scheduled | MessageSource::System(_)
@@ -76,5 +74,19 @@ impl AgentLoopRunner {
         }
         self.params.store.push_user(user_msg);
         WaitResult::MessageAdded
+    }
+
+    /// Non-blocking drain of all pending input (frontend + scheduler).
+    /// Returns immediately with whatever messages are queued. Used by Task
+    /// agents to check if there's more work before deciding to exit.
+    pub(super) async fn drain_pending_input(&mut self) -> Vec<Envelope> {
+        let mut pending = self.params.deps.frontend.drain_pending().await;
+        // Also drain scheduler triggers.
+        if let Some(ref mut rx) = self.trigger_rx {
+            while let Ok(env) = rx.try_recv() {
+                pending.push(env);
+            }
+        }
+        pending
     }
 }

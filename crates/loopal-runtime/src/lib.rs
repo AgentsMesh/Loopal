@@ -6,7 +6,9 @@ pub mod permission;
 pub mod session;
 pub mod tool_pipeline;
 
-pub use agent_loop::{AgentConfig, AgentDeps, AgentLoopParams, InterruptHandle, agent_loop};
+pub use agent_loop::{
+    AgentConfig, AgentDeps, AgentLoopParams, InterruptHandle, LifecycleMode, agent_loop,
+};
 pub use frontend::unified::UnifiedFrontend;
 pub use mode::AgentMode;
 pub use permission::check_permission;

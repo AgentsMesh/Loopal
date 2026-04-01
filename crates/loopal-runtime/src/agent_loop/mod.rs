@@ -56,8 +56,19 @@ pub(crate) const MAX_AUTO_CONTINUATIONS: u32 = 3;
 
 // ── Sub-structs ────────────────────────────────────────────────────
 
+/// Agent lifecycle mode — determines idle behavior after turn completion.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum LifecycleMode {
+    /// Wait for user input between turns (root agent, TUI, interactive CLI).
+    #[default]
+    Interactive,
+    /// Process prompt, exit when idle with no pending input (sub-agents, headless).
+    Task,
+}
+
 /// Agent configuration — mostly immutable, some fields switchable at runtime.
 pub struct AgentConfig {
+    pub lifecycle: LifecycleMode,
     pub router: ModelRouter,
     pub system_prompt: String,
     pub mode: AgentMode,
@@ -80,6 +91,7 @@ impl AgentConfig {
 impl Default for AgentConfig {
     fn default() -> Self {
         Self {
+            lifecycle: LifecycleMode::default(),
             router: ModelRouter::new("claude-sonnet-4-20250514".into()),
             system_prompt: String::new(),
             mode: AgentMode::Act,

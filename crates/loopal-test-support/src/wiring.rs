@@ -124,6 +124,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
 
     let params = AgentLoopParams {
         config: loopal_runtime::AgentConfig {
+            lifecycle: builder.lifecycle,
             router: {
                 let mut routing = std::collections::HashMap::new();
                 if let Some(m) = builder.summarization_model {

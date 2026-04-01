@@ -32,6 +32,7 @@ pub struct HarnessBuilder {
     pub(crate) permission_mode: PermissionMode,
     pub(crate) messages: Vec<Message>,
     pub(crate) mode: AgentMode,
+    pub(crate) lifecycle: loopal_runtime::LifecycleMode,
     pub(crate) system_prompt: String,
     pub(crate) thinking_config: ThinkingConfig,
     pub(crate) tool_filter: Option<HashSet<String>>,
@@ -57,6 +58,7 @@ impl HarnessBuilder {
             permission_mode: PermissionMode::Bypass,
             messages: vec![Message::user("hello")],
             mode: AgentMode::Act,
+            lifecycle: loopal_runtime::LifecycleMode::Task,
             system_prompt: "test".into(),
             thinking_config: ThinkingConfig::Auto,
             tool_filter: None,
@@ -127,7 +129,9 @@ impl HarnessBuilder {
     }
 
     /// Build and spawn `agent_loop` in a background task.
-    pub async fn build_spawned(self) -> SpawnedHarness {
+    /// Forces Interactive lifecycle since spawned tests send messages interactively.
+    pub async fn build_spawned(mut self) -> SpawnedHarness {
+        self.lifecycle = loopal_runtime::LifecycleMode::Interactive;
         let (harness, runner) = self.into_wired().await;
         tokio::spawn(async move {
             let mut runner = runner;
@@ -163,16 +167,6 @@ impl IntegrationHarness {
             session_ctrl: h.session_ctrl,
             fixture: h.fixture,
         }
-    }
-
-    /// Close input channels so the agent exits after processing any pre-loaded
-    /// messages. Call before `runner.run()` for prompt-driven tests.
-    pub fn close_input(&mut self) {
-        // Replace senders with closed channels (drop originals).
-        let (tx, _) = mpsc::channel(1);
-        self.mailbox_tx = tx;
-        let (tx, _) = mpsc::channel(1);
-        self.control_tx = tx;
     }
 }
 

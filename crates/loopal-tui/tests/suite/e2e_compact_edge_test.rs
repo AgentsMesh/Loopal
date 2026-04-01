@@ -61,9 +61,6 @@ async fn test_auto_compact_on_large_context() {
     }
     let before = h.runner.params.store.len();
 
-    // Close input channels so agent exits after processing (unified idle behavior).
-    h.close_input();
-
     let _ = h.runner.run().await;
 
     // After auto-compact + turn execution, message count should have decreased.

@@ -167,8 +167,15 @@ pub fn build_with_frontend(
         tool_tokens,
     );
 
+    let lifecycle = if start.prompt.is_some() {
+        loopal_runtime::LifecycleMode::Task
+    } else {
+        loopal_runtime::LifecycleMode::Interactive
+    };
+
     let params = AgentLoopParams {
         config: loopal_runtime::AgentConfig {
+            lifecycle,
             router,
             system_prompt,
             mode,

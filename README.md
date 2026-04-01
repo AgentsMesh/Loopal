@@ -11,6 +11,12 @@
 </p>
 
 <p align="center">
+  <a href="https://youtube.com/shorts/Lptchj75HP8">
+    <img src="https://img.youtube.com/vi/Lptchj75HP8/maxresdefault.jpg" alt="Loopal Demo" width="600"/>
+  </a>
+</p>
+
+<p align="center">
   <a href="#installation">Installation</a> •
   <a href="#quick-start">Quick Start</a> •
   <a href="#features">Features</a> •

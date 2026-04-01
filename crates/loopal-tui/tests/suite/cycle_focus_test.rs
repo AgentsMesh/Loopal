@@ -130,7 +130,11 @@ fn scroll_follows_focus_downward() {
         cycle_agent_focus(&mut app, true);
     }
     assert_eq!(app.focused_agent.as_deref(), Some("a6"));
-    assert!(app.agent_panel_offset >= 2, "got {}", app.agent_panel_offset);
+    assert!(
+        app.agent_panel_offset >= 2,
+        "got {}",
+        app.agent_panel_offset,
+    );
 }
 
 #[test]
@@ -173,5 +177,9 @@ fn scroll_adjusts_on_backward_past_window() {
     cycle_agent_focus(&mut app, false);
     // a2 → a1, now ABOVE window → offset adjusts
     assert_eq!(app.focused_agent.as_deref(), Some("a1"));
-    assert!(app.agent_panel_offset <= 1, "got {}", app.agent_panel_offset);
+    assert!(
+        app.agent_panel_offset <= 1,
+        "got {}",
+        app.agent_panel_offset
+    );
 }

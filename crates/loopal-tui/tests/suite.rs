@@ -11,18 +11,22 @@ mod app_tool_edge_test;
 mod app_tool_test;
 #[path = "suite/command_dispatch_test.rs"]
 mod command_dispatch_test;
-#[path = "suite/cycle_focus_test.rs"]
-mod cycle_focus_test;
-#[path = "suite/enter_panel_test.rs"]
-mod enter_panel_test;
 #[path = "suite/command_edge_test.rs"]
 mod command_edge_test;
 #[path = "suite/command_test.rs"]
 mod command_test;
+#[path = "suite/cycle_focus_test.rs"]
+mod cycle_focus_test;
+#[path = "suite/enter_panel_test.rs"]
+mod enter_panel_test;
 #[path = "suite/event_forwarding_test.rs"]
 mod event_forwarding_test;
 #[path = "suite/event_test.rs"]
 mod event_test;
+#[path = "suite/focus_mode_test.rs"]
+mod focus_mode_test;
+#[path = "suite/focus_panel_keys_test.rs"]
+mod focus_panel_keys_test;
 #[path = "suite/init_cmd_test.rs"]
 mod init_cmd_test;
 #[path = "suite/input_edge_test.rs"]
@@ -49,10 +53,6 @@ mod message_lines_test;
 mod skill_render_test;
 #[path = "suite/styled_wrap_test.rs"]
 mod styled_wrap_test;
-#[path = "suite/focus_mode_test.rs"]
-mod focus_mode_test;
-#[path = "suite/focus_panel_keys_test.rs"]
-mod focus_panel_keys_test;
 #[path = "suite/view_switch_panel_lifecycle_test.rs"]
 mod view_switch_panel_lifecycle_test;
 #[path = "suite/view_switch_test.rs"]

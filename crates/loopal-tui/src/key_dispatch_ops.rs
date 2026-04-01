@@ -183,7 +183,9 @@ fn adjust_agent_scroll(app: &mut App, focused_idx: usize, total: usize) {
     } else if focused_idx >= app.agent_panel_offset + MAX_VISIBLE {
         app.agent_panel_offset = focused_idx + 1 - MAX_VISIBLE;
     }
-    app.agent_panel_offset = app.agent_panel_offset.min(total.saturating_sub(MAX_VISIBLE));
+    app.agent_panel_offset = app
+        .agent_panel_offset
+        .min(total.saturating_sub(MAX_VISIBLE));
 }
 
 fn is_agent_live(status: &AgentStatus) -> bool {

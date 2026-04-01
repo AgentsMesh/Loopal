@@ -79,7 +79,9 @@ pub fn render_agent_panel(
     for (name, agent) in &live_agents[offset..window_end] {
         let is_focused = focused == Some(name.as_str());
         let is_viewing = viewing == Some(name.as_str());
-        lines.push(render_agent_line(name, agent, is_focused, is_viewing, max_name));
+        lines.push(render_agent_line(
+            name, agent, is_focused, is_viewing, max_name,
+        ));
     }
 
     if window_end < total {

@@ -39,21 +39,15 @@ mod macos_tests {
     }
 
     #[test]
-    fn readonly_profile_only_allows_system_writes() {
+    fn readonly_profile_has_no_user_writable_paths() {
         let policy = readonly_policy();
         let profile = generate_seatbelt_profile(&policy);
-
         assert!(profile.contains("(deny default)"));
         assert!(profile.contains("(allow file-read*)"));
-        // System writable paths are allowed (device files, /var/tmp)
+        // System paths present, but no user-configured writable paths
         assert!(profile.contains("(allow file-write* (subpath \"/dev\"))"));
         assert!(profile.contains("(allow file-write* (subpath \"/private/var/tmp\"))"));
-        // No workspace write rules beyond system paths
-        let write_count = profile.matches("file-write*").count();
-        assert_eq!(
-            write_count, 2,
-            "only system write rules expected, got: {profile}"
-        );
+        assert!(!profile.contains("/home/user"));
     }
 
     #[test]
@@ -74,5 +68,45 @@ mod macos_tests {
         let policy = workspace_policy();
         let profile = generate_seatbelt_profile(&policy);
         assert!(profile.contains("(allow network*)"));
+    }
+
+    #[test]
+    fn process_rules_aligned_with_codex() {
+        let profile = generate_seatbelt_profile(&workspace_policy());
+        // signal scoped to same-sandbox (not unrestricted)
+        assert!(profile.contains("(allow signal (target same-sandbox))"));
+        // process-info scoped to same-sandbox
+        assert!(profile.contains("(allow process-info* (target same-sandbox))"));
+        // iokit limited to RootDomainUserClient
+        assert!(profile.contains("(allow iokit-open"));
+        assert!(profile.contains("RootDomainUserClient"));
+        // sysctl-write only for JVM
+        assert!(profile.contains("kern.grade_cputype"));
+    }
+
+    #[test]
+    fn ipc_and_pty_rules_present() {
+        let profile = generate_seatbelt_profile(&workspace_policy());
+        assert!(profile.contains("(allow ipc-posix-sem)"));
+        assert!(profile.contains("(allow ipc-posix-shm*)"));
+        assert!(profile.contains("(allow pseudo-tty)"));
+        assert!(profile.contains("/dev/ptmx"));
+    }
+
+    #[test]
+    fn mach_lookup_is_whitelist() {
+        let profile = generate_seatbelt_profile(&workspace_policy());
+        // Must contain specific service names, not blanket mach-lookup
+        assert!(profile.contains("com.apple.system.opendirectoryd.libinfo"));
+        assert!(profile.contains("com.apple.trustd"));
+        assert!(profile.contains("com.apple.SystemConfiguration.DNSConfiguration"));
+    }
+
+    #[test]
+    fn file_map_executable_for_system_frameworks() {
+        let profile = generate_seatbelt_profile(&workspace_policy());
+        assert!(profile.contains("(allow file-map-executable"));
+        assert!(profile.contains("/System/Library/Frameworks"));
+        assert!(profile.contains("/usr/lib"));
     }
 }

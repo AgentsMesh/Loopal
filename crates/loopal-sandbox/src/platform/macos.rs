@@ -2,57 +2,38 @@ use std::path::Path;
 
 use loopal_config::{ResolvedPolicy, SandboxPolicy};
 
-/// System paths that must be writable for basic CLI tool operation.
-/// These are platform-invariant safe paths (device files, system temp).
-const SYSTEM_WRITABLE_PATHS: &[&str] = &[
-    "/dev",             // /dev/null, /dev/tty, /dev/urandom etc.
-    "/private/var/tmp", // POSIX /var/tmp (some tools bypass $TMPDIR)
-];
+/// Static base policy loaded from the `.sbpl` file at compile time.
+/// Contains: deny-default, process/sysctl/iokit/mach/ipc/pty rules,
+/// system writable paths, and framework executable-mapping rules.
+const BASE_POLICY: &str = include_str!("seatbelt_base.sbpl");
 
-/// Append seatbelt rules for essential system writable paths.
-fn append_system_write_rules(profile: &mut String) {
-    for path in SYSTEM_WRITABLE_PATHS {
-        profile.push_str(&format!("(allow file-write* (subpath \"{path}\"))\n"));
-    }
-}
+/// Generate a macOS Seatbelt profile string from the resolved policy.
 ///
-/// The profile allows reads everywhere but restricts writes to the
-/// configured writable paths.
+/// Composes the static base policy with dynamic sections for file-read,
+/// file-write (writable paths), and network access.
 pub fn generate_seatbelt_profile(policy: &ResolvedPolicy) -> String {
-    let mut profile = String::from("(version 1)\n");
+    if policy.policy == SandboxPolicy::Disabled {
+        return "(version 1)\n(allow default)\n".to_string();
+    }
 
-    match policy.policy {
-        SandboxPolicy::ReadOnly => {
-            profile.push_str("(deny default)\n");
-            profile.push_str("(allow process-exec)\n");
-            profile.push_str("(allow process-fork)\n");
-            profile.push_str("(allow sysctl-read)\n");
-            profile.push_str("(allow file-read*)\n");
-            profile.push_str("(allow mach-lookup)\n");
-            append_system_write_rules(&mut profile);
-        }
-        SandboxPolicy::WorkspaceWrite => {
-            profile.push_str("(deny default)\n");
-            profile.push_str("(allow process-exec)\n");
-            profile.push_str("(allow process-fork)\n");
-            profile.push_str("(allow sysctl-read)\n");
-            profile.push_str("(allow file-read*)\n");
-            profile.push_str("(allow mach-lookup)\n");
-            append_system_write_rules(&mut profile);
+    let mut profile = BASE_POLICY.to_string();
 
-            // Allow writes to configured writable paths
-            for path in &policy.writable_paths {
-                let path_str = path.to_string_lossy();
-                profile.push_str(&format!("(allow file-write* (subpath \"{path_str}\"))\n"));
-            }
-        }
-        SandboxPolicy::Disabled => {
-            profile.push_str("(allow default)\n");
+    // file-read*: full read access (Codex supports per-root restrictions,
+    // but we keep it simple for now).
+    profile.push_str("\n; --- Dynamic: file access ---\n");
+    profile.push_str("(allow file-read*)\n");
+
+    // file-write*: per-path restrictions for WorkspaceWrite
+    if policy.policy == SandboxPolicy::WorkspaceWrite {
+        for path in &policy.writable_paths {
+            let path_str = path.to_string_lossy();
+            profile.push_str(&format!("(allow file-write* (subpath \"{path_str}\"))\n"));
         }
     }
 
-    // Allow network if not restricted
+    // network
     if policy.network.allowed_domains.is_empty() && policy.network.denied_domains.is_empty() {
+        profile.push_str("\n; --- Dynamic: network ---\n");
         profile.push_str("(allow network*)\n");
     }
 

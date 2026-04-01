@@ -19,3 +19,4 @@ loopal-*
 
 logs/
 .claude/scheduled_tasks.lock
+.loopal/worktrees/

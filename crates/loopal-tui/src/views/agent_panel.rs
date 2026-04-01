@@ -18,11 +18,16 @@ use loopal_session::state::AgentViewState;
 use super::unified_status::{format_duration, spinner_frame};
 
 /// Maximum visible agent rows before showing overflow.
-const MAX_VISIBLE: usize = 5;
+/// NOTE: must match `key_dispatch_ops::MAX_VISIBLE` (scroll calculation).
+pub const MAX_VISIBLE: usize = 5;
 
 /// Compute the height needed for the agent panel.
 /// Excludes the currently viewed agent — it's the active conversation, not a switchable target.
-pub fn panel_height(agents: &IndexMap<String, AgentViewState>, active_view: &str) -> u16 {
+pub fn panel_height(
+    agents: &IndexMap<String, AgentViewState>,
+    active_view: &str,
+    agent_panel_offset: usize,
+) -> u16 {
     let live = agents
         .iter()
         .filter(|(name, a)| name.as_str() != active_view && is_live(&a.observable.status))
@@ -31,11 +36,14 @@ pub fn panel_height(agents: &IndexMap<String, AgentViewState>, active_view: &str
         return 0;
     }
     let visible = live.min(MAX_VISIBLE);
-    let overflow = u16::from(live > MAX_VISIBLE);
-    visible as u16 + overflow
+    let clamped = agent_panel_offset.min(live.saturating_sub(MAX_VISIBLE));
+    let has_above = clamped > 0;
+    let has_below = live > clamped + MAX_VISIBLE;
+    let indicators = u16::from(has_above) + u16::from(has_below);
+    visible as u16 + indicators
 }
 
-/// Render the agent panel.
+/// Render the agent panel with a scrolling viewport.
 /// `active_view` is excluded from the list (it's the current conversation).
 pub fn render_agent_panel(
     f: &mut Frame,
@@ -43,6 +51,7 @@ pub fn render_agent_panel(
     focused: Option<&str>,
     viewing: Option<&str>,
     active_view: &str,
+    agent_panel_offset: usize,
     area: Rect,
 ) {
     if area.height == 0 || agents.is_empty() {
@@ -55,20 +64,27 @@ pub fn render_agent_panel(
         .filter(|(name, a)| name.as_str() != active_view && is_live(&a.observable.status))
         .collect();
 
-    let visible = live_agents.len().min(MAX_VISIBLE);
-    let mut lines: Vec<Line<'static>> = live_agents[..visible]
-        .iter()
-        .map(|(name, agent)| {
-            let is_focused = focused == Some(name.as_str());
-            let is_viewing = viewing == Some(name.as_str());
-            render_agent_line(name, agent, is_focused, is_viewing, max_name)
-        })
-        .collect();
+    let total = live_agents.len();
+    let offset = agent_panel_offset.min(total.saturating_sub(MAX_VISIBLE));
+    let window_end = (offset + MAX_VISIBLE).min(total);
+    let mut lines: Vec<Line<'static>> = Vec::new();
 
-    if live_agents.len() > MAX_VISIBLE {
-        let extra = live_agents.len() - MAX_VISIBLE;
+    if offset > 0 {
         lines.push(Line::from(Span::styled(
-            format!("  +{extra} more agents"),
+            format!("  \u{2191} {offset} more"),
+            Style::default().fg(Color::DarkGray),
+        )));
+    }
+
+    for (name, agent) in &live_agents[offset..window_end] {
+        let is_focused = focused == Some(name.as_str());
+        let is_viewing = viewing == Some(name.as_str());
+        lines.push(render_agent_line(name, agent, is_focused, is_viewing, max_name));
+    }
+
+    if window_end < total {
+        lines.push(Line::from(Span::styled(
+            format!("  \u{2193} {} more", total - window_end),
             Style::default().fg(Color::DarkGray),
         )));
     }

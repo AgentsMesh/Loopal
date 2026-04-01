@@ -1,4 +1,4 @@
-use crate::app::App;
+use crate::app::{App, FocusMode};
 
 use super::InputAction;
 use super::commands::try_execute_slash_command;
@@ -44,7 +44,7 @@ pub(super) fn handle_backspace(app: &mut App) -> InputAction {
     InputAction::None
 }
 
-/// Ctrl+C: clear input if non-empty, clear focus if set, otherwise interrupt agent.
+/// Ctrl+C: clear input → exit AgentPanel → clear focus → interrupt agent.
 pub(super) fn handle_ctrl_c(app: &mut App) -> InputAction {
     if !app.input.is_empty() || !app.pending_images.is_empty() {
         app.input.clear();
@@ -53,6 +53,11 @@ pub(super) fn handle_ctrl_c(app: &mut App) -> InputAction {
         app.pending_images.clear();
         app.paste_map.clear();
         app.autocomplete = None;
+        InputAction::None
+    } else if app.focus_mode == FocusMode::AgentPanel {
+        app.focused_agent = None;
+        app.focus_mode = FocusMode::Input;
+        app.agent_panel_offset = 0;
         InputAction::None
     } else if app.focused_agent.is_some() {
         app.focused_agent = None;

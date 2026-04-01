@@ -12,7 +12,7 @@ pub use actions::*;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use crate::app::App;
+use crate::app::{App, FocusMode};
 use autocomplete::{handle_autocomplete_key, update_autocomplete};
 use editing::{handle_backspace, handle_ctrl_c, handle_enter};
 use navigation::{
@@ -45,6 +45,13 @@ fn handle_global_keys(app: &mut App, key: &KeyEvent) -> Option<InputAction> {
             KeyCode::Char('c') => return Some(handle_ctrl_c(app)),
             KeyCode::Char('d') => return Some(InputAction::Quit),
             KeyCode::Char('v') => return Some(InputAction::PasteRequested),
+            // Ctrl+P/N: mode-aware up/down (agent nav in AgentPanel, history in Input)
+            KeyCode::Char('p') if app.focus_mode == FocusMode::AgentPanel => {
+                return Some(InputAction::AgentPanelUp);
+            }
+            KeyCode::Char('n') if app.focus_mode == FocusMode::AgentPanel => {
+                return Some(InputAction::AgentPanelDown);
+            }
             KeyCode::Char('p') => return Some(handle_up(app)),
             KeyCode::Char('n') => return Some(handle_down(app)),
             _ => {}
@@ -62,20 +69,40 @@ fn handle_global_keys(app: &mut App, key: &KeyEvent) -> Option<InputAction> {
     None
 }
 
-/// Handle normal input keys (typing, navigation, submit).
+/// Handle normal input keys — dispatch by current focus mode.
 fn handle_normal_key(app: &mut App, key: &KeyEvent) -> InputAction {
-    // Agent focus mode: when an agent is focused, input is empty, and
-    // content doesn't need scrolling, Up/Down navigate agents.
-    // Delete terminates the focused agent.
-    if app.focused_agent.is_some() && app.input.is_empty() {
-        let needs_scroll = app.scroll_offset > 0 || app.content_overflows;
-        match key.code {
-            KeyCode::Up if !needs_scroll => return InputAction::FocusPrevAgent,
-            KeyCode::Down if !needs_scroll => return InputAction::FocusNextAgent,
-            KeyCode::Delete => return InputAction::TerminateFocusedAgent,
-            _ => {}
-        }
+    match app.focus_mode {
+        FocusMode::AgentPanel => handle_agent_panel_key(app, key),
+        FocusMode::Input => handle_input_mode_key(app, key),
     }
+}
+
+/// Keys in AgentPanel mode: Up/Down navigate, Enter drills in, Tab/Esc exits.
+fn handle_agent_panel_key(app: &mut App, key: &KeyEvent) -> InputAction {
+    match key.code {
+        KeyCode::Up => InputAction::AgentPanelUp,
+        KeyCode::Down => InputAction::AgentPanelDown,
+        KeyCode::Enter => InputAction::EnterAgentView,
+        KeyCode::Delete => InputAction::TerminateFocusedAgent,
+        KeyCode::Tab | KeyCode::Esc => InputAction::ExitAgentPanel,
+        KeyCode::Char(c) => {
+            // Auto-switch to Input mode and insert the character
+            app.focus_mode = FocusMode::Input;
+            app.input.insert(app.input_cursor, c);
+            app.input_cursor += c.len_utf8();
+            InputAction::None
+        }
+        KeyCode::Backspace => {
+            // Auto-switch to Input mode and delete
+            app.focus_mode = FocusMode::Input;
+            handle_backspace(app)
+        }
+        _ => InputAction::None,
+    }
+}
+
+/// Keys in Input mode: typing, navigation, submit.
+fn handle_input_mode_key(app: &mut App, key: &KeyEvent) -> InputAction {
     match key.code {
         KeyCode::Enter if key.modifiers.contains(KeyModifiers::SHIFT) => {
             app.input.insert(app.input_cursor, '\n');
@@ -115,7 +142,7 @@ fn handle_normal_key(app: &mut App, key: &KeyEvent) -> InputAction {
         }
         KeyCode::Up => handle_up_key(app),
         KeyCode::Down => handle_down_key(app),
-        KeyCode::Tab => InputAction::FocusNextAgent,
+        KeyCode::Tab => InputAction::EnterAgentPanel,
         KeyCode::Esc => handle_esc(app),
         KeyCode::PageUp => {
             app.scroll_offset = app.scroll_offset.saturating_add(10);

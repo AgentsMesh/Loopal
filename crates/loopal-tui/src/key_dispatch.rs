@@ -7,7 +7,7 @@ use crate::event::EventHandler;
 use crate::input::paste;
 use crate::input::{InputAction, handle_key};
 use crate::key_dispatch_ops::{
-    cycle_agent_focus, handle_effect, handle_sub_page_confirm, push_to_inbox,
+    cycle_agent_focus, enter_agent_panel, handle_effect, handle_sub_page_confirm, push_to_inbox,
     terminate_focused_agent,
 };
 use crate::views::progress::LineCache;
@@ -81,16 +81,20 @@ pub(crate) async fn handle_key_action(
             handle_sub_page_confirm(app, result).await;
             false
         }
-        InputAction::FocusNextAgent => {
-            cycle_agent_focus(app, true);
+        InputAction::EnterAgentPanel => {
+            enter_agent_panel(app);
             false
         }
-        InputAction::FocusPrevAgent => {
+        InputAction::ExitAgentPanel => {
+            app.focus_mode = crate::app::FocusMode::Input;
+            false
+        }
+        InputAction::AgentPanelUp => {
             cycle_agent_focus(app, false);
             false
         }
-        InputAction::UnfocusAgent => {
-            app.focused_agent = None;
+        InputAction::AgentPanelDown => {
+            cycle_agent_focus(app, true);
             false
         }
         InputAction::TerminateFocusedAgent => {
@@ -100,6 +104,7 @@ pub(crate) async fn handle_key_action(
         InputAction::EnterAgentView => {
             if let Some(name) = app.focused_agent.clone() {
                 if app.session.enter_agent_view(&name) {
+                    app.focus_mode = crate::app::FocusMode::Input;
                     app.scroll_offset = 0;
                     app.line_cache = LineCache::new();
                     app.last_esc_time = None; // prevent stale double-ESC rewind

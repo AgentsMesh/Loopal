@@ -53,11 +53,10 @@ fn tab_focuses_first_live_subagent() {
     let mut app = make_app();
     spawn_agent(&app, "researcher");
     let action = handle_key(&mut app, key(KeyCode::Tab));
-    assert!(matches!(action, InputAction::FocusNextAgent));
+    assert!(matches!(action, InputAction::EnterAgentPanel));
     // Simulate dispatch
     loopal_tui::input::handle_key(&mut app, key(KeyCode::Tab));
-    // Can't call cycle_agent_focus directly (crate-private), but we can test via handle_key
-    // Tab returns FocusNextAgent, which key_dispatch handles
+    // Tab returns EnterAgentPanel, which key_dispatch handles
 }
 
 #[test]

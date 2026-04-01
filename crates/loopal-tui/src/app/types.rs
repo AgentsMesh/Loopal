@@ -87,6 +87,19 @@ pub enum SubPage {
     RewindPicker(RewindPickerState),
 }
 
+/// Which UI region currently owns keyboard input.
+///
+/// Orthogonal to `focused_agent` — mode says "are we navigating agents"
+/// while `focused_agent` says "which one is highlighted".
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum FocusMode {
+    /// Default: typing goes to input field; Up/Down = multiline → scroll → history.
+    #[default]
+    Input,
+    /// Agent panel navigation: Up/Down = navigate agents; Enter = drill in.
+    AgentPanel,
+}
+
 /// State for the rewind turn picker.
 pub struct RewindPickerState {
     /// Available turns (most recent first for display).

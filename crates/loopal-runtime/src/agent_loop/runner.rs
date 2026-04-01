@@ -110,7 +110,15 @@ impl AgentLoopRunner {
     ///
     /// **This is the ONLY way to change agent status.** Every status change
     /// goes through this method, ensuring SSOT and deterministic event emission.
+    ///
+    /// Skips emission when already in the target status (idempotent) to prevent
+    /// duplicate idle events — e.g. `emit_interrupted()` already transitions to
+    /// WaitingForInput, so the subsequent `transition(WaitingForInput)` at the
+    /// top of the loop must NOT emit a second AwaitingInput.
     pub(super) async fn transition(&mut self, new_status: AgentStatus) -> Result<()> {
+        if self.status == new_status {
+            return Ok(());
+        }
         self.status = new_status;
         match new_status {
             AgentStatus::Starting => Ok(()),

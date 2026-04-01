@@ -21,14 +21,17 @@ impl ControlBackend {
     pub(crate) fn interrupt_target(&self, target: &str) {
         match self {
             Self::Local(ch) => {
+                tracing::info!(target, "interrupt_target: local signal");
                 ch.interrupt.signal();
                 ch.interrupt_tx.send_modify(|v| *v = v.wrapping_add(1));
             }
             Self::Hub(client) => {
+                tracing::info!(target, "interrupt_target: hub IPC");
                 let client = client.clone();
                 let target = target.to_string();
                 tokio::spawn(async move {
                     client.interrupt_target(&target).await;
+                    tracing::info!(target = %target, "interrupt_target: hub IPC sent");
                 });
             }
         }

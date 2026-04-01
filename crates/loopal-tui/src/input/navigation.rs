@@ -80,13 +80,17 @@ pub(super) fn handle_down(app: &mut App) -> InputAction {
 
 pub(super) fn handle_esc(app: &mut App) -> InputAction {
     // Priority 1: exit agent view
-    if app.session.lock().active_view != loopal_session::ROOT_AGENT {
+    let active_view = app.session.lock().active_view.clone();
+    if active_view != loopal_session::ROOT_AGENT {
+        tracing::info!(view = %active_view, "ESC: exit agent view (not root)");
         return InputAction::ExitAgentView;
     }
     let is_idle = app.session.lock().active_conversation().agent_idle;
     if !is_idle {
+        tracing::info!("ESC: agent busy, sending interrupt");
         return InputAction::Interrupt;
     }
+    tracing::debug!("ESC: agent idle, no interrupt");
     let now = Instant::now();
     let is_empty = app.input.is_empty();
     if is_empty {

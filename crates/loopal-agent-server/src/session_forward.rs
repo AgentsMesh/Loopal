@@ -47,6 +47,7 @@ pub(crate) async fn forward_loop(
                     }
                     Incoming::Notification { method, params } => {
                         if method == methods::AGENT_INTERRUPT.name {
+                            tracing::info!("forward_loop: received agent/interrupt, signaling");
                             session.interrupt.signal();
                             session.interrupt_tx.send_modify(|v| *v = v.wrapping_add(1));
                         } else if method == methods::AGENT_MESSAGE.name {

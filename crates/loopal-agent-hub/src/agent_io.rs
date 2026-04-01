@@ -8,7 +8,7 @@ use tracing::{info, warn};
 
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
-use loopal_protocol::AgentEvent;
+use loopal_protocol::{AgentEvent, Envelope};
 
 use crate::dispatch::dispatch_hub_request;
 use crate::hub::Hub;
@@ -125,25 +125,37 @@ fn spawn_wait_agent(
 }
 
 /// Register agent Connection in Hub and spawn background IO loop.
+///
+/// Sets up a completion channel + bridge so background sub-agent results
+/// are forwarded to this agent via IPC `agent/message` notifications.
 pub fn start_agent_io(
     hub: Arc<Mutex<Hub>>,
     name: &str,
     conn: Arc<Connection>,
     rx: tokio::sync::mpsc::Receiver<Incoming>,
 ) {
-    // Registration + IO loop in one background task (used by hub_server for incoming clients)
     let hub2 = hub.clone();
     let n = name.to_string();
     let n2 = name.to_string();
     let conn2 = conn.clone();
+    let conn3 = conn.clone();
     tokio::spawn(async move {
+        // Completion channel: delivers background sub-agent results to this agent.
+        let (completion_tx, completion_rx) = tokio::sync::mpsc::channel::<Envelope>(32);
         {
             let mut h = hub.lock().await;
-            if let Err(e) = h.registry.register_connection(&n, conn2) {
+            if let Err(e) = h.registry.register_connection_with_parent(
+                &n,
+                conn2,
+                None,
+                None,
+                Some(completion_tx),
+            ) {
                 tracing::warn!(agent = %n, error = %e, "registration failed");
                 return;
             }
         }
+        crate::spawn_manager::spawn_completion_bridge(&n, conn3, completion_rx);
         info!(agent = %n, "agent registered in Hub");
         let output = agent_io_loop(hub2, conn, rx, n.clone()).await;
         let pending = {

@@ -133,7 +133,11 @@ pub async fn register_agent_connection(
 }
 
 /// Bridge: reads from Hub-internal channel, forwards to agent via IPC notification.
-fn spawn_completion_bridge(name: &str, conn: Arc<Connection>, mut rx: mpsc::Receiver<Envelope>) {
+pub fn spawn_completion_bridge(
+    name: &str,
+    conn: Arc<Connection>,
+    mut rx: mpsc::Receiver<Envelope>,
+) {
     let n = name.to_string();
     tokio::spawn(async move {
         while let Some(envelope) = rx.recv().await {

@@ -48,15 +48,21 @@ pub async fn handle_control(hub: &Arc<Mutex<Hub>>, params: Value) -> Result<Valu
 
 pub async fn handle_interrupt(hub: &Arc<Mutex<Hub>>, params: Value) -> Result<Value, String> {
     let target = params["target"].as_str().ok_or("missing 'target' field")?;
+    tracing::info!(target, "handle_interrupt: looking up agent connection");
     let conn = {
         let h = hub.lock().await;
         h.registry
             .get_agent_connection(target)
             .ok_or_else(|| format!("no agent: '{target}'"))?
     };
-    let _ = conn
+    let result = conn
         .send_notification(methods::AGENT_INTERRUPT.name, json!({}))
         .await;
+    match &result {
+        Ok(()) => tracing::info!(target, "handle_interrupt: notification sent"),
+        Err(e) => tracing::warn!(target, error = %e, "handle_interrupt: send failed"),
+    }
+    let _ = result;
     Ok(json!({"ok": true}))
 }
 

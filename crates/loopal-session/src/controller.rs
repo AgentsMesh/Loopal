@@ -76,8 +76,9 @@ impl SessionController {
 
     /// Interrupt the currently viewed agent.
     pub fn interrupt(&self) {
-        tracing::debug!("session: interrupt signaled");
-        self.backend.interrupt_target(&self.active_target());
+        let target = self.active_target();
+        tracing::info!(target = %target, "session: interrupt signaled");
+        self.backend.interrupt_target(&target);
     }
 
     /// Interrupt a specific named agent (e.g., to terminate from agent panel).

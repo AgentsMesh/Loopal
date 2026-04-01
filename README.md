@@ -6,7 +6,8 @@
  | |___  | |_| || |_| ||  __/ / ___ \ | |___
  |_____|  \___/  \___/ |_|   /_/   \_\|_____|
   </pre>
-  <em>Rooted in code, Growing with loopal.</em><br/>
+  <strong>An agentic AI coding tool that lives in your terminal.</strong><br/>
+  Built in Rust. Multi-model. Multi-agent. Extensible.<br/><br/>
   Part of <a href="https://agentsmesh.ai">AgentsMesh.ai</a>
 </p>
 
@@ -14,163 +15,230 @@
   <a href="https://youtube.com/shorts/Lptchj75HP8">
     <img src="https://img.youtube.com/vi/Lptchj75HP8/maxresdefault.jpg" alt="Loopal Demo" width="600"/>
   </a>
+  <br/>
+  <em>Click to watch the demo</em>
 </p>
 
 <p align="center">
-  <a href="#installation">Installation</a> •
-  <a href="#quick-start">Quick Start</a> •
-  <a href="#features">Features</a> •
-  <a href="#architecture">Architecture</a> •
-  <a href="#configuration">Configuration</a> •
+  <a href="#installation">Installation</a> &bull;
+  <a href="#quick-start">Quick Start</a> &bull;
+  <a href="#features">Features</a> &bull;
+  <a href="#configuration">Configuration</a> &bull;
+  <a href="#architecture">Architecture</a> &bull;
   <a href="#license">License</a>
 </p>
 
 ---
 
-**Loopal** is a terminal-native AI coding agent built in Rust. It connects to LLM providers, reads and edits your codebase, runs commands, and orchestrates multi-agent workflows — all from inside your terminal with a rich TUI.
-
-## Features
-
-- 🚀 **Terminal-native TUI** — Rich interactive interface powered by [Ratatui](https://ratatui.rs), with Markdown rendering, syntax highlighting, and progress indicators.
-- 🧠 **Multi-provider LLM support** — Works with OpenAI, Anthropic, and any OpenAI-compatible endpoint. Configurable thinking/reasoning modes (auto, effort levels, token budgets).
-- 🔧 **Comprehensive tool suite** — File read/write/edit, multi-edit, apply-patch, grep, glob, ls, bash execution, background tasks, and fetch.
-- 🤖 **Multi-agent orchestration** — Spawn sub-agents that run in parallel, communicate via message passing and pub/sub channels, with a shared task store.
-- 🔌 **MCP integration** — First-class [Model Context Protocol](https://modelcontextprotocol.io/) support for connecting external tool servers.
-- 🖥️ **ACP server mode** — Agent Client Protocol over stdin/stdout JSON-RPC for IDE integration (Zed, JetBrains, Neovim, etc.) via `--acp`.
-- 🔒 **Sandbox & permissions** — Configurable sandbox policies for filesystem access, network, and command execution. Supervised or bypass permission modes.
-- 🪝 **Lifecycle hooks** — Run custom scripts on agent events (session start, tool calls, etc.).
-- 💾 **Session management** — Persist and resume sessions. Context compaction with smart truncation to stay within token limits.
-- 🧩 **Context pipeline** — Middleware-based context processing with message size guards, smart compaction, and context guards.
-- 📝 **Memory** — Cross-session memory that persists observations and preferences across conversations.
-- 🗂️ **Skills** — Extend agent capabilities with project-specific skill definitions.
-- 📋 **Plan mode** — Read-only exploration mode for safe planning before making changes.
-
 ## Installation
 
-### Prerequisites
+### From GitHub Releases (recommended)
 
-- **Rust** (edition 2024, nightly toolchain recommended)
-- An API key for your LLM provider (e.g., `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`)
+Download pre-built binaries from [Releases](https://github.com/AgentsMesh/Loopal/releases):
+
+| Platform | Target |
+|---|---|
+| macOS (Apple Silicon) | `aarch64-apple-darwin` |
+| Linux (x86_64) | `x86_64-unknown-linux-gnu` |
+| Linux (ARM64) | `aarch64-unknown-linux-gnu` |
+| Windows (x86_64) | `x86_64-pc-windows-msvc` |
 
 ### Build from source
 
 ```bash
-git clone https://github.com/AgentsMesh/Loopal.git
-cd Loopal
-cargo build --release
+git clone https://github.com/AgentsMesh/Loopal.git && cd Loopal
+make install   # builds optimized binary → ~/.local/bin/loopal
 ```
 
-The binary will be at `target/release/loopal`. Add it to your `PATH` or install directly:
-
-```bash
-cargo install --path .
-```
+Requires [Bazel 8+](https://bazel.build/) (via [Bazelisk](https://github.com/bazelbuild/bazelisk)).
 
 ## Quick Start
 
 ```bash
-# Navigate to your project
-cd your-project
+# Set your API key
+export ANTHROPIC_API_KEY="sk-..."   # or OPENAI_API_KEY, GOOGLE_API_KEY
 
-# Start Loopal (uses default model from config)
-loopal
+# Start Loopal in your project
+cd your-project && loopal
 
-# Start with a specific model
-loopal -m claude-sonnet-4-20250514
-
-# Start in plan mode (read-only exploration)
-loopal --plan
-
-# Resume a previous session
-loopal -r <session-id>
-
-# Run with an initial prompt
+# Or pass a prompt directly
 loopal "explain the architecture of this project"
-
-# Bypass permission prompts
-loopal -P bypass
 ```
 
-## Architecture
+## Features
 
-Loopal is built as a modular Rust workspace with clear separation of concerns:
+### Multi-Provider LLM Support
 
-```
-loopal
-├── src/                        # Binary entry point, CLI, bootstrap
-├── crates/
-│   ├── loopal-kernel/          # Core kernel: provider registry, tool dispatch
-│   ├── loopal-runtime/         # Agent loop, session management, frontend traits
-│   ├── loopal-agent/           # Multi-agent registry, router, task store
-│   ├── loopal-session/         # Session state, display messages, event handling
-│   ├── loopal-tui/             # Terminal UI (Ratatui-based)
-│   ├── loopal-provider/        # LLM provider implementations
-│   ├── loopal-provider-api/    # Provider trait definitions
-│   ├── loopal-protocol/        # Shared protocol types (events, messages)
-│   ├── loopal-message/         # Message types and serialization
-│   ├── loopal-config/          # Layered configuration system
-│   ├── loopal-context/         # Context pipeline, compaction, system prompt
-│   ├── loopal-memory/          # Cross-session persistent memory
-│   ├── loopal-storage/         # Session persistence
-│   ├── loopal-sandbox/         # Command & filesystem sandboxing
-│   ├── loopal-hooks/           # Lifecycle hook system
-│   ├── loopal-mcp/             # MCP client integration
-│   ├── loopal-acp/             # ACP server for IDE integration
-│   ├── loopal-git/             # Git operations & worktree management
-│   ├── loopal-tool-api/        # Tool trait definitions
-│   ├── loopal-error/           # Error types
-│   └── tools/                  # Built-in tool implementations
-│       ├── filesystem/         # read, write, edit, multi-edit, apply-patch,
-│       │                       # grep, glob, ls, fetch, file-ops
-│       ├── process/            # bash, background task execution
-│       └── agent/              # ask-user, plan-mode
+Works out of the box with **Anthropic**, **OpenAI**, **Google**, and any **OpenAI-compatible** endpoint. Switch models on the fly with `-m`:
+
+```bash
+loopal -m claude-sonnet-4-20250514
+loopal -m gpt-4o
+loopal -m gemini-2.5-pro
 ```
 
-### Key design decisions
+Supports thinking/reasoning modes (auto, effort levels, token budgets) and per-task model routing.
 
-- **Layered configuration** — Settings merge from defaults → global config → project config → CLI flags.
-- **Context pipeline** — Middleware chain processes messages before sending to the LLM, handling token limits, compaction, and guards.
-- **Unified frontend** — Both TUI and ACP share the same `AgentFrontend` trait, making the agent loop UI-agnostic.
-- **Sandbox-first** — File and command access goes through policy checks by default.
+### Rich Terminal UI
+
+Full-featured interactive TUI built with [Ratatui](https://ratatui.rs):
+
+- Markdown rendering with syntax highlighting
+- Streaming responses with real-time progress
+- Permission approval dialogs
+- Multi-agent topology visualization
+- Plan/Act mode toggle
+- Slash-command completion
+- Session resume (`loopal -r <session-id>`)
+
+### 17 Built-in Tools
+
+| Category | Tools |
+|---|---|
+| **File I/O** | Read, Write, Edit, MultiEdit, ApplyPatch, CopyFile, MoveFile, Delete |
+| **Search** | Grep (regex, context, file filters), Glob (pattern matching), Ls |
+| **Process** | Bash (foreground + background), Fetch, WebSearch |
+| **Agent** | AskUser, EnterPlanMode, ExitPlanMode |
+
+All tools go through sandbox policy checks before execution.
+
+### Multi-Agent Orchestration
+
+Spawn sub-agents that run in parallel, communicate via message passing, and coordinate through a shared task store. The TUI provides a topology view to observe and interact with any agent in the tree.
+
+### MCP Integration
+
+First-class [Model Context Protocol](https://modelcontextprotocol.io/) support:
+
+- **Stdio** transport — spawn MCP servers as child processes
+- **Streamable HTTP** transport — connect to remote MCP servers
+- **OAuth** — automatic browser-based auth for protected servers
+
+```json
+{
+  "mcp_servers": {
+    "my-server": {
+      "command": "npx",
+      "args": ["-y", "@my/mcp-server"]
+    }
+  }
+}
+```
+
+### IDE Integration (ACP)
+
+Run as an [Agent Client Protocol](https://agentclientprotocol.com/) server for IDE integration:
+
+```bash
+loopal --acp   # JSON-RPC 2.0 over stdin/stdout
+```
+
+Works with Zed, JetBrains, Neovim, and any ACP-compatible editor.
+
+### Skills & Memory
+
+- **Skills** — Extend agent capabilities with project-specific markdown skill files (`/skill-name` invocation)
+- **Memory** — Cross-session persistent memory that remembers observations and preferences
+
+### Sandbox & Permissions
+
+Three permission modes to control what the agent can do:
+
+| Mode | Behavior |
+|---|---|
+| `bypass` | Auto-approve everything |
+| `auto` | Smart approval based on intent classification |
+| `supervised` | Require user confirmation for writes and commands |
+
+Sandbox policies (strict/permissive/disabled) enforce filesystem, network, and command restrictions.
+
+### Lifecycle Hooks
+
+Run custom scripts on agent events — tool calls, session start, permission requests, etc:
+
+```json
+{
+  "hooks": [
+    {
+      "event": "tool_call_post",
+      "tool_filter": ["Bash"],
+      "command": "notify-send 'Command executed'"
+    }
+  ]
+}
+```
 
 ## Configuration
 
-Loopal uses a layered configuration system. Create a `.loopal/config.toml` in your project root or `~/.config/loopal/config.toml` for global settings.
+Loopal uses a layered config system — each layer overrides the previous:
 
-```toml
-# .loopal/config.toml
-
-# Default model
-model = "claude-sonnet-4-20250514"
-
-# Permission mode: "supervised" or "bypass"
-permission_mode = "supervised"
-
-# Max context tokens before compaction
-max_context_tokens = 120000
-
-# Thinking/reasoning configuration
-[thinking]
-type = "auto"                  # "auto", "disabled", "effort", or "budget"
-# level = "medium"             # for "effort" type
-# tokens = 10000               # for "budget" type
-
-# MCP servers
-[mcp_servers.my-server]
-command = "npx"
-args = ["-y", "@my/mcp-server"]
-
-# Sandbox policy
-[sandbox]
-policy = "strict"              # "strict", "permissive", or "disabled"
+```
+~/.loopal/settings.json              # Global settings
+~/.loopal/LOOPAL.md                  # Global system prompt instructions
+<project>/.loopal/settings.json      # Project settings
+<project>/.loopal/settings.local.json  # Local overrides (gitignored)
+<project>/LOOPAL.md                  # Project instructions
 ```
 
-### Environment variables
+Key settings:
 
-| Variable | Description |
-|---|---|
-| `ANTHROPIC_API_KEY` | Anthropic API key |
-| `OPENAI_API_KEY` | OpenAI API key |
+```json
+{
+  "model": "claude-sonnet-4-20250514",
+  "permission_mode": "supervised",
+  "thinking": { "type": "auto" },
+  "providers": {
+    "anthropic": { "api_key": "..." }
+  },
+  "mcp_servers": { },
+  "sandbox": { "policy": "strict" }
+}
+```
+
+Environment variables: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`.
+
+## Architecture
+
+Loopal runs as a multi-process, Hub-centric system. **Hub** is the sole coordinator — all agents and UI clients connect to it, no direct agent-to-agent communication.
+
+```
+                    ┌───────────┐   ┌───────────┐   ┌───────────┐
+                    │    TUI    │   │ ACP (IDE) │   │    CLI    │
+                    └─────┬─────┘   └─────┬─────┘   └─────┬─────┘
+                          │   TCP (JSON-RPC 2.0)          │
+                          └───────────┬───────────────────┘
+                                      │
+┌─────────────────────────────────────▼──────────────────────────────┐
+│                              Hub                                   │
+│                                                                    │
+│   Registry ── agent parent/child tree + lifecycle tracking         │
+│   Dispatch ── broadcast events to all connected UI clients         │
+│   Relay    ── race permission/question requests to UIs             │
+│   Spawner  ── fork agent processes + bridge completion results     │
+│                                                                    │
+│               stdio (JSON-RPC 2.0)                                 │
+│              ┌────────────┼────────────┐                           │
+│              │            │            │                            │
+│   ┌──────────▼──┐  ┌─────▼──────┐  ┌──▼───────────┐              │
+│   │ Root Agent  │  │ Sub-Agent  │  │ Sub-Agent ..  │              │
+│   │             │  │            │  │               │              │
+│   │ Kernel      │  │ Kernel     │  │ Kernel        │              │
+│   │ LLM Stream  │  │ LLM Stream │  │ LLM Stream    │              │
+│   │ Tools       │  │ Tools      │  │ Tools         │              │
+│   │ MCP Servers │  │ MCP Servers│  │ MCP Servers   │              │
+│   └─────────────┘  └────────────┘  └───────────────┘              │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+**How it works:**
+
+- **Agents** connect to Hub via stdio pipes (forked child processes). Each agent runs its own Kernel with LLM providers, tools, and MCP servers.
+- **UI clients** (TUI, IDE via ACP, CLI) connect via TCP. Multiple clients can observe and interact with the same session simultaneously.
+- **Sub-agents** are spawned on demand — Hub forks a new process, registers the parent/child relationship, and bridges completion results back to the parent as normal messages.
+- **Events** are broadcast to all UI clients. **Permissions** are raced to all connected UIs — first response wins.
+- All communication uses JSON-RPC 2.0, whether over stdio or TCP.
+
+Built as 40+ Rust crates in a layered architecture — see [CLAUDE.md](./CLAUDE.md) for the full dependency graph and development guide.
 
 ## CLI Reference
 
@@ -178,15 +246,17 @@ policy = "strict"              # "strict", "permissive", or "disabled"
 Usage: loopal [OPTIONS] [PROMPT]...
 
 Arguments:
-  [PROMPT]...           Initial prompt (non-interactive)
+  [PROMPT]...               Initial prompt
 
 Options:
   -m, --model <MODEL>       Model to use
   -r, --resume <SESSION>    Resume a previous session
-  -P, --permission <MODE>   Permission mode (supervised/bypass)
+  -P, --permission <MODE>   Permission mode (bypass/auto/supervised)
       --plan                Start in plan mode (read-only)
+      --headless            Process prompt and exit (no TUI)
+      --worktree            Create isolated git worktree
       --no-sandbox          Disable sandbox enforcement
-      --acp                 Run as ACP server (stdin/stdout JSON-RPC)
+      --acp                 Run as ACP server
   -h, --help                Print help
 ```
 
@@ -194,4 +264,4 @@ Options:
 
 Proprietary. Copyright (c) 2024-2026 AgentsMesh.ai. All Rights Reserved.
 
-This software is licensed under a proprietary commercial license. See the [LICENSE](./LICENSE) file for the full terms. Unauthorized copying, modification, distribution, or use of this software is strictly prohibited.
+See [LICENSE](./LICENSE) for full terms.

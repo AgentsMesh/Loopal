@@ -144,10 +144,13 @@ pub fn start_agent_io(
         let (completion_tx, completion_rx) = tokio::sync::mpsc::channel::<Envelope>(32);
         {
             let mut h = hub.lock().await;
-            if let Err(e) =
-                h.registry
-                    .register_connection_with_parent(&n, conn2, None, None, Some(completion_tx))
-            {
+            if let Err(e) = h.registry.register_connection_with_parent(
+                &n,
+                conn2,
+                None,
+                None,
+                Some(completion_tx),
+            ) {
                 tracing::warn!(agent = %n, error = %e, "registration failed");
                 return;
             }

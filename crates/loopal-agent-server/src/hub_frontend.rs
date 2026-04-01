@@ -14,7 +14,7 @@ use tracing::{debug, info};
 
 use loopal_error::{LoopalError, Result};
 use loopal_ipc::protocol::methods;
-use loopal_protocol::{AgentEvent, AgentEventPayload, Question, UserQuestionResponse};
+use loopal_protocol::{AgentEvent, AgentEventPayload, Envelope, Question, UserQuestionResponse};
 use loopal_runtime::agent_input::AgentInput;
 use loopal_runtime::frontend::traits::{AgentFrontend, EventEmitter};
 use loopal_tool_api::PermissionDecision;
@@ -191,5 +191,16 @@ impl AgentFrontend for HubFrontend {
             }
         });
         true
+    }
+
+    async fn drain_pending(&self) -> Vec<Envelope> {
+        let mut rx = self.input_rx.lock().await;
+        let mut envelopes = Vec::new();
+        while let Ok(msg) = rx.try_recv() {
+            if let InputFromClient::Message(env) = msg {
+                envelopes.push(env);
+            }
+        }
+        envelopes
     }
 }

@@ -29,14 +29,16 @@ impl AgentLoopRunner {
 
                 match self.params.config.lifecycle {
                     LifecycleMode::Task => {
-                        // Task agent: check for pending input (non-blocking).
-                        // If nothing pending, work is done — exit.
+                        // Task agent: check for pending input. If nothing pending
+                        // after a brief yield, work is done — exit.
+                        // The yield allows in-flight IPC messages (e.g. sub-agent
+                        // completions) to arrive before we decide to exit.
+                        tokio::task::yield_now().await;
                         let pending = self.drain_pending_input().await;
                         if pending.is_empty() {
                             info!("task agent idle with no pending input, exiting");
                             break;
                         }
-                        // Has pending messages (e.g. sub-agent completions) — ingest and continue.
                         for env in &pending {
                             self.ingest_message(env);
                         }

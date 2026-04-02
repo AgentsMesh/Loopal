@@ -16,14 +16,16 @@ impl From<TypesAgentMode> for AgentMode {
 }
 
 impl AgentMode {
+    /// Append mode-specific instructions after the system prompt.
+    ///
+    /// Plan mode returns empty — the `plan-5phase` Fragment handles all
+    /// plan instructions, and `handle_enter_plan` injects the plan file
+    /// path via `tool_result`. Keeping the suffix empty avoids conflicting
+    /// with the Fragment's 5-phase workflow.
     pub fn system_prompt_suffix(&self) -> &str {
         match self {
             AgentMode::Act => "",
-            AgentMode::Plan => {
-                "\n\nYou are in PLAN mode. Explore the codebase and design a solution. \
-                 Write your plan to .loopal/plans/plan.md. Use AskUser to confirm with \
-                 the user before calling ExitPlanMode."
-            }
+            AgentMode::Plan => "",
         }
     }
 }

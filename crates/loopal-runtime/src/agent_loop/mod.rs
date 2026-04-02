@@ -26,6 +26,7 @@ mod tool_progress;
 mod tools;
 mod tools_check;
 mod tools_inject;
+pub(crate) mod tools_plan;
 mod tools_resolve;
 pub mod turn_context;
 mod turn_exec;
@@ -79,6 +80,16 @@ pub struct AgentConfig {
     pub thinking_config: ThinkingConfig,
     /// Context tokens cap from settings (0 = auto, use model's context_window).
     pub context_tokens_cap: u32,
+    /// Captured state before entering Plan mode (restored on ExitPlanMode).
+    /// `Some` iff the agent is in plan mode entered via EnterPlanMode.
+    pub plan_state: Option<PlanModeState>,
+}
+
+/// Snapshot of pre-plan-mode state, captured atomically on EnterPlanMode.
+pub struct PlanModeState {
+    pub previous_mode: AgentMode,
+    pub previous_permission_mode: PermissionMode,
+    pub tool_filter: HashSet<String>,
 }
 
 impl AgentConfig {
@@ -99,6 +110,7 @@ impl Default for AgentConfig {
             tool_filter: None,
             thinking_config: ThinkingConfig::Auto,
             context_tokens_cap: 0,
+            plan_state: None,
         }
     }
 }

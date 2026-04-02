@@ -43,6 +43,31 @@ impl AgentLoopRunner {
                 .position(|(tid, _, _)| tid == id)
                 .unwrap_or(0);
 
+            // Plan mode hard-enforcement: block tools not in plan_tool_filter.
+            if let Some(filter) = self.plan_tool_filter() {
+                if !filter.contains(name.as_str()) {
+                    info!(tool = name.as_str(), "plan mode: tool not allowed");
+                    denied.push((
+                        orig_idx,
+                        error_block(
+                            id,
+                            "Plan mode: this tool is not available. Use read-only tools only.",
+                        ),
+                    ));
+                    self.emit_tool_error(id, name, "Plan mode: tool not allowed")
+                        .await?;
+                    continue;
+                }
+                // Write/Edit in plan mode: only allow plan file path.
+                if (name == "Write" || name == "Edit") && !self.is_plan_file_target(input) {
+                    let plan_path = self.plan_file.path().display();
+                    let msg = format!("Plan mode: only the plan file ({plan_path}) can be edited.");
+                    denied.push((orig_idx, error_block(id, &msg)));
+                    self.emit_tool_error(id, name, &msg).await?;
+                    continue;
+                }
+            }
+
             // Sandbox precheck
             let precheck_reason = self
                 .params
@@ -113,6 +138,15 @@ impl AgentLoopRunner {
             metadata: None,
         })
         .await
+    }
+
+    /// Check if a Write/Edit tool input targets the plan file.
+    fn is_plan_file_target(&self, input: &serde_json::Value) -> bool {
+        let target = input
+            .get("file_path")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        self.plan_file.matches_path(target)
     }
 }
 

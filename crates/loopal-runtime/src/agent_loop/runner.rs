@@ -11,6 +11,7 @@ use super::token_accumulator::TokenAccumulator;
 use super::turn_context::TurnContext;
 use super::turn_observer::TurnObserver;
 use super::{AgentLoopParams, TurnOutput};
+use crate::plan_file::PlanFile;
 
 /// Encapsulates the agent loop state and behavior.
 pub struct AgentLoopRunner {
@@ -26,6 +27,8 @@ pub struct AgentLoopRunner {
     pub trigger_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
     /// Explicit agent state — source of truth, propagated via events to Session layer.
     pub status: AgentStatus,
+    /// Plan file for the current session (created lazily on first plan mode entry).
+    pub plan_file: PlanFile,
 }
 
 impl AgentLoopRunner {
@@ -48,6 +51,7 @@ impl AgentLoopRunner {
         let interrupt = params.interrupt.signal.clone();
         let interrupt_tx = params.interrupt.tx.clone();
         let trigger_rx = params.scheduled_rx.take();
+        let plan_file = PlanFile::new(std::path::Path::new(&params.session.cwd));
         Self {
             params,
             tool_ctx,
@@ -59,6 +63,7 @@ impl AgentLoopRunner {
             observers: Vec::new(),
             trigger_rx,
             status: AgentStatus::Starting,
+            plan_file,
         }
     }
 

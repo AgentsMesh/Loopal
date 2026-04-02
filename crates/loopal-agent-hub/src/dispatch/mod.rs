@@ -35,6 +35,26 @@ pub async fn dispatch_hub_request(
         m if m == methods::HUB_WAIT_AGENT.name => handle_wait_agent(hub, params).await,
         m if m == methods::HUB_AGENT_INFO.name => handle_agent_info(hub, params).await,
         m if m == methods::HUB_TOPOLOGY.name => handle_topology(hub).await,
+        m if m == methods::HUB_STATUS.name => handle_status(hub).await,
+        // Forward meta/* methods to MetaHub via uplink
+        m if m.starts_with("meta/") => {
+            let uplink = hub.lock().await.uplink.clone();
+            match uplink {
+                Some(ul) => {
+                    let resp = ul
+                        .connection()
+                        .send_request(method, params)
+                        .await
+                        .map_err(|e| format!("{method} via uplink failed: {e}"))?;
+                    if let Some(msg) = resp.get("message").and_then(|m| m.as_str()) {
+                        Err(format!("{method} error: {msg}"))
+                    } else {
+                        Ok(resp)
+                    }
+                }
+                None => Err("not connected to MetaHub cluster".to_string()),
+            }
+        }
         _ => Err(format!("unknown hub method: {method}")),
     }
 }

@@ -60,11 +60,11 @@ pub(crate) const MAX_AUTO_CONTINUATIONS: u32 = 3;
 /// Agent lifecycle mode — determines idle behavior after turn completion.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum LifecycleMode {
-    /// Wait for user input between turns (root agent, TUI, interactive CLI).
+    /// Wait indefinitely for next input (root agent, long-lived sessions).
     #[default]
-    Interactive,
-    /// Process prompt, exit when idle with no pending input (sub-agents, headless).
-    Task,
+    Persistent,
+    /// Exit when idle with no pending input (sub-agents, one-shot tasks).
+    Ephemeral,
 }
 
 /// Agent configuration — mostly immutable, some fields switchable at runtime.

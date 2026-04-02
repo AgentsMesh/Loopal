@@ -136,11 +136,11 @@ async fn run_session(
         _ => None,
     };
 
-    if handle.has_initial_prompt {
-        info!("prompt-driven session complete, server exiting");
+    if handle.lifecycle == loopal_runtime::LifecycleMode::Ephemeral {
+        info!("ephemeral session complete, server exiting");
         Ok(agent_output)
     } else {
-        info!("session ended, ready for next");
+        info!("persistent session ended, ready for next");
         Ok(None)
     }
 }

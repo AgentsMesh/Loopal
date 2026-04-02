@@ -58,7 +58,7 @@ impl HarnessBuilder {
             permission_mode: PermissionMode::Bypass,
             messages: vec![Message::user("hello")],
             mode: AgentMode::Act,
-            lifecycle: loopal_runtime::LifecycleMode::Task,
+            lifecycle: loopal_runtime::LifecycleMode::Ephemeral,
             system_prompt: "test".into(),
             thinking_config: ThinkingConfig::Auto,
             tool_filter: None,
@@ -129,9 +129,9 @@ impl HarnessBuilder {
     }
 
     /// Build and spawn `agent_loop` in a background task.
-    /// Forces Interactive lifecycle since spawned tests send messages interactively.
+    /// Forces Persistent lifecycle since spawned tests send messages over time.
     pub async fn build_spawned(mut self) -> SpawnedHarness {
-        self.lifecycle = loopal_runtime::LifecycleMode::Interactive;
+        self.lifecycle = loopal_runtime::LifecycleMode::Persistent;
         let (harness, runner) = self.into_wired().await;
         tokio::spawn(async move {
             let mut runner = runner;

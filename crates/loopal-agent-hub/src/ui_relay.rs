@@ -41,10 +41,27 @@ pub(crate) async fn relay_to_ui_clients(
     };
 
     if ui_conns.is_empty() {
-        warn!(agent = %agent_name, %method, "no UI clients connected, denying");
-        let _ = agent_conn
-            .respond(request_id, serde_json::json!({"allow": false}))
-            .await;
+        // No local UI clients — try uplink to MetaHub if available
+        let uplink = {
+            let h = hub.lock().await;
+            h.uplink.clone()
+        };
+        let response = if let Some(ul) = uplink {
+            match ul.relay_permission(method, enriched).await {
+                Ok(resp) => {
+                    info!(agent = %agent_name, %method, "relayed via uplink");
+                    resp
+                }
+                Err(e) => {
+                    warn!(agent = %agent_name, %method, error = %e, "uplink relay failed, denying");
+                    serde_json::json!({"allow": false})
+                }
+            }
+        } else {
+            warn!(agent = %agent_name, %method, "no UI clients connected, denying");
+            serde_json::json!({"allow": false})
+        };
+        let _ = agent_conn.respond(request_id, response).await;
         return;
     }
 

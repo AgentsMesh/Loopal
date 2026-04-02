@@ -18,6 +18,9 @@ pub(crate) enum AgentConnectionState {
     Local(LocalChannels),
     /// Hub-mode: uniform IPC connection (agents via stdio, clients via TCP).
     Connected(Arc<Connection>),
+    /// Shadow entry for a remote agent spawned on another Hub via MetaHub.
+    /// No real connection — only a placeholder so wait_agent and completion work.
+    Shadow,
 }
 
 impl AgentConnectionState {
@@ -25,8 +28,13 @@ impl AgentConnectionState {
     pub(crate) fn connection(&self) -> Option<Arc<Connection>> {
         match self {
             Self::Connected(conn) => Some(Arc::clone(conn)),
-            Self::Local(_) => None,
+            Self::Local(_) | Self::Shadow => None,
         }
+    }
+
+    /// Whether this is a shadow entry (remote agent placeholder).
+    pub(crate) fn is_shadow(&self) -> bool {
+        matches!(self, Self::Shadow)
     }
 }
 

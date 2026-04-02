@@ -58,6 +58,7 @@ async fn full_bootstrap_hub_to_agent_roundtrip() {
             None,
             true, // no sandbox
             None,
+            None, // lifecycle: default
         )
         .await
         .expect("start_agent should work");

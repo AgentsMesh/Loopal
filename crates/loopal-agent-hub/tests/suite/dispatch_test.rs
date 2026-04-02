@@ -64,5 +64,5 @@ async fn dispatch_route_without_target_fails() {
     });
     let result = dispatch_hub_request(&hub, "hub/route", envelope, "sender".into()).await;
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("no agent registered"));
+    assert!(result.unwrap_err().contains("not found"));
 }

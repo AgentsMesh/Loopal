@@ -91,6 +91,10 @@ impl AgentRegistry {
                         .send_notification(methods::AGENT_INTERRUPT.name, serde_json::json!({}))
                         .await;
                 }
+                crate::types::AgentConnectionState::Shadow => {
+                    // Shadow entries represent remote agents — can't interrupt locally.
+                    tracing::debug!(agent = %name, "skipping interrupt for shadow entry");
+                }
             }
         }
     }
@@ -103,9 +107,9 @@ impl AgentRegistry {
                     .children
                     .iter()
                     .filter(|c| {
-                        self.agents
-                            .get(c.as_str())
-                            .is_some_and(|a| a.info.lifecycle == AgentLifecycle::Running)
+                        self.agents.get(c.as_str()).is_some_and(|a| {
+                            a.info.lifecycle == AgentLifecycle::Running && !a.state.is_shadow() // shadows are remote, can't interrupt locally
+                        })
                     })
                     .cloned()
                     .collect()

@@ -45,7 +45,7 @@ impl AgentLoopRunner {
 
         // Degraded: fall back to the frontend's permission handler.
         // The consumer determines the response: TUI prompts a human,
-        // headless auto-approves, sub-agents auto-deny.
+        // server mode auto-approves, sub-agents auto-deny.
         if classifier.is_degraded() {
             return self.ask_human_sequential(approved, denied, pending).await;
         }

@@ -1,8 +1,8 @@
 //! Outer loop: user-interaction granularity.
 //!
 //! The agent loop runs turns until:
-//! - Task agent: idle with no pending input → exit
-//! - Interactive agent: `wait_for_input` returns None (channel closed)
+//! - Ephemeral agent: idle with no pending input → exit
+//! - Persistent agent: `wait_for_input` returns None (channel closed)
 //! - Unrecoverable error
 //!
 //! State machine: Starting → Running → WaitingForInput → Running → ... → Finished
@@ -28,23 +28,21 @@ impl AgentLoopRunner {
                 self.transition(AgentStatus::WaitingForInput).await?;
 
                 match self.params.config.lifecycle {
-                    LifecycleMode::Task => {
-                        // Task agent: check for pending input. If nothing pending
+                    LifecycleMode::Ephemeral => {
+                        // Ephemeral agent: check for pending input. If nothing pending
                         // after a brief yield, work is done — exit.
-                        // The yield allows in-flight IPC messages (e.g. sub-agent
-                        // completions) to arrive before we decide to exit.
                         tokio::task::yield_now().await;
                         let pending = self.drain_pending_input().await;
                         if pending.is_empty() {
-                            info!("task agent idle with no pending input, exiting");
+                            info!("ephemeral agent idle, exiting");
                             break;
                         }
                         for env in &pending {
                             self.ingest_message(env);
                         }
                     }
-                    LifecycleMode::Interactive => {
-                        // Interactive: block until input arrives or channel closes.
+                    LifecycleMode::Persistent => {
+                        // Persistent: block until input arrives or channel closes.
                         match self.wait_for_input().await? {
                             Some(WaitResult::MessageAdded) => {
                                 self.interrupt.take();

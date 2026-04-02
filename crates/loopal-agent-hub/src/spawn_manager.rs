@@ -43,6 +43,7 @@ pub async fn spawn_and_register(
             permission_mode.as_deref(),
             false,
             None,
+            Some("ephemeral"), // sub-agents always exit on idle
         )
         .await
     {

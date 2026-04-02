@@ -96,7 +96,7 @@ pub fn build_with_frontend(
     });
 
     let memory_channel = crate::memory_adapter::build_memory_channel(
-        start.prompt.is_none(), // memory only for long-lived sessions
+        start.lifecycle == loopal_runtime::LifecycleMode::Persistent,
         &config.settings,
         &agent_shared,
         &model,
@@ -167,11 +167,7 @@ pub fn build_with_frontend(
         tool_tokens,
     );
 
-    let lifecycle = if start.prompt.is_some() {
-        loopal_runtime::LifecycleMode::Task
-    } else {
-        loopal_runtime::LifecycleMode::Interactive
-    };
+    let lifecycle = start.lifecycle;
 
     let params = AgentLoopParams {
         config: loopal_runtime::AgentConfig {

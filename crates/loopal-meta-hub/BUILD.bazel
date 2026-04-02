@@ -1,0 +1,55 @@
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+rust_library(
+    name = "loopal-meta-hub",
+    srcs = glob(["src/**/*.rs"]),
+    edition = "2024",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//crates/loopal-agent-hub",
+        "//crates/loopal-ipc",
+        "//crates/loopal-protocol",
+        "@crates//:anyhow",
+        "@crates//:serde",
+        "@crates//:serde_json",
+        "@crates//:tokio",
+        "@crates//:tracing",
+        "@crates//:uuid",
+    ],
+)
+
+# Unit + integration tests (DuplexTransport, no real binary needed)
+rust_test(
+    name = "loopal-meta-hub_test",
+    srcs = ["tests/suite.rs"] + glob(["tests/suite/**/*.rs"]),
+    crate_root = "tests/suite.rs",
+    edition = "2024",
+    deps = [
+        ":loopal-meta-hub",
+        "//crates/loopal-agent-hub",
+        "//crates/loopal-ipc",
+        "//crates/loopal-protocol",
+        "@crates//:tokio",
+        "@crates//:serde_json",
+    ],
+)
+
+# End-to-end cluster tests (real binary, real TCP, real agent processes)
+rust_test(
+    name = "loopal-meta-hub_e2e",
+    srcs = glob(["tests/e2e/**/*.rs"]),
+    crate_root = "tests/e2e/e2e_cluster_test.rs",
+    edition = "2024",
+    local = True,
+    data = ["//:loopal"],
+    env = {"LOOPAL_BINARY": "$(rootpath //:loopal)"},
+    deps = [
+        ":loopal-meta-hub",
+        "//crates/loopal-agent-hub",
+        "//crates/loopal-agent-client",
+        "//crates/loopal-ipc",
+        "//crates/loopal-protocol",
+        "@crates//:tokio",
+        "@crates//:serde_json",
+    ],
+)

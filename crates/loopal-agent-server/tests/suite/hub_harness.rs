@@ -129,6 +129,7 @@ pub async fn build_hub_harness_with(
         permission_mode: None,
         no_sandbox: true,
         resume: None,
+        lifecycle: loopal_runtime::LifecycleMode::Persistent,
     };
     let (hub_conn, _hub_peer) = loopal_ipc::duplex_pair();
     let hub_connection = std::sync::Arc::new(loopal_ipc::Connection::new(hub_conn));

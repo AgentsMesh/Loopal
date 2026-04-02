@@ -14,6 +14,8 @@ pub struct StartParams {
     pub permission_mode: Option<String>,
     pub no_sandbox: bool,
     pub resume: Option<String>,
+    /// Explicit lifecycle mode. Ephemeral exits on idle, Persistent waits.
+    pub lifecycle: loopal_runtime::LifecycleMode,
 }
 
 /// Build a Kernel from config (production path: MCP, tools).

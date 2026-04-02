@@ -20,6 +20,7 @@ rust_binary(
         "//crates/loopal-storage",
         "//crates/loopal-session",
         "//crates/loopal-agent-hub",
+        "//crates/loopal-meta-hub",
         "//crates/loopal-tui",
         "//crates/loopal-acp",
         "//crates/loopal-agent-server",

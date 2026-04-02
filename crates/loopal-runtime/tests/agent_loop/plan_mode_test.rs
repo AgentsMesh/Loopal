@@ -56,7 +56,7 @@ async fn enter_plan_when_already_in_plan_returns_error() {
 #[tokio::test]
 async fn enter_plan_blocked_for_task_lifecycle() {
     let (mut runner, _rx) = make_runner();
-    runner.params.config.lifecycle = LifecycleMode::Task;
+    runner.params.config.lifecycle = LifecycleMode::Ephemeral;
 
     let tool_uses = vec![(
         "tc-1".to_string(),

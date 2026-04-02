@@ -23,6 +23,7 @@
   <a href="#installation">Installation</a> &bull;
   <a href="#quick-start">Quick Start</a> &bull;
   <a href="#features">Features</a> &bull;
+  <a href="#distributed-cluster">Distributed Cluster</a> &bull;
   <a href="#configuration">Configuration</a> &bull;
   <a href="#architecture">Architecture</a> &bull;
   <a href="#license">License</a>
@@ -63,6 +64,9 @@ cd your-project && loopal
 
 # Or pass a prompt directly
 loopal "explain the architecture of this project"
+
+# Server mode (no TUI, for CI/scripting)
+loopal --server --ephemeral "run all tests and fix failures"
 ```
 
 ## Features
@@ -98,7 +102,7 @@ Full-featured interactive TUI built with [Ratatui](https://ratatui.rs):
 | **File I/O** | Read, Write, Edit, MultiEdit, ApplyPatch, CopyFile, MoveFile, Delete |
 | **Search** | Grep (regex, context, file filters), Glob (pattern matching), Ls |
 | **Process** | Bash (foreground + background), Fetch, WebSearch |
-| **Agent** | AskUser, EnterPlanMode, ExitPlanMode |
+| **Agent** | AskUser, EnterPlanMode, ExitPlanMode, ListHubs |
 
 All tools go through sandbox policy checks before execution.
 
@@ -168,6 +172,40 @@ Run custom scripts on agent events — tool calls, session start, permission req
 }
 ```
 
+## Distributed Cluster
+
+Connect multiple Loopal instances into a cluster via **MetaHub** — a lightweight TCP coordinator that enables cross-hub agent communication.
+
+### Start a cluster
+
+```bash
+# Terminal 1: Start MetaHub coordinator
+loopal --meta-hub 0.0.0.0:9900
+
+# Terminal 2: Connect first Hub
+LOOPAL_META_HUB_TOKEN=<token> loopal --join-hub 127.0.0.1:9900 --hub-name code-hub
+
+# Terminal 3: Connect second Hub
+LOOPAL_META_HUB_TOKEN=<token> loopal --join-hub 127.0.0.1:9900 --hub-name review-hub
+```
+
+### What agents can do in a cluster
+
+- **Discover hubs** — `ListHubs` tool shows all connected hubs and their agents
+- **Spawn remotely** — `Agent` tool with `target_hub` parameter creates agents on other hubs
+- **Route messages** — `SendMessage` to `"hub-name/agent-name"` routes through MetaHub
+- **Auto-relay** — Permissions and events automatically propagate across hubs
+
+### Three orthogonal execution dimensions
+
+| Dimension | Options | Controls |
+|---|---|---|
+| **Frontend** | `--server` / TUI (default) | Who sees events and approves actions |
+| **Lifecycle** | `--ephemeral` / persistent (default) | Exit on idle vs. wait for next task |
+| **Cluster** | `--join-hub` / standalone (default) | Single instance vs. distributed |
+
+All combinations are valid — a `--server --join-hub` instance is a headless cluster worker.
+
 ## Configuration
 
 Loopal uses a layered config system — each layer overrides the previous:
@@ -199,7 +237,9 @@ Environment variables: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`.
 
 ## Architecture
 
-Loopal runs as a multi-process, Hub-centric system. **Hub** is the sole coordinator — all agents and UI clients connect to it, no direct agent-to-agent communication.
+Loopal runs as a multi-process, Hub-centric system. Multiple Hubs can form a cluster via **MetaHub**.
+
+### Single Hub (default)
 
 ```
                     ┌───────────┐   ┌───────────┐   ┌───────────┐
@@ -221,13 +261,30 @@ Loopal runs as a multi-process, Hub-centric system. **Hub** is the sole coordina
 │              │            │            │                            │
 │   ┌──────────▼──┐  ┌─────▼──────┐  ┌──▼───────────┐              │
 │   │ Root Agent  │  │ Sub-Agent  │  │ Sub-Agent ..  │              │
-│   │             │  │            │  │               │              │
-│   │ Kernel      │  │ Kernel     │  │ Kernel        │              │
-│   │ LLM Stream  │  │ LLM Stream │  │ LLM Stream    │              │
-│   │ Tools       │  │ Tools      │  │ Tools         │              │
-│   │ MCP Servers │  │ MCP Servers│  │ MCP Servers   │              │
+│   │ Kernel+LLM  │  │ Kernel+LLM │  │ Kernel+LLM   │              │
+│   │ Tools+MCP   │  │ Tools+MCP  │  │ Tools+MCP     │              │
 │   └─────────────┘  └────────────┘  └───────────────┘              │
 └────────────────────────────────────────────────────────────────────┘
+```
+
+### Distributed Cluster (via MetaHub)
+
+```
+                         ┌──────────────┐
+                         │   MetaHub    │
+                         │  (TCP coord) │
+                         └──┬───────┬───┘
+                    TCP     │       │     TCP
+               ┌────────────┘       └────────────┐
+               │                                  │
+        ┌──────▼──────┐                   ┌───────▼─────┐
+        │   Hub-A     │                   │   Hub-B     │
+        │  (uplink)   │                   │  (uplink)   │
+        │ ┌─────────┐ │                   │ ┌─────────┐ │
+        │ │ Agent-1 │ │  ←── meta/route   │ │ Agent-3 │ │
+        │ │ Agent-2 │ │      meta/spawn → │ │ Agent-4 │ │
+        │ └─────────┘ │                   │ └─────────┘ │
+        └─────────────┘                   └─────────────┘
 ```
 
 **How it works:**
@@ -235,7 +292,8 @@ Loopal runs as a multi-process, Hub-centric system. **Hub** is the sole coordina
 - **Agents** connect to Hub via stdio pipes (forked child processes). Each agent runs its own Kernel with LLM providers, tools, and MCP servers.
 - **UI clients** (TUI, IDE via ACP, CLI) connect via TCP. Multiple clients can observe and interact with the same session simultaneously.
 - **Sub-agents** are spawned on demand — Hub forks a new process, registers the parent/child relationship, and bridges completion results back to the parent as normal messages.
-- **Events** are broadcast to all UI clients. **Permissions** are raced to all connected UIs — first response wins.
+- **MetaHub** coordinates multiple Hubs via TCP. Cross-hub operations (routing, spawning, discovery) go through MetaHub transparently — agents don't know which Hub they're on.
+- **Events** are broadcast to all UI clients. **Permissions** are raced to all connected UIs — first response wins. In cluster mode, permissions propagate through MetaHub.
 - All communication uses JSON-RPC 2.0, whether over stdio or TCP.
 
 Built as 40+ Rust crates in a layered architecture — see [CLAUDE.md](./CLAUDE.md) for the full dependency graph and development guide.
@@ -246,18 +304,22 @@ Built as 40+ Rust crates in a layered architecture — see [CLAUDE.md](./CLAUDE.
 Usage: loopal [OPTIONS] [PROMPT]...
 
 Arguments:
-  [PROMPT]...               Initial prompt
+  [PROMPT]...                 Initial prompt
 
 Options:
-  -m, --model <MODEL>       Model to use
-  -r, --resume <SESSION>    Resume a previous session
-  -P, --permission <MODE>   Permission mode (bypass/auto/supervised)
-      --plan                Start in plan mode (read-only)
-      --headless            Process prompt and exit (no TUI)
-      --worktree            Create isolated git worktree
-      --no-sandbox          Disable sandbox enforcement
-      --acp                 Run as ACP server
-  -h, --help                Print help
+  -m, --model <MODEL>         Model to use
+  -r, --resume <SESSION>      Resume a previous session
+  -P, --permission <MODE>     Permission mode (bypass/auto/supervised)
+      --plan                  Start in plan mode (read-only)
+      --server                Run without TUI (server mode)
+      --ephemeral             Exit after completing current task
+      --worktree              Create isolated git worktree
+      --no-sandbox            Disable sandbox enforcement
+      --acp                   Run as ACP server
+      --meta-hub <ADDR>       Run as MetaHub cluster coordinator
+      --join-hub <ADDR>       Join a MetaHub cluster
+      --hub-name <NAME>       Hub name when joining a cluster
+  -h, --help                  Print help
 ```
 
 ## License

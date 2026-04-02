@@ -57,7 +57,16 @@ pub(crate) async fn start_bridge_client(
     let client = AgentClient::new(client_t);
     client.initialize().await.expect("initialize");
     client
-        .start_agent(fixture.path(), None, None, Some("work"), None, false, None)
+        .start_agent(
+            fixture.path(),
+            None,
+            None,
+            Some("work"),
+            None,
+            false,
+            None,
+            None,
+        )
         .await
         .expect("start_agent");
 
@@ -145,6 +154,7 @@ async fn bridge_cancel_sends_shutdown() {
             Some("slow task"),
             None,
             false,
+            None,
             None,
         )
         .await

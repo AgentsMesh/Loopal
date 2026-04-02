@@ -26,8 +26,8 @@ pub async fn handle_wait_agent(hub: &Arc<Mutex<Hub>>, params: Value) -> Result<V
             return Ok(json!({"output": output}));
         }
 
-        // Agent still running — create watcher
-        if h.registry.get_agent_connection(&name).is_none() {
+        // Agent still running (or shadow entry for remote agent) — create watcher
+        if !h.registry.agents.contains_key(&name) {
             info!(agent = %name, "handle_wait_agent: not found");
             return Ok(json!({"output": "agent not found or already finished"}));
         }

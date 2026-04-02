@@ -9,6 +9,7 @@ pub fn register_all(kernel: &mut Kernel) {
     // Collaboration tools (Hub-based multi-agent)
     kernel.register_tool(Box::new(collaboration::agent::AgentTool));
     kernel.register_tool(Box::new(collaboration::send_message::SendMessageTool));
+    kernel.register_tool(Box::new(collaboration::list_hubs::ListHubsTool));
     // Agent-internal tools
     kernel.register_tool(Box::new(task::TaskCreateTool));
     kernel.register_tool(Box::new(task::TaskUpdateTool));

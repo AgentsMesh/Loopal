@@ -32,6 +32,10 @@ impl Tool for AgentTool {
                 "name": { "type": "string" },
                 "subagent_type": { "type": "string" },
                 "model": { "type": "string" },
+                "target_hub": {
+                    "type": "string",
+                    "description": "Spawn on a remote hub in the cluster (e.g. 'hub-b'). Requires MetaHub connection."
+                },
                 "run_in_background": {
                     "type": "boolean",
                     "description": "Default false (foreground). Only set true when you have independent work to do while the agent runs."
@@ -85,6 +89,10 @@ async fn action_spawn(
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
     let isolation = input.get("isolation").and_then(|v| v.as_str());
+    let target_hub = input
+        .get("target_hub")
+        .and_then(|v| v.as_str())
+        .map(String::from);
     if shared.depth >= shared.max_depth {
         return Ok(ToolResult::error(format!(
             "Maximum nesting depth ({}) reached",
@@ -121,6 +129,7 @@ async fn action_spawn(
             model: Some(model),
             cwd_override,
             permission_mode: Some(perm_mode.to_string()),
+            target_hub,
         },
     )
     .await;

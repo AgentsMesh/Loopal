@@ -54,6 +54,45 @@ async fn test_non_interactive_exits_after_tool_turn() {
     let _ = std::fs::remove_file(&tmp);
 }
 
+/// Regression: tool call with text -> next LLM returns empty (no text, no
+/// tools) -> output must preserve text from the earlier iteration.
+/// This was the root cause of sub-agents returning output_len=0 to parents:
+/// the normal exit path in `execute_turn_inner` used `result.assistant_text`
+/// (empty) instead of `last_text` (accumulated).
+#[tokio::test]
+async fn test_empty_final_response_preserves_last_text() {
+    let tmp = std::env::temp_dir().join(format!("la_ef_{}.txt", std::process::id()));
+    std::fs::write(&tmp, "content").unwrap();
+    let calls = vec![
+        // First LLM call: text + tool
+        vec![
+            Ok(StreamChunk::Text {
+                text: "Let me check the file.".into(),
+            }),
+            Ok(StreamChunk::ToolUse {
+                id: "tc-1".into(),
+                name: "Read".into(),
+                input: serde_json::json!({"file_path": tmp.to_str().unwrap()}),
+            }),
+            Ok(StreamChunk::Done {
+                stop_reason: StopReason::EndTurn,
+            }),
+        ],
+        // Second LLM call: empty response (no text, no tools)
+        vec![Ok(StreamChunk::Done {
+            stop_reason: StopReason::EndTurn,
+        })],
+    ];
+    let (mut runner, mut event_rx) = make_multi_runner(calls, false);
+    tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
+
+    let output = runner.run().await.unwrap();
+    assert_eq!(output.result, "Let me check the file.");
+    assert_eq!(output.terminate_reason, TerminateReason::Goal);
+
+    let _ = std::fs::remove_file(&tmp);
+}
+
 /// Regression test: tool call with text -> next LLM call stream error ->
 /// output preserves the text from the successful iteration (not empty).
 /// This was the root cause of sub-agents returning empty results.

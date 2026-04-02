@@ -101,9 +101,12 @@ impl AgentLoopRunner {
             }
 
             if result.tool_uses.is_empty() {
-                return Ok(TurnOutput {
-                    output: result.assistant_text,
-                });
+                // Use last_text (already updated at line 79-81 if current
+                // assistant_text is non-empty). This preserves the last
+                // meaningful text when the final LLM response is empty —
+                // e.g. ephemeral sub-agents whose last call returns no
+                // visible content still propagate their earlier output.
+                return Ok(TurnOutput { output: last_text });
             }
 
             // Observer: on_before_tools

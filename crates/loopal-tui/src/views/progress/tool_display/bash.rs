@@ -5,7 +5,7 @@ use ratatui::prelude::*;
 use loopal_session::types::SessionToolCall;
 use loopal_tool_api::TimeoutSecs;
 
-use super::{EXPAND_MAX_LINES, expand_output, output_first_line, output_style};
+use super::{EXPAND_MAX_LINES, dim_style, expand_output, output_first_line, output_style};
 
 /// Extract Bash command for header: strip `cd ... &&` preamble, collapse whitespace.
 pub fn extract_detail(input: &serde_json::Value) -> Option<String> {
@@ -51,7 +51,7 @@ pub fn render_running_body(tc: &SessionToolCall) -> Vec<Line<'static>> {
             }
             lines.push(Line::from(Span::styled(
                 format!("    ({elapsed} / {timeout})"),
-                Style::default().fg(Color::Rgb(100, 105, 115)),
+                dim_style(),
             )));
             return lines;
         }

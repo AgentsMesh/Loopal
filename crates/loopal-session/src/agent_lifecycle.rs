@@ -57,6 +57,14 @@ pub(crate) fn register_spawned_agent(
     }
 }
 
+/// Post-event cleanup: error recovery + parent tool progress sync.
+pub(crate) fn post_event_cleanup(state: &mut SessionState, name: &str, sync_parent: bool) {
+    auto_return_on_error(state, name);
+    if sync_parent && name != ROOT_AGENT {
+        sync_parent_tool_progress(state, name);
+    }
+}
+
 /// Auto-return to root view when the viewed agent enters Error status.
 /// Also truncates the conversation to bound memory.
 pub(crate) fn auto_return_on_error(state: &mut SessionState, name: &str) {
@@ -91,6 +99,50 @@ fn truncate_if_done(state: &mut SessionState, name: &str) {
     if msgs.len() > MAX_DONE_MSGS {
         let start = msgs.len() - MAX_DONE_MSGS;
         *msgs = msgs.split_off(start);
+    }
+}
+
+/// Propagate sub-agent's last tool activity to the parent's Agent tool call.
+///
+/// Syncs `observable.last_tool` into the parent's `SessionToolCall.progress_tail`
+/// so the TUI content area can display live sub-agent status.
+pub(crate) fn sync_parent_tool_progress(state: &mut SessionState, child_name: &str) {
+    // Phase 1: read child state (shared borrow released before phase 2).
+    let (parent_name, status_text) = {
+        let Some(agent) = state.agents.get(child_name) else {
+            return;
+        };
+        let parent = match &agent.parent {
+            Some(p) => p.clone(),
+            None => return,
+        };
+        let text = agent.observable.last_tool.clone().unwrap_or_default();
+        (parent, text)
+    };
+
+    // Phase 2: find the matching Agent tool call in parent's conversation.
+    let Some(parent) = state.agents.get_mut(&parent_name) else {
+        return;
+    };
+    for msg in parent.conversation.messages.iter_mut().rev() {
+        for tc in msg.tool_calls.iter_mut().rev() {
+            if tc.name == "Agent" && tc.status.is_active() {
+                let matches = tc
+                    .tool_input
+                    .as_ref()
+                    .and_then(|i| i.get("name"))
+                    .and_then(|v| v.as_str())
+                    == Some(child_name);
+                if matches {
+                    tc.progress_tail = if status_text.is_empty() {
+                        None
+                    } else {
+                        Some(status_text)
+                    };
+                    return;
+                }
+            }
+        }
     }
 }
 

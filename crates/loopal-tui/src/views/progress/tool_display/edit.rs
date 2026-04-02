@@ -4,7 +4,7 @@ use ratatui::prelude::*;
 
 use loopal_session::types::SessionToolCall;
 
-use super::output_first_line;
+use super::{dim_style, output_first_line};
 
 /// Max diff lines before folding.
 const DIFF_MAX_LINES: usize = 8;
@@ -53,7 +53,7 @@ pub fn render_body(tc: &SessionToolCall) -> Vec<Line<'static>> {
     // Diff body: removed lines (red), then added lines (green)
     let red = Style::default().fg(Color::Rgb(220, 80, 80));
     let green = Style::default().fg(Color::Rgb(80, 200, 80));
-    let dim = Style::default().fg(Color::Rgb(100, 105, 115));
+    let dim = dim_style();
 
     let total_diff = removed + added;
     let mut shown = 0;

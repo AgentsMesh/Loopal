@@ -1,12 +1,5 @@
-//! Tool rendering — each tool independently displayed with expanded output,
-//! folded after N lines.
-//!
-//! ```text
-//! ● Bash(git log --oneline -5)
-//!   ⎿ fd661d3 feat(tui): progressive disclosure
-//!     dc0a5e7 Add fragment-based prompt engine
-//!     … +3 lines
-//! ```
+//! Tool rendering — each tool displayed with expanded output, folded after N lines.
+mod agent;
 mod bash;
 mod edit;
 mod glob;
@@ -17,6 +10,8 @@ mod write;
 use ratatui::prelude::*;
 
 use loopal_session::types::{SessionToolCall, ToolCallStatus};
+
+use crate::views::unified_status::spinner_frame;
 
 /// Max output lines before folding.
 const EXPAND_MAX_LINES: usize = 4;
@@ -37,7 +32,7 @@ fn render_one(tc: &SessionToolCall) -> Vec<Line<'static>> {
 // ── Header: ● ToolName(detail) ──
 
 fn render_header(tc: &SessionToolCall) -> Line<'static> {
-    let (icon, color) = status_style(tc.status);
+    let (icon, color) = status_icon(tc);
     let detail = extract_detail(tc);
 
     let mut spans = vec![
@@ -78,10 +73,7 @@ fn extract_detail(tc: &SessionToolCall) -> String {
             .get("query")
             .and_then(|v| v.as_str())
             .map(|s| format!("\"{s}\"")),
-        "Agent" => input
-            .get("description")
-            .and_then(|v| v.as_str())
-            .map(String::from),
+        "Agent" => agent::extract_detail(input),
         _ => None,
     };
     truncate_chars(&shorten_home(&raw.unwrap_or_default()), 80)
@@ -92,10 +84,10 @@ fn extract_detail(tc: &SessionToolCall) -> String {
 fn render_body(tc: &SessionToolCall) -> Vec<Line<'static>> {
     // Active (pending/running)
     if tc.status.is_active() {
-        return if tc.name == "Bash" {
-            bash::render_running_body(tc)
-        } else {
-            Vec::new()
+        return match tc.name.as_str() {
+            "Bash" => bash::render_running_body(tc),
+            "Agent" => agent::render_running_body(tc),
+            _ => Vec::new(),
         };
     }
     // Error — shared: expand first N error lines
@@ -108,6 +100,7 @@ fn render_body(tc: &SessionToolCall) -> Vec<Line<'static>> {
     // Success — per-tool dispatch
     match tc.name.as_str() {
         "Bash" => bash::render_success_body(tc),
+        "Agent" => agent::render_success_body(tc),
         "Read" => read::render_body(tc),
         "Write" => write::render_body(tc),
         "Edit" | "MultiEdit" => edit::render_body(tc),
@@ -139,6 +132,11 @@ pub(crate) fn output_style() -> Style {
     Style::default().fg(Color::Rgb(155, 160, 170))
 }
 
+/// Dimmed style for secondary info (elapsed time, fold counts, etc.).
+pub(crate) fn dim_style() -> Style {
+    Style::default().fg(Color::Rgb(100, 105, 115))
+}
+
 /// Expand output up to `max_lines`, fold the rest.
 pub(crate) fn expand_output(content: &str, max_lines: usize, style: Style) -> Vec<Line<'static>> {
     let all: Vec<&str> = content.lines().collect();
@@ -153,7 +151,7 @@ pub(crate) fn expand_output(content: &str, max_lines: usize, style: Style) -> Ve
     if total > max_lines {
         lines.push(Line::from(Span::styled(
             format!("    … +{} lines", total - max_lines),
-            Style::default().fg(Color::Rgb(100, 105, 115)),
+            dim_style(),
         )));
     }
     lines
@@ -184,10 +182,15 @@ fn truncate_chars(s: &str, max: usize) -> String {
     }
 }
 
-fn status_style(status: ToolCallStatus) -> (&'static str, Color) {
-    match status {
-        ToolCallStatus::Success => ("●", Color::Green),
-        ToolCallStatus::Error => ("●", Color::Red),
-        _ => ("●", Color::Yellow),
+fn status_icon(tc: &SessionToolCall) -> (String, Color) {
+    match tc.status {
+        ToolCallStatus::Success => ("●".to_string(), Color::Green),
+        ToolCallStatus::Error => ("●".to_string(), Color::Red),
+        _ => {
+            let elapsed = tc
+                .started_at
+                .map_or(std::time::Duration::ZERO, |t| t.elapsed());
+            (spinner_frame(elapsed).to_string(), Color::Yellow)
+        }
     }
 }

@@ -54,6 +54,8 @@ mod cancel_test;
 mod context_budget_test;
 mod model_routing_test;
 mod permission_test_ext;
+mod plan_mode_filter_test;
+mod plan_mode_test;
 mod preflight_test;
 mod record_message_test;
 mod retry_cancel_test;
@@ -62,8 +64,6 @@ mod tools_test;
 mod turn_completion_edge_test;
 mod turn_completion_test;
 mod turn_test;
-mod plan_mode_test;
-mod plan_mode_filter_test;
 
 /// Minimal runner with no provider — for testing pure AgentLoopRunner methods.
 pub fn make_runner() -> (AgentLoopRunner, mpsc::Receiver<AgentEvent>) {

@@ -1,6 +1,6 @@
 //! Unit tests for PlanFile and plan_file helpers.
 
-use loopal_runtime::plan_file::{build_plan_mode_filter, wrap_plan_reminder, PlanFile};
+use loopal_runtime::plan_file::{PlanFile, build_plan_mode_filter, wrap_plan_reminder};
 
 #[test]
 fn new_creates_path_under_plans_dir() {

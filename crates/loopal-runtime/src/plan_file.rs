@@ -23,12 +23,18 @@ impl PlanFile {
             let slug = generate_slug_with_attempt(attempt);
             let path = dir.join(format!("{slug}.md"));
             if !path.exists() {
-                return Self { path, cwd: cwd.to_path_buf() };
+                return Self {
+                    path,
+                    cwd: cwd.to_path_buf(),
+                };
             }
         }
         let slug = generate_slug_with_attempt(99);
         let path = dir.join(format!("{slug}.md"));
-        Self { path, cwd: cwd.to_path_buf() }
+        Self {
+            path,
+            cwd: cwd.to_path_buf(),
+        }
     }
 
     pub fn path(&self) -> &Path {
@@ -105,12 +111,12 @@ fn generate_slug_with_attempt(attempt: u32) -> String {
     let seed = time_seed ^ ((std::process::id() as u128) << 32) ^ (attempt as u128 * 9973);
 
     let adjectives = [
-        "calm", "bold", "warm", "pure", "keen", "soft", "wise", "fair",
-        "swift", "bright", "cool", "clear", "fresh", "light", "grand",
+        "calm", "bold", "warm", "pure", "keen", "soft", "wise", "fair", "swift", "bright", "cool",
+        "clear", "fresh", "light", "grand",
     ];
     let nouns = [
-        "brook", "ridge", "grove", "stone", "cliff", "trail", "coast",
-        "field", "lake", "cedar", "hawk", "crane", "dawn", "frost", "bloom",
+        "brook", "ridge", "grove", "stone", "cliff", "trail", "coast", "field", "lake", "cedar",
+        "hawk", "crane", "dawn", "frost", "bloom",
     ];
     let a = adjectives[(seed as usize) % adjectives.len()];
     let n1 = nouns[((seed / 17) as usize) % nouns.len()];

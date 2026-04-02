@@ -5,10 +5,10 @@ use loopal_protocol::AgentEventPayload;
 use loopal_tool_api::PermissionDecision;
 use tracing::{debug, info, warn};
 
+use super::PlanModeState;
 use super::runner::AgentLoopRunner;
 use super::tools_check::error_block;
 use super::tools_inject::success_block;
-use super::PlanModeState;
 use crate::frontend::traits::PlanApproval;
 use crate::mode::AgentMode;
 use crate::plan_file::build_plan_mode_filter;
@@ -26,17 +26,25 @@ impl AgentLoopRunner {
             return Ok((idx, error_block(id, "Already in plan mode.")));
         }
         if self.params.config.lifecycle == super::LifecycleMode::Task {
-            return Ok((idx, error_block(id, "EnterPlanMode cannot be used in agent contexts")));
+            return Ok((
+                idx,
+                error_block(id, "EnterPlanMode cannot be used in agent contexts"),
+            ));
         }
 
         let decision = self
-            .params.deps.frontend
+            .params
+            .deps
+            .frontend
             .request_permission(id, "EnterPlanMode", &serde_json::json!({}))
             .await;
         if decision != PermissionDecision::Allow {
             return Ok((
                 idx,
-                success_block(id, "User declined to enter plan mode. Continue without planning."),
+                success_block(
+                    id,
+                    "User declined to enter plan mode. Continue without planning.",
+                ),
             ));
         }
 
@@ -48,7 +56,10 @@ impl AgentLoopRunner {
         });
         self.params.config.mode = AgentMode::Plan;
 
-        self.emit(AgentEventPayload::ModeChanged { mode: "plan".into() }).await?;
+        self.emit(AgentEventPayload::ModeChanged {
+            mode: "plan".into(),
+        })
+        .await?;
 
         // Ensure plans directory exists — rollback on failure to avoid dead state.
         if let Some(dir) = self.plan_file.path().parent() {
@@ -59,11 +70,16 @@ impl AgentLoopRunner {
                     self.params.config.mode = s.previous_mode;
                     self.params.config.permission_mode = s.previous_permission_mode;
                 }
-                let _ = self.emit(AgentEventPayload::ModeChanged {
-                    mode: "act".into(),
-                }).await;
-                return Ok((idx, error_block(id, &format!(
-                    "Cannot create plans directory: {e}. Plan mode was not entered."))));
+                let _ = self
+                    .emit(AgentEventPayload::ModeChanged { mode: "act".into() })
+                    .await;
+                return Ok((
+                    idx,
+                    error_block(
+                        id,
+                        &format!("Cannot create plans directory: {e}. Plan mode was not entered."),
+                    ),
+                ));
             }
         }
 
@@ -74,12 +90,18 @@ impl AgentLoopRunner {
             format!("No plan file yet. Create your plan at {plan_path} using the Write tool.")
         };
         info!(plan_file = %plan_path, "entered plan mode");
-        Ok((idx, success_block(id, &format!(
-            "Entered plan mode.\n\n\
+        Ok((
+            idx,
+            success_block(
+                id,
+                &format!(
+                    "Entered plan mode.\n\n\
              ## Plan File Info:\n{file_info}\n\
              This is the ONLY file you may edit. All other tools are read-only.\n\
              Detailed workflow instructions will follow."
-        ))))
+                ),
+            ),
+        ))
     }
 
     /// Handle ExitPlanMode — validate, read plan, approve, restore state.
@@ -91,21 +113,39 @@ impl AgentLoopRunner {
         debug!(tool = "ExitPlanMode", "intercepted");
 
         if self.params.config.mode != AgentMode::Plan {
-            return Ok((idx, error_block(id,
-                "You are not in plan mode. If your plan was already approved, \
-                 continue with implementation.")));
+            return Ok((
+                idx,
+                error_block(
+                    id,
+                    "You are not in plan mode. If your plan was already approved, \
+                 continue with implementation.",
+                ),
+            ));
         }
 
         let plan_content = match self.plan_file.read() {
             Some(c) => c,
-            None => return Ok((idx, error_block(id, &format!(
-                "No plan file at {}. Write your plan before calling ExitPlanMode.",
-                self.plan_file.path().display())))),
+            None => {
+                return Ok((
+                    idx,
+                    error_block(
+                        id,
+                        &format!(
+                            "No plan file at {}. Write your plan before calling ExitPlanMode.",
+                            self.plan_file.path().display()
+                        ),
+                    ),
+                ));
+            }
         };
 
         let plan_path_str = self.plan_file.path().to_string_lossy().to_string();
-        let approval = self.params.deps.frontend
-            .request_plan_approval(&plan_content, &plan_path_str).await;
+        let approval = self
+            .params
+            .deps
+            .frontend
+            .request_plan_approval(&plan_content, &plan_path_str)
+            .await;
 
         match approval {
             PlanApproval::Approve => {
@@ -119,8 +159,13 @@ impl AgentLoopRunner {
                 self.restore_pre_plan_state().await?;
                 Ok((idx, self.build_approved_result(id, &edited)))
             }
-            PlanApproval::Reject => Ok((idx, success_block(id,
-                "User rejected the plan. Revise and call ExitPlanMode again."))),
+            PlanApproval::Reject => Ok((
+                idx,
+                success_block(
+                    id,
+                    "User rejected the plan. Revise and call ExitPlanMode again.",
+                ),
+            )),
         }
     }
 
@@ -140,7 +185,10 @@ impl AgentLoopRunner {
             AgentMode::Act => "act",
             AgentMode::Plan => "plan",
         };
-        self.emit(AgentEventPayload::ModeChanged { mode: mode_str.into() }).await?;
+        self.emit(AgentEventPayload::ModeChanged {
+            mode: mode_str.into(),
+        })
+        .await?;
         info!("restored pre-plan mode: {mode_str}");
         Ok(())
     }
@@ -150,17 +198,27 @@ impl AgentLoopRunner {
         let team_hint = if self.params.deps.kernel.get_tool("Agent").is_some() {
             "\n\nIf this plan can be broken into independent tasks, \
              consider using the Agent tool to parallelize."
-        } else { "" };
+        } else {
+            ""
+        };
         let path = self.plan_file.path().display();
-        success_block(id, &format!(
-            "User approved your plan. Start implementing.\n\n\
+        success_block(
+            id,
+            &format!(
+                "User approved your plan. Start implementing.\n\n\
              Plan saved at: {path}\n\
              Refer back to it during implementation.{team_hint}\n\n\
-             ## Approved Plan:\n{plan}"))
+             ## Approved Plan:\n{plan}"
+            ),
+        )
     }
 
     /// Plan mode tool filter — delegates to the captured snapshot.
     pub(super) fn plan_tool_filter(&self) -> Option<&std::collections::HashSet<String>> {
-        self.params.config.plan_state.as_ref().map(|s| &s.tool_filter)
+        self.params
+            .config
+            .plan_state
+            .as_ref()
+            .map(|s| &s.tool_filter)
     }
 }

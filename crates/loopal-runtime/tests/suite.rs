@@ -15,6 +15,8 @@ mod loop_detector_test;
 mod mode_test;
 #[path = "suite/permission_test.rs"]
 mod permission_test;
+#[path = "suite/plan_file_test.rs"]
+mod plan_file_test;
 #[path = "suite/rewind_test.rs"]
 mod rewind_test;
 #[path = "suite/session_manager_test.rs"]
@@ -25,5 +27,3 @@ mod session_test;
 mod tool_pipeline_hooks_test;
 #[path = "suite/tool_pipeline_test.rs"]
 mod tool_pipeline_test;
-#[path = "suite/plan_file_test.rs"]
-mod plan_file_test;

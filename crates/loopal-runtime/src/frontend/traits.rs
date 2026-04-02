@@ -76,11 +76,7 @@ pub trait AgentFrontend: Send + Sync {
     ///
     /// Presents the plan content and returns the user's decision.
     /// Default auto-approves for sub-agents and headless mode.
-    async fn request_plan_approval(
-        &self,
-        _plan_content: &str,
-        _plan_path: &str,
-    ) -> PlanApproval {
+    async fn request_plan_approval(&self, _plan_content: &str, _plan_path: &str) -> PlanApproval {
         PlanApproval::Approve
     }
 

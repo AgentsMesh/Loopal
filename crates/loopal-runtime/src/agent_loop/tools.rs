@@ -9,8 +9,8 @@ use super::question_parse::{format_answers, parse_questions};
 use super::runner::AgentLoopRunner;
 use super::tool_exec::execute_approved_tools;
 use super::tools_inject::success_block;
-use crate::plan_file::wrap_plan_reminder;
 use crate::mode::AgentMode;
+use crate::plan_file::wrap_plan_reminder;
 
 use loopal_error::Result;
 

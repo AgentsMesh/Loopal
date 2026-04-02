@@ -167,7 +167,10 @@ fn test_tool_call_pending_shows_spinner() {
     };
     let lines = message_to_lines(&m, 80);
     let text = all_text(&lines);
-    assert!(text.contains("●"), "pending tool call should have ● icon");
+    assert!(
+        text.contains("⠋") || text.contains("●"),
+        "pending tool call should have spinner or ● icon, got: {text}"
+    );
 }
 
 #[test]

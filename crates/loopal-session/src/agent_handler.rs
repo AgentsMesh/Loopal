@@ -4,7 +4,7 @@ use std::time::Instant;
 
 use loopal_protocol::{AgentEventPayload, AgentStatus, UserContent};
 
-use crate::agent_lifecycle::{extract_key_param, handle_idle};
+use crate::agent_lifecycle::{extract_key_param, handle_idle, post_event_cleanup};
 use crate::conversation_display::{
     handle_auto_continuation, handle_compaction, handle_token_usage, push_system_msg,
 };
@@ -28,6 +28,7 @@ pub(crate) fn apply_agent_event(
     }
     let obs = &mut agent.observable;
     let conv = &mut agent.conversation;
+    let mut sync_parent = false;
 
     match payload {
         AgentEventPayload::Stream { text } => {
@@ -54,6 +55,7 @@ pub(crate) fn apply_agent_event(
             obs.last_tool = Some(extract_key_param(&tn, &input));
             obs.status = AgentStatus::Running;
             handle_tool_call(conv, id, tn, input);
+            sync_parent = true;
         }
         AgentEventPayload::ToolResult {
             id,
@@ -76,6 +78,7 @@ pub(crate) fn apply_agent_event(
             );
             obs.tools_in_flight = obs.tools_in_flight.saturating_sub(1);
             obs.status = AgentStatus::Running;
+            sync_parent = true;
         }
         AgentEventPayload::ToolBatchStart { tool_ids } => {
             handle_tool_batch_start(conv, tool_ids);
@@ -84,6 +87,7 @@ pub(crate) fn apply_agent_event(
             id, output_tail, ..
         } => {
             handle_tool_progress(conv, id, output_tail);
+            sync_parent = true;
         }
         AgentEventPayload::ToolPermissionRequest {
             id,
@@ -208,6 +212,6 @@ pub(crate) fn apply_agent_event(
             push_system_msg(conv, &format!("[{label}] {tool_name}: {reason} {t}"));
         }
     }
-    crate::agent_lifecycle::auto_return_on_error(state, name);
+    post_event_cleanup(state, name, sync_parent);
     None
 }

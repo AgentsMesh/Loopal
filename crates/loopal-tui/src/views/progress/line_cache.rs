@@ -106,7 +106,7 @@ fn fingerprint(msg: &SessionMessage) -> u64 {
             h = mix(
                 h,
                 tc.started_at
-                    .map_or(0, |t| t.elapsed().as_millis() as u64 / 500),
+                    .map_or(0, |t| t.elapsed().as_millis() as u64 / 200),
             );
         }
     }

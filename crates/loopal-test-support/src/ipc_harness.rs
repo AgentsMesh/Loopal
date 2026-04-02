@@ -68,7 +68,16 @@ pub async fn build_ipc_harness(
     let client = loopal_agent_client::AgentClient::new(client_transport);
     client.initialize().await.expect("IPC initialize failed");
     client
-        .start_agent(fixture.path(), None, None, Some("hello"), None, false, None, None)
+        .start_agent(
+            fixture.path(),
+            None,
+            None,
+            Some("hello"),
+            None,
+            false,
+            None,
+            None,
+        )
         .await
         .expect("agent/start failed");
 

@@ -107,7 +107,8 @@ async fn hub_disconnect_cleans_up_registry() {
     }
 }
 
-/// Hub with local UI clients does NOT relay via uplink (regression).#[tokio::test]
+/// Hub with local UI clients does NOT relay via uplink (regression).
+#[tokio::test]
 async fn local_ui_skips_uplink_relay() {
     let (hub, _) = make_hub();
 
@@ -144,7 +145,7 @@ async fn local_ui_skips_uplink_relay() {
     let (ac, agent_rx) = loopal_agent_hub::hub_server::connect_local(hub.clone(), "agent");
     tokio::spawn(async move {
         let mut rx = agent_rx;
-        while let Some(_) = rx.recv().await {}
+        while rx.recv().await.is_some() {}
     });
     tokio::time::sleep(Duration::from_millis(50)).await;
 

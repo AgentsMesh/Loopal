@@ -19,7 +19,7 @@ async fn hub_status_shows_uplink() {
     let (conn, rx) = loopal_agent_hub::hub_server::connect_local(hub.clone(), "querier");
     tokio::spawn(async move {
         let mut rx = rx;
-        while let Some(_) = rx.recv().await {}
+        while rx.recv().await.is_some() {}
     });
     tokio::time::sleep(Duration::from_millis(50)).await;
 

@@ -109,15 +109,16 @@ async fn completion_delivery_to_remote_parent() {
 
     let received = tokio::time::timeout(Duration::from_secs(5), async {
         while let Some(msg) = parent_rx.recv().await {
-            if let Incoming::Request { params, .. } | Incoming::Notification { params, .. } = &msg {
-                let text = params
-                    .get("content")
-                    .and_then(|c| c.get("text"))
-                    .and_then(|t| t.as_str())
-                    .unwrap_or("");
-                if text.contains("agent-result") && text.contains("child-worker") {
-                    return true;
-                }
+            let params = match &msg {
+                Incoming::Request { params, .. } | Incoming::Notification { params, .. } => params,
+            };
+            let text = params
+                .get("content")
+                .and_then(|c| c.get("text"))
+                .and_then(|t| t.as_str())
+                .unwrap_or("");
+            if text.contains("agent-result") && text.contains("child-worker") {
+                return true;
             }
         }
         false

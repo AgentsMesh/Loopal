@@ -11,6 +11,7 @@ use loopal_ipc::protocol::methods;
 use loopal_protocol::{AgentEvent, Envelope};
 
 use crate::dispatch::dispatch_hub_request;
+use crate::finish::finish_and_deliver;
 use crate::hub::Hub;
 use crate::ui_relay::relay_to_ui_clients;
 
@@ -57,7 +58,7 @@ pub async fn agent_io_loop(
                     // inline or it blocks all subsequent hub/* requests from this agent.
                     info!(agent = %agent_name, %method, "spawning background wait");
                     spawn_wait_agent(hub.clone(), conn.clone(), id, params, agent_name.clone());
-                } else if method.starts_with("hub/") {
+                } else if method.starts_with("hub/") || method.starts_with("meta/") {
                     info!(agent = %agent_name, %method, "hub request received");
                     match dispatch_hub_request(&hub, &method, params, agent_name.clone()).await {
                         Ok(result) => {
@@ -158,19 +159,7 @@ pub fn start_agent_io(
         crate::spawn_manager::spawn_completion_bridge(&n, conn3, completion_rx);
         info!(agent = %n, "agent registered in Hub");
         let output = agent_io_loop(hub2, conn, rx, n.clone()).await;
-        let pending = {
-            let mut h = hub.lock().await;
-            // Order matters: emit BEFORE unregister to avoid race with wait_agent.
-            let pending = h.registry.emit_agent_finished(&n2, output);
-            h.registry.unregister_connection(&n2);
-            pending
-        }; // Lock released.
-        // Deliver to parent outside the lock — uses async send (no data loss).
-        if let Some((tx, envelope)) = pending {
-            if tx.send(envelope).await.is_err() {
-                tracing::warn!(agent = %n2, "parent completion channel closed");
-            }
-        }
+        finish_and_deliver(&hub, &n2, output).await;
         info!(agent = %n2, "agent IO loop ended");
     });
 }
@@ -187,17 +176,7 @@ pub fn spawn_io_loop(
     let n2 = name.to_string();
     tokio::spawn(async move {
         let output = agent_io_loop(hub2, conn, rx, n.clone()).await;
-        let pending = {
-            let mut h = hub.lock().await;
-            let pending = h.registry.emit_agent_finished(&n2, output);
-            h.registry.unregister_connection(&n2);
-            pending
-        };
-        if let Some((tx, envelope)) = pending {
-            if tx.send(envelope).await.is_err() {
-                tracing::warn!(agent = %n2, "parent completion channel closed");
-            }
-        }
+        finish_and_deliver(&hub, &n2, output).await;
         info!(agent = %n2, "agent IO loop ended");
     });
 }

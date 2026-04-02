@@ -93,7 +93,37 @@ impl AgentRegistry {
         self.completions.remove(name);
     }
 
+    /// Register a shadow entry for a remotely-spawned agent.
+    ///
+    /// The agent runs on another Hub but we need a local entry so that
+    /// `wait_agent` and `emit_agent_finished` work when the completion
+    /// notification arrives via MetaHub.
+    pub fn register_shadow(&mut self, name: &str, parent: &str) {
+        use crate::topology::AgentInfo;
+        use crate::types::{AgentConnectionState, ManagedAgent};
+
+        let mut info = AgentInfo::new(name, Some(parent), None);
+        info.lifecycle = crate::AgentLifecycle::Running;
+        self.agents.insert(
+            name.to_string(),
+            ManagedAgent {
+                state: AgentConnectionState::Shadow,
+                info,
+                completion_tx: None,
+            },
+        );
+        // Add to parent's children list (parent must be local bare name)
+        if let Some(pa) = self.agents.get_mut(parent) {
+            pa.info.children.push(name.to_string());
+        }
+        tracing::info!(agent = %name, parent = %parent, "shadow registered for remote agent");
+    }
+
     // ── Queries ──────────────────────────────────────────────────
+
+    pub fn agent_count(&self) -> usize {
+        self.agents.len()
+    }
 
     pub fn get_agent_connection(&self, name: &str) -> Option<Arc<Connection>> {
         self.agents.get(name).and_then(|a| a.state.connection())
@@ -113,6 +143,7 @@ impl AgentRegistry {
                 let l = match &a.state {
                     AgentConnectionState::Local(_) => "local",
                     AgentConnectionState::Connected(_) => "connected",
+                    AgentConnectionState::Shadow => "shadow",
                 };
                 (n.clone(), l)
             })

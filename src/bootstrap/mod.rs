@@ -7,10 +7,12 @@ use loopal_config::load_config;
 use crate::cli::Cli;
 
 mod acp;
-mod headless;
 mod hub_bootstrap;
+mod meta_hub;
 mod multiprocess;
+mod server_mode;
 mod sub_agent_resume;
+mod uplink_bootstrap;
 
 pub async fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
@@ -23,6 +25,10 @@ pub async fn run() -> anyhow::Result<()> {
 
     let mut config = load_config(&cwd)?;
     cli.apply_overrides(&mut config.settings);
+
+    if let Some(ref bind_addr) = cli.meta_hub {
+        return meta_hub::run(bind_addr).await;
+    }
 
     if cli.acp {
         return acp::run(&cli, &cwd, &config).await;
@@ -39,8 +45,8 @@ pub async fn run() -> anyhow::Result<()> {
         return loopal_agent_server::run_agent_server().await;
     }
 
-    if cli.headless {
-        return headless::run(&cli, &cwd, &config).await;
+    if cli.server {
+        return server_mode::run(&cli, &cwd, &config).await;
     }
 
     // Worktree isolation: create worktree before agent starts, clean up after.

@@ -122,4 +122,46 @@ pub mod methods {
     pub const HUB_INTERRUPT: Method = Method {
         name: "hub/interrupt",
     };
+
+    /// Query Hub status (uplink, agent count, etc).
+    pub const HUB_STATUS: Method = Method {
+        name: "hub/status",
+    };
+
+    // ── MetaHub methods (Sub-Hub ↔ MetaHub) ────────────────────────
+
+    /// Sub-Hub registers with MetaHub after connecting.
+    pub const META_REGISTER: Method = Method {
+        name: "meta/register",
+    };
+
+    /// Sub-Hub heartbeat to MetaHub (agent count, health).
+    pub const META_HEARTBEAT: Method = Method {
+        name: "meta/heartbeat",
+    };
+
+    /// Cross-hub message routing (envelope forwarding).
+    pub const META_ROUTE: Method = Method {
+        name: "meta/route",
+    };
+
+    /// MetaHub asks Sub-Hub if a named agent exists locally.
+    pub const META_RESOLVE: Method = Method {
+        name: "meta/resolve",
+    };
+
+    /// Cross-hub agent spawn delegation.
+    pub const META_SPAWN: Method = Method {
+        name: "meta/spawn",
+    };
+
+    /// List all connected Sub-Hubs.
+    pub const META_LIST_HUBS: Method = Method {
+        name: "meta/list_hubs",
+    };
+
+    /// Global agent topology across all Sub-Hubs.
+    pub const META_TOPOLOGY: Method = Method {
+        name: "meta/topology",
+    };
 }

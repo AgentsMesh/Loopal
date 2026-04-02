@@ -17,6 +17,8 @@ pub struct SpawnParams {
     pub cwd_override: Option<PathBuf>,
     /// Permission mode to propagate from parent agent.
     pub permission_mode: Option<String>,
+    /// Target hub for cross-hub spawn (e.g. "hub-b"). None = local hub.
+    pub target_hub: Option<String>,
 }
 
 /// Result returned from Hub after spawning.
@@ -37,13 +39,16 @@ pub async fn spawn_agent(
         .to_string_lossy()
         .to_string();
 
-    let request = json!({
+    let mut request = json!({
         "name": params.name,
         "cwd": cwd,
         "model": params.model,
         "prompt": params.prompt,
         "permission_mode": params.permission_mode,
     });
+    if let Some(ref hub) = params.target_hub {
+        request["target_hub"] = json!(hub);
+    }
 
     tracing::info!(agent = %params.name, "sending hub/spawn_agent request");
     let response = shared

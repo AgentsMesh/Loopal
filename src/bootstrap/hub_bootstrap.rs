@@ -28,18 +28,20 @@ pub async fn bootstrap_hub_and_agent(
     cwd: &std::path::Path,
     config: &loopal_config::ResolvedConfig,
 ) -> anyhow::Result<BootstrapContext> {
-    // 1. Create Hub
     let (event_tx, event_rx) = mpsc::channel(256);
     let hub = Arc::new(Mutex::new(Hub::new(event_tx)));
 
-    // 2. Start Hub TCP listener for external clients
-    let (listener, _hub_port, hub_token) = hub_server::start_hub_listener(hub.clone()).await?;
+    let (listener, _port, hub_token) = hub_server::start_hub_listener(hub.clone()).await?;
     let hub_accept = hub.clone();
     tokio::spawn(async move {
         hub_server::accept_loop(listener, hub_accept, hub_token).await;
     });
 
-    // 3. Spawn root agent
+    if let Some(ref meta_addr) = cli.join_hub {
+        super::uplink_bootstrap::connect_to_meta_hub(&hub, meta_addr, cli.hub_name.as_deref())
+            .await?;
+    }
+
     let agent_proc = loopal_agent_client::AgentProcess::spawn(None).await?;
     let client = loopal_agent_client::AgentClient::new(agent_proc.transport());
     client.initialize().await?;
@@ -50,6 +52,11 @@ pub async fn bootstrap_hub_and_agent(
     } else {
         Some(cli.prompt.join(" "))
     };
+    let lifecycle_str = if cli.ephemeral {
+        Some("ephemeral")
+    } else {
+        None // default: persistent (server decides based on prompt)
+    };
     let root_session_id = client
         .start_agent(
             cwd,
@@ -59,10 +66,10 @@ pub async fn bootstrap_hub_and_agent(
             cli.permission.as_deref(),
             cli.no_sandbox,
             cli.resume.as_deref(),
+            lifecycle_str,
         )
         .await?;
 
-    // Register root agent's stdio as "main" in Hub
     let (root_conn, incoming_rx) = client.into_parts();
     loopal_agent_hub::agent_io::start_agent_io(hub.clone(), "main", root_conn, incoming_rx);
     info!("root agent registered as 'main' in Hub");

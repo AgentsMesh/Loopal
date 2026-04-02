@@ -1,3 +1,4 @@
+pub mod address;
 pub mod agent_state;
 pub mod command;
 pub mod control;
@@ -9,6 +10,7 @@ pub mod projection;
 pub mod question;
 pub mod user_content;
 
+pub use address::QualifiedAddress;
 pub use agent_state::{AgentStatus, ObservableAgentState};
 pub use command::AgentMode;
 pub use control::ControlCommand;

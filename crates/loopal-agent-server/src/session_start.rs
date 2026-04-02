@@ -22,9 +22,8 @@ pub(crate) struct SessionHandle {
     pub session_id: String,
     pub session: Arc<SharedSession>,
     pub agent_task: tokio::task::JoinHandle<Option<AgentOutput>>,
-    /// When false (prompt-driven session), the server process exits after agent completes.
-    /// When true (no initial prompt), the server stays alive for subsequent messages.
-    pub has_initial_prompt: bool,
+    /// Lifecycle mode — Ephemeral exits after completion, Persistent stays alive.
+    pub lifecycle: loopal_runtime::LifecycleMode,
 }
 
 /// Create a session: build Kernel, HubFrontend, spawn agent loop.
@@ -41,6 +40,19 @@ pub(crate) async fn start_session(
         .map(PathBuf::from)
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
 
+    // Lifecycle: explicit from params, default based on prompt presence.
+    let lifecycle = match params["lifecycle"].as_str() {
+        Some("ephemeral") => loopal_runtime::LifecycleMode::Ephemeral,
+        Some("persistent") => loopal_runtime::LifecycleMode::Persistent,
+        Some(unknown) => {
+            anyhow::bail!(
+                "unknown lifecycle mode: '{unknown}' (expected 'ephemeral' or 'persistent')"
+            );
+        }
+        None if params["prompt"].as_str().is_some() => loopal_runtime::LifecycleMode::Ephemeral,
+        None => loopal_runtime::LifecycleMode::Persistent,
+    };
+
     let start = StartParams {
         cwd: cwd_str,
         model: params["model"].as_str().map(String::from),
@@ -49,6 +61,7 @@ pub(crate) async fn start_session(
         permission_mode: params["permission_mode"].as_str().map(String::from),
         no_sandbox: params["no_sandbox"].as_bool().unwrap_or(false),
         resume: params["resume"].as_str().map(String::from),
+        lifecycle,
     };
 
     let mut config = load_config(&cwd)?;
@@ -78,9 +91,6 @@ pub(crate) async fn start_session(
         None,
         watch_rx,
     ));
-
-    // If a prompt was provided, the server process should exit after agent completes.
-    let has_initial_prompt = start.prompt.is_some();
 
     let agent_params = agent_setup::build_with_frontend(
         &cwd,
@@ -129,6 +139,6 @@ pub(crate) async fn start_session(
         session_id,
         session,
         agent_task,
-        has_initial_prompt,
+        lifecycle,
     })
 }

@@ -27,9 +27,13 @@ pub struct Cli {
     #[arg(long)]
     pub acp: bool,
 
-    /// Run headless — process prompt and exit without TUI (for CI/eval/scripts)
+    /// Run without TUI (server mode, for CI/scripting/cluster workers)
     #[arg(long)]
-    pub headless: bool,
+    pub server: bool,
+
+    /// Exit after completing current task (default: persistent)
+    #[arg(long)]
+    pub ephemeral: bool,
 
     /// Internal: run as agent worker process (stdin/stdout IPC)
     #[arg(long, hide = true)]
@@ -43,6 +47,18 @@ pub struct Cli {
     /// Can also be set via LOOPAL_TEST_PROVIDER env var.
     #[arg(long, hide = true)]
     pub test_provider: Option<String>,
+
+    /// Run as MetaHub server (cluster coordinator)
+    #[arg(long)]
+    pub meta_hub: Option<String>,
+
+    /// Join a MetaHub cluster (address:port)
+    #[arg(long)]
+    pub join_hub: Option<String>,
+
+    /// Hub name when joining a MetaHub (defaults to hostname)
+    #[arg(long)]
+    pub hub_name: Option<String>,
 
     /// Initial prompt (non-interactive)
     pub prompt: Vec<String>,

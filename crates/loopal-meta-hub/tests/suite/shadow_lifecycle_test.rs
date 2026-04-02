@@ -11,14 +11,10 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use tokio::sync::Mutex;
-
 use loopal_agent_hub::spawn_manager::register_agent_connection;
 use loopal_ipc::connection::Connection;
 use loopal_ipc::protocol::methods;
 use serde_json::json;
-
-use loopal_meta_hub::MetaHub;
 
 use crate::test_helpers::*;
 

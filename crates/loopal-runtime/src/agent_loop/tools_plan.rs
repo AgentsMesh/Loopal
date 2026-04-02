@@ -25,7 +25,7 @@ impl AgentLoopRunner {
         if self.params.config.mode == AgentMode::Plan {
             return Ok((idx, error_block(id, "Already in plan mode.")));
         }
-        if self.params.config.lifecycle == super::LifecycleMode::Task {
+        if self.params.config.lifecycle == super::LifecycleMode::Ephemeral {
             return Ok((
                 idx,
                 error_block(id, "EnterPlanMode cannot be used in agent contexts"),

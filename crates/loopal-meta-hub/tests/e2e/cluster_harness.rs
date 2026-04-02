@@ -47,6 +47,7 @@ impl MetaHubHandle {
 
 // ── Hub handle ──────────────────────────────────────────────────
 
+#[allow(dead_code)]
 pub struct HubHandle {
     pub name: String,
     pub hub: Arc<Mutex<Hub>>,
@@ -132,6 +133,7 @@ impl HubHandle {
     }
 
     /// Wait for AwaitingInput event (agent is ready).
+    #[allow(dead_code)]
     pub async fn wait_ready(&mut self, event_rx: &mut mpsc::Receiver<AgentEvent>) {
         for _ in 0..50 {
             tokio::time::sleep(Duration::from_millis(100)).await;

@@ -8,7 +8,6 @@ mod cluster_harness;
 use std::time::Duration;
 
 use loopal_ipc::protocol::methods;
-use loopal_protocol::AgentEventPayload;
 use serde_json::json;
 
 use cluster_harness::{HubHandle, MetaHubHandle};
@@ -17,8 +16,8 @@ use cluster_harness::{HubHandle, MetaHubHandle};
 #[tokio::test]
 async fn cluster_boots_two_hubs_with_agents() {
     let meta = MetaHubHandle::boot().await;
-    let mut hub_a = HubHandle::boot("hub-a", &meta).await;
-    let mut hub_b = HubHandle::boot("hub-b", &meta).await;
+    let hub_a = HubHandle::boot("hub-a", &meta).await;
+    let hub_b = HubHandle::boot("hub-b", &meta).await;
     tokio::time::sleep(Duration::from_millis(200)).await;
 
     // Verify both hubs registered in MetaHub
@@ -57,8 +56,8 @@ async fn cluster_boots_two_hubs_with_agents() {
 #[tokio::test]
 async fn cluster_list_hubs_via_agent() {
     let meta = MetaHubHandle::boot().await;
-    let mut hub_a = HubHandle::boot("hub-a", &meta).await;
-    let mut hub_b = HubHandle::boot("hub-b", &meta).await;
+    let hub_a = HubHandle::boot("hub-a", &meta).await;
+    let hub_b = HubHandle::boot("hub-b", &meta).await;
     tokio::time::sleep(Duration::from_millis(200)).await;
 
     // Agent on hub-a queries meta/list_hubs via dispatch
@@ -89,8 +88,8 @@ async fn cluster_list_hubs_via_agent() {
 #[tokio::test]
 async fn cluster_cross_hub_message_delivery() {
     let meta = MetaHubHandle::boot().await;
-    let mut hub_a = HubHandle::boot("hub-a", &meta).await;
-    let mut hub_b = HubHandle::boot("hub-b", &meta).await;
+    let hub_a = HubHandle::boot("hub-a", &meta).await;
+    let hub_b = HubHandle::boot("hub-b", &meta).await;
     tokio::time::sleep(Duration::from_millis(200)).await;
 
     // Route message from hub-a to hub-b/main

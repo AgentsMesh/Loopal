@@ -25,3 +25,5 @@ mod session_test;
 mod tool_pipeline_hooks_test;
 #[path = "suite/tool_pipeline_test.rs"]
 mod tool_pipeline_test;
+#[path = "suite/plan_file_test.rs"]
+mod plan_file_test;

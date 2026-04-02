@@ -6,6 +6,17 @@ use loopal_protocol::AgentEventPayload;
 use loopal_protocol::{Envelope, Question};
 use loopal_tool_api::PermissionDecision;
 
+/// Outcome of a plan approval request.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PlanApproval {
+    /// User approved the plan as-is.
+    Approve,
+    /// User rejected — agent should revise and retry.
+    Reject,
+    /// User edited the plan content before approving.
+    ApproveWithEdits(String),
+}
+
 /// Unified abstraction for agent-to-consumer communication.
 ///
 /// Production uses `HubFrontend` (in `loopal-agent-server`), which broadcasts
@@ -59,6 +70,18 @@ pub trait AgentFrontend: Send + Sync {
     /// Default returns "(not supported)" for sub-agents.
     async fn ask_user(&self, _questions: Vec<Question>) -> Vec<String> {
         vec!["(not supported)".into()]
+    }
+
+    /// Request user approval for a plan (ExitPlanMode interception).
+    ///
+    /// Presents the plan content and returns the user's decision.
+    /// Default auto-approves for sub-agents and headless mode.
+    async fn request_plan_approval(
+        &self,
+        _plan_content: &str,
+        _plan_path: &str,
+    ) -> PlanApproval {
+        PlanApproval::Approve
     }
 
     /// Non-blocking, synchronous event emission for use in `Drop` guards.

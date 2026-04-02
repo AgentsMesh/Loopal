@@ -138,6 +138,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
             tool_filter: builder.tool_filter,
             thinking_config: builder.thinking_config,
             context_tokens_cap: 200_000,
+            plan_state: None,
         },
         deps: loopal_runtime::AgentDeps {
             kernel,

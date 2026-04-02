@@ -15,7 +15,7 @@
 .bazel_cache/
 
 # Release binaries
-loopal-*
+/loopal-*
 
 logs/
 .claude/scheduled_tasks.lock

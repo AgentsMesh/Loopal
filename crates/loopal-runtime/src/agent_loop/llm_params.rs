@@ -8,6 +8,7 @@ use loopal_provider::{get_thinking_capability, resolve_thinking_config};
 use loopal_provider_api::ChatParams;
 
 use super::runner::AgentLoopRunner;
+use crate::mode::AgentMode;
 
 impl AgentLoopRunner {
     /// Build chat params from a provided message slice (typically a working copy).
@@ -21,9 +22,18 @@ impl AgentLoopRunner {
             env_section,
         );
         let mut tool_defs = self.params.deps.kernel.tool_definitions();
+
+        // Apply user-configured tool filter first.
         if let Some(ref filter) = self.params.config.tool_filter {
             tool_defs.retain(|t| filter.contains(&t.name));
         }
+        // In plan mode, further restrict to plan-allowed tools.
+        if self.params.config.mode == AgentMode::Plan {
+            if let Some(plan_filter) = self.plan_tool_filter() {
+                tool_defs.retain(|t| plan_filter.contains(&t.name));
+            }
+        }
+
         let capability = get_thinking_capability(self.params.config.model());
         let resolved_thinking = resolve_thinking_config(
             &self.model_config.thinking,

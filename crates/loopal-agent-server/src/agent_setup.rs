@@ -183,6 +183,7 @@ pub fn build_with_frontend(
             tool_filter: None,
             thinking_config,
             context_tokens_cap: config.settings.max_context_tokens,
+            plan_state: None,
         },
         deps: loopal_runtime::AgentDeps {
             kernel,

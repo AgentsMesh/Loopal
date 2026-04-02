@@ -1,14 +1,18 @@
-use loopal_error::Result;
+//! Tool execution orchestration: intercept → precheck → permission → execute.
+
 use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_protocol::AgentEventPayload;
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 use super::cancel::TurnCancel;
 use super::question_parse::{format_answers, parse_questions};
 use super::runner::AgentLoopRunner;
 use super::tool_exec::execute_approved_tools;
 use super::tools_inject::success_block;
+use crate::plan_file::wrap_plan_reminder;
 use crate::mode::AgentMode;
+
+use loopal_error::Result;
 
 impl AgentLoopRunner {
     /// Execute tool calls: intercept → precheck → permission → parallel execution.
@@ -23,6 +27,10 @@ impl AgentLoopRunner {
 
         // Phase 0: Intercept special tools (EnterPlanMode, ExitPlanMode, AskUser)
         let (intercepted, remaining) = self.intercept_special_tools(&tool_uses).await?;
+        // Track intercepted indices — their tool_results already contain
+        // appropriate content and should not be wrapped with system-reminder.
+        let intercepted_indices: std::collections::HashSet<usize> =
+            intercepted.iter().map(|(idx, _)| *idx).collect();
 
         // Phase 1: Sandbox precheck + permission checks
         info!(remaining = remaining.len(), "check_tools start");
@@ -61,6 +69,24 @@ impl AgentLoopRunner {
             indexed_results.extend(parallel);
         }
 
+        // Plan mode: wrap non-intercepted tool results with system-reminder.
+        if self.params.config.mode == AgentMode::Plan {
+            let plan_path = self.plan_file.path().to_string_lossy().to_string();
+            for (idx, block) in &mut indexed_results {
+                if intercepted_indices.contains(idx) {
+                    continue; // Intercepted results already have appropriate content.
+                }
+                if let ContentBlock::ToolResult {
+                    content, is_error, ..
+                } = block
+                {
+                    if !*is_error {
+                        *content = wrap_plan_reminder(content, &plan_path);
+                    }
+                }
+            }
+        }
+
         self.finalize_tool_results(indexed_results)
     }
 
@@ -78,25 +104,10 @@ impl AgentLoopRunner {
         for (idx, (id, name, input)) in tool_uses.iter().enumerate() {
             match name.as_str() {
                 "EnterPlanMode" => {
-                    debug!(tool = name, "intercepted special tool");
-                    self.params.config.mode = AgentMode::Plan;
-                    self.emit(AgentEventPayload::ModeChanged {
-                        mode: "plan".into(),
-                    })
-                    .await?;
-                    intercepted.push((
-                        idx,
-                        success_block(id, "Plan mode activated. Only read-only tools allowed."),
-                    ));
+                    intercepted.push(self.handle_enter_plan(idx, id).await?);
                 }
                 "ExitPlanMode" => {
-                    self.params.config.mode = AgentMode::Act;
-                    self.emit(AgentEventPayload::ModeChanged { mode: "act".into() })
-                        .await?;
-                    intercepted.push((
-                        idx,
-                        success_block(id, "Returned to Act mode. All tools available."),
-                    ));
+                    intercepted.push(self.handle_exit_plan(idx, id).await?);
                 }
                 "AskUser" => {
                     let questions = parse_questions(input);

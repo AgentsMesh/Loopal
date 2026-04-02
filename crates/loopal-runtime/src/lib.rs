@@ -3,6 +3,7 @@ pub mod agent_loop;
 pub mod frontend;
 pub mod mode;
 pub mod permission;
+pub mod plan_file;
 pub mod session;
 pub mod tool_pipeline;
 
@@ -36,4 +37,4 @@ pub fn build_initial_budget(
 pub use loopal_error::{AgentOutput, TerminateReason};
 // Re-export frontend traits and agent input for external consumers.
 pub use agent_input::AgentInput;
-pub use frontend::traits::{AgentFrontend, EventEmitter};
+pub use frontend::traits::{AgentFrontend, EventEmitter, PlanApproval};

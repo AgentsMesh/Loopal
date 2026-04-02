@@ -48,6 +48,7 @@ async fn full_chain_sub_agent_result_delivered_to_parent() {
             None,
             false,
             None,
+            None,
         )
         .await
         .expect("start_agent");

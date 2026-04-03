@@ -88,8 +88,6 @@ async fn test_fetch_with_prompt() {
 
 #[tokio::test]
 async fn test_bash_timeout() {
-    // Clear store before and after to avoid polluting other tests.
-    loopal_tool_background::clear_store();
     // Bash with timeout=0 (0 seconds → 0ms) and a command that sleeps 60s.
     // The streaming path converts timeout to a background task (success, not error).
     let calls = vec![
@@ -125,7 +123,4 @@ async fn test_bash_timeout() {
         results[0].contains("process_id"),
         "should include background process_id"
     );
-
-    // Clean up background tasks created by this test
-    loopal_tool_background::clear_store();
 }

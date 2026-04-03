@@ -1,10 +1,5 @@
 // Single test binary — includes all test modules
 
-/// Global mutex for tests that operate on the shared background task store.
-/// The store is a `LazyLock<Mutex<HashMap>>` global static in `loopal_tool_background`,
-/// so parallel tests that clear/populate it need mutual exclusion.
-pub(crate) static BG_STORE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
 #[path = "suite/app_event_edge_test.rs"]
 mod app_event_edge_test;
 #[path = "suite/app_event_test.rs"]

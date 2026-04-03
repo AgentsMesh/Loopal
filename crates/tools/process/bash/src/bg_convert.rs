@@ -3,33 +3,35 @@
 //! Two entry points:
 //! - [`register`] — for `ExecOutcome::TimedOut` (has child + accumulated buffers)
 //! - [`register_spawned`] — for `Backend::exec_background` (fresh child, no buffers yet)
-//!
-//! Both register the task in the global background store so the LLM can
-//! query or stop it later via `Bash(process_id=...)`.
 
 use std::sync::{Arc, Mutex};
 
 use loopal_backend::shell::SpawnedBackgroundData;
 use loopal_backend::shell_stream::TimedOutProcessData;
 use loopal_error::ProcessHandle;
-use loopal_tool_background::{self, TaskStatus};
+use loopal_tool_background::{BackgroundTaskStore, TaskStatus};
 
 use crate::bg_monitor::{
-    combine, insert_task, read_pipe, spawn_monitor_with_cleanup, truncate_cmd,
+    build_task, combine, insert_task, read_pipe, spawn_monitor_with_cleanup, truncate_cmd,
 };
 
 // ── Timed-out process (streaming → background) ──────────────────────
 
-/// Extract a timed-out process from the opaque handle and register it.
-///
-/// Returns `Some(task_id)` on success, `None` if the handle type is wrong.
-pub fn register(handle: ProcessHandle, command: &str) -> Option<String> {
+pub fn register(
+    store: &BackgroundTaskStore,
+    handle: ProcessHandle,
+    command: &str,
+) -> Option<String> {
     let data = handle.0.downcast::<TimedOutProcessData>().ok()?;
     let desc = format!("(auto-bg) {}", truncate_cmd(command, 60));
-    Some(register_timed_out(*data, &desc))
+    Some(register_timed_out(store, *data, &desc))
 }
 
-fn register_timed_out(data: TimedOutProcessData, desc: &str) -> String {
+fn register_timed_out(
+    store: &BackgroundTaskStore,
+    data: TimedOutProcessData,
+    desc: &str,
+) -> String {
     let TimedOutProcessData {
         child,
         stdout_buf,
@@ -37,20 +39,23 @@ fn register_timed_out(data: TimedOutProcessData, desc: &str) -> String {
         abort_handles,
     } = data;
 
-    let task_id = loopal_tool_background::generate_task_id();
+    let task_id = store.generate_task_id();
     let combined_output = Arc::new(Mutex::new(combine(&stdout_buf, &stderr_buf)));
     let exit_code = Arc::new(Mutex::new(None));
     let status = Arc::new(Mutex::new(TaskStatus::Running));
     let (watch_tx, watch_rx) = tokio::sync::watch::channel(TaskStatus::Running);
 
     insert_task(
+        store,
         &task_id,
-        desc,
-        &combined_output,
-        &exit_code,
-        &status,
-        &child,
-        watch_rx,
+        build_task(
+            &combined_output,
+            &exit_code,
+            &status,
+            &child,
+            desc,
+            watch_rx,
+        ),
     );
 
     let ob = Arc::clone(&stdout_buf);
@@ -70,15 +75,20 @@ fn register_timed_out(data: TimedOutProcessData, desc: &str) -> String {
 
 // ── Freshly spawned process (run_in_background → store) ─────────────
 
-/// Extract a spawned child from the opaque handle and register it.
-///
-/// Returns `Some(task_id)` on success, `None` if the handle type is wrong.
-pub fn register_spawned(handle: ProcessHandle, desc: &str) -> Option<String> {
+pub fn register_spawned(
+    store: &BackgroundTaskStore,
+    handle: ProcessHandle,
+    desc: &str,
+) -> Option<String> {
     let data = handle.0.downcast::<SpawnedBackgroundData>().ok()?;
-    Some(register_spawned_data(*data, desc))
+    Some(register_spawned_data(store, *data, desc))
 }
 
-fn register_spawned_data(data: SpawnedBackgroundData, desc: &str) -> String {
+fn register_spawned_data(
+    store: &BackgroundTaskStore,
+    data: SpawnedBackgroundData,
+    desc: &str,
+) -> String {
     let stdout_pipe;
     let stderr_pipe;
     {
@@ -94,19 +104,21 @@ fn register_spawned_data(data: SpawnedBackgroundData, desc: &str) -> String {
     let exit_code = Arc::new(Mutex::new(None));
     let status = Arc::new(Mutex::new(TaskStatus::Running));
     let (watch_tx, watch_rx) = tokio::sync::watch::channel(TaskStatus::Running);
-    let task_id = loopal_tool_background::generate_task_id();
+    let task_id = store.generate_task_id();
 
     insert_task(
+        store,
         &task_id,
-        desc,
-        &combined_output,
-        &exit_code,
-        &status,
-        &data.child,
-        watch_rx,
+        build_task(
+            &combined_output,
+            &exit_code,
+            &status,
+            &data.child,
+            desc,
+            watch_rx,
+        ),
     );
 
-    // Spawn reader tasks and collect abort handles for cleanup.
     let mut reader_aborts = Vec::new();
     if let Some(pipe) = stdout_pipe {
         let buf = Arc::clone(&stdout_buf);

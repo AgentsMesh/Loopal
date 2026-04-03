@@ -32,6 +32,7 @@ rust_test(
     deps = [
         ":loopal-tool-bash",
         "//crates/loopal-backend:loopal-backend",
+        "//crates/tools/process/background:loopal-tool-background",
         "@crates//:tempfile",
         "@crates//:tokio",
         "@crates//:serde_json",

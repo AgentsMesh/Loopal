@@ -8,7 +8,6 @@ use loopal_tui::views::bg_tasks_panel;
 use tokio::sync::mpsc;
 
 fn make_app() -> App {
-    loopal_tool_background::clear_store();
     let (control_tx, _) = mpsc::channel::<ControlCommand>(16);
     let (perm_tx, _) = mpsc::channel::<bool>(16);
     let (question_tx, _) = mpsc::channel::<UserQuestionResponse>(16);
@@ -24,13 +23,13 @@ fn make_app() -> App {
     App::new(session, std::env::temp_dir())
 }
 
-fn add_bg_task(id: &str, desc: &str) {
-    loopal_tool_background::register_proxy(id.to_string(), desc.to_string());
+fn add_bg_task(app: &App, id: &str, desc: &str) {
+    app.bg_store
+        .register_proxy(id.to_string(), desc.to_string());
 }
 
-/// Sync app.bg_snapshots from the global store.
 fn sync_bg(app: &mut App) {
-    app.bg_snapshots = loopal_tool_background::snapshot_running();
+    app.bg_snapshots = app.bg_store.snapshot_running();
 }
 
 fn snap(id: &str, desc: &str) -> BgTaskSnapshot {
@@ -41,7 +40,7 @@ fn snap(id: &str, desc: &str) -> BgTaskSnapshot {
     }
 }
 
-// === bg_tasks_panel utility functions (pure, no global store) ===
+// === bg_tasks_panel utility functions (pure, no store) ===
 
 #[test]
 fn bg_panel_height_zero_when_no_tasks() {
@@ -79,11 +78,10 @@ fn running_task_ids_sorted() {
 
 #[test]
 fn forward_through_bg_tasks() {
-    let _guard = crate::BG_STORE_LOCK.lock().unwrap();
     let mut app = make_app();
-    add_bg_task("bg_1", "one");
-    add_bg_task("bg_2", "two");
-    add_bg_task("bg_3", "three");
+    add_bg_task(&app, "bg_1", "one");
+    add_bg_task(&app, "bg_2", "two");
+    add_bg_task(&app, "bg_3", "three");
     sync_bg(&mut app);
     app.focus_mode = FocusMode::Panel(PanelKind::BgTasks);
     cycle_panel_focus(&mut app, true);
@@ -96,10 +94,9 @@ fn forward_through_bg_tasks() {
 
 #[test]
 fn forward_wraps_around() {
-    let _guard = crate::BG_STORE_LOCK.lock().unwrap();
     let mut app = make_app();
-    add_bg_task("bg_1", "one");
-    add_bg_task("bg_2", "two");
+    add_bg_task(&app, "bg_1", "one");
+    add_bg_task(&app, "bg_2", "two");
     sync_bg(&mut app);
     app.focused_bg_task = Some("bg_2".into());
     app.focus_mode = FocusMode::Panel(PanelKind::BgTasks);
@@ -109,10 +106,9 @@ fn forward_wraps_around() {
 
 #[test]
 fn backward_wraps_around() {
-    let _guard = crate::BG_STORE_LOCK.lock().unwrap();
     let mut app = make_app();
-    add_bg_task("bg_1", "one");
-    add_bg_task("bg_2", "two");
+    add_bg_task(&app, "bg_1", "one");
+    add_bg_task(&app, "bg_2", "two");
     sync_bg(&mut app);
     app.focused_bg_task = Some("bg_1".into());
     app.focus_mode = FocusMode::Panel(PanelKind::BgTasks);
@@ -122,10 +118,9 @@ fn backward_wraps_around() {
 
 #[test]
 fn backward_from_none_selects_last() {
-    let _guard = crate::BG_STORE_LOCK.lock().unwrap();
     let mut app = make_app();
-    add_bg_task("bg_1", "one");
-    add_bg_task("bg_2", "two");
+    add_bg_task(&app, "bg_1", "one");
+    add_bg_task(&app, "bg_2", "two");
     sync_bg(&mut app);
     app.focus_mode = FocusMode::Panel(PanelKind::BgTasks);
     cycle_panel_focus(&mut app, false);
@@ -134,9 +129,7 @@ fn backward_from_none_selects_last() {
 
 #[test]
 fn empty_tasks_clears_focus_and_exits_panel() {
-    let _guard = crate::BG_STORE_LOCK.lock().unwrap();
     let mut app = make_app();
-    // bg_snapshots stays empty
     app.focused_bg_task = Some("stale".into());
     app.focus_mode = FocusMode::Panel(PanelKind::BgTasks);
     cycle_panel_focus(&mut app, true);
@@ -150,12 +143,11 @@ fn empty_tasks_clears_focus_and_exits_panel() {
 
 #[test]
 fn stale_focus_recovery() {
-    let _guard = crate::BG_STORE_LOCK.lock().unwrap();
     let mut app = make_app();
-    add_bg_task("bg_live", "alive");
-    let handle = loopal_tool_background::register_proxy("bg_done".into(), "done".into());
+    add_bg_task(&app, "bg_live", "alive");
+    let handle = app.bg_store.register_proxy("bg_done".into(), "done".into());
     handle.complete("output".into(), true);
-    sync_bg(&mut app); // only bg_live shows (running filter)
+    sync_bg(&mut app);
     app.focused_bg_task = Some("bg_done".into());
     app.focus_mode = FocusMode::Panel(PanelKind::BgTasks);
     cycle_panel_focus(&mut app, true);

@@ -13,6 +13,7 @@ rust_library(
         "//crates/loopal-runtime",
         "//crates/loopal-session",
         "//crates/loopal-tool-api",
+        "//crates/tools/process/background:loopal-tool-background",
         "@crates//:anyhow",
         "@crates//:arboard",
         "@crates//:base64",

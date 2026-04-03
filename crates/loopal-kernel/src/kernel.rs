@@ -14,6 +14,8 @@ use tracing::{info, warn};
 
 use crate::provider_registry;
 
+use loopal_tool_background::BackgroundTaskStore;
+
 pub struct Kernel {
     tool_registry: ToolRegistry,
     provider_registry: ProviderRegistry,
@@ -26,12 +28,14 @@ pub struct Kernel {
     /// MCP prompts cached at start_mcp() time.
     mcp_prompts: Vec<(String, McpPrompt)>,
     settings: Settings,
+    bg_store: Arc<BackgroundTaskStore>,
 }
 
 impl Kernel {
     pub fn new(settings: Settings) -> Result<Self> {
+        let bg_store = BackgroundTaskStore::new();
         let mut tool_registry = ToolRegistry::new();
-        loopal_tools::builtin::register_all(&mut tool_registry);
+        loopal_tools::builtin::register_all(&mut tool_registry, bg_store.clone());
 
         let mut provider_registry = ProviderRegistry::new();
         provider_registry::register_providers(&settings, &mut provider_registry);
@@ -50,6 +54,7 @@ impl Kernel {
             mcp_resources: Vec::new(),
             mcp_prompts: Vec::new(),
             settings,
+            bg_store,
         })
     }
 
@@ -129,6 +134,11 @@ impl Kernel {
             policy,
             loopal_backend::ResourceLimits::default(),
         )
+    }
+
+    /// Background task store shared by BashTool and TUI.
+    pub fn bg_store(&self) -> &Arc<BackgroundTaskStore> {
+        &self.bg_store
     }
 
     /// Access settings.

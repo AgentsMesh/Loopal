@@ -7,7 +7,6 @@ use loopal_tui::dispatch_ops::panel_tab;
 use tokio::sync::mpsc;
 
 fn make_app() -> App {
-    loopal_tool_background::clear_store();
     let (control_tx, _) = mpsc::channel::<ControlCommand>(16);
     let (perm_tx, _) = mpsc::channel::<bool>(16);
     let (question_tx, _) = mpsc::channel::<UserQuestionResponse>(16);
@@ -38,22 +37,22 @@ fn spawn_agent(app: &App, name: &str) {
         .handle_event(AgentEvent::named(name, AgentEventPayload::Started));
 }
 
-fn add_bg_task(id: &str, desc: &str) {
-    loopal_tool_background::register_proxy(id.to_string(), desc.to_string());
+fn add_bg_task(app: &App, id: &str, desc: &str) {
+    app.bg_store
+        .register_proxy(id.to_string(), desc.to_string());
 }
 
 fn sync_bg(app: &mut App) {
-    app.bg_snapshots = loopal_tool_background::snapshot_running();
+    app.bg_snapshots = app.bg_store.snapshot_running();
 }
 
 // === Both panels have content: Tab switches between them ===
 
 #[test]
 fn tab_switches_from_agents_to_bg_tasks() {
-    let _guard = crate::BG_STORE_LOCK.lock().unwrap();
     let mut app = make_app();
     spawn_agent(&app, "worker");
-    add_bg_task("t1", "build");
+    add_bg_task(&app, "t1", "build");
     sync_bg(&mut app);
     app.focused_agent = Some("worker".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
@@ -69,10 +68,9 @@ fn tab_switches_from_agents_to_bg_tasks() {
 
 #[test]
 fn tab_switches_from_bg_tasks_to_agents() {
-    let _guard = crate::BG_STORE_LOCK.lock().unwrap();
     let mut app = make_app();
     spawn_agent(&app, "worker");
-    add_bg_task("t1", "build");
+    add_bg_task(&app, "t1", "build");
     sync_bg(&mut app);
     app.focused_bg_task = Some("t1".into());
     app.focus_mode = FocusMode::Panel(PanelKind::BgTasks);
@@ -87,7 +85,6 @@ fn tab_switches_from_bg_tasks_to_agents() {
 
 #[test]
 fn tab_cycles_agents_when_only_agents() {
-    let _guard = crate::BG_STORE_LOCK.lock().unwrap();
     let mut app = make_app();
     spawn_agent(&app, "a");
     spawn_agent(&app, "b");
@@ -106,10 +103,9 @@ fn tab_cycles_agents_when_only_agents() {
 
 #[test]
 fn tab_cycles_bg_tasks_when_only_bg_tasks() {
-    let _guard = crate::BG_STORE_LOCK.lock().unwrap();
     let mut app = make_app();
-    add_bg_task("t1", "lint");
-    add_bg_task("t2", "test");
+    add_bg_task(&app, "t1", "lint");
+    add_bg_task(&app, "t2", "test");
     sync_bg(&mut app);
     app.focused_bg_task = Some("t1".into());
     app.focus_mode = FocusMode::Panel(PanelKind::BgTasks);
@@ -128,10 +124,9 @@ fn tab_cycles_bg_tasks_when_only_bg_tasks() {
 
 #[test]
 fn tab_roundtrip_both_panels() {
-    let _guard = crate::BG_STORE_LOCK.lock().unwrap();
     let mut app = make_app();
     spawn_agent(&app, "alpha");
-    add_bg_task("t1", "deploy");
+    add_bg_task(&app, "t1", "deploy");
     sync_bg(&mut app);
     app.focused_agent = Some("alpha".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
@@ -148,7 +143,6 @@ fn tab_roundtrip_both_panels() {
 
 #[test]
 fn tab_noop_when_single_agent() {
-    let _guard = crate::BG_STORE_LOCK.lock().unwrap();
     let mut app = make_app();
     spawn_agent(&app, "solo");
     app.focused_agent = Some("solo".into());

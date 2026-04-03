@@ -2,31 +2,31 @@
 
 use std::sync::{Arc, Mutex};
 
-use loopal_tool_background::{self, BackgroundTask, TaskStatus};
+use loopal_tool_background::{BackgroundTask, BackgroundTaskStore, TaskStatus};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::task::AbortHandle;
 
-pub fn insert_task(
-    task_id: &str,
-    desc: &str,
+pub fn insert_task(store: &BackgroundTaskStore, task_id: &str, task: BackgroundTask) {
+    store.insert(task_id.to_string(), task);
+}
+
+/// Build a `BackgroundTask` from its component Arc fields.
+pub fn build_task(
     output: &Arc<Mutex<String>>,
     exit_code: &Arc<Mutex<Option<i32>>>,
     status: &Arc<Mutex<TaskStatus>>,
     child: &Arc<Mutex<Option<tokio::process::Child>>>,
+    desc: &str,
     watch_rx: tokio::sync::watch::Receiver<TaskStatus>,
-) {
-    let task = BackgroundTask {
+) -> BackgroundTask {
+    BackgroundTask {
         output: Arc::clone(output),
         exit_code: Arc::clone(exit_code),
         status: Arc::clone(status),
         description: desc.to_string(),
         child: Arc::clone(child),
         status_watch: watch_rx,
-    };
-    loopal_tool_background::store()
-        .lock()
-        .unwrap()
-        .insert(task_id.to_string(), task);
+    }
 }
 
 /// Monitor with reader task cleanup.
@@ -49,7 +49,7 @@ pub fn spawn_monitor_with_cleanup<F>(
     tokio::spawn(async move {
         let mut ch = match child_arc.lock().unwrap().take() {
             Some(c) => c,
-            None => return, // already taken (e.g. by bg_stop)
+            None => return,
         };
         let code = ch.wait().await.ok().and_then(|s| s.code());
 
@@ -64,7 +64,6 @@ pub fn spawn_monitor_with_cleanup<F>(
         *combined_output.lock().unwrap() = output;
         *exit_code.lock().unwrap() = code;
 
-        // Only update if still Running — bg_stop may have set Failed.
         let final_status = if code == Some(0) {
             TaskStatus::Completed
         } else {
@@ -74,8 +73,6 @@ pub fn spawn_monitor_with_cleanup<F>(
         if *s == TaskStatus::Running {
             *s = final_status;
         }
-        // Always notify watchers so blocking bg_output callers wake up,
-        // even if bg_stop already set the status.
         let current = s.clone();
         drop(s);
         let _ = watch_tx.send(current);

@@ -4,10 +4,12 @@ pub use types::*;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Instant;
 
 use loopal_protocol::{BgTaskSnapshot, ImageAttachment, UserContent};
 use loopal_session::SessionController;
+use loopal_tool_background::BackgroundTaskStore;
 
 use crate::command::CommandRegistry;
 use crate::views::progress::LineCache;
@@ -51,10 +53,8 @@ pub struct App {
     /// Scroll offset for the agent panel (index of first visible agent).
     pub agent_panel_offset: usize,
 
-    /// Provider for background task snapshots.  Injected at construction;
-    /// defaults to a no-op that returns an empty vec (overridden in
-    /// production by `loopal_tool_background::snapshot_running`).
-    pub bg_provider: fn() -> Vec<BgTaskSnapshot>,
+    /// Background task store (injectable; tests use isolated instances).
+    pub bg_store: Arc<BackgroundTaskStore>,
     /// Cached background task snapshots, refreshed each render cycle.
     pub bg_snapshots: Vec<BgTaskSnapshot>,
 
@@ -97,7 +97,7 @@ impl App {
             focused_bg_task: None,
             focus_mode: FocusMode::default(),
             agent_panel_offset: 0,
-            bg_provider: || Vec::new(),
+            bg_store: BackgroundTaskStore::new(),
             bg_snapshots: Vec::new(),
             session,
             line_cache: LineCache::new(),

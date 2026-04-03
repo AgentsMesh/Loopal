@@ -1,8 +1,14 @@
+use std::sync::Arc;
+
 use loopal_tool_api::{PermissionLevel, Tool, ToolContext};
-use loopal_tool_background::{BackgroundTask, TaskStatus};
+use loopal_tool_background::{BackgroundTask, BackgroundTaskStore, TaskStatus};
 use loopal_tool_bash::BashTool;
 use serde_json::json;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
+
+fn make_store() -> Arc<BackgroundTaskStore> {
+    BackgroundTaskStore::new()
+}
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     let backend = loopal_backend::LocalBackend::new(
@@ -21,9 +27,8 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
 
 #[test]
 fn test_store_insert_and_retrieve() {
-    let _g = crate::BG_STORE_LOCK.lock().unwrap();
-    let store = loopal_tool_background::store();
-    let task_id = loopal_tool_background::generate_task_id();
+    let store = make_store();
+    let task_id = store.generate_task_id();
     let (_watch_tx, watch_rx) = tokio::sync::watch::channel(TaskStatus::Running);
     let task = BackgroundTask {
         output: Arc::new(Mutex::new(String::new())),
@@ -33,29 +38,27 @@ fn test_store_insert_and_retrieve() {
         child: Arc::new(Mutex::new(None)),
         status_watch: watch_rx,
     };
-    store.lock().unwrap().insert(task_id.clone(), task);
-    assert!(store.lock().unwrap().contains_key(&task_id));
-    store.lock().unwrap().remove(&task_id);
+    store.insert(task_id.clone(), task);
+    assert!(store.with_task(&task_id, |_| ()).is_some());
 }
 
 #[test]
 fn test_generate_task_id_is_unique() {
-    let id1 = loopal_tool_background::generate_task_id();
-    let id2 = loopal_tool_background::generate_task_id();
+    let store = make_store();
+    let id1 = store.generate_task_id();
+    let id2 = store.generate_task_id();
     assert_ne!(id1, id2);
     assert!(id1.starts_with("bg_"));
 }
 
 /// Bash tool handles background execution and output retrieval.
 #[tokio::test]
-#[allow(clippy::await_holding_lock)]
 async fn test_bash_background_and_output() {
-    let _g = crate::BG_STORE_LOCK.lock().unwrap();
     let tmp = tempfile::tempdir().unwrap();
-    let bash = BashTool;
+    let store = make_store();
+    let bash = BashTool::new(store);
     let ctx = make_ctx(tmp.path());
 
-    // Start background process
     let result = bash
         .execute(
             json!({"command": "echo bg_hello", "run_in_background": true}),
@@ -73,7 +76,6 @@ async fn test_bash_background_and_output() {
         .and_then(|l| l.strip_prefix("process_id: "))
         .unwrap();
 
-    // Get output via Bash(process_id=...)
     let output = bash
         .execute(
             json!({"process_id": pid, "block": true, "timeout": 5000}),
@@ -82,18 +84,21 @@ async fn test_bash_background_and_output() {
         .await
         .unwrap();
     assert!(!output.is_error);
-    assert!(output.content.contains("bg_hello"));
+    assert!(
+        output.content.contains("bg_hello"),
+        "expected bg_hello in output: {}",
+        output.content,
+    );
     assert!(output.content.contains("Completed"));
 }
 
 /// Bash tool handles stopping background processes.
 #[tokio::test]
 #[cfg(not(windows))]
-#[allow(clippy::await_holding_lock)]
 async fn test_bash_stop_background() {
-    let _g = crate::BG_STORE_LOCK.lock().unwrap();
     let tmp = tempfile::tempdir().unwrap();
-    let bash = BashTool;
+    let store = make_store();
+    let bash = BashTool::new(store);
     let ctx = make_ctx(tmp.path());
 
     let result = bash
@@ -112,7 +117,6 @@ async fn test_bash_stop_background() {
 
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
-    // Stop via Bash(process_id=..., stop=true)
     let stop = bash
         .execute(json!({"process_id": pid, "stop": true}), &ctx)
         .await
@@ -120,18 +124,19 @@ async fn test_bash_stop_background() {
     assert!(
         !stop.is_error,
         "bg_stop returned error for {pid}: {}",
-        stop.content
+        stop.content,
     );
     assert!(
-        stop.content.contains("stopped") || stop.content.contains("Process"),
-        "unexpected stop content: {}",
-        stop.content
+        stop.content.contains("stopped"),
+        "unexpected: {}",
+        stop.content,
     );
 }
 
 #[test]
 fn test_bash_schema_includes_background_fields() {
-    let tool = BashTool;
+    let store = make_store();
+    let tool = BashTool::new(store);
     let schema = tool.parameters_schema();
     assert!(schema["properties"]["run_in_background"].is_object());
     assert!(schema["properties"]["process_id"].is_object());

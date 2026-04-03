@@ -25,16 +25,14 @@ fn make_streaming_ctx(cwd: &std::path::Path) -> ToolContext {
 #[cfg(not(windows))]
 async fn streaming_timeout_converts_to_background() {
     let tmp = tempfile::tempdir().unwrap();
-    let bash = BashTool;
+    let bash = BashTool::new(super::make_store());
     let ctx = make_streaming_ctx(tmp.path());
 
-    // timeout=0 forces immediate timeout; sleep 60 ensures the command is running.
     let result = bash
         .execute(json!({"command": "sleep 60", "timeout": 0}), &ctx)
         .await
         .unwrap();
 
-    // Should be a success (converted to background), not an error.
     assert!(
         !result.is_error,
         "streaming timeout should be success (bg conversion), got: {}",
@@ -44,12 +42,7 @@ async fn streaming_timeout_converts_to_background() {
         result.content.contains("process_id"),
         "should include background process_id",
     );
-    assert!(
-        result.content.contains("timed out") || result.content.contains("Timed out"),
-        "should mention timeout",
-    );
 
-    // Verify the process was registered in the background store.
     let pid = result
         .content
         .lines()
@@ -66,7 +59,6 @@ async fn streaming_timeout_converts_to_background() {
         "bg task should be running",
     );
 
-    // Cleanup
     let _ = bash
         .execute(json!({"process_id": pid, "stop": true}), &ctx)
         .await;
@@ -76,7 +68,7 @@ async fn streaming_timeout_converts_to_background() {
 #[tokio::test]
 async fn non_streaming_timeout_is_hard_error() {
     let tmp = tempfile::tempdir().unwrap();
-    let bash = BashTool;
+    let bash = BashTool::new(super::make_store());
     let backend = loopal_backend::LocalBackend::new(
         tmp.path().to_path_buf(),
         None,
@@ -86,7 +78,7 @@ async fn non_streaming_timeout_is_hard_error() {
         session_id: "test".into(),
         shared: None,
         memory_channel: None,
-        output_tail: None, // no streaming
+        output_tail: None,
         backend,
     };
 

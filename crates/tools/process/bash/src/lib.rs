@@ -12,20 +12,25 @@ mod bg_monitor;
 mod bg_ops;
 mod format;
 
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use loopal_error::{LoopalError, ToolIoError};
 use loopal_tool_api::{ExecOutcome, PermissionLevel, TimeoutSecs, Tool, ToolContext, ToolResult};
+use loopal_tool_background::BackgroundTaskStore;
 use serde_json::{Value, json};
 
 use loopal_config::CommandDecision;
 use loopal_sandbox::command_checker::check_command;
 use loopal_sandbox::security_inspector::{SecurityVerdict, inspect_command};
 
-pub struct BashTool;
+pub struct BashTool {
+    store: Arc<BackgroundTaskStore>,
+}
 
-impl Default for BashTool {
-    fn default() -> Self {
-        Self
+impl BashTool {
+    pub fn new(store: Arc<BackgroundTaskStore>) -> Self {
+        Self { store }
     }
 }
 
@@ -78,16 +83,19 @@ impl Tool for BashTool {
     }
 
     async fn execute(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
-        // Route: process_id → background ops, command → execute
         if let Some(pid) = input["process_id"].as_str() {
             if input["stop"].as_bool().unwrap_or(false) {
-                return Ok(bg_ops::bg_stop(pid));
+                return Ok(bg_ops::bg_stop(&self.store, pid));
             }
             let block = input["block"].as_bool().unwrap_or(true);
             let timeout = TimeoutSecs::from_tool_input(&input, DEFAULT_BG_TIMEOUT_SECS);
-            return Ok(
-                bg_ops::bg_output(pid, block, timeout.to_millis_clamped(MAX_TIMEOUT_MS)).await,
-            );
+            return Ok(bg_ops::bg_output(
+                &self.store,
+                pid,
+                block,
+                timeout.to_millis_clamped(MAX_TIMEOUT_MS),
+            )
+            .await);
         }
 
         let command = input["command"].as_str().ok_or_else(|| {
@@ -100,7 +108,7 @@ impl Tool for BashTool {
             let desc = input["description"].as_str().unwrap_or(command);
             return match ctx.backend.exec_background(command).await {
                 Ok(handle) => {
-                    let task_id = bg_convert::register_spawned(handle, desc)
+                    let task_id = bg_convert::register_spawned(&self.store, handle, desc)
                         .unwrap_or_else(|| "(unknown)".into());
                     Ok(ToolResult::success(format!(
                         "Background process started.\nprocess_id: {task_id}"
@@ -110,12 +118,12 @@ impl Tool for BashTool {
             };
         }
 
-        exec_foreground(command, &input, ctx).await
+        exec_foreground(&self.store, command, &input, ctx).await
     }
 }
 
-/// Execute a foreground command; on timeout the process is moved to background.
 async fn exec_foreground(
+    store: &BackgroundTaskStore,
     command: &str,
     input: &Value,
     ctx: &ToolContext,
@@ -142,7 +150,7 @@ async fn exec_foreground(
             handle,
         }) => {
             let task_id =
-                bg_convert::register(handle, command).unwrap_or_else(|| "(unknown)".into());
+                bg_convert::register(store, handle, command).unwrap_or_else(|| "(unknown)".into());
             Ok(format::format_converted_to_background(
                 &task_id,
                 timeout_ms,

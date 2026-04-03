@@ -2,11 +2,13 @@
 
 use std::io;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use ratatui::prelude::*;
 
-use loopal_protocol::{AgentEvent, BgTaskSnapshot};
+use loopal_protocol::AgentEvent;
 use loopal_session::SessionController;
+use loopal_tool_background::BackgroundTaskStore;
 use tokio::sync::mpsc;
 
 use crate::app::App;
@@ -17,21 +19,18 @@ use crate::render::draw;
 use crate::terminal::TerminalGuard;
 
 /// Run the TUI event loop with a real terminal (production entry point).
-///
-/// `bg_provider` supplies background task snapshots each render cycle.
-/// In production this is `loopal_tool_background::snapshot_running`.
 pub async fn run_tui(
     session: SessionController,
     cwd: PathBuf,
     agent_event_rx: mpsc::Receiver<AgentEvent>,
-    bg_provider: fn() -> Vec<BgTaskSnapshot>,
+    bg_store: Arc<BackgroundTaskStore>,
 ) -> anyhow::Result<()> {
     let _guard = TerminalGuard::new()?;
     let backend = CrosstermBackend::new(io::stdout());
     let mut terminal = Terminal::new(backend)?;
     let events = EventHandler::new(agent_event_rx);
     let mut app = App::new(session, cwd);
-    app.bg_provider = bg_provider;
+    app.bg_store = bg_store;
 
     run_tui_loop(&mut terminal, events, &mut app).await?;
 
@@ -48,7 +47,7 @@ pub async fn run_tui_loop<B: Backend>(
 where
     B::Error: Send + Sync + 'static,
 {
-    app.bg_snapshots = (app.bg_provider)();
+    app.bg_snapshots = app.bg_store.snapshot_running();
     terminal.draw(|f| draw(f, app))?;
 
     loop {
@@ -85,7 +84,7 @@ where
         if should_quit || app.exiting {
             break;
         }
-        app.bg_snapshots = (app.bg_provider)();
+        app.bg_snapshots = app.bg_store.snapshot_running();
         terminal.draw(|f| draw(f, app))?;
     }
 

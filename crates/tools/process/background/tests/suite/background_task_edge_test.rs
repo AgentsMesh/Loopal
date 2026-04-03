@@ -1,7 +1,12 @@
+use std::sync::Arc;
+
 use loopal_tool_api::{Tool, ToolContext};
-#[cfg(not(windows))]
-use loopal_tool_bash::BashTool;
+use loopal_tool_background::BackgroundTaskStore;
 use serde_json::json;
+
+fn make_store() -> Arc<BackgroundTaskStore> {
+    BackgroundTaskStore::new()
+}
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     let backend = loopal_backend::LocalBackend::new(
@@ -20,11 +25,9 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
 
 /// Bash(process_id=nonexistent) returns error.
 #[tokio::test]
-#[allow(clippy::await_holding_lock)]
 async fn test_output_nonexistent_process() {
-    let _g = crate::BG_STORE_LOCK.lock().unwrap();
     let tmp = tempfile::tempdir().unwrap();
-    let bash = loopal_tool_bash::BashTool;
+    let bash = loopal_tool_bash::BashTool::new(make_store());
     let ctx = make_ctx(tmp.path());
 
     let result = bash
@@ -37,11 +40,9 @@ async fn test_output_nonexistent_process() {
 
 /// Bash(process_id=nonexistent, stop=true) returns error.
 #[tokio::test]
-#[allow(clippy::await_holding_lock)]
 async fn test_stop_nonexistent_process() {
-    let _g = crate::BG_STORE_LOCK.lock().unwrap();
     let tmp = tempfile::tempdir().unwrap();
-    let bash = loopal_tool_bash::BashTool;
+    let bash = loopal_tool_bash::BashTool::new(make_store());
     let ctx = make_ctx(tmp.path());
 
     let result = bash
@@ -58,11 +59,10 @@ async fn test_stop_nonexistent_process() {
 /// Non-blocking output returns Running immediately.
 #[tokio::test]
 #[cfg(not(windows))]
-#[allow(clippy::await_holding_lock)]
 async fn test_non_blocking_output() {
-    let _g = crate::BG_STORE_LOCK.lock().unwrap();
     let tmp = tempfile::tempdir().unwrap();
-    let bash = BashTool;
+    let store = make_store();
+    let bash = loopal_tool_bash::BashTool::new(store);
     let ctx = make_ctx(tmp.path());
 
     let result = bash
@@ -85,7 +85,6 @@ async fn test_non_blocking_output() {
         .unwrap();
     assert!(output.content.contains("[Status: Running]"));
 
-    // Cleanup
     let _ = bash
         .execute(json!({"process_id": pid, "stop": true}), &ctx)
         .await;
@@ -94,11 +93,10 @@ async fn test_non_blocking_output() {
 /// Blocking with short timeout returns timed-out status.
 #[tokio::test]
 #[cfg(not(windows))]
-#[allow(clippy::await_holding_lock)]
 async fn test_output_timeout() {
-    let _g = crate::BG_STORE_LOCK.lock().unwrap();
     let tmp = tempfile::tempdir().unwrap();
-    let bash = BashTool;
+    let store = make_store();
+    let bash = loopal_tool_bash::BashTool::new(store);
     let ctx = make_ctx(tmp.path());
 
     let result = bash

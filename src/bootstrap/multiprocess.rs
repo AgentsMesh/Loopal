@@ -70,12 +70,12 @@ pub async fn run(
         session_ctrl.push_welcome(&model, &display_path);
     }
 
-    // 10. Run TUI
+    // 10. Run TUI (bg_store is TUI-local; future: sync from agent via IPC)
     let result = loopal_tui::run_tui(
         session_ctrl,
         cwd.to_path_buf(),
         tui_event_rx,
-        loopal_tool_background::snapshot_running,
+        loopal_tool_background::BackgroundTaskStore::new(),
     )
     .await;
 

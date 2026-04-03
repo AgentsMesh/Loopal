@@ -50,7 +50,7 @@ pub async fn exec_command_streaming(
     cwd: &Path,
     policy: Option<&ResolvedPolicy>,
     command: &str,
-    timeout_ms: u64,
+    timeout: Duration,
     limits: &ResourceLimits,
     tail: Arc<OutputTail>,
 ) -> Result<ExecOutcome, ToolIoError> {
@@ -101,7 +101,7 @@ pub async fn exec_command_streaming(
     // only runs after pipes close (readers finish → child exited), so on
     // timeout the child is still inside child_arc (not taken/dropped).
     let child_for_wait = Arc::clone(&child_arc);
-    let wait_result = tokio::time::timeout(Duration::from_millis(timeout_ms), async {
+    let wait_result = tokio::time::timeout(timeout, async {
         let (r1, r2) = tokio::join!(stdout_task, stderr_task);
         let _ = (r1, r2);
         let child_opt = child_for_wait.lock().unwrap().take();
@@ -126,7 +126,7 @@ pub async fn exec_command_streaming(
         Err(_timeout) => {
             let partial = tail.snapshot();
             Ok(ExecOutcome::TimedOut {
-                timeout_ms,
+                timeout,
                 partial_output: partial,
                 handle: ProcessHandle(Box::new(TimedOutProcessData {
                     child: child_arc,

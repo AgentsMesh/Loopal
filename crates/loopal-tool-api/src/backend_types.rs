@@ -3,6 +3,8 @@
 //! These are deliberately simple structs so that tool crates only depend
 //! on `loopal-tool-api` (a leaf crate) for their I/O interface.
 
+use std::time::Duration;
+
 /// Result of a file read operation.
 #[derive(Debug, Clone)]
 pub struct ReadResult {
@@ -167,9 +169,15 @@ impl TimeoutSecs {
         self.0
     }
 
-    /// Convert to milliseconds, clamped to `max_ms`.
-    pub fn to_millis_clamped(&self, max_ms: u64) -> u64 {
-        (self.0.saturating_mul(1000)).min(max_ms)
+    /// Convert to a `Duration`.
+    pub const fn to_duration(&self) -> Duration {
+        Duration::from_secs(self.0)
+    }
+
+    /// Convert to a `Duration`, clamped to `max`.
+    pub fn to_duration_clamped(&self, max: Duration) -> Duration {
+        let d = Duration::from_secs(self.0);
+        if d > max { max } else { d }
     }
 }
 

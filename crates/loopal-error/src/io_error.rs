@@ -1,3 +1,4 @@
+use std::time::Duration;
 use thiserror::Error;
 
 /// Opaque handle for passing implementation-specific data through error
@@ -37,8 +38,8 @@ pub enum ToolIoError {
     #[error("exec failed: {0}")]
     ExecFailed(String),
 
-    #[error("timeout after {0}ms")]
-    Timeout(u64),
+    #[error("timeout after {0:?}")]
+    Timeout(Duration),
 
     #[error("network error: {0}")]
     Network(String),

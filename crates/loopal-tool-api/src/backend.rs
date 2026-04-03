@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use loopal_error::{ProcessHandle, ToolIoError};
@@ -21,7 +22,7 @@ pub enum ExecOutcome {
     /// The `handle` carries the child so the caller can register it as a
     /// background task.
     TimedOut {
-        timeout_ms: u64,
+        timeout: Duration,
         partial_output: String,
         handle: ProcessHandle,
     },
@@ -99,7 +100,7 @@ pub trait Backend: Send + Sync {
     // --- Command execution ---
 
     /// Execute a shell command synchronously (with timeout).
-    async fn exec(&self, command: &str, timeout_ms: u64) -> Result<ExecResult, ToolIoError>;
+    async fn exec(&self, command: &str, timeout: Duration) -> Result<ExecResult, ToolIoError>;
 
     /// Execute a shell command with streaming output capture.
     ///
@@ -112,10 +113,10 @@ pub trait Backend: Send + Sync {
     async fn exec_streaming(
         &self,
         command: &str,
-        timeout_ms: u64,
+        timeout: Duration,
         _tail: Arc<OutputTail>,
     ) -> Result<ExecOutcome, ToolIoError> {
-        self.exec(command, timeout_ms)
+        self.exec(command, timeout)
             .await
             .map(ExecOutcome::Completed)
     }

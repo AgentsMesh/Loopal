@@ -47,28 +47,27 @@ pub async fn bg_output(process_id: &str, block: bool, timeout_ms: u64) -> ToolRe
 
 /// Stop a background process.
 ///
-/// Lock order: `child` → `status` (matches the monitor task in bg_convert).
+/// Lock order: `child` → `status` (matches the monitor task).
+/// Always returns success with "stopped" — even if the monitor already
+/// set a terminal status (race between kill and monitor is benign).
 pub fn bg_stop(process_id: &str) -> ToolResult {
     let store = loopal_tool_background::store().lock().unwrap();
     let Some(task) = store.get(process_id) else {
         return ToolResult::error(format!("Process not found: {process_id}"));
     };
 
-    // Kill child first — acquire and release the child lock before touching
-    // the status lock.  This is the same order the monitor task uses
-    // (child → output → exit_code → status).
+    // Kill child (if monitor hasn't taken it already).
     {
         if let Some(child) = task.child.lock().unwrap().as_mut() {
             let _ = child.start_kill();
         }
     }
 
-    // Now update status (child lock already released).
+    // Force status to Failed if still Running.
     let mut status = task.status.lock().unwrap();
-    if *status != TaskStatus::Running {
-        return ToolResult::success(format!("Process already {:?}: {process_id}", *status));
+    if *status == TaskStatus::Running {
+        *status = TaskStatus::Failed;
     }
-    *status = TaskStatus::Failed;
     ToolResult::success(format!("Process stopped: {process_id}"))
 }
 

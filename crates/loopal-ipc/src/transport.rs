@@ -30,4 +30,13 @@ pub trait Transport: Send + Sync {
 
     /// Check whether the transport is still connected.
     fn is_connected(&self) -> bool;
+
+    /// Close the write side of the transport.
+    ///
+    /// After this call the remote end sees EOF on its read side.
+    /// Subsequent `send()` calls will fail. The transport is marked
+    /// disconnected. This is safe to call even when other `Arc` clones
+    /// of the transport still exist — it performs an interior shutdown
+    /// of the writer without requiring sole ownership.
+    async fn close(&self);
 }

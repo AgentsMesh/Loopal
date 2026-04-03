@@ -84,4 +84,15 @@ impl Transport for StdioTransport {
     fn is_connected(&self) -> bool {
         self.connected.load(Ordering::Acquire)
     }
+
+    async fn close(&self) {
+        if !self.is_connected() {
+            return;
+        }
+        let mut w = self.writer.lock().await;
+        if let Err(e) = w.shutdown().await {
+            tracing::warn!("IPC transport close: {e}");
+        }
+        self.connected.store(false, Ordering::Release);
+    }
 }

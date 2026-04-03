@@ -80,3 +80,48 @@ async fn is_connected_initially_true() {
     assert!(a.is_connected());
     assert!(b.is_connected());
 }
+
+// ── close() tests ──────────────────────────────────────────────────
+
+#[tokio::test]
+async fn close_causes_remote_eof() {
+    let (a, b) = pipe_pair();
+
+    // Send a message first to confirm the connection works
+    a.send(b"before_close").await.unwrap();
+    let msg = b.recv().await.unwrap().expect("should receive");
+    assert_eq!(msg, b"before_close");
+
+    // Close the writer side of `a`
+    a.close().await;
+
+    // Remote end should see EOF
+    let result = b.recv().await.unwrap();
+    assert!(result.is_none(), "expected EOF after close");
+}
+
+#[tokio::test]
+async fn send_after_close_fails() {
+    let (a, _b) = pipe_pair();
+    a.close().await;
+
+    let result = a.send(b"should_fail").await;
+    assert!(result.is_err(), "send after close should fail");
+}
+
+#[tokio::test]
+async fn close_marks_disconnected() {
+    let (a, _b) = pipe_pair();
+    assert!(a.is_connected());
+
+    a.close().await;
+    assert!(!a.is_connected());
+}
+
+#[tokio::test]
+async fn close_is_idempotent() {
+    let (a, _b) = pipe_pair();
+    a.close().await;
+    a.close().await; // Should not panic
+    assert!(!a.is_connected());
+}

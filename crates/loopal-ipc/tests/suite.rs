@@ -2,6 +2,8 @@
 mod connection_edge_test;
 #[path = "suite/connection_test.rs"]
 mod connection_test;
+#[path = "suite/duplex_test.rs"]
+mod duplex_test;
 #[path = "suite/e2e_ipc_edge_test.rs"]
 mod e2e_ipc_edge_test;
 #[path = "suite/e2e_ipc_test.rs"]

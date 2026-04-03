@@ -106,9 +106,7 @@ impl Connection {
     }
 
     /// Send a JSON-RPC request and wait for the response.
-    ///
-    /// Cancellation-safe: if the future is dropped mid-await, the pending
-    /// entry is removed from the map to prevent memory leaks.
+    /// Cancellation-safe: dropped futures clean up via `PendingGuard`.
     pub async fn send_request(&self, method: &str, params: Value) -> Result<Value, String> {
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         debug!(id, method, "IPC send_request");
@@ -166,13 +164,19 @@ impl Connection {
     pub fn is_connected(&self) -> bool {
         self.transport.is_connected()
     }
+
+    /// Close the write side of the underlying transport.
+    /// The remote end will see EOF; pending responses are cleaned up by the reader loop.
+    pub async fn close(&self) {
+        self.transport.close().await;
+    }
 }
 
 // ── Cancellation guard ───────────────────────────────────────────────
 
 /// Removes a pending request entry on drop (cancellation safety).
 /// Call `disarm()` on success to skip cleanup. Uses `try_lock` in Drop
-/// to avoid spawning async tasks (which is unsafe during runtime shutdown).
+/// to avoid spawning async tasks (unsafe during runtime shutdown).
 struct PendingGuard {
     id: i64,
     pending: Option<PendingMap>,
@@ -191,8 +195,6 @@ impl Drop for PendingGuard {
         {
             map.remove(&self.id);
         }
-        // If lock is held, the entry leaks. This is acceptable:
-        // it only happens during concurrent cancellation, and the
-        // reader loop's EOF cleanup (map.clear()) will reclaim it.
+        // If lock is held, the entry leaks — reader loop cleanup reclaims it.
     }
 }

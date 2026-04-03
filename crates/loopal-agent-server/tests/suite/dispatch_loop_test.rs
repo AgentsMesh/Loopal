@@ -147,3 +147,33 @@ async fn forward_new_start_interrupts_active_session() {
 
     assert_ne!(sid1, sid2);
 }
+
+/// Closing the client transport (EOF) causes the server to exit cleanly
+/// within a bounded time, without relying on process-level SIGKILL.
+#[tokio::test]
+async fn forward_loop_eof_exits_cleanly() {
+    use loopal_test_support::chunks;
+
+    // Server with one interactive session (no prompt → waits for input)
+    let (conn, mut rx, _f) =
+        start_test_server_with_calls(vec![chunks::text_turn("reply")]).await;
+
+    let _sid = init_and_start(&conn, &mut rx, None).await;
+    drain_until_idle(&mut rx).await;
+
+    // Close the client transport → server should see EOF and exit
+    conn.close().await;
+
+    // Server must exit within 2 seconds (internal budget is ~1s).
+    // If the shutdown path is broken, this timeout fires.
+    let deadline = tokio::time::timeout(Duration::from_secs(2), async {
+        // After close, the reader loop sees EOF and rx closes.
+        while rx.recv().await.is_some() {}
+    })
+    .await;
+
+    assert!(
+        deadline.is_ok(),
+        "server should exit promptly after client EOF"
+    );
+}

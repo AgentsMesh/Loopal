@@ -26,7 +26,7 @@ pub async fn exec_command(
     let (program, args, env) = build_command(cwd, policy, command);
 
     let mut cmd = Command::new(&program);
-    cmd.args(&args).current_dir(cwd);
+    cmd.args(&args).current_dir(cwd).kill_on_drop(true);
     if let Some(env_map) = env {
         cmd.env_clear();
         for (k, v) in env_map {
@@ -83,7 +83,8 @@ pub async fn exec_background(
     cmd.args(&args)
         .current_dir(cwd)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
     if let Some(env_map) = env {
         cmd.env_clear();
         for (k, v) in env_map {

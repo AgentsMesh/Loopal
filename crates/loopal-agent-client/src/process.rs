@@ -12,7 +12,7 @@ use loopal_ipc::StdioTransport;
 use loopal_ipc::transport::Transport;
 
 /// Grace period before SIGKILL after requesting shutdown.
-const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
+const SHUTDOWN_GRACE: Duration = Duration::from_secs(3);
 
 /// A managed agent child process communicating over stdin/stdout.
 pub struct AgentProcess {
@@ -88,13 +88,15 @@ impl AgentProcess {
         self.child.wait().await
     }
 
-    /// Graceful shutdown: close stdin (signals EOF to child), wait for exit,
-    /// then SIGKILL if the grace period expires.
+    /// Graceful shutdown: close the transport writer (signals EOF to child),
+    /// wait for exit, then SIGKILL if the grace period expires.
     pub async fn shutdown(mut self) -> anyhow::Result<()> {
         info!("shutting down agent process");
 
-        // Close stdin → child's transport.recv() returns None → server loop exits
-        drop(self.child.stdin.take());
+        // Close the transport writer → child's transport.recv() returns None → server exits.
+        // Note: child.stdin was already moved into the transport during spawn,
+        // so we must close via the transport rather than dropping child.stdin.
+        self.transport.close().await;
 
         // Wait with timeout for graceful exit
         match tokio::time::timeout(SHUTDOWN_GRACE, self.child.wait()).await {

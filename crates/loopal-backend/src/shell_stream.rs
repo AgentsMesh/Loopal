@@ -3,9 +3,9 @@
 //! Feeds real-time output into an `OutputTail` ring buffer so the progress
 //! reporter can include actual command output in `ToolProgress` events.
 //!
-//! On timeout the child is **not** killed — instead an
-//! [`ExecOutcome::TimedOut`] is returned so the caller can register it as
-//! a background task.
+//! On timeout the child is preserved for background monitoring via
+//! [`ExecOutcome::TimedOut`]. If the handle is dropped without being
+//! registered, `kill_on_drop` ensures the child is cleaned up.
 
 use std::path::Path;
 use std::process::Stdio;
@@ -43,9 +43,9 @@ pub struct TimedOutProcessData {
 /// Like `exec_command`, but spawns the process and reads stdout/stderr line by
 /// line, pushing each line into the `tail` buffer for real-time observation.
 ///
-/// Returns [`ExecOutcome::TimedOut`] when the timeout is exceeded (the process
-/// is **not** killed).  The caller can downcast the [`ProcessHandle`] to
-/// [`TimedOutProcessData`] and register it as a background task.
+/// Returns [`ExecOutcome::TimedOut`] when the timeout is exceeded. The child
+/// is preserved for background monitoring; `kill_on_drop` ensures cleanup if
+/// the handle is dropped without being registered.
 pub async fn exec_command_streaming(
     cwd: &Path,
     policy: Option<&ResolvedPolicy>,
@@ -60,7 +60,8 @@ pub async fn exec_command_streaming(
     cmd.args(&args)
         .current_dir(cwd)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
     if let Some(env_map) = env {
         cmd.env_clear();
         for (k, v) in env_map {

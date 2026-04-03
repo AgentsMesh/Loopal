@@ -3,6 +3,8 @@
 //! Routes incoming IPC messages to the session's input channel and signals
 //! interrupts. Returns when agent completes or a new agent/start arrives.
 
+use std::time::Duration;
+
 use loopal_error::AgentOutput;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::jsonrpc;
@@ -32,6 +34,25 @@ pub(crate) async fn forward_loop(
         tokio::select! {
             msg = incoming_rx.recv() => {
                 let Some(msg) = msg else {
+                    // Connection closed (EOF). Signal agent to exit cleanly.
+                    session.interrupt.signal();
+                    session.interrupt_tx.send_modify(|v| *v = v.wrapping_add(1));
+                    // Brief wait; if agent didn't exit, re-signal to cover the
+                    // race where it consumed the first interrupt during turn
+                    // teardown before re-entering recv_input().
+                    if tokio::time::timeout(
+                        Duration::from_millis(100),
+                        &mut handle.agent_task,
+                    ).await.is_err() {
+                        session.interrupt.signal();
+                        session.interrupt_tx.send_modify(|v| *v = v.wrapping_add(1));
+                        if tokio::time::timeout(
+                            Duration::from_millis(900),
+                            &mut handle.agent_task,
+                        ).await.is_err() {
+                            handle.agent_task.abort();
+                        }
+                    }
                     return ForwardResult::Done(None);
                 };
                 match msg {

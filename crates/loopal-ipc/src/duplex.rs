@@ -14,21 +14,23 @@ use tokio::sync::Mutex;
 use crate::transport::Transport;
 
 /// Create a pair of connected in-memory transports.
+///
+/// Each side has its own independent `connected` flag so that closing
+/// one side does not prevent the other side from closing its writer.
 pub fn duplex_pair() -> (Arc<dyn Transport>, Arc<dyn Transport>) {
     // Two pipes: a→b direction and b→a direction
     let (a_write, b_read) = tokio::io::duplex(1024 * 1024);
     let (b_write, a_read) = tokio::io::duplex(1024 * 1024);
-    let connected = Arc::new(AtomicBool::new(true));
     (
         Arc::new(DuplexTransport {
             reader: Mutex::new(BufReader::new(a_read)),
             writer: Mutex::new(a_write),
-            connected: connected.clone(),
+            connected: AtomicBool::new(true),
         }),
         Arc::new(DuplexTransport {
             reader: Mutex::new(BufReader::new(b_read)),
             writer: Mutex::new(b_write),
-            connected,
+            connected: AtomicBool::new(true),
         }),
     )
 }
@@ -36,25 +38,24 @@ pub fn duplex_pair() -> (Arc<dyn Transport>, Arc<dyn Transport>) {
 struct DuplexTransport {
     reader: Mutex<BufReader<DuplexStream>>,
     writer: Mutex<DuplexStream>,
-    connected: Arc<AtomicBool>,
+    connected: AtomicBool,
 }
 
 #[async_trait]
 impl Transport for DuplexTransport {
     async fn send(&self, data: &[u8]) -> Result<(), LoopalError> {
         let mut writer = self.writer.lock().await;
-        writer
-            .write_all(data)
-            .await
-            .map_err(|e| LoopalError::Ipc(e.to_string()))?;
-        writer
-            .write_all(b"\n")
-            .await
-            .map_err(|e| LoopalError::Ipc(e.to_string()))?;
-        writer
-            .flush()
-            .await
-            .map_err(|e| LoopalError::Ipc(e.to_string()))
+        let result = async {
+            writer.write_all(data).await?;
+            writer.write_all(b"\n").await?;
+            writer.flush().await
+        }
+        .await;
+        if let Err(ref e) = result {
+            self.connected.store(false, Ordering::Release);
+            return Err(LoopalError::Ipc(format!("write failed: {e}")));
+        }
+        Ok(())
     }
 
     async fn recv(&self) -> Result<Option<Vec<u8>>, LoopalError> {
@@ -62,7 +63,7 @@ impl Transport for DuplexTransport {
         let mut line = String::new();
         match reader.read_line(&mut line).await {
             Ok(0) => {
-                self.connected.store(false, Ordering::Relaxed);
+                self.connected.store(false, Ordering::Release);
                 Ok(None)
             }
             Ok(_) => {
@@ -72,13 +73,24 @@ impl Transport for DuplexTransport {
                 Ok(Some(line.into_bytes()))
             }
             Err(e) => {
-                self.connected.store(false, Ordering::Relaxed);
+                self.connected.store(false, Ordering::Release);
                 Err(LoopalError::Ipc(e.to_string()))
             }
         }
     }
 
     fn is_connected(&self) -> bool {
-        self.connected.load(Ordering::Relaxed)
+        self.connected.load(Ordering::Acquire)
+    }
+
+    async fn close(&self) {
+        if !self.is_connected() {
+            return;
+        }
+        let mut w = self.writer.lock().await;
+        if let Err(e) = w.shutdown().await {
+            tracing::warn!("duplex transport close: {e}");
+        }
+        self.connected.store(false, Ordering::Release);
     }
 }

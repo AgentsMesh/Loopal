@@ -164,10 +164,10 @@ pub(crate) fn output_first_line(text: &str) -> Line<'static> {
 
 fn shorten_home(path: &str) -> String {
     for prefix in ["/Users/", "/home/"] {
-        if path.starts_with(prefix) {
-            if let Some(rest) = path.splitn(4, '/').nth(3) {
-                return format!("~/{rest}");
-            }
+        if path.starts_with(prefix)
+            && let Some(rest) = path.splitn(4, '/').nth(3)
+        {
+            return format!("~/{rest}");
         }
     }
     path.to_string()

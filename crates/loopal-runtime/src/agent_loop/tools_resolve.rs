@@ -124,10 +124,10 @@ impl AgentLoopRunner {
                 .request_permission(&id, &name, &input)
                 .await;
             if decision == PermissionDecision::Allow {
-                if let Some(ref c) = self.params.auto_classifier {
-                    if c.is_degraded() {
-                        c.on_human_approval(&name);
-                    }
+                if let Some(ref c) = self.params.auto_classifier
+                    && c.is_degraded()
+                {
+                    c.on_human_approval(&name);
                 }
                 approved.push((id, name, input));
             } else {

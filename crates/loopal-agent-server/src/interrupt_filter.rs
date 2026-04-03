@@ -27,12 +27,12 @@ pub fn spawn(
     let (tx, rx) = mpsc::channel(256);
     tokio::spawn(async move {
         while let Some(msg) = incoming_rx.recv().await {
-            if let Incoming::Notification { ref method, .. } = msg {
-                if method == methods::AGENT_INTERRUPT.name {
-                    interrupt.signal();
-                    interrupt_tx.send_modify(|v| *v = v.wrapping_add(1));
-                    continue;
-                }
+            if let Incoming::Notification { ref method, .. } = msg
+                && method == methods::AGENT_INTERRUPT.name
+            {
+                interrupt.signal();
+                interrupt_tx.send_modify(|v| *v = v.wrapping_add(1));
+                continue;
             }
             if tx.send(msg).await.is_err() {
                 break;

@@ -12,7 +12,7 @@ pub use actions::*;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use crate::app::{App, FocusMode};
+use crate::app::{App, FocusMode, PanelKind};
 use autocomplete::{handle_autocomplete_key, update_autocomplete};
 use editing::{handle_backspace, handle_ctrl_c, handle_enter};
 use navigation::{
@@ -45,12 +45,12 @@ fn handle_global_keys(app: &mut App, key: &KeyEvent) -> Option<InputAction> {
             KeyCode::Char('c') => return Some(handle_ctrl_c(app)),
             KeyCode::Char('d') => return Some(InputAction::Quit),
             KeyCode::Char('v') => return Some(InputAction::PasteRequested),
-            // Ctrl+P/N: mode-aware up/down (agent nav in AgentPanel, history in Input)
-            KeyCode::Char('p') if app.focus_mode == FocusMode::AgentPanel => {
-                return Some(InputAction::AgentPanelUp);
+            // Ctrl+P/N: mode-aware up/down (panel nav in Panel, history in Input)
+            KeyCode::Char('p') if matches!(app.focus_mode, FocusMode::Panel(_)) => {
+                return Some(InputAction::PanelUp);
             }
-            KeyCode::Char('n') if app.focus_mode == FocusMode::AgentPanel => {
-                return Some(InputAction::AgentPanelDown);
+            KeyCode::Char('n') if matches!(app.focus_mode, FocusMode::Panel(_)) => {
+                return Some(InputAction::PanelDown);
             }
             KeyCode::Char('p') => return Some(handle_up(app)),
             KeyCode::Char('n') => return Some(handle_down(app)),
@@ -72,19 +72,24 @@ fn handle_global_keys(app: &mut App, key: &KeyEvent) -> Option<InputAction> {
 /// Handle normal input keys — dispatch by current focus mode.
 fn handle_normal_key(app: &mut App, key: &KeyEvent) -> InputAction {
     match app.focus_mode {
-        FocusMode::AgentPanel => handle_agent_panel_key(app, key),
+        FocusMode::Panel(_) => handle_panel_key(app, key),
         FocusMode::Input => handle_input_mode_key(app, key),
     }
 }
 
-/// Keys in AgentPanel mode: Up/Down navigate, Enter drills in, Tab/Esc exits.
-fn handle_agent_panel_key(app: &mut App, key: &KeyEvent) -> InputAction {
+/// Keys in Panel mode: Up/Down navigate, Enter drills in (agents), Tab switches/cycles.
+fn handle_panel_key(app: &mut App, key: &KeyEvent) -> InputAction {
+    let kind = match app.focus_mode {
+        FocusMode::Panel(k) => k,
+        _ => return InputAction::None,
+    };
     match key.code {
-        KeyCode::Up => InputAction::AgentPanelUp,
-        KeyCode::Down => InputAction::AgentPanelDown,
-        KeyCode::Enter => InputAction::EnterAgentView,
-        KeyCode::Delete => InputAction::TerminateFocusedAgent,
-        KeyCode::Tab | KeyCode::Esc => InputAction::ExitAgentPanel,
+        KeyCode::Up => InputAction::PanelUp,
+        KeyCode::Down => InputAction::PanelDown,
+        KeyCode::Enter if kind == PanelKind::Agents => InputAction::EnterAgentView,
+        KeyCode::Delete if kind == PanelKind::Agents => InputAction::TerminateFocusedAgent,
+        KeyCode::Tab => InputAction::PanelTab,
+        KeyCode::Esc => InputAction::ExitPanel,
         KeyCode::Char(c) => {
             // Auto-switch to Input mode and insert the character
             app.focus_mode = FocusMode::Input;
@@ -142,7 +147,7 @@ fn handle_input_mode_key(app: &mut App, key: &KeyEvent) -> InputAction {
         }
         KeyCode::Up => handle_up_key(app),
         KeyCode::Down => handle_down_key(app),
-        KeyCode::Tab => InputAction::EnterAgentPanel,
+        KeyCode::Tab => InputAction::EnterPanel,
         KeyCode::Esc => handle_esc(app),
         KeyCode::PageUp => {
             app.scroll_offset = app.scroll_offset.saturating_add(10);

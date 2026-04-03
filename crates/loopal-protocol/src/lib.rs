@@ -1,5 +1,6 @@
 pub mod address;
 pub mod agent_state;
+pub mod bg_task;
 pub mod command;
 pub mod control;
 pub mod envelope;
@@ -12,6 +13,7 @@ pub mod user_content;
 
 pub use address::QualifiedAddress;
 pub use agent_state::{AgentStatus, ObservableAgentState};
+pub use bg_task::{BgTaskSnapshot, BgTaskStatus};
 pub use command::AgentMode;
 pub use control::ControlCommand;
 pub use envelope::{Envelope, MessageSource};

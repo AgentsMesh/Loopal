@@ -130,10 +130,10 @@ async fn full_bootstrap_hub_to_agent_roundtrip() {
 /// Find the loopal binary. Checks LOOPAL_BINARY env var first (set by Bazel),
 /// then falls back to Cargo target directory layout.
 fn resolve_loopal_binary() -> String {
-    if let Ok(path) = std::env::var("LOOPAL_BINARY") {
-        if std::path::Path::new(&path).exists() {
-            return path;
-        }
+    if let Ok(path) = std::env::var("LOOPAL_BINARY")
+        && std::path::Path::new(&path).exists()
+    {
+        return path;
     }
     let test_exe = std::env::current_exe().expect("current_exe");
     let target_dir = test_exe

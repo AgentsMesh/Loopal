@@ -60,10 +60,11 @@ impl futures::Stream for MockStreamChunks {
 
         // Return next chunk, then arm delay for the following one
         let item = self.chunks.pop_front();
-        if item.is_some() && !self.chunks.is_empty() {
-            if let Some(d) = self.delay {
-                self.pending_sleep = Some(Box::pin(tokio::time::sleep(d)));
-            }
+        if item.is_some()
+            && !self.chunks.is_empty()
+            && let Some(d) = self.delay
+        {
+            self.pending_sleep = Some(Box::pin(tokio::time::sleep(d)));
         }
         std::task::Poll::Ready(item)
     }

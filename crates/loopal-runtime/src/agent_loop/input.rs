@@ -62,15 +62,14 @@ impl AgentLoopRunner {
             env.source,
             MessageSource::Scheduled | MessageSource::System(_)
         );
-        if !ephemeral {
-            if let Err(e) = self
+        if !ephemeral
+            && let Err(e) = self
                 .params
                 .deps
                 .session_manager
                 .save_message(&self.params.session.id, &mut user_msg)
-            {
-                error!(error = %e, "failed to persist message");
-            }
+        {
+            error!(error = %e, "failed to persist message");
         }
         self.params.store.push_user(user_msg);
         WaitResult::MessageAdded

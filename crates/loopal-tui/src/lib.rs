@@ -5,6 +5,7 @@ pub mod input;
 mod key_dispatch;
 mod key_dispatch_ops;
 pub mod markdown;
+mod panel_ops;
 pub mod render;
 mod render_layout;
 pub mod terminal;
@@ -17,5 +18,5 @@ pub use tui_loop::{run_tui, run_tui_loop};
 /// Re-exports of dispatch functions for integration testing.
 #[doc(hidden)]
 pub mod dispatch_ops {
-    pub use crate::key_dispatch_ops::{cycle_agent_focus, enter_agent_panel};
+    pub use crate::key_dispatch_ops::{cycle_panel_focus, enter_panel, panel_tab};
 }

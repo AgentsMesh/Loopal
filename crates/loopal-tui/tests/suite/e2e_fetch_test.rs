@@ -88,7 +88,8 @@ async fn test_fetch_with_prompt() {
 
 #[tokio::test]
 async fn test_bash_timeout() {
-    // Bash with timeout=0 (0 seconds → 0ms) and a command that sleeps 60s
+    // Bash with timeout=0 (0 seconds → 0ms) and a command that sleeps 60s.
+    // The streaming path converts timeout to a background task (success, not error).
     let calls = vec![
         chunks::tool_turn(
             "tc-to",
@@ -100,14 +101,14 @@ async fn test_bash_timeout() {
     let mut harness = build_tui_harness(calls, 80, 24).await;
     let evts = harness.collect_until_idle().await;
 
-    // Timeout propagates as an error ToolResult
-    assertions::assert_has_tool_result(&evts, "Bash", true);
+    // Timeout now converts to background → success ToolResult (not error)
+    assertions::assert_has_tool_result(&evts, "Bash", false);
 
     let results: Vec<&str> = evts
         .iter()
         .filter_map(|e| match e {
             AgentEventPayload::ToolResult { name, result, .. }
-                if name == "Bash" && result.to_lowercase().contains("timeout") =>
+                if name == "Bash" && result.to_lowercase().contains("timed out") =>
             {
                 Some(result.as_str())
             }
@@ -116,6 +117,10 @@ async fn test_bash_timeout() {
         .collect();
     assert!(
         !results.is_empty(),
-        "bash timeout error should mention 'timeout'"
+        "bash timeout-to-background result should mention 'timed out'"
+    );
+    assert!(
+        results[0].contains("process_id"),
+        "should include background process_id"
     );
 }

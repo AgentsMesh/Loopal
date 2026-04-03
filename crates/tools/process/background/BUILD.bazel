@@ -6,12 +6,9 @@ rust_library(
     edition = "2024",
     visibility = ["//visibility:public"],
     deps = [
-        "//crates/loopal-error:loopal-error",
-        "//crates/loopal-tool-api:loopal-tool-api",
-        "@crates//:serde_json",
+        "//crates/loopal-protocol:loopal-protocol",
         "@crates//:tokio",
     ],
-    proc_macro_deps = ["@crates//:async-trait"],
 )
 
 rust_test(
@@ -22,6 +19,7 @@ rust_test(
     deps = [
         ":loopal-tool-background",
         "//crates/loopal-backend:loopal-backend",
+        "//crates/loopal-protocol:loopal-protocol",
         "//crates/tools/process/bash:loopal-tool-bash",
         "@crates//:tempfile",
         "@crates//:serde_json",

@@ -43,13 +43,14 @@ impl AcpAdapter {
         let requested_sid = params["sessionId"].as_str().unwrap_or("");
         let current_sid = self.session_id.lock().await.clone();
 
-        if let Some(ref sid) = current_sid {
-            if !requested_sid.is_empty() && requested_sid != sid.as_str() {
-                self.acp_out
-                    .respond_error(id, jsonrpc::INVALID_REQUEST, "session mismatch")
-                    .await;
-                return;
-            }
+        if let Some(ref sid) = current_sid
+            && !requested_sid.is_empty()
+            && requested_sid != sid.as_str()
+        {
+            self.acp_out
+                .respond_error(id, jsonrpc::INVALID_REQUEST, "session mismatch")
+                .await;
+            return;
         }
 
         self.client.shutdown_agent().await;

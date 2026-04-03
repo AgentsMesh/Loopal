@@ -46,17 +46,17 @@ impl ProviderRegistry {
     /// Resolve which provider handles a given model ID.
     pub fn resolve(&self, model: &str) -> Result<Arc<dyn Provider>, LoopalError> {
         // 1. Check static catalog for an exact match.
-        if let Some(info) = model_info::get_model_info(model) {
-            if let Some(p) = self.providers.get(&info.provider) {
-                return Ok(p.clone());
-            }
+        if let Some(info) = model_info::get_model_info(model)
+            && let Some(p) = self.providers.get(&info.provider)
+        {
+            return Ok(p.clone());
         }
         // 2. Check user-configured prefix map (longest prefix wins).
         for (prefix, provider_name) in &self.prefix_map {
-            if model.starts_with(prefix.as_str()) {
-                if let Some(p) = self.providers.get(provider_name) {
-                    return Ok(p.clone());
-                }
+            if model.starts_with(prefix.as_str())
+                && let Some(p) = self.providers.get(provider_name)
+            {
+                return Ok(p.clone());
             }
         }
         // 3. Hardcoded prefix heuristic.

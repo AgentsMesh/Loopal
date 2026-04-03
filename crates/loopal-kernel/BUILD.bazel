@@ -16,6 +16,7 @@ rust_library(
         "//crates/loopal-provider-api",
         "//crates/loopal-sandbox",
         "//crates/loopal-tool-api",
+        "//crates/tools/process/background:loopal-tool-background",
         "//crates/tools/registry:loopal-tools",
         "@crates//:thiserror",
         "@crates//:tokio",

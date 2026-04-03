@@ -43,12 +43,12 @@ pub fn load_sub_agent_histories(
         agent.conversation.agent_idle = true;
         agent.observable.status = loopal_protocol::AgentStatus::Finished;
         // Register as child of parent
-        if let Some(ref parent_name) = sub_ref.parent {
+        if let Some(ref parent_name) = sub_ref.parent
+            && let Some(parent_agent) = state.agents.get_mut(parent_name)
+        {
             let child_name = sub_ref.name.clone();
-            if let Some(parent_agent) = state.agents.get_mut(parent_name) {
-                if !parent_agent.children.contains(&child_name) {
-                    parent_agent.children.push(child_name);
-                }
+            if !parent_agent.children.contains(&child_name) {
+                parent_agent.children.push(child_name);
             }
         }
     }

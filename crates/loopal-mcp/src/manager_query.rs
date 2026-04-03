@@ -121,15 +121,15 @@ impl McpManager {
             return;
         }
         for tool in &conn.cached_tools {
-            if let Some(prev) = self.tool_map.insert(tool.name.clone(), name.to_string()) {
-                if prev != name {
-                    warn!(
-                        tool = %tool.name,
-                        new_server = %name,
-                        prev_server = %prev,
-                        "MCP tool name conflict"
-                    );
-                }
+            if let Some(prev) = self.tool_map.insert(tool.name.clone(), name.to_string())
+                && prev != name
+            {
+                warn!(
+                    tool = %tool.name,
+                    new_server = %name,
+                    prev_server = %prev,
+                    "MCP tool name conflict"
+                );
             }
         }
     }

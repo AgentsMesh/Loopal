@@ -244,10 +244,10 @@ async fn cascade_shutdown_interrupts_children() {
     tokio::spawn(async move {
         let mut rx = client_rx;
         while let Some(msg) = rx.recv().await {
-            if let Incoming::Notification { method, .. } = &msg {
-                if method == methods::AGENT_INTERRUPT.name {
-                    let _ = interrupt_tx.send(true).await;
-                }
+            if let Incoming::Notification { method, .. } = &msg
+                && method == methods::AGENT_INTERRUPT.name
+            {
+                let _ = interrupt_tx.send(true).await;
             }
             if let Incoming::Request { id, .. } = msg {
                 let _ = cc.respond(id, json!({"ok": true})).await;

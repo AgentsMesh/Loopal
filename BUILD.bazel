@@ -23,6 +23,7 @@ rust_binary(
         "//crates/loopal-meta-hub",
         "//crates/loopal-tui",
         "//crates/loopal-acp",
+        "//crates/tools/process/background:loopal-tool-background",
         "//crates/loopal-agent-server",
         "//crates/loopal-agent-client",
         "//crates/loopal-ipc",

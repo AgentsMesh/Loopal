@@ -2,13 +2,30 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use loopal_error::ToolIoError;
+use loopal_error::{ProcessHandle, ToolIoError};
 
 use crate::backend_types::{
     EditResult, ExecResult, FetchResult, FileInfo, GlobOptions, GlobSearchResult, GrepOptions,
     GrepSearchResult, LsResult, ReadResult, WriteResult,
 };
 use crate::output_tail::OutputTail;
+
+/// Outcome of a streaming command execution.
+///
+/// Unlike a plain `Result<ExecResult>`, this explicitly models the timeout
+/// path as a valid outcome rather than an error.
+pub enum ExecOutcome {
+    /// Command completed (successfully or not) within the timeout.
+    Completed(ExecResult),
+    /// Command exceeded its timeout; the process is still running.
+    /// The `handle` carries the child so the caller can register it as a
+    /// background task.
+    TimedOut {
+        timeout_ms: u64,
+        partial_output: String,
+        handle: ProcessHandle,
+    },
+}
 
 /// Capability-based I/O abstraction injected into tools via `ToolContext`.
 ///
@@ -87,18 +104,28 @@ pub trait Backend: Send + Sync {
     /// Execute a shell command with streaming output capture.
     ///
     /// Like `exec`, but feeds stdout/stderr lines into `tail` in real time.
+    /// Returns [`ExecOutcome::Completed`] on normal exit, or
+    /// [`ExecOutcome::TimedOut`] when the timeout is exceeded (the process
+    /// is **not** killed — it can be registered as a background task).
+    ///
     /// Default implementation ignores `tail` and delegates to `exec`.
     async fn exec_streaming(
         &self,
         command: &str,
         timeout_ms: u64,
         _tail: Arc<OutputTail>,
-    ) -> Result<ExecResult, ToolIoError> {
-        self.exec(command, timeout_ms).await
+    ) -> Result<ExecOutcome, ToolIoError> {
+        self.exec(command, timeout_ms)
+            .await
+            .map(ExecOutcome::Completed)
     }
 
-    /// Spawn a command in the background; returns a task ID.
-    async fn exec_background(&self, command: &str, desc: &str) -> Result<String, ToolIoError>;
+    /// Spawn a command in the background.
+    ///
+    /// Returns a [`ProcessHandle`](loopal_error::ProcessHandle) carrying the
+    /// child process.  The caller is responsible for registering it in the
+    /// background task store and monitoring it.
+    async fn exec_background(&self, command: &str) -> Result<ProcessHandle, ToolIoError>;
 
     // --- Network ---
 

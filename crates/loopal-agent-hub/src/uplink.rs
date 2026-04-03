@@ -132,15 +132,14 @@ pub async fn handle_reverse_requests(
                         serde_json::from_value::<loopal_protocol::Envelope>(params)
                     {
                         // If this is a remote agent completion, trigger shadow entry
-                        if let loopal_protocol::MessageSource::System(ref tag) = env.source {
-                            if tag == "agent-completed" {
-                                if let Some(child) = extract_agent_result_name(&env) {
-                                    let output = env.content.text.clone();
-                                    let mut h = hub.lock().await;
-                                    h.registry.emit_agent_finished(&child, Some(output));
-                                    h.registry.unregister_connection(&child);
-                                }
-                            }
+                        if let loopal_protocol::MessageSource::System(ref tag) = env.source
+                            && tag == "agent-completed"
+                            && let Some(child) = extract_agent_result_name(&env)
+                        {
+                            let output = env.content.text.clone();
+                            let mut h = hub.lock().await;
+                            h.registry.emit_agent_finished(&child, Some(output));
+                            h.registry.unregister_connection(&child);
                         }
                         hub.lock().await.registry.route_message(&env).await.is_ok()
                     } else {
@@ -168,10 +167,10 @@ pub async fn handle_reverse_requests(
                 }
             }
             Incoming::Notification { method, params } => {
-                if method == methods::AGENT_MESSAGE.name {
-                    if let Ok(env) = serde_json::from_value::<loopal_protocol::Envelope>(params) {
-                        let _ = hub.lock().await.registry.route_message(&env).await;
-                    }
+                if method == methods::AGENT_MESSAGE.name
+                    && let Ok(env) = serde_json::from_value::<loopal_protocol::Envelope>(params)
+                {
+                    let _ = hub.lock().await.registry.route_message(&env).await;
                 }
             }
         }

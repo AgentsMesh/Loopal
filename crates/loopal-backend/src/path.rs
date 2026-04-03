@@ -23,20 +23,26 @@ pub fn resolve(
         return check_with_policy(pol, &path, is_write);
     }
 
-    // No sandbox policy — reject relative `..` traversal escaping cwd
-    if !Path::new(raw).is_absolute() {
-        let canonical = resolve_canonical(&path)?;
-        if !canonical.starts_with(cwd) {
-            return Err(ToolIoError::PathDenied(format!(
-                "path escapes working directory: {}",
-                canonical.display()
-            )));
-        }
-        return Ok(canonical);
+    // No sandbox policy — guard against directory escape
+    let canonical = resolve_canonical(&path)?;
+
+    // Relative paths: must remain under cwd
+    if !Path::new(raw).is_absolute() && !canonical.starts_with(cwd) {
+        return Err(ToolIoError::PathDenied(format!(
+            "path escapes working directory: {}",
+            canonical.display()
+        )));
     }
 
-    // Absolute paths: resolve canonical without write restrictions
-    resolve_canonical(&path)
+    // Writes to absolute paths: must remain under cwd (defence-in-depth)
+    if is_write && !canonical.starts_with(cwd) {
+        return Err(ToolIoError::PathDenied(format!(
+            "write outside working directory: {}",
+            canonical.display()
+        )));
+    }
+
+    Ok(canonical)
 }
 
 /// Convert a raw path to absolute (join with cwd if relative).

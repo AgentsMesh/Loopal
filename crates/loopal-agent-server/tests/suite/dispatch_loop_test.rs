@@ -88,13 +88,13 @@ async fn drain_until_idle(rx: &mut tokio::sync::mpsc::Receiver<Incoming>) {
     while tokio::time::Instant::now() < deadline {
         match tokio::time::timeout(Duration::from_secs(3), rx.recv()).await {
             Ok(Some(Incoming::Notification { method, params })) => {
-                if method == methods::AGENT_EVENT.name {
-                    if let Ok(ev) = serde_json::from_value::<loopal_protocol::AgentEvent>(params) {
-                        match ev.payload {
-                            loopal_protocol::AgentEventPayload::Finished
-                            | loopal_protocol::AgentEventPayload::AwaitingInput => return,
-                            _ => {}
-                        }
+                if method == methods::AGENT_EVENT.name
+                    && let Ok(ev) = serde_json::from_value::<loopal_protocol::AgentEvent>(params)
+                {
+                    match ev.payload {
+                        loopal_protocol::AgentEventPayload::Finished
+                        | loopal_protocol::AgentEventPayload::AwaitingInput => return,
+                        _ => {}
                     }
                 }
             }

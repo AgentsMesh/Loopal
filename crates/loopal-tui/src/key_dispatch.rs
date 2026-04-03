@@ -7,8 +7,8 @@ use crate::event::EventHandler;
 use crate::input::paste;
 use crate::input::{InputAction, handle_key};
 use crate::key_dispatch_ops::{
-    cycle_agent_focus, enter_agent_panel, handle_effect, handle_sub_page_confirm, push_to_inbox,
-    terminate_focused_agent,
+    cycle_panel_focus, enter_panel, handle_effect, handle_sub_page_confirm, panel_tab,
+    push_to_inbox, terminate_focused_agent,
 };
 use crate::views::progress::LineCache;
 
@@ -81,20 +81,24 @@ pub(crate) async fn handle_key_action(
             handle_sub_page_confirm(app, result).await;
             false
         }
-        InputAction::EnterAgentPanel => {
-            enter_agent_panel(app);
+        InputAction::EnterPanel => {
+            enter_panel(app);
             false
         }
-        InputAction::ExitAgentPanel => {
+        InputAction::ExitPanel => {
             app.focus_mode = crate::app::FocusMode::Input;
             false
         }
-        InputAction::AgentPanelUp => {
-            cycle_agent_focus(app, false);
+        InputAction::PanelTab => {
+            panel_tab(app);
             false
         }
-        InputAction::AgentPanelDown => {
-            cycle_agent_focus(app, true);
+        InputAction::PanelUp => {
+            cycle_panel_focus(app, false);
+            false
+        }
+        InputAction::PanelDown => {
+            cycle_panel_focus(app, true);
             false
         }
         InputAction::TerminateFocusedAgent => {
@@ -102,13 +106,13 @@ pub(crate) async fn handle_key_action(
             false
         }
         InputAction::EnterAgentView => {
-            if let Some(name) = app.focused_agent.clone() {
-                if app.session.enter_agent_view(&name) {
-                    app.focus_mode = crate::app::FocusMode::Input;
-                    app.scroll_offset = 0;
-                    app.line_cache = LineCache::new();
-                    app.last_esc_time = None; // prevent stale double-ESC rewind
-                }
+            if let Some(name) = app.focused_agent.clone()
+                && app.session.enter_agent_view(&name)
+            {
+                app.focus_mode = crate::app::FocusMode::Input;
+                app.scroll_offset = 0;
+                app.line_cache = LineCache::new();
+                app.last_esc_time = None;
             }
             false
         }
@@ -116,7 +120,7 @@ pub(crate) async fn handle_key_action(
             app.session.exit_agent_view();
             app.scroll_offset = 0;
             app.line_cache = LineCache::new();
-            app.last_esc_time = None; // prevent stale double-ESC rewind
+            app.last_esc_time = None;
             false
         }
         InputAction::QuestionUp => {

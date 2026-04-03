@@ -186,13 +186,13 @@ impl PendingGuard {
 
 impl Drop for PendingGuard {
     fn drop(&mut self) {
-        if let Some(ref pending) = self.pending {
-            if let Ok(mut map) = pending.try_lock() {
-                map.remove(&self.id);
-            }
-            // If lock is held, the entry leaks. This is acceptable:
-            // it only happens during concurrent cancellation, and the
-            // reader loop's EOF cleanup (map.clear()) will reclaim it.
+        if let Some(ref pending) = self.pending
+            && let Ok(mut map) = pending.try_lock()
+        {
+            map.remove(&self.id);
         }
+        // If lock is held, the entry leaks. This is acceptable:
+        // it only happens during concurrent cancellation, and the
+        // reader loop's EOF cleanup (map.clear()) will reclaim it.
     }
 }

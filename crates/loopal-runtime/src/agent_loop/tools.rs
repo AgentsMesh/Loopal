@@ -79,10 +79,9 @@ impl AgentLoopRunner {
                 if let ContentBlock::ToolResult {
                     content, is_error, ..
                 } = block
+                    && !*is_error
                 {
-                    if !*is_error {
-                        *content = wrap_plan_reminder(content, &plan_path);
-                    }
+                    *content = wrap_plan_reminder(content, &plan_path);
                 }
             }
         }

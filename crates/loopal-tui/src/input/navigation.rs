@@ -79,9 +79,9 @@ pub(super) fn handle_down(app: &mut App) -> InputAction {
 }
 
 pub(super) fn handle_esc(app: &mut App) -> InputAction {
-    // AgentPanel mode: exit back to Input (don't trigger view exit or rewind)
-    if app.focus_mode == FocusMode::AgentPanel {
-        return InputAction::ExitAgentPanel;
+    // Panel mode: exit back to Input (don't trigger view exit or rewind)
+    if matches!(app.focus_mode, FocusMode::Panel(_)) {
+        return InputAction::ExitPanel;
     }
     // Priority 1: exit agent view
     let active_view = app.session.lock().active_view.clone();

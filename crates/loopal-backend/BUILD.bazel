@@ -11,7 +11,6 @@ rust_library(
         "//crates/loopal-sandbox",
         "//crates/loopal-tool-api",
         "//crates/tools/filesystem/edit-core:loopal-edit-core",
-        "//crates/tools/process/background:loopal-tool-background",
         "@crates//:futures",
         "@crates//:globset",
         "@crates//:ignore",

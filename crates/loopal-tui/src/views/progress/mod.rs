@@ -2,6 +2,7 @@
 mod line_cache;
 mod message_lines;
 mod skill_display;
+mod thinking_render;
 mod tool_display;
 mod welcome;
 
@@ -38,14 +39,9 @@ pub fn render_progress(
     // Streaming lines (pre-wrapped at current width)
     let streaming = streaming_to_lines(&conv.streaming_text, area.width);
 
-    // Thinking indicator (shown during active thinking)
+    // Thinking indicator (shown during active thinking with full content)
     let thinking_lines = if conv.thinking_active {
-        let token_est = conv.streaming_thinking.len() as u32 / 4;
-        let label = format!("Thinking... ({token_est} tokens)");
-        vec![Line::from(Span::styled(
-            label,
-            Style::default().fg(Color::Rgb(180, 130, 210)),
-        ))]
+        thinking_render::streaming_thinking_lines(&conv.streaming_thinking, area.width)
     } else {
         vec![]
     };

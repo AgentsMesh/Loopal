@@ -28,40 +28,47 @@ fn all_text(lines: &[ratatui::prelude::Line<'_>]) -> String {
 // --- Thinking role ---
 
 #[test]
-fn test_thinking_collapsed_to_single_line() {
-    let content = "x".repeat(8000); // ~2k tokens
+fn test_thinking_shows_full_content() {
+    // Format: "{token_count}\n{full_text}"
+    let content = format!("2000\n{}", "x".repeat(200));
     let m = msg("thinking", &content);
     let lines = message_to_lines(&m, 80);
-    // 1 indicator line + 1 empty separator = 2
-    assert_eq!(lines.len(), 2, "thinking should collapse to single line");
+    // Header + blank + body lines + trailing separator
+    assert!(
+        lines.len() > 3,
+        "thinking should show full content, got {}",
+        lines.len()
+    );
     let text = all_text(&lines);
     assert!(text.contains("Thinking"), "should contain Thinking label");
-    assert!(text.contains("k tokens"), "should show token estimate");
+    assert!(text.contains("2.0k tokens"), "should show token count");
+    // Body text present (indented x's)
+    assert!(text.contains("xxxx"), "should contain thinking body text");
 }
 
 #[test]
-fn test_thinking_empty_shows_ellipsis() {
+fn test_thinking_empty_shows_header_only() {
     let m = msg("thinking", "");
     let lines = message_to_lines(&m, 80);
     let text = all_text(&lines);
-    assert!(
-        text.contains("Thinking..."),
-        "empty thinking shows ellipsis"
-    );
+    assert!(text.contains("Thinking"), "empty thinking shows header");
 }
 
 #[test]
-fn test_thinking_small_shows_raw_token_count() {
-    // 400 bytes / 4 = 100 tokens — should show "100 tokens", not "0k tokens"
-    let content = "x".repeat(400);
-    let m = msg("thinking", &content);
+fn test_thinking_small_token_count() {
+    // 500 tokens, some text
+    let content = "500\nShort thinking content";
+    let m = msg("thinking", content);
     let lines = message_to_lines(&m, 80);
     let text = all_text(&lines);
     assert!(
-        text.contains("100 tokens"),
+        text.contains("500 tokens"),
         "small thinking should show raw count: {text}"
     );
-    assert!(!text.contains("0k"), "should NOT show 0k: {text}");
+    assert!(
+        text.contains("Short thinking content"),
+        "body should be shown"
+    );
 }
 
 // --- Error and system roles ---

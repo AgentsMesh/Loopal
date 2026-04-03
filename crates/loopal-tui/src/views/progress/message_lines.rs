@@ -3,7 +3,7 @@
 /// Instruction model: user messages show in a tinted background block
 /// with a left accent bar for dark-mode readability. Assistant output
 /// flows directly without labels, tool calls are single-line work traces,
-/// thinking is a collapsed indicator.
+/// thinking shows full content in dimmed gray-purple.
 use ratatui::prelude::*;
 use unicode_width::UnicodeWidthStr;
 
@@ -11,6 +11,7 @@ use crate::markdown;
 use loopal_session::types::SessionMessage;
 
 use super::skill_display::render_skill_invoke;
+use super::thinking_render;
 use super::tool_display::render_tool_calls;
 use super::welcome::render_welcome;
 
@@ -21,7 +22,7 @@ pub fn message_to_lines(msg: &SessionMessage, width: u16) -> Vec<Line<'static>> 
     match msg.role.as_str() {
         "user" => render_user(&mut lines, msg, width),
         "assistant" => render_assistant(&mut lines, msg, width),
-        "thinking" => render_thinking(&mut lines, msg),
+        "thinking" => thinking_render::render_thinking(&mut lines, &msg.content, width),
         "welcome" => render_welcome(&mut lines, msg),
         "error" => render_prefixed(&mut lines, msg, "Error: ", Color::Red, width),
         "system" => render_prefixed(&mut lines, msg, "System: ", Color::Yellow, width),
@@ -92,22 +93,6 @@ fn render_assistant(lines: &mut Vec<Line<'static>>, msg: &SessionMessage, width:
     if !msg.content.is_empty() {
         lines.extend(markdown::render_markdown(&msg.content, width));
     }
-}
-
-/// Thinking: collapsed to single-line indicator with token estimate.
-fn render_thinking(lines: &mut Vec<Line<'static>>, msg: &SessionMessage) {
-    let token_est = msg.content.len() / 4;
-    let label = if token_est >= 1000 {
-        format!("Thinking ({}k tokens)", token_est / 1000)
-    } else if token_est > 0 {
-        format!("Thinking ({token_est} tokens)")
-    } else {
-        "Thinking...".to_string()
-    };
-    lines.push(Line::from(Span::styled(
-        label,
-        Style::default().fg(Color::Rgb(180, 130, 210)),
-    )));
 }
 
 /// Generic prefixed message (error, system, unknown roles).

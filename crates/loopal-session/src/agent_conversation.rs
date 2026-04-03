@@ -6,7 +6,7 @@
 
 use std::time::{Duration, Instant};
 
-use crate::thinking_display::format_thinking_summary;
+use crate::thinking_display::format_thinking_content;
 use crate::types::{PendingPermission, PendingQuestion, SessionMessage};
 
 /// Per-agent conversation state — everything needed to render one agent's chat view.
@@ -72,10 +72,10 @@ impl AgentConversation {
         if !self.streaming_thinking.is_empty() {
             let thinking = std::mem::take(&mut self.streaming_thinking);
             let token_est = thinking.len() as u32 / 4;
-            let summary = format_thinking_summary(&thinking, token_est);
+            let content = format_thinking_content(&thinking, token_est);
             self.messages.push(SessionMessage {
                 role: "thinking".to_string(),
-                content: summary,
+                content,
                 tool_calls: Vec::new(),
                 image_count: 0,
                 skill_info: None,

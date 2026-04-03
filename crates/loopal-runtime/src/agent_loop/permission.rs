@@ -30,21 +30,21 @@ impl AgentLoopRunner {
         }
 
         // Auto mode with classifier: defer to auto_classify.
-        if self.params.config.permission_mode == PermissionMode::Auto {
-            if let Some(ref classifier) = self.params.auto_classifier {
-                let context =
-                    loopal_auto_mode::prompt::build_recent_context(self.params.store.messages());
-                let model = self
-                    .params
-                    .config
-                    .router
-                    .resolve(loopal_provider_api::TaskType::Classification);
-                let provider = self.params.deps.kernel.resolve_provider(model)?;
-                let result = classifier
-                    .classify(name, input, &context, provider.as_ref(), model)
-                    .await;
-                return Ok(result.decision);
-            }
+        if self.params.config.permission_mode == PermissionMode::Auto
+            && let Some(ref classifier) = self.params.auto_classifier
+        {
+            let context =
+                loopal_auto_mode::prompt::build_recent_context(self.params.store.messages());
+            let model = self
+                .params
+                .config
+                .router
+                .resolve(loopal_provider_api::TaskType::Classification);
+            let provider = self.params.deps.kernel.resolve_provider(model)?;
+            let result = classifier
+                .classify(name, input, &context, provider.as_ref(), model)
+                .await;
+            return Ok(result.decision);
         }
 
         // Fall through to human approval.

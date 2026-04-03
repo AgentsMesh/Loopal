@@ -52,11 +52,11 @@ pub fn collect_context_groups(
 
     let mut merged: Vec<(usize, usize)> = Vec::new();
     for r in ranges {
-        if let Some(prev) = merged.last_mut() {
-            if r.0 <= prev.1 + 1 {
-                prev.1 = prev.1.max(r.1);
-                continue;
-            }
+        if let Some(prev) = merged.last_mut()
+            && r.0 <= prev.1 + 1
+        {
+            prev.1 = prev.1.max(r.1);
+            continue;
         }
         merged.push(r);
     }

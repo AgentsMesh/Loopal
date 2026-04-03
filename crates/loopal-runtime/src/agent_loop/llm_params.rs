@@ -28,10 +28,10 @@ impl AgentLoopRunner {
             tool_defs.retain(|t| filter.contains(&t.name));
         }
         // In plan mode, further restrict to plan-allowed tools.
-        if self.params.config.mode == AgentMode::Plan {
-            if let Some(plan_filter) = self.plan_tool_filter() {
-                tool_defs.retain(|t| plan_filter.contains(&t.name));
-            }
+        if self.params.config.mode == AgentMode::Plan
+            && let Some(plan_filter) = self.plan_tool_filter()
+        {
+            tool_defs.retain(|t| plan_filter.contains(&t.name));
         }
 
         let capability = get_thinking_capability(self.params.config.model());

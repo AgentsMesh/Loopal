@@ -47,12 +47,12 @@ pub(crate) fn register_spawned_agent(
     if let Some(m) = model {
         agent.observable.model = m.to_string();
     }
-    if let Some(p) = parent {
+    if let Some(p) = parent
+        && let Some(parent_agent) = state.agents.get_mut(p)
+    {
         let child_name = name.to_string();
-        if let Some(parent_agent) = state.agents.get_mut(p) {
-            if !parent_agent.children.contains(&child_name) {
-                parent_agent.children.push(child_name);
-            }
+        if !parent_agent.children.contains(&child_name) {
+            parent_agent.children.push(child_name);
         }
     }
 }

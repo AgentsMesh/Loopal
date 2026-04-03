@@ -162,17 +162,17 @@ fn extract_touched_files(messages: &[Message]) -> Vec<String> {
     let mut files = Vec::new();
     for msg in messages {
         for block in &msg.content {
-            if let ContentBlock::ToolUse { name, input, .. } = block {
-                if matches!(name.as_str(), "Read" | "Write" | "Edit" | "MultiEdit") {
-                    let path = input
-                        .get("file_path")
-                        .or_else(|| input.get("path"))
-                        .and_then(|v| v.as_str());
-                    if let Some(p) = path {
-                        if seen.insert(p.to_string()) {
-                            files.push(p.to_string());
-                        }
-                    }
+            if let ContentBlock::ToolUse { name, input, .. } = block
+                && matches!(name.as_str(), "Read" | "Write" | "Edit" | "MultiEdit")
+            {
+                let path = input
+                    .get("file_path")
+                    .or_else(|| input.get("path"))
+                    .and_then(|v| v.as_str());
+                if let Some(p) = path
+                    && seen.insert(p.to_string())
+                {
+                    files.push(p.to_string());
                 }
             }
         }

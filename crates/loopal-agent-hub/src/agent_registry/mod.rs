@@ -66,10 +66,10 @@ impl AgentRegistry {
         if self.agents.contains_key(name) {
             return Err(format!("agent '{name}' already registered"));
         }
-        if let Some(p) = parent {
-            if let Some(pa) = self.agents.get_mut(p) {
-                pa.info.children.push(name.to_string());
-            }
+        if let Some(p) = parent
+            && let Some(pa) = self.agents.get_mut(p)
+        {
+            pa.info.children.push(name.to_string());
         }
         self.agents.insert(
             name.to_string(),
@@ -84,10 +84,10 @@ impl AgentRegistry {
 
     pub fn unregister_connection(&mut self, name: &str) {
         let parent = self.agents.get(name).and_then(|a| a.info.parent.clone());
-        if let Some(ref p) = parent {
-            if let Some(pa) = self.agents.get_mut(p.as_str()) {
-                pa.info.children.retain(|c| c != name);
-            }
+        if let Some(ref p) = parent
+            && let Some(pa) = self.agents.get_mut(p.as_str())
+        {
+            pa.info.children.retain(|c| c != name);
         }
         self.agents.remove(name);
         self.completions.remove(name);

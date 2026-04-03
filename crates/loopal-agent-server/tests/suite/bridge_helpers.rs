@@ -95,16 +95,16 @@ pub async fn collect_agent_events(
     while tokio::time::Instant::now() < deadline {
         match tokio::time::timeout(Duration::from_secs(3), rx.recv()).await {
             Ok(Some(Incoming::Notification { method, params })) => {
-                if method == methods::AGENT_EVENT.name {
-                    if let Ok(ev) = serde_json::from_value::<AgentEvent>(params) {
-                        let terminal = matches!(
-                            ev.payload,
-                            AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
-                        );
-                        events.push(ev.payload);
-                        if terminal {
-                            break;
-                        }
+                if method == methods::AGENT_EVENT.name
+                    && let Ok(ev) = serde_json::from_value::<AgentEvent>(params)
+                {
+                    let terminal = matches!(
+                        ev.payload,
+                        AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
+                    );
+                    events.push(ev.payload);
+                    if terminal {
+                        break;
                     }
                 }
             }

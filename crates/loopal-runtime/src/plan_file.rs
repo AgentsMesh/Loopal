@@ -144,10 +144,10 @@ pub fn build_plan_mode_filter(kernel: &loopal_kernel::Kernel) -> HashSet<String>
     use loopal_tool_api::PermissionLevel;
     let mut allowed = HashSet::new();
     for def in kernel.tool_definitions() {
-        if let Some(tool) = kernel.get_tool(&def.name) {
-            if tool.permission() == PermissionLevel::ReadOnly {
-                allowed.insert(def.name);
-            }
+        if let Some(tool) = kernel.get_tool(&def.name)
+            && tool.permission() == PermissionLevel::ReadOnly
+        {
+            allowed.insert(def.name);
         }
     }
     // Write/Edit allowed but path-restricted to plan file (checked in tools_check).

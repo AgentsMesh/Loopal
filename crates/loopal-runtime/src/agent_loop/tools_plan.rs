@@ -62,25 +62,25 @@ impl AgentLoopRunner {
         .await?;
 
         // Ensure plans directory exists — rollback on failure to avoid dead state.
-        if let Some(dir) = self.plan_file.path().parent() {
-            if let Err(e) = std::fs::create_dir_all(dir) {
-                warn!(error = %e, "failed to create plans directory, rolling back");
-                // Rollback: restore pre-plan state so agent isn't stuck in Plan mode.
-                if let Some(s) = self.params.config.plan_state.take() {
-                    self.params.config.mode = s.previous_mode;
-                    self.params.config.permission_mode = s.previous_permission_mode;
-                }
-                let _ = self
-                    .emit(AgentEventPayload::ModeChanged { mode: "act".into() })
-                    .await;
-                return Ok((
-                    idx,
-                    error_block(
-                        id,
-                        &format!("Cannot create plans directory: {e}. Plan mode was not entered."),
-                    ),
-                ));
+        if let Some(dir) = self.plan_file.path().parent()
+            && let Err(e) = std::fs::create_dir_all(dir)
+        {
+            warn!(error = %e, "failed to create plans directory, rolling back");
+            // Rollback: restore pre-plan state so agent isn't stuck in Plan mode.
+            if let Some(s) = self.params.config.plan_state.take() {
+                self.params.config.mode = s.previous_mode;
+                self.params.config.permission_mode = s.previous_permission_mode;
             }
+            let _ = self
+                .emit(AgentEventPayload::ModeChanged { mode: "act".into() })
+                .await;
+            return Ok((
+                idx,
+                error_block(
+                    id,
+                    &format!("Cannot create plans directory: {e}. Plan mode was not entered."),
+                ),
+            ));
         }
 
         let plan_path = self.plan_file.path().display();

@@ -129,10 +129,10 @@ impl AgentProcess {
             return Ok(explicit);
         }
         // Otherwise, use the current executable (same binary, worker mode).
-        if let Ok(current) = std::env::current_exe() {
-            if current.exists() {
-                return Ok(current);
-            }
+        if let Ok(current) = std::env::current_exe()
+            && current.exists()
+        {
+            return Ok(current);
         }
         Ok(explicit)
     }

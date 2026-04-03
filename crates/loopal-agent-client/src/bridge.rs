@@ -55,14 +55,13 @@ pub fn start_bridge(
     let conn_ctrl = connection.clone();
     tokio::spawn(async move {
         while let Some(cmd) = control_rx.recv().await {
-            if let Ok(params) = serde_json::to_value(&cmd) {
-                if let Err(e) = conn_ctrl
+            if let Ok(params) = serde_json::to_value(&cmd)
+                && let Err(e) = conn_ctrl
                     .send_request(methods::AGENT_CONTROL.name, params)
                     .await
-                {
-                    warn!("bridge: control send failed: {e}");
-                    break;
-                }
+            {
+                warn!("bridge: control send failed: {e}");
+                break;
             }
         }
     });
@@ -72,14 +71,13 @@ pub fn start_bridge(
     tokio::spawn(async move {
         while let Some(envelope) = mailbox_rx.recv().await {
             debug!(target_agent = %envelope.target, "bridge: forwarding message");
-            if let Ok(params) = serde_json::to_value(&envelope) {
-                if let Err(e) = conn_msg
+            if let Ok(params) = serde_json::to_value(&envelope)
+                && let Err(e) = conn_msg
                     .send_request(methods::AGENT_MESSAGE.name, params)
                     .await
-                {
-                    warn!("bridge: message send failed: {e}");
-                    break;
-                }
+            {
+                warn!("bridge: message send failed: {e}");
+                break;
             }
         }
     });

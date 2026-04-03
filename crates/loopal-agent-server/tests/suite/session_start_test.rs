@@ -84,18 +84,19 @@ async fn model_override_applied_in_session_start() {
     while tokio::time::Instant::now() < deadline {
         match tokio::time::timeout(Duration::from_secs(3), rx.recv()).await {
             Ok(Some(Incoming::Notification { method, params })) => {
-                if method == methods::AGENT_EVENT.name {
-                    if let Ok(ev) = serde_json::from_value::<loopal_protocol::AgentEvent>(params) {
-                        match &ev.payload {
-                            loopal_protocol::AgentEventPayload::Stream { .. } => {
-                                got_stream = true;
-                            }
-                            loopal_protocol::AgentEventPayload::Finished => break,
-                            loopal_protocol::AgentEventPayload::Error { message } => {
-                                panic!("agent error (model override not applied?): {message}");
-                            }
-                            _ => {}
+                if method == methods::AGENT_EVENT.name
+                    && let Ok(ev) =
+                        serde_json::from_value::<loopal_protocol::AgentEvent>(params)
+                {
+                    match &ev.payload {
+                        loopal_protocol::AgentEventPayload::Stream { .. } => {
+                            got_stream = true;
                         }
+                        loopal_protocol::AgentEventPayload::Finished => break,
+                        loopal_protocol::AgentEventPayload::Error { message } => {
+                            panic!("agent error (model override not applied?): {message}");
+                        }
+                        _ => {}
                     }
                 }
             }

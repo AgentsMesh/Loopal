@@ -142,11 +142,11 @@ pub async fn handle_spawn_agent(
         };
         // On success, register a shadow entry so wait_agent can work locally.
         // The completion will arrive via MetaHub → uplink → agent/message.
-        if let Ok(ref resp) = result {
-            if let Some(name) = resp["name"].as_str() {
-                let mut h = hub.lock().await;
-                h.registry.register_shadow(name, from_agent);
-            }
+        if let Ok(ref resp) = result
+            && let Some(name) = resp["name"].as_str()
+        {
+            let mut h = hub.lock().await;
+            h.registry.register_shadow(name, from_agent);
         }
         return result;
     }

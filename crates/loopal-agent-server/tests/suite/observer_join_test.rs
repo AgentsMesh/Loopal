@@ -35,15 +35,14 @@ async fn drain_until_terminal(rx: &mut tokio::sync::mpsc::Receiver<Incoming>) {
     while tokio::time::Instant::now() < deadline {
         match tokio::time::timeout(Duration::from_secs(3), rx.recv()).await {
             Ok(Some(Incoming::Notification { method, params })) => {
-                if method == methods::AGENT_EVENT.name {
-                    if let Ok(ev) = serde_json::from_value::<AgentEvent>(params) {
-                        if matches!(
-                            ev.payload,
-                            AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
-                        ) {
-                            return;
-                        }
-                    }
+                if method == methods::AGENT_EVENT.name
+                    && let Ok(ev) = serde_json::from_value::<AgentEvent>(params)
+                    && matches!(
+                        ev.payload,
+                        AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
+                    )
+                {
+                    return;
                 }
             }
             _ => return,
@@ -58,16 +57,16 @@ async fn collect_events(rx: &mut tokio::sync::mpsc::Receiver<Incoming>) -> Vec<A
     while tokio::time::Instant::now() < deadline {
         match tokio::time::timeout(Duration::from_secs(3), rx.recv()).await {
             Ok(Some(Incoming::Notification { method, params })) => {
-                if method == methods::AGENT_EVENT.name {
-                    if let Ok(ev) = serde_json::from_value::<AgentEvent>(params) {
-                        let terminal = matches!(
-                            ev.payload,
-                            AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
-                        );
-                        events.push(ev.payload);
-                        if terminal {
-                            break;
-                        }
+                if method == methods::AGENT_EVENT.name
+                    && let Ok(ev) = serde_json::from_value::<AgentEvent>(params)
+                {
+                    let terminal = matches!(
+                        ev.payload,
+                        AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
+                    );
+                    events.push(ev.payload);
+                    if terminal {
+                        break;
                     }
                 }
             }

@@ -72,31 +72,31 @@ async fn wait_for_meta_register(
     expected_token: &str,
 ) -> anyhow::Result<(String, Vec<String>)> {
     while let Some(msg) = rx.recv().await {
-        if let Incoming::Request { id, method, params } = msg {
-            if method == methods::META_REGISTER.name {
-                let client_token = params["token"].as_str().unwrap_or("");
-                if client_token != expected_token {
-                    let _ = conn
-                        .respond_error(id, INVALID_REQUEST, "invalid token")
-                        .await;
-                    anyhow::bail!("invalid token");
-                }
-                let name = params["name"]
-                    .as_str()
-                    .ok_or_else(|| anyhow::anyhow!("missing 'name' field"))?
-                    .to_string();
-                let capabilities: Vec<String> = params["capabilities"]
-                    .as_array()
-                    .map(|arr| {
-                        arr.iter()
-                            .filter_map(|v| v.as_str().map(String::from))
-                            .collect()
-                    })
-                    .unwrap_or_default();
-
-                let _ = conn.respond(id, serde_json::json!({"ok": true})).await;
-                return Ok((name, capabilities));
+        if let Incoming::Request { id, method, params } = msg
+            && method == methods::META_REGISTER.name
+        {
+            let client_token = params["token"].as_str().unwrap_or("");
+            if client_token != expected_token {
+                let _ = conn
+                    .respond_error(id, INVALID_REQUEST, "invalid token")
+                    .await;
+                anyhow::bail!("invalid token");
             }
+            let name = params["name"]
+                .as_str()
+                .ok_or_else(|| anyhow::anyhow!("missing 'name' field"))?
+                .to_string();
+            let capabilities: Vec<String> = params["capabilities"]
+                .as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            let _ = conn.respond(id, serde_json::json!({"ok": true})).await;
+            return Ok((name, capabilities));
         }
     }
     anyhow::bail!("connection closed before meta/register");

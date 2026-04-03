@@ -40,15 +40,15 @@ pub async fn agent_io_loop(
                         .map(String::from);
                     info!(agent = %agent_name, has_result = agent_result.is_some(), "received agent/completed");
                     break;
-                } else if method == methods::AGENT_EVENT.name {
-                    if let Ok(mut event) = serde_json::from_value::<AgentEvent>(params) {
-                        if event.agent_name.is_none() {
-                            event.agent_name = Some(agent_name.clone());
-                        }
-                        let h = hub.lock().await;
-                        if h.registry.event_sender().try_send(event).is_err() {
-                            tracing::debug!(agent = %agent_name, "event dropped (channel full)");
-                        }
+                } else if method == methods::AGENT_EVENT.name
+                    && let Ok(mut event) = serde_json::from_value::<AgentEvent>(params)
+                {
+                    if event.agent_name.is_none() {
+                        event.agent_name = Some(agent_name.clone());
+                    }
+                    let h = hub.lock().await;
+                    if h.registry.event_sender().try_send(event).is_err() {
+                        tracing::debug!(agent = %agent_name, "event dropped (channel full)");
                     }
                 }
             }

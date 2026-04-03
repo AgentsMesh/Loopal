@@ -1,6 +1,5 @@
 /// Tests for snapshot_running() — protocol-level snapshot generation.
 use loopal_protocol::BgTaskStatus;
-use loopal_tool_background::{self, TaskStatus};
 
 static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 

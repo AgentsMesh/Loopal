@@ -103,11 +103,11 @@ impl GlobalRouter {
 
         for &(hub_name, conn) in candidates {
             let result = conn.send_request("meta/resolve", params.clone()).await;
-            if let Ok(resp) = result {
-                if resp.get("found").and_then(|v| v.as_bool()).unwrap_or(false) {
-                    self.cache_insert(agent_name, hub_name);
-                    return Some(hub_name.to_string());
-                }
+            if let Ok(resp) = result
+                && resp.get("found").and_then(|v| v.as_bool()).unwrap_or(false)
+            {
+                self.cache_insert(agent_name, hub_name);
+                return Some(hub_name.to_string());
             }
         }
 

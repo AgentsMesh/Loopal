@@ -90,23 +90,22 @@ async fn system_spawn_and_initialize() {
     while tokio::time::Instant::now() < deadline {
         match tokio::time::timeout(Duration::from_secs(5), rx.recv()).await {
             Ok(Some(Incoming::Notification { method, params })) => {
-                if method == methods::AGENT_EVENT.name {
-                    if let Ok(event) = serde_json::from_value::<loopal_protocol::AgentEvent>(params)
-                    {
-                        match &event.payload {
-                            loopal_protocol::AgentEventPayload::Stream { text } => {
-                                all_texts.push_str(text);
-                                got_stream = true;
-                            }
-                            // Prompt-driven agents emit AwaitingInput before
-                            // Finished. Either one signals turn completion.
-                            loopal_protocol::AgentEventPayload::AwaitingInput
-                            | loopal_protocol::AgentEventPayload::Finished => {
-                                got_finished = true;
-                                break;
-                            }
-                            _ => {}
+                if method == methods::AGENT_EVENT.name
+                    && let Ok(event) = serde_json::from_value::<loopal_protocol::AgentEvent>(params)
+                {
+                    match &event.payload {
+                        loopal_protocol::AgentEventPayload::Stream { text } => {
+                            all_texts.push_str(text);
+                            got_stream = true;
                         }
+                        // Prompt-driven agents emit AwaitingInput before
+                        // Finished. Either one signals turn completion.
+                        loopal_protocol::AgentEventPayload::AwaitingInput
+                        | loopal_protocol::AgentEventPayload::Finished => {
+                            got_finished = true;
+                            break;
+                        }
+                        _ => {}
                     }
                 }
             }

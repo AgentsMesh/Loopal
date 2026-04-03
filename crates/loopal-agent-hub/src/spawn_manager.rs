@@ -94,10 +94,10 @@ pub async fn register_agent_connection(
 
     {
         let mut h = hub.lock().await;
-        if let Some(p) = parent {
-            if !h.registry.agents.contains_key(p) {
-                warn!(agent = %name, parent = %p, "parent not found");
-            }
+        if let Some(p) = parent
+            && !h.registry.agents.contains_key(p)
+        {
+            warn!(agent = %name, parent = %p, "parent not found");
         }
         if let Err(e) = h.registry.register_connection_with_parent(
             name,

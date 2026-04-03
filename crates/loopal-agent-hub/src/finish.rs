@@ -32,19 +32,19 @@ pub(crate) async fn finish_and_deliver(hub: &Arc<Mutex<Hub>>, name: &str, output
         }
     } else if let Some(parent) = parent_name {
         let addr = QualifiedAddress::parse(&parent);
-        if addr.is_remote() {
-            if let Some(ul) = uplink {
-                let content =
-                    format!("<agent-result name=\"{name}\">\n{output_text}\n</agent-result>");
-                let envelope = Envelope::new(
-                    loopal_protocol::MessageSource::System("agent-completed".into()),
-                    &parent,
-                    content,
-                );
-                if let Err(e) = ul.route(&envelope).await {
-                    tracing::warn!(agent = %name, parent = %parent, error = %e,
-                        "failed to deliver completion to remote parent");
-                }
+        if addr.is_remote()
+            && let Some(ul) = uplink
+        {
+            let content =
+                format!("<agent-result name=\"{name}\">\n{output_text}\n</agent-result>");
+            let envelope = Envelope::new(
+                loopal_protocol::MessageSource::System("agent-completed".into()),
+                &parent,
+                content,
+            );
+            if let Err(e) = ul.route(&envelope).await {
+                tracing::warn!(agent = %name, parent = %parent, error = %e,
+                    "failed to deliver completion to remote parent");
             }
         }
     }

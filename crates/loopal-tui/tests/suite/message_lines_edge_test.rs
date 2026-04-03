@@ -34,7 +34,11 @@ fn test_thinking_shows_full_content() {
     let m = msg("thinking", &content);
     let lines = message_to_lines(&m, 80);
     // Header + blank + body lines + trailing separator
-    assert!(lines.len() > 3, "thinking should show full content, got {}", lines.len());
+    assert!(
+        lines.len() > 3,
+        "thinking should show full content, got {}",
+        lines.len()
+    );
     let text = all_text(&lines);
     assert!(text.contains("Thinking"), "should contain Thinking label");
     assert!(text.contains("2.0k tokens"), "should show token count");
@@ -47,10 +51,7 @@ fn test_thinking_empty_shows_header_only() {
     let m = msg("thinking", "");
     let lines = message_to_lines(&m, 80);
     let text = all_text(&lines);
-    assert!(
-        text.contains("Thinking"),
-        "empty thinking shows header"
-    );
+    assert!(text.contains("Thinking"), "empty thinking shows header");
 }
 
 #[test]
@@ -64,7 +65,10 @@ fn test_thinking_small_token_count() {
         text.contains("500 tokens"),
         "small thinking should show raw count: {text}"
     );
-    assert!(text.contains("Short thinking content"), "body should be shown");
+    assert!(
+        text.contains("Short thinking content"),
+        "body should be shown"
+    );
 }
 
 // --- Error and system roles ---

@@ -10,8 +10,12 @@ const INSTRUCTIONS_FILE: &str = "LOOPAL.md";
 const LOCAL_INSTRUCTIONS_FILE: &str = "LOOPAL.local.md";
 
 /// Returns the global config directory: ~/.loopal/
+///
+/// Returns `Err` when the home directory cannot be determined (e.g. `HOME` is
+/// unset or empty, which happens inside Bazel test sandboxes).
 pub fn global_config_dir() -> Result<PathBuf, ConfigError> {
     dirs::home_dir()
+        .filter(|h| !h.as_os_str().is_empty())
         .map(|h| h.join(GLOBAL_DIR_NAME))
         .ok_or_else(|| ConfigError::Parse("could not determine home directory".to_string()))
 }

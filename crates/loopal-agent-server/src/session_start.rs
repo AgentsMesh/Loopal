@@ -92,6 +92,7 @@ pub(crate) async fn start_session(
         watch_rx,
     ));
 
+    let session_dir_override = hub.session_dir_override().await;
     let agent_params = agent_setup::build_with_frontend(
         &cwd,
         &config,
@@ -101,7 +102,7 @@ pub(crate) async fn start_session(
         interrupt_tx.clone(),
         kernel,
         connection.clone(),
-        None,
+        session_dir_override.as_deref(),
     )?;
 
     let session_id = agent_params.session.id.clone();

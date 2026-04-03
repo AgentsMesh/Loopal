@@ -3,11 +3,14 @@
 /// Each program run gets its own log file: `loopal-{timestamp}-{pid}.log`.
 /// Old log files are cleaned up to keep total directory size bounded.
 ///
+/// Falls back to `{temp_dir}/loopal/logs/` when the primary directory is not
+/// writable (e.g. inside Bazel's macOS seatbelt sandbox).
+///
 /// Returns the log file path and a guard — hold the guard until process exit to
 /// flush buffered logs.
 pub fn init_logging() -> (String, tracing_appender::non_blocking::WorkerGuard) {
-    let log_dir = loopal_config::logs_dir();
-    std::fs::create_dir_all(&log_dir).expect("failed to create log directory");
+    let log_dir = pick_writable_log_dir();
+    let _ = std::fs::create_dir_all(&log_dir);
 
     // Housekeep: remove old logs exceeding the retention policy
     crate::log_writer::cleanup_old_logs(&log_dir);
@@ -37,4 +40,28 @@ pub fn init_logging() -> (String, tracing_appender::non_blocking::WorkerGuard) {
     tracing::info!(path = %log_path, "logging initialized");
 
     (log_path, guard)
+}
+
+/// Choose a writable log directory: prefer `~/.loopal/logs/`, fall back to
+/// `{temp_dir}/loopal/logs/` when the primary is not writable.
+fn pick_writable_log_dir() -> std::path::PathBuf {
+    let primary = loopal_config::logs_dir();
+    if std::fs::create_dir_all(&primary).is_ok() && dir_is_writable(&primary) {
+        return primary;
+    }
+    // Fallback: volatile temp directory (always writable, even in sandboxes)
+    let fallback = loopal_config::volatile_dir().join("logs");
+    let _ = std::fs::create_dir_all(&fallback);
+    fallback
+}
+
+/// Probe whether we can actually create files in a directory.
+fn dir_is_writable(dir: &std::path::Path) -> bool {
+    let probe = dir.join(".write_probe");
+    if std::fs::File::create(&probe).is_ok() {
+        let _ = std::fs::remove_file(&probe);
+        true
+    } else {
+        false
+    }
 }

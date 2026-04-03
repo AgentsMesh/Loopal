@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::sync::OnceLock;
 
 use loopal_config::{ResolvedPolicy, SandboxPolicy};
 
@@ -6,6 +7,26 @@ use loopal_config::{ResolvedPolicy, SandboxPolicy};
 /// Contains: deny-default, process/sysctl/iokit/mach/ipc/pty rules,
 /// system writable paths, and framework executable-mapping rules.
 const BASE_POLICY: &str = include_str!("seatbelt_base.sbpl");
+
+/// Cached result of the `sandbox-exec` availability probe.
+static SANDBOX_AVAILABLE: OnceLock<bool> = OnceLock::new();
+
+/// Test whether `sandbox-exec` is functional on this system.
+///
+/// Recent macOS versions disable the Seatbelt API for non-Apple processes,
+/// causing `sandbox-exec` to fail with exit code 71 ("Operation not permitted").
+/// This probe runs once and caches the result for the lifetime of the process.
+fn is_sandbox_exec_available() -> bool {
+    *SANDBOX_AVAILABLE.get_or_init(|| {
+        std::process::Command::new("sandbox-exec")
+            .args(["-p", "(version 1)(allow default)", "true"])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .is_ok_and(|s| s.success())
+    })
+}
 
 /// Generate a macOS Seatbelt profile string from the resolved policy.
 ///
@@ -41,9 +62,15 @@ pub fn generate_seatbelt_profile(policy: &ResolvedPolicy) -> String {
 }
 
 /// Build the `sandbox-exec` command prefix.
-pub fn build_prefix(policy: &ResolvedPolicy, _cwd: &Path) -> (String, Vec<String>) {
+///
+/// Returns `None` when `sandbox-exec` is unavailable on this system
+/// (e.g. recent macOS versions that block the Seatbelt API).
+pub fn build_prefix(policy: &ResolvedPolicy, _cwd: &Path) -> Option<(String, Vec<String>)> {
+    if !is_sandbox_exec_available() {
+        return None;
+    }
     let profile = generate_seatbelt_profile(policy);
     let program = "sandbox-exec".to_string();
     let args = vec!["-p".to_string(), profile];
-    (program, args)
+    Some((program, args))
 }

@@ -8,7 +8,9 @@ use loopal_error::ToolIoError;
 /// Resolve a user-supplied path to an absolute, canonicalized path.
 ///
 /// When `policy` is present, delegates to the sandbox `check_path`.
-/// When absent, performs cwd-containment check for write operations.
+/// When absent, only rejects relative paths that use `..` to escape cwd
+/// (basic traversal guard). Absolute paths are always allowed — the sandbox
+/// policy is responsible for enforcing broader path boundaries.
 pub fn resolve(
     cwd: &Path,
     raw: &str,
@@ -21,7 +23,7 @@ pub fn resolve(
         return check_with_policy(pol, &path, is_write);
     }
 
-    // No sandbox policy — resolve canonical and check cwd containment for writes
+    // No sandbox policy — reject relative `..` traversal escaping cwd
     if !Path::new(raw).is_absolute() {
         let canonical = resolve_canonical(&path)?;
         if !canonical.starts_with(cwd) {
@@ -33,19 +35,8 @@ pub fn resolve(
         return Ok(canonical);
     }
 
-    // Absolute path: for write ops, check containment
-    if is_write {
-        let canonical = resolve_canonical(&path)?;
-        if !canonical.starts_with(cwd) {
-            return Err(ToolIoError::PathDenied(format!(
-                "write to path outside working directory: {}",
-                canonical.display()
-            )));
-        }
-        return Ok(canonical);
-    }
-
-    Ok(path)
+    // Absolute paths: resolve canonical without write restrictions
+    resolve_canonical(&path)
 }
 
 /// Convert a raw path to absolute (join with cwd if relative).

@@ -45,8 +45,15 @@ fn workspace_uses_sandbox_on_supported_platform() {
     let cmd = wrap_command(&policy, "ls -la", "/home/user/project".as_ref());
 
     if cfg!(target_os = "macos") {
-        assert_eq!(cmd.program, "sandbox-exec");
-        assert!(cmd.args.contains(&"-p".to_string()));
+        // sandbox-exec may be unavailable on recent macOS — fallback to sh
+        assert!(
+            cmd.program == "sandbox-exec" || cmd.program == "sh",
+            "expected sandbox-exec or sh, got: {}",
+            cmd.program
+        );
+        if cmd.program == "sandbox-exec" {
+            assert!(cmd.args.contains(&"-p".to_string()));
+        }
     } else if cfg!(target_os = "linux") {
         // bwrap if available with user-namespace permissions, otherwise sh fallback
         assert!(

@@ -20,7 +20,7 @@ use loopal_config::ResolvedPolicy;
 pub fn build_sandbox_prefix(policy: &ResolvedPolicy, cwd: &Path) -> Option<(String, Vec<String>)> {
     #[cfg(target_os = "macos")]
     {
-        Some(macos::build_prefix(policy, cwd))
+        macos::build_prefix(policy, cwd)
     }
 
     #[cfg(target_os = "linux")]

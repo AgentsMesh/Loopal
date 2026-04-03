@@ -15,12 +15,13 @@ pub async fn run_server_for_test(
     transport: Arc<dyn Transport>,
     provider: Arc<dyn loopal_provider_api::Provider>,
     _cwd: std::path::PathBuf,
-    _session_dir: std::path::PathBuf,
+    session_dir: std::path::PathBuf,
 ) -> anyhow::Result<()> {
     let connection = Arc::new(Connection::new(transport));
     let mut incoming_rx = connection.start();
     let hub = SessionHub::new();
     hub.set_test_provider(provider).await;
+    hub.set_session_dir_override(session_dir).await;
     wait_for_initialize(&connection, &mut incoming_rx).await?;
     dispatch_loop(connection, incoming_rx, &hub, false).await
 }
@@ -31,9 +32,9 @@ pub async fn run_server_for_test_interactive(
     transport: Arc<dyn Transport>,
     provider: Arc<dyn loopal_provider_api::Provider>,
     _cwd: std::path::PathBuf,
-    _session_dir: std::path::PathBuf,
+    session_dir: std::path::PathBuf,
 ) -> anyhow::Result<()> {
-    run_server_for_test(transport, provider, _cwd, _session_dir).await
+    run_server_for_test(transport, provider, _cwd, session_dir).await
 }
 
 /// Run a dispatch loop for a single connection on a shared hub.

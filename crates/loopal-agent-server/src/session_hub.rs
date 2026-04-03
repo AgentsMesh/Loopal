@@ -41,6 +41,8 @@ pub struct SessionHub {
     sessions: Mutex<Vec<Arc<SharedSession>>>,
     /// Test-only: injected mock provider for session creation.
     test_provider: Mutex<Option<Arc<dyn loopal_provider_api::Provider>>>,
+    /// Override base directory for session/message storage (test sandboxes).
+    session_dir_override: Mutex<Option<std::path::PathBuf>>,
 }
 
 impl SessionHub {
@@ -48,6 +50,7 @@ impl SessionHub {
         Self {
             sessions: Mutex::new(Vec::new()),
             test_provider: Mutex::new(None),
+            session_dir_override: Mutex::new(None),
         }
     }
 
@@ -59,6 +62,16 @@ impl SessionHub {
     /// Get the test provider (if set). Cloned — available for multiple sessions.
     pub async fn get_test_provider(&self) -> Option<Arc<dyn loopal_provider_api::Provider>> {
         self.test_provider.lock().await.clone()
+    }
+
+    /// Override session storage directory (for sandbox/test environments).
+    pub async fn set_session_dir_override(&self, dir: std::path::PathBuf) {
+        *self.session_dir_override.lock().await = Some(dir);
+    }
+
+    /// Get the session directory override, if set.
+    pub async fn session_dir_override(&self) -> Option<std::path::PathBuf> {
+        self.session_dir_override.lock().await.clone()
     }
 
     /// Register a new session.

@@ -8,6 +8,7 @@ build --experimental_reuse_sandbox_directories
 # Test
 test --test_output=errors
 test --notest_verbose_timeout_warnings
+test --test_env=HOME
 
 # Platform configs for cross-compilation
 build:linux-x86 --platforms=//:linux-x86_64

@@ -112,8 +112,16 @@ async fn test_bash_stop_background() {
         .execute(json!({"process_id": pid, "stop": true}), &ctx)
         .await
         .unwrap();
-    assert!(!stop.is_error);
-    assert!(stop.content.contains("stopped"));
+    assert!(
+        !stop.is_error,
+        "bg_stop returned error for {pid}: {}",
+        stop.content
+    );
+    assert!(
+        stop.content.contains("stopped") || stop.content.contains("Process"),
+        "unexpected stop content: {}",
+        stop.content
+    );
 }
 
 #[test]

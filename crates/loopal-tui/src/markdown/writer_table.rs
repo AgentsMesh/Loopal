@@ -18,8 +18,10 @@ impl MdWriter {
         self.in_table = false;
         let rows = std::mem::take(&mut self.table_rows);
         let alignments = std::mem::take(&mut self.table_alignments);
+        let border = self.styles.table_border;
+        let header = self.styles.table_header;
         self.lines
-            .extend(render_table(&rows, &alignments, self.width));
+            .extend(render_table(&rows, &alignments, self.width, border, header));
         self.lines.push(Line::from(""));
     }
 
@@ -53,7 +55,13 @@ impl MdWriter {
 
 // ---------- rendering ----------
 
-fn render_table(rows: &[Vec<String>], alignments: &[Alignment], width: u16) -> Vec<Line<'static>> {
+fn render_table(
+    rows: &[Vec<String>],
+    alignments: &[Alignment],
+    width: u16,
+    border: Style,
+    header: Style,
+) -> Vec<Line<'static>> {
     if rows.is_empty() {
         return Vec::new();
     }
@@ -63,12 +71,15 @@ fn render_table(rows: &[Vec<String>], alignments: &[Alignment], width: u16) -> V
     }
     let col_widths = compute_col_widths(rows, num_cols, width);
     let mut lines: Vec<Line<'static>> = Vec::new();
+    lines.push(border_line(&col_widths, "┌", "┬", "┐", border));
     for (i, row) in rows.iter().enumerate() {
-        lines.extend(format_row(row, &col_widths, alignments, i == 0));
+        let cell_style = if i == 0 { header } else { Style::default() };
+        lines.extend(format_row(row, &col_widths, alignments, border, cell_style));
         if i == 0 {
-            lines.push(separator_line(&col_widths));
+            lines.push(border_line(&col_widths, "├", "┼", "┤", border));
         }
     }
+    lines.push(border_line(&col_widths, "└", "┴", "┘", border));
     lines
 }
 
@@ -80,7 +91,7 @@ fn compute_col_widths(rows: &[Vec<String>], num_cols: usize, width: u16) -> Vec<
             widths[j] = widths[j].max(UnicodeWidthStr::width(cell.as_str())).max(3);
         }
     }
-    let overhead = if num_cols > 1 { (num_cols - 1) * 3 } else { 0 };
+    let overhead = (num_cols - 1) * 3 + 4; // " │ " between cols + "│ " left + " │" right
     let total: usize = widths.iter().sum::<usize>() + overhead;
     let budget = (width as usize).max(num_cols + overhead);
     if total > budget {
@@ -99,14 +110,9 @@ fn format_row(
     row: &[String],
     col_widths: &[usize],
     alignments: &[Alignment],
-    bold: bool,
+    border: Style,
+    cell_style: Style,
 ) -> Vec<Line<'static>> {
-    let dim = Style::default().fg(Color::DarkGray);
-    let cell_style = if bold {
-        Style::default().add_modifier(Modifier::BOLD)
-    } else {
-        Style::default()
-    };
     let wrapped: Vec<Vec<String>> = col_widths
         .iter()
         .enumerate()
@@ -119,18 +125,16 @@ fn format_row(
 
     (0..height)
         .map(|li| {
-            let spans: Vec<Span<'static>> = col_widths
-                .iter()
-                .enumerate()
-                .flat_map(|(j, cw)| {
-                    let sep = (j > 0).then(|| Span::styled(" │ ", dim));
-                    let text = wrapped[j].get(li).map(|s| s.as_str()).unwrap_or("");
-                    let align = alignments.get(j).copied().unwrap_or(Alignment::None);
-                    let padded = align_cell(text, *cw, align);
-                    sep.into_iter()
-                        .chain(std::iter::once(Span::styled(padded, cell_style)))
-                })
-                .collect();
+            let mut spans = vec![Span::styled("│ ", border)];
+            for (j, cw) in col_widths.iter().enumerate() {
+                if j > 0 {
+                    spans.push(Span::styled(" │ ", border));
+                }
+                let text = wrapped[j].get(li).map(|s| s.as_str()).unwrap_or("");
+                let align = alignments.get(j).copied().unwrap_or(Alignment::None);
+                spans.push(Span::styled(align_cell(text, *cw, align), cell_style));
+            }
+            spans.push(Span::styled(" │", border));
             Line::from(spans)
         })
         .collect()
@@ -148,15 +152,23 @@ fn wrap_cell(text: &str, width: usize) -> Vec<String> {
     if v.is_empty() { vec![String::new()] } else { v }
 }
 
-fn separator_line(col_widths: &[usize]) -> Line<'static> {
-    let dim = Style::default().fg(Color::DarkGray);
+fn border_line(
+    col_widths: &[usize],
+    left: &'static str,
+    mid: &'static str,
+    right: &'static str,
+    style: Style,
+) -> Line<'static> {
     let mut spans: Vec<Span<'static>> = Vec::new();
     for (j, cw) in col_widths.iter().enumerate() {
-        if j > 0 {
-            spans.push(Span::styled("─┼─", dim));
+        if j == 0 {
+            spans.push(Span::styled(left, style));
+        } else {
+            spans.push(Span::styled(mid, style));
         }
-        spans.push(Span::styled("─".repeat(*cw), dim));
+        spans.push(Span::styled("─".repeat(cw + 2), style));
     }
+    spans.push(Span::styled(right, style));
     Line::from(spans)
 }
 

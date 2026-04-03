@@ -49,9 +49,8 @@ impl MdWriter {
         if let Some(url) = self.link_url.take()
             && !url.is_empty()
         {
-            let dim = Style::default().fg(Color::DarkGray);
             self.pending_spans
-                .push(Span::styled(format!(" ({url})"), dim));
+                .push(Span::styled(format!(" ({url})"), self.styles.link_url));
         }
     }
 
@@ -60,12 +59,12 @@ impl MdWriter {
     pub(super) fn start_image(&mut self) {
         // Image text events will be collected as pending spans; we just
         // push an opening marker so end_image can wrap them.
-        let dim = Style::default().fg(Color::DarkGray);
-        self.pending_spans.push(Span::styled("[image: ", dim));
+        self.pending_spans
+            .push(Span::styled("[image: ", self.styles.image_marker));
     }
 
     pub(super) fn end_image(&mut self) {
-        let dim = Style::default().fg(Color::DarkGray);
+        let marker = self.styles.image_marker;
         // If no alt text was collected, show generic placeholder
         let has_text = self.pending_spans.iter().any(|s| {
             let content = s.content.as_ref();
@@ -75,10 +74,10 @@ impl MdWriter {
             && let Some(last) = self.pending_spans.last_mut()
             && last.content.as_ref() == "[image: "
         {
-            *last = Span::styled("[image]", dim);
+            *last = Span::styled("[image]", marker);
             return;
         }
-        self.pending_spans.push(Span::styled("]", dim));
+        self.pending_spans.push(Span::styled("]", marker));
     }
 
     // ---- Task list marker ----
@@ -86,9 +85,9 @@ impl MdWriter {
     pub(super) fn on_task_list_marker(&mut self, checked: bool) {
         let marker = if checked { "[x] " } else { "[ ] " };
         let style = if checked {
-            Style::default().fg(Color::Green)
+            self.styles.task_checked
         } else {
-            Style::default().fg(Color::DarkGray)
+            self.styles.task_unchecked
         };
         self.pending_spans.push(Span::styled(marker, style));
     }
@@ -96,9 +95,8 @@ impl MdWriter {
     // ---- Footnote reference ----
 
     pub(super) fn on_footnote_ref(&mut self, label: &str) {
-        let dim = Style::default().fg(Color::DarkGray);
         self.pending_spans
-            .push(Span::styled(format!("[^{label}]"), dim));
+            .push(Span::styled(format!("[^{label}]"), self.styles.footnote_ref));
     }
 
     // ---- Text ----

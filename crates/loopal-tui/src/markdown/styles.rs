@@ -12,9 +12,16 @@ pub(super) struct MarkdownStyles {
     pub strikethrough: Style,
     pub code_inline: Style,
     pub link: Style,
+    pub link_url: Style,
+    pub image_marker: Style,
+    pub task_checked: Style,
+    pub task_unchecked: Style,
+    pub footnote_ref: Style,
     pub list_marker: Style,
     pub blockquote_marker: Style,
     pub rule: Style,
+    pub table_border: Style,
+    pub table_header: Style,
 }
 
 impl Default for MarkdownStyles {
@@ -31,9 +38,16 @@ impl Default for MarkdownStyles {
             link: Style::default()
                 .fg(Color::Cyan)
                 .add_modifier(Modifier::UNDERLINED),
+            link_url: Style::default().fg(Color::DarkGray),
+            image_marker: Style::default().fg(Color::DarkGray),
+            task_checked: Style::default().fg(Color::Green),
+            task_unchecked: Style::default().fg(Color::DarkGray),
+            footnote_ref: Style::default().fg(Color::DarkGray),
             list_marker: Style::default().fg(Color::LightBlue),
             blockquote_marker: Style::default().fg(Color::Green),
             rule: Style::default().fg(Color::DarkGray),
+            table_border: Style::default().fg(Color::DarkGray),
+            table_header: Style::default().add_modifier(Modifier::BOLD),
         }
     }
 }

@@ -44,6 +44,8 @@ mod line_cache_test;
 mod markdown_code_test;
 #[path = "suite/markdown_edge_test.rs"]
 mod markdown_edge_test;
+#[path = "suite/markdown_elements_test.rs"]
+mod markdown_elements_test;
 #[path = "suite/markdown_table_test.rs"]
 mod markdown_table_test;
 #[path = "suite/markdown_test.rs"]

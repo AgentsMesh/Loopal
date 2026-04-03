@@ -29,6 +29,8 @@ fn test_table_header_separator_line() {
     // Should have a separator line with ─ and ┼
     assert!(texts.iter().any(|t| t.contains("─")), "separator dashes");
     assert!(texts.iter().any(|t| t.contains("┼")), "separator cross");
+    assert!(texts[0].contains("┌"), "top border");
+    assert!(texts.iter().any(|t| t.contains("└")), "bottom border");
 }
 
 #[test]
@@ -69,77 +71,6 @@ fn test_table_right_alignment() {
     assert!(texts.iter().any(|t| t.contains("42")));
 }
 
-// --- Task lists ---
-
-#[test]
-fn test_task_list_unchecked() {
-    let input = "- [ ] todo item";
-    let lines = render_markdown(input, 80);
-    let texts = lines_text(&lines);
-    assert!(
-        texts
-            .iter()
-            .any(|t| t.contains("[ ]") && t.contains("todo"))
-    );
-}
-
-#[test]
-fn test_task_list_checked() {
-    let input = "- [x] done item";
-    let lines = render_markdown(input, 80);
-    let texts = lines_text(&lines);
-    assert!(
-        texts
-            .iter()
-            .any(|t| t.contains("[x]") && t.contains("done"))
-    );
-}
-
-#[test]
-fn test_task_list_checked_has_green_style() {
-    let input = "- [x] completed";
-    let lines = render_markdown(input, 80);
-    let span = lines
-        .iter()
-        .flat_map(|l| &l.spans)
-        .find(|s| s.content.contains("[x]"));
-    assert!(span.is_some());
-    assert_eq!(span.unwrap().style.fg, Some(Color::Green));
-}
-
-// --- Link with URL ---
-
-#[test]
-fn test_link_shows_url() {
-    let input = "[click](https://example.com)";
-    let lines = render_markdown(input, 80);
-    let texts = lines_text(&lines);
-    let full = texts.join("");
-    assert!(full.contains("click"), "link text");
-    assert!(full.contains("https://example.com"), "URL shown");
-}
-
-// --- Image ---
-
-#[test]
-fn test_image_shows_alt_text() {
-    let input = "![alt text](image.png)";
-    let lines = render_markdown(input, 80);
-    let texts = lines_text(&lines);
-    let full = texts.join("");
-    assert!(full.contains("image:"), "image marker");
-    assert!(full.contains("alt text"), "alt text shown");
-}
-
-#[test]
-fn test_image_no_alt_shows_placeholder() {
-    let input = "![](image.png)";
-    let lines = render_markdown(input, 80);
-    let texts = lines_text(&lines);
-    let full = texts.join("");
-    assert!(full.contains("[image]"), "placeholder for empty alt");
-}
-
 // --- Cell wrapping ---
 
 #[test]
@@ -151,7 +82,7 @@ fn test_table_cell_wraps_when_narrow() {
     let sep_idx = texts.iter().position(|t| t.contains("─┼─")).unwrap();
     let data_lines: Vec<_> = texts[sep_idx + 1..]
         .iter()
-        .take_while(|t| !t.is_empty())
+        .take_while(|t| !t.is_empty() && !t.contains("└"))
         .collect();
     assert!(
         data_lines.len() >= 2,
@@ -170,7 +101,7 @@ fn test_table_wrapped_rows_keep_separators() {
     // Every visual line of the data row should have the │ column separator.
     let data_lines: Vec<_> = texts[sep_idx + 1..]
         .iter()
-        .take_while(|t| !t.is_empty())
+        .take_while(|t| !t.is_empty() && !t.contains("└"))
         .collect();
     for line in &data_lines {
         assert!(line.contains("│"), "wrapped row line must keep │: {line:?}");
@@ -186,15 +117,4 @@ fn test_table_no_truncation_of_content() {
     for word in ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot"] {
         assert!(full.contains(word), "word '{word}' must not be truncated");
     }
-}
-
-// --- Footnote reference ---
-
-#[test]
-fn test_footnote_reference() {
-    let input = "text[^1] more";
-    let lines = render_markdown(input, 80);
-    let texts = lines_text(&lines);
-    let full = texts.join("");
-    assert!(full.contains("[^1]"), "footnote ref shown");
 }

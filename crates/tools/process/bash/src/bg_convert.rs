@@ -106,23 +106,28 @@ fn register_spawned_data(data: SpawnedBackgroundData, desc: &str) -> String {
         watch_rx,
     );
 
+    // Spawn reader tasks and collect abort handles for cleanup.
+    let mut reader_aborts = Vec::new();
     if let Some(pipe) = stdout_pipe {
         let buf = Arc::clone(&stdout_buf);
-        tokio::spawn(async move { read_pipe(&buf, pipe).await });
+        let h = tokio::spawn(async move { read_pipe(&buf, pipe).await });
+        reader_aborts.push(h.abort_handle());
     }
     if let Some(pipe) = stderr_pipe {
         let buf = Arc::clone(&stderr_buf);
-        tokio::spawn(async move { read_pipe(&buf, pipe).await });
+        let h = tokio::spawn(async move { read_pipe(&buf, pipe).await });
+        reader_aborts.push(h.abort_handle());
     }
 
     let ob = Arc::clone(&stdout_buf);
     let eb = Arc::clone(&stderr_buf);
-    spawn_monitor(
+    spawn_monitor_with_cleanup(
         data.child,
         combined_output,
         exit_code,
         status,
         watch_tx,
+        reader_aborts,
         move || combine(&ob, &eb),
     );
 

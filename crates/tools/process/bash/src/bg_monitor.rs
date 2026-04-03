@@ -75,8 +75,9 @@ pub fn spawn_monitor_with_cleanup<F>(
         };
         let code = ch.wait().await.ok().and_then(|s| s.code());
 
-        // Pipes close with child exit — readers should finish promptly.
-        // Abort any stragglers to prevent task leaks.
+        // Pipes close with child exit — give readers a brief window to
+        // finish draining, then abort any stragglers.
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         for handle in &abort_handles {
             handle.abort();
         }

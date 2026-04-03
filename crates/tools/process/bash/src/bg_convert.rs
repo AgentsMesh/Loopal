@@ -15,7 +15,7 @@ use loopal_error::ProcessHandle;
 use loopal_tool_background::{self, TaskStatus};
 
 use crate::bg_monitor::{
-    combine, insert_task, read_pipe, spawn_monitor, spawn_monitor_with_cleanup, truncate_cmd,
+    combine, insert_task, read_pipe, spawn_monitor_with_cleanup, truncate_cmd,
 };
 
 // ── Timed-out process (streaming → background) ──────────────────────

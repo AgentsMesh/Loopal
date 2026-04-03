@@ -29,28 +29,6 @@ pub fn insert_task(
         .insert(task_id.to_string(), task);
 }
 
-/// Spawn a monitor task that waits for child exit → updates store status.
-pub fn spawn_monitor<F>(
-    child_arc: Arc<Mutex<Option<tokio::process::Child>>>,
-    combined_output: Arc<Mutex<String>>,
-    exit_code: Arc<Mutex<Option<i32>>>,
-    status: Arc<Mutex<TaskStatus>>,
-    watch_tx: tokio::sync::watch::Sender<TaskStatus>,
-    refresh_output: F,
-) where
-    F: FnOnce() -> String + Send + 'static,
-{
-    spawn_monitor_with_cleanup(
-        child_arc,
-        combined_output,
-        exit_code,
-        status,
-        watch_tx,
-        Vec::new(),
-        refresh_output,
-    );
-}
-
 /// Monitor with reader task cleanup.
 ///
 /// After the child exits, waits briefly for reader tasks to drain (pipes

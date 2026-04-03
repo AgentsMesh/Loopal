@@ -155,8 +155,7 @@ async fn forward_loop_eof_exits_cleanly() {
     use loopal_test_support::chunks;
 
     // Server with one interactive session (no prompt → waits for input)
-    let (conn, mut rx, _f) =
-        start_test_server_with_calls(vec![chunks::text_turn("reply")]).await;
+    let (conn, mut rx, _f) = start_test_server_with_calls(vec![chunks::text_turn("reply")]).await;
 
     let _sid = init_and_start(&conn, &mut rx, None).await;
     drain_until_idle(&mut rx).await;

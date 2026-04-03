@@ -6,6 +6,6 @@ pub use errors::{
     AgentOutput, ConfigError, HookError, LoopalError, McpError, ProviderError, StorageError,
     TerminateReason, ToolError,
 };
-pub use io_error::ToolIoError;
+pub use io_error::{ProcessHandle, ToolIoError};
 
 pub type Result<T> = std::result::Result<T, LoopalError>;

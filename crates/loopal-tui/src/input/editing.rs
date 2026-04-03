@@ -5,12 +5,13 @@ use super::commands::try_execute_slash_command;
 
 pub(super) fn handle_enter(app: &mut App) -> InputAction {
     // Empty Enter with a focused sub-agent → drill into its view
-    if app.input.is_empty() && app.pending_images.is_empty() {
-        if let Some(ref focused) = app.focused_agent {
-            let active = &app.session.lock().active_view;
-            if focused != active {
-                return InputAction::EnterAgentView;
-            }
+    if app.input.is_empty()
+        && app.pending_images.is_empty()
+        && let Some(ref focused) = app.focused_agent
+    {
+        let active = &app.session.lock().active_view;
+        if focused != active {
+            return InputAction::EnterAgentView;
         }
     }
     let trimmed = app.input.trim().to_string();
@@ -44,7 +45,7 @@ pub(super) fn handle_backspace(app: &mut App) -> InputAction {
     InputAction::None
 }
 
-/// Ctrl+C: clear input → exit AgentPanel → clear focus → interrupt agent.
+/// Ctrl+C: clear input → exit Panel → clear focus → interrupt agent.
 pub(super) fn handle_ctrl_c(app: &mut App) -> InputAction {
     if !app.input.is_empty() || !app.pending_images.is_empty() {
         app.input.clear();
@@ -54,8 +55,9 @@ pub(super) fn handle_ctrl_c(app: &mut App) -> InputAction {
         app.paste_map.clear();
         app.autocomplete = None;
         InputAction::None
-    } else if app.focus_mode == FocusMode::AgentPanel {
+    } else if matches!(app.focus_mode, FocusMode::Panel(_)) {
         app.focused_agent = None;
+        app.focused_bg_task = None;
         app.focus_mode = FocusMode::Input;
         app.agent_panel_offset = 0;
         InputAction::None

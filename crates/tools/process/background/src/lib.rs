@@ -4,6 +4,8 @@ use std::sync::{Arc, LazyLock, Mutex};
 use tokio::process::Child;
 use tokio::sync::watch;
 
+use loopal_protocol::{BgTaskSnapshot, BgTaskStatus};
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum TaskStatus {
     Running,
@@ -31,6 +33,35 @@ pub fn store() -> &'static Mutex<HashMap<String, BackgroundTask>> {
 
 pub fn generate_task_id() -> String {
     format!("bg_{}", COUNTER.fetch_add(1, Ordering::Relaxed))
+}
+
+/// Remove all tasks from the store. Intended for test cleanup.
+pub fn clear_store() {
+    store().lock().unwrap().clear();
+}
+
+/// Snapshot all running background tasks as protocol-level types.
+///
+/// Returns a lightweight `Vec<BgTaskSnapshot>` suitable for display in the
+/// TUI or sending over IPC, without exposing the internal store.
+pub fn snapshot_running() -> Vec<BgTaskSnapshot> {
+    let store = store().lock().unwrap();
+    let mut out: Vec<BgTaskSnapshot> = store
+        .iter()
+        .filter_map(|(id, task)| {
+            let status = task.status.lock().unwrap().clone();
+            if status != TaskStatus::Running {
+                return None;
+            }
+            Some(BgTaskSnapshot {
+                id: id.clone(),
+                description: task.description.clone(),
+                status: BgTaskStatus::Running,
+            })
+        })
+        .collect();
+    out.sort_by(|a, b| a.id.cmp(&b.id));
+    out
 }
 
 /// Register a proxy task for a background agent process.

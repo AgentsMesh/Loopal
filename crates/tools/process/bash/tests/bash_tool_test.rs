@@ -2,6 +2,9 @@ use loopal_tool_api::{PermissionLevel, Tool, ToolContext};
 use loopal_tool_bash::BashTool;
 use serde_json::json;
 
+#[path = "streaming_timeout_test.rs"]
+mod streaming_timeout_test;
+
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     let backend = loopal_backend::LocalBackend::new(
         cwd.to_path_buf(),

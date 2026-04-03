@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use loopal_protocol::{ImageAttachment, UserContent};
+use loopal_protocol::{BgTaskSnapshot, ImageAttachment, UserContent};
 use loopal_session::SessionController;
 
 use crate::command::CommandRegistry;
@@ -44,10 +44,19 @@ pub struct App {
     pub show_topology: bool,
     /// Agent panel cursor — Tab cycles through agents. Purely TUI concept.
     pub focused_agent: Option<String>,
+    /// Background tasks panel cursor.
+    pub focused_bg_task: Option<String>,
     /// Which UI region owns keyboard focus.
     pub focus_mode: FocusMode,
     /// Scroll offset for the agent panel (index of first visible agent).
     pub agent_panel_offset: usize,
+
+    /// Provider for background task snapshots.  Injected at construction;
+    /// defaults to a no-op that returns an empty vec (overridden in
+    /// production by `loopal_tool_background::snapshot_running`).
+    pub bg_provider: fn() -> Vec<BgTaskSnapshot>,
+    /// Cached background task snapshots, refreshed each render cycle.
+    pub bg_snapshots: Vec<BgTaskSnapshot>,
 
     // === Session Controller (observable + interactive) ===
     pub session: SessionController,
@@ -85,8 +94,11 @@ impl App {
             content_overflows: false,
             show_topology: false,
             focused_agent: None,
+            focused_bg_task: None,
             focus_mode: FocusMode::default(),
             agent_panel_offset: 0,
+            bg_provider: || Vec::new(),
+            bg_snapshots: Vec::new(),
             session,
             line_cache: LineCache::new(),
         }

@@ -87,17 +87,27 @@ pub enum SubPage {
     RewindPicker(RewindPickerState),
 }
 
+/// Which sub-panel within the panel zone is focused.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PanelKind {
+    /// Agent status list.
+    Agents,
+    /// Background shell tasks.
+    BgTasks,
+}
+
 /// Which UI region currently owns keyboard input.
 ///
-/// Orthogonal to `focused_agent` — mode says "are we navigating agents"
-/// while `focused_agent` says "which one is highlighted".
+/// Orthogonal to `focused_agent` / `focused_bg_task` — mode says "are we
+/// navigating a panel" while the focused-item fields say "which item is
+/// highlighted".
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum FocusMode {
     /// Default: typing goes to input field; Up/Down = multiline → scroll → history.
     #[default]
     Input,
-    /// Agent panel navigation: Up/Down = navigate agents; Enter = drill in.
-    AgentPanel,
+    /// Panel navigation: Up/Down = navigate items; Enter = drill in (agents only).
+    Panel(PanelKind),
 }
 
 /// State for the rewind turn picker.

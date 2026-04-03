@@ -1,5 +1,15 @@
 use thiserror::Error;
 
+/// Opaque handle for passing implementation-specific data through error
+/// boundaries — e.g. a still-running child process and its I/O buffers.
+pub struct ProcessHandle(pub Box<dyn std::any::Any + Send + Sync>);
+
+impl std::fmt::Debug for ProcessHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("ProcessHandle(..)")
+    }
+}
+
 /// Errors returned by `Backend` trait methods.
 ///
 /// Designed as a self-contained error type so that `Backend` consumers

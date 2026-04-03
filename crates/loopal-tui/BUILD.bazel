@@ -49,6 +49,7 @@ rust_test(
         "//crates/loopal-provider-api",
         "//crates/loopal-test-support",
         "//crates/loopal-tool-api",
+        "//crates/tools/process/background:loopal-tool-background",
         "@crates//:tempfile",
         "@crates//:tokio",
         "@crates//:wiremock",

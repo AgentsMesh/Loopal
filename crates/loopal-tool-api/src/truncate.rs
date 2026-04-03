@@ -1,3 +1,8 @@
+/// Default maximum lines in tool output.
+pub const DEFAULT_MAX_OUTPUT_LINES: usize = 2_000;
+/// Default maximum bytes in tool output.
+pub const DEFAULT_MAX_OUTPUT_BYTES: usize = 512_000;
+
 /// Truncate tool output to fit within limits.
 ///
 /// If the output exceeds `max_lines` or `max_bytes`, it is truncated

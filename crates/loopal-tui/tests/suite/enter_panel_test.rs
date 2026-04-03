@@ -1,12 +1,13 @@
-/// Tests for enter_agent_panel dispatch function.
+/// Tests for enter_panel dispatch function.
 use loopal_protocol::{AgentEvent, AgentEventPayload, ControlCommand, UserQuestionResponse};
 use loopal_session::SessionController;
-use loopal_tui::app::{App, FocusMode};
-use loopal_tui::dispatch_ops::enter_agent_panel;
+use loopal_tui::app::{App, FocusMode, PanelKind};
+use loopal_tui::dispatch_ops::enter_panel;
 
 use tokio::sync::mpsc;
 
 fn make_app() -> App {
+    loopal_tool_background::clear_store();
     let (control_tx, _) = mpsc::channel::<ControlCommand>(16);
     let (perm_tx, _) = mpsc::channel::<bool>(16);
     let (question_tx, _) = mpsc::channel::<UserQuestionResponse>(16);
@@ -42,44 +43,56 @@ fn finish_agent(app: &App, name: &str) {
         .handle_event(AgentEvent::named(name, AgentEventPayload::Finished));
 }
 
+fn add_bg_task(id: &str, desc: &str) {
+    loopal_tool_background::register_proxy(id.to_string(), desc.to_string());
+}
+
+fn sync_bg(app: &mut App) {
+    app.bg_snapshots = loopal_tool_background::snapshot_running();
+}
+
 #[test]
 fn noop_without_agents() {
+    let _guard = crate::BG_STORE_LOCK.lock().unwrap();
     let mut app = make_app();
-    enter_agent_panel(&mut app);
+    enter_panel(&mut app);
     assert_eq!(app.focus_mode, FocusMode::Input);
     assert!(app.focused_agent.is_none());
 }
 
 #[test]
 fn sets_mode_and_focuses_first() {
+    let _guard = crate::BG_STORE_LOCK.lock().unwrap();
     let mut app = make_app();
     spawn_agent(&app, "alpha");
     spawn_agent(&app, "beta");
-    enter_agent_panel(&mut app);
-    assert_eq!(app.focus_mode, FocusMode::AgentPanel);
+    enter_panel(&mut app);
+    assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Agents));
     assert_eq!(app.focused_agent.as_deref(), Some("alpha"));
 }
 
 #[test]
 fn keeps_existing_live_focus() {
+    let _guard = crate::BG_STORE_LOCK.lock().unwrap();
     let mut app = make_app();
     spawn_agent(&app, "alpha");
     spawn_agent(&app, "beta");
     app.focused_agent = Some("beta".into());
-    enter_agent_panel(&mut app);
-    assert_eq!(app.focus_mode, FocusMode::AgentPanel);
+    enter_panel(&mut app);
+    assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Agents));
     assert_eq!(app.focused_agent.as_deref(), Some("beta"));
 }
 
 #[test]
 fn refocuses_when_focused_agent_is_dead() {
+    let _guard = crate::BG_STORE_LOCK.lock().unwrap();
     let mut app = make_app();
     spawn_agent(&app, "alive");
     spawn_agent(&app, "dead");
     finish_agent(&app, "dead");
     app.focused_agent = Some("dead".into());
-    enter_agent_panel(&mut app);
-    assert_eq!(app.focus_mode, FocusMode::AgentPanel);
+    enter_panel(&mut app);
+    assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Agents));
     assert_eq!(
         app.focused_agent.as_deref(),
         Some("alive"),
@@ -89,9 +102,44 @@ fn refocuses_when_focused_agent_is_dead() {
 
 #[test]
 fn noop_when_only_finished_agents() {
+    let _guard = crate::BG_STORE_LOCK.lock().unwrap();
     let mut app = make_app();
     spawn_agent(&app, "done");
     finish_agent(&app, "done");
-    enter_agent_panel(&mut app);
+    enter_panel(&mut app);
     assert_eq!(app.focus_mode, FocusMode::Input);
+}
+
+#[test]
+fn enters_bg_tasks_when_no_agents_but_bg_tasks() {
+    let _guard = crate::BG_STORE_LOCK.lock().unwrap();
+    let mut app = make_app();
+    add_bg_task("t1", "compiling");
+    sync_bg(&mut app);
+    enter_panel(&mut app);
+    assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::BgTasks));
+    assert!(app.focused_bg_task.is_some(), "should set focused_bg_task");
+}
+
+#[test]
+fn enters_bg_tasks_when_only_finished_agents_and_bg_tasks() {
+    let _guard = crate::BG_STORE_LOCK.lock().unwrap();
+    let mut app = make_app();
+    spawn_agent(&app, "done");
+    finish_agent(&app, "done");
+    add_bg_task("t2", "testing");
+    sync_bg(&mut app);
+    enter_panel(&mut app);
+    assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::BgTasks));
+}
+
+#[test]
+fn prefers_agents_over_bg_tasks() {
+    let _guard = crate::BG_STORE_LOCK.lock().unwrap();
+    let mut app = make_app();
+    spawn_agent(&app, "worker");
+    add_bg_task("t3", "linting");
+    sync_bg(&mut app);
+    enter_panel(&mut app);
+    assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Agents));
 }

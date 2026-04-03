@@ -33,19 +33,21 @@ pub enum InputAction {
     RunCommand(String, Option<String>),
     /// Sub-page picker confirmed a result
     SubPageConfirm(SubPageResult),
-    /// Enter AgentPanel focus mode (Tab from Input when agents exist)
-    EnterAgentPanel,
-    /// Exit AgentPanel focus mode back to Input
-    ExitAgentPanel,
-    /// Navigate up within agent panel (with scroll)
-    AgentPanelUp,
-    /// Navigate down within agent panel (with scroll)
-    AgentPanelDown,
-    /// Enter the focused agent's conversation view (drill in)
+    /// Enter Panel focus mode (Tab from Input when panels have content)
+    EnterPanel,
+    /// Exit Panel focus mode back to Input
+    ExitPanel,
+    /// Tab within panel zone — switch panel or cycle item
+    PanelTab,
+    /// Navigate up within the active panel (with scroll)
+    PanelUp,
+    /// Navigate down within the active panel (with scroll)
+    PanelDown,
+    /// Enter the focused agent's conversation view (drill in, Agents panel only)
     EnterAgentView,
     /// Return to root/parent view (drill out)
     ExitAgentView,
-    /// Terminate the focused agent
+    /// Terminate the focused agent (Agents panel only)
     TerminateFocusedAgent,
     // --- Question dialog actions ---
     /// Navigate up in question options

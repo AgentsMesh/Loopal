@@ -1,3 +1,5 @@
+use loopal_tool_api::{DEFAULT_MAX_OUTPUT_BYTES, DEFAULT_MAX_OUTPUT_LINES};
+
 /// Resource limits applied by `LocalBackend`.
 #[derive(Debug, Clone)]
 pub struct ResourceLimits {
@@ -23,8 +25,8 @@ impl Default for ResourceLimits {
     fn default() -> Self {
         Self {
             max_file_read_bytes: 10 * 1024 * 1024, // 10 MB
-            max_output_lines: 2_000,
-            max_output_bytes: 512_000,
+            max_output_lines: DEFAULT_MAX_OUTPUT_LINES,
+            max_output_bytes: DEFAULT_MAX_OUTPUT_BYTES,
             max_glob_results: 10_000,
             max_grep_matches: 500,
             max_fetch_bytes: 5 * 1024 * 1024, // 5 MB

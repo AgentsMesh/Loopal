@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use loopal_config::ResolvedPolicy;
-use loopal_error::ToolIoError;
-use loopal_tool_api::Backend;
+use loopal_error::{ProcessHandle, ToolIoError};
+use loopal_tool_api::{Backend, ExecOutcome};
 use loopal_tool_api::backend_types::{
     EditResult, ExecResult, FetchResult, FileInfo, GlobOptions, GlobSearchResult, GrepOptions,
     GrepSearchResult, LsEntry, LsResult, ReadResult, WriteResult,
@@ -167,7 +167,7 @@ impl Backend for LocalBackend {
         command: &str,
         timeout_ms: u64,
         tail: Arc<loopal_tool_api::OutputTail>,
-    ) -> Result<ExecResult, ToolIoError> {
+    ) -> Result<ExecOutcome, ToolIoError> {
         shell_stream::exec_command_streaming(
             &self.cwd,
             self.policy.as_ref(),
@@ -178,9 +178,9 @@ impl Backend for LocalBackend {
         )
         .await
     }
-
-    async fn exec_background(&self, command: &str, desc: &str) -> Result<String, ToolIoError> {
-        shell::exec_background(&self.cwd, self.policy.as_ref(), command, desc).await
+    async fn exec_background(&self, command: &str) -> Result<ProcessHandle, ToolIoError> {
+        let data = shell::exec_background(&self.cwd, self.policy.as_ref(), command).await?;
+        Ok(ProcessHandle(Box::new(data)))
     }
 
     async fn fetch(&self, url: &str) -> Result<FetchResult, ToolIoError> {

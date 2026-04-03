@@ -23,10 +23,14 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         0
     };
 
+    let agent_panel_h =
+        views::agent_panel::panel_height(&state.agents, &state.active_view, app.agent_panel_offset);
+    let bg_panel_h = views::bg_tasks_panel::bg_panel_height(&app.bg_snapshots);
+
     let layout = FrameLayout::compute(
         size,
         breadcrumb_h,
-        views::agent_panel::panel_height(&state.agents, &state.active_view, app.agent_panel_offset),
+        agent_panel_h + bg_panel_h,
         banner_h,
         input_h,
     );
@@ -59,15 +63,40 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     } else {
         None
     };
-    views::agent_panel::render_agent_panel(
-        f,
-        &state.agents,
-        app.focused_agent.as_deref(),
-        viewing,
-        &state.active_view,
-        app.agent_panel_offset,
-        layout.agents,
-    );
+    // Agent panel + background tasks panel share the `agents` rect.
+    // Guard: skip panel rendering if the available area is zero height.
+    let focused_bg = app.focused_bg_task.as_deref();
+    if layout.agents.height > 0 && bg_panel_h > 0 && agent_panel_h > 0 {
+        let split = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(agent_panel_h),
+                Constraint::Length(bg_panel_h),
+            ])
+            .split(layout.agents);
+        views::agent_panel::render_agent_panel(
+            f,
+            &state.agents,
+            app.focused_agent.as_deref(),
+            viewing,
+            &state.active_view,
+            app.agent_panel_offset,
+            split[0],
+        );
+        views::bg_tasks_panel::render_bg_tasks(f, &app.bg_snapshots, focused_bg, conv.turn_elapsed(), split[1]);
+    } else if layout.agents.height > 0 && bg_panel_h > 0 {
+        views::bg_tasks_panel::render_bg_tasks(f, &app.bg_snapshots, focused_bg, conv.turn_elapsed(), layout.agents);
+    } else if layout.agents.height > 0 {
+        views::agent_panel::render_agent_panel(
+            f,
+            &state.agents,
+            app.focused_agent.as_deref(),
+            viewing,
+            &state.active_view,
+            app.agent_panel_offset,
+            layout.agents,
+        );
+    }
     views::separator::render_separator(f, layout.separator);
     if let Some(ref msg) = conv.retry_banner {
         views::retry_banner::render_retry_banner(f, msg, layout.retry_banner);

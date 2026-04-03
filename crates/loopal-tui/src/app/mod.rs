@@ -92,7 +92,7 @@ impl App {
             input_scroll: 0,
             paste_map: HashMap::new(),
             content_overflows: false,
-            show_topology: false,
+            show_topology: true,
             focused_agent: None,
             focused_bg_task: None,
             focus_mode: FocusMode::default(),

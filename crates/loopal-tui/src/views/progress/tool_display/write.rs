@@ -1,9 +1,10 @@
-//! Write tool rendering.
+//! Write tool rendering — shows bytes written + content preview.
 
 use ratatui::prelude::*;
 
 use loopal_session::types::SessionToolCall;
 
+use super::diff_style::{self, DIFF_MAX_LINES};
 use super::output_first_line;
 
 /// Header detail: file path.
@@ -14,7 +15,7 @@ pub fn extract_detail(input: &serde_json::Value) -> Option<String> {
         .map(|s| s.to_string())
 }
 
-/// Body: show bytes written (from structured metadata, with string fallback).
+/// Body: show bytes written + content preview (green `+` lines via diff_style).
 pub fn render_body(tc: &SessionToolCall) -> Vec<Line<'static>> {
     let msg = tc
         .metadata
@@ -33,7 +34,24 @@ pub fn render_body(tc: &SessionToolCall) -> Vec<Line<'static>> {
             })
         })
         .unwrap_or_else(|| "written".to_string());
-    vec![output_first_line(&msg)]
+
+    let mut lines = vec![output_first_line(&msg)];
+
+    // Content preview: treat as all-new (old="", new=content)
+    if let Some(content) = tc
+        .tool_input
+        .as_ref()
+        .and_then(|i| i.get("content"))
+        .and_then(|v| v.as_str())
+    {
+        let diff = diff_style::render_diff_lines("", content, DIFF_MAX_LINES);
+        lines.extend(diff.lines);
+        if diff.added > DIFF_MAX_LINES {
+            lines.push(diff_style::fold_indicator(diff.added - DIFF_MAX_LINES));
+        }
+    }
+
+    lines
 }
 
 fn format_bytes(bytes: u64) -> String {

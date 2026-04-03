@@ -1,13 +1,11 @@
-//! Edit tool rendering — shows inline diff with -/+ markers.
+//! Edit / MultiEdit tool rendering — shows inline diff with -/+ markers.
 
 use ratatui::prelude::*;
 
 use loopal_session::types::SessionToolCall;
 
-use super::{dim_style, output_first_line};
-
-/// Max diff lines before folding.
-const DIFF_MAX_LINES: usize = 8;
+use super::diff_style::{self, DIFF_MAX_LINES};
+use super::output_first_line;
 
 /// Header detail: file path.
 pub fn extract_detail(input: &serde_json::Value) -> Option<String> {
@@ -16,6 +14,8 @@ pub fn extract_detail(input: &serde_json::Value) -> Option<String> {
         .and_then(|v| v.as_str())
         .map(|s| s.to_string())
 }
+
+// ── Edit (single) ──
 
 /// Body: show summary + inline diff content.
 pub fn render_body(tc: &SessionToolCall) -> Vec<Line<'static>> {
@@ -31,54 +31,60 @@ pub fn render_body(tc: &SessionToolCall) -> Vec<Line<'static>> {
         .and_then(|v| v.as_str())
         .unwrap_or("");
 
-    let old_lines: Vec<&str> = if old.is_empty() {
-        Vec::new()
-    } else {
-        old.lines().collect()
+    let diff = diff_style::render_diff_lines(old, new, DIFF_MAX_LINES);
+    let total = diff.added + diff.removed;
+    let mut lines = vec![output_first_line(&format_summary(diff.added, diff.removed))];
+    lines.extend(diff.lines);
+    if total > DIFF_MAX_LINES {
+        lines.push(diff_style::fold_indicator(total - DIFF_MAX_LINES));
+    }
+    lines
+}
+
+// ── MultiEdit ──
+
+/// Body: iterate edits array, aggregate diff across all edits.
+pub fn render_multi_edit_body(tc: &SessionToolCall) -> Vec<Line<'static>> {
+    let edits = tc
+        .tool_input
+        .as_ref()
+        .and_then(|i| i.get("edits"))
+        .and_then(|v| v.as_array());
+    let Some(edits) = edits else {
+        return vec![output_first_line("edited")];
     };
-    let new_lines: Vec<&str> = if new.is_empty() {
-        Vec::new()
-    } else {
-        new.lines().collect()
-    };
-    let removed = old_lines.len();
-    let added = new_lines.len();
 
-    let mut lines = Vec::new();
+    let mut all_diff: Vec<Line<'static>> = Vec::new();
+    let (mut total_added, mut total_removed) = (0usize, 0usize);
+    let mut budget = DIFF_MAX_LINES;
 
-    // Summary line
-    let summary = format_summary(added, removed);
-    lines.push(output_first_line(&summary));
-
-    // Diff body: removed lines (red), then added lines (green)
-    let red = Style::default().fg(Color::Rgb(220, 80, 80));
-    let green = Style::default().fg(Color::Rgb(80, 200, 80));
-    let dim = dim_style();
-
-    let total_diff = removed + added;
-    let mut shown = 0;
-
-    for line in &old_lines {
-        if shown >= DIFF_MAX_LINES {
-            break;
-        }
-        lines.push(Line::from(Span::styled(format!("    - {line}"), red)));
-        shown += 1;
-    }
-    for line in &new_lines {
-        if shown >= DIFF_MAX_LINES {
-            break;
-        }
-        lines.push(Line::from(Span::styled(format!("    + {line}"), green)));
-        shown += 1;
-    }
-    if total_diff > shown {
-        lines.push(Line::from(Span::styled(
-            format!("    … +{} lines", total_diff - shown),
-            dim,
-        )));
+    for edit in edits {
+        let old = edit
+            .get("old_string")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let new = edit
+            .get("new_string")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let diff = diff_style::render_diff_lines(old, new, budget);
+        total_added += diff.added;
+        total_removed += diff.removed;
+        budget = budget.saturating_sub(diff.lines.len());
+        all_diff.extend(diff.lines);
     }
 
+    let summary = format!(
+        "{} edit(s): {}",
+        edits.len(),
+        format_summary(total_added, total_removed)
+    );
+    let mut lines = vec![output_first_line(&summary)];
+    lines.extend(all_diff);
+    let total = total_added + total_removed;
+    if total > DIFF_MAX_LINES {
+        lines.push(diff_style::fold_indicator(total - DIFF_MAX_LINES));
+    }
     lines
 }
 

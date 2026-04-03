@@ -21,6 +21,7 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
 
 #[test]
 fn test_store_insert_and_retrieve() {
+    let _g = crate::BG_STORE_LOCK.lock().unwrap();
     let store = loopal_tool_background::store();
     let task_id = loopal_tool_background::generate_task_id();
     let (_watch_tx, watch_rx) = tokio::sync::watch::channel(TaskStatus::Running);
@@ -47,7 +48,9 @@ fn test_generate_task_id_is_unique() {
 
 /// Bash tool handles background execution and output retrieval.
 #[tokio::test]
+#[allow(clippy::await_holding_lock)]
 async fn test_bash_background_and_output() {
+    let _g = crate::BG_STORE_LOCK.lock().unwrap();
     let tmp = tempfile::tempdir().unwrap();
     let bash = BashTool;
     let ctx = make_ctx(tmp.path());
@@ -86,7 +89,9 @@ async fn test_bash_background_and_output() {
 /// Bash tool handles stopping background processes.
 #[tokio::test]
 #[cfg(not(windows))]
+#[allow(clippy::await_holding_lock)]
 async fn test_bash_stop_background() {
+    let _g = crate::BG_STORE_LOCK.lock().unwrap();
     let tmp = tempfile::tempdir().unwrap();
     let bash = BashTool;
     let ctx = make_ctx(tmp.path());

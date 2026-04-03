@@ -84,7 +84,9 @@ pub async fn exec_command_streaming(
     let stdout_tail = Arc::clone(&tail);
 
     let stdout_task =
-        tokio::spawn(async move { read_lines_into_buf(stdout_pipe, &ob, Some(&stdout_tail)).await });
+        tokio::spawn(
+            async move { read_lines_into_buf(stdout_pipe, &ob, Some(&stdout_tail)).await },
+        );
     let stderr_task =
         tokio::spawn(async move { read_lines_into_buf(stderr_pipe, &eb, None).await });
 
@@ -146,9 +148,25 @@ fn build_exec_result(
 ) -> Result<ExecResult, ToolIoError> {
     let stdout_raw = stdout_buf.lock().unwrap().clone();
     let stderr_raw = stderr_buf.lock().unwrap().clone();
-    let stdout = handle_overflow(&stdout_raw, limits.max_output_lines, limits.max_output_bytes, "bash_stdout").display;
-    let stderr = handle_overflow(&stderr_raw, limits.max_output_lines, limits.max_output_bytes, "bash_stderr").display;
-    Ok(ExecResult { stdout, stderr, exit_code })
+    let stdout = handle_overflow(
+        &stdout_raw,
+        limits.max_output_lines,
+        limits.max_output_bytes,
+        "bash_stdout",
+    )
+    .display;
+    let stderr = handle_overflow(
+        &stderr_raw,
+        limits.max_output_lines,
+        limits.max_output_bytes,
+        "bash_stderr",
+    )
+    .display;
+    Ok(ExecResult {
+        stdout,
+        stderr,
+        exit_code,
+    })
 }
 
 /// Read lines from an async reader into a shared buffer, optionally pushing

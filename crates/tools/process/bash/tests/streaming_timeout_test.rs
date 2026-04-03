@@ -58,10 +58,7 @@ async fn streaming_timeout_converts_to_background() {
         .unwrap();
 
     let output = bash
-        .execute(
-            json!({"process_id": pid, "block": false}),
-            &ctx,
-        )
+        .execute(json!({"process_id": pid, "block": false}), &ctx)
         .await
         .unwrap();
     assert!(

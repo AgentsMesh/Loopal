@@ -11,12 +11,12 @@ mod app_event_edge_test;
 mod app_event_test;
 #[path = "suite/app_test.rs"]
 mod app_test;
-#[path = "suite/bg_task_focus_test.rs"]
-mod bg_task_focus_test;
 #[path = "suite/app_tool_edge_test.rs"]
 mod app_tool_edge_test;
 #[path = "suite/app_tool_test.rs"]
 mod app_tool_test;
+#[path = "suite/bg_task_focus_test.rs"]
+mod bg_task_focus_test;
 #[path = "suite/command_dispatch_test.rs"]
 mod command_dispatch_test;
 #[path = "suite/command_edge_test.rs"]
@@ -45,10 +45,6 @@ mod input_scroll_test;
 mod input_test;
 #[path = "suite/line_cache_test.rs"]
 mod line_cache_test;
-#[path = "suite/panel_tab_test.rs"]
-mod panel_tab_test;
-#[path = "suite/render_guard_test.rs"]
-mod render_guard_test;
 #[path = "suite/markdown_code_test.rs"]
 mod markdown_code_test;
 #[path = "suite/markdown_edge_test.rs"]
@@ -61,6 +57,10 @@ mod markdown_test;
 mod message_lines_edge_test;
 #[path = "suite/message_lines_test.rs"]
 mod message_lines_test;
+#[path = "suite/panel_tab_test.rs"]
+mod panel_tab_test;
+#[path = "suite/render_guard_test.rs"]
+mod render_guard_test;
 #[path = "suite/skill_render_test.rs"]
 mod skill_render_test;
 #[path = "suite/styled_wrap_test.rs"]

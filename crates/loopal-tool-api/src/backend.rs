@@ -115,7 +115,9 @@ pub trait Backend: Send + Sync {
         timeout_ms: u64,
         _tail: Arc<OutputTail>,
     ) -> Result<ExecOutcome, ToolIoError> {
-        self.exec(command, timeout_ms).await.map(ExecOutcome::Completed)
+        self.exec(command, timeout_ms)
+            .await
+            .map(ExecOutcome::Completed)
     }
 
     /// Spawn a command in the background.

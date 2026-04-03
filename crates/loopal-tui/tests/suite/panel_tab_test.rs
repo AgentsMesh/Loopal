@@ -61,7 +61,10 @@ fn tab_switches_from_agents_to_bg_tasks() {
     panel_tab(&mut app);
 
     assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::BgTasks));
-    assert!(app.focused_bg_task.is_some(), "focused_bg_task should be set");
+    assert!(
+        app.focused_bg_task.is_some(),
+        "focused_bg_task should be set"
+    );
 }
 
 #[test]
@@ -94,7 +97,11 @@ fn tab_cycles_agents_when_only_agents() {
     panel_tab(&mut app);
 
     assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Agents));
-    assert_eq!(app.focused_agent.as_deref(), Some("b"), "should cycle to next agent");
+    assert_eq!(
+        app.focused_agent.as_deref(),
+        Some("b"),
+        "should cycle to next agent"
+    );
 }
 
 #[test]
@@ -110,7 +117,11 @@ fn tab_cycles_bg_tasks_when_only_bg_tasks() {
     panel_tab(&mut app);
 
     assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::BgTasks));
-    assert_eq!(app.focused_bg_task.as_deref(), Some("t2"), "should cycle to next task");
+    assert_eq!(
+        app.focused_bg_task.as_deref(),
+        Some("t2"),
+        "should cycle to next task"
+    );
 }
 
 // === Round-trip ===

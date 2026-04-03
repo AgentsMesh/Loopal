@@ -85,8 +85,7 @@ async fn model_override_applied_in_session_start() {
         match tokio::time::timeout(Duration::from_secs(3), rx.recv()).await {
             Ok(Some(Incoming::Notification { method, params })) => {
                 if method == methods::AGENT_EVENT.name
-                    && let Ok(ev) =
-                        serde_json::from_value::<loopal_protocol::AgentEvent>(params)
+                    && let Ok(ev) = serde_json::from_value::<loopal_protocol::AgentEvent>(params)
                 {
                     match &ev.payload {
                         loopal_protocol::AgentEventPayload::Stream { .. } => {

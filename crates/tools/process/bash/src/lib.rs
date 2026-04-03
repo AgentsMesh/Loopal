@@ -141,8 +141,8 @@ async fn exec_foreground(
             partial_output,
             handle,
         }) => {
-            let task_id = bg_convert::register(handle, command)
-                .unwrap_or_else(|| "(unknown)".into());
+            let task_id =
+                bg_convert::register(handle, command).unwrap_or_else(|| "(unknown)".into());
             Ok(format::format_converted_to_background(
                 &task_id,
                 timeout_ms,

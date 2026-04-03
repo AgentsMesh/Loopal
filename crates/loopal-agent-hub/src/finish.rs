@@ -35,8 +35,7 @@ pub(crate) async fn finish_and_deliver(hub: &Arc<Mutex<Hub>>, name: &str, output
         if addr.is_remote()
             && let Some(ul) = uplink
         {
-            let content =
-                format!("<agent-result name=\"{name}\">\n{output_text}\n</agent-result>");
+            let content = format!("<agent-result name=\"{name}\">\n{output_text}\n</agent-result>");
             let envelope = Envelope::new(
                 loopal_protocol::MessageSource::System("agent-completed".into()),
                 &parent,

@@ -144,7 +144,11 @@ fn ctrl_c_clears_input_first_even_in_agent_panel() {
     handle_key(&mut app, ctrl('c'));
     assert!(app.input.is_empty());
     assert!(app.focused_agent.is_some(), "focus not cleared yet");
-    assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Agents), "mode unchanged");
+    assert_eq!(
+        app.focus_mode,
+        FocusMode::Panel(PanelKind::Agents),
+        "mode unchanged"
+    );
 }
 
 #[test]

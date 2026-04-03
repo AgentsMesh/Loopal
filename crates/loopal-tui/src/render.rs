@@ -83,9 +83,21 @@ pub fn draw(f: &mut Frame, app: &mut App) {
             app.agent_panel_offset,
             split[0],
         );
-        views::bg_tasks_panel::render_bg_tasks(f, &app.bg_snapshots, focused_bg, conv.turn_elapsed(), split[1]);
+        views::bg_tasks_panel::render_bg_tasks(
+            f,
+            &app.bg_snapshots,
+            focused_bg,
+            conv.turn_elapsed(),
+            split[1],
+        );
     } else if layout.agents.height > 0 && bg_panel_h > 0 {
-        views::bg_tasks_panel::render_bg_tasks(f, &app.bg_snapshots, focused_bg, conv.turn_elapsed(), layout.agents);
+        views::bg_tasks_panel::render_bg_tasks(
+            f,
+            &app.bg_snapshots,
+            focused_bg,
+            conv.turn_elapsed(),
+            layout.agents,
+        );
     } else if layout.agents.height > 0 {
         views::agent_panel::render_agent_panel(
             f,

@@ -17,7 +17,11 @@ pub fn format_exec_result(output: ExecResult) -> ToolResult {
         }
         combined.push_str(&output.stderr);
     }
-    let truncated = truncate_output(&combined, DEFAULT_MAX_OUTPUT_LINES, DEFAULT_MAX_OUTPUT_BYTES);
+    let truncated = truncate_output(
+        &combined,
+        DEFAULT_MAX_OUTPUT_LINES,
+        DEFAULT_MAX_OUTPUT_BYTES,
+    );
     if output.exit_code != 0 {
         ToolResult::error(format!("Exit code: {}\n{truncated}", output.exit_code))
     } else {
@@ -38,7 +42,11 @@ pub fn format_converted_to_background(
          Use Bash with process_id to check output later."
     );
     if !partial_output.is_empty() {
-        let truncated = truncate_output(partial_output, DEFAULT_MAX_OUTPUT_LINES, DEFAULT_MAX_OUTPUT_BYTES);
+        let truncated = truncate_output(
+            partial_output,
+            DEFAULT_MAX_OUTPUT_LINES,
+            DEFAULT_MAX_OUTPUT_BYTES,
+        );
         msg.push_str("\n\nPartial output before timeout:\n");
         msg.push_str(&truncated);
     }

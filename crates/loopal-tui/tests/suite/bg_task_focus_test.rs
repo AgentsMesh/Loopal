@@ -34,7 +34,11 @@ fn sync_bg(app: &mut App) {
 }
 
 fn snap(id: &str, desc: &str) -> BgTaskSnapshot {
-    BgTaskSnapshot { id: id.into(), description: desc.into(), status: BgTaskStatus::Running }
+    BgTaskSnapshot {
+        id: id.into(),
+        description: desc.into(),
+        status: BgTaskStatus::Running,
+    }
 }
 
 // === bg_tasks_panel utility functions (pure, no global store) ===
@@ -52,13 +56,19 @@ fn bg_panel_height_counts_running_tasks() {
 
 #[test]
 fn bg_panel_height_caps_at_max() {
-    let snaps: Vec<_> = (1..=5).map(|i| snap(&format!("bg_{i}"), &format!("t{i}"))).collect();
+    let snaps: Vec<_> = (1..=5)
+        .map(|i| snap(&format!("bg_{i}"), &format!("t{i}")))
+        .collect();
     assert_eq!(bg_tasks_panel::bg_panel_height(&snaps), 3);
 }
 
 #[test]
 fn running_task_ids_sorted() {
-    let snaps = vec![snap("bg_3", "three"), snap("bg_1", "one"), snap("bg_2", "two")];
+    let snaps = vec![
+        snap("bg_3", "three"),
+        snap("bg_1", "one"),
+        snap("bg_2", "two"),
+    ];
     assert_eq!(
         bg_tasks_panel::running_task_ids(&snaps),
         vec!["bg_3", "bg_1", "bg_2"],
@@ -131,7 +141,11 @@ fn empty_tasks_clears_focus_and_exits_panel() {
     app.focus_mode = FocusMode::Panel(PanelKind::BgTasks);
     cycle_panel_focus(&mut app, true);
     assert!(app.focused_bg_task.is_none());
-    assert_eq!(app.focus_mode, FocusMode::Input, "should exit panel when bg tasks empty");
+    assert_eq!(
+        app.focus_mode,
+        FocusMode::Input,
+        "should exit panel when bg tasks empty"
+    );
 }
 
 #[test]
@@ -139,8 +153,7 @@ fn stale_focus_recovery() {
     let _guard = crate::BG_STORE_LOCK.lock().unwrap();
     let mut app = make_app();
     add_bg_task("bg_live", "alive");
-    let handle =
-        loopal_tool_background::register_proxy("bg_done".into(), "done".into());
+    let handle = loopal_tool_background::register_proxy("bg_done".into(), "done".into());
     handle.complete("output".into(), true);
     sync_bg(&mut app); // only bg_live shows (running filter)
     app.focused_bg_task = Some("bg_done".into());

@@ -5,11 +5,11 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use loopal_config::ResolvedPolicy;
 use loopal_error::{ProcessHandle, ToolIoError};
-use loopal_tool_api::{Backend, ExecOutcome};
 use loopal_tool_api::backend_types::{
     EditResult, ExecResult, FetchResult, FileInfo, GlobOptions, GlobSearchResult, GrepOptions,
     GrepSearchResult, LsEntry, LsResult, ReadResult, WriteResult,
 };
+use loopal_tool_api::{Backend, ExecOutcome};
 
 use crate::limits::ResourceLimits;
 use crate::{fs, net, path, search, shell, shell_stream};

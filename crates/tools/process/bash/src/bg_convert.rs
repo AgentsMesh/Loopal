@@ -43,7 +43,15 @@ fn register_timed_out(data: TimedOutProcessData, desc: &str) -> String {
     let status = Arc::new(Mutex::new(TaskStatus::Running));
     let (watch_tx, watch_rx) = tokio::sync::watch::channel(TaskStatus::Running);
 
-    insert_task(&task_id, desc, &combined_output, &exit_code, &status, &child, watch_rx);
+    insert_task(
+        &task_id,
+        desc,
+        &combined_output,
+        &exit_code,
+        &status,
+        &child,
+        watch_rx,
+    );
 
     let ob = Arc::clone(&stdout_buf);
     let eb = Arc::clone(&stderr_buf);
@@ -88,7 +96,15 @@ fn register_spawned_data(data: SpawnedBackgroundData, desc: &str) -> String {
     let (watch_tx, watch_rx) = tokio::sync::watch::channel(TaskStatus::Running);
     let task_id = loopal_tool_background::generate_task_id();
 
-    insert_task(&task_id, desc, &combined_output, &exit_code, &status, &data.child, watch_rx);
+    insert_task(
+        &task_id,
+        desc,
+        &combined_output,
+        &exit_code,
+        &status,
+        &data.child,
+        watch_rx,
+    );
 
     if let Some(pipe) = stdout_pipe {
         let buf = Arc::clone(&stdout_buf);
@@ -101,9 +117,14 @@ fn register_spawned_data(data: SpawnedBackgroundData, desc: &str) -> String {
 
     let ob = Arc::clone(&stdout_buf);
     let eb = Arc::clone(&stderr_buf);
-    spawn_monitor(data.child, combined_output, exit_code, status, watch_tx, move || {
-        combine(&ob, &eb)
-    });
+    spawn_monitor(
+        data.child,
+        combined_output,
+        exit_code,
+        status,
+        watch_tx,
+        move || combine(&ob, &eb),
+    );
 
     task_id
 }

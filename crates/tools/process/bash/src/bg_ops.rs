@@ -35,9 +35,7 @@ pub async fn bg_output(process_id: &str, block: bool, timeout_ms: u64) -> ToolRe
         };
         if tokio::time::timeout(deadline, wait).await.is_err() {
             let output = output_buf.lock().unwrap().clone();
-            return ToolResult::success(format!(
-                "{output}\n[Status: Running (timed out waiting)]"
-            ));
+            return ToolResult::success(format!("{output}\n[Status: Running (timed out waiting)]"));
         }
     }
 
@@ -68,10 +66,7 @@ pub fn bg_stop(process_id: &str) -> ToolResult {
     // Now update status (child lock already released).
     let mut status = task.status.lock().unwrap();
     if *status != TaskStatus::Running {
-        return ToolResult::success(format!(
-            "Process already {:?}: {process_id}",
-            *status
-        ));
+        return ToolResult::success(format!("Process already {:?}: {process_id}", *status));
     }
     *status = TaskStatus::Failed;
     ToolResult::success(format!("Process stopped: {process_id}"))

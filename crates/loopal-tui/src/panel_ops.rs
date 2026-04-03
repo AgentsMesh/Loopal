@@ -64,11 +64,7 @@ fn cycle_agent_focus(app: &mut App, forward: bool) {
         app.agent_panel_offset = 0;
         return;
     }
-    app.focused_agent = Some(next_in_list(
-        &keys,
-        app.focused_agent.as_deref(),
-        forward,
-    ));
+    app.focused_agent = Some(next_in_list(&keys, app.focused_agent.as_deref(), forward));
     if let Some(ref focused) = app.focused_agent
         && let Some(idx) = keys.iter().position(|k| k == focused)
     {
@@ -88,11 +84,7 @@ fn cycle_bg_task_focus(app: &mut App, forward: bool) {
         }
         return;
     }
-    app.focused_bg_task = Some(next_in_list(
-        &ids,
-        app.focused_bg_task.as_deref(),
-        forward,
-    ));
+    app.focused_bg_task = Some(next_in_list(&ids, app.focused_bg_task.as_deref(), forward));
 }
 
 /// Ensure the focused item exists for the given panel kind.

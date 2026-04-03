@@ -140,9 +140,7 @@ impl SharedSession {
             .find(|c| c.id == client_id)
             .is_some_and(|c| c.is_primary);
         clients.retain(|c| c.id != client_id);
-        if was_primary
-            && let Some(first) = clients.first_mut()
-        {
+        if was_primary && let Some(first) = clients.first_mut() {
             first.is_primary = true;
             tracing::info!(client = %first.id, "promoted to primary");
         }
@@ -195,9 +193,7 @@ impl SharedSession {
         }
         // Promote new primary if needed
         let has_primary = clients.iter().any(|c| c.is_primary);
-        if !has_primary
-            && let Some(first) = clients.first_mut()
-        {
+        if !has_primary && let Some(first) = clients.first_mut() {
             first.is_primary = true;
             tracing::info!(client = %first.id, "promoted to primary (dead cleanup)");
         }

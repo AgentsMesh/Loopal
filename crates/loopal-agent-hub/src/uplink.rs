@@ -168,8 +168,7 @@ pub async fn handle_reverse_requests(
             }
             Incoming::Notification { method, params } => {
                 if method == methods::AGENT_MESSAGE.name
-                    && let Ok(env) =
-                        serde_json::from_value::<loopal_protocol::Envelope>(params)
+                    && let Ok(env) = serde_json::from_value::<loopal_protocol::Envelope>(params)
                 {
                     let _ = hub.lock().await.registry.route_message(&env).await;
                 }

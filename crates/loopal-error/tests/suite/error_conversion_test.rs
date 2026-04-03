@@ -27,7 +27,7 @@ fn test_loopal_error_from_provider_error() {
 
 #[test]
 fn test_loopal_error_from_tool_error() {
-    let tool_err = ToolError::Timeout(5000);
+    let tool_err = ToolError::Timeout(std::time::Duration::from_secs(5));
     let err: LoopalError = tool_err.into();
     assert!(matches!(err, LoopalError::Tool(_)));
 }
@@ -75,8 +75,8 @@ fn test_tool_error_display_execution_failed() {
 
 #[test]
 fn test_tool_error_display_timeout() {
-    let err = ToolError::Timeout(30000);
-    assert_eq!(format!("{err}"), "Timeout after 30000ms");
+    let err = ToolError::Timeout(std::time::Duration::from_secs(30));
+    assert_eq!(format!("{err}"), "Timeout after 30s");
 }
 
 // --- ConfigError Display ---

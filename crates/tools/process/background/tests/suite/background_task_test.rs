@@ -78,7 +78,7 @@ async fn test_bash_background_and_output() {
 
     let output = bash
         .execute(
-            json!({"process_id": pid, "block": true, "timeout": 5000}),
+            json!({"process_id": pid, "block": true, "timeout": 5}),
             &ctx,
         )
         .await

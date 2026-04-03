@@ -115,7 +115,7 @@ async fn test_output_timeout() {
 
     let output = bash
         .execute(
-            json!({"process_id": pid, "block": true, "timeout": 200}),
+            json!({"process_id": pid, "block": true, "timeout": 1}),
             &ctx,
         )
         .await

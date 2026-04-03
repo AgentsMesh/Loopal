@@ -1,3 +1,4 @@
+use std::time::Duration;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -71,8 +72,8 @@ pub enum ToolError {
     #[error("Execution failed: {0}")]
     ExecutionFailed(String),
 
-    #[error("Timeout after {0}ms")]
-    Timeout(u64),
+    #[error("Timeout after {0:?}")]
+    Timeout(Duration),
 }
 
 #[derive(Debug, Error)]

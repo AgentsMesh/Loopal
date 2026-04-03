@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use loopal_tool_api::{DEFAULT_MAX_OUTPUT_BYTES, DEFAULT_MAX_OUTPUT_LINES};
 
 /// Resource limits applied by `LocalBackend`.
@@ -15,10 +17,10 @@ pub struct ResourceLimits {
     pub max_grep_matches: usize,
     /// Maximum HTTP response body size in bytes.
     pub max_fetch_bytes: usize,
-    /// Default shell command timeout (ms).
-    pub default_timeout_ms: u64,
-    /// HTTP fetch timeout (seconds).
-    pub fetch_timeout_secs: u64,
+    /// Default shell command timeout.
+    pub default_timeout: Duration,
+    /// HTTP fetch timeout.
+    pub fetch_timeout: Duration,
 }
 
 impl Default for ResourceLimits {
@@ -29,9 +31,9 @@ impl Default for ResourceLimits {
             max_output_bytes: DEFAULT_MAX_OUTPUT_BYTES,
             max_glob_results: 10_000,
             max_grep_matches: 500,
-            max_fetch_bytes: 5 * 1024 * 1024, // 5 MB
-            default_timeout_ms: 300_000,      // 5 min
-            fetch_timeout_secs: 30,
+            max_fetch_bytes: 5 * 1024 * 1024,          // 5 MB
+            default_timeout: Duration::from_secs(300), // 5 min
+            fetch_timeout: Duration::from_secs(30),
         }
     }
 }

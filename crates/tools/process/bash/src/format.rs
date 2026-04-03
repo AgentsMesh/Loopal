@@ -32,10 +32,10 @@ pub fn format_exec_result(output: ExecResult) -> ToolResult {
 /// Format a timeout-to-background conversion into a success `ToolResult`.
 pub fn format_converted_to_background(
     task_id: &str,
-    timeout_ms: u64,
+    timeout: std::time::Duration,
     partial_output: &str,
 ) -> ToolResult {
-    let timeout_secs = timeout_ms / 1000;
+    let timeout_secs = timeout.as_secs();
     let mut msg = format!(
         "Command timed out after {timeout_secs}s and was moved to background.\n\
          process_id: {task_id}\n\

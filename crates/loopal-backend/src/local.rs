@@ -1,6 +1,7 @@
 //! `LocalBackend` — production `Backend` for local filesystem + OS sandbox.
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use loopal_config::ResolvedPolicy;
@@ -151,12 +152,12 @@ impl Backend for LocalBackend {
         &self.cwd
     }
 
-    async fn exec(&self, command: &str, timeout_ms: u64) -> Result<ExecResult, ToolIoError> {
+    async fn exec(&self, command: &str, timeout: Duration) -> Result<ExecResult, ToolIoError> {
         shell::exec_command(
             &self.cwd,
             self.policy.as_ref(),
             command,
-            timeout_ms,
+            timeout,
             &self.limits,
         )
         .await
@@ -165,14 +166,14 @@ impl Backend for LocalBackend {
     async fn exec_streaming(
         &self,
         command: &str,
-        timeout_ms: u64,
+        timeout: Duration,
         tail: Arc<loopal_tool_api::OutputTail>,
     ) -> Result<ExecOutcome, ToolIoError> {
         shell_stream::exec_command_streaming(
             &self.cwd,
             self.policy.as_ref(),
             command,
-            timeout_ms,
+            timeout,
             &self.limits,
             tail,
         )

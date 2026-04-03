@@ -29,7 +29,7 @@ pub async fn fetch_url(
     }
 
     let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(limits.fetch_timeout_secs))
+        .timeout(limits.fetch_timeout)
         .build()
         .map_err(|e| ToolIoError::Network(e.to_string()))?;
 

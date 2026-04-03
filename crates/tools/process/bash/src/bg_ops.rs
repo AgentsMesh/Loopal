@@ -11,7 +11,7 @@ pub async fn bg_output(
     store: &BackgroundTaskStore,
     process_id: &str,
     block: bool,
-    timeout_ms: u64,
+    timeout: Duration,
 ) -> ToolResult {
     let cloned = store.with_task(process_id, |task| {
         (
@@ -26,7 +26,6 @@ pub async fn bg_output(
     };
 
     if block {
-        let deadline = Duration::from_millis(timeout_ms);
         let wait = async {
             loop {
                 if *watch_rx.borrow() != TaskStatus::Running {
@@ -37,7 +36,7 @@ pub async fn bg_output(
                 }
             }
         };
-        if tokio::time::timeout(deadline, wait).await.is_err() {
+        if tokio::time::timeout(timeout, wait).await.is_err() {
             let output = output_buf.lock().unwrap().clone();
             return ToolResult::success(format!("{output}\n[Status: Running (timed out waiting)]"));
         }

@@ -20,7 +20,7 @@ pub async fn exec_command(
     cwd: &Path,
     policy: Option<&ResolvedPolicy>,
     command: &str,
-    timeout_ms: u64,
+    timeout: Duration,
     limits: &ResourceLimits,
 ) -> Result<ExecResult, ToolIoError> {
     let (program, args, env) = build_command(cwd, policy, command);
@@ -34,9 +34,9 @@ pub async fn exec_command(
         }
     }
 
-    let output = tokio::time::timeout(Duration::from_millis(timeout_ms), cmd.output())
+    let output = tokio::time::timeout(timeout, cmd.output())
         .await
-        .map_err(|_| ToolIoError::Timeout(timeout_ms))?
+        .map_err(|_| ToolIoError::Timeout(timeout))?
         .map_err(|e| ToolIoError::ExecFailed(format!("spawn failed: {e}")))?;
 
     let stdout_raw = String::from_utf8_lossy(&output.stdout);

@@ -4,8 +4,8 @@ use std::sync::OnceLock;
 use loopal_config::{ResolvedPolicy, SandboxPolicy};
 
 /// Static base policy loaded from the `.sbpl` file at compile time.
-/// Contains: deny-default, process/sysctl/iokit/mach/ipc/pty rules,
-/// system writable paths, and framework executable-mapping rules.
+/// Contains: deny-default, broad system-access allows, IPC/PTY rules,
+/// system writable paths, and unrestricted executable-mapping.
 const BASE_POLICY: &str = include_str!("seatbelt_base.sbpl");
 
 /// Cached result of the `sandbox-exec` availability probe.

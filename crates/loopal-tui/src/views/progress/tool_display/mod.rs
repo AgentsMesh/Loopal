@@ -1,11 +1,15 @@
-//! Tool rendering — each tool displayed with expanded output, folded after N lines.
 mod agent;
+mod apply_patch;
 mod bash;
+mod diff_style;
 mod edit;
 mod glob;
 mod grep;
+mod output_format;
 mod read;
 mod write;
+
+pub(crate) use output_format::{dim_style, expand_output, output_first_line, output_style};
 
 use ratatui::prelude::*;
 
@@ -58,6 +62,7 @@ fn extract_detail(tc: &SessionToolCall) -> String {
         "Read" => read::extract_detail(input),
         "Write" => write::extract_detail(input),
         "Edit" | "MultiEdit" => edit::extract_detail(input),
+        "ApplyPatch" => apply_patch::extract_detail(input),
         "Grep" => grep::extract_detail(input),
         "Glob" => glob::extract_detail(input),
         "Ls" => input
@@ -103,7 +108,9 @@ fn render_body(tc: &SessionToolCall) -> Vec<Line<'static>> {
         "Agent" => agent::render_success_body(tc),
         "Read" => read::render_body(tc),
         "Write" => write::render_body(tc),
-        "Edit" | "MultiEdit" => edit::render_body(tc),
+        "Edit" => edit::render_body(tc),
+        "MultiEdit" => edit::render_multi_edit_body(tc),
+        "ApplyPatch" => apply_patch::render_body(tc),
         "Grep" => grep::render_body(tc),
         "Glob" => glob::render_body(tc),
         _ => render_default_body(tc),
@@ -123,43 +130,6 @@ fn render_default_body(tc: &SessionToolCall) -> Vec<Line<'static>> {
         return vec![output_first_line(trimmed)];
     }
     expand_output(result, EXPAND_MAX_LINES, output_style())
-}
-
-// ── Shared helpers (used by sub-modules via `super::`) ──
-
-/// Standard style for tool output text — light enough for dark-mode readability.
-pub(crate) fn output_style() -> Style {
-    Style::default().fg(Color::Rgb(155, 160, 170))
-}
-
-/// Dimmed style for secondary info (elapsed time, fold counts, etc.).
-pub(crate) fn dim_style() -> Style {
-    Style::default().fg(Color::Rgb(100, 105, 115))
-}
-
-/// Expand output up to `max_lines`, fold the rest.
-pub(crate) fn expand_output(content: &str, max_lines: usize, style: Style) -> Vec<Line<'static>> {
-    let all: Vec<&str> = content.lines().collect();
-    let total = all.len();
-    let mut lines = Vec::new();
-
-    for (i, text) in all.iter().take(max_lines).enumerate() {
-        let prefix = if i == 0 { "  ⎿ " } else { "    " };
-        lines.push(Line::from(Span::styled(format!("{prefix}{text}"), style)));
-    }
-
-    if total > max_lines {
-        lines.push(Line::from(Span::styled(
-            format!("    … +{} lines", total - max_lines),
-            dim_style(),
-        )));
-    }
-    lines
-}
-
-/// Single output line with ⎿ prefix.
-pub(crate) fn output_first_line(text: &str) -> Line<'static> {
-    Line::from(Span::styled(format!("  ⎿ {text}"), output_style()))
 }
 
 fn shorten_home(path: &str) -> String {

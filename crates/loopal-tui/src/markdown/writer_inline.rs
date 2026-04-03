@@ -95,8 +95,10 @@ impl MdWriter {
     // ---- Footnote reference ----
 
     pub(super) fn on_footnote_ref(&mut self, label: &str) {
-        self.pending_spans
-            .push(Span::styled(format!("[^{label}]"), self.styles.footnote_ref));
+        self.pending_spans.push(Span::styled(
+            format!("[^{label}]"),
+            self.styles.footnote_ref,
+        ));
     }
 
     // ---- Text ----

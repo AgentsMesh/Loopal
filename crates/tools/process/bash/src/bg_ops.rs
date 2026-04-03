@@ -48,8 +48,8 @@ pub async fn bg_output(process_id: &str, block: bool, timeout_ms: u64) -> ToolRe
 /// Stop a background process.
 ///
 /// Lock order: `child` → `status` (matches the monitor task).
-/// Always returns success with "stopped" — even if the monitor already
-/// set a terminal status (race between kill and monitor is benign).
+/// Always returns success — even if the monitor already set a terminal
+/// status (race between kill and monitor is benign).
 pub fn bg_stop(process_id: &str) -> ToolResult {
     let store = loopal_tool_background::store().lock().unwrap();
     let Some(task) = store.get(process_id) else {

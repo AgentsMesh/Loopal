@@ -105,7 +105,7 @@ async fn test_bash_stop_background() {
         .and_then(|l| l.strip_prefix("process_id: "))
         .unwrap();
 
-    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
     // Stop via Bash(process_id=..., stop=true)
     let stop = bash

@@ -1,6 +1,11 @@
 ; Loopal macOS Seatbelt base policy
-; Inspired by Codex / Chromium sandbox policy, with relaxations for broad
-; CLI-tool compatibility.
+;
+; Security model: protect file-system writes (workspace containment) and
+; sensitive-file access.  Everything else — process execution, system-info
+; reads, service lookups, device enumeration, dylib loading — is allowed
+; because restricting them adds no security when process-exec/process-fork
+; are already unrestricted, yet causes repeated tool-compatibility failures
+; (Bazel TSan dylib, JVM crashes, Nix toolchains, etc.).
 ;
 ; This file is included via include_str!() and provides the static rules.
 ; Dynamic sections (file-read*, file-write*, network) are appended by Rust.
@@ -16,69 +21,19 @@
 (allow signal (target same-sandbox))
 (allow process-info* (target same-sandbox))
 
-; --- sysctl ---
-; Prefix-based whitelist: broader than Codex for tool compatibility,
-; but still blocks writes (except the one JVM needs).
-(allow sysctl-read
-  (sysctl-name-prefix "hw.")
-  (sysctl-name-prefix "kern.os")
-  (sysctl-name-prefix "kern.proc.")
-  (sysctl-name-prefix "machdep.cpu.")
-  (sysctl-name-prefix "net.routetable.")
-  (sysctl-name "kern.argmax")
-  (sysctl-name "kern.hostname")
-  (sysctl-name "kern.maxfilesperproc")
-  (sysctl-name "kern.maxproc")
-  (sysctl-name "kern.secure_kernel")
-  (sysctl-name "kern.usrstack64")
-  (sysctl-name "kern.version")
-  (sysctl-name "sysctl.proc_cputype")
-  (sysctl-name "vm.loadavg")
-)
+; --- System info (read-only, no security impact) ---
+(allow sysctl-read)
 
 ; JVM passes a memory buffer to this sysctl; classified as "write" but
-; conceptually it is a read.
+; conceptually it is a read.  All other sysctl writes stay denied.
 (allow sysctl-write
   (sysctl-name "kern.grade_cputype"))
 
-; --- IOKit ---
-; Only RootDomainUserClient (power/hardware info). This is enough for
-; JVM, Node, Docker, and most native tools.
-(allow iokit-open
-  (iokit-registry-entry-class "RootDomainUserClient"))
+; --- IOKit (device enumeration, hardware info) ---
+(allow iokit-open)
 
-; --- Mach services ---
-; Whitelist of system services needed by common dev tools.
-(allow mach-lookup
-  ; Directory / user info
-  (global-name "com.apple.system.opendirectoryd.libinfo")
-  (global-name "com.apple.system.opendirectoryd.membership")
-  (global-name "com.apple.system.DirectoryService.libinfo_v1")
-  (global-name "com.apple.bsd.dirhelper")
-  ; Preferences
-  (global-name "com.apple.cfprefsd.agent")
-  (global-name "com.apple.cfprefsd.daemon")
-  (local-name "com.apple.cfprefsd.agent")
-  ; Security / TLS
-  (global-name "com.apple.SecurityServer")
-  (global-name "com.apple.trustd")
-  (global-name "com.apple.trustd.agent")
-  (global-name "com.apple.ocspd")
-  (global-name "com.apple.secinitd")
-  ; Network config
-  (global-name "com.apple.networkd")
-  (global-name "com.apple.SystemConfiguration.DNSConfiguration")
-  (global-name "com.apple.SystemConfiguration.configd")
-  ; Logging / diagnostics
-  (global-name "com.apple.system.logger")
-  (global-name "com.apple.system.notification_center")
-  (global-name "com.apple.logd")
-  (global-name "com.apple.logd.events")
-  (global-name "com.apple.diagnosticd")
-  (global-name "com.apple.runningboard")
-  ; Power management
-  (global-name "com.apple.PowerManagement.control")
-)
+; --- Mach services (XPC / system daemons) ---
+(allow mach-lookup)
 
 ; --- IPC ---
 ; POSIX semaphores: needed by Python multiprocessing, database engines, etc.
@@ -101,15 +56,7 @@
 (allow file-write* (subpath "/private/var/tmp"))
 
 ; --- Executable mapping ---
-; Allow mmap(PROT_EXEC) for system frameworks and libraries so the
-; dynamic linker can load .dylib files.
-(allow file-map-executable
-  (subpath "/Library/Apple/System/Library/Frameworks")
-  (subpath "/Library/Apple/System/Library/PrivateFrameworks")
-  (subpath "/Library/Apple/usr/lib")
-  (subpath "/System/Library/Frameworks")
-  (subpath "/System/Library/PrivateFrameworks")
-  (subpath "/usr/lib")
-  (subpath "/opt/homebrew/lib")
-  (subpath "/usr/local/lib")
-)
+; Allow mmap(PROT_EXEC) everywhere — no security value when process-exec
+; is unrestricted, but path-based whitelists break Bazel toolchains,
+; Nix store, Homebrew Cellar, pyenv/rbenv, Cargo builds, etc.
+(allow file-map-executable)

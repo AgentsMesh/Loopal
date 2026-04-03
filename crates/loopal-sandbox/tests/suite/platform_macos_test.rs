@@ -70,17 +70,25 @@ mod macos_tests {
         assert!(profile.contains("(allow network*)"));
     }
 
+    /// Non-file-system operations are broadly allowed because process-exec
+    /// is unrestricted — whitelisting them adds no security but breaks tools.
     #[test]
-    fn process_rules_aligned_with_codex() {
+    fn system_access_rules_are_permissive() {
         let profile = generate_seatbelt_profile(&workspace_policy());
-        // signal scoped to same-sandbox (not unrestricted)
+
+        // Process rules
+        assert!(profile.contains("(allow process-exec)"));
+        assert!(profile.contains("(allow process-fork)"));
         assert!(profile.contains("(allow signal (target same-sandbox))"));
-        // process-info scoped to same-sandbox
         assert!(profile.contains("(allow process-info* (target same-sandbox))"));
-        // iokit limited to RootDomainUserClient
-        assert!(profile.contains("(allow iokit-open"));
-        assert!(profile.contains("RootDomainUserClient"));
-        // sysctl-write only for JVM
+
+        // Blanket allows (no whitelists)
+        assert!(profile.contains("(allow sysctl-read)"));
+        assert!(profile.contains("(allow iokit-open)"));
+        assert!(profile.contains("(allow mach-lookup)"));
+        assert!(profile.contains("(allow file-map-executable)"));
+
+        // sysctl-write still restricted to JVM's kern.grade_cputype
         assert!(profile.contains("kern.grade_cputype"));
     }
 
@@ -91,22 +99,5 @@ mod macos_tests {
         assert!(profile.contains("(allow ipc-posix-shm*)"));
         assert!(profile.contains("(allow pseudo-tty)"));
         assert!(profile.contains("/dev/ptmx"));
-    }
-
-    #[test]
-    fn mach_lookup_is_whitelist() {
-        let profile = generate_seatbelt_profile(&workspace_policy());
-        // Must contain specific service names, not blanket mach-lookup
-        assert!(profile.contains("com.apple.system.opendirectoryd.libinfo"));
-        assert!(profile.contains("com.apple.trustd"));
-        assert!(profile.contains("com.apple.SystemConfiguration.DNSConfiguration"));
-    }
-
-    #[test]
-    fn file_map_executable_for_system_frameworks() {
-        let profile = generate_seatbelt_profile(&workspace_policy());
-        assert!(profile.contains("(allow file-map-executable"));
-        assert!(profile.contains("/System/Library/Frameworks"));
-        assert!(profile.contains("/usr/lib"));
     }
 }

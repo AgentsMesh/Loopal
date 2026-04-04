@@ -1,13 +1,11 @@
-use loopal_prompt::{
-    Category, Condition, Fragment, FragmentRegistry, PromptBuilder, PromptContext,
-};
+use loopal_prompt::{FragmentRegistry, PromptBuilder, PromptContext};
 
-fn frag(id: &str, priority: u16, content: &str) -> Fragment {
-    Fragment {
+fn frag(id: &str, priority: u16, content: &str) -> loopal_prompt::Fragment {
+    loopal_prompt::Fragment {
         id: id.to_string(),
         name: id.to_string(),
-        category: Category::Core,
-        condition: Condition::Always,
+        category: loopal_prompt::Category::Core,
+        condition: loopal_prompt::Condition::Always,
         priority,
         content: content.to_string(),
     }
@@ -36,7 +34,7 @@ fn build_includes_instructions_and_memory() {
         ..Default::default()
     };
     let prompt = builder.build(&ctx);
-    assert!(prompt.starts_with("Be helpful."));
+    assert!(prompt.contains("Be helpful."));
     assert!(prompt.contains("# Project Memory"));
     assert!(prompt.contains("User prefers Rust."));
 }
@@ -54,33 +52,18 @@ fn build_skips_empty_renders() {
 }
 
 #[test]
-fn build_agent_prompt_fallback() {
-    let builder = PromptBuilder::new(FragmentRegistry::new(vec![]));
-    let ctx = PromptContext {
-        agent_name: Some("explorer".into()),
-        cwd: "/work".into(),
-        ..Default::default()
-    };
-    let prompt = builder.build_agent_prompt("nonexistent", &ctx);
-    assert!(prompt.contains("explorer"));
-    assert!(prompt.contains("/work"));
-}
-
-#[test]
-fn build_agent_prompt_uses_fragment() {
-    let frags = vec![Fragment {
-        id: "agents/explore".into(),
-        name: "Explore".into(),
-        category: Category::Agents,
-        condition: Condition::Always,
-        priority: 100,
-        content: "You are an explorer in {{ cwd }}.".into(),
-    }];
+fn fragments_come_before_instructions() {
+    let frags = vec![frag("core/id", 100, "## Identity")];
     let builder = PromptBuilder::new(FragmentRegistry::new(frags));
     let ctx = PromptContext {
-        cwd: "/project".into(),
+        instructions: "## User Instructions".into(),
         ..Default::default()
     };
-    let prompt = builder.build_agent_prompt("explore", &ctx);
-    assert_eq!(prompt, "You are an explorer in /project.");
+    let prompt = builder.build(&ctx);
+    let frag_pos = prompt.find("## Identity").unwrap();
+    let instr_pos = prompt.find("## User Instructions").unwrap();
+    assert!(
+        frag_pos < instr_pos,
+        "fragments ({frag_pos}) should come before instructions ({instr_pos})"
+    );
 }

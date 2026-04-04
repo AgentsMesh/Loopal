@@ -16,6 +16,8 @@ pub struct StartParams {
     pub resume: Option<String>,
     /// Explicit lifecycle mode. Ephemeral exits on idle, Persistent waits.
     pub lifecycle: loopal_runtime::LifecycleMode,
+    /// Agent type for fragment selection (e.g. "explore", "plan").
+    pub agent_type: Option<String>,
 }
 
 /// Build a Kernel from config (production path: MCP, tools).

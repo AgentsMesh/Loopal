@@ -37,6 +37,8 @@ pub enum Condition {
     Feature(String),
     /// Only when the specified tool is available.
     Tool(String),
+    /// Only when spawned as the specified agent type ("explore", "plan").
+    Agent(String),
 }
 
 // -- Frontmatter deserialization --
@@ -128,6 +130,7 @@ fn parse_condition(kind: Option<&str>, value: Option<&str>) -> Condition {
         Some("mode") => Condition::Mode(value.unwrap_or("plan").to_string()),
         Some("feature") => Condition::Feature(value.unwrap_or("").to_string()),
         Some("tool") => Condition::Tool(value.unwrap_or("").to_string()),
+        Some("agent") => Condition::Agent(value.unwrap_or("").to_string()),
         Some(other) => {
             tracing::warn!(
                 condition = other,

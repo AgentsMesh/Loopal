@@ -3,26 +3,28 @@ use loopal_tool_api::ToolDefinition;
 
 #[test]
 fn includes_instructions() {
-    let result = build_system_prompt("You are helpful.", &[], "act", "/tmp", "", "");
+    let result = build_system_prompt("You are helpful.", &[], "act", "/tmp", "", "", None);
     assert!(result.contains("You are helpful."));
 }
 
 #[test]
-fn includes_tool_schemas() {
+fn tool_schemas_not_in_system_prompt() {
     let tools = vec![ToolDefinition {
         name: "read".into(),
         description: "Read a file".into(),
         input_schema: serde_json::json!({"type": "object"}),
     }];
-    let result = build_system_prompt("Base", &tools, "act", "/workspace", "", "");
-    assert!(result.contains("# Available Tools"));
-    assert!(result.contains("## read"));
-    assert!(result.contains("Read a file"));
+    let result = build_system_prompt("Base", &tools, "act", "/workspace", "", "", None);
+    // Tool schemas should NOT appear in system prompt — they go via ChatParams.tools
+    assert!(!result.contains("# Available Tools"));
+    assert!(!result.contains("## read"));
+    // But tool names should still feed fragment conditionals
+    assert!(result.contains("Base")); // instructions still present
 }
 
 #[test]
 fn includes_fragments() {
-    let result = build_system_prompt("Base", &[], "act", "/workspace", "", "");
+    let result = build_system_prompt("Base", &[], "act", "/workspace", "", "", None);
     // Core fragments should be present
     assert!(
         result.contains("Output Efficiency"),
@@ -35,15 +37,28 @@ fn includes_fragments() {
 }
 
 #[test]
-fn includes_environment() {
-    let result = build_system_prompt("Base", &[], "act", "/Users/dev/project", "", "");
-    assert!(result.contains("/Users/dev/project"), "cwd not rendered");
+fn cwd_available_in_subagent_prompt() {
+    // Root agent: cwd is injected per-turn via env_context, not in static prompt.
+    // Sub-agent: cwd appears in default-subagent fragment template.
+    let result = build_system_prompt(
+        "Base",
+        &[],
+        "act",
+        "/Users/dev/project",
+        "",
+        "",
+        Some("general"), // any agent_type makes is_subagent() true
+    );
+    assert!(
+        result.contains("/Users/dev/project"),
+        "cwd not rendered in sub-agent prompt"
+    );
 }
 
 #[test]
 fn includes_skills() {
     let skills = "# Available Skills\n- /commit: Generate a git commit message";
-    let result = build_system_prompt("Base", &[], "act", "/workspace", skills, "");
+    let result = build_system_prompt("Base", &[], "act", "/workspace", skills, "", None);
     assert!(result.contains("Available Skills"));
     assert!(result.contains("/commit"));
 }
@@ -57,6 +72,7 @@ fn includes_memory() {
         "/workspace",
         "",
         "## Key Patterns\n- Use DI",
+        None,
     );
     assert!(result.contains("# Project Memory"));
     assert!(result.contains("Key Patterns"));
@@ -64,7 +80,7 @@ fn includes_memory() {
 
 #[test]
 fn empty_memory_no_section() {
-    let result = build_system_prompt("Base", &[], "act", "/workspace", "", "");
+    let result = build_system_prompt("Base", &[], "act", "/workspace", "", "", None);
     assert!(!result.contains("Project Memory"));
 }
 
@@ -76,14 +92,14 @@ fn tool_conditional_fragments() {
         description: "Execute commands".into(),
         input_schema: serde_json::json!({"type": "object"}),
     }];
-    let result = build_system_prompt("Base", &tools, "act", "/workspace", "", "");
+    let result = build_system_prompt("Base", &tools, "act", "/workspace", "", "", None);
     assert!(
         result.contains("Bash Tool Guidelines"),
         "bash guidelines missing when Bash tool present"
     );
 
     // Without Bash tool → no bash guidelines
-    let result_no_bash = build_system_prompt("Base", &[], "act", "/workspace", "", "");
+    let result_no_bash = build_system_prompt("Base", &[], "act", "/workspace", "", "", None);
     assert!(
         !result_no_bash.contains("Bash Tool Guidelines"),
         "bash guidelines should not appear without Bash"
@@ -136,23 +152,22 @@ fn report_token_usage() {
     let mem = "## Architecture\n- 17 Rust crates\n- 200-line limit";
     let skills = "# Available Skills\n- /commit: Git commit\n- /review-pr: Review PR";
 
-    let bare = build_system_prompt("", &[], "act", "/project", "", "");
-    let with_tools = build_system_prompt("", &tools, "act", "/project", "", "");
-    let full_act = build_system_prompt(instr, &tools, "act", "/project", skills, mem);
-    let full_plan = build_system_prompt(instr, &tools, "plan", "/project", skills, mem);
+    let bare = build_system_prompt("", &[], "act", "/project", "", "", None);
+    let with_tools = build_system_prompt("", &tools, "act", "/project", "", "", None);
+    let full_act = build_system_prompt(instr, &tools, "act", "/project", skills, mem, None);
+    let full_plan = build_system_prompt(instr, &tools, "plan", "/project", skills, mem, None);
 
     let t_bare = estimate_tokens(&bare);
     let t_tools = estimate_tokens(&with_tools);
     let t_act = estimate_tokens(&full_act);
     let t_plan = estimate_tokens(&full_plan);
 
-    eprintln!("\n=== System Prompt Token Analysis ===");
     eprintln!(
         "Fragments only:              {} tokens ({} chars)",
         t_bare,
         bare.len()
     );
-    eprintln!("Fragments + 21 tool schemas: {t_tools} tokens");
+    eprintln!("Fragments + 21 tools (cond): {t_tools} tokens");
     eprintln!(
         "Full (act, 21 tools):        {} tokens ({} chars)",
         t_act,
@@ -166,7 +181,7 @@ fn report_token_usage() {
     eprintln!("Plan overhead:               +{} tokens", t_plan - t_act);
     eprintln!("--- Breakdown ---");
     eprintln!("  Behavior fragments: {t_bare} tokens");
-    eprintln!("  Tool schemas:       {} tokens", t_tools - t_bare);
+    eprintln!("  Tool-conditional:   {} tokens", t_tools - t_bare);
     eprintln!("  Instructions:       {} tokens", estimate_tokens(instr));
     eprintln!("  Skills:             {} tokens", estimate_tokens(skills));
     eprintln!(

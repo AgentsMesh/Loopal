@@ -67,6 +67,7 @@ pub async fn bootstrap_hub_and_agent(
             cli.no_sandbox,
             cli.resume.as_deref(),
             lifecycle_str,
+            None, // root agent has no agent_type
         )
         .await?;
 

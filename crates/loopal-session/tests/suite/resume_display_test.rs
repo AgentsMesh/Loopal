@@ -2,8 +2,8 @@
 
 use std::sync::Arc;
 
-use loopal_protocol::{AgentStatus, ControlCommand, ProjectedMessage, ProjectedToolCall};
 use loopal_protocol::UserQuestionResponse;
+use loopal_protocol::{AgentStatus, ControlCommand, ProjectedMessage, ProjectedToolCall};
 use loopal_session::SessionController;
 use tokio::sync::mpsc;
 

@@ -55,10 +55,7 @@ pub fn apply_event(state: &mut SessionState, event: AgentEvent) -> Option<UserCo
     }
 
     // Track new root session ID on resume
-    if let AgentEventPayload::SessionResumed {
-        ref session_id, ..
-    } = event.payload
-    {
+    if let AgentEventPayload::SessionResumed { ref session_id, .. } = event.payload {
         state.root_session_id = Some(session_id.clone());
     }
 

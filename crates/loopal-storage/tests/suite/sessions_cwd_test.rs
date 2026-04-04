@@ -44,9 +44,7 @@ fn test_latest_for_cwd_returns_none_when_no_match() {
 
     store.create_session(Path::new("/other"), "m1").unwrap();
 
-    let result = store
-        .latest_session_for_cwd(Path::new("/project"))
-        .unwrap();
+    let result = store.latest_session_for_cwd(Path::new("/project")).unwrap();
     assert!(result.is_none());
 }
 
@@ -55,9 +53,7 @@ fn test_latest_for_cwd_returns_none_when_empty() {
     let tmp = TempDir::new().unwrap();
     let store = SessionStore::with_base_dir(tmp.path().to_path_buf());
 
-    let result = store
-        .latest_session_for_cwd(Path::new("/project"))
-        .unwrap();
+    let result = store.latest_session_for_cwd(Path::new("/project")).unwrap();
     assert!(result.is_none());
 }
 
@@ -120,13 +116,14 @@ fn test_cwd_normalization_via_roundtrip() {
 
     // Create session with the canonical tmpdir path
     let canonical = std::fs::canonicalize(tmp.path()).unwrap();
-    store
-        .create_session(&canonical, "m1")
-        .unwrap();
+    store.create_session(&canonical, "m1").unwrap();
 
     // Query with the original (possibly non-canonical) path — should still match
     let result = store.latest_session_for_cwd(tmp.path()).unwrap();
-    assert!(result.is_some(), "canonical and non-canonical paths should match");
+    assert!(
+        result.is_some(),
+        "canonical and non-canonical paths should match"
+    );
 }
 
 #[test]
@@ -139,5 +136,8 @@ fn test_cwd_normalization_nonexistent_path_fallback() {
     store.create_session(fake, "m1").unwrap();
 
     let result = store.latest_session_for_cwd(fake).unwrap();
-    assert!(result.is_some(), "non-existent path should match by raw string");
+    assert!(
+        result.is_some(),
+        "non-existent path should match by raw string"
+    );
 }

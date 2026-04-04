@@ -2,8 +2,8 @@
 
 use std::sync::Arc;
 
-use loopal_protocol::{AgentEvent, AgentEventPayload, ControlCommand};
 use loopal_protocol::UserQuestionResponse;
+use loopal_protocol::{AgentEvent, AgentEventPayload, ControlCommand};
 use loopal_session::SessionController;
 use loopal_session::event_handler::apply_event;
 use loopal_session::state::SessionState;
@@ -46,10 +46,7 @@ fn test_session_resumed_event_updates_root_session_id() {
         }),
     );
 
-    assert_eq!(
-        state.root_session_id.as_deref(),
-        Some("new-session-xyz"),
-    );
+    assert_eq!(state.root_session_id.as_deref(), Some("new-session-xyz"),);
 }
 
 #[test]
@@ -65,10 +62,7 @@ fn test_session_resumed_event_sets_root_session_id_from_none() {
         }),
     );
 
-    assert_eq!(
-        state.root_session_id.as_deref(),
-        Some("first-session"),
-    );
+    assert_eq!(state.root_session_id.as_deref(), Some("first-session"),);
 }
 
 // ---------------------------------------------------------------------------
@@ -93,7 +87,10 @@ async fn test_controller_resume_session_clears_display() {
     let state = ctrl.lock();
     let conv = &state.agents["main"].conversation;
     assert!(conv.messages.is_empty(), "messages should be cleared");
-    assert!(conv.streaming_text.is_empty(), "streaming should be cleared");
+    assert!(
+        conv.streaming_text.is_empty(),
+        "streaming should be cleared"
+    );
     assert_eq!(conv.turn_count, 0);
     assert_eq!(conv.input_tokens, 0);
     assert_eq!(conv.output_tokens, 0);

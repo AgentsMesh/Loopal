@@ -51,7 +51,10 @@ fn resolve_session_id(cwd: &Path, partial: &str) -> Result<String, String> {
     let sessions = sm
         .list_sessions_for_cwd(cwd)
         .map_err(|e| format!("Failed to list sessions: {e}"))?;
-    let matches: Vec<_> = sessions.iter().filter(|s| s.id.starts_with(partial)).collect();
+    let matches: Vec<_> = sessions
+        .iter()
+        .filter(|s| s.id.starts_with(partial))
+        .collect();
     match matches.len() {
         0 => Err(format!("No session matching '{partial}'")),
         1 => Ok(matches[0].id.clone()),

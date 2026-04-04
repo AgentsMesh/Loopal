@@ -21,13 +21,13 @@ mod inbox_test;
 mod message_log_test;
 #[path = "suite/projection_convert_test.rs"]
 mod projection_convert_test;
+#[path = "suite/resume_display_test.rs"]
+mod resume_display_test;
+#[path = "suite/resume_test.rs"]
+mod resume_test;
 #[path = "suite/retry_banner_test.rs"]
 mod retry_banner_test;
 #[path = "suite/rewind_test.rs"]
 mod rewind_test;
-#[path = "suite/resume_test.rs"]
-mod resume_test;
-#[path = "suite/resume_display_test.rs"]
-mod resume_display_test;
 #[path = "suite/topology_test.rs"]
 mod topology_test;

@@ -72,9 +72,8 @@ where
                 AppEvent::Agent(agent_event) => {
                     // Load display history before handle_event processes the event,
                     // so the conversation view is populated before any state reset.
-                    if let AgentEventPayload::SessionResumed {
-                        ref session_id, ..
-                    } = agent_event.payload
+                    if let AgentEventPayload::SessionResumed { ref session_id, .. } =
+                        agent_event.payload
                     {
                         load_resumed_display(app, session_id);
                     }

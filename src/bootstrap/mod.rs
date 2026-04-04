@@ -67,8 +67,8 @@ pub async fn run() -> anyhow::Result<()> {
         Some(crate::cli::ResumeIntent::Latest) => resolve_resume_for_cwd(&effective_cwd),
     };
 
-    let result = multiprocess::run(&cli, &effective_cwd, &config, resume_session_id.as_deref())
-        .await;
+    let result =
+        multiprocess::run(&cli, &effective_cwd, &config, resume_session_id.as_deref()).await;
 
     // Clean up worktree: remove if no changes, keep otherwise.
     // Note: If the process is killed by SIGKILL or panics, this cleanup won't run.

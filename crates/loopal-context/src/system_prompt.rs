@@ -5,6 +5,7 @@ use loopal_prompt_system::system_fragments;
 use loopal_tool_api::ToolDefinition;
 
 /// Build a full system prompt using the fragment-based prompt system.
+#[allow(clippy::too_many_arguments)]
 pub fn build_system_prompt(
     instructions: &str,
     tools: &[ToolDefinition],
@@ -13,6 +14,7 @@ pub fn build_system_prompt(
     skills_summary: &str,
     memory: &str,
     agent_type: Option<&str>,
+    features: Vec<String>,
 ) -> String {
     let mut registry = FragmentRegistry::new(system_fragments());
 
@@ -49,7 +51,7 @@ pub fn build_system_prompt(
         instructions: instructions.to_string(),
         memory: memory.to_string(),
         skills_summary: skills_summary.to_string(),
-        features: Vec::new(),
+        features,
         agent_name: None,
         agent_type: agent_type.map(String::from),
     };

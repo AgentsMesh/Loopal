@@ -3,7 +3,7 @@ use loopal_tool_api::ToolDefinition;
 
 #[test]
 fn includes_instructions() {
-    let result = build_system_prompt("You are helpful.", &[], "act", "/tmp", "", "", None);
+    let result = build_system_prompt("You are helpful.", &[], "act", "/tmp", "", "", None, vec![]);
     assert!(result.contains("You are helpful."));
 }
 
@@ -14,7 +14,7 @@ fn tool_schemas_not_in_system_prompt() {
         description: "Read a file".into(),
         input_schema: serde_json::json!({"type": "object"}),
     }];
-    let result = build_system_prompt("Base", &tools, "act", "/workspace", "", "", None);
+    let result = build_system_prompt("Base", &tools, "act", "/workspace", "", "", None, vec![]);
     // Tool schemas should NOT appear in system prompt — they go via ChatParams.tools
     assert!(!result.contains("# Available Tools"));
     assert!(!result.contains("## read"));
@@ -24,7 +24,7 @@ fn tool_schemas_not_in_system_prompt() {
 
 #[test]
 fn includes_fragments() {
-    let result = build_system_prompt("Base", &[], "act", "/workspace", "", "", None);
+    let result = build_system_prompt("Base", &[], "act", "/workspace", "", "", None, vec![]);
     // Core fragments should be present
     assert!(
         result.contains("Output Efficiency"),
@@ -47,7 +47,8 @@ fn cwd_available_in_subagent_prompt() {
         "/Users/dev/project",
         "",
         "",
-        Some("general"), // any agent_type makes is_subagent() true
+        Some("general"),
+        vec![],
     );
     assert!(
         result.contains("/Users/dev/project"),
@@ -58,7 +59,7 @@ fn cwd_available_in_subagent_prompt() {
 #[test]
 fn includes_skills() {
     let skills = "# Available Skills\n- /commit: Generate a git commit message";
-    let result = build_system_prompt("Base", &[], "act", "/workspace", skills, "", None);
+    let result = build_system_prompt("Base", &[], "act", "/workspace", skills, "", None, vec![]);
     assert!(result.contains("Available Skills"));
     assert!(result.contains("/commit"));
 }
@@ -73,6 +74,7 @@ fn includes_memory() {
         "",
         "## Key Patterns\n- Use DI",
         None,
+        vec![],
     );
     assert!(result.contains("# Project Memory"));
     assert!(result.contains("Key Patterns"));
@@ -80,7 +82,7 @@ fn includes_memory() {
 
 #[test]
 fn empty_memory_no_section() {
-    let result = build_system_prompt("Base", &[], "act", "/workspace", "", "", None);
+    let result = build_system_prompt("Base", &[], "act", "/workspace", "", "", None, vec![]);
     assert!(!result.contains("Project Memory"));
 }
 
@@ -92,17 +94,91 @@ fn tool_conditional_fragments() {
         description: "Execute commands".into(),
         input_schema: serde_json::json!({"type": "object"}),
     }];
-    let result = build_system_prompt("Base", &tools, "act", "/workspace", "", "", None);
+    let result = build_system_prompt("Base", &tools, "act", "/workspace", "", "", None, vec![]);
     assert!(
         result.contains("Bash Tool Guidelines"),
         "bash guidelines missing when Bash tool present"
     );
 
     // Without Bash tool → no bash guidelines
-    let result_no_bash = build_system_prompt("Base", &[], "act", "/workspace", "", "", None);
+    let result_no_bash = build_system_prompt("Base", &[], "act", "/workspace", "", "", None, vec![]);
     assert!(
         !result_no_bash.contains("Bash Tool Guidelines"),
         "bash guidelines should not appear without Bash"
+    );
+}
+
+#[test]
+fn feature_conditional_fragments() {
+    // With "memory" feature → memory guidance should appear
+    let with_memory = build_system_prompt(
+        "Base",
+        &[],
+        "act",
+        "/workspace",
+        "",
+        "",
+        None,
+        vec!["memory".into()],
+    );
+    assert!(
+        with_memory.contains("Memory System"),
+        "memory guidance fragment missing when memory feature enabled"
+    );
+
+    // Without "memory" feature → no memory guidance
+    let without = build_system_prompt("Base", &[], "act", "/workspace", "", "", None, vec![]);
+    assert!(
+        !without.contains("Memory System"),
+        "memory guidance should not appear without memory feature"
+    );
+
+    // With "hooks" feature → hooks guidance should appear
+    let with_hooks = build_system_prompt(
+        "Base",
+        &[],
+        "act",
+        "/workspace",
+        "",
+        "",
+        None,
+        vec!["hooks".into()],
+    );
+    assert!(
+        with_hooks.contains("hooks"),
+        "hooks fragment missing when hooks feature enabled"
+    );
+
+    // With style feature → style fragment should appear
+    let with_style = build_system_prompt(
+        "Base",
+        &[],
+        "act",
+        "/workspace",
+        "",
+        "",
+        None,
+        vec!["style_explanatory".into()],
+    );
+    assert!(
+        with_style.contains("Explanatory"),
+        "explanatory style fragment missing when style feature enabled"
+    );
+
+    // With "subagent" feature → agent guidelines should appear
+    let with_subagent = build_system_prompt(
+        "Base",
+        &[],
+        "act",
+        "/workspace",
+        "",
+        "",
+        None,
+        vec!["subagent".into()],
+    );
+    assert!(
+        with_subagent.contains("Sub-Agent Usage"),
+        "agent guidelines fragment missing when subagent feature enabled"
     );
 }
 
@@ -152,10 +228,11 @@ fn report_token_usage() {
     let mem = "## Architecture\n- 17 Rust crates\n- 200-line limit";
     let skills = "# Available Skills\n- /commit: Git commit\n- /review-pr: Review PR";
 
-    let bare = build_system_prompt("", &[], "act", "/project", "", "", None);
-    let with_tools = build_system_prompt("", &tools, "act", "/project", "", "", None);
-    let full_act = build_system_prompt(instr, &tools, "act", "/project", skills, mem, None);
-    let full_plan = build_system_prompt(instr, &tools, "plan", "/project", skills, mem, None);
+    let bare = build_system_prompt("", &[], "act", "/project", "", "", None, vec![]);
+    let with_tools = build_system_prompt("", &tools, "act", "/project", "", "", None, vec![]);
+    let full_act = build_system_prompt(instr, &tools, "act", "/project", skills, mem, None, vec![]);
+    let full_plan =
+        build_system_prompt(instr, &tools, "plan", "/project", skills, mem, None, vec![]);
 
     let t_bare = estimate_tokens(&bare);
     let t_tools = estimate_tokens(&with_tools);

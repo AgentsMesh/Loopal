@@ -14,12 +14,6 @@ use loopal_runtime::frontend::traits::AgentFrontend;
 
 use crate::params::StartParams;
 
-const SCHEDULER_PROMPT: &str = "\n\n# Scheduled Messages\n\
-    Messages prefixed with `[scheduled]` are injected by the cron scheduler, \
-    not typed by the user. Treat them as automated prompts and execute the \
-    requested action without asking for confirmation. \
-    Use CronCreate/CronDelete/CronList tools to manage scheduled jobs.";
-
 /// Build `AgentLoopParams` with a pre-constructed frontend (HubFrontend or IpcFrontend).
 ///
 /// The caller provides the frontend and interrupt signal, decoupling agent setup
@@ -120,6 +114,19 @@ pub fn build_with_frontend(
     let skills: Vec<_> = config.skills.values().map(|e| e.skill.clone()).collect();
     let skills_summary = loopal_config::format_skills_summary(&skills);
     let tool_defs = kernel.tool_definitions();
+
+    let mut features = Vec::new();
+    if config.settings.memory.enabled && memory_channel.is_some() {
+        features.push("memory".into());
+    }
+    if !config.settings.hooks.is_empty() {
+        features.push("hooks".into());
+    }
+    features.push("subagent".into());
+    if !config.settings.output_style.is_empty() {
+        features.push(format!("style_{}", config.settings.output_style));
+    }
+
     let mut system_prompt = build_system_prompt(
         &config.instructions,
         &tool_defs,
@@ -128,37 +135,11 @@ pub fn build_with_frontend(
         &skills_summary,
         &config.memory,
         start.agent_type.as_deref(),
+        features,
     );
 
-    // Append MCP server instructions (from initialize handshake).
-    let mcp_instructions = kernel.mcp_instructions();
-    if !mcp_instructions.is_empty() {
-        system_prompt.push_str("\n\n# MCP Server Instructions\n");
-        for (server_name, instructions) in mcp_instructions {
-            system_prompt.push_str(&format!("\n## {server_name}\n{instructions}\n"));
-        }
-    }
+    crate::prompt_post::append_runtime_sections(&mut system_prompt, &kernel);
 
-    // Append scheduler instructions (every agent has cron capability).
-    system_prompt.push_str(SCHEDULER_PROMPT);
-
-    // Append MCP resource and prompt summaries so the LLM knows what's available.
-    let mcp_resources = kernel.mcp_resources();
-    if !mcp_resources.is_empty() {
-        system_prompt.push_str("\n\n# Available MCP Resources\n");
-        for (server, res) in mcp_resources {
-            let desc = res.description.as_deref().unwrap_or("");
-            system_prompt.push_str(&format!("\n- `{}` ({server}): {desc}", res.uri));
-        }
-    }
-    let mcp_prompts = kernel.mcp_prompts();
-    if !mcp_prompts.is_empty() {
-        system_prompt.push_str("\n\n# Available MCP Prompts\n");
-        for (server, p) in mcp_prompts {
-            let desc = p.description.as_deref().unwrap_or("");
-            system_prompt.push_str(&format!("\n- `{}` ({server}): {desc}", p.name));
-        }
-    }
     let mut messages = resume_messages;
     if let Some(prompt) = &start.prompt {
         messages.push(loopal_message::Message::user(prompt));

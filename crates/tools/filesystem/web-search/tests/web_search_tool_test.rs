@@ -28,7 +28,7 @@ fn test_web_search_description() {
     let tool = WebSearchTool;
     let desc = tool.description();
     assert!(!desc.is_empty());
-    assert!(desc.contains("Tavily"));
+    assert!(desc.contains("Search the web"));
 }
 
 #[test]

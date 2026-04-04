@@ -57,6 +57,10 @@ pub struct Settings {
     /// Harness control parameters — configurable thresholds for the agent control loop.
     #[serde(default)]
     pub harness: HarnessConfig,
+
+    /// Output style override (e.g. "explanatory", "learning"). Empty = default.
+    #[serde(default)]
+    pub output_style: String,
 }
 
 impl Default for Settings {
@@ -74,6 +78,7 @@ impl Default for Settings {
             thinking: ThinkingConfig::default(),
             memory: MemoryConfig::default(),
             harness: HarnessConfig::default(),
+            output_style: String::new(),
         }
     }
 }

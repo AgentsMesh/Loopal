@@ -18,6 +18,7 @@ mod ipc_frontend;
 mod memory_adapter;
 mod mock_loader;
 mod params;
+mod prompt_post;
 mod server;
 pub mod server_info;
 mod server_init;

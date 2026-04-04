@@ -14,7 +14,11 @@ impl Tool for WriteTool {
     }
 
     fn description(&self) -> &str {
-        "Write content to a file. Creates parent directories if needed."
+        "Write content to a file. Creates parent directories if needed.\n\
+         - If the file already exists, you MUST use Read first to see its current contents. This tool will fail if you did not read it first.\n\
+         - Prefer the Edit tool for modifying existing files — it only sends the diff.\n\
+         - NEVER create documentation files (*.md) or README files unless explicitly requested.\n\
+         - Only use emojis if the user explicitly requests it."
     }
 
     fn parameters_schema(&self) -> Value {

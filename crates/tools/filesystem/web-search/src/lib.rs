@@ -25,7 +25,10 @@ impl Tool for WebSearchTool {
     }
 
     fn description(&self) -> &str {
-        "Search the web using Tavily API. Returns titles, URLs, and snippets for up to 10 results."
+        "Search the web for up-to-date information. Returns titles, URLs, and snippets.\n\
+         - CRITICAL: After answering using search results, you MUST include a \"Sources:\" section with markdown hyperlinks.\n\
+         - Use domain filtering (allowed_domains / blocked_domains) to scope results.\n\
+         - Use the current year in queries when searching for recent information or documentation."
     }
 
     fn parameters_schema(&self) -> Value {

@@ -16,8 +16,11 @@ impl Tool for EnterPlanModeTool {
     }
 
     fn description(&self) -> &str {
-        "Switch the agent into plan mode. In plan mode only read-only tools are \
-         available, allowing safe exploration and planning before making changes."
+        "Use this tool proactively before starting non-trivial implementation tasks.\n\
+         When to use: new features, multiple valid approaches, code modifications affecting existing behavior, \
+         architectural decisions, multi-file changes, unclear requirements.\n\
+         When NOT to use: single-line fixes, trivial bugs, small tweaks, or when the user gave very specific instructions.\n\
+         In plan mode, only read-only tools are available for safe exploration and planning."
     }
 
     fn parameters_schema(&self) -> Value {
@@ -49,7 +52,10 @@ impl Tool for ExitPlanModeTool {
     }
 
     fn description(&self) -> &str {
-        "Exit plan mode and return to the normal mode where all tools are available."
+        "Exit plan mode and return to normal mode where all tools are available.\n\
+         This tool reads the plan from the plan file you wrote — it does not take the plan content as a parameter.\n\
+         Only use for implementation planning, not for research or exploration tasks.\n\
+         Do NOT use AskUserQuestion to ask 'Is this plan okay?' — use ExitPlanMode instead, which inherently requests approval."
     }
 
     fn parameters_schema(&self) -> Value {

@@ -12,8 +12,13 @@ impl Tool for FetchTool {
     }
 
     fn description(&self) -> &str {
-        "Download a URL. Without prompt: saves to temp file and returns path. \
-         With prompt: returns content directly (HTML auto-converted to markdown)."
+        "Download a URL and process its content.\n\
+         - Without prompt: saves to a temp file and returns the path.\n\
+         - With prompt: returns content directly (HTML auto-converted to markdown).\n\
+         - WILL FAIL for authenticated/private URLs (Google Docs, Jira, Confluence). Use a specialized MCP tool for those.\n\
+         - If an MCP-provided web fetch tool is available, prefer that (may have fewer restrictions).\n\
+         - HTTP URLs auto-upgrade to HTTPS. Includes a 15-minute cache.\n\
+         - When a URL redirects to a different host, the tool returns the redirect URL — make a new request with it."
     }
 
     fn parameters_schema(&self) -> Value {

@@ -12,8 +12,14 @@ impl Tool for ReadTool {
     }
 
     fn description(&self) -> &str {
-        "Read a file from the filesystem. Returns content with line numbers. \
-         Supports PDF (text extraction) and HTML (converts to markdown)."
+        "Read a file from the local filesystem.\n\
+         - The file_path must be an absolute path, not relative.\n\
+         - By default reads up to 2000 lines. Use offset and limit for large files.\n\
+         - Supports images (PNG, JPG, etc.) — contents are presented visually.\n\
+         - Supports PDF files. For large PDFs (>10 pages), you MUST provide the pages parameter. Max 20 pages per request.\n\
+         - Supports Jupyter notebooks (.ipynb) — returns all cells with outputs.\n\
+         - Supports HTML files — auto-converted to markdown.\n\
+         - If the user provides a path to a screenshot, ALWAYS use this tool to view it."
     }
 
     fn parameters_schema(&self) -> Value {

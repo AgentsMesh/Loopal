@@ -59,7 +59,10 @@ fn test_up_navigates_history_with_content() {
     let mut app = make_app();
     app.input_history.push("previous".into());
     handle_key(&mut app, key(KeyCode::Up));
-    assert_eq!(app.input, "previous", "Up should browse history, not scroll");
+    assert_eq!(
+        app.input, "previous",
+        "Up should browse history, not scroll"
+    );
     assert_eq!(app.scroll_offset, 0);
 }
 

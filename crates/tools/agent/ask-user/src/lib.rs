@@ -12,8 +12,12 @@ impl Tool for AskUserTool {
     }
 
     fn description(&self) -> &str {
-        "Present one or more questions to the user with predefined options. \
-         Use this when you need clarification or a decision from the user."
+        "Present one or more questions to the user with predefined options.\n\
+         Use when you need clarification, a decision, or user preferences.\n\
+         - Users can always select 'Other' to provide custom text input.\n\
+         - Use multiSelect: true when choices are not mutually exclusive.\n\
+         - In plan mode: use this to clarify requirements BEFORE finalizing the plan. \
+         Do NOT use it to ask 'Is my plan ready?' — use ExitPlanMode for that."
     }
 
     fn parameters_schema(&self) -> Value {

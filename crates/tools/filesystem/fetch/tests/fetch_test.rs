@@ -22,6 +22,13 @@ fn test_fetch_name() {
 }
 
 #[test]
+fn test_fetch_description() {
+    let desc = FetchTool.description();
+    assert!(!desc.is_empty());
+    assert!(desc.contains("URL"));
+}
+
+#[test]
 fn test_fetch_permission() {
     assert_eq!(FetchTool.permission(), PermissionLevel::ReadOnly);
 }

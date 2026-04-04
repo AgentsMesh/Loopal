@@ -14,7 +14,12 @@ impl Tool for EditTool {
     }
 
     fn description(&self) -> &str {
-        "Perform exact string replacement in a file. The old_string must be unique unless replace_all is true."
+        "Perform exact string replacement in a file.\n\
+         - You must use Read at least once before editing. This tool will fail if you have not read the file first.\n\
+         - Preserve the exact indentation (tabs/spaces) as shown in Read output.\n\
+         - The edit will FAIL if old_string is not unique in the file. Provide a larger string with more surrounding context to make it unique, or use replace_all.\n\
+         - ALWAYS prefer editing existing files. NEVER write new files unless explicitly required.\n\
+         - Use replace_all for renaming variables or strings across the entire file."
     }
 
     fn parameters_schema(&self) -> Value {

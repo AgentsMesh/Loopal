@@ -28,6 +28,7 @@ fn explore_subagent_full_prompt() {
         "",
         "",
         Some("explore"),
+        vec![],
     );
 
     // Explore-specific content present
@@ -61,7 +62,7 @@ fn explore_subagent_full_prompt() {
 
 #[test]
 fn root_agent_excludes_agent_fragments() {
-    let result = build_system_prompt("Base", &[], "act", "/workspace", "", "", None);
+    let result = build_system_prompt("Base", &[], "act", "/workspace", "", "", None, vec![]);
     // No agent fragments in root prompt
     assert!(
         !result.contains("sub-agent named"),
@@ -77,7 +78,7 @@ fn root_agent_excludes_agent_fragments() {
 
 #[test]
 fn plan_subagent_gets_plan_fragment() {
-    let result = build_system_prompt("", &[], "act", "/work", "", "", Some("plan"));
+    let result = build_system_prompt("", &[], "act", "/work", "", "", Some("plan"), vec![]);
     assert!(
         result.contains("software architect"),
         "plan fragment should be included"
@@ -94,7 +95,7 @@ fn plan_subagent_gets_plan_fragment() {
 
 #[test]
 fn general_subagent_gets_default_fragment() {
-    let result = build_system_prompt("", &[], "act", "/work", "", "", Some("general"));
+    let result = build_system_prompt("", &[], "act", "/work", "", "", Some("general"), vec![]);
     // Default sub-agent fragment (fallback for unknown types)
     assert!(
         result.contains("sub-agent named"),

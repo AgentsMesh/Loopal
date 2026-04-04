@@ -39,9 +39,6 @@ pub struct App {
     pub input_scroll: usize,
     /// Paste placeholder → original content map for large paste folding.
     pub paste_map: HashMap<String, String>,
-    /// Whether the content area overflows the viewport (set by render pass).
-    /// Used by input handler to decide Up/Down = scroll vs history navigation.
-    pub content_overflows: bool,
     /// Whether the topology overlay is visible (toggled by /topology).
     pub show_topology: bool,
     /// Agent panel cursor — Tab cycles through agents. Purely TUI concept.
@@ -91,7 +88,6 @@ impl App {
             last_esc_time: None,
             input_scroll: 0,
             paste_map: HashMap::new(),
-            content_overflows: false,
             show_topology: true,
             focused_agent: None,
             focused_bg_task: None,

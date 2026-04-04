@@ -34,6 +34,8 @@ mod focus_panel_keys_test;
 mod init_cmd_test;
 #[path = "suite/input_edge_test.rs"]
 mod input_edge_test;
+#[path = "suite/input_scroll_edge_test.rs"]
+mod input_scroll_edge_test;
 #[path = "suite/input_scroll_test.rs"]
 mod input_scroll_test;
 #[path = "suite/input_test.rs"]

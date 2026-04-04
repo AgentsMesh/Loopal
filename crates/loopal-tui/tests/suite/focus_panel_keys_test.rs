@@ -76,7 +76,6 @@ fn up_in_input_mode_ignores_agent_panel() {
     spawn_agent(&app, "worker");
     app.focused_agent = Some("worker".into());
     app.focus_mode = FocusMode::Input;
-    app.content_overflows = true;
     let action = handle_key(&mut app, key(KeyCode::Up));
     assert!(!matches!(action, InputAction::PanelUp));
 }

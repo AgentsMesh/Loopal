@@ -108,6 +108,13 @@ fn handle_panel_key(app: &mut App, key: &KeyEvent) -> InputAction {
 
 /// Keys in Input mode: typing, navigation, submit.
 fn handle_input_mode_key(app: &mut App, key: &KeyEvent) -> InputAction {
+    // Auto-scroll to bottom on input interaction (except scroll/panel/escape keys)
+    if !matches!(
+        key.code,
+        KeyCode::PageUp | KeyCode::PageDown | KeyCode::Tab | KeyCode::Esc
+    ) {
+        app.scroll_offset = 0;
+    }
     match key.code {
         KeyCode::Enter if key.modifiers.contains(KeyModifiers::SHIFT) => {
             app.input.insert(app.input_cursor, '\n');
@@ -145,8 +152,8 @@ fn handle_input_mode_key(app: &mut App, key: &KeyEvent) -> InputAction {
                 multiline::line_end(&app.input, app.input_cursor, DEFAULT_WRAP_WIDTH);
             InputAction::None
         }
-        KeyCode::Up => handle_up_key(app),
-        KeyCode::Down => handle_down_key(app),
+        KeyCode::Up => handle_up(app),
+        KeyCode::Down => handle_down(app),
         KeyCode::Tab => InputAction::EnterPanel,
         KeyCode::Esc => handle_esc(app),
         KeyCode::PageUp => {
@@ -158,40 +165,5 @@ fn handle_input_mode_key(app: &mut App, key: &KeyEvent) -> InputAction {
             InputAction::None
         }
         _ => InputAction::None,
-    }
-}
-
-/// Up key: multiline nav → scroll → history.
-fn handle_up_key(app: &mut App) -> InputAction {
-    if multiline::is_multiline(&app.input, DEFAULT_WRAP_WIDTH)
-        && let Some(pos) = multiline::cursor_up(&app.input, app.input_cursor, DEFAULT_WRAP_WIDTH)
-    {
-        app.input_cursor = pos;
-        InputAction::None
-    } else if app.scroll_offset > 0
-        || !app.session.lock().active_conversation().agent_idle
-        || app.content_overflows
-    {
-        app.scroll_offset = app.scroll_offset.saturating_add(1);
-        InputAction::None
-    } else {
-        handle_up(app)
-    }
-}
-
-/// Down key: multiline nav → scroll → history.
-fn handle_down_key(app: &mut App) -> InputAction {
-    if multiline::is_multiline(&app.input, DEFAULT_WRAP_WIDTH)
-        && let Some(pos) = multiline::cursor_down(&app.input, app.input_cursor, DEFAULT_WRAP_WIDTH)
-    {
-        app.input_cursor = pos;
-        InputAction::None
-    } else if app.scroll_offset > 0 {
-        app.scroll_offset = app.scroll_offset.saturating_sub(1);
-        InputAction::None
-    } else if app.content_overflows {
-        InputAction::None
-    } else {
-        handle_down(app)
     }
 }

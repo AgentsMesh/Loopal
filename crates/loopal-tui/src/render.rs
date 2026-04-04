@@ -51,7 +51,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     if breadcrumb_h > 0 {
         views::breadcrumb::render_breadcrumb(f, &state.active_view, layout.breadcrumb);
     }
-    app.content_overflows = views::progress::render_progress(
+    views::progress::render_progress(
         f,
         &state,
         app.scroll_offset,

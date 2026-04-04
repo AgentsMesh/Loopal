@@ -1,9 +1,11 @@
-/// Tests for Up/Down scroll routing, Ctrl+P/N history, and multiline priority.
+/// Tests for Up/Down key routing, Ctrl+P/N history, and multiline priority.
 ///
-/// Priority chain for Up/Down (via xterm alternate scroll = mouse wheel):
+/// Priority chain for Up/Down in Input mode:
 ///   1. Multiline cursor navigation (Shift+Enter input)
-///   2. Content scroll
-///   3. History navigation (only when content fits)
+///   2. History navigation
+///
+/// Content scrolling is exclusively handled by PageUp/PageDown.
+/// All input-mode keys (except PageUp/PageDown/Tab/Esc) auto-reset scroll_offset to 0.
 ///
 /// Ctrl+P/N always navigate history regardless of scroll state.
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -50,59 +52,62 @@ fn test_page_up_down_scroll() {
     assert_eq!(app.scroll_offset, 0);
 }
 
-// --- Up/Down content scroll ---
+// --- Up/Down navigate history ---
 
 #[test]
-fn test_up_scrolls_when_content_overflows() {
+fn test_up_navigates_history_with_content() {
     let mut app = make_app();
-    app.content_overflows = true;
+    app.input_history.push("previous".into());
     handle_key(&mut app, key(KeyCode::Up));
-    assert_eq!(app.scroll_offset, 1, "Up should scroll +1 when overflows");
-    handle_key(&mut app, key(KeyCode::Up));
-    assert_eq!(app.scroll_offset, 2, "repeated Up keeps incrementing");
+    assert_eq!(
+        app.input, "previous",
+        "Up should browse history, not scroll"
+    );
+    assert_eq!(app.scroll_offset, 0);
 }
 
 #[test]
-fn test_down_scrolls_back_when_offset_positive() {
+fn test_down_resets_scroll_and_navigates_history() {
     let mut app = make_app();
     app.scroll_offset = 5;
+    app.input_history.push("first".into());
+    app.input_history.push("second".into());
+    handle_key(&mut app, key(KeyCode::Up));
+    handle_key(&mut app, key(KeyCode::Up));
+    assert_eq!(app.input, "first");
     handle_key(&mut app, key(KeyCode::Down));
-    assert_eq!(app.scroll_offset, 4, "Down should scroll -1 when offset>0");
+    assert_eq!(app.input, "second", "Down should navigate history forward");
+    assert_eq!(app.scroll_offset, 0, "scroll_offset should be 0");
 }
 
 #[test]
-fn test_up_scrolls_when_content_overflows_and_idle() {
+fn test_up_navigates_history_when_idle() {
     let mut app = make_app();
     app.session.lock().active_conversation_mut().agent_idle = true;
-    app.content_overflows = true;
     app.input_history.push("older".into());
     app.input_history.push("recent".into());
     handle_key(&mut app, key(KeyCode::Up));
-    assert_eq!(app.scroll_offset, 1, "Up should scroll even when idle");
-    assert!(app.input.is_empty(), "input stays empty (no history)");
+    assert_eq!(app.input, "recent", "Up should browse history");
+    assert_eq!(app.scroll_offset, 0);
 }
 
 #[test]
-fn test_down_absorbed_when_content_overflows_at_bottom() {
+fn test_down_navigates_history_forward() {
     let mut app = make_app();
     app.session.lock().active_conversation_mut().agent_idle = true;
-    app.content_overflows = true;
-    app.input_history.push("cmd".into());
+    app.input_history.push("first".into());
+    app.input_history.push("second".into());
+    handle_key(&mut app, key(KeyCode::Up));
+    handle_key(&mut app, key(KeyCode::Up));
+    assert_eq!(app.input, "first");
     handle_key(&mut app, key(KeyCode::Down));
-    assert_eq!(app.scroll_offset, 0, "scroll_offset stays 0");
-    assert!(
-        app.input.is_empty(),
-        "Down at bottom should not trigger history"
-    );
+    assert_eq!(app.input, "second", "Down should navigate history forward");
 }
-
-// --- Up/Down history (content fits) ---
 
 #[test]
 fn test_up_navigates_history_when_content_fits() {
     let mut app = make_app();
     app.session.lock().active_conversation_mut().agent_idle = true;
-    app.content_overflows = false;
     app.input_history.push("previous command".into());
     let action = handle_key(&mut app, key(KeyCode::Up));
     assert!(matches!(action, InputAction::None));
@@ -113,10 +118,9 @@ fn test_up_navigates_history_when_content_fits() {
 // --- Ctrl+P/N history navigation ---
 
 #[test]
-fn test_ctrl_p_navigates_history_when_content_overflows() {
+fn test_ctrl_p_navigates_history() {
     let mut app = make_app();
     app.session.lock().active_conversation_mut().agent_idle = true;
-    app.content_overflows = true;
     app.input_history.push("first".into());
     app.input_history.push("second".into());
     handle_key(&mut app, ctrl('p'));
@@ -137,15 +141,13 @@ fn test_ctrl_n_navigates_history_forward() {
     assert_eq!(app.input, "second", "Ctrl+N browses history forward");
 }
 
-// --- Multiline cursor priority over scroll ---
+// --- Multiline cursor priority over history ---
 
 #[test]
-fn test_up_multiline_cursor_beats_scroll() {
+fn test_up_multiline_cursor_beats_history() {
     let mut app = make_app();
-    app.session.lock().active_conversation_mut().agent_idle = true;
-    app.content_overflows = true;
     app.input = "line1\nline2".into();
-    app.input_cursor = app.input.len(); // end of line2
+    app.input_cursor = app.input.len();
     handle_key(&mut app, key(KeyCode::Up));
     assert_eq!(app.scroll_offset, 0, "should move cursor, not scroll");
     assert!(
@@ -156,12 +158,10 @@ fn test_up_multiline_cursor_beats_scroll() {
 }
 
 #[test]
-fn test_down_multiline_cursor_beats_absorb() {
+fn test_down_multiline_cursor_beats_history() {
     let mut app = make_app();
-    app.session.lock().active_conversation_mut().agent_idle = true;
-    app.content_overflows = true;
     app.input = "line1\nline2".into();
-    app.input_cursor = 0; // start of line1
+    app.input_cursor = 0;
     handle_key(&mut app, key(KeyCode::Down));
     assert_eq!(app.scroll_offset, 0, "should move cursor, not scroll");
     assert!(
@@ -169,4 +169,25 @@ fn test_down_multiline_cursor_beats_absorb() {
         "cursor should be on line2, got {}",
         app.input_cursor
     );
+}
+
+// --- Auto-reset scroll on input interaction ---
+
+#[test]
+fn test_typing_resets_scroll_offset() {
+    let mut app = make_app();
+    app.scroll_offset = 5;
+    handle_key(&mut app, key(KeyCode::Char('a')));
+    assert_eq!(app.scroll_offset, 0, "typing should reset scroll to bottom");
+    assert_eq!(app.input, "a");
+}
+
+#[test]
+fn test_up_resets_scroll_offset() {
+    let mut app = make_app();
+    app.scroll_offset = 3;
+    app.input_history.push("cmd".into());
+    handle_key(&mut app, key(KeyCode::Up));
+    assert_eq!(app.scroll_offset, 0, "Up should reset scroll to bottom");
+    assert_eq!(app.input, "cmd");
 }

@@ -67,6 +67,9 @@ impl AgentLoopRunner {
                     Err(e) => error!(error = %e, "invalid thinking config"),
                 }
             }
+            ControlCommand::ResumeSession(session_id) => {
+                self.handle_resume_session(&session_id).await?;
+            }
         }
         Ok(())
     }

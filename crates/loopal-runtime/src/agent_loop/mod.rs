@@ -16,6 +16,7 @@ pub(crate) mod message_build;
 pub(crate) mod model_config;
 mod permission;
 mod question_parse;
+mod resume_session;
 pub mod rewind;
 mod run;
 mod runner;

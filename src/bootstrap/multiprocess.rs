@@ -14,11 +14,12 @@ pub async fn run(
     cli: &Cli,
     cwd: &std::path::Path,
     config: &loopal_config::ResolvedConfig,
+    resume: Option<&str>,
 ) -> anyhow::Result<()> {
     info!("starting in Hub mode");
 
     // 1-3. Create Hub + spawn root agent
-    let ctx = super::hub_bootstrap::bootstrap_hub_and_agent(cli, cwd, config).await?;
+    let ctx = super::hub_bootstrap::bootstrap_hub_and_agent(cli, cwd, config, resume).await?;
     let root_session_id = ctx.root_session_id.clone();
 
     // 4. Start event broadcast
@@ -56,7 +57,7 @@ pub async fn run(
 
     // 9. Load display history or show welcome
     let session_manager = loopal_runtime::SessionManager::new()?;
-    if let Some(ref sid) = cli.resume {
+    if let Some(sid) = resume {
         if let Ok((session, messages)) = session_manager.resume_session(sid) {
             session_ctrl.load_display_history(project_messages(&messages));
             super::sub_agent_resume::load_sub_agent_histories(

@@ -27,6 +27,7 @@ pub async fn bootstrap_hub_and_agent(
     cli: &Cli,
     cwd: &std::path::Path,
     config: &loopal_config::ResolvedConfig,
+    resume: Option<&str>,
 ) -> anyhow::Result<BootstrapContext> {
     let (event_tx, event_rx) = mpsc::channel(256);
     let hub = Arc::new(Mutex::new(Hub::new(event_tx)));
@@ -65,7 +66,7 @@ pub async fn bootstrap_hub_and_agent(
             prompt.as_deref(),
             cli.permission.as_deref(),
             cli.no_sandbox,
-            cli.resume.as_deref(),
+            resume,
             lifecycle_str,
             None, // root agent has no agent_type
         )

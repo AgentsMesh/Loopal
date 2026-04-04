@@ -85,3 +85,23 @@ fn test_event_rewound_serde_roundtrip() {
         panic!("expected AgentEventPayload::Rewound");
     }
 }
+
+#[test]
+fn test_event_session_resumed_serde_roundtrip() {
+    let event = AgentEvent::root(AgentEventPayload::SessionResumed {
+        session_id: "abc-123".into(),
+        message_count: 42,
+    });
+    let json = serde_json::to_string(&event).unwrap();
+    let de: AgentEvent = serde_json::from_str(&json).unwrap();
+    if let AgentEventPayload::SessionResumed {
+        session_id,
+        message_count,
+    } = de.payload
+    {
+        assert_eq!(session_id, "abc-123");
+        assert_eq!(message_count, 42);
+    } else {
+        panic!("expected AgentEventPayload::SessionResumed");
+    }
+}

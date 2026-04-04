@@ -12,17 +12,8 @@ fn test_registry_new_has_all_builtins() {
     let entries = registry.entries();
     let names: Vec<&str> = entries.iter().map(|e| e.name.as_str()).collect();
     for expected in &[
-        "/plan",
-        "/act",
-        "/clear",
-        "/compact",
-        "/model",
-        "/rewind",
-        "/status",
-        "/sessions",
-        "/init",
-        "/help",
-        "/exit",
+        "/plan", "/act", "/clear", "/compact", "/model", "/rewind", "/status", "/resume", "/init",
+        "/help", "/exit",
     ] {
         assert!(names.contains(expected), "missing builtin: {expected}");
     }
@@ -33,6 +24,16 @@ fn test_registry_find_returns_handler() {
     let registry = CommandRegistry::new();
     assert!(registry.find("/clear").is_some());
     assert!(registry.find("/model").is_some());
+    assert!(registry.find("/resume").is_some());
+}
+
+#[test]
+fn test_registry_sessions_command_removed() {
+    let registry = CommandRegistry::new();
+    assert!(
+        registry.find("/sessions").is_none(),
+        "/sessions was replaced by /resume"
+    );
 }
 
 #[test]

@@ -1,6 +1,6 @@
 //! Session display state operations: messages, welcome, history, inbox.
 
-use loopal_protocol::{ProjectedMessage, UserContent};
+use loopal_protocol::{AgentStatus, ProjectedMessage, UserContent};
 
 use crate::controller::SessionController;
 use crate::conversation_display::push_system_msg;
@@ -44,6 +44,40 @@ impl SessionController {
             .expect("main agent missing")
             .conversation;
         conv.messages = session_msgs;
+    }
+
+    /// Load a sub-agent's display history from pre-projected messages.
+    ///
+    /// Creates the agent entry if it doesn't exist, sets parent/child
+    /// relationships, and marks the agent as finished (historical data).
+    pub fn load_sub_agent_history(
+        &self,
+        name: &str,
+        session_id: &str,
+        parent: Option<&str>,
+        model: Option<&str>,
+        projected: Vec<ProjectedMessage>,
+    ) {
+        let display_msgs: Vec<SessionMessage> =
+            projected.into_iter().map(into_session_message).collect();
+        let mut state = self.lock();
+        let agent = state.agents.entry(name.to_string()).or_default();
+        agent.parent = parent.map(|s| s.to_string());
+        agent.session_id = Some(session_id.to_string());
+        if let Some(m) = model {
+            agent.observable.model = m.to_string();
+        }
+        agent.conversation.messages = display_msgs;
+        agent.conversation.agent_idle = true;
+        agent.observable.status = AgentStatus::Finished;
+        if let Some(parent_name) = parent
+            && let Some(parent_agent) = state.agents.get_mut(parent_name)
+        {
+            let child_name = name.to_string();
+            if !parent_agent.children.contains(&child_name) {
+                parent_agent.children.push(child_name);
+            }
+        }
     }
 }
 

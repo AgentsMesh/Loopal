@@ -162,6 +162,12 @@ pub enum AgentEventPayload {
         duration_ms: u64,
     },
 
+    /// Session context was replaced by resuming a persisted session.
+    SessionResumed {
+        session_id: String,
+        message_count: usize,
+    },
+
     /// Aggregated metrics emitted at the end of each turn.
     TurnCompleted {
         turn_id: u32,

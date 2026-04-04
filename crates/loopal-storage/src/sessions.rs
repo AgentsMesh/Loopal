@@ -74,7 +74,7 @@ impl SessionStore {
             id: Uuid::new_v4().to_string(),
             title: String::new(),
             model: model.to_string(),
-            cwd: cwd.to_string_lossy().to_string(),
+            cwd: normalize_cwd(cwd),
             created_at: now,
             updated_at: now,
             mode: "default".to_string(),
@@ -138,6 +138,26 @@ impl SessionStore {
         Ok(())
     }
 
+    /// Find the most recently updated session for a given working directory.
+    pub fn latest_session_for_cwd(&self, cwd: &Path) -> Result<Option<Session>, StorageError> {
+        let cwd_str = normalize_cwd(cwd);
+        let mut sessions = self.list_sessions()?;
+        sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+        Ok(sessions.into_iter().find(|s| s.cwd == cwd_str))
+    }
+
+    /// List sessions filtered by working directory, sorted by `updated_at` (newest first).
+    pub fn list_sessions_for_cwd(&self, cwd: &Path) -> Result<Vec<Session>, StorageError> {
+        let cwd_str = normalize_cwd(cwd);
+        let mut sessions: Vec<Session> = self
+            .list_sessions()?
+            .into_iter()
+            .filter(|s| s.cwd == cwd_str)
+            .collect();
+        sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+        Ok(sessions)
+    }
+
     /// List all sessions, sorted by creation time (newest first).
     pub fn list_sessions(&self) -> Result<Vec<Session>, StorageError> {
         let sessions_dir = self.sessions_dir();
@@ -162,4 +182,13 @@ impl SessionStore {
         sessions.sort_by(|a, b| b.created_at.cmp(&a.created_at));
         Ok(sessions)
     }
+}
+
+/// Canonicalize a path for consistent session cwd comparison.
+/// Falls back to the original path if canonicalization fails (e.g. path doesn't exist yet).
+fn normalize_cwd(cwd: &Path) -> String {
+    std::fs::canonicalize(cwd)
+        .unwrap_or_else(|_| cwd.to_path_buf())
+        .to_string_lossy()
+        .to_string()
 }

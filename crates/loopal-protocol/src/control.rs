@@ -25,4 +25,6 @@ pub enum ControlCommand {
     Rewind { turn_index: usize },
     /// Switch thinking config at runtime. JSON string of ThinkingConfig.
     ThinkingSwitch(String),
+    /// Resume (hot-swap) to a different persisted session by ID.
+    ResumeSession(String),
 }

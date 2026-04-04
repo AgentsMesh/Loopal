@@ -6,6 +6,7 @@ mod help_cmd;
 pub(crate) mod init_cmd;
 mod model_cmd;
 pub mod registry;
+mod resume_cmd;
 mod rewind_cmd;
 mod skill;
 mod topology_cmd;
@@ -26,6 +27,8 @@ pub enum CommandEffect {
     ModeSwitch(AgentMode),
     /// Exit the application.
     Quit,
+    /// Resume a persisted session by ID (hot-swap agent context).
+    ResumeSession(String),
 }
 
 /// Slash command handler trait.

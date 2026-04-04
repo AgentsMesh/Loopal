@@ -7,6 +7,13 @@ fn make_hook(command: &str, timeout_ms: u64) -> HookConfig {
         command: command.to_string(),
         tool_filter: None,
         timeout_ms,
+        hook_type: Default::default(),
+        url: None,
+        headers: Default::default(),
+        prompt: None,
+        model: None,
+        condition: None,
+        id: None,
     }
 }
 
@@ -197,6 +204,13 @@ async fn test_run_hook_post_tool_use_event() {
         command: "echo post-hook".to_string(),
         tool_filter: None,
         timeout_ms: 5000,
+        hook_type: Default::default(),
+        url: None,
+        headers: Default::default(),
+        prompt: None,
+        model: None,
+        condition: None,
+        id: None,
     };
     let data = serde_json::json!({"tool_name": "Read", "result": "ok"});
     let result = run_hook(&hook, data)

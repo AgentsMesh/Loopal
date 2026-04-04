@@ -1,4 +1,6 @@
+pub mod harness;
 pub mod hook;
+pub mod hook_condition;
 pub mod housekeeping;
 pub mod layer;
 pub mod loader;
@@ -12,7 +14,7 @@ pub mod settings;
 pub mod skills;
 mod validate;
 
-pub use hook::{HookConfig, HookEvent, HookResult};
+pub use hook::{HookConfig, HookEvent, HookResult, HookType};
 pub use layer::{ConfigLayer, LayerSource};
 pub use locations::*;
 pub use pipeline::load_config;
@@ -22,6 +24,7 @@ pub use sandbox::{
     CommandDecision, FileSystemPolicy, NetworkPolicy, PathDecision, ResolvedPolicy, SandboxConfig,
     SandboxPolicy,
 };
+pub use harness::HarnessConfig;
 pub use settings::{
     McpServerConfig, OpenAiCompatConfig, ProviderConfig, ProvidersConfig, Settings,
 };

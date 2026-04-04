@@ -1,5 +1,20 @@
+pub mod async_store;
+pub mod executor;
+pub mod executor_command;
+pub mod executor_http;
+pub mod executor_prompt;
+pub mod input;
+pub mod output;
 pub mod registry;
 pub mod runner;
+pub mod service;
 
+pub use executor::{ExecutorFactory, HookExecutor, RawHookOutput};
+pub use executor_command::CommandExecutor;
+pub use executor_http::HttpExecutor;
+pub use executor_prompt::PromptExecutor;
+pub use input::{HookContext, build_hook_input};
+pub use output::{HookOutput, PermissionOverride, interpret_output, interpret_pre_tool_output};
 pub use registry::HookRegistry;
 pub use runner::run_hook;
+pub use service::HookService;

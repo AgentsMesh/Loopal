@@ -61,6 +61,8 @@ async fn test_agent_loop_immediate_channel_close() {
         memory_channel: None,
         scheduled_rx: None,
         auto_classifier: None,
+        harness: loopal_config::HarnessConfig::default(),
+        rewake_rx: None,
     };
 
     // Drop senders to close channels

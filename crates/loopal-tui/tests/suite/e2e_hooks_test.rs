@@ -37,6 +37,13 @@ async fn test_pre_tool_hook_executes() {
         command: script.to_str().unwrap().to_string(),
         tool_filter: None,
         timeout_ms: 5000,
+        hook_type: Default::default(),
+        url: None,
+        headers: Default::default(),
+        prompt: None,
+        model: None,
+        condition: None,
+        id: None,
     }];
 
     let calls = vec![
@@ -84,6 +91,13 @@ async fn test_hook_failure_blocks_tool() {
         command: script.to_str().unwrap().to_string(),
         tool_filter: None,
         timeout_ms: 5000,
+        hook_type: Default::default(),
+        url: None,
+        headers: Default::default(),
+        prompt: None,
+        model: None,
+        condition: None,
+        id: None,
     }];
 
     let calls = vec![
@@ -117,6 +131,13 @@ async fn test_post_hook_output_captured() {
         command: script.to_str().unwrap().to_string(),
         tool_filter: None,
         timeout_ms: 5000,
+        hook_type: Default::default(),
+        url: None,
+        headers: Default::default(),
+        prompt: None,
+        model: None,
+        condition: None,
+        id: None,
     }];
 
     let calls = vec![

@@ -17,6 +17,8 @@ mod locations_test;
 mod plugin_test;
 #[path = "suite/resolver_edge_test.rs"]
 mod resolver_edge_test;
+#[path = "suite/resolver_hooks_test.rs"]
+mod resolver_hooks_test;
 #[path = "suite/resolver_test.rs"]
 mod resolver_test;
 #[path = "suite/settings_routing_test.rs"]

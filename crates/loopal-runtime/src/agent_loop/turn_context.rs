@@ -2,12 +2,13 @@
 //!
 //! Created at the start of each turn in `run_loop`, passed to
 //! `execute_turn`, and consumed at turn end. Holds data that
-//! observers accumulate during a turn (e.g. file diffs).
+//! observers accumulate during a turn (e.g. file diffs, metrics).
 
 use std::collections::BTreeSet;
 use std::time::Instant;
 
 use super::cancel::TurnCancel;
+use super::turn_metrics::TurnMetrics;
 
 /// Mutable context for a single turn (LLM → [tools → LLM]* → done).
 pub struct TurnContext {
@@ -20,6 +21,8 @@ pub struct TurnContext {
     /// to the tool results message. Must NOT be pushed as a separate User
     /// message — that breaks tool_use/tool_result pairing after normalization.
     pub pending_warnings: Vec<String>,
+    /// Aggregated telemetry counters for this turn.
+    pub metrics: TurnMetrics,
 }
 
 impl TurnContext {
@@ -30,6 +33,7 @@ impl TurnContext {
             started_at: Instant::now(),
             modified_files: BTreeSet::new(),
             pending_warnings: Vec::new(),
+            metrics: TurnMetrics::default(),
         }
     }
 }

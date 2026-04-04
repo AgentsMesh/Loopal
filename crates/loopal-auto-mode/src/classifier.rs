@@ -41,6 +41,21 @@ impl AutoClassifier {
         }
     }
 
+    /// Create with custom circuit breaker thresholds (from HarnessConfig).
+    pub fn new_with_thresholds(
+        instructions: String,
+        cwd: String,
+        max_consecutive: u32,
+        max_total: u32,
+    ) -> Self {
+        Self {
+            circuit_breaker: CircuitBreaker::with_thresholds(max_consecutive, max_total),
+            cache: ClassifierCache::new(),
+            instructions,
+            cwd,
+        }
+    }
+
     /// Whether the circuit breaker has tripped (too many denials/errors).
     pub fn is_degraded(&self) -> bool {
         self.circuit_breaker.is_degraded()

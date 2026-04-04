@@ -72,8 +72,19 @@ impl ConfigResolver {
                 );
             }
 
-            // Hooks: append all, preserving order
+            // Hooks: dedup by id (higher layer wins), append others.
             for config in layer.hooks {
+                if let Some(ref id) = config.id {
+                    // Same id across layers: higher-priority layer replaces.
+                    if let Some(pos) = hooks.iter().position(|h| h.config.id.as_ref() == Some(id))
+                    {
+                        hooks[pos] = HookEntry {
+                            config,
+                            source: layer.source.clone(),
+                        };
+                        continue;
+                    }
+                }
                 hooks.push(HookEntry {
                     config,
                     source: layer.source.clone(),

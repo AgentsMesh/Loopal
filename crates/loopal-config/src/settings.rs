@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
+use crate::harness::HarnessConfig;
 use crate::hook::HookConfig;
 use crate::sandbox::SandboxConfig;
 use loopal_provider_api::{ModelOverride, TaskType, ThinkingConfig};
@@ -52,6 +53,10 @@ pub struct Settings {
     /// Auto-memory configuration
     #[serde(default)]
     pub memory: MemoryConfig,
+
+    /// Harness control parameters — configurable thresholds for the agent control loop.
+    #[serde(default)]
+    pub harness: HarnessConfig,
 }
 
 impl Default for Settings {
@@ -68,6 +73,7 @@ impl Default for Settings {
             sandbox: SandboxConfig::default(),
             thinking: ThinkingConfig::default(),
             memory: MemoryConfig::default(),
+            harness: HarnessConfig::default(),
         }
     }
 }

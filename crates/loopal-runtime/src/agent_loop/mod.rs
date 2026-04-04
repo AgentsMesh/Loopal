@@ -30,12 +30,14 @@ pub(crate) mod tools_plan;
 mod tools_resolve;
 pub mod turn_context;
 mod turn_exec;
+pub(crate) mod turn_metrics;
 pub mod turn_observer;
 
 use std::collections::HashSet;
 use std::sync::Arc;
 
 use crate::frontend::traits::AgentFrontend;
+use loopal_config::HarnessConfig;
 use loopal_context::ContextStore;
 use loopal_error::{AgentOutput, Result};
 use loopal_kernel::Kernel;
@@ -51,9 +53,6 @@ use crate::session::SessionManager;
 use finished_guard::FinishedGuard;
 
 pub use runner::AgentLoopRunner;
-
-/// Maximum number of automatic continuations when LLM hits max_tokens.
-pub(crate) const MAX_AUTO_CONTINUATIONS: u32 = 3;
 
 // ── Sub-structs ────────────────────────────────────────────────────
 
@@ -162,6 +161,10 @@ pub struct AgentLoopParams {
     pub scheduled_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
     /// Auto-mode LLM classifier (active when permission_mode == Auto).
     pub auto_classifier: Option<Arc<loopal_auto_mode::AutoClassifier>>,
+    /// Harness control parameters (loop thresholds, continuations, etc.).
+    pub harness: HarnessConfig,
+    /// Receive end for async hook rewake messages (exit code 2 from background hooks).
+    pub rewake_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
 }
 
 /// Public wrapper — constructs default observers and runs the loop.
@@ -169,8 +172,12 @@ pub struct AgentLoopParams {
 /// A `FinishedGuard` ensures `Finished` is always emitted — even on panic.
 pub async fn agent_loop(params: AgentLoopParams) -> Result<AgentOutput> {
     let mut guard = FinishedGuard::new(params.deps.frontend.clone());
+    let h = &params.harness;
     let observers: Vec<Box<dyn turn_observer::TurnObserver>> = vec![
-        Box::new(loop_detector::LoopDetector::new()),
+        Box::new(loop_detector::LoopDetector::with_thresholds(
+            h.loop_warn_threshold,
+            h.loop_abort_threshold,
+        )),
         Box::new(diff_tracker::DiffTracker::new(params.deps.frontend.clone())),
     ];
     let mut runner = AgentLoopRunner::new(params);

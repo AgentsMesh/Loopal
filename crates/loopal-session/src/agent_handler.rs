@@ -192,7 +192,8 @@ pub(crate) fn apply_agent_event(
         }
         AgentEventPayload::SubAgentSpawned { .. }
         | AgentEventPayload::MessageRouted { .. }
-        | AgentEventPayload::TurnDiffSummary { .. } => {}
+        | AgentEventPayload::TurnDiffSummary { .. }
+        | AgentEventPayload::TurnCompleted { .. } => {}
         AgentEventPayload::AutoModeDecision {
             tool_name,
             decision,

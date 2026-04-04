@@ -103,9 +103,11 @@ pub fn build_with_frontend(
     );
 
     let auto_classifier = if permission_mode == loopal_tool_api::PermissionMode::Auto {
-        Some(Arc::new(loopal_auto_mode::AutoClassifier::new(
+        Some(Arc::new(loopal_auto_mode::AutoClassifier::new_with_thresholds(
             config.instructions.clone(),
             cwd.to_string_lossy().into_owned(),
+            config.settings.harness.cb_max_consecutive_denials,
+            config.settings.harness.cb_max_total_denials,
         )))
     } else {
         None
@@ -197,6 +199,8 @@ pub fn build_with_frontend(
         memory_channel,
         scheduled_rx: Some(scheduled_rx),
         auto_classifier,
+        harness: config.settings.harness.clone(),
+        rewake_rx: None, // TODO: wire from AsyncHookStore when async hooks are configured
     };
     Ok(params)
 }

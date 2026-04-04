@@ -54,6 +54,9 @@ async fn e2e_message_then_event_roundtrip() {
             let _ = sc.respond(id, serde_json::json!({"ok": true})).await;
             let event = AgentEvent {
                 agent_name: None,
+                event_id: 0,
+                turn_id: 0,
+                correlation_id: 0,
                 payload: AgentEventPayload::Stream {
                     text: "reply".into(),
                 },

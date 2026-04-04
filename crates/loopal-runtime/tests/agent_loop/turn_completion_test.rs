@@ -102,6 +102,8 @@ pub(crate) fn make_multi_runner(
         memory_channel: None,
         scheduled_rx: None,
         auto_classifier: None,
+        harness: loopal_config::HarnessConfig::default(),
+        rewake_rx: None,
     };
     (AgentLoopRunner::new(params), event_rx)
 }

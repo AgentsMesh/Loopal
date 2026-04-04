@@ -51,6 +51,9 @@ async fn bridge_survives_malformed_event_notification() {
     // Send valid event after
     let valid = loopal_protocol::AgentEvent {
         agent_name: None,
+        event_id: 0,
+        turn_id: 0,
+        correlation_id: 0,
         payload: AgentEventPayload::AwaitingInput,
     };
     server_conn
@@ -124,6 +127,9 @@ async fn client_recv_survives_malformed_event() {
 
     let valid = loopal_protocol::AgentEvent {
         agent_name: Some("test".into()),
+        event_id: 0,
+        turn_id: 0,
+        correlation_id: 0,
         payload: AgentEventPayload::Finished,
     };
     server_conn

@@ -12,6 +12,8 @@ const MAX_TOTAL_DENIALS: u32 = 20;
 /// are exceeded, preventing runaway classification loops.
 pub struct CircuitBreaker {
     inner: Mutex<Inner>,
+    max_consecutive: u32,
+    max_total: u32,
 }
 
 struct Inner {
@@ -25,12 +27,19 @@ struct Inner {
 
 impl CircuitBreaker {
     pub fn new() -> Self {
+        Self::with_thresholds(MAX_CONSECUTIVE_DENIALS, MAX_TOTAL_DENIALS)
+    }
+
+    /// Create with custom thresholds (from HarnessConfig).
+    pub fn with_thresholds(max_consecutive: u32, max_total: u32) -> Self {
         Self {
             inner: Mutex::new(Inner {
                 consecutive: HashMap::new(),
                 total_denials: 0,
                 degraded: false,
             }),
+            max_consecutive,
+            max_total,
         }
     }
 
@@ -39,9 +48,9 @@ impl CircuitBreaker {
         let mut inner = self.inner.lock().unwrap();
         let count = inner.consecutive.entry(tool_name.to_string()).or_insert(0);
         *count += 1;
-        let consecutive_exceeded = *count >= MAX_CONSECUTIVE_DENIALS;
+        let consecutive_exceeded = *count >= self.max_consecutive;
         inner.total_denials += 1;
-        if consecutive_exceeded || inner.total_denials >= MAX_TOTAL_DENIALS {
+        if consecutive_exceeded || inner.total_denials >= self.max_total {
             inner.degraded = true;
         }
     }

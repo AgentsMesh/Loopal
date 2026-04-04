@@ -158,6 +158,8 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         memory_channel: None,
         scheduled_rx: Some(scheduled_rx),
         auto_classifier: None,
+        harness: loopal_config::HarnessConfig::default(),
+        rewake_rx: None,
     };
 
     let harness = SpawnedHarness {

@@ -9,6 +9,7 @@ use super::question_parse::{format_answers, parse_questions};
 use super::runner::AgentLoopRunner;
 use super::tool_exec::execute_approved_tools;
 use super::tools_inject::success_block;
+use super::turn_metrics::ToolExecStats;
 use crate::mode::AgentMode;
 use crate::plan_file::wrap_plan_reminder;
 
@@ -16,13 +17,16 @@ use loopal_error::Result;
 
 impl AgentLoopRunner {
     /// Execute tool calls: intercept → precheck → permission → parallel execution.
+    ///
+    /// Returns [`ToolExecStats`] for turn-level metrics aggregation.
     pub async fn execute_tools(
         &mut self,
         tool_uses: Vec<(String, String, serde_json::Value)>,
         cancel: &TurnCancel,
-    ) -> Result<()> {
+    ) -> Result<ToolExecStats> {
         if cancel.is_cancelled() {
-            return self.emit_all_interrupted(&tool_uses).await;
+            self.emit_all_interrupted(&tool_uses).await?;
+            return Ok(ToolExecStats::default());
         }
 
         // Phase 0: Intercept special tools (EnterPlanMode, ExitPlanMode, AskUser)
@@ -41,6 +45,12 @@ impl AgentLoopRunner {
             "check_tools done"
         );
 
+        let mut stats = ToolExecStats {
+            approved: check.approved.len() as u32,
+            denied: check.denied.len() as u32,
+            errors: 0,
+        };
+
         // Phase 2: Parallel execution
         let mut indexed_results: Vec<(usize, ContentBlock)> = Vec::new();
         indexed_results.extend(intercepted);
@@ -50,6 +60,9 @@ impl AgentLoopRunner {
             if check.approved.len() >= 3 {
                 let tool_ids: Vec<String> =
                     check.approved.iter().map(|(id, _, _)| id.clone()).collect();
+                // Set correlation ID so all events in this batch are grouped.
+                let batch_id = loopal_protocol::event_id::next_event_id();
+                loopal_protocol::event_id::set_current_correlation_id(batch_id);
                 self.emit(AgentEventPayload::ToolBatchStart { tool_ids })
                     .await?;
             }
@@ -67,6 +80,8 @@ impl AgentLoopRunner {
             )
             .await;
             indexed_results.extend(parallel);
+            // Reset correlation ID after batch completes.
+            loopal_protocol::event_id::set_current_correlation_id(0);
         }
 
         // Plan mode: wrap non-intercepted tool results with system-reminder.
@@ -86,7 +101,15 @@ impl AgentLoopRunner {
             }
         }
 
-        self.finalize_tool_results(indexed_results)
+        // Count execution errors from result blocks
+        for (_, block) in &indexed_results {
+            if let ContentBlock::ToolResult { is_error: true, .. } = block {
+                stats.errors += 1;
+            }
+        }
+
+        self.finalize_tool_results(indexed_results)?;
+        Ok(stats)
     }
 
     /// Phase 0: intercept EnterPlanMode, ExitPlanMode, AskUser.

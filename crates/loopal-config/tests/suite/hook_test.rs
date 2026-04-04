@@ -135,6 +135,13 @@ fn test_hook_config_serde_roundtrip() {
         command: "cargo fmt".to_string(),
         tool_filter: Some(vec!["Write".to_string()]),
         timeout_ms: 5000,
+        hook_type: Default::default(),
+        url: None,
+        headers: Default::default(),
+        prompt: None,
+        model: None,
+        condition: None,
+        id: None,
     };
     let json = serde_json::to_string(&config).unwrap();
     let deserialized: HookConfig = serde_json::from_str(&json).unwrap();

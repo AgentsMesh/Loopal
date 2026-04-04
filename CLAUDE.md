@@ -117,3 +117,4 @@ Tools declare a `PermissionLevel` (ReadOnly / Supervised / Dangerous). The runti
 ## Principles
 
 - Architecture must conform to SOLID, GRASP, and YAGNI; files should stay under 200 lines; balance cohesion and SRP — split by reason to change, not by line count.
+- Names must be specific and descriptive — files, modules, functions, and variables should say exactly what they do. Avoid vague names like `common`, `helpers`, `utils`, `misc`, `edge_test`, `manager`, `handler`, `data`, `info`, `process`.

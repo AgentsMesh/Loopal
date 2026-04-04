@@ -133,6 +133,8 @@ async fn test_check_permission_channel_closed_denies() {
         memory_channel: None,
         scheduled_rx: None,
         auto_classifier: None,
+        harness: loopal_config::HarnessConfig::default(),
+        rewake_rx: None,
     };
 
     let runner = AgentLoopRunner::new(params);

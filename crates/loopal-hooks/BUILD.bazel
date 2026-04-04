@@ -8,11 +8,19 @@ rust_library(
     deps = [
         "//crates/loopal-config",
         "//crates/loopal-error",
+        "//crates/loopal-message",
+        "//crates/loopal-protocol",
+        "//crates/loopal-provider-api",
+        "@crates//:futures",
+        "@crates//:reqwest",
         "@crates//:serde",
         "@crates//:serde_json",
         "@crates//:thiserror",
         "@crates//:tokio",
         "@crates//:tracing",
+    ],
+    proc_macro_deps = [
+        "@crates//:async-trait",
     ],
 )
 
@@ -23,8 +31,16 @@ rust_test(
     edition = "2024",
     deps = [
         ":loopal-hooks",
+        "//crates/loopal-config",
+        "//crates/loopal-error",
+        "//crates/loopal-kernel",
+        "//crates/loopal-provider-api",
+        "//crates/loopal-test-support",
+        "@crates//:futures",
         "@crates//:serde_json",
         "@crates//:tokio",
-        "//crates/loopal-config",
+    ],
+    proc_macro_deps = [
+        "@crates//:async-trait",
     ],
 )

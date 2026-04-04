@@ -26,6 +26,9 @@ impl EventEmitter for ChannelEventEmitter {
     async fn emit(&self, payload: AgentEventPayload) -> Result<()> {
         let event = AgentEvent {
             agent_name: self.agent_name.clone(),
+            event_id: loopal_protocol::event_id::next_event_id(),
+            turn_id: loopal_protocol::event_id::current_turn_id(),
+            correlation_id: loopal_protocol::event_id::current_correlation_id(),
             payload,
         };
         self.tx

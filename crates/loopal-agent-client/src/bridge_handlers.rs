@@ -26,6 +26,9 @@ pub(crate) async fn handle_permission(
     let tool_id = params["tool_call_id"].as_str().unwrap_or("").to_string();
     let event = AgentEvent {
         agent_name: None,
+        event_id: loopal_protocol::event_id::next_event_id(),
+        turn_id: loopal_protocol::event_id::current_turn_id(),
+        correlation_id: loopal_protocol::event_id::current_correlation_id(),
         payload: loopal_protocol::AgentEventPayload::ToolPermissionRequest {
             id: tool_id,
             name: tool_name.clone(),
@@ -60,6 +63,9 @@ pub(crate) async fn handle_question(
     if let Ok(questions) = parsed {
         let event = AgentEvent {
             agent_name: None,
+            event_id: loopal_protocol::event_id::next_event_id(),
+            turn_id: 0,
+            correlation_id: 0,
             payload: loopal_protocol::AgentEventPayload::UserQuestionRequest {
                 id: "ipc".into(),
                 questions,

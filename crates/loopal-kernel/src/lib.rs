@@ -1,3 +1,4 @@
+pub mod hook_factory;
 pub mod kernel;
 pub mod provider_registry;
 pub mod sampling;

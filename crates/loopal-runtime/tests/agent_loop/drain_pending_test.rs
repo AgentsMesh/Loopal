@@ -138,6 +138,8 @@ async fn test_subagent_drains_pending_before_exit() {
         memory_channel: None,
         scheduled_rx: None,
         auto_classifier: None,
+        harness: loopal_config::HarnessConfig::default(),
+        rewake_rx: None,
     };
 
     // Drain events in background so channels don't block

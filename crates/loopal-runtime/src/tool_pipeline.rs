@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use loopal_config::HookEvent;
 use loopal_error::{LoopalError, Result};
-use loopal_hooks::run_hook;
+use loopal_hooks::{HookContext, HookOutput, PermissionOverride};
 use loopal_kernel::Kernel;
 use loopal_tool_api::{ToolContext, ToolResult, handle_overflow};
 use serde_json::Value;
@@ -14,7 +14,10 @@ const MAX_RESULT_LINES: usize = 2000;
 const MAX_RESULT_BYTES: usize = 100_000;
 
 /// Execute a tool through the full pipeline:
-/// pre-hooks -> execute -> overflow-to-file -> post-hooks.
+/// pre-hooks → execute → overflow-to-file → post-hooks.
+///
+/// Pre-hooks can reject (PermissionOverride::Deny) or modify input (updated_input).
+/// Post-hooks can inject feedback (additional_context) into the tool result.
 pub async fn execute_tool(
     kernel: &Kernel,
     name: &str,
@@ -26,37 +29,43 @@ pub async fn execute_tool(
         .get_tool(name)
         .ok_or_else(|| LoopalError::Tool(loopal_error::ToolError::NotFound(name.to_string())))?;
 
-    // Run pre-hooks
-    let pre_hooks = kernel.get_hooks(HookEvent::PreToolUse, Some(name));
-    for hook_config in &pre_hooks {
-        let hook_data = serde_json::json!({
-            "tool_name": name,
-            "tool_input": input,
-        });
-        match run_hook(hook_config, hook_data).await {
-            Ok(result) => {
-                if !result.is_success() {
-                    warn!(
-                        tool = name,
-                        exit_code = result.exit_code,
-                        "pre-hook rejected"
-                    );
-                    return Ok(ToolResult::error(format!(
-                        "Pre-hook rejected: {}",
-                        result.stderr.trim()
-                    )));
-                }
+    // ── Pre-hooks ──────────────────────────────────────────────
+    let pre_outputs = kernel
+        .hook_service()
+        .run_hooks(
+            HookEvent::PreToolUse,
+            &HookContext {
+                tool_name: Some(name),
+                tool_input: Some(&input),
+                ..Default::default()
+            },
+        )
+        .await;
+
+    // Check for rejections and input modifications.
+    let mut effective_input = input;
+    let mut input_updated = false;
+    for out in &pre_outputs {
+        if let Some(PermissionOverride::Deny { ref reason }) = out.permission {
+            warn!(tool = name, %reason, "pre-hook rejected");
+            return Ok(ToolResult::error(format!("Pre-hook rejected: {reason}")));
+        }
+        if let Some(ref updated) = out.updated_input {
+            if input_updated {
+                warn!(
+                    tool = name,
+                    "multiple pre-hooks modified input, later override wins"
+                );
             }
-            Err(e) => {
-                warn!(tool = name, error = %e, "pre-hook failed");
-                return Ok(ToolResult::error(format!("Pre-hook error: {e}")));
-            }
+            effective_input = updated.clone();
+            input_updated = true;
         }
     }
 
+    // ── Execute ────────────────────────────────────────────────
     debug!(tool = name, "executing tool");
     let start = Instant::now();
-    let result = tool.execute(input.clone(), ctx).await?;
+    let result = tool.execute(effective_input.clone(), ctx).await?;
     let duration = start.elapsed();
     info!(
         tool = name,
@@ -66,7 +75,7 @@ pub async fn execute_tool(
         "tool pipeline exec"
     );
 
-    // Overflow-to-file: save large outputs to disk, return preview + path.
+    // ── Overflow-to-file ───────────────────────────────────────
     let overflow = handle_overflow(&result.content, MAX_RESULT_LINES, MAX_RESULT_BYTES, name);
     let result = if overflow.overflowed {
         warn!(
@@ -83,18 +92,37 @@ pub async fn execute_tool(
         result
     };
 
-    let post_hooks = kernel.get_hooks(HookEvent::PostToolUse, Some(name));
-    for hook_config in &post_hooks {
-        let hook_data = serde_json::json!({
-            "tool_name": name,
-            "tool_input": input,
-            "tool_output": result.content,
-            "is_error": result.is_error,
-        });
-        if let Err(e) = run_hook(hook_config, hook_data).await {
-            warn!(tool = name, error = %e, "post-hook failed");
-        }
+    // ── Post-hooks ─────────────────────────────────────────────
+    let post_outputs = kernel
+        .hook_service()
+        .run_hooks(
+            HookEvent::PostToolUse,
+            &HookContext {
+                tool_name: Some(name),
+                tool_input: Some(&effective_input),
+                tool_output: Some(&result.content),
+                is_error: Some(result.is_error),
+                ..Default::default()
+            },
+        )
+        .await;
+
+    let result = append_post_hook_feedback(result, &post_outputs);
+    Ok(result)
+}
+
+/// Collect `additional_context` from post-hook outputs and append to tool result.
+fn append_post_hook_feedback(mut result: ToolResult, outputs: &[HookOutput]) -> ToolResult {
+    let feedback: Vec<&str> = outputs
+        .iter()
+        .filter_map(|o| o.additional_context.as_deref())
+        .collect();
+
+    if feedback.is_empty() {
+        return result;
     }
 
-    Ok(result)
+    result.content.push_str("\n\n[POST-HOOK FEEDBACK]\n");
+    result.content.push_str(&feedback.join("\n---\n"));
+    result
 }

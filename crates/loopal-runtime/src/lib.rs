@@ -1,5 +1,6 @@
 pub mod agent_input;
 pub mod agent_loop;
+pub mod fire_hooks;
 pub mod frontend;
 pub mod mode;
 pub mod permission;

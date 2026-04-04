@@ -30,6 +30,9 @@ impl PermissionHandler for RelayPermissionHandler {
     async fn decide(&self, id: &str, name: &str, input: &serde_json::Value) -> PermissionDecision {
         let event = AgentEvent {
             agent_name: None,
+            event_id: loopal_protocol::event_id::next_event_id(),
+            turn_id: loopal_protocol::event_id::current_turn_id(),
+            correlation_id: loopal_protocol::event_id::current_correlation_id(),
             payload: AgentEventPayload::ToolPermissionRequest {
                 id: id.to_string(),
                 name: name.to_string(),

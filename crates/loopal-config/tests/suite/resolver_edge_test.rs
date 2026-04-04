@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use loopal_config::hook::{HookConfig, HookEvent};
 use loopal_config::layer::{ConfigLayer, LayerSource};
 use loopal_config::resolver::ConfigResolver;
 use loopal_config::settings::McpServerConfig;
@@ -53,27 +52,6 @@ fn test_resolve_mcp_written_back_to_settings() {
         panic!("expected Stdio config");
     };
     assert_eq!(command, "test-cmd");
-}
-
-#[test]
-fn test_resolve_hooks_written_back_to_settings() {
-    let mut resolver = ConfigResolver::new();
-    let hook = HookConfig {
-        event: HookEvent::PreToolUse,
-        command: "echo test".into(),
-        tool_filter: None,
-        timeout_ms: 10_000,
-    };
-    let mut layer = ConfigLayer {
-        source: LayerSource::Global,
-        ..Default::default()
-    };
-    layer.hooks = vec![hook];
-    resolver.add_layer(layer);
-    let config = resolver.resolve().unwrap();
-    assert_eq!(config.hooks.len(), 1);
-    assert_eq!(config.settings.hooks.len(), 1);
-    assert_eq!(config.settings.hooks[0].command, "echo test");
 }
 
 #[test]

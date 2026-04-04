@@ -112,7 +112,8 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
         | AgentEventPayload::ServerToolResult { .. }
         | AgentEventPayload::RetryCleared
         | AgentEventPayload::SubAgentSpawned { .. }
-        | AgentEventPayload::AutoModeDecision { .. } => None,
+        | AgentEventPayload::AutoModeDecision { .. }
+        | AgentEventPayload::TurnCompleted { .. } => None,
     }
 }
 

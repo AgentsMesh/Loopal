@@ -3,7 +3,7 @@ use std::sync::Arc;
 use loopal_config::HookEvent;
 use loopal_config::Settings;
 use loopal_error::Result;
-use loopal_hooks::HookRegistry;
+use loopal_hooks::{HookRegistry, HookService};
 use loopal_mcp::types::{McpPrompt, McpResource};
 use loopal_mcp::{McpManager, McpToolAdapter};
 use loopal_provider::ProviderRegistry;
@@ -12,6 +12,7 @@ use loopal_tools::ToolRegistry;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 
+use crate::hook_factory::DefaultExecutorFactory;
 use crate::provider_registry;
 
 use loopal_tool_background::BackgroundTaskStore;
@@ -19,7 +20,7 @@ use loopal_tool_background::BackgroundTaskStore;
 pub struct Kernel {
     tool_registry: ToolRegistry,
     provider_registry: ProviderRegistry,
-    hook_registry: HookRegistry,
+    hook_service: HookService,
     mcp_manager: Arc<RwLock<McpManager>>,
     /// MCP server instructions cached at start_mcp() time.
     mcp_instructions: Vec<(String, String)>,
@@ -41,6 +42,8 @@ impl Kernel {
         provider_registry::register_providers(&settings, &mut provider_registry);
 
         let hook_registry = HookRegistry::new(settings.hooks.clone());
+        let factory = Arc::new(DefaultExecutorFactory::new(None));
+        let hook_service = HookService::new(hook_registry, factory);
         let mcp_manager = Arc::new(RwLock::new(McpManager::new()));
 
         info!("kernel initialized");
@@ -48,7 +51,7 @@ impl Kernel {
         Ok(Self {
             tool_registry,
             provider_registry,
-            hook_registry,
+            hook_service,
             mcp_manager,
             mcp_instructions: Vec::new(),
             mcp_resources: Vec::new(),
@@ -171,7 +174,14 @@ impl Kernel {
         event: HookEvent,
         tool_name: Option<&str>,
     ) -> Vec<&loopal_config::HookConfig> {
-        self.hook_registry.match_hooks(event, tool_name)
+        self.hook_service
+            .registry()
+            .match_hooks(event, tool_name, None)
+    }
+
+    /// Access the hook service for structured hook execution.
+    pub fn hook_service(&self) -> &HookService {
+        &self.hook_service
     }
 
     /// Get the shared MCP manager for server instructions and other queries.
@@ -179,17 +189,17 @@ impl Kernel {
         &self.mcp_manager
     }
 
-    /// Get MCP server instructions cached from the initialize handshake.
+    /// MCP server instructions cached from the initialize handshake.
     pub fn mcp_instructions(&self) -> &[(String, String)] {
         &self.mcp_instructions
     }
 
-    /// Get MCP resources cached at startup.
+    /// MCP resources cached at startup.
     pub fn mcp_resources(&self) -> &[(String, McpResource)] {
         &self.mcp_resources
     }
 
-    /// Get MCP prompts cached at startup.
+    /// MCP prompts cached at startup.
     pub fn mcp_prompts(&self) -> &[(String, McpPrompt)] {
         &self.mcp_prompts
     }

@@ -29,6 +29,18 @@ impl AgentLoopRunner {
             .deps
             .kernel
             .resolve_provider(self.params.config.model())?;
+
+        // PreRequest hook: notify before LLM call.
+        crate::fire_hooks::fire_hooks(
+            &self.params.deps.kernel,
+            loopal_config::HookEvent::PreRequest,
+            &loopal_hooks::HookContext {
+                session_id: Some(&self.params.session.id),
+                ..Default::default()
+            },
+        )
+        .await;
+
         let llm_start = Instant::now();
         info!(
             model = %self.params.config.model(), messages = messages.len(),

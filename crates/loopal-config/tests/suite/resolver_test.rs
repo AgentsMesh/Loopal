@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use loopal_config::hook::{HookConfig, HookEvent};
 use loopal_config::layer::{ConfigLayer, LayerSource};
 use loopal_config::resolver::ConfigResolver;
 use loopal_config::settings::McpServerConfig;
@@ -150,43 +149,6 @@ fn test_resolve_skills_override_by_name() {
         "Project commit skill."
     );
     assert_eq!(config.skills["/commit"].source, LayerSource::Project);
-}
-
-#[test]
-fn test_resolve_hooks_append_all() {
-    let mut resolver = ConfigResolver::new();
-
-    let hook1 = HookConfig {
-        event: HookEvent::PreToolUse,
-        command: "echo global".into(),
-        tool_filter: None,
-        timeout_ms: 10_000,
-    };
-    let hook2 = HookConfig {
-        event: HookEvent::PostToolUse,
-        command: "echo project".into(),
-        tool_filter: None,
-        timeout_ms: 5_000,
-    };
-
-    let mut layer1 = ConfigLayer {
-        source: LayerSource::Global,
-        ..Default::default()
-    };
-    layer1.hooks = vec![hook1];
-    let mut layer2 = ConfigLayer {
-        source: LayerSource::Project,
-        ..Default::default()
-    };
-    layer2.hooks = vec![hook2];
-
-    resolver.add_layer(layer1);
-    resolver.add_layer(layer2);
-
-    let config = resolver.resolve().unwrap();
-    assert_eq!(config.hooks.len(), 2);
-    assert_eq!(config.hooks[0].config.command, "echo global");
-    assert_eq!(config.hooks[1].config.command, "echo project");
 }
 
 #[test]

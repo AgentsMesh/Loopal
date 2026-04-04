@@ -24,6 +24,17 @@ impl AgentLoopRunner {
             return Ok(());
         }
 
+        // PreCompact hook: notify before compaction.
+        crate::fire_hooks::fire_hooks(
+            &self.params.deps.kernel,
+            loopal_config::HookEvent::PreCompact,
+            &loopal_hooks::HookContext {
+                session_id: Some(&self.params.session.id),
+                ..Default::default()
+            },
+        )
+        .await;
+
         let msg_tokens = self.params.store.current_tokens();
         let budget = self.params.store.budget().clone();
 

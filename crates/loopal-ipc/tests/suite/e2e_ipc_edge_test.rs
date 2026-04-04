@@ -40,6 +40,9 @@ async fn e2e_streaming_events_ordered() {
     for i in 0..5 {
         let event = AgentEvent {
             agent_name: None,
+            event_id: 0,
+            turn_id: 0,
+            correlation_id: 0,
             payload: AgentEventPayload::Stream {
                 text: format!("chunk-{i}"),
             },
@@ -149,6 +152,9 @@ async fn e2e_bridge_stops_on_incoming_close() {
 
     let event = AgentEvent {
         agent_name: None,
+        event_id: 0,
+        turn_id: 0,
+        correlation_id: 0,
         payload: AgentEventPayload::Stream { text: "one".into() },
     };
     fwd_tx

@@ -16,15 +16,31 @@ const ABORT_THRESHOLD: u32 = 5;
 const SIGNATURE_INPUT_LIMIT: usize = 200;
 
 /// Tracks tool call signatures and their cumulative occurrence count.
-#[derive(Default)]
 pub struct LoopDetector {
     /// (signature → cumulative count across the turn)
     signatures: HashMap<String, u32>,
+    warn_threshold: u32,
+    abort_threshold: u32,
+}
+
+impl Default for LoopDetector {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl LoopDetector {
     pub fn new() -> Self {
-        Self::default()
+        Self::with_thresholds(WARN_THRESHOLD, ABORT_THRESHOLD)
+    }
+
+    /// Create a detector with custom thresholds (from HarnessConfig).
+    pub fn with_thresholds(warn: u32, abort: u32) -> Self {
+        Self {
+            signatures: HashMap::new(),
+            warn_threshold: warn,
+            abort_threshold: abort,
+        }
     }
 }
 
@@ -41,14 +57,14 @@ impl TurnObserver for LoopDetector {
             let count = self.signatures.entry(sig).or_insert(0);
             *count += 1;
 
-            if *count >= ABORT_THRESHOLD {
+            if *count >= self.abort_threshold {
                 tracing::warn!(tool = name, count, "loop detected, aborting turn");
                 return ObserverAction::AbortTurn(format!(
                     "Loop detected: tool '{name}' called {count} cumulative times \
                      with similar arguments. Aborting to prevent waste.",
                 ));
             }
-            if *count >= WARN_THRESHOLD {
+            if *count >= self.warn_threshold {
                 tracing::warn!(tool = name, count, "possible loop detected");
                 worst = ObserverAction::InjectWarning(format!(
                     "[WARNING: Tool '{name}' has been called {count} times with similar \

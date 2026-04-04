@@ -66,6 +66,9 @@ impl AgentFrontend for UnifiedFrontend {
     async fn emit(&self, payload: AgentEventPayload) -> Result<()> {
         let event = AgentEvent {
             agent_name: self.agent_name.clone(),
+            event_id: loopal_protocol::event_id::next_event_id(),
+            turn_id: loopal_protocol::event_id::current_turn_id(),
+            correlation_id: loopal_protocol::event_id::current_correlation_id(),
             payload,
         };
         if self.agent_name.is_some() {
@@ -133,6 +136,9 @@ impl AgentFrontend for UnifiedFrontend {
     fn try_emit(&self, payload: AgentEventPayload) -> bool {
         let event = AgentEvent {
             agent_name: self.agent_name.clone(),
+            event_id: loopal_protocol::event_id::next_event_id(),
+            turn_id: loopal_protocol::event_id::current_turn_id(),
+            correlation_id: loopal_protocol::event_id::current_correlation_id(),
             payload,
         };
         self.event_tx.try_send(event).is_ok()

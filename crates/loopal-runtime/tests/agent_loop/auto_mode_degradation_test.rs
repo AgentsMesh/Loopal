@@ -115,6 +115,8 @@ async fn no_provider_denies_gracefully() {
         memory_channel: None,
         scheduled_rx: None,
         auto_classifier: Some(classifier),
+        harness: loopal_config::HarnessConfig::default(),
+        rewake_rx: None,
     };
     let mut runner = AgentLoopRunner::new(params);
 

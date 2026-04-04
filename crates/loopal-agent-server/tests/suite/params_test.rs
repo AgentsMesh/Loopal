@@ -67,6 +67,9 @@ async fn event_forwarder_delivers_sub_agent_events() {
     // Send a sub-agent event through the channel
     let event = loopal_protocol::AgentEvent {
         agent_name: Some("sub-1".into()),
+        event_id: 0,
+        turn_id: 0,
+        correlation_id: 0,
         payload: loopal_protocol::AgentEventPayload::Stream {
             text: "from sub-agent".into(),
         },

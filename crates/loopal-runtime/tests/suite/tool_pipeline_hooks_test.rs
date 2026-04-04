@@ -38,6 +38,13 @@ async fn test_passing_pre_hook() {
         command: "echo ok".to_string(),
         tool_filter: None,
         timeout_ms: 5000,
+        hook_type: Default::default(),
+        url: None,
+        headers: Default::default(),
+        prompt: None,
+        model: None,
+        condition: None,
+        id: None,
     }]);
     let (path, ctx) = temp_file("tool_pre_hook_pass.txt", "pre-hook pass content");
     let result = execute_tool(
@@ -61,6 +68,13 @@ async fn test_failing_pre_hook() {
         command: "echo 'denied by hook' >&2; exit 1".to_string(),
         tool_filter: None,
         timeout_ms: 5000,
+        hook_type: Default::default(),
+        url: None,
+        headers: Default::default(),
+        prompt: None,
+        model: None,
+        condition: None,
+        id: None,
     }]);
     let (path, ctx) = temp_file("tool_pre_hook_fail.txt", "should not read this");
     let result = execute_tool(
@@ -84,6 +98,13 @@ async fn test_post_hook_failure_ignored() {
         command: "exit 1".to_string(),
         tool_filter: None,
         timeout_ms: 5000,
+        hook_type: Default::default(),
+        url: None,
+        headers: Default::default(),
+        prompt: None,
+        model: None,
+        condition: None,
+        id: None,
     }]);
     let (path, ctx) = temp_file("tool_post_hook_fail.txt", "post hook test content");
     let result = execute_tool(
@@ -107,6 +128,13 @@ async fn test_filtered_pre_hook_not_matching() {
         command: "exit 1".to_string(),
         tool_filter: Some(vec!["Bash".to_string()]),
         timeout_ms: 5000,
+        hook_type: Default::default(),
+        url: None,
+        headers: Default::default(),
+        prompt: None,
+        model: None,
+        condition: None,
+        id: None,
     }]);
     let (path, ctx) = temp_file("tool_filtered_hook.txt", "filtered hook content");
     let result = execute_tool(
@@ -130,12 +158,26 @@ async fn test_both_pre_and_post_hooks() {
             command: "echo pre-hook-ok".to_string(),
             tool_filter: None,
             timeout_ms: 5000,
+            hook_type: Default::default(),
+            url: None,
+            headers: Default::default(),
+            prompt: None,
+            model: None,
+            condition: None,
+            id: None,
         },
         HookConfig {
             event: HookEvent::PostToolUse,
             command: "echo post-hook-ok".to_string(),
             tool_filter: None,
             timeout_ms: 5000,
+            hook_type: Default::default(),
+            url: None,
+            headers: Default::default(),
+            prompt: None,
+            model: None,
+            condition: None,
+            id: None,
         },
     ]);
     let (path, ctx) = temp_file("tool_both_hooks.txt", "both hooks content");

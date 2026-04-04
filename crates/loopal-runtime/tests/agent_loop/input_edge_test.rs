@@ -56,6 +56,8 @@ fn test_model_info_defaults_for_unknown_model() {
         memory_channel: None,
         scheduled_rx: None,
         auto_classifier: None,
+        harness: loopal_config::HarnessConfig::default(),
+        rewake_rx: None,
     };
 
     let runner = AgentLoopRunner::new(params);

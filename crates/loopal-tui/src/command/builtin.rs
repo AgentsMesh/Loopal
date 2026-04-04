@@ -81,23 +81,6 @@ impl CommandHandler for StatusCmd {
     }
 }
 
-pub struct SessionsCmd;
-
-#[async_trait]
-impl CommandHandler for SessionsCmd {
-    fn name(&self) -> &str {
-        "/sessions"
-    }
-    fn description(&self) -> &str {
-        "List session history"
-    }
-    async fn execute(&self, app: &mut App, _arg: Option<&str>) -> CommandEffect {
-        app.session
-            .push_system_message("Session listing is not yet available in TUI.".to_string());
-        CommandEffect::Done
-    }
-}
-
 pub struct PlanCmd;
 
 #[async_trait]
@@ -152,7 +135,7 @@ pub fn register_all(registry: &mut CommandRegistry) {
     registry.register(Arc::new(super::model_cmd::ModelCmd));
     registry.register(Arc::new(super::rewind_cmd::RewindCmd));
     registry.register(Arc::new(StatusCmd));
-    registry.register(Arc::new(SessionsCmd));
+    registry.register(Arc::new(super::resume_cmd::ResumeCmd));
     registry.register(Arc::new(super::init_cmd::InitCmd));
     registry.register(Arc::new(super::help_cmd::HelpCmd));
     registry.register(Arc::new(ExitCmd));

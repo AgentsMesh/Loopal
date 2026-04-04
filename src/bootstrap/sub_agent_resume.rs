@@ -28,29 +28,13 @@ pub fn load_sub_agent_histories(
         if messages.is_empty() {
             continue;
         }
-        let display_msgs = project_messages(&messages)
-            .into_iter()
-            .map(loopal_session::into_session_message)
-            .collect();
-        let mut state = session_ctrl.lock();
-        let agent = state.agents.entry(sub_ref.name.clone()).or_default();
-        agent.parent = sub_ref.parent.clone();
-        agent.session_id = Some(sub_ref.session_id.clone());
-        if let Some(ref m) = sub_ref.model {
-            agent.observable.model = m.clone();
-        }
-        agent.conversation.messages = display_msgs;
-        agent.conversation.agent_idle = true;
-        agent.observable.status = loopal_protocol::AgentStatus::Finished;
-        // Register as child of parent
-        if let Some(ref parent_name) = sub_ref.parent
-            && let Some(parent_agent) = state.agents.get_mut(parent_name)
-        {
-            let child_name = sub_ref.name.clone();
-            if !parent_agent.children.contains(&child_name) {
-                parent_agent.children.push(child_name);
-            }
-        }
+        session_ctrl.load_sub_agent_history(
+            &sub_ref.name,
+            &sub_ref.session_id,
+            sub_ref.parent.as_deref(),
+            sub_ref.model.as_deref(),
+            project_messages(&messages),
+        );
     }
 }
 

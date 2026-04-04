@@ -55,3 +55,25 @@ fn test_control_command_thinking_switch() {
         panic!("expected ThinkingSwitch");
     }
 }
+
+#[test]
+fn test_control_command_resume_session() {
+    let cmd = ControlCommand::ResumeSession("abc-123".to_string());
+    if let ControlCommand::ResumeSession(sid) = cmd {
+        assert_eq!(sid, "abc-123");
+    } else {
+        panic!("expected ResumeSession");
+    }
+}
+
+#[test]
+fn test_control_command_resume_session_serde_roundtrip() {
+    let cmd = ControlCommand::ResumeSession("session-xyz".to_string());
+    let json = serde_json::to_string(&cmd).unwrap();
+    let deserialized: ControlCommand = serde_json::from_str(&json).unwrap();
+    if let ControlCommand::ResumeSession(sid) = deserialized {
+        assert_eq!(sid, "session-xyz");
+    } else {
+        panic!("expected ResumeSession after roundtrip");
+    }
+}

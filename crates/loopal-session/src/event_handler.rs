@@ -54,6 +54,14 @@ pub fn apply_event(state: &mut SessionState, event: AgentEvent) -> Option<UserCo
         }
     }
 
+    // Track new root session ID on resume
+    if let AgentEventPayload::SessionResumed {
+        ref session_id, ..
+    } = event.payload
+    {
+        state.root_session_id = Some(session_id.clone());
+    }
+
     // Unified: route to agent conversation by name (root = "main")
     let name = event.agent_name.unwrap_or_else(|| ROOT_AGENT.into());
     crate::agent_handler::apply_agent_event(state, &name, event.payload)

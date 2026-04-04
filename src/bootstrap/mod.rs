@@ -60,7 +60,15 @@ pub async fn run() -> anyhow::Result<()> {
         .map(|wt| wt.info.path.clone())
         .unwrap_or_else(|| cwd.clone());
 
-    let result = multiprocess::run(&cli, &effective_cwd, &config).await;
+    // Resolve resume intent to a concrete session ID.
+    let resume_session_id = match cli.resume_intent() {
+        None => None,
+        Some(crate::cli::ResumeIntent::Specific(id)) => Some(id),
+        Some(crate::cli::ResumeIntent::Latest) => resolve_resume_for_cwd(&effective_cwd),
+    };
+
+    let result = multiprocess::run(&cli, &effective_cwd, &config, resume_session_id.as_deref())
+        .await;
 
     // Clean up worktree: remove if no changes, keep otherwise.
     // Note: If the process is killed by SIGKILL or panics, this cleanup won't run.
@@ -107,4 +115,30 @@ fn abbreviate_home(path: &std::path::Path) -> String {
         return format!("~/{}", rel.display());
     }
     path.display().to_string()
+}
+
+/// Resolve `--resume` (no session ID) to the latest session for the given cwd.
+/// Returns `Some(session_id)` if found, `None` if no matching session exists.
+fn resolve_resume_for_cwd(cwd: &std::path::Path) -> Option<String> {
+    let sm = match loopal_runtime::SessionManager::new() {
+        Ok(sm) => sm,
+        Err(e) => {
+            tracing::warn!("failed to create session manager for resume: {e}");
+            return None;
+        }
+    };
+    match sm.latest_session_for_cwd(cwd) {
+        Ok(Some(session)) => {
+            tracing::info!(session_id = %session.id, "auto-resuming latest session for cwd");
+            Some(session.id)
+        }
+        Ok(None) => {
+            tracing::info!("no previous session found for cwd, starting fresh");
+            None
+        }
+        Err(e) => {
+            tracing::warn!("failed to query sessions for resume: {e}");
+            None
+        }
+    }
 }

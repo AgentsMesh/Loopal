@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use ratatui::prelude::*;
 
-use loopal_protocol::AgentEvent;
+use loopal_protocol::{AgentEvent, AgentEventPayload};
 use loopal_session::SessionController;
 use loopal_tool_background::BackgroundTaskStore;
 use tokio::sync::mpsc;
@@ -70,6 +70,14 @@ where
                     }
                 }
                 AppEvent::Agent(agent_event) => {
+                    // Load display history before handle_event processes the event,
+                    // so the conversation view is populated before any state reset.
+                    if let AgentEventPayload::SessionResumed {
+                        ref session_id, ..
+                    } = agent_event.payload
+                    {
+                        load_resumed_display(app, session_id);
+                    }
                     if let Some(content) = app.session.handle_event(agent_event) {
                         app.session.route_message(content).await;
                     }
@@ -89,4 +97,33 @@ where
     }
 
     Ok(())
+}
+
+/// Load display history from storage after the agent confirms a session resume.
+fn load_resumed_display(app: &mut App, session_id: &str) {
+    let Ok(sm) = loopal_runtime::SessionManager::new() else {
+        return;
+    };
+    let Ok((session, messages)) = sm.resume_session(session_id) else {
+        return;
+    };
+    let projected = loopal_protocol::project_messages(&messages);
+    app.session.load_display_history(projected);
+
+    // Restore sub-agent conversation views
+    for sub in &session.sub_agents {
+        let Ok(sub_msgs) = sm.load_messages(&sub.session_id) else {
+            continue;
+        };
+        if sub_msgs.is_empty() {
+            continue;
+        }
+        app.session.load_sub_agent_history(
+            &sub.name,
+            &sub.session_id,
+            sub.parent.as_deref(),
+            sub.model.as_deref(),
+            loopal_protocol::project_messages(&sub_msgs),
+        );
+    }
 }

@@ -17,6 +17,7 @@ pub(crate) mod model_config;
 mod permission;
 mod question_parse;
 pub mod rewind;
+mod resume_session;
 mod run;
 mod runner;
 pub(crate) mod token_accumulator;

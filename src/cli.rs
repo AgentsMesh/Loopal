@@ -1,5 +1,13 @@
 use clap::Parser;
 
+/// Parsed resume intent — hides the clap-level empty-string sentinel.
+pub enum ResumeIntent {
+    /// `--resume` (no ID): auto-find latest session for current directory.
+    Latest,
+    /// `--resume <ID>`: resume a specific session.
+    Specific(String),
+}
+
 #[derive(Parser)]
 #[command(name = "loopal", about = "AI coding agent", version = "0.1.0")]
 pub struct Cli {
@@ -7,9 +15,9 @@ pub struct Cli {
     #[arg(short, long)]
     pub model: Option<String>,
 
-    /// Resume a previous session
-    #[arg(short, long)]
-    pub resume: Option<String>,
+    /// Resume a previous session (by ID, or latest for current directory if no ID given)
+    #[arg(short, long, num_args = 0..=1, default_missing_value = "")]
+    resume: Option<String>,
 
     /// Permission mode
     #[arg(short = 'P', long)]
@@ -65,6 +73,16 @@ pub struct Cli {
 }
 
 impl Cli {
+    /// Parse the raw `--resume` flag into a typed intent.
+    /// Encapsulates the clap-level `default_missing_value = ""` convention.
+    pub fn resume_intent(&self) -> Option<ResumeIntent> {
+        match self.resume.as_deref() {
+            None => None,
+            Some("") => Some(ResumeIntent::Latest),
+            Some(id) => Some(ResumeIntent::Specific(id.to_string())),
+        }
+    }
+
     /// Apply CLI flags to settings, overriding config-file values.
     pub fn apply_overrides(&self, settings: &mut loopal_config::Settings) {
         if let Some(model) = &self.model {
@@ -79,6 +97,55 @@ impl Cli {
         }
         if self.no_sandbox {
             settings.sandbox.policy = loopal_config::SandboxPolicy::Disabled;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn cli_with_resume(resume: Option<String>) -> Cli {
+        Cli {
+            model: None,
+            resume,
+            permission: None,
+            plan: false,
+            no_sandbox: false,
+            acp: false,
+            server: false,
+            ephemeral: false,
+            serve: false,
+            worktree: false,
+            test_provider: None,
+            meta_hub: None,
+            join_hub: None,
+            hub_name: None,
+            prompt: vec![],
+        }
+    }
+
+    #[test]
+    fn test_resume_intent_none_when_no_flag() {
+        let cli = cli_with_resume(None);
+        assert!(cli.resume_intent().is_none());
+    }
+
+    #[test]
+    fn test_resume_intent_latest_when_empty_string() {
+        let cli = cli_with_resume(Some(String::new()));
+        let intent = cli.resume_intent().expect("should be Some");
+        assert!(matches!(intent, ResumeIntent::Latest));
+    }
+
+    #[test]
+    fn test_resume_intent_specific_when_id_given() {
+        let cli = cli_with_resume(Some("abc-123".into()));
+        let intent = cli.resume_intent().expect("should be Some");
+        if let ResumeIntent::Specific(id) = intent {
+            assert_eq!(id, "abc-123");
+        } else {
+            panic!("expected ResumeIntent::Specific");
         }
     }
 }

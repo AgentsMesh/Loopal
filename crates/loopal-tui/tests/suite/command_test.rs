@@ -19,7 +19,7 @@ fn test_registry_new_has_all_builtins() {
         "/model",
         "/rewind",
         "/status",
-        "/sessions",
+        "/resume",
         "/init",
         "/help",
         "/exit",
@@ -33,6 +33,16 @@ fn test_registry_find_returns_handler() {
     let registry = CommandRegistry::new();
     assert!(registry.find("/clear").is_some());
     assert!(registry.find("/model").is_some());
+    assert!(registry.find("/resume").is_some());
+}
+
+#[test]
+fn test_registry_sessions_command_removed() {
+    let registry = CommandRegistry::new();
+    assert!(
+        registry.find("/sessions").is_none(),
+        "/sessions was replaced by /resume"
+    );
 }
 
 #[test]

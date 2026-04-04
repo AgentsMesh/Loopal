@@ -109,6 +109,18 @@ impl SessionManager {
         Ok(())
     }
 
+    /// Find the most recently updated session for a given working directory.
+    pub fn latest_session_for_cwd(&self, cwd: &Path) -> Result<Option<Session>> {
+        let session = self.session_store.latest_session_for_cwd(cwd)?;
+        Ok(session)
+    }
+
+    /// List sessions for a given working directory, sorted by `updated_at` (newest first).
+    pub fn list_sessions_for_cwd(&self, cwd: &Path) -> Result<Vec<Session>> {
+        let sessions = self.session_store.list_sessions_for_cwd(cwd)?;
+        Ok(sessions)
+    }
+
     /// List all sessions.
     pub fn list_sessions(&self) -> Result<Vec<Session>> {
         let sessions = self.session_store.list_sessions()?;

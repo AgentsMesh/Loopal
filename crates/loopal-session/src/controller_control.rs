@@ -87,4 +87,34 @@ impl SessionController {
             .send_control_to_agent(&target, ControlCommand::Rewind { turn_index })
             .await;
     }
+
+    /// Resume a persisted session by ID.
+    ///
+    /// Clears local display state and sends `ResumeSession` to the agent.
+    /// The agent loads the session context; the TUI reloads display history
+    /// when it receives the `SessionResumed` event.
+    pub async fn resume_session(&self, session_id: &str) {
+        let target = {
+            let mut s = self.lock();
+            let conv = s.active_conversation_mut();
+            conv.messages.clear();
+            conv.streaming_text.clear();
+            conv.turn_count = 0;
+            conv.input_tokens = 0;
+            conv.output_tokens = 0;
+            conv.cache_creation_tokens = 0;
+            conv.cache_read_tokens = 0;
+            conv.retry_banner = None;
+            conv.reset_timer();
+            s.inbox.clear();
+            s.root_session_id = Some(session_id.to_string());
+            s.active_view.clone()
+        };
+        self.backend
+            .send_control_to_agent(
+                &target,
+                ControlCommand::ResumeSession(session_id.to_string()),
+            )
+            .await;
+    }
 }

@@ -21,7 +21,7 @@ pub async fn run(
 ) -> anyhow::Result<()> {
     info!("starting in server mode (ephemeral={})", cli.ephemeral);
 
-    let ctx = super::hub_bootstrap::bootstrap_hub_and_agent(cli, cwd, config).await?;
+    let ctx = super::hub_bootstrap::bootstrap_hub_and_agent(cli, cwd, config, None).await?;
     let _event_loop = loopal_agent_hub::start_event_loop(ctx.hub.clone(), ctx.event_rx);
     let ui_session = UiSession::connect(ctx.hub.clone(), "server").await;
     info!("server client connected to Hub");

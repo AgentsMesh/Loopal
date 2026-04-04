@@ -44,6 +44,10 @@ pub(crate) async fn handle_effect(app: &mut App, effect: CommandEffect) -> bool 
             app.exiting = true;
             true
         }
+        CommandEffect::ResumeSession(session_id) => {
+            app.session.resume_session(&session_id).await;
+            false
+        }
     }
 }
 

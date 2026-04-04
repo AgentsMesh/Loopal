@@ -1,6 +1,6 @@
 ---
 description: Commit, create PR, monitor CI, fix failures, merge
-allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git add:*), Bash(git commit:*), Bash(git push:*), Bash(git branch:*), Bash(git checkout:*), Bash(git log:*), Bash(gh pr:*), Bash(gh run:*), Bash(cargo check:*), Bash(cargo test:*), Bash(cargo clippy:*), Read, Edit, Write, Grep, Glob
+allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git add:*), Bash(git commit:*), Bash(git push:*), Bash(git branch:*), Bash(git checkout:*), Bash(git log:*), Bash(git fetch:*), Bash(git merge:*), Bash(git rebase:*), Bash(git cherry-pick:*), Bash(git reset:*), Bash(gh pr:*), Bash(gh run:*), Bash(gh api:*), Bash(cargo check:*), Bash(cargo test:*), Bash(cargo clippy:*), Bash(bazel:*), Bash(rustfmt:*), Bash(sleep:*), Read, Edit, Write, Grep, Glob
 ---
 
 # GitHub PR 全流程
@@ -53,6 +53,43 @@ allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git add:*), Bash(git c
    ```
 
 4. 记录 PR 编号，后续阶段会用到。
+
+## Phase 2.5: Conflict Detection
+
+CI 不触发的常见原因是 PR 有 conflict。创建 PR 后立即检查：
+
+```
+gh pr view <PR#> --json mergeable,mergeStateStatus
+```
+
+- **mergeStateStatus: "CLEAN"** → 无冲突，继续 Phase 3
+- **mergeStateStatus: "DIRTY" / mergeable: "CONFLICTING"** → 需要解决冲突：
+
+**解决流程：**
+1. `git fetch origin main` 获取最新 main
+2. `git log --oneline origin/main..HEAD` 查看当前分支比 main 多了哪些 commit
+3. 判断多余 commit 是否已经在 main 上（通过其他 PR squash 合并过）：
+   - `git log --oneline <merge-base>..origin/main` 对比 main 上的新 commit
+   - 如果当前分支的旧 commit 已在 main 上 squash 合并，只需保留本次 PR 的 commit
+4. 解决方案（按优先级）：
+   - **Cherry-pick 法**（推荐，当旧 commit 已在 main 上）：
+     ```
+     git reset --hard origin/main
+     git cherry-pick <本次PR的commit>
+     git push --force-with-lease
+     ```
+   - **Rebase 法**（通用）：
+     ```
+     git rebase origin/main
+     # 逐个解决冲突
+     git push --force-with-lease
+     ```
+5. 推送后重新检查 `gh pr view <PR#> --json mergeable,mergeStateStatus`
+
+**注意**：worktree 中 `gh pr merge` 可能因为无法 checkout main 而失败，此时用 API 合并：
+```
+gh api repos/{owner}/{repo}/pulls/{PR#}/merge -f merge_method=squash
+```
 
 ## Phase 3: Monitor CI
 
@@ -115,6 +152,7 @@ allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git add:*), Bash(git c
 
 - 每个阶段完成后简要汇报进度
 - 遇到不确定的决策（如 CI 失败原因不明）时询问用户
-- 绝不 force push
 - 绝不直接 push 到 main/master
+- Force push 仅限 `--force-with-lease` 且仅在 rebase/cherry-pick 解决冲突后使用
 - 如果 PR 需要 review approval 才能 merge，报告并等待用户指示
+- 在 worktree 中合并 PR 时，优先使用 `gh api` 而非 `gh pr merge`（避免 checkout main 失败）

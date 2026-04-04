@@ -160,6 +160,7 @@ pub async fn handle_spawn_agent(
     let model = params["model"].as_str().map(String::from);
     let prompt = params["prompt"].as_str().map(String::from);
     let permission_mode = params["permission_mode"].as_str().map(String::from);
+    let agent_type = params["agent_type"].as_str().map(String::from);
 
     // Parent: use explicit "parent" field from params if present (cross-hub),
     // otherwise use from_agent (local spawn).
@@ -180,6 +181,7 @@ pub async fn handle_spawn_agent(
             prompt,
             parent,
             permission_mode,
+            agent_type,
         )
         .await
     });

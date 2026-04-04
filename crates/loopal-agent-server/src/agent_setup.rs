@@ -123,6 +123,7 @@ pub fn build_with_frontend(
         &cwd.to_string_lossy(),
         &skills_summary,
         &config.memory,
+        start.agent_type.as_deref(),
     );
 
     // Append MCP server instructions (from initialize handshake).

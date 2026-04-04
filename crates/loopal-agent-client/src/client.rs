@@ -55,6 +55,7 @@ impl AgentClient {
         no_sandbox: bool,
         resume: Option<&str>,
         lifecycle: Option<&str>,
+        agent_type: Option<&str>,
     ) -> anyhow::Result<String> {
         let params = serde_json::json!({
             "cwd": cwd.to_string_lossy(),
@@ -65,6 +66,7 @@ impl AgentClient {
             "no_sandbox": no_sandbox,
             "resume": resume,
             "lifecycle": lifecycle,
+            "agent_type": agent_type,
         });
         let result = self
             .connection

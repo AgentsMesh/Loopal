@@ -62,6 +62,7 @@ pub(crate) async fn start_session(
         no_sandbox: params["no_sandbox"].as_bool().unwrap_or(false),
         resume: params["resume"].as_str().map(String::from),
         lifecycle,
+        agent_type: params["agent_type"].as_str().map(String::from),
     };
 
     let mut config = load_config(&cwd)?;

@@ -77,6 +77,7 @@ pub async fn build_ipc_harness(
             false,
             None,
             None,
+            None,
         )
         .await
         .expect("agent/start failed");

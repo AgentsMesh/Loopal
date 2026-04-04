@@ -13,26 +13,26 @@ impl PromptBuilder {
 
     /// Build the full system prompt for the given context.
     ///
-    /// Assembly order:
-    /// 1. User instructions (raw, highest priority)
-    /// 2. Matched & rendered fragments (sorted by priority)
+    /// Assembly order (identity-first for stronger LLM attention):
+    /// 1. Matched & rendered fragments (sorted by priority: core → tasks → tools → modes)
+    /// 2. User instructions (project-specific, after core behavioral rules)
     /// 3. Skills summary
     /// 4. Project memory (tail)
     pub fn build(&self, ctx: &PromptContext) -> String {
         let mut parts = Vec::new();
 
-        // 1. User instructions (injected raw)
-        if !ctx.instructions.is_empty() {
-            parts.push(ctx.instructions.clone());
-        }
-
-        // 2. Fragments: select → sort → render → collect
+        // 1. Fragments: select → sort → render → collect
         for frag in self.registry.select(ctx) {
             let rendered = self.registry.render(frag, ctx);
             let trimmed = rendered.trim();
             if !trimmed.is_empty() {
                 parts.push(trimmed.to_string());
             }
+        }
+
+        // 2. User instructions (after fragments so identity/core rules come first)
+        if !ctx.instructions.is_empty() {
+            parts.push(ctx.instructions.clone());
         }
 
         // 3. Skills summary
@@ -48,30 +48,8 @@ impl PromptBuilder {
         parts.join("\n\n")
     }
 
-    /// Build a prompt for a specific sub-agent type.
-    ///
-    /// Looks for a fragment with id "agents/{agent_type}" and renders it.
-    /// Falls back to the default sub-agent prompt if not found.
-    pub fn build_agent_prompt(&self, agent_type: &str, ctx: &PromptContext) -> String {
-        let agent_id = format!("agents/{agent_type}");
-        if let Some(frag) = self.registry.fragments().iter().find(|f| f.id == agent_id) {
-            self.registry.render(frag, ctx)
-        } else {
-            default_agent_prompt(ctx)
-        }
-    }
-
     /// Access the underlying registry.
     pub fn registry(&self) -> &FragmentRegistry {
         &self.registry
     }
-}
-
-fn default_agent_prompt(ctx: &PromptContext) -> String {
-    let name = ctx.agent_name.as_deref().unwrap_or("sub-agent");
-    format!(
-        "You are a sub-agent named '{name}'. Your working directory is: {}. \
-         Complete the task given to you and report your findings.",
-        ctx.cwd
-    )
 }

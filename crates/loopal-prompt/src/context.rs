@@ -37,8 +37,16 @@ pub struct PromptContext {
     // -- Sub-agent context --
     #[serde(skip_serializing_if = "Option::is_none")]
     pub agent_name: Option<String>,
+    /// Agent type for fragment selection. Some(_) implies this is a sub-agent.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub agent_type: Option<String>,
+}
+
+impl PromptContext {
+    /// Whether this context is for a sub-agent (determined by agent_type presence).
+    pub fn is_subagent(&self) -> bool {
+        self.agent_type.is_some()
+    }
 }
 
 impl Default for PromptContext {

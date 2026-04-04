@@ -19,6 +19,8 @@ pub struct SpawnParams {
     pub permission_mode: Option<String>,
     /// Target hub for cross-hub spawn (e.g. "hub-b"). None = local hub.
     pub target_hub: Option<String>,
+    /// Agent type for fragment selection (e.g. "explore", "plan").
+    pub agent_type: Option<String>,
 }
 
 /// Result returned from Hub after spawning.
@@ -45,6 +47,7 @@ pub async fn spawn_agent(
         "model": params.model,
         "prompt": params.prompt,
         "permission_mode": params.permission_mode,
+        "agent_type": params.agent_type,
     });
     if let Some(ref hub) = params.target_hub {
         request["target_hub"] = json!(hub);

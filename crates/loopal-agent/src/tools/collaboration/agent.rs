@@ -130,6 +130,7 @@ async fn action_spawn(
             cwd_override,
             permission_mode: Some(perm_mode.to_string()),
             target_hub,
+            agent_type: subagent_type.map(String::from),
         },
     )
     .await;

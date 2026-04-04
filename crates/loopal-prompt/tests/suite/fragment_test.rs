@@ -67,3 +67,21 @@ fn returns_none_without_frontmatter() {
     let raw = "Just plain text, no frontmatter.";
     assert!(parse_fragment("bad", raw).is_none());
 }
+
+#[test]
+fn parse_agent_condition() {
+    let raw = "\
+---
+name: Explore Agent
+category: agents
+condition: agent
+condition_value: explore
+priority: 100
+---
+Explore instructions.
+";
+    let frag = parse_fragment("agents/explore", raw).unwrap();
+    assert_eq!(frag.category, Category::Agents);
+    assert_eq!(frag.condition, Condition::Agent("explore".to_string()));
+    assert_eq!(frag.priority, 100);
+}

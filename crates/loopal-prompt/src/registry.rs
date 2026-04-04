@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use crate::context::PromptContext;
-use crate::fragment::{Condition, Fragment, parse_fragment, parse_fragments_from_dir};
+use crate::fragment::{Category, Condition, Fragment, parse_fragment, parse_fragments_from_dir};
 use crate::render::PromptRenderer;
 
 /// Manages a collection of prompt fragments with selection, rendering,
@@ -41,11 +41,37 @@ impl FragmentRegistry {
     }
 
     /// Select fragments that match the given context, sorted by priority.
+    ///
+    /// Agents-category fragments are excluded for the root agent (non-subagent).
+    /// When a specific Agent condition matches (e.g. "explore"), the default
+    /// fallback agent fragment (Always + Agents) is excluded to avoid overlap.
     pub fn select<'a>(&'a self, ctx: &PromptContext) -> Vec<&'a Fragment> {
+        let is_subagent = ctx.is_subagent();
+
+        // Check if any Agent(type) condition matches for this context.
+        let has_specific_agent = is_subagent
+            && self.fragments.iter().any(|f| {
+                f.category == Category::Agents
+                    && matches!(&f.condition, Condition::Agent(t) if ctx.agent_type.as_deref() == Some(t.as_str()))
+            });
+
         let mut matched: Vec<&Fragment> = self
             .fragments
             .iter()
-            .filter(|f| condition_matches(&f.condition, ctx))
+            .filter(|f| {
+                // Agents category only relevant for sub-agents
+                if f.category == Category::Agents && !is_subagent {
+                    return false;
+                }
+                // If a specific agent fragment matches, skip the Always fallback
+                if has_specific_agent
+                    && f.category == Category::Agents
+                    && f.condition == Condition::Always
+                {
+                    return false;
+                }
+                condition_matches(&f.condition, ctx)
+            })
             .collect();
         matched.sort_by_key(|f| f.priority);
         matched
@@ -68,6 +94,7 @@ fn condition_matches(cond: &Condition, ctx: &PromptContext) -> bool {
         Condition::Mode(m) => ctx.mode == *m,
         Condition::Feature(f) => ctx.features.contains(f),
         Condition::Tool(t) => ctx.tool_names.contains(t),
+        Condition::Agent(t) => ctx.agent_type.as_deref() == Some(t.as_str()),
     }
 }
 

@@ -93,7 +93,8 @@ fn full_prompt_build() {
         prompt.contains("Executing Actions with Care"),
         "safety fragment missing"
     );
-    assert!(prompt.contains("/home/user/project"), "cwd not rendered");
+    // cwd is injected per-turn via env_context for root agent, not in static prompt.
+    // Sub-agent fragments (which do use cwd) are excluded when is_subagent=false.
 }
 
 #[test]

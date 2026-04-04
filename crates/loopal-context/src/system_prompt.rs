@@ -12,6 +12,7 @@ pub fn build_system_prompt(
     cwd: &str,
     skills_summary: &str,
     memory: &str,
+    agent_type: Option<&str>,
 ) -> String {
     let mut registry = FragmentRegistry::new(system_fragments());
 
@@ -23,25 +24,14 @@ pub fn build_system_prompt(
 
     let builder = PromptBuilder::new(registry);
 
+    // Tool names/descriptions feed Minijinja conditionals in fragments
+    // (e.g. `{% if "Bash" in tool_names %}`). Full JSON schemas are sent
+    // separately via ChatParams.tools — no need to duplicate them here.
     let tool_names: Vec<String> = tools.iter().map(|t| t.name.clone()).collect();
     let tool_descriptions: HashMap<String, String> = tools
         .iter()
         .map(|t| (t.name.clone(), t.description.clone()))
         .collect();
-
-    // Build tool schema section (kept as-is for LLM function calling)
-    let tools_section = if tools.is_empty() {
-        String::new()
-    } else {
-        let mut s = String::from("# Available Tools\n");
-        for tool in tools {
-            s.push_str(&format!(
-                "\n## {}\n{}\nParameters: {}\n",
-                tool.name, tool.description, tool.input_schema
-            ));
-        }
-        s
-    };
 
     let ctx = PromptContext {
         cwd: cwd.to_string(),
@@ -61,18 +51,10 @@ pub fn build_system_prompt(
         skills_summary: skills_summary.to_string(),
         features: Vec::new(),
         agent_name: None,
-        agent_type: None,
+        agent_type: agent_type.map(String::from),
     };
 
-    let mut prompt = builder.build(&ctx);
-
-    // Append tool schemas after fragments (LLM needs the JSON schemas)
-    if !tools_section.is_empty() {
-        prompt.push_str("\n\n");
-        prompt.push_str(&tools_section);
-    }
-
-    prompt
+    builder.build(&ctx)
 }
 
 fn today() -> String {

@@ -12,6 +12,7 @@ use loopal_protocol::{AgentEvent, AgentEventPayload, Envelope};
 use crate::hub::Hub;
 
 /// Spawn a real agent process, initialize, start, and register in Hub.
+#[allow(clippy::too_many_arguments)]
 pub async fn spawn_and_register(
     hub: Arc<Mutex<Hub>>,
     name: String,
@@ -20,6 +21,7 @@ pub async fn spawn_and_register(
     prompt: Option<String>,
     parent: Option<String>,
     permission_mode: Option<String>,
+    agent_type: Option<String>,
 ) -> Result<String, String> {
     info!(agent = %name, parent = ?parent, "spawn: forking process");
     let agent_proc = loopal_agent_client::AgentProcess::spawn(None)
@@ -44,6 +46,7 @@ pub async fn spawn_and_register(
             false,
             None,
             Some("ephemeral"), // sub-agents always exit on idle
+            agent_type.as_deref(),
         )
         .await
     {

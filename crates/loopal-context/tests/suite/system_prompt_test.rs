@@ -101,7 +101,8 @@ fn tool_conditional_fragments() {
     );
 
     // Without Bash tool → no bash guidelines
-    let result_no_bash = build_system_prompt("Base", &[], "act", "/workspace", "", "", None, vec![]);
+    let result_no_bash =
+        build_system_prompt("Base", &[], "act", "/workspace", "", "", None, vec![]);
     assert!(
         !result_no_bash.contains("Bash Tool Guidelines"),
         "bash guidelines should not appear without Bash"

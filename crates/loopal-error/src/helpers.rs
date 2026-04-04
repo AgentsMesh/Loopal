@@ -6,10 +6,12 @@ impl ProviderError {
         matches!(self, ProviderError::RateLimited { .. })
     }
 
-    /// Check if this error is retryable (rate limit, server errors, etc.)
+    /// Check if this error is retryable (rate limit, server errors, network errors, etc.)
     pub fn is_retryable(&self) -> bool {
         match self {
             ProviderError::RateLimited { .. } => true,
+            // Network-level errors (connection reset, timeout, DNS) are transient.
+            ProviderError::Http(_) => true,
             ProviderError::Api { status, message } => {
                 // 400 with context overflow keywords is deterministic — never retryable
                 if *status == 400

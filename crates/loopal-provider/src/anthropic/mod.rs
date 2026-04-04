@@ -8,12 +8,12 @@ mod thinking;
 use async_trait::async_trait;
 use loopal_error::{LoopalError, ProviderError};
 use loopal_provider_api::{ChatParams, ChatStream, Provider};
-use reqwest::Client;
 use serde_json::json;
 use std::collections::VecDeque;
 use std::time::Duration;
 use tokio::sync::Semaphore;
 
+use crate::resilient_client::ResilientClient;
 use crate::sse::SseStream;
 use stream::{ServerToolAccumulator, ThinkingAccumulator, ToolUseAccumulator};
 
@@ -21,7 +21,7 @@ use stream::{ServerToolAccumulator, ThinkingAccumulator, ToolUseAccumulator};
 const MAX_CONCURRENT_REQUESTS: usize = 3;
 
 pub struct AnthropicProvider {
-    client: Client,
+    client: ResilientClient,
     api_key: String,
     base_url: String,
     /// Limits concurrent in-flight requests across all agents sharing this provider.
@@ -30,13 +30,8 @@ pub struct AnthropicProvider {
 
 impl AnthropicProvider {
     pub fn new(api_key: String) -> Self {
-        let client = Client::builder()
-            .timeout(Duration::from_secs(300))
-            .connect_timeout(Duration::from_secs(10))
-            .build()
-            .expect("failed to build HTTP client");
         Self {
-            client,
+            client: ResilientClient::new(Duration::from_secs(300), Duration::from_secs(10)),
             api_key,
             base_url: "https://api.anthropic.com".to_string(),
             request_semaphore: Semaphore::new(MAX_CONCURRENT_REQUESTS),
@@ -117,8 +112,8 @@ impl AnthropicProvider {
             "API request"
         );
 
-        let response = self
-            .client
+        let (client, client_gen) = self.client.get();
+        let response = client
             .post(format!("{}/v1/messages", self.base_url))
             .header("x-api-key", &self.api_key)
             .header("anthropic-version", "2023-06-01")
@@ -126,7 +121,11 @@ impl AnthropicProvider {
             .json(&body)
             .send()
             .await
-            .map_err(|e| ProviderError::Http(e.to_string()))?;
+            .map_err(|e| {
+                self.client.report_network_error(client_gen);
+                ProviderError::Http(format!("{e:#}"))
+            })?;
+        self.client.report_success(client_gen);
 
         let status = response.status();
         tracing::info!(status = status.as_u16(), "API response");

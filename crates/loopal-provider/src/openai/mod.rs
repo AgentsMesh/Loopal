@@ -6,28 +6,23 @@ mod thinking;
 use async_trait::async_trait;
 use loopal_error::{LoopalError, ProviderError};
 use loopal_provider_api::{ChatParams, ChatStream, Provider};
-use reqwest::Client;
 use serde_json::json;
 use std::collections::VecDeque;
 use std::time::Duration;
 
+use crate::resilient_client::ResilientClient;
 use crate::sse::SseStream;
 
 pub struct OpenAiProvider {
-    client: Client,
+    client: ResilientClient,
     api_key: String,
     base_url: String,
 }
 
 impl OpenAiProvider {
     pub fn new(api_key: String) -> Self {
-        let client = Client::builder()
-            .timeout(Duration::from_secs(300))
-            .connect_timeout(Duration::from_secs(10))
-            .build()
-            .expect("failed to build HTTP client");
         Self {
-            client,
+            client: ResilientClient::new(Duration::from_secs(300), Duration::from_secs(10)),
             api_key,
             base_url: "https://api.openai.com".to_string(),
         }
@@ -78,15 +73,19 @@ impl Provider for OpenAiProvider {
             "API request"
         );
 
-        let response = self
-            .client
+        let (client, client_gen) = self.client.get();
+        let response = client
             .post(format!("{}/v1/responses", self.base_url))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
             .json(&body)
             .send()
             .await
-            .map_err(|e| ProviderError::Http(e.to_string()))?;
+            .map_err(|e| {
+                self.client.report_network_error(client_gen);
+                ProviderError::Http(format!("{e:#}"))
+            })?;
+        self.client.report_success(client_gen);
 
         let status = response.status();
         tracing::info!(status = status.as_u16(), "API response");

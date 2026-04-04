@@ -35,11 +35,13 @@ fn test_match_with_tool_filter() {
         Some(vec!["bash".into(), "write".into()]),
     )]);
     assert_eq!(
-        reg.match_hooks(HookEvent::PreToolUse, Some("bash"), None).len(),
+        reg.match_hooks(HookEvent::PreToolUse, Some("bash"), None)
+            .len(),
         1
     );
     assert_eq!(
-        reg.match_hooks(HookEvent::PreToolUse, Some("read"), None).len(),
+        reg.match_hooks(HookEvent::PreToolUse, Some("read"), None)
+            .len(),
         0
     );
     assert_eq!(reg.match_hooks(HookEvent::PreToolUse, None, None).len(), 0);
@@ -48,7 +50,10 @@ fn test_match_with_tool_filter() {
 #[test]
 fn test_no_match_wrong_event() {
     let reg = HookRegistry::new(vec![make_hook(HookEvent::PreToolUse, None)]);
-    assert!(reg.match_hooks(HookEvent::PostToolUse, None, None).is_empty());
+    assert!(
+        reg.match_hooks(HookEvent::PostToolUse, None, None)
+            .is_empty()
+    );
 }
 
 #[test]
@@ -101,7 +106,10 @@ fn test_match_hooks_with_tool_filter_only_matches_specified_tools() {
 #[test]
 fn test_empty_registry_returns_empty() {
     let reg = HookRegistry::new(vec![]);
-    assert!(reg.match_hooks(HookEvent::PreToolUse, None, None).is_empty());
+    assert!(
+        reg.match_hooks(HookEvent::PreToolUse, None, None)
+            .is_empty()
+    );
     assert!(
         reg.match_hooks(HookEvent::PreToolUse, Some("bash"), None)
             .is_empty()
@@ -149,23 +157,54 @@ fn make_condition_hook(event: HookEvent, condition: &str) -> HookConfig {
 #[test]
 fn test_condition_wildcard_matches_any_tool() {
     let reg = HookRegistry::new(vec![make_condition_hook(HookEvent::PreToolUse, "*")]);
-    assert_eq!(reg.match_hooks(HookEvent::PreToolUse, Some("Bash"), None).len(), 1);
-    assert_eq!(reg.match_hooks(HookEvent::PreToolUse, Some("Write"), None).len(), 1);
+    assert_eq!(
+        reg.match_hooks(HookEvent::PreToolUse, Some("Bash"), None)
+            .len(),
+        1
+    );
+    assert_eq!(
+        reg.match_hooks(HookEvent::PreToolUse, Some("Write"), None)
+            .len(),
+        1
+    );
 }
 
 #[test]
 fn test_condition_exact_tool_name() {
     let reg = HookRegistry::new(vec![make_condition_hook(HookEvent::PreToolUse, "Bash")]);
-    assert_eq!(reg.match_hooks(HookEvent::PreToolUse, Some("Bash"), None).len(), 1);
-    assert_eq!(reg.match_hooks(HookEvent::PreToolUse, Some("Write"), None).len(), 0);
+    assert_eq!(
+        reg.match_hooks(HookEvent::PreToolUse, Some("Bash"), None)
+            .len(),
+        1
+    );
+    assert_eq!(
+        reg.match_hooks(HookEvent::PreToolUse, Some("Write"), None)
+            .len(),
+        0
+    );
 }
 
 #[test]
 fn test_condition_or_syntax() {
-    let reg = HookRegistry::new(vec![make_condition_hook(HookEvent::PreToolUse, "Bash|Write")]);
-    assert_eq!(reg.match_hooks(HookEvent::PreToolUse, Some("Bash"), None).len(), 1);
-    assert_eq!(reg.match_hooks(HookEvent::PreToolUse, Some("Write"), None).len(), 1);
-    assert_eq!(reg.match_hooks(HookEvent::PreToolUse, Some("Read"), None).len(), 0);
+    let reg = HookRegistry::new(vec![make_condition_hook(
+        HookEvent::PreToolUse,
+        "Bash|Write",
+    )]);
+    assert_eq!(
+        reg.match_hooks(HookEvent::PreToolUse, Some("Bash"), None)
+            .len(),
+        1
+    );
+    assert_eq!(
+        reg.match_hooks(HookEvent::PreToolUse, Some("Write"), None)
+            .len(),
+        1
+    );
+    assert_eq!(
+        reg.match_hooks(HookEvent::PreToolUse, Some("Read"), None)
+            .len(),
+        0
+    );
 }
 
 #[test]
@@ -173,28 +212,54 @@ fn test_condition_overrides_tool_filter() {
     let mut hook = make_condition_hook(HookEvent::PreToolUse, "Read");
     hook.tool_filter = Some(vec!["Bash".into()]);
     let reg = HookRegistry::new(vec![hook]);
-    assert_eq!(reg.match_hooks(HookEvent::PreToolUse, Some("Bash"), None).len(), 0);
-    assert_eq!(reg.match_hooks(HookEvent::PreToolUse, Some("Read"), None).len(), 1);
+    assert_eq!(
+        reg.match_hooks(HookEvent::PreToolUse, Some("Bash"), None)
+            .len(),
+        0
+    );
+    assert_eq!(
+        reg.match_hooks(HookEvent::PreToolUse, Some("Read"), None)
+            .len(),
+        1
+    );
 }
 
 #[test]
 fn test_condition_glob_matches_with_tool_input() {
-    let reg = HookRegistry::new(vec![
-        make_condition_hook(HookEvent::PreToolUse, "Bash(git push*)"),
-    ]);
+    let reg = HookRegistry::new(vec![make_condition_hook(
+        HookEvent::PreToolUse,
+        "Bash(git push*)",
+    )]);
     let push = serde_json::json!({"command": "git push origin main"});
     let pull = serde_json::json!({"command": "git pull origin main"});
-    assert_eq!(reg.match_hooks(HookEvent::PreToolUse, Some("Bash"), Some(&push)).len(), 1);
-    assert_eq!(reg.match_hooks(HookEvent::PreToolUse, Some("Bash"), Some(&pull)).len(), 0);
+    assert_eq!(
+        reg.match_hooks(HookEvent::PreToolUse, Some("Bash"), Some(&push))
+            .len(),
+        1
+    );
+    assert_eq!(
+        reg.match_hooks(HookEvent::PreToolUse, Some("Bash"), Some(&pull))
+            .len(),
+        0
+    );
 }
 
 #[test]
 fn test_condition_file_glob_matches_with_tool_input() {
-    let reg = HookRegistry::new(vec![
-        make_condition_hook(HookEvent::PreToolUse, "Write(*.rs)"),
-    ]);
+    let reg = HookRegistry::new(vec![make_condition_hook(
+        HookEvent::PreToolUse,
+        "Write(*.rs)",
+    )]);
     let rs = serde_json::json!({"file_path": "src/main.rs"});
     let ts = serde_json::json!({"file_path": "src/main.ts"});
-    assert_eq!(reg.match_hooks(HookEvent::PreToolUse, Some("Write"), Some(&rs)).len(), 1);
-    assert_eq!(reg.match_hooks(HookEvent::PreToolUse, Some("Write"), Some(&ts)).len(), 0);
+    assert_eq!(
+        reg.match_hooks(HookEvent::PreToolUse, Some("Write"), Some(&rs))
+            .len(),
+        1
+    );
+    assert_eq!(
+        reg.match_hooks(HookEvent::PreToolUse, Some("Write"), Some(&ts))
+            .len(),
+        0
+    );
 }

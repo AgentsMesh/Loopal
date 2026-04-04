@@ -78,9 +78,7 @@ impl AgentLoopRunner {
                     None => { self.rewake_rx = None; SelectResult::ChannelClosed }
                 },
             },
-            (None, None) => {
-                SelectResult::AgentInput(self.params.deps.frontend.recv_input().await)
-            }
+            (None, None) => SelectResult::AgentInput(self.params.deps.frontend.recv_input().await),
         }
     }
 

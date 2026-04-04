@@ -56,7 +56,10 @@ impl ExecutorFactory for DefaultExecutorFactory {
                 };
                 Some(Box::new(PromptExecutor {
                     system_prompt: config.prompt.clone().unwrap_or_default(),
-                    model: config.model.clone().unwrap_or_else(|| "claude-haiku-4-5-20251001".into()),
+                    model: config
+                        .model
+                        .clone()
+                        .unwrap_or_else(|| "claude-haiku-4-5-20251001".into()),
                     provider: provider.clone(),
                     timeout,
                     max_tokens: 256,

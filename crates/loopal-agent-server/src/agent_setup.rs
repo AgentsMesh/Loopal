@@ -103,12 +103,14 @@ pub fn build_with_frontend(
     );
 
     let auto_classifier = if permission_mode == loopal_tool_api::PermissionMode::Auto {
-        Some(Arc::new(loopal_auto_mode::AutoClassifier::new_with_thresholds(
-            config.instructions.clone(),
-            cwd.to_string_lossy().into_owned(),
-            config.settings.harness.cb_max_consecutive_denials,
-            config.settings.harness.cb_max_total_denials,
-        )))
+        Some(Arc::new(
+            loopal_auto_mode::AutoClassifier::new_with_thresholds(
+                config.instructions.clone(),
+                cwd.to_string_lossy().into_owned(),
+                config.settings.harness.cb_max_consecutive_denials,
+                config.settings.harness.cb_max_total_denials,
+            ),
+        ))
     } else {
         None
     };

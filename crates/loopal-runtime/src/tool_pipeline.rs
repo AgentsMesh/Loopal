@@ -52,7 +52,10 @@ pub async fn execute_tool(
         }
         if let Some(ref updated) = out.updated_input {
             if input_updated {
-                warn!(tool = name, "multiple pre-hooks modified input, later override wins");
+                warn!(
+                    tool = name,
+                    "multiple pre-hooks modified input, later override wins"
+                );
             }
             effective_input = updated.clone();
             input_updated = true;

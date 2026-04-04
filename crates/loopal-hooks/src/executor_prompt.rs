@@ -41,7 +41,10 @@ impl HookExecutor for PromptExecutor {
         let text = tokio::time::timeout(self.timeout, self.stream_text(&params))
             .await
             .map_err(|_| {
-                HookError::Timeout(format!("prompt hook timed out after {}ms", self.timeout.as_millis()))
+                HookError::Timeout(format!(
+                    "prompt hook timed out after {}ms",
+                    self.timeout.as_millis()
+                ))
             })??;
 
         // Try to extract exit_code from JSON response, default to 0.

@@ -174,7 +174,9 @@ impl Kernel {
         event: HookEvent,
         tool_name: Option<&str>,
     ) -> Vec<&loopal_config::HookConfig> {
-        self.hook_service.registry().match_hooks(event, tool_name, None)
+        self.hook_service
+            .registry()
+            .match_hooks(event, tool_name, None)
     }
 
     /// Access the hook service for structured hook execution.
@@ -183,14 +185,22 @@ impl Kernel {
     }
 
     /// Get the shared MCP manager for server instructions and other queries.
-    pub fn mcp_manager(&self) -> &Arc<RwLock<McpManager>> { &self.mcp_manager }
+    pub fn mcp_manager(&self) -> &Arc<RwLock<McpManager>> {
+        &self.mcp_manager
+    }
 
     /// MCP server instructions cached from the initialize handshake.
-    pub fn mcp_instructions(&self) -> &[(String, String)] { &self.mcp_instructions }
+    pub fn mcp_instructions(&self) -> &[(String, String)] {
+        &self.mcp_instructions
+    }
 
     /// MCP resources cached at startup.
-    pub fn mcp_resources(&self) -> &[(String, McpResource)] { &self.mcp_resources }
+    pub fn mcp_resources(&self) -> &[(String, McpResource)] {
+        &self.mcp_resources
+    }
 
     /// MCP prompts cached at startup.
-    pub fn mcp_prompts(&self) -> &[(String, McpPrompt)] { &self.mcp_prompts }
+    pub fn mcp_prompts(&self) -> &[(String, McpPrompt)] {
+        &self.mcp_prompts
+    }
 }

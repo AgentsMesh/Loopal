@@ -84,11 +84,13 @@ impl AgentLoopRunner {
         info!(model = %self.params.config.model(), "agent loop started");
         self.transition(AgentStatus::Running).await?;
         self.emit(AgentEventPayload::Started).await?;
-        self.fire_session_hook(loopal_config::HookEvent::SessionStart).await;
+        self.fire_session_hook(loopal_config::HookEvent::SessionStart)
+            .await;
 
         let result = self.run_loop().await;
 
-        self.fire_session_hook(loopal_config::HookEvent::SessionEnd).await;
+        self.fire_session_hook(loopal_config::HookEvent::SessionEnd)
+            .await;
 
         if let Err(ref e) = result {
             let _ = self.transition_error(e.to_string()).await;
@@ -132,10 +134,16 @@ impl AgentLoopRunner {
         let files: Vec<String> = turn_ctx.modified_files.iter().cloned().collect();
         let duration_ms = turn_ctx.started_at.elapsed().as_millis() as u64;
         info!(
-            turn = turn_ctx.turn_id, duration_ms, llm = m.llm_calls,
-            tools = m.tool_calls_requested, ok = m.tool_calls_approved,
-            denied = m.tool_calls_denied, errs = m.tool_errors,
-            tok_in = m.tokens_in, tok_out = m.tokens_out, "turn completed"
+            turn = turn_ctx.turn_id,
+            duration_ms,
+            llm = m.llm_calls,
+            tools = m.tool_calls_requested,
+            ok = m.tool_calls_approved,
+            denied = m.tool_calls_denied,
+            errs = m.tool_errors,
+            tok_in = m.tokens_in,
+            tok_out = m.tokens_out,
+            "turn completed"
         );
 
         let _ = self

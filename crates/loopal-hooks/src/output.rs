@@ -44,7 +44,9 @@ pub enum PermissionOverride {
 /// exit-code protocol, so interpretation logic lives here.
 pub fn interpret_output(raw: &RawHookOutput) -> HookOutput {
     // Structured path: try to parse stdout as JSON
-    if !raw.stdout.is_empty() && let Ok(parsed) = serde_json::from_str::<HookOutput>(&raw.stdout) {
+    if !raw.stdout.is_empty()
+        && let Ok(parsed) = serde_json::from_str::<HookOutput>(&raw.stdout)
+    {
         return parsed;
     }
     // Fallback: exit-code protocol
@@ -72,7 +74,9 @@ pub fn interpret_output(raw: &RawHookOutput) -> HookOutput {
 /// This variant preserves that behavior while adding structured JSON support.
 pub fn interpret_pre_tool_output(raw: &RawHookOutput) -> HookOutput {
     // Structured path: try JSON first
-    if !raw.stdout.is_empty() && let Ok(parsed) = serde_json::from_str::<HookOutput>(&raw.stdout) {
+    if !raw.stdout.is_empty()
+        && let Ok(parsed) = serde_json::from_str::<HookOutput>(&raw.stdout)
+    {
         return parsed;
     }
     match raw.exit_code {
@@ -154,7 +158,10 @@ mod tests {
             stderr: "denied by hook".into(),
         };
         let out = interpret_pre_tool_output(&raw);
-        assert!(matches!(out.permission, Some(PermissionOverride::Deny { .. })));
+        assert!(matches!(
+            out.permission,
+            Some(PermissionOverride::Deny { .. })
+        ));
         if let Some(PermissionOverride::Deny { reason }) = out.permission {
             assert!(reason.contains("denied by hook"));
         }
@@ -179,7 +186,10 @@ mod tests {
             stderr: String::new(),
         };
         let out = interpret_pre_tool_output(&raw);
-        assert!(matches!(out.permission, Some(PermissionOverride::Deny { .. })));
+        assert!(matches!(
+            out.permission,
+            Some(PermissionOverride::Deny { .. })
+        ));
     }
 
     #[test]

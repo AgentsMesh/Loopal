@@ -85,11 +85,7 @@ fn test_resolve_hooks_dedup_by_id_higher_priority_wins() {
     assert_eq!(lint.config.command, "echo project-lint");
     assert_eq!(lint.source, LayerSource::Project);
     // No-id hook preserved.
-    let log = config
-        .hooks
-        .iter()
-        .find(|h| h.config.id.is_none())
-        .unwrap();
+    let log = config.hooks.iter().find(|h| h.config.id.is_none()).unwrap();
     assert_eq!(log.config.command, "echo global-log");
 }
 

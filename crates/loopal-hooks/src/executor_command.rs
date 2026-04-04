@@ -46,7 +46,10 @@ impl HookExecutor for CommandExecutor {
         let output = tokio::time::timeout(self.timeout, child.wait_with_output())
             .await
             .map_err(|_| {
-                HookError::Timeout(format!("hook timed out after {}ms", self.timeout.as_millis()))
+                HookError::Timeout(format!(
+                    "hook timed out after {}ms",
+                    self.timeout.as_millis()
+                ))
             })?
             .map_err(|e| HookError::ExecutionFailed(e.to_string()))?;
 

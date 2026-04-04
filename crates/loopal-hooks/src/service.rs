@@ -31,12 +31,10 @@ impl HookService {
     ///
     /// Async hooks will be handled in a future phase (AsyncHookStore).
     /// Currently all hooks execute synchronously in sequence.
-    pub async fn run_hooks(
-        &self,
-        event: HookEvent,
-        context: &HookContext<'_>,
-    ) -> Vec<HookOutput> {
-        let matched = self.registry.match_hooks(event, context.tool_name, context.tool_input);
+    pub async fn run_hooks(&self, event: HookEvent, context: &HookContext<'_>) -> Vec<HookOutput> {
+        let matched = self
+            .registry
+            .match_hooks(event, context.tool_name, context.tool_input);
         if matched.is_empty() {
             return Vec::new();
         }

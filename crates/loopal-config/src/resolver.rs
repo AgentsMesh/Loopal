@@ -76,8 +76,7 @@ impl ConfigResolver {
             for config in layer.hooks {
                 if let Some(ref id) = config.id {
                     // Same id across layers: higher-priority layer replaces.
-                    if let Some(pos) = hooks.iter().position(|h| h.config.id.as_ref() == Some(id))
-                    {
+                    if let Some(pos) = hooks.iter().position(|h| h.config.id.as_ref() == Some(id)) {
                         hooks[pos] = HookEntry {
                             config,
                             source: layer.source.clone(),

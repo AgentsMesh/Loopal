@@ -14,6 +14,7 @@ pub mod settings;
 pub mod skills;
 mod validate;
 
+pub use harness::HarnessConfig;
 pub use hook::{HookConfig, HookEvent, HookResult, HookType};
 pub use layer::{ConfigLayer, LayerSource};
 pub use locations::*;
@@ -24,7 +25,6 @@ pub use sandbox::{
     CommandDecision, FileSystemPolicy, NetworkPolicy, PathDecision, ResolvedPolicy, SandboxConfig,
     SandboxPolicy,
 };
-pub use harness::HarnessConfig;
 pub use settings::{
     McpServerConfig, OpenAiCompatConfig, ProviderConfig, ProvidersConfig, Settings,
 };

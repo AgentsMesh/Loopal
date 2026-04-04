@@ -1,7 +1,7 @@
 pub mod agent_input;
 pub mod agent_loop;
-pub mod frontend;
 pub mod fire_hooks;
+pub mod frontend;
 pub mod mode;
 pub mod permission;
 pub mod plan_file;

@@ -10,11 +10,7 @@
 ///
 /// Stored as a raw string in config; parsed on demand for matching.
 /// This avoids upfront compilation cost for hooks that may never fire.
-pub fn matches_condition(
-    condition: &str,
-    tool_name: &str,
-    tool_input: &serde_json::Value,
-) -> bool {
+pub fn matches_condition(condition: &str, tool_name: &str, tool_input: &serde_json::Value) -> bool {
     if condition == "*" {
         return true;
     }

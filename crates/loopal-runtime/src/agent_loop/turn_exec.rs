@@ -5,10 +5,10 @@ use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::StopReason;
 use tracing::{debug, info, warn};
 
+use super::TurnOutput;
 use super::runner::AgentLoopRunner;
 use super::turn_context::TurnContext;
 use super::turn_observer::ObserverAction;
-use super::TurnOutput;
 
 impl AgentLoopRunner {
     /// Inner loop: LLM → [tools → LLM]* → done.
@@ -106,7 +106,11 @@ impl AgentLoopRunner {
             if result.tool_uses.is_empty() {
                 // Stop hook: if any hook provides feedback, continue (bounded).
                 if stop_feedback_count < max_stop_feedback {
-                    let stop_outputs = self.params.deps.kernel.hook_service()
+                    let stop_outputs = self
+                        .params
+                        .deps
+                        .kernel
+                        .hook_service()
                         .run_hooks(
                             loopal_config::HookEvent::Stop,
                             &loopal_hooks::HookContext {
@@ -115,14 +119,15 @@ impl AgentLoopRunner {
                             },
                         )
                         .await;
-                    let feedback: Vec<&str> = stop_outputs.iter()
+                    let feedback: Vec<&str> = stop_outputs
+                        .iter()
                         .filter_map(|o| o.additional_context.as_deref())
                         .collect();
                     if !feedback.is_empty() {
                         stop_feedback_count += 1;
-                        self.params.store.append_warnings_to_last_user(
-                            vec![feedback.join("\n")],
-                        );
+                        self.params
+                            .store
+                            .append_warnings_to_last_user(vec![feedback.join("\n")]);
                         continue;
                     }
                 }

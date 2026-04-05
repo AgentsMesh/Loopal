@@ -187,5 +187,14 @@ pub(crate) async fn handle_key_action(
             false
         }
         InputAction::None => false,
+        InputAction::StartArrowDebounce => {
+            let tx = events.sender();
+            let wait = crate::input::scroll_debounce::burst_detect_duration();
+            tokio::spawn(async move {
+                tokio::time::sleep(wait).await;
+                let _ = tx.send(crate::event::AppEvent::ArrowDebounceTimeout).await;
+            });
+            false
+        }
     }
 }

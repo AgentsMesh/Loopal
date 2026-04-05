@@ -14,6 +14,7 @@ use loopal_session::SessionController;
 use loopal_tool_background::BackgroundTaskStore;
 
 use crate::command::CommandRegistry;
+use crate::input::scroll_debounce::ArrowDebounce;
 use crate::views::progress::LineCache;
 
 /// Main application state — UI-only fields + session controller handle.
@@ -49,6 +50,8 @@ pub struct App {
     pub focused_bg_task: Option<String>,
     /// Which UI region owns keyboard focus.
     pub focus_mode: FocusMode,
+    /// Arrow-key debounce state for mouse-wheel vs keyboard detection.
+    pub(crate) arrow_debounce: ArrowDebounce,
     /// Scroll offset for the agent panel (index of first visible agent).
     pub agent_panel_offset: usize,
 
@@ -94,6 +97,7 @@ impl App {
             focused_agent: None,
             focused_bg_task: None,
             focus_mode: FocusMode::default(),
+            arrow_debounce: ArrowDebounce::default(),
             agent_panel_offset: 0,
             bg_store: BackgroundTaskStore::new(),
             bg_snapshots: Vec::new(),

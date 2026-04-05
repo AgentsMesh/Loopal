@@ -60,6 +60,8 @@ mod message_lines_test;
 mod panel_tab_test;
 #[path = "suite/render_guard_test.rs"]
 mod render_guard_test;
+#[path = "suite/scroll_burst_test.rs"]
+mod scroll_burst_test;
 #[path = "suite/skill_render_test.rs"]
 mod skill_render_test;
 #[path = "suite/styled_wrap_test.rs"]

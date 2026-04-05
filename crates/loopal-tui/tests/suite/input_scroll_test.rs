@@ -1,20 +1,13 @@
 /// Tests for Up/Down key routing, Ctrl+P/N history, and multiline priority.
-///
-/// Priority chain for Up/Down in Input mode:
-///   1. Multiline cursor navigation (Shift+Enter input)
-///   2. History navigation
-///
-/// Content scrolling is exclusively handled by PageUp/PageDown.
-/// All input-mode keys (except PageUp/PageDown/Tab/Esc) auto-reset scroll_offset to 0.
-///
-/// Ctrl+P/N always navigate history regardless of scroll state.
+/// Up/Down goes through arrow-key debounce (30 ms window); multiline bypasses it.
+/// Ctrl+P/N always navigate history. Burst detection tests in edge test file.
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use loopal_protocol::UserQuestionResponse;
 use loopal_protocol::{AgentStatus, ControlCommand};
 use loopal_session::SessionController;
 use loopal_tui::app::App;
-use loopal_tui::input::{InputAction, handle_key};
+use loopal_tui::input::{InputAction, handle_key, resolve_arrow_debounce};
 use tokio::sync::mpsc;
 
 fn make_app() -> App {
@@ -41,6 +34,13 @@ fn ctrl(c: char) -> KeyEvent {
     KeyEvent::new(KeyCode::Char(c), KeyModifiers::CONTROL)
 }
 
+/// Simulate a single keyboard arrow press: sends the key then resolves the
+/// debounce timer (equivalent to 30 ms passing with no burst).
+fn arrow(app: &mut App, code: KeyCode) {
+    handle_key(app, key(code));
+    resolve_arrow_debounce(app);
+}
+
 // --- PageUp / PageDown ---
 
 #[test]
@@ -52,13 +52,13 @@ fn test_page_up_down_scroll() {
     assert_eq!(app.scroll_offset, 0);
 }
 
-// --- Up/Down navigate history ---
+// --- Up/Down navigate history (after debounce resolves as keyboard) ---
 
 #[test]
 fn test_up_navigates_history_with_content() {
     let mut app = make_app();
     app.input_history.push("previous".into());
-    handle_key(&mut app, key(KeyCode::Up));
+    arrow(&mut app, KeyCode::Up);
     assert_eq!(
         app.input, "previous",
         "Up should browse history, not scroll"
@@ -72,10 +72,10 @@ fn test_down_resets_scroll_and_navigates_history() {
     app.scroll_offset = 5;
     app.input_history.push("first".into());
     app.input_history.push("second".into());
-    handle_key(&mut app, key(KeyCode::Up));
-    handle_key(&mut app, key(KeyCode::Up));
+    arrow(&mut app, KeyCode::Up);
+    arrow(&mut app, KeyCode::Up);
     assert_eq!(app.input, "first");
-    handle_key(&mut app, key(KeyCode::Down));
+    arrow(&mut app, KeyCode::Down);
     assert_eq!(app.input, "second", "Down should navigate history forward");
     assert_eq!(app.scroll_offset, 0, "scroll_offset should be 0");
 }
@@ -92,7 +92,7 @@ fn test_up_navigates_history_when_idle() {
         .status = AgentStatus::WaitingForInput;
     app.input_history.push("older".into());
     app.input_history.push("recent".into());
-    handle_key(&mut app, key(KeyCode::Up));
+    arrow(&mut app, KeyCode::Up);
     assert_eq!(app.input, "recent", "Up should browse history");
     assert_eq!(app.scroll_offset, 0);
 }
@@ -109,10 +109,10 @@ fn test_down_navigates_history_forward() {
         .status = AgentStatus::WaitingForInput;
     app.input_history.push("first".into());
     app.input_history.push("second".into());
-    handle_key(&mut app, key(KeyCode::Up));
-    handle_key(&mut app, key(KeyCode::Up));
+    arrow(&mut app, KeyCode::Up);
+    arrow(&mut app, KeyCode::Up);
     assert_eq!(app.input, "first");
-    handle_key(&mut app, key(KeyCode::Down));
+    arrow(&mut app, KeyCode::Down);
     assert_eq!(app.input, "second", "Down should navigate history forward");
 }
 
@@ -128,7 +128,8 @@ fn test_up_navigates_history_when_content_fits() {
         .status = AgentStatus::WaitingForInput;
     app.input_history.push("previous command".into());
     let action = handle_key(&mut app, key(KeyCode::Up));
-    assert!(matches!(action, InputAction::None));
+    assert!(matches!(action, InputAction::StartArrowDebounce));
+    resolve_arrow_debounce(&mut app);
     assert_eq!(app.input, "previous command", "Up browses history");
     assert_eq!(app.scroll_offset, 0);
 }
@@ -171,14 +172,16 @@ fn test_ctrl_n_navigates_history_forward() {
     assert_eq!(app.input, "second", "Ctrl+N browses history forward");
 }
 
-// --- Multiline cursor priority over history ---
+// --- Multiline cursor priority (bypasses debounce) ---
 
 #[test]
 fn test_up_multiline_cursor_beats_history() {
     let mut app = make_app();
     app.input = "line1\nline2".into();
     app.input_cursor = app.input.len();
-    handle_key(&mut app, key(KeyCode::Up));
+    let action = handle_key(&mut app, key(KeyCode::Up));
+    // Multiline nav is immediate — no debounce
+    assert!(matches!(action, InputAction::None));
     assert_eq!(app.scroll_offset, 0, "should move cursor, not scroll");
     assert!(
         app.input_cursor < "line1\n".len(),
@@ -192,7 +195,8 @@ fn test_down_multiline_cursor_beats_history() {
     let mut app = make_app();
     app.input = "line1\nline2".into();
     app.input_cursor = 0;
-    handle_key(&mut app, key(KeyCode::Down));
+    let action = handle_key(&mut app, key(KeyCode::Down));
+    assert!(matches!(action, InputAction::None));
     assert_eq!(app.scroll_offset, 0, "should move cursor, not scroll");
     assert!(
         app.input_cursor >= "line1\n".len(),
@@ -217,7 +221,7 @@ fn test_up_resets_scroll_offset() {
     let mut app = make_app();
     app.scroll_offset = 3;
     app.input_history.push("cmd".into());
-    handle_key(&mut app, key(KeyCode::Up));
+    arrow(&mut app, KeyCode::Up);
     assert_eq!(app.scroll_offset, 0, "Up should reset scroll to bottom");
     assert_eq!(app.input, "cmd");
 }

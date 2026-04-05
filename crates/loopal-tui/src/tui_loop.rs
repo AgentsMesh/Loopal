@@ -82,7 +82,15 @@ where
                 AppEvent::Paste(result) => {
                     paste::apply_paste_result(app, result);
                 }
-                AppEvent::Resize(_, _) | AppEvent::Tick => {}
+                AppEvent::ArrowDebounceTimeout => {
+                    // Flush pending arrow as history if still pending; stale
+                    // timeouts (Idle/Scrolling) are ignored by resolve.
+                    crate::input::scroll_debounce::resolve_pending_arrow(app);
+                }
+                AppEvent::Resize(_, _) => {}
+                AppEvent::Tick => {
+                    crate::input::scroll_debounce::tick_debounce(app);
+                }
             }
         }
 

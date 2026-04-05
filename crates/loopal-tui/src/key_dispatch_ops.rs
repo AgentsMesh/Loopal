@@ -66,6 +66,9 @@ pub(crate) async fn handle_sub_page_confirm(app: &mut App, result: SubPageResult
         SubPageResult::RewindConfirmed(turn_index) => {
             app.session.rewind(turn_index).await;
         }
+        SubPageResult::SessionSelected(session_id) => {
+            app.session.resume_session(&session_id).await;
+        }
     }
 }
 

@@ -98,6 +98,21 @@ impl AgentLoopRunner {
         {
             error!(error = %e, "failed to persist message");
         }
+        // Auto-generate session title from first non-ephemeral user message.
+        if !ephemeral && self.params.session.title.is_empty() {
+            let title = extract_title(&env.content.text);
+            if !title.is_empty() {
+                self.params.session.title = title;
+                if let Err(e) = self
+                    .params
+                    .deps
+                    .session_manager
+                    .update_session(&self.params.session)
+                {
+                    error!(error = %e, "failed to persist session title");
+                }
+            }
+        }
         self.params.store.push_user(user_msg);
         WaitResult::MessageAdded
     }
@@ -123,4 +138,16 @@ enum SelectResult {
     AgentInput(Option<AgentInput>),
     Envelope(Envelope),
     ChannelClosed,
+}
+
+/// Extract first line of user text, truncated to 80 **characters**, for session title.
+fn extract_title(text: &str) -> String {
+    let line = text.lines().next().unwrap_or("").trim();
+    let char_count = line.chars().count();
+    if char_count <= 80 {
+        line.to_string()
+    } else {
+        let truncated: String = line.chars().take(80).collect();
+        format!("{truncated}…")
+    }
 }

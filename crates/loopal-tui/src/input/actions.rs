@@ -11,6 +11,8 @@ pub enum SubPageResult {
     },
     /// A turn was selected for rewind (turn_index from oldest = 0).
     RewindConfirmed(usize),
+    /// A session was selected to resume (full session ID).
+    SessionSelected(String),
 }
 
 /// Action resulting from input handling.

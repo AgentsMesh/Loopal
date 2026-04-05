@@ -15,26 +15,27 @@ pub fn check_path(policy: &ResolvedPolicy, path: &Path, is_write: bool) -> PathD
     // Resolve symlinks and normalize to a canonical path
     let canonical = match resolve_canonical(path) {
         Ok(p) => p,
-        Err(reason) => return PathDecision::DenyWrite(reason),
+        Err(reason) => return PathDecision::Deny(reason),
     };
 
-    // Check read denials first (applies to both read and write)
+    // Check read denials first (applies to both read and write).
+    // Soft deny — can be overridden through the permission system.
     if let Some(reason) = check_deny_globs(&canonical, &policy.deny_read_globs, "read") {
-        return PathDecision::DenyRead(reason);
+        return PathDecision::RequiresApproval(reason);
     }
 
     if !is_write {
         return PathDecision::Allow;
     }
 
-    // Read-only mode blocks all writes
+    // Read-only mode blocks all writes — hard deny, no override.
     if policy.policy == SandboxPolicy::ReadOnly {
-        return PathDecision::DenyWrite("read-only sandbox: all writes are blocked".into());
+        return PathDecision::Deny("read-only sandbox: all writes are blocked".into());
     }
 
-    // Check explicit write denials
+    // Check explicit write denials — soft deny via permission system.
     if let Some(reason) = check_deny_globs(&canonical, &policy.deny_write_globs, "write") {
-        return PathDecision::DenyWrite(reason);
+        return PathDecision::RequiresApproval(reason);
     }
 
     // Check whether the path is under a writable directory
@@ -42,7 +43,8 @@ pub fn check_path(policy: &ResolvedPolicy, path: &Path, is_write: bool) -> PathD
         return PathDecision::Allow;
     }
 
-    PathDecision::DenyWrite(format!(
+    // Outside writable directories — soft deny via permission system.
+    PathDecision::RequiresApproval(format!(
         "path outside writable directories: {}",
         canonical.display()
     ))

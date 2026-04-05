@@ -20,6 +20,9 @@ mod resume_session;
 pub mod rewind;
 mod run;
 mod runner;
+/// Sandbox path pre-check utilities for the tools_check phase.
+/// Public for integration testing; runtime consumers should use tools_check directly.
+pub mod sandbox_precheck;
 pub(crate) mod token_accumulator;
 mod tool_collect;
 pub(crate) mod tool_exec;

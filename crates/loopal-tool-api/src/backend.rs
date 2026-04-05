@@ -132,4 +132,20 @@ pub trait Backend: Send + Sync {
 
     /// Fetch content from a URL.
     async fn fetch(&self, url: &str) -> Result<FetchResult, ToolIoError>;
+
+    // --- Sandbox approval ---
+
+    /// Record a path as approved for this session (sandbox RequiresApproval flow).
+    /// Once approved, subsequent operations on this path skip the approval check.
+    /// Default: no-op (for test backends that don't enforce sandbox).
+    fn approve_path(&self, _path: &Path) {}
+
+    /// Pre-check whether a path operation would require sandbox approval.
+    /// Returns `Some(reason)` if approval is needed, `None` if the path is
+    /// allowed (either by policy or by prior approval).
+    /// Called by the runtime BEFORE tool execution to route through the
+    /// permission system.
+    fn check_sandbox_path(&self, _raw: &str, _is_write: bool) -> Option<String> {
+        None
+    }
 }

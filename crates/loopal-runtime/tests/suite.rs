@@ -19,6 +19,8 @@ mod permission_test;
 mod plan_file_test;
 #[path = "suite/rewind_test.rs"]
 mod rewind_test;
+#[path = "suite/sandbox_precheck_test.rs"]
+mod sandbox_precheck_test;
 #[path = "suite/session_manager_test.rs"]
 mod session_manager_test;
 #[path = "suite/session_test.rs"]

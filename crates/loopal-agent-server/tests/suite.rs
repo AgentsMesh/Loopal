@@ -6,6 +6,8 @@ mod bridge_edge_test;
 mod bridge_helpers;
 #[path = "suite/dispatch_loop_test.rs"]
 mod dispatch_loop_test;
+#[path = "suite/hub_drain_test.rs"]
+mod hub_drain_test;
 #[path = "suite/hub_frontend_edge_test.rs"]
 mod hub_frontend_edge_test;
 #[path = "suite/hub_frontend_test.rs"]

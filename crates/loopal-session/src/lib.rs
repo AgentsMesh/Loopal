@@ -7,7 +7,6 @@ mod controller_control;
 mod controller_ops;
 mod conversation_display;
 pub mod event_handler;
-pub mod inbox;
 pub mod message_log;
 pub mod rewind;
 mod server_tool_display;

@@ -20,6 +20,11 @@ pub enum AgentStatus {
 ///
 /// Collected on the Observation Plane and consumed by the frontend to render
 /// per-agent status panels. All fields are cheap to clone.
+///
+/// **Status contract**: `status` is derived solely from agent events
+/// (`AwaitingInput`, `Finished`, `Error`, `Stream`, `ToolCall`, etc.).
+/// The agent loop's internal status field is for local idempotency only;
+/// this observable copy is the authoritative view for all external consumers.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ObservableAgentState {
     /// Current lifecycle status.

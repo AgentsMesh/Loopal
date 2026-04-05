@@ -6,6 +6,7 @@
 use std::time::Instant;
 
 use indexmap::IndexMap;
+use loopal_protocol::AgentStatus;
 
 /// Name of the root agent in the agents map.
 pub const ROOT_AGENT: &str = "main";
@@ -13,7 +14,6 @@ pub const ROOT_AGENT: &str = "main";
 use loopal_protocol::ObservableAgentState;
 
 use crate::agent_conversation::AgentConversation;
-use crate::inbox::Inbox;
 use crate::message_log::{MessageFeed, MessageLogEntry};
 
 /// Enhanced agent view state with full observability.
@@ -53,7 +53,6 @@ pub struct SessionState {
     // === Observation plane ===
     pub message_feed: MessageFeed,
     // === Interaction state ===
-    pub inbox: Inbox,
     /// Pending sub-agent refs to be persisted (drained by caller).
     pub pending_sub_agent_refs: Vec<PendingSubAgentRef>,
 }
@@ -71,9 +70,10 @@ impl SessionState {
     pub fn new(model: String, mode: String) -> Self {
         let mut agents = IndexMap::new();
         // Root agent "main" is a regular entry — no special treatment.
-        let mut main_agent = AgentViewState::default();
-        main_agent.conversation.agent_idle = false;
-        main_agent.started_at = Some(Instant::now());
+        let main_agent = AgentViewState {
+            started_at: Some(Instant::now()),
+            ..Default::default()
+        };
         agents.insert(ROOT_AGENT.to_string(), main_agent);
 
         Self {
@@ -84,9 +84,16 @@ impl SessionState {
             thinking_config: "auto".to_string(),
             root_session_id: None,
             message_feed: MessageFeed::new(200),
-            inbox: Inbox::new(),
             pending_sub_agent_refs: Vec::new(),
         }
+    }
+
+    /// Whether the currently viewed agent is idle (derived from observable status).
+    pub fn is_active_agent_idle(&self) -> bool {
+        self.agents
+            .get(&self.active_view)
+            .map(|a| a.is_idle())
+            .unwrap_or(true)
     }
 
     // === Active conversation projection (zero branching) ===
@@ -117,6 +124,17 @@ impl SessionState {
 }
 
 impl AgentViewState {
+    /// Whether the agent is idle — derived solely from `observable.status`.
+    ///
+    /// Agent state is internal; external consumers must derive it from events,
+    /// never set it directly. This replaces the former `agent_idle` flag.
+    pub fn is_idle(&self) -> bool {
+        matches!(
+            self.observable.status,
+            AgentStatus::WaitingForInput | AgentStatus::Finished | AgentStatus::Error
+        )
+    }
+
     /// Elapsed time since the agent was first observed.
     pub fn elapsed(&self) -> std::time::Duration {
         self.started_at

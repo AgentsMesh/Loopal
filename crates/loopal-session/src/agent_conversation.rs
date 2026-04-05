@@ -16,7 +16,6 @@ pub struct AgentConversation {
     pub streaming_text: String,
     pub streaming_thinking: String,
     pub thinking_active: bool,
-    pub agent_idle: bool,
     pub pending_permission: Option<PendingPermission>,
     pub pending_question: Option<PendingQuestion>,
     /// Transient retry error banner.

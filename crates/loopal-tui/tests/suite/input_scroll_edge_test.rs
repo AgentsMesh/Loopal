@@ -2,8 +2,8 @@
 /// Ctrl+P/N scroll reset, and multiline boundary fall-through to history.
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use loopal_protocol::ControlCommand;
 use loopal_protocol::UserQuestionResponse;
+use loopal_protocol::{AgentStatus, ControlCommand};
 use loopal_session::SessionController;
 use loopal_tui::app::App;
 use loopal_tui::input::handle_key;
@@ -78,7 +78,13 @@ fn test_esc_preserves_scroll_offset() {
 #[test]
 fn test_up_navigates_history_when_agent_busy() {
     let mut app = make_app();
-    app.session.lock().active_conversation_mut().agent_idle = false;
+    app.session
+        .lock()
+        .agents
+        .get_mut("main")
+        .unwrap()
+        .observable
+        .status = AgentStatus::Running;
     app.input_history.push("prev".into());
     handle_key(&mut app, key(KeyCode::Up));
     assert_eq!(

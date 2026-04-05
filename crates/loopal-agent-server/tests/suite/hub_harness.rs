@@ -19,13 +19,13 @@ use loopal_test_support::mock_provider::MultiCallProvider;
 use loopal_test_support::scenarios::Calls;
 
 use loopal_agent_server::testing::{
-    InputFromClient, SharedSession, StartParams, build_kernel_with_provider,
+    AgentInput, SharedSession, StartParams, build_kernel_with_provider,
 };
 
 pub const T: Duration = Duration::from_secs(10);
 
 pub struct HubTestHarness {
-    pub input_tx: mpsc::Sender<InputFromClient>,
+    pub input_tx: mpsc::Sender<AgentInput>,
     pub interrupt: InterruptSignal,
     pub interrupt_tx: Arc<watch::Sender<u64>>,
     pub client_rx: mpsc::Receiver<Incoming>,
@@ -52,7 +52,7 @@ impl HubTestHarness {
     pub async fn send_message(&self, text: &str) {
         let env = Envelope::new(MessageSource::Human, "main", text);
         self.input_tx
-            .send(InputFromClient::Message(env))
+            .send(AgentInput::Message(env))
             .await
             .expect("input channel open");
     }
@@ -101,7 +101,7 @@ pub async fn build_hub_harness_with(
     let provider = Arc::new(MultiCallProvider::new(calls));
     let kernel = build_kernel_with_provider(provider).unwrap();
 
-    let (input_tx, input_rx) = mpsc::channel::<InputFromClient>(16);
+    let (input_tx, input_rx) = mpsc::channel::<AgentInput>(16);
     let interrupt = InterruptSignal::new();
     let (watch_tx, watch_rx) = watch::channel(0u64);
     let interrupt_tx = Arc::new(watch_tx);

@@ -64,7 +64,7 @@ pub(super) fn handle_ctrl_c(app: &mut App) -> InputAction {
     } else if app.focused_agent.is_some() {
         app.focused_agent = None;
         InputAction::None
-    } else if !app.session.lock().active_conversation().agent_idle {
+    } else if !app.session.lock().is_active_agent_idle() {
         InputAction::Interrupt
     } else {
         InputAction::None

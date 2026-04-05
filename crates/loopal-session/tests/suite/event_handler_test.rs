@@ -1,6 +1,6 @@
 //! Tests for event_handler: apply_event, unified routing, MessageRouted recording.
 
-use loopal_protocol::{AgentEvent, AgentEventPayload, ImageAttachment, UserContent};
+use loopal_protocol::{AgentEvent, AgentEventPayload};
 use loopal_session::event_handler::apply_event;
 use loopal_session::state::SessionState;
 
@@ -83,26 +83,23 @@ fn test_apply_event_records_message_routed_to_agent_logs() {
 }
 
 #[test]
-fn test_awaiting_input_forwards_inbox() {
+fn test_awaiting_input_sets_idle() {
     let mut state = make_state();
-    state.inbox.push("queued msg".into());
-    let forward = apply_event(
+    apply_event(
         &mut state,
         AgentEvent::root(AgentEventPayload::AwaitingInput),
     );
-    assert_eq!(forward.map(|c| c.text), Some("queued msg".to_string()));
-    assert!(!conv!(state).agent_idle); // Immediately busy again
+    assert!(state.agents["main"].is_idle());
 }
 
 #[test]
 fn test_awaiting_input_no_inbox_stays_idle() {
     let mut state = make_state();
-    let forward = apply_event(
+    apply_event(
         &mut state,
         AgentEvent::root(AgentEventPayload::AwaitingInput),
     );
-    assert!(forward.is_none());
-    assert!(conv!(state).agent_idle);
+    assert!(state.agents["main"].is_idle());
 }
 
 #[test]
@@ -135,7 +132,7 @@ fn test_error_flushes_streaming() {
 fn test_finished_marks_idle() {
     let mut state = make_state();
     apply_event(&mut state, AgentEvent::root(AgentEventPayload::Finished));
-    assert!(conv!(state).agent_idle);
+    assert!(state.agents["main"].is_idle());
 }
 
 #[test]
@@ -171,28 +168,11 @@ fn test_mode_changed_updates_mode() {
 }
 
 #[test]
-fn test_try_forward_inbox_with_images() {
+fn test_idle_event_does_not_forward_messages() {
     let mut state = make_state();
-    let content = UserContent {
-        text: "look at this".to_string(),
-        images: vec![ImageAttachment {
-            media_type: "image/png".to_string(),
-            data: "iVBORw0KGgo=".to_string(),
-        }],
-        skill_info: None,
-    };
-    state.inbox.push(content);
-    let forward = apply_event(
+    apply_event(
         &mut state,
         AgentEvent::root(AgentEventPayload::AwaitingInput),
     );
-    let forwarded = forward.expect("should forward inbox content");
-    assert_eq!(forwarded.text, "look at this");
-    assert_eq!(forwarded.images.len(), 1);
-    assert_eq!(forwarded.images[0].media_type, "image/png");
-    let display = conv!(state).messages.last().unwrap();
-    assert_eq!(display.role, "user");
-    assert!(display.content.contains("[+1 image(s)]"));
-    assert_eq!(display.image_count, 1);
-    assert!(!conv!(state).agent_idle);
+    assert!(state.agents["main"].is_idle());
 }

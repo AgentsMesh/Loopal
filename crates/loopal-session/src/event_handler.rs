@@ -1,12 +1,13 @@
 //! AgentEvent → SessionState update logic. Unified routing for all agents.
 
-use loopal_protocol::{AgentEvent, AgentEventPayload, UserContent};
+use loopal_protocol::{AgentEvent, AgentEventPayload};
 
 use crate::message_log::record_message_routed;
 use crate::state::{ROOT_AGENT, SessionState};
 
-/// Handle an AgentEvent. Returns `Some(content)` if an inbox message should be forwarded.
-pub fn apply_event(state: &mut SessionState, event: AgentEvent) -> Option<UserContent> {
+/// Handle an AgentEvent. Updates display state only — messages are delivered
+/// directly to the agent mailbox.
+pub fn apply_event(state: &mut SessionState, event: AgentEvent) {
     // Global logging for inter-agent messages
     if let AgentEventPayload::MessageRouted {
         ref source,
@@ -61,5 +62,5 @@ pub fn apply_event(state: &mut SessionState, event: AgentEvent) -> Option<UserCo
 
     // Unified: route to agent conversation by name (root = "main")
     let name = event.agent_name.unwrap_or_else(|| ROOT_AGENT.into());
-    crate::agent_handler::apply_agent_event(state, &name, event.payload)
+    crate::agent_handler::apply_agent_event(state, &name, event.payload);
 }

@@ -13,7 +13,8 @@ use loopal_ipc::transport::Transport;
 use loopal_protocol::{AgentEventPayload, InterruptSignal};
 use loopal_runtime::frontend::traits::AgentFrontend;
 
-use loopal_agent_server::session_hub::{InputFromClient, SharedSession};
+use loopal_agent_server::session_hub::SharedSession;
+use loopal_runtime::agent_input::AgentInput;
 
 /// Create a bidirectional Connection pair (like a network socket pair).
 /// Returns (server_conn, client_conn, client_rx).
@@ -41,7 +42,7 @@ fn conn_pair() -> (
 
 fn make_session() -> (
     Arc<SharedSession>,
-    tokio::sync::mpsc::Receiver<InputFromClient>,
+    tokio::sync::mpsc::Receiver<AgentInput>,
     tokio::sync::watch::Receiver<u64>,
 ) {
     let (input_tx, input_rx) = tokio::sync::mpsc::channel(16);

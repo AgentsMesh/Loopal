@@ -15,8 +15,8 @@ mod controller_test;
 mod event_handler_edge_test;
 #[path = "suite/event_handler_test.rs"]
 mod event_handler_test;
-#[path = "suite/inbox_test.rs"]
-mod inbox_test;
+#[path = "suite/is_idle_test.rs"]
+mod is_idle_test;
 #[path = "suite/message_log_test.rs"]
 mod message_log_test;
 #[path = "suite/projection_convert_test.rs"]
@@ -31,3 +31,5 @@ mod retry_banner_test;
 mod rewind_test;
 #[path = "suite/topology_test.rs"]
 mod topology_test;
+#[path = "suite/user_display_test.rs"]
+mod user_display_test;

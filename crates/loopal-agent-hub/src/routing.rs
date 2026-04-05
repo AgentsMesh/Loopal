@@ -26,6 +26,11 @@ pub async fn route_to_agent(
         target: envelope.target.clone(),
         content_preview: envelope.content_preview().to_string(),
     });
-    let _ = observation_tx.try_send(event);
+    if observation_tx.try_send(event).is_err() {
+        tracing::warn!(
+            target = %envelope.target,
+            "observation event dropped (channel full)"
+        );
+    }
     Ok(())
 }

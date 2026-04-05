@@ -19,7 +19,6 @@ pub fn render_input(
     f: &mut Frame,
     input: &str,
     cursor: usize,
-    inbox_count: usize,
     image_count: usize,
     input_scroll: usize,
     area: Rect,
@@ -28,7 +27,7 @@ pub fn render_input(
         return;
     }
 
-    let prefix = build_prefix(inbox_count, image_count);
+    let prefix = build_prefix(image_count);
     let prefix_width = display_width(&prefix);
     let content_width = (area.width as usize).saturating_sub(prefix_width);
 
@@ -71,8 +70,8 @@ pub fn input_height(input: &str, area_width: u16, prefix_width: usize) -> u16 {
 }
 
 /// Calculate the prefix display width (exported for layout computation).
-pub fn prefix_width(inbox_count: usize, image_count: usize) -> usize {
-    display_width(&build_prefix(inbox_count, image_count))
+pub fn prefix_width(image_count: usize) -> usize {
+    display_width(&build_prefix(image_count))
 }
 
 // --- Internal helpers ---
@@ -138,12 +137,11 @@ fn set_cursor(
     f.set_cursor_position((x, y));
 }
 
-fn build_prefix(inbox_count: usize, image_count: usize) -> String {
-    match (inbox_count > 0, image_count > 0) {
-        (true, true) => format!("> [img:{image_count}] ({inbox_count} queued) "),
-        (true, false) => format!("> ({inbox_count} queued) "),
-        (false, true) => format!("> [img:{image_count}] "),
-        (false, false) => "> ".to_string(),
+fn build_prefix(image_count: usize) -> String {
+    if image_count > 0 {
+        format!("> [img:{image_count}] ")
+    } else {
+        "> ".to_string()
     }
 }
 
@@ -184,14 +182,13 @@ mod tests {
 
     #[test]
     fn test_prefix_variants() {
-        assert_eq!(build_prefix(0, 0), "> ");
-        assert_eq!(build_prefix(2, 0), "> (2 queued) ");
-        assert_eq!(build_prefix(0, 1), "> [img:1] ");
-        assert_eq!(build_prefix(3, 2), "> [img:2] (3 queued) ");
+        assert_eq!(build_prefix(0), "> ");
+        assert_eq!(build_prefix(1), "> [img:1] ");
+        assert_eq!(build_prefix(2), "> [img:2] ");
     }
 
     #[test]
     fn test_prefix_width_fn() {
-        assert_eq!(prefix_width(0, 0), 2);
+        assert_eq!(prefix_width(0), 2);
     }
 }

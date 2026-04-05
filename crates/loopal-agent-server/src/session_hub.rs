@@ -8,6 +8,7 @@ use tokio::sync::Mutex;
 
 use loopal_ipc::connection::Connection;
 use loopal_protocol::InterruptSignal;
+use loopal_runtime::agent_input::AgentInput;
 
 /// A connected client handle within a shared session.
 pub struct ClientHandle {
@@ -22,17 +23,10 @@ pub struct SharedSession {
     pub session_id: String,
     pub clients: Mutex<Vec<ClientHandle>>,
     /// Channel to send input into the agent loop.
-    pub input_tx: tokio::sync::mpsc::Sender<InputFromClient>,
+    pub input_tx: tokio::sync::mpsc::Sender<AgentInput>,
     /// Interrupt signal shared with the agent loop.
     pub interrupt: InterruptSignal,
     pub interrupt_tx: Arc<tokio::sync::watch::Sender<u64>>,
-}
-
-/// Input forwarded from a client connection to the agent loop.
-pub enum InputFromClient {
-    Message(loopal_protocol::Envelope),
-    Control(loopal_protocol::ControlCommand),
-    Interrupt,
 }
 
 /// Server-wide session registry.
@@ -108,7 +102,7 @@ impl SessionHub {
 impl SharedSession {
     /// Create a placeholder session (for bootstrapping before session_id is known).
     pub fn placeholder(
-        input_tx: tokio::sync::mpsc::Sender<InputFromClient>,
+        input_tx: tokio::sync::mpsc::Sender<AgentInput>,
         interrupt: InterruptSignal,
         interrupt_tx: Arc<tokio::sync::watch::Sender<u64>>,
     ) -> Self {

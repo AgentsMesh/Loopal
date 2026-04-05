@@ -3,6 +3,8 @@
 mod agent_loop;
 #[path = "suite/diff_tracker_test.rs"]
 mod diff_tracker_test;
+#[path = "suite/drain_controls_test.rs"]
+mod drain_controls_test;
 #[path = "suite/env_context_test.rs"]
 mod env_context_test;
 #[path = "suite/frontend_unified_edge_test.rs"]

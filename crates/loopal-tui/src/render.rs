@@ -12,8 +12,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     let size = f.area();
     let state = app.session.lock();
 
-    let inbox_count = state.inbox.len();
-    let pw = input_view::prefix_width(inbox_count, app.pending_image_count());
+    let pw = input_view::prefix_width(app.pending_image_count());
     let input_h = input_view::input_height(&app.input, size.width, pw);
     let conv = state.active_conversation();
     let banner_h = views::retry_banner::banner_height(&conv.retry_banner);
@@ -125,7 +124,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     let pending_question = conv.pending_question.clone();
     let topology_data = if app.show_topology {
         use loopal_protocol::AgentStatus;
-        let root_status = if conv.agent_idle {
+        let root_status = if state.is_active_agent_idle() {
             AgentStatus::WaitingForInput
         } else {
             AgentStatus::Running
@@ -146,7 +145,6 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         f,
         &app.input,
         app.input_cursor,
-        inbox_count,
         image_count,
         app.input_scroll,
         layout.input,

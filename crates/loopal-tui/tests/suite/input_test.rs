@@ -1,7 +1,7 @@
 /// Input handling tests: key routing priority chain + basic interactions.
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use loopal_protocol::{ControlCommand, UserQuestionResponse};
+use loopal_protocol::{AgentStatus, ControlCommand, UserQuestionResponse};
 use loopal_session::SessionController;
 use loopal_tui::app::App;
 
@@ -50,7 +50,13 @@ fn test_ctrl_c_clears_input_when_non_empty() {
 #[test]
 fn test_ctrl_c_interrupts_when_agent_busy() {
     let mut app = make_app();
-    app.session.lock().active_conversation_mut().agent_idle = false;
+    app.session
+        .lock()
+        .agents
+        .get_mut("main")
+        .unwrap()
+        .observable
+        .status = AgentStatus::Running;
     let action = handle_key(&mut app, ctrl('c'));
     assert!(matches!(action, InputAction::Interrupt));
 }
@@ -58,7 +64,13 @@ fn test_ctrl_c_interrupts_when_agent_busy() {
 #[test]
 fn test_ctrl_c_noop_when_idle_and_empty() {
     let mut app = make_app();
-    app.session.lock().active_conversation_mut().agent_idle = true;
+    app.session
+        .lock()
+        .agents
+        .get_mut("main")
+        .unwrap()
+        .observable
+        .status = AgentStatus::WaitingForInput;
     let action = handle_key(&mut app, ctrl('c'));
     assert!(matches!(action, InputAction::None));
 }

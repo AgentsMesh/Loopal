@@ -28,7 +28,12 @@ pub struct AgentLoopRunner {
     pub trigger_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
     /// Async hook rewake channel — background hooks send Envelopes here.
     pub rewake_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
-    /// Explicit agent state — source of truth, propagated via events to Session layer.
+    /// Local status for idempotent `transition()` checks.
+    ///
+    /// This is NOT the authoritative status for external observers. The session
+    /// layer derives its `observable.status` solely from agent events
+    /// (`AwaitingInput`, `Finished`, `Error`, etc.). If `emit()` fails during
+    /// `transition()`, this field is rolled back so the event can be retried.
     pub status: AgentStatus,
     /// Plan file for the current session (created lazily on first plan mode entry).
     pub plan_file: PlanFile,
@@ -175,18 +180,27 @@ impl AgentLoopRunner {
     }
 
     /// Transition to a new agent status. Skips if already in target (idempotent).
+    ///
+    /// If the event emission fails, the local status is rolled back so the
+    /// transition can be retried. This keeps `self.status` consistent with
+    /// what observers have actually seen.
     pub(super) async fn transition(&mut self, new_status: AgentStatus) -> Result<()> {
         if self.status == new_status {
             return Ok(());
         }
+        let old = self.status;
         self.status = new_status;
-        match new_status {
+        let result = match new_status {
             AgentStatus::Starting => Ok(()),
             AgentStatus::Running => Ok(()), // Running is signaled implicitly by Stream/ToolCall events.
             AgentStatus::WaitingForInput => self.emit(AgentEventPayload::AwaitingInput).await,
             AgentStatus::Finished => self.emit(AgentEventPayload::Finished).await,
             AgentStatus::Error => Ok(()), // Error event carries a message; use transition_error().
+        };
+        if result.is_err() {
+            self.status = old;
         }
+        result
     }
 
     /// Transition to Error status with a message.

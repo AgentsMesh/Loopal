@@ -243,10 +243,17 @@ async fn test_unified_drain_pending() {
 
     let pending = f.drain_pending().await;
     assert_eq!(pending.len(), 2);
-    assert_eq!(pending[0].source.label(), "lead");
-    assert_eq!(pending[0].content.text, "task A");
-    assert_eq!(pending[1].source.label(), "peer");
-    assert_eq!(pending[1].content.text, "task B");
+    // drain_pending returns AgentInput; extract Envelope via pattern match.
+    let AgentInput::Message(ref env0) = pending[0] else {
+        panic!("expected Message");
+    };
+    let AgentInput::Message(ref env1) = pending[1] else {
+        panic!("expected Message");
+    };
+    assert_eq!(env0.source.label(), "lead");
+    assert_eq!(env0.content.text, "task A");
+    assert_eq!(env1.source.label(), "peer");
+    assert_eq!(env1.content.text, "task B");
 }
 
 // --- permission: auto deny ---

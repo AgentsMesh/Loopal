@@ -1,24 +1,23 @@
 //! Agent lifecycle: idle state transitions, error recovery, topology registration, display helpers.
 
-use loopal_protocol::{AgentStatus, UserContent};
+use loopal_protocol::AgentStatus;
 
-use crate::inbox::try_forward_inbox;
 use crate::state::{ROOT_AGENT, SessionState};
 
 /// Shared idle handling for AwaitingInput / Finished / Interrupted.
-pub(crate) fn handle_idle(
-    state: &mut SessionState,
-    name: &str,
-    status: AgentStatus,
-) -> Option<UserContent> {
-    let agent = state.agents.get_mut(name)?;
+///
+/// Updates display state only. Messages are delivered directly to the agent
+/// mailbox.
+pub(crate) fn handle_idle(state: &mut SessionState, name: &str, status: AgentStatus) {
+    let Some(agent) = state.agents.get_mut(name) else {
+        return;
+    };
     agent.conversation.flush_streaming();
     agent.conversation.end_turn();
     if status != AgentStatus::Finished {
         agent.conversation.turn_count += 1;
         agent.observable.turn_count += 1;
     }
-    agent.conversation.agent_idle = true;
     agent.conversation.retry_banner = None;
     agent.observable.status = status;
     // Auto-return to root when the viewed agent finishes
@@ -27,10 +26,6 @@ pub(crate) fn handle_idle(
     }
     // Truncate completed sub-agent conversation to bound memory growth
     truncate_if_done(state, name);
-    if state.active_view == name {
-        return try_forward_inbox(state);
-    }
-    None
 }
 
 /// Register a newly spawned agent with parent/child topology.

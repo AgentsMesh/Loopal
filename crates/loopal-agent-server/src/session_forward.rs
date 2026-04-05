@@ -10,8 +10,8 @@ use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::jsonrpc;
 use loopal_ipc::protocol::methods;
 use loopal_protocol::{ControlCommand, Envelope};
+use loopal_runtime::agent_input::AgentInput;
 
-use crate::session_hub::InputFromClient;
 use crate::session_start::SessionHandle;
 
 /// Result of forward_loop — tells dispatch_loop what happened.
@@ -74,7 +74,7 @@ pub(crate) async fn forward_loop(
                         } else if method == methods::AGENT_MESSAGE.name {
                             // Hub-injected message (e.g. sub-agent completion notification).
                             if let Ok(env) = serde_json::from_value::<Envelope>(params) {
-                                let _ = session.input_tx.send(InputFromClient::Message(env)).await;
+                                let _ = session.input_tx.send(AgentInput::Message(env)).await;
                             }
                         }
                     }
@@ -98,7 +98,7 @@ async fn route_request(
     match method {
         m if m == methods::AGENT_MESSAGE.name => match serde_json::from_value::<Envelope>(params) {
             Ok(env) => {
-                let _ = session.input_tx.send(InputFromClient::Message(env)).await;
+                let _ = session.input_tx.send(AgentInput::Message(env)).await;
                 let _ = connection
                     .respond(id, serde_json::json!({"ok": true}))
                     .await;
@@ -112,7 +112,7 @@ async fn route_request(
         m if m == methods::AGENT_CONTROL.name => {
             match serde_json::from_value::<ControlCommand>(params) {
                 Ok(cmd) => {
-                    let _ = session.input_tx.send(InputFromClient::Control(cmd)).await;
+                    let _ = session.input_tx.send(AgentInput::Control(cmd)).await;
                     let _ = connection
                         .respond(id, serde_json::json!({"ok": true}))
                         .await;

@@ -29,9 +29,8 @@ impl AgentLoopRunner {
 
                 match self.params.config.lifecycle {
                     LifecycleMode::Ephemeral => {
-                        // Ephemeral agent: check for pending input. If nothing pending
-                        // after a brief yield, work is done — exit.
-                        tokio::task::yield_now().await;
+                        // Messages are delivered directly to the agent mailbox.
+                        // drain is reliable — no yield/timeout needed.
                         let pending = self.drain_pending_input().await;
                         if pending.is_empty() {
                             info!("ephemeral agent idle, exiting");

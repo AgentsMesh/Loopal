@@ -4,8 +4,6 @@ use std::sync::Arc;
 
 use loopal_protocol::{ControlCommand, UserContent, UserQuestionResponse};
 
-use crate::inbox::try_forward_inbox;
-use crate::state::SessionState;
 use loopal_agent_hub::{HubClient, LocalChannels};
 
 /// Backend for session control operations.
@@ -114,9 +112,4 @@ impl ControlBackend {
             }
         }
     }
-}
-
-/// Forward a pending inbox message to the agent.
-pub(crate) fn try_forward_from_inbox(state: &mut SessionState) -> Option<UserContent> {
-    try_forward_inbox(state)
 }

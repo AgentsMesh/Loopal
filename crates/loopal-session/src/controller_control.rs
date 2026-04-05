@@ -66,7 +66,6 @@ impl SessionController {
             conv.cache_read_tokens = 0;
             conv.retry_banner = None;
             conv.reset_timer();
-            s.inbox.clear();
             s.active_view.clone()
         };
         self.backend
@@ -106,7 +105,6 @@ impl SessionController {
             conv.cache_read_tokens = 0;
             conv.retry_banner = None;
             conv.reset_timer();
-            s.inbox.clear();
             s.root_session_id = Some(session_id.to_string());
             s.active_view.clone()
         };

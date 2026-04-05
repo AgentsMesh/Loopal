@@ -19,14 +19,19 @@ impl CommandHandler for StatusCmd {
         "Show status dashboard"
     }
     async fn execute(&self, app: &mut App, _arg: Option<&str>) -> CommandEffect {
-        open_status_page(app);
+        open_status_page(app).await;
         CommandEffect::Done
     }
 }
 
-fn open_status_page(app: &mut App) {
-    let (session, usage) = collect_session_data(app);
+async fn open_status_page(app: &mut App) {
+    let (mut session, usage) = collect_session_data(app);
     let config = collect_config_snapshot(app);
+
+    // Hub listener port requires async lock — resolve outside the sync session lock.
+    if let Some(port) = app.session.hub_listener_port().await {
+        session.hub_endpoint = format!("127.0.0.1:{port}");
+    }
 
     app.sub_page = Some(SubPage::StatusPage(StatusPageState {
         active_tab: StatusTab::Status,
@@ -57,6 +62,7 @@ fn collect_session_data(app: &App) -> (SessionSnapshot, UsageSnapshot) {
         cwd: app.cwd.display().to_string(),
         model_display: state.model.clone(),
         mode: state.mode.clone(),
+        hub_endpoint: String::new(),
     };
 
     let usage = UsageSnapshot {

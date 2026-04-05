@@ -50,6 +50,8 @@ pub struct SessionSnapshot {
     pub cwd: String,
     pub model_display: String,
     pub mode: String,
+    /// Hub TCP endpoint, e.g. "127.0.0.1:12345". Empty if not listening.
+    pub hub_endpoint: String,
 }
 
 /// Snapshot of resolved configuration (from disk-loaded ResolvedConfig).
@@ -127,6 +129,6 @@ impl StatusPageState {
 }
 
 /// Fixed row count for the Status tab.
-pub const STATUS_TAB_ROWS: usize = 8;
+pub const STATUS_TAB_ROWS: usize = 9;
 /// Fixed row count for the Usage tab (including separator rows).
 pub const USAGE_TAB_ROWS: usize = 7;

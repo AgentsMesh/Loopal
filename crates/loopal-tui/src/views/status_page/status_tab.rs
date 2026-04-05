@@ -34,6 +34,11 @@ pub(super) fn render_status_tab(f: &mut Frame, state: &StatusPageState, area: Re
         row("Model", &s.model_display, Style::default().fg(Color::Cyan)),
         row("Mode", &s.mode.to_uppercase(), mode_style),
         row(
+            "Hub Endpoint",
+            &display_or_none(&s.hub_endpoint),
+            default_style(),
+        ),
+        row(
             "MCP Servers",
             &mcp_summary(c.mcp_configured, c.mcp_enabled),
             default_style(),

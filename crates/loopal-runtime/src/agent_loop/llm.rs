@@ -7,7 +7,7 @@ use loopal_message::{ContentBlock, Message};
 use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::StreamChunk;
 use std::time::Instant;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 impl AgentLoopRunner {
     /// Stream the LLM response using a provided working copy of messages.
@@ -52,13 +52,14 @@ impl AgentLoopRunner {
             .retry_stream_chat(&chat_params, &*provider, cancel)
             .await?;
         let mut result = LlmStreamResult::default();
+        let mut received_done = false;
 
         loop {
             tokio::select! {
                 biased;
                 chunk = stream.next() => {
                     let Some(chunk_result) = chunk else { break; };
-                    if !self.handle_stream_chunk(chunk_result, &mut result).await? {
+                    if !self.handle_stream_chunk(chunk_result, &mut result, &mut received_done).await? {
                         break;
                     }
                 }
@@ -68,6 +69,14 @@ impl AgentLoopRunner {
                     break;
                 }
             }
+        }
+
+        // Stream EOF without Done → connection dropped mid-stream.
+        // Exclude cancellation: retry_stream_chat returns empty stream on cancel,
+        // which would look like truncation but is intentional.
+        if !received_done && !result.stream_error && !cancel.is_cancelled() {
+            warn!("SSE stream ended without message_stop — treating as stream truncation");
+            result.stream_error = true;
         }
 
         self.emit_thinking_complete(&result).await?;
@@ -88,6 +97,7 @@ impl AgentLoopRunner {
         &mut self,
         chunk: std::result::Result<StreamChunk, loopal_error::LoopalError>,
         result: &mut LlmStreamResult,
+        received_done: &mut bool,
     ) -> Result<bool> {
         match chunk {
             Ok(StreamChunk::Text { text }) => {
@@ -162,6 +172,7 @@ impl AgentLoopRunner {
                 .await?;
             }
             Ok(StreamChunk::Done { stop_reason }) => {
+                *received_done = true;
                 result.stop_reason = stop_reason;
                 return Ok(false);
             }

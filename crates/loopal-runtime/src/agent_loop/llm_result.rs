@@ -5,6 +5,9 @@ use loopal_provider_api::StopReason;
 pub struct LlmStreamResult {
     pub assistant_text: String,
     pub tool_uses: Vec<(String, String, serde_json::Value)>,
+    /// True when the stream did not complete normally: explicit error chunk,
+    /// user cancellation, or silent truncation (EOF without `message_stop`).
+    /// `turn_exec` uses this to decide whether to auto-continue or bail.
     pub stream_error: bool,
     pub stop_reason: StopReason,
     pub thinking_text: String,

@@ -32,7 +32,8 @@ pub async fn bootstrap_hub_and_agent(
     let (event_tx, event_rx) = mpsc::channel(256);
     let hub = Arc::new(Mutex::new(Hub::new(event_tx)));
 
-    let (listener, _port, hub_token) = hub_server::start_hub_listener(hub.clone()).await?;
+    let (listener, port, hub_token) = hub_server::start_hub_listener(hub.clone()).await?;
+    hub.lock().await.listener_port = Some(port);
     let hub_accept = hub.clone();
     tokio::spawn(async move {
         hub_server::accept_loop(listener, hub_accept, hub_token).await;

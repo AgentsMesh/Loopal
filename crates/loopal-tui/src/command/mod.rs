@@ -9,6 +9,8 @@ pub mod registry;
 mod resume_cmd;
 mod rewind_cmd;
 mod skill;
+mod status_cmd;
+mod status_config;
 mod topology_cmd;
 
 use async_trait::async_trait;

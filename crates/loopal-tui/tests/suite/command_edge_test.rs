@@ -57,19 +57,13 @@ async fn test_exit_cmd_returns_quit() {
 }
 
 #[tokio::test]
-async fn test_status_cmd_pushes_system_message() {
+async fn test_status_cmd_opens_sub_page() {
     let mut app = make_app();
+    assert!(app.sub_page.is_none());
     let handler = app.command_registry.find("/status").unwrap();
     let effect = handler.execute(&mut app, None).await;
     assert!(matches!(effect, loopal_tui::command::CommandEffect::Done));
-    let state = app.session.lock();
-    let last = state
-        .active_conversation()
-        .messages
-        .last()
-        .expect("expected a status message");
-    assert!(last.content.contains("Model:"));
-    assert!(last.content.contains("Mode:"));
+    assert!(app.sub_page.is_some());
 }
 
 #[tokio::test]

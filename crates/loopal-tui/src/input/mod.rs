@@ -6,6 +6,7 @@ mod modal;
 pub(crate) mod multiline;
 mod navigation;
 pub(crate) mod paste;
+mod status_page_keys;
 mod sub_page;
 mod sub_page_rewind;
 

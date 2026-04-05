@@ -7,6 +7,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use loopal_protocol::AgentMode;
 
+use super::status_cmd::StatusCmd;
 use super::{CommandEffect, CommandHandler};
 use crate::app::App;
 use crate::command::registry::CommandRegistry;
@@ -44,39 +45,6 @@ impl CommandHandler for CompactCmd {
     }
     async fn execute(&self, app: &mut App, _arg: Option<&str>) -> CommandEffect {
         app.session.compact().await;
-        CommandEffect::Done
-    }
-}
-
-pub struct StatusCmd;
-
-#[async_trait]
-impl CommandHandler for StatusCmd {
-    fn name(&self) -> &str {
-        "/status"
-    }
-    fn description(&self) -> &str {
-        "Show current status"
-    }
-    async fn execute(&self, app: &mut App, _arg: Option<&str>) -> CommandEffect {
-        let state = app.session.lock();
-        let conv = state.active_conversation();
-        let token_count = conv.token_count();
-        let context_info = if conv.context_window > 0 {
-            format!("{}k/{}k", token_count / 1000, conv.context_window / 1000)
-        } else {
-            format!("{token_count} tokens")
-        };
-        let status = format!(
-            "Mode: {} | Model: {} | Context: {} | Turns: {} | CWD: {}",
-            state.mode.to_uppercase(),
-            state.model,
-            context_info,
-            conv.turn_count,
-            app.cwd.display(),
-        );
-        drop(state);
-        app.session.push_system_message(status);
         CommandEffect::Done
     }
 }

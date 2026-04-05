@@ -70,6 +70,11 @@ impl SessionController {
         &self.connections
     }
 
+    /// Hub TCP listener port (if listening). Returns `None` for in-process test setups.
+    pub async fn hub_listener_port(&self) -> Option<u16> {
+        self.connections.lock().await.listener_port
+    }
+
     pub(crate) fn active_target(&self) -> String {
         self.lock().active_view.clone()
     }

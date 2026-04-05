@@ -24,6 +24,8 @@ pub struct Hub {
     /// `None` = standalone mode (default, identical to pre-MetaHub behavior).
     /// `Some(...)` = cluster mode (local misses escalate to MetaHub).
     pub uplink: Option<Arc<HubUplink>>,
+    /// TCP listener port, set after `start_hub_listener`. `None` if not listening.
+    pub listener_port: Option<u16>,
 }
 
 impl Hub {
@@ -32,6 +34,7 @@ impl Hub {
             registry: AgentRegistry::new(event_tx),
             ui: UiDispatcher::new(),
             uplink: None,
+            listener_port: None,
         }
     }
 
@@ -42,6 +45,7 @@ impl Hub {
             registry: AgentRegistry::new(tx),
             ui: UiDispatcher::new(),
             uplink: None,
+            listener_port: None,
         }
     }
 }

@@ -79,6 +79,8 @@ impl PickerState {
     }
 }
 
+use super::StatusPageState;
+
 /// Active sub-page overlay that replaces the main chat area.
 pub enum SubPage {
     /// Model picker — user selects from known models.
@@ -87,6 +89,8 @@ pub enum SubPage {
     RewindPicker(RewindPickerState),
     /// Session picker — user selects a session to resume.
     SessionPicker(PickerState),
+    /// Status dashboard — tabbed view of session info, config, and usage.
+    StatusPage(StatusPageState),
 }
 
 /// Which sub-panel within the panel zone is focused.

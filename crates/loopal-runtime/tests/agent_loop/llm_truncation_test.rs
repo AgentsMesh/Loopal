@@ -23,7 +23,10 @@ async fn test_eof_with_text_no_done_sets_stream_error() {
     let result = runner.stream_llm_with(&msgs, &cancel).await.unwrap();
 
     assert_eq!(result.assistant_text, "Let me create the file.");
-    assert!(result.stream_error, "EOF without Done should set stream_error");
+    assert!(
+        result.stream_error,
+        "EOF without Done should set stream_error"
+    );
     assert!(result.tool_uses.is_empty());
     // stop_reason stays at default EndTurn (Done never arrived to set it)
     assert_eq!(result.stop_reason, StopReason::EndTurn);
@@ -121,6 +124,9 @@ async fn test_max_tokens_done_not_confused_with_truncation() {
 
     let result = runner.stream_llm_with(&msgs, &cancel).await.unwrap();
 
-    assert!(!result.stream_error, "MaxTokens with Done is not truncation");
+    assert!(
+        !result.stream_error,
+        "MaxTokens with Done is not truncation"
+    );
     assert_eq!(result.stop_reason, StopReason::MaxTokens);
 }

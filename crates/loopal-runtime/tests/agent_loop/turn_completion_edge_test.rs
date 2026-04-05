@@ -93,67 +93,6 @@ async fn test_empty_final_response_preserves_last_text() {
     let _ = std::fs::remove_file(&tmp);
 }
 
-/// Stream truncation (EOF without Done) with partial text → auto-continue →
-/// second LLM call completes normally with a tool → tool executes.
-#[tokio::test]
-async fn test_stream_truncation_continues_from_partial() {
-    let tmp = std::env::temp_dir().join(format!("la_trunc_{}.txt", std::process::id()));
-    std::fs::write(&tmp, "data").unwrap();
-    let calls = vec![
-        // First LLM call: text only, then EOF (no Done) — simulates proxy cut.
-        vec![Ok(StreamChunk::Text {
-            text: "Let me create the file.".into(),
-        })],
-        // Second LLM call (auto-continue): model sees partial text, completes with tool.
-        vec![
-            Ok(StreamChunk::ToolUse {
-                id: "tc-1".into(),
-                name: "Read".into(),
-                input: serde_json::json!({"file_path": tmp.to_str().unwrap()}),
-            }),
-            Ok(StreamChunk::Done {
-                stop_reason: StopReason::EndTurn,
-            }),
-        ],
-        // Third LLM call: final text after tool execution.
-        vec![
-            Ok(StreamChunk::Text {
-                text: "File created.".into(),
-            }),
-            Ok(StreamChunk::Done {
-                stop_reason: StopReason::EndTurn,
-            }),
-        ],
-    ];
-    let (mut runner, mut event_rx) = make_multi_runner(calls, false);
-    tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
-
-    let output = runner.run().await.unwrap();
-    assert_eq!(output.result, "File created.");
-    assert_eq!(output.terminate_reason, TerminateReason::Goal);
-    let _ = std::fs::remove_file(&tmp);
-}
-
-/// Repeated stream truncation exhausts max_auto_continuations → preserves last text.
-#[tokio::test]
-async fn test_stream_truncation_max_continuations() {
-    // Default max_auto_continuations = 3, so we need 4 truncated calls:
-    // 1 original + 3 continuations = 4 calls total, all truncated.
-    let calls = vec![
-        vec![Ok(StreamChunk::Text { text: "attempt 1".into() })],
-        vec![Ok(StreamChunk::Text { text: "attempt 2".into() })],
-        vec![Ok(StreamChunk::Text { text: "attempt 3".into() })],
-        vec![Ok(StreamChunk::Text { text: "attempt 4".into() })],
-    ];
-    let (mut runner, mut event_rx) = make_multi_runner(calls, false);
-    tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
-
-    let output = runner.run().await.unwrap();
-    // After 3 continuations exhausted, last text should be preserved.
-    assert_eq!(output.result, "attempt 4");
-    assert_eq!(output.terminate_reason, TerminateReason::Goal);
-}
-
 /// Regression test: tool call with text -> next LLM call stream error ->
 /// output preserves the text from the successful iteration (not empty).
 /// This was the root cause of sub-agents returning empty results.

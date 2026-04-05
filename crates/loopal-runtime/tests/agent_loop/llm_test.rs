@@ -189,7 +189,10 @@ async fn test_stream_llm_empty_stream() {
     let stream_error = result.stream_error;
     assert!(text.is_empty());
     assert!(tool_uses.is_empty());
-    assert!(stream_error, "empty stream (no Done) should set stream_error");
+    assert!(
+        stream_error,
+        "empty stream (no Done) should set stream_error"
+    );
 }
 
 #[test]

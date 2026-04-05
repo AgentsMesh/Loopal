@@ -60,7 +60,11 @@ impl AgentLoopRunner {
                     );
                 }
                 // For truncated streams, discard possibly-incomplete tool_use blocks.
-                let tools = if stream_truncated { &[][..] } else { effective_tools };
+                let tools = if stream_truncated {
+                    &[][..]
+                } else {
+                    effective_tools
+                };
                 self.record_assistant_message(
                     &result.assistant_text,
                     tools,
@@ -145,9 +149,16 @@ impl AgentLoopRunner {
                 return Ok(TurnOutput { output: last_text });
             }
 
-            let tool_names: Vec<&str> =
-                result.tool_uses.iter().map(|(_, n, _)| n.as_str()).collect();
-            info!(tool_count = result.tool_uses.len(), ?tool_names, "tool exec start");
+            let tool_names: Vec<&str> = result
+                .tool_uses
+                .iter()
+                .map(|(_, n, _)| n.as_str())
+                .collect();
+            info!(
+                tool_count = result.tool_uses.len(),
+                ?tool_names,
+                "tool exec start"
+            );
             let cancel = &turn_ctx.cancel;
             turn_ctx.metrics.tool_calls_requested += result.tool_uses.len() as u32;
             let stats = self.execute_tools(result.tool_uses.clone(), cancel).await?;
@@ -175,4 +186,3 @@ impl AgentLoopRunner {
         }
     }
 }
-

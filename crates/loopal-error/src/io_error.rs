@@ -46,4 +46,11 @@ pub enum ToolIoError {
 
     #[error("{0}")]
     Other(String),
+
+    /// The operation requires explicit user/classifier approval before it can
+    /// proceed (e.g. writing outside the working directory).  Distinguished
+    /// from `PermissionDenied` (hard block) so the runtime can route it
+    /// through the permission system.
+    #[error("requires approval: {0}")]
+    RequiresApproval(String),
 }

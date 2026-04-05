@@ -8,12 +8,13 @@ use loopal_config::ResolvedPolicy;
 use loopal_error::{ProcessHandle, ToolIoError};
 use loopal_tool_api::backend_types::{
     EditResult, ExecResult, FetchResult, FileInfo, GlobOptions, GlobSearchResult, GrepOptions,
-    GrepSearchResult, LsEntry, LsResult, ReadResult, WriteResult,
+    GrepSearchResult, LsResult, ReadResult, WriteResult,
 };
 use loopal_tool_api::{Backend, ExecOutcome};
 
+use crate::approved::ApprovedPaths;
 use crate::limits::ResourceLimits;
-use crate::{fs, net, path, search, shell, shell_stream};
+use crate::{fs, net, path, platform, search, shell, shell_stream};
 
 /// Production backend: local disk I/O with path checking, size limits,
 /// atomic writes, OS-level sandbox wrapping, and resource budgets.
@@ -21,31 +22,48 @@ pub struct LocalBackend {
     cwd: PathBuf,
     policy: Option<ResolvedPolicy>,
     limits: ResourceLimits,
+    approved: ApprovedPaths,
 }
 
 impl LocalBackend {
     pub fn new(cwd: PathBuf, policy: Option<ResolvedPolicy>, limits: ResourceLimits) -> Arc<Self> {
-        // Canonicalize cwd to resolve symlinks (e.g. macOS /tmp → /private/tmp).
-        // On Windows, strip \\?\ prefix that canonicalize() adds.
         let cwd = path::strip_win_prefix(cwd.canonicalize().unwrap_or(cwd));
         Arc::new(Self {
             cwd,
             policy,
             limits,
+            approved: ApprovedPaths::new(),
         })
+    }
+
+    /// Resolve with sandbox check; falls back to approved-paths on `RequiresApproval`.
+    fn resolve_checked(&self, raw: &str, is_write: bool) -> Result<PathBuf, ToolIoError> {
+        match path::resolve(&self.cwd, raw, is_write, self.policy.as_ref()) {
+            Ok(p) => Ok(p),
+            Err(ToolIoError::RequiresApproval(reason)) => {
+                let abs = path::to_absolute(&self.cwd, raw);
+                if self.approved.contains(&abs) {
+                    // Canonicalize for consistency with the Allow path
+                    // (path::resolve returns canonical form).
+                    Ok(abs.canonicalize().unwrap_or(abs))
+                } else {
+                    Err(ToolIoError::RequiresApproval(reason))
+                }
+            }
+            Err(e) => Err(e),
+        }
     }
 }
 
 #[async_trait]
 impl Backend for LocalBackend {
     async fn read(&self, p: &str, offset: usize, limit: usize) -> Result<ReadResult, ToolIoError> {
-        let resolved = path::resolve(&self.cwd, p, false, self.policy.as_ref())?;
+        let resolved = self.resolve_checked(p, false)?;
         fs::read_file(&resolved, offset, limit, &self.limits).await
     }
 
     async fn write(&self, p: &str, content: &str) -> Result<WriteResult, ToolIoError> {
-        let resolved = path::resolve(&self.cwd, p, true, self.policy.as_ref())?;
-        fs::write_file(&resolved, content).await
+        fs::write_file(&self.resolve_checked(p, true)?, content).await
     }
 
     async fn edit(
@@ -55,12 +73,11 @@ impl Backend for LocalBackend {
         new: &str,
         replace_all: bool,
     ) -> Result<EditResult, ToolIoError> {
-        let resolved = path::resolve(&self.cwd, p, true, self.policy.as_ref())?;
-        fs::edit_file(&resolved, old, new, replace_all).await
+        fs::edit_file(&self.resolve_checked(p, true)?, old, new, replace_all).await
     }
 
     async fn remove(&self, p: &str) -> Result<(), ToolIoError> {
-        let resolved = path::resolve(&self.cwd, p, true, self.policy.as_ref())?;
+        let resolved = self.resolve_checked(p, true)?;
         let meta = tokio::fs::metadata(&resolved).await?;
         if meta.is_dir() {
             tokio::fs::remove_dir_all(&resolved).await?;
@@ -71,54 +88,30 @@ impl Backend for LocalBackend {
     }
 
     async fn create_dir_all(&self, p: &str) -> Result<(), ToolIoError> {
-        let resolved = path::resolve(&self.cwd, p, true, self.policy.as_ref())?;
-        tokio::fs::create_dir_all(&resolved).await?;
+        tokio::fs::create_dir_all(self.resolve_checked(p, true)?).await?;
         Ok(())
     }
 
     async fn copy(&self, from: &str, to: &str) -> Result<(), ToolIoError> {
-        let src = path::resolve(&self.cwd, from, false, self.policy.as_ref())?;
-        let dst = path::resolve(&self.cwd, to, true, self.policy.as_ref())?;
+        let src = self.resolve_checked(from, false)?;
+        let dst = self.resolve_checked(to, true)?;
         tokio::fs::copy(&src, &dst).await?;
         Ok(())
     }
 
     async fn rename(&self, from: &str, to: &str) -> Result<(), ToolIoError> {
-        let src = path::resolve(&self.cwd, from, true, self.policy.as_ref())?;
-        let dst = path::resolve(&self.cwd, to, true, self.policy.as_ref())?;
+        let src = self.resolve_checked(from, true)?;
+        let dst = self.resolve_checked(to, true)?;
         tokio::fs::rename(&src, &dst).await?;
         Ok(())
     }
 
     async fn file_info(&self, p: &str) -> Result<FileInfo, ToolIoError> {
-        let resolved = path::resolve(&self.cwd, p, false, self.policy.as_ref())?;
-        fs::get_file_info(&resolved).await
+        fs::get_file_info(&self.resolve_checked(p, false)?).await
     }
 
     async fn ls(&self, p: &str) -> Result<LsResult, ToolIoError> {
-        let resolved = path::resolve(&self.cwd, p, false, self.policy.as_ref())?;
-        let mut rd = tokio::fs::read_dir(&resolved).await?;
-        let mut entries = Vec::new();
-        while let Some(entry) = rd.next_entry().await? {
-            let meta = entry.metadata().await?;
-            let ft = entry.file_type().await?;
-            let modified = meta.modified().ok().and_then(|t| {
-                t.duration_since(std::time::UNIX_EPOCH)
-                    .ok()
-                    .map(|d| d.as_secs())
-            });
-            let permissions = extract_permissions(&meta);
-            entries.push(LsEntry {
-                name: entry.file_name().to_string_lossy().into_owned(),
-                is_dir: ft.is_dir(),
-                is_symlink: ft.is_symlink(),
-                size: meta.len(),
-                modified,
-                permissions,
-            });
-        }
-        entries.sort_by(|a, b| a.name.cmp(&b.name));
-        Ok(LsResult { entries })
+        platform::list_directory(&self.resolve_checked(p, false)?).await
     }
 
     async fn glob(&self, opts: &GlobOptions) -> Result<GlobSearchResult, ToolIoError> {
@@ -140,12 +133,11 @@ impl Backend for LocalBackend {
     }
 
     fn resolve_path(&self, raw: &str, is_write: bool) -> Result<PathBuf, ToolIoError> {
-        path::resolve(&self.cwd, raw, is_write, self.policy.as_ref())
+        self.resolve_checked(raw, is_write)
     }
 
     async fn read_raw(&self, p: &str) -> Result<String, ToolIoError> {
-        let resolved = path::resolve(&self.cwd, p, false, self.policy.as_ref())?;
-        fs::read_raw_file(&resolved, &self.limits).await
+        fs::read_raw_file(&self.resolve_checked(p, false)?, &self.limits).await
     }
 
     fn cwd(&self) -> &Path {
@@ -179,6 +171,7 @@ impl Backend for LocalBackend {
         )
         .await
     }
+
     async fn exec_background(&self, command: &str) -> Result<ProcessHandle, ToolIoError> {
         let data = shell::exec_background(&self.cwd, self.policy.as_ref(), command).await?;
         Ok(ProcessHandle(Box::new(data)))
@@ -187,15 +180,16 @@ impl Backend for LocalBackend {
     async fn fetch(&self, url: &str) -> Result<FetchResult, ToolIoError> {
         net::fetch_url(url, self.policy.as_ref(), &self.limits).await
     }
-}
 
-#[cfg(unix)]
-fn extract_permissions(meta: &std::fs::Metadata) -> Option<u32> {
-    use std::os::unix::fs::PermissionsExt;
-    Some(meta.permissions().mode())
-}
+    fn approve_path(&self, p: &Path) {
+        self.approved.insert(p.to_path_buf());
+    }
 
-#[cfg(not(unix))]
-fn extract_permissions(_meta: &std::fs::Metadata) -> Option<u32> {
-    None
+    fn check_sandbox_path(&self, raw: &str, is_write: bool) -> Option<String> {
+        let abs = path::to_absolute(&self.cwd, raw);
+        if self.approved.contains(&abs) {
+            return None;
+        }
+        path::check_requires_approval(&self.cwd, raw, is_write, self.policy.as_ref())
+    }
 }

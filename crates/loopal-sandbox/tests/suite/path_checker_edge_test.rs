@@ -24,10 +24,11 @@ fn dotdot_traversal_detected() {
     // A path with ".." that resolves outside the writable area
     let path = PathBuf::from("/home/user/project/../../etc/passwd");
     let decision = check_path(&policy, &path, true);
-    // Either the canonical resolution catches this or the ".." detection does
+    // Either the canonical resolution catches this (Deny) or it's
+    // outside writable dirs (RequiresApproval) — both are non-Allow.
     assert!(
-        matches!(decision, PathDecision::DenyWrite(_)),
-        "expected DenyWrite, got: {decision:?}"
+        !matches!(decision, PathDecision::Allow),
+        "expected non-Allow, got: {decision:?}"
     );
 }
 
@@ -42,13 +43,13 @@ fn multiple_deny_globs_checked() {
     let pem_path = tmp.join("cert.pem");
     assert!(matches!(
         check_path(&policy, &pem_path, true),
-        PathDecision::DenyWrite(_)
+        PathDecision::RequiresApproval(_)
     ));
 
     let key_path = tmp.join("server.key");
     assert!(matches!(
         check_path(&policy, &key_path, true),
-        PathDecision::DenyWrite(_)
+        PathDecision::RequiresApproval(_)
     ));
 
     let txt_path = tmp.join("readme.txt");
@@ -67,6 +68,6 @@ fn empty_writable_paths_blocks_all_writes() {
     let path = PathBuf::from("/tmp/some_file.txt");
     assert!(matches!(
         check_path(&policy, &path, true),
-        PathDecision::DenyWrite(_)
+        PathDecision::RequiresApproval(_)
     ));
 }

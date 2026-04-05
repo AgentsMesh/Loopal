@@ -53,7 +53,7 @@ fn readonly_blocks_all_writes() {
     assert_eq!(check_path(&policy, &path, false), PathDecision::Allow);
     assert!(matches!(
         check_path(&policy, &path, true),
-        PathDecision::DenyWrite(_)
+        PathDecision::Deny(_)
     ));
 }
 
@@ -71,7 +71,7 @@ fn workspace_blocks_writes_outside_cwd() {
     let path = PathBuf::from("/usr/local/bin/evil");
     assert!(matches!(
         check_path(&policy, &path, true),
-        PathDecision::DenyWrite(_)
+        PathDecision::RequiresApproval(_)
     ));
 }
 
@@ -82,7 +82,7 @@ fn deny_write_glob_blocks_env_files() {
     let path = tmp.join(".env");
     assert!(matches!(
         check_path(&policy, &path, true),
-        PathDecision::DenyWrite(_)
+        PathDecision::RequiresApproval(_)
     ));
 }
 
@@ -94,7 +94,7 @@ fn deny_read_glob_blocks_reads() {
     let path = tmp.join("secret.txt");
     assert!(matches!(
         check_path(&policy, &path, false),
-        PathDecision::DenyRead(_)
+        PathDecision::RequiresApproval(_)
     ));
 }
 

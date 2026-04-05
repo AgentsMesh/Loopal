@@ -5,11 +5,12 @@
 
 use loopal_message::ContentBlock;
 use loopal_protocol::AgentEventPayload;
-use loopal_tool_api::PermissionDecision;
+use loopal_tool_api::{PermissionDecision, PermissionLevel};
 use tracing::info;
 
 use super::cancel::TurnCancel;
 use super::runner::AgentLoopRunner;
+use super::sandbox_precheck;
 
 /// Result of the precheck + permission phase.
 pub(super) struct CheckResult {
@@ -68,7 +69,7 @@ impl AgentLoopRunner {
                 }
             }
 
-            // Sandbox precheck
+            // Sandbox precheck (tool-level, e.g. Bash command checks)
             let precheck_reason = self
                 .params
                 .deps
@@ -84,29 +85,63 @@ impl AgentLoopRunner {
                 continue;
             }
 
-            // Fast-path permission check (no LLM call)
+            // Sandbox path pre-check: detect RequiresApproval paths before execution.
+            let extracted = sandbox_precheck::extract_paths(name, input);
+            let sandbox_needs =
+                sandbox_precheck::check_paths(self.tool_ctx.backend.as_ref(), &extracted);
+
+            // Determine effective permission level — elevate to Dangerous when
+            // the sandbox requires approval so it flows through the permission system.
             let tool_perm = self
                 .params
                 .deps
                 .kernel
                 .get_tool(name)
                 .map(|t| t.permission());
-            let decision = tool_perm
+            let effective_perm = if sandbox_needs.is_empty() {
+                tool_perm
+            } else {
+                Some(PermissionLevel::Dangerous)
+            };
+
+            let decision = effective_perm
                 .map(|p| self.params.config.permission_mode.check(p))
                 .unwrap_or(PermissionDecision::Allow);
 
             if decision != PermissionDecision::Ask {
+                // Auto-approve paths when permission mode allows it (e.g. Bypass).
+                if !sandbox_needs.is_empty() {
+                    sandbox_precheck::approve_all(self.tool_ctx.backend.as_ref(), &sandbox_needs);
+                }
                 approved.push((id.clone(), name.clone(), input.clone()));
                 continue;
             }
 
-            // Needs further decision — collect for batch or human
-            needs_classify.push((orig_idx, id.clone(), name.clone(), input.clone()));
+            // Annotate input with sandbox reason for the permission prompt.
+            let annotated = if sandbox_needs.is_empty() {
+                input.clone()
+            } else {
+                let reasons: Vec<&str> = sandbox_needs.iter().map(|n| n.reason.as_str()).collect();
+                let mut a = input.clone();
+                a["sandbox_approval_reason"] = serde_json::Value::String(reasons.join("; "));
+                a
+            };
+
+            needs_classify.push((orig_idx, id.clone(), name.clone(), annotated));
         }
 
         // Parallel auto-classification or sequential human approval
         self.resolve_pending(&mut approved, &mut denied, needs_classify)
             .await?;
+
+        // Post-approval: approve sandbox paths for tools that were just granted permission.
+        for (_, name, input) in &approved {
+            let extracted = sandbox_precheck::extract_paths(name, input);
+            let needs = sandbox_precheck::check_paths(self.tool_ctx.backend.as_ref(), &extracted);
+            if !needs.is_empty() {
+                sandbox_precheck::approve_all(self.tool_ctx.backend.as_ref(), &needs);
+            }
+        }
 
         // Mark unprocessed tools as interrupted
         for (id, name, _) in &remaining[processed..] {

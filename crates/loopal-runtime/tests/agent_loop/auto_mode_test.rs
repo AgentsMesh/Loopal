@@ -39,10 +39,13 @@ async fn readonly_tool_skips_classifier() {
 async fn supervised_tool_skips_classifier() {
     let (mut runner, mut event_rx) = make_auto_runner(vec![]);
 
+    // Use a path under the session's cwd so sandbox doesn't require approval.
+    let cwd = runner.tool_ctx.backend.cwd().to_path_buf();
+    let target = cwd.join("test.txt");
     let tool_uses = vec![(
         "tc-1".into(),
         "Write".into(),
-        serde_json::json!({"file_path": "/tmp/test.txt", "content": "hello"}),
+        serde_json::json!({"file_path": target.to_str().unwrap(), "content": "hello"}),
     )];
 
     runner

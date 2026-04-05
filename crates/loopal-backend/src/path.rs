@@ -113,7 +113,26 @@ fn check_with_policy(
 ) -> Result<PathBuf, ToolIoError> {
     match loopal_sandbox::path_checker::check_path(policy, path, is_write) {
         PathDecision::Allow => Ok(path.to_path_buf()),
-        PathDecision::DenyWrite(reason) => Err(ToolIoError::PermissionDenied(reason)),
-        PathDecision::DenyRead(reason) => Err(ToolIoError::PermissionDenied(reason)),
+        PathDecision::Deny(reason) => Err(ToolIoError::PermissionDenied(reason)),
+        PathDecision::RequiresApproval(reason) => Err(ToolIoError::RequiresApproval(reason)),
+    }
+}
+
+/// Check whether a path would require sandbox approval (without executing I/O).
+///
+/// Returns `Some(reason)` if approval is needed, `None` if allowed.
+/// Used by the runtime's sandbox pre-check phase to route through the
+/// permission system before tool execution.
+pub fn check_requires_approval(
+    cwd: &Path,
+    raw: &str,
+    is_write: bool,
+    policy: Option<&ResolvedPolicy>,
+) -> Option<String> {
+    let path = to_absolute(cwd, raw);
+    let pol = policy?;
+    match loopal_sandbox::path_checker::check_path(pol, &path, is_write) {
+        PathDecision::RequiresApproval(reason) => Some(reason),
+        _ => None,
     }
 }

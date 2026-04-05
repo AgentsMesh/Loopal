@@ -1,4 +1,6 @@
-//! Inner turn execution loop and observer dispatch.
+//! Inner turn execution loop.
+//!
+//! Observer dispatch lives in `turn_observer_dispatch.rs`.
 
 use loopal_error::Result;
 use loopal_protocol::AgentEventPayload;
@@ -8,7 +10,6 @@ use tracing::{debug, info, warn};
 use super::TurnOutput;
 use super::runner::AgentLoopRunner;
 use super::turn_context::TurnContext;
-use super::turn_observer::ObserverAction;
 
 impl AgentLoopRunner {
     /// Inner loop: LLM → [tools → LLM]* → done.
@@ -26,9 +27,7 @@ impl AgentLoopRunner {
                 return Ok(TurnOutput { output: last_text });
             }
 
-            // Persistent compaction (LLM summarization if over budget)
             self.check_and_compact().await?;
-            // Prepare context for LLM (clone + strip old thinking)
             let working = self.params.store.prepare_for_llm();
             turn_ctx.metrics.llm_calls += 1;
             let result = self.stream_llm_with(&working, &turn_ctx.cancel).await?;
@@ -45,12 +44,30 @@ impl AgentLoopRunner {
                 &result.tool_uses
             };
 
-            // Auto-continue triggers: MaxTokens+tools, PauseTurn (server-side limit)
+            // Auto-continue: MaxTokens+tools, PauseTurn, or stream truncation.
+            // Exclude user cancellation — cancel should stop, not retry.
             let needs_auto_continue = truncated || result.stop_reason == StopReason::PauseTurn;
-            if needs_auto_continue {
+            let stream_truncated = result.stream_error
+                && !turn_ctx.cancel.is_cancelled()
+                && !(result.assistant_text.is_empty() && result.tool_uses.is_empty());
+
+            if needs_auto_continue || stream_truncated {
+                if stream_truncated {
+                    warn!(
+                        text_len = result.assistant_text.len(),
+                        tool_calls = result.tool_uses.len(),
+                        "stream truncated — discarding incomplete tool calls"
+                    );
+                }
+                // For truncated streams, discard possibly-incomplete tool_use blocks.
+                let tools = if stream_truncated {
+                    &[][..]
+                } else {
+                    effective_tools
+                };
                 self.record_assistant_message(
                     &result.assistant_text,
-                    effective_tools,
+                    tools,
                     &result.thinking_text,
                     result.thinking_signature.as_deref(),
                     result.server_blocks,
@@ -71,6 +88,23 @@ impl AgentLoopRunner {
                 return Ok(TurnOutput { output: last_text });
             }
 
+            // Stream error (cancel or empty truncation) — record any partial
+            // text that was already streamed to the user, then exit.
+            if result.stream_error {
+                if !result.assistant_text.is_empty() {
+                    let no_tools: &[(String, String, serde_json::Value)] = &[];
+                    self.record_assistant_message(
+                        &result.assistant_text,
+                        no_tools,
+                        &result.thinking_text,
+                        result.thinking_signature.as_deref(),
+                        result.server_blocks,
+                    );
+                    last_text.clone_from(&result.assistant_text);
+                }
+                return Ok(TurnOutput { output: last_text });
+            }
+
             self.record_assistant_message(
                 &result.assistant_text,
                 &result.tool_uses,
@@ -80,13 +114,6 @@ impl AgentLoopRunner {
             );
             if !result.assistant_text.is_empty() {
                 last_text.clone_from(&result.assistant_text);
-            }
-
-            if result.stream_error
-                && result.tool_uses.is_empty()
-                && result.assistant_text.is_empty()
-            {
-                return Ok(TurnOutput { output: last_text });
             }
 
             if result.tool_uses.is_empty() && result.stop_reason == StopReason::MaxTokens {
@@ -104,32 +131,14 @@ impl AgentLoopRunner {
             }
 
             if result.tool_uses.is_empty() {
-                // Stop hook: if any hook provides feedback, continue (bounded).
-                if stop_feedback_count < max_stop_feedback {
-                    let stop_outputs = self
-                        .params
-                        .deps
-                        .kernel
-                        .hook_service()
-                        .run_hooks(
-                            loopal_config::HookEvent::Stop,
-                            &loopal_hooks::HookContext {
-                                stop_reason: Some("end_turn"),
-                                ..Default::default()
-                            },
-                        )
-                        .await;
-                    let feedback: Vec<&str> = stop_outputs
-                        .iter()
-                        .filter_map(|o| o.additional_context.as_deref())
-                        .collect();
-                    if !feedback.is_empty() {
-                        stop_feedback_count += 1;
-                        self.params
-                            .store
-                            .append_warnings_to_last_user(vec![feedback.join("\n")]);
-                        continue;
-                    }
+                if stop_feedback_count < max_stop_feedback
+                    && let Some(feedback) = self.run_stop_hooks().await
+                {
+                    stop_feedback_count += 1;
+                    self.params
+                        .store
+                        .append_warnings_to_last_user(vec![feedback]);
+                    continue;
                 }
                 return Ok(TurnOutput { output: last_text });
             }
@@ -158,12 +167,10 @@ impl AgentLoopRunner {
             turn_ctx.metrics.tool_errors += stats.errors;
             info!("tool exec complete");
 
-            // Append observer warnings after tool results (must follow ToolResult blocks).
             let warnings = std::mem::take(&mut turn_ctx.pending_warnings);
             self.params.store.append_warnings_to_last_user(warnings);
 
             self.inject_pending_messages().await;
-            // Observer: on_after_tools with results from the last message
             let result_blocks = self
                 .params
                 .store
@@ -177,28 +184,5 @@ impl AgentLoopRunner {
 
             continuation_count = 0;
         }
-    }
-
-    /// Run before-tools observers. Returns `true` if the turn should abort.
-    pub(super) async fn run_before_tools(
-        &mut self,
-        turn_ctx: &mut TurnContext,
-        tool_uses: &[(String, String, serde_json::Value)],
-    ) -> Result<bool> {
-        for obs in &mut self.observers {
-            match obs.on_before_tools(turn_ctx, tool_uses) {
-                ObserverAction::Continue => {}
-                ObserverAction::InjectWarning(msg) => {
-                    turn_ctx.pending_warnings.push(msg);
-                }
-                ObserverAction::AbortTurn(reason) => {
-                    warn!(%reason, "observer aborted turn");
-                    self.emit(AgentEventPayload::Error { message: reason })
-                        .await?;
-                    return Ok(true);
-                }
-            }
-        }
-        Ok(false)
     }
 }

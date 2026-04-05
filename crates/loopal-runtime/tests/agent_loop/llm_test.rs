@@ -177,7 +177,7 @@ async fn test_stream_llm_error_in_stream() {
 
 #[tokio::test]
 async fn test_stream_llm_empty_stream() {
-    // Empty stream (no chunks at all) — tests the while loop body never executing
+    // Empty stream (no chunks at all) — stream EOF without Done = truncation.
     let chunks = vec![];
     let (mut runner, _event_rx, _input_tx, _ctrl_tx) = make_runner_with_mock_provider(chunks);
 
@@ -189,7 +189,10 @@ async fn test_stream_llm_empty_stream() {
     let stream_error = result.stream_error;
     assert!(text.is_empty());
     assert!(tool_uses.is_empty());
-    assert!(!stream_error);
+    assert!(
+        stream_error,
+        "empty stream (no Done) should set stream_error"
+    );
 }
 
 #[test]

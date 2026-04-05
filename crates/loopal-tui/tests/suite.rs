@@ -42,6 +42,8 @@ mod input_scroll_test;
 mod input_test;
 #[path = "suite/line_cache_test.rs"]
 mod line_cache_test;
+#[path = "suite/scroll_burst_test.rs"]
+mod scroll_burst_test;
 #[path = "suite/markdown_code_test.rs"]
 mod markdown_code_test;
 #[path = "suite/markdown_edge_test.rs"]

@@ -1,6 +1,6 @@
 /// Command edge cases: handler effects, skill expansion, sub-page open.
 use loopal_config::Skill;
-use loopal_protocol::{AgentMode, ControlCommand, UserQuestionResponse};
+use loopal_protocol::{AgentMode, AgentStatus, ControlCommand, UserQuestionResponse};
 use loopal_session::SessionController;
 use loopal_tui::app::App;
 
@@ -97,7 +97,7 @@ async fn test_rewind_on_idle_opens_sub_page() {
     let mut app = make_app();
     {
         let mut state = app.session.lock();
-        state.active_conversation_mut().agent_idle = true;
+        state.agents.get_mut("main").unwrap().observable.status = AgentStatus::WaitingForInput;
         state
             .active_conversation_mut()
             .messages
@@ -118,7 +118,13 @@ async fn test_rewind_on_idle_opens_sub_page() {
 async fn test_rewind_on_busy_agent_shows_error() {
     let mut app = make_app();
     {
-        app.session.lock().active_conversation_mut().agent_idle = false;
+        app.session
+            .lock()
+            .agents
+            .get_mut("main")
+            .unwrap()
+            .observable
+            .status = AgentStatus::Running;
     }
     let handler = app.command_registry.find("/rewind").unwrap();
     handler.execute(&mut app, None).await;

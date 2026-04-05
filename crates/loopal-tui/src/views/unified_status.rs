@@ -100,7 +100,7 @@ fn status_icon_and_label(
             Style::default().fg(Color::Yellow),
             "Waiting",
         )
-    } else if !conv.agent_idle {
+    } else if !state.is_active_agent_idle() {
         let frame = spinner_frame(elapsed);
         (
             frame.to_string(),
@@ -131,7 +131,7 @@ pub fn spinner_frame(elapsed: std::time::Duration) -> &'static str {
 
 fn is_agent_active(state: &SessionState) -> bool {
     let conv = state.active_conversation();
-    !conv.agent_idle
+    !state.is_active_agent_idle()
         || !conv.streaming_text.is_empty()
         || conv.thinking_active
         || has_live_subagents(state)

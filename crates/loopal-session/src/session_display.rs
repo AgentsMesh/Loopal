@@ -1,6 +1,6 @@
-//! Session display state operations: messages, welcome, history, inbox.
+//! Session display state operations: messages, welcome, history.
 
-use loopal_protocol::{AgentStatus, ProjectedMessage, UserContent};
+use loopal_protocol::{AgentStatus, ProjectedMessage};
 
 use crate::controller::SessionController;
 use crate::conversation_display::push_system_msg;
@@ -8,10 +8,6 @@ use crate::state::ROOT_AGENT;
 use crate::types::{SessionMessage, SessionToolCall, ToolCallStatus};
 
 impl SessionController {
-    pub fn pop_inbox_to_edit(&self) -> Option<UserContent> {
-        self.lock().inbox.pop_back()
-    }
-
     pub fn push_system_message(&self, content: String) {
         let mut state = self.lock();
         let conv = state.active_conversation_mut();
@@ -68,7 +64,6 @@ impl SessionController {
             agent.observable.model = m.to_string();
         }
         agent.conversation.messages = display_msgs;
-        agent.conversation.agent_idle = true;
         agent.observable.status = AgentStatus::Finished;
         if let Some(parent_name) = parent
             && let Some(parent_agent) = state.agents.get_mut(parent_name)

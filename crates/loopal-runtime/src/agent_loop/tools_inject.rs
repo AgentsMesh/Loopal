@@ -60,24 +60,34 @@ impl AgentLoopRunner {
         Ok(())
     }
 
-    /// Drain pending envelopes from the frontend and inject them as user messages.
+    /// Drain pending input from the frontend and inject messages into the store.
+    /// Control commands are processed inline.
     pub async fn inject_pending_messages(&mut self) {
         let pending = self.params.deps.frontend.drain_pending().await;
-        for env in pending {
-            let mut user_msg = build_user_message(&env);
-            info!(
-                text_len = env.content.text.len(),
-                "injecting pending message"
-            );
-            if let Err(e) = self
-                .params
-                .deps
-                .session_manager
-                .save_message(&self.params.session.id, &mut user_msg)
-            {
-                error!(error = %e, "failed to persist injected message");
+        for input in pending {
+            match input {
+                crate::agent_input::AgentInput::Message(env) => {
+                    let mut user_msg = build_user_message(&env);
+                    info!(
+                        text_len = env.content.text.len(),
+                        "injecting pending message"
+                    );
+                    if let Err(e) = self
+                        .params
+                        .deps
+                        .session_manager
+                        .save_message(&self.params.session.id, &mut user_msg)
+                    {
+                        error!(error = %e, "failed to persist injected message");
+                    }
+                    self.params.store.push_user(user_msg);
+                }
+                crate::agent_input::AgentInput::Control(cmd) => {
+                    if let Err(e) = self.handle_control(cmd).await {
+                        tracing::warn!(error = %e, "failed to handle drained control");
+                    }
+                }
             }
-            self.params.store.push_user(user_msg);
         }
     }
 }

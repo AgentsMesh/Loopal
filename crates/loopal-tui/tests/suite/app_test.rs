@@ -65,50 +65,20 @@ fn test_submit_input_returns_text_and_resets() {
 #[test]
 fn test_awaiting_input_sets_idle() {
     let (app, _, _) = make_app();
-    assert!(!app.session.lock().active_conversation().agent_idle);
+    assert!(!app.session.lock().is_active_agent_idle());
     app.session
         .handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
-    assert!(app.session.lock().active_conversation().agent_idle);
+    assert!(app.session.lock().is_active_agent_idle());
 }
 
 #[test]
-fn test_awaiting_input_forwards_inbox_message() {
+fn test_awaiting_input_does_not_auto_forward() {
     let (app, _, _) = make_app();
-    {
-        let mut state = app.session.lock();
-        state.inbox.push("queued".into());
-    }
-    // AwaitingInput sets idle=true then tries forward
-    let forwarded = app
-        .session
+    // AwaitingInput no longer auto-forwards — messages go directly to agent mailbox.
+    app.session
         .handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
-    assert_eq!(forwarded.map(|c| c.text), Some("queued".to_string()));
     let state = app.session.lock();
-    let conv = state.active_conversation();
-    assert!(!conv.agent_idle); // forwarding clears idle
-    assert!(state.inbox.is_empty());
-    assert_eq!(conv.messages.last().unwrap().role, "user");
-    assert_eq!(conv.messages.last().unwrap().content, "queued");
-}
-
-#[test]
-fn test_pop_inbox_to_input() {
-    let (mut app, _, _) = make_app();
-    {
-        let mut state = app.session.lock();
-        state.inbox.push("first".into());
-        state.inbox.push("second".into());
-    }
-    assert!(app.pop_inbox_to_input());
-    assert_eq!(app.input, "second");
-    assert_eq!(app.input_cursor, 6);
-    assert_eq!(app.session.lock().inbox.len(), 1);
-}
-
-#[test]
-fn test_pop_inbox_empty_returns_false() {
-    let (mut app, _, _) = make_app();
-    assert!(!app.pop_inbox_to_input());
+    assert!(state.is_active_agent_idle());
 }
 
 fn sample_image(label: &str) -> ImageAttachment {

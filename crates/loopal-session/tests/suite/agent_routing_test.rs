@@ -79,7 +79,7 @@ fn root_events_route_to_main_agent() {
     apply_event(&mut state, AgentEvent::root(AgentEventPayload::Finished));
     // "main" exists (created at init), root events route there
     assert!(state.agents.contains_key("main"));
-    assert!(state.agents["main"].conversation.agent_idle);
+    assert!(state.agents["main"].is_idle());
 }
 
 /// SubAgentSpawned event creates an AgentViewState entry with topology info.

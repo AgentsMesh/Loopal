@@ -1,7 +1,7 @@
 //! Async tests for SessionController interaction methods (channels).
 
-use loopal_protocol::ControlCommand;
 use loopal_protocol::{AgentEvent, AgentEventPayload, UserQuestionResponse};
+use loopal_protocol::{AgentStatus, ControlCommand};
 use loopal_session::SessionController;
 use tokio::sync::mpsc;
 
@@ -64,21 +64,30 @@ async fn test_deny_permission() {
 }
 
 #[tokio::test]
-async fn test_enqueue_message_forwards_when_idle() {
+async fn test_append_user_display() {
     let (ctrl, _, _) = make_controller();
-    ctrl.lock().active_conversation_mut().agent_idle = true;
-    let result = ctrl.enqueue_message("hello".into());
-    assert_eq!(result.map(|c| c.text), Some("hello".to_string()));
+    let content = loopal_protocol::UserContent::from("hello");
+    ctrl.append_user_display(&content);
+    let state = ctrl.lock();
+    let conv = state.active_conversation();
+    assert_eq!(conv.messages.last().unwrap().role, "user");
+    assert_eq!(conv.messages.last().unwrap().content, "hello");
 }
 
 #[tokio::test]
-async fn test_enqueue_message_queues_when_busy() {
+async fn test_append_user_display_does_not_change_status() {
     let (ctrl, _, _) = make_controller();
-    ctrl.lock().active_conversation_mut().agent_idle = false;
-
-    let result = ctrl.enqueue_message("queued".into());
-    assert!(result.is_none());
-    assert_eq!(ctrl.lock().inbox.len(), 1);
+    // Agent state is internal — TUI display ops never change it.
+    ctrl.lock()
+        .agents
+        .get_mut("main")
+        .unwrap()
+        .observable
+        .status = AgentStatus::Running;
+    let content = loopal_protocol::UserContent::from("queued");
+    ctrl.append_user_display(&content);
+    // Status unchanged — only agent events drive status transitions.
+    assert!(!ctrl.lock().is_active_agent_idle());
 }
 
 #[tokio::test]
@@ -136,7 +145,6 @@ async fn test_clear() {
         let state = ctrl.lock();
         let conv = state.active_conversation();
         assert!(conv.messages.is_empty());
-        assert!(state.inbox.is_empty());
         assert!(conv.streaming_text.is_empty());
         assert_eq!(conv.turn_count, 0);
         assert_eq!(conv.input_tokens, 0);

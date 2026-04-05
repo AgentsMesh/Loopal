@@ -2,7 +2,7 @@
 
 use std::time::Instant;
 
-use loopal_protocol::{AgentEventPayload, AgentStatus, UserContent};
+use loopal_protocol::{AgentEventPayload, AgentStatus};
 
 use crate::agent_lifecycle::{extract_key_param, handle_idle, post_event_cleanup};
 use crate::conversation_display::{
@@ -17,11 +17,7 @@ use crate::tool_result_handler::{
 use crate::types::{PendingPermission, PendingQuestion, SessionMessage};
 
 /// Handle an agent event — writes both observable metrics and conversation state.
-pub(crate) fn apply_agent_event(
-    state: &mut SessionState,
-    name: &str,
-    payload: AgentEventPayload,
-) -> Option<UserContent> {
+pub(crate) fn apply_agent_event(state: &mut SessionState, name: &str, payload: AgentEventPayload) {
     let agent = state.agents.entry(name.to_string()).or_default();
     if agent.started_at.is_none() {
         agent.started_at = Some(Instant::now());
@@ -128,13 +124,16 @@ pub(crate) fn apply_agent_event(
         }
         AgentEventPayload::RetryCleared => conv.retry_banner = None,
         AgentEventPayload::AwaitingInput => {
-            return handle_idle(state, name, AgentStatus::WaitingForInput);
+            handle_idle(state, name, AgentStatus::WaitingForInput);
+            return;
         }
         AgentEventPayload::Finished => {
-            return handle_idle(state, name, AgentStatus::Finished);
+            handle_idle(state, name, AgentStatus::Finished);
+            return;
         }
         AgentEventPayload::Interrupted => {
-            return handle_idle(state, name, AgentStatus::WaitingForInput);
+            handle_idle(state, name, AgentStatus::WaitingForInput);
+            return;
         }
         AgentEventPayload::AutoContinuation {
             continuation,
@@ -215,5 +214,4 @@ pub(crate) fn apply_agent_event(
         }
     }
     post_event_cleanup(state, name, sync_parent);
-    None
 }

@@ -11,14 +11,14 @@ use loopal_runtime::agent_input::AgentInput;
 use loopal_runtime::frontend::traits::AgentFrontend;
 
 use loopal_agent_server::hub_frontend::HubFrontend;
-use loopal_agent_server::session_hub::{InputFromClient, SharedSession};
+use loopal_agent_server::session_hub::SharedSession;
 
 const T: Duration = Duration::from_secs(5);
 
 fn make_session() -> (
     Arc<SharedSession>,
-    tokio::sync::mpsc::Sender<InputFromClient>,
-    tokio::sync::mpsc::Receiver<InputFromClient>,
+    tokio::sync::mpsc::Sender<AgentInput>,
+    tokio::sync::mpsc::Receiver<AgentInput>,
     tokio::sync::watch::Receiver<u64>,
 ) {
     let (input_tx, input_rx) = tokio::sync::mpsc::channel(16);
@@ -60,7 +60,7 @@ async fn stale_interrupt_does_not_exit_recv_input() {
 
     // Now send a real message — recv_input should return it.
     let env = Envelope::new(MessageSource::Human, "main", "hello after interrupt");
-    input_tx.send(InputFromClient::Message(env)).await.unwrap();
+    input_tx.send(AgentInput::Message(env)).await.unwrap();
 
     let result = tokio::time::timeout(T, recv_task).await.unwrap().unwrap();
     assert!(
@@ -104,7 +104,7 @@ async fn interrupt_then_continue_cycle() {
 
     // Send a message — should be delivered.
     let env = Envelope::new(MessageSource::Human, "main", "continue working");
-    input_tx.send(InputFromClient::Message(env)).await.unwrap();
+    input_tx.send(AgentInput::Message(env)).await.unwrap();
 
     let result2 = tokio::time::timeout(T, recv2).await.unwrap().unwrap();
     assert!(
@@ -136,7 +136,7 @@ async fn multiple_stale_interrupts_all_consumed() {
     );
 
     let env = Envelope::new(MessageSource::Human, "main", "msg");
-    input_tx.send(InputFromClient::Message(env)).await.unwrap();
+    input_tx.send(AgentInput::Message(env)).await.unwrap();
 
     let result = tokio::time::timeout(T, recv_task).await.unwrap().unwrap();
     assert!(matches!(result, Some(AgentInput::Message(_))));

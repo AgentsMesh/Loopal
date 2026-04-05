@@ -48,7 +48,7 @@ pub fn ipc_frontend_for_test(
 #[doc(hidden)]
 pub fn hub_frontend_for_test(
     session: std::sync::Arc<session_hub::SharedSession>,
-    input_rx: tokio::sync::mpsc::Receiver<session_hub::InputFromClient>,
+    input_rx: tokio::sync::mpsc::Receiver<loopal_runtime::agent_input::AgentInput>,
     interrupt_rx: tokio::sync::watch::Receiver<u64>,
 ) -> std::sync::Arc<dyn loopal_runtime::frontend::traits::AgentFrontend> {
     std::sync::Arc::new(hub_frontend::HubFrontend::new(
@@ -64,5 +64,6 @@ pub fn hub_frontend_for_test(
 pub mod testing {
     pub use crate::agent_setup::build_with_frontend;
     pub use crate::params::{StartParams, build_kernel_with_provider};
-    pub use crate::session_hub::{InputFromClient, SharedSession};
+    pub use crate::session_hub::SharedSession;
+    pub use loopal_runtime::agent_input::AgentInput;
 }

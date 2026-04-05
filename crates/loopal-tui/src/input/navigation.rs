@@ -39,10 +39,8 @@ pub(super) fn handle_up(app: &mut App) -> InputAction {
         app.input_cursor = new_cursor;
         return InputAction::None;
     }
-    // Fall back to inbox pop / history
-    if app.pop_inbox_to_input() {
-        // Popped last Inbox message back into input for editing
-    } else if !app.input_history.is_empty() {
+    // Fall back to history browse
+    if !app.input_history.is_empty() {
         let idx = match app.history_index {
             None => app.input_history.len() - 1,
             Some(i) if i > 0 => i - 1,
@@ -91,7 +89,7 @@ pub(super) fn handle_esc(app: &mut App) -> InputAction {
         tracing::info!(view = %active_view, "ESC: exit agent view (not root)");
         return InputAction::ExitAgentView;
     }
-    let is_idle = app.session.lock().active_conversation().agent_idle;
+    let is_idle = app.session.lock().is_active_agent_idle();
     if !is_idle {
         tracing::info!("ESC: agent busy, sending interrupt");
         return InputAction::Interrupt;

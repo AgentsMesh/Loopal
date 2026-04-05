@@ -118,8 +118,22 @@ impl AgentLoopRunner {
     }
 
     /// Non-blocking drain of all pending input (frontend + scheduler + rewake).
+    ///
+    /// Returns pending message envelopes. Control commands are processed
+    /// inline (they affect agent config, not conversation history).
     pub(super) async fn drain_pending_input(&mut self) -> Vec<Envelope> {
-        let mut pending = self.params.deps.frontend.drain_pending().await;
+        let all_inputs = self.params.deps.frontend.drain_pending().await;
+        let mut pending = Vec::new();
+        for input in all_inputs {
+            match input {
+                AgentInput::Message(env) => pending.push(env),
+                AgentInput::Control(cmd) => {
+                    if let Err(e) = self.handle_control(cmd).await {
+                        tracing::warn!(error = %e, "failed to handle drained control");
+                    }
+                }
+            }
+        }
         if let Some(ref mut rx) = self.trigger_rx {
             while let Ok(env) = rx.try_recv() {
                 pending.push(env);

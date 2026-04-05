@@ -120,13 +120,17 @@ impl AgentFrontend for UnifiedFrontend {
         ))
     }
 
-    async fn drain_pending(&self) -> Vec<Envelope> {
-        let mut rx = self.mailbox_rx.lock().await;
-        let mut envelopes = Vec::new();
-        while let Ok(env) = rx.try_recv() {
-            envelopes.push(env);
+    async fn drain_pending(&self) -> Vec<AgentInput> {
+        let mut mbox = self.mailbox_rx.lock().await;
+        let mut ctrl = self.control_rx.lock().await;
+        let mut inputs = Vec::new();
+        while let Ok(env) = mbox.try_recv() {
+            inputs.push(AgentInput::Message(env));
         }
-        envelopes
+        while let Ok(cmd) = ctrl.try_recv() {
+            inputs.push(AgentInput::Control(cmd));
+        }
+        inputs
     }
 
     async fn ask_user(&self, questions: Vec<loopal_protocol::Question>) -> Vec<String> {

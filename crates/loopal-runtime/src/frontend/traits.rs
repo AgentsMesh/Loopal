@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use crate::agent_input::AgentInput;
 use loopal_error::Result;
 use loopal_protocol::AgentEventPayload;
-use loopal_protocol::{Envelope, Question};
+use loopal_protocol::Question;
 use loopal_tool_api::PermissionDecision;
 
 /// Outcome of a plan approval request.
@@ -56,13 +56,11 @@ pub trait AgentFrontend: Send + Sync {
     /// Create a cloneable event emitter for use in `tokio::spawn` blocks.
     fn event_emitter(&self) -> Box<dyn EventEmitter>;
 
-    /// Non-blocking drain of pending messages from the mailbox.
+    /// Non-blocking drain of all pending input from the mailbox.
     ///
-    /// Returns raw `Envelope`s preserving full source metadata.
-    /// Called between tool executions and before sub-agent exit to
-    /// prevent message loss. Default returns empty — root agent uses
-    /// consumer inbox instead.
-    async fn drain_pending(&self) -> Vec<Envelope> {
+    /// Returns both data messages and control commands so that ephemeral
+    /// agents can process controls before exiting. Default returns empty.
+    async fn drain_pending(&self) -> Vec<AgentInput> {
         Vec::new()
     }
 

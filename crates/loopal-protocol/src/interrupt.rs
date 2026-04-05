@@ -1,6 +1,8 @@
 //! Shared interrupt signal for cancelling in-progress agent work.
 //!
-//! Used by both cancel-to-interrupt and send-message-while-busy flows.
+//! Used exclusively for explicit cancel (ESC key) and shutdown flows.
+//! Message arrival does NOT trigger interrupt — messages are deposited
+//! directly into the agent's mailbox and processed at the agent's pace.
 //! The consumer calls `signal()`, the runtime polls `is_signaled()` at
 //! key checkpoints (per stream chunk, before tool execution).
 
@@ -18,7 +20,7 @@ impl InterruptSignal {
         Self(Arc::new(AtomicBool::new(false)))
     }
 
-    /// Raise the interrupt flag (called by consumer on cancel or new message).
+    /// Raise the interrupt flag (called by consumer on explicit cancel or shutdown).
     pub fn signal(&self) {
         self.0.store(true, Ordering::Release);
     }

@@ -36,11 +36,10 @@ fn test_initial_state() {
     let conv = state.active_conversation();
     assert!(conv.messages.is_empty());
     assert!(conv.streaming_text.is_empty());
-    assert!(!conv.agent_idle);
+    assert!(!state.is_active_agent_idle());
     assert_eq!(conv.turn_count, 0);
     assert_eq!(conv.token_count(), 0);
     assert!(conv.pending_permission.is_none());
-    assert!(state.inbox.is_empty());
 }
 
 #[test]
@@ -75,31 +74,14 @@ fn test_awaiting_input_flushes_streaming() {
     assert_eq!(conv.messages[0].role, "assistant");
     assert_eq!(conv.messages[0].content, "response");
     assert_eq!(conv.turn_count, 1);
-    assert!(conv.agent_idle);
+    assert!(state.is_active_agent_idle());
 }
 
 #[test]
-fn test_awaiting_input_forwards_inbox() {
+fn test_awaiting_input_stays_idle_with_no_messages() {
     let (ctrl, _, _) = make_controller();
-    ctrl.lock().inbox.push("queued msg".into());
-
-    let forwarded = ctrl.handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
-    assert_eq!(forwarded.map(|c| c.text), Some("queued msg".to_string()));
-
-    let state = ctrl.lock();
-    let conv = state.active_conversation();
-    assert!(!conv.agent_idle);
-    assert!(state.inbox.is_empty());
-    assert_eq!(conv.messages.last().unwrap().role, "user");
-    assert_eq!(conv.messages.last().unwrap().content, "queued msg");
-}
-
-#[test]
-fn test_awaiting_input_no_inbox_stays_idle() {
-    let (ctrl, _, _) = make_controller();
-    let forwarded = ctrl.handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
-    assert!(forwarded.is_none());
-    assert!(ctrl.lock().active_conversation().agent_idle);
+    ctrl.handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
+    assert!(ctrl.lock().is_active_agent_idle());
 }
 
 #[test]

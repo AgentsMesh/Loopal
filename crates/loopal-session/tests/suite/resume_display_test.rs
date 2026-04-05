@@ -41,7 +41,7 @@ fn test_load_sub_agent_history_creates_agent_entry() {
     assert_eq!(agent.session_id.as_deref(), Some("sub-sid"));
     assert_eq!(agent.observable.model, "gpt-4");
     assert_eq!(agent.observable.status, AgentStatus::Finished);
-    assert!(agent.conversation.agent_idle);
+    assert!(agent.is_idle());
     assert_eq!(agent.conversation.messages.len(), 1);
     assert_eq!(agent.conversation.messages[0].content, "sub-agent response");
 }

@@ -27,7 +27,9 @@ impl AgentRegistry {
         let pending_delivery = self.prepare_parent_delivery(name, &text);
 
         let event = AgentEvent::named(name, AgentEventPayload::Finished);
-        let _ = self.event_tx.try_send(event);
+        if self.event_tx.try_send(event).is_err() {
+            tracing::warn!(agent = %name, "Finished event dropped (channel full)");
+        }
 
         if let Some(tx) = self.completions.remove(name) {
             let _ = tx.send(Some(text));

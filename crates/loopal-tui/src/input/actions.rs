@@ -19,7 +19,7 @@ pub enum SubPageResult {
 pub enum InputAction {
     /// No action needed
     None,
-    /// User message queued into Inbox for forwarding to agent
+    /// User message ready for forwarding to agent
     InboxPush(UserContent),
     /// User wants to quit
     Quit,

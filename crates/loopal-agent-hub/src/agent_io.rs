@@ -48,7 +48,7 @@ pub async fn agent_io_loop(
                     }
                     let h = hub.lock().await;
                     if h.registry.event_sender().try_send(event).is_err() {
-                        tracing::debug!(agent = %agent_name, "event dropped (channel full)");
+                        tracing::warn!(agent = %agent_name, "event dropped (channel full)");
                     }
                 }
             }

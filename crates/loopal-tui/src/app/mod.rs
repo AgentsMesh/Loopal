@@ -127,19 +127,6 @@ impl App {
         })
     }
 
-    /// Pop the last Inbox message back into the input field for editing.
-    /// Returns true if a message was popped.
-    pub fn pop_inbox_to_input(&mut self) -> bool {
-        if let Some(content) = self.session.pop_inbox_to_edit() {
-            self.input = content.text;
-            self.pending_images = content.images;
-            self.input_cursor = self.input.len();
-            true
-        } else {
-            false
-        }
-    }
-
     /// Attach an image to the current pending input.
     pub fn attach_image(&mut self, attachment: ImageAttachment) {
         self.pending_images.push(attachment);

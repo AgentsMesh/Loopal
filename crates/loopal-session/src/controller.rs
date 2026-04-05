@@ -92,10 +92,26 @@ impl SessionController {
         self.backend.interrupt_target(name);
     }
 
-    pub fn enqueue_message(&self, content: UserContent) -> Option<UserContent> {
+    /// Optimistic display update: append a user message to the conversation view.
+    ///
+    /// This is a pure display operation — it does NOT route the message to the
+    /// agent. Use `route_message()` separately for delivery to the agent mailbox.
+    /// Agent state (idle/busy) is NOT modified; it is derived from agent events.
+    pub fn append_user_display(&self, content: &UserContent) {
         let mut state = self.lock();
-        state.inbox.push(content);
-        crate::controller_ops::try_forward_from_inbox(&mut state)
+        let conv = state.active_conversation_mut();
+        let image_count = content.images.len();
+        let mut display_text = content.text.clone();
+        if image_count > 0 {
+            display_text.push_str(&format!(" [+{image_count} image(s)]"));
+        }
+        conv.messages.push(crate::types::SessionMessage {
+            role: "user".to_string(),
+            content: display_text,
+            tool_calls: Vec::new(),
+            image_count,
+            skill_info: content.skill_info.clone(),
+        });
     }
 
     pub async fn approve_permission(&self) {
@@ -155,9 +171,9 @@ impl SessionController {
 
     // === Event handling ===
 
-    pub fn handle_event(&self, event: AgentEvent) -> Option<UserContent> {
+    pub fn handle_event(&self, event: AgentEvent) {
         let mut state = self.lock();
-        event_handler::apply_event(&mut state, event)
+        event_handler::apply_event(&mut state, event);
     }
 
     /// Set the root session ID (for sub-agent ref persistence).

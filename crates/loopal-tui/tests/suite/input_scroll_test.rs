@@ -10,8 +10,8 @@
 /// Ctrl+P/N always navigate history regardless of scroll state.
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use loopal_protocol::ControlCommand;
 use loopal_protocol::UserQuestionResponse;
+use loopal_protocol::{AgentStatus, ControlCommand};
 use loopal_session::SessionController;
 use loopal_tui::app::App;
 use loopal_tui::input::{InputAction, handle_key};
@@ -83,7 +83,13 @@ fn test_down_resets_scroll_and_navigates_history() {
 #[test]
 fn test_up_navigates_history_when_idle() {
     let mut app = make_app();
-    app.session.lock().active_conversation_mut().agent_idle = true;
+    app.session
+        .lock()
+        .agents
+        .get_mut("main")
+        .unwrap()
+        .observable
+        .status = AgentStatus::WaitingForInput;
     app.input_history.push("older".into());
     app.input_history.push("recent".into());
     handle_key(&mut app, key(KeyCode::Up));
@@ -94,7 +100,13 @@ fn test_up_navigates_history_when_idle() {
 #[test]
 fn test_down_navigates_history_forward() {
     let mut app = make_app();
-    app.session.lock().active_conversation_mut().agent_idle = true;
+    app.session
+        .lock()
+        .agents
+        .get_mut("main")
+        .unwrap()
+        .observable
+        .status = AgentStatus::WaitingForInput;
     app.input_history.push("first".into());
     app.input_history.push("second".into());
     handle_key(&mut app, key(KeyCode::Up));
@@ -107,7 +119,13 @@ fn test_down_navigates_history_forward() {
 #[test]
 fn test_up_navigates_history_when_content_fits() {
     let mut app = make_app();
-    app.session.lock().active_conversation_mut().agent_idle = true;
+    app.session
+        .lock()
+        .agents
+        .get_mut("main")
+        .unwrap()
+        .observable
+        .status = AgentStatus::WaitingForInput;
     app.input_history.push("previous command".into());
     let action = handle_key(&mut app, key(KeyCode::Up));
     assert!(matches!(action, InputAction::None));
@@ -120,7 +138,13 @@ fn test_up_navigates_history_when_content_fits() {
 #[test]
 fn test_ctrl_p_navigates_history() {
     let mut app = make_app();
-    app.session.lock().active_conversation_mut().agent_idle = true;
+    app.session
+        .lock()
+        .agents
+        .get_mut("main")
+        .unwrap()
+        .observable
+        .status = AgentStatus::WaitingForInput;
     app.input_history.push("first".into());
     app.input_history.push("second".into());
     handle_key(&mut app, ctrl('p'));
@@ -131,7 +155,13 @@ fn test_ctrl_p_navigates_history() {
 #[test]
 fn test_ctrl_n_navigates_history_forward() {
     let mut app = make_app();
-    app.session.lock().active_conversation_mut().agent_idle = true;
+    app.session
+        .lock()
+        .agents
+        .get_mut("main")
+        .unwrap()
+        .observable
+        .status = AgentStatus::WaitingForInput;
     app.input_history.push("first".into());
     app.input_history.push("second".into());
     handle_key(&mut app, ctrl('p'));

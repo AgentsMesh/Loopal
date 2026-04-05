@@ -130,7 +130,7 @@ pub async fn register_agent_connection(
             session_id: session_id.map(String::from),
         });
         if h.registry.event_sender().try_send(event).is_err() {
-            tracing::debug!(agent = %name, "SubAgentSpawned event dropped");
+            tracing::warn!(agent = %name, "SubAgentSpawned event dropped (channel full)");
         }
     }
     agent_id

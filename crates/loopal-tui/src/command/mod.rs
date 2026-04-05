@@ -23,7 +23,7 @@ use crate::app::App;
 pub enum CommandEffect {
     /// Command completed all work internally (e.g. push_system_message, open SubPage).
     Done,
-    /// Push expanded content into the inbox for the agent.
+    /// Push expanded content to the agent for processing.
     InboxPush(UserContent),
     /// Switch agent mode (plan / act).
     ModeSwitch(AgentMode),

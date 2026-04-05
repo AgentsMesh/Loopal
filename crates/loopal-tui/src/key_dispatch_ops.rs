@@ -20,13 +20,10 @@ pub(crate) async fn push_to_inbox(app: &mut App, content: UserContent) {
     };
     app.input_history.push(history_text);
     app.history_index = None;
-    if let Some(msg) = app.session.enqueue_message(content) {
-        tracing::debug!("TUI: message forwarded to agent");
-        app.session.route_message(msg).await;
-    } else {
-        tracing::debug!("TUI: agent busy, message queued + interrupt sent");
-        app.session.interrupt();
-    }
+    // Optimistic display update, then deliver directly to agent mailbox.
+    // Agent state (idle/busy) is derived from agent events, not set here.
+    app.session.append_user_display(&content);
+    app.session.route_message(content).await;
 }
 
 pub(crate) async fn handle_effect(app: &mut App, effect: CommandEffect) -> bool {

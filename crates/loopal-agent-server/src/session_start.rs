@@ -10,12 +10,13 @@ use loopal_config::load_config;
 use loopal_error::AgentOutput;
 use loopal_ipc::connection::Connection;
 use loopal_protocol::InterruptSignal;
+use loopal_runtime::agent_input::AgentInput;
 use loopal_runtime::agent_loop;
 
 use crate::agent_setup;
 use crate::hub_frontend::HubFrontend;
 use crate::params::StartParams;
-use crate::session_hub::{InputFromClient, SessionHub, SharedSession};
+use crate::session_hub::{SessionHub, SharedSession};
 
 /// Handle returned to the dispatch loop after starting a session.
 pub(crate) struct SessionHandle {
@@ -77,7 +78,7 @@ pub(crate) async fn start_session(
     };
 
     // Create session infrastructure
-    let (input_tx, input_rx) = tokio::sync::mpsc::channel::<InputFromClient>(16);
+    let (input_tx, input_rx) = tokio::sync::mpsc::channel::<AgentInput>(16);
     let interrupt = InterruptSignal::new();
     let (watch_tx, watch_rx) = tokio::sync::watch::channel(0u64);
     let interrupt_tx = Arc::new(watch_tx);

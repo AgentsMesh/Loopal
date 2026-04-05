@@ -77,9 +77,7 @@ where
                     {
                         load_resumed_display(app, session_id);
                     }
-                    if let Some(content) = app.session.handle_event(agent_event) {
-                        app.session.route_message(content).await;
-                    }
+                    app.session.handle_event(agent_event);
                 }
                 AppEvent::Paste(result) => {
                     paste::apply_paste_result(app, result);

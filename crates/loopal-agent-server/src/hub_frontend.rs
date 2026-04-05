@@ -14,18 +14,18 @@ use tracing::{debug, info};
 
 use loopal_error::{LoopalError, Result};
 use loopal_ipc::protocol::methods;
-use loopal_protocol::{AgentEvent, AgentEventPayload, Envelope, Question, UserQuestionResponse};
+use loopal_protocol::{AgentEvent, AgentEventPayload, Question, UserQuestionResponse};
 use loopal_runtime::agent_input::AgentInput;
 use loopal_runtime::frontend::traits::{AgentFrontend, EventEmitter};
 use loopal_tool_api::PermissionDecision;
 
 use crate::hub_emitter::HubEventEmitter;
-use crate::session_hub::{InputFromClient, SharedSession};
+use crate::session_hub::SharedSession;
 
 /// Frontend that multiplexes across all clients in a shared session.
 pub struct HubFrontend {
     session: tokio::sync::RwLock<Arc<SharedSession>>,
-    input_rx: tokio::sync::Mutex<tokio::sync::mpsc::Receiver<InputFromClient>>,
+    input_rx: tokio::sync::Mutex<tokio::sync::mpsc::Receiver<AgentInput>>,
     agent_name: Option<String>,
     /// Watch channel for interrupt detection in recv_input.
     interrupt_rx: tokio::sync::Mutex<tokio::sync::watch::Receiver<u64>>,
@@ -34,7 +34,7 @@ pub struct HubFrontend {
 impl HubFrontend {
     pub fn new(
         session: Arc<SharedSession>,
-        input_rx: tokio::sync::mpsc::Receiver<InputFromClient>,
+        input_rx: tokio::sync::mpsc::Receiver<AgentInput>,
         agent_name: Option<String>,
         interrupt_rx: tokio::sync::watch::Receiver<u64>,
     ) -> Self {
@@ -95,18 +95,12 @@ impl AgentFrontend for HubFrontend {
         // has already been handled by TurnCancel. Without this, changed()
         // fires immediately on the old value and exits the agent loop.
         interrupt_rx.borrow_and_update();
-        loop {
-            tokio::select! {
-                msg = rx.recv() => {
-                    match msg? {
-                        InputFromClient::Message(env) => return Some(AgentInput::Message(env)),
-                        InputFromClient::Control(cmd) => return Some(AgentInput::Control(cmd)),
-                        InputFromClient::Interrupt => continue,
-                    }
-                }
-                _ = interrupt_rx.changed() => {
-                    return None; // Interrupted — exit agent loop
-                }
+        tokio::select! {
+            msg = rx.recv() => {
+                return msg;
+            }
+            _ = interrupt_rx.changed() => {
+                return None; // Interrupted — exit agent loop
             }
         }
     }
@@ -199,14 +193,12 @@ impl AgentFrontend for HubFrontend {
         true
     }
 
-    async fn drain_pending(&self) -> Vec<Envelope> {
+    async fn drain_pending(&self) -> Vec<AgentInput> {
         let mut rx = self.input_rx.lock().await;
-        let mut envelopes = Vec::new();
+        let mut inputs = Vec::new();
         while let Ok(msg) = rx.try_recv() {
-            if let InputFromClient::Message(env) = msg {
-                envelopes.push(env);
-            }
+            inputs.push(msg);
         }
-        envelopes
+        inputs
     }
 }

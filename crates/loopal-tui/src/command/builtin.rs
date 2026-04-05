@@ -7,6 +7,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use loopal_protocol::AgentMode;
 
+use super::status_cmd::StatusCmd;
 use super::{CommandEffect, CommandHandler};
 use crate::app::App;
 use crate::command::registry::CommandRegistry;
@@ -48,35 +49,19 @@ impl CommandHandler for CompactCmd {
     }
 }
 
-pub struct StatusCmd;
+pub struct SessionsCmd;
 
 #[async_trait]
-impl CommandHandler for StatusCmd {
+impl CommandHandler for SessionsCmd {
     fn name(&self) -> &str {
-        "/status"
+        "/sessions"
     }
     fn description(&self) -> &str {
-        "Show current status"
+        "List session history"
     }
     async fn execute(&self, app: &mut App, _arg: Option<&str>) -> CommandEffect {
-        let state = app.session.lock();
-        let conv = state.active_conversation();
-        let token_count = conv.token_count();
-        let context_info = if conv.context_window > 0 {
-            format!("{}k/{}k", token_count / 1000, conv.context_window / 1000)
-        } else {
-            format!("{token_count} tokens")
-        };
-        let status = format!(
-            "Mode: {} | Model: {} | Context: {} | Turns: {} | CWD: {}",
-            state.mode.to_uppercase(),
-            state.model,
-            context_info,
-            conv.turn_count,
-            app.cwd.display(),
-        );
-        drop(state);
-        app.session.push_system_message(status);
+        app.session
+            .push_system_message("Session listing is not yet available in TUI.".to_string());
         CommandEffect::Done
     }
 }
@@ -135,6 +120,7 @@ pub fn register_all(registry: &mut CommandRegistry) {
     registry.register(Arc::new(super::model_cmd::ModelCmd));
     registry.register(Arc::new(super::rewind_cmd::RewindCmd));
     registry.register(Arc::new(StatusCmd));
+    registry.register(Arc::new(SessionsCmd));
     registry.register(Arc::new(super::resume_cmd::ResumeCmd));
     registry.register(Arc::new(super::init_cmd::InitCmd));
     registry.register(Arc::new(super::help_cmd::HelpCmd));

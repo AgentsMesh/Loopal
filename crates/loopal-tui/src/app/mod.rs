@@ -1,5 +1,7 @@
+mod status_page;
 mod types;
 
+pub use status_page::*;
 pub use types::*;
 
 use std::collections::HashMap;

@@ -85,6 +85,8 @@ pub enum SubPage {
     ModelPicker(PickerState),
     /// Rewind picker — user selects a turn to rewind to.
     RewindPicker(RewindPickerState),
+    /// Session picker — user selects a session to resume.
+    SessionPicker(PickerState),
 }
 
 /// Which sub-panel within the panel zone is focused.

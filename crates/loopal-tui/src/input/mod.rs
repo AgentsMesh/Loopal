@@ -7,6 +7,7 @@ pub(crate) mod multiline;
 mod navigation;
 pub(crate) mod paste;
 mod sub_page;
+mod sub_page_rewind;
 
 pub use actions::*;
 

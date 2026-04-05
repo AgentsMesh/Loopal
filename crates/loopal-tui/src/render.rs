@@ -38,7 +38,9 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     // Sub-page mode: picker replaces f₁..f₄, only f₅ remains
     if let Some(ref sub_page) = app.sub_page {
         match sub_page {
-            SubPage::ModelPicker(p) => views::picker::render_picker(f, p, layout.picker),
+            SubPage::ModelPicker(p) | SubPage::SessionPicker(p) => {
+                views::picker::render_picker(f, p, layout.picker);
+            }
             SubPage::RewindPicker(r) => {
                 views::rewind_picker::render_rewind_picker(f, r, layout.picker);
             }

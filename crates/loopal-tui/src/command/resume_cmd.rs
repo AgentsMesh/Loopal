@@ -1,14 +1,14 @@
-//! `/resume` — resume a previous session or list resumable sessions.
+//! `/resume` — resume a previous session or open the session picker.
 //!
 //! With argument: hot-swap agent context to the specified session (prefix match).
-//! Without argument: list recent sessions for the current project directory.
+//! Without argument: open a picker sub-page listing resumable sessions.
 
 use std::path::Path;
 
 use async_trait::async_trait;
 
 use super::{CommandEffect, CommandHandler};
-use crate::app::App;
+use crate::app::{App, PickerItem, PickerState, SubPage};
 
 pub struct ResumeCmd;
 
@@ -33,9 +33,7 @@ impl CommandHandler for ResumeCmd {
                 }
             },
             None => {
-                let text = format_project_sessions(&app.cwd)
-                    .unwrap_or_else(|| "No previous sessions found for this project.".into());
-                app.session.push_system_message(text);
+                open_session_picker(app);
                 CommandEffect::Done
             }
         }
@@ -44,12 +42,12 @@ impl CommandHandler for ResumeCmd {
 
 // ── Query ──────────────────────────────────────────────────────────
 
-/// Resolve a partial ID (prefix) to the full session ID.
+/// Resolve a partial ID (prefix) to the full session ID (root sessions only).
 fn resolve_session_id(cwd: &Path, partial: &str) -> Result<String, String> {
     let sm = loopal_runtime::SessionManager::new()
         .map_err(|e| format!("Failed to access sessions: {e}"))?;
     let sessions = sm
-        .list_sessions_for_cwd(cwd)
+        .list_root_sessions_for_cwd(cwd)
         .map_err(|e| format!("Failed to list sessions: {e}"))?;
     let matches: Vec<_> = sessions
         .iter()
@@ -62,30 +60,60 @@ fn resolve_session_id(cwd: &Path, partial: &str) -> Result<String, String> {
     }
 }
 
-// ── Formatting ─────────────────────────────────────────────────────
+// ── Picker ─────────────────────────────────────────────────────────
 
-fn format_project_sessions(cwd: &Path) -> Option<String> {
-    let sm = loopal_runtime::SessionManager::new().ok()?;
-    let sessions = sm.list_sessions_for_cwd(cwd).ok()?;
-    if sessions.is_empty() {
-        return None;
+fn open_session_picker(app: &mut App) {
+    let sm = match loopal_runtime::SessionManager::new() {
+        Ok(sm) => sm,
+        Err(_) => {
+            app.session
+                .push_system_message("Failed to access sessions.".into());
+            return;
+        }
+    };
+    let sessions = match sm.list_root_sessions_for_cwd(&app.cwd) {
+        Ok(s) => s,
+        Err(_) => {
+            app.session
+                .push_system_message("Failed to list sessions.".into());
+            return;
+        }
+    };
+
+    // Exclude current session
+    let current_id = app.session.lock().root_session_id.clone();
+    let items: Vec<PickerItem> = sessions
+        .into_iter()
+        .filter(|s| current_id.as_deref() != Some(&s.id))
+        .map(|s| {
+            let label = if s.title.is_empty() {
+                "(untitled)".to_string()
+            } else {
+                s.title
+            };
+            let short_id = &s.id[..8.min(s.id.len())];
+            let updated = s.updated_at.format("%m-%d %H:%M");
+            PickerItem {
+                description: format!("{short_id}  {updated}  {}", s.model),
+                label,
+                value: s.id,
+            }
+        })
+        .collect();
+
+    if items.is_empty() {
+        app.session
+            .push_system_message("No previous sessions found for this project.".into());
+        return;
     }
-    let mut lines = Vec::with_capacity(sessions.len().min(5) + 3);
-    lines.push("Recent sessions for this project:".into());
-    lines.push(String::new());
 
-    for s in sessions.iter().take(5) {
-        let short_id = &s.id[..8];
-        let updated = s.updated_at.format("%Y-%m-%d %H:%M");
-        let title = if s.title.is_empty() {
-            String::new()
-        } else {
-            format!(" — {}", s.title)
-        };
-        lines.push(format!("  {short_id}  {updated}  {}{title}", s.model));
-    }
-
-    lines.push(String::new());
-    lines.push("To resume: /resume <ID>".into());
-    Some(lines.join("\n"))
+    app.sub_page = Some(SubPage::SessionPicker(PickerState {
+        title: "Resume Session".to_string(),
+        items,
+        filter: String::new(),
+        filter_cursor: 0,
+        selected: 0,
+        thinking_options: vec![],
+        thinking_selected: 0,
+    }));
 }

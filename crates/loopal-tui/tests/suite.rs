@@ -42,8 +42,6 @@ mod input_scroll_test;
 mod input_test;
 #[path = "suite/line_cache_test.rs"]
 mod line_cache_test;
-#[path = "suite/scroll_burst_test.rs"]
-mod scroll_burst_test;
 #[path = "suite/markdown_code_test.rs"]
 mod markdown_code_test;
 #[path = "suite/markdown_edge_test.rs"]
@@ -62,6 +60,8 @@ mod message_lines_test;
 mod panel_tab_test;
 #[path = "suite/render_guard_test.rs"]
 mod render_guard_test;
+#[path = "suite/scroll_burst_test.rs"]
+mod scroll_burst_test;
 #[path = "suite/skill_render_test.rs"]
 mod skill_render_test;
 #[path = "suite/styled_wrap_test.rs"]

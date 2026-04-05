@@ -84,7 +84,7 @@ fn test_down_burst_exact_offset() {
 fn test_mixed_direction_burst_applies_both() {
     let mut app = make_app();
     app.scroll_offset = 10;
-    handle_key(&mut app, key(KeyCode::Up));   // Pending(Up)
+    handle_key(&mut app, key(KeyCode::Up)); // Pending(Up)
     handle_key(&mut app, key(KeyCode::Down)); // burst: scroll Up+3 then Down-3
     // Net effect: +3 - 3 = 0 change
     assert_eq!(app.scroll_offset, 10, "Up then Down burst should net zero");
@@ -116,7 +116,10 @@ fn test_up_with_empty_history_does_nothing() {
     let mut app = make_app();
     // No history entries
     arrow(&mut app, KeyCode::Up);
-    assert!(app.input.is_empty(), "Up with no history should leave input empty");
+    assert!(
+        app.input.is_empty(),
+        "Up with no history should leave input empty"
+    );
     assert_eq!(app.scroll_offset, 0);
 }
 
@@ -170,5 +173,8 @@ fn test_sequential_up_then_down_bursts() {
     handle_key(&mut app, key(KeyCode::Down));
     handle_key(&mut app, key(KeyCode::Down));
     handle_key(&mut app, key(KeyCode::Down));
-    assert!(app.scroll_offset < after_up, "Down burst should reduce offset");
+    assert!(
+        app.scroll_offset < after_up,
+        "Down burst should reduce offset"
+    );
 }

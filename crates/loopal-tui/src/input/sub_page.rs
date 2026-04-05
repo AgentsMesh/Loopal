@@ -2,8 +2,8 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::app::{App, PickerState, SubPage};
 
-use super::{InputAction, SubPageResult};
 use super::sub_page_rewind::handle_rewind_picker_key;
+use super::{InputAction, SubPageResult};
 
 /// Handle keys when a sub-page (picker) is active. All keys are consumed.
 pub(super) fn handle_sub_page_key(app: &mut App, key: &KeyEvent) -> InputAction {

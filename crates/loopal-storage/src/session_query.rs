@@ -4,7 +4,7 @@ use std::path::Path;
 
 use loopal_error::StorageError;
 
-use super::sessions::{normalize_cwd, Session, SessionStore};
+use super::sessions::{Session, SessionStore, normalize_cwd};
 
 impl SessionStore {
     /// Find the most recently updated session for a given working directory.

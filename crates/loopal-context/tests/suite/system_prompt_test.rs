@@ -3,7 +3,17 @@ use loopal_tool_api::ToolDefinition;
 
 #[test]
 fn includes_instructions() {
-    let result = build_system_prompt("You are helpful.", &[], "act", "/tmp", "", "", None, vec![], 0);
+    let result = build_system_prompt(
+        "You are helpful.",
+        &[],
+        "act",
+        "/tmp",
+        "",
+        "",
+        None,
+        vec![],
+        0,
+    );
     assert!(result.contains("You are helpful."));
 }
 
@@ -60,7 +70,17 @@ fn cwd_available_in_subagent_prompt() {
 #[test]
 fn includes_skills() {
     let skills = "# Available Skills\n- /commit: Generate a git commit message";
-    let result = build_system_prompt("Base", &[], "act", "/workspace", skills, "", None, vec![], 0);
+    let result = build_system_prompt(
+        "Base",
+        &[],
+        "act",
+        "/workspace",
+        skills,
+        "",
+        None,
+        vec![],
+        0,
+    );
     assert!(result.contains("Available Skills"));
     assert!(result.contains("/commit"));
 }
@@ -237,9 +257,28 @@ fn report_token_usage() {
 
     let bare = build_system_prompt("", &[], "act", "/project", "", "", None, vec![], 0);
     let with_tools = build_system_prompt("", &tools, "act", "/project", "", "", None, vec![], 0);
-    let full_act = build_system_prompt(instr, &tools, "act", "/project", skills, mem, None, vec![], 0);
-    let full_plan =
-        build_system_prompt(instr, &tools, "plan", "/project", skills, mem, None, vec![], 0);
+    let full_act = build_system_prompt(
+        instr,
+        &tools,
+        "act",
+        "/project",
+        skills,
+        mem,
+        None,
+        vec![],
+        0,
+    );
+    let full_plan = build_system_prompt(
+        instr,
+        &tools,
+        "plan",
+        "/project",
+        skills,
+        mem,
+        None,
+        vec![],
+        0,
+    );
 
     let t_bare = estimate_tokens(&bare);
     let t_tools = estimate_tokens(&with_tools);

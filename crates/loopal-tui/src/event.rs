@@ -17,8 +17,6 @@ pub enum AppEvent {
     Paste(PasteResult),
     /// Tick for periodic UI refresh
     Tick,
-    /// Arrow-key debounce timer expired — flush pending arrow as history
-    ArrowDebounceTimeout,
 }
 
 /// Merges crossterm terminal events with agent events into a single stream.

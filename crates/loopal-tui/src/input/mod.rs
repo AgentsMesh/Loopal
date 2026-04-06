@@ -6,7 +6,6 @@ mod modal;
 pub(crate) mod multiline;
 mod navigation;
 pub(crate) mod paste;
-pub(crate) mod scroll_debounce;
 mod status_page_keys;
 mod sub_page;
 mod sub_page_rewind;
@@ -21,36 +20,24 @@ use editing::{handle_backspace, handle_ctrl_c, handle_enter};
 use navigation::{
     DEFAULT_WRAP_WIDTH, handle_down, handle_esc, handle_up, move_cursor_left, move_cursor_right,
 };
-use scroll_debounce::{ScrollDirection, handle_arrow_with_debounce, resolve_pending_arrow};
 
 /// Process a key event and update the app's input state.
 pub fn handle_key(app: &mut App, key: KeyEvent) -> InputAction {
     if let Some(action) = modal::handle_modal_keys(app, &key) {
-        scroll_debounce::discard_pending(app);
         return action;
     }
     if let Some(action) = handle_global_keys(app, &key) {
-        scroll_debounce::discard_pending(app);
         return action;
     }
     if app.autocomplete.is_some()
         && let Some(action) = handle_autocomplete_key(app, &key)
     {
-        scroll_debounce::discard_pending(app);
         return action;
     }
 
     let action = handle_normal_key(app, &key);
     update_autocomplete(app);
     action
-}
-
-/// Flush any pending arrow-key debounce as history navigation.
-///
-/// Called by the event loop when the 30 ms debounce timer expires and by
-/// tests to simulate the timeout deterministically.
-pub fn resolve_arrow_debounce(app: &mut App) {
-    scroll_debounce::resolve_pending_arrow(app);
 }
 
 /// Handle global shortcuts: Ctrl combos, Shift+Tab.
@@ -123,12 +110,7 @@ fn handle_panel_key(app: &mut App, key: &KeyEvent) -> InputAction {
 
 /// Keys in Input mode: typing, navigation, submit.
 fn handle_input_mode_key(app: &mut App, key: &KeyEvent) -> InputAction {
-    // Flush any pending arrow debounce on non-arrow key input.
-    if !matches!(key.code, KeyCode::Up | KeyCode::Down) {
-        resolve_pending_arrow(app);
-    }
-    // Auto-scroll to bottom on input interaction (except scroll/panel/escape/arrow keys).
-    // Arrow keys are exempt because they may become scroll via debounce.
+    // Auto-scroll to bottom on input interaction (except scroll/panel/escape keys).
     if !matches!(
         key.code,
         KeyCode::PageUp
@@ -138,7 +120,7 @@ fn handle_input_mode_key(app: &mut App, key: &KeyEvent) -> InputAction {
             | KeyCode::Up
             | KeyCode::Down
     ) {
-        app.scroll_offset = 0;
+        app.content_scroll.to_bottom();
     }
     match key.code {
         KeyCode::Enter if key.modifiers.contains(KeyModifiers::SHIFT) => {
@@ -177,18 +159,16 @@ fn handle_input_mode_key(app: &mut App, key: &KeyEvent) -> InputAction {
                 multiline::line_end(&app.input, app.input_cursor, DEFAULT_WRAP_WIDTH);
             InputAction::None
         }
-        KeyCode::Up | KeyCode::Down => {
-            let dir = ScrollDirection::from_key(key.code).unwrap();
-            handle_arrow_with_debounce(app, dir)
-        }
+        KeyCode::Up => handle_up(app),
+        KeyCode::Down => handle_down(app),
         KeyCode::Tab => InputAction::EnterPanel,
         KeyCode::Esc => handle_esc(app),
         KeyCode::PageUp => {
-            app.scroll_offset = app.scroll_offset.saturating_add(10);
+            app.content_scroll.scroll_up(10);
             InputAction::None
         }
         KeyCode::PageDown => {
-            app.scroll_offset = app.scroll_offset.saturating_sub(10);
+            app.content_scroll.scroll_down(10);
             InputAction::None
         }
         _ => InputAction::None,

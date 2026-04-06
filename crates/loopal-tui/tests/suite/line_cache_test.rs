@@ -17,7 +17,7 @@ fn msg(role: &str, content: &str) -> SessionMessage {
 fn test_empty_messages() {
     let mut cache = LineCache::new();
     assert_eq!(cache.update(&[], W), 0);
-    assert!(cache.tail(100).is_empty());
+    assert!(cache.slice(0, 100).is_empty());
 }
 
 #[test]
@@ -33,11 +33,13 @@ fn test_incremental_append() {
 }
 
 #[test]
-fn test_tail_window() {
+fn test_slice_window() {
     let mut cache = LineCache::new();
     let msgs: Vec<_> = (0..20).map(|i| msg("user", &format!("msg {i}"))).collect();
     cache.update(&msgs, W);
-    let tail = cache.tail(5);
+    let total = cache.total_lines();
+    let start = total.saturating_sub(5);
+    let tail = cache.slice(start, 5);
     assert!(tail.len() <= 5);
 }
 
@@ -47,7 +49,7 @@ fn test_clear_invalidation() {
     let msgs = vec![msg("user", "hello"), msg("assistant", "hi")];
     cache.update(&msgs, W);
     cache.update(&[], W);
-    assert!(cache.tail(100).is_empty());
+    assert!(cache.slice(0, 100).is_empty());
 }
 
 #[test]
@@ -81,7 +83,7 @@ fn test_tool_call_mutation_detected() {
 
     // Cache should detect the mutation via fingerprint change
     let text: String = cache
-        .tail(100)
+        .slice(0, cache.total_lines())
         .iter()
         .flat_map(|l| l.spans.iter().map(|s| s.content.to_string()))
         .collect();
@@ -146,7 +148,7 @@ fn test_tool_result_arrival_invalidates_cache() {
     // Single-line summary: line count stays the same, but cache was rebuilt
     // (fingerprint changed). Verify the summary text is updated.
     let text: String = cache
-        .tail(100)
+        .slice(0, cache.total_lines())
         .iter()
         .flat_map(|l| l.spans.iter().map(|s| s.content.to_string()))
         .collect();

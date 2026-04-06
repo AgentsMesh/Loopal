@@ -62,6 +62,8 @@ mod panel_tab_test;
 mod render_guard_test;
 #[path = "suite/scroll_burst_test.rs"]
 mod scroll_burst_test;
+#[path = "suite/scroll_compensation_test.rs"]
+mod scroll_compensation_test;
 #[path = "suite/skill_render_test.rs"]
 mod skill_render_test;
 #[path = "suite/styled_wrap_test.rs"]
@@ -98,6 +100,8 @@ mod e2e_mcp_test;
 mod e2e_multi_turn_test;
 #[path = "suite/e2e_permission_test.rs"]
 mod e2e_permission_test;
+#[path = "suite/e2e_scroll_test.rs"]
+mod e2e_scroll_test;
 #[path = "suite/e2e_session_test.rs"]
 mod e2e_session_test;
 #[path = "suite/e2e_system_test.rs"]

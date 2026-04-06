@@ -64,6 +64,4 @@ pub enum InputAction {
     QuestionCancel,
     /// User pressed Ctrl+V — caller should spawn async clipboard read
     PasteRequested,
-    /// Arrow key deferred — start 30 ms debounce timer for scroll detection
-    StartArrowDebounce,
 }

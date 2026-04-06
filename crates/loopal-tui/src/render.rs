@@ -55,13 +55,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     if breadcrumb_h > 0 {
         views::breadcrumb::render_breadcrumb(f, &state.active_view, layout.breadcrumb);
     }
-    views::progress::render_progress(
-        f,
-        &state,
-        app.scroll_offset,
-        &mut app.line_cache,
-        layout.content,
-    );
+    app.content_scroll.render(f, &state, layout.content);
     let viewing = if state.active_view != loopal_session::ROOT_AGENT {
         Some(state.active_view.as_str())
     } else {

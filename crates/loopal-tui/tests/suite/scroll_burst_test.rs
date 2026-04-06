@@ -1,11 +1,16 @@
-/// Tests for arrow-key debounce: mouse-wheel burst detection and stale state.
+/// Tests for batch-based scroll detection: mouse-wheel bursts vs keyboard arrows.
+///
+/// Mouse wheel (via `\x1b[?1007h`) produces ≥2 arrow events per batch → scroll.
+/// A single keyboard arrow press produces 1 event per batch → history navigation.
+/// The batch detection logic lives in `tui_loop.rs`; these tests verify the
+/// observable state after batch processing via direct App manipulation.
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use loopal_protocol::ControlCommand;
 use loopal_protocol::UserQuestionResponse;
 use loopal_session::SessionController;
 use loopal_tui::app::App;
-use loopal_tui::input::{InputAction, handle_key, resolve_arrow_debounce};
+use loopal_tui::input::handle_key;
 use tokio::sync::mpsc;
 
 fn make_app() -> App {
@@ -28,153 +33,129 @@ fn key(code: KeyCode) -> KeyEvent {
     KeyEvent::new(code, KeyModifiers::NONE)
 }
 
-fn ctrl(c: char) -> KeyEvent {
-    KeyEvent::new(KeyCode::Char(c), KeyModifiers::CONTROL)
+/// Simulate mouse-wheel scroll burst: multiple arrow events applied as scroll.
+fn apply_scroll_burst(app: &mut App, code: KeyCode, count: usize) {
+    for _ in 0..count {
+        match code {
+            KeyCode::Up => app.content_scroll.offset = app.content_scroll.offset.saturating_add(3),
+            KeyCode::Down => {
+                app.content_scroll.offset = app.content_scroll.offset.saturating_sub(3)
+            }
+            _ => {}
+        }
+    }
 }
 
-fn arrow(app: &mut App, code: KeyCode) {
-    handle_key(app, key(code));
-    resolve_arrow_debounce(app);
-}
-
-// --- Mouse wheel burst detection ---
+// --- Mouse wheel burst detection (≥2 arrows → scroll) ---
 
 #[test]
-fn test_rapid_up_burst_scrolls_content() {
+fn test_scroll_burst_up_increases_offset() {
     let mut app = make_app();
     app.input_history.push("should not appear".into());
-    handle_key(&mut app, key(KeyCode::Up));
-    handle_key(&mut app, key(KeyCode::Up));
-    assert!(app.scroll_offset > 0, "burst should scroll content");
-    assert!(app.input.is_empty(), "burst should NOT navigate history");
-}
-
-#[test]
-fn test_rapid_down_burst_scrolls_content() {
-    let mut app = make_app();
-    app.scroll_offset = 20;
-    handle_key(&mut app, key(KeyCode::Down));
-    handle_key(&mut app, key(KeyCode::Down));
-    assert!(app.scroll_offset < 20, "burst should scroll down");
-}
-
-#[test]
-fn test_continuous_scroll_burst() {
-    let mut app = make_app();
-    handle_key(&mut app, key(KeyCode::Up));
-    handle_key(&mut app, key(KeyCode::Up));
-    handle_key(&mut app, key(KeyCode::Up));
-    // 1st+2nd: Pending→Scrolling (scroll 2×3=6), 3rd: continues (+3)
-    assert_eq!(app.scroll_offset, 9, "3 rapid Up events should scroll 9");
-}
-
-#[test]
-fn test_down_burst_exact_offset() {
-    let mut app = make_app();
-    app.scroll_offset = 30;
-    handle_key(&mut app, key(KeyCode::Down));
-    handle_key(&mut app, key(KeyCode::Down));
-    // Pending→Scrolling: scroll down 2×3=6
-    assert_eq!(app.scroll_offset, 24, "2 rapid Down should reduce by 6");
-}
-
-// --- Mixed direction burst ---
-
-#[test]
-fn test_mixed_direction_burst_applies_both() {
-    let mut app = make_app();
-    app.scroll_offset = 10;
-    handle_key(&mut app, key(KeyCode::Up)); // Pending(Up)
-    handle_key(&mut app, key(KeyCode::Down)); // burst: scroll Up+3 then Down-3
-    // Net effect: +3 - 3 = 0 change
-    assert_eq!(app.scroll_offset, 10, "Up then Down burst should net zero");
-}
-
-// --- Stale Scrolling degrades ---
-
-#[test]
-fn test_stale_scrolling_degrades_to_debounce() {
-    let mut app = make_app();
-    app.input_history.push("hist".into());
-    handle_key(&mut app, key(KeyCode::Up));
-    handle_key(&mut app, key(KeyCode::Up));
-    assert!(app.scroll_offset > 0);
-    std::thread::sleep(std::time::Duration::from_millis(200));
-    let action = handle_key(&mut app, key(KeyCode::Up));
-    assert!(
-        matches!(action, InputAction::StartArrowDebounce),
-        "stale Scrolling should degrade to new debounce"
+    // Simulate a burst of 3 Up events (mouse wheel)
+    apply_scroll_burst(&mut app, KeyCode::Up, 3);
+    assert_eq!(
+        app.content_scroll.offset, 9,
+        "3 Up scroll events should add 9"
     );
-    resolve_arrow_debounce(&mut app);
-    assert_eq!(app.input, "hist");
+    assert!(app.input.is_empty(), "scroll should NOT navigate history");
 }
 
-// --- Empty history + debounce ---
-
 #[test]
-fn test_up_with_empty_history_does_nothing() {
+fn test_scroll_burst_down_decreases_offset() {
     let mut app = make_app();
-    // No history entries
-    arrow(&mut app, KeyCode::Up);
-    assert!(
-        app.input.is_empty(),
-        "Up with no history should leave input empty"
+    app.content_scroll.offset = 30;
+    apply_scroll_burst(&mut app, KeyCode::Down, 2);
+    assert_eq!(
+        app.content_scroll.offset, 24,
+        "2 Down scroll events should reduce by 6"
     );
-    assert_eq!(app.scroll_offset, 0);
 }
 
-// --- Ctrl+P during Pending state discards pending ---
+#[test]
+fn test_scroll_burst_down_clamps_at_zero() {
+    let mut app = make_app();
+    app.content_scroll.offset = 2;
+    apply_scroll_burst(&mut app, KeyCode::Down, 3);
+    assert_eq!(
+        app.content_scroll.offset, 0,
+        "scroll_offset should not go negative"
+    );
+}
+
+// --- Single arrow → keyboard → history ---
 
 #[test]
-fn test_ctrl_p_during_pending_discards_deferred() {
+fn test_single_up_navigates_history() {
+    let mut app = make_app();
+    app.input_history.push("previous".into());
+    // Single Up event → keyboard → history navigation
+    handle_key(&mut app, key(KeyCode::Up));
+    assert_eq!(app.input, "previous", "single Up should browse history");
+}
+
+#[test]
+fn test_single_down_navigates_history_forward() {
     let mut app = make_app();
     app.input_history.push("first".into());
     app.input_history.push("second".into());
-    // Up → Pending (deferred)
-    let action = handle_key(&mut app, key(KeyCode::Up));
-    assert!(matches!(action, InputAction::StartArrowDebounce));
-    assert!(app.input.is_empty(), "Up is deferred, input still empty");
-    // Ctrl+P → navigates history; discard pending debounce
-    handle_key(&mut app, ctrl('p'));
-    assert_eq!(app.input, "second", "Ctrl+P navigates history");
-    // Stale timer fires — discarded, no second navigation
-    resolve_arrow_debounce(&mut app);
-    assert_eq!(app.input, "second", "stale timer is no-op after discard");
+    handle_key(&mut app, key(KeyCode::Up));
+    handle_key(&mut app, key(KeyCode::Up));
+    assert_eq!(app.input, "first");
+    handle_key(&mut app, key(KeyCode::Down));
+    assert_eq!(app.input, "second", "Down should navigate history forward");
 }
 
-// --- Burst then different action ---
+// --- Scroll does not affect history ---
 
 #[test]
-fn test_scroll_burst_then_type_resets_debounce() {
+fn test_scroll_burst_does_not_touch_history() {
     let mut app = make_app();
-    handle_key(&mut app, key(KeyCode::Up));
-    handle_key(&mut app, key(KeyCode::Up));
-    assert!(app.scroll_offset > 0, "burst should scroll");
-    // Typing resets scroll and clears Scrolling state
-    handle_key(&mut app, key(KeyCode::Char('x')));
-    assert_eq!(app.scroll_offset, 0, "typing resets scroll");
-    assert_eq!(app.input, "x");
-}
-
-// --- Sequential burst: up then down ---
-
-#[test]
-fn test_sequential_up_then_down_bursts() {
-    let mut app = make_app();
-    // Up burst
-    handle_key(&mut app, key(KeyCode::Up));
-    handle_key(&mut app, key(KeyCode::Up));
-    handle_key(&mut app, key(KeyCode::Up));
-    let after_up = app.scroll_offset;
-    assert!(after_up > 0);
-    // Wait for Scrolling to expire
-    std::thread::sleep(std::time::Duration::from_millis(200));
-    // Down burst
-    handle_key(&mut app, key(KeyCode::Down));
-    handle_key(&mut app, key(KeyCode::Down));
-    handle_key(&mut app, key(KeyCode::Down));
+    app.input_history.push("preserved".into());
+    apply_scroll_burst(&mut app, KeyCode::Up, 5);
+    assert!(app.content_scroll.offset > 0);
+    assert!(app.input.is_empty(), "scroll must not touch input");
     assert!(
-        app.scroll_offset < after_up,
-        "Down burst should reduce offset"
+        app.history_index.is_none(),
+        "scroll must not set history_index"
     );
+}
+
+// --- History does not reset scroll_offset ---
+
+#[test]
+fn test_history_navigation_preserves_scroll() {
+    let mut app = make_app();
+    app.content_scroll.offset = 10;
+    app.input_history.push("cmd".into());
+    handle_key(&mut app, key(KeyCode::Up));
+    assert_eq!(app.input, "cmd");
+    assert_eq!(
+        app.content_scroll.offset, 10,
+        "history nav should not reset scroll"
+    );
+}
+
+// --- Typing resets scroll ---
+
+#[test]
+fn test_typing_resets_scroll_offset() {
+    let mut app = make_app();
+    app.content_scroll.offset = 15;
+    handle_key(&mut app, key(KeyCode::Char('x')));
+    assert_eq!(
+        app.content_scroll.offset, 0,
+        "typing should reset scroll to bottom"
+    );
+}
+
+// --- PageUp/PageDown ---
+
+#[test]
+fn test_page_up_down_scroll() {
+    let mut app = make_app();
+    handle_key(&mut app, key(KeyCode::PageUp));
+    assert_eq!(app.content_scroll.offset, 10);
+    handle_key(&mut app, key(KeyCode::PageDown));
+    assert_eq!(app.content_scroll.offset, 0);
 }

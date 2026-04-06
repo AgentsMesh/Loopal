@@ -97,7 +97,6 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         hub_connection,
         cwd,
         depth: 0,
-        max_depth: 3,
         agent_name: "main".to_string(),
         parent_event_tx: Some(event_tx),
         cancel_token: None,

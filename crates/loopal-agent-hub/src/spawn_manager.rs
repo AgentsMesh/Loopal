@@ -22,6 +22,7 @@ pub async fn spawn_and_register(
     parent: Option<String>,
     permission_mode: Option<String>,
     agent_type: Option<String>,
+    depth: Option<u32>,
 ) -> Result<String, String> {
     info!(agent = %name, parent = ?parent, "spawn: forking process");
     let agent_proc = loopal_agent_client::AgentProcess::spawn(None)
@@ -36,18 +37,19 @@ pub async fn spawn_and_register(
         return Err(format!("agent initialize failed: {e}"));
     }
     info!(agent = %name, "spawn: starting agent");
+    let model_for_registry = model.clone();
     let session_id = match client
-        .start_agent(
-            std::path::Path::new(&cwd),
-            model.as_deref(),
-            Some("act"),
-            prompt.as_deref(),
-            permission_mode.as_deref(),
-            false,
-            None,
-            Some("ephemeral"), // sub-agents always exit on idle
-            agent_type.as_deref(),
-        )
+        .start_agent(&loopal_agent_client::StartAgentParams {
+            cwd: std::path::PathBuf::from(&cwd),
+            model,
+            mode: Some("act".to_string()),
+            prompt,
+            permission_mode,
+            lifecycle: Some("ephemeral".to_string()), // sub-agents always exit on idle
+            agent_type,
+            depth,
+            ..Default::default()
+        })
         .await
     {
         Ok(sid) => Some(sid),
@@ -65,7 +67,7 @@ pub async fn spawn_and_register(
         conn,
         incoming_rx,
         parent.as_deref(),
-        model.as_deref(),
+        model_for_registry.as_deref(),
         session_id.as_deref(),
     )
     .await;

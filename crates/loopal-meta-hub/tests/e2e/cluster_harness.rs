@@ -106,7 +106,12 @@ impl HubHandle {
         client.initialize().await.expect("initialize");
         let cwd = std::env::temp_dir();
         client
-            .start_agent(&cwd, None, Some("act"), None, None, true, None, None, None)
+            .start_agent(&loopal_agent_client::StartAgentParams {
+                cwd: cwd.clone(),
+                mode: Some("act".to_string()),
+                no_sandbox: true,
+                ..Default::default()
+            })
             .await
             .expect("start_agent");
 

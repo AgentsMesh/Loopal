@@ -210,6 +210,7 @@ fn report_real_system_prompt_tokens() {
         "",
         None,
         vec![],
+        0,
     );
     runner.params.config.system_prompt = real_prompt.clone();
     let params = runner
@@ -228,6 +229,7 @@ fn report_real_system_prompt_tokens() {
         "",
         None,
         vec![],
+        0,
     );
     let fragment_tokens = loopal_context::estimate_tokens(&prompt_no_tools);
 

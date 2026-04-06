@@ -81,8 +81,7 @@ pub fn build_with_frontend(
         task_store: Arc::new(TaskStore::new(tasks_dir)),
         hub_connection,
         cwd: cwd.to_path_buf(),
-        depth: 0,
-        max_depth: 3,
+        depth: start.depth.unwrap_or(0),
         agent_name: "main".into(),
         parent_event_tx: Some(event_tx),
         cancel_token: None,
@@ -136,6 +135,7 @@ pub fn build_with_frontend(
         &config.memory,
         start.agent_type.as_deref(),
         features,
+        start.depth.unwrap_or(0),
     );
 
     crate::prompt_post::append_runtime_sections(&mut system_prompt, &kernel);

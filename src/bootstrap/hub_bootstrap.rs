@@ -60,17 +60,17 @@ pub async fn bootstrap_hub_and_agent(
         None // default: persistent (server decides based on prompt)
     };
     let root_session_id = client
-        .start_agent(
-            cwd,
-            Some(&config.settings.model),
-            Some(mode_str),
-            prompt.as_deref(),
-            cli.permission.as_deref(),
-            cli.no_sandbox,
-            resume,
-            lifecycle_str,
-            None, // root agent has no agent_type
-        )
+        .start_agent(&loopal_agent_client::StartAgentParams {
+            cwd: cwd.to_path_buf(),
+            model: Some(config.settings.model.clone()),
+            mode: Some(mode_str.to_string()),
+            prompt: prompt.clone(),
+            permission_mode: cli.permission.clone(),
+            no_sandbox: cli.no_sandbox,
+            resume: resume.map(String::from),
+            lifecycle: lifecycle_str.map(String::from),
+            ..Default::default()
+        })
         .await?;
 
     let (root_conn, incoming_rx) = client.into_parts();

@@ -18,6 +18,8 @@ pub struct StartParams {
     pub lifecycle: loopal_runtime::LifecycleMode,
     /// Agent type for fragment selection (e.g. "explore", "plan").
     pub agent_type: Option<String>,
+    /// Nesting depth (0 = root). Propagated from parent via IPC.
+    pub depth: Option<u32>,
 }
 
 /// Build a Kernel from config (production path: MCP, tools).

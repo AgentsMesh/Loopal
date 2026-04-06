@@ -3,7 +3,17 @@ use loopal_tool_api::ToolDefinition;
 
 #[test]
 fn includes_instructions() {
-    let result = build_system_prompt("You are helpful.", &[], "act", "/tmp", "", "", None, vec![]);
+    let result = build_system_prompt(
+        "You are helpful.",
+        &[],
+        "act",
+        "/tmp",
+        "",
+        "",
+        None,
+        vec![],
+        0,
+    );
     assert!(result.contains("You are helpful."));
 }
 
@@ -14,7 +24,7 @@ fn tool_schemas_not_in_system_prompt() {
         description: "Read a file".into(),
         input_schema: serde_json::json!({"type": "object"}),
     }];
-    let result = build_system_prompt("Base", &tools, "act", "/workspace", "", "", None, vec![]);
+    let result = build_system_prompt("Base", &tools, "act", "/workspace", "", "", None, vec![], 0);
     // Tool schemas should NOT appear in system prompt — they go via ChatParams.tools
     assert!(!result.contains("# Available Tools"));
     assert!(!result.contains("## read"));
@@ -24,7 +34,7 @@ fn tool_schemas_not_in_system_prompt() {
 
 #[test]
 fn includes_fragments() {
-    let result = build_system_prompt("Base", &[], "act", "/workspace", "", "", None, vec![]);
+    let result = build_system_prompt("Base", &[], "act", "/workspace", "", "", None, vec![], 0);
     // Core fragments should be present
     assert!(
         result.contains("Output Efficiency"),
@@ -49,6 +59,7 @@ fn cwd_available_in_subagent_prompt() {
         "",
         Some("general"),
         vec![],
+        0,
     );
     assert!(
         result.contains("/Users/dev/project"),
@@ -59,7 +70,17 @@ fn cwd_available_in_subagent_prompt() {
 #[test]
 fn includes_skills() {
     let skills = "# Available Skills\n- /commit: Generate a git commit message";
-    let result = build_system_prompt("Base", &[], "act", "/workspace", skills, "", None, vec![]);
+    let result = build_system_prompt(
+        "Base",
+        &[],
+        "act",
+        "/workspace",
+        skills,
+        "",
+        None,
+        vec![],
+        0,
+    );
     assert!(result.contains("Available Skills"));
     assert!(result.contains("/commit"));
 }
@@ -75,6 +96,7 @@ fn includes_memory() {
         "## Key Patterns\n- Use DI",
         None,
         vec![],
+        0,
     );
     assert!(result.contains("# Project Memory"));
     assert!(result.contains("Key Patterns"));
@@ -82,7 +104,7 @@ fn includes_memory() {
 
 #[test]
 fn empty_memory_no_section() {
-    let result = build_system_prompt("Base", &[], "act", "/workspace", "", "", None, vec![]);
+    let result = build_system_prompt("Base", &[], "act", "/workspace", "", "", None, vec![], 0);
     assert!(!result.contains("Project Memory"));
 }
 
@@ -94,7 +116,7 @@ fn tool_conditional_fragments() {
         description: "Execute commands".into(),
         input_schema: serde_json::json!({"type": "object"}),
     }];
-    let result = build_system_prompt("Base", &tools, "act", "/workspace", "", "", None, vec![]);
+    let result = build_system_prompt("Base", &tools, "act", "/workspace", "", "", None, vec![], 0);
     assert!(
         result.contains("Bash Tool Guidelines"),
         "bash guidelines missing when Bash tool present"
@@ -102,7 +124,7 @@ fn tool_conditional_fragments() {
 
     // Without Bash tool → no bash guidelines
     let result_no_bash =
-        build_system_prompt("Base", &[], "act", "/workspace", "", "", None, vec![]);
+        build_system_prompt("Base", &[], "act", "/workspace", "", "", None, vec![], 0);
     assert!(
         !result_no_bash.contains("Bash Tool Guidelines"),
         "bash guidelines should not appear without Bash"
@@ -121,6 +143,7 @@ fn feature_conditional_fragments() {
         "",
         None,
         vec!["memory".into()],
+        0,
     );
     assert!(
         with_memory.contains("Memory System"),
@@ -128,7 +151,7 @@ fn feature_conditional_fragments() {
     );
 
     // Without "memory" feature → no memory guidance
-    let without = build_system_prompt("Base", &[], "act", "/workspace", "", "", None, vec![]);
+    let without = build_system_prompt("Base", &[], "act", "/workspace", "", "", None, vec![], 0);
     assert!(
         !without.contains("Memory System"),
         "memory guidance should not appear without memory feature"
@@ -144,6 +167,7 @@ fn feature_conditional_fragments() {
         "",
         None,
         vec!["hooks".into()],
+        0,
     );
     assert!(
         with_hooks.contains("hooks"),
@@ -160,6 +184,7 @@ fn feature_conditional_fragments() {
         "",
         None,
         vec!["style_explanatory".into()],
+        0,
     );
     assert!(
         with_style.contains("Explanatory"),
@@ -176,6 +201,7 @@ fn feature_conditional_fragments() {
         "",
         None,
         vec!["subagent".into()],
+        0,
     );
     assert!(
         with_subagent.contains("Sub-Agent Usage"),
@@ -229,11 +255,30 @@ fn report_token_usage() {
     let mem = "## Architecture\n- 17 Rust crates\n- 200-line limit";
     let skills = "# Available Skills\n- /commit: Git commit\n- /review-pr: Review PR";
 
-    let bare = build_system_prompt("", &[], "act", "/project", "", "", None, vec![]);
-    let with_tools = build_system_prompt("", &tools, "act", "/project", "", "", None, vec![]);
-    let full_act = build_system_prompt(instr, &tools, "act", "/project", skills, mem, None, vec![]);
-    let full_plan =
-        build_system_prompt(instr, &tools, "plan", "/project", skills, mem, None, vec![]);
+    let bare = build_system_prompt("", &[], "act", "/project", "", "", None, vec![], 0);
+    let with_tools = build_system_prompt("", &tools, "act", "/project", "", "", None, vec![], 0);
+    let full_act = build_system_prompt(
+        instr,
+        &tools,
+        "act",
+        "/project",
+        skills,
+        mem,
+        None,
+        vec![],
+        0,
+    );
+    let full_plan = build_system_prompt(
+        instr,
+        &tools,
+        "plan",
+        "/project",
+        skills,
+        mem,
+        None,
+        vec![],
+        0,
+    );
 
     let t_bare = estimate_tokens(&bare);
     let t_tools = estimate_tokens(&with_tools);

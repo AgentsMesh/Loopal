@@ -75,10 +75,9 @@ pub struct AgentShared {
     pub hub_connection: Arc<Connection>,
     /// Initial working directory. Immutable after construction.
     pub cwd: PathBuf,
-    /// Current nesting depth (0 = root agent).
+    /// Current nesting depth (0 = root agent). Propagated via IPC so agents
+    /// can sense how deep they are in the delegation chain.
     pub depth: u32,
-    /// Maximum allowed nesting depth.
-    pub max_depth: u32,
     /// Name of the current agent.
     pub agent_name: String,
     /// Event sender for forwarding sub-agent events up the chain.

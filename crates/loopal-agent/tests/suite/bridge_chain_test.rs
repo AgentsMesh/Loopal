@@ -40,17 +40,11 @@ async fn full_chain_sub_agent_result_delivered_to_parent() {
     let client = AgentClient::new(client_t);
     client.initialize().await.expect("initialize");
     client
-        .start_agent(
-            fixture.path(),
-            None,
-            None,
-            Some("research this project"),
-            None,
-            false,
-            None,
-            None,
-            None,
-        )
+        .start_agent(&loopal_agent_client::StartAgentParams {
+            cwd: fixture.path().to_path_buf(),
+            prompt: Some("research this project".to_string()),
+            ..Default::default()
+        })
         .await
         .expect("start_agent");
 

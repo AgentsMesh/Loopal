@@ -64,6 +64,7 @@ pub(crate) async fn start_session(
         resume: params["resume"].as_str().map(String::from),
         lifecycle,
         agent_type: params["agent_type"].as_str().map(String::from),
+        depth: params["depth"].as_u64().map(|v| v as u32),
     };
 
     let mut config = load_config(&cwd)?;

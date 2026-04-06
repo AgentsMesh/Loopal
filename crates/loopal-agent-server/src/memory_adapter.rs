@@ -50,6 +50,7 @@ impl MemoryProcessor for ServerMemoryProcessor {
             permission_mode: None,
             target_hub: None,
             agent_type: None,
+            depth: self.shared.depth + 1,
         };
         spawn_agent(&self.shared, params).await?;
         info!("memory-maintainer agent spawned via Hub");

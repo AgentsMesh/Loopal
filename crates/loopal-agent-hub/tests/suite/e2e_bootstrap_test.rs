@@ -50,17 +50,12 @@ async fn full_bootstrap_hub_to_agent_roundtrip() {
 
     let cwd = std::env::temp_dir();
     client
-        .start_agent(
-            &cwd,
-            None, // use default model
-            Some("act"),
-            None, // no initial prompt
-            None,
-            true, // no sandbox
-            None,
-            None, // lifecycle: default
-            None, // agent_type
-        )
+        .start_agent(&loopal_agent_client::StartAgentParams {
+            cwd: cwd.clone(),
+            mode: Some("act".to_string()),
+            no_sandbox: true,
+            ..Default::default()
+        })
         .await
         .expect("start_agent should work");
 

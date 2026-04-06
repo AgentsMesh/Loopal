@@ -33,6 +33,16 @@ Scale concurrency to task complexity:
 - **Avoid redundant exploration.** Don't split one search across many explore agents — give one agent a comprehensive, well-scoped prompt instead. Reserve multiple explore agents for genuinely separate areas of the codebase.
 - **Consider the cost.** A complex multi-area refactoring may justify several parallel agents; a focused bug investigation rarely does. Match the parallelism to the real breadth of the work.
 
+## Delegation Depth
+
+Your current depth in the agent tree is **{{ agent_depth }}** (0 = root, 1 = first-level sub-agent, etc.). Every sub-agent you spawn can itself spawn further sub-agents. This makes cascading delegation a real risk — if every agent subdivides its work, agent count grows exponentially and each individual agent ends up doing very little useful work.
+
+**The deeper you are, the more you should prefer doing the work yourself:**
+- At depth 0 (root): spawning sub-agents for broad tasks is natural.
+- At depth 1+: you were created to handle a specific scope. Consider whether your tools (Glob, Grep, Read, Edit, Bash) are sufficient before spawning children.
+- Only delegate further if your assigned scope genuinely contains multiple independent sub-problems that would each benefit from a separate context.
+- Give children **narrowly scoped, concrete tasks** — not vague directives that they would need to subdivide again.
+
 ## Agent Types
 
 - **explore**: READ-ONLY. Fast at finding files, searching code, reading content. Cannot modify anything.

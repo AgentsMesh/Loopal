@@ -161,6 +161,7 @@ pub async fn handle_spawn_agent(
     let prompt = params["prompt"].as_str().map(String::from);
     let permission_mode = params["permission_mode"].as_str().map(String::from);
     let agent_type = params["agent_type"].as_str().map(String::from);
+    let depth = params["depth"].as_u64().map(|v| v as u32);
 
     // Parent: use explicit "parent" field from params if present (cross-hub),
     // otherwise use from_agent (local spawn).
@@ -182,6 +183,7 @@ pub async fn handle_spawn_agent(
             parent,
             permission_mode,
             agent_type,
+            depth,
         )
         .await
     });

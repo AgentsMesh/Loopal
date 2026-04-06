@@ -67,7 +67,6 @@ fn agent_tool_context_inner(
         hub_connection,
         cwd,
         depth: 0,
-        max_depth: 3,
         agent_name: "test".into(),
         parent_event_tx: None,
         cancel_token: None,

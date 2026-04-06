@@ -21,6 +21,8 @@ pub struct SpawnParams {
     pub target_hub: Option<String>,
     /// Agent type for fragment selection (e.g. "explore", "plan").
     pub agent_type: Option<String>,
+    /// Nesting depth of the child agent (parent depth + 1).
+    pub depth: u32,
 }
 
 /// Result returned from Hub after spawning.
@@ -48,6 +50,7 @@ pub async fn spawn_agent(
         "prompt": params.prompt,
         "permission_mode": params.permission_mode,
         "agent_type": params.agent_type,
+        "depth": params.depth,
     });
     if let Some(ref hub) = params.target_hub {
         request["target_hub"] = json!(hub);

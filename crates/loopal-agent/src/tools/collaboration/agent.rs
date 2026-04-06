@@ -93,12 +93,6 @@ async fn action_spawn(
         .get("target_hub")
         .and_then(|v| v.as_str())
         .map(String::from);
-    if shared.depth >= shared.max_depth {
-        return Ok(ToolResult::error(format!(
-            "Maximum nesting depth ({}) reached",
-            shared.max_depth
-        )));
-    }
 
     let mut config = subagent_type
         .and_then(|t| load_agent_configs(&shared.cwd).remove(t))
@@ -131,6 +125,7 @@ async fn action_spawn(
             permission_mode: Some(perm_mode.to_string()),
             target_hub,
             agent_type: subagent_type.map(String::from),
+            depth: shared.depth + 1,
         },
     )
     .await;

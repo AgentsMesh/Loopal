@@ -9,5 +9,5 @@ mod client;
 mod process;
 
 pub use bridge::{BridgeHandles, start_bridge};
-pub use client::{AgentClient, AgentClientEvent};
+pub use client::{AgentClient, AgentClientEvent, StartAgentParams};
 pub use process::AgentProcess;

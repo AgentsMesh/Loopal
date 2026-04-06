@@ -15,6 +15,7 @@ pub fn build_system_prompt(
     memory: &str,
     agent_type: Option<&str>,
     features: Vec<String>,
+    agent_depth: u32,
 ) -> String {
     let mut registry = FragmentRegistry::new(system_fragments());
 
@@ -54,6 +55,7 @@ pub fn build_system_prompt(
         features,
         agent_name: None,
         agent_type: agent_type.map(String::from),
+        agent_depth,
     };
 
     builder.build(&ctx)

@@ -1,6 +1,6 @@
 //! IPC client — wraps `Connection` with agent protocol methods.
 
-use std::path::Path;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use serde_json::Value;
@@ -11,6 +11,22 @@ use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
 use loopal_protocol::{AgentEvent, ControlCommand, Envelope, UserQuestionResponse};
+
+/// Parameters for `agent/start` IPC request.
+#[derive(Debug, Default)]
+pub struct StartAgentParams {
+    pub cwd: PathBuf,
+    pub model: Option<String>,
+    pub mode: Option<String>,
+    pub prompt: Option<String>,
+    pub permission_mode: Option<String>,
+    pub no_sandbox: bool,
+    pub resume: Option<String>,
+    pub lifecycle: Option<String>,
+    pub agent_type: Option<String>,
+    /// Nesting depth (0 = root). Propagated from parent.
+    pub depth: Option<u32>,
+}
 
 /// High-level agent IPC client.
 pub struct AgentClient {
@@ -44,29 +60,18 @@ impl AgentClient {
     }
 
     /// Send `agent/start` to begin the agent loop.
-    #[allow(clippy::too_many_arguments)]
-    pub async fn start_agent(
-        &self,
-        cwd: &Path,
-        model: Option<&str>,
-        mode: Option<&str>,
-        prompt: Option<&str>,
-        permission_mode: Option<&str>,
-        no_sandbox: bool,
-        resume: Option<&str>,
-        lifecycle: Option<&str>,
-        agent_type: Option<&str>,
-    ) -> anyhow::Result<String> {
+    pub async fn start_agent(&self, p: &StartAgentParams) -> anyhow::Result<String> {
         let params = serde_json::json!({
-            "cwd": cwd.to_string_lossy(),
-            "model": model,
-            "mode": mode,
-            "prompt": prompt,
-            "permission_mode": permission_mode,
-            "no_sandbox": no_sandbox,
-            "resume": resume,
-            "lifecycle": lifecycle,
-            "agent_type": agent_type,
+            "cwd": p.cwd.to_string_lossy(),
+            "model": p.model,
+            "mode": p.mode,
+            "prompt": p.prompt,
+            "permission_mode": p.permission_mode,
+            "no_sandbox": p.no_sandbox,
+            "resume": p.resume,
+            "lifecycle": p.lifecycle,
+            "agent_type": p.agent_type,
+            "depth": p.depth,
         });
         let result = self
             .connection

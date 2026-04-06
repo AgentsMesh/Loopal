@@ -40,6 +40,8 @@ pub struct PromptContext {
     /// Agent type for fragment selection. Some(_) implies this is a sub-agent.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub agent_type: Option<String>,
+    /// Nesting depth (0 = root). Available as `{{ agent_depth }}` in templates.
+    pub agent_depth: u32,
 }
 
 impl PromptContext {
@@ -66,6 +68,7 @@ impl Default for PromptContext {
             features: Vec::new(),
             agent_name: None,
             agent_type: None,
+            agent_depth: 0,
         }
     }
 }

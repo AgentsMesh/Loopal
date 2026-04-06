@@ -1,9 +1,8 @@
-/// Tests for batch-based scroll detection: mouse-wheel bursts vs keyboard arrows.
+/// Tests for scroll behavior: mouse scroll events vs keyboard arrow keys.
 ///
-/// Mouse wheel (via `\x1b[?1007h`) produces ≥2 arrow events per batch → scroll.
-/// A single keyboard arrow press produces 1 event per batch → history navigation.
-/// The batch detection logic lives in `tui_loop.rs`; these tests verify the
-/// observable state after batch processing via direct App manipulation.
+/// Mouse scroll uses dedicated `AppEvent::ScrollUp/Down` (via `EnableMouseCapture`).
+/// Keyboard Up/Down always routes to history navigation through `handle_key`.
+/// The two paths are completely independent — no heuristic detection needed.
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use loopal_protocol::ControlCommand;
@@ -33,69 +32,57 @@ fn key(code: KeyCode) -> KeyEvent {
     KeyEvent::new(code, KeyModifiers::NONE)
 }
 
-/// Simulate mouse-wheel scroll burst: multiple arrow events applied as scroll.
-fn apply_scroll_burst(app: &mut App, code: KeyCode, count: usize) {
-    for _ in 0..count {
-        match code {
-            KeyCode::Up => app.content_scroll.offset = app.content_scroll.offset.saturating_add(3),
-            KeyCode::Down => {
-                app.content_scroll.offset = app.content_scroll.offset.saturating_sub(3)
-            }
-            _ => {}
-        }
-    }
-}
-
-// --- Mouse wheel burst detection (≥2 arrows → scroll) ---
+// --- Mouse scroll (ContentScroll direct manipulation) ---
 
 #[test]
-fn test_scroll_burst_up_increases_offset() {
+fn test_scroll_up_increases_offset() {
     let mut app = make_app();
     app.input_history.push("should not appear".into());
-    // Simulate a burst of 3 Up events (mouse wheel)
-    apply_scroll_burst(&mut app, KeyCode::Up, 3);
-    assert_eq!(
-        app.content_scroll.offset, 9,
-        "3 Up scroll events should add 9"
-    );
+    // Mouse scroll events directly modify content_scroll, never touching history.
+    app.content_scroll.scroll_up(3);
+    app.content_scroll.scroll_up(3);
+    app.content_scroll.scroll_up(3);
+    assert_eq!(app.content_scroll.offset, 9, "3 scroll_up(3) should add 9");
     assert!(app.input.is_empty(), "scroll should NOT navigate history");
 }
 
 #[test]
-fn test_scroll_burst_down_decreases_offset() {
+fn test_scroll_down_decreases_offset() {
     let mut app = make_app();
     app.content_scroll.offset = 30;
-    apply_scroll_burst(&mut app, KeyCode::Down, 2);
+    app.content_scroll.scroll_down(3);
+    app.content_scroll.scroll_down(3);
     assert_eq!(
         app.content_scroll.offset, 24,
-        "2 Down scroll events should reduce by 6"
+        "2 scroll_down(3) should reduce by 6"
     );
 }
 
 #[test]
-fn test_scroll_burst_down_clamps_at_zero() {
+fn test_scroll_down_clamps_at_zero() {
     let mut app = make_app();
     app.content_scroll.offset = 2;
-    apply_scroll_burst(&mut app, KeyCode::Down, 3);
+    app.content_scroll.scroll_down(3);
+    app.content_scroll.scroll_down(3);
+    app.content_scroll.scroll_down(3);
     assert_eq!(
         app.content_scroll.offset, 0,
         "scroll_offset should not go negative"
     );
 }
 
-// --- Single arrow → keyboard → history ---
+// --- Keyboard Up/Down → history ---
 
 #[test]
-fn test_single_up_navigates_history() {
+fn test_up_navigates_history() {
     let mut app = make_app();
     app.input_history.push("previous".into());
-    // Single Up event → keyboard → history navigation
     handle_key(&mut app, key(KeyCode::Up));
-    assert_eq!(app.input, "previous", "single Up should browse history");
+    assert_eq!(app.input, "previous", "Up should browse history");
 }
 
 #[test]
-fn test_single_down_navigates_history_forward() {
+fn test_down_navigates_history_forward() {
     let mut app = make_app();
     app.input_history.push("first".into());
     app.input_history.push("second".into());
@@ -109,10 +96,11 @@ fn test_single_down_navigates_history_forward() {
 // --- Scroll does not affect history ---
 
 #[test]
-fn test_scroll_burst_does_not_touch_history() {
+fn test_scroll_does_not_touch_history() {
     let mut app = make_app();
     app.input_history.push("preserved".into());
-    apply_scroll_burst(&mut app, KeyCode::Up, 5);
+    app.content_scroll.scroll_up(3);
+    app.content_scroll.scroll_up(3);
     assert!(app.content_scroll.offset > 0);
     assert!(app.input.is_empty(), "scroll must not touch input");
     assert!(

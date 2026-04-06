@@ -1,4 +1,4 @@
-use crossterm::event::{self, Event as CrosstermEvent, KeyEvent};
+use crossterm::event::{self, Event as CrosstermEvent, KeyEvent, MouseEventKind};
 use loopal_protocol::AgentEvent;
 use tokio::sync::mpsc;
 
@@ -9,6 +9,10 @@ use crate::input::paste::PasteResult;
 pub enum AppEvent {
     /// Keyboard / terminal event
     Key(KeyEvent),
+    /// Mouse scroll up (wheel toward user → content scrolls toward top)
+    ScrollUp,
+    /// Mouse scroll down (wheel away from user → content scrolls toward bottom)
+    ScrollDown,
     /// Resize event
     Resize(u16, u16),
     /// Agent event from the runtime
@@ -38,37 +42,58 @@ impl EventHandler {
         // blocks the agent-side `event_tx.send().await` — deadlock.
         let (tx, rx) = mpsc::channel(4096);
 
-        // Spawn crossterm event polling task
+        // Spawn crossterm event polling task.
+        //
+        // Reads ALL buffered events in a single `spawn_blocking` call so
+        // that rapid events (e.g. paste sequences) land in the channel
+        // together, improving batch processing in `tui_loop.rs`.
         let term_tx = tx.clone();
         tokio::spawn(async move {
             loop {
-                // Poll crossterm with a 50ms timeout to yield periodically
-                match tokio::task::spawn_blocking(|| {
-                    if event::poll(std::time::Duration::from_millis(50)).unwrap_or(false) {
-                        event::read().ok()
-                    } else {
-                        None
+                let result = tokio::task::spawn_blocking(|| {
+                    // Wait up to 50ms for the first event.
+                    if !event::poll(std::time::Duration::from_millis(50)).unwrap_or(false) {
+                        return Vec::new();
                     }
+                    let mut events = Vec::new();
+                    if let Ok(ev) = event::read() {
+                        events.push(ev);
+                    }
+                    // Drain any additional buffered events without waiting.
+                    while event::poll(std::time::Duration::ZERO).unwrap_or(false) {
+                        match event::read() {
+                            Ok(ev) => events.push(ev),
+                            Err(_) => break,
+                        }
+                    }
+                    events
                 })
-                .await
-                {
-                    Ok(Some(CrosstermEvent::Key(key))) => {
-                        if term_tx.send(AppEvent::Key(key)).await.is_err() {
-                            break;
+                .await;
+
+                match result {
+                    Ok(events) if events.is_empty() => continue,
+                    Ok(events) => {
+                        for ev in events {
+                            let app_event = match ev {
+                                CrosstermEvent::Key(key) => Some(AppEvent::Key(key)),
+                                CrosstermEvent::Mouse(mouse) => match mouse.kind {
+                                    MouseEventKind::ScrollUp => Some(AppEvent::ScrollUp),
+                                    MouseEventKind::ScrollDown => Some(AppEvent::ScrollDown),
+                                    _ => None,
+                                },
+                                CrosstermEvent::Resize(w, h) => Some(AppEvent::Resize(w, h)),
+                                CrosstermEvent::Paste(text) => {
+                                    Some(AppEvent::Paste(PasteResult::Text(text)))
+                                }
+                                _ => None,
+                            };
+                            if let Some(app_event) = app_event
+                                && term_tx.send(app_event).await.is_err()
+                            {
+                                return;
+                            }
                         }
                     }
-                    Ok(Some(CrosstermEvent::Resize(w, h))) => {
-                        if term_tx.send(AppEvent::Resize(w, h)).await.is_err() {
-                            break;
-                        }
-                    }
-                    Ok(Some(CrosstermEvent::Paste(text))) => {
-                        let result = PasteResult::Text(text);
-                        if term_tx.send(AppEvent::Paste(result)).await.is_err() {
-                            break;
-                        }
-                    }
-                    Ok(_) => {}
                     Err(_) => break,
                 }
             }

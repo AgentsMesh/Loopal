@@ -4,7 +4,6 @@ use std::io;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use crossterm::event::KeyCode;
 use ratatui::prelude::*;
 
 use loopal_protocol::{AgentEvent, AgentEventPayload};
@@ -61,36 +60,14 @@ where
             batch.push(event);
         }
 
-        // Pre-scan: count Up/Down arrow key events in this batch.
-        // Mouse wheel (via \x1b[?1007h]) generates ≥2 arrows per tick;
-        // a single keyboard press generates exactly 1.
-        let arrow_count = batch
-            .iter()
-            .filter(|e| {
-                matches!(
-                    e,
-                    AppEvent::Key(k) if matches!(k.code, KeyCode::Up | KeyCode::Down)
-                )
-            })
-            .count();
-        let is_scroll_burst = arrow_count >= 2;
-
         let mut should_quit = false;
         for event in batch {
             match event {
-                AppEvent::Key(key)
-                    if is_scroll_burst && matches!(key.code, KeyCode::Up | KeyCode::Down) =>
-                {
-                    // Mouse-wheel burst → scroll content, bypass key handler.
-                    match key.code {
-                        KeyCode::Up => {
-                            app.content_scroll.scroll_up(3);
-                        }
-                        KeyCode::Down => {
-                            app.content_scroll.scroll_down(3);
-                        }
-                        _ => unreachable!(),
-                    }
+                AppEvent::ScrollUp => {
+                    app.content_scroll.scroll_up(3);
+                }
+                AppEvent::ScrollDown => {
+                    app.content_scroll.scroll_down(3);
                 }
                 AppEvent::Key(key) => {
                     should_quit = handle_key_action(app, key, &events).await;

@@ -69,11 +69,11 @@ impl LineCache {
         self.lines.len()
     }
 
-    /// Return the tail of cached lines for the visible window.
-    /// Only clones the lines needed for rendering, not the entire history.
-    pub fn tail(&self, max_lines: usize) -> &[Line<'static>] {
-        let start = self.lines.len().saturating_sub(max_lines);
-        &self.lines[start..]
+    /// Return a slice of cached lines at an absolute position.
+    pub fn slice(&self, start: usize, len: usize) -> &[Line<'static>] {
+        let s = start.min(self.lines.len());
+        let e = (s + len).min(self.lines.len());
+        &self.lines[s..e]
     }
 
     /// Total number of cached lines.

@@ -83,8 +83,7 @@ pub(crate) async fn terminate_focused_agent(app: &mut App) {
     app.session.interrupt_agent(&name);
     if active == name {
         app.session.exit_agent_view();
-        app.scroll_offset = 0;
-        app.line_cache = crate::views::progress::LineCache::new();
+        app.content_scroll.reset();
     }
     app.focused_agent = None;
     // If no panels have content, exit panel mode

@@ -14,8 +14,7 @@ use loopal_session::SessionController;
 use loopal_tool_background::BackgroundTaskStore;
 
 use crate::command::CommandRegistry;
-use crate::input::scroll_debounce::ArrowDebounce;
-use crate::views::progress::LineCache;
+use crate::views::progress::ContentScroll;
 
 /// Main application state — UI-only fields + session controller handle.
 pub struct App {
@@ -23,7 +22,6 @@ pub struct App {
     pub exiting: bool,
     pub input: String,
     pub input_cursor: usize,
-    pub scroll_offset: u16,
     pub input_history: Vec<String>,
     pub history_index: Option<usize>,
     /// Images attached to the current input (pending submit).
@@ -50,8 +48,6 @@ pub struct App {
     pub focused_bg_task: Option<String>,
     /// Which UI region owns keyboard focus.
     pub focus_mode: FocusMode,
-    /// Arrow-key debounce state for mouse-wheel vs keyboard detection.
-    pub(crate) arrow_debounce: ArrowDebounce,
     /// Scroll offset for the agent panel (index of first visible agent).
     pub agent_panel_offset: usize,
 
@@ -63,8 +59,8 @@ pub struct App {
     // === Session Controller (observable + interactive) ===
     pub session: SessionController,
 
-    // === Render optimization ===
-    pub line_cache: LineCache,
+    // === Content area scroll + render state ===
+    pub content_scroll: ContentScroll,
 }
 
 impl App {
@@ -82,7 +78,6 @@ impl App {
             exiting: false,
             input: String::new(),
             input_cursor: 0,
-            scroll_offset: 0,
             input_history: Vec::new(),
             history_index: None,
             pending_images: Vec::new(),
@@ -97,12 +92,11 @@ impl App {
             focused_agent: None,
             focused_bg_task: None,
             focus_mode: FocusMode::default(),
-            arrow_debounce: ArrowDebounce::default(),
             agent_panel_offset: 0,
             bg_store: BackgroundTaskStore::new(),
             bg_snapshots: Vec::new(),
             session,
-            line_cache: LineCache::new(),
+            content_scroll: ContentScroll::new(),
         }
     }
 
@@ -123,7 +117,7 @@ impl App {
         }
         self.input_cursor = 0;
         self.input_scroll = 0;
-        self.scroll_offset = 0;
+        self.content_scroll.to_bottom();
         Some(UserContent {
             text,
             images,

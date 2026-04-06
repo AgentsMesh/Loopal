@@ -10,7 +10,6 @@ use crate::key_dispatch_ops::{
     cycle_panel_focus, enter_panel, handle_effect, handle_sub_page_confirm, panel_tab,
     push_to_inbox, terminate_focused_agent,
 };
-use crate::views::progress::LineCache;
 
 /// Process a single key event and return `true` if the TUI should quit.
 pub(crate) async fn handle_key_action(
@@ -110,16 +109,14 @@ pub(crate) async fn handle_key_action(
                 && app.session.enter_agent_view(&name)
             {
                 app.focus_mode = crate::app::FocusMode::Input;
-                app.scroll_offset = 0;
-                app.line_cache = LineCache::new();
+                app.content_scroll.reset();
                 app.last_esc_time = None;
             }
             false
         }
         InputAction::ExitAgentView => {
             app.session.exit_agent_view();
-            app.scroll_offset = 0;
-            app.line_cache = LineCache::new();
+            app.content_scroll.reset();
             app.last_esc_time = None;
             false
         }
@@ -187,14 +184,5 @@ pub(crate) async fn handle_key_action(
             false
         }
         InputAction::None => false,
-        InputAction::StartArrowDebounce => {
-            let tx = events.sender();
-            let wait = crate::input::scroll_debounce::burst_detect_duration();
-            tokio::spawn(async move {
-                tokio::time::sleep(wait).await;
-                let _ = tx.send(crate::event::AppEvent::ArrowDebounceTimeout).await;
-            });
-            false
-        }
     }
 }

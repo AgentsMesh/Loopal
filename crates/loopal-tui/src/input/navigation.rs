@@ -31,7 +31,6 @@ pub(super) fn move_cursor_right(app: &mut App) {
 
 /// Up: multiline navigation first, then history browse.
 pub(super) fn handle_up(app: &mut App) -> InputAction {
-    app.scroll_offset = 0;
     if multiline::is_multiline(&app.input, DEFAULT_WRAP_WIDTH)
         && let Some(new_cursor) =
             multiline::cursor_up(&app.input, app.input_cursor, DEFAULT_WRAP_WIDTH)
@@ -55,7 +54,6 @@ pub(super) fn handle_up(app: &mut App) -> InputAction {
 
 /// Down: multiline navigation first, then history browse.
 pub(super) fn handle_down(app: &mut App) -> InputAction {
-    app.scroll_offset = 0;
     if multiline::is_multiline(&app.input, DEFAULT_WRAP_WIDTH)
         && let Some(new_cursor) =
             multiline::cursor_down(&app.input, app.input_cursor, DEFAULT_WRAP_WIDTH)

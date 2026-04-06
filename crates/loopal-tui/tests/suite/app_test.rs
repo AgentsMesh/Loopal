@@ -28,7 +28,7 @@ fn test_app_new_initializes_correctly() {
     assert!(!app.exiting);
     assert!(app.input.is_empty());
     assert_eq!(app.input_cursor, 0);
-    assert_eq!(app.scroll_offset, 0);
+    assert_eq!(app.content_scroll.offset, 0);
     let state = app.session.lock();
     let conv = state.active_conversation();
     assert!(conv.messages.is_empty());

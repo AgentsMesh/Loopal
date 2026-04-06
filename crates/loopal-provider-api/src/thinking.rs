@@ -15,6 +15,16 @@ pub enum ThinkingCapability {
     ThinkingBudget,
 }
 
+impl ThinkingCapability {
+    /// Whether this capability forbids assistant-message prefill when active.
+    ///
+    /// Anthropic's API rejects conversations ending with an assistant message
+    /// when thinking is enabled. OpenAI and Google allow prefill regardless.
+    pub fn forbids_prefill(&self) -> bool {
+        matches!(self, Self::BudgetRequired | Self::Adaptive)
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ThinkingConfig {

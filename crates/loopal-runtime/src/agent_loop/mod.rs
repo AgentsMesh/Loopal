@@ -33,6 +33,7 @@ mod tools_inject;
 pub(crate) mod tools_plan;
 mod tools_resolve;
 pub mod turn_context;
+mod turn_continue;
 mod turn_exec;
 pub(crate) mod turn_metrics;
 pub mod turn_observer;

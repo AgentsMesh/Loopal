@@ -51,4 +51,23 @@ impl AgentLoopRunner {
             debug_dump_dir: Some(loopal_config::tmp_dir()),
         })
     }
+
+    /// Whether the current model requires a user-message suffix for continuation.
+    ///
+    /// Returns true only when thinking is active AND the provider forbids
+    /// assistant-message prefill (currently Anthropic only). OpenAI and Google
+    /// reasoning models allow prefill regardless of thinking state, so we
+    /// preserve the higher-quality mid-sentence continuation for them.
+    pub(super) fn needs_continuation_injection(&self) -> bool {
+        let capability = get_thinking_capability(self.params.config.model());
+        if !capability.forbids_prefill() {
+            return false;
+        }
+        resolve_thinking_config(
+            &self.model_config.thinking,
+            capability,
+            self.model_config.max_output_tokens,
+        )
+        .is_some()
+    }
 }

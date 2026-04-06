@@ -83,6 +83,7 @@ impl AgentLoopRunner {
                         max_continuations: self.params.harness.max_auto_continuations,
                     })
                     .await?;
+                    self.push_continuation_if_thinking();
                     continue;
                 }
                 return Ok(TurnOutput { output: last_text });
@@ -125,6 +126,7 @@ impl AgentLoopRunner {
                         max_continuations: self.params.harness.max_auto_continuations,
                     })
                     .await?;
+                    self.push_continuation_if_thinking();
                     continue;
                 }
                 return Ok(TurnOutput { output: last_text });
@@ -135,9 +137,7 @@ impl AgentLoopRunner {
                     && let Some(feedback) = self.run_stop_hooks().await
                 {
                     stop_feedback_count += 1;
-                    self.params
-                        .store
-                        .append_warnings_to_last_user(vec![feedback]);
+                    self.push_stop_feedback(feedback);
                     continue;
                 }
                 return Ok(TurnOutput { output: last_text });

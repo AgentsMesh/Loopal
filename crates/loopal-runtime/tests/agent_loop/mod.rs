@@ -63,6 +63,7 @@ mod retry_cancel_test;
 mod run_test;
 mod stream_truncation_edge_test;
 mod stream_truncation_test;
+mod thinking_continue_test;
 mod tools_test;
 mod turn_completion_edge_test;
 mod turn_completion_test;

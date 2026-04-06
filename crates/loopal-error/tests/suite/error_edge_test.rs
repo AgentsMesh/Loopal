@@ -48,6 +48,29 @@ fn test_api_400_invalid_request_not_retryable() {
 }
 
 #[test]
+fn test_prefill_rejection_not_context_overflow() {
+    // Anthropic returns this when thinking mode is active but conversation
+    // ends with an assistant message (prefill not supported).
+    let body = concat!(
+        r#"{"error":{"message":"This model does not support assistant"#,
+        r#" message prefill. The conversation must end with a user"#,
+        r#" message.","type":"invalid_request_error"},"type":"error"}"#,
+    );
+    let err = ProviderError::Api {
+        status: 400,
+        message: body.into(),
+    };
+    assert!(
+        !err.is_context_overflow(),
+        "prefill rejection must not be classified as context overflow"
+    );
+    assert!(
+        !err.is_retryable(),
+        "prefill rejection is deterministic, not retryable"
+    );
+}
+
+#[test]
 fn test_api_500_not_context_overflow() {
     let err = ProviderError::Api {
         status: 500,

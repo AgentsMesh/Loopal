@@ -13,10 +13,11 @@ impl ProviderError {
             // Network-level errors (connection reset, timeout, DNS) are transient.
             ProviderError::Http(_) => true,
             ProviderError::Api { status, message } => {
-                // 400 with context overflow keywords is deterministic — never retryable
+                // 400 with context overflow keywords is deterministic — never retryable.
+                // Generic "invalid_request_error" is excluded: it covers many
+                // non-overflow 400s (prefill rejection, malformed blocks, etc.).
                 if *status == 400
-                    && (message.contains("invalid_request_error")
-                        || message.contains("prompt is too long")
+                    && (message.contains("prompt is too long")
                         || message.contains("maximum context length"))
                 {
                     return false;

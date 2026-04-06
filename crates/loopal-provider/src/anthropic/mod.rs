@@ -177,11 +177,12 @@ impl AnthropicProvider {
             .unwrap_or_else(|_| "failed to read body".into());
         tracing::error!(status = status.as_u16(), body = %text, "API error");
 
-        // Detect context overflow: 400 + known prompt-too-long patterns
+        // Detect context overflow: 400 + known prompt-too-long patterns.
+        // Intentionally excludes "invalid_request_error" — that type covers
+        // many 400 errors (prefill rejection, malformed blocks, etc.) and
+        // must not be conflated with context overflow.
         if status.as_u16() == 400
-            && (text.contains("prompt is too long")
-                || text.contains("maximum context length")
-                || text.contains("invalid_request_error"))
+            && (text.contains("prompt is too long") || text.contains("maximum context length"))
         {
             return ProviderError::ContextOverflow { message: text }.into();
         }

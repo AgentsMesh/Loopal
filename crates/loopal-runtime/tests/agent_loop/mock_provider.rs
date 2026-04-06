@@ -28,11 +28,28 @@ fn build_params(
     messages: Vec<loopal_message::Message>,
     permission_mode: PermissionMode,
 ) -> AgentLoopParams {
-    AgentLoopParams {
-        config: AgentConfig {
+    build_params_with_config(
+        kernel,
+        frontend,
+        fixture,
+        messages,
+        AgentConfig {
             permission_mode,
             ..Default::default()
         },
+    )
+}
+
+/// Build AgentLoopParams with a fully custom `AgentConfig`.
+fn build_params_with_config(
+    kernel: Arc<Kernel>,
+    frontend: Arc<dyn loopal_runtime::AgentFrontend>,
+    fixture: &TestFixture,
+    messages: Vec<loopal_message::Message>,
+    config: AgentConfig,
+) -> AgentLoopParams {
+    AgentLoopParams {
+        config,
         deps: AgentDeps {
             kernel,
             frontend,
@@ -97,6 +114,15 @@ pub fn make_runner_with_mock_provider(
 pub fn make_multi_runner(
     calls: Vec<Vec<Result<StreamChunk, LoopalError>>>,
 ) -> (AgentLoopRunner, mpsc::Receiver<AgentEvent>) {
+    make_multi_runner_with_config(calls, AgentConfig::default())
+}
+
+/// Like `make_multi_runner` but accepts a custom `AgentConfig` (e.g. for
+/// testing with `ThinkingConfig::Disabled`).
+pub fn make_multi_runner_with_config(
+    calls: Vec<Vec<Result<StreamChunk, LoopalError>>>,
+    config: AgentConfig,
+) -> (AgentLoopRunner, mpsc::Receiver<AgentEvent>) {
     let fixture = TestFixture::new();
     let (event_tx, event_rx) = mpsc::channel(64);
     let (_mbox_tx, mailbox_rx) = mpsc::channel::<Envelope>(16);
@@ -112,12 +138,12 @@ pub fn make_multi_runner(
     ));
     let mut kernel = Kernel::new(Settings::default()).unwrap();
     kernel.register_provider(Arc::new(MultiCallProvider::new(calls)) as Arc<dyn Provider>);
-    let params = build_params(
+    let params = build_params_with_config(
         Arc::new(kernel),
         frontend,
         &fixture,
         vec![loopal_message::Message::user("go")],
-        PermissionMode::Bypass,
+        config,
     );
     (AgentLoopRunner::new(params), event_rx)
 }

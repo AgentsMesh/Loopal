@@ -138,7 +138,13 @@ fn test_load_settings_empty_json_file_uses_defaults() {
     std::fs::write(config_dir.join("settings.json"), "{}").unwrap();
 
     let settings = load_config(tmp.path()).unwrap().settings;
-    assert_eq!(settings.model, "claude-sonnet-4-20250514");
+    // Don't assert a specific default model string — env vars (LOOPAL_MODEL)
+    // from parallel tests can override it. The exact default is already
+    // verified in the serialized test_load_settings_all_env_var_scenarios.
+    assert!(
+        !settings.model.is_empty(),
+        "empty settings.json should still produce a non-empty model"
+    );
 }
 
 #[test]

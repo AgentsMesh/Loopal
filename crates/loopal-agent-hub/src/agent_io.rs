@@ -158,8 +158,8 @@ pub fn start_agent_io(
         }
         crate::spawn_manager::spawn_completion_bridge(&n, conn3, completion_rx);
         info!(agent = %n, "agent registered in Hub");
-        let output = agent_io_loop(hub2, conn, rx, n.clone()).await;
-        finish_and_deliver(&hub, &n2, output).await;
+        let output = agent_io_loop(hub2, conn.clone(), rx, n.clone()).await;
+        finish_and_deliver(&hub, &n2, output, &conn).await;
         info!(agent = %n2, "agent IO loop ended");
     });
 }
@@ -175,8 +175,8 @@ pub fn spawn_io_loop(
     let n = name.to_string();
     let n2 = name.to_string();
     tokio::spawn(async move {
-        let output = agent_io_loop(hub2, conn, rx, n.clone()).await;
-        finish_and_deliver(&hub, &n2, output).await;
+        let output = agent_io_loop(hub2, conn.clone(), rx, n.clone()).await;
+        finish_and_deliver(&hub, &n2, output, &conn).await;
         info!(agent = %n2, "agent IO loop ended");
     });
 }

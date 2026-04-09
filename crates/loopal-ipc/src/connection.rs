@@ -83,10 +83,24 @@ impl Connection {
                         }
                     }
                     IncomingMessage::Request { id, method, params } => {
-                        let _ = tx.send(Incoming::Request { id, method, params }).await;
+                        if tx
+                            .send(Incoming::Request { id, method, params })
+                            .await
+                            .is_err()
+                        {
+                            debug!("IPC reader: incoming channel closed, exiting");
+                            break;
+                        }
                     }
                     IncomingMessage::Notification { method, params } => {
-                        let _ = tx.send(Incoming::Notification { method, params }).await;
+                        if tx
+                            .send(Incoming::Notification { method, params })
+                            .await
+                            .is_err()
+                        {
+                            debug!("IPC reader: incoming channel closed, exiting");
+                            break;
+                        }
                     }
                 }
             }

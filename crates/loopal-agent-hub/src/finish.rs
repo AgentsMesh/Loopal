@@ -4,15 +4,22 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 
+use loopal_ipc::connection::Connection;
 use loopal_protocol::{Envelope, QualifiedAddress};
 
 use crate::hub::Hub;
 
-/// Emit agent finished, unregister, and deliver completion to parent.
+/// Emit agent finished, unregister, deliver completion to parent, and close the
+/// connection so the child process receives EOF on stdin and can exit.
 ///
 /// Handles both local parents (via completion_tx) and remote parents
 /// (via MetaHub uplink). Called after the agent IO loop exits.
-pub(crate) async fn finish_and_deliver(hub: &Arc<Mutex<Hub>>, name: &str, output: Option<String>) {
+pub(crate) async fn finish_and_deliver(
+    hub: &Arc<Mutex<Hub>>,
+    name: &str,
+    output: Option<String>,
+    conn: &Arc<Connection>,
+) {
     let output_text = output.as_deref().unwrap_or("(no output)").to_string();
 
     let (pending, uplink, parent_name) = {
@@ -47,4 +54,9 @@ pub(crate) async fn finish_and_deliver(hub: &Arc<Mutex<Hub>>, name: &str, output
             }
         }
     }
+
+    // Close the transport writer so the child process receives EOF on stdin.
+    // This must happen AFTER delivery — the child's blocking stdin read will
+    // return, allowing the process to exit cleanly.
+    conn.close().await;
 }

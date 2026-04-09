@@ -14,6 +14,8 @@ mod ipc_acceptance_test;
 mod jsonrpc_test;
 #[path = "suite/protocol_test.rs"]
 mod protocol_test;
+#[path = "suite/reader_exit_test.rs"]
+mod reader_exit_test;
 #[path = "suite/regression_test.rs"]
 mod regression_test;
 #[path = "suite/tcp_listener_test.rs"]

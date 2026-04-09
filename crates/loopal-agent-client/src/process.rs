@@ -88,6 +88,29 @@ impl AgentProcess {
         self.child.wait().await
     }
 
+    /// Wait for the child to exit with a timeout, then SIGKILL if it doesn't.
+    ///
+    /// Intended for callers that need a bounded wait after signalling the child
+    /// to exit (e.g. after closing the transport). Not currently used by the
+    /// default spawn path — kept as a utility for future callers.
+    pub async fn wait_or_kill(mut self, timeout: Duration) {
+        match tokio::time::timeout(timeout, self.child.wait()).await {
+            Ok(Ok(status)) => {
+                info!(?status, "agent child exited");
+            }
+            Ok(Err(e)) => {
+                warn!("error waiting for agent child: {e}");
+            }
+            Err(_) => {
+                warn!("agent child did not exit within grace period, killing");
+                if let Err(e) = self.child.kill().await {
+                    warn!("failed to kill agent child: {e}");
+                }
+                let _ = self.child.wait().await;
+            }
+        }
+    }
+
     /// Graceful shutdown: close the transport writer (signals EOF to child),
     /// wait for exit, then SIGKILL if the grace period expires.
     pub async fn shutdown(mut self) -> anyhow::Result<()> {

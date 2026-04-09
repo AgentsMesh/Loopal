@@ -108,11 +108,8 @@ async fn agent_receives_eof_after_hub_closes_transport() {
 
     // Agent's reader should now get EOF when trying to read.
     // recv() returns Ok(None) on EOF.
-    let recv_result = tokio::time::timeout(
-        Duration::from_secs(2),
-        agent_transport_ref.recv(),
-    )
-    .await;
+    let recv_result =
+        tokio::time::timeout(Duration::from_secs(2), agent_transport_ref.recv()).await;
 
     match recv_result {
         Ok(Ok(None)) => {} // EOF — correct, Hub closed its writer

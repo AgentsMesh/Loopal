@@ -44,16 +44,12 @@ async fn reader_exits_after_incoming_channel_dropped() {
     // If the reader task were still running, it would be holding the read Mutex
     // and we couldn't call recv(). Since the reader exited, we can recv() and
     // should see EOF immediately.
-    let result = tokio::time::timeout(
-        Duration::from_secs(1),
-        server_transport_ref.recv(),
-    )
-    .await;
+    let result = tokio::time::timeout(Duration::from_secs(1), server_transport_ref.recv()).await;
 
     match result {
         Ok(Ok(None)) => {} // EOF — reader is gone, we got the Mutex and saw EOF
         Ok(Ok(Some(_))) => panic!("should not receive data after remote closed"),
-        Ok(Err(_)) => {}   // read error also acceptable
+        Ok(Err(_)) => {} // read error also acceptable
         Err(_) => panic!("recv timed out — reader task likely still holding the Mutex"),
     }
 }

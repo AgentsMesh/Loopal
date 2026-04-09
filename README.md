@@ -89,20 +89,30 @@ Full-featured interactive TUI built with [Ratatui](https://ratatui.rs):
 
 - Markdown rendering with syntax highlighting
 - Streaming responses with real-time progress
+- Image attachment via clipboard paste (Ctrl+V)
+- Inline diff visualization for code changes
+- Real-time thinking process display with token count
 - Permission approval dialogs
 - Multi-agent topology visualization
+- Status dashboard (session info, config, token usage)
+- Background task panel
+- Rewind to any previous turn
 - Plan/Act mode toggle
 - Slash-command completion
 - Session resume (`loopal -r <session-id>`)
 
-### 17 Built-in Tools
+### 27 Built-in Tools
 
 | Category | Tools |
 |---|---|
 | **File I/O** | Read, Write, Edit, MultiEdit, ApplyPatch, CopyFile, MoveFile, Delete |
 | **Search** | Grep (regex, context, file filters), Glob (pattern matching), Ls |
-| **Process** | Bash (foreground + background), Fetch, WebSearch |
-| **Agent** | AskUser, EnterPlanMode, ExitPlanMode, ListHubs |
+| **Process** | Bash (foreground + background), Fetch |
+| **Interaction** | AskUser, EnterPlanMode, ExitPlanMode |
+| **Orchestration** | Agent (spawn sub-agents), SendMessage, ListHubs |
+| **Task Management** | TaskCreate, TaskUpdate, TaskList, TaskGet |
+| **Scheduling** | CronCreate, CronDelete, CronList |
+| **Knowledge** | Memory (cross-session persistent observations) |
 
 All tools go through sandbox policy checks before execution.
 
@@ -139,10 +149,59 @@ loopal --acp   # JSON-RPC 2.0 over stdin/stdout
 
 Works with Zed, JetBrains, Neovim, and any ACP-compatible editor.
 
-### Skills & Memory
+### Skills
 
-- **Skills** — Extend agent capabilities with project-specific markdown skill files (`/skill-name` invocation)
-- **Memory** — Cross-session persistent memory that remembers observations and preferences
+Extend agent capabilities with project-specific markdown skill files. Place `.md` files in `.loopal/skills/` and invoke them as `/skill-name`:
+
+```markdown
+---
+description: Create a git commit
+---
+
+Analyze all staged changes and draft a commit message.
+User notes: $ARGUMENTS
+```
+
+- Skill name = filename stem (e.g., `commit.md` → `/commit`)
+- `$ARGUMENTS` placeholder receives user input after the command
+- Skills merge across config layers — project skills override global ones
+
+### Memory
+
+Cross-session persistent memory stored at `.loopal/memory/MEMORY.md`. The agent reads and writes this file to remember observations, preferences, and project context across conversations.
+
+- Initialize with `/init` command
+- Agent records observations via the built-in `Memory` tool
+- LLM-based consolidation keeps memory concise and up-to-date
+
+### Context Management
+
+Automatic context window management with a 4-layer degradation pipeline:
+
+| Layer | Trigger | Action |
+|---|---|---|
+| 0 | Always | Strip old thinking blocks and ephemeral content |
+| 1 | >60% budget | Truncate oversized old tool results |
+| 2 | >75% budget | LLM-based summarization of older messages |
+| 3 | >90% budget | Emergency compaction — summarize + drop oldest |
+
+Use `/compact` to trigger compaction manually.
+
+### Built-in Commands
+
+| Command | Description |
+|---|---|
+| `/plan` | Switch to plan mode (read-only) |
+| `/act` | Switch to act mode (execution enabled) |
+| `/model [name]` | Switch model or open model picker |
+| `/compact` | Compact conversation context |
+| `/rewind` | Rewind to a previous turn |
+| `/status` | Show session info, config, and token usage |
+| `/resume [id]` | Resume a previous session |
+| `/init` | Initialize project config and memory |
+| `/agents` | Show sub-agent status |
+| `/topology` | Toggle agent topology overlay |
+| `/clear` | Clear conversation history |
 
 ### Sandbox & Permissions
 
@@ -154,7 +213,13 @@ Three permission modes to control what the agent can do:
 | `auto` | Smart approval based on intent classification |
 | `supervised` | Require user confirmation for writes and commands |
 
-Sandbox policies (strict/permissive/disabled) enforce filesystem, network, and command restrictions.
+Sandbox policies control filesystem and command restrictions:
+
+| Policy | Behavior |
+|---|---|
+| `workspace-write` | Allow writes only within workspace and temp directories (default) |
+| `read-only` | All writes blocked, reads only |
+| `disabled` | No sandbox enforcement |
 
 ### Lifecycle Hooks
 
@@ -229,7 +294,7 @@ Key settings:
     "anthropic": { "api_key": "..." }
   },
   "mcp_servers": { },
-  "sandbox": { "policy": "strict" }
+  "sandbox": { "policy": "workspace-write" }
 }
 ```
 

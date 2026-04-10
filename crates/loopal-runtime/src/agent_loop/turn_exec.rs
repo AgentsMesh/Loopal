@@ -3,7 +3,7 @@
 use loopal_error::Result;
 use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::StopReason;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 use super::TurnOutput;
 use super::runner::AgentLoopRunner;

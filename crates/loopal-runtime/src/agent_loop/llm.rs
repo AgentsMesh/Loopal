@@ -6,6 +6,7 @@ use loopal_error::Result;
 use loopal_message::{ContentBlock, Message};
 use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::StreamChunk;
+use opentelemetry::KeyValue;
 use std::time::Instant;
 use tracing::{error, info, warn};
 
@@ -89,6 +90,11 @@ impl AgentLoopRunner {
             thinking_tokens = result.thinking_tokens,
             "LLM complete"
         );
+        let llm_attrs = &[
+            KeyValue::new("gen_ai.request.model", self.params.config.model().to_string()),
+            KeyValue::new("gen_ai.system", provider.name().to_string()),
+        ];
+        crate::otel_metrics::llm_duration().record(llm_duration.as_secs_f64(), llm_attrs);
         Ok(result)
     }
 

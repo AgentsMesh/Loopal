@@ -6,9 +6,11 @@
 /// Falls back to `{temp_dir}/loopal/logs/` when the primary directory is not
 /// writable (e.g. inside Bazel's macOS seatbelt sandbox).
 ///
-/// Returns the log file path and a guard — hold the guard until process exit to
-/// flush buffered logs.
-pub fn init_logging() -> (String, tracing_appender::non_blocking::WorkerGuard) {
+/// Returns the log file path and guards — hold all guards until process exit to
+/// flush buffered logs and OTel pipelines.
+pub fn init_logging(
+    telemetry_config: &loopal_config::TelemetryConfig,
+) -> (String, loopal_telemetry::TelemetryGuard) {
     let log_dir = pick_writable_log_dir();
     let _ = std::fs::create_dir_all(&log_dir);
 
@@ -17,25 +19,18 @@ pub fn init_logging() -> (String, tracing_appender::non_blocking::WorkerGuard) {
 
     let writer = crate::log_writer::RotatingFileWriter::new(&log_dir);
     let log_path = writer.current_path();
-    let (non_blocking, guard) = tracing_appender::non_blocking(writer);
 
     let env_filter = std::env::var("LOOPAL_LOG").unwrap_or_else(|_| "info".to_string());
-    let filter = format!(
+    let filter_str = format!(
         "loopal={env_filter},loopal_runtime={env_filter},\
          loopal_provider={env_filter},loopal_kernel={env_filter},\
          loopal_mcp={env_filter},loopal_tools={env_filter},\
          loopal_context={env_filter},loopal_hooks={env_filter},\
          loopal_storage={env_filter},loopal_config={env_filter}"
     );
+    let env_filter = tracing_subscriber::EnvFilter::new(filter_str);
 
-    // NonBlocking implements MakeWriter — pass it directly.
-    tracing_subscriber::fmt()
-        .with_env_filter(filter)
-        .with_writer(non_blocking)
-        .with_ansi(false)
-        .with_target(true)
-        .with_span_events(tracing_subscriber::fmt::format::FmtSpan::NONE)
-        .init();
+    let guard = loopal_telemetry::init_subscriber(telemetry_config, writer, env_filter);
 
     tracing::info!(path = %log_path, "logging initialized");
 

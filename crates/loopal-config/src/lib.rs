@@ -12,6 +12,7 @@ pub mod resolver;
 pub mod sandbox;
 pub mod settings;
 pub mod skills;
+pub mod telemetry;
 mod validate;
 
 pub use harness::HarnessConfig;
@@ -29,3 +30,4 @@ pub use settings::{
     McpServerConfig, OpenAiCompatConfig, ProviderConfig, ProvidersConfig, Settings,
 };
 pub use skills::{Skill, format_skills_summary, scan_skills_dir};
+pub use telemetry::TelemetryConfig;

@@ -46,11 +46,27 @@ impl Tool for BashTool {
     }
 
     fn description(&self) -> &str {
-        "Execute a bash command, or manage a background process.\n\
-         - Run command: provide `command`\n\
-         - Background: provide `command` + `run_in_background: true`\n\
-         - Get output: provide `process_id` (blocks until done by default)\n\
-         - Stop: provide `process_id` + `stop: true`"
+        "Executes a given bash command and returns its output.\n\n\
+         The working directory persists between commands, but shell state does not.\n\n\
+         IMPORTANT: Avoid using this tool to run `find`, `grep`, `cat`, `head`, `tail`, `sed`, `awk`, \
+         or `echo` commands, unless explicitly instructed or after you have verified that a dedicated tool \
+         cannot accomplish your task. Instead, use the appropriate dedicated tool:\n\
+         - File search: Use Glob (NOT find or ls)\n\
+         - Content search: Use Grep (NOT grep or rg)\n\
+         - Read files: Use Read (NOT cat/head/tail)\n\
+         - Edit files: Use Edit (NOT sed/awk)\n\
+         - Write files: Use Write (NOT echo >/cat <<EOF)\n\n\
+         # Instructions\n\
+         - Always quote file paths that contain spaces with double quotes.\n\
+         - Try to maintain your current working directory by using absolute paths and avoiding `cd`.\n\
+         - You may specify an optional timeout in seconds (up to 600s / 10 minutes). Default timeout is 300s (5 minutes).\n\
+         - Use `run_in_background` for long-running commands. You will be notified when they finish — do not poll.\n\
+         - When issuing multiple commands:\n\
+           - If independent and can run in parallel, make multiple Bash tool calls in a single message.\n\
+           - If dependent, chain them with '&&' in a single Bash call.\n\
+           - DO NOT use newlines to separate commands.\n\
+         - Avoid unnecessary `sleep` commands — diagnose root causes instead of retry loops.\n\
+         - For git commands: prefer new commits over amending; never skip hooks (--no-verify) unless asked."
     }
 
     fn parameters_schema(&self) -> Value {

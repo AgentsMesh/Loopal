@@ -29,7 +29,15 @@ impl Tool for TaskCreateTool {
         "TaskCreate"
     }
     fn description(&self) -> &str {
-        "Create a new task in the shared task list."
+        "Create a structured task to track your work. Use this proactively when starting \
+         complex multi-step tasks — decompose them into subtasks BEFORE beginning implementation.\n\n\
+         When to use:\n\
+         - Complex tasks requiring 3+ steps\n\
+         - Non-trivial tasks that need careful planning\n\
+         - When the user provides multiple requests\n\
+         - After receiving new instructions — capture requirements as tasks immediately\n\n\
+         All tasks are created with status 'pending'. Use TaskUpdate to set 'in_progress' when you start \
+         and 'completed' when you finish. Mark each task completed as soon as it is done — do not batch."
     }
     fn parameters_schema(&self) -> serde_json::Value {
         serde_json::json!({
@@ -88,7 +96,13 @@ impl Tool for TaskUpdateTool {
         "TaskUpdate"
     }
     fn description(&self) -> &str {
-        "Update an existing task (status, owner, dependencies, etc.)."
+        "Update a task's status, description, owner, or dependencies.\n\n\
+         Status workflow: pending → in_progress → completed.\n\
+         - Set 'in_progress' BEFORE beginning work on a task.\n\
+         - Set 'completed' as soon as the task is done. Do not batch.\n\
+         - Set 'deleted' to permanently remove a task that is no longer relevant.\n\n\
+         ONLY mark a task as completed when you have FULLY accomplished it. \
+         If you encounter errors or blockers, keep the task as in_progress."
     }
     fn parameters_schema(&self) -> serde_json::Value {
         serde_json::json!({
@@ -162,7 +176,8 @@ impl Tool for TaskListTool {
         "TaskList"
     }
     fn description(&self) -> &str {
-        "List all tasks in the shared task list."
+        "List all tasks to see current progress. Check this after completing each task \
+         to find what remains and identify newly unblocked work."
     }
     fn parameters_schema(&self) -> serde_json::Value {
         serde_json::json!({ "type": "object", "properties": {} })
@@ -193,7 +208,8 @@ impl Tool for TaskGetTool {
         "TaskGet"
     }
     fn description(&self) -> &str {
-        "Get full details of a task by ID."
+        "Get full details of a task by ID, including description, status, and dependencies. \
+         Use this before starting work on a task to understand its full requirements."
     }
     fn parameters_schema(&self) -> serde_json::Value {
         serde_json::json!({

@@ -23,6 +23,7 @@ mod runner;
 /// Sandbox path pre-check utilities for the tools_check phase.
 /// Public for integration testing; runtime consumers should use tools_check directly.
 pub mod sandbox_precheck;
+pub(crate) mod streaming_tool_exec;
 pub(crate) mod token_accumulator;
 mod tool_collect;
 pub(crate) mod tool_exec;
@@ -38,6 +39,7 @@ mod turn_exec;
 pub(crate) mod turn_metrics;
 pub mod turn_observer;
 mod turn_observer_dispatch;
+mod turn_telemetry;
 
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -195,12 +197,5 @@ pub async fn agent_loop(params: AgentLoopParams) -> Result<AgentOutput> {
 
 /// Output from a single turn (LLM → [tools → LLM]* → done).
 pub(crate) struct TurnOutput {
-    /// The final assistant text of this turn.
     pub output: String,
-}
-
-/// Result of waiting for user input.
-pub enum WaitResult {
-    /// A user message was added to the conversation
-    MessageAdded,
 }

@@ -6,7 +6,7 @@ use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolDefinition, ToolRe
 use rmcp::model::CallToolResult;
 use serde_json::Value;
 use tokio::sync::RwLock;
-use tracing::warn;
+use tracing::{Instrument, warn};
 
 use crate::manager::McpManager;
 use crate::reconnect::ReconnectPolicy;
@@ -58,30 +58,36 @@ impl Tool for McpToolAdapter {
     }
 
     async fn execute(&self, input: Value, _ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
-        // Fast path: read lock for normal tool calls (allows concurrency).
-        let result = {
-            let mgr = self.manager.read().await;
-            mgr.call_tool(&self.server_name, &self.definition.name, &input)
-                .await
-        };
-
-        let result = match result {
-            Ok(val) => val,
-            Err(McpError::TransportClosed(_)) if self.is_reconnectable().await => {
-                warn!(server = %self.server_name, tool = %self.definition.name, "transport closed, reconnecting");
-                {
-                    let mut mgr = self.manager.write().await;
-                    let _ = mgr.restart_connection(&self.server_name).await;
-                }
+        let mcp_span =
+            tracing::info_span!("mcp_tool_call", mcp.tool = self.definition.name.as_str());
+        async {
+            // Fast path: read lock for normal tool calls (allows concurrency).
+            let result = {
                 let mgr = self.manager.read().await;
                 mgr.call_tool(&self.server_name, &self.definition.name, &input)
                     .await
-                    .map_err(LoopalError::Mcp)?
-            }
-            Err(e) => return Err(LoopalError::Mcp(e)),
-        };
+            };
 
-        Ok(convert_tool_result(&result))
+            let result = match result {
+                Ok(val) => val,
+                Err(McpError::TransportClosed(_)) if self.is_reconnectable().await => {
+                    warn!(server = %self.server_name, tool = %self.definition.name, "transport closed, reconnecting");
+                    {
+                        let mut mgr = self.manager.write().await;
+                        let _ = mgr.restart_connection(&self.server_name).await;
+                    }
+                    let mgr = self.manager.read().await;
+                    mgr.call_tool(&self.server_name, &self.definition.name, &input)
+                        .await
+                        .map_err(LoopalError::Mcp)?
+                }
+                Err(e) => return Err(LoopalError::Mcp(e)),
+            };
+
+            Ok(convert_tool_result(&result))
+        }
+        .instrument(mcp_span)
+        .await
     }
 }
 

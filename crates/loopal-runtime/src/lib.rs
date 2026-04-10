@@ -3,6 +3,7 @@ pub mod agent_loop;
 pub mod fire_hooks;
 pub mod frontend;
 pub mod mode;
+pub mod otel_metrics;
 pub mod permission;
 pub mod plan_file;
 pub mod session;

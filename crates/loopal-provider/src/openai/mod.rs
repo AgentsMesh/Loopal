@@ -9,6 +9,7 @@ use loopal_provider_api::{ChatParams, ChatStream, Provider};
 use serde_json::json;
 use std::collections::VecDeque;
 use std::time::Duration;
+use tracing::Instrument;
 
 use crate::resilient_client::ResilientClient;
 use crate::sse::SseStream;
@@ -73,6 +74,7 @@ impl Provider for OpenAiProvider {
             "API request"
         );
 
+        let http_span = tracing::info_span!("http_request", gen_ai.system = "openai");
         let (client, client_gen) = self.client.get();
         let response = client
             .post(format!("{}/v1/responses", self.base_url))
@@ -80,6 +82,7 @@ impl Provider for OpenAiProvider {
             .header("Content-Type", "application/json")
             .json(&body)
             .send()
+            .instrument(http_span)
             .await
             .map_err(|e| {
                 self.client.report_network_error(client_gen);

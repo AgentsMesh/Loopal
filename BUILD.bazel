@@ -16,6 +16,7 @@ rust_binary(
         "//crates/loopal-protocol",
         "//crates/loopal-tool-api",
         "//crates/loopal-config",
+        "//crates/loopal-telemetry",
         "//crates/loopal-runtime",
         "//crates/loopal-storage",
         "//crates/loopal-session",

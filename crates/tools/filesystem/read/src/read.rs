@@ -12,14 +12,23 @@ impl Tool for ReadTool {
     }
 
     fn description(&self) -> &str {
-        "Read a file from the local filesystem.\n\
-         - The file_path must be an absolute path, not relative.\n\
-         - By default reads up to 2000 lines. Use offset and limit for large files.\n\
-         - Supports images (PNG, JPG, etc.) — contents are presented visually.\n\
-         - Supports PDF files. For large PDFs (>10 pages), you MUST provide the pages parameter. Max 20 pages per request.\n\
-         - Supports Jupyter notebooks (.ipynb) — returns all cells with outputs.\n\
+        "Reads a file from the local filesystem. You can access any file directly by using this tool.\n\
+         Assume this tool is able to read all files on the machine. If a path is provided, assume it is valid. \
+         It is okay to read a file that does not exist; an error will be returned.\n\n\
+         Usage:\n\
+         - The file_path parameter must be an absolute path, not a relative path.\n\
+         - By default, it reads up to 2000 lines starting from the beginning of the file.\n\
+         - You can optionally specify a line offset and limit (especially handy for long files), \
+         but it's recommended to read the whole file by not providing these parameters.\n\
+         - Results are returned using cat -n format, with line numbers starting at 1.\n\
+         - This tool can read images (PNG, JPG, etc). When reading an image file the contents are presented visually.\n\
+         - This tool can read PDF files (.pdf). For large PDFs (more than 10 pages), you MUST provide the pages \
+         parameter to read specific page ranges (e.g., pages: \"1-5\"). Max 20 pages per request.\n\
+         - This tool can read Jupyter notebooks (.ipynb files) and returns all cells with their outputs.\n\
          - Supports HTML files — auto-converted to markdown.\n\
-         - If the user provides a path to a screenshot, ALWAYS use this tool to view it."
+         - This tool can only read files, not directories. To read a directory, use Ls or an ls command via Bash.\n\
+         - If the user provides a path to a screenshot, ALWAYS use this tool to view the file at the path.\n\
+         - If you read a file that exists but has empty contents you will receive a system reminder warning."
     }
 
     fn parameters_schema(&self) -> Value {

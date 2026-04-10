@@ -27,3 +27,7 @@ mod settings_routing_test;
 mod skills_loader_test;
 #[path = "suite/skills_parser_test.rs"]
 mod skills_parser_test;
+#[path = "suite/telemetry_edge_test.rs"]
+mod telemetry_edge_test;
+#[path = "suite/telemetry_test.rs"]
+mod telemetry_test;

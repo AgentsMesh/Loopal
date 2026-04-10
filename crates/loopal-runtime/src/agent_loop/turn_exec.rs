@@ -9,6 +9,7 @@ use tracing::{debug, info, warn};
 
 use super::TurnOutput;
 use super::runner::AgentLoopRunner;
+use super::streaming_tool_exec::{self, StreamingToolHandle, ToolUseArrived};
 use super::turn_context::TurnContext;
 
 impl AgentLoopRunner {
@@ -149,6 +150,32 @@ impl AgentLoopRunner {
                 return Ok(TurnOutput { output: last_text });
             }
 
+            // Start ReadOnly tools immediately — they execute in parallel with
+            // the permission checks for Supervised/Dangerous tools below.
+            let kernel = std::sync::Arc::clone(&self.params.deps.kernel);
+            let mut early_handle = StreamingToolHandle::empty();
+            for (idx, (id, name, input)) in result.tool_uses.iter().enumerate() {
+                streaming_tool_exec::feed_tool(
+                    &mut early_handle,
+                    &kernel,
+                    &self.tool_ctx,
+                    self.params.config.mode,
+                    &ToolUseArrived {
+                        index: idx,
+                        id: id.clone(),
+                        name: name.clone(),
+                        input: input.clone(),
+                    },
+                    self.params.deps.frontend.event_emitter(),
+                );
+            }
+            if early_handle.has_early_tools() {
+                info!(
+                    early = early_handle.early_started_ids().len(),
+                    "ReadOnly tools started early"
+                );
+            }
+
             let tool_names: Vec<&str> = result
                 .tool_uses
                 .iter()
@@ -161,7 +188,13 @@ impl AgentLoopRunner {
             );
             let cancel = &turn_ctx.cancel;
             turn_ctx.metrics.tool_calls_requested += result.tool_uses.len() as u32;
-            let stats = self.execute_tools(result.tool_uses.clone(), cancel).await?;
+            let stats = self
+                .execute_tools_with_early(
+                    result.tool_uses.clone(),
+                    cancel,
+                    early_handle,
+                )
+                .await?;
             turn_ctx.metrics.tool_calls_approved += stats.approved;
             turn_ctx.metrics.tool_calls_denied += stats.denied;
             turn_ctx.metrics.tool_errors += stats.errors;

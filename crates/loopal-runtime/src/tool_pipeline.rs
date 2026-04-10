@@ -5,8 +5,9 @@ use loopal_error::{LoopalError, Result};
 use loopal_hooks::{HookContext, HookOutput, PermissionOverride};
 use loopal_kernel::Kernel;
 use loopal_tool_api::{ToolContext, ToolResult, handle_overflow};
+use opentelemetry::KeyValue;
 use serde_json::Value;
-use tracing::{debug, info, warn};
+use tracing::{Instrument, debug, info, warn};
 
 use crate::mode::AgentMode;
 
@@ -63,17 +64,26 @@ pub async fn execute_tool(
     }
 
     // ── Execute ────────────────────────────────────────────────
-    debug!(tool = name, "executing tool");
-    let start = Instant::now();
-    let result = tool.execute(effective_input.clone(), ctx).await?;
-    let duration = start.elapsed();
-    info!(
-        tool = name,
-        duration_ms = duration.as_millis() as u64,
-        ok = !result.is_error,
-        output_len = result.content.len(),
-        "tool pipeline exec"
-    );
+    let tool_span = tracing::info_span!("tool_exec", tool.name = name);
+    let result = async {
+        debug!(tool = name, "executing tool");
+        let start = Instant::now();
+        let result = tool.execute(effective_input.clone(), ctx).await?;
+        let duration = start.elapsed();
+        info!(
+            tool = name,
+            duration_ms = duration.as_millis() as u64,
+            ok = !result.is_error,
+            output_len = result.content.len(),
+            "tool pipeline exec"
+        );
+        let tool_attrs = &[KeyValue::new("tool.name", name.to_string())];
+        crate::otel_metrics::tool_duration().record(duration.as_secs_f64(), tool_attrs);
+        crate::otel_metrics::tool_invocations().add(1, tool_attrs);
+        Ok::<_, LoopalError>(result)
+    }
+    .instrument(tool_span)
+    .await?;
 
     // ── Overflow-to-file ───────────────────────────────────────
     let overflow = handle_overflow(&result.content, MAX_RESULT_LINES, MAX_RESULT_BYTES, name);

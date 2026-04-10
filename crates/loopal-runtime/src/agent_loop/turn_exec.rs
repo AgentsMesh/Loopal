@@ -1,6 +1,4 @@
 //! Inner turn execution loop.
-//!
-//! Observer dispatch lives in `turn_observer_dispatch.rs`.
 
 use loopal_error::Result;
 use loopal_protocol::AgentEventPayload;
@@ -37,7 +35,7 @@ impl AgentLoopRunner {
             let truncated =
                 result.stop_reason == StopReason::MaxTokens && !result.tool_uses.is_empty();
             if truncated {
-                warn!("max_tokens hit with tool calls — discarding truncated tools");
+                warn!("max_tokens hit with tool calls — discarding");
             }
             let effective_tools = if truncated {
                 &[][..]
@@ -46,7 +44,6 @@ impl AgentLoopRunner {
             };
 
             // Auto-continue: MaxTokens+tools, PauseTurn, or stream truncation.
-            // Exclude user cancellation — cancel should stop, not retry.
             let needs_auto_continue = truncated || result.stop_reason == StopReason::PauseTurn;
             let stream_truncated = result.stream_error
                 && !turn_ctx.cancel.is_cancelled()
@@ -54,13 +51,8 @@ impl AgentLoopRunner {
 
             if needs_auto_continue || stream_truncated {
                 if stream_truncated {
-                    warn!(
-                        text_len = result.assistant_text.len(),
-                        tool_calls = result.tool_uses.len(),
-                        "stream truncated — discarding incomplete tool calls"
-                    );
+                    warn!("stream truncated — discarding incomplete tool calls");
                 }
-                // For truncated streams, discard possibly-incomplete tool_use blocks.
                 let tools = if stream_truncated {
                     &[][..]
                 } else {
@@ -90,8 +82,7 @@ impl AgentLoopRunner {
                 return Ok(TurnOutput { output: last_text });
             }
 
-            // Stream error (cancel or empty truncation) — record any partial
-            // text that was already streamed to the user, then exit.
+            // Stream error (cancel or empty truncation) — record partial text, then exit.
             if result.stream_error {
                 if !result.assistant_text.is_empty() {
                     let no_tools: &[(String, String, serde_json::Value)] = &[];
@@ -118,8 +109,11 @@ impl AgentLoopRunner {
                 last_text.clone_from(&result.assistant_text);
             }
 
-            if result.tool_uses.is_empty() && result.stop_reason == StopReason::MaxTokens {
-                if continuation_count < self.params.harness.max_auto_continuations {
+            // No tool calls — check MaxTokens continuation or stop hooks.
+            if result.tool_uses.is_empty() {
+                if result.stop_reason == StopReason::MaxTokens
+                    && continuation_count < self.params.harness.max_auto_continuations
+                {
                     continuation_count += 1;
                     turn_ctx.metrics.auto_continuations = continuation_count;
                     self.emit(AgentEventPayload::AutoContinuation {
@@ -130,10 +124,6 @@ impl AgentLoopRunner {
                     self.push_continuation_if_thinking();
                     continue;
                 }
-                return Ok(TurnOutput { output: last_text });
-            }
-
-            if result.tool_uses.is_empty() {
                 if stop_feedback_count < max_stop_feedback
                     && let Some(feedback) = self.run_stop_hooks().await
                 {
@@ -145,13 +135,11 @@ impl AgentLoopRunner {
             }
 
             // Observer: on_before_tools — may inject warnings or abort.
-            debug!(tool_count = result.tool_uses.len(), "pre-tool phase");
             if self.run_before_tools(turn_ctx, &result.tool_uses).await? {
                 return Ok(TurnOutput { output: last_text });
             }
 
-            // Start ReadOnly tools immediately — they execute in parallel with
-            // the permission checks for Supervised/Dangerous tools below.
+            // Start ReadOnly tools early (parallel with permission checks).
             let kernel = std::sync::Arc::clone(&self.params.deps.kernel);
             let mut early_handle = StreamingToolHandle::empty();
             for (idx, (id, name, input)) in result.tool_uses.iter().enumerate() {
@@ -169,12 +157,6 @@ impl AgentLoopRunner {
                     self.params.deps.frontend.event_emitter(),
                 );
             }
-            if early_handle.has_early_tools() {
-                info!(
-                    early = early_handle.early_started_ids().len(),
-                    "ReadOnly tools started early"
-                );
-            }
 
             let tool_names: Vec<&str> = result
                 .tool_uses
@@ -189,11 +171,7 @@ impl AgentLoopRunner {
             let cancel = &turn_ctx.cancel;
             turn_ctx.metrics.tool_calls_requested += result.tool_uses.len() as u32;
             let stats = self
-                .execute_tools_with_early(
-                    result.tool_uses.clone(),
-                    cancel,
-                    early_handle,
-                )
+                .execute_tools_with_early(result.tool_uses.clone(), cancel, early_handle)
                 .await?;
             turn_ctx.metrics.tool_calls_approved += stats.approved;
             turn_ctx.metrics.tool_calls_denied += stats.denied;

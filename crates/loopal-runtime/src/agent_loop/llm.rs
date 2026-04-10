@@ -91,7 +91,10 @@ impl AgentLoopRunner {
             "LLM complete"
         );
         let llm_attrs = &[
-            KeyValue::new("gen_ai.request.model", self.params.config.model().to_string()),
+            KeyValue::new(
+                "gen_ai.request.model",
+                self.params.config.model().to_string(),
+            ),
             KeyValue::new("gen_ai.system", provider.name().to_string()),
         ];
         crate::otel_metrics::llm_duration().record(llm_duration.as_secs_f64(), llm_attrs);

@@ -1,5 +1,4 @@
 //! JSONL file exporter for OpenTelemetry metrics.
-//! Writes one JSON object per metric data point for offline analysis.
 
 use std::fmt::Debug;
 use std::fs::{File, OpenOptions};
@@ -8,9 +7,9 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 
 use async_trait::async_trait;
+use opentelemetry_sdk::metrics::Temporality;
 use opentelemetry_sdk::metrics::data::{Metric, ResourceMetrics};
 use opentelemetry_sdk::metrics::exporter::PushMetricExporter;
-use opentelemetry_sdk::metrics::Temporality;
 use serde::Serialize;
 
 /// Metric exporter that appends JSONL data points to a local file.
@@ -143,7 +142,10 @@ impl JsonlMetricExporter {
 
 #[async_trait]
 impl PushMetricExporter for JsonlMetricExporter {
-    async fn export(&self, metrics: &mut ResourceMetrics) -> opentelemetry_sdk::error::OTelSdkResult {
+    async fn export(
+        &self,
+        metrics: &mut ResourceMetrics,
+    ) -> opentelemetry_sdk::error::OTelSdkResult {
         for scope in &metrics.scope_metrics {
             for metric in &scope.metrics {
                 self.write_metric(metric);
@@ -181,7 +183,6 @@ struct MetricRecord<'a> {
     name: &'a str,
     unit: &'a str,
     kind: &'a str,
-    #[serde(skip_serializing_if = "is_zero")]
     value: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
     count: Option<u64>,
@@ -192,8 +193,4 @@ struct MetricRecord<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     max: Option<f64>,
     attributes: Vec<(String, String)>,
-}
-
-fn is_zero(v: &f64) -> bool {
-    *v == 0.0
 }

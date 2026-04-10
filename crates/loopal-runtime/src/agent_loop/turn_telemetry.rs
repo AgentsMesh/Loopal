@@ -51,11 +51,18 @@ impl AgentLoopRunner {
             );
 
             crate::otel_metrics::active_turns().add(-1, &[]);
-            let model_attr =
-                KeyValue::new("gen_ai.request.model", self.params.config.model().to_string());
-            crate::otel_metrics::turn_duration()
-                .record(turn_duration.as_secs_f64(), std::slice::from_ref(&model_attr));
-            let attrs = &[KeyValue::new("gen_ai.token.type", "input"), model_attr.clone()];
+            let model_attr = KeyValue::new(
+                "gen_ai.request.model",
+                self.params.config.model().to_string(),
+            );
+            crate::otel_metrics::turn_duration().record(
+                turn_duration.as_secs_f64(),
+                std::slice::from_ref(&model_attr),
+            );
+            let attrs = &[
+                KeyValue::new("gen_ai.token.type", "input"),
+                model_attr.clone(),
+            ];
             crate::otel_metrics::token_usage().add(m.tokens_in as u64, attrs);
             let attrs = &[KeyValue::new("gen_ai.token.type", "output"), model_attr];
             crate::otel_metrics::token_usage().add(m.tokens_out as u64, attrs);

@@ -1,0 +1,34 @@
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+rust_library(
+    name = "loopal-telemetry",
+    srcs = glob(["src/**/*.rs"]),
+    edition = "2024",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//crates/loopal-config",
+        "@crates//:chrono",
+        "@crates//:opentelemetry",
+        "@crates//:opentelemetry_sdk",
+        "@crates//:opentelemetry-otlp",
+        "@crates//:serde",
+        "@crates//:serde_json",
+        "@crates//:tracing",
+        "@crates//:tracing-opentelemetry",
+        "@crates//:opentelemetry-appender-tracing",
+        "@crates//:tracing-subscriber",
+        "@crates//:tracing-appender",
+    ],
+    proc_macro_deps = [
+        "@crates//:async-trait",
+    ],
+)
+
+rust_test(
+    name = "loopal-telemetry_test",
+    crate = ":loopal-telemetry",
+    edition = "2024",
+    deps = [
+        "@crates//:tokio",
+    ],
+)

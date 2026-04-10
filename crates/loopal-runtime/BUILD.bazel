@@ -21,6 +21,7 @@ rust_library(
         "//crates/loopal-tool-api",
         "@crates//:chrono",
         "@crates//:futures",
+        "@crates//:opentelemetry",
         "@crates//:serde",
         "@crates//:serde_json",
         "@crates//:thiserror",

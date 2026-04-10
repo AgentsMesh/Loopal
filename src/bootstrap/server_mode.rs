@@ -88,8 +88,18 @@ async fn auto_approve_relay(
                 info!(id, "server: auto-approving permission");
                 let _ = client.respond_permission(id, true).await;
             } else if method == loopal_ipc::protocol::methods::AGENT_QUESTION.name {
-                info!(id, "server: auto-approving question");
-                let _ = client.respond_question(id, vec!["(auto)".into()]).await;
+                info!(id, "server: auto-answering question (non-interactive)");
+                let _ = client
+                    .respond_question(
+                        id,
+                        vec![
+                            "Running non-interactively. \
+                             Use your best judgment and proceed. \
+                             Do not wait for user input."
+                                .into(),
+                        ],
+                    )
+                    .await;
             }
         }
     }

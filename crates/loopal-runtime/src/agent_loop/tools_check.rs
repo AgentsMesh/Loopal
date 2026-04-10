@@ -1,12 +1,9 @@
 //! Tool precheck and permission verification phase.
-//!
-//! Separated from `tools.rs` to keep files under 200 lines.
-//! Parallel classification and human fallback live in `tools_resolve.rs`.
 
 use loopal_message::ContentBlock;
 use loopal_protocol::AgentEventPayload;
 use loopal_tool_api::{PermissionDecision, PermissionLevel};
-use tracing::info;
+use tracing::{Instrument, info};
 
 use super::cancel::TurnCancel;
 use super::runner::AgentLoopRunner;
@@ -19,11 +16,20 @@ pub(super) struct CheckResult {
 }
 
 impl AgentLoopRunner {
-    /// Phase 1: sandbox precheck + permission check for each tool.
-    ///
-    /// When Auto mode is active and multiple tools need classification,
-    /// classifier calls are parallelized to reduce latency.
+    /// Sandbox precheck + permission check for each tool.
     pub(super) async fn check_tools(
+        &mut self,
+        remaining: &[(String, String, serde_json::Value)],
+        tool_uses: &[(String, String, serde_json::Value)],
+        cancel: &TurnCancel,
+    ) -> loopal_error::Result<CheckResult> {
+        let check_span = tracing::info_span!("tool_check", tools.count = remaining.len());
+        self.check_tools_inner(remaining, tool_uses, cancel)
+            .instrument(check_span)
+            .await
+    }
+
+    async fn check_tools_inner(
         &mut self,
         remaining: &[(String, String, serde_json::Value)],
         tool_uses: &[(String, String, serde_json::Value)],
@@ -175,7 +181,6 @@ impl AgentLoopRunner {
         .await
     }
 
-    /// Check if a Write/Edit tool input targets the plan file.
     fn is_plan_file_target(&self, input: &serde_json::Value) -> bool {
         let target = input
             .get("file_path")

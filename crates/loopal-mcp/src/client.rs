@@ -11,7 +11,7 @@ use rmcp::model::{
     Request, RequestOptionalParam, ServerResult,
 };
 use rmcp::service::{PeerRequestOptions, RoleClient, RunningService, ServiceError, ServiceExt};
-use tracing::info;
+use tracing::{Instrument, info};
 
 use crate::handler::{LoopalClientHandler, SamplingCallback};
 
@@ -134,21 +134,28 @@ impl McpClient {
 
     /// Send a request with timeout. Uses rmcp's built-in timeout on RequestHandle.
     async fn send(&self, request: ClientRequest) -> Result<ServerResult, McpError> {
-        let mut options = PeerRequestOptions::default();
-        options.timeout = Some(self.timeout);
+        let mcp_span = tracing::info_span!("mcp_request");
+        async {
+            let mut options = PeerRequestOptions::default();
+            options.timeout = Some(self.timeout);
 
-        let handle = self
-            .service
-            .send_cancellable_request(request, options)
-            .await
-            .map_err(|e| McpError::TransportClosed(e.to_string()))?;
+            let handle = self
+                .service
+                .send_cancellable_request(request, options)
+                .await
+                .map_err(|e| McpError::TransportClosed(e.to_string()))?;
 
-        handle.await_response().await.map_err(|e| match e {
-            ServiceError::Timeout { timeout } => {
-                McpError::Timeout(format!("{}ms", timeout.as_millis()))
-            }
-            ServiceError::TransportClosed => McpError::TransportClosed("transport closed".into()),
-            other => McpError::Protocol(other.to_string()),
-        })
+            handle.await_response().await.map_err(|e| match e {
+                ServiceError::Timeout { timeout } => {
+                    McpError::Timeout(format!("{}ms", timeout.as_millis()))
+                }
+                ServiceError::TransportClosed => {
+                    McpError::TransportClosed("transport closed".into())
+                }
+                other => McpError::Protocol(other.to_string()),
+            })
+        }
+        .instrument(mcp_span)
+        .await
     }
 }

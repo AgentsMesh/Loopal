@@ -6,11 +6,10 @@ use loopal_tool_api::ToolContext;
 use tokio::sync::watch;
 use tracing::{Instrument, info, info_span};
 
+use super::AgentLoopParams;
 use super::model_config::ModelConfig;
 use super::token_accumulator::TokenAccumulator;
-use super::turn_context::TurnContext;
 use super::turn_observer::TurnObserver;
-use super::{AgentLoopParams, TurnOutput};
 use crate::fire_hooks::fire_hooks;
 use crate::plan_file::PlanFile;
 
@@ -80,7 +79,7 @@ impl AgentLoopRunner {
     /// Main loop — orchestrates input, middleware, LLM, and tool execution.
     /// Guarantees `Finished` event is emitted regardless of exit path.
     pub async fn run(&mut self) -> Result<AgentOutput> {
-        let span = info_span!("agent", session_id = %self.params.session.id);
+        let span = info_span!("agent", session.id = %self.params.session.id);
         self.run_instrumented().instrument(span).await
     }
 
@@ -117,61 +116,6 @@ impl AgentLoopRunner {
             },
         )
         .await;
-    }
-
-    /// One complete turn: LLM → [tools → LLM]* → returns when no tool calls.
-    /// Emits `TurnCompleted` event with aggregated metrics at the end.
-    pub(super) async fn execute_turn(&mut self, turn_ctx: &mut TurnContext) -> Result<TurnOutput> {
-        loopal_protocol::event_id::set_current_turn_id(turn_ctx.turn_id); // global turn context
-        for obs in &mut self.observers {
-            obs.on_turn_start(turn_ctx);
-        }
-        let result = self.execute_turn_inner(turn_ctx).await;
-        for obs in &mut self.observers {
-            obs.on_turn_end(turn_ctx);
-        }
-
-        // Finalize and emit turn telemetry.
-        turn_ctx.metrics.warnings_injected = turn_ctx.pending_warnings.len() as u32;
-        turn_ctx.metrics.tokens_in = self.tokens.input;
-        turn_ctx.metrics.tokens_out = self.tokens.output;
-        let m = &turn_ctx.metrics;
-        let files: Vec<String> = turn_ctx.modified_files.iter().cloned().collect();
-        let duration_ms = turn_ctx.started_at.elapsed().as_millis() as u64;
-        info!(
-            turn = turn_ctx.turn_id,
-            duration_ms,
-            llm = m.llm_calls,
-            tools = m.tool_calls_requested,
-            ok = m.tool_calls_approved,
-            denied = m.tool_calls_denied,
-            errs = m.tool_errors,
-            tok_in = m.tokens_in,
-            tok_out = m.tokens_out,
-            "turn completed"
-        );
-
-        let _ = self
-            .emit(AgentEventPayload::TurnCompleted {
-                turn_id: turn_ctx.turn_id,
-                duration_ms,
-                llm_calls: m.llm_calls,
-                tool_calls_requested: m.tool_calls_requested,
-                tool_calls_approved: m.tool_calls_approved,
-                tool_calls_denied: m.tool_calls_denied,
-                tool_errors: m.tool_errors,
-                auto_continuations: m.auto_continuations,
-                warnings_injected: m.warnings_injected,
-                tokens_in: m.tokens_in,
-                tokens_out: m.tokens_out,
-                modified_files: files,
-            })
-            .await;
-
-        // Reset turn context — events outside turns carry turn_id/correlation_id = 0.
-        loopal_protocol::event_id::set_current_turn_id(0);
-        loopal_protocol::event_id::set_current_correlation_id(0);
-        result
     }
 
     /// Send an event payload via the frontend.

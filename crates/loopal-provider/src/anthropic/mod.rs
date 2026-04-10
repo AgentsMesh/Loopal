@@ -12,6 +12,7 @@ use serde_json::json;
 use std::collections::VecDeque;
 use std::time::Duration;
 use tokio::sync::Semaphore;
+use tracing::Instrument;
 
 use crate::resilient_client::ResilientClient;
 use crate::sse::SseStream;
@@ -112,6 +113,7 @@ impl AnthropicProvider {
             "API request"
         );
 
+        let http_span = tracing::info_span!("http_request", gen_ai.system = "anthropic");
         let (client, client_gen) = self.client.get();
         let response = client
             .post(format!("{}/v1/messages", self.base_url))
@@ -120,6 +122,7 @@ impl AnthropicProvider {
             .header("content-type", "application/json")
             .json(&body)
             .send()
+            .instrument(http_span)
             .await
             .map_err(|e| {
                 self.client.report_network_error(client_gen);

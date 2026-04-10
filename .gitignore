@@ -20,3 +20,6 @@
 logs/
 .claude/scheduled_tasks.lock
 .loopal/worktrees/
+runs/
+**/__pycache__/
+benchmarks/terminal_bench/bin/

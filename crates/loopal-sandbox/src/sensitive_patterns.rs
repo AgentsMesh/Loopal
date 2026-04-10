@@ -109,6 +109,11 @@ pub const SENSITIVE_ENV_PATTERNS: &[&str] = &[
     "SALT",
     "HMAC",
     "CIPHER",
+    // OTLP headers (commonly carry auth tokens like "Authorization=Bearer ...")
+    "OTLP_HEADERS",
+    "OTLP_TRACES_HEADERS",
+    "OTLP_METRICS_HEADERS",
+    "OTLP_LOGS_HEADERS",
 ];
 
 /// Environment variable names that are always safe to keep.
@@ -155,6 +160,15 @@ pub const SAFE_ENV_ALLOWLIST: &[&str] = &[
     "LOOPAL_PERMISSION_MODE",
     "LOOPAL_LOG",
     "LOOPAL_SANDBOX",
+    "LOOPAL_OTEL_ENABLED",
+    "LOOPAL_OTEL_ENDPOINT",
+    // OpenTelemetry standard env vars
+    "OTEL_EXPORTER_OTLP_ENDPOINT",
+    "OTEL_EXPORTER_OTLP_PROTOCOL",
+    "OTEL_TRACES_SAMPLER",
+    "OTEL_TRACES_SAMPLER_ARG",
+    "OTEL_SERVICE_NAME",
+    "OTEL_RESOURCE_ATTRIBUTES",
 ];
 
 /// Dangerous command patterns that should be blocked entirely.

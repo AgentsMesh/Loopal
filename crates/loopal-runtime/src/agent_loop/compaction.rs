@@ -6,7 +6,7 @@
 
 use loopal_error::Result;
 use loopal_protocol::AgentEventPayload;
-use tracing::{info, warn};
+use tracing::{Instrument, info, warn};
 
 use super::runner::AgentLoopRunner;
 
@@ -20,52 +20,57 @@ impl AgentLoopRunner {
     /// every push. This method handles Layer 2: async LLM summarization
     /// when messages exceed 75% of budget.
     pub async fn check_and_compact(&mut self) -> Result<()> {
-        if !self.params.store.needs_summarization() {
-            return Ok(());
-        }
-
-        // PreCompact hook: notify before compaction.
-        crate::fire_hooks::fire_hooks(
-            &self.params.deps.kernel,
-            loopal_config::HookEvent::PreCompact,
-            &loopal_hooks::HookContext {
-                session_id: Some(&self.params.session.id),
-                ..Default::default()
-            },
-        )
-        .await;
-
-        let msg_tokens = self.params.store.current_tokens();
-        let budget = self.params.store.budget().clone();
-
-        info!(
-            msg_tokens,
-            message_budget = budget.message_budget,
-            messages = self.params.store.len(),
-            "compaction triggered"
-        );
-
-        self.emit(AgentEventPayload::Stream {
-            text: "[compacting context...]\n".to_string(),
-        })
-        .await?;
-
-        let before = self.params.store.len();
-        let tokens_before = msg_tokens;
-
-        // Try LLM summarization first, fall back to emergency truncation
-        if !budget.needs_emergency(msg_tokens) {
-            if self.try_smart_compact().await {
-                self.post_compact(before, tokens_before, "smart").await?;
+        let compact_span = tracing::info_span!("context_compact");
+        async {
+            if !self.params.store.needs_summarization() {
                 return Ok(());
             }
-            warn!("smart compact failed, falling back to emergency truncation");
-        }
 
-        self.params.store.emergency_compact(EMERGENCY_KEEP_LAST);
-        self.post_compact(before, tokens_before, "emergency")
+            // PreCompact hook: notify before compaction.
+            crate::fire_hooks::fire_hooks(
+                &self.params.deps.kernel,
+                loopal_config::HookEvent::PreCompact,
+                &loopal_hooks::HookContext {
+                    session_id: Some(&self.params.session.id),
+                    ..Default::default()
+                },
+            )
+            .await;
+
+            let msg_tokens = self.params.store.current_tokens();
+            let budget = self.params.store.budget().clone();
+
+            info!(
+                msg_tokens,
+                message_budget = budget.message_budget,
+                messages = self.params.store.len(),
+                "compaction triggered"
+            );
+
+            self.emit(AgentEventPayload::Stream {
+                text: "[compacting context...]\n".to_string(),
+            })
             .await?;
-        Ok(())
+
+            let before = self.params.store.len();
+            let tokens_before = msg_tokens;
+
+            // Try LLM summarization first, fall back to emergency truncation
+            if !budget.needs_emergency(msg_tokens) {
+                if self.try_smart_compact().await {
+                    self.post_compact(before, tokens_before, "smart").await?;
+                    return Ok(());
+                }
+                warn!("smart compact failed, falling back to emergency truncation");
+            }
+
+            self.params.store.emergency_compact(EMERGENCY_KEEP_LAST);
+            self.post_compact(before, tokens_before, "emergency")
+                .await?;
+            Ok(())
+        }
+        .instrument(compact_span)
+        .await
     }
 
     /// Attempt LLM-based summarization. Returns true if successful.

@@ -11,10 +11,11 @@ use loopal_error::{AgentOutput, LoopalError, Result, TerminateReason};
 use loopal_protocol::{AgentEventPayload, AgentStatus};
 use tracing::{error, info};
 
+use super::LifecycleMode;
 use super::cancel::TurnCancel;
+use super::input::WaitResult;
 use super::runner::AgentLoopRunner;
 use super::turn_context::TurnContext;
-use super::{LifecycleMode, WaitResult};
 
 impl AgentLoopRunner {
     pub(super) async fn run_loop(&mut self) -> Result<AgentOutput> {

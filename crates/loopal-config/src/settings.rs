@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::harness::HarnessConfig;
 use crate::hook::HookConfig;
 use crate::sandbox::SandboxConfig;
+use crate::telemetry::TelemetryConfig;
 use loopal_provider_api::{ModelOverride, TaskType, ThinkingConfig};
 use loopal_tool_api::PermissionMode;
 
@@ -61,6 +62,10 @@ pub struct Settings {
     /// Output style override (e.g. "explanatory", "learning"). Empty = default.
     #[serde(default)]
     pub output_style: String,
+
+    /// OpenTelemetry configuration
+    #[serde(default)]
+    pub telemetry: TelemetryConfig,
 }
 
 impl Default for Settings {
@@ -79,6 +84,7 @@ impl Default for Settings {
             memory: MemoryConfig::default(),
             harness: HarnessConfig::default(),
             output_style: String::new(),
+            telemetry: TelemetryConfig::default(),
         }
     }
 }

@@ -14,8 +14,10 @@ impl Tool for LsTool {
     }
 
     fn description(&self) -> &str {
-        "List directory contents. Use long mode for size, permissions, and mtime. \
-         When path points to a file, shows detailed file info (stat)."
+        "List directory contents with file names, sizes, and types.\n\
+         - Use long mode for detailed info: size, permissions, and modification time.\n\
+         - When path points to a file, shows detailed file info (stat).\n\
+         - Use this tool instead of running `ls` via Bash — it provides structured output."
     }
 
     fn parameters_schema(&self) -> Value {

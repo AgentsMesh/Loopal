@@ -74,3 +74,31 @@ fn unrecognized_vars_kept() {
     assert!(clean.contains_key("MY_CUSTOM_VAR"));
     assert!(clean.contains_key("CARGO_HOME"));
 }
+
+#[test]
+fn otel_headers_stripped() {
+    // OTEL_EXPORTER_OTLP_HEADERS commonly carries auth tokens
+    assert!(is_sensitive("OTEL_EXPORTER_OTLP_HEADERS"));
+}
+
+#[test]
+fn otel_traces_headers_stripped() {
+    assert!(is_sensitive("OTEL_EXPORTER_OTLP_TRACES_HEADERS"));
+    assert!(is_sensitive("OTEL_EXPORTER_OTLP_METRICS_HEADERS"));
+    assert!(is_sensitive("OTEL_EXPORTER_OTLP_LOGS_HEADERS"));
+}
+
+#[test]
+fn otel_safe_vars_kept() {
+    assert!(!is_sensitive("OTEL_EXPORTER_OTLP_ENDPOINT"));
+    assert!(!is_sensitive("OTEL_EXPORTER_OTLP_PROTOCOL"));
+    assert!(!is_sensitive("OTEL_SERVICE_NAME"));
+    assert!(!is_sensitive("OTEL_RESOURCE_ATTRIBUTES"));
+    assert!(!is_sensitive("OTEL_TRACES_SAMPLER"));
+}
+
+#[test]
+fn loopal_otel_vars_kept() {
+    assert!(!is_sensitive("LOOPAL_OTEL_ENABLED"));
+    assert!(!is_sensitive("LOOPAL_OTEL_ENDPOINT"));
+}

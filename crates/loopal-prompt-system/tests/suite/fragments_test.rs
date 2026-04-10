@@ -135,11 +135,11 @@ fn conditional_tool_fragments() {
 #[test]
 fn fragment_count() {
     let frags = system_fragments();
-    // core/6 + tasks/11 + tools/5 + modes/2 + agents/3 + styles/2 = 29
+    // core/6 + tasks/12 + tools/6 + modes/2 + agents/3 + styles/2 = 31
     assert_eq!(
         frags.len(),
-        29,
-        "expected 29 fragments, got {}: {:?}",
+        31,
+        "expected 31 fragments, got {}: {:?}",
         frags.len(),
         frags.iter().map(|f| &f.id).collect::<Vec<_>>()
     );

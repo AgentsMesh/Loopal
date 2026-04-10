@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use tokio::sync::Mutex;
-use tracing::info;
+use tracing::{Instrument, info};
 
 use loopal_config::load_config;
 use loopal_error::AgentOutput;
@@ -35,114 +35,120 @@ pub(crate) async fn start_session(
     hub: &SessionHub,
     is_production: bool,
 ) -> anyhow::Result<SessionHandle> {
-    let cwd_str = params["cwd"].as_str().map(String::from);
-    let cwd = cwd_str
-        .as_deref()
-        .map(PathBuf::from)
-        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+    let session_span = tracing::info_span!("session_start", session.id = tracing::field::Empty);
+    async {
+        let cwd_str = params["cwd"].as_str().map(String::from);
+        let cwd = cwd_str
+            .as_deref()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
 
-    // Lifecycle: explicit from params, default based on prompt presence.
-    let lifecycle = match params["lifecycle"].as_str() {
-        Some("ephemeral") => loopal_runtime::LifecycleMode::Ephemeral,
-        Some("persistent") => loopal_runtime::LifecycleMode::Persistent,
-        Some(unknown) => {
-            anyhow::bail!(
-                "unknown lifecycle mode: '{unknown}' (expected 'ephemeral' or 'persistent')"
-            );
-        }
-        None if params["prompt"].as_str().is_some() => loopal_runtime::LifecycleMode::Ephemeral,
-        None => loopal_runtime::LifecycleMode::Persistent,
-    };
+        // Lifecycle: explicit from params, default based on prompt presence.
+        let lifecycle = match params["lifecycle"].as_str() {
+            Some("ephemeral") => loopal_runtime::LifecycleMode::Ephemeral,
+            Some("persistent") => loopal_runtime::LifecycleMode::Persistent,
+            Some(unknown) => {
+                anyhow::bail!(
+                    "unknown lifecycle mode: '{unknown}' (expected 'ephemeral' or 'persistent')"
+                );
+            }
+            None if params["prompt"].as_str().is_some() => loopal_runtime::LifecycleMode::Ephemeral,
+            None => loopal_runtime::LifecycleMode::Persistent,
+        };
 
-    let start = StartParams {
-        cwd: cwd_str,
-        model: params["model"].as_str().map(String::from),
-        mode: params["mode"].as_str().map(String::from),
-        prompt: params["prompt"].as_str().map(String::from),
-        permission_mode: params["permission_mode"].as_str().map(String::from),
-        no_sandbox: params["no_sandbox"].as_bool().unwrap_or(false),
-        resume: params["resume"].as_str().map(String::from),
-        lifecycle,
-        agent_type: params["agent_type"].as_str().map(String::from),
-        depth: params["depth"].as_u64().map(|v| v as u32),
-    };
+        let start = StartParams {
+            cwd: cwd_str,
+            model: params["model"].as_str().map(String::from),
+            mode: params["mode"].as_str().map(String::from),
+            prompt: params["prompt"].as_str().map(String::from),
+            permission_mode: params["permission_mode"].as_str().map(String::from),
+            no_sandbox: params["no_sandbox"].as_bool().unwrap_or(false),
+            resume: params["resume"].as_str().map(String::from),
+            lifecycle,
+            agent_type: params["agent_type"].as_str().map(String::from),
+            depth: params["depth"].as_u64().map(|v| v as u32),
+        };
 
-    let mut config = load_config(&cwd)?;
-    crate::params::apply_start_overrides(&mut config.settings, &start);
-    let kernel = if is_production {
-        crate::params::build_kernel_from_config(&config, true).await?
-    } else {
-        match hub.get_test_provider().await {
-            Some(provider) => crate::params::build_kernel_with_provider(provider)?,
-            None => crate::params::build_kernel_from_config(&config, false).await?,
-        }
-    };
+        let mut config = load_config(&cwd)?;
+        crate::params::apply_start_overrides(&mut config.settings, &start);
+        let kernel = if is_production {
+            crate::params::build_kernel_from_config(&config, true).await?
+        } else {
+            match hub.get_test_provider().await {
+                Some(provider) => crate::params::build_kernel_with_provider(provider)?,
+                None => crate::params::build_kernel_from_config(&config, false).await?,
+            }
+        };
 
-    // Create session infrastructure
-    let (input_tx, input_rx) = tokio::sync::mpsc::channel::<AgentInput>(16);
-    let interrupt = InterruptSignal::new();
-    let (watch_tx, watch_rx) = tokio::sync::watch::channel(0u64);
-    let interrupt_tx = Arc::new(watch_tx);
+        // Create session infrastructure
+        let (input_tx, input_rx) = tokio::sync::mpsc::channel::<AgentInput>(16);
+        let interrupt = InterruptSignal::new();
+        let (watch_tx, watch_rx) = tokio::sync::watch::channel(0u64);
+        let interrupt_tx = Arc::new(watch_tx);
 
-    let frontend_placeholder = Arc::new(HubFrontend::new(
-        Arc::new(SharedSession::placeholder(
-            input_tx.clone(),
+        let frontend_placeholder = Arc::new(HubFrontend::new(
+            Arc::new(SharedSession::placeholder(
+                input_tx.clone(),
+                interrupt.clone(),
+                interrupt_tx.clone(),
+            )),
+            input_rx,
+            None,
+            watch_rx,
+        ));
+
+        let session_dir_override = hub.session_dir_override().await;
+        let agent_params = agent_setup::build_with_frontend(
+            &cwd,
+            &config,
+            &start,
+            frontend_placeholder.clone(),
             interrupt.clone(),
             interrupt_tx.clone(),
-        )),
-        input_rx,
-        None,
-        watch_rx,
-    ));
+            kernel,
+            connection.clone(),
+            session_dir_override.as_deref(),
+        )?;
 
-    let session_dir_override = hub.session_dir_override().await;
-    let agent_params = agent_setup::build_with_frontend(
-        &cwd,
-        &config,
-        &start,
-        frontend_placeholder.clone(),
-        interrupt.clone(),
-        interrupt_tx.clone(),
-        kernel,
-        connection.clone(),
-        session_dir_override.as_deref(),
-    )?;
+        let session_id = agent_params.session.id.clone();
+        tracing::Span::current().record("session.id", session_id.as_str());
 
-    let session_id = agent_params.session.id.clone();
+        let session = Arc::new(SharedSession {
+            session_id: session_id.clone(),
+            clients: Mutex::new(Vec::new()),
+            input_tx,
+            interrupt: interrupt.clone(),
+            interrupt_tx: interrupt_tx.clone(),
+        });
+        session.add_client("stdio".into(), connection.clone()).await;
+        frontend_placeholder.replace_session(session.clone()).await;
+        hub.register_session(session.clone()).await;
 
-    let session = Arc::new(SharedSession {
-        session_id: session_id.clone(),
-        clients: Mutex::new(Vec::new()),
-        input_tx,
-        interrupt: interrupt.clone(),
-        interrupt_tx: interrupt_tx.clone(),
-    });
-    session.add_client("stdio".into(), connection.clone()).await;
-    frontend_placeholder.replace_session(session.clone()).await;
-    hub.register_session(session.clone()).await;
+        let _ = connection
+            .respond(request_id, serde_json::json!({"session_id": session_id}))
+            .await;
+        info!(session.id = %session_id, "session started");
 
-    let _ = connection
-        .respond(request_id, serde_json::json!({"session_id": session_id}))
-        .await;
-    info!(session = %session_id, "session started");
-
-    let agent_task = tokio::spawn(async move {
-        match agent_loop(agent_params).await {
-            Ok(output) => {
-                info!(reason = ?output.terminate_reason, "agent loop completed");
-                Some(output)
+        let agent_task = tokio::spawn(async move {
+            match agent_loop(agent_params).await {
+                Ok(output) => {
+                    info!(reason = ?output.terminate_reason, "agent loop completed");
+                    Some(output)
+                }
+                Err(e) => {
+                    tracing::error!(error = %e, "agent loop error");
+                    None
+                }
             }
-            Err(e) => {
-                tracing::error!(error = %e, "agent loop error");
-                None
-            }
-        }
-    });
+        });
 
-    Ok(SessionHandle {
-        session_id,
-        session,
-        agent_task,
-        lifecycle,
-    })
+        Ok(SessionHandle {
+            session_id,
+            session,
+            agent_task,
+            lifecycle,
+        })
+    }
+    .instrument(session_span)
+    .await
 }

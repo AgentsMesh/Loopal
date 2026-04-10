@@ -6,10 +6,15 @@ use loopal_error::Result;
 use loopal_protocol::{Envelope, MessageSource};
 use tracing::{error, info};
 
-use super::WaitResult;
 use super::message_build::build_user_message;
 use super::runner::AgentLoopRunner;
 use crate::fire_hooks::fire_hooks;
+
+/// Result of waiting for user input.
+pub enum WaitResult {
+    /// A user message was added to the conversation
+    MessageAdded,
+}
 
 impl AgentLoopRunner {
     /// Wait for input from any source. Returns None if all channels closed.

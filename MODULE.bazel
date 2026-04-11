@@ -12,6 +12,19 @@ bazel_dep(name = "platforms", version = "1.0.0")
 # Rust rules
 bazel_dep(name = "rules_rust", version = "0.69.0")
 
+# Patch rules_rust to fix Windows PATH length overflow (bazelbuild/rules_rust#3767).
+# The process_wrapper consolidates hundreds of -Ldependency= paths into a single
+# temporary directory via hard links, keeping PATH under the 32,767-char Win32 limit.
+# Safe to remove once upstream merges commits eb70659c + 22830c79.
+single_version_override(
+    module_name = "rules_rust",
+    patch_strip = 1,
+    patches = [
+        "//patches:rules_rust_windows_consolidate_deps.patch",
+    ],
+    version = "0.69.0",
+)
+
 # Rust toolchain
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 rust.toolchain(

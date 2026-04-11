@@ -28,9 +28,11 @@ jobs:
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-24.04-arm
             archive: tar.gz
-          - target: x86_64-pc-windows-msvc
-            os: windows-latest
-            archive: zip
+          # Windows disabled: rules_rust#3767 — rustc PATH env var exceeds
+          # 32,767 char limit with many transitive deps. Pending upstream fix.
+          # - target: x86_64-pc-windows-msvc
+          #   os: windows-latest
+          #   archive: zip
 
     steps:
       - uses: actions/checkout@v4
@@ -45,15 +47,6 @@ jobs:
           bazelisk-cache: true
           disk-cache: release-${{ matrix.target }}
           repository-cache: true
-
-      # Workaround: rules_rust#3767 — on Windows, rustc adds -Ldependency paths
-      # to PATH which has a 32,767 char limit. Shorten Bazel output base to reduce path lengths.
-      - name: Shorten Bazel output base (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $bazelrc = "$env:USERPROFILE\.bazelrc"
-          (Get-Content $bazelrc) -replace 'startup --output_base=.*', 'startup --output_base=C:/b' | Set-Content $bazelrc
 
       - name: Build release binary
         run: bazel build //:loopal -c opt

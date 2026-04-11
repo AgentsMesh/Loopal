@@ -6,8 +6,7 @@ use loopal_runtime::plan_file::{PlanFile, build_plan_mode_filter, wrap_plan_remi
 fn new_creates_path_under_plans_dir() {
     let tmp = tempfile::tempdir().unwrap();
     let pf = PlanFile::new(tmp.path());
-    let expected_segment: &std::path::Path =
-        &std::path::PathBuf::from(".loopal").join("plans");
+    let expected_segment: &std::path::Path = &std::path::PathBuf::from(".loopal").join("plans");
     let path = pf.path();
     assert!(
         path.to_string_lossy()

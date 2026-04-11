@@ -11,7 +11,7 @@ fn new_creates_path_under_plans_dir() {
     let path = pf.path();
     assert!(
         path.to_string_lossy()
-            .contains(&expected_segment.to_string_lossy().as_ref()),
+            .contains(expected_segment.to_string_lossy().as_ref()),
         "path {path:?} should contain {expected_segment:?}"
     );
     assert!(path.extension().is_some_and(|e| e == "md"));

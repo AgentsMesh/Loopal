@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
-use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
+use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolDispatch, ToolResult};
 use loopal_tools::ToolRegistry;
 use serde_json::{Value, json};
 
@@ -114,4 +114,22 @@ fn test_register_overwrites_same_name() {
 fn test_default_creates_empty_registry() {
     let registry = ToolRegistry::default();
     assert!(registry.list().is_empty());
+}
+
+/// Contract: runner-direct tools (AskUser, EnterPlanMode, ExitPlanMode) declare
+/// `ToolDispatch::RunnerDirect`; all other builtin tools default to `Pipeline`.
+#[test]
+fn dispatch_contract_for_builtin_tools() {
+    use loopal_tool_ask_user::AskUserTool;
+    use loopal_tool_plan_mode::{EnterPlanModeTool, ExitPlanModeTool};
+    use loopal_tool_read::ReadTool;
+
+    // Runner-direct tools
+    assert_eq!(AskUserTool.dispatch(), ToolDispatch::RunnerDirect);
+    assert_eq!(EnterPlanModeTool.dispatch(), ToolDispatch::RunnerDirect);
+    assert_eq!(ExitPlanModeTool.dispatch(), ToolDispatch::RunnerDirect);
+
+    // Pipeline tools (default)
+    assert_eq!(ReadTool.dispatch(), ToolDispatch::Pipeline);
+    assert_eq!(MockTool::new("Foo").dispatch(), ToolDispatch::Pipeline);
 }

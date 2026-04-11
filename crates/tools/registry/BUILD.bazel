@@ -35,9 +35,12 @@ rust_test(
     deps = [
         ":loopal-tools",
         "//crates/loopal-error:loopal-error",
+        "//crates/loopal-tool-api",
+        "//crates/tools/agent/ask-user:loopal-tool-ask-user",
+        "//crates/tools/agent/plan-mode:loopal-tool-plan-mode",
+        "//crates/tools/filesystem/read:loopal-tool-read",
         "@crates//:serde_json",
         "@crates//:tempfile",
-        "//crates/loopal-tool-api",
     ],
     proc_macro_deps = ["@crates//:async-trait"],
 )

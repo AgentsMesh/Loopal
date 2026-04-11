@@ -11,12 +11,32 @@ use crate::permission::PermissionLevel;
 
 use crate::output_tail::OutputTail;
 
+/// How a tool call is dispatched at runtime.
+///
+/// Separates the *execution strategy* from the *permission level*: a tool can
+/// be `ReadOnly` (no user approval needed) yet still require runner-level
+/// orchestration rather than the normal execute-in-pipeline path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToolDispatch {
+    /// Normal pipeline: permission check → `Tool::execute()`.
+    Pipeline,
+    /// Handled directly by the agent-loop runner (e.g. AskUser,
+    /// EnterPlanMode, ExitPlanMode). Skips `execute()` and must NOT be
+    /// early-started by the streaming executor.
+    RunnerDirect,
+}
+
 #[async_trait]
 pub trait Tool: Send + Sync {
     fn name(&self) -> &str;
     fn description(&self) -> &str;
     fn parameters_schema(&self) -> serde_json::Value;
     fn permission(&self) -> PermissionLevel;
+
+    /// How this tool is dispatched. Defaults to `Pipeline` (normal execution).
+    fn dispatch(&self) -> ToolDispatch {
+        ToolDispatch::Pipeline
+    }
 
     /// Pre-execution validation. Returns `Some(reason)` to block, `None` to allow.
     /// Called before permission prompt. Default: always allow.

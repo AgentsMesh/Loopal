@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
-use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
+use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolDispatch, ToolResult};
 use serde_json::{Value, json};
 
 pub struct AskUserTool;
@@ -71,6 +71,10 @@ impl Tool for AskUserTool {
 
     fn permission(&self) -> PermissionLevel {
         PermissionLevel::ReadOnly
+    }
+
+    fn dispatch(&self) -> ToolDispatch {
+        ToolDispatch::RunnerDirect
     }
 
     async fn execute(&self, _input: Value, _ctx: &ToolContext) -> Result<ToolResult, LoopalError> {

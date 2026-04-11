@@ -23,7 +23,7 @@ use std::time::Instant;
 use loopal_kernel::Kernel;
 use loopal_message::ContentBlock;
 use loopal_protocol::AgentEventPayload;
-use loopal_tool_api::{PermissionLevel, ToolContext};
+use loopal_tool_api::{PermissionLevel, ToolContext, ToolDispatch};
 use tokio::task::JoinSet;
 use tracing::{debug, info};
 
@@ -95,12 +95,18 @@ pub fn feed_tool(
     tool_use: &ToolUseArrived,
     emitter: Box<dyn EventEmitter>,
 ) -> bool {
-    let is_readonly = kernel
-        .get_tool(&tool_use.name)
-        .map(|t| t.permission() == PermissionLevel::ReadOnly)
-        .unwrap_or(false);
+    let tool = match kernel.get_tool(&tool_use.name) {
+        Some(t) => t,
+        None => return false,
+    };
 
-    if !is_readonly {
+    // Skip runner-direct tools (AskUser, PlanMode, etc.) — they are handled
+    // by intercept_special_tools, not the normal execution pipeline.
+    if tool.dispatch() == ToolDispatch::RunnerDirect {
+        return false;
+    }
+
+    if tool.permission() != PermissionLevel::ReadOnly {
         return false;
     }
 

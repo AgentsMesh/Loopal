@@ -53,6 +53,7 @@ pub mod mock_provider;
 pub use mock_provider::make_runner_with_mock_provider;
 mod cancel_test;
 mod context_budget_test;
+mod dispatch_test;
 mod model_routing_test;
 mod permission_test_ext;
 mod plan_mode_filter_test;

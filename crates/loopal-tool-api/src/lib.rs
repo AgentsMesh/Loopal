@@ -15,7 +15,7 @@ pub use backend_types::{
 pub use memory_channel::MemoryChannel;
 pub use output_tail::OutputTail;
 pub use permission::{PermissionDecision, PermissionLevel, PermissionMode};
-pub use tool::{Tool, ToolContext, ToolDefinition, ToolResult};
+pub use tool::{Tool, ToolContext, ToolDefinition, ToolDispatch, ToolResult};
 pub use truncate::{
     DEFAULT_MAX_OUTPUT_BYTES, DEFAULT_MAX_OUTPUT_LINES, OverflowResult, handle_overflow,
     needs_truncation, save_to_overflow_file, truncate_output,

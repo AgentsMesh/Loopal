@@ -101,8 +101,15 @@ impl AgentLoopRunner {
         }
 
         // Phase 3: Collect early-started ReadOnly tool results.
+        // Filter out any that were also intercepted (defensive — feed_tool already
+        // skips RunnerDirect tools, but this prevents duplicate tool_result if the
+        // invariant is ever broken).
         let early_results = early_handle.take_results().await;
-        indexed_results.extend(early_results);
+        indexed_results.extend(
+            early_results
+                .into_iter()
+                .filter(|(idx, _)| !intercepted_indices.contains(idx)),
+        );
 
         // Plan mode: wrap non-intercepted tool results with system-reminder.
         if self.params.config.mode == AgentMode::Plan {

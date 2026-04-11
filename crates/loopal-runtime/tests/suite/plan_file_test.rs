@@ -6,9 +6,14 @@ use loopal_runtime::plan_file::{PlanFile, build_plan_mode_filter, wrap_plan_remi
 fn new_creates_path_under_plans_dir() {
     let tmp = tempfile::tempdir().unwrap();
     let pf = PlanFile::new(tmp.path());
-    let path = pf.path().to_string_lossy();
-    assert!(path.contains(".loopal/plans/"));
-    assert!(path.ends_with(".md"));
+    let expected_segment: &std::path::Path = &std::path::PathBuf::from(".loopal").join("plans");
+    let path = pf.path();
+    assert!(
+        path.to_string_lossy()
+            .contains(expected_segment.to_string_lossy().as_ref()),
+        "path {path:?} should contain {expected_segment:?}"
+    );
+    assert!(path.extension().is_some_and(|e| e == "md"));
 }
 
 #[test]

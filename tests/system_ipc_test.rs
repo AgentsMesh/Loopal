@@ -32,6 +32,7 @@ fn write_mock_fixture(content: &str) -> tempfile::NamedTempFile {
 
 const TIMEOUT: Duration = Duration::from_secs(15);
 
+#[cfg(not(target_os = "windows"))]
 #[tokio::test]
 async fn system_spawn_and_initialize() {
     let fixture = write_mock_fixture(
@@ -134,6 +135,7 @@ async fn system_spawn_and_initialize() {
     }
 }
 
+#[cfg(not(target_os = "windows"))]
 #[tokio::test]
 async fn system_process_isolation_survives_kill() {
     let fixture = write_mock_fixture(

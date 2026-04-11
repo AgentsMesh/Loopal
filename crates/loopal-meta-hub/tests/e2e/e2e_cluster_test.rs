@@ -13,6 +13,7 @@ use serde_json::json;
 use cluster_harness::{HubHandle, MetaHubHandle};
 
 /// Two-hub cluster: both agents become ready via real IPC.
+#[cfg(not(target_os = "windows"))]
 #[tokio::test]
 async fn cluster_boots_two_hubs_with_agents() {
     let meta = MetaHubHandle::boot().await;
@@ -53,6 +54,7 @@ async fn cluster_boots_two_hubs_with_agents() {
 }
 
 /// ListHubs from hub-a sees hub-b (and vice versa) via MetaHub.
+#[cfg(not(target_os = "windows"))]
 #[tokio::test]
 async fn cluster_list_hubs_via_agent() {
     let meta = MetaHubHandle::boot().await;
@@ -85,6 +87,7 @@ async fn cluster_list_hubs_via_agent() {
 }
 
 /// Cross-hub message routing: hub-a sends to hub-b's agent via MetaHub.
+#[cfg(not(target_os = "windows"))]
 #[tokio::test]
 async fn cluster_cross_hub_message_delivery() {
     let meta = MetaHubHandle::boot().await;

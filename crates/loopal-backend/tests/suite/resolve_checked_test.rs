@@ -32,6 +32,15 @@ fn make_readonly_backend(cwd: &std::path::Path) -> Arc<LocalBackend> {
 
 // ── check_sandbox_path ───────────────────────────────────────────
 
+/// An absolute path guaranteed to be outside any tempdir on all platforms.
+fn outside_cwd_path() -> &'static str {
+    if cfg!(windows) {
+        r"C:\Windows\System32\evil.exe"
+    } else {
+        "/usr/local/bin/evil"
+    }
+}
+
 #[test]
 fn check_sandbox_path_returns_none_for_allowed() {
     let dir = tempfile::tempdir().unwrap();
@@ -48,7 +57,7 @@ fn check_sandbox_path_returns_none_for_allowed() {
 fn check_sandbox_path_returns_reason_for_outside_cwd() {
     let dir = tempfile::tempdir().unwrap();
     let backend = make_backend(dir.path());
-    let reason = backend.check_sandbox_path("/usr/local/bin/evil", true);
+    let reason = backend.check_sandbox_path(outside_cwd_path(), true);
     assert!(reason.is_some());
     assert!(reason.unwrap().contains("outside writable"));
 }
@@ -66,22 +75,15 @@ fn check_sandbox_path_returns_reason_for_deny_glob() {
 fn check_sandbox_path_returns_none_after_approve() {
     let dir = tempfile::tempdir().unwrap();
     let backend = make_backend(dir.path());
-    let path = std::path::PathBuf::from("/usr/local/bin/evil");
+    let evil = outside_cwd_path();
+    let path = std::path::PathBuf::from(evil);
 
     // Before approval: needs approval
-    assert!(
-        backend
-            .check_sandbox_path("/usr/local/bin/evil", true)
-            .is_some()
-    );
+    assert!(backend.check_sandbox_path(evil, true).is_some());
 
     // After approval: no longer needs approval
     backend.approve_path(&path);
-    assert!(
-        backend
-            .check_sandbox_path("/usr/local/bin/evil", true)
-            .is_none()
-    );
+    assert!(backend.check_sandbox_path(evil, true).is_none());
 }
 
 // ── resolve_checked (via Backend methods) ────────────────────────
@@ -99,7 +101,7 @@ async fn write_to_allowed_path_succeeds() {
 async fn write_outside_cwd_returns_requires_approval() {
     let dir = tempfile::tempdir().unwrap();
     let backend = make_backend(dir.path());
-    let result = backend.write("/usr/local/bin/evil", "bad").await;
+    let result = backend.write(outside_cwd_path(), "bad").await;
     assert!(matches!(result, Err(ToolIoError::RequiresApproval(_))));
 }
 

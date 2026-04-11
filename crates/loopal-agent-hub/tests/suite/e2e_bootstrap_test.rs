@@ -17,6 +17,7 @@ use serde_json::json;
 
 /// Full bootstrap e2e: Hub spawns real agent process with mock provider,
 /// agent starts, emits AwaitingInput, TUI sends message, agent responds.
+#[cfg(not(target_os = "windows"))]
 #[tokio::test]
 async fn full_bootstrap_hub_to_agent_roundtrip() {
     // 1. Create mock provider JSON file

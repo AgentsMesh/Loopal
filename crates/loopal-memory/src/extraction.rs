@@ -1,4 +1,4 @@
-/// Utilities for extracting structured sections from agent output.
+//! Utilities for extracting structured sections from agent output.
 
 /// Extract memory suggestions from agent output.
 ///
@@ -19,12 +19,12 @@ pub fn extract_memory_suggestions(output: &str) -> Vec<String> {
             in_section = false;
             continue;
         }
-        if in_section {
-            if let Some(bullet) = trimmed.strip_prefix("- ") {
-                let bullet = bullet.trim();
-                if !bullet.is_empty() {
-                    suggestions.push(bullet.to_string());
-                }
+        if in_section
+            && let Some(bullet) = trimmed.strip_prefix("- ")
+        {
+            let bullet = bullet.trim();
+            if !bullet.is_empty() {
+                suggestions.push(bullet.to_string());
             }
         }
     }

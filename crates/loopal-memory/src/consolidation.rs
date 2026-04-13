@@ -1,7 +1,7 @@
-/// Memory consolidation — scheduling, locking, and TTL utilities.
-///
-/// Filesystem I/O is intentionally kept thin (marker file read/write only).
-/// Heavy operations (agent spawning, prompt building) live in loopal-agent-server.
+//! Memory consolidation — scheduling, locking, and TTL utilities.
+//!
+//! Filesystem I/O is intentionally kept thin (marker file read/write only).
+//! Heavy operations (agent spawning, prompt building) live in loopal-agent-server.
 
 use std::path::Path;
 
@@ -51,7 +51,7 @@ pub fn needs_consolidation(memory_dir: &Path, interval_days: u32) -> bool {
         Ok(content) => {
             let last = content.trim();
             let today = date::today_str();
-            date::days_between(last, &today).map_or(true, |d| d >= interval_days as i64)
+            date::days_between(last, &today).is_none_or(|d| d >= interval_days as i64)
         }
         Err(_) => {
             // No marker file — consolidation never ran, but only trigger if memory dir exists
@@ -81,7 +81,7 @@ pub fn is_expired(created_at: &str, ttl_days: Option<u32>) -> bool {
         None => false, // never expires
         Some(ttl) => {
             let today = date::today_str();
-            date::days_between(created_at, &today).map_or(false, |d| d >= ttl as i64)
+            date::days_between(created_at, &today).is_some_and(|d| d >= ttl as i64)
         }
     }
 }

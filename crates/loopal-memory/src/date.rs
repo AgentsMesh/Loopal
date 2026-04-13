@@ -1,6 +1,6 @@
-/// Date utilities for the memory system.
-///
-/// Pure functions with no I/O dependencies — safe to use in any crate.
+//! Date utilities for the memory system.
+//!
+//! Pure functions with no I/O dependencies — safe to use in any crate.
 
 /// Format today's date as YYYY-MM-DD.
 pub fn today_str() -> String {

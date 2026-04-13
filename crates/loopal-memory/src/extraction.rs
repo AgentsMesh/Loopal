@@ -19,9 +19,7 @@ pub fn extract_memory_suggestions(output: &str) -> Vec<String> {
             in_section = false;
             continue;
         }
-        if in_section
-            && let Some(bullet) = trimmed.strip_prefix("- ")
-        {
+        if in_section && let Some(bullet) = trimmed.strip_prefix("- ") {
             let bullet = bullet.trim();
             if !bullet.is_empty() {
                 suggestions.push(bullet.to_string());
@@ -95,10 +93,7 @@ Done.";
 Some text.
 ## Memory Suggestions
 - Last observation";
-        assert_eq!(
-            extract_memory_suggestions(output),
-            vec!["Last observation"]
-        );
+        assert_eq!(extract_memory_suggestions(output), vec!["Last observation"]);
     }
 
     #[test]

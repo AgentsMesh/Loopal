@@ -21,3 +21,15 @@ When done, provide a clear summary of:
 - What was accomplished (or what was found, for research tasks)
 - Any issues encountered or decisions made
 - File paths of modified or relevant files
+
+## Memory Suggestions
+
+If during your work you discover stable knowledge that future sessions should know — such as architecture decisions, non-obvious conventions, recurring pitfalls, or environment quirks — include a section at the end of your output:
+
+```
+## Memory Suggestions
+- <atomic observation 1, including the why>
+- <atomic observation 2>
+```
+
+Only include genuinely durable insights. Do not include temporary task details, file listings, or information derivable from code.

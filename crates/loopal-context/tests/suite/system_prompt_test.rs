@@ -98,7 +98,7 @@ fn includes_memory() {
         vec![],
         0,
     );
-    assert!(result.contains("# Project Memory"));
+    assert!(result.contains("# Memory"));
     assert!(result.contains("Key Patterns"));
 }
 

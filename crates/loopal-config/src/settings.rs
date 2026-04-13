@@ -188,10 +188,29 @@ fn default_mcp_timeout() -> u64 {
 pub struct MemoryConfig {
     /// Enable Memory tool + Observer (default: true)
     pub enabled: bool,
+    /// Debounce window in milliseconds — observations arriving within this window
+    /// are batched into a single maintainer agent call (default: 2000).
+    pub batch_window_ms: u64,
+    /// Channel buffer capacity (default: 256).
+    pub channel_buffer: usize,
+    /// Consolidation interval in days — how often to trigger full memory consolidation
+    /// on session start (default: 7). Set to 0 to disable.
+    pub consolidation_interval_days: u32,
 }
 
 impl Default for MemoryConfig {
     fn default() -> Self {
-        Self { enabled: true }
+        Self {
+            enabled: true,
+            // 2s window: allows rapid-fire Memory() calls to batch (50-80% spawn reduction)
+            // while keeping latency acceptable for interactive use.
+            batch_window_ms: 2000,
+            // 256 slots ≈ ~8s of high-frequency observations before backpressure.
+            // Dropped observations return "channel full" to the LLM for retry.
+            channel_buffer: 256,
+            // Weekly full consolidation: balance between freshness and API cost.
+            // Set to 0 to disable automatic consolidation.
+            consolidation_interval_days: 7,
+        }
     }
 }

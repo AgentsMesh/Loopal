@@ -77,10 +77,7 @@ fn full_prompt_build() {
         prompt.contains("Always respond in English."),
         "instructions missing"
     );
-    assert!(
-        prompt.contains("# Project Memory"),
-        "memory section missing"
-    );
+    assert!(prompt.contains("# Memory"), "memory section missing");
     assert!(
         prompt.contains("User prefers Rust."),
         "memory content missing"

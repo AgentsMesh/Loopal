@@ -31,3 +31,10 @@ rust_test(
     ],
     proc_macro_deps = ["@crates//:async-trait"],
 )
+
+# Unit tests for #[cfg(test)] modules in src/ (date, consolidation, extraction)
+rust_test(
+    name = "loopal-memory-unit-test",
+    crate = ":loopal-memory",
+    edition = "2024",
+)

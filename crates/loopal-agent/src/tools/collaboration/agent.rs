@@ -55,13 +55,14 @@ impl Tool for AgentTool {
         ctx: &ToolContext,
     ) -> Result<ToolResult, LoopalError> {
         let shared = extract_shared(ctx)?;
+        let memory_channel = ctx.memory_channel.clone();
         let action = input
             .get("action")
             .and_then(|v| v.as_str())
             .unwrap_or("spawn");
 
         match action {
-            "spawn" => action_spawn(shared, &input).await,
+            "spawn" => action_spawn(shared, &input, memory_channel.as_deref()).await,
             "result" => action_result(shared, &input).await,
             "status" => action_status(shared, &input).await,
             other => Ok(ToolResult::error(format!("Unknown action: '{other}'"))),
@@ -72,6 +73,7 @@ impl Tool for AgentTool {
 async fn action_spawn(
     shared: Arc<AgentShared>,
     input: &serde_json::Value,
+    memory_channel: Option<&dyn loopal_tool_api::MemoryChannel>,
 ) -> Result<ToolResult, LoopalError> {
     let prompt = require_str(input, "prompt")?;
     let name = input
@@ -145,7 +147,17 @@ async fn action_spawn(
                     loopal_git::cleanup_if_clean(&root, &info);
                 }
                 match output {
-                    Ok(text) => Ok(ToolResult::success(text)),
+                    Ok(text) => {
+                        // Forward any memory suggestions from sub-agent to the memory channel
+                        if let Some(ch) = memory_channel {
+                            for suggestion in
+                                loopal_memory::extraction::extract_memory_suggestions(&text)
+                            {
+                                let _ = ch.try_send(suggestion);
+                            }
+                        }
+                        Ok(ToolResult::success(text))
+                    }
                     Err(e) => Ok(ToolResult::error(e)),
                 }
             }

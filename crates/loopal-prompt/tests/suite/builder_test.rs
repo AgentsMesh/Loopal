@@ -35,7 +35,7 @@ fn build_includes_instructions_and_memory() {
     };
     let prompt = builder.build(&ctx);
     assert!(prompt.contains("Be helpful."));
-    assert!(prompt.contains("# Project Memory"));
+    assert!(prompt.contains("# Memory"));
     assert!(prompt.contains("User prefers Rust."));
 }
 
@@ -65,5 +65,52 @@ fn fragments_come_before_instructions() {
     assert!(
         frag_pos < instr_pos,
         "fragments ({frag_pos}) should come before instructions ({instr_pos})"
+    );
+}
+
+#[test]
+fn build_memory_includes_precedence_note() {
+    let builder = PromptBuilder::new(FragmentRegistry::new(vec![]));
+    let ctx = PromptContext {
+        memory: "Some memory content".into(),
+        ..Default::default()
+    };
+    let prompt = builder.build(&ctx);
+    assert!(
+        prompt.contains("project memory takes precedence"),
+        "memory section should include precedence note: {}",
+        prompt
+    );
+}
+
+#[test]
+fn build_empty_memory_excluded() {
+    let builder = PromptBuilder::new(FragmentRegistry::new(vec![]));
+    let ctx = PromptContext {
+        memory: String::new(),
+        ..Default::default()
+    };
+    let prompt = builder.build(&ctx);
+    assert!(
+        !prompt.contains("# Memory"),
+        "empty memory should not produce a section"
+    );
+}
+
+#[test]
+fn build_memory_at_tail() {
+    let frags = vec![frag("core/id", 100, "## Identity")];
+    let builder = PromptBuilder::new(FragmentRegistry::new(frags));
+    let ctx = PromptContext {
+        instructions: "## Instructions".into(),
+        memory: "## Project Memory\nSome fact".into(),
+        ..Default::default()
+    };
+    let prompt = builder.build(&ctx);
+    let instr_pos = prompt.find("## Instructions").unwrap();
+    let memory_pos = prompt.find("# Memory").unwrap();
+    assert!(
+        memory_pos > instr_pos,
+        "memory ({memory_pos}) should come after instructions ({instr_pos})"
     );
 }

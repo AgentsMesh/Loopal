@@ -98,11 +98,19 @@ impl ConfigResolver {
                 }
             }
 
-            // Memory: concatenate (same semantics as instructions)
+            // Memory: concatenate with source labels for precedence clarity
             if let Some(text) = layer.memory {
                 let trimmed = text.trim();
                 if !trimmed.is_empty() {
-                    memory_parts.push(trimmed.to_string());
+                    let label = match &layer.source {
+                        LayerSource::Plugin(name) => format!("## Plugin Memory: {name}"),
+                        LayerSource::Global => "## Global Memory".to_string(),
+                        LayerSource::Project => "## Project Memory".to_string(),
+                        LayerSource::Local => "## Local Memory".to_string(),
+                        LayerSource::Env => "## Environment Memory".to_string(),
+                        LayerSource::Cli => "## CLI Memory".to_string(),
+                    };
+                    memory_parts.push(format!("{label}\n\n{trimmed}"));
                 }
             }
         }

@@ -1,27 +1,42 @@
 //! Memory adapter for the agent server process.
+//!
+//! Bridges the generic memory traits (loopal-memory) with concrete agent spawning
+//! and filesystem operations.
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use tokio::sync::mpsc;
-use tracing::info;
+use tracing::{info, warn};
 
 use loopal_agent::shared::AgentShared;
 use loopal_agent::spawn::{SpawnParams, spawn_agent, wait_agent};
-use loopal_memory::{MEMORY_AGENT_PROMPT, MemoryProcessor};
+use loopal_memory::{MEMORY_AGENT_PROMPT, MEMORY_CONSOLIDATION_PROMPT, MemoryProcessor};
 use loopal_tool_api::MemoryChannel;
 
+// ---------------------------------------------------------------------------
+// Channel adapter
+// ---------------------------------------------------------------------------
+
 /// Adapts `mpsc::Sender<String>` to the `MemoryChannel` trait.
-pub struct ServerMemoryChannel(pub mpsc::Sender<String>);
+pub(crate) struct ServerMemoryChannel(mpsc::Sender<String>);
 
 impl MemoryChannel for ServerMemoryChannel {
     fn try_send(&self, observation: String) -> Result<(), String> {
-        self.0.try_send(observation).map_err(|e| e.to_string())
+        self.0.try_send(observation).map_err(|e| {
+            warn!("memory observation dropped: channel full");
+            e.to_string()
+        })
     }
 }
 
+// ---------------------------------------------------------------------------
+// Observation processor
+// ---------------------------------------------------------------------------
+
 /// Processes memory observations by spawning a memory-maintainer agent via Hub.
-pub struct ServerMemoryProcessor {
+pub(crate) struct ServerMemoryProcessor {
     shared: Arc<AgentShared>,
     model: String,
 }
@@ -30,21 +45,19 @@ impl ServerMemoryProcessor {
     pub fn new(shared: Arc<AgentShared>, model: String) -> Self {
         Self { shared, model }
     }
-}
 
-#[async_trait]
-impl MemoryProcessor for ServerMemoryProcessor {
-    async fn process(&self, observation: &str) -> Result<(), String> {
+    fn make_agent_name(prefix: &str) -> String {
         let ts = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .subsec_nanos();
-        let name = format!("memory-{ts:08x}");
+        format!("{prefix}-{ts:08x}")
+    }
+
+    async fn spawn_and_wait(&self, name: &str, prompt: String) -> Result<(), String> {
         let params = SpawnParams {
-            name: name.clone(),
-            prompt: format!(
-                "{MEMORY_AGENT_PROMPT}\n\nNew observation to incorporate:\n\n{observation}"
-            ),
+            name: name.to_string(),
+            prompt,
             model: Some(self.model.clone()),
             cwd_override: None,
             permission_mode: None,
@@ -53,10 +66,7 @@ impl MemoryProcessor for ServerMemoryProcessor {
             depth: self.shared.depth + 1,
         };
         spawn_agent(&self.shared, params).await?;
-        info!("memory-maintainer agent spawned via Hub");
-
-        // Wait for completion
-        match wait_agent(&self.shared, &name).await {
+        match wait_agent(&self.shared, name).await {
             Ok(output) => {
                 info!(output = %output, "memory-maintainer done");
                 Ok(())
@@ -66,7 +76,109 @@ impl MemoryProcessor for ServerMemoryProcessor {
     }
 }
 
+#[async_trait]
+impl MemoryProcessor for ServerMemoryProcessor {
+    async fn process(&self, observation: &str) -> Result<(), String> {
+        let name = Self::make_agent_name("memory");
+        let today = loopal_memory::date::today_str();
+        let prompt = format!(
+            "{MEMORY_AGENT_PROMPT}\n\n\
+             Today: {today}\n\n\
+             ## Observations to incorporate\n\n\
+             1. {observation}"
+        );
+        info!("spawning memory-maintainer agent (single observation)");
+        self.spawn_and_wait(&name, prompt).await
+    }
+
+    async fn process_batch(&self, observations: &[String]) -> Result<(), String> {
+        let name = Self::make_agent_name("memory");
+        let today = loopal_memory::date::today_str();
+        let numbered: String = observations
+            .iter()
+            .enumerate()
+            .map(|(i, obs)| format!("{}. {}", i + 1, obs))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let prompt = format!(
+            "{MEMORY_AGENT_PROMPT}\n\n\
+             Today: {today}\n\n\
+             ## Observations to incorporate\n\n\
+             {numbered}"
+        );
+        info!(
+            count = observations.len(),
+            "spawning memory-maintainer agent (batch)"
+        );
+        self.spawn_and_wait(&name, prompt).await
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Consolidation trigger
+// ---------------------------------------------------------------------------
+
+/// Trigger a full memory consolidation via a dedicated sub-agent.
+///
+/// Runs in the background (non-blocking). Uses a `.consolidation_lock` file
+/// as an optimistic lock to prevent concurrent sessions from triggering
+/// duplicate consolidations. The `.last_consolidation` marker is written
+/// only after the agent completes successfully.
+pub fn trigger_consolidation(shared: &Arc<AgentShared>, model: &str) {
+    let memory_dir = shared.cwd.join(".loopal/memory");
+
+    // Acquire lock — handles stale lock detection (> 1 hour) automatically.
+    let lock_path = match loopal_memory::consolidation::try_acquire_lock(&memory_dir) {
+        Some(path) => path,
+        None => {
+            info!("consolidation already in progress, skipping");
+            return;
+        }
+    };
+
+    let shared = shared.clone();
+    let model = model.to_string();
+    tokio::spawn(async move {
+        let memory_dir = shared.cwd.join(".loopal/memory");
+        let today = loopal_memory::date::today_str();
+        let name = ServerMemoryProcessor::make_agent_name("memory-consolidation");
+        let prompt = format!("{MEMORY_CONSOLIDATION_PROMPT}\n\nToday: {today}");
+        let params = SpawnParams {
+            name: name.clone(),
+            prompt,
+            model: Some(model),
+            cwd_override: None,
+            permission_mode: None,
+            target_hub: None,
+            agent_type: None,
+            depth: shared.depth + 1,
+        };
+        match spawn_agent(&shared, params).await {
+            Ok(_) => {
+                info!("memory consolidation agent spawned");
+                match wait_agent(&shared, &name).await {
+                    Ok(output) => {
+                        info!(output = %output, "memory consolidation done");
+                        // Mark done ONLY on success — if agent fails, next session retries.
+                        loopal_memory::consolidation::mark_done(&memory_dir);
+                    }
+                    Err(e) => warn!(error = %e, "memory consolidation failed"),
+                }
+            }
+            Err(e) => warn!(error = %e, "failed to spawn consolidation agent"),
+        }
+        // Always release the lock
+        loopal_memory::consolidation::release_lock(&lock_path);
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Pipeline builder (entry point)
+// ---------------------------------------------------------------------------
+
 /// Build the optional memory channel + observer sidebar.
+///
+/// Also checks if memory consolidation is due and triggers it in the background.
 pub fn build_memory_channel(
     long_lived: bool,
     settings: &loopal_config::Settings,
@@ -76,11 +188,28 @@ pub fn build_memory_channel(
     if !(long_lived && settings.memory.enabled) {
         return None;
     }
-    let (tx, rx) = mpsc::channel::<String>(64);
+
+    // Check if consolidation is due
+    if settings.memory.consolidation_interval_days > 0
+        && loopal_memory::consolidation::needs_consolidation(
+            &shared.cwd.join(".loopal/memory"),
+            settings.memory.consolidation_interval_days,
+        )
+    {
+        info!("memory consolidation due — triggering in background");
+        trigger_consolidation(shared, model);
+    }
+
+    // Channel capacity from config (default: 256)
+    let buffer = settings.memory.channel_buffer;
+    // Debounce window from config (default: 2000ms)
+    let batch_window = Duration::from_millis(settings.memory.batch_window_ms);
+
+    let (tx, rx) = mpsc::channel::<String>(buffer);
     let processor = Arc::new(ServerMemoryProcessor::new(
         shared.clone(),
         model.to_string(),
     ));
-    tokio::spawn(loopal_memory::MemoryObserver::new(rx, processor).run());
+    tokio::spawn(loopal_memory::MemoryObserver::new(rx, processor, batch_window).run());
     Some(Arc::new(ServerMemoryChannel(tx)))
 }

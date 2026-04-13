@@ -78,7 +78,7 @@ fn full_prompt_build() {
         "instructions missing"
     );
     assert!(
-        prompt.contains("# Project Memory"),
+        prompt.contains("# Memory"),
         "memory section missing"
     );
     assert!(

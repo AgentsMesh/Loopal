@@ -40,9 +40,14 @@ impl PromptBuilder {
             parts.push(ctx.skills_summary.clone());
         }
 
-        // 4. Memory (tail position)
+        // 4. Memory (tail position — curated by Knowledge Manager agent)
         if !ctx.memory.is_empty() {
-            parts.push(format!("# Project Memory\n{}", ctx.memory));
+            parts.push(format!(
+                "# Memory\n\n\
+                 When global and project memory conflict, project memory takes precedence.\n\n\
+                 {}",
+                ctx.memory
+            ));
         }
 
         parts.join("\n\n")

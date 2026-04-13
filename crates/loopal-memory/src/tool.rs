@@ -3,6 +3,10 @@ use loopal_error::LoopalError;
 use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
 use serde_json::{Value, json};
 
+/// Tool for recording cross-session memory observations.
+///
+/// The main agent calls this to submit atomic facts to the sidebar
+/// Knowledge Manager agent for classification, integration, and indexing.
 pub struct MemoryTool;
 
 #[async_trait]

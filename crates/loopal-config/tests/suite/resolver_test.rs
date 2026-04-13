@@ -174,3 +174,201 @@ fn test_resolve_instructions_concatenated() {
     assert!(config.instructions.contains("Project instructions"));
     assert!(config.instructions.contains("\n\n"));
 }
+
+// ---------------------------------------------------------------------------
+// Memory layer labeling tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_resolve_memory_global_labeled() {
+    let mut resolver = ConfigResolver::new();
+    let mut layer = ConfigLayer {
+        source: LayerSource::Global,
+        ..Default::default()
+    };
+    layer.memory = Some("User prefers Rust".into());
+    resolver.add_layer(layer);
+
+    let config = resolver.resolve().unwrap();
+    assert!(
+        config.memory.contains("## Global Memory"),
+        "global memory should be labeled: {}",
+        config.memory
+    );
+    assert!(config.memory.contains("User prefers Rust"));
+}
+
+#[test]
+fn test_resolve_memory_project_labeled() {
+    let mut resolver = ConfigResolver::new();
+    let mut layer = ConfigLayer {
+        source: LayerSource::Project,
+        ..Default::default()
+    };
+    layer.memory = Some("Use snake_case".into());
+    resolver.add_layer(layer);
+
+    let config = resolver.resolve().unwrap();
+    assert!(
+        config.memory.contains("## Project Memory"),
+        "project memory should be labeled: {}",
+        config.memory
+    );
+    assert!(config.memory.contains("Use snake_case"));
+}
+
+#[test]
+fn test_resolve_memory_plugin_labeled() {
+    let mut resolver = ConfigResolver::new();
+    let mut layer = ConfigLayer {
+        source: LayerSource::Plugin("my-plugin".into()),
+        ..Default::default()
+    };
+    layer.memory = Some("Plugin-specific fact".into());
+    resolver.add_layer(layer);
+
+    let config = resolver.resolve().unwrap();
+    assert!(
+        config.memory.contains("## Plugin Memory: my-plugin"),
+        "plugin memory should be labeled: {}",
+        config.memory
+    );
+}
+
+#[test]
+fn test_resolve_memory_multiple_layers_concatenated() {
+    let mut resolver = ConfigResolver::new();
+
+    let mut global = ConfigLayer {
+        source: LayerSource::Global,
+        ..Default::default()
+    };
+    global.memory = Some("Global fact".into());
+
+    let mut project = ConfigLayer {
+        source: LayerSource::Project,
+        ..Default::default()
+    };
+    project.memory = Some("Project fact".into());
+
+    resolver.add_layer(global);
+    resolver.add_layer(project);
+
+    let config = resolver.resolve().unwrap();
+    assert!(config.memory.contains("## Global Memory"));
+    assert!(config.memory.contains("## Project Memory"));
+    assert!(config.memory.contains("Global fact"));
+    assert!(config.memory.contains("Project fact"));
+    // Verify they are separated
+    assert!(config.memory.contains("\n\n"));
+}
+
+#[test]
+fn test_resolve_memory_empty_layers_skipped() {
+    let mut resolver = ConfigResolver::new();
+
+    let mut layer1 = ConfigLayer {
+        source: LayerSource::Global,
+        ..Default::default()
+    };
+    layer1.memory = Some("   ".into()); // whitespace-only
+
+    let mut layer2 = ConfigLayer {
+        source: LayerSource::Project,
+        ..Default::default()
+    };
+    layer2.memory = Some("Actual content".into());
+
+    resolver.add_layer(layer1);
+    resolver.add_layer(layer2);
+
+    let config = resolver.resolve().unwrap();
+    assert!(
+        !config.memory.contains("## Global Memory"),
+        "whitespace-only memory should be skipped"
+    );
+    assert!(config.memory.contains("## Project Memory"));
+}
+
+// ---------------------------------------------------------------------------
+// MemoryConfig defaults test
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_memory_config_defaults() {
+    let config = loopal_config::settings::MemoryConfig::default();
+    assert!(config.enabled);
+    assert_eq!(config.batch_window_ms, 2000);
+    assert_eq!(config.channel_buffer, 256);
+    assert_eq!(config.consolidation_interval_days, 7);
+}
+
+#[test]
+fn test_memory_config_deserialize_partial() {
+    let json = serde_json::json!({"enabled": false});
+    let config: loopal_config::settings::MemoryConfig = serde_json::from_value(json).unwrap();
+    assert!(!config.enabled);
+    // Other fields should have defaults
+    assert_eq!(config.batch_window_ms, 2000);
+    assert_eq!(config.channel_buffer, 256);
+    assert_eq!(config.consolidation_interval_days, 7);
+}
+
+#[test]
+fn test_memory_config_deserialize_full() {
+    let json = serde_json::json!({
+        "enabled": true,
+        "batch_window_ms": 5000,
+        "channel_buffer": 512,
+        "consolidation_interval_days": 14
+    });
+    let config: loopal_config::settings::MemoryConfig = serde_json::from_value(json).unwrap();
+    assert!(config.enabled);
+    assert_eq!(config.batch_window_ms, 5000);
+    assert_eq!(config.channel_buffer, 512);
+    assert_eq!(config.consolidation_interval_days, 14);
+}
+
+#[test]
+fn test_memory_config_in_settings() {
+    let json = serde_json::json!({"memory": {"batch_window_ms": 1000}});
+    let settings: loopal_config::settings::Settings = serde_json::from_value(json).unwrap();
+    assert_eq!(settings.memory.batch_window_ms, 1000);
+    assert!(settings.memory.enabled); // default
+}
+
+#[test]
+fn test_resolve_memory_env_labeled() {
+    let mut resolver = ConfigResolver::new();
+    let mut layer = ConfigLayer {
+        source: LayerSource::Env,
+        ..Default::default()
+    };
+    layer.memory = Some("Env memory fact".into());
+    resolver.add_layer(layer);
+
+    let config = resolver.resolve().unwrap();
+    assert!(
+        config.memory.contains("## Environment Memory"),
+        "env memory should be labeled: {}",
+        config.memory
+    );
+}
+
+#[test]
+fn test_resolve_memory_cli_labeled() {
+    let mut resolver = ConfigResolver::new();
+    let mut layer = ConfigLayer {
+        source: LayerSource::Cli,
+        ..Default::default()
+    };
+    layer.memory = Some("CLI memory fact".into());
+    resolver.add_layer(layer);
+
+    let config = resolver.resolve().unwrap();
+    assert!(
+        config.memory.contains("## CLI Memory"),
+        "cli memory should be labeled: {}",
+        config.memory
+    );
+}

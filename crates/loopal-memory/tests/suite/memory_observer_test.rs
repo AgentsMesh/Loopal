@@ -48,10 +48,7 @@ impl MemoryProcessor for BatchRecordingProcessor {
     }
 
     async fn process_batch(&self, observations: &[String]) -> Result<(), String> {
-        self.batch_calls
-            .lock()
-            .unwrap()
-            .push(observations.to_vec());
+        self.batch_calls.lock().unwrap().push(observations.to_vec());
         Ok(())
     }
 }
@@ -157,7 +154,10 @@ async fn test_single_observation_calls_process_not_batch() {
 
     handle.await.unwrap();
     assert_eq!(processor.single_calls(), vec!["single fact"]);
-    assert!(processor.batch_calls().is_empty(), "process_batch should not be called for single observation");
+    assert!(
+        processor.batch_calls().is_empty(),
+        "process_batch should not be called for single observation"
+    );
 }
 
 #[tokio::test]
@@ -177,7 +177,10 @@ async fn test_multiple_observations_within_window_calls_batch() {
     drop(tx);
 
     handle.await.unwrap();
-    assert!(processor.single_calls().is_empty(), "process() should not be called for batch");
+    assert!(
+        processor.single_calls().is_empty(),
+        "process() should not be called for batch"
+    );
     let batches = processor.batch_calls();
     assert_eq!(batches.len(), 1, "should be exactly one batch");
     assert_eq!(batches[0], vec!["obs1", "obs2", "obs3"]);

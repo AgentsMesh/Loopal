@@ -102,6 +102,7 @@ pub fn make_runner() -> (AgentLoopRunner, mpsc::Receiver<AgentEvent>) {
         auto_classifier: None,
         harness: loopal_config::HarnessConfig::default(),
         rewake_rx: None,
+        message_snapshot: None,
     };
     (AgentLoopRunner::new(params), event_rx)
 }
@@ -148,6 +149,7 @@ pub fn make_runner_with_channels() -> (
         auto_classifier: None,
         harness: loopal_config::HarnessConfig::default(),
         rewake_rx: None,
+        message_snapshot: None,
     };
     (
         AgentLoopRunner::new(params),

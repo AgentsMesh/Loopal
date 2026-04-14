@@ -1,10 +1,11 @@
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use tokio_util::sync::CancellationToken;
 
 use loopal_ipc::connection::Connection;
 use loopal_kernel::Kernel;
+use loopal_message::Message;
 use loopal_protocol::{AgentEvent, Envelope, MessageSource};
 use loopal_scheduler::CronScheduler;
 
@@ -86,4 +87,7 @@ pub struct AgentShared {
     pub cancel_token: Option<CancellationToken>,
     /// Per-agent cron scheduler (tick loop cancelled on drop).
     pub scheduler_handle: SchedulerHandle,
+    /// Conversation snapshot updated by the runtime before each tool batch.
+    /// The Agent tool reads this to build fork context for child agents.
+    pub message_snapshot: Arc<RwLock<Vec<Message>>>,
 }

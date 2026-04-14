@@ -2,7 +2,6 @@
 
 use std::path::PathBuf;
 use std::sync::Arc;
-
 use serde_json::Value;
 use tokio::sync::mpsc;
 use tracing::info;
@@ -26,6 +25,8 @@ pub struct StartAgentParams {
     pub agent_type: Option<String>,
     /// Nesting depth (0 = root). Propagated from parent.
     pub depth: Option<u32>,
+    /// Compressed parent conversation for fork context inheritance.
+    pub fork_context: Option<serde_json::Value>,
 }
 
 /// High-level agent IPC client.
@@ -35,7 +36,6 @@ pub struct AgentClient {
 }
 
 impl AgentClient {
-    /// Create a client from a transport (e.g. from `AgentProcess::transport()`).
     pub fn new(transport: Arc<dyn Transport>) -> Self {
         let connection = Arc::new(Connection::new(transport));
         let incoming_rx = connection.start();
@@ -61,7 +61,7 @@ impl AgentClient {
 
     /// Send `agent/start` to begin the agent loop.
     pub async fn start_agent(&self, p: &StartAgentParams) -> anyhow::Result<String> {
-        let params = serde_json::json!({
+        let mut params = serde_json::json!({
             "cwd": p.cwd.to_string_lossy(),
             "model": p.model,
             "mode": p.mode,
@@ -73,6 +73,9 @@ impl AgentClient {
             "agent_type": p.agent_type,
             "depth": p.depth,
         });
+        if let Some(ref fc) = p.fork_context {
+            params["fork_context"] = fc.clone();
+        }
         let result = self
             .connection
             .send_request(methods::AGENT_START.name, params)
@@ -120,8 +123,7 @@ impl AgentClient {
         Ok(())
     }
 
-    /// Receive the next incoming message from the agent.
-    /// Returns `None` when the connection closes.
+    /// Receive the next incoming message. Returns `None` when the connection closes.
     pub async fn recv(&mut self) -> Option<AgentClientEvent> {
         loop {
             let incoming = self.incoming_rx.recv().await?;
@@ -142,8 +144,7 @@ impl AgentClient {
                         return Some(AgentClientEvent::QuestionRequest { id, params });
                     }
                     // Unknown request — respond with error
-                    let _ = self
-                        .connection
+                    let _ = self.connection
                         .respond_error(
                             id,
                             loopal_ipc::jsonrpc::METHOD_NOT_FOUND,

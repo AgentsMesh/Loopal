@@ -1,7 +1,5 @@
 //! Internal agent loop setup — builds `AgentLoopParams` from resolved config.
-
 use std::sync::Arc;
-
 use loopal_agent::shared::{AgentShared, SchedulerHandle};
 use loopal_agent::task_store::TaskStore;
 use loopal_config::ResolvedConfig;
@@ -11,18 +9,12 @@ use loopal_kernel::Kernel;
 use loopal_protocol::InterruptSignal;
 use loopal_runtime::AgentLoopParams;
 use loopal_runtime::frontend::traits::AgentFrontend;
-
 use crate::params::StartParams;
 
-/// Build `AgentLoopParams` with a pre-constructed frontend (HubFrontend or IpcFrontend).
-///
-/// The caller provides the frontend and interrupt signal, decoupling agent setup
-/// from the connection/transport layer.
+/// Build `AgentLoopParams` with a pre-constructed frontend.
 #[allow(clippy::too_many_arguments)]
 pub fn build_with_frontend(
-    cwd: &std::path::Path,
-    config: &ResolvedConfig,
-    start: &StartParams,
+    cwd: &std::path::Path, config: &ResolvedConfig, start: &StartParams,
     frontend: Arc<dyn AgentFrontend>,
     interrupt: InterruptSignal,
     interrupt_tx: Arc<tokio::sync::watch::Sender<u64>>,
@@ -56,8 +48,7 @@ pub fn build_with_frontend(
         (session_manager.create_session(cwd, &model)?, Vec::new())
     };
 
-    // Channel for sub-agent lifecycle events (SubAgentSpawned).
-    // Only lifecycle events are forwarded — sub-agent internal events go via TCP.
+    // Sub-agent lifecycle events: forward SubAgentSpawned to frontend.
     let (event_tx, mut event_rx) = tokio::sync::mpsc::channel::<loopal_protocol::AgentEvent>(256);
     let lifecycle_frontend = frontend.clone();
     tokio::spawn(async move {
@@ -75,7 +66,7 @@ pub fn build_with_frontend(
         .unwrap_or_else(|_| std::env::temp_dir().join("loopal/tasks"));
 
     let (scheduler_handle, scheduled_rx) = SchedulerHandle::create();
-
+    let message_snapshot = Arc::new(std::sync::RwLock::new(Vec::new()));
     let agent_shared = Arc::new(AgentShared {
         kernel: kernel.clone(),
         task_store: Arc::new(TaskStore::new(tasks_dir)),
@@ -86,6 +77,7 @@ pub fn build_with_frontend(
         parent_event_tx: Some(event_tx),
         cancel_token: None,
         scheduler_handle,
+        message_snapshot: message_snapshot.clone(),
     });
 
     let memory_channel = crate::memory_adapter::build_memory_channel(
@@ -107,9 +99,7 @@ pub fn build_with_frontend(
     } else {
         None
     };
-
     let shared_any: Arc<dyn std::any::Any + Send + Sync> = Arc::new(agent_shared);
-
     let skills: Vec<_> = config.skills.values().map(|e| e.skill.clone()).collect();
     let skills_summary = loopal_config::format_skills_summary(&skills);
     let tool_defs = kernel.tool_definitions();
@@ -137,12 +127,28 @@ pub fn build_with_frontend(
         features,
         start.depth.unwrap_or(0),
     );
-
     crate::prompt_post::append_runtime_sections(&mut system_prompt, &kernel);
 
     let mut messages = resume_messages;
+    let mut has_fork = false;
+    if let Some(ref fc_value) = start.fork_context
+        && start.resume.is_none()
+    {
+        match serde_json::from_value::<Vec<loopal_message::Message>>(fc_value.clone()) {
+            Ok(fork_msgs) => {
+                messages.extend(fork_msgs);
+                has_fork = true;
+            }
+            Err(e) => tracing::warn!("fork context deserialization failed, skipping: {e}"),
+        }
+    }
     if let Some(prompt) = &start.prompt {
-        messages.push(loopal_message::Message::user(prompt));
+        let text = if has_fork {
+            format!("{}\n\n{prompt}", loopal_context::fork::FORK_BOILERPLATE)
+        } else {
+            prompt.to_string()
+        };
+        messages.push(loopal_message::Message::user(&text));
     }
 
     let tool_tokens = ContextBudget::estimate_tool_tokens(&tool_defs);
@@ -152,8 +158,11 @@ pub fn build_with_frontend(
         &system_prompt,
         tool_tokens,
     );
-
     let lifecycle = start.lifecycle;
+    let depth = start.depth.unwrap_or(0);
+    let tool_filter = crate::spawn_policy::build_depth_tool_filter(
+        &kernel, depth, config.settings.harness.agent_max_depth,
+    );
 
     let params = AgentLoopParams {
         config: loopal_runtime::AgentConfig {
@@ -162,7 +171,7 @@ pub fn build_with_frontend(
             system_prompt,
             mode,
             permission_mode,
-            tool_filter: None,
+            tool_filter,
             thinking_config,
             context_tokens_cap: config.settings.max_context_tokens,
             plan_state: None,
@@ -183,7 +192,8 @@ pub fn build_with_frontend(
         scheduled_rx: Some(scheduled_rx),
         auto_classifier,
         harness: config.settings.harness.clone(),
-        rewake_rx: None, // TODO: wire from AsyncHookStore when async hooks are configured
+        rewake_rx: None,
+        message_snapshot: Some(message_snapshot),
     };
     Ok(params)
 }

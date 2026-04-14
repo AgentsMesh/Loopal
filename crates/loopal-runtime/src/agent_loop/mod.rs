@@ -40,6 +40,7 @@ pub(crate) mod turn_metrics;
 pub mod turn_observer;
 mod turn_observer_dispatch;
 mod turn_telemetry;
+mod fork_snapshot;
 
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -61,8 +62,6 @@ use crate::session::SessionManager;
 use finished_guard::FinishedGuard;
 
 pub use runner::AgentLoopRunner;
-
-// ── Sub-structs ────────────────────────────────────────────────────
 
 /// Agent lifecycle mode — determines idle behavior after turn completion.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -150,8 +149,6 @@ impl Default for InterruptHandle {
     }
 }
 
-// ── AgentLoopParams ────────────────────────────────────────────────
-
 pub struct AgentLoopParams {
     pub config: AgentConfig,
     pub deps: AgentDeps,
@@ -173,6 +170,8 @@ pub struct AgentLoopParams {
     pub harness: HarnessConfig,
     /// Receive end for async hook rewake messages (exit code 2 from background hooks).
     pub rewake_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
+    /// Shared conversation snapshot for fork context — updated before tool execution.
+    pub message_snapshot: Option<Arc<std::sync::RwLock<Vec<loopal_message::Message>>>>,
 }
 
 /// Public wrapper — constructs default observers and runs the loop.

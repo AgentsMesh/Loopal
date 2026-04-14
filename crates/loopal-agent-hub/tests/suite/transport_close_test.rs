@@ -37,7 +37,7 @@ async fn transport_closed_after_agent_completes() {
     let _agent_rx = agent_conn.start();
     let server_rx = server_conn.start();
 
-    register_agent_connection(
+    let _ = register_agent_connection(
         hub.clone(),
         "worker",
         server_conn,
@@ -82,7 +82,7 @@ async fn agent_receives_eof_after_hub_closes_transport() {
     let _agent_rx = agent_conn.start();
     let server_rx = server_conn.start();
 
-    register_agent_connection(
+    let _ = register_agent_connection(
         hub.clone(),
         "worker",
         server_conn,
@@ -131,7 +131,7 @@ async fn result_delivered_before_transport_close() {
     let _agent_rx = agent_conn.start();
     let server_rx = server_conn.start();
 
-    register_agent_connection(
+    let _ = register_agent_connection(
         hub.clone(),
         "worker",
         server_conn,
@@ -184,7 +184,7 @@ async fn child_crash_triggers_transport_close() {
     let _agent_rx = agent_conn.start();
     let server_rx = server_conn.start();
 
-    register_agent_connection(
+    let _ = register_agent_connection(
         hub.clone(),
         "crasher",
         server_conn,
@@ -232,7 +232,7 @@ async fn agent_unregistered_after_completion() {
     let _agent_rx = agent_conn.start();
     let server_rx = server_conn.start();
 
-    register_agent_connection(
+    let _ = register_agent_connection(
         hub.clone(),
         "ephemeral",
         server_conn,

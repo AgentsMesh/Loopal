@@ -16,6 +16,7 @@ pub mod interrupt_filter;
 mod ipc_emitter;
 mod ipc_frontend;
 mod memory_adapter;
+mod memory_consolidation;
 mod mock_loader;
 mod params;
 mod prompt_post;
@@ -23,6 +24,7 @@ mod server;
 pub mod server_info;
 mod server_init;
 mod session_forward;
+mod spawn_policy;
 #[doc(hidden)]
 pub mod session_hub;
 mod session_start;

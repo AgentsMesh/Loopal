@@ -132,6 +132,7 @@ pub fn make_auto_runner_with_setup(
         auto_classifier: Some(classifier),
         harness: loopal_config::HarnessConfig::default(),
         rewake_rx: None,
+        message_snapshot: None,
     };
     (AgentLoopRunner::new(params), event_rx)
 }

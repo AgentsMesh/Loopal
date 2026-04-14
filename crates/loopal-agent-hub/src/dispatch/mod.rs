@@ -9,6 +9,7 @@ use tokio::sync::Mutex;
 use crate::hub::Hub;
 
 mod dispatch_handlers;
+mod status_handler;
 mod topology_handlers;
 mod wait_handler;
 
@@ -22,6 +23,7 @@ pub async fn dispatch_hub_request(
     use dispatch_handlers::*;
     use topology_handlers::*;
     use wait_handler::handle_wait_agent;
+    use status_handler::handle_status;
 
     match method {
         m if m == methods::HUB_ROUTE.name => handle_route(hub, params).await,

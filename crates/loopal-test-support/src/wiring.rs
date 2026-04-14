@@ -101,6 +101,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         parent_event_tx: Some(event_tx),
         cancel_token: None,
         scheduler_handle,
+        message_snapshot: Arc::new(std::sync::RwLock::new(Vec::new())),
     });
     let shared_any: Arc<dyn std::any::Any + Send + Sync> = Arc::new(shared);
 
@@ -159,6 +160,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         auto_classifier: None,
         harness: loopal_config::HarnessConfig::default(),
         rewake_rx: None,
+        message_snapshot: None,
     };
 
     let harness = SpawnedHarness {

@@ -1,6 +1,7 @@
 pub mod budget;
 pub mod compaction;
 pub mod degradation;
+pub mod fork;
 pub mod ingestion;
 pub mod middleware;
 pub mod pipeline;

@@ -133,7 +133,7 @@ async fn orphan_cascade_skips_shadows() {
     let _real_client_conn = Arc::new(Connection::new(real_client));
     let real_rx = real_conn.start();
     let _real_client_rx = _real_client_conn.start();
-    register_agent_connection(
+    let _ = register_agent_connection(
         hub.clone(),
         "real-child",
         real_conn,

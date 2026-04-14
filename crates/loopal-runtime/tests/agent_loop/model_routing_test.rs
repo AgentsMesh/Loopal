@@ -56,6 +56,7 @@ fn make_runner_with_routing(
         auto_classifier: None,
         harness: loopal_config::HarnessConfig::default(),
         rewake_rx: None,
+        message_snapshot: None,
     };
     (AgentLoopRunner::new(params), event_rx)
 }
@@ -142,6 +143,7 @@ fn test_model_routing_default_override_via_config_model() {
         auto_classifier: None,
         harness: loopal_config::HarnessConfig::default(),
         rewake_rx: None,
+        message_snapshot: None,
     };
     let (runner, _rx) = (AgentLoopRunner::new(params), event_rx);
 

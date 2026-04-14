@@ -45,7 +45,8 @@ async fn register_agent_connection_makes_agent_routable() {
         None,
         None,
     )
-    .await;
+    .await
+    .unwrap();
     assert!(!agent_id.is_empty());
 
     // Should receive SubAgentSpawned event
@@ -120,7 +121,7 @@ async fn wait_agent_returns_when_agent_disconnects() {
     let _agent_rx = agent_conn.start();
     let server_rx = server_conn.start();
 
-    register_agent_connection(
+    let _ = register_agent_connection(
         hub.clone(),
         "ephemeral",
         server_conn,
@@ -188,7 +189,7 @@ async fn spawned_agent_routes_message_to_parent() {
 
     let _child_rx = child_conn.start();
     let server_rx = server_conn.start();
-    register_agent_connection(
+    let _ = register_agent_connection(
         hub.clone(),
         "child",
         server_conn,

@@ -163,7 +163,7 @@ async fn wait_already_finished_agent_returns_immediately() {
     let (_t1, t2) = loopal_ipc::duplex_pair();
     let conn = Arc::new(Connection::new(t2));
     let rx = conn.start();
-    register_agent_connection(hub.clone(), "done-agent", conn, rx, None, None, None).await;
+    let _ = register_agent_connection(hub.clone(), "done-agent", conn, rx, None, None, None).await.unwrap();
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Finish it
@@ -203,7 +203,7 @@ async fn multiple_waiters_on_same_agent() {
     let (_t1, t2) = loopal_ipc::duplex_pair();
     let conn = Arc::new(Connection::new(t2));
     let rx = conn.start();
-    register_agent_connection(hub.clone(), "shared-target", conn, rx, None, None, None).await;
+    let _ = register_agent_connection(hub.clone(), "shared-target", conn, rx, None, None, None).await.unwrap();
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Two waiters

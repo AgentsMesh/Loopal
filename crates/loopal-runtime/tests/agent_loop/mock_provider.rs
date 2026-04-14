@@ -64,6 +64,7 @@ fn build_params_with_config(
         auto_classifier: None,
         harness: loopal_config::HarnessConfig::default(),
         rewake_rx: None,
+        message_snapshot: None,
     }
 }
 

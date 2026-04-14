@@ -86,7 +86,7 @@ async fn local_parent_completion_unaffected_by_uplink() {
     let child_client_conn = Arc::new(Connection::new(child_client));
     let child_server_rx = child_server_conn.start();
     let _child_client_rx = child_client_conn.start();
-    register_agent_connection(
+    let _ = register_agent_connection(
         hub.clone(),
         "child",
         child_server_conn,

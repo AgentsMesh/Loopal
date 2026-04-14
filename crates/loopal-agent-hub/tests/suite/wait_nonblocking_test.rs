@@ -30,7 +30,7 @@ async fn wait_agent_does_not_block_io_loop() {
 
     // Register two mock child agents
     let (_child_a_conn, child_a_server, child_a_rx) = mock_agent();
-    register_agent_connection(
+    let _ = register_agent_connection(
         hub.clone(),
         "child-a",
         child_a_server,
@@ -42,7 +42,7 @@ async fn wait_agent_does_not_block_io_loop() {
     .await;
 
     let (_child_b_conn, child_b_server, child_b_rx) = mock_agent();
-    register_agent_connection(
+    let _ = register_agent_connection(
         hub.clone(),
         "child-b",
         child_b_server,
@@ -117,7 +117,7 @@ async fn spawn_after_wait_not_blocked() {
 
     // Register a mock child that we'll wait on
     let (_child_conn, child_server, child_rx) = mock_agent();
-    register_agent_connection(
+    let _ = register_agent_connection(
         hub.clone(),
         "existing-child",
         child_server,

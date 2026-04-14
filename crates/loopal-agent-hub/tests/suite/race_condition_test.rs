@@ -26,7 +26,7 @@ async fn wait_agent_after_finish_returns_cached_output() {
     let (_ca, ct) = loopal_ipc::duplex_pair();
     let conn = Arc::new(Connection::new(ct));
     let rx = conn.start();
-    register_agent_connection(hub.clone(), "fast-agent", conn, rx, None, None, None).await;
+    let _ = register_agent_connection(hub.clone(), "fast-agent", conn, rx, None, None, None).await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Agent finishes BEFORE any wait_agent call
@@ -62,7 +62,7 @@ async fn emit_before_unregister_delivers_output() {
     let (_ca, ct) = loopal_ipc::duplex_pair();
     let conn = Arc::new(Connection::new(ct));
     let rx = conn.start();
-    register_agent_connection(hub.clone(), "normal", conn, rx, None, None, None).await;
+    let _ = register_agent_connection(hub.clone(), "normal", conn, rx, None, None, None).await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let hub2 = hub.clone();

@@ -71,7 +71,7 @@ pub async fn register_mock_agent(
     let server_rx = server_conn.start();
     let client_rx = client_conn.start();
 
-    register_agent_connection(
+    let _ = register_agent_connection(
         hub.clone(),
         name,
         server_conn,

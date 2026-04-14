@@ -1,7 +1,5 @@
 //! Spawn manager — Hub spawns agent processes and registers their stdio.
-
 use std::sync::Arc;
-
 use tokio::sync::{Mutex, mpsc};
 use tracing::{info, warn};
 
@@ -23,7 +21,21 @@ pub async fn spawn_and_register(
     permission_mode: Option<String>,
     agent_type: Option<String>,
     depth: Option<u32>,
+    fork_context: Option<serde_json::Value>,
 ) -> Result<String, String> {
+    // Pre-check budget BEFORE spawning process to avoid orphans.
+    if parent.is_some() {
+        let h = hub.lock().await;
+        let sub_count = h.registry.sub_agent_count();
+        if sub_count >= h.max_total_agents as usize {
+            return Err(format!(
+                "Spawn budget exhausted ({sub_count}/{} sub-agents). \
+                 Complete the task with your own tools.",
+                h.max_total_agents
+            ));
+        }
+    }
+
     info!(agent = %name, parent = ?parent, "spawn: forking process");
     let agent_proc = loopal_agent_client::AgentProcess::spawn(None)
         .await
@@ -48,6 +60,7 @@ pub async fn spawn_and_register(
             lifecycle: Some("ephemeral".to_string()), // sub-agents always exit on idle
             agent_type,
             depth,
+            fork_context,
             ..Default::default()
         })
         .await
@@ -61,7 +74,7 @@ pub async fn spawn_and_register(
     };
 
     let (conn, incoming_rx) = client.into_parts();
-    let agent_id = register_agent_connection(
+    match register_agent_connection(
         hub,
         &name,
         conn,
@@ -70,18 +83,25 @@ pub async fn spawn_and_register(
         model_for_registry.as_deref(),
         session_id.as_deref(),
     )
-    .await;
-
-    tokio::spawn(async move {
-        let _ = agent_proc.wait().await;
-    });
-
-    info!(agent = %name, "agent spawned and registered via Hub");
-    Ok(agent_id)
+    .await
+    {
+        Ok(agent_id) => {
+            tokio::spawn(async move {
+                let _ = agent_proc.wait().await;
+            });
+            info!(agent = %name, "agent spawned and registered via Hub");
+            Ok(agent_id)
+        }
+        Err(e) => {
+            warn!(agent = %name, error = %e, "registration failed, killing orphan");
+            let _ = agent_proc.shutdown().await;
+            Err(e)
+        }
+    }
 }
 
 /// Register a pre-built Connection as a named agent in Hub.
-/// Creates a completion notification channel and bridge for this agent.
+/// Performs spawn budget check atomically with registration.
 pub async fn register_agent_connection(
     hub: Arc<Mutex<Hub>>,
     name: &str,
@@ -90,7 +110,7 @@ pub async fn register_agent_connection(
     parent: Option<&str>,
     model: Option<&str>,
     session_id: Option<&str>,
-) -> String {
+) -> Result<String, String> {
     let agent_id = uuid::Uuid::new_v4().to_string();
 
     // Completion channel: Hub writes here when this agent's children finish.
@@ -99,6 +119,21 @@ pub async fn register_agent_connection(
 
     {
         let mut h = hub.lock().await;
+
+        // Budget check (atomic with registration — no TOCTOU).
+        // Count only sub-agents (those with a parent), excluding root "main".
+        if parent.is_some() {
+            let sub_count = h.registry.sub_agent_count();
+            if sub_count >= h.max_total_agents as usize {
+                warn!(agent = %name, count = sub_count, "spawn budget exhausted");
+                return Err(format!(
+                    "Spawn budget exhausted ({sub_count}/{} sub-agents). \
+                     Complete the task with your own tools.",
+                    h.max_total_agents
+                ));
+            }
+        }
+
         if let Some(p) = parent
             && !h.registry.agents.contains_key(p)
         {
@@ -112,7 +147,7 @@ pub async fn register_agent_connection(
             Some(completion_tx),
         ) {
             warn!(agent = %name, error = %e, "registration failed");
-            return agent_id;
+            return Err(format!("agent registration failed: {e}"));
         }
         h.registry
             .set_lifecycle(name, crate::AgentLifecycle::Running);
@@ -135,7 +170,7 @@ pub async fn register_agent_connection(
             tracing::warn!(agent = %name, "SubAgentSpawned event dropped (channel full)");
         }
     }
-    agent_id
+    Ok(agent_id)
 }
 
 /// Bridge: reads from Hub-internal channel, forwards to agent via IPC notification.

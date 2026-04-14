@@ -67,6 +67,7 @@ pub(crate) async fn start_session(
             lifecycle,
             agent_type: params["agent_type"].as_str().map(String::from),
             depth: params["depth"].as_u64().map(|v| v as u32),
+            fork_context: params.get("fork_context").cloned(),
         };
 
         let mut config = load_config(&cwd)?;

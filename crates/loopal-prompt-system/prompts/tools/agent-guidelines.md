@@ -35,13 +35,17 @@ Scale concurrency to task complexity:
 
 ## Delegation Depth
 
-Your current depth in the agent tree is **{{ agent_depth }}** (0 = root, 1 = first-level sub-agent, etc.). Every sub-agent you spawn can itself spawn further sub-agents. This makes cascading delegation a real risk — if every agent subdivides its work, agent count grows exponentially and each individual agent ends up doing very little useful work.
+Your current depth in the agent tree is **{{ agent_depth }}** (0 = root, 1 = first-level sub-agent, etc.).
 
-**The deeper you are, the more you should prefer doing the work yourself:**
-- At depth 0 (root): spawning sub-agents for broad tasks is natural.
-- At depth 1+: you were created to handle a specific scope. Consider whether your tools (Glob, Grep, Read, Edit, Bash) are sufficient before spawning children.
-- Only delegate further if your assigned scope genuinely contains multiple independent sub-problems that would each benefit from a separate context.
-- Give children **narrowly scoped, concrete tasks** — not vague directives that they would need to subdivide again.
+{% if agent_depth == 0 %}
+Before spawning any sub-agents, **you must first use Glob/Grep/Read to understand the project structure**. Then spawn focused agents with concrete, narrow tasks. Prefer fewer well-scoped agents over many vague ones.
+
+**Anti-pattern to avoid:** Spawning 5+ agents immediately after receiving a task without reading any files first. This leads to exponential agent growth because each blind agent subdivides its blind sub-task further.
+{% elif agent_depth >= 2 %}
+**Your spawn capability has been removed at this depth.** Execute your task directly with your tools (Glob, Grep, Read, Edit, Bash). You have your parent's context — use it.
+{% else %}
+**You are a sub-agent (depth {{ agent_depth }}).** You were spawned to handle a specific task and already have your parent's context. Strongly prefer doing the work yourself with Glob/Grep/Read/Edit/Bash. Only delegate further if your scope genuinely contains 3+ independent sub-problems each requiring separate exploration of different codebase areas. If in doubt, do it yourself.
+{% endif %}
 
 ## Agent Types
 

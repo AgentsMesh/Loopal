@@ -2,6 +2,8 @@
 name: Windows CI Gotchas
 description: Known issues and workarounds for Windows builds with Bazel + rules_rust
 type: project
+created_at: 2026-04-11
+ttl_days: 90
 ---
 
 ## PATH length limit with rules_rust

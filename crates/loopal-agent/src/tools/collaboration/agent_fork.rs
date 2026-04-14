@@ -5,9 +5,7 @@ use std::sync::Arc;
 use crate::shared::AgentShared;
 use crate::spawn::wait_agent;
 
-pub(super) fn build_fork_context(
-    shared: &AgentShared,
-) -> Option<Vec<loopal_message::Message>> {
+pub(super) fn build_fork_context(shared: &AgentShared) -> Option<Vec<loopal_message::Message>> {
     let snapshot = shared
         .message_snapshot
         .read()

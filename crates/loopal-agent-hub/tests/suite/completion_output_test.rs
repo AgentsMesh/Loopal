@@ -27,7 +27,9 @@ async fn completion_output_passed_through_wait() {
     let (_ca, ct) = loopal_ipc::duplex_pair();
     let conn = Arc::new(Connection::new(ct));
     let rx = conn.start();
-    let _ = register_agent_connection(hub.clone(), "worker", conn, rx, None, None, None).await.unwrap();
+    let _ = register_agent_connection(hub.clone(), "worker", conn, rx, None, None, None)
+        .await
+        .unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Set up waiter
@@ -69,7 +71,9 @@ async fn completion_no_output_fallback() {
     let (_ca, ct) = loopal_ipc::duplex_pair();
     let conn = Arc::new(Connection::new(ct));
     let rx = conn.start();
-    let _ = register_agent_connection(hub.clone(), "worker2", conn, rx, None, None, None).await.unwrap();
+    let _ = register_agent_connection(hub.clone(), "worker2", conn, rx, None, None, None)
+        .await
+        .unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let hub2 = hub.clone();

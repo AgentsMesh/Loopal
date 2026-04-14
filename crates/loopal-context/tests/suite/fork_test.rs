@@ -113,7 +113,9 @@ fn fork_context_json_round_trip() {
             id: None,
             role: MessageRole::Assistant,
             content: vec![
-                ContentBlock::Text { text: "Let me check.".into() },
+                ContentBlock::Text {
+                    text: "Let me check.".into(),
+                },
                 ContentBlock::ToolUse {
                     id: "tu1".into(),
                     name: "Glob".into(),
@@ -143,8 +145,7 @@ fn fork_context_json_round_trip() {
     assert!(!compressed.is_empty());
 
     let json_val = serde_json::to_value(&compressed).expect("serialize");
-    let recovered: Vec<Message> =
-        serde_json::from_value(json_val).expect("deserialize");
+    let recovered: Vec<Message> = serde_json::from_value(json_val).expect("deserialize");
 
     assert_eq!(recovered.len(), compressed.len());
     for (orig, recov) in compressed.iter().zip(recovered.iter()) {

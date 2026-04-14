@@ -1,10 +1,10 @@
-use std::sync::Arc;
 use async_trait::async_trait;
 use loopal_error::LoopalError;
 use loopal_ipc::protocol::methods;
 use loopal_tool_api::PermissionLevel;
 use loopal_tool_api::{Tool, ToolContext, ToolResult};
 use serde_json::json;
+use std::sync::Arc;
 
 use super::shared_extract::{create_agent_worktree, extract_shared, require_str};
 use crate::config::load_agent_configs;

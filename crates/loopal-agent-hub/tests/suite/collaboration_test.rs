@@ -217,7 +217,9 @@ async fn cascade_shutdown_interrupts_children() {
     let (_pa, pt) = loopal_ipc::duplex_pair();
     let parent = Arc::new(Connection::new(pt));
     let parent_rx = parent.start();
-    let _ = register_agent_connection(hub.clone(), "parent", parent, parent_rx, None, None, None).await.unwrap();
+    let _ = register_agent_connection(hub.clone(), "parent", parent, parent_rx, None, None, None)
+        .await
+        .unwrap();
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Register child with interrupt capture

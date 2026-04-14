@@ -67,11 +67,7 @@ fn has_tool_use(msg: &Message) -> bool {
 }
 
 fn compress_message(msg: &Message) -> Message {
-    let content: Vec<ContentBlock> = msg
-        .content
-        .iter()
-        .filter_map(compress_block)
-        .collect();
+    let content: Vec<ContentBlock> = msg.content.iter().filter_map(compress_block).collect();
     Message {
         id: msg.id.clone(),
         role: msg.role.clone(),

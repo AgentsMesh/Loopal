@@ -8,10 +8,7 @@ impl AgentLoopRunner {
     /// Called before each tool execution batch so the Agent tool can
     /// read a consistent snapshot for building fork context.
     /// Only clones if this batch contains an Agent tool call.
-    pub(super) fn update_fork_snapshot(
-        &self,
-        tool_uses: &[(String, String, serde_json::Value)],
-    ) {
+    pub(super) fn update_fork_snapshot(&self, tool_uses: &[(String, String, serde_json::Value)]) {
         let has_agent_call = tool_uses.iter().any(|(_, name, _)| name == "Agent");
         if !has_agent_call {
             return;

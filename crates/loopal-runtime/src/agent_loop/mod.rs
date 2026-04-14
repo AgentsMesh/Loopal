@@ -4,6 +4,7 @@ mod context_prep;
 pub mod diff_tracker;
 pub mod env_context;
 mod finished_guard;
+mod fork_snapshot;
 mod input;
 mod input_control;
 mod llm;
@@ -40,7 +41,6 @@ pub(crate) mod turn_metrics;
 pub mod turn_observer;
 mod turn_observer_dispatch;
 mod turn_telemetry;
-mod fork_snapshot;
 
 use std::collections::HashSet;
 use std::sync::Arc;

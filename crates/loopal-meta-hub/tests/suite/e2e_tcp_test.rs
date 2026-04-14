@@ -92,7 +92,9 @@ async fn register_mock(
     let server_rx = server.start();
     let client_rx = client.start();
 
-    let _ = register_agent_connection(hub.clone(), name, server, server_rx, None, None, None).await.unwrap();
+    let _ = register_agent_connection(hub.clone(), name, server, server_rx, None, None, None)
+        .await
+        .unwrap();
 
     let cc = client.clone();
     let mut listen = client_rx;

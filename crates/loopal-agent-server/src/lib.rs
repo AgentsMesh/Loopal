@@ -24,10 +24,10 @@ mod server;
 pub mod server_info;
 mod server_init;
 mod session_forward;
-mod spawn_policy;
 #[doc(hidden)]
 pub mod session_hub;
 mod session_start;
+mod spawn_policy;
 mod test_server;
 
 pub use server::{run_agent_server, run_agent_server_with_mock};

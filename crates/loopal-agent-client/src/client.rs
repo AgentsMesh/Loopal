@@ -1,8 +1,8 @@
 //! IPC client — wraps `Connection` with agent protocol methods.
 
+use serde_json::Value;
 use std::path::PathBuf;
 use std::sync::Arc;
-use serde_json::Value;
 use tokio::sync::mpsc;
 use tracing::info;
 
@@ -144,7 +144,8 @@ impl AgentClient {
                         return Some(AgentClientEvent::QuestionRequest { id, params });
                     }
                     // Unknown request — respond with error
-                    let _ = self.connection
+                    let _ = self
+                        .connection
                         .respond_error(
                             id,
                             loopal_ipc::jsonrpc::METHOD_NOT_FOUND,

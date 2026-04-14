@@ -1,5 +1,5 @@
 //! Internal agent loop setup — builds `AgentLoopParams` from resolved config.
-use std::sync::Arc;
+use crate::params::StartParams;
 use loopal_agent::shared::{AgentShared, SchedulerHandle};
 use loopal_agent::task_store::TaskStore;
 use loopal_config::ResolvedConfig;
@@ -9,12 +9,14 @@ use loopal_kernel::Kernel;
 use loopal_protocol::InterruptSignal;
 use loopal_runtime::AgentLoopParams;
 use loopal_runtime::frontend::traits::AgentFrontend;
-use crate::params::StartParams;
+use std::sync::Arc;
 
 /// Build `AgentLoopParams` with a pre-constructed frontend.
 #[allow(clippy::too_many_arguments)]
 pub fn build_with_frontend(
-    cwd: &std::path::Path, config: &ResolvedConfig, start: &StartParams,
+    cwd: &std::path::Path,
+    config: &ResolvedConfig,
+    start: &StartParams,
     frontend: Arc<dyn AgentFrontend>,
     interrupt: InterruptSignal,
     interrupt_tx: Arc<tokio::sync::watch::Sender<u64>>,
@@ -61,10 +63,8 @@ pub fn build_with_frontend(
             }
         }
     });
-
     let tasks_dir = loopal_config::session_tasks_dir(&session.id)
         .unwrap_or_else(|_| std::env::temp_dir().join("loopal/tasks"));
-
     let (scheduler_handle, scheduled_rx) = SchedulerHandle::create();
     let message_snapshot = Arc::new(std::sync::RwLock::new(Vec::new()));
     let agent_shared = Arc::new(AgentShared {
@@ -161,7 +161,9 @@ pub fn build_with_frontend(
     let lifecycle = start.lifecycle;
     let depth = start.depth.unwrap_or(0);
     let tool_filter = crate::spawn_policy::build_depth_tool_filter(
-        &kernel, depth, config.settings.harness.agent_max_depth,
+        &kernel,
+        depth,
+        config.settings.harness.agent_max_depth,
     );
 
     let params = AgentLoopParams {

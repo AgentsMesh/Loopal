@@ -72,10 +72,17 @@ mod tests {
 
     #[tokio::test]
     async fn jsonl_exporter_failure_pushes_warning() {
+        // Use a path that create_dir_all will fail on across all platforms:
+        // a deeply nested path under a non-existent device/root.
+        let bad_dir = if cfg!(windows) {
+            "Z:\\__no_such_drive__\\otel".to_string()
+        } else {
+            "/nonexistent/otel-dir".to_string()
+        };
         let config = TelemetryConfig {
             enabled: true,
             file_export: Some(true),
-            telemetry_dir: Some("/nonexistent/otel-dir".into()),
+            telemetry_dir: Some(bad_dir),
             ..Default::default()
         };
         let mut warnings = Vec::new();

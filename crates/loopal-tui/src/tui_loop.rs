@@ -25,6 +25,7 @@ pub async fn run_tui(
     agent_event_rx: mpsc::Receiver<AgentEvent>,
     bg_store: Arc<BackgroundTaskStore>,
 ) -> anyhow::Result<()> {
+    crate::terminal::install_panic_hook();
     let _guard = TerminalGuard::new()?;
     let backend = CrosstermBackend::new(io::stdout());
     let mut terminal = Terminal::new(backend)?;

@@ -18,13 +18,14 @@ const SHUTDOWN_GRACE: Duration = Duration::from_secs(3);
 pub struct AgentProcess {
     child: Child,
     transport: Arc<dyn Transport>,
+    _stderr_drain: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl AgentProcess {
     /// Spawn an agent worker process with additional environment variables.
     ///
-    /// The child's stdin/stdout are captured for IPC. Stderr is inherited
-    /// (passes through to the parent's terminal for debugging/logging).
+    /// The child's stdin/stdout are captured for IPC. Stderr is piped and
+    /// drained to tracing to avoid corrupting the parent TUI terminal.
     pub async fn spawn_with_env(
         executable: Option<&str>,
         env_vars: &[(&str, &str)],
@@ -38,7 +39,7 @@ impl AgentProcess {
         cmd.arg("--serve")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
+            .stderr(Stdio::piped())
             .kill_on_drop(true);
         for (key, val) in env_vars {
             cmd.env(key, val);
@@ -55,12 +56,21 @@ impl AgentProcess {
             .take()
             .ok_or_else(|| anyhow::anyhow!("failed to capture child stdout"))?;
 
+        let stderr_drain = child
+            .stderr
+            .take()
+            .map(|stderr| tokio::spawn(crate::stderr_drain::drain_to_tracing(stderr)));
+
         let transport: Arc<dyn Transport> = Arc::new(StdioTransport::new(
             Box::new(tokio::io::BufReader::new(stdout)),
             Box::new(stdin),
         ));
 
-        Ok(Self { child, transport })
+        Ok(Self {
+            child,
+            transport,
+            _stderr_drain: stderr_drain,
+        })
     }
 
     /// Spawn an agent worker process.

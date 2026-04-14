@@ -10,6 +10,7 @@ use crate::resource::build_resource;
 /// Build a TracerProvider with OTLP and/or JSONL file exporter.
 pub(crate) fn build_tracer_provider(
     config: &TelemetryConfig,
+    warnings: &mut Vec<String>,
 ) -> Result<SdkTracerProvider, TraceError> {
     let sampler = if (config.sample_rate() - 1.0).abs() < f64::EPSILON {
         Sampler::AlwaysOn
@@ -34,7 +35,7 @@ pub(crate) fn build_tracer_provider(
     if config.file_export_enabled() {
         match crate::file_span_exporter::JsonlSpanExporter::new(&config.telemetry_dir()) {
             Ok(exporter) => builder = builder.with_batch_exporter(exporter),
-            Err(e) => eprintln!("otel: failed to create JSONL span exporter: {e}"),
+            Err(e) => warnings.push(format!("otel: failed to create JSONL span exporter: {e}")),
         }
     }
 
@@ -54,7 +55,7 @@ mod tests {
 
     #[tokio::test]
     async fn build_provider_succeeds_with_defaults() {
-        let result = build_tracer_provider(&enabled_config());
+        let result = build_tracer_provider(&enabled_config(), &mut Vec::new());
         assert!(result.is_ok());
     }
 
@@ -65,7 +66,30 @@ mod tests {
             sample_rate: Some(0.0),
             ..Default::default()
         };
-        let result = build_tracer_provider(&config);
+        let result = build_tracer_provider(&config, &mut Vec::new());
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn jsonl_exporter_failure_pushes_warning() {
+        // Use a path that create_dir_all will fail on across all platforms:
+        // a deeply nested path under a non-existent device/root.
+        let bad_dir = if cfg!(windows) {
+            "Z:\\__no_such_drive__\\otel".to_string()
+        } else {
+            "/nonexistent/otel-dir".to_string()
+        };
+        let config = TelemetryConfig {
+            enabled: true,
+            file_export: Some(true),
+            telemetry_dir: Some(bad_dir),
+            ..Default::default()
+        };
+        let mut warnings = Vec::new();
+        let _ = build_tracer_provider(&config, &mut warnings);
+        assert!(
+            warnings.iter().any(|w| w.contains("JSONL span exporter")),
+            "expected JSONL exporter warning, got: {warnings:?}"
+        );
     }
 }

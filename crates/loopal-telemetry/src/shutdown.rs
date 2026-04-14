@@ -36,17 +36,17 @@ impl Drop for TelemetryGuard {
         if let Some(tp) = self.tracer_provider.take()
             && let Err(e) = tp.shutdown()
         {
-            eprintln!("otel tracer shutdown error: {e}");
+            tracing::warn!("otel tracer shutdown error: {e}");
         }
         if let Some(mp) = self.meter_provider.take()
             && let Err(e) = mp.shutdown()
         {
-            eprintln!("otel meter shutdown error: {e}");
+            tracing::warn!("otel meter shutdown error: {e}");
         }
         if let Some(lp) = self.logger_provider.take()
             && let Err(e) = lp.shutdown()
         {
-            eprintln!("otel logger shutdown error: {e}");
+            tracing::warn!("otel logger shutdown error: {e}");
         }
     }
 }

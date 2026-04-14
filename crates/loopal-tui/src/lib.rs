@@ -13,6 +13,7 @@ pub(crate) mod text_util;
 mod tui_loop;
 pub mod views;
 
+pub use terminal::install_panic_hook;
 pub use tui_loop::{run_tui, run_tui_loop};
 
 /// Re-exports of dispatch functions for integration testing.

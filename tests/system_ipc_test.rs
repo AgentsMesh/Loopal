@@ -45,7 +45,7 @@ async fn system_spawn_and_initialize() {
         .arg(fixture.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
+        .stderr(Stdio::piped())
         .kill_on_drop(true)
         .spawn()
         .expect("failed to spawn agent worker");
@@ -148,7 +148,7 @@ async fn system_process_isolation_survives_kill() {
         .arg(fixture.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
+        .stderr(Stdio::piped())
         .kill_on_drop(true)
         .spawn()
         .expect("failed to spawn agent worker");

@@ -40,11 +40,7 @@ impl RotatingFileWriter {
             .create(true)
             .append(true)
             .open(&path)
-            .unwrap_or_else(|e| {
-                eprintln!("warning: cannot open log file {}: {e}", path.display());
-                // Open /dev/null so the writer always has a valid File handle.
-                File::open("/dev/null").expect("/dev/null must be openable")
-            });
+            .unwrap_or_else(|_| File::open("/dev/null").expect("/dev/null must be openable"));
 
         Self {
             state: WriterState {

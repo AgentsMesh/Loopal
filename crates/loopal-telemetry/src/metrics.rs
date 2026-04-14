@@ -9,6 +9,7 @@ use crate::resource::build_resource;
 /// Build a MeterProvider with OTLP and/or JSONL file periodic reader.
 pub(crate) fn build_meter_provider(
     config: &TelemetryConfig,
+    warnings: &mut Vec<String>,
 ) -> Result<SdkMeterProvider, opentelemetry_sdk::metrics::MetricError> {
     let interval = std::time::Duration::from_secs(60);
 
@@ -33,7 +34,7 @@ pub(crate) fn build_meter_provider(
                     .build();
                 builder = builder.with_reader(reader);
             }
-            Err(e) => eprintln!("otel: failed to create JSONL metric exporter: {e}"),
+            Err(e) => warnings.push(format!("otel: failed to create JSONL metric exporter: {e}")),
         }
     }
 
@@ -53,7 +54,23 @@ mod tests {
 
     #[tokio::test]
     async fn build_meter_provider_succeeds() {
-        let result = build_meter_provider(&enabled_config());
+        let result = build_meter_provider(&enabled_config(), &mut Vec::new());
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn jsonl_exporter_failure_pushes_warning() {
+        let config = TelemetryConfig {
+            enabled: true,
+            file_export: Some(true),
+            telemetry_dir: Some("/nonexistent/otel-dir".into()),
+            ..Default::default()
+        };
+        let mut warnings = Vec::new();
+        let _ = build_meter_provider(&config, &mut warnings);
+        assert!(
+            warnings.iter().any(|w| w.contains("JSONL metric exporter")),
+            "expected JSONL exporter warning, got: {warnings:?}"
+        );
     }
 }

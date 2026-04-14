@@ -21,6 +21,7 @@ pub fn init_subscriber(
     env_filter: EnvFilter,
 ) -> TelemetryGuard {
     let (non_blocking, log_guard) = tracing_appender::non_blocking(writer);
+    let mut init_warnings: Vec<String> = Vec::new();
 
     let fmt_layer = tracing_subscriber::fmt::layer()
         .with_writer(non_blocking)
@@ -29,10 +30,10 @@ pub fn init_subscriber(
         .with_span_events(tracing_subscriber::fmt::format::FmtSpan::NONE);
 
     let tracer_provider = if config.traces_enabled() {
-        match crate::traces::build_tracer_provider(config) {
+        match crate::traces::build_tracer_provider(config, &mut init_warnings) {
             Ok(tp) => Some(tp),
             Err(e) => {
-                eprintln!("otel: failed to build tracer provider: {e}");
+                init_warnings.push(format!("otel: failed to build tracer provider: {e}"));
                 None
             }
         }
@@ -46,13 +47,13 @@ pub fn init_subscriber(
     });
 
     let meter_provider = if config.metrics_enabled() {
-        match crate::metrics::build_meter_provider(config) {
+        match crate::metrics::build_meter_provider(config, &mut init_warnings) {
             Ok(mp) => {
                 opentelemetry::global::set_meter_provider(mp.clone());
                 Some(mp)
             }
             Err(e) => {
-                eprintln!("otel: failed to build meter provider: {e}");
+                init_warnings.push(format!("otel: failed to build meter provider: {e}"));
                 None
             }
         }
@@ -64,7 +65,7 @@ pub fn init_subscriber(
         match crate::logs::build_logger_provider(config) {
             Ok(lp) => Some(lp),
             Err(e) => {
-                eprintln!("otel: failed to build logger provider: {e}");
+                init_warnings.push(format!("otel: failed to build logger provider: {e}"));
                 None
             }
         }
@@ -82,6 +83,10 @@ pub fn init_subscriber(
         .with(env_filter)
         .with(fmt_layer)
         .init();
+
+    for msg in &init_warnings {
+        tracing::warn!("{msg}");
+    }
 
     TelemetryGuard::new(tracer_provider, meter_provider, logger_provider, log_guard)
 }

@@ -7,6 +7,12 @@ pub mod bridge;
 mod bridge_handlers;
 mod client;
 mod process;
+pub(crate) mod stderr_drain;
+
+#[doc(hidden)]
+pub mod test_support {
+    pub use crate::stderr_drain::drain_to_tracing;
+}
 
 pub use bridge::{BridgeHandles, start_bridge};
 pub use client::{AgentClient, AgentClientEvent, StartAgentParams};

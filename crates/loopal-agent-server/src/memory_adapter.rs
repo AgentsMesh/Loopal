@@ -12,7 +12,7 @@ use tracing::{info, warn};
 
 use loopal_agent::shared::AgentShared;
 use loopal_agent::spawn::{SpawnParams, spawn_agent, wait_agent};
-use loopal_memory::{MEMORY_AGENT_PROMPT, MEMORY_CONSOLIDATION_PROMPT, MemoryProcessor};
+use loopal_memory::{MEMORY_AGENT_PROMPT, MemoryProcessor};
 use loopal_tool_api::MemoryChannel;
 
 // ---------------------------------------------------------------------------
@@ -46,7 +46,7 @@ impl ServerMemoryProcessor {
         Self { shared, model }
     }
 
-    fn make_agent_name(prefix: &str) -> String {
+    pub(crate) fn make_agent_name(prefix: &str) -> String {
         let ts = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -64,6 +64,7 @@ impl ServerMemoryProcessor {
             target_hub: None,
             agent_type: None,
             depth: self.shared.depth + 1,
+            fork_context: None,
         };
         spawn_agent(&self.shared, params).await?;
         match wait_agent(&self.shared, name).await {
@@ -115,64 +116,6 @@ impl MemoryProcessor for ServerMemoryProcessor {
 }
 
 // ---------------------------------------------------------------------------
-// Consolidation trigger
-// ---------------------------------------------------------------------------
-
-/// Trigger a full memory consolidation via a dedicated sub-agent.
-///
-/// Runs in the background (non-blocking). Uses a `.consolidation_lock` file
-/// as an optimistic lock to prevent concurrent sessions from triggering
-/// duplicate consolidations. The `.last_consolidation` marker is written
-/// only after the agent completes successfully.
-pub fn trigger_consolidation(shared: &Arc<AgentShared>, model: &str) {
-    let memory_dir = shared.cwd.join(".loopal/memory");
-
-    // Acquire lock — handles stale lock detection (> 1 hour) automatically.
-    let lock_path = match loopal_memory::consolidation::try_acquire_lock(&memory_dir) {
-        Some(path) => path,
-        None => {
-            info!("consolidation already in progress, skipping");
-            return;
-        }
-    };
-
-    let shared = shared.clone();
-    let model = model.to_string();
-    tokio::spawn(async move {
-        let memory_dir = shared.cwd.join(".loopal/memory");
-        let today = loopal_memory::date::today_str();
-        let name = ServerMemoryProcessor::make_agent_name("memory-consolidation");
-        let prompt = format!("{MEMORY_CONSOLIDATION_PROMPT}\n\nToday: {today}");
-        let params = SpawnParams {
-            name: name.clone(),
-            prompt,
-            model: Some(model),
-            cwd_override: None,
-            permission_mode: None,
-            target_hub: None,
-            agent_type: None,
-            depth: shared.depth + 1,
-        };
-        match spawn_agent(&shared, params).await {
-            Ok(_) => {
-                info!("memory consolidation agent spawned");
-                match wait_agent(&shared, &name).await {
-                    Ok(output) => {
-                        info!(output = %output, "memory consolidation done");
-                        // Mark done ONLY on success — if agent fails, next session retries.
-                        loopal_memory::consolidation::mark_done(&memory_dir);
-                    }
-                    Err(e) => warn!(error = %e, "memory consolidation failed"),
-                }
-            }
-            Err(e) => warn!(error = %e, "failed to spawn consolidation agent"),
-        }
-        // Always release the lock
-        loopal_memory::consolidation::release_lock(&lock_path);
-    });
-}
-
-// ---------------------------------------------------------------------------
 // Pipeline builder (entry point)
 // ---------------------------------------------------------------------------
 
@@ -197,7 +140,7 @@ pub fn build_memory_channel(
         )
     {
         info!("memory consolidation due — triggering in background");
-        trigger_consolidation(shared, model);
+        crate::memory_consolidation::trigger_consolidation(shared, model);
     }
 
     // Channel capacity from config (default: 256)

@@ -162,6 +162,7 @@ pub async fn handle_spawn_agent(
     let permission_mode = params["permission_mode"].as_str().map(String::from);
     let agent_type = params["agent_type"].as_str().map(String::from);
     let depth = params["depth"].as_u64().map(|v| v as u32);
+    let fork_context = params.get("fork_context").cloned();
 
     // Parent: use explicit "parent" field from params if present (cross-hub),
     // otherwise use from_agent (local spawn).
@@ -184,6 +185,7 @@ pub async fn handle_spawn_agent(
             permission_mode,
             agent_type,
             depth,
+            fork_context,
         )
         .await
     });
@@ -195,18 +197,4 @@ pub async fn handle_spawn_agent(
 
     info!(agent = %name, %agent_id, "handle_spawn_agent done");
     Ok(json!({"agent_id": agent_id, "name": name}))
-}
-
-pub async fn handle_status(hub: &Arc<Mutex<Hub>>) -> Result<Value, String> {
-    let h = hub.lock().await;
-    let uplink_info = h.uplink.as_ref().map(|u| {
-        json!({
-            "connected": true,
-            "hub_name": u.hub_name(),
-        })
-    });
-    Ok(json!({
-        "agent_count": h.registry.agent_count(),
-        "uplink": uplink_info,
-    }))
 }

@@ -26,6 +26,8 @@ pub struct Hub {
     pub uplink: Option<Arc<HubUplink>>,
     /// TCP listener port, set after `start_hub_listener`. `None` if not listening.
     pub listener_port: Option<u16>,
+    /// Max total sub-agents allowed (set from HarnessConfig at bootstrap).
+    pub max_total_agents: u32,
 }
 
 impl Hub {
@@ -35,6 +37,7 @@ impl Hub {
             ui: UiDispatcher::new(),
             uplink: None,
             listener_port: None,
+            max_total_agents: 16,
         }
     }
 
@@ -46,6 +49,7 @@ impl Hub {
             ui: UiDispatcher::new(),
             uplink: None,
             listener_port: None,
+            max_total_agents: 16,
         }
     }
 }

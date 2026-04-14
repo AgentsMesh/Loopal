@@ -58,6 +58,7 @@ fn test_model_info_defaults_for_unknown_model() {
         auto_classifier: None,
         harness: loopal_config::HarnessConfig::default(),
         rewake_rx: None,
+        message_snapshot: None,
     };
 
     let runner = AgentLoopRunner::new(params);

@@ -5,6 +5,7 @@
 //! - **ListHubs**: discover other hubs in MetaHub cluster
 
 pub mod agent;
+mod agent_fork;
 pub mod list_hubs;
 pub mod send_message;
 pub(crate) mod shared_extract;

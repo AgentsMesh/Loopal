@@ -29,7 +29,7 @@ async fn register_agent(
     let server_conn = Arc::new(Connection::new(server_transport));
     let client_rx = client_conn.start();
     let server_rx = server_conn.start();
-    register_agent_connection(
+    let _ = register_agent_connection(
         hub.clone(),
         name,
         server_conn,

@@ -23,6 +23,8 @@ pub struct SpawnParams {
     pub agent_type: Option<String>,
     /// Nesting depth of the child agent (parent depth + 1).
     pub depth: u32,
+    /// Compressed parent conversation to inject as initial context.
+    pub fork_context: Option<Vec<loopal_message::Message>>,
 }
 
 /// Result returned from Hub after spawning.
@@ -54,6 +56,11 @@ pub async fn spawn_agent(
     });
     if let Some(ref hub) = params.target_hub {
         request["target_hub"] = json!(hub);
+    }
+    if let Some(ref fc) = params.fork_context
+        && let Ok(val) = serde_json::to_value(fc)
+    {
+        request["fork_context"] = val;
     }
 
     tracing::info!(agent = %params.name, "sending hub/spawn_agent request");

@@ -89,7 +89,7 @@ async fn completion_delivery_to_remote_parent() {
     let child_client_conn = Arc::new(Connection::new(child_client));
     let child_server_rx = child_server_conn.start();
     let _child_client_rx = child_client_conn.start();
-    register_agent_connection(
+    let _ = register_agent_connection(
         hub_b.clone(),
         "child-worker",
         child_server_conn,

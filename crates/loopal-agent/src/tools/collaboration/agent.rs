@@ -1,16 +1,17 @@
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use loopal_error::LoopalError;
 use loopal_ipc::protocol::methods;
 use loopal_tool_api::PermissionLevel;
 use loopal_tool_api::{Tool, ToolContext, ToolResult};
 use serde_json::json;
+use std::sync::Arc;
 
 use super::shared_extract::{create_agent_worktree, extract_shared, require_str};
 use crate::config::load_agent_configs;
 use crate::shared::AgentShared;
 use crate::spawn::{SpawnParams, spawn_agent, wait_agent};
+
+use super::agent_fork::{build_fork_context, spawn_bg_cleanup};
 
 pub struct AgentTool;
 
@@ -20,8 +21,7 @@ impl Tool for AgentTool {
         "Agent"
     }
     fn description(&self) -> &str {
-        "Spawn a sub-agent to handle a task. Blocks until the agent completes \
-         and returns its result. Multiple Agent calls in one turn run in parallel."
+        "Spawn a sub-agent. Blocks until complete. Multiple calls run in parallel."
     }
     fn parameters_schema(&self) -> serde_json::Value {
         json!({
@@ -128,6 +128,7 @@ async fn action_spawn(
             target_hub,
             agent_type: subagent_type.map(String::from),
             depth: shared.depth + 1,
+            fork_context: build_fork_context(&shared),
         },
     )
     .await;
@@ -195,23 +196,5 @@ async fn action_status(
             serde_json::to_string_pretty(&info).unwrap_or_default(),
         )),
         Err(e) => Ok(ToolResult::error(format!("Agent '{name}': {e}"))),
-    }
-}
-
-fn spawn_bg_cleanup(
-    shared: Arc<AgentShared>,
-    name: String,
-    wt: Option<(loopal_git::WorktreeInfo, std::path::PathBuf)>,
-) {
-    if let Some((info, root)) = wt {
-        tokio::spawn(async move {
-            let timeout = std::time::Duration::from_secs(3600);
-            match tokio::time::timeout(timeout, wait_agent(&shared, &name)).await {
-                Ok(_) => {
-                    loopal_git::cleanup_if_clean(&root, &info);
-                }
-                Err(_) => tracing::warn!(agent = %name, "background agent timed out"),
-            }
-        });
     }
 }

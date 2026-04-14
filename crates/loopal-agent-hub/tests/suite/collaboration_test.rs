@@ -37,7 +37,7 @@ async fn spawn_and_result_full_chain() {
     let (_ca, ct) = loopal_ipc::duplex_pair();
     let child = Arc::new(Connection::new(ct));
     let child_rx = child.start();
-    register_agent_connection(
+    let _ = register_agent_connection(
         hub.clone(),
         "worker",
         child,
@@ -88,7 +88,7 @@ async fn agent_info_running_and_finished() {
     let (_ca, ct) = loopal_ipc::duplex_pair();
     let child = Arc::new(Connection::new(ct));
     let child_rx = child.start();
-    register_agent_connection(
+    let _ = register_agent_connection(
         hub.clone(),
         "child-a",
         child,
@@ -217,7 +217,9 @@ async fn cascade_shutdown_interrupts_children() {
     let (_pa, pt) = loopal_ipc::duplex_pair();
     let parent = Arc::new(Connection::new(pt));
     let parent_rx = parent.start();
-    register_agent_connection(hub.clone(), "parent", parent, parent_rx, None, None, None).await;
+    let _ = register_agent_connection(hub.clone(), "parent", parent, parent_rx, None, None, None)
+        .await
+        .unwrap();
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Register child with interrupt capture
@@ -226,7 +228,7 @@ async fn cascade_shutdown_interrupts_children() {
     let server_conn = Arc::new(Connection::new(child_server));
     let client_rx = child_conn.start();
     let server_rx = server_conn.start();
-    register_agent_connection(
+    let _ = register_agent_connection(
         hub.clone(),
         "child",
         server_conn,

@@ -5,6 +5,8 @@ mod compaction_pair_test;
 mod compaction_test;
 #[path = "suite/degradation_test.rs"]
 mod degradation_test;
+#[path = "suite/fork_test.rs"]
+mod fork_test;
 #[path = "suite/ingestion_test.rs"]
 mod ingestion_test;
 #[path = "suite/pipeline_test.rs"]

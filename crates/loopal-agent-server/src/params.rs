@@ -20,6 +20,8 @@ pub struct StartParams {
     pub agent_type: Option<String>,
     /// Nesting depth (0 = root). Propagated from parent via IPC.
     pub depth: Option<u32>,
+    /// Fork context: compressed parent messages (JSON Value, deserialized in agent_setup).
+    pub fork_context: Option<serde_json::Value>,
 }
 
 /// Build a Kernel from config (production path: MCP, tools).

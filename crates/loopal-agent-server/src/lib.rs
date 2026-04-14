@@ -16,6 +16,7 @@ pub mod interrupt_filter;
 mod ipc_emitter;
 mod ipc_frontend;
 mod memory_adapter;
+mod memory_consolidation;
 mod mock_loader;
 mod params;
 mod prompt_post;
@@ -26,6 +27,7 @@ mod session_forward;
 #[doc(hidden)]
 pub mod session_hub;
 mod session_start;
+mod spawn_policy;
 mod test_server;
 
 pub use server::{run_agent_server, run_agent_server_with_mock};

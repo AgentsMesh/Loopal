@@ -9,6 +9,7 @@ use tokio::sync::Mutex;
 use crate::hub::Hub;
 
 mod dispatch_handlers;
+mod status_handler;
 mod topology_handlers;
 mod wait_handler;
 
@@ -20,6 +21,7 @@ pub async fn dispatch_hub_request(
     from_agent: String,
 ) -> Result<Value, String> {
     use dispatch_handlers::*;
+    use status_handler::handle_status;
     use topology_handlers::*;
     use wait_handler::handle_wait_agent;
 

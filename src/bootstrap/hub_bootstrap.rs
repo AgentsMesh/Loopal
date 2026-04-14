@@ -31,6 +31,7 @@ pub async fn bootstrap_hub_and_agent(
 ) -> anyhow::Result<BootstrapContext> {
     let (event_tx, event_rx) = mpsc::channel(256);
     let hub = Arc::new(Mutex::new(Hub::new(event_tx)));
+    hub.lock().await.max_total_agents = config.settings.harness.agent_max_total;
 
     let (listener, port, hub_token) = hub_server::start_hub_listener(hub.clone()).await?;
     hub.lock().await.listener_port = Some(port);

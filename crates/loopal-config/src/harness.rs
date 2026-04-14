@@ -19,6 +19,13 @@ pub struct HarnessConfig {
     pub max_auto_continuations: u32,
     /// Max Stop hook feedback rounds before forcing exit (default: 2).
     pub max_stop_feedback: u32,
+    /// Max agent spawn depth (default: 2). Agents at depth >= this value
+    /// lose their spawn tools. E.g., 2 means depth 0 and 1 can spawn,
+    /// depth 2+ cannot.
+    pub agent_max_depth: u32,
+    /// Max total sub-agents across the entire Hub (default: 16).
+    /// Excludes root agent — only counts spawned children.
+    pub agent_max_total: u32,
 }
 
 impl Default for HarnessConfig {
@@ -30,6 +37,8 @@ impl Default for HarnessConfig {
             cb_max_total_denials: 20,
             max_auto_continuations: 3,
             max_stop_feedback: 2,
+            agent_max_depth: 2,
+            agent_max_total: 16,
         }
     }
 }

@@ -1,5 +1,3 @@
-//! Inner turn execution loop.
-
 use loopal_error::Result;
 use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::StopReason;
@@ -138,6 +136,8 @@ impl AgentLoopRunner {
             if self.run_before_tools(turn_ctx, &result.tool_uses).await? {
                 return Ok(TurnOutput { output: last_text });
             }
+
+            self.update_fork_snapshot(&result.tool_uses); // fork context
 
             // Start ReadOnly tools early (parallel with permission checks).
             let kernel = std::sync::Arc::clone(&self.params.deps.kernel);

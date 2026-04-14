@@ -125,6 +125,14 @@ impl AgentRegistry {
         self.agents.len()
     }
 
+    /// Count only sub-agents (those with a parent). Excludes root "main".
+    pub fn sub_agent_count(&self) -> usize {
+        self.agents
+            .values()
+            .filter(|a| a.info.parent.is_some())
+            .count()
+    }
+
     pub fn get_agent_connection(&self, name: &str) -> Option<Arc<Connection>> {
         self.agents.get(name).and_then(|a| a.state.connection())
     }

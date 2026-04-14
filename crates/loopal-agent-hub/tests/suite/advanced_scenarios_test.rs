@@ -134,7 +134,9 @@ async fn recursive_agent_nesting_grandchild_routes_to_root() {
     let server_a = Arc::new(Connection::new(t2));
     let _ra = child_a.start();
     let sra = server_a.start();
-    register_agent_connection(hub.clone(), "child-a", server_a, sra, None, None, None).await;
+    let _ = register_agent_connection(hub.clone(), "child-a", server_a, sra, None, None, None)
+        .await
+        .unwrap();
 
     // Grandchild B (registered as sub-agent of child-a, same Hub)
     let (t3, t4) = loopal_ipc::duplex_pair();
@@ -142,7 +144,9 @@ async fn recursive_agent_nesting_grandchild_routes_to_root() {
     let server_b = Arc::new(Connection::new(t4));
     let _rb = grandchild_b.start();
     let srb = server_b.start();
-    register_agent_connection(hub.clone(), "grandchild-b", server_b, srb, None, None, None).await;
+    let _ = register_agent_connection(hub.clone(), "grandchild-b", server_b, srb, None, None, None)
+        .await
+        .unwrap();
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Grandchild B sends message to root (skipping parent)

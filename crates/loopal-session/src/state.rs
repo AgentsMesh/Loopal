@@ -6,7 +6,7 @@
 use std::time::Instant;
 
 use indexmap::IndexMap;
-use loopal_protocol::AgentStatus;
+use loopal_protocol::{AgentStatus, BgTaskDetail};
 
 /// Name of the root agent in the agents map.
 pub const ROOT_AGENT: &str = "main";
@@ -52,6 +52,8 @@ pub struct SessionState {
     pub root_session_id: Option<String>,
     // === Observation plane ===
     pub message_feed: MessageFeed,
+    // === Background tasks (synced from agent via events) ===
+    pub bg_tasks: IndexMap<String, BgTaskDetail>,
     // === Interaction state ===
     /// Pending sub-agent refs to be persisted (drained by caller).
     pub pending_sub_agent_refs: Vec<PendingSubAgentRef>,
@@ -84,6 +86,7 @@ impl SessionState {
             thinking_config: "auto".to_string(),
             root_session_id: None,
             message_feed: MessageFeed::new(200),
+            bg_tasks: IndexMap::new(),
             pending_sub_agent_refs: Vec::new(),
         }
     }

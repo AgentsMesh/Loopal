@@ -1,5 +1,8 @@
 /// Tests for panel_tab() dispatch: Tab key behavior within the panel zone.
-use loopal_protocol::{AgentEvent, AgentEventPayload, ControlCommand, UserQuestionResponse};
+use loopal_protocol::{
+    AgentEvent, AgentEventPayload, BgTaskSnapshot, BgTaskStatus, ControlCommand,
+    UserQuestionResponse,
+};
 use loopal_session::SessionController;
 use loopal_tui::app::{App, FocusMode, PanelKind};
 use loopal_tui::dispatch_ops::panel_tab;
@@ -37,13 +40,13 @@ fn spawn_agent(app: &App, name: &str) {
         .handle_event(AgentEvent::named(name, AgentEventPayload::Started));
 }
 
-fn add_bg_task(app: &App, id: &str, desc: &str) {
-    app.bg_store
-        .register_proxy(id.to_string(), desc.to_string());
-}
-
-fn sync_bg(app: &mut App) {
-    app.bg_snapshots = app.bg_store.snapshot_running();
+fn add_bg_snapshot(app: &mut App, id: &str, desc: &str) {
+    app.bg_snapshots.push(BgTaskSnapshot {
+        id: id.into(),
+        description: desc.into(),
+        status: BgTaskStatus::Running,
+        exit_code: None,
+    });
 }
 
 // === Both panels have content: Tab switches between them ===
@@ -52,8 +55,7 @@ fn sync_bg(app: &mut App) {
 fn tab_switches_from_agents_to_bg_tasks() {
     let mut app = make_app();
     spawn_agent(&app, "worker");
-    add_bg_task(&app, "t1", "build");
-    sync_bg(&mut app);
+    add_bg_snapshot(&mut app, "t1", "build");
     app.focused_agent = Some("worker".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
 
@@ -70,8 +72,7 @@ fn tab_switches_from_agents_to_bg_tasks() {
 fn tab_switches_from_bg_tasks_to_agents() {
     let mut app = make_app();
     spawn_agent(&app, "worker");
-    add_bg_task(&app, "t1", "build");
-    sync_bg(&mut app);
+    add_bg_snapshot(&mut app, "t1", "build");
     app.focused_bg_task = Some("t1".into());
     app.focus_mode = FocusMode::Panel(PanelKind::BgTasks);
 
@@ -104,9 +105,8 @@ fn tab_cycles_agents_when_only_agents() {
 #[test]
 fn tab_cycles_bg_tasks_when_only_bg_tasks() {
     let mut app = make_app();
-    add_bg_task(&app, "t1", "lint");
-    add_bg_task(&app, "t2", "test");
-    sync_bg(&mut app);
+    add_bg_snapshot(&mut app, "t1", "lint");
+    add_bg_snapshot(&mut app, "t2", "test");
     app.focused_bg_task = Some("t1".into());
     app.focus_mode = FocusMode::Panel(PanelKind::BgTasks);
 
@@ -126,8 +126,7 @@ fn tab_cycles_bg_tasks_when_only_bg_tasks() {
 fn tab_roundtrip_both_panels() {
     let mut app = make_app();
     spawn_agent(&app, "alpha");
-    add_bg_task(&app, "t1", "deploy");
-    sync_bg(&mut app);
+    add_bg_snapshot(&mut app, "t1", "deploy");
     app.focused_agent = Some("alpha".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
 

@@ -114,7 +114,10 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
         | AgentEventPayload::SubAgentSpawned { .. }
         | AgentEventPayload::AutoModeDecision { .. }
         | AgentEventPayload::TurnCompleted { .. }
-        | AgentEventPayload::SessionResumed { .. } => None,
+        | AgentEventPayload::SessionResumed { .. }
+        | AgentEventPayload::BgTaskSpawned { .. }
+        | AgentEventPayload::BgTaskOutput { .. }
+        | AgentEventPayload::BgTaskCompleted { .. } => None,
     }
 }
 

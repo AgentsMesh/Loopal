@@ -1,3 +1,5 @@
+#[path = "suite/bg_task_bridge_test.rs"]
+mod bg_task_bridge_test;
 #[path = "suite/bridge_basic_test.rs"]
 mod bridge_basic_test;
 #[path = "suite/bridge_edge_test.rs"]

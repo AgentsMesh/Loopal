@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::process::Child;
-use tokio::sync::watch;
+use tokio::sync::{mpsc, watch};
 
 use loopal_protocol::{BgTaskSnapshot, BgTaskStatus};
 
@@ -24,7 +24,18 @@ pub struct BackgroundTask {
     pub status: Arc<Mutex<TaskStatus>>,
     pub description: String,
     pub child: Arc<Mutex<Option<Child>>>,
-    /// Watch channel for event-driven status notification.
+    pub status_watch: watch::Receiver<TaskStatus>,
+}
+
+/// Notification sent when a background task is inserted into the store.
+///
+/// Carries Arc handles so the receiver can monitor task output and status
+/// without holding the store lock.
+pub struct SpawnNotification {
+    pub task_id: String,
+    pub description: String,
+    pub output: Arc<Mutex<String>>,
+    pub exit_code: Arc<Mutex<Option<i32>>>,
     pub status_watch: watch::Receiver<TaskStatus>,
 }
 
@@ -36,6 +47,7 @@ pub struct BackgroundTask {
 pub struct BackgroundTaskStore {
     tasks: Mutex<HashMap<String, BackgroundTask>>,
     counter: AtomicU64,
+    spawn_tx: Mutex<Option<mpsc::UnboundedSender<SpawnNotification>>>,
 }
 
 impl BackgroundTaskStore {
@@ -43,6 +55,7 @@ impl BackgroundTaskStore {
         Arc::new(Self {
             tasks: Mutex::new(HashMap::new()),
             counter: AtomicU64::new(1),
+            spawn_tx: Mutex::new(None),
         })
     }
 
@@ -50,13 +63,31 @@ impl BackgroundTaskStore {
         format!("bg_{}", self.counter.fetch_add(1, Ordering::Relaxed))
     }
 
+    /// Subscribe to task spawn notifications.
+    ///
+    /// Returns a receiver that yields a `SpawnNotification` each time a
+    /// task is inserted. Only one subscriber is supported.
+    pub fn subscribe_spawns(&self) -> mpsc::UnboundedReceiver<SpawnNotification> {
+        let (tx, rx) = mpsc::unbounded_channel();
+        *self.spawn_tx.lock().unwrap() = Some(tx);
+        rx
+    }
+
     pub fn insert(&self, id: String, task: BackgroundTask) {
+        let notif = SpawnNotification {
+            task_id: id.clone(),
+            description: task.description.clone(),
+            output: task.output.clone(),
+            exit_code: task.exit_code.clone(),
+            status_watch: task.status_watch.clone(),
+        };
         self.tasks.lock().unwrap().insert(id, task);
+        if let Some(tx) = self.spawn_tx.lock().unwrap().as_ref() {
+            let _ = tx.send(notif);
+        }
     }
 
     /// Access a task by ID under the store lock.
-    ///
-    /// The closure runs while the lock is held — keep it short.
     pub fn with_task<T>(&self, id: &str, f: impl FnOnce(&BackgroundTask) -> T) -> Option<T> {
         let guard = self.tasks.lock().unwrap();
         guard.get(id).map(f)
@@ -76,6 +107,7 @@ impl BackgroundTaskStore {
                     id: id.clone(),
                     description: task.description.clone(),
                     status: BgTaskStatus::Running,
+                    exit_code: None,
                 })
             })
             .collect();
@@ -113,6 +145,7 @@ impl Default for BackgroundTaskStore {
         Self {
             tasks: Mutex::new(HashMap::new()),
             counter: AtomicU64::new(1),
+            spawn_tx: Mutex::new(None),
         }
     }
 }

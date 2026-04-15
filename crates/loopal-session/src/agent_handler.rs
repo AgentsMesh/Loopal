@@ -194,6 +194,11 @@ pub(crate) fn apply_agent_event(state: &mut SessionState, name: &str, payload: A
         | AgentEventPayload::TurnDiffSummary { .. }
         | AgentEventPayload::TurnCompleted { .. }
         | AgentEventPayload::SessionResumed { .. } => {}
+        AgentEventPayload::BgTaskSpawned { .. }
+        | AgentEventPayload::BgTaskOutput { .. }
+        | AgentEventPayload::BgTaskCompleted { .. } => {
+            crate::bg_task_state::apply(state, payload);
+        }
         AgentEventPayload::AutoModeDecision {
             tool_name,
             decision,

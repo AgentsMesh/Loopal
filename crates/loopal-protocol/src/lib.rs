@@ -15,7 +15,7 @@ pub mod user_content;
 
 pub use address::QualifiedAddress;
 pub use agent_state::{AgentStatus, ObservableAgentState};
-pub use bg_task::{BgTaskSnapshot, BgTaskStatus};
+pub use bg_task::{BgTaskDetail, BgTaskSnapshot, BgTaskStatus};
 pub use command::AgentMode;
 pub use control::ControlCommand;
 pub use envelope::{Envelope, MessageSource};

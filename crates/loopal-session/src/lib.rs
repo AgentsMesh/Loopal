@@ -2,6 +2,7 @@ pub mod agent_conversation;
 mod agent_handler;
 mod agent_lifecycle;
 mod agent_ops;
+mod bg_task_state;
 pub mod controller;
 mod controller_control;
 mod controller_ops;

@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::bg_task::BgTaskStatus;
 use crate::question::Question;
 
 /// Event payload. Runner/LLM/Tools only construct this enum.
@@ -166,6 +167,20 @@ pub enum AgentEventPayload {
     SessionResumed {
         session_id: String,
         message_count: usize,
+    },
+
+    /// Periodic snapshot of background tasks from agent process.
+    BgTaskSpawned { id: String, description: String },
+
+    /// Incremental output from a running background task.
+    BgTaskOutput { id: String, output_delta: String },
+
+    /// Background task completed or failed (authoritative final state).
+    BgTaskCompleted {
+        id: String,
+        status: BgTaskStatus,
+        exit_code: Option<i32>,
+        output: String,
     },
 
     /// Aggregated metrics emitted at the end of each turn.

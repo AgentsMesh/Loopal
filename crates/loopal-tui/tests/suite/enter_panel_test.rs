@@ -1,5 +1,8 @@
 /// Tests for enter_panel dispatch function.
-use loopal_protocol::{AgentEvent, AgentEventPayload, ControlCommand, UserQuestionResponse};
+use loopal_protocol::{
+    AgentEvent, AgentEventPayload, BgTaskSnapshot, BgTaskStatus, ControlCommand,
+    UserQuestionResponse,
+};
 use loopal_session::SessionController;
 use loopal_tui::app::{App, FocusMode, PanelKind};
 use loopal_tui::dispatch_ops::enter_panel;
@@ -42,13 +45,13 @@ fn finish_agent(app: &App, name: &str) {
         .handle_event(AgentEvent::named(name, AgentEventPayload::Finished));
 }
 
-fn add_bg_task(app: &App, id: &str, desc: &str) {
-    app.bg_store
-        .register_proxy(id.to_string(), desc.to_string());
-}
-
-fn sync_bg(app: &mut App) {
-    app.bg_snapshots = app.bg_store.snapshot_running();
+fn add_bg_snapshot(app: &mut App, id: &str, desc: &str) {
+    app.bg_snapshots.push(BgTaskSnapshot {
+        id: id.into(),
+        description: desc.into(),
+        status: BgTaskStatus::Running,
+        exit_code: None,
+    });
 }
 
 #[test]
@@ -108,8 +111,7 @@ fn noop_when_only_finished_agents() {
 #[test]
 fn enters_bg_tasks_when_no_agents_but_bg_tasks() {
     let mut app = make_app();
-    add_bg_task(&app, "t1", "compiling");
-    sync_bg(&mut app);
+    add_bg_snapshot(&mut app, "t1", "compiling");
     enter_panel(&mut app);
     assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::BgTasks));
     assert!(app.focused_bg_task.is_some(), "should set focused_bg_task");
@@ -120,8 +122,7 @@ fn enters_bg_tasks_when_only_finished_agents_and_bg_tasks() {
     let mut app = make_app();
     spawn_agent(&app, "done");
     finish_agent(&app, "done");
-    add_bg_task(&app, "t2", "testing");
-    sync_bg(&mut app);
+    add_bg_snapshot(&mut app, "t2", "testing");
     enter_panel(&mut app);
     assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::BgTasks));
 }
@@ -130,8 +131,7 @@ fn enters_bg_tasks_when_only_finished_agents_and_bg_tasks() {
 fn prefers_agents_over_bg_tasks() {
     let mut app = make_app();
     spawn_agent(&app, "worker");
-    add_bg_task(&app, "t3", "linting");
-    sync_bg(&mut app);
+    add_bg_snapshot(&mut app, "t3", "linting");
     enter_panel(&mut app);
     assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Agents));
 }

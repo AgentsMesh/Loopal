@@ -46,6 +46,9 @@ pub fn draw(f: &mut Frame, app: &mut App) {
             SubPage::StatusPage(s) => {
                 views::status_page::render_status_page(f, s, layout.picker);
             }
+            SubPage::BgTaskLog(s) => {
+                views::bg_task_log::render_bg_task_log(f, s, &app.bg_task_details, layout.picker);
+            }
         }
         views::unified_status::render_unified_status(f, &state, layout.status);
         return;

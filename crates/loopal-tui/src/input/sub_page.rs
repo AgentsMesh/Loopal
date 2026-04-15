@@ -5,6 +5,7 @@ use crate::app::{App, PickerState, SubPage};
 use super::status_page_keys::handle_status_page_key;
 use super::sub_page_rewind::handle_rewind_picker_key;
 use super::{InputAction, SubPageResult};
+use super::bg_task_log_keys::handle_bg_task_log_key;
 
 /// Handle keys when a sub-page (picker) is active. All keys are consumed.
 pub(super) fn handle_sub_page_key(app: &mut App, key: &KeyEvent) -> InputAction {
@@ -27,6 +28,7 @@ pub(super) fn handle_sub_page_key(app: &mut App, key: &KeyEvent) -> InputAction 
         SubPage::RewindPicker(_) => handle_rewind_picker_key(app, key),
         SubPage::SessionPicker(_) => handle_session_picker_key(app, key),
         SubPage::StatusPage(_) => handle_status_page_key(app, key),
+        SubPage::BgTaskLog(_) => handle_bg_task_log_key(app, key),
     }
 }
 

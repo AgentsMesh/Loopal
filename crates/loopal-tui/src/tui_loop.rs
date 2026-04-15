@@ -2,13 +2,11 @@
 
 use std::io;
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use ratatui::prelude::*;
 
 use loopal_protocol::{AgentEvent, AgentEventPayload};
 use loopal_session::SessionController;
-use loopal_tool_background::BackgroundTaskStore;
 use tokio::sync::mpsc;
 
 use crate::app::App;
@@ -23,7 +21,6 @@ pub async fn run_tui(
     session: SessionController,
     cwd: PathBuf,
     agent_event_rx: mpsc::Receiver<AgentEvent>,
-    bg_store: Arc<BackgroundTaskStore>,
 ) -> anyhow::Result<()> {
     crate::terminal::install_panic_hook();
     let _guard = TerminalGuard::new()?;
@@ -31,7 +28,6 @@ pub async fn run_tui(
     let mut terminal = Terminal::new(backend)?;
     let events = EventHandler::new(agent_event_rx);
     let mut app = App::new(session, cwd);
-    app.bg_store = bg_store;
 
     run_tui_loop(&mut terminal, events, &mut app).await?;
 
@@ -48,7 +44,7 @@ pub async fn run_tui_loop<B: Backend>(
 where
     B::Error: Send + Sync + 'static,
 {
-    app.bg_snapshots = app.bg_store.snapshot_running();
+    sync_bg_tasks(app);
     terminal.draw(|f| draw(f, app))?;
 
     loop {
@@ -97,11 +93,18 @@ where
         if should_quit || app.exiting {
             break;
         }
-        app.bg_snapshots = app.bg_store.snapshot_running();
+        sync_bg_tasks(app);
         terminal.draw(|f| draw(f, app))?;
     }
 
     Ok(())
+}
+
+/// Sync background task data from session state into App-level cache.
+fn sync_bg_tasks(app: &mut App) {
+    let state = app.session.lock();
+    app.bg_snapshots = state.bg_tasks.values().map(|t| t.to_snapshot()).collect();
+    app.bg_task_details = state.bg_tasks.values().cloned().collect();
 }
 
 /// Load display history from storage after the agent confirms a session resume.

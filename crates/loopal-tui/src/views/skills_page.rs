@@ -26,8 +26,7 @@ pub fn render_skills_page(f: &mut Frame, state: &mut SkillsPageState, area: Rect
     }
 
     if state.skills.is_empty() {
-        let msg =
-            Paragraph::new("  No skills loaded").style(Style::default().fg(Color::DarkGray));
+        let msg = Paragraph::new("  No skills loaded").style(Style::default().fg(Color::DarkGray));
         f.render_widget(msg, inner);
         return;
     }

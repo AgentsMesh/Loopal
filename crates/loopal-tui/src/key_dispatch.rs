@@ -116,14 +116,12 @@ pub(crate) async fn handle_key_action(
         }
         InputAction::EnterBgTaskView => {
             if let Some(ref task_id) = app.focused_bg_task {
-                app.sub_page = Some(crate::app::SubPage::BgTaskLog(
-                    crate::app::BgTaskLogState {
-                        task_id: task_id.clone(),
-                        scroll_offset: 0,
-                        auto_follow: true,
-                        prev_line_count: 0,
-                    },
-                ));
+                app.sub_page = Some(crate::app::SubPage::BgTaskLog(crate::app::BgTaskLogState {
+                    task_id: task_id.clone(),
+                    scroll_offset: 0,
+                    auto_follow: true,
+                    prev_line_count: 0,
+                }));
                 app.focus_mode = crate::app::FocusMode::Input;
             }
             false

@@ -30,9 +30,7 @@ fn multiple_inserts_send_ordered_notifications() {
     store.register_proxy("bg_a".into(), "a".into());
     store.register_proxy("bg_b".into(), "b".into());
     store.register_proxy("bg_c".into(), "c".into());
-    let ids: Vec<String> = (0..3)
-        .map(|_| rx.try_recv().unwrap().task_id)
-        .collect();
+    let ids: Vec<String> = (0..3).map(|_| rx.try_recv().unwrap().task_id).collect();
     assert_eq!(ids, vec!["bg_a", "bg_b", "bg_c"]);
 }
 

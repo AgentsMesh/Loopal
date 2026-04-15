@@ -90,9 +90,7 @@ pub async fn run(
     // switched sessions via `/resume` during the TUI session. The fallback to
     // `root_session_id` is defensive only; `set_root_session_id` on line 44
     // guarantees the Option is always Some.
-    let final_session_id = session_ref
-        .root_session_id()
-        .unwrap_or(root_session_id);
+    let final_session_id = session_ref.root_session_id().unwrap_or(root_session_id);
     result.map(|()| final_session_id)
 }
 

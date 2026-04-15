@@ -1,18 +1,27 @@
 use std::io;
 
 use crossterm::{
-    event::{DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture},
+    event::{
+        DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
+        KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
+    },
     execute,
-    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+    terminal::{
+        EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
+        supports_keyboard_enhancement,
+    },
 };
 
 /// RAII guard that ensures raw mode and alternate screen are cleaned up on drop,
 /// even if the TUI panics or returns early via `?`.
-pub struct TerminalGuard;
+pub struct TerminalGuard {
+    keyboard_enhanced: bool,
+}
 
 impl TerminalGuard {
     pub fn new() -> io::Result<Self> {
         enable_raw_mode()?;
+        let keyboard_enhanced = supports_keyboard_enhancement().unwrap_or(false);
         let mut stdout = io::stdout();
         execute!(
             stdout,
@@ -20,12 +29,21 @@ impl TerminalGuard {
             EnableMouseCapture,
             EnableBracketedPaste
         )?;
-        Ok(Self)
+        if keyboard_enhanced {
+            let _ = execute!(
+                stdout,
+                PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES)
+            );
+        }
+        Ok(Self { keyboard_enhanced })
     }
 }
 
 impl Drop for TerminalGuard {
     fn drop(&mut self) {
+        if self.keyboard_enhanced {
+            let _ = execute!(io::stdout(), PopKeyboardEnhancementFlags);
+        }
         let _ = disable_raw_mode();
         let _ = execute!(
             io::stdout(),
@@ -45,6 +63,7 @@ pub fn install_panic_hook() {
         let _ = disable_raw_mode();
         let _ = execute!(
             io::stdout(),
+            PopKeyboardEnhancementFlags,
             DisableBracketedPaste,
             DisableMouseCapture,
             LeaveAlternateScreen,

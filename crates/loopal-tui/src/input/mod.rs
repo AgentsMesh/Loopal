@@ -54,6 +54,12 @@ fn handle_global_keys(app: &mut App, key: &KeyEvent) -> Option<InputAction> {
             KeyCode::Char('n') if matches!(app.focus_mode, FocusMode::Panel(_)) => {
                 return Some(InputAction::PanelDown);
             }
+            // 0x0A (LF) arrives as Ctrl+J — many terminals send this for Shift+Enter
+            KeyCode::Char('j') => {
+                app.input.insert(app.input_cursor, '\n');
+                app.input_cursor += 1;
+                return Some(InputAction::None);
+            }
             KeyCode::Char('p') => return Some(handle_up(app)),
             KeyCode::Char('n') => return Some(handle_down(app)),
             _ => {}
@@ -92,8 +98,12 @@ fn handle_panel_key(app: &mut App, key: &KeyEvent) -> InputAction {
         KeyCode::Delete if kind == PanelKind::Agents => InputAction::TerminateFocusedAgent,
         KeyCode::Tab => InputAction::PanelTab,
         KeyCode::Esc => InputAction::ExitPanel,
-        KeyCode::Char(c) => {
-            // Auto-switch to Input mode and insert the character
+        // Only insert plain or Shift-modified characters; ignore Ctrl/Alt combos
+        KeyCode::Char(c)
+            if !key
+                .modifiers
+                .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
+        {
             app.focus_mode = FocusMode::Input;
             app.input.insert(app.input_cursor, c);
             app.input_cursor += c.len_utf8();
@@ -129,7 +139,12 @@ fn handle_input_mode_key(app: &mut App, key: &KeyEvent) -> InputAction {
             InputAction::None
         }
         KeyCode::Enter => handle_enter(app),
-        KeyCode::Char(c) => {
+        // Only insert plain or Shift-modified characters; ignore Ctrl/Alt combos
+        KeyCode::Char(c)
+            if !key
+                .modifiers
+                .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
+        {
             app.input.insert(app.input_cursor, c);
             app.input_cursor += c.len_utf8();
             InputAction::None

@@ -57,7 +57,11 @@ fn handle_generic_picker_key(picker: &mut PickerState, key: &KeyEvent) -> Picker
             }
             PickerKeyResult::Handled
         }
-        KeyCode::Char(c) => {
+        KeyCode::Char(c)
+            if !key
+                .modifiers
+                .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
+        {
             picker.filter.insert(picker.filter_cursor, c);
             picker.filter_cursor += c.len_utf8();
             picker.selected = 0;

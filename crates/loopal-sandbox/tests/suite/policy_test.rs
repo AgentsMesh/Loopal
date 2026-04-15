@@ -143,7 +143,11 @@ fn default_write_includes_home() {
 fn deny_write_globs_include_shell_configs() {
     let config = SandboxConfig::default();
     let resolved = resolve_policy(&config, "/tmp".as_ref());
-    assert!(resolved.deny_write_globs.contains(&"**/.bashrc".to_string()));
+    assert!(
+        resolved
+            .deny_write_globs
+            .contains(&"**/.bashrc".to_string())
+    );
     assert!(resolved.deny_write_globs.contains(&"**/.zshrc".to_string()));
     assert!(
         resolved

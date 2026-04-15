@@ -3,8 +3,12 @@
 mod compaction_pair_test;
 #[path = "suite/compaction_test.rs"]
 mod compaction_test;
+#[path = "suite/config_refresh_test.rs"]
+mod config_refresh_test;
 #[path = "suite/degradation_test.rs"]
 mod degradation_test;
+#[path = "suite/file_snapshot_test.rs"]
+mod file_snapshot_test;
 #[path = "suite/fork_test.rs"]
 mod fork_test;
 #[path = "suite/ingestion_test.rs"]

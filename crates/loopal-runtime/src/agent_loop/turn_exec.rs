@@ -5,11 +5,9 @@ use tracing::{info, warn};
 
 use super::TurnOutput;
 use super::runner::AgentLoopRunner;
-use super::streaming_tool_exec::{self, StreamingToolHandle, ToolUseArrived};
 use super::turn_context::TurnContext;
 
 impl AgentLoopRunner {
-    /// Inner loop: LLM → [tools → LLM]* → done.
     pub(super) async fn execute_turn_inner(
         &mut self,
         turn_ctx: &mut TurnContext,
@@ -25,11 +23,11 @@ impl AgentLoopRunner {
             }
 
             self.check_and_compact().await?;
-            let working = self.params.store.prepare_for_llm();
+            let mut working = self.params.store.prepare_for_llm();
+            self.run_context_pipeline(&mut working).await;
             turn_ctx.metrics.llm_calls += 1;
             let result = self.stream_llm_with(&working, &turn_ctx.cancel).await?;
 
-            // MaxTokens + tool calls = truncated args, discard tools.
             let truncated =
                 result.stop_reason == StopReason::MaxTokens && !result.tool_uses.is_empty();
             if truncated {
@@ -41,7 +39,6 @@ impl AgentLoopRunner {
                 &result.tool_uses
             };
 
-            // Auto-continue: MaxTokens+tools, PauseTurn, or stream truncation.
             let needs_auto_continue = truncated || result.stop_reason == StopReason::PauseTurn;
             let stream_truncated = result.stream_error
                 && !turn_ctx.cancel.is_cancelled()
@@ -80,7 +77,6 @@ impl AgentLoopRunner {
                 return Ok(TurnOutput { output: last_text });
             }
 
-            // Stream error (cancel or empty truncation) — record partial text, then exit.
             if result.stream_error {
                 if !result.assistant_text.is_empty() {
                     let no_tools: &[(String, String, serde_json::Value)] = &[];
@@ -107,7 +103,6 @@ impl AgentLoopRunner {
                 last_text.clone_from(&result.assistant_text);
             }
 
-            // No tool calls — check MaxTokens continuation or stop hooks.
             if result.tool_uses.is_empty() {
                 if result.stop_reason == StopReason::MaxTokens
                     && continuation_count < self.params.harness.max_auto_continuations
@@ -132,66 +127,12 @@ impl AgentLoopRunner {
                 return Ok(TurnOutput { output: last_text });
             }
 
-            // Observer: on_before_tools — may inject warnings or abort.
             if self.run_before_tools(turn_ctx, &result.tool_uses).await? {
                 return Ok(TurnOutput { output: last_text });
             }
 
-            self.update_fork_snapshot(&result.tool_uses); // fork context
-
-            // Start ReadOnly tools early (parallel with permission checks).
-            let kernel = std::sync::Arc::clone(&self.params.deps.kernel);
-            let mut early_handle = StreamingToolHandle::empty();
-            for (idx, (id, name, input)) in result.tool_uses.iter().enumerate() {
-                streaming_tool_exec::feed_tool(
-                    &mut early_handle,
-                    &kernel,
-                    &self.tool_ctx,
-                    self.params.config.mode,
-                    &ToolUseArrived {
-                        index: idx,
-                        id: id.clone(),
-                        name: name.clone(),
-                        input: input.clone(),
-                    },
-                    self.params.deps.frontend.event_emitter(),
-                );
-            }
-
-            let tool_names: Vec<&str> = result
-                .tool_uses
-                .iter()
-                .map(|(_, n, _)| n.as_str())
-                .collect();
-            info!(
-                tool_count = result.tool_uses.len(),
-                ?tool_names,
-                "tool exec start"
-            );
-            let cancel = &turn_ctx.cancel;
-            turn_ctx.metrics.tool_calls_requested += result.tool_uses.len() as u32;
-            let stats = self
-                .execute_tools_with_early(result.tool_uses.clone(), cancel, early_handle)
+            self.execute_tool_phase(turn_ctx, result.tool_uses.clone())
                 .await?;
-            turn_ctx.metrics.tool_calls_approved += stats.approved;
-            turn_ctx.metrics.tool_calls_denied += stats.denied;
-            turn_ctx.metrics.tool_errors += stats.errors;
-            info!("tool exec complete");
-
-            let warnings = std::mem::take(&mut turn_ctx.pending_warnings);
-            self.params.store.append_warnings_to_last_user(warnings);
-
-            self.inject_pending_messages().await;
-            let result_blocks = self
-                .params
-                .store
-                .messages()
-                .last()
-                .map(|m| m.content.as_slice())
-                .unwrap_or(&[]);
-            for obs in &mut self.observers {
-                obs.on_after_tools(turn_ctx, &result.tool_uses, result_blocks);
-            }
 
             continuation_count = 0;
         }

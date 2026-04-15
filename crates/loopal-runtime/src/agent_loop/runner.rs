@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use loopal_error::{AgentOutput, Result};
 use loopal_protocol::{AgentEventPayload, AgentStatus, InterruptSignal};
+use loopal_context::ContextPipeline;
 use loopal_tool_api::ToolContext;
 use tokio::sync::watch;
 use tracing::{Instrument, info, info_span};
@@ -23,6 +24,7 @@ pub struct AgentLoopRunner {
     pub interrupt: InterruptSignal,
     pub interrupt_tx: Arc<watch::Sender<u64>>,
     pub observers: Vec<Box<dyn TurnObserver>>,
+    pub pipeline: ContextPipeline,
     /// Scheduler message receiver — consumed in `wait_for_input()`.
     pub trigger_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
     /// Async hook rewake channel — background hooks send Envelopes here.
@@ -69,6 +71,7 @@ impl AgentLoopRunner {
             interrupt,
             interrupt_tx,
             observers: Vec::new(),
+            pipeline: ContextPipeline::new(),
             trigger_rx,
             rewake_rx,
             status: AgentStatus::Starting,

@@ -181,6 +181,10 @@ impl SessionController {
         self.lock().root_session_id = Some(session_id.to_string());
     }
 
+    pub fn root_session_id(&self) -> Option<String> {
+        self.lock().root_session_id.clone()
+    }
+
     /// Drain pending sub-agent refs that need to be persisted.
     /// Returns `(root_session_id, refs)`. The caller is responsible for
     /// writing them to disk via `SessionManager::add_sub_agent`.

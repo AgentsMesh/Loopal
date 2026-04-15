@@ -73,11 +73,15 @@ pub async fn run() -> anyhow::Result<()> {
     // Clean up worktree: remove if no changes, keep otherwise.
     // Note: If the process is killed by SIGKILL or panics, this cleanup won't run.
     // Stale worktrees are caught by `cleanup_stale_worktrees()` on the next startup.
-    if let Some(wt) = worktree {
-        cleanup_session_worktree(&wt);
+    let worktree_kept = match worktree.as_ref() {
+        Some(wt) if !cleanup_session_worktree(wt) => Some(wt),
+        _ => None,
+    };
+    if let Ok(ref session_id) = result {
+        print_resume_info(session_id, worktree_kept);
     }
 
-    result
+    result.map(|_| ())
 }
 
 /// Holds worktree info for cleanup on exit.
@@ -96,14 +100,29 @@ fn create_session_worktree(cwd: &std::path::Path) -> anyhow::Result<SessionWorkt
     Ok(SessionWorktree { info, repo_root })
 }
 
-fn cleanup_session_worktree(wt: &SessionWorktree) {
-    if loopal_git::cleanup_if_clean(&wt.repo_root, &wt.info) {
+fn cleanup_session_worktree(wt: &SessionWorktree) -> bool {
+    let removed = loopal_git::cleanup_if_clean(&wt.repo_root, &wt.info);
+    if removed {
         tracing::info!("session worktree removed (no changes)");
     } else {
         tracing::info!(
             worktree = %wt.info.path.display(),
             "worktree has changes, keeping for manual review"
         );
+    }
+    removed
+}
+
+/// Print session resume instructions to stderr after TUI exits.
+fn print_resume_info(session_id: &str, worktree: Option<&SessionWorktree>) {
+    eprintln!();
+    eprintln!("To resume this session:");
+    eprintln!("  loopal --resume {session_id}");
+    if let Some(wt) = worktree {
+        let display = abbreviate_home(&wt.info.path);
+        eprintln!();
+        eprintln!("Session worktree: {display}");
+        eprintln!("  cd {display} && loopal --resume {session_id}");
     }
 }
 

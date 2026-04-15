@@ -6,7 +6,7 @@
 use std::time::Instant;
 
 use indexmap::IndexMap;
-use loopal_protocol::AgentStatus;
+use loopal_protocol::{AgentStatus, McpServerSnapshot};
 
 /// Name of the root agent in the agents map.
 pub const ROOT_AGENT: &str = "main";
@@ -55,6 +55,9 @@ pub struct SessionState {
     // === Interaction state ===
     /// Pending sub-agent refs to be persisted (drained by caller).
     pub pending_sub_agent_refs: Vec<PendingSubAgentRef>,
+    // === MCP runtime status (updated via McpStatusReport events) ===
+    /// `None` = not yet received from agent; `Some` = at least one report received.
+    pub mcp_status: Option<Vec<McpServerSnapshot>>,
 }
 
 /// Sub-agent reference awaiting persistence to disk.
@@ -85,6 +88,7 @@ impl SessionState {
             root_session_id: None,
             message_feed: MessageFeed::new(200),
             pending_sub_agent_refs: Vec::new(),
+            mcp_status: None,
         }
     }
 

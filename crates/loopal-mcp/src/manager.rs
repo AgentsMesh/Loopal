@@ -83,6 +83,9 @@ impl McpManager {
             } else {
                 warn!(server = %conn.name, errors = ?conn.errors, "failed to start MCP server");
                 failure_count += 1;
+                // Keep failed connections so /mcp page can display them and
+                // the user can attempt a manual reconnect.
+                self.connections.insert(conn.name.clone(), conn);
             }
         }
 

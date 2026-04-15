@@ -4,6 +4,7 @@ mod agent_cmd;
 mod builtin;
 mod help_cmd;
 pub(crate) mod init_cmd;
+mod mcp_cmd;
 mod model_cmd;
 pub mod registry;
 mod resume_cmd;

@@ -5,6 +5,11 @@ use loopal_protocol::{AgentMode, ControlCommand};
 use crate::controller::SessionController;
 
 impl SessionController {
+    /// Send a raw control command to a specific agent target.
+    pub async fn send_control(&self, target: String, cmd: ControlCommand) {
+        self.backend.send_control_to_agent(&target, cmd).await;
+    }
+
     pub async fn switch_mode(&self, mode: AgentMode) {
         let target = {
             let mut s = self.lock();

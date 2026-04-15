@@ -88,6 +88,7 @@ impl AgentLoopRunner {
         info!(model = %self.params.config.model(), "agent loop started");
         self.transition(AgentStatus::Running).await?;
         self.emit(AgentEventPayload::Started).await?;
+        self.emit_initial_mcp_status().await;
         self.fire_session_hook(loopal_config::HookEvent::SessionStart)
             .await;
 

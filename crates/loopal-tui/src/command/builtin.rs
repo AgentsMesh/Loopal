@@ -103,6 +103,7 @@ pub fn register_all(registry: &mut CommandRegistry) {
     registry.register(Arc::new(super::model_cmd::ModelCmd));
     registry.register(Arc::new(super::rewind_cmd::RewindCmd));
     registry.register(Arc::new(StatusCmd));
+    registry.register(Arc::new(super::mcp_cmd::McpCmd));
     registry.register(Arc::new(super::resume_cmd::ResumeCmd));
     registry.register(Arc::new(super::init_cmd::InitCmd));
     registry.register(Arc::new(super::help_cmd::HelpCmd));

@@ -1,13 +1,25 @@
 /// Query and lifecycle methods for McpManager.
 ///
 /// Split from `manager.rs` to stay within the 200-line file limit.
-/// Contains: resource/prompt/instruction queries, reconnect, restart.
+/// Contains: resource/prompt/instruction queries, reconnect, restart, snapshot.
+use loopal_config::McpServerConfig;
 use loopal_error::McpError;
 use tracing::warn;
 
 use crate::manager::McpManager;
 use crate::reconnect::{self, ReconnectPolicy};
 use crate::types::{McpPrompt, McpResource};
+
+/// Lightweight snapshot of a single MCP connection for status display.
+pub struct McpConnectionSnapshot {
+    pub name: String,
+    pub transport: String,
+    pub status: String,
+    pub tool_count: usize,
+    pub resource_count: usize,
+    pub prompt_count: usize,
+    pub errors: Vec<String>,
+}
 
 impl McpManager {
     /// Collect server instructions from all connected MCP servers.
@@ -132,5 +144,36 @@ impl McpManager {
                 );
             }
         }
+    }
+
+    /// Return tool definitions for a single connected server (empty if not connected).
+    pub fn get_tools_for_server(&self, server: &str) -> Vec<loopal_tool_api::ToolDefinition> {
+        self.connections
+            .get(server)
+            .filter(|c| c.status.is_connected())
+            .map(|c| c.cached_tools.clone())
+            .unwrap_or_default()
+    }
+
+    /// Collect a snapshot of all managed connections for status display.
+    pub fn collect_snapshots(&self) -> Vec<McpConnectionSnapshot> {
+        self.connections
+            .iter()
+            .map(|(name, conn)| {
+                let transport = match &conn.config {
+                    McpServerConfig::Stdio { .. } => "stdio",
+                    McpServerConfig::StreamableHttp { .. } => "streamable-http",
+                };
+                McpConnectionSnapshot {
+                    name: name.clone(),
+                    transport: transport.to_string(),
+                    status: conn.status.to_string(),
+                    tool_count: conn.cached_tools.len(),
+                    resource_count: conn.cached_resources.len(),
+                    prompt_count: conn.cached_prompts.len(),
+                    errors: conn.errors.clone(),
+                }
+            })
+            .collect()
     }
 }

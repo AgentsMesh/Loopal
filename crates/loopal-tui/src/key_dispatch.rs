@@ -183,6 +183,10 @@ pub(crate) async fn handle_key_action(
                 .await;
             false
         }
+        InputAction::McpReconnect(server) => {
+            crate::key_dispatch_ops::mcp_reconnect(app, server).await;
+            false
+        }
         InputAction::None => false,
     }
 }

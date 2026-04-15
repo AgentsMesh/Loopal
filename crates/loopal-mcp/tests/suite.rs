@@ -12,3 +12,6 @@ mod types_test;
 
 #[path = "suite/callback_test.rs"]
 mod callback_test;
+
+#[path = "suite/snapshot_test.rs"]
+mod snapshot_test;

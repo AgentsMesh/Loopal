@@ -52,6 +52,12 @@ mod markdown_elements_test;
 mod markdown_table_test;
 #[path = "suite/markdown_test.rs"]
 mod markdown_test;
+#[path = "suite/mcp_page_keys_test.rs"]
+mod mcp_page_keys_test;
+#[path = "suite/mcp_page_test.rs"]
+mod mcp_page_test;
+#[path = "suite/mcp_refresh_test.rs"]
+mod mcp_refresh_test;
 #[path = "suite/message_lines_edge_test.rs"]
 mod message_lines_edge_test;
 #[path = "suite/message_lines_test.rs"]

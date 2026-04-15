@@ -7,6 +7,7 @@ mod finished_guard;
 mod fork_snapshot;
 mod input;
 mod input_control;
+mod input_mcp;
 mod llm;
 mod llm_params;
 mod llm_record;

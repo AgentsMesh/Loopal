@@ -64,4 +64,6 @@ pub enum InputAction {
     QuestionCancel,
     /// User pressed Ctrl+V — caller should spawn async clipboard read
     PasteRequested,
+    /// Reconnect an MCP server by name
+    McpReconnect(String),
 }

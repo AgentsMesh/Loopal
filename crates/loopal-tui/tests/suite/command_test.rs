@@ -19,6 +19,7 @@ fn test_registry_new_has_all_builtins() {
         "/model",
         "/rewind",
         "/status",
+        "/mcp",
         "/resume",
         "/init",
         "/help",

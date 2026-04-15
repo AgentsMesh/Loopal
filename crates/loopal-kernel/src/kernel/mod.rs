@@ -1,3 +1,5 @@
+mod mcp;
+
 use std::sync::Arc;
 
 use loopal_config::HookEvent;
@@ -18,16 +20,13 @@ use crate::provider_registry;
 use loopal_tool_background::BackgroundTaskStore;
 
 pub struct Kernel {
-    tool_registry: ToolRegistry,
+    pub(super) tool_registry: ToolRegistry,
     provider_registry: ProviderRegistry,
     hook_service: HookService,
-    mcp_manager: Arc<RwLock<McpManager>>,
-    /// MCP server instructions cached at start_mcp() time.
-    mcp_instructions: Vec<(String, String)>,
-    /// MCP resources cached at start_mcp() time.
-    mcp_resources: Vec<(String, McpResource)>,
-    /// MCP prompts cached at start_mcp() time.
-    mcp_prompts: Vec<(String, McpPrompt)>,
+    pub(super) mcp_manager: Arc<RwLock<McpManager>>,
+    pub(super) mcp_instructions: Vec<(String, String)>,
+    pub(super) mcp_resources: Vec<(String, McpResource)>,
+    pub(super) mcp_prompts: Vec<(String, McpPrompt)>,
     settings: Settings,
     bg_store: Arc<BackgroundTaskStore>,
 }
@@ -35,8 +34,8 @@ pub struct Kernel {
 impl Kernel {
     pub fn new(settings: Settings) -> Result<Self> {
         let bg_store = BackgroundTaskStore::new();
-        let mut tool_registry = ToolRegistry::new();
-        loopal_tools::builtin::register_all(&mut tool_registry, bg_store.clone());
+        let tool_registry = ToolRegistry::new();
+        loopal_tools::builtin::register_all(&tool_registry, bg_store.clone());
 
         let mut provider_registry = ProviderRegistry::new();
         provider_registry::register_providers(&settings, &mut provider_registry);
@@ -61,10 +60,8 @@ impl Kernel {
         })
     }
 
-    // --- Mutation methods (pre-Arc phase only) ---
-
-    /// Register an additional tool (before wrapping in Arc).
-    pub fn register_tool(&mut self, tool: Box<dyn loopal_tool_api::Tool>) {
+    /// Register an additional tool (thread-safe, can be called after Arc wrapping).
+    pub fn register_tool(&self, tool: Box<dyn loopal_tool_api::Tool>) {
         self.tool_registry.register(tool);
     }
 
@@ -91,12 +88,9 @@ impl Kernel {
 
             let mut skipped_tools = Vec::new();
             for (server_name, tool_def) in tools_with_server {
-                // Prevent MCP tools from shadowing already-registered tools
-                // (built-in, agent, or from a previously loaded MCP server).
                 if self.tool_registry.get(&tool_def.name).is_some() {
                     warn!(
-                        tool = %tool_def.name,
-                        server = %server_name,
+                        tool = %tool_def.name, server = %server_name,
                         "MCP tool name conflicts with existing tool, skipping"
                     );
                     skipped_tools.push(tool_def.name.clone());
@@ -108,7 +102,6 @@ impl Kernel {
                 self.tool_registry.register(Box::new(adapter));
             }
 
-            // Remove skipped tools from manager's tool_map for consistency.
             if !skipped_tools.is_empty() {
                 let mut mgr = self.mcp_manager.write().await;
                 for name in &skipped_tools {
@@ -119,12 +112,6 @@ impl Kernel {
         Ok(())
     }
 
-    // --- Query methods (post-Arc, immutable) ---
-
-    /// Create a `LocalBackend` for the given working directory.
-    ///
-    /// Resolves the sandbox policy (if enabled) and bundles it with default
-    /// resource limits. The returned `Arc` is injected into `ToolContext.backend`.
     pub fn create_backend(&self, cwd: &std::path::Path) -> Arc<dyn loopal_tool_api::Backend> {
         use loopal_config::SandboxPolicy;
         let policy = if self.settings.sandbox.policy != SandboxPolicy::Disabled {
@@ -139,27 +126,22 @@ impl Kernel {
         )
     }
 
-    /// Background task store shared by BashTool and TUI.
     pub fn bg_store(&self) -> &Arc<BackgroundTaskStore> {
         &self.bg_store
     }
 
-    /// Access settings.
     pub fn settings(&self) -> &Settings {
         &self.settings
     }
 
-    /// Get a tool by name from the registry.
-    pub fn get_tool(&self, name: &str) -> Option<&dyn loopal_tool_api::Tool> {
+    pub fn get_tool(&self, name: &str) -> Option<Arc<dyn loopal_tool_api::Tool>> {
         self.tool_registry.get(name)
     }
 
-    /// Get tool definitions for LLM.
     pub fn tool_definitions(&self) -> Vec<ToolDefinition> {
         self.tool_registry.to_definitions()
     }
 
-    /// Resolve a provider for the given model.
     pub fn resolve_provider(
         &self,
         model: &str,
@@ -168,7 +150,6 @@ impl Kernel {
         self.provider_registry.resolve(model)
     }
 
-    /// Get hooks matching the given event and optional tool name.
     pub fn get_hooks(
         &self,
         event: HookEvent,
@@ -179,28 +160,11 @@ impl Kernel {
             .match_hooks(event, tool_name, None)
     }
 
-    /// Access the hook service for structured hook execution.
     pub fn hook_service(&self) -> &HookService {
         &self.hook_service
     }
 
-    /// Get the shared MCP manager for server instructions and other queries.
     pub fn mcp_manager(&self) -> &Arc<RwLock<McpManager>> {
         &self.mcp_manager
-    }
-
-    /// MCP server instructions cached from the initialize handshake.
-    pub fn mcp_instructions(&self) -> &[(String, String)] {
-        &self.mcp_instructions
-    }
-
-    /// MCP resources cached at startup.
-    pub fn mcp_resources(&self) -> &[(String, McpResource)] {
-        &self.mcp_resources
-    }
-
-    /// MCP prompts cached at startup.
-    pub fn mcp_prompts(&self) -> &[(String, McpPrompt)] {
-        &self.mcp_prompts
     }
 }

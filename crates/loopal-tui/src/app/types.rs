@@ -81,6 +81,8 @@ impl PickerState {
 
 use super::StatusPageState;
 
+use crate::app::McpPageState;
+
 /// Active sub-page overlay that replaces the main chat area.
 pub enum SubPage {
     /// Model picker — user selects from known models.
@@ -91,6 +93,8 @@ pub enum SubPage {
     SessionPicker(PickerState),
     /// Status dashboard — tabbed view of session info, config, and usage.
     StatusPage(StatusPageState),
+    /// MCP server status page — list of MCP servers with connection state.
+    McpPage(McpPageState),
 }
 
 /// Which sub-panel within the panel zone is focused.

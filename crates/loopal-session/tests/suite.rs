@@ -7,6 +7,8 @@ mod agent_handler_test;
 mod agent_lifecycle_test;
 #[path = "suite/agent_routing_test.rs"]
 mod agent_routing_test;
+#[path = "suite/bg_task_state_test.rs"]
+mod bg_task_state_test;
 #[path = "suite/controller_async_test.rs"]
 mod controller_async_test;
 #[path = "suite/controller_test.rs"]

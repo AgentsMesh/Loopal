@@ -99,6 +99,7 @@ pub(crate) async fn start_session(
         ));
 
         let session_dir_override = hub.session_dir_override().await;
+        let kernel_for_bridge = kernel.clone();
         let agent_params = agent_setup::build_with_frontend(
             &cwd,
             &config,
@@ -130,6 +131,9 @@ pub(crate) async fn start_session(
             .await;
         info!(session.id = %session_id, "session started");
 
+        let spawn_rx = kernel_for_bridge.bg_store().subscribe_spawns();
+        let bridge_task = crate::bg_task_bridge::spawn(spawn_rx, frontend_placeholder.clone());
+
         let agent_task = tokio::spawn(async move {
             match agent_loop(agent_params).await {
                 Ok(output) => {
@@ -142,6 +146,15 @@ pub(crate) async fn start_session(
                 }
             }
         });
+
+        let agent_task = {
+            let bridge_abort = bridge_task.abort_handle();
+            tokio::spawn(async move {
+                let result = agent_task.await;
+                bridge_abort.abort();
+                result.ok().flatten()
+            })
+        };
 
         Ok(SessionHandle {
             session_id,

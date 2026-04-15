@@ -47,6 +47,8 @@ pub enum InputAction {
     PanelDown,
     /// Enter the focused agent's conversation view (drill in, Agents panel only)
     EnterAgentView,
+    /// Enter the focused background task's log viewer (drill in, BgTasks panel only)
+    EnterBgTaskView,
     /// Return to root/parent view (drill out)
     ExitAgentView,
     /// Terminate the focused agent (Agents panel only)

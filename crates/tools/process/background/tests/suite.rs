@@ -6,3 +6,5 @@ mod background_task_edge_test;
 mod background_task_test;
 #[path = "suite/snapshot_test.rs"]
 mod snapshot_test;
+#[path = "suite/spawn_notification_test.rs"]
+mod spawn_notification_test;

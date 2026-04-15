@@ -8,6 +8,7 @@
 //! LLM providers, tools, and context pipeline.
 
 mod agent_setup;
+mod bg_task_bridge;
 mod hub_emitter;
 #[doc(hidden)]
 pub mod hub_frontend;
@@ -65,6 +66,7 @@ pub fn hub_frontend_for_test(
 #[doc(hidden)]
 pub mod testing {
     pub use crate::agent_setup::build_with_frontend;
+    pub use crate::bg_task_bridge::spawn as bg_task_bridge_spawn;
     pub use crate::params::{StartParams, build_kernel_with_provider};
     pub use crate::session_hub::SharedSession;
     pub use loopal_runtime::agent_input::AgentInput;

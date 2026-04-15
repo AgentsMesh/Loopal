@@ -1,5 +1,6 @@
 mod actions;
 mod autocomplete;
+mod bg_task_log_keys;
 mod commands;
 mod editing;
 mod mcp_page_keys;
@@ -96,6 +97,7 @@ fn handle_panel_key(app: &mut App, key: &KeyEvent) -> InputAction {
         KeyCode::Up => InputAction::PanelUp,
         KeyCode::Down => InputAction::PanelDown,
         KeyCode::Enter if kind == PanelKind::Agents => InputAction::EnterAgentView,
+        KeyCode::Enter if kind == PanelKind::BgTasks => InputAction::EnterBgTaskView,
         KeyCode::Delete if kind == PanelKind::Agents => InputAction::TerminateFocusedAgent,
         KeyCode::Tab => InputAction::PanelTab,
         KeyCode::Esc => InputAction::ExitPanel,

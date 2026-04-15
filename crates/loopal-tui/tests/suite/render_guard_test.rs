@@ -30,6 +30,7 @@ fn render_tiny_terminal_with_bg_tasks_no_panic() {
         id: "bg_1".into(),
         description: "task".into(),
         status: BgTaskStatus::Running,
+        exit_code: None,
     }];
     let backend = TestBackend::new(80, 1);
     let mut terminal = Terminal::new(backend).unwrap();
@@ -47,6 +48,7 @@ fn render_small_terminal_no_panic() {
         id: "bg_1".into(),
         description: "build".into(),
         status: BgTaskStatus::Running,
+        exit_code: None,
     }];
     let backend = TestBackend::new(80, 3);
     let mut terminal = Terminal::new(backend).unwrap();

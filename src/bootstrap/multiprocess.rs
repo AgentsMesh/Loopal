@@ -71,16 +71,10 @@ pub async fn run(
         session_ctrl.push_welcome(&model, &display_path);
     }
 
-    // 10. Run TUI (bg_store is TUI-local; future: sync from agent via IPC)
+    // 10. Run TUI (bg tasks synced from agent process via BgTasksUpdate events)
     // Clone before move into run_tui — used after TUI exits to read final session ID.
     let session_ref = session_ctrl.clone();
-    let result = loopal_tui::run_tui(
-        session_ctrl,
-        cwd.to_path_buf(),
-        tui_event_rx,
-        loopal_tool_background::BackgroundTaskStore::new(),
-    )
-    .await;
+    let result = loopal_tui::run_tui(session_ctrl, cwd.to_path_buf(), tui_event_rx).await;
 
     // 11. Cleanup
     info!("shutting down agent process");

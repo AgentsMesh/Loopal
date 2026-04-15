@@ -29,10 +29,10 @@ pub fn bg_panel_height(snapshots: &[BgTaskSnapshot]) -> u16 {
     count.min(MAX_BG_VISIBLE) as u16
 }
 
-/// IDs of running background tasks from the cached snapshots.
+/// IDs of all background tasks from the cached snapshots.
 ///
 /// Used by `panel_ops` for focus cycling.
-pub fn running_task_ids(snapshots: &[BgTaskSnapshot]) -> Vec<String> {
+pub fn task_ids(snapshots: &[BgTaskSnapshot]) -> Vec<String> {
     snapshots.iter().map(|s| s.id.clone()).collect()
 }
 

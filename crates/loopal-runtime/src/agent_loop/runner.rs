@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
+use loopal_context::ContextPipeline;
 use loopal_error::{AgentOutput, Result};
 use loopal_protocol::{AgentEventPayload, AgentStatus, InterruptSignal};
-use loopal_context::ContextPipeline;
 use loopal_tool_api::ToolContext;
 use tokio::sync::watch;
 use tracing::{Instrument, info, info_span};

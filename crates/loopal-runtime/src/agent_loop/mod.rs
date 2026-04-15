@@ -41,11 +41,11 @@ mod tools_resolve;
 pub mod turn_context;
 mod turn_continue;
 mod turn_exec;
-mod turn_tool_phase;
 pub(crate) mod turn_metrics;
 pub mod turn_observer;
 mod turn_observer_dispatch;
 mod turn_telemetry;
+mod turn_tool_phase;
 
 use loopal_error::{AgentOutput, Result};
 

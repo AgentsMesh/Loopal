@@ -1,8 +1,8 @@
 use std::path::Path;
 
+use loopal_context::ContextPipeline;
 use loopal_context::middleware::config_refresh::ConfigRefreshMiddleware;
 use loopal_context::middleware::file_snapshot::FileSnapshot;
-use loopal_context::ContextPipeline;
 
 pub(super) fn build_context_pipeline(cwd: &str) -> ContextPipeline {
     let cwd = Path::new(cwd);

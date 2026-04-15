@@ -66,6 +66,8 @@ mod scroll_compensation_test;
 mod scroll_test;
 #[path = "suite/skill_render_test.rs"]
 mod skill_render_test;
+#[path = "suite/skills_cmd_test.rs"]
+mod skills_cmd_test;
 #[path = "suite/styled_wrap_test.rs"]
 mod styled_wrap_test;
 #[path = "suite/view_switch_panel_lifecycle_test.rs"]

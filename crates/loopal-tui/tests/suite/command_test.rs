@@ -13,7 +13,7 @@ fn test_registry_new_has_all_builtins() {
     let names: Vec<&str> = entries.iter().map(|e| e.name.as_str()).collect();
     for expected in &[
         "/plan", "/act", "/clear", "/compact", "/model", "/rewind", "/status", "/resume", "/init",
-        "/help", "/exit",
+        "/help", "/exit", "/agents", "/topology", "/skills",
     ] {
         assert!(names.contains(expected), "missing builtin: {expected}");
     }

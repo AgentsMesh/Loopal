@@ -9,6 +9,7 @@ pub mod registry;
 mod resume_cmd;
 mod rewind_cmd;
 mod skill;
+mod skills_cmd;
 mod status_cmd;
 mod status_config;
 mod topology_cmd;

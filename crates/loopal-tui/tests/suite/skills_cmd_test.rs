@@ -84,8 +84,16 @@ async fn test_skills_cmd_single_skill() {
 #[tokio::test]
 async fn test_skills_cmd_multiple_sorted() {
     let tmp = tempfile::tempdir().unwrap();
-    write_skill(tmp.path(), "deploy.md", "---\ndescription: Deploy app\n---\nDeploy.\n");
-    write_skill(tmp.path(), "audit.md", "---\ndescription: Run audit\n---\nAudit.\n");
+    write_skill(
+        tmp.path(),
+        "deploy.md",
+        "---\ndescription: Deploy app\n---\nDeploy.\n",
+    );
+    write_skill(
+        tmp.path(),
+        "audit.md",
+        "---\ndescription: Run audit\n---\nAudit.\n",
+    );
     let mut app = make_app_with_cwd(tmp.path().to_path_buf());
     let handler = app.command_registry.find("/skills").unwrap();
     handler.execute(&mut app, None).await;
@@ -94,7 +102,10 @@ async fn test_skills_cmd_multiple_sorted() {
     assert!(msg.contains("Loaded skills (2):"));
     let audit_pos = msg.find("/audit").expect("missing /audit");
     let deploy_pos = msg.find("/deploy").expect("missing /deploy");
-    assert!(audit_pos < deploy_pos, "skills should be sorted alphabetically");
+    assert!(
+        audit_pos < deploy_pos,
+        "skills should be sorted alphabetically"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -104,7 +115,11 @@ async fn test_skills_cmd_multiple_sorted() {
 #[tokio::test]
 async fn test_skills_cmd_source_legend() {
     let tmp = tempfile::tempdir().unwrap();
-    write_skill(tmp.path(), "test.md", "---\ndescription: Test\n---\nTest.\n");
+    write_skill(
+        tmp.path(),
+        "test.md",
+        "---\ndescription: Test\n---\nTest.\n",
+    );
     let mut app = make_app_with_cwd(tmp.path().to_path_buf());
     let handler = app.command_registry.find("/skills").unwrap();
     handler.execute(&mut app, None).await;

@@ -48,7 +48,10 @@ impl Middleware for ConfigRefreshMiddleware {
             "<system-reminder>\n{}\n</system-reminder>",
             reminders.join("\n\n")
         );
-        debug!(count = reminders.len(), "injecting config refresh reminders");
+        debug!(
+            count = reminders.len(),
+            "injecting config refresh reminders"
+        );
         // User role (not System) — modifying the system prompt would invalidate
         // Anthropic's prefix cache. system-reminder XML tags are the established
         // convention for injecting context updates as user messages.

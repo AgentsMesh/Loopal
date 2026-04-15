@@ -95,6 +95,21 @@ pub enum SubPage {
     StatusPage(StatusPageState),
     /// MCP server status page — list of MCP servers with connection state.
     McpPage(McpPageState),
+    /// Background task log viewer — full output of a single bg task.
+    BgTaskLog(BgTaskLogState),
+}
+
+/// State for the background task log viewer sub-page.
+pub struct BgTaskLogState {
+    /// ID of the task being viewed.
+    pub task_id: String,
+    /// Scroll offset (lines from top; 0 = top).
+    pub scroll_offset: usize,
+    /// Auto-scroll to bottom when new output arrives.
+    pub auto_follow: bool,
+    /// Previous line count — detects output growth for auto-follow.
+    pub prev_line_count: usize,
+}
 }
 
 /// Which sub-panel within the panel zone is focused.

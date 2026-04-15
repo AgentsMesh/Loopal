@@ -23,13 +23,13 @@ fn make_app() -> App {
     App::new(session, std::env::temp_dir())
 }
 
-fn add_bg_task(app: &App, id: &str, desc: &str) {
-    app.bg_store
-        .register_proxy(id.to_string(), desc.to_string());
-}
-
-fn sync_bg(app: &mut App) {
-    app.bg_snapshots = app.bg_store.snapshot_running();
+fn add_bg_snapshot(app: &mut App, id: &str, desc: &str) {
+    app.bg_snapshots.push(BgTaskSnapshot {
+        id: id.into(),
+        description: desc.into(),
+        status: BgTaskStatus::Running,
+        exit_code: None,
+    });
 }
 
 fn snap(id: &str, desc: &str) -> BgTaskSnapshot {
@@ -37,6 +37,7 @@ fn snap(id: &str, desc: &str) -> BgTaskSnapshot {
         id: id.into(),
         description: desc.into(),
         status: BgTaskStatus::Running,
+        exit_code: None,
     }
 }
 
@@ -69,7 +70,7 @@ fn running_task_ids_sorted() {
         snap("bg_2", "two"),
     ];
     assert_eq!(
-        bg_tasks_panel::running_task_ids(&snaps),
+        bg_tasks_panel::task_ids(&snaps),
         vec!["bg_3", "bg_1", "bg_2"],
     );
 }
@@ -79,10 +80,9 @@ fn running_task_ids_sorted() {
 #[test]
 fn forward_through_bg_tasks() {
     let mut app = make_app();
-    add_bg_task(&app, "bg_1", "one");
-    add_bg_task(&app, "bg_2", "two");
-    add_bg_task(&app, "bg_3", "three");
-    sync_bg(&mut app);
+    add_bg_snapshot(&mut app, "bg_1", "one");
+    add_bg_snapshot(&mut app, "bg_2", "two");
+    add_bg_snapshot(&mut app, "bg_3", "three");
     app.focus_mode = FocusMode::Panel(PanelKind::BgTasks);
     cycle_panel_focus(&mut app, true);
     assert_eq!(app.focused_bg_task.as_deref(), Some("bg_1"));
@@ -95,9 +95,8 @@ fn forward_through_bg_tasks() {
 #[test]
 fn forward_wraps_around() {
     let mut app = make_app();
-    add_bg_task(&app, "bg_1", "one");
-    add_bg_task(&app, "bg_2", "two");
-    sync_bg(&mut app);
+    add_bg_snapshot(&mut app, "bg_1", "one");
+    add_bg_snapshot(&mut app, "bg_2", "two");
     app.focused_bg_task = Some("bg_2".into());
     app.focus_mode = FocusMode::Panel(PanelKind::BgTasks);
     cycle_panel_focus(&mut app, true);
@@ -107,9 +106,8 @@ fn forward_wraps_around() {
 #[test]
 fn backward_wraps_around() {
     let mut app = make_app();
-    add_bg_task(&app, "bg_1", "one");
-    add_bg_task(&app, "bg_2", "two");
-    sync_bg(&mut app);
+    add_bg_snapshot(&mut app, "bg_1", "one");
+    add_bg_snapshot(&mut app, "bg_2", "two");
     app.focused_bg_task = Some("bg_1".into());
     app.focus_mode = FocusMode::Panel(PanelKind::BgTasks);
     cycle_panel_focus(&mut app, false);
@@ -119,9 +117,8 @@ fn backward_wraps_around() {
 #[test]
 fn backward_from_none_selects_last() {
     let mut app = make_app();
-    add_bg_task(&app, "bg_1", "one");
-    add_bg_task(&app, "bg_2", "two");
-    sync_bg(&mut app);
+    add_bg_snapshot(&mut app, "bg_1", "one");
+    add_bg_snapshot(&mut app, "bg_2", "two");
     app.focus_mode = FocusMode::Panel(PanelKind::BgTasks);
     cycle_panel_focus(&mut app, false);
     assert_eq!(app.focused_bg_task.as_deref(), Some("bg_2"));
@@ -144,11 +141,8 @@ fn empty_tasks_clears_focus_and_exits_panel() {
 #[test]
 fn stale_focus_recovery() {
     let mut app = make_app();
-    add_bg_task(&app, "bg_live", "alive");
-    let handle = app.bg_store.register_proxy("bg_done".into(), "done".into());
-    handle.complete("output".into(), true);
-    sync_bg(&mut app);
-    app.focused_bg_task = Some("bg_done".into());
+    add_bg_snapshot(&mut app, "bg_live", "alive");
+    app.focused_bg_task = Some("bg_gone".into());
     app.focus_mode = FocusMode::Panel(PanelKind::BgTasks);
     cycle_panel_focus(&mut app, true);
     assert_eq!(app.focused_bg_task.as_deref(), Some("bg_live"));

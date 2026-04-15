@@ -1,4 +1,5 @@
 pub mod agent_panel;
+pub mod bg_task_log;
 pub mod bg_tasks_panel;
 pub mod breadcrumb;
 pub mod command_menu;

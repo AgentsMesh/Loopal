@@ -73,7 +73,7 @@ fn cycle_agent_focus(app: &mut App, forward: bool) {
 }
 
 fn cycle_bg_task_focus(app: &mut App, forward: bool) {
-    let ids = bg_tasks_panel::running_task_ids(&app.bg_snapshots);
+    let ids = bg_tasks_panel::task_ids(&app.bg_snapshots);
     if ids.is_empty() {
         app.focused_bg_task = None;
         if has_live_agents(app) {
@@ -101,7 +101,7 @@ fn ensure_focus(app: &mut App, kind: PanelKind) {
             }
         }
         PanelKind::BgTasks => {
-            let ids = bg_tasks_panel::running_task_ids(&app.bg_snapshots);
+            let ids = bg_tasks_panel::task_ids(&app.bg_snapshots);
             let needs = match &app.focused_bg_task {
                 None => true,
                 Some(id) => !ids.contains(id),

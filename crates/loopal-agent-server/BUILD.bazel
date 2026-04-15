@@ -20,6 +20,7 @@ rust_library(
         "//crates/loopal-runtime",
         "//crates/loopal-storage",
         "//crates/loopal-tool-api",
+        "//crates/tools/process/background:loopal-tool-background",
         "@crates//:anyhow",
         "@crates//:futures",
         "@crates//:serde",
@@ -50,5 +51,7 @@ rust_test(
         "//crates/loopal-error",
         "//crates/loopal-provider-api",
         "//crates/loopal-tool-api",
+        "//crates/tools/process/background:loopal-tool-background",
     ],
+    proc_macro_deps = ["@crates//:async-trait"],
 )

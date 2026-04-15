@@ -17,7 +17,8 @@ pub fn resolve_policy(config: &SandboxConfig, cwd: &Path) -> ResolvedPolicy {
         };
     }
 
-    // Writable paths: cwd + tmpdir + user-configured extras
+    // Baseline writable paths for app-level path_checker: cwd + tmpdir + HOME + user extras.
+    // OS sandbox (seatbelt/bwrap) does NOT use these — it allows all writes in DefaultWrite.
     let mut writable_paths = Vec::new();
     // Canonicalize all writable paths to handle symlinks (e.g. macOS /tmp → /private/tmp)
     let add_canonical = |paths: &mut Vec<PathBuf>, p: PathBuf| {
@@ -32,6 +33,12 @@ pub fn resolve_policy(config: &SandboxConfig, cwd: &Path) -> ResolvedPolicy {
         add_canonical(&mut writable_paths, tmp.into());
     }
     add_canonical(&mut writable_paths, std::env::temp_dir());
+
+    // User's home directory: CLI tools write configs, caches, tokens here.
+    // Sensitive files within HOME are guarded by deny_write_globs (RequiresApproval).
+    if let Ok(home) = std::env::var("HOME") {
+        add_canonical(&mut writable_paths, PathBuf::from(home));
+    }
 
     // Add user-configured writable paths (resolved relative to cwd)
     for pattern in &config.filesystem.allow_write {

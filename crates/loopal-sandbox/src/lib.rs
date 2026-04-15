@@ -1,5 +1,6 @@
 pub mod command_checker;
 pub mod command_wrapper;
+pub mod env_patterns;
 pub mod env_sanitizer;
 pub mod network;
 pub mod path_checker;

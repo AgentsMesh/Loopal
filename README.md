@@ -217,7 +217,7 @@ Sandbox policies control filesystem and command restrictions:
 
 | Policy | Behavior |
 |---|---|
-| `workspace-write` | Allow writes only within workspace and temp directories (default) |
+| `default-write` | OS sandbox allows all writes; app-level path_checker guards sensitive files (default) |
 | `read-only` | All writes blocked, reads only |
 | `disabled` | No sandbox enforcement |
 
@@ -294,7 +294,7 @@ Key settings:
     "anthropic": { "api_key": "..." }
   },
   "mcp_servers": { },
-  "sandbox": { "policy": "workspace-write" }
+  "sandbox": { "policy": "default-write" }
 }
 ```
 

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::sensitive_patterns::{SAFE_ENV_ALLOWLIST, SENSITIVE_ENV_PATTERNS};
+use crate::env_patterns::{SAFE_ENV_ALLOWLIST, SENSITIVE_ENV_PATTERNS};
 
 /// Sanitize environment variables by removing sensitive entries.
 ///

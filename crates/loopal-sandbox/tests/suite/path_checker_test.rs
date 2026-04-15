@@ -10,7 +10,7 @@ fn workspace_policy(cwd: &str) -> ResolvedPolicy {
         .canonicalize()
         .unwrap_or_else(|_| std::env::temp_dir());
     ResolvedPolicy {
-        policy: SandboxPolicy::WorkspaceWrite,
+        policy: SandboxPolicy::DefaultWrite,
         writable_paths: vec![cwd_canon, tmp_canon],
         deny_write_globs: vec!["**/.env".to_string()],
         deny_read_globs: vec![],

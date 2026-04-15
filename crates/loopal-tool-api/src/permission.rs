@@ -15,12 +15,14 @@ pub enum PermissionLevel {
 ///
 /// Three modes: Bypass (trust everything), Auto (LLM classifies danger),
 /// Supervised (human approves everything non-readonly).
-/// Sandbox enforcement is a separate, orthogonal layer.
+///
+/// File tools have an additional app-level layer: path_checker +
+/// deny_write_globs route sensitive-file writes through RequiresApproval.
+/// Bash commands rely solely on the permission mode for gating.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PermissionMode {
     /// All tools auto-allowed, no approval needed.
-    /// Sandbox still blocks dangerous operations.
     Bypass,
     /// ReadOnly auto-allowed; Supervised and Dangerous require human approval.
     Supervised,

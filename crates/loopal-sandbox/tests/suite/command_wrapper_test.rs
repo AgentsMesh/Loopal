@@ -15,7 +15,7 @@ fn disabled_policy() -> ResolvedPolicy {
 
 fn workspace_policy() -> ResolvedPolicy {
     ResolvedPolicy {
-        policy: SandboxPolicy::WorkspaceWrite,
+        policy: SandboxPolicy::DefaultWrite,
         writable_paths: vec![PathBuf::from("/home/user/project"), std::env::temp_dir()],
         deny_write_globs: vec![],
         deny_read_globs: vec![],

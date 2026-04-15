@@ -10,7 +10,7 @@ fn workspace_policy_with_deny(cwd: &str, deny_write: Vec<String>) -> ResolvedPol
         .canonicalize()
         .unwrap_or_else(|_| std::env::temp_dir());
     ResolvedPolicy {
-        policy: SandboxPolicy::WorkspaceWrite,
+        policy: SandboxPolicy::DefaultWrite,
         writable_paths: vec![cwd_canon, tmp_canon],
         deny_write_globs: deny_write,
         deny_read_globs: vec![],
@@ -59,7 +59,7 @@ fn multiple_deny_globs_checked() {
 #[test]
 fn empty_writable_paths_blocks_all_writes() {
     let policy = ResolvedPolicy {
-        policy: SandboxPolicy::WorkspaceWrite,
+        policy: SandboxPolicy::DefaultWrite,
         writable_paths: vec![],
         deny_write_globs: vec![],
         deny_read_globs: vec![],

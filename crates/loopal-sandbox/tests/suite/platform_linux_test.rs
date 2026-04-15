@@ -7,7 +7,7 @@ mod linux_tests {
 
     fn workspace_policy() -> ResolvedPolicy {
         ResolvedPolicy {
-            policy: SandboxPolicy::WorkspaceWrite,
+            policy: SandboxPolicy::DefaultWrite,
             writable_paths: vec![PathBuf::from("/home/user/project"), PathBuf::from("/tmp")],
             deny_write_globs: vec![],
             deny_read_globs: vec![],
@@ -26,24 +26,27 @@ mod linux_tests {
     }
 
     #[test]
-    fn workspace_has_ro_bind_root() {
+    fn workspace_binds_root_rw() {
         let args = build_bwrap_args(&workspace_policy(), "/home/user/project".as_ref());
-        assert!(args.contains(&"--ro-bind".to_string()));
+        // DefaultWrite: root is bound read-write (no --ro-bind)
+        let first_bind_idx = args.iter().position(|a| a == "--bind").unwrap();
+        assert_eq!(args[first_bind_idx + 1], "/");
+        assert_eq!(args[first_bind_idx + 2], "/");
     }
 
     #[test]
-    fn workspace_binds_writable_paths() {
+    fn workspace_has_no_per_path_binds() {
         let args = build_bwrap_args(&workspace_policy(), "/home/user/project".as_ref());
-        assert!(args.contains(&"--bind".to_string()));
-        assert!(args.contains(&"/home/user/project".to_string()));
-        assert!(args.contains(&"/tmp".to_string()));
+        // Only one --bind for root "/" — no per-path writable binds
+        let bind_count = args.iter().filter(|a| *a == "--bind").count();
+        assert_eq!(bind_count, 1);
     }
 
     #[test]
     fn readonly_no_bind_writable() {
         let args = build_bwrap_args(&readonly_policy(), "/tmp".as_ref());
-        // Should have --ro-bind, and only system-writable --bind entries (e.g. /var/tmp),
-        // not user-specified writable paths (which are empty in readonly_policy).
+        // ReadOnly: root is --ro-bind, system writable paths get --bind
+        assert!(args.contains(&"--ro-bind".to_string()));
         let bind_count = args.iter().filter(|a| *a == "--bind").count();
         // 1 = /var/tmp (the single system-writable path)
         assert_eq!(bind_count, 1);

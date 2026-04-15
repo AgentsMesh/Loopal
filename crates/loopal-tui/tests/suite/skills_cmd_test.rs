@@ -1,9 +1,9 @@
-/// `/skills` command tests: output formatting, source display, edge cases.
+/// `/skills` command tests: opens sub-page, displays correct state.
 use std::path::PathBuf;
 
 use loopal_protocol::{ControlCommand, UserQuestionResponse};
 use loopal_session::SessionController;
-use loopal_tui::app::App;
+use loopal_tui::app::{App, SubPage};
 
 use tokio::sync::mpsc;
 
@@ -23,25 +23,21 @@ fn make_app_with_cwd(cwd: PathBuf) -> App {
     App::new(session, cwd)
 }
 
-fn last_system_message(app: &App) -> String {
-    let state = app.session.lock();
-    state
-        .active_conversation()
-        .messages
-        .last()
-        .expect("expected a system message")
-        .content
-        .clone()
-}
-
 fn write_skill(dir: &std::path::Path, filename: &str, content: &str) {
     let skills_dir = dir.join(".loopal").join("skills");
     std::fs::create_dir_all(&skills_dir).unwrap();
     std::fs::write(skills_dir.join(filename), content).unwrap();
 }
 
+fn extract_skills_page(app: &App) -> &loopal_tui::app::SkillsPageState {
+    match app.sub_page.as_ref().expect("sub_page should be set") {
+        SubPage::SkillsPage(s) => s,
+        _ => panic!("expected SkillsPage variant"),
+    }
+}
+
 // ---------------------------------------------------------------------------
-// No skills
+// No skills — sub-page opens with empty list
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
@@ -51,7 +47,8 @@ async fn test_skills_cmd_no_skills() {
     let handler = app.command_registry.find("/skills").unwrap();
     let effect = handler.execute(&mut app, None).await;
     assert!(matches!(effect, loopal_tui::command::CommandEffect::Done));
-    assert_eq!(last_system_message(&app), "No skills loaded.");
+    let state = extract_skills_page(&app);
+    assert!(state.skills.is_empty());
 }
 
 // ---------------------------------------------------------------------------
@@ -70,15 +67,15 @@ async fn test_skills_cmd_single_skill() {
     let handler = app.command_registry.find("/skills").unwrap();
     handler.execute(&mut app, None).await;
 
-    let msg = last_system_message(&app);
-    assert!(msg.contains("Loaded skills (1):"));
-    assert!(msg.contains("/commit"));
-    assert!(msg.contains("[project]"));
-    assert!(msg.contains("Generate git commit"));
+    let state = extract_skills_page(&app);
+    assert_eq!(state.skills.len(), 1);
+    assert_eq!(state.skills[0].name, "/commit");
+    assert_eq!(state.skills[0].source, "project");
+    assert_eq!(state.skills[0].description, "Generate git commit");
 }
 
 // ---------------------------------------------------------------------------
-// Multiple skills — sorted, all listed
+// Multiple skills — sorted alphabetically
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
@@ -98,34 +95,10 @@ async fn test_skills_cmd_multiple_sorted() {
     let handler = app.command_registry.find("/skills").unwrap();
     handler.execute(&mut app, None).await;
 
-    let msg = last_system_message(&app);
-    assert!(msg.contains("Loaded skills (2):"));
-    let audit_pos = msg.find("/audit").expect("missing /audit");
-    let deploy_pos = msg.find("/deploy").expect("missing /deploy");
-    assert!(
-        audit_pos < deploy_pos,
-        "skills should be sorted alphabetically"
-    );
-}
-
-// ---------------------------------------------------------------------------
-// Source legend
-// ---------------------------------------------------------------------------
-
-#[tokio::test]
-async fn test_skills_cmd_source_legend() {
-    let tmp = tempfile::tempdir().unwrap();
-    write_skill(
-        tmp.path(),
-        "test.md",
-        "---\ndescription: Test\n---\nTest.\n",
-    );
-    let mut app = make_app_with_cwd(tmp.path().to_path_buf());
-    let handler = app.command_registry.find("/skills").unwrap();
-    handler.execute(&mut app, None).await;
-
-    let msg = last_system_message(&app);
-    assert!(msg.contains("Sources: project"));
+    let state = extract_skills_page(&app);
+    assert_eq!(state.skills.len(), 2);
+    assert_eq!(state.skills[0].name, "/audit");
+    assert_eq!(state.skills[1].name, "/deploy");
 }
 
 // ---------------------------------------------------------------------------
@@ -139,4 +112,25 @@ fn test_skills_cmd_is_builtin() {
     let handler = app.command_registry.find("/skills").unwrap();
     assert!(!handler.is_skill());
     assert!(handler.skill_body().is_none());
+}
+
+// ---------------------------------------------------------------------------
+// Selected defaults to 0
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn test_skills_page_initial_selection() {
+    let tmp = tempfile::tempdir().unwrap();
+    write_skill(
+        tmp.path(),
+        "test.md",
+        "---\ndescription: Test\n---\nTest.\n",
+    );
+    let mut app = make_app_with_cwd(tmp.path().to_path_buf());
+    let handler = app.command_registry.find("/skills").unwrap();
+    handler.execute(&mut app, None).await;
+
+    let state = extract_skills_page(&app);
+    assert_eq!(state.selected, 0);
+    assert_eq!(state.scroll_offset, 0);
 }

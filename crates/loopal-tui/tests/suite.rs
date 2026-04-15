@@ -74,6 +74,8 @@ mod scroll_test;
 mod skill_render_test;
 #[path = "suite/skills_cmd_test.rs"]
 mod skills_cmd_test;
+#[path = "suite/skills_page_keys_test.rs"]
+mod skills_page_keys_test;
 #[path = "suite/styled_wrap_test.rs"]
 mod styled_wrap_test;
 #[path = "suite/view_switch_panel_lifecycle_test.rs"]

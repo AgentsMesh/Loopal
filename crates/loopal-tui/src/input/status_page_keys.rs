@@ -1,6 +1,6 @@
 //! Key handler for the status page sub-page.
 
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::InputAction;
 use crate::app::{App, StatusTab, SubPage};
@@ -39,7 +39,12 @@ pub(super) fn handle_status_page_key(app: &mut App, key: &KeyEvent) -> InputActi
             }
             InputAction::None
         }
-        KeyCode::Char(c) if state.active_tab == StatusTab::Config => {
+        KeyCode::Char(c)
+            if state.active_tab == StatusTab::Config
+                && !key
+                    .modifiers
+                    .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
+        {
             state.filter.insert(state.filter_cursor, c);
             state.filter_cursor += c.len_utf8();
             state.scroll_offsets[StatusTab::Config.index()] = 0;

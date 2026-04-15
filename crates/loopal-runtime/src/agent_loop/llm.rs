@@ -77,6 +77,11 @@ impl AgentLoopRunner {
         // which would look like truncation but is intentional.
         if !received_done && !result.stream_error && !cancel.is_cancelled() {
             warn!("SSE stream ended without message_stop — treating as stream truncation");
+            self.emit(AgentEventPayload::Error {
+                message: "Response stream ended unexpectedly — possible network interruption"
+                    .to_string(),
+            })
+            .await?;
             result.stream_error = true;
         }
 

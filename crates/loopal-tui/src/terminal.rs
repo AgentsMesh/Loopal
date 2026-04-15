@@ -32,9 +32,7 @@ impl TerminalGuard {
         if keyboard_enhanced {
             let _ = execute!(
                 stdout,
-                PushKeyboardEnhancementFlags(
-                    KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
-                )
+                PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES)
             );
         }
         Ok(Self { keyboard_enhanced })

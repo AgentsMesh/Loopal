@@ -10,7 +10,7 @@ use loopal_tool_api::Backend;
 fn make_backend(cwd: &std::path::Path) -> Arc<LocalBackend> {
     let cwd_canon = cwd.canonicalize().unwrap_or_else(|_| cwd.to_path_buf());
     let policy = ResolvedPolicy {
-        policy: SandboxPolicy::WorkspaceWrite,
+        policy: SandboxPolicy::DefaultWrite,
         writable_paths: vec![cwd_canon],
         deny_write_globs: vec!["**/.env".to_string()],
         deny_read_globs: vec![],

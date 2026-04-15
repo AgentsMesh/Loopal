@@ -1,11 +1,16 @@
 ; Loopal macOS Seatbelt base policy
 ;
-; Security model: protect file-system writes (workspace containment) and
-; sensitive-file access.  Everything else — process execution, system-info
-; reads, service lookups, device enumeration, dylib loading — is allowed
-; because restricting them adds no security when process-exec/process-fork
-; are already unrestricted, yet causes repeated tool-compatibility failures
-; (Bazel TSan dylib, JVM crashes, Nix toolchains, etc.).
+; Security model: base restrictions for process-level sandboxing.
+; DefaultWrite mode appends (allow file-write*) — all file writes are
+; allowed at the OS level; app-level path_checker + deny_write_globs
+; enforce sensitive-file protection for File tools.
+; ReadOnly mode omits file-write rules, blocking all writes.
+;
+; Everything else — process execution, system-info reads, service
+; lookups, device enumeration, dylib loading — is allowed because
+; restricting them adds no security when process-exec/process-fork
+; are already unrestricted, yet causes repeated tool-compatibility
+; failures (Bazel TSan dylib, JVM crashes, Nix toolchains, etc.).
 ;
 ; This file is included via include_str!() and provides the static rules.
 ; Dynamic sections (file-read*, file-write*, network) are appended by Rust.

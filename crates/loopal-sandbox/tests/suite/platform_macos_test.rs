@@ -7,7 +7,7 @@ mod macos_tests {
 
     fn workspace_policy() -> ResolvedPolicy {
         ResolvedPolicy {
-            policy: SandboxPolicy::WorkspaceWrite,
+            policy: SandboxPolicy::DefaultWrite,
             writable_paths: vec![PathBuf::from("/home/user/project"), PathBuf::from("/tmp")],
             deny_write_globs: vec![],
             deny_read_globs: vec![],
@@ -26,16 +26,16 @@ mod macos_tests {
     }
 
     #[test]
-    fn workspace_profile_allows_writes_to_configured_paths() {
+    fn workspace_profile_allows_all_writes() {
         let policy = workspace_policy();
         let profile = generate_seatbelt_profile(&policy);
 
         assert!(profile.contains("(version 1)"));
         assert!(profile.contains("(deny default)"));
         assert!(profile.contains("(allow file-read*)"));
-        assert!(profile.contains("(allow file-write* (subpath \"/dev\"))"));
-        assert!(profile.contains("(allow file-write* (subpath \"/home/user/project\"))"));
-        assert!(profile.contains("(allow file-write* (subpath \"/tmp\"))"));
+        assert!(profile.contains("(allow file-write*)"));
+        // No per-path write rules — DefaultWrite allows all writes at OS level
+        assert!(!profile.contains("(allow file-write* (subpath \"/home/user/project\"))"));
     }
 
     #[test]

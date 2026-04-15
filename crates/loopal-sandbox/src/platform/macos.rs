@@ -31,7 +31,7 @@ fn is_sandbox_exec_available() -> bool {
 /// Generate a macOS Seatbelt profile string from the resolved policy.
 ///
 /// Composes the static base policy with dynamic sections for file-read,
-/// file-write (writable paths), and network access.
+/// file-write, and network access.
 pub fn generate_seatbelt_profile(policy: &ResolvedPolicy) -> String {
     if policy.policy == SandboxPolicy::Disabled {
         return "(version 1)\n(allow default)\n".to_string();
@@ -44,12 +44,11 @@ pub fn generate_seatbelt_profile(policy: &ResolvedPolicy) -> String {
     profile.push_str("\n; --- Dynamic: file access ---\n");
     profile.push_str("(allow file-read*)\n");
 
-    // file-write*: per-path restrictions for WorkspaceWrite
-    if policy.policy == SandboxPolicy::WorkspaceWrite {
-        for path in &policy.writable_paths {
-            let path_str = path.to_string_lossy();
-            profile.push_str(&format!("(allow file-write* (subpath \"{path_str}\"))\n"));
-        }
+    // file-write*: DefaultWrite allows all writes at the OS level.
+    // File tools enforce fine-grained deny_write_globs via app-level path_checker.
+    // Bash commands are gated by the permission system (user approves each command).
+    if policy.policy == SandboxPolicy::DefaultWrite {
+        profile.push_str("(allow file-write*)\n");
     }
 
     // network

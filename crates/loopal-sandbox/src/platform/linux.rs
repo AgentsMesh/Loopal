@@ -27,25 +27,17 @@ pub fn build_bwrap_args(policy: &ResolvedPolicy, cwd: &Path) -> Vec<String> {
                 args.extend_from_slice(&["--bind".into(), (*path).into(), (*path).into()]);
             }
         }
-        SandboxPolicy::WorkspaceWrite => {
-            // Bind root read-only first
-            args.extend_from_slice(&["--ro-bind".into(), "/".into(), "/".into()]);
+        SandboxPolicy::DefaultWrite => {
+            // DefaultWrite: full read-write access at the OS level.
+            // File tools enforce fine-grained deny_write_globs via app-level path_checker.
+            // Bash commands are gated by the permission system.
+            args.extend_from_slice(&["--bind".into(), "/".into(), "/".into()]);
             args.extend_from_slice(&[
                 "--proc".into(),
                 "/proc".into(),
                 "--dev".into(),
                 "/dev".into(),
             ]);
-            // System paths
-            for path in SYSTEM_WRITABLE_PATHS {
-                args.extend_from_slice(&["--bind".into(), (*path).into(), (*path).into()]);
-            }
-
-            // Bind writable paths
-            for path in &policy.writable_paths {
-                let p = path.to_string_lossy().into_owned();
-                args.extend_from_slice(&["--bind".into(), p.clone(), p]);
-            }
         }
         SandboxPolicy::Disabled => {
             // No sandboxing, bind everything read-write

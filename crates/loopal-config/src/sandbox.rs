@@ -8,9 +8,13 @@ use serde::{Deserialize, Serialize};
 pub enum SandboxPolicy {
     /// No sandbox enforcement.
     Disabled,
-    /// Allow writes only within workspace and temp directories.
+    /// Default write policy: OS sandbox allows all file writes (Bash
+    /// commands are gated by the permission system). App-level path_checker
+    /// enforces deny_write_globs for File tools, routing sensitive-file
+    /// writes through RequiresApproval → user approval.
     #[default]
-    WorkspaceWrite,
+    #[serde(alias = "workspace_write")]
+    DefaultWrite,
     /// Read-only: all writes blocked, only reads allowed.
     ReadOnly,
 }
@@ -30,7 +34,7 @@ pub struct SandboxConfig {
 impl Default for SandboxConfig {
     fn default() -> Self {
         Self {
-            policy: SandboxPolicy::WorkspaceWrite,
+            policy: SandboxPolicy::DefaultWrite,
             filesystem: FileSystemPolicy::default(),
             network: NetworkPolicy::default(),
         }
@@ -41,7 +45,7 @@ impl Default for SandboxConfig {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct FileSystemPolicy {
-    /// Additional writable path globs (cwd and tmpdir are always writable).
+    /// Additional writable paths for app-level path_checker (cwd, tmpdir, and HOME are included by default).
     pub allow_write: Vec<String>,
     /// Path globs that are always denied for writing.
     pub deny_write: Vec<String>,
@@ -60,9 +64,13 @@ pub struct NetworkPolicy {
 }
 
 /// Resolved runtime policy computed from config + defaults + cwd.
+///
+/// `writable_paths` is used by app-level path_checker only (File tools).
+/// OS sandbox (seatbelt/bwrap) allows all writes in DefaultWrite mode.
 #[derive(Debug, Clone)]
 pub struct ResolvedPolicy {
     pub policy: SandboxPolicy,
+    /// Baseline writable zones for app-level path_checker (not OS sandbox).
     pub writable_paths: Vec<PathBuf>,
     pub deny_write_globs: Vec<String>,
     pub deny_read_globs: Vec<String>,

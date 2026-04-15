@@ -1,6 +1,6 @@
 //! Side-effect implementations for key dispatch actions.
 
-use loopal_protocol::UserContent;
+use loopal_protocol::{ControlCommand, UserContent};
 
 use crate::app::{App, FocusMode, PanelKind};
 use crate::command::CommandEffect;
@@ -67,6 +67,14 @@ pub(crate) async fn handle_sub_page_confirm(app: &mut App, result: SubPageResult
             app.session.resume_session(&session_id).await;
         }
     }
+}
+
+/// Request reconnect of an MCP server (page stays open for live status update).
+pub(crate) async fn mcp_reconnect(app: &mut App, server: String) {
+    let target = app.session.lock().active_view.clone();
+    app.session
+        .send_control(target, ControlCommand::McpReconnect { server })
+        .await;
 }
 
 /// Terminate (interrupt) the currently focused agent via Hub.

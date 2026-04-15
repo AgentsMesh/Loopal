@@ -13,5 +13,6 @@ pub use client::McpClient;
 pub use connection::McpConnection;
 pub use handler::SamplingCallback;
 pub use manager::McpManager;
+pub use manager_query::McpConnectionSnapshot;
 pub use tool_adapter::McpToolAdapter;
 pub use types::ConnectionStatus;

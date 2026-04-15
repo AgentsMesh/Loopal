@@ -193,7 +193,8 @@ pub(crate) fn apply_agent_event(state: &mut SessionState, name: &str, payload: A
         | AgentEventPayload::MessageRouted { .. }
         | AgentEventPayload::TurnDiffSummary { .. }
         | AgentEventPayload::TurnCompleted { .. }
-        | AgentEventPayload::SessionResumed { .. } => {}
+        | AgentEventPayload::SessionResumed { .. }
+        | AgentEventPayload::McpStatusReport { .. } => {}
         AgentEventPayload::AutoModeDecision {
             tool_name,
             decision,

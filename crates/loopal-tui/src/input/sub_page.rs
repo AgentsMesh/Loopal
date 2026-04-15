@@ -2,6 +2,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::app::{App, PickerState, SubPage};
 
+use super::mcp_page_keys::handle_mcp_page_key;
 use super::status_page_keys::handle_status_page_key;
 use super::sub_page_rewind::handle_rewind_picker_key;
 use super::{InputAction, SubPageResult};
@@ -27,6 +28,7 @@ pub(super) fn handle_sub_page_key(app: &mut App, key: &KeyEvent) -> InputAction 
         SubPage::RewindPicker(_) => handle_rewind_picker_key(app, key),
         SubPage::SessionPicker(_) => handle_session_picker_key(app, key),
         SubPage::StatusPage(_) => handle_status_page_key(app, key),
+        SubPage::McpPage(_) => handle_mcp_page_key(app, key),
     }
 }
 

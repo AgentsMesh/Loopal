@@ -46,7 +46,7 @@ impl Tool for MockTool {
 
 #[test]
 fn test_register_and_get() {
-    let mut registry = ToolRegistry::new();
+    let registry = ToolRegistry::new();
     registry.register(Box::new(MockTool::new("TestTool")));
 
     let tool = registry.get("TestTool");
@@ -62,7 +62,7 @@ fn test_get_unknown_returns_none() {
 
 #[test]
 fn test_list_returns_all_tools() {
-    let mut registry = ToolRegistry::new();
+    let registry = ToolRegistry::new();
     registry.register(Box::new(MockTool::new("ToolA")));
     registry.register(Box::new(MockTool::new("ToolB")));
     registry.register(Box::new(MockTool::new("ToolC")));
@@ -77,7 +77,7 @@ fn test_list_returns_all_tools() {
 
 #[test]
 fn test_to_definitions() {
-    let mut registry = ToolRegistry::new();
+    let registry = ToolRegistry::new();
     registry.register(Box::new(MockTool::new("Beta")));
     registry.register(Box::new(MockTool::new("Alpha")));
 
@@ -92,7 +92,7 @@ fn test_to_definitions() {
 
 #[test]
 fn test_register_multiple_tools() {
-    let mut registry = ToolRegistry::new();
+    let registry = ToolRegistry::new();
     for i in 0..5 {
         registry.register(Box::new(MockTool::new(&format!("Tool{i}"))));
     }
@@ -101,7 +101,7 @@ fn test_register_multiple_tools() {
 
 #[test]
 fn test_register_overwrites_same_name() {
-    let mut registry = ToolRegistry::new();
+    let registry = ToolRegistry::new();
     registry.register(Box::new(MockTool::new("Dup")));
     registry.register(Box::new(MockTool::new("Dup")));
 

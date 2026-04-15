@@ -27,4 +27,8 @@ pub enum ControlCommand {
     ThinkingSwitch(String),
     /// Resume (hot-swap) to a different persisted session by ID.
     ResumeSession(String),
+    /// Request MCP server status snapshot (agent responds with McpStatusReport event).
+    QueryMcpStatus,
+    /// Reconnect a specific MCP server by name.
+    McpReconnect { server: String },
 }

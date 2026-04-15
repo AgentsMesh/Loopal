@@ -95,7 +95,7 @@ async fn no_provider_denies_gracefully() {
         Box::new(AutoCancelQuestionHandler),
     ));
     // Kernel with DangerTool but NO provider.
-    let mut kernel = Kernel::new(Settings::default()).unwrap();
+    let kernel = Kernel::new(Settings::default()).unwrap();
     kernel.register_tool(Box::new(DummyTool::dangerous("DangerTool")));
     let classifier = Arc::new(AutoClassifier::new(String::new(), "/tmp".into()));
     let params = AgentLoopParams {

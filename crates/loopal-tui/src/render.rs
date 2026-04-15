@@ -46,6 +46,9 @@ pub fn draw(f: &mut Frame, app: &mut App) {
             SubPage::StatusPage(s) => {
                 views::status_page::render_status_page(f, s, layout.picker);
             }
+            SubPage::McpPage(s) => {
+                views::mcp_page::render_mcp_page(f, s, layout.picker);
+            }
         }
         views::unified_status::render_unified_status(f, &state, layout.status);
         return;

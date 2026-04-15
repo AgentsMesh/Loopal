@@ -2,6 +2,7 @@ mod actions;
 mod autocomplete;
 mod commands;
 mod editing;
+mod mcp_page_keys;
 mod modal;
 pub(crate) mod multiline;
 mod navigation;

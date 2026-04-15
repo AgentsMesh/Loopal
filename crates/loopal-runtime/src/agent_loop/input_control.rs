@@ -70,6 +70,12 @@ impl AgentLoopRunner {
             ControlCommand::ResumeSession(session_id) => {
                 self.handle_resume_session(&session_id).await?;
             }
+            ControlCommand::QueryMcpStatus => {
+                self.handle_query_mcp_status().await?;
+            }
+            ControlCommand::McpReconnect { server } => {
+                self.handle_mcp_reconnect(server).await?;
+            }
         }
         Ok(())
     }

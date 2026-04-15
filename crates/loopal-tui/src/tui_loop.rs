@@ -11,7 +11,7 @@ use loopal_session::SessionController;
 use loopal_tool_background::BackgroundTaskStore;
 use tokio::sync::mpsc;
 
-use crate::app::App;
+use crate::app::{App, SubPage};
 use crate::event::{AppEvent, EventHandler};
 use crate::input::paste;
 use crate::key_dispatch::handle_key_action;
@@ -77,14 +77,19 @@ where
                     }
                 }
                 AppEvent::Agent(agent_event) => {
-                    // Load display history before handle_event processes the event,
-                    // so the conversation view is populated before any state reset.
                     if let AgentEventPayload::SessionResumed { ref session_id, .. } =
                         agent_event.payload
                     {
                         load_resumed_display(app, session_id);
                     }
+                    let is_mcp_report = matches!(
+                        agent_event.payload,
+                        AgentEventPayload::McpStatusReport { .. }
+                    );
                     app.session.handle_event(agent_event);
+                    if is_mcp_report {
+                        refresh_mcp_page(app);
+                    }
                 }
                 AppEvent::Paste(result) => {
                     paste::apply_paste_result(app, result);
@@ -102,6 +107,17 @@ where
     }
 
     Ok(())
+}
+
+/// Refresh the MCP sub-page data if it's currently open.
+fn refresh_mcp_page(app: &mut App) {
+    if let Some(SubPage::McpPage(ref mut state)) = app.sub_page {
+        let servers = app.session.lock().mcp_status.clone().unwrap_or_default();
+        state.selected = state.selected.min(servers.len().saturating_sub(1));
+        state.scroll_offset = state.scroll_offset.min(servers.len().saturating_sub(1));
+        state.servers = servers;
+        state.loaded = true;
+    }
 }
 
 /// Load display history from storage after the agent confirms a session resume.

@@ -11,6 +11,8 @@ mod envelope_test;
 mod event_edge_test;
 #[path = "suite/event_test.rs"]
 mod event_test;
+#[path = "suite/mcp_snapshot_test.rs"]
+mod mcp_snapshot_test;
 #[path = "suite/projection_edge_test.rs"]
 mod projection_edge_test;
 #[path = "suite/projection_test.rs"]

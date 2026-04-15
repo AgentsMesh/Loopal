@@ -5,7 +5,7 @@ use loopal_tool_background::BackgroundTaskStore;
 use crate::registry::ToolRegistry;
 
 /// Register all built-in tools with the given registry.
-pub fn register_all(registry: &mut ToolRegistry, bg_store: Arc<BackgroundTaskStore>) {
+pub fn register_all(registry: &ToolRegistry, bg_store: Arc<BackgroundTaskStore>) {
     registry.register(Box::new(loopal_tool_apply_patch::ApplyPatchTool));
     registry.register(Box::new(loopal_tool_read::ReadTool));
     registry.register(Box::new(loopal_tool_write::WriteTool));

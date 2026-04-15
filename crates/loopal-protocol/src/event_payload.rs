@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::mcp_snapshot::McpServerSnapshot;
 use crate::question::Question;
 
 /// Event payload. Runner/LLM/Tools only construct this enum.
@@ -183,4 +184,7 @@ pub enum AgentEventPayload {
         tokens_out: u32,
         modified_files: Vec<String>,
     },
+
+    /// MCP server status snapshot (emitted on startup and on reconnect).
+    McpStatusReport { servers: Vec<McpServerSnapshot> },
 }

@@ -114,7 +114,8 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
         | AgentEventPayload::SubAgentSpawned { .. }
         | AgentEventPayload::AutoModeDecision { .. }
         | AgentEventPayload::TurnCompleted { .. }
-        | AgentEventPayload::SessionResumed { .. } => None,
+        | AgentEventPayload::SessionResumed { .. }
+        | AgentEventPayload::McpStatusReport { .. } => None,
     }
 }
 
@@ -159,6 +160,7 @@ mod tests {
             AgentEventPayload::Finished,
             AgentEventPayload::Interrupted,
             AgentEventPayload::RetryCleared,
+            AgentEventPayload::McpStatusReport { servers: vec![] },
         ];
         for ev in &nones {
             assert!(

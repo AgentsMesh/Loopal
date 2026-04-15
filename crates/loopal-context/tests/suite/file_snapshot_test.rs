@@ -1,7 +1,15 @@
 use std::fs;
 use std::path::PathBuf;
+use std::thread::sleep;
+use std::time::Duration;
 
 use loopal_context::middleware::file_snapshot::{FileSnapshot, format_file_change, line_diff};
+
+/// Sleep enough for filesystem mtime to advance (NTFS has ~100ms granularity,
+/// but Windows CI can be slow — 1.1s covers HFS+ 1-second granularity too).
+fn wait_for_mtime() {
+    sleep(Duration::from_millis(1100));
+}
 
 #[test]
 fn line_diff_empty_to_content() {
@@ -112,6 +120,7 @@ fn snapshot_detects_modification() {
 
     let mut snap = FileSnapshot::load(path.clone(), "Test");
 
+    wait_for_mtime();
     fs::write(&path, "updated").unwrap();
     let reminder = snap.check_and_refresh();
     assert!(reminder.is_some());
@@ -164,9 +173,11 @@ fn snapshot_sequential_changes_both_detected() {
 
     let mut snap = FileSnapshot::load(path.clone(), "Test");
 
+    wait_for_mtime();
     fs::write(&path, "v2").unwrap();
     assert!(snap.check_and_refresh().is_some());
 
+    wait_for_mtime();
     fs::write(&path, "v3").unwrap();
     let r = snap.check_and_refresh();
     assert!(r.is_some());

@@ -1,9 +1,15 @@
 use std::fs;
+use std::thread::sleep;
+use std::time::Duration;
 
 use loopal_context::middleware::config_refresh::ConfigRefreshMiddleware;
 use loopal_context::middleware::file_snapshot::FileSnapshot;
 use loopal_message::{Message, MessageRole};
 use loopal_provider_api::{Middleware, MiddlewareContext};
+
+fn wait_for_mtime() {
+    sleep(Duration::from_millis(1100));
+}
 
 fn make_ctx(messages: Vec<Message>) -> MiddlewareContext {
     MiddlewareContext {
@@ -46,6 +52,7 @@ async fn change_injects_reminder() {
     let snap = FileSnapshot::load(path.clone(), "Project Memory");
     let mw = ConfigRefreshMiddleware::new(vec![snap]);
 
+    wait_for_mtime();
     fs::write(&path, "updated line").unwrap();
 
     let mut ctx = make_ctx(vec![Message::user("hello")]);
@@ -77,6 +84,7 @@ async fn second_call_no_duplicate() {
     let snap = FileSnapshot::load(path.clone(), "Test");
     let mw = ConfigRefreshMiddleware::new(vec![snap]);
 
+    wait_for_mtime();
     fs::write(&path, "v2").unwrap();
 
     let mut ctx1 = make_ctx(vec![Message::user("a")]);
@@ -101,6 +109,7 @@ async fn system_prompt_unchanged() {
     let snap = FileSnapshot::load(path.clone(), "Test");
     let mw = ConfigRefreshMiddleware::new(vec![snap]);
 
+    wait_for_mtime();
     fs::write(&path, "new").unwrap();
 
     let mut ctx = make_ctx(vec![Message::user("hi")]);
@@ -127,6 +136,7 @@ async fn multiple_files_single_reminder() {
     ];
     let mw = ConfigRefreshMiddleware::new(snaps);
 
+    wait_for_mtime();
     fs::write(&p1, "mem_new").unwrap();
     fs::write(&p2, "instr_new").unwrap();
 

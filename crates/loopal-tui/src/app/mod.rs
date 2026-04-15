@@ -1,8 +1,10 @@
 mod mcp_page;
+mod skills_page;
 mod status_page;
 mod types;
 
 pub use mcp_page::*;
+pub use skills_page::*;
 pub use status_page::*;
 pub use types::*;
 

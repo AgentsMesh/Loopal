@@ -50,6 +50,11 @@ pub fn render_mcp_page(f: &mut Frame, state: &mut McpPageState, area: Rect) {
 
 fn render_server_list(f: &mut Frame, state: &mut McpPageState, area: Rect) {
     let visible = area.height as usize;
+    if state.selected < state.scroll_offset {
+        state.scroll_offset = state.selected;
+    } else if visible > 0 && state.selected >= state.scroll_offset + visible {
+        state.scroll_offset = state.selected - visible + 1;
+    }
     let max_scroll = state.servers.len().saturating_sub(visible);
     if state.scroll_offset > max_scroll {
         state.scroll_offset = max_scroll;

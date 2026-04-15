@@ -132,8 +132,7 @@ pub(crate) async fn start_session(
         info!(session.id = %session_id, "session started");
 
         let spawn_rx = kernel_for_bridge.bg_store().subscribe_spawns();
-        let bridge_task =
-            crate::bg_task_bridge::spawn(spawn_rx, frontend_placeholder.clone());
+        let bridge_task = crate::bg_task_bridge::spawn(spawn_rx, frontend_placeholder.clone());
 
         let agent_task = tokio::spawn(async move {
             match agent_loop(agent_params).await {

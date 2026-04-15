@@ -29,12 +29,17 @@ fn emit_output(state: &mut SessionState, id: &str, delta: &str) {
 }
 
 fn emit_completed(state: &mut SessionState, id: &str, status: BgTaskStatus, output: &str) {
+    let code = if status == BgTaskStatus::Completed {
+        0
+    } else {
+        1
+    };
     apply_event(
         state,
         AgentEvent::root(AgentEventPayload::BgTaskCompleted {
             id: id.into(),
             status,
-            exit_code: Some(if status == BgTaskStatus::Completed { 0 } else { 1 }),
+            exit_code: Some(code),
             output: output.into(),
         }),
     );

@@ -57,10 +57,7 @@ pub fn render_bg_task_log(
         return;
     }
 
-    let lines: Vec<Line<'static>> = output
-        .lines()
-        .map(|l| Line::from(l.to_string()))
-        .collect();
+    let lines: Vec<Line<'static>> = output.lines().map(|l| Line::from(l.to_string())).collect();
     let total = lines.len();
 
     if state.auto_follow {

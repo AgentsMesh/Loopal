@@ -1,6 +1,5 @@
 //! Event-driven background task bridge — subscribes to store spawn
 //! notifications and emits lifecycle + output events via the Hub.
-//!
 //! Per-task monitoring: output sampler + completion watcher run as
 //! concurrent branches of a single `select!`, ensuring clean cancellation.
 //! All per-task tasks are tracked in a JoinSet — bridge drop cascades.

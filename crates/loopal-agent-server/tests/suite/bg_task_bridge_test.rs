@@ -35,7 +35,12 @@ struct CaptureFrontend {
 impl CaptureFrontend {
     fn new() -> (Self, Arc<Mutex<Vec<AgentEventPayload>>>) {
         let events = Arc::new(Mutex::new(Vec::new()));
-        (Self { events: events.clone() }, events)
+        (
+            Self {
+                events: events.clone(),
+            },
+            events,
+        )
     }
 }
 
@@ -93,10 +98,12 @@ async fn completion_event_emitted_on_task_finish() {
     bridge.abort();
 
     let captured = events.lock().unwrap();
-    let completed = captured.iter().find(|e| matches!(
-        e,
-        AgentEventPayload::BgTaskCompleted { id, .. } if id == "bg_1"
-    ));
+    let completed = captured.iter().find(|e| {
+        matches!(
+            e,
+            AgentEventPayload::BgTaskCompleted { id, .. } if id == "bg_1"
+        )
+    });
     assert!(completed.is_some(), "should emit BgTaskCompleted");
     if let Some(AgentEventPayload::BgTaskCompleted { output, .. }) = completed {
         assert_eq!(output, "final output");
@@ -124,11 +131,13 @@ async fn output_delta_emitted_for_running_task() {
     bridge.abort();
 
     let captured = events.lock().unwrap();
-    let has_output = captured.iter().any(|e| matches!(
-        e,
-        AgentEventPayload::BgTaskOutput { id, output_delta }
-            if id == "bg_1" && output_delta.contains("hello world")
-    ));
+    let has_output = captured.iter().any(|e| {
+        matches!(
+            e,
+            AgentEventPayload::BgTaskOutput { id, output_delta }
+                if id == "bg_1" && output_delta.contains("hello world")
+        )
+    });
     assert!(has_output, "should emit BgTaskOutput with delta");
 }
 

@@ -7,13 +7,16 @@ use crate::state::SessionState;
 pub(crate) fn apply(state: &mut SessionState, payload: AgentEventPayload) {
     match payload {
         AgentEventPayload::BgTaskSpawned { id, description } => {
-            state.bg_tasks.entry(id.clone()).or_insert_with(|| BgTaskDetail {
-                id,
-                description,
-                status: BgTaskStatus::Running,
-                exit_code: None,
-                output: String::new(),
-            });
+            state
+                .bg_tasks
+                .entry(id.clone())
+                .or_insert_with(|| BgTaskDetail {
+                    id,
+                    description,
+                    status: BgTaskStatus::Running,
+                    exit_code: None,
+                    output: String::new(),
+                });
         }
         AgentEventPayload::BgTaskOutput { id, output_delta } => {
             if let Some(task) = state.bg_tasks.get_mut(&id)

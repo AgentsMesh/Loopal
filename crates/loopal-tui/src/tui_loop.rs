@@ -122,7 +122,6 @@ fn sync_bg_tasks(app: &mut App) {
     app.bg_snapshots = state.bg_tasks.values().map(|t| t.to_snapshot()).collect();
     app.bg_task_details = state.bg_tasks.values().cloned().collect();
 }
-}
 
 /// Load display history from storage after the agent confirms a session resume.
 fn load_resumed_display(app: &mut App, session_id: &str) {

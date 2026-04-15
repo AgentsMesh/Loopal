@@ -110,7 +110,6 @@ pub struct BgTaskLogState {
     /// Previous line count — detects output growth for auto-follow.
     pub prev_line_count: usize,
 }
-}
 
 /// Which sub-panel within the panel zone is focused.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

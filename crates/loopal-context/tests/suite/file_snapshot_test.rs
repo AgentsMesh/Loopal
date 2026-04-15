@@ -1,9 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use loopal_context::middleware::file_snapshot::{
-    FileSnapshot, format_file_change, line_diff,
-};
+use loopal_context::middleware::file_snapshot::{FileSnapshot, format_file_change, line_diff};
 
 #[test]
 fn line_diff_empty_to_content() {

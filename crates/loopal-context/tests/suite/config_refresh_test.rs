@@ -53,7 +53,11 @@ async fn change_injects_reminder() {
 
     assert_eq!(ctx.messages.len(), 2);
     let injected = &ctx.messages[1];
-    assert_eq!(injected.role, MessageRole::User, "must be User to preserve prefix cache");
+    assert_eq!(
+        injected.role,
+        MessageRole::User,
+        "must be User to preserve prefix cache"
+    );
     let text = injected.text_content();
     assert!(text.contains("system-reminder"));
     assert!(text.contains("Project Memory"));

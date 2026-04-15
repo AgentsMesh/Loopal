@@ -49,6 +49,9 @@ pub fn draw(f: &mut Frame, app: &mut App) {
             SubPage::McpPage(s) => {
                 views::mcp_page::render_mcp_page(f, s, layout.picker);
             }
+            SubPage::SkillsPage(s) => {
+                views::skills_page::render_skills_page(f, s, layout.picker);
+            }
         }
         views::unified_status::render_unified_status(f, &state, layout.status);
         return;

@@ -10,6 +10,7 @@ pub mod question_dialog;
 pub mod retry_banner;
 pub mod rewind_picker;
 pub mod separator;
+pub mod skills_page;
 pub mod status_page;
 pub mod tool_confirm;
 pub mod topology_overlay;

@@ -82,6 +82,7 @@ impl PickerState {
 use super::StatusPageState;
 
 use crate::app::McpPageState;
+use crate::app::SkillsPageState;
 
 /// Active sub-page overlay that replaces the main chat area.
 pub enum SubPage {
@@ -95,6 +96,8 @@ pub enum SubPage {
     StatusPage(StatusPageState),
     /// MCP server status page — list of MCP servers with connection state.
     McpPage(McpPageState),
+    /// Skills page — list of loaded skills with source info.
+    SkillsPage(SkillsPageState),
 }
 
 /// Which sub-panel within the panel zone is focused.

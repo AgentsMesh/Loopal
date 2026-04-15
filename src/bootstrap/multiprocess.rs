@@ -15,7 +15,7 @@ pub async fn run(
     cwd: &std::path::Path,
     config: &loopal_config::ResolvedConfig,
     resume: Option<&str>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<String> {
     info!("starting in Hub mode");
 
     // 1-3. Create Hub + spawn root agent
@@ -72,6 +72,8 @@ pub async fn run(
     }
 
     // 10. Run TUI (bg_store is TUI-local; future: sync from agent via IPC)
+    // Clone before move into run_tui — used after TUI exits to read final session ID.
+    let session_ref = session_ctrl.clone();
     let result = loopal_tui::run_tui(
         session_ctrl,
         cwd.to_path_buf(),
@@ -84,7 +86,14 @@ pub async fn run(
     info!("shutting down agent process");
     let _ = ctx.agent_proc.shutdown().await;
 
-    result
+    // Read the final session ID — may differ from `root_session_id` if the user
+    // switched sessions via `/resume` during the TUI session. The fallback to
+    // `root_session_id` is defensive only; `set_root_session_id` on line 44
+    // guarantees the Option is always Some.
+    let final_session_id = session_ref
+        .root_session_id()
+        .unwrap_or(root_session_id);
+    result.map(|()| final_session_id)
 }
 
 /// Bridge broadcast::Receiver → mpsc::Receiver for TUI compatibility.

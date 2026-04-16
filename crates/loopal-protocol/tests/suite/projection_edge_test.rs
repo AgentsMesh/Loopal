@@ -10,8 +10,14 @@ fn summarize_input_respects_utf8_boundary() {
         "activeForm": "Creating directories"
     });
     let raw = long_chinese.to_string();
-    assert!(raw.len() > 60, "input must exceed 60 bytes to trigger truncation");
-    assert!(!raw.is_char_boundary(57), "byte 57 must be mid-character to test the fix");
+    assert!(
+        raw.len() > 60,
+        "input must exceed 60 bytes to trigger truncation"
+    );
+    assert!(
+        !raw.is_char_boundary(57),
+        "byte 57 must be mid-character to test the fix"
+    );
 
     let msg = Message {
         id: None,

@@ -1,7 +1,7 @@
 /// Tests for enter_panel dispatch function.
 use loopal_protocol::{
     AgentEvent, AgentEventPayload, BgTaskSnapshot, BgTaskStatus, ControlCommand,
-    UserQuestionResponse,
+    TaskSnapshot, TaskSnapshotStatus, UserQuestionResponse,
 };
 use loopal_session::SessionController;
 use loopal_tui::app::{App, FocusMode, PanelKind};
@@ -54,12 +54,22 @@ fn add_bg_snapshot(app: &mut App, id: &str, desc: &str) {
     });
 }
 
+fn add_task_snapshot(app: &mut App, id: &str, subject: &str) {
+    app.task_snapshots.push(TaskSnapshot {
+        id: id.into(),
+        subject: subject.into(),
+        active_form: None,
+        status: TaskSnapshotStatus::InProgress,
+        blocked_by: Vec::new(),
+    });
+}
+
 #[test]
 fn noop_without_agents() {
     let mut app = make_app();
     enter_panel(&mut app);
     assert_eq!(app.focus_mode, FocusMode::Input);
-    assert!(app.focused_agent.is_none());
+    assert!(app.section(PanelKind::Agents).focused.is_none());
 }
 
 #[test]
@@ -69,7 +79,7 @@ fn sets_mode_and_focuses_first() {
     spawn_agent(&app, "beta");
     enter_panel(&mut app);
     assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Agents));
-    assert_eq!(app.focused_agent.as_deref(), Some("alpha"));
+    assert_eq!(app.section(PanelKind::Agents).focused.as_deref(), Some("alpha"));
 }
 
 #[test]
@@ -77,10 +87,10 @@ fn keeps_existing_live_focus() {
     let mut app = make_app();
     spawn_agent(&app, "alpha");
     spawn_agent(&app, "beta");
-    app.focused_agent = Some("beta".into());
+    app.section_mut(PanelKind::Agents).focused = Some("beta".into());
     enter_panel(&mut app);
     assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Agents));
-    assert_eq!(app.focused_agent.as_deref(), Some("beta"));
+    assert_eq!(app.section(PanelKind::Agents).focused.as_deref(), Some("beta"));
 }
 
 #[test]
@@ -89,11 +99,11 @@ fn refocuses_when_focused_agent_is_dead() {
     spawn_agent(&app, "alive");
     spawn_agent(&app, "dead");
     finish_agent(&app, "dead");
-    app.focused_agent = Some("dead".into());
+    app.section_mut(PanelKind::Agents).focused = Some("dead".into());
     enter_panel(&mut app);
     assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Agents));
     assert_eq!(
-        app.focused_agent.as_deref(),
+        app.section(PanelKind::Agents).focused.as_deref(),
         Some("alive"),
         "should re-focus to a live agent"
     );
@@ -114,7 +124,7 @@ fn enters_bg_tasks_when_no_agents_but_bg_tasks() {
     add_bg_snapshot(&mut app, "t1", "compiling");
     enter_panel(&mut app);
     assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::BgTasks));
-    assert!(app.focused_bg_task.is_some(), "should set focused_bg_task");
+    assert!(app.section(PanelKind::BgTasks).focused.is_some(), "should set focused_bg_task");
 }
 
 #[test]
@@ -134,4 +144,31 @@ fn prefers_agents_over_bg_tasks() {
     add_bg_snapshot(&mut app, "t3", "linting");
     enter_panel(&mut app);
     assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Agents));
+}
+
+#[test]
+fn enters_tasks_when_no_agents_but_tasks() {
+    let mut app = make_app();
+    add_task_snapshot(&mut app, "1", "Build thing");
+    enter_panel(&mut app);
+    assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Tasks));
+    assert!(app.section(PanelKind::Tasks).focused.is_some());
+}
+
+#[test]
+fn prefers_agents_over_tasks() {
+    let mut app = make_app();
+    spawn_agent(&app, "worker");
+    add_task_snapshot(&mut app, "1", "Build thing");
+    enter_panel(&mut app);
+    assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Agents));
+}
+
+#[test]
+fn enters_tasks_before_bg_tasks() {
+    let mut app = make_app();
+    add_task_snapshot(&mut app, "1", "Task A");
+    add_bg_snapshot(&mut app, "bg1", "compiling");
+    enter_panel(&mut app);
+    assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Tasks));
 }

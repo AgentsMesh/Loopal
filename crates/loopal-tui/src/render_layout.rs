@@ -19,7 +19,7 @@ impl FrameLayout {
     pub fn compute(
         size: Rect,
         breadcrumb_h: u16,
-        agent_panel_h: u16,
+        panel_zone_h: u16,
         banner_h: u16,
         input_h: u16,
     ) -> Self {
@@ -28,7 +28,7 @@ impl FrameLayout {
             .constraints([
                 Constraint::Length(breadcrumb_h),
                 Constraint::Min(3),
-                Constraint::Length(agent_panel_h),
+                Constraint::Length(panel_zone_h),
                 Constraint::Length(1),
                 Constraint::Length(banner_h),
                 Constraint::Length(input_h),

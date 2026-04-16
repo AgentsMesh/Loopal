@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 use std::sync::Mutex;
 
+use tokio::sync::mpsc;
+
 use crate::types::{Task, TaskId, TaskStatus};
 
 /// File-backed task store with in-memory cache.
@@ -10,6 +12,7 @@ use crate::types::{Task, TaskId, TaskStatus};
 pub struct TaskStore {
     base_dir: PathBuf,
     inner: Mutex<TaskStoreInner>,
+    change_tx: Mutex<Option<mpsc::UnboundedSender<()>>>,
 }
 
 struct TaskStoreInner {
@@ -24,6 +27,7 @@ impl TaskStore {
         Self {
             base_dir,
             inner: Mutex::new(TaskStoreInner { tasks, next_id }),
+            change_tx: Mutex::new(None),
         }
     }
 
@@ -47,6 +51,8 @@ impl TaskStore {
         };
         inner.tasks.push(task.clone());
         self.persist(&inner);
+        drop(inner);
+        self.notify_change();
         task
     }
 
@@ -74,7 +80,27 @@ impl TaskStore {
         patch.apply(task);
         let updated = task.clone();
         self.persist(&inner);
+        drop(inner);
+        self.notify_change();
         Some(updated)
+    }
+
+    /// Subscribe to change notifications. Returns a receiver that fires
+    /// after each `create()` or `update()` call.
+    ///
+    /// Only one subscriber is supported. Calling again replaces the previous one.
+    pub fn subscribe(&self) -> mpsc::UnboundedReceiver<()> {
+        let (tx, rx) = mpsc::unbounded_channel();
+        *self.change_tx.lock().expect("lock poisoned") = Some(tx);
+        rx
+    }
+
+    fn notify_change(&self) {
+        if let Ok(guard) = self.change_tx.lock()
+            && let Some(ref tx) = *guard
+        {
+            let _ = tx.send(());
+        }
     }
 
     fn persist(&self, inner: &TaskStoreInner) {

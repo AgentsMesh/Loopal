@@ -16,24 +16,26 @@ use ratatui::widgets::Paragraph;
 use super::unified_status::spinner_frame;
 
 /// Maximum background task lines to show.
-const MAX_BG_VISIBLE: usize = 3;
+pub const MAX_BG_VISIBLE: usize = 3;
 
 /// Height needed for the background tasks sub-panel.
 ///
 /// Returns 0 when no running background tasks exist.
 pub fn bg_panel_height(snapshots: &[BgTaskSnapshot]) -> u16 {
-    let count = snapshots.len();
+    let count = running_count(snapshots);
     if count == 0 {
         return 0;
     }
     count.min(MAX_BG_VISIBLE) as u16
 }
 
-/// IDs of all background tasks from the cached snapshots.
-///
-/// Used by `panel_ops` for focus cycling.
+/// IDs of running background tasks from the cached snapshots.
 pub fn task_ids(snapshots: &[BgTaskSnapshot]) -> Vec<String> {
-    snapshots.iter().map(|s| s.id.clone()).collect()
+    snapshots
+        .iter()
+        .filter(|s| s.status == BgTaskStatus::Running)
+        .map(|s| s.id.clone())
+        .collect()
 }
 
 /// Render background task lines into the given area.
@@ -49,6 +51,7 @@ pub fn render_bg_tasks(
     }
     let lines: Vec<Line<'static>> = snapshots
         .iter()
+        .filter(|t| t.status == BgTaskStatus::Running)
         .take(MAX_BG_VISIBLE)
         .map(|t| render_task_line(t, focused_task, elapsed))
         .collect();
@@ -92,4 +95,8 @@ fn render_task_line(
         Span::raw(" "),
         Span::styled(desc, Style::default().fg(Color::Rgb(100, 100, 100))),
     ])
+}
+
+fn running_count(snapshots: &[BgTaskSnapshot]) -> usize {
+    snapshots.iter().filter(|s| s.status == BgTaskStatus::Running).count()
 }

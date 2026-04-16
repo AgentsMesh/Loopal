@@ -12,10 +12,12 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use loopal_protocol::{BgTaskDetail, BgTaskSnapshot, ImageAttachment, UserContent};
+use loopal_protocol::{BgTaskDetail, BgTaskSnapshot, ImageAttachment, TaskSnapshot, UserContent};
 use loopal_session::SessionController;
 
 use crate::command::CommandRegistry;
+use crate::panel_provider::PanelRegistry;
+use crate::panel_state::PanelSectionState;
 use crate::views::progress::ContentScroll;
 
 /// Main application state — UI-only fields + session controller handle.
@@ -44,19 +46,19 @@ pub struct App {
     pub paste_map: HashMap<String, String>,
     /// Whether the topology overlay is visible (toggled by /topology).
     pub show_topology: bool,
-    /// Agent panel cursor — Tab cycles through agents. Purely TUI concept.
-    pub focused_agent: Option<String>,
-    /// Background tasks panel cursor.
-    pub focused_bg_task: Option<String>,
+    /// Per-panel focus and scroll state (Agents, Tasks, BgTasks).
+    pub panel_sections: Vec<PanelSectionState>,
+    /// Registered panel providers (Agents, Tasks, BgTasks).
+    pub panel_registry: PanelRegistry,
     /// Which UI region owns keyboard focus.
     pub focus_mode: FocusMode,
-    /// Scroll offset for the agent panel (index of first visible agent).
-    pub agent_panel_offset: usize,
 
     /// Cached background task snapshots (synced from session state each frame).
     pub bg_snapshots: Vec<BgTaskSnapshot>,
     /// Full bg task details including output (for log viewer).
     pub bg_task_details: Vec<BgTaskDetail>,
+    /// Cached structured task snapshots (synced from session state each frame).
+    pub task_snapshots: Vec<TaskSnapshot>,
 
     // === Session Controller (observable + interactive) ===
     pub session: SessionController,
@@ -76,6 +78,14 @@ impl App {
         };
         registry.reload_skills(&skills);
 
+        let mut panel_registry = PanelRegistry::new();
+        crate::providers::register_all(&mut panel_registry);
+        let panel_sections = panel_registry
+            .providers()
+            .iter()
+            .map(|p| PanelSectionState::new(p.kind()))
+            .collect();
+
         Self {
             exiting: false,
             input: String::new(),
@@ -91,12 +101,12 @@ impl App {
             input_scroll: 0,
             paste_map: HashMap::new(),
             show_topology: true,
-            focused_agent: None,
-            focused_bg_task: None,
+            panel_sections,
+            panel_registry,
             focus_mode: FocusMode::default(),
-            agent_panel_offset: 0,
             bg_snapshots: Vec::new(),
             bg_task_details: Vec::new(),
+            task_snapshots: Vec::new(),
             session,
             content_scroll: ContentScroll::new(),
         }
@@ -145,5 +155,13 @@ impl App {
             Err(_) => Vec::new(),
         };
         self.command_registry.reload_skills(&skills);
+    }
+
+    pub fn section(&self, kind: PanelKind) -> &PanelSectionState {
+        self.panel_sections.iter().find(|s| s.kind == kind).unwrap()
+    }
+
+    pub fn section_mut(&mut self, kind: PanelKind) -> &mut PanelSectionState {
+        self.panel_sections.iter_mut().find(|s| s.kind == kind).unwrap()
     }
 }

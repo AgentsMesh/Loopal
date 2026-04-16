@@ -2,8 +2,16 @@
 
 use std::sync::Arc;
 
+use loopal_agent::task_store::TaskStore;
 use loopal_config::ResolvedConfig;
 use loopal_kernel::Kernel;
+use loopal_runtime::AgentLoopParams;
+
+/// Return value from `build_with_frontend` — agent loop params + task store handle.
+pub struct AgentSetupResult {
+    pub params: AgentLoopParams,
+    pub task_store: Arc<TaskStore>,
+}
 
 pub struct StartParams {
     #[allow(dead_code)]

@@ -100,7 +100,7 @@ pub(crate) async fn start_session(
 
         let session_dir_override = hub.session_dir_override().await;
         let kernel_for_bridge = kernel.clone();
-        let agent_params = agent_setup::build_with_frontend(
+        let setup = agent_setup::build_with_frontend(
             &cwd,
             &config,
             &start,
@@ -111,6 +111,8 @@ pub(crate) async fn start_session(
             connection.clone(),
             session_dir_override.as_deref(),
         )?;
+        let agent_params = setup.params;
+        let task_store_for_bridge = setup.task_store;
 
         let session_id = agent_params.session.id.clone();
         tracing::Span::current().record("session.id", session_id.as_str());
@@ -133,6 +135,12 @@ pub(crate) async fn start_session(
 
         let spawn_rx = kernel_for_bridge.bg_store().subscribe_spawns();
         let bridge_task = crate::bg_task_bridge::spawn(spawn_rx, frontend_placeholder.clone());
+        let task_change_rx = task_store_for_bridge.subscribe();
+        let task_bridge_task = crate::task_bridge::spawn(
+            task_change_rx,
+            task_store_for_bridge,
+            frontend_placeholder.clone(),
+        );
 
         let agent_task = tokio::spawn(async move {
             match agent_loop(agent_params).await {
@@ -149,9 +157,11 @@ pub(crate) async fn start_session(
 
         let agent_task = {
             let bridge_abort = bridge_task.abort_handle();
+            let task_bridge_abort = task_bridge_task.abort_handle();
             tokio::spawn(async move {
                 let result = agent_task.await;
                 bridge_abort.abort();
+                task_bridge_abort.abort();
                 result.ok().flatten()
             })
         };

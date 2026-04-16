@@ -1,179 +1,122 @@
-//! Panel zone focus navigation — enter, tab, cycle, ensure focus.
-
-use loopal_protocol::AgentStatus;
+//! Panel zone focus navigation — driven by PanelRegistry.
+//!
+//! All per-kind dispatch goes through the registry. Adding a new panel
+//! requires zero changes here — only a new PanelProvider impl + register call.
 
 use crate::app::{App, FocusMode, PanelKind};
-use crate::views::agent_panel::MAX_VISIBLE;
-use crate::views::bg_tasks_panel;
+use crate::panel_state::PanelSectionState;
 
-/// Enter Panel focus mode. Picks the first panel with content.
+/// Enter Panel focus mode. Picks the first non-empty section.
 pub fn enter_panel(app: &mut App) {
-    let has_agents = has_live_agents(app);
-    let has_bg = bg_tasks_panel::bg_panel_height(&app.bg_snapshots) > 0;
-    if !has_agents && !has_bg {
-        return;
-    }
-    let kind = if has_agents {
-        PanelKind::Agents
-    } else {
-        PanelKind::BgTasks
-    };
-    app.focus_mode = FocusMode::Panel(kind);
-    ensure_focus(app, kind);
+    let kinds = non_empty_kinds(app);
+    let Some(&first) = kinds.first() else { return };
+    app.focus_mode = FocusMode::Panel(first);
+    ensure_focus(app, first);
 }
 
-/// Tab within the panel zone: switch panel if both have content, else cycle.
+/// Tab within the panel zone: cycle through non-empty sections.
 pub fn panel_tab(app: &mut App) {
-    let kind = match app.focus_mode {
+    let current = match app.focus_mode {
         FocusMode::Panel(k) => k,
         _ => return,
     };
-    let has_agents = has_live_agents(app);
-    let has_bg = bg_tasks_panel::bg_panel_height(&app.bg_snapshots) > 0;
-
-    if has_agents && has_bg {
-        let next = match kind {
-            PanelKind::Agents => PanelKind::BgTasks,
-            PanelKind::BgTasks => PanelKind::Agents,
-        };
+    let kinds = non_empty_kinds(app);
+    if kinds.len() <= 1 {
+        cycle_panel_focus(app, true);
+        return;
+    }
+    if let Some(pos) = kinds.iter().position(|&k| k == current) {
+        let next = kinds[(pos + 1) % kinds.len()];
         app.focus_mode = FocusMode::Panel(next);
         ensure_focus(app, next);
-    } else {
-        cycle_panel_focus(app, true);
     }
 }
 
 /// Navigate up/down within the currently active panel.
 pub fn cycle_panel_focus(app: &mut App, forward: bool) {
-    match app.focus_mode {
-        FocusMode::Panel(PanelKind::Agents) => cycle_agent_focus(app, forward),
-        FocusMode::Panel(PanelKind::BgTasks) => cycle_bg_task_focus(app, forward),
-        _ => {}
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Agent panel focus cycling
-// ---------------------------------------------------------------------------
-
-fn cycle_agent_focus(app: &mut App, forward: bool) {
-    let keys = live_agent_keys(app);
-    if keys.is_empty() {
-        app.focused_agent = None;
-        app.focus_mode = FocusMode::Input;
-        app.agent_panel_offset = 0;
-        return;
-    }
-    app.focused_agent = Some(next_in_list(&keys, app.focused_agent.as_deref(), forward));
-    if let Some(ref focused) = app.focused_agent
-        && let Some(idx) = keys.iter().position(|k| k == focused)
-    {
-        adjust_agent_scroll(app, idx, keys.len());
-    }
-}
-
-fn cycle_bg_task_focus(app: &mut App, forward: bool) {
-    let ids = bg_tasks_panel::task_ids(&app.bg_snapshots);
+    let kind = match app.focus_mode {
+        FocusMode::Panel(k) => k,
+        _ => return,
+    };
+    let Some(provider) = app.panel_registry.by_kind(kind) else { return };
+    let ids = provider.item_ids(app);
+    let max = provider.max_visible();
     if ids.is_empty() {
-        app.focused_bg_task = None;
-        if has_live_agents(app) {
-            app.focus_mode = FocusMode::Panel(PanelKind::Agents);
-            ensure_focus(app, PanelKind::Agents);
-        } else {
-            app.focus_mode = FocusMode::Input;
-        }
+        let section = app.section_mut(kind);
+        section.focused = None;
+        section.scroll_offset = 0;
+        fallback(app);
         return;
     }
-    app.focused_bg_task = Some(next_in_list(&ids, app.focused_bg_task.as_deref(), forward));
-}
-
-/// Ensure the focused item exists for the given panel kind.
-fn ensure_focus(app: &mut App, kind: PanelKind) {
-    match kind {
-        PanelKind::Agents => {
-            let keys = live_agent_keys(app);
-            let needs = match &app.focused_agent {
-                None => true,
-                Some(name) => !keys.contains(name),
-            };
-            if needs {
-                cycle_agent_focus(app, true);
-            }
-        }
-        PanelKind::BgTasks => {
-            let ids = bg_tasks_panel::task_ids(&app.bg_snapshots);
-            let needs = match &app.focused_bg_task {
-                None => true,
-                Some(id) => !ids.contains(id),
-            };
-            if needs {
-                cycle_bg_task_focus(app, true);
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-pub(crate) fn live_agent_keys(app: &App) -> Vec<String> {
-    let state = app.session.lock();
-    let active = &state.active_view;
-    state
-        .agents
-        .iter()
-        .filter(|(k, a)| k.as_str() != active && is_agent_live(&a.observable.status))
-        .map(|(k, _)| k.clone())
-        .collect()
+    let section = app.section_mut(kind);
+    section.focused = Some(next_in_list(&ids, section.focused.as_deref(), forward));
+    adjust_scroll(section, &ids, max);
 }
 
 pub(crate) fn has_live_agents(app: &App) -> bool {
-    let state = app.session.lock();
-    let active = &state.active_view;
-    state
-        .agents
-        .iter()
-        .any(|(k, a)| k.as_str() != active && is_agent_live(&a.observable.status))
+    app.panel_registry
+        .by_kind(PanelKind::Agents)
+        .is_some_and(|p| !p.item_ids(app).is_empty())
 }
 
-/// Pick the next (or previous) item in a list, wrapping around.
+// --- Generic helpers ---
+
+fn ensure_focus(app: &mut App, kind: PanelKind) {
+    let Some(provider) = app.panel_registry.by_kind(kind) else { return };
+    let ids = provider.item_ids(app);
+    let max = provider.max_visible();
+    let section = app.section_mut(kind);
+    if section.focused.as_ref().is_none_or(|f| !ids.contains(f)) {
+        section.focused = ids.first().cloned();
+        adjust_scroll(section, &ids, max);
+    }
+}
+
+fn fallback(app: &mut App) {
+    let kinds = non_empty_kinds(app);
+    if let Some(&first) = kinds.first() {
+        app.focus_mode = FocusMode::Panel(first);
+        ensure_focus(app, first);
+    } else {
+        app.focus_mode = FocusMode::Input;
+    }
+}
+
+fn non_empty_kinds(app: &App) -> Vec<PanelKind> {
+    app.panel_registry
+        .providers()
+        .iter()
+        .filter(|p| !p.item_ids(app).is_empty())
+        .map(|p| p.kind())
+        .collect()
+}
+
 fn next_in_list(items: &[String], current: Option<&str>, forward: bool) -> String {
     let pos = current.and_then(|c| items.iter().position(|k| k == c));
-    match pos {
-        Some(i) => {
-            if forward {
-                items[(i + 1) % items.len()].clone()
-            } else {
-                items[(i + items.len() - 1) % items.len()].clone()
-            }
-        }
-        None => {
-            if forward {
-                items[0].clone()
-            } else {
-                items[items.len() - 1].clone()
-            }
-        }
-    }
+    let idx = match pos {
+        Some(i) if forward => (i + 1) % items.len(),
+        Some(i) => (i + items.len() - 1) % items.len(),
+        None if forward => 0,
+        None => items.len() - 1,
+    };
+    items[idx].clone()
 }
 
-/// Ensure the focused agent at `focused_idx` is visible within the scroll window.
-fn adjust_agent_scroll(app: &mut App, focused_idx: usize, total: usize) {
-    if total <= MAX_VISIBLE {
-        app.agent_panel_offset = 0;
+fn adjust_scroll(section: &mut PanelSectionState, ids: &[String], max_visible: usize) {
+    let total = ids.len();
+    if max_visible == 0 || total <= max_visible {
+        section.scroll_offset = 0;
         return;
     }
-    if focused_idx < app.agent_panel_offset {
-        app.agent_panel_offset = focused_idx;
-    } else if focused_idx >= app.agent_panel_offset + MAX_VISIBLE {
-        app.agent_panel_offset = focused_idx + 1 - MAX_VISIBLE;
+    let idx = section
+        .focused
+        .as_ref()
+        .and_then(|f| ids.iter().position(|k| k == f))
+        .unwrap_or(0);
+    if idx < section.scroll_offset {
+        section.scroll_offset = idx;
+    } else if idx >= section.scroll_offset + max_visible {
+        section.scroll_offset = idx + 1 - max_visible;
     }
-    app.agent_panel_offset = app
-        .agent_panel_offset
-        .min(total.saturating_sub(MAX_VISIBLE));
-}
-
-fn is_agent_live(status: &AgentStatus) -> bool {
-    !matches!(status, AgentStatus::Finished | AgentStatus::Error)
+    section.scroll_offset = section.scroll_offset.min(total.saturating_sub(max_visible));
 }

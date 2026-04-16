@@ -116,11 +116,34 @@ fn refresh_mcp_page(app: &mut App) {
     }
 }
 
-/// Sync background task data from session state into App-level cache.
+/// Sync panel data from session state into App-level cache.
+///
+/// bg_task_details uses merge-and-retain so the log viewer can still
+/// access completed tasks after they're cleaned from session state.
 fn sync_bg_tasks(app: &mut App) {
-    let state = app.session.lock();
-    app.bg_snapshots = state.bg_tasks.values().map(|t| t.to_snapshot()).collect();
-    app.bg_task_details = state.bg_tasks.values().cloned().collect();
+    {
+        let mut state = app.session.lock();
+        app.bg_snapshots = state.bg_tasks.values().map(|t| t.to_snapshot()).collect();
+        crate::session_cleanup::merge_bg_details(&mut app.bg_task_details, &state.bg_tasks);
+        app.task_snapshots = state.task_snapshots.clone();
+        crate::session_cleanup::cleanup_session_state(&mut state);
+    }
+    crate::session_cleanup::cap_bg_details(&mut app.bg_task_details);
+    clamp_scroll_offsets(app);
+}
+
+/// Ensure scroll offsets don't exceed item counts after data changes.
+fn clamp_scroll_offsets(app: &mut App) {
+    let clamps: Vec<_> = app
+        .panel_registry
+        .providers()
+        .iter()
+        .map(|p| (p.kind(), p.item_ids(app).len(), p.max_visible()))
+        .collect();
+    for (kind, count, max) in clamps {
+        let section = app.section_mut(kind);
+        section.scroll_offset = section.scroll_offset.min(count.saturating_sub(max));
+    }
 }
 
 /// Load display history from storage after the agent confirms a session resume.

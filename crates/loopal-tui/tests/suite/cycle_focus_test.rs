@@ -52,11 +52,11 @@ fn forward_through_agents() {
     spawn_agent(&app, "c");
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     cycle_panel_focus(&mut app, true);
-    assert_eq!(app.focused_agent.as_deref(), Some("a"));
+    assert_eq!(app.section(PanelKind::Agents).focused.as_deref(), Some("a"));
     cycle_panel_focus(&mut app, true);
-    assert_eq!(app.focused_agent.as_deref(), Some("b"));
+    assert_eq!(app.section(PanelKind::Agents).focused.as_deref(), Some("b"));
     cycle_panel_focus(&mut app, true);
-    assert_eq!(app.focused_agent.as_deref(), Some("c"));
+    assert_eq!(app.section(PanelKind::Agents).focused.as_deref(), Some("c"));
 }
 
 #[test]
@@ -64,10 +64,10 @@ fn forward_wraps_around() {
     let mut app = make_app();
     spawn_agent(&app, "a");
     spawn_agent(&app, "b");
-    app.focused_agent = Some("b".into());
+    app.section_mut(PanelKind::Agents).focused = Some("b".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     cycle_panel_focus(&mut app, true);
-    assert_eq!(app.focused_agent.as_deref(), Some("a"));
+    assert_eq!(app.section(PanelKind::Agents).focused.as_deref(), Some("a"));
 }
 
 #[test]
@@ -75,10 +75,10 @@ fn backward_wraps_around() {
     let mut app = make_app();
     spawn_agent(&app, "a");
     spawn_agent(&app, "b");
-    app.focused_agent = Some("a".into());
+    app.section_mut(PanelKind::Agents).focused = Some("a".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     cycle_panel_focus(&mut app, false);
-    assert_eq!(app.focused_agent.as_deref(), Some("b"));
+    assert_eq!(app.section(PanelKind::Agents).focused.as_deref(), Some("b"));
 }
 
 #[test]
@@ -88,7 +88,7 @@ fn backward_from_none_selects_last() {
     spawn_agent(&app, "b");
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     cycle_panel_focus(&mut app, false);
-    assert_eq!(app.focused_agent.as_deref(), Some("b"));
+    assert_eq!(app.section(PanelKind::Agents).focused.as_deref(), Some("b"));
 }
 
 // === Stale focus recovery ===
@@ -99,10 +99,10 @@ fn recovers_from_stale_focused_agent() {
     spawn_agent(&app, "live");
     spawn_agent(&app, "dead");
     finish_agent(&app, "dead");
-    app.focused_agent = Some("dead".into());
+    app.section_mut(PanelKind::Agents).focused = Some("dead".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     cycle_panel_focus(&mut app, true);
-    assert_eq!(app.focused_agent.as_deref(), Some("live"));
+    assert_eq!(app.section(PanelKind::Agents).focused.as_deref(), Some("live"));
 }
 
 // === Empty list auto-exits AgentPanel ===
@@ -112,13 +112,13 @@ fn empty_list_exits_agent_panel() {
     let mut app = make_app();
     spawn_agent(&app, "worker");
     finish_agent(&app, "worker");
-    app.focused_agent = Some("worker".into());
+    app.section_mut(PanelKind::Agents).focused = Some("worker".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
-    app.agent_panel_offset = 2;
+    app.section_mut(PanelKind::Agents).scroll_offset = 2;
     cycle_panel_focus(&mut app, true);
-    assert!(app.focused_agent.is_none());
+    assert!(app.section(PanelKind::Agents).focused.is_none());
     assert_eq!(app.focus_mode, FocusMode::Input);
-    assert_eq!(app.agent_panel_offset, 0);
+    assert_eq!(app.section(PanelKind::Agents).scroll_offset, 0);
 }
 
 // === Scroll offset (indirect via 7 agents) ===
@@ -133,11 +133,11 @@ fn scroll_follows_focus_downward() {
     for _ in 0..7 {
         cycle_panel_focus(&mut app, true);
     }
-    assert_eq!(app.focused_agent.as_deref(), Some("a6"));
+    assert_eq!(app.section(PanelKind::Agents).focused.as_deref(), Some("a6"));
     assert!(
-        app.agent_panel_offset >= 2,
+        app.section(PanelKind::Agents).scroll_offset >= 2,
         "got {}",
-        app.agent_panel_offset,
+        app.section(PanelKind::Agents).scroll_offset,
     );
 }
 
@@ -150,7 +150,7 @@ fn scroll_zero_when_few_agents() {
     for _ in 0..3 {
         cycle_panel_focus(&mut app, true);
     }
-    assert_eq!(app.agent_panel_offset, 0);
+    assert_eq!(app.section(PanelKind::Agents).scroll_offset, 0);
 }
 
 #[test]
@@ -159,12 +159,12 @@ fn scroll_resets_on_wrap_to_first() {
     for i in 0..7 {
         spawn_agent(&app, &format!("a{i}"));
     }
-    app.focused_agent = Some("a6".into());
-    app.agent_panel_offset = 2;
+    app.section_mut(PanelKind::Agents).focused = Some("a6".into());
+    app.section_mut(PanelKind::Agents).scroll_offset = 2;
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     cycle_panel_focus(&mut app, true);
-    assert_eq!(app.focused_agent.as_deref(), Some("a0"));
-    assert_eq!(app.agent_panel_offset, 0);
+    assert_eq!(app.section(PanelKind::Agents).focused.as_deref(), Some("a0"));
+    assert_eq!(app.section(PanelKind::Agents).scroll_offset, 0);
 }
 
 #[test]
@@ -173,19 +173,19 @@ fn scroll_adjusts_on_backward_past_window() {
     for i in 0..7 {
         spawn_agent(&app, &format!("a{i}"));
     }
-    app.focused_agent = Some("a3".into());
-    app.agent_panel_offset = 2; // window: a2..a6
+    app.section_mut(PanelKind::Agents).focused = Some("a3".into());
+    app.section_mut(PanelKind::Agents).scroll_offset = 2; // window: a2..a6
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     cycle_panel_focus(&mut app, false);
     // a3 → a2, still in window
-    assert_eq!(app.focused_agent.as_deref(), Some("a2"));
-    assert_eq!(app.agent_panel_offset, 2);
+    assert_eq!(app.section(PanelKind::Agents).focused.as_deref(), Some("a2"));
+    assert_eq!(app.section(PanelKind::Agents).scroll_offset, 2);
     cycle_panel_focus(&mut app, false);
     // a2 → a1, now ABOVE window → offset adjusts
-    assert_eq!(app.focused_agent.as_deref(), Some("a1"));
+    assert_eq!(app.section(PanelKind::Agents).focused.as_deref(), Some("a1"));
     assert!(
-        app.agent_panel_offset <= 1,
+        app.section(PanelKind::Agents).scroll_offset <= 1,
         "got {}",
-        app.agent_panel_offset
+        app.section(PanelKind::Agents).scroll_offset
     );
 }

@@ -1,7 +1,7 @@
 /// Tests for panel_tab() dispatch: Tab key behavior within the panel zone.
 use loopal_protocol::{
     AgentEvent, AgentEventPayload, BgTaskSnapshot, BgTaskStatus, ControlCommand,
-    UserQuestionResponse,
+    TaskSnapshot, TaskSnapshotStatus, UserQuestionResponse,
 };
 use loopal_session::SessionController;
 use loopal_tui::app::{App, FocusMode, PanelKind};
@@ -49,6 +49,16 @@ fn add_bg_snapshot(app: &mut App, id: &str, desc: &str) {
     });
 }
 
+fn add_task_snapshot(app: &mut App, id: &str, subject: &str) {
+    app.task_snapshots.push(TaskSnapshot {
+        id: id.into(),
+        subject: subject.into(),
+        active_form: None,
+        status: TaskSnapshotStatus::InProgress,
+        blocked_by: Vec::new(),
+    });
+}
+
 // === Both panels have content: Tab switches between them ===
 
 #[test]
@@ -56,14 +66,14 @@ fn tab_switches_from_agents_to_bg_tasks() {
     let mut app = make_app();
     spawn_agent(&app, "worker");
     add_bg_snapshot(&mut app, "t1", "build");
-    app.focused_agent = Some("worker".into());
+    app.section_mut(PanelKind::Agents).focused = Some("worker".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
 
     panel_tab(&mut app);
 
     assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::BgTasks));
     assert!(
-        app.focused_bg_task.is_some(),
+        app.section(PanelKind::BgTasks).focused.is_some(),
         "focused_bg_task should be set"
     );
 }
@@ -73,13 +83,13 @@ fn tab_switches_from_bg_tasks_to_agents() {
     let mut app = make_app();
     spawn_agent(&app, "worker");
     add_bg_snapshot(&mut app, "t1", "build");
-    app.focused_bg_task = Some("t1".into());
+    app.section_mut(PanelKind::BgTasks).focused = Some("t1".into());
     app.focus_mode = FocusMode::Panel(PanelKind::BgTasks);
 
     panel_tab(&mut app);
 
     assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Agents));
-    assert!(app.focused_agent.is_some(), "focused_agent should be set");
+    assert!(app.section(PanelKind::Agents).focused.is_some(), "focused_agent should be set");
 }
 
 // === Only one panel: Tab cycles within that panel ===
@@ -89,14 +99,14 @@ fn tab_cycles_agents_when_only_agents() {
     let mut app = make_app();
     spawn_agent(&app, "a");
     spawn_agent(&app, "b");
-    app.focused_agent = Some("a".into());
+    app.section_mut(PanelKind::Agents).focused = Some("a".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
 
     panel_tab(&mut app);
 
     assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Agents));
     assert_eq!(
-        app.focused_agent.as_deref(),
+        app.section(PanelKind::Agents).focused.as_deref(),
         Some("b"),
         "should cycle to next agent"
     );
@@ -107,14 +117,14 @@ fn tab_cycles_bg_tasks_when_only_bg_tasks() {
     let mut app = make_app();
     add_bg_snapshot(&mut app, "t1", "lint");
     add_bg_snapshot(&mut app, "t2", "test");
-    app.focused_bg_task = Some("t1".into());
+    app.section_mut(PanelKind::BgTasks).focused = Some("t1".into());
     app.focus_mode = FocusMode::Panel(PanelKind::BgTasks);
 
     panel_tab(&mut app);
 
     assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::BgTasks));
     assert_eq!(
-        app.focused_bg_task.as_deref(),
+        app.section(PanelKind::BgTasks).focused.as_deref(),
         Some("t2"),
         "should cycle to next task"
     );
@@ -127,7 +137,7 @@ fn tab_roundtrip_both_panels() {
     let mut app = make_app();
     spawn_agent(&app, "alpha");
     add_bg_snapshot(&mut app, "t1", "deploy");
-    app.focused_agent = Some("alpha".into());
+    app.section_mut(PanelKind::Agents).focused = Some("alpha".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
 
     panel_tab(&mut app);
@@ -135,7 +145,7 @@ fn tab_roundtrip_both_panels() {
 
     panel_tab(&mut app);
     assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Agents));
-    assert!(app.focused_agent.is_some());
+    assert!(app.section(PanelKind::Agents).focused.is_some());
 }
 
 // === Edge case: single element wraps to itself ===
@@ -144,15 +154,57 @@ fn tab_roundtrip_both_panels() {
 fn tab_noop_when_single_agent() {
     let mut app = make_app();
     spawn_agent(&app, "solo");
-    app.focused_agent = Some("solo".into());
+    app.section_mut(PanelKind::Agents).focused = Some("solo".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
 
     panel_tab(&mut app);
 
     assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Agents));
     assert_eq!(
-        app.focused_agent.as_deref(),
+        app.section(PanelKind::Agents).focused.as_deref(),
         Some("solo"),
         "single agent wraps to itself"
     );
+}
+
+// === Three panels: Agents → Tasks → BgTasks → Agents ===
+
+#[test]
+fn tab_cycles_three_panels() {
+    let mut app = make_app();
+    spawn_agent(&app, "worker");
+    add_task_snapshot(&mut app, "1", "Build");
+    add_bg_snapshot(&mut app, "bg1", "lint");
+    app.section_mut(PanelKind::Agents).focused = Some("worker".into());
+    app.focus_mode = FocusMode::Panel(PanelKind::Agents);
+
+    panel_tab(&mut app);
+    assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Tasks));
+    assert!(app.section(PanelKind::Tasks).focused.is_some());
+
+    panel_tab(&mut app);
+    assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::BgTasks));
+    assert!(app.section(PanelKind::BgTasks).focused.is_some());
+
+    panel_tab(&mut app);
+    assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Agents));
+}
+
+#[test]
+fn tab_skips_missing_panel() {
+    let mut app = make_app();
+    add_task_snapshot(&mut app, "1", "Fix bug");
+    add_bg_snapshot(&mut app, "bg1", "build");
+    app.section_mut(PanelKind::Tasks).focused = Some("1".into());
+    app.focus_mode = FocusMode::Panel(PanelKind::Tasks);
+
+    panel_tab(&mut app);
+    assert_eq!(
+        app.focus_mode,
+        FocusMode::Panel(PanelKind::BgTasks),
+        "should skip Agents (empty)"
+    );
+
+    panel_tab(&mut app);
+    assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Tasks));
 }

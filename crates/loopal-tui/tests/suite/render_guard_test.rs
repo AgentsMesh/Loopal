@@ -1,5 +1,8 @@
 /// Tests for render guard: zero-height agents area must not panic.
-use loopal_protocol::{BgTaskSnapshot, BgTaskStatus, ControlCommand, UserQuestionResponse};
+use loopal_protocol::{
+    AgentEvent, AgentEventPayload, BgTaskSnapshot, BgTaskStatus, ControlCommand,
+    TaskSnapshot, TaskSnapshotStatus, UserQuestionResponse,
+};
 use loopal_session::SessionController;
 use loopal_tui::app::App;
 use ratatui::Terminal;
@@ -51,6 +54,63 @@ fn render_small_terminal_no_panic() {
         exit_code: None,
     }];
     let backend = TestBackend::new(80, 3);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| loopal_tui::render::draw(f, &mut app))
+        .unwrap();
+}
+
+fn spawn_agent(app: &App, name: &str) {
+    app.session.handle_event(AgentEvent::named(
+        name,
+        AgentEventPayload::SubAgentSpawned {
+            name: name.to_string(),
+            agent_id: format!("id-{name}"),
+            parent: Some("main".into()),
+            model: Some("test-model".into()),
+            session_id: None,
+        },
+    ));
+    app.session
+        .handle_event(AgentEvent::named(name, AgentEventPayload::Started));
+}
+
+#[test]
+fn render_tasks_only_no_panic() {
+    let mut app = make_app();
+    app.task_snapshots = vec![TaskSnapshot {
+        id: "1".into(),
+        subject: "Build feature".into(),
+        active_form: Some("Building".into()),
+        status: TaskSnapshotStatus::InProgress,
+        blocked_by: Vec::new(),
+    }];
+    let backend = TestBackend::new(80, 10);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| loopal_tui::render::draw(f, &mut app))
+        .unwrap();
+}
+
+#[test]
+fn render_all_three_panels_no_panic() {
+    let mut app = make_app();
+    app.show_topology = false;
+    spawn_agent(&app, "worker");
+    app.task_snapshots = vec![TaskSnapshot {
+        id: "1".into(),
+        subject: "Task A".into(),
+        active_form: None,
+        status: TaskSnapshotStatus::Pending,
+        blocked_by: Vec::new(),
+    }];
+    app.bg_snapshots = vec![BgTaskSnapshot {
+        id: "bg_1".into(),
+        description: "lint".into(),
+        status: BgTaskStatus::Running,
+        exit_code: None,
+    }];
+    let backend = TestBackend::new(80, 15);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal
         .draw(|f| loopal_tui::render::draw(f, &mut app))

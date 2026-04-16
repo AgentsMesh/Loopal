@@ -105,7 +105,7 @@ pub(crate) async fn handle_key_action(
             false
         }
         InputAction::EnterAgentView => {
-            if let Some(name) = app.focused_agent.clone()
+            if let Some(name) = app.section(crate::app::PanelKind::Agents).focused.clone()
                 && app.session.enter_agent_view(&name)
             {
                 app.focus_mode = crate::app::FocusMode::Input;
@@ -115,7 +115,7 @@ pub(crate) async fn handle_key_action(
             false
         }
         InputAction::EnterBgTaskView => {
-            if let Some(ref task_id) = app.focused_bg_task {
+            if let Some(ref task_id) = app.section(crate::app::PanelKind::BgTasks).focused {
                 app.sub_page = Some(crate::app::SubPage::BgTaskLog(crate::app::BgTaskLogState {
                     task_id: task_id.clone(),
                     scroll_offset: 0,

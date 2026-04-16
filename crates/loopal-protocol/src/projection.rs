@@ -111,7 +111,11 @@ fn summarize_input(input: &serde_json::Value) -> String {
     if s.len() <= 60 {
         s
     } else {
-        format!("{}...", &s[..57])
+        let mut end = 57;
+        while end > 0 && !s.is_char_boundary(end) {
+            end -= 1;
+        }
+        format!("{}...", &s[..end])
     }
 }
 

@@ -96,7 +96,11 @@ pub fn truncate_cmd(cmd: &str, max: usize) -> String {
     if single_line.len() <= max {
         single_line
     } else {
-        format!("{}…", &single_line[..max - 1])
+        let mut end = max.saturating_sub(1);
+        while end > 0 && !single_line.is_char_boundary(end) {
+            end -= 1;
+        }
+        format!("{}…", &single_line[..end])
     }
 }
 
@@ -110,5 +114,51 @@ pub async fn read_pipe<R: tokio::io::AsyncRead + Unpin>(buf: &Mutex<String>, rea
             Ok(_) => buf.lock().unwrap().push_str(&line),
             Err(_) => break,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn truncate_cmd_ascii_within_limit() {
+        assert_eq!(truncate_cmd("ls -la", 10), "ls -la");
+    }
+
+    #[test]
+    fn truncate_cmd_ascii_exceeds_limit() {
+        let result = truncate_cmd("echo hello world foo bar", 10);
+        assert!(result.ends_with('…'));
+        // 9 ASCII chars + 3-byte '…' = 12 bytes max
+        assert!(result.len() <= 12);
+    }
+
+    #[test]
+    fn truncate_cmd_multibyte_boundary() {
+        // '创' = 3 bytes, so "echo 创建目录" has byte offsets where max could land mid-char
+        let result = truncate_cmd("echo 创建目录结构并初始化配置文件", 12);
+        assert!(result.ends_with('…'));
+        // Strip the trailing '…' (3 bytes) and verify the prefix is valid UTF-8
+        let prefix = &result[..result.len() - '…'.len_utf8()];
+        assert!(prefix.is_char_boundary(prefix.len()));
+    }
+
+    #[test]
+    fn truncate_cmd_max_exactly_inside_char() {
+        // "创" is bytes 0..3; max=2 lands inside it, must back up to 0
+        let result = truncate_cmd("创建", 2);
+        assert_eq!(result, "…"); // backed up to 0, only ellipsis remains
+    }
+
+    #[test]
+    fn truncate_cmd_collapses_whitespace() {
+        assert_eq!(truncate_cmd("ls  -la   /tmp", 20), "ls -la /tmp");
+    }
+
+    #[test]
+    fn truncate_cmd_zero_max() {
+        let result = truncate_cmd("hello", 0);
+        assert_eq!(result, "…");
     }
 }

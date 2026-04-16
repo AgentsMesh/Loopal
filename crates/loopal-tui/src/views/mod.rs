@@ -14,6 +14,7 @@ pub mod rewind_picker;
 pub mod separator;
 pub mod skills_page;
 pub mod status_page;
+pub mod tasks_panel;
 pub mod tool_confirm;
 pub mod topology_overlay;
 pub mod unified_status;

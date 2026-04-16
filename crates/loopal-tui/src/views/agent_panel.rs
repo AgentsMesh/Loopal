@@ -49,7 +49,6 @@ pub fn render_agent_panel(
     f: &mut Frame,
     agents: &IndexMap<String, AgentViewState>,
     focused: Option<&str>,
-    viewing: Option<&str>,
     active_view: &str,
     agent_panel_offset: usize,
     area: Rect,
@@ -78,10 +77,7 @@ pub fn render_agent_panel(
 
     for (name, agent) in &live_agents[offset..window_end] {
         let is_focused = focused == Some(name.as_str());
-        let is_viewing = viewing == Some(name.as_str());
-        lines.push(render_agent_line(
-            name, agent, is_focused, is_viewing, max_name,
-        ));
+        lines.push(render_agent_line(name, agent, is_focused, max_name));
     }
 
     if window_end < total {
@@ -100,26 +96,19 @@ fn render_agent_line(
     name: &str,
     agent: &AgentViewState,
     is_focused: bool,
-    is_viewing: bool,
     name_width: usize,
 ) -> Line<'static> {
     let mut spans: Vec<Span<'static>> = Vec::with_capacity(10);
 
-    // Focus / viewing indicator
-    let (indicator, base_style) = if is_viewing {
-        (" ▶ ", Style::default().fg(Color::Green).bold())
-    } else if is_focused {
+    let (indicator, base_style) = if is_focused {
         (" ▸ ", Style::default().fg(Color::Cyan).bold())
     } else {
         ("   ", Style::default())
     };
     spans.push(Span::styled(indicator.to_string(), base_style));
 
-    // Name (padded for column alignment)
     let padded = format!("{name:<name_width$}");
-    let name_style = if is_viewing {
-        Style::default().fg(Color::Green).bold()
-    } else if is_focused {
+    let name_style = if is_focused {
         Style::default().fg(Color::Cyan).bold()
     } else {
         Style::default().fg(Color::White)

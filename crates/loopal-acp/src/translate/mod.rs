@@ -118,7 +118,8 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
         | AgentEventPayload::McpStatusReport { .. }
         | AgentEventPayload::BgTaskSpawned { .. }
         | AgentEventPayload::BgTaskOutput { .. }
-        | AgentEventPayload::BgTaskCompleted { .. } => None,
+        | AgentEventPayload::BgTaskCompleted { .. }
+        | AgentEventPayload::TasksChanged { .. } => None,
     }
 }
 

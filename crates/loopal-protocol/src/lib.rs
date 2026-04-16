@@ -12,6 +12,7 @@ pub mod mcp_snapshot;
 pub mod projected;
 pub mod projection;
 pub mod question;
+pub mod task_snapshot;
 pub mod user_content;
 
 pub use address::QualifiedAddress;
@@ -27,4 +28,5 @@ pub use mcp_snapshot::McpServerSnapshot;
 pub use projected::{ProjectedMessage, ProjectedToolCall};
 pub use projection::project_messages;
 pub use question::{Question, QuestionOption, UserQuestionResponse};
+pub use task_snapshot::{TaskSnapshot, TaskSnapshotStatus};
 pub use user_content::{ImageAttachment, SkillInvocation, UserContent};

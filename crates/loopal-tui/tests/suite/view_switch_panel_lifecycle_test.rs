@@ -1,7 +1,7 @@
 /// Tests for agent panel visibility rules and memory truncation on agent lifecycle.
 use loopal_protocol::{AgentEvent, AgentEventPayload, ControlCommand, UserQuestionResponse};
 use loopal_session::SessionController;
-use loopal_tui::app::App;
+use loopal_tui::app::{App, PanelKind};
 
 use tokio::sync::mpsc;
 
@@ -88,7 +88,7 @@ fn panel_empty_when_only_main_exists() {
 fn tab_without_subagents_leaves_focus_none() {
     let app = make_app();
     // Only "main" exists — cycle finds no switchable agents
-    assert!(app.focused_agent.is_none());
+    assert!(app.section(PanelKind::Agents).focused.is_none());
 }
 
 #[test]

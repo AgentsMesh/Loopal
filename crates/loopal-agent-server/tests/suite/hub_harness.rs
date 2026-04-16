@@ -137,7 +137,7 @@ pub async fn build_hub_harness_with(
     let (hub_conn, _hub_peer) = loopal_ipc::duplex_pair();
     let hub_connection = std::sync::Arc::new(loopal_ipc::Connection::new(hub_conn));
 
-    let params = loopal_agent_server::testing::build_with_frontend(
+    let setup = loopal_agent_server::testing::build_with_frontend(
         fixture.path(),
         &config,
         &start,
@@ -149,7 +149,7 @@ pub async fn build_hub_harness_with(
         Some(fixture.path()),
     )
     .unwrap();
-    let agent_task = tokio::spawn(loopal_runtime::agent_loop(params));
+    let agent_task = tokio::spawn(loopal_runtime::agent_loop(setup.params));
 
     HubTestHarness {
         input_tx,

@@ -5,7 +5,7 @@ use loopal_protocol::{
     AgentEvent, AgentEventPayload, AgentStatus, ControlCommand, UserQuestionResponse,
 };
 use loopal_session::SessionController;
-use loopal_tui::app::App;
+use loopal_tui::app::{App, PanelKind};
 use loopal_tui::input::{InputAction, handle_key};
 
 use tokio::sync::mpsc;
@@ -116,7 +116,7 @@ fn tab_skips_finished_agents() {
 fn enter_on_empty_input_with_focus_returns_enter_agent_view() {
     let mut app = make_app();
     spawn_agent(&app, "researcher");
-    app.focused_agent = Some("researcher".into());
+    app.section_mut(PanelKind::Agents).focused = Some("researcher".into());
     let action = handle_key(&mut app, key(KeyCode::Enter));
     assert!(matches!(action, InputAction::EnterAgentView));
 }
@@ -125,7 +125,7 @@ fn enter_on_empty_input_with_focus_returns_enter_agent_view() {
 fn enter_with_text_does_not_drill_in() {
     let mut app = make_app();
     spawn_agent(&app, "researcher");
-    app.focused_agent = Some("researcher".into());
+    app.section_mut(PanelKind::Agents).focused = Some("researcher".into());
     app.input = "hello".into();
     let action = handle_key(&mut app, key(KeyCode::Enter));
     assert!(matches!(action, InputAction::InboxPush(_)));
@@ -135,7 +135,7 @@ fn enter_with_text_does_not_drill_in() {
 fn enter_when_focused_equals_active_view_does_not_drill() {
     let mut app = make_app();
     // focused on "main" which is already active_view → no drill
-    app.focused_agent = Some("main".into());
+    app.section_mut(PanelKind::Agents).focused = Some("main".into());
     let action = handle_key(&mut app, key(KeyCode::Enter));
     // Should be None (empty input, focused == active)
     assert!(matches!(action, InputAction::None));

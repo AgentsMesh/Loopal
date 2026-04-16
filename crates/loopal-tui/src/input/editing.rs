@@ -1,13 +1,12 @@
-use crate::app::{App, FocusMode};
+use crate::app::{App, FocusMode, PanelKind};
 
 use super::InputAction;
 use super::commands::try_execute_slash_command;
 
 pub(super) fn handle_enter(app: &mut App) -> InputAction {
-    // Empty Enter with a focused sub-agent → drill into its view
     if app.input.is_empty()
         && app.pending_images.is_empty()
-        && let Some(ref focused) = app.focused_agent
+        && let Some(ref focused) = app.section(PanelKind::Agents).focused
     {
         let active = &app.session.lock().active_view;
         if focused != active {
@@ -55,14 +54,14 @@ pub(super) fn handle_ctrl_c(app: &mut App) -> InputAction {
         app.paste_map.clear();
         app.autocomplete = None;
         InputAction::None
-    } else if matches!(app.focus_mode, FocusMode::Panel(_)) {
-        app.focused_agent = None;
-        app.focused_bg_task = None;
+    } else if let FocusMode::Panel(kind) = app.focus_mode {
+        let section = app.section_mut(kind);
+        section.focused = None;
+        section.scroll_offset = 0;
         app.focus_mode = FocusMode::Input;
-        app.agent_panel_offset = 0;
         InputAction::None
-    } else if app.focused_agent.is_some() {
-        app.focused_agent = None;
+    } else if app.section(PanelKind::Agents).focused.is_some() {
+        app.section_mut(PanelKind::Agents).focused = None;
         InputAction::None
     } else if !app.session.lock().is_active_agent_idle() {
         InputAction::Interrupt

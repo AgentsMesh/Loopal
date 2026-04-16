@@ -112,3 +112,93 @@ fn test_auto_increment_ids() {
     let id3: u64 = t3.id.parse().unwrap();
     assert!(id1 < id2 && id2 < id3);
 }
+
+#[test]
+fn test_subscribe_notifies_on_create() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = TaskStore::new(dir.path().to_path_buf());
+    let mut rx = store.subscribe();
+    store.create("Task", "desc");
+    assert!(
+        rx.try_recv().is_ok(),
+        "should receive notification on create"
+    );
+}
+
+#[test]
+fn test_subscribe_notifies_on_update() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = TaskStore::new(dir.path().to_path_buf());
+    let task = store.create("Task", "desc");
+    let mut rx = store.subscribe();
+    store.update(
+        &task.id,
+        TaskPatch {
+            status: Some(TaskStatus::InProgress),
+            ..Default::default()
+        },
+    );
+    assert!(
+        rx.try_recv().is_ok(),
+        "should receive notification on update"
+    );
+}
+
+#[test]
+fn test_subscribe_no_notification_on_read() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = TaskStore::new(dir.path().to_path_buf());
+    store.create("Task", "desc");
+    let mut rx = store.subscribe();
+    let _ = store.list();
+    let _ = store.get("1");
+    assert!(rx.try_recv().is_err(), "reads should not notify");
+}
+
+#[test]
+fn test_list_excludes_deleted_after_create() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = TaskStore::new(dir.path().to_path_buf());
+    let t1 = store.create("Keep", "");
+    store.create("Delete me", "");
+    store.update(
+        "2",
+        TaskPatch {
+            status: Some(TaskStatus::Deleted),
+            ..Default::default()
+        },
+    );
+    let tasks = store.list();
+    assert_eq!(tasks.len(), 1);
+    assert_eq!(tasks[0].id, t1.id);
+}
+
+#[test]
+fn test_list_returns_all_statuses() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = TaskStore::new(dir.path().to_path_buf());
+    store.create("Pending", "");
+    store.create("Active", "");
+    store.create("Done", "");
+    store.update(
+        "2",
+        TaskPatch {
+            status: Some(TaskStatus::InProgress),
+            active_form: Some("Building".into()),
+            ..Default::default()
+        },
+    );
+    store.update(
+        "3",
+        TaskPatch {
+            status: Some(TaskStatus::Completed),
+            ..Default::default()
+        },
+    );
+    let tasks = store.list();
+    assert_eq!(tasks.len(), 3);
+    assert_eq!(tasks[0].status, TaskStatus::Pending);
+    assert_eq!(tasks[1].status, TaskStatus::InProgress);
+    assert_eq!(tasks[1].active_form.as_deref(), Some("Building"));
+    assert_eq!(tasks[2].status, TaskStatus::Completed);
+}

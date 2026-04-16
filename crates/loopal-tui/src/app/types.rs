@@ -115,19 +115,20 @@ pub struct BgTaskLogState {
 }
 
 /// Which sub-panel within the panel zone is focused.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PanelKind {
     /// Agent status list.
     Agents,
+    /// Structured tasks progress.
+    Tasks,
     /// Background shell tasks.
     BgTasks,
 }
 
 /// Which UI region currently owns keyboard input.
 ///
-/// Orthogonal to `focused_agent` / `focused_bg_task` — mode says "are we
-/// navigating a panel" while the focused-item fields say "which item is
-/// highlighted".
+/// Orthogonal to panel section focus — mode says "are we navigating a panel"
+/// while the `PanelSectionState.focused` fields say "which item is highlighted".
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum FocusMode {
     /// Default: typing goes to input field; Up/Down = multiline → scroll → history.

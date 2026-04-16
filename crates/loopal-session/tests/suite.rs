@@ -31,6 +31,8 @@ mod resume_test;
 mod retry_banner_test;
 #[path = "suite/rewind_test.rs"]
 mod rewind_test;
+#[path = "suite/task_state_test.rs"]
+mod task_state_test;
 #[path = "suite/topology_test.rs"]
 mod topology_test;
 #[path = "suite/user_display_test.rs"]

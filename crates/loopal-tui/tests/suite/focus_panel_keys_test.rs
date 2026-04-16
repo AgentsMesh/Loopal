@@ -54,7 +54,7 @@ fn down_in_agent_panel_returns_panel_down() {
     let mut app = make_app();
     spawn_agent(&app, "a");
     spawn_agent(&app, "b");
-    app.focused_agent = Some("a".into());
+    app.section_mut(PanelKind::Agents).focused = Some("a".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     let action = handle_key(&mut app, key(KeyCode::Down));
     assert!(matches!(action, InputAction::PanelDown));
@@ -64,7 +64,7 @@ fn down_in_agent_panel_returns_panel_down() {
 fn up_in_agent_panel_returns_panel_up() {
     let mut app = make_app();
     spawn_agent(&app, "worker");
-    app.focused_agent = Some("worker".into());
+    app.section_mut(PanelKind::Agents).focused = Some("worker".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     let action = handle_key(&mut app, key(KeyCode::Up));
     assert!(matches!(action, InputAction::PanelUp));
@@ -74,7 +74,7 @@ fn up_in_agent_panel_returns_panel_up() {
 fn up_in_input_mode_ignores_agent_panel() {
     let mut app = make_app();
     spawn_agent(&app, "worker");
-    app.focused_agent = Some("worker".into());
+    app.section_mut(PanelKind::Agents).focused = Some("worker".into());
     app.focus_mode = FocusMode::Input;
     let action = handle_key(&mut app, key(KeyCode::Up));
     assert!(!matches!(action, InputAction::PanelUp));
@@ -86,7 +86,7 @@ fn up_in_input_mode_ignores_agent_panel() {
 fn ctrl_p_in_agent_panel_navigates_up() {
     let mut app = make_app();
     spawn_agent(&app, "worker");
-    app.focused_agent = Some("worker".into());
+    app.section_mut(PanelKind::Agents).focused = Some("worker".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     let action = handle_key(&mut app, ctrl('p'));
     assert!(matches!(action, InputAction::PanelUp));
@@ -96,7 +96,7 @@ fn ctrl_p_in_agent_panel_navigates_up() {
 fn ctrl_n_in_agent_panel_navigates_down() {
     let mut app = make_app();
     spawn_agent(&app, "worker");
-    app.focused_agent = Some("worker".into());
+    app.section_mut(PanelKind::Agents).focused = Some("worker".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     let action = handle_key(&mut app, ctrl('n'));
     assert!(matches!(action, InputAction::PanelDown));
@@ -117,7 +117,7 @@ fn ctrl_p_in_input_mode_does_history() {
 fn delete_in_agent_panel_terminates_agent() {
     let mut app = make_app();
     spawn_agent(&app, "worker");
-    app.focused_agent = Some("worker".into());
+    app.section_mut(PanelKind::Agents).focused = Some("worker".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     let action = handle_key(&mut app, key(KeyCode::Delete));
     assert!(matches!(action, InputAction::TerminateFocusedAgent));
@@ -127,7 +127,7 @@ fn delete_in_agent_panel_terminates_agent() {
 fn delete_in_input_mode_deletes_char() {
     let mut app = make_app();
     spawn_agent(&app, "worker");
-    app.focused_agent = Some("worker".into());
+    app.section_mut(PanelKind::Agents).focused = Some("worker".into());
     app.focus_mode = FocusMode::Input;
     app.input = "hello".into();
     app.input_cursor = 3;
@@ -142,7 +142,7 @@ fn delete_in_input_mode_deletes_char() {
 fn enter_in_agent_panel_returns_enter_agent_view() {
     let mut app = make_app();
     spawn_agent(&app, "researcher");
-    app.focused_agent = Some("researcher".into());
+    app.section_mut(PanelKind::Agents).focused = Some("researcher".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     let action = handle_key(&mut app, key(KeyCode::Enter));
     assert!(matches!(action, InputAction::EnterAgentView));
@@ -152,11 +152,27 @@ fn enter_in_agent_panel_returns_enter_agent_view() {
 fn enter_in_input_mode_with_focus_also_drills_in() {
     let mut app = make_app();
     spawn_agent(&app, "researcher");
-    app.focused_agent = Some("researcher".into());
+    app.section_mut(PanelKind::Agents).focused = Some("researcher".into());
     app.focus_mode = FocusMode::Input;
     // Empty input + focused agent → drill in (backward-compat path via editing.rs)
     let action = handle_key(&mut app, key(KeyCode::Enter));
     assert!(matches!(action, InputAction::EnterAgentView));
+}
+
+#[test]
+fn enter_in_tasks_panel_returns_none() {
+    let mut app = make_app();
+    app.task_snapshots.push(loopal_protocol::TaskSnapshot {
+        id: "1".into(),
+        subject: "Task".into(),
+        active_form: None,
+        status: loopal_protocol::TaskSnapshotStatus::InProgress,
+        blocked_by: Vec::new(),
+    });
+    app.section_mut(PanelKind::Tasks).focused = Some("1".into());
+    app.focus_mode = FocusMode::Panel(PanelKind::Tasks);
+    let action = handle_key(&mut app, key(KeyCode::Enter));
+    assert!(matches!(action, InputAction::None));
 }
 
 // === Root agent guard ===

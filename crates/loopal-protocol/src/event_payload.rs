@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::bg_task::BgTaskStatus;
 use crate::mcp_snapshot::McpServerSnapshot;
 use crate::question::Question;
+use crate::task_snapshot::TaskSnapshot;
 
 /// Event payload. Runner/LLM/Tools only construct this enum.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -202,4 +203,7 @@ pub enum AgentEventPayload {
 
     /// MCP server status snapshot (emitted on startup and on reconnect).
     McpStatusReport { servers: Vec<McpServerSnapshot> },
+
+    /// Full task list snapshot (emitted after TaskCreate/TaskUpdate mutations).
+    TasksChanged { tasks: Vec<TaskSnapshot> },
 }

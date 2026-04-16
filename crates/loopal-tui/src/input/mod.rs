@@ -99,6 +99,7 @@ fn handle_panel_key(app: &mut App, key: &KeyEvent) -> InputAction {
         KeyCode::Down => InputAction::PanelDown,
         KeyCode::Enter if kind == PanelKind::Agents => InputAction::EnterAgentView,
         KeyCode::Enter if kind == PanelKind::BgTasks => InputAction::EnterBgTaskView,
+        KeyCode::Enter if kind == PanelKind::Tasks => InputAction::None,
         KeyCode::Delete if kind == PanelKind::Agents => InputAction::TerminateFocusedAgent,
         KeyCode::Tab => InputAction::PanelTab,
         KeyCode::Esc => InputAction::ExitPanel,

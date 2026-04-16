@@ -78,6 +78,8 @@ mod skills_cmd_test;
 mod skills_page_keys_test;
 #[path = "suite/styled_wrap_test.rs"]
 mod styled_wrap_test;
+#[path = "suite/tasks_panel_test.rs"]
+mod tasks_panel_test;
 #[path = "suite/view_switch_panel_lifecycle_test.rs"]
 mod view_switch_panel_lifecycle_test;
 #[path = "suite/view_switch_test.rs"]

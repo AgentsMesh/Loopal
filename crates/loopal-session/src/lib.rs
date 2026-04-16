@@ -14,6 +14,7 @@ mod server_tool_display;
 pub use server_tool_display::format_server_tool_content;
 mod session_display;
 pub mod state;
+pub mod task_state;
 pub mod thinking_display;
 mod tool_result_handler;
 pub(crate) mod truncate;

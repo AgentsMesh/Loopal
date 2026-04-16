@@ -2,13 +2,11 @@
 
 use loopal_protocol::{ControlCommand, UserContent};
 
-use crate::app::{App, FocusMode, PanelKind};
+use crate::app::{App, PanelKind};
 use crate::command::CommandEffect;
 use crate::input::SubPageResult;
 use crate::panel_ops;
-use crate::views::bg_tasks_panel;
 
-// Re-export panel operations used by key_dispatch and lib.rs dispatch_ops.
 pub use crate::panel_ops::{cycle_panel_focus, enter_panel, panel_tab};
 
 pub(crate) async fn tool_approve(app: &mut App) {
@@ -36,7 +34,6 @@ pub(crate) async fn tool_deny(app: &mut App) {
 }
 
 pub(crate) async fn push_to_inbox(app: &mut App, content: UserContent) {
-    // For skill invocations, record the slash command (not the expanded body)
     let history_text = match &content.skill_info {
         Some(si) if si.user_args.is_empty() => si.name.clone(),
         Some(si) => format!("{} {}", si.name, si.user_args),
@@ -44,8 +41,6 @@ pub(crate) async fn push_to_inbox(app: &mut App, content: UserContent) {
     };
     app.input_history.push(history_text);
     app.history_index = None;
-    // Optimistic display update, then deliver directly to agent mailbox.
-    // Agent state (idle/busy) is derived from agent events, not set here.
     app.session.append_user_display(&content);
     app.session.route_message(content).await;
 }
@@ -93,7 +88,6 @@ pub(crate) async fn handle_sub_page_confirm(app: &mut App, result: SubPageResult
     }
 }
 
-/// Request reconnect of an MCP server (page stays open for live status update).
 pub(crate) async fn mcp_reconnect(app: &mut App, server: String) {
     let target = app.session.lock().active_view.clone();
     app.session
@@ -111,7 +105,7 @@ pub(crate) async fn mcp_disconnect(app: &mut App, server: String) {
 
 /// Terminate (interrupt) the currently focused agent via Hub.
 pub(crate) async fn terminate_focused_agent(app: &mut App) {
-    let Some(name) = app.focused_agent.clone() else {
+    let Some(name) = app.section(PanelKind::Agents).focused.clone() else {
         return;
     };
     if name == loopal_session::ROOT_AGENT {
@@ -125,13 +119,9 @@ pub(crate) async fn terminate_focused_agent(app: &mut App) {
         app.session.exit_agent_view();
         app.content_scroll.reset();
     }
-    app.focused_agent = None;
-    // If no panels have content, exit panel mode
-    if !panel_ops::has_live_agents(app) && bg_tasks_panel::bg_panel_height(&app.bg_snapshots) == 0 {
-        app.focus_mode = FocusMode::Input;
-        app.agent_panel_offset = 0;
-    } else if !panel_ops::has_live_agents(app) {
-        app.focus_mode = FocusMode::Panel(PanelKind::BgTasks);
+    app.section_mut(PanelKind::Agents).focused = None;
+    if !panel_ops::has_live_agents(app) {
         panel_ops::enter_panel(app);
+        // enter_panel is a no-op if no panels have content → stays Input
     }
 }

@@ -29,6 +29,7 @@ mod session_forward;
 pub mod session_hub;
 mod session_start;
 mod spawn_policy;
+mod task_bridge;
 mod test_server;
 
 pub use server::{run_agent_server, run_agent_server_with_mock};
@@ -67,6 +68,7 @@ pub fn hub_frontend_for_test(
 pub mod testing {
     pub use crate::agent_setup::build_with_frontend;
     pub use crate::bg_task_bridge::spawn as bg_task_bridge_spawn;
+    pub use crate::params::AgentSetupResult;
     pub use crate::params::{StartParams, build_kernel_with_provider};
     pub use crate::session_hub::SharedSession;
     pub use loopal_runtime::agent_input::AgentInput;

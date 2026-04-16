@@ -185,7 +185,9 @@ impl AnthropicProvider {
         // many 400 errors (prefill rejection, malformed blocks, etc.) and
         // must not be conflated with context overflow.
         if status.as_u16() == 400
-            && (text.contains("prompt is too long") || text.contains("maximum context length"))
+            && (text.contains("prompt is too long")
+                || text.contains("maximum context length")
+                || text.contains("exceed context limit"))
         {
             return ProviderError::ContextOverflow { message: text }.into();
         }

@@ -2,6 +2,7 @@
 //!
 //! Split from llm.rs to keep files under 200 lines.
 
+use loopal_context::{estimate_messages_tokens, estimate_tokens};
 use loopal_error::Result;
 use loopal_message::Message;
 use loopal_provider::{get_thinking_capability, resolve_thinking_config};
@@ -34,18 +35,27 @@ impl AgentLoopRunner {
             tool_defs.retain(|t| plan_filter.contains(&t.name));
         }
 
+        // Pre-flight: estimate input tokens and clamp max_tokens to avoid
+        // the API's `input + max_tokens > context_window` hard rejection.
+        let tool_token_count = loopal_context::ContextBudget::estimate_tool_tokens(&tool_defs);
+        let estimated_input = estimate_tokens(&full_system_prompt)
+            + tool_token_count
+            + estimate_messages_tokens(messages);
+        let safe_max_tokens = self
+            .params
+            .store
+            .budget()
+            .clamp_output_tokens(estimated_input);
+
         let capability = get_thinking_capability(self.params.config.model());
-        let resolved_thinking = resolve_thinking_config(
-            &self.model_config.thinking,
-            capability,
-            self.model_config.max_output_tokens,
-        );
+        let resolved_thinking =
+            resolve_thinking_config(&self.model_config.thinking, capability, safe_max_tokens);
         Ok(ChatParams {
             model: self.params.config.model().to_string(),
             messages: messages.to_vec(),
             system_prompt: full_system_prompt,
             tools: tool_defs,
-            max_tokens: self.model_config.max_output_tokens,
+            max_tokens: safe_max_tokens,
             temperature: None,
             thinking: resolved_thinking,
             debug_dump_dir: Some(loopal_config::tmp_dir()),

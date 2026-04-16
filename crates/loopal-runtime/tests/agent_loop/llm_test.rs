@@ -19,6 +19,7 @@ fn test_prepare_chat_params_act_mode() {
         !params.system_prompt.is_empty(),
         "env section should be present"
     );
+    // With empty messages and 200K window, max_tokens should be preserved (headroom is large).
     assert_eq!(params.max_tokens, runner.model_config.max_output_tokens);
     assert!(params.messages.is_empty());
     // Builtin tools should be present

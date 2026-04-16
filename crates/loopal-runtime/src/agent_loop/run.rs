@@ -21,6 +21,7 @@ impl AgentLoopRunner {
     pub(super) async fn run_loop(&mut self) -> Result<AgentOutput> {
         let mut last_output = String::new();
         let mut server_block_retry = false;
+        let mut context_overflow_retry = false;
         let mut needs_input = self.params.store.is_empty();
 
         loop {
@@ -84,6 +85,17 @@ impl AgentLoopRunner {
                         needs_input = false;
                         continue;
                     }
+                    if !context_overflow_retry && e.is_context_overflow() {
+                        context_overflow_retry = true;
+                        info!("context overflow detected, emergency compacting and retrying");
+                        self.params.store.emergency_compact(5);
+                        self.emit(AgentEventPayload::Error {
+                            message: "Context overflow — compacting and retrying...".into(),
+                        })
+                        .await?;
+                        needs_input = false;
+                        continue;
+                    }
                     if self.interrupt.take() {
                         self.emit_interrupted().await?;
                         continue;
@@ -93,6 +105,7 @@ impl AgentLoopRunner {
                 }
             }
             server_block_retry = false;
+            context_overflow_retry = false;
         }
 
         Ok(AgentOutput {

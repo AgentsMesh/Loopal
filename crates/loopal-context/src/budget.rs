@@ -14,6 +14,8 @@ pub struct ContextBudget {
     pub safety_margin: u32,
     /// Actual token budget available for messages.
     pub message_budget: u32,
+    /// True max_output_tokens from model (uncapped, for API constraint validation).
+    pub max_output_tokens: u32,
 }
 
 impl ContextBudget {
@@ -48,6 +50,7 @@ impl ContextBudget {
             output_reserve,
             safety_margin,
             message_budget,
+            max_output_tokens,
         }
     }
 
@@ -76,6 +79,19 @@ impl ContextBudget {
     /// Whether messages exceed 95% of the budget, triggering emergency truncation.
     pub fn needs_emergency(&self, msg_tokens: u32) -> bool {
         msg_tokens > self.message_budget * 19 / 20
+    }
+
+    /// Clamp max_tokens so that `estimated_input + result <= context_window`.
+    ///
+    /// Pre-flight check before API call: if input has grown large, dynamically
+    /// reduce max_tokens to avoid the `input + max_tokens > context_window` rejection.
+    /// Returns the original max_output_tokens when there is enough headroom.
+    pub fn clamp_output_tokens(&self, estimated_input: u32) -> u32 {
+        let headroom = self
+            .context_window
+            .saturating_sub(estimated_input)
+            .saturating_sub(self.safety_margin);
+        self.max_output_tokens.min(headroom).max(1)
     }
 }
 
@@ -108,6 +124,7 @@ mod tests {
             output_reserve: 0,
             safety_margin: 0,
             message_budget: 100_000,
+            max_output_tokens: 16_384,
         };
         assert!(!budget.needs_compaction(74_999));
         assert!(budget.needs_compaction(75_001));
@@ -122,8 +139,36 @@ mod tests {
             output_reserve: 0,
             safety_margin: 0,
             message_budget: 100_000,
+            max_output_tokens: 16_384,
         };
         assert!(!budget.needs_emergency(94_999));
         assert!(budget.needs_emergency(95_001));
+    }
+
+    #[test]
+    fn calculate_preserves_max_output_tokens() {
+        let budget = ContextBudget::calculate(200_000, "sys", 0, 64_000);
+        assert_eq!(budget.max_output_tokens, 64_000);
+        assert_eq!(budget.output_reserve, 16_384);
+    }
+
+    #[test]
+    fn clamp_preserves_when_input_small() {
+        let budget = ContextBudget::calculate(200_000, "", 0, 64_000);
+        assert_eq!(budget.clamp_output_tokens(50_000), 64_000);
+    }
+
+    #[test]
+    fn clamp_reduces_when_input_large() {
+        let budget = ContextBudget::calculate(200_000, "", 0, 64_000);
+        let clamped = budget.clamp_output_tokens(180_000);
+        assert!(clamped < 64_000, "should be reduced: {clamped}");
+        assert!(clamped <= 200_000 - 180_000 - budget.safety_margin);
+    }
+
+    #[test]
+    fn clamp_saturates_to_one() {
+        let budget = ContextBudget::calculate(200_000, "", 0, 64_000);
+        assert_eq!(budget.clamp_output_tokens(300_000), 1);
     }
 }

@@ -20,6 +20,7 @@ fn make_test_budget() -> ContextBudget {
         output_reserve: 16_384,
         safety_margin: 10_000,
         message_budget: 173_616,
+        max_output_tokens: 64_000,
     }
 }
 

@@ -19,6 +19,7 @@ fn tiny_budget() -> ContextBudget {
         output_reserve: 50,
         safety_margin: 25,
         message_budget: 425,
+        max_output_tokens: 50,
     }
 }
 

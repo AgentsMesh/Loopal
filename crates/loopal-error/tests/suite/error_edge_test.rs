@@ -29,6 +29,20 @@ fn test_api_400_prompt_too_long_is_context_overflow() {
 }
 
 #[test]
+fn test_api_400_exceed_context_limit_is_context_overflow() {
+    let body = concat!(
+        r#"{"error":{"message":"input length and `max_tokens` exceed context limit:"#,
+        r#" 140795 + 64000 > 200000","type":"invalid_request_error"},"type":"error"}"#,
+    );
+    let err = ProviderError::Api {
+        status: 400,
+        message: body.into(),
+    };
+    assert!(err.is_context_overflow());
+    assert!(!err.is_retryable());
+}
+
+#[test]
 fn test_api_400_max_context_is_context_overflow() {
     let err = ProviderError::Api {
         status: 400,

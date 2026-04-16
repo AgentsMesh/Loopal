@@ -116,6 +116,24 @@ fn test_default_creates_empty_registry() {
     assert!(registry.list().is_empty());
 }
 
+#[test]
+fn test_unregister_removes_tool() {
+    let registry = ToolRegistry::new();
+    registry.register(Box::new(MockTool::new("Keep")));
+    registry.register(Box::new(MockTool::new("Remove")));
+
+    assert!(registry.unregister("Remove"));
+    assert!(registry.get("Remove").is_none());
+    assert!(registry.get("Keep").is_some());
+    assert_eq!(registry.list().len(), 1);
+}
+
+#[test]
+fn test_unregister_nonexistent_returns_false() {
+    let registry = ToolRegistry::new();
+    assert!(!registry.unregister("Ghost"));
+}
+
 /// Contract: runner-direct tools (AskUser, EnterPlanMode, ExitPlanMode) declare
 /// `ToolDispatch::RunnerDirect`; all other builtin tools default to `Pipeline`.
 #[test]

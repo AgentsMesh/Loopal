@@ -32,27 +32,11 @@ pub(crate) async fn handle_key_action(
             false
         }
         InputAction::ToolApprove => {
-            let has = app
-                .session
-                .lock()
-                .active_conversation()
-                .pending_permission
-                .is_some();
-            if has {
-                app.session.approve_permission().await;
-            }
+            crate::key_dispatch_ops::tool_approve(app).await;
             false
         }
         InputAction::ToolDeny => {
-            let has = app
-                .session
-                .lock()
-                .active_conversation()
-                .pending_permission
-                .is_some();
-            if has {
-                app.session.deny_permission().await;
-            }
+            crate::key_dispatch_ops::tool_deny(app).await;
             false
         }
         InputAction::Interrupt => {
@@ -197,6 +181,10 @@ pub(crate) async fn handle_key_action(
         }
         InputAction::McpReconnect(server) => {
             crate::key_dispatch_ops::mcp_reconnect(app, server).await;
+            false
+        }
+        InputAction::McpDisconnect(server) => {
+            crate::key_dispatch_ops::mcp_disconnect(app, server).await;
             false
         }
         InputAction::None => false,

@@ -103,6 +103,23 @@ impl McpManager {
         Ok(())
     }
 
+    /// Disconnect a specific connection by name. Returns removed tool names.
+    pub async fn disconnect_connection(&mut self, name: &str) -> Result<Vec<String>, McpError> {
+        let conn = self
+            .connections
+            .get_mut(name)
+            .ok_or_else(|| McpError::ServerNotFound(name.to_string()))?;
+        let removed: Vec<String> = self
+            .tool_map
+            .iter()
+            .filter(|(_, srv)| srv.as_str() == name)
+            .map(|(tool, _)| tool.clone())
+            .collect();
+        self.tool_map.retain(|_, srv| srv != name);
+        conn.disconnect().await;
+        Ok(removed)
+    }
+
     /// Restart a specific connection by name (manual restart, no backoff).
     ///
     /// Skips if the connection is already connected (guards against concurrent

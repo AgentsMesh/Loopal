@@ -124,6 +124,7 @@ pub(crate) fn read_optional_text(path: &Path) -> Option<String> {
 /// ```text
 /// <dir>/
 /// ├── settings.json     # settings + mcp_servers + hooks
+/// ├── .mcp.json         # MCP servers (industry-standard format, overrides settings.json)
 /// ├── skills/           # skill markdown files
 /// └── LOOPAL.md         # instruction text
 /// ```
@@ -147,6 +148,12 @@ pub fn load_layer_from_dir(
         layer.mcp_servers = mcp;
         layer.hooks = hooks;
         layer.settings = settings_value;
+    }
+
+    // .mcp.json — industry-standard format, overrides settings.json by name
+    let mcp_json = crate::mcp_json::load_mcp_json(&dir.join(".mcp.json"));
+    for (name, config) in mcp_json {
+        layer.mcp_servers.insert(name, config);
     }
 
     // skills/ directory

@@ -92,20 +92,31 @@ fn test_down_clamps_at_end() {
 }
 
 #[test]
-fn test_enter_returns_reconnect() {
+fn test_enter_opens_action_menu() {
     let mut app = make_app();
     app.sub_page = Some(SubPage::McpPage(McpPageState::new(Some(servers()))));
     let a = handle_key(&mut app, KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
-    assert!(matches!(a, InputAction::McpReconnect(n) if n == "a"));
+    assert!(matches!(a, InputAction::None));
+    let s = match app.sub_page.as_ref().unwrap() {
+        SubPage::McpPage(s) => s,
+        _ => panic!("wrong"),
+    };
+    assert!(s.action_menu.is_some());
+    assert_eq!(s.action_menu.as_ref().unwrap().server_name, "a");
 }
 
 #[test]
-fn test_enter_on_second_item() {
+fn test_enter_on_second_item_opens_menu() {
     let mut app = make_app();
     app.sub_page = Some(SubPage::McpPage(McpPageState::new(Some(servers()))));
     handle_key(&mut app, KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
     let a = handle_key(&mut app, KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
-    assert!(matches!(a, InputAction::McpReconnect(n) if n == "b"));
+    assert!(matches!(a, InputAction::None));
+    let s = match app.sub_page.as_ref().unwrap() {
+        SubPage::McpPage(s) => s,
+        _ => panic!("wrong"),
+    };
+    assert_eq!(s.action_menu.as_ref().unwrap().server_name, "b");
 }
 
 #[test]

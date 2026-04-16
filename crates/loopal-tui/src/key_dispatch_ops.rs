@@ -11,6 +11,30 @@ use crate::views::bg_tasks_panel;
 // Re-export panel operations used by key_dispatch and lib.rs dispatch_ops.
 pub use crate::panel_ops::{cycle_panel_focus, enter_panel, panel_tab};
 
+pub(crate) async fn tool_approve(app: &mut App) {
+    let has = app
+        .session
+        .lock()
+        .active_conversation()
+        .pending_permission
+        .is_some();
+    if has {
+        app.session.approve_permission().await;
+    }
+}
+
+pub(crate) async fn tool_deny(app: &mut App) {
+    let has = app
+        .session
+        .lock()
+        .active_conversation()
+        .pending_permission
+        .is_some();
+    if has {
+        app.session.deny_permission().await;
+    }
+}
+
 pub(crate) async fn push_to_inbox(app: &mut App, content: UserContent) {
     // For skill invocations, record the slash command (not the expanded body)
     let history_text = match &content.skill_info {
@@ -74,6 +98,14 @@ pub(crate) async fn mcp_reconnect(app: &mut App, server: String) {
     let target = app.session.lock().active_view.clone();
     app.session
         .send_control(target, ControlCommand::McpReconnect { server })
+        .await;
+}
+
+/// Request disconnect of an MCP server.
+pub(crate) async fn mcp_disconnect(app: &mut App, server: String) {
+    let target = app.session.lock().active_view.clone();
+    app.session
+        .send_control(target, ControlCommand::McpDisconnect { server })
         .await;
 }
 

@@ -13,6 +13,8 @@ mod loader_settings_test;
 mod loader_unit_test;
 #[path = "suite/locations_test.rs"]
 mod locations_test;
+#[path = "suite/mcp_json_test.rs"]
+mod mcp_json_test;
 #[path = "suite/plugin_test.rs"]
 mod plugin_test;
 #[path = "suite/resolver_edge_test.rs"]

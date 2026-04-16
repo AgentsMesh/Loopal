@@ -4,6 +4,7 @@ pub mod bg_tasks_panel;
 pub mod breadcrumb;
 pub mod command_menu;
 pub mod input_view;
+pub mod mcp_action_menu;
 pub mod mcp_page;
 pub mod picker;
 pub mod progress;

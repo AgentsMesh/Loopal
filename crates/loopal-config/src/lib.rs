@@ -5,6 +5,7 @@ pub mod housekeeping;
 pub mod layer;
 pub mod loader;
 pub mod locations;
+pub mod mcp_json;
 pub mod pipeline;
 pub mod plugin;
 pub mod resolved;

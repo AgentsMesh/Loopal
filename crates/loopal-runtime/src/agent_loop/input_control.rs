@@ -76,6 +76,9 @@ impl AgentLoopRunner {
             ControlCommand::McpReconnect { server } => {
                 self.handle_mcp_reconnect(server).await?;
             }
+            ControlCommand::McpDisconnect { server } => {
+                self.handle_mcp_disconnect(server).await?;
+            }
         }
         Ok(())
     }

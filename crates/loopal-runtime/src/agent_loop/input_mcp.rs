@@ -1,4 +1,4 @@
-//! MCP control command handlers — status query and reconnect.
+//! MCP control command handlers — status query, reconnect, and disconnect.
 
 use std::collections::HashMap;
 
@@ -38,6 +38,23 @@ impl AgentLoopRunner {
             .kernel
             .register_mcp_tools_for_server(&server)
             .await;
+        let snapshots = self.collect_mcp_snapshots().await;
+        self.emit(AgentEventPayload::McpStatusReport { servers: snapshots })
+            .await
+    }
+
+    pub(super) async fn handle_mcp_disconnect(&mut self, server: String) -> Result<()> {
+        info!(server = %server, "disconnecting MCP server");
+        let mgr = self.params.deps.kernel.mcp_manager();
+        let result = mgr.write().await.disconnect_connection(&server).await;
+        match result {
+            Ok(removed_tools) => {
+                self.params.deps.kernel.unregister_tools(&removed_tools);
+            }
+            Err(e) => {
+                error!(server = %server, error = %e, "MCP disconnect failed");
+            }
+        }
         let snapshots = self.collect_mcp_snapshots().await;
         self.emit(AgentEventPayload::McpStatusReport { servers: snapshots })
             .await

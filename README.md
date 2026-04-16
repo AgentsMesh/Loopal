@@ -33,7 +33,25 @@
 
 ## Installation
 
-### From GitHub Releases (recommended)
+### Quick Install (recommended)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/AgentsMesh/Loopal/main/install/install.sh | bash
+```
+
+Options:
+
+```bash
+# Install to a custom directory
+INSTALL_DIR=/usr/local/bin curl -fsSL https://raw.githubusercontent.com/AgentsMesh/Loopal/main/install/install.sh | bash
+
+# Install a specific version
+VERSION=0.1.1 curl -fsSL https://raw.githubusercontent.com/AgentsMesh/Loopal/main/install/install.sh | bash
+```
+
+Supports macOS (Apple Silicon) and Linux (x86_64 / ARM64). Installs to `~/.local/bin` by default.
+
+### From GitHub Releases
 
 Download pre-built binaries from [Releases](https://github.com/AgentsMesh/Loopal/releases):
 

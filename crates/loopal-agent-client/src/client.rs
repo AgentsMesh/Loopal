@@ -46,17 +46,47 @@ impl AgentClient {
     }
 
     /// Send `initialize` and wait for response.
+    /// Retries on transient failures (e.g. agent process still starting up).
     pub async fn initialize(&self) -> anyhow::Result<Value> {
-        let result = self
-            .connection
-            .send_request(
-                methods::INITIALIZE.name,
-                serde_json::json!({"protocol_version": 1}),
+        use std::time::Duration;
+        const MAX_ATTEMPTS: u32 = 5;
+        const TIMEOUT: Duration = Duration::from_secs(2);
+
+        for attempt in 1..=MAX_ATTEMPTS {
+            match tokio::time::timeout(
+                TIMEOUT,
+                self.connection.send_request(
+                    methods::INITIALIZE.name,
+                    serde_json::json!({"protocol_version": 1}),
+                ),
             )
             .await
-            .map_err(|e| anyhow::anyhow!("initialize failed: {e}"))?;
-        info!("IPC initialized: {result}");
-        Ok(result)
+            {
+                Ok(Ok(result)) => {
+                    info!("IPC initialized: {result}");
+                    return Ok(result);
+                }
+                Ok(Err(e)) if attempt < MAX_ATTEMPTS => {
+                    tracing::warn!(attempt, error = %e, "initialize failed, retrying");
+                    tokio::time::sleep(Duration::from_millis(100 * attempt as u64)).await;
+                }
+                Ok(Err(e)) => {
+                    return Err(anyhow::anyhow!(
+                        "initialize failed after {MAX_ATTEMPTS} attempts: {e}"
+                    ));
+                }
+                Err(_) if attempt < MAX_ATTEMPTS => {
+                    tracing::warn!(attempt, "initialize timed out, retrying");
+                    tokio::time::sleep(Duration::from_millis(100 * attempt as u64)).await;
+                }
+                Err(_) => {
+                    return Err(anyhow::anyhow!(
+                        "initialize timed out after {MAX_ATTEMPTS} attempts"
+                    ));
+                }
+            }
+        }
+        unreachable!()
     }
 
     /// Send `agent/start` to begin the agent loop.

@@ -58,13 +58,20 @@ pub async fn run(
     // 9. Load display history or show welcome
     let session_manager = loopal_runtime::SessionManager::new()?;
     if let Some(sid) = resume {
-        if let Ok((session, messages)) = session_manager.resume_session(sid) {
-            session_ctrl.load_display_history(project_messages(&messages));
-            super::sub_agent_resume::load_sub_agent_histories(
-                &session_ctrl,
-                &session,
-                &session_manager,
-            );
+        match session_manager.resume_session(sid) {
+            Ok((session, messages)) => {
+                session_ctrl.load_display_history(project_messages(&messages));
+                super::sub_agent_resume::load_sub_agent_histories(
+                    &session_ctrl,
+                    &session,
+                    &session_manager,
+                );
+            }
+            Err(e) => {
+                tracing::warn!(session_id = sid, error = %e, "failed to resume session");
+                let short = &sid[..8.min(sid.len())];
+                session_ctrl.push_system_message(format!("Failed to resume session {short}: {e}"));
+            }
         }
     } else {
         let display_path = super::abbreviate_home(cwd);

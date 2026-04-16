@@ -18,7 +18,8 @@ impl ProviderError {
                 // non-overflow 400s (prefill rejection, malformed blocks, etc.).
                 if *status == 400
                     && (message.contains("prompt is too long")
-                        || message.contains("maximum context length"))
+                        || message.contains("maximum context length")
+                        || message.contains("exceed context limit"))
                 {
                     return false;
                 }
@@ -34,7 +35,9 @@ impl ProviderError {
         match self {
             ProviderError::ContextOverflow { .. } => true,
             ProviderError::Api { status, message } if *status == 400 => {
-                message.contains("prompt is too long") || message.contains("maximum context length")
+                message.contains("prompt is too long")
+                    || message.contains("maximum context length")
+                    || message.contains("exceed context limit")
             }
             _ => false,
         }

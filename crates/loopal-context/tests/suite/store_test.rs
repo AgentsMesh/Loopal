@@ -10,6 +10,7 @@ fn make_budget(message_budget: u32) -> ContextBudget {
         output_reserve: 0,
         safety_margin: 0,
         message_budget,
+        max_output_tokens: 16_384,
     }
 }
 

@@ -70,8 +70,7 @@ pub async fn run(
             Err(e) => {
                 tracing::warn!(session_id = sid, error = %e, "failed to resume session");
                 let short = &sid[..8.min(sid.len())];
-                session_ctrl
-                    .push_system_message(format!("Failed to resume session {short}: {e}"));
+                session_ctrl.push_system_message(format!("Failed to resume session {short}: {e}"));
             }
         }
     } else {

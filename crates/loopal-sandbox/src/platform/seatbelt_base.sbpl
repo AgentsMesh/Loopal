@@ -23,8 +23,17 @@
 ; --- Process ---
 (allow process-exec)
 (allow process-fork)
-(allow signal (target same-sandbox))
-(allow process-info* (target same-sandbox))
+; signal / process-info are unrestricted: restricting them to same-sandbox
+; provides no security when process-exec/process-fork are already open —
+; a child can trivially escape by spawning a helper outside the sandbox.
+(allow signal)
+(allow process-info*)
+
+; --- Mach service registration ---
+; GUI apps (Chrome, browsers, etc.) need to register Mach ports via
+; bootstrap_check_in. Blocking mach-register while allowing process-exec
+; breaks app launches without adding security.
+(allow mach-register)
 
 ; --- System info (read-only, no security impact) ---
 (allow sysctl-read)

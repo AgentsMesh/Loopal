@@ -76,11 +76,12 @@ mod macos_tests {
     fn system_access_rules_are_permissive() {
         let profile = generate_seatbelt_profile(&workspace_policy());
 
-        // Process rules
+        // Process rules — unrestricted (same rationale as process-exec)
         assert!(profile.contains("(allow process-exec)"));
         assert!(profile.contains("(allow process-fork)"));
-        assert!(profile.contains("(allow signal (target same-sandbox))"));
-        assert!(profile.contains("(allow process-info* (target same-sandbox))"));
+        assert!(profile.contains("(allow signal)"));
+        assert!(profile.contains("(allow process-info*)"));
+        assert!(profile.contains("(allow mach-register)"));
 
         // Blanket allows (no whitelists)
         assert!(profile.contains("(allow sysctl-read)"));

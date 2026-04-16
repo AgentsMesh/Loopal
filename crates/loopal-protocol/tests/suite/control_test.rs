@@ -77,3 +77,17 @@ fn test_control_command_resume_session_serde_roundtrip() {
         panic!("expected ResumeSession after roundtrip");
     }
 }
+
+#[test]
+fn test_control_command_mcp_disconnect_serde_roundtrip() {
+    let cmd = ControlCommand::McpDisconnect {
+        server: "my-mcp".to_string(),
+    };
+    let json = serde_json::to_string(&cmd).unwrap();
+    let deserialized: ControlCommand = serde_json::from_str(&json).unwrap();
+    if let ControlCommand::McpDisconnect { server } = deserialized {
+        assert_eq!(server, "my-mcp");
+    } else {
+        panic!("expected McpDisconnect after roundtrip");
+    }
+}

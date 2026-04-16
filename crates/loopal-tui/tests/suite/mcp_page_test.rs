@@ -2,7 +2,7 @@ use loopal_protocol::{
     AgentEvent, AgentEventPayload, ControlCommand, McpServerSnapshot, UserQuestionResponse,
 };
 use loopal_session::SessionController;
-use loopal_tui::app::{App, McpPageState, SubPage};
+use loopal_tui::app::{App, McpAction, McpPageState, SubPage};
 
 use tokio::sync::mpsc;
 
@@ -93,21 +93,20 @@ fn test_selected_out_of_bounds() {
 // --- Event → SessionState caching ---
 
 #[test]
-fn test_status_cached() {
+fn test_mcp_status_caching() {
     let app = make_app();
+    assert!(app.session.lock().mcp_status.is_none());
     app.session
         .handle_event(AgentEvent::root(AgentEventPayload::McpStatusReport {
             servers: servers(),
         }));
-    let st = app.session.lock();
-    let v = st.mcp_status.as_ref().unwrap();
-    assert_eq!(v.len(), 2);
-    assert_eq!(v[0].name, "a");
-}
-
-#[test]
-fn test_status_initially_none() {
-    assert!(make_app().session.lock().mcp_status.is_none());
+    assert_eq!(app.session.lock().mcp_status.as_ref().unwrap().len(), 2);
+    // Update replaces previous
+    app.session
+        .handle_event(AgentEvent::root(AgentEventPayload::McpStatusReport {
+            servers: vec![servers()[0].clone()],
+        }));
+    assert_eq!(app.session.lock().mcp_status.as_ref().unwrap().len(), 1);
 }
 
 #[test]
@@ -117,22 +116,7 @@ fn test_empty_report_sets_some() {
         .handle_event(AgentEvent::root(AgentEventPayload::McpStatusReport {
             servers: vec![],
         }));
-    let st = app.session.lock();
-    assert!(st.mcp_status.as_ref().unwrap().is_empty());
-}
-
-#[test]
-fn test_update_replaces_previous() {
-    let app = make_app();
-    app.session
-        .handle_event(AgentEvent::root(AgentEventPayload::McpStatusReport {
-            servers: servers(),
-        }));
-    app.session
-        .handle_event(AgentEvent::root(AgentEventPayload::McpStatusReport {
-            servers: vec![servers()[0].clone()],
-        }));
-    assert_eq!(app.session.lock().mcp_status.as_ref().unwrap().len(), 1);
+    assert!(app.session.lock().mcp_status.as_ref().unwrap().is_empty());
 }
 
 // --- Command registry ---
@@ -144,7 +128,7 @@ fn test_mcp_command_registered() {
     assert!(!h.is_skill());
 }
 
-// --- Reconnect dispatch ---
+// --- Control dispatch ---
 
 #[tokio::test]
 async fn test_reconnect_sends_control() {
@@ -155,5 +139,54 @@ async fn test_reconnect_sends_control() {
         .send_control(target, ControlCommand::McpReconnect { server: "s".into() })
         .await;
     let cmd = rx.try_recv().unwrap();
-    assert!(matches!(cmd, ControlCommand::McpReconnect { server } if server == "s"));
+    assert!(matches!(
+        cmd,
+        ControlCommand::McpReconnect { server } if server == "s"
+    ));
+}
+
+#[tokio::test]
+async fn test_disconnect_sends_control() {
+    let (app, mut rx) = make_app_with_rx();
+    let target = app.session.lock().active_view.clone();
+    app.session
+        .send_control(target, ControlCommand::McpDisconnect { server: "x".into() })
+        .await;
+    let cmd = rx.try_recv().unwrap();
+    assert!(matches!(
+        cmd,
+        ControlCommand::McpDisconnect { server } if server == "x"
+    ));
+}
+
+// --- ActionMenu ---
+
+#[test]
+fn test_action_menu_connected_vs_failed() {
+    let mut s = McpPageState::new(Some(servers()));
+    assert!(s.action_menu.is_none());
+
+    // connected server → Disconnect + Reconnect
+    s.selected = 0;
+    s.open_action_menu();
+    let menu = s.action_menu.as_ref().unwrap();
+    assert_eq!(menu.server_name, "a");
+    assert_eq!(
+        menu.options,
+        vec![McpAction::Disconnect, McpAction::Reconnect]
+    );
+
+    // failed server → Reconnect only
+    s.selected = 1;
+    s.open_action_menu();
+    let menu = s.action_menu.as_ref().unwrap();
+    assert_eq!(menu.server_name, "b");
+    assert_eq!(menu.options, vec![McpAction::Reconnect]);
+}
+
+#[test]
+fn test_open_menu_empty_list_noop() {
+    let mut s = McpPageState::new(Some(vec![]));
+    s.open_action_menu();
+    assert!(s.action_menu.is_none());
 }

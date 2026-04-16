@@ -31,4 +31,6 @@ pub enum ControlCommand {
     QueryMcpStatus,
     /// Reconnect a specific MCP server by name.
     McpReconnect { server: String },
+    /// Disconnect a specific MCP server by name.
+    McpDisconnect { server: String },
 }

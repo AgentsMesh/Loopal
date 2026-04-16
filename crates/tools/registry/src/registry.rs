@@ -24,6 +24,11 @@ impl ToolRegistry {
         self.tools.write().unwrap().insert(name, Arc::from(tool));
     }
 
+    /// Remove a tool by name. Returns `true` if the tool was present.
+    pub fn unregister(&self, name: &str) -> bool {
+        self.tools.write().unwrap().remove(name).is_some()
+    }
+
     /// Get a tool by name.
     pub fn get(&self, name: &str) -> Option<Arc<dyn Tool>> {
         self.tools.read().unwrap().get(name).cloned()

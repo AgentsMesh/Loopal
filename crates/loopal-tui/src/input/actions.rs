@@ -68,4 +68,6 @@ pub enum InputAction {
     PasteRequested,
     /// Reconnect an MCP server by name
     McpReconnect(String),
+    /// Disconnect an MCP server by name
+    McpDisconnect(String),
 }

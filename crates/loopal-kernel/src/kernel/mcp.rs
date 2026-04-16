@@ -48,4 +48,12 @@ impl Kernel {
             self.tool_registry.register(Box::new(adapter));
         }
     }
+
+    /// Remove tools by name from the ToolRegistry.
+    pub fn unregister_tools(&self, names: &[String]) {
+        for name in names {
+            info!(tool = %name, "unregistering MCP tool");
+            self.tool_registry.unregister(name);
+        }
+    }
 }

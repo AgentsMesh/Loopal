@@ -113,6 +113,7 @@ fn refresh_mcp_page(app: &mut App) {
         state.scroll_offset = state.scroll_offset.min(servers.len().saturating_sub(1));
         state.servers = servers;
         state.loaded = true;
+        state.action_menu = None;
     }
 }
 

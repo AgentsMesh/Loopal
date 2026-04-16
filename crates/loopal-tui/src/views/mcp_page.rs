@@ -5,9 +5,12 @@ use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 
 use crate::app::McpPageState;
 
+use super::mcp_action_menu;
+
 pub fn render_mcp_page(f: &mut Frame, state: &mut McpPageState, area: Rect) {
     f.render_widget(Clear, area);
 
+    let has_menu = state.action_menu.is_some();
     let block = Block::default()
         .borders(Borders::ALL)
         .title(Line::from(vec![
@@ -15,7 +18,11 @@ pub fn render_mcp_page(f: &mut Frame, state: &mut McpPageState, area: Rect) {
             Span::styled("MCP Servers", Style::default().fg(Color::Cyan).bold()),
             Span::raw(" "),
         ]))
-        .title_bottom(build_hint_bar())
+        .title_bottom(if has_menu {
+            mcp_action_menu::hint_bar()
+        } else {
+            build_hint_bar()
+        })
         .border_style(Style::default().fg(Color::DarkGray));
 
     let inner = block.inner(area);
@@ -46,6 +53,10 @@ pub fn render_mcp_page(f: &mut Frame, state: &mut McpPageState, area: Rect) {
 
     render_server_list(f, state, list_area);
     render_server_detail(f, state, detail_area);
+
+    if state.action_menu.is_some() {
+        mcp_action_menu::render(f, state, inner);
+    }
 }
 
 fn render_server_list(f: &mut Frame, state: &mut McpPageState, area: Rect) {
@@ -72,7 +83,10 @@ fn render_server_list(f: &mut Frame, state: &mut McpPageState, area: Rect) {
         let prefix = if is_selected { "\u{25b8} " } else { "  " };
         let line = Line::from(vec![
             Span::styled(prefix, Style::default().fg(Color::Cyan)),
-            Span::styled(status_icon, status_style(&server.status)),
+            Span::styled(
+                status_icon,
+                Style::default().fg(status_color(&server.status)),
+            ),
             Span::raw(" "),
             Span::styled(
                 &server.name,
@@ -157,28 +171,19 @@ fn detail_row<'a>(label: &'a str, value: &'a str, value_color: Color) -> Line<'a
 }
 
 fn status_indicator(status: &str) -> &'static str {
-    if status == "connected" {
-        "\u{25cf}" // ● filled = connected
-    } else if status.starts_with("failed") {
-        "\u{2717}" // ✗ cross = failed
-    } else {
-        "\u{25cb}" // ○ hollow = disconnected/connecting
+    match () {
+        _ if status == "connected" => "\u{25cf}",
+        _ if status.starts_with("failed") => "\u{2717}",
+        _ => "\u{25cb}",
     }
 }
 
-fn status_style(status: &str) -> Style {
-    Style::default().fg(status_color(status))
-}
-
 fn status_color(status: &str) -> Color {
-    if status == "connected" {
-        Color::Green
-    } else if status.starts_with("failed") {
-        Color::Red
-    } else if status == "connecting" {
-        Color::Yellow
-    } else {
-        Color::DarkGray
+    match () {
+        _ if status == "connected" => Color::Green,
+        _ if status.starts_with("failed") => Color::Red,
+        _ if status == "connecting" => Color::Yellow,
+        _ => Color::DarkGray,
     }
 }
 
@@ -188,7 +193,7 @@ fn build_hint_bar() -> Line<'static> {
         Span::styled("\u{2191}/\u{2193}", Style::default().fg(Color::Cyan)),
         Span::raw(" navigate  "),
         Span::styled("Enter", Style::default().fg(Color::Green)),
-        Span::raw(" reconnect  "),
+        Span::raw(" actions  "),
         Span::styled("Esc", Style::default().fg(Color::Yellow)),
         Span::raw(" close "),
     ])

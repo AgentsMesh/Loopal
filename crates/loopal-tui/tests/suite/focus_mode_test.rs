@@ -143,7 +143,10 @@ fn ctrl_c_clears_input_first_even_in_agent_panel() {
     app.input = "text".into();
     handle_key(&mut app, ctrl('c'));
     assert!(app.input.is_empty());
-    assert!(app.section(PanelKind::Agents).focused.is_some(), "focus not cleared yet");
+    assert!(
+        app.section(PanelKind::Agents).focused.is_some(),
+        "focus not cleared yet"
+    );
     assert_eq!(
         app.focus_mode,
         FocusMode::Panel(PanelKind::Agents),
@@ -191,7 +194,10 @@ fn ctrl_c_from_tasks_panel_preserves_agent_focus() {
     app.section_mut(PanelKind::Tasks).focused = Some("1".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Tasks);
     handle_key(&mut app, ctrl('c'));
-    assert!(app.section(PanelKind::Tasks).focused.is_none(), "active panel cleared");
+    assert!(
+        app.section(PanelKind::Tasks).focused.is_none(),
+        "active panel cleared"
+    );
     assert_eq!(
         app.section(PanelKind::Agents).focused.as_deref(),
         Some("worker"),

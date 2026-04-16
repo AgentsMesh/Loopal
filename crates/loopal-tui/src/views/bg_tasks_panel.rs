@@ -98,5 +98,8 @@ fn render_task_line(
 }
 
 fn running_count(snapshots: &[BgTaskSnapshot]) -> usize {
-    snapshots.iter().filter(|s| s.status == BgTaskStatus::Running).count()
+    snapshots
+        .iter()
+        .filter(|s| s.status == BgTaskStatus::Running)
+        .count()
 }

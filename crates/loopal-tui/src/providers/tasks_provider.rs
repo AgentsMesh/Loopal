@@ -34,13 +34,6 @@ impl PanelProvider for TasksPanelProvider {
         area: Rect,
     ) {
         let offset = app.section(PanelKind::Tasks).scroll_offset;
-        tasks_panel::render_tasks_panel(
-            f,
-            &app.task_snapshots,
-            focused,
-            elapsed,
-            offset,
-            area,
-        );
+        tasks_panel::render_tasks_panel(f, &app.task_snapshots, focused, elapsed, offset, area);
     }
 }

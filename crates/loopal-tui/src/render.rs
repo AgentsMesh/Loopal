@@ -55,7 +55,12 @@ pub fn draw(f: &mut Frame, app: &mut App) {
 
     let image_count = app.pending_image_count();
     views::input_view::render_input(
-        f, &app.input, app.input_cursor, image_count, app.input_scroll, layout.input,
+        f,
+        &app.input,
+        app.input_cursor,
+        image_count,
+        app.input_scroll,
+        layout.input,
     );
     if let Some(ref perm) = pending_perm {
         views::tool_confirm::render_tool_confirm(f, &perm.name, &perm.input, size);
@@ -110,7 +115,10 @@ fn render_panel_zone(
     if heights.is_empty() {
         return;
     }
-    let constraints: Vec<Constraint> = heights.iter().map(|(_, h)| Constraint::Length(*h)).collect();
+    let constraints: Vec<Constraint> = heights
+        .iter()
+        .map(|(_, h)| Constraint::Length(*h))
+        .collect();
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints(constraints)

@@ -198,8 +198,5 @@ pub fn build_with_frontend(
         rewake_rx: None,
         message_snapshot: Some(message_snapshot),
     };
-    Ok(AgentSetupResult {
-        params,
-        task_store,
-    })
+    Ok(AgentSetupResult { params, task_store })
 }

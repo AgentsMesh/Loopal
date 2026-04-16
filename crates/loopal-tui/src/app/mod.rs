@@ -162,6 +162,9 @@ impl App {
     }
 
     pub fn section_mut(&mut self, kind: PanelKind) -> &mut PanelSectionState {
-        self.panel_sections.iter_mut().find(|s| s.kind == kind).unwrap()
+        self.panel_sections
+            .iter_mut()
+            .find(|s| s.kind == kind)
+            .unwrap()
     }
 }

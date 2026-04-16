@@ -1,7 +1,7 @@
 /// Tests for panel_tab() dispatch: Tab key behavior within the panel zone.
 use loopal_protocol::{
-    AgentEvent, AgentEventPayload, BgTaskSnapshot, BgTaskStatus, ControlCommand,
-    TaskSnapshot, TaskSnapshotStatus, UserQuestionResponse,
+    AgentEvent, AgentEventPayload, BgTaskSnapshot, BgTaskStatus, ControlCommand, TaskSnapshot,
+    TaskSnapshotStatus, UserQuestionResponse,
 };
 use loopal_session::SessionController;
 use loopal_tui::app::{App, FocusMode, PanelKind};
@@ -89,7 +89,10 @@ fn tab_switches_from_bg_tasks_to_agents() {
     panel_tab(&mut app);
 
     assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Agents));
-    assert!(app.section(PanelKind::Agents).focused.is_some(), "focused_agent should be set");
+    assert!(
+        app.section(PanelKind::Agents).focused.is_some(),
+        "focused_agent should be set"
+    );
 }
 
 // === Only one panel: Tab cycles within that panel ===

@@ -38,7 +38,9 @@ pub fn cycle_panel_focus(app: &mut App, forward: bool) {
         FocusMode::Panel(k) => k,
         _ => return,
     };
-    let Some(provider) = app.panel_registry.by_kind(kind) else { return };
+    let Some(provider) = app.panel_registry.by_kind(kind) else {
+        return;
+    };
     let ids = provider.item_ids(app);
     let max = provider.max_visible();
     if ids.is_empty() {
@@ -62,7 +64,9 @@ pub(crate) fn has_live_agents(app: &App) -> bool {
 // --- Generic helpers ---
 
 fn ensure_focus(app: &mut App, kind: PanelKind) {
-    let Some(provider) = app.panel_registry.by_kind(kind) else { return };
+    let Some(provider) = app.panel_registry.by_kind(kind) else {
+        return;
+    };
     let ids = provider.item_ids(app);
     let max = provider.max_visible();
     let section = app.section_mut(kind);

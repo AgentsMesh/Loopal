@@ -52,9 +52,7 @@ pub(crate) fn live_agent_ids(state: &SessionState) -> Vec<String> {
     state
         .agents
         .iter()
-        .filter(|(k, a)| {
-            k.as_str() != state.active_view && is_live(&a.observable.status)
-        })
+        .filter(|(k, a)| k.as_str() != state.active_view && is_live(&a.observable.status))
         .map(|(k, _)| k.clone())
         .collect()
 }

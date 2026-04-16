@@ -119,7 +119,10 @@ fn test_subscribe_notifies_on_create() {
     let store = TaskStore::new(dir.path().to_path_buf());
     let mut rx = store.subscribe();
     store.create("Task", "desc");
-    assert!(rx.try_recv().is_ok(), "should receive notification on create");
+    assert!(
+        rx.try_recv().is_ok(),
+        "should receive notification on create"
+    );
 }
 
 #[test]
@@ -135,7 +138,10 @@ fn test_subscribe_notifies_on_update() {
             ..Default::default()
         },
     );
-    assert!(rx.try_recv().is_ok(), "should receive notification on update");
+    assert!(
+        rx.try_recv().is_ok(),
+        "should receive notification on update"
+    );
 }
 
 #[test]

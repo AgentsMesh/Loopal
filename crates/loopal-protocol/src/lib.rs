@@ -2,7 +2,6 @@ pub mod address;
 pub mod agent_state;
 pub mod bg_task;
 pub mod command;
-pub mod task_snapshot;
 pub mod control;
 pub mod envelope;
 pub mod event;
@@ -13,6 +12,7 @@ pub mod mcp_snapshot;
 pub mod projected;
 pub mod projection;
 pub mod question;
+pub mod task_snapshot;
 pub mod user_content;
 
 pub use address::QualifiedAddress;

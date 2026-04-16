@@ -85,11 +85,20 @@ fn forward_through_bg_tasks() {
     add_bg_snapshot(&mut app, "bg_3", "three");
     app.focus_mode = FocusMode::Panel(PanelKind::BgTasks);
     cycle_panel_focus(&mut app, true);
-    assert_eq!(app.section(PanelKind::BgTasks).focused.as_deref(), Some("bg_1"));
+    assert_eq!(
+        app.section(PanelKind::BgTasks).focused.as_deref(),
+        Some("bg_1")
+    );
     cycle_panel_focus(&mut app, true);
-    assert_eq!(app.section(PanelKind::BgTasks).focused.as_deref(), Some("bg_2"));
+    assert_eq!(
+        app.section(PanelKind::BgTasks).focused.as_deref(),
+        Some("bg_2")
+    );
     cycle_panel_focus(&mut app, true);
-    assert_eq!(app.section(PanelKind::BgTasks).focused.as_deref(), Some("bg_3"));
+    assert_eq!(
+        app.section(PanelKind::BgTasks).focused.as_deref(),
+        Some("bg_3")
+    );
 }
 
 #[test]
@@ -100,7 +109,10 @@ fn forward_wraps_around() {
     app.section_mut(PanelKind::BgTasks).focused = Some("bg_2".into());
     app.focus_mode = FocusMode::Panel(PanelKind::BgTasks);
     cycle_panel_focus(&mut app, true);
-    assert_eq!(app.section(PanelKind::BgTasks).focused.as_deref(), Some("bg_1"));
+    assert_eq!(
+        app.section(PanelKind::BgTasks).focused.as_deref(),
+        Some("bg_1")
+    );
 }
 
 #[test]
@@ -111,7 +123,10 @@ fn backward_wraps_around() {
     app.section_mut(PanelKind::BgTasks).focused = Some("bg_1".into());
     app.focus_mode = FocusMode::Panel(PanelKind::BgTasks);
     cycle_panel_focus(&mut app, false);
-    assert_eq!(app.section(PanelKind::BgTasks).focused.as_deref(), Some("bg_2"));
+    assert_eq!(
+        app.section(PanelKind::BgTasks).focused.as_deref(),
+        Some("bg_2")
+    );
 }
 
 #[test]
@@ -121,7 +136,10 @@ fn backward_from_none_selects_last() {
     add_bg_snapshot(&mut app, "bg_2", "two");
     app.focus_mode = FocusMode::Panel(PanelKind::BgTasks);
     cycle_panel_focus(&mut app, false);
-    assert_eq!(app.section(PanelKind::BgTasks).focused.as_deref(), Some("bg_2"));
+    assert_eq!(
+        app.section(PanelKind::BgTasks).focused.as_deref(),
+        Some("bg_2")
+    );
 }
 
 #[test]
@@ -145,5 +163,8 @@ fn stale_focus_recovery() {
     app.section_mut(PanelKind::BgTasks).focused = Some("bg_gone".into());
     app.focus_mode = FocusMode::Panel(PanelKind::BgTasks);
     cycle_panel_focus(&mut app, true);
-    assert_eq!(app.section(PanelKind::BgTasks).focused.as_deref(), Some("bg_live"));
+    assert_eq!(
+        app.section(PanelKind::BgTasks).focused.as_deref(),
+        Some("bg_live")
+    );
 }

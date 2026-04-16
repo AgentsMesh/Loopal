@@ -33,12 +33,6 @@ impl PanelProvider for BgTasksPanelProvider {
         elapsed: Duration,
         area: Rect,
     ) {
-        bg_tasks_panel::render_bg_tasks(
-            f,
-            &app.bg_snapshots,
-            focused,
-            elapsed,
-            area,
-        );
+        bg_tasks_panel::render_bg_tasks(f, &app.bg_snapshots, focused, elapsed, area);
     }
 }

@@ -102,7 +102,10 @@ fn recovers_from_stale_focused_agent() {
     app.section_mut(PanelKind::Agents).focused = Some("dead".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     cycle_panel_focus(&mut app, true);
-    assert_eq!(app.section(PanelKind::Agents).focused.as_deref(), Some("live"));
+    assert_eq!(
+        app.section(PanelKind::Agents).focused.as_deref(),
+        Some("live")
+    );
 }
 
 // === Empty list auto-exits AgentPanel ===
@@ -133,7 +136,10 @@ fn scroll_follows_focus_downward() {
     for _ in 0..7 {
         cycle_panel_focus(&mut app, true);
     }
-    assert_eq!(app.section(PanelKind::Agents).focused.as_deref(), Some("a6"));
+    assert_eq!(
+        app.section(PanelKind::Agents).focused.as_deref(),
+        Some("a6")
+    );
     assert!(
         app.section(PanelKind::Agents).scroll_offset >= 2,
         "got {}",
@@ -163,7 +169,10 @@ fn scroll_resets_on_wrap_to_first() {
     app.section_mut(PanelKind::Agents).scroll_offset = 2;
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     cycle_panel_focus(&mut app, true);
-    assert_eq!(app.section(PanelKind::Agents).focused.as_deref(), Some("a0"));
+    assert_eq!(
+        app.section(PanelKind::Agents).focused.as_deref(),
+        Some("a0")
+    );
     assert_eq!(app.section(PanelKind::Agents).scroll_offset, 0);
 }
 
@@ -178,11 +187,17 @@ fn scroll_adjusts_on_backward_past_window() {
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     cycle_panel_focus(&mut app, false);
     // a3 → a2, still in window
-    assert_eq!(app.section(PanelKind::Agents).focused.as_deref(), Some("a2"));
+    assert_eq!(
+        app.section(PanelKind::Agents).focused.as_deref(),
+        Some("a2")
+    );
     assert_eq!(app.section(PanelKind::Agents).scroll_offset, 2);
     cycle_panel_focus(&mut app, false);
     // a2 → a1, now ABOVE window → offset adjusts
-    assert_eq!(app.section(PanelKind::Agents).focused.as_deref(), Some("a1"));
+    assert_eq!(
+        app.section(PanelKind::Agents).focused.as_deref(),
+        Some("a1")
+    );
     assert!(
         app.section(PanelKind::Agents).scroll_offset <= 1,
         "got {}",

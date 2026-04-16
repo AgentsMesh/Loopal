@@ -1,7 +1,7 @@
 /// Tests for render guard: zero-height agents area must not panic.
 use loopal_protocol::{
-    AgentEvent, AgentEventPayload, BgTaskSnapshot, BgTaskStatus, ControlCommand,
-    TaskSnapshot, TaskSnapshotStatus, UserQuestionResponse,
+    AgentEvent, AgentEventPayload, BgTaskSnapshot, BgTaskStatus, ControlCommand, TaskSnapshot,
+    TaskSnapshotStatus, UserQuestionResponse,
 };
 use loopal_session::SessionController;
 use loopal_tui::app::App;

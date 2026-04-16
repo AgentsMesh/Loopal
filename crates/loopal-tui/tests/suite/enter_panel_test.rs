@@ -1,7 +1,7 @@
 /// Tests for enter_panel dispatch function.
 use loopal_protocol::{
-    AgentEvent, AgentEventPayload, BgTaskSnapshot, BgTaskStatus, ControlCommand,
-    TaskSnapshot, TaskSnapshotStatus, UserQuestionResponse,
+    AgentEvent, AgentEventPayload, BgTaskSnapshot, BgTaskStatus, ControlCommand, TaskSnapshot,
+    TaskSnapshotStatus, UserQuestionResponse,
 };
 use loopal_session::SessionController;
 use loopal_tui::app::{App, FocusMode, PanelKind};
@@ -79,7 +79,10 @@ fn sets_mode_and_focuses_first() {
     spawn_agent(&app, "beta");
     enter_panel(&mut app);
     assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Agents));
-    assert_eq!(app.section(PanelKind::Agents).focused.as_deref(), Some("alpha"));
+    assert_eq!(
+        app.section(PanelKind::Agents).focused.as_deref(),
+        Some("alpha")
+    );
 }
 
 #[test]
@@ -90,7 +93,10 @@ fn keeps_existing_live_focus() {
     app.section_mut(PanelKind::Agents).focused = Some("beta".into());
     enter_panel(&mut app);
     assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Agents));
-    assert_eq!(app.section(PanelKind::Agents).focused.as_deref(), Some("beta"));
+    assert_eq!(
+        app.section(PanelKind::Agents).focused.as_deref(),
+        Some("beta")
+    );
 }
 
 #[test]
@@ -124,7 +130,10 @@ fn enters_bg_tasks_when_no_agents_but_bg_tasks() {
     add_bg_snapshot(&mut app, "t1", "compiling");
     enter_panel(&mut app);
     assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::BgTasks));
-    assert!(app.section(PanelKind::BgTasks).focused.is_some(), "should set focused_bg_task");
+    assert!(
+        app.section(PanelKind::BgTasks).focused.is_some(),
+        "should set focused_bg_task"
+    );
 }
 
 #[test]

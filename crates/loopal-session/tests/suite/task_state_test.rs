@@ -1,8 +1,6 @@
 //! Tests for task_state: TasksChanged event handling.
 
-use loopal_protocol::{
-    AgentEvent, AgentEventPayload, TaskSnapshot, TaskSnapshotStatus,
-};
+use loopal_protocol::{AgentEvent, AgentEventPayload, TaskSnapshot, TaskSnapshotStatus};
 use loopal_session::event_handler::apply_event;
 use loopal_session::state::SessionState;
 
@@ -38,7 +36,10 @@ fn stores_task_snapshots() {
     emit_tasks_changed(&mut state, tasks);
     assert_eq!(state.task_snapshots.len(), 2);
     assert_eq!(state.task_snapshots[0].subject, "Task A");
-    assert_eq!(state.task_snapshots[1].status, TaskSnapshotStatus::InProgress);
+    assert_eq!(
+        state.task_snapshots[1].status,
+        TaskSnapshotStatus::InProgress
+    );
 }
 
 #[test]
@@ -57,7 +58,10 @@ fn replaces_previous_snapshots() {
         ],
     );
     assert_eq!(state.task_snapshots.len(), 2);
-    assert_eq!(state.task_snapshots[0].status, TaskSnapshotStatus::Completed);
+    assert_eq!(
+        state.task_snapshots[0].status,
+        TaskSnapshotStatus::Completed
+    );
 }
 
 #[test]

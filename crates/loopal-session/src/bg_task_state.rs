@@ -48,6 +48,12 @@ pub(crate) fn apply(state: &mut SessionState, payload: AgentEventPayload) {
                 );
             }
         }
+        AgentEventPayload::SessionResumed { .. } => {
+            // Drop bg tasks belonging to the prior session; fresh
+            // BgTaskSpawned events will repopulate if the resumed session
+            // has active tasks.
+            state.bg_tasks.clear();
+        }
         _ => {}
     }
 }

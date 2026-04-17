@@ -1,12 +1,21 @@
-//! Task snapshot state updates from `TasksChanged` events.
+//! Task snapshot state updates from `TasksChanged` / `SessionResumed` events.
 
 use loopal_protocol::{AgentEventPayload, TaskSnapshot};
 
 use crate::state::SessionState;
 
 pub(crate) fn apply(state: &mut SessionState, payload: AgentEventPayload) {
-    if let AgentEventPayload::TasksChanged { tasks } = payload {
-        state.task_snapshots = tasks;
+    match payload {
+        AgentEventPayload::TasksChanged { tasks } => {
+            state.task_snapshots = tasks;
+        }
+        AgentEventPayload::SessionResumed { .. } => {
+            // Clear stale task snapshots from the prior session; the task
+            // bridge will re-emit against the resumed TaskStore on its next
+            // change notification.
+            state.task_snapshots.clear();
+        }
+        _ => {}
     }
 }
 

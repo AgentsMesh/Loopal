@@ -11,6 +11,7 @@ use loopal_protocol::{TaskSnapshot, TaskSnapshotStatus};
 use ratatui::prelude::*;
 use ratatui::widgets::Paragraph;
 
+use super::text_width::truncate_to_width;
 use super::unified_status::spinner_frame;
 
 pub const MAX_TASK_VISIBLE: usize = 5;
@@ -79,13 +80,13 @@ fn render_task_line(
         Style::default().fg(Color::DarkGray)
     };
 
-    // Subject: truncate to fit, leave room for suffix
+    // Subject: truncate to fit (by terminal width, not byte length).
     let prefix_len = 3 + 2 + 5; // indicator + icon+space + id
     let suffix = task_suffix(task);
     let suffix_len = suffix.len();
     let max_subject = width.saturating_sub(prefix_len + suffix_len + 2);
-    let subject: String = task.subject.chars().take(max_subject).collect();
-    let pad = max_subject.saturating_sub(subject.len());
+    let (subject, subject_width) = truncate_to_width(&task.subject, max_subject);
+    let pad = max_subject.saturating_sub(subject_width);
 
     let mut spans = vec![
         Span::styled(indicator.to_string(), indicator_style),

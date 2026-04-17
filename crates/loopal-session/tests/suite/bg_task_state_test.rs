@@ -132,3 +132,23 @@ fn insertion_order_preserved() {
     let ids: Vec<&str> = state.bg_tasks.keys().map(|s| s.as_str()).collect();
     assert_eq!(ids, vec!["bg_3", "bg_1", "bg_2"]);
 }
+
+#[test]
+fn session_resumed_clears_bg_tasks() {
+    let mut state = make_state();
+    emit_spawned(&mut state, "bg_stale", "from old session");
+    assert_eq!(state.bg_tasks.len(), 1);
+
+    apply_event(
+        &mut state,
+        AgentEvent::root(AgentEventPayload::SessionResumed {
+            session_id: "new-sid".into(),
+            message_count: 0,
+        }),
+    );
+
+    assert!(
+        state.bg_tasks.is_empty(),
+        "SessionResumed must clear stale bg_tasks"
+    );
+}

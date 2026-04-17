@@ -13,6 +13,7 @@ use loopal_protocol::{BgTaskSnapshot, BgTaskStatus};
 use ratatui::prelude::*;
 use ratatui::widgets::Paragraph;
 
+use super::text_width::truncate_to_width;
 use super::unified_status::spinner_frame;
 
 /// Maximum background task lines to show.
@@ -81,7 +82,7 @@ fn render_task_line(
         BgTaskStatus::Completed => ("✓".into(), Style::default().fg(Color::Green)),
         BgTaskStatus::Failed => ("✗".into(), Style::default().fg(Color::Red)),
     };
-    let desc: String = task.description.chars().take(40).collect();
+    let (desc, _) = truncate_to_width(&task.description, 40);
     let id_style = if is_focused {
         Style::default().fg(Color::Cyan).bold()
     } else {

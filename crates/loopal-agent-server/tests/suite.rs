@@ -1,3 +1,5 @@
+#[path = "suite/agent_setup_helpers_test.rs"]
+mod agent_setup_helpers_test;
 #[path = "suite/bg_task_bridge_test.rs"]
 mod bg_task_bridge_test;
 #[path = "suite/bridge_basic_test.rs"]
@@ -6,6 +8,12 @@ mod bridge_basic_test;
 mod bridge_edge_test;
 #[path = "suite/bridge_helpers.rs"]
 mod bridge_helpers;
+#[path = "suite/cron_bridge_edge_test.rs"]
+mod cron_bridge_edge_test;
+#[path = "suite/cron_bridge_helpers.rs"]
+mod cron_bridge_helpers;
+#[path = "suite/cron_bridge_test.rs"]
+mod cron_bridge_test;
 #[path = "suite/dispatch_loop_test.rs"]
 mod dispatch_loop_test;
 #[path = "suite/hub_drain_test.rs"]

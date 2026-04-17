@@ -18,6 +18,14 @@ mod command_dispatch_test;
 mod command_edge_test;
 #[path = "suite/command_test.rs"]
 mod command_test;
+#[path = "suite/cron_duration_format_test.rs"]
+mod cron_duration_format_test;
+#[path = "suite/crons_panel_edge_test.rs"]
+mod crons_panel_edge_test;
+#[path = "suite/crons_panel_test.rs"]
+mod crons_panel_test;
+#[path = "suite/crons_provider_test.rs"]
+mod crons_provider_test;
 #[path = "suite/cycle_focus_test.rs"]
 mod cycle_focus_test;
 #[path = "suite/enter_panel_test.rs"]
@@ -62,6 +70,8 @@ mod mcp_refresh_test;
 mod message_lines_edge_test;
 #[path = "suite/message_lines_test.rs"]
 mod message_lines_test;
+#[path = "suite/panel_tab_crons_test.rs"]
+mod panel_tab_crons_test;
 #[path = "suite/panel_tab_test.rs"]
 mod panel_tab_test;
 #[path = "suite/render_guard_test.rs"]
@@ -80,6 +90,8 @@ mod skills_page_keys_test;
 mod styled_wrap_test;
 #[path = "suite/tasks_panel_test.rs"]
 mod tasks_panel_test;
+#[path = "suite/text_width_test.rs"]
+mod text_width_test;
 #[path = "suite/view_switch_panel_lifecycle_test.rs"]
 mod view_switch_panel_lifecycle_test;
 #[path = "suite/view_switch_test.rs"]

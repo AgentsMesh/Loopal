@@ -5,6 +5,8 @@ mod agent_state_test;
 mod command_test;
 #[path = "suite/control_test.rs"]
 mod control_test;
+#[path = "suite/cron_snapshot_test.rs"]
+mod cron_snapshot_test;
 #[path = "suite/envelope_test.rs"]
 mod envelope_test;
 #[path = "suite/event_edge_test.rs"]

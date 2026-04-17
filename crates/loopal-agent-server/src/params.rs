@@ -6,11 +6,13 @@ use loopal_agent::task_store::TaskStore;
 use loopal_config::ResolvedConfig;
 use loopal_kernel::Kernel;
 use loopal_runtime::AgentLoopParams;
+use loopal_scheduler::CronScheduler;
 
-/// Return value from `build_with_frontend` — agent loop params + task store handle.
+/// Return value from `build_with_frontend` — agent loop params + bridge handles.
 pub struct AgentSetupResult {
     pub params: AgentLoopParams,
     pub task_store: Arc<TaskStore>,
+    pub scheduler: Arc<CronScheduler>,
 }
 
 pub struct StartParams {

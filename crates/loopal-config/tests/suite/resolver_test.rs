@@ -19,7 +19,7 @@ fn mcp_config(command: &str) -> McpServerConfig {
 fn test_resolve_empty_produces_defaults() {
     let resolver = ConfigResolver::new();
     let config = resolver.resolve().unwrap();
-    assert_eq!(config.settings.model, "claude-sonnet-4-20250514");
+    assert_eq!(config.settings.model, "claude-opus-4-7");
     assert!(config.mcp_servers.is_empty());
     assert!(config.skills.is_empty());
     assert!(config.hooks.is_empty());

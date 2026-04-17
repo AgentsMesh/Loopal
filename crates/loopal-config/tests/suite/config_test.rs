@@ -5,7 +5,7 @@ use loopal_tool_api::PermissionMode;
 #[test]
 fn test_settings_default_model() {
     let settings = Settings::default();
-    assert_eq!(settings.model, "claude-sonnet-4-20250514");
+    assert_eq!(settings.model, "claude-opus-4-7");
 }
 
 #[test]
@@ -48,7 +48,7 @@ fn test_settings_serde_roundtrip() {
 fn test_settings_serde_from_empty_json() {
     let json = "{}";
     let settings: Settings = serde_json::from_str(json).unwrap();
-    assert_eq!(settings.model, "claude-sonnet-4-20250514");
+    assert_eq!(settings.model, "claude-opus-4-7");
 }
 
 #[test]

@@ -54,6 +54,21 @@ fn test_get_sonnet_4_6_model() {
 }
 
 #[test]
+fn test_get_opus_4_7_model() {
+    let info = get_model_info("claude-opus-4-7").unwrap();
+    assert_eq!(info.provider, "anthropic");
+    assert_eq!(info.display_name, "Claude Opus 4.7");
+    assert_eq!(info.context_window, 1_000_000);
+    assert_eq!(info.max_output_tokens, 128_000);
+    assert_eq!(info.thinking, ThinkingCapability::Adaptive);
+}
+
+#[test]
+fn test_opus_4_7_resolves_to_anthropic() {
+    assert_eq!(resolve_provider("claude-opus-4-7"), "anthropic");
+}
+
+#[test]
 fn test_resolve_provider_anthropic() {
     assert_eq!(resolve_provider("claude-sonnet-4"), "anthropic");
 }

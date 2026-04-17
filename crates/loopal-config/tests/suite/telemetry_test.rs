@@ -129,7 +129,7 @@ fn settings_with_telemetry_merge() {
     assert!(settings.telemetry.enabled);
     assert!((settings.telemetry.sample_rate.unwrap() - 0.5).abs() < f64::EPSILON);
     // Other settings remain default
-    assert_eq!(settings.model, "claude-sonnet-4-20250514");
+    assert_eq!(settings.model, "claude-opus-4-7");
 }
 
 #[test]

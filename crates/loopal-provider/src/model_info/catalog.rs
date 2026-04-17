@@ -107,6 +107,19 @@ pub(crate) static KNOWN_MODELS: &[ModelEntry] = &[
         true
     ),
     model!(
+        "claude-opus-4-7",
+        "anthropic",
+        "Claude Opus 4.7",
+        1_000_000,
+        128_000,
+        Adaptive,
+        Slow,
+        High,
+        Premium,
+        true,
+        true
+    ),
+    model!(
         "claude-haiku-3-5-20241022",
         "anthropic",
         "Claude 3.5 Haiku",

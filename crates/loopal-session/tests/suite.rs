@@ -13,6 +13,8 @@ mod bg_task_state_test;
 mod controller_async_test;
 #[path = "suite/controller_test.rs"]
 mod controller_test;
+#[path = "suite/cron_state_test.rs"]
+mod cron_state_test;
 #[path = "suite/event_handler_edge_test.rs"]
 mod event_handler_edge_test;
 #[path = "suite/event_handler_test.rs"]

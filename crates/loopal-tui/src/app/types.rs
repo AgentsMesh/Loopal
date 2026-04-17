@@ -123,6 +123,8 @@ pub enum PanelKind {
     Tasks,
     /// Background shell tasks.
     BgTasks,
+    /// Scheduled cron jobs.
+    Crons,
 }
 
 /// Which UI region currently owns keyboard input.

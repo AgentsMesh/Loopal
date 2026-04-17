@@ -113,6 +113,7 @@ pub(crate) async fn start_session(
         )?;
         let agent_params = setup.params;
         let task_store_for_bridge = setup.task_store;
+        let scheduler_for_bridge = setup.scheduler;
 
         let session_id = agent_params.session.id.clone();
         tracing::Span::current().record("session.id", session_id.as_str());
@@ -141,6 +142,8 @@ pub(crate) async fn start_session(
             task_store_for_bridge,
             frontend_placeholder.clone(),
         );
+        let cron_bridge_task =
+            crate::cron_bridge::spawn(scheduler_for_bridge, frontend_placeholder.clone());
 
         let agent_task = tokio::spawn(async move {
             match agent_loop(agent_params).await {
@@ -158,10 +161,12 @@ pub(crate) async fn start_session(
         let agent_task = {
             let bridge_abort = bridge_task.abort_handle();
             let task_bridge_abort = task_bridge_task.abort_handle();
+            let cron_bridge_abort = cron_bridge_task.abort_handle();
             tokio::spawn(async move {
                 let result = agent_task.await;
                 bridge_abort.abort();
                 task_bridge_abort.abort();
+                cron_bridge_abort.abort();
                 result.ok().flatten()
             })
         };

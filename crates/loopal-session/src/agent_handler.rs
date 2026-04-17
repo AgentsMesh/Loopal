@@ -4,17 +4,15 @@ use std::time::Instant;
 
 use loopal_protocol::{AgentEventPayload, AgentStatus};
 
-use crate::agent_lifecycle::{extract_key_param, handle_idle, post_event_cleanup};
-use crate::conversation_display::{
-    handle_auto_continuation, handle_compaction, handle_token_usage, push_system_msg,
+use crate::agent_event_helpers::{
+    apply_auto_continuation, apply_auto_mode_decision, apply_compaction_event, apply_error_event,
+    apply_token_usage, apply_tool_permission_request, apply_tool_result_event,
+    apply_user_question_request, clear_all_panel_caches_for_resume,
 };
+use crate::agent_lifecycle::{extract_key_param, handle_idle, post_event_cleanup};
 use crate::state::SessionState;
 use crate::thinking_display::handle_thinking_complete;
-use crate::tool_result_handler::{
-    ToolResultParams, handle_tool_batch_start, handle_tool_call, handle_tool_progress,
-    handle_tool_result,
-};
-use crate::types::{PendingPermission, PendingQuestion, SessionMessage};
+use crate::tool_result_handler::{handle_tool_batch_start, handle_tool_call, handle_tool_progress};
 
 /// Handle an agent event — writes both observable metrics and conversation state.
 pub(crate) fn apply_agent_event(state: &mut SessionState, name: &str, payload: AgentEventPayload) {
@@ -53,27 +51,8 @@ pub(crate) fn apply_agent_event(state: &mut SessionState, name: &str, payload: A
             handle_tool_call(conv, id, tn, input);
             sync_parent = true;
         }
-        AgentEventPayload::ToolResult {
-            id,
-            name: tn,
-            result,
-            is_error,
-            duration_ms,
-            metadata,
-        } => {
-            handle_tool_result(
-                conv,
-                ToolResultParams {
-                    id,
-                    name: tn,
-                    result,
-                    is_error,
-                    duration_ms,
-                    metadata,
-                },
-            );
-            obs.tools_in_flight = obs.tools_in_flight.saturating_sub(1);
-            obs.status = AgentStatus::Running;
+        payload @ AgentEventPayload::ToolResult { .. } => {
+            apply_tool_result_event(conv, obs, payload);
             sync_parent = true;
         }
         AgentEventPayload::ToolBatchStart { tool_ids } => {
@@ -85,35 +64,13 @@ pub(crate) fn apply_agent_event(state: &mut SessionState, name: &str, payload: A
             handle_tool_progress(conv, id, output_tail);
             sync_parent = true;
         }
-        AgentEventPayload::ToolPermissionRequest {
-            id,
-            name: tn,
-            input,
-        } => {
-            conv.flush_streaming();
-            conv.pending_permission = Some(PendingPermission {
-                id,
-                name: tn,
-                input,
-                relay_request_id: None,
-            });
+        payload @ AgentEventPayload::ToolPermissionRequest { .. } => {
+            apply_tool_permission_request(conv, payload);
         }
-        AgentEventPayload::UserQuestionRequest { id, questions } => {
-            conv.flush_streaming();
-            conv.pending_question = Some(PendingQuestion::new(id, questions));
+        payload @ AgentEventPayload::UserQuestionRequest { .. } => {
+            apply_user_question_request(conv, payload);
         }
-        AgentEventPayload::Error { message } => {
-            conv.flush_streaming();
-            conv.retry_banner = None;
-            conv.messages.push(SessionMessage {
-                role: "error".into(),
-                content: message,
-                tool_calls: Vec::new(),
-                image_count: 0,
-                skill_info: None,
-            });
-            obs.status = AgentStatus::Error;
-        }
+        AgentEventPayload::Error { message } => apply_error_event(conv, obs, message),
         AgentEventPayload::RetryError {
             message,
             attempt,
@@ -135,44 +92,15 @@ pub(crate) fn apply_agent_event(state: &mut SessionState, name: &str, payload: A
             handle_idle(state, name, AgentStatus::WaitingForInput);
             return;
         }
-        AgentEventPayload::AutoContinuation {
-            continuation,
-            max_continuations,
-        } => {
-            handle_auto_continuation(conv, continuation, max_continuations);
+        payload @ AgentEventPayload::AutoContinuation { .. } => {
+            apply_auto_continuation(conv, payload);
         }
-        AgentEventPayload::TokenUsage {
-            input_tokens,
-            output_tokens,
-            context_window,
-            cache_creation_input_tokens,
-            cache_read_input_tokens,
-            ..
-        } => {
-            handle_token_usage(
-                conv,
-                input_tokens,
-                output_tokens,
-                context_window,
-                cache_creation_input_tokens,
-                cache_read_input_tokens,
-            );
-            obs.input_tokens = input_tokens;
-            obs.output_tokens = output_tokens;
-        }
+        payload @ AgentEventPayload::TokenUsage { .. } => apply_token_usage(conv, obs, payload),
         AgentEventPayload::ModeChanged { mode } => obs.mode.clone_from(&mode),
         AgentEventPayload::Rewound { remaining_turns } => {
             crate::rewind::truncate_display_to_turn(conv, remaining_turns);
         }
-        AgentEventPayload::Compacted {
-            kept,
-            removed,
-            tokens_before,
-            tokens_after,
-            strategy,
-        } => {
-            handle_compaction(conv, kept, removed, tokens_before, tokens_after, &strategy);
-        }
+        payload @ AgentEventPayload::Compacted { .. } => apply_compaction_event(conv, payload),
         AgentEventPayload::Started => obs.status = AgentStatus::Running,
         AgentEventPayload::ServerToolUse {
             id,
@@ -193,8 +121,11 @@ pub(crate) fn apply_agent_event(state: &mut SessionState, name: &str, payload: A
         | AgentEventPayload::MessageRouted { .. }
         | AgentEventPayload::TurnDiffSummary { .. }
         | AgentEventPayload::TurnCompleted { .. }
-        | AgentEventPayload::SessionResumed { .. }
         | AgentEventPayload::McpStatusReport { .. } => {}
+        payload @ AgentEventPayload::SessionResumed { .. } => {
+            clear_all_panel_caches_for_resume(state, payload);
+            return;
+        }
         AgentEventPayload::BgTaskSpawned { .. }
         | AgentEventPayload::BgTaskOutput { .. }
         | AgentEventPayload::BgTaskCompleted { .. } => {
@@ -205,23 +136,12 @@ pub(crate) fn apply_agent_event(state: &mut SessionState, name: &str, payload: A
             crate::task_state::apply(state, payload);
             return;
         }
-        AgentEventPayload::AutoModeDecision {
-            tool_name,
-            decision,
-            reason,
-            duration_ms,
-        } => {
-            let label = if decision == "allow" {
-                "auto-allowed"
-            } else {
-                "auto-denied"
-            };
-            let t = if duration_ms > 0 {
-                format!("({duration_ms}ms)")
-            } else {
-                "(cached)".into()
-            };
-            push_system_msg(conv, &format!("[{label}] {tool_name}: {reason} {t}"));
+        AgentEventPayload::CronsChanged { .. } => {
+            crate::cron_state::apply(state, payload);
+            return;
+        }
+        payload @ AgentEventPayload::AutoModeDecision { .. } => {
+            apply_auto_mode_decision(conv, payload);
         }
     }
     post_event_cleanup(state, name, sync_parent);

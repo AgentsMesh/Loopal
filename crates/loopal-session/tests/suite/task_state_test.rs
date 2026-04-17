@@ -75,3 +75,30 @@ fn empty_tasks_clears_snapshots() {
     emit_tasks_changed(&mut state, Vec::new());
     assert!(state.task_snapshots.is_empty());
 }
+
+#[test]
+fn session_resumed_clears_task_snapshots() {
+    let mut state = make_state();
+    emit_tasks_changed(
+        &mut state,
+        vec![snapshot(
+            "stale",
+            "pre-resume",
+            TaskSnapshotStatus::InProgress,
+        )],
+    );
+    assert_eq!(state.task_snapshots.len(), 1);
+
+    apply_event(
+        &mut state,
+        AgentEvent::root(AgentEventPayload::SessionResumed {
+            session_id: "new-sid".into(),
+            message_count: 0,
+        }),
+    );
+
+    assert!(
+        state.task_snapshots.is_empty(),
+        "SessionResumed must clear stale task cache"
+    );
+}

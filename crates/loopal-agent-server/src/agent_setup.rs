@@ -1,4 +1,7 @@
 //! Internal agent loop setup — builds `AgentLoopParams` from resolved config.
+use crate::agent_setup_helpers::{
+    build_initial_messages, collect_feature_tags, spawn_sub_agent_forwarder,
+};
 use crate::params::{AgentSetupResult, StartParams};
 use loopal_agent::shared::{AgentShared, SchedulerHandle};
 use loopal_agent::task_store::TaskStore;
@@ -50,23 +53,13 @@ pub fn build_with_frontend(
         (session_manager.create_session(cwd, &model)?, Vec::new())
     };
 
-    // Sub-agent lifecycle events: forward SubAgentSpawned to frontend.
-    let (event_tx, mut event_rx) = tokio::sync::mpsc::channel::<loopal_protocol::AgentEvent>(256);
-    let lifecycle_frontend = frontend.clone();
-    tokio::spawn(async move {
-        while let Some(event) = event_rx.recv().await {
-            if matches!(
-                event.payload,
-                loopal_protocol::AgentEventPayload::SubAgentSpawned { .. }
-            ) {
-                let _ = lifecycle_frontend.emit(event.payload).await;
-            }
-        }
-    });
+    let event_tx = spawn_sub_agent_forwarder(frontend.clone());
     let tasks_dir = loopal_config::session_tasks_dir(&session.id)
         .unwrap_or_else(|_| std::env::temp_dir().join("loopal/tasks"));
     let task_store = Arc::new(TaskStore::new(tasks_dir));
-    let (scheduler_handle, scheduled_rx) = SchedulerHandle::create();
+    let scheduler = Arc::new(loopal_scheduler::CronScheduler::new());
+    let (scheduler_handle, scheduled_rx) =
+        SchedulerHandle::create_with_scheduler(scheduler.clone());
     let message_snapshot = Arc::new(std::sync::RwLock::new(Vec::new()));
     let agent_shared = Arc::new(AgentShared {
         kernel: kernel.clone(),
@@ -105,17 +98,7 @@ pub fn build_with_frontend(
     let skills_summary = loopal_config::format_skills_summary(&skills);
     let tool_defs = kernel.tool_definitions();
 
-    let mut features = Vec::new();
-    if config.settings.memory.enabled && memory_channel.is_some() {
-        features.push("memory".into());
-    }
-    if !config.settings.hooks.is_empty() {
-        features.push("hooks".into());
-    }
-    features.push("subagent".into());
-    if !config.settings.output_style.is_empty() {
-        features.push(format!("style_{}", config.settings.output_style));
-    }
+    let features = collect_feature_tags(config, memory_channel.is_some());
 
     let mut system_prompt = build_system_prompt(
         &config.instructions,
@@ -130,27 +113,7 @@ pub fn build_with_frontend(
     );
     crate::prompt_post::append_runtime_sections(&mut system_prompt, &kernel);
 
-    let mut messages = resume_messages;
-    let mut has_fork = false;
-    if let Some(ref fc_value) = start.fork_context
-        && start.resume.is_none()
-    {
-        match serde_json::from_value::<Vec<loopal_message::Message>>(fc_value.clone()) {
-            Ok(fork_msgs) => {
-                messages.extend(fork_msgs);
-                has_fork = true;
-            }
-            Err(e) => tracing::warn!("fork context deserialization failed, skipping: {e}"),
-        }
-    }
-    if let Some(prompt) = &start.prompt {
-        let text = if has_fork {
-            format!("{}\n\n{prompt}", loopal_context::fork::FORK_BOILERPLATE)
-        } else {
-            prompt.to_string()
-        };
-        messages.push(loopal_message::Message::user(&text));
-    }
+    let messages = build_initial_messages(resume_messages, start);
 
     let tool_tokens = ContextBudget::estimate_tool_tokens(&tool_defs);
     let budget = loopal_runtime::build_initial_budget(
@@ -198,5 +161,9 @@ pub fn build_with_frontend(
         rewake_rx: None,
         message_snapshot: Some(message_snapshot),
     };
-    Ok(AgentSetupResult { params, task_store })
+    Ok(AgentSetupResult {
+        params,
+        task_store,
+        scheduler,
+    })
 }

@@ -6,7 +6,8 @@
 
 use ratatui::prelude::*;
 use ratatui::widgets::Paragraph;
-use unicode_width::UnicodeWidthChar;
+
+use super::text_width::display_width;
 
 use crate::input::multiline;
 use crate::input::paste;
@@ -143,10 +144,6 @@ fn build_prefix(image_count: usize) -> String {
     } else {
         "> ".to_string()
     }
-}
-
-fn display_width(s: &str) -> usize {
-    s.chars().map(|c| c.width().unwrap_or(0)).sum()
 }
 
 #[cfg(test)]

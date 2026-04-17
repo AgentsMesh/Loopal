@@ -44,7 +44,7 @@ pub async fn run_tui_loop<B: Backend>(
 where
     B::Error: Send + Sync + 'static,
 {
-    sync_bg_tasks(app);
+    sync_panel_caches(app);
     terminal.draw(|f| draw(f, app))?;
 
     loop {
@@ -98,7 +98,7 @@ where
         if should_quit || app.exiting {
             break;
         }
-        sync_bg_tasks(app);
+        sync_panel_caches(app);
         terminal.draw(|f| draw(f, app))?;
     }
 
@@ -117,16 +117,18 @@ fn refresh_mcp_page(app: &mut App) {
     }
 }
 
-/// Sync panel data from session state into App-level cache.
+/// Sync all panel caches from session state into App-level fields.
 ///
-/// bg_task_details uses merge-and-retain so the log viewer can still
-/// access completed tasks after they're cleaned from session state.
-fn sync_bg_tasks(app: &mut App) {
+/// Copies bg_tasks, task_snapshots, and cron_snapshots. `bg_task_details`
+/// uses merge-and-retain so the log viewer can still access completed
+/// tasks after they're cleaned from session state.
+fn sync_panel_caches(app: &mut App) {
     {
         let mut state = app.session.lock();
         app.bg_snapshots = state.bg_tasks.values().map(|t| t.to_snapshot()).collect();
         crate::session_cleanup::merge_bg_details(&mut app.bg_task_details, &state.bg_tasks);
         app.task_snapshots = state.task_snapshots.clone();
+        app.cron_snapshots = state.cron_snapshots.clone();
         crate::session_cleanup::cleanup_session_state(&mut state);
     }
     crate::session_cleanup::cap_bg_details(&mut app.bg_task_details);

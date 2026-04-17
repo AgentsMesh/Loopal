@@ -6,7 +6,9 @@
 use std::time::Instant;
 
 use indexmap::IndexMap;
-use loopal_protocol::{AgentStatus, BgTaskDetail, McpServerSnapshot, TaskSnapshot};
+use loopal_protocol::{
+    AgentStatus, BgTaskDetail, CronJobSnapshot, McpServerSnapshot, TaskSnapshot,
+};
 
 /// Name of the root agent in the agents map.
 pub const ROOT_AGENT: &str = "main";
@@ -56,6 +58,8 @@ pub struct SessionState {
     pub bg_tasks: IndexMap<String, BgTaskDetail>,
     // === Structured tasks (synced from TaskStore via TasksChanged events) ===
     pub task_snapshots: Vec<TaskSnapshot>,
+    // === Cron jobs (synced from CronScheduler via CronsChanged events) ===
+    pub cron_snapshots: Vec<CronJobSnapshot>,
     // === Interaction state ===
     /// Pending sub-agent refs to be persisted (drained by caller).
     pub pending_sub_agent_refs: Vec<PendingSubAgentRef>,
@@ -93,6 +97,7 @@ impl SessionState {
             message_feed: MessageFeed::new(200),
             bg_tasks: IndexMap::new(),
             task_snapshots: Vec::new(),
+            cron_snapshots: Vec::new(),
             pending_sub_agent_refs: Vec::new(),
             mcp_status: None,
         }

@@ -12,7 +12,9 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use loopal_protocol::{BgTaskDetail, BgTaskSnapshot, ImageAttachment, TaskSnapshot, UserContent};
+use loopal_protocol::{
+    BgTaskDetail, BgTaskSnapshot, CronJobSnapshot, ImageAttachment, TaskSnapshot, UserContent,
+};
 use loopal_session::SessionController;
 
 use crate::command::CommandRegistry;
@@ -59,6 +61,8 @@ pub struct App {
     pub bg_task_details: Vec<BgTaskDetail>,
     /// Cached structured task snapshots (synced from session state each frame).
     pub task_snapshots: Vec<TaskSnapshot>,
+    /// Cached cron job snapshots (synced from session state each frame).
+    pub cron_snapshots: Vec<CronJobSnapshot>,
 
     // === Session Controller (observable + interactive) ===
     pub session: SessionController,
@@ -107,6 +111,7 @@ impl App {
             bg_snapshots: Vec::new(),
             bg_task_details: Vec::new(),
             task_snapshots: Vec::new(),
+            cron_snapshots: Vec::new(),
             session,
             content_scroll: ContentScroll::new(),
         }

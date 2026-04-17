@@ -94,7 +94,7 @@ loopal --server --ephemeral "run all tests and fix failures"
 Works out of the box with **Anthropic**, **OpenAI**, **Google**, and any **OpenAI-compatible** endpoint. Switch models on the fly with `-m`:
 
 ```bash
-loopal -m claude-sonnet-4-20250514
+loopal -m claude-opus-4-7
 loopal -m gpt-4o
 loopal -m gemini-2.5-pro
 ```
@@ -305,7 +305,7 @@ Key settings:
 
 ```json
 {
-  "model": "claude-sonnet-4-20250514",
+  "model": "claude-opus-4-7",
   "permission_mode": "supervised",
   "thinking": { "type": "auto" },
   "providers": {

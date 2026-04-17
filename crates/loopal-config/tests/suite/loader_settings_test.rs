@@ -14,7 +14,7 @@ fn test_load_settings_all_env_var_scenarios() {
     {
         let tmp = TempDir::new().unwrap();
         let settings = load_config(tmp.path()).unwrap().settings;
-        assert_eq!(settings.model, "claude-sonnet-4-20250514");
+        assert_eq!(settings.model, "claude-opus-4-7");
         assert!(!settings.model.is_empty());
     }
 

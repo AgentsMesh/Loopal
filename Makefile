@@ -39,7 +39,7 @@ check: clippy fmt test
 
 # ── Run ──────────────────────────────────────────────────────────────────────
 
-MODEL ?= claude-opus-4-6
+MODEL ?= claude-opus-4-7
 
 run: build
 	./bazel-bin/loopal -m $(MODEL) $(ARGS)

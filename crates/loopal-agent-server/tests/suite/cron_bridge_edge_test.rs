@@ -23,7 +23,7 @@ async fn frontend_emit_errors_do_not_crash_bridge() {
     // Drive one change so the bridge tries to emit more than the initial frame.
     tokio::time::sleep(Duration::from_millis(80)).await;
     scheduler
-        .add("*/5 * * * *", "job", true)
+        .add("*/5 * * * *", "job", true, false)
         .await
         .expect("add");
     tokio::time::sleep(Duration::from_millis(200)).await;
@@ -42,7 +42,7 @@ async fn frontend_emit_errors_do_not_crash_bridge() {
 async fn identical_job_set_skips_emit() {
     let scheduler = Arc::new(CronScheduler::new());
     scheduler
-        .add("*/5 * * * *", "stable job", true)
+        .add("*/5 * * * *", "stable job", true, false)
         .await
         .expect("add");
     let (frontend, events) = CaptureFrontend::new();
@@ -69,7 +69,7 @@ async fn identical_job_set_skips_emit() {
 async fn next_fire_changes_alone_do_not_re_emit() {
     let scheduler = Arc::new(CronScheduler::new());
     scheduler
-        .add("*/5 * * * *", "job-a", true)
+        .add("*/5 * * * *", "job-a", true, false)
         .await
         .expect("add");
     let (frontend, events) = CaptureFrontend::new();

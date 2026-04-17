@@ -16,6 +16,7 @@ fn snapshot(id: &str, prompt: &str, next_ms: Option<i64>) -> CronJobSnapshot {
         recurring: true,
         created_at_unix_ms: 1_700_000_000_000,
         next_fire_unix_ms: next_ms,
+        durable: false,
     }
 }
 

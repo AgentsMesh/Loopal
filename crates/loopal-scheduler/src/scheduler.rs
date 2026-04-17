@@ -8,11 +8,13 @@ use tokio_util::sync::CancellationToken;
 use crate::clock::{Clock, SystemClock};
 use crate::error::{SchedulerError, generate_task_id};
 use crate::expression::CronExpression;
+use crate::id::find_unique_id;
+use crate::persistence::DurableStore;
 use crate::task::{CronJobInfo, ScheduledTask, truncate_to_secs};
 use crate::trigger::ScheduledTrigger;
 
 /// Maximum number of concurrent scheduled tasks.
-const MAX_TASKS: usize = 50;
+pub(crate) const MAX_TASKS: usize = 50;
 
 /// Cron-based scheduler that manages tasks and emits triggers.
 ///
@@ -21,34 +23,76 @@ const MAX_TASKS: usize = 50;
 /// each other. Writers (`add`, `remove`, and the internal tick loop when
 /// it fires or expires a task) acquire an exclusive lock.
 ///
-/// The background tick loop is started via [`start()`](Self::start).
+/// When a [`DurableStore`] is attached via [`with_store`](Self::with_store)
+/// or [`with_store_and_clock`](Self::with_store_and_clock), mutations
+/// that touch `durable = true` tasks are written through to the store
+/// while the `tasks` write lock is held, preventing interleaved saves
+/// from producing a stale on-disk view.
 pub struct CronScheduler {
-    tasks: Arc<RwLock<Vec<ScheduledTask>>>,
+    pub(crate) tasks: Arc<RwLock<Vec<ScheduledTask>>>,
     started: AtomicBool,
-    clock: Arc<dyn Clock>,
+    pub(crate) clock: Arc<dyn Clock>,
+    pub(crate) store: Option<Arc<dyn DurableStore>>,
+    /// Set when a `save_all` call fails. The next tick (or next mutation)
+    /// retries so transient disk errors don't permanently diverge
+    /// memory from disk.
+    pub(crate) dirty: Arc<AtomicBool>,
+    /// Latched when the durable store refuses to operate (e.g. a
+    /// corrupt file could not be quarantined). While set, all
+    /// `persist_locked` calls become no-ops so the scheduler never
+    /// overwrites unrecognized on-disk state. In-memory operation
+    /// continues uninterrupted.
+    pub(crate) store_disabled: Arc<AtomicBool>,
 }
 
 impl CronScheduler {
-    /// Create a scheduler with the default system clock.
+    /// Create an in-memory-only scheduler with the default system clock.
     pub fn new() -> Self {
         Self::with_clock(Arc::new(SystemClock))
     }
 
-    /// Create a scheduler with a custom clock (for deterministic testing).
+    /// Create an in-memory-only scheduler with a custom clock.
     pub fn with_clock(clock: Arc<dyn Clock>) -> Self {
         Self {
             tasks: Arc::new(RwLock::new(Vec::new())),
             started: AtomicBool::new(false),
             clock,
+            store: None,
+            dirty: Arc::new(AtomicBool::new(false)),
+            store_disabled: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    /// Create a scheduler backed by `store`. Tasks added with
+    /// `durable = true` are written to the store; non-durable tasks
+    /// still live only in memory.
+    pub fn with_store(store: Arc<dyn DurableStore>) -> Self {
+        Self::with_store_and_clock(store, Arc::new(SystemClock))
+    }
+
+    /// Like [`with_store`](Self::with_store) but with a custom clock
+    /// (for deterministic testing).
+    pub fn with_store_and_clock(store: Arc<dyn DurableStore>, clock: Arc<dyn Clock>) -> Self {
+        Self {
+            tasks: Arc::new(RwLock::new(Vec::new())),
+            started: AtomicBool::new(false),
+            clock,
+            store: Some(store),
+            dirty: Arc::new(AtomicBool::new(false)),
+            store_disabled: Arc::new(AtomicBool::new(false)),
         }
     }
 
     /// Add a new scheduled task. Returns the 8-char task ID.
+    ///
+    /// When `durable` is `true` and the scheduler has a store attached,
+    /// the new task is persisted before this method returns.
     pub async fn add(
         &self,
         cron_expr: &str,
         prompt: &str,
         recurring: bool,
+        durable: bool,
     ) -> Result<String, SchedulerError> {
         let now = self.clock.now();
         let cron = CronExpression::parse_at(cron_expr, now).map_err(SchedulerError::InvalidCron)?;
@@ -64,16 +108,27 @@ impl CronScheduler {
             recurring,
             created_at: now,
             last_fired: None,
+            durable,
         });
+        if durable || self.dirty.load(Ordering::Acquire) {
+            self.persist_locked(&tasks).await;
+        }
         Ok(id)
     }
 
     /// Remove a task by ID. Returns `true` if found and removed.
+    ///
+    /// A durable removal is written through to the store inline.
     pub async fn remove(&self, id: &str) -> bool {
         let mut tasks = self.tasks.write().await;
+        let was_durable = tasks.iter().any(|t| t.id == id && t.durable);
         let before = tasks.len();
         tasks.retain(|t| t.id != id);
-        tasks.len() < before
+        let removed = tasks.len() < before;
+        if removed && (was_durable || self.dirty.load(Ordering::Acquire)) {
+            self.persist_locked(&tasks).await;
+        }
+        removed
     }
 
     /// List all active tasks as read-only snapshots.
@@ -98,6 +153,7 @@ impl CronScheduler {
                     recurring: t.recurring,
                     created_at: t.created_at,
                     next_fire,
+                    durable: t.durable,
                 }
             })
             .collect()
@@ -118,8 +174,20 @@ impl CronScheduler {
         );
         let tasks = self.tasks.clone();
         let clock = self.clock.clone();
+        let store = self.store.clone();
+        let dirty = self.dirty.clone();
+        let store_disabled = self.store_disabled.clone();
         tokio::spawn(async move {
-            crate::tick::tick_loop(tasks, trigger_tx, cancel, clock).await;
+            crate::tick::tick_loop(
+                tasks,
+                trigger_tx,
+                cancel,
+                clock,
+                store,
+                dirty,
+                store_disabled,
+            )
+            .await;
         })
     }
 }
@@ -127,69 +195,5 @@ impl CronScheduler {
 impl Default for CronScheduler {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-/// Draw IDs from `id_source` until one is not already taken by `tasks`.
-///
-/// Extracted for testability — the production path calls it with
-/// [`generate_task_id`] which returns random 8-char strings. Collisions
-/// are statistically impossible there, so the retry loop can only be
-/// exercised by injecting a deterministic generator.
-pub(crate) fn find_unique_id(
-    tasks: &[ScheduledTask],
-    mut id_source: impl FnMut() -> String,
-) -> String {
-    let mut id = id_source();
-    while tasks.iter().any(|t| t.id == id) {
-        id = id_source();
-    }
-    id
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::expression::CronExpression;
-    use chrono::{DateTime, Utc};
-
-    fn sample_task(id: &str) -> ScheduledTask {
-        let now: DateTime<Utc> = DateTime::from_timestamp(1_700_000_000, 0).unwrap();
-        ScheduledTask {
-            id: id.into(),
-            cron: CronExpression::parse_at("* * * * *", now).unwrap(),
-            prompt: String::new(),
-            recurring: true,
-            created_at: now,
-            last_fired: None,
-        }
-    }
-
-    #[test]
-    fn find_unique_id_returns_first_when_no_collision() {
-        let tasks = vec![sample_task("abc")];
-        let mut calls = 0;
-        let picked = find_unique_id(&tasks, || {
-            calls += 1;
-            "xyz".to_string()
-        });
-        assert_eq!(picked, "xyz");
-        assert_eq!(calls, 1);
-    }
-
-    #[test]
-    fn find_unique_id_retries_on_collision() {
-        let tasks = vec![sample_task("dup1"), sample_task("dup2")];
-        let sequence = vec!["dup1".to_string(), "dup2".to_string(), "fresh".to_string()];
-        let mut iter = sequence.into_iter();
-        let picked = find_unique_id(&tasks, || iter.next().unwrap());
-        assert_eq!(picked, "fresh");
-    }
-
-    #[test]
-    fn find_unique_id_on_empty_tasks_accepts_anything() {
-        let tasks: Vec<ScheduledTask> = Vec::new();
-        let picked = find_unique_id(&tasks, || "only".into());
-        assert_eq!(picked, "only");
     }
 }

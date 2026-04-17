@@ -10,6 +10,7 @@ fn snap(id: &str, prompt: &str, recurring: bool, next_ms: Option<i64>) -> CronJo
         recurring,
         created_at_unix_ms: 1_700_000_000_000,
         next_fire_unix_ms: next_ms,
+        durable: false,
     }
 }
 
@@ -84,6 +85,7 @@ fn to_snapshot_maps_none_next_fire() {
         recurring: false,
         created_at: now,
         next_fire: None,
+        durable: false,
     };
     let snap = super::to_snapshot_for_test(info);
     assert_eq!(snap.id, "zzz");
@@ -105,6 +107,7 @@ fn to_snapshot_strips_newlines_from_prompt() {
         recurring: true,
         created_at: now,
         next_fire: Some(now),
+        durable: false,
     };
     let snap = super::to_snapshot_for_test(info);
     assert!(!snap.prompt.contains('\n'));

@@ -8,6 +8,7 @@ fn sample_snapshot() -> CronJobSnapshot {
         recurring: true,
         created_at_unix_ms: 1_700_000_000_000,
         next_fire_unix_ms: Some(1_700_000_000_000),
+        durable: false,
     }
 }
 
@@ -97,8 +98,8 @@ fn new_fields_roundtrip_preserves_cron_expr_and_created_at() {
 
 #[test]
 fn missing_new_fields_deserialize_with_defaults() {
-    // Compatibility check: older payloads without cron_expr / created_at
-    // should deserialize using serde(default).
+    // Compatibility check: older payloads without cron_expr / created_at /
+    // durable should deserialize using serde(default).
     let legacy = r#"{
         "id":"old",
         "prompt":"legacy",
@@ -110,4 +111,5 @@ fn missing_new_fields_deserialize_with_defaults() {
     assert_eq!(back.cron_expr, "");
     assert_eq!(back.created_at_unix_ms, 0);
     assert!(back.next_fire_unix_ms.is_none());
+    assert!(!back.durable);
 }

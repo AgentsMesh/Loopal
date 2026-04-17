@@ -20,7 +20,10 @@ async fn setup_manual(
     CancellationToken,
 ) {
     let sched = Arc::new(CronScheduler::with_clock(clock));
-    sched.add(cron_expr, prompt, recurring).await.unwrap();
+    sched
+        .add(cron_expr, prompt, recurring, false)
+        .await
+        .unwrap();
     let (trigger_tx, trigger_rx) = tokio::sync::mpsc::channel(16);
     let cancel = CancellationToken::new();
     sched.start(trigger_tx, cancel.clone());

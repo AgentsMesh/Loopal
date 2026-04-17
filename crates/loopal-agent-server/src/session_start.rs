@@ -115,6 +115,12 @@ pub(crate) async fn start_session(
         let task_store_for_bridge = setup.task_store;
         let scheduler_for_bridge = setup.scheduler;
 
+        if start.resume.is_some()
+            && let Err(e) = scheduler_for_bridge.load_persisted().await
+        {
+            tracing::warn!(error = %e, "failed to load persisted cron tasks");
+        }
+
         let session_id = agent_params.session.id.clone();
         tracing::Span::current().record("session.id", session_id.as_str());
 

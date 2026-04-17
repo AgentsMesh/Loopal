@@ -48,6 +48,7 @@ fn add_cron(app: &mut App, id: &str, prompt: &str) {
         recurring: true,
         created_at_unix_ms: 1_700_000_000_000,
         next_fire_unix_ms: Some(1_700_000_000_000),
+        durable: false,
     });
 }
 

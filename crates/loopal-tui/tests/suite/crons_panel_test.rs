@@ -16,6 +16,7 @@ fn snap(id: &str, prompt: &str, recurring: bool, next_ms: Option<i64>) -> CronJo
         recurring,
         created_at_unix_ms: 1_700_000_000_000,
         next_fire_unix_ms: next_ms,
+        durable: false,
     }
 }
 

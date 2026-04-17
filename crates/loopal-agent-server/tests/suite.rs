@@ -14,6 +14,8 @@ mod cron_bridge_edge_test;
 mod cron_bridge_helpers;
 #[path = "suite/cron_bridge_test.rs"]
 mod cron_bridge_test;
+#[path = "suite/cron_resume_e2e_test.rs"]
+mod cron_resume_e2e_test;
 #[path = "suite/dispatch_loop_test.rs"]
 mod dispatch_loop_test;
 #[path = "suite/hub_drain_test.rs"]

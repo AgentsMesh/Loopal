@@ -13,6 +13,7 @@ fn make_task(cron: &str, created_at: chrono::DateTime<Utc>) -> ScheduledTask {
         recurring: true,
         created_at,
         last_fired: None,
+        durable: false,
     }
 }
 
@@ -84,5 +85,17 @@ fn is_expired_false_within_lifetime() {
     let task = make_task("* * * * *", created);
     // 1 hour later → not expired
     let now = Utc.with_ymd_and_hms(2026, 3, 29, 11, 0, 0).unwrap();
+    assert!(!task.is_expired(&now));
+}
+
+#[test]
+fn durable_task_never_expires() {
+    // R5: durable tasks bypass the 3-day lifetime cap so persisted
+    // schedules survive indefinitely across restarts.
+    let created = Utc.with_ymd_and_hms(2026, 3, 20, 10, 0, 0).unwrap();
+    let mut task = make_task("* * * * *", created);
+    task.durable = true;
+    // 30 days later — non-durable would be expired, durable is not.
+    let now = Utc.with_ymd_and_hms(2026, 4, 19, 10, 0, 0).unwrap();
     assert!(!task.is_expired(&now));
 }

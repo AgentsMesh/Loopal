@@ -45,4 +45,9 @@ pub struct CronJobSnapshot {
     pub created_at_unix_ms: i64,
     /// Next fire time as Unix milliseconds UTC. `None` when exhausted.
     pub next_fire_unix_ms: Option<i64>,
+    /// Whether the job is backed by a durable store and therefore
+    /// persists across process restarts. Defaults to `false` for
+    /// legacy senders that predate this field.
+    #[serde(default)]
+    pub durable: bool,
 }

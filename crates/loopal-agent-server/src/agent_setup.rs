@@ -57,7 +57,28 @@ pub fn build_with_frontend(
     let tasks_dir = loopal_config::session_tasks_dir(&session.id)
         .unwrap_or_else(|_| std::env::temp_dir().join("loopal/tasks"));
     let task_store = Arc::new(TaskStore::new(tasks_dir));
-    let scheduler = Arc::new(loopal_scheduler::CronScheduler::new());
+    // Only the root agent (depth = 0) gets a durable store. Sub-agents
+    // are ephemeral — persisting their cron would create orphan files
+    // that never get cleaned up, and `cron_bridge` only observes the
+    // root scheduler anyway.
+    let scheduler = if start.depth.unwrap_or(0) == 0 {
+        let cron_path = session_dir_override
+            .map(|base| base.join(&session.id).join("cron.json"))
+            .or_else(|| {
+                loopal_config::session_dir(&session.id)
+                    .ok()
+                    .map(|d| d.join("cron.json"))
+            })
+            .unwrap_or_else(|| std::env::temp_dir().join("loopal/cron.json"));
+        let durable_store: Arc<dyn loopal_scheduler::DurableStore> =
+            Arc::new(loopal_scheduler::FileDurableStore::new(cron_path));
+        Arc::new(loopal_scheduler::CronScheduler::with_store(durable_store))
+    } else {
+        Arc::new(loopal_scheduler::CronScheduler::new())
+    };
+    // Note: durable tasks are restored asynchronously by the caller
+    // (see `session_start::run`) right before the cron bridge spawns,
+    // because this builder is synchronous.
     let (scheduler_handle, scheduled_rx) =
         SchedulerHandle::create_with_scheduler(scheduler.clone());
     let message_snapshot = Arc::new(std::sync::RwLock::new(Vec::new()));

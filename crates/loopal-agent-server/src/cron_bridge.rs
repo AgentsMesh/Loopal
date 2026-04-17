@@ -62,6 +62,7 @@ impl From<&CronJobSnapshot> for CronIdentity {
         s.prompt.hash(&mut hasher);
         s.recurring.hash(&mut hasher);
         s.cron_expr.hash(&mut hasher);
+        s.durable.hash(&mut hasher);
         Self {
             id: s.id.clone(),
             content_hash: hasher.finish(),
@@ -138,6 +139,7 @@ fn to_snapshot(info: CronJobInfo) -> CronJobSnapshot {
         recurring: info.recurring,
         created_at_unix_ms: info.created_at.timestamp_millis(),
         next_fire_unix_ms: info.next_fire.map(|t| t.timestamp_millis()),
+        durable: info.durable,
     }
 }
 

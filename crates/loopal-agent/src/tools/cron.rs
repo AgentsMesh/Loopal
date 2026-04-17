@@ -32,6 +32,11 @@ impl Tool for CronCreateTool {
         "Schedule a prompt to be enqueued at a future time. \
          Uses standard 5-field cron (minute hour dom month dow). \
          Set recurring=false for one-shot tasks that auto-delete after firing. \
+         Set durable=true to persist the job to disk so it survives across \
+         session restarts (loaded on session resume; missed one-shots discarded). \
+         Note: durable delivery is at-least-once — if the process crashes \
+         between a one-shot firing and the post-fire save, it may re-fire \
+         exactly once on the next resume. \
          Jobs only fire while the agent is idle. \
          Recurring jobs auto-expire after 3 days. Max 50 concurrent jobs."
     }
@@ -52,6 +57,12 @@ impl Tool for CronCreateTool {
                 "recurring": {
                     "type": "boolean",
                     "description": "true (default) = recurring; false = one-shot"
+                },
+                "durable": {
+                    "type": "boolean",
+                    "description": "false (default) = in-memory only; true = persist to disk \
+                                    and restore on session resume. Missed one-shot durable \
+                                    jobs are discarded on load (no catch-up)."
                 }
             }
         })
@@ -75,12 +86,14 @@ impl Tool for CronCreateTool {
             return Ok(ToolResult::error("prompt cannot be empty"));
         }
         let recurring = input["recurring"].as_bool().unwrap_or(true);
+        let durable = input["durable"].as_bool().unwrap_or(false);
         let scheduler = extract_scheduler(ctx)?;
-        match scheduler.add(cron_expr, prompt, recurring).await {
+        match scheduler.add(cron_expr, prompt, recurring, durable).await {
             Ok(id) => {
                 let kind = if recurring { "recurring" } else { "one-shot" };
+                let suffix = if durable { " (durable)" } else { "" };
                 Ok(ToolResult::success(format!(
-                    "Scheduled {kind} job {id} with cron \"{cron_expr}\""
+                    "Scheduled {kind} job {id} with cron \"{cron_expr}\"{suffix}"
                 )))
             }
             Err(e) => Ok(ToolResult::error(e.to_string())),

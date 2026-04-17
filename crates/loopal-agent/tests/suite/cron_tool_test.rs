@@ -36,6 +36,38 @@ async fn cron_create_oneshot() {
 }
 
 #[tokio::test]
+async fn cron_create_durable_flag_propagates_to_scheduler() {
+    let fixture = TestFixture::new();
+    let (ctx, shared) = agent_tool_context(&fixture);
+    let result = CronCreateTool
+        .execute(
+            json!({"cron": "*/5 * * * *", "prompt": "stay", "durable": true}),
+            &ctx,
+        )
+        .await
+        .unwrap();
+    assert!(!result.is_error);
+    assert!(result.content.contains("(durable)"));
+    let jobs = shared.scheduler_handle.scheduler.list().await;
+    assert_eq!(jobs.len(), 1);
+    assert!(jobs[0].durable);
+}
+
+#[tokio::test]
+async fn cron_create_defaults_to_non_durable() {
+    let fixture = TestFixture::new();
+    let (ctx, shared) = agent_tool_context(&fixture);
+    let result = CronCreateTool
+        .execute(json!({"cron": "*/5 * * * *", "prompt": "transient"}), &ctx)
+        .await
+        .unwrap();
+    assert!(!result.is_error);
+    assert!(!result.content.contains("(durable)"));
+    let jobs = shared.scheduler_handle.scheduler.list().await;
+    assert!(!jobs[0].durable);
+}
+
+#[tokio::test]
 async fn cron_create_missing_cron() {
     let fixture = TestFixture::new();
     let (ctx, _) = agent_tool_context(&fixture);
@@ -77,7 +109,7 @@ async fn cron_delete_existing() {
     let id = shared
         .scheduler_handle
         .scheduler
-        .add("*/5 * * * *", "test", true)
+        .add("*/5 * * * *", "test", true, false)
         .await
         .unwrap();
     let result = CronDeleteTool
@@ -124,7 +156,7 @@ async fn cron_list_with_jobs() {
     shared
         .scheduler_handle
         .scheduler
-        .add("*/5 * * * *", "check", true)
+        .add("*/5 * * * *", "check", true, false)
         .await
         .unwrap();
     let result = CronListTool.execute(json!({}), &ctx).await.unwrap();

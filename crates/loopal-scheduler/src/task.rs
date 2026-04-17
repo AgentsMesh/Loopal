@@ -14,6 +14,11 @@ pub(crate) struct ScheduledTask {
     pub recurring: bool,
     pub created_at: DateTime<Utc>,
     pub last_fired: Option<DateTime<Utc>>,
+    /// When `true`, mutations to this task are persisted via the
+    /// scheduler's [`DurableStore`](crate::persistence::DurableStore)
+    /// so it survives across process restarts. Non-durable tasks live
+    /// only in memory.
+    pub durable: bool,
 }
 
 /// Truncate a timestamp to whole seconds to avoid sub-second precision issues
@@ -34,7 +39,17 @@ impl ScheduledTask {
             .is_some_and(|next| next <= *now)
     }
 
+    /// Whether this task has aged past its maximum lifetime.
+    ///
+    /// Durable tasks (backed by a `DurableStore`) are exempt from the
+    /// lifetime cap: users who explicitly opt into persistence expect
+    /// their schedules to survive indefinitely across restarts.
+    /// Non-durable (in-memory) tasks still expire after
+    /// [`MAX_LIFETIME_SECS`] to keep ephemeral entries from piling up.
     pub fn is_expired(&self, now: &DateTime<Utc>) -> bool {
+        if self.durable {
+            return false;
+        }
         now.signed_duration_since(self.created_at).num_seconds() > MAX_LIFETIME_SECS
     }
 }
@@ -48,4 +63,7 @@ pub struct CronJobInfo {
     pub recurring: bool,
     pub created_at: DateTime<Utc>,
     pub next_fire: Option<DateTime<Utc>>,
+    /// Whether this task's state is backed by a [`DurableStore`](crate::persistence::DurableStore)
+    /// and therefore persists across session restarts.
+    pub durable: bool,
 }

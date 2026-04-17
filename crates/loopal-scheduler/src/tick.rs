@@ -1,12 +1,14 @@
 //! Background tick loop — runs every second, checks tasks, sends triggers.
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 use tracing::info;
 
 use crate::clock::Clock;
+use crate::persistence::{DurableStore, durable_snapshot};
 use crate::task::ScheduledTask;
 use crate::trigger::ScheduledTrigger;
 
@@ -20,6 +22,14 @@ use crate::trigger::ScheduledTrigger;
 /// releases the read lock and iterates — other readers (e.g. the bridge
 /// calling `list()`) never block. Only when tasks must be mutated does
 /// the loop upgrade to a write lock.
+///
+/// ## Durable persistence
+///
+/// When `store` is `Some`, the post-mutation snapshot of durable tasks
+/// is written while still holding the write lock, guaranteeing at most
+/// one save per tick regardless of how many tasks fired or expired.
+/// If the previous save failed (`dirty == true`) a retry is issued
+/// even when this tick produced no mutations.
 ///
 /// ## Concurrency semantics
 ///
@@ -44,6 +54,9 @@ pub(crate) async fn tick_loop(
     trigger_tx: tokio::sync::mpsc::Sender<ScheduledTrigger>,
     cancel: CancellationToken,
     clock: Arc<dyn Clock>,
+    store: Option<Arc<dyn DurableStore>>,
+    dirty: Arc<AtomicBool>,
+    store_disabled: Arc<AtomicBool>,
 ) {
     let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -55,11 +68,28 @@ pub(crate) async fn tick_loop(
 
         let now = clock.now();
         let (needs_write, expiring_ids, firing_ids) = survey_tasks(&tasks, &now).await;
-        if !needs_write {
+        let should_retry = dirty.load(Ordering::Acquire);
+        if !needs_write && !should_retry {
             continue;
         }
 
-        let triggers = mutate_tasks(&tasks, &now, &expiring_ids, &firing_ids).await;
+        // Treat a disabled store as "no store" for this tick so the
+        // retry path doesn't thrash trying to save into a file that
+        // `load_persisted` already refused to normalize.
+        let effective_store = if store_disabled.load(Ordering::Acquire) {
+            None
+        } else {
+            store.as_ref()
+        };
+        let triggers = mutate_tasks(
+            &tasks,
+            &now,
+            &expiring_ids,
+            &firing_ids,
+            effective_store,
+            &dirty,
+        )
+        .await;
 
         for trigger in triggers {
             tokio::select! {
@@ -94,20 +124,27 @@ async fn survey_tasks(
 }
 
 /// Exclusive mutation: stamp `last_fired`, build triggers, remove
-/// expired/one-shot tasks. Returns the triggers to dispatch.
+/// expired/one-shot tasks, then persist if any durable task changed
+/// (or if the previous save failed). Returns the triggers to dispatch.
 async fn mutate_tasks(
     tasks: &Arc<RwLock<Vec<ScheduledTask>>>,
     now: &chrono::DateTime<chrono::Utc>,
     expiring_ids: &[String],
     firing_ids: &[String],
+    store: Option<&Arc<dyn DurableStore>>,
+    dirty: &Arc<AtomicBool>,
 ) -> Vec<ScheduledTrigger> {
     let mut guard = tasks.write().await;
     let mut triggers = Vec::new();
     let mut to_remove: Vec<usize> = Vec::new();
+    let mut durable_touched = false;
 
     for (i, task) in guard.iter_mut().enumerate() {
         if expiring_ids.contains(&task.id) {
             info!(task_id = %task.id, "cron job expired");
+            if task.durable {
+                durable_touched = true;
+            }
             to_remove.push(i);
         } else if firing_ids.contains(&task.id) {
             info!(task_id = %task.id, "cron job fired");
@@ -117,6 +154,9 @@ async fn mutate_tasks(
                 fired_at: *now,
             });
             task.last_fired = Some(*now);
+            if task.durable {
+                durable_touched = true;
+            }
             if !task.recurring {
                 to_remove.push(i);
             }
@@ -132,6 +172,20 @@ async fn mutate_tasks(
     );
     for i in to_remove.into_iter().rev() {
         guard.remove(i);
+    }
+
+    if let Some(store) = store {
+        let retry_pending = dirty.load(Ordering::Acquire);
+        if durable_touched || retry_pending {
+            let snapshot = durable_snapshot(&guard);
+            match store.save_all(&snapshot).await {
+                Ok(()) => dirty.store(false, Ordering::Release),
+                Err(e) => {
+                    tracing::error!(error = %e, "cron durable save failed in tick");
+                    dirty.store(true, Ordering::Release);
+                }
+            }
+        }
     }
     triggers
 }

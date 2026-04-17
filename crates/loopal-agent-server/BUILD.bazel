@@ -53,6 +53,7 @@ rust_test(
         "//crates/loopal-test-support",
         "//crates/loopal-tool-api",
         "//crates/tools/process/background:loopal-tool-background",
+        "@crates//:chrono",
         "@crates//:indexmap",
         "@crates//:serde_json",
         "@crates//:tokio",

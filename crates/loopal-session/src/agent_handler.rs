@@ -102,6 +102,10 @@ pub(crate) fn apply_agent_event(state: &mut SessionState, name: &str, payload: A
         }
         payload @ AgentEventPayload::Compacted { .. } => apply_compaction_event(conv, payload),
         AgentEventPayload::Started => obs.status = AgentStatus::Running,
+        AgentEventPayload::Running => {
+            conv.begin_turn();
+            obs.status = AgentStatus::Running;
+        }
         AgentEventPayload::ServerToolUse {
             id,
             name: tn,

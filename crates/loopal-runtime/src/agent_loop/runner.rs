@@ -140,7 +140,7 @@ impl AgentLoopRunner {
         self.status = new_status;
         let result = match new_status {
             AgentStatus::Starting => Ok(()),
-            AgentStatus::Running => Ok(()), // Running is signaled implicitly by Stream/ToolCall events.
+            AgentStatus::Running => self.emit(AgentEventPayload::Running).await,
             AgentStatus::WaitingForInput => self.emit(AgentEventPayload::AwaitingInput).await,
             AgentStatus::Finished => self.emit(AgentEventPayload::Finished).await,
             AgentStatus::Error => Ok(()), // Error event carries a message; use transition_error().

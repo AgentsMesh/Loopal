@@ -81,6 +81,10 @@ pub enum AgentEventPayload {
     ModeChanged { mode: String },
     /// Agent loop started
     Started,
+    /// Agent transitioned into active processing (turn begins).
+    /// Authoritative "started working" signal: emitted as soon as the runner
+    /// moves from `WaitingForInput` to `Running`, before any LLM call or tool.
+    Running,
     /// Agent loop finished
     Finished,
     /// Inter-agent message routed through MessageRouter (Observation Plane).

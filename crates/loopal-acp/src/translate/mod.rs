@@ -98,6 +98,7 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
         AgentEventPayload::AwaitingInput
         | AgentEventPayload::AutoContinuation { .. }
         | AgentEventPayload::Started
+        | AgentEventPayload::Running
         | AgentEventPayload::Finished
         | AgentEventPayload::MessageRouted { .. }
         | AgentEventPayload::ToolPermissionRequest { .. }
@@ -162,6 +163,7 @@ mod tests {
             AgentEventPayload::AwaitingInput,
             AgentEventPayload::MaxTurnsReached { turns: 50 },
             AgentEventPayload::Started,
+            AgentEventPayload::Running,
             AgentEventPayload::Finished,
             AgentEventPayload::Interrupted,
             AgentEventPayload::RetryCleared,

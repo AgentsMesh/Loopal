@@ -133,3 +133,43 @@ async fn test_prompt_driven_error_exits_cleanly() {
         output.terminate_reason
     );
 }
+
+/// Authoritative `Running` event is emitted before any `Stream`, so the
+/// TUI status bar can flip before the first LLM byte arrives.
+#[tokio::test]
+async fn test_running_emitted_before_stream() {
+    let calls = vec![vec![
+        Ok(StreamChunk::Text {
+            text: "hello".into(),
+        }),
+        Ok(StreamChunk::Done {
+            stop_reason: StopReason::EndTurn,
+        }),
+    ]];
+    let (mut runner, mut event_rx) = make_multi_runner(calls);
+
+    let events = tokio::spawn(async move {
+        let mut payloads = vec![];
+        while let Some(e) = event_rx.recv().await {
+            payloads.push(e.payload);
+        }
+        payloads
+    });
+
+    runner.run().await.unwrap();
+    drop(runner);
+    let payloads = events.await.unwrap();
+
+    let running_pos = payloads
+        .iter()
+        .position(|p| matches!(p, AgentEventPayload::Running));
+    let stream_pos = payloads
+        .iter()
+        .position(|p| matches!(p, AgentEventPayload::Stream { .. }));
+    assert!(running_pos.is_some(), "Running event must be emitted");
+    assert!(stream_pos.is_some(), "Stream event must be emitted");
+    assert!(
+        running_pos.unwrap() < stream_pos.unwrap(),
+        "Running must precede first Stream",
+    );
+}

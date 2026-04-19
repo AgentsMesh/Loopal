@@ -27,16 +27,19 @@ pub(crate) fn apply_agent_event(state: &mut SessionState, name: &str, payload: A
     match payload {
         AgentEventPayload::Stream { text } => {
             conv.begin_turn();
+            conv.mark_active();
             conv.streaming_text.push_str(&text);
             obs.status = AgentStatus::Running;
         }
         AgentEventPayload::ThinkingStream { text } => {
             conv.begin_turn();
+            conv.mark_active();
             conv.thinking_active = true;
             conv.streaming_thinking.push_str(&text);
             obs.status = AgentStatus::Running;
         }
         AgentEventPayload::ThinkingComplete { token_count } => {
+            conv.mark_active();
             handle_thinking_complete(conv, token_count);
         }
         AgentEventPayload::ToolCall {
@@ -48,19 +51,23 @@ pub(crate) fn apply_agent_event(state: &mut SessionState, name: &str, payload: A
             obs.tools_in_flight += 1;
             obs.last_tool = Some(extract_key_param(&tn, &input));
             obs.status = AgentStatus::Running;
+            conv.mark_active();
             handle_tool_call(conv, id, tn, input);
             sync_parent = true;
         }
         payload @ AgentEventPayload::ToolResult { .. } => {
+            conv.mark_active();
             apply_tool_result_event(conv, obs, payload);
             sync_parent = true;
         }
         AgentEventPayload::ToolBatchStart { tool_ids } => {
+            conv.mark_active();
             handle_tool_batch_start(conv, tool_ids);
         }
         AgentEventPayload::ToolProgress {
             id, output_tail, ..
         } => {
+            conv.mark_active();
             handle_tool_progress(conv, id, output_tail);
             sync_parent = true;
         }
@@ -78,6 +85,7 @@ pub(crate) fn apply_agent_event(state: &mut SessionState, name: &str, payload: A
         } => {
             conv.retry_banner = Some(format!("{message} ({attempt}/{max_attempts})"));
             obs.status = AgentStatus::Running;
+            conv.mark_active();
         }
         AgentEventPayload::RetryCleared => conv.retry_banner = None,
         AgentEventPayload::AwaitingInput => {
@@ -101,9 +109,13 @@ pub(crate) fn apply_agent_event(state: &mut SessionState, name: &str, payload: A
             crate::rewind::truncate_display_to_turn(conv, remaining_turns);
         }
         payload @ AgentEventPayload::Compacted { .. } => apply_compaction_event(conv, payload),
-        AgentEventPayload::Started => obs.status = AgentStatus::Running,
+        AgentEventPayload::Started => {
+            obs.status = AgentStatus::Running;
+            conv.mark_active();
+        }
         AgentEventPayload::Running => {
             conv.begin_turn();
+            conv.mark_active();
             obs.status = AgentStatus::Running;
         }
         AgentEventPayload::ServerToolUse {
@@ -111,6 +123,7 @@ pub(crate) fn apply_agent_event(state: &mut SessionState, name: &str, payload: A
             name: tn,
             input,
         } => {
+            conv.mark_active();
             crate::server_tool_display::handle_server_tool_use(conv, id, tn, &input);
             obs.status = AgentStatus::Running;
         }
@@ -118,6 +131,7 @@ pub(crate) fn apply_agent_event(state: &mut SessionState, name: &str, payload: A
             tool_use_id,
             content,
         } => {
+            conv.mark_active();
             crate::server_tool_display::handle_server_tool_result(conv, &tool_use_id, &content);
             obs.status = AgentStatus::Running;
         }

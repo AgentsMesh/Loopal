@@ -30,6 +30,11 @@ pub struct AgentConversation {
     // Turn timer
     turn_start: Option<Instant>,
     last_turn_duration: Duration,
+    /// Last time the agent emitted a "still working" signal (Stream, tool
+    /// event, Running, …). Used by the TUI to bridge short idle windows
+    /// between `AwaitingInput` and the next `Running` event, so the status
+    /// spinner does not flicker off between turns.
+    last_active_at: Option<Instant>,
 }
 
 impl AgentConversation {
@@ -53,6 +58,21 @@ impl AgentConversation {
         }
     }
 
+    /// Record that the agent just emitted an activity signal.
+    ///
+    /// The TUI uses this timestamp to keep the status spinner/timer live
+    /// during the brief gap between `AwaitingInput` (end of turn N) and
+    /// `Running` (start of turn N+1), which can be several milliseconds
+    /// because those events hop across agent-proc → hub → TUI IPC.
+    pub fn mark_active(&mut self) {
+        self.last_active_at = Some(Instant::now());
+    }
+
+    /// Whether the agent emitted any activity within the last `grace` window.
+    pub fn is_recently_active(&self, grace: Duration) -> bool {
+        self.last_active_at.is_some_and(|t| t.elapsed() < grace)
+    }
+
     /// Mark the end of a turn (agent became idle).
     pub fn end_turn(&mut self) {
         if let Some(start) = self.turn_start.take() {
@@ -64,6 +84,7 @@ impl AgentConversation {
     pub fn reset_timer(&mut self) {
         self.turn_start = None;
         self.last_turn_duration = Duration::ZERO;
+        self.last_active_at = None;
     }
 
     /// Flush buffered streaming text and thinking into SessionMessages.

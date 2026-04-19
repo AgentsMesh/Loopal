@@ -1,4 +1,6 @@
 // Single test binary — includes all test modules
+#[path = "suite/activity_grace_test.rs"]
+mod activity_grace_test;
 #[path = "suite/agent_handler_edge_test.rs"]
 mod agent_handler_edge_test;
 #[path = "suite/agent_handler_test.rs"]

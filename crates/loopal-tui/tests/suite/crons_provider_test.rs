@@ -60,8 +60,9 @@ fn provider_max_visible_matches_panel_constant() {
 #[test]
 fn provider_item_ids_empty_when_no_snapshots() {
     let app = make_app();
+    let state = app.session.lock();
     let provider = app.panel_registry.by_kind(PanelKind::Crons).unwrap();
-    assert!(provider.item_ids(&app).is_empty());
+    assert!(provider.item_ids(&app, &state).is_empty());
 }
 
 #[test]
@@ -72,8 +73,12 @@ fn provider_item_ids_lists_all_snapshots_in_order() {
         snap("second", "p2", false),
         snap("third", "p3", true),
     ];
+    let state = app.session.lock();
     let provider = app.panel_registry.by_kind(PanelKind::Crons).unwrap();
-    assert_eq!(provider.item_ids(&app), vec!["first", "second", "third"]);
+    assert_eq!(
+        provider.item_ids(&app, &state),
+        vec!["first", "second", "third"]
+    );
 }
 
 #[test]

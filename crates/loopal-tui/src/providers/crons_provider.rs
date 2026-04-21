@@ -15,11 +15,17 @@ impl PanelProvider for CronsPanelProvider {
     fn kind(&self) -> PanelKind {
         PanelKind::Crons
     }
+    fn title(&self) -> &'static str {
+        "Scheduled"
+    }
     fn max_visible(&self) -> usize {
         crons_panel::MAX_CRON_VISIBLE
     }
-    fn item_ids(&self, app: &App) -> Vec<String> {
+    fn item_ids(&self, app: &App, _state: &SessionState) -> Vec<String> {
         crons_panel::cron_ids(&app.cron_snapshots)
+    }
+    fn count(&self, app: &App, _state: &SessionState) -> usize {
+        app.cron_snapshots.len()
     }
     fn height(&self, app: &App, _state: &SessionState) -> u16 {
         crons_panel::crons_panel_height(&app.cron_snapshots)

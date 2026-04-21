@@ -98,7 +98,9 @@ fn render_task_line(
     ])
 }
 
-fn running_count(snapshots: &[BgTaskSnapshot]) -> usize {
+/// Running background task count — allocation-free alternative to
+/// `task_ids(...).len()`.
+pub fn running_count(snapshots: &[BgTaskSnapshot]) -> usize {
     snapshots
         .iter()
         .filter(|s| s.status == BgTaskStatus::Running)

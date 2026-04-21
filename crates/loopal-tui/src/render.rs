@@ -19,12 +19,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     let breadcrumb_h = u16::from(state.active_view != loopal_session::ROOT_AGENT);
     let elapsed = conv.turn_elapsed();
 
-    let panel_zone_h: u16 = app
-        .panel_registry
-        .providers()
-        .iter()
-        .map(|p| p.height(app, &state))
-        .sum();
+    let panel_zone_h = crate::render_panel::panel_zone_height(app, &state);
     let layout = FrameLayout::compute(size, breadcrumb_h, panel_zone_h, banner_h, input_h);
 
     if let Some(ref mut sub_page) = app.sub_page {
@@ -37,7 +32,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         views::breadcrumb::render_breadcrumb(f, &state.active_view, layout.breadcrumb);
     }
     app.content_scroll.render(f, &state, layout.content);
-    render_panel_zone(f, app, &state, elapsed, layout.agents);
+    crate::render_panel::render_panel_zone(f, app, &state, elapsed, layout.agents);
     views::separator::render_separator(f, layout.separator);
     if let Some(ref msg) = conv.retry_banner {
         views::retry_banner::render_retry_banner(f, msg, layout.retry_banner);
@@ -91,41 +86,6 @@ fn render_sub_page(
         SubPage::McpPage(s) => views::mcp_page::render_mcp_page(f, s, area),
         SubPage::SkillsPage(s) => views::skills_page::render_skills_page(f, s, area),
         SubPage::BgTaskLog(s) => views::bg_task_log::render_bg_task_log(f, s, bg_details, area),
-    }
-}
-
-/// Render the panel zone using registered providers.
-fn render_panel_zone(
-    f: &mut Frame,
-    app: &App,
-    state: &loopal_session::state::SessionState,
-    elapsed: std::time::Duration,
-    area: Rect,
-) {
-    if area.height == 0 {
-        return;
-    }
-    let heights: Vec<_> = app
-        .panel_registry
-        .providers()
-        .iter()
-        .map(|p| (p.as_ref(), p.height(app, state)))
-        .filter(|(_, h)| *h > 0)
-        .collect();
-    if heights.is_empty() {
-        return;
-    }
-    let constraints: Vec<Constraint> = heights
-        .iter()
-        .map(|(_, h)| Constraint::Length(*h))
-        .collect();
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(constraints)
-        .split(area);
-    for ((provider, _), &chunk) in heights.iter().zip(chunks.iter()) {
-        let focused = app.section(provider.kind()).focused.as_deref();
-        provider.render(f, app, state, focused, elapsed, chunk);
     }
 }
 

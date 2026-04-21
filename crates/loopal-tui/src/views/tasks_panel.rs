@@ -135,7 +135,10 @@ fn task_suffix(task: &TaskSnapshot) -> String {
     String::new()
 }
 
-fn active_count(snapshots: &[TaskSnapshot]) -> usize {
+/// Non-completed task count — used by the panel height calc, section
+/// headers, and focus tracking. Allocation-free alternative to
+/// `task_ids(...).len()`.
+pub fn active_count(snapshots: &[TaskSnapshot]) -> usize {
     snapshots
         .iter()
         .filter(|t| !matches!(t.status, TaskSnapshotStatus::Completed))

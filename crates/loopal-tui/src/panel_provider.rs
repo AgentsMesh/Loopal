@@ -13,8 +13,25 @@ use crate::app::{App, PanelKind};
 
 pub trait PanelProvider: Send + Sync {
     fn kind(&self) -> PanelKind;
+    /// Short label shown in the section header when multiple panels are visible.
+    fn title(&self) -> &'static str;
     fn max_visible(&self) -> usize;
-    fn item_ids(&self, app: &App) -> Vec<String>;
+    /// List of item identifiers in the panel, read from the passed-in
+    /// `state`.
+    ///
+    /// Taking `state` as a parameter (rather than calling
+    /// `app.session.lock()` internally) avoids lock-reentrancy deadlocks
+    /// when render-time callers already hold the session guard.
+    fn item_ids(&self, app: &App, state: &SessionState) -> Vec<String>;
+    /// Number of items in the panel.
+    ///
+    /// Default delegates to `item_ids(...).len()`. Providers should
+    /// override with an allocation-free count (`iter().filter().count()`)
+    /// when `item_ids` would otherwise build a throwaway `Vec<String>`
+    /// — the section header only needs the integer.
+    fn count(&self, app: &App, state: &SessionState) -> usize {
+        self.item_ids(app, state).len()
+    }
     fn height(&self, app: &App, state: &SessionState) -> u16;
     fn render(
         &self,

@@ -70,6 +70,12 @@ mod mcp_refresh_test;
 mod message_lines_edge_test;
 #[path = "suite/message_lines_test.rs"]
 mod message_lines_test;
+#[path = "suite/panel_focus_visibility_test.rs"]
+mod panel_focus_visibility_test;
+#[path = "suite/panel_header_render_test.rs"]
+mod panel_header_render_test;
+#[path = "suite/panel_provider_count_test.rs"]
+mod panel_provider_count_test;
 #[path = "suite/panel_tab_crons_test.rs"]
 mod panel_tab_crons_test;
 #[path = "suite/panel_tab_test.rs"]

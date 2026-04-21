@@ -8,6 +8,7 @@ pub mod crons_panel;
 pub mod input_view;
 pub mod mcp_action_menu;
 pub mod mcp_page;
+pub mod panel_header;
 pub mod picker;
 pub mod progress;
 pub mod question_dialog;
@@ -21,3 +22,6 @@ pub mod text_width;
 pub mod tool_confirm;
 pub mod topology_overlay;
 pub mod unified_status;
+
+/// Shared dim-grey color used for separators and inactive panel decoration.
+pub const DIM_SEPARATOR: ratatui::style::Color = ratatui::style::Color::Rgb(60, 60, 60);

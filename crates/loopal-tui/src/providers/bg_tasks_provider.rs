@@ -15,11 +15,17 @@ impl PanelProvider for BgTasksPanelProvider {
     fn kind(&self) -> PanelKind {
         PanelKind::BgTasks
     }
+    fn title(&self) -> &'static str {
+        "Background"
+    }
     fn max_visible(&self) -> usize {
         bg_tasks_panel::MAX_BG_VISIBLE
     }
-    fn item_ids(&self, app: &App) -> Vec<String> {
+    fn item_ids(&self, app: &App, _state: &SessionState) -> Vec<String> {
         bg_tasks_panel::task_ids(&app.bg_snapshots)
+    }
+    fn count(&self, app: &App, _state: &SessionState) -> usize {
+        bg_tasks_panel::running_count(&app.bg_snapshots)
     }
     fn height(&self, app: &App, _state: &SessionState) -> u16 {
         bg_tasks_panel::bg_panel_height(&app.bg_snapshots)

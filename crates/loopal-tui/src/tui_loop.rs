@@ -137,12 +137,14 @@ fn sync_panel_caches(app: &mut App) {
 
 /// Ensure scroll offsets don't exceed item counts after data changes.
 fn clamp_scroll_offsets(app: &mut App) {
-    let clamps: Vec<_> = app
-        .panel_registry
-        .providers()
-        .iter()
-        .map(|p| (p.kind(), p.item_ids(app).len(), p.max_visible()))
-        .collect();
+    let clamps: Vec<_> = {
+        let state = app.session.lock();
+        app.panel_registry
+            .providers()
+            .iter()
+            .map(|p| (p.kind(), p.item_ids(app, &state).len(), p.max_visible()))
+            .collect()
+    };
     for (kind, count, max) in clamps {
         let section = app.section_mut(kind);
         section.scroll_offset = section.scroll_offset.min(count.saturating_sub(max));

@@ -15,11 +15,17 @@ impl PanelProvider for TasksPanelProvider {
     fn kind(&self) -> PanelKind {
         PanelKind::Tasks
     }
+    fn title(&self) -> &'static str {
+        "Tasks"
+    }
     fn max_visible(&self) -> usize {
         tasks_panel::MAX_TASK_VISIBLE
     }
-    fn item_ids(&self, app: &App) -> Vec<String> {
+    fn item_ids(&self, app: &App, _state: &SessionState) -> Vec<String> {
         tasks_panel::task_ids(&app.task_snapshots)
+    }
+    fn count(&self, app: &App, _state: &SessionState) -> usize {
+        tasks_panel::active_count(&app.task_snapshots)
     }
     fn height(&self, app: &App, _state: &SessionState) -> u16 {
         tasks_panel::tasks_panel_height(&app.task_snapshots)

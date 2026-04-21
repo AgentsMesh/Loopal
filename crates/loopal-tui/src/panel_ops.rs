@@ -41,8 +41,11 @@ pub fn cycle_panel_focus(app: &mut App, forward: bool) {
     let Some(provider) = app.panel_registry.by_kind(kind) else {
         return;
     };
-    let ids = provider.item_ids(app);
     let max = provider.max_visible();
+    let ids = {
+        let state = app.session.lock();
+        provider.item_ids(app, &state)
+    };
     if ids.is_empty() {
         let section = app.section_mut(kind);
         section.focused = None;
@@ -56,9 +59,11 @@ pub fn cycle_panel_focus(app: &mut App, forward: bool) {
 }
 
 pub(crate) fn has_live_agents(app: &App) -> bool {
-    app.panel_registry
-        .by_kind(PanelKind::Agents)
-        .is_some_and(|p| !p.item_ids(app).is_empty())
+    let Some(provider) = app.panel_registry.by_kind(PanelKind::Agents) else {
+        return false;
+    };
+    let state = app.session.lock();
+    !provider.item_ids(app, &state).is_empty()
 }
 
 // --- Generic helpers ---
@@ -67,8 +72,11 @@ fn ensure_focus(app: &mut App, kind: PanelKind) {
     let Some(provider) = app.panel_registry.by_kind(kind) else {
         return;
     };
-    let ids = provider.item_ids(app);
     let max = provider.max_visible();
+    let ids = {
+        let state = app.session.lock();
+        provider.item_ids(app, &state)
+    };
     let section = app.section_mut(kind);
     if section.focused.as_ref().is_none_or(|f| !ids.contains(f)) {
         section.focused = ids.first().cloned();
@@ -87,10 +95,11 @@ fn fallback(app: &mut App) {
 }
 
 fn non_empty_kinds(app: &App) -> Vec<PanelKind> {
+    let state = app.session.lock();
     app.panel_registry
         .providers()
         .iter()
-        .filter(|p| !p.item_ids(app).is_empty())
+        .filter(|p| !p.item_ids(app, &state).is_empty())
         .map(|p| p.kind())
         .collect()
 }

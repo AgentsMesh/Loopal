@@ -11,6 +11,7 @@ pub mod panel_state;
 pub mod providers;
 pub mod render;
 mod render_layout;
+pub mod render_panel;
 mod session_cleanup;
 pub mod terminal;
 pub(crate) mod text_util;

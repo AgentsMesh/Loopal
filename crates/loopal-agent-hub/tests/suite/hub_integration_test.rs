@@ -96,8 +96,8 @@ async fn agent_a_routes_message_to_agent_b() {
 
     let envelope = json!({
         "id": "00000000-0000-0000-0000-000000000001",
-        "source": {"Agent": "agent-a"},
-        "target": "agent-b",
+        "source": {"Agent": {"hub": [], "agent": "agent-a"}},
+        "target": {"hub": [], "agent": "agent-b"},
         "content": {"text": "hello from A", "images": []},
         "timestamp": "2026-01-01T00:00:00Z"
     });
@@ -236,5 +236,8 @@ async fn agent_event_reaches_hub_event_channel() {
     let received = tokio::time::timeout(Duration::from_secs(2), event_rx.recv()).await;
     assert!(received.is_ok(), "Hub should forward event");
     let evt = received.unwrap().unwrap();
-    assert_eq!(evt.agent_name.as_deref(), Some("worker"));
+    assert_eq!(
+        evt.agent_name.as_ref().map(|a| a.to_string()).as_deref(),
+        Some("worker")
+    );
 }

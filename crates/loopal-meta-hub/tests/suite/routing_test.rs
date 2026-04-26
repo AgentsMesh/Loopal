@@ -20,9 +20,12 @@ async fn route_message_across_hubs() {
     let (_agent_conn, _rx) = register_mock_agent(&hub_b, "target", None).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
+    // After hub-a's SNAT the target carries the next-hop hub name; here we
+    // feed MetaHub directly so we synthesize the post-SNAT envelope.
     let envelope = json!({
         "id": "00000000-0000-0000-0000-000000000001",
-        "source": {"Agent": "sender"}, "target": "target",
+        "source": {"Agent": {"hub": ["hub-a"], "agent": "sender"}},
+        "target": {"hub": ["hub-b"], "agent": "target"},
         "content": {"text": "cross-hub hello", "images": []},
         "timestamp": "2026-01-01T00:00:00Z"
     });
@@ -50,9 +53,13 @@ async fn hub_uplink_escalates_unknown_agent() {
     let (_agent_conn, _rx) = register_mock_agent(&hub_b, "remote-worker", None).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
+    // Targets must already carry the destination hub — NAT model no longer
+    // resolves bare agent names at MetaHub. The agent supplies a qualified
+    // address explicitly (or via tooling that knows about ListHubs).
     let envelope = json!({
         "id": "00000000-0000-0000-0000-000000000002",
-        "source": {"Agent": "local"}, "target": "remote-worker",
+        "source": {"Agent": {"hub": [], "agent": "local"}},
+        "target": {"hub": ["hub-b"], "agent": "remote-worker"},
         "content": {"text": "find you", "images": []},
         "timestamp": "2026-01-01T00:00:00Z"
     });
@@ -85,7 +92,8 @@ async fn qualified_address_routes_via_uplink() {
 
     let envelope = json!({
         "id": "00000000-0000-0000-0000-000000000003",
-        "source": {"Agent": "sender"}, "target": "hub-b/worker",
+        "source": {"Agent": {"hub": [], "agent": "sender"}},
+        "target": {"hub": ["hub-b"], "agent": "worker"},
         "content": {"text": "explicit hub target", "images": []},
         "timestamp": "2026-01-01T00:00:00Z"
     });
@@ -113,7 +121,8 @@ async fn route_to_nonexistent_agent_fails() {
 
     let envelope = json!({
         "id": "00000000-0000-0000-0000-000000000004",
-        "source": {"Agent": "sender"}, "target": "ghost-agent",
+        "source": {"Agent": {"hub": [], "agent": "sender"}},
+        "target": {"hub": ["hub-b"], "agent": "ghost-agent"},
         "content": {"text": "nobody home", "images": []},
         "timestamp": "2026-01-01T00:00:00Z"
     });
@@ -151,7 +160,8 @@ async fn route_after_hub_disconnect_fails() {
 
     let envelope = json!({
         "id": "00000000-0000-0000-0000-000000000005",
-        "source": {"Agent": "sender"}, "target": "target",
+        "source": {"Agent": {"hub": [], "agent": "sender"}},
+        "target": {"hub": ["hub-b"], "agent": "target"},
         "content": {"text": "too late", "images": []},
         "timestamp": "2026-01-01T00:00:00Z"
     });

@@ -7,13 +7,14 @@ use async_trait::async_trait;
 use loopal_error::{LoopalError, Result};
 use loopal_ipc::connection::Connection;
 use loopal_ipc::protocol::methods;
-use loopal_protocol::{AgentEvent, AgentEventPayload};
+use loopal_protocol::{AgentEvent, AgentEventPayload, QualifiedAddress};
 use loopal_runtime::frontend::traits::EventEmitter;
 
 #[derive(Clone)]
 pub(crate) struct IpcEventEmitter {
     pub connection: Arc<Connection>,
-    pub agent_name: Option<String>,
+    /// Pre-converted to a local qualified address.
+    pub agent_name: Option<QualifiedAddress>,
 }
 
 #[async_trait]

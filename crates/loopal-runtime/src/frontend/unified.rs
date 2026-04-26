@@ -8,6 +8,7 @@ use crate::frontend::traits::{AgentFrontend, EventEmitter};
 use loopal_error::Result;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::Envelope;
+use loopal_protocol::QualifiedAddress;
 use loopal_protocol::{AgentEvent, AgentEventPayload};
 use loopal_tool_api::PermissionDecision;
 
@@ -25,7 +26,8 @@ use super::question_handler::QuestionHandler;
 /// - Root agent:  `agent_name = None`, uses `RelayPermissionHandler`
 /// - Sub-agent:   `agent_name = Some(name)`, uses `AutoDenyHandler`
 pub struct UnifiedFrontend {
-    agent_name: Option<String>,
+    /// Pre-converted local qualified address; reused on every emit.
+    agent_name: Option<QualifiedAddress>,
     event_tx: mpsc::Sender<AgentEvent>,
     mailbox_rx: Mutex<mpsc::Receiver<Envelope>>,
     control_rx: Mutex<mpsc::Receiver<ControlCommand>>,
@@ -45,7 +47,7 @@ impl UnifiedFrontend {
         question_handler: Box<dyn QuestionHandler>,
     ) -> Self {
         Self {
-            agent_name,
+            agent_name: agent_name.map(QualifiedAddress::local),
             event_tx,
             mailbox_rx: Mutex::new(mailbox_rx),
             control_rx: Mutex::new(control_rx),

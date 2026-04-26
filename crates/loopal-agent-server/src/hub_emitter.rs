@@ -6,7 +6,7 @@ use async_trait::async_trait;
 
 use loopal_error::{LoopalError, Result};
 use loopal_ipc::protocol::methods;
-use loopal_protocol::{AgentEvent, AgentEventPayload};
+use loopal_protocol::{AgentEvent, AgentEventPayload, QualifiedAddress};
 use loopal_runtime::frontend::traits::EventEmitter;
 
 use crate::session_hub::SharedSession;
@@ -14,7 +14,7 @@ use crate::session_hub::SharedSession;
 #[derive(Clone)]
 pub(crate) struct HubEventEmitter {
     pub(crate) session: Option<Arc<SharedSession>>,
-    pub(crate) agent_name: Option<String>,
+    pub(crate) agent_name: Option<QualifiedAddress>,
 }
 
 #[async_trait]

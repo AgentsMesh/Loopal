@@ -22,8 +22,8 @@ fn make_hub() -> (Arc<Mutex<Hub>>, mpsc::Receiver<AgentEvent>) {
 fn envelope(from: &str, target: &str, text: &str) -> serde_json::Value {
     json!({
         "id": uuid::Uuid::new_v4().to_string(),
-        "source": {"Agent": from},
-        "target": target,
+        "source": {"Agent": {"hub": [], "agent": from}},
+        "target": {"hub": [], "agent": target},
         "content": {"text": text, "images": []},
         "timestamp": "2026-01-01T00:00:00Z"
     })
@@ -206,7 +206,7 @@ async fn concurrent_events_all_reach_hub() {
     let mut received_names: Vec<String> = Vec::new();
     while let Ok(event) = event_rx.try_recv() {
         if let Some(name) = event.agent_name {
-            received_names.push(name);
+            received_names.push(name.to_string());
         }
     }
 

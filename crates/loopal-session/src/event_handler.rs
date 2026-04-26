@@ -27,10 +27,12 @@ pub fn apply_event(state: &mut SessionState, event: AgentEvent) {
         ..
     } = event.payload
     {
+        // Session/UI deal in flat strings — flatten the qualified address.
+        let parent_str = parent.as_ref().map(|p| p.to_string());
         crate::agent_lifecycle::register_spawned_agent(
             state,
             name,
-            parent.as_deref(),
+            parent_str.as_deref(),
             model.as_deref(),
             session_id.as_deref(),
         );
@@ -41,7 +43,7 @@ pub fn apply_event(state: &mut SessionState, event: AgentEvent) {
                 .push(crate::state::PendingSubAgentRef {
                     name: name.clone(),
                     session_id: sid.clone(),
-                    parent: parent.clone(),
+                    parent: parent_str,
                     model: model.clone(),
                 });
         }
@@ -49,7 +51,11 @@ pub fn apply_event(state: &mut SessionState, event: AgentEvent) {
 
     // Session-level mode sync: when the active agent's mode changes, update state.mode
     if let AgentEventPayload::ModeChanged { ref mode } = event.payload {
-        let agent_name = event.agent_name.as_deref().unwrap_or(ROOT_AGENT);
+        let agent_name = event
+            .agent_name
+            .as_ref()
+            .map(|a| a.to_string())
+            .unwrap_or_else(|| ROOT_AGENT.to_string());
         if agent_name == state.active_view && state.mode != *mode {
             state.mode.clone_from(mode);
         }
@@ -66,6 +72,10 @@ pub fn apply_event(state: &mut SessionState, event: AgentEvent) {
     }
 
     // Unified: route to agent conversation by name (root = "main")
-    let name = event.agent_name.unwrap_or_else(|| ROOT_AGENT.into());
+    let name = event
+        .agent_name
+        .as_ref()
+        .map(|a| a.to_string())
+        .unwrap_or_else(|| ROOT_AGENT.to_string());
     crate::agent_handler::apply_agent_event(state, &name, event.payload);
 }

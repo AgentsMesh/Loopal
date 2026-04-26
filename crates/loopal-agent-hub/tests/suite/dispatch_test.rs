@@ -57,12 +57,16 @@ async fn dispatch_route_without_target_fails() {
     let hub = make_hub();
     let envelope = json!({
         "id": "00000000-0000-0000-0000-000000000000",
-        "source": {"Agent": "sender"},
-        "target": "nonexistent",
+        "source": {"Agent": {"hub": [], "agent": "sender"}},
+        "target": {"hub": [], "agent": "nonexistent"},
         "content": {"text": "hi", "images": []},
         "timestamp": "2026-01-01T00:00:00Z"
     });
     let result = dispatch_hub_request(&hub, "hub/route", envelope, "sender".into()).await;
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("not found"));
+    let err = result.unwrap_err();
+    assert!(
+        err.contains("no agent") || err.contains("uplink"),
+        "expected local-miss error, got: {err}"
+    );
 }

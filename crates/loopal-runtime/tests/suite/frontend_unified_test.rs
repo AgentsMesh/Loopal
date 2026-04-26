@@ -68,7 +68,10 @@ async fn test_unified_emit_wraps_agent_name() {
     f.emit(AgentEventPayload::Finished).await.unwrap();
 
     let event = event_rx.recv().await.unwrap();
-    assert_eq!(event.agent_name.as_deref(), Some("researcher"));
+    assert_eq!(
+        event.agent_name.as_ref().map(|a| a.to_string()).as_deref(),
+        Some("researcher")
+    );
 }
 
 #[tokio::test]

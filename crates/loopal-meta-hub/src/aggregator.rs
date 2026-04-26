@@ -43,11 +43,17 @@ impl EventAggregator {
     }
 }
 
-/// Prefix the event's agent_name with `"hub_name/"` for global uniqueness.
+/// Stamp this hub's name into the event (SNAT-equivalent for events).
+///
+/// Two surfaces get NATed:
+/// 1. `event.agent_name` — always (hub itself is the originator if `None`).
+/// 2. `event.payload` — every still-local qualified address inside, so the
+///    payload is self-describing once it reaches the MetaHub broadcast plane.
 pub fn prefix_agent_name(event: &mut AgentEvent, hub_name: &str) {
-    if let Some(ref agent_name) = event.agent_name {
-        event.agent_name = Some(format!("{hub_name}/{agent_name}"));
+    if let Some(ref mut addr) = event.agent_name {
+        addr.prepend_hub_if_local(hub_name.to_string());
     } else {
-        event.agent_name = Some(hub_name.to_string());
+        event.agent_name = Some(loopal_protocol::QualifiedAddress::local(hub_name));
     }
+    event.payload.prepend_self_hub(hub_name);
 }

@@ -82,7 +82,8 @@ async fn recv_input_skips_unknown_notifications() {
                 methods::AGENT_MESSAGE.name,
                 serde_json::json!({
                     "id": "00000000-0000-0000-0000-000000000000",
-                    "source": "Human", "target": "main",
+                    "source": "Human",
+                    "target": {"hub": [], "agent": "main"},
                     "content": {"text": "test", "images": []},
                     "timestamp": "2024-01-01T00:00:00Z"
                 }),

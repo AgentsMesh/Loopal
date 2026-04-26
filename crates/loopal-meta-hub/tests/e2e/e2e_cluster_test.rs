@@ -98,8 +98,8 @@ async fn cluster_cross_hub_message_delivery() {
     // Route message from hub-a to hub-b/main
     let envelope = json!({
         "id": "00000000-0000-0000-0000-000000000020",
-        "source": {"Agent": "main"},
-        "target": "hub-b/main",
+        "source": {"Agent": {"hub": [], "agent": "main"}},
+        "target": {"hub": ["hub-b"], "agent": "main"},
         "content": {"text": "hello from hub-a", "images": []},
         "timestamp": "2026-01-01T00:00:00Z"
     });

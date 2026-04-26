@@ -1,4 +1,4 @@
-use loopal_protocol::{Envelope, MessageSource};
+use loopal_protocol::{Envelope, MessageSource, QualifiedAddress};
 
 #[test]
 fn test_envelope_new_generates_unique_ids() {
@@ -10,12 +10,15 @@ fn test_envelope_new_generates_unique_ids() {
 #[test]
 fn test_envelope_fields_stored_correctly() {
     let env = Envelope::new(
-        MessageSource::Agent("researcher".into()),
+        MessageSource::Agent(QualifiedAddress::local("researcher")),
         "main",
         "found results",
     );
-    assert_eq!(env.source, MessageSource::Agent("researcher".into()));
-    assert_eq!(env.target, "main");
+    assert_eq!(
+        env.source,
+        MessageSource::Agent(QualifiedAddress::local("researcher"))
+    );
+    assert_eq!(env.target, QualifiedAddress::local("main"));
     assert_eq!(env.content.text, "found results");
 }
 
@@ -37,7 +40,7 @@ fn test_envelope_serde_roundtrip() {
     let env = Envelope::new(
         MessageSource::Channel {
             channel: "general".into(),
-            from: "bot".into(),
+            from: QualifiedAddress::local("bot"),
         },
         "worker-1",
         "task update",
@@ -53,13 +56,12 @@ fn test_envelope_serde_roundtrip() {
 #[test]
 fn test_message_source_variants() {
     let human = MessageSource::Human;
-    let agent = MessageSource::Agent("coder".into());
+    let agent = MessageSource::Agent(QualifiedAddress::local("coder"));
     let channel = MessageSource::Channel {
         channel: "updates".into(),
-        from: "notifier".into(),
+        from: QualifiedAddress::local("notifier"),
     };
 
-    // Ensure PartialEq works across variants
     assert_ne!(human, agent);
     assert_ne!(agent, channel);
     assert_eq!(human, MessageSource::Human);
@@ -71,10 +73,116 @@ fn test_scheduled_source_label() {
 }
 
 #[test]
+fn test_agent_label_uses_qualified_form() {
+    let local = MessageSource::Agent(QualifiedAddress::local("alpha"));
+    assert_eq!(local.label(), "alpha");
+
+    let remote = MessageSource::Agent(QualifiedAddress::remote(["hub-A"], "alpha"));
+    assert_eq!(remote.label(), "hub-A/alpha");
+}
+
+#[test]
 fn test_scheduled_source_serde_roundtrip() {
     let env = Envelope::new(MessageSource::Scheduled, "main", "check deploys");
     let json = serde_json::to_string(&env).unwrap();
     let restored: Envelope = serde_json::from_str(&json).unwrap();
     assert_eq!(restored.source, MessageSource::Scheduled);
     assert_eq!(restored.content.text, "check deploys");
+}
+
+#[test]
+fn test_apply_snat_stamps_source_with_self_hub() {
+    let mut env = Envelope::new(
+        MessageSource::Agent(QualifiedAddress::local("alpha")),
+        "hub-B/beta",
+        "hi",
+    );
+    env.apply_snat("hub-A");
+    let MessageSource::Agent(addr) = &env.source else {
+        panic!("expected Agent source");
+    };
+    assert_eq!(addr, &QualifiedAddress::remote(["hub-A"], "alpha"));
+    assert_eq!(env.target, QualifiedAddress::remote(["hub-B"], "beta"));
+}
+
+#[test]
+fn test_apply_dnat_pops_target_next_hop() {
+    let mut env = Envelope::new(
+        MessageSource::Agent(QualifiedAddress::remote(["hub-A"], "alpha")),
+        "hub-B/beta",
+        "hi",
+    );
+    let consumed = env.apply_dnat();
+    assert_eq!(consumed.as_deref(), Some("hub-B"));
+    assert_eq!(env.target, QualifiedAddress::local("beta"));
+}
+
+#[test]
+fn test_apply_snat_is_noop_for_non_addressable_sources() {
+    // Human / Scheduled / System sources have no qualified address to
+    // stamp — apply_snat must leave them untouched. This guards against
+    // future MessageSource refactors accidentally promoting these
+    // variants into the NAT path.
+    for source in [
+        MessageSource::Human,
+        MessageSource::Scheduled,
+        MessageSource::System("agent-completed".into()),
+    ] {
+        let mut env = Envelope::new(source.clone(), "main", "x");
+        env.apply_snat("hub-A");
+        assert_eq!(env.source, source, "non-addressable source must not change");
+        // Target SNAT is not envelope-side; target only changes via DNAT.
+        assert_eq!(env.target, QualifiedAddress::local("main"));
+    }
+}
+
+#[test]
+fn test_apply_snat_stamps_channel_from() {
+    let mut env = Envelope::new(
+        MessageSource::Channel {
+            channel: "general".into(),
+            from: QualifiedAddress::local("alpha"),
+        },
+        "hub-B/beta",
+        "hi",
+    );
+    env.apply_snat("hub-A");
+    let MessageSource::Channel { from, .. } = &env.source else {
+        panic!("expected Channel source");
+    };
+    assert_eq!(from, &QualifiedAddress::remote(["hub-A"], "alpha"));
+}
+
+#[test]
+fn test_snat_dnat_compose_for_round_trip() {
+    // α in hub-A → β in hub-B
+    let mut out = Envelope::new(
+        MessageSource::Agent(QualifiedAddress::local("alpha")),
+        "hub-B/beta",
+        "ping",
+    );
+    out.apply_snat("hub-A"); // hub-A uplink stamps source
+
+    // arrives at hub-B; meta-hub strips next hop in target
+    out.apply_dnat();
+
+    // β replies using the source it received
+    let reply_target = match &out.source {
+        MessageSource::Agent(addr) => addr.clone(),
+        _ => panic!("expected Agent source"),
+    };
+    let mut reply = Envelope::new(
+        MessageSource::Agent(QualifiedAddress::local("beta")),
+        reply_target,
+        "pong",
+    );
+    reply.apply_snat("hub-B");
+    reply.apply_dnat();
+
+    // α receives the reply with hub-B in source
+    assert_eq!(
+        reply.source,
+        MessageSource::Agent(QualifiedAddress::remote(["hub-B"], "beta"))
+    );
+    assert_eq!(reply.target, QualifiedAddress::local("alpha"));
 }

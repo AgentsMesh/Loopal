@@ -44,7 +44,8 @@ pub async fn agent_io_loop(
                     && let Ok(mut event) = serde_json::from_value::<AgentEvent>(params)
                 {
                     if event.agent_name.is_none() {
-                        event.agent_name = Some(agent_name.clone());
+                        event.agent_name =
+                            Some(loopal_protocol::QualifiedAddress::local(agent_name.clone()));
                     }
                     let h = hub.lock().await;
                     if h.registry.event_sender().try_send(event).is_err() {

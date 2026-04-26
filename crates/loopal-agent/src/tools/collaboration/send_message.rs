@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
 use loopal_ipc::protocol::methods;
-use loopal_protocol::{Envelope, MessageSource};
+use loopal_protocol::{Envelope, MessageSource, QualifiedAddress};
 use loopal_tool_api::PermissionLevel;
 use loopal_tool_api::{Tool, ToolContext, ToolResult};
 
@@ -51,9 +51,11 @@ impl Tool for SendMessageTool {
         })?;
         let content = input["message"].as_str().unwrap_or("");
 
+        // Source carries this agent's local view (no hub prefix). Hub-A's
+        // uplink applies SNAT (`apply_snat`) before forwarding cross-hub.
         let envelope = Envelope::new(
-            MessageSource::Agent(shared.agent_name.clone()),
-            target,
+            MessageSource::Agent(QualifiedAddress::local(shared.agent_name.clone())),
+            QualifiedAddress::parse(target),
             content,
         );
         let params = serde_json::to_value(&envelope)

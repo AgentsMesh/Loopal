@@ -117,6 +117,10 @@ pub async fn register_agent_connection(
     // Bridge task forwards to the agent process via IPC.
     let (completion_tx, completion_rx) = mpsc::channel::<Envelope>(32);
 
+    // String parent comes in qualified-or-bare form depending on caller
+    // (cross-hub spawn provides "hub/agent", local spawn provides "agent").
+    let parent_addr = parent.map(loopal_protocol::QualifiedAddress::parse);
+
     {
         let mut h = hub.lock().await;
 
@@ -134,15 +138,16 @@ pub async fn register_agent_connection(
             }
         }
 
-        if let Some(p) = parent
-            && !h.registry.agents.contains_key(p)
+        if let Some(p) = &parent_addr
+            && p.is_local()
+            && !h.registry.agents.contains_key(&p.agent)
         {
             warn!(agent = %name, parent = %p, "parent not found");
         }
         if let Err(e) = h.registry.register_connection_with_parent(
             name,
             conn.clone(),
-            parent,
+            parent_addr.clone(),
             model,
             Some(completion_tx),
         ) {
@@ -162,7 +167,7 @@ pub async fn register_agent_connection(
         let event = AgentEvent::root(AgentEventPayload::SubAgentSpawned {
             name: name.to_string(),
             agent_id: agent_id.clone(),
-            parent: parent.map(String::from),
+            parent: parent_addr.clone(),
             model: model.map(String::from),
             session_id: session_id.map(String::from),
         });

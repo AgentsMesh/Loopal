@@ -10,7 +10,7 @@ pub mod agent_io;
 pub mod agent_registry;
 pub mod dispatch;
 mod event_router;
-mod finish;
+pub mod finish;
 mod hub;
 pub mod hub_server;
 mod hub_ui_client;

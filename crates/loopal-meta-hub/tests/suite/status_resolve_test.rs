@@ -1,4 +1,4 @@
-//! Tests: hub/status, meta/list_hubs, meta/resolve, heartbeat.
+//! Tests: hub/status, meta/list_hubs, heartbeat.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -62,46 +62,6 @@ async fn list_hubs_returns_registered() {
     .await
     .unwrap();
     assert_eq!(r["hubs"].as_array().unwrap().len(), 2);
-}
-
-#[tokio::test]
-async fn resolve_agent_finds_correct_hub() {
-    let meta_hub = Arc::new(Mutex::new(MetaHub::new()));
-    let (ha, _) = make_hub();
-    let (hb, _) = make_hub();
-    let _a = wire_hub_to_meta("hub-a", &ha, &meta_hub).await;
-    let _b = wire_hub_to_meta("hub-b", &hb, &meta_hub).await;
-    let (_c, _rx) = register_mock_agent(&hb, "only-on-b", None).await;
-    tokio::time::sleep(Duration::from_millis(50)).await;
-
-    let r = loopal_meta_hub::dispatch::dispatch_meta_request(
-        &meta_hub,
-        methods::META_RESOLVE.name,
-        json!({"agent_name": "only-on-b"}),
-        "hub-a".into(),
-    )
-    .await
-    .unwrap();
-    assert_eq!(r["found"].as_bool(), Some(true));
-    assert_eq!(r["hub"].as_str(), Some("hub-b"));
-}
-
-#[tokio::test]
-async fn resolve_nonexistent_returns_false() {
-    let meta_hub = Arc::new(Mutex::new(MetaHub::new()));
-    let (ha, _) = make_hub();
-    let _a = wire_hub_to_meta("hub-a", &ha, &meta_hub).await;
-    tokio::time::sleep(Duration::from_millis(50)).await;
-
-    let r = loopal_meta_hub::dispatch::dispatch_meta_request(
-        &meta_hub,
-        methods::META_RESOLVE.name,
-        json!({"agent_name": "ghost"}),
-        "hub-a".into(),
-    )
-    .await
-    .unwrap();
-    assert_eq!(r["found"].as_bool(), Some(false));
 }
 
 #[tokio::test]

@@ -84,30 +84,16 @@ async fn event_aggregation_prefixes_hub_name() {
 
     let received = tokio::time::timeout(Duration::from_secs(1), event_rx.recv()).await;
     assert_eq!(
-        received.unwrap().unwrap().agent_name.as_deref(),
+        received
+            .unwrap()
+            .unwrap()
+            .agent_name
+            .map(|a| a.to_string())
+            .as_deref(),
         Some("hub-b/test-agent")
     );
 }
 
-#[tokio::test]
-async fn hub_disconnect_cleans_up_registry() {
-    let meta_hub = Arc::new(Mutex::new(MetaHub::new()));
-    let (_, meta_transport) = loopal_ipc::duplex_pair();
-    let meta_conn = Arc::new(Connection::new(meta_transport));
-    let _rx = meta_conn.start();
-    {
-        let mut mh = meta_hub.lock().await;
-        mh.registry
-            .register("dying-hub", meta_conn, vec![])
-            .unwrap();
-        mh.router.cache_insert("agent-on-dying", "dying-hub");
-        mh.remove_hub("dying-hub");
-        assert_eq!(mh.registry.len(), 0);
-        assert!(mh.router.cache_lookup("agent-on-dying").is_none());
-    }
-}
-
-/// Hub with local UI clients does NOT relay via uplink (regression).
 #[tokio::test]
 async fn local_ui_skips_uplink_relay() {
     let (hub, _) = make_hub();
@@ -192,9 +178,9 @@ async fn multi_hub_events_in_single_broadcast() {
         .unwrap()
         .unwrap();
 
-    let names: Vec<_> = [e1, e2]
+    let names: Vec<String> = [e1, e2]
         .iter()
-        .filter_map(|e| e.agent_name.clone())
+        .filter_map(|e| e.agent_name.as_ref().map(|a| a.to_string()))
         .collect();
     assert!(names.contains(&"hub-a/worker-1".to_string()));
     assert!(names.contains(&"hub-b/worker-2".to_string()));

@@ -141,11 +141,6 @@ pub mod methods {
     /// Cross-hub message routing (envelope forwarding).
     pub const META_ROUTE: Method = Method { name: "meta/route" };
 
-    /// MetaHub asks Sub-Hub if a named agent exists locally.
-    pub const META_RESOLVE: Method = Method {
-        name: "meta/resolve",
-    };
-
     /// Cross-hub agent spawn delegation.
     pub const META_SPAWN: Method = Method { name: "meta/spawn" };
 

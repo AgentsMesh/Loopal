@@ -110,7 +110,9 @@ async fn bridge_forwards_mailbox_messages_to_ipc() {
     match msg {
         Some(loopal_ipc::connection::Incoming::Request { method, params, .. }) => {
             assert_eq!(method, methods::AGENT_MESSAGE.name);
-            assert_eq!(params["target"], "main");
+            // QualifiedAddress serializes as { "hub": [...], "agent": "name" }
+            assert_eq!(params["target"]["agent"], "main");
+            assert!(params["target"]["hub"].as_array().unwrap().is_empty());
         }
         other => panic!("expected message request, got: {other:?}"),
     }

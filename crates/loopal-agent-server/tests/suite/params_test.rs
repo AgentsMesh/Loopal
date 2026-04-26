@@ -86,7 +86,10 @@ async fn event_forwarder_delivers_sub_agent_events() {
         Incoming::Notification { method, params } => {
             assert_eq!(method, methods::AGENT_EVENT.name);
             let ev: loopal_protocol::AgentEvent = serde_json::from_value(params).unwrap();
-            assert_eq!(ev.agent_name.as_deref(), Some("sub-1"));
+            assert_eq!(
+                ev.agent_name.as_ref().map(|a| a.to_string()).as_deref(),
+                Some("sub-1")
+            );
             match ev.payload {
                 loopal_protocol::AgentEventPayload::Stream { text } => {
                     assert_eq!(text, "from sub-agent");

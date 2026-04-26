@@ -17,7 +17,7 @@ pub async fn handle_agent_info(hub: &Arc<Mutex<Hub>>, params: Value) -> Result<V
     if let Some(info) = h.registry.agent_info(name) {
         Ok(json!({
             "name": info.name,
-            "parent": info.parent,
+            "parent": info.parent.as_ref().map(|p| p.to_string()),
             "children": info.children,
             "lifecycle": format!("{:?}", info.lifecycle),
             "model": info.model,

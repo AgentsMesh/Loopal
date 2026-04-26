@@ -174,8 +174,8 @@ async fn send_message_running_vs_finished() {
     // Route to running agent → should succeed
     let envelope = json!({
         "id": "00000000-0000-0000-0000-000000000001",
-        "source": {"Agent": "sender"},
-        "target": "receiver",
+        "source": {"Agent": {"hub": [], "agent": "sender"}},
+        "target": {"hub": [], "agent": "receiver"},
         "content": {"text": "hello", "images": []},
         "timestamp": "2026-01-01T00:00:00Z"
     });
@@ -192,8 +192,8 @@ async fn send_message_running_vs_finished() {
     // Route to finished agent → should fail
     let envelope2 = json!({
         "id": "00000000-0000-0000-0000-000000000002",
-        "source": {"Agent": "sender"},
-        "target": "receiver",
+        "source": {"Agent": {"hub": [], "agent": "sender"}},
+        "target": {"hub": [], "agent": "receiver"},
         "content": {"text": "hello again", "images": []},
         "timestamp": "2026-01-01T00:00:00Z"
     });

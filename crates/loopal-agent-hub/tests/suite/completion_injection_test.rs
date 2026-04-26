@@ -96,8 +96,11 @@ async fn child_completion_delivered_to_parent_via_bridge() {
         .expect("channel should not close");
 
     assert!(
-        matches!(envelope.source, MessageSource::System(ref k) if k == "agent-completed"),
-        "source should be System(agent-completed), got: {:?}",
+        matches!(
+            envelope.source,
+            MessageSource::Agent(ref qa) if qa.agent == "child-a" && qa.is_local()
+        ),
+        "source should be Agent(local('child-a')), got: {:?}",
         envelope.source
     );
     let text = &envelope.content.text;

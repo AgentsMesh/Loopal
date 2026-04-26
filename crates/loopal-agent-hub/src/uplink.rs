@@ -48,9 +48,13 @@ impl HubUplink {
     }
 
     /// Route an envelope to a remote agent via MetaHub.
+    ///
+    /// Applies SNAT before forwarding: stamps this hub's name onto the
+    /// envelope source so the receiver sees the full return path.
     pub async fn route(&self, envelope: &Envelope) -> Result<(), String> {
-        let params =
-            serde_json::to_value(envelope).map_err(|e| format!("serialize envelope: {e}"))?;
+        let mut env = envelope.clone();
+        env.apply_snat(&self.hub_name);
+        let params = serde_json::to_value(&env).map_err(|e| format!("serialize envelope: {e}"))?;
         let resp = self
             .conn
             .send_request(methods::META_ROUTE.name, params)
@@ -104,7 +108,7 @@ impl HubUplink {
     }
 }
 
-/// Process reverse requests from MetaHub (meta/resolve, agent/message, hub/*).
+/// Process reverse requests from MetaHub (agent/message, hub/*).
 ///
 /// Shared implementation used by both production bootstrap and integration tests.
 /// Runs until the connection closes.
@@ -118,29 +122,26 @@ pub async fn handle_reverse_requests(
     while let Some(msg) = rx.recv().await {
         match msg {
             Incoming::Request { id, method, params } => {
-                if method == methods::META_RESOLVE.name {
-                    let agent = params["agent_name"].as_str().unwrap_or("");
-                    let found = hub
-                        .lock()
-                        .await
-                        .registry
-                        .get_agent_connection(agent)
-                        .is_some();
-                    let _ = conn.respond(id, json!({"found": found})).await;
-                } else if method == methods::AGENT_MESSAGE.name {
+                if method == methods::AGENT_MESSAGE.name {
                     let ok = if let Ok(env) =
                         serde_json::from_value::<loopal_protocol::Envelope>(params)
                     {
-                        // If this is a remote agent completion, trigger shadow entry
-                        if let loopal_protocol::MessageSource::System(ref tag) = env.source
-                            && tag == "agent-completed"
-                            && let Some(child) = extract_agent_result_name(&env)
-                        {
+                        // Remote agent completions arrive with the agent-result
+                        // marker in content. Detect by content (not source tag)
+                        // so it works with the typed Agent source after SNAT.
+                        if let Some(child) = extract_agent_result_name(&env) {
                             let output = env.content.text.clone();
                             let mut h = hub.lock().await;
                             h.registry.emit_agent_finished(&child, Some(output));
                             h.registry.unregister_connection(&child);
                         }
+                        // Defense in depth: target should be local at this point
+                        // (MetaHub router consumed the next-hop hub via DNAT).
+                        debug_assert!(
+                            env.target.is_local(),
+                            "target should be local after MetaHub DNAT, got {:?}",
+                            env.target
+                        );
                         hub.lock().await.registry.route_message(&env).await.is_ok()
                     } else {
                         false
@@ -170,6 +171,11 @@ pub async fn handle_reverse_requests(
                 if method == methods::AGENT_MESSAGE.name
                     && let Ok(env) = serde_json::from_value::<loopal_protocol::Envelope>(params)
                 {
+                    debug_assert!(
+                        env.target.is_local(),
+                        "notification target should be local after DNAT, got {:?}",
+                        env.target
+                    );
                     let _ = hub.lock().await.registry.route_message(&env).await;
                 }
             }

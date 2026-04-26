@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 
+use crate::address::QualifiedAddress;
 use crate::bg_task::BgTaskStatus;
 use crate::cron_snapshot::CronJobSnapshot;
+use crate::envelope::MessageSource;
 use crate::mcp_snapshot::McpServerSnapshot;
 use crate::question::Question;
 use crate::task_snapshot::TaskSnapshot;
@@ -89,8 +91,11 @@ pub enum AgentEventPayload {
     Finished,
     /// Inter-agent message routed through MessageRouter (Observation Plane).
     MessageRouted {
-        source: String,
-        target: String,
+        /// Origin: full `MessageSource` so observers see the kind
+        /// (Human/Agent/Channel/Scheduled/System) plus any qualified address.
+        source: MessageSource,
+        /// Routed-to address. Carries the post-NAT view of the receiver.
+        target: QualifiedAddress,
         content_preview: String,
     },
     /// Tool is requesting user to answer questions.
@@ -128,8 +133,9 @@ pub enum AgentEventPayload {
     SubAgentSpawned {
         name: String,
         agent_id: String,
+        /// Parent address (qualified when spawned cross-hub).
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        parent: Option<String>,
+        parent: Option<QualifiedAddress>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         model: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -180,4 +186,29 @@ pub enum AgentEventPayload {
     TasksChanged { tasks: Vec<TaskSnapshot> },
     /// Full scheduled cron jobs snapshot (emitted by the periodic bridge).
     CronsChanged { crons: Vec<CronJobSnapshot> },
+}
+
+impl AgentEventPayload {
+    /// SNAT — stamp `self_hub` onto every still-local qualified address
+    /// inside this payload. Already-qualified (cross-hub) addresses are
+    /// left untouched. Called by the event aggregator before relaying an
+    /// event upward to the MetaHub broadcast plane so receivers see a
+    /// fully-qualified, self-describing payload.
+    pub fn prepend_self_hub(&mut self, self_hub: &str) {
+        match self {
+            Self::MessageRouted { source, target, .. } => {
+                source.prepend_hub_if_local(self_hub);
+                target.prepend_hub_if_local(self_hub);
+            }
+            Self::SubAgentSpawned {
+                parent: Some(p), ..
+            } => {
+                p.prepend_hub_if_local(self_hub);
+            }
+            // Other variants either carry no qualified address or carry
+            // local-only data (tool ids, token counts, etc.) that are
+            // meaningful only inside the originating hub.
+            _ => {}
+        }
+    }
 }

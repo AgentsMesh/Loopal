@@ -150,7 +150,10 @@ async fn topology_tracks_parent_child() {
         .registry
         .agent_info("child-1")
         .expect("child should exist");
-    assert_eq!(child_info.parent.as_deref(), Some("parent"));
+    assert_eq!(
+        child_info.parent.as_ref().map(|p| p.to_string()).as_deref(),
+        Some("parent")
+    );
     assert_eq!(child_info.model.as_deref(), Some("sonnet"));
 
     let descendants = h.registry.descendants("parent");

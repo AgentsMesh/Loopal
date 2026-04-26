@@ -16,7 +16,6 @@ pub async fn dispatch_meta_request(
 ) -> Result<Value, String> {
     match method {
         m if m == methods::META_ROUTE.name => handle_meta_route(meta_hub, params, &from_hub).await,
-        m if m == methods::META_RESOLVE.name => handle_meta_resolve(meta_hub, params).await,
         m if m == methods::META_SPAWN.name => handle_meta_spawn(meta_hub, params).await,
         m if m == methods::META_LIST_HUBS.name => handle_meta_list_hubs(meta_hub).await,
         m if m == methods::META_TOPOLOGY.name => handle_meta_topology(meta_hub).await,
@@ -37,11 +36,11 @@ async fn handle_meta_route(
     let envelope: loopal_protocol::Envelope =
         serde_json::from_value(params).map_err(|e| format!("invalid envelope: {e}"))?;
 
-    // Self-routing detection: if target explicitly names the originating hub, reject.
-    let addr = loopal_protocol::QualifiedAddress::parse(&envelope.target);
-    if addr.hub.as_deref() == Some(from_hub) {
+    // Self-routing detection: the next hop in target equals the originating hub.
+    if envelope.target.next_hop() == Some(from_hub) {
         return Err(format!(
-            "self-routing detected: target '{}' is on originating hub '{from_hub}', route locally",
+            "self-routing detected: target '{}' next-hop is originating hub '{from_hub}', \
+             route locally instead",
             envelope.target
         ));
     }
@@ -58,33 +57,6 @@ async fn handle_meta_route(
 
     mh.router.route(&envelope, &refs).await?;
     Ok(json!({"ok": true}))
-}
-
-/// Resolve whether an agent exists on any Sub-Hub.
-///
-/// Single lock acquisition — candidates snapshot and resolution happen together.
-async fn handle_meta_resolve(
-    meta_hub: &Arc<Mutex<MetaHub>>,
-    params: Value,
-) -> Result<Value, String> {
-    let agent_name = params["agent_name"]
-        .as_str()
-        .ok_or("missing 'agent_name'")?;
-
-    let mut mh = meta_hub.lock().await;
-    let candidates: Vec<(String, Arc<loopal_ipc::connection::Connection>)> = mh
-        .registry
-        .alive_hubs()
-        .into_iter()
-        .map(|(name, conn)| (name.to_string(), conn.clone()))
-        .collect();
-    let refs: Vec<(&str, &Arc<loopal_ipc::connection::Connection>)> =
-        candidates.iter().map(|(n, c)| (n.as_str(), c)).collect();
-
-    match mh.router.resolve_agent(agent_name, &refs).await {
-        Some(hub_name) => Ok(json!({"found": true, "hub": hub_name})),
-        None => Ok(json!({"found": false})),
-    }
 }
 
 /// Delegate agent spawn to a specific Sub-Hub.

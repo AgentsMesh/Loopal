@@ -14,7 +14,9 @@ use tracing::{debug, info};
 
 use loopal_error::{LoopalError, Result};
 use loopal_ipc::protocol::methods;
-use loopal_protocol::{AgentEvent, AgentEventPayload, Question, UserQuestionResponse};
+use loopal_protocol::{
+    AgentEvent, AgentEventPayload, QualifiedAddress, Question, UserQuestionResponse,
+};
 use loopal_runtime::agent_input::AgentInput;
 use loopal_runtime::frontend::traits::{AgentFrontend, EventEmitter};
 use loopal_tool_api::PermissionDecision;
@@ -26,7 +28,8 @@ use crate::session_hub::SharedSession;
 pub struct HubFrontend {
     session: tokio::sync::RwLock<Arc<SharedSession>>,
     input_rx: tokio::sync::Mutex<tokio::sync::mpsc::Receiver<AgentInput>>,
-    agent_name: Option<String>,
+    /// Pre-converted to a local qualified address.
+    agent_name: Option<QualifiedAddress>,
     /// Watch channel for interrupt detection in recv_input.
     interrupt_rx: tokio::sync::Mutex<tokio::sync::watch::Receiver<u64>>,
 }
@@ -41,7 +44,7 @@ impl HubFrontend {
         Self {
             session: tokio::sync::RwLock::new(session),
             input_rx: tokio::sync::Mutex::new(input_rx),
-            agent_name,
+            agent_name: agent_name.map(QualifiedAddress::local),
             interrupt_rx: tokio::sync::Mutex::new(interrupt_rx),
         }
     }

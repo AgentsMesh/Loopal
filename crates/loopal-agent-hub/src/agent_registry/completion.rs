@@ -1,7 +1,7 @@
 //! Agent completion tracking, result delivery, and cascade interrupt.
 
 use loopal_ipc::protocol::methods;
-use loopal_protocol::{AgentEvent, AgentEventPayload, Envelope, MessageSource};
+use loopal_protocol::{AgentEvent, AgentEventPayload, Envelope, MessageSource, QualifiedAddress};
 use tokio::sync::{mpsc, watch};
 
 use super::AgentRegistry;
@@ -45,16 +45,22 @@ impl AgentRegistry {
     }
 
     /// Build the delivery envelope and find the parent's completion_tx.
-    /// Returns None if no parent or no completion channel.
+    /// Returns None if no parent, parent is remote, or parent has no
+    /// completion channel registered.
     fn prepare_parent_delivery(
         &self,
         child_name: &str,
         result: &str,
     ) -> Option<(mpsc::Sender<Envelope>, Envelope)> {
-        let parent_name = self.agents.get(child_name)?.info.parent.as_deref()?;
+        let parent = self.agents.get(child_name)?.info.parent.as_ref()?;
+        // Local-only delivery path. Remote parents take the uplink route in
+        // `finish::finish_and_deliver` instead.
+        if parent.is_remote() {
+            return None;
+        }
         let tx = self
             .agents
-            .get(parent_name)?
+            .get(&parent.agent)?
             .completion_tx
             .as_ref()?
             .clone();
@@ -65,9 +71,11 @@ impl AgentRegistry {
             result.to_string()
         };
         let content = format!("<agent-result name=\"{child_name}\">\n{body}\n</agent-result>");
+        // Source carries the child's local view; uplink SNAT stamps the
+        // origin hub when this completion is delivered to a remote parent.
         let envelope = Envelope::new(
-            MessageSource::System("agent-completed".into()),
-            parent_name,
+            MessageSource::Agent(QualifiedAddress::local(child_name)),
+            parent.clone(),
             content,
         );
         Some((tx, envelope))

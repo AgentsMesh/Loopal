@@ -37,10 +37,7 @@ impl MetaHub {
     }
 
     /// Remove a sub-hub (disconnect cleanup).
-    ///
-    /// Invalidates router cache and unregisters.
     pub fn remove_hub(&mut self, hub_name: &str) {
-        self.router.invalidate_hub(hub_name);
         self.registry.unregister(hub_name);
         tracing::info!(hub = %hub_name, "sub-hub fully removed");
     }

@@ -1,10 +1,10 @@
-use loopal_protocol::{AgentEvent, AgentEventPayload};
+use loopal_protocol::{AgentEvent, AgentEventPayload, MessageSource, QualifiedAddress};
 
 #[test]
 fn test_event_message_routed_serde_roundtrip() {
     let event = AgentEvent::root(AgentEventPayload::MessageRouted {
-        source: "agent-a".into(),
-        target: "agent-b".into(),
+        source: MessageSource::Agent(QualifiedAddress::local("agent-a")),
+        target: QualifiedAddress::local("agent-b"),
         content_preview: "hello world".into(),
     });
     let json = serde_json::to_string(&event).unwrap();
@@ -15,8 +15,11 @@ fn test_event_message_routed_serde_roundtrip() {
         content_preview,
     } = deserialized.payload
     {
-        assert_eq!(source, "agent-a");
-        assert_eq!(target, "agent-b");
+        assert_eq!(
+            source,
+            MessageSource::Agent(QualifiedAddress::local("agent-a"))
+        );
+        assert_eq!(target, QualifiedAddress::local("agent-b"));
         assert_eq!(content_preview, "hello world");
     } else {
         panic!("expected AgentEventPayload::MessageRouted");
@@ -28,7 +31,10 @@ fn test_event_named_agent_serde_roundtrip() {
     let event = AgentEvent::named("worker", AgentEventPayload::Started);
     let json = serde_json::to_string(&event).unwrap();
     let deserialized: AgentEvent = serde_json::from_str(&json).unwrap();
-    assert_eq!(deserialized.agent_name, Some("worker".to_string()));
+    assert_eq!(
+        deserialized.agent_name,
+        Some(QualifiedAddress::local("worker"))
+    );
     assert!(matches!(deserialized.payload, AgentEventPayload::Started));
 }
 

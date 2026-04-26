@@ -103,8 +103,8 @@ async fn route_to_disconnected_agent_returns_error() {
 
     let envelope = json!({
         "id": "00000000-0000-0000-0000-000000000003",
-        "source": {"Agent": "sender"},
-        "target": "ghost",
+        "source": {"Agent": {"hub": [], "agent": "sender"}},
+        "target": {"hub": [], "agent": "ghost"},
         "content": {"text": "are you there?", "images": []},
         "timestamp": "2026-01-01T00:00:00Z"
     });
@@ -141,8 +141,8 @@ async fn sibling_agents_communicate_via_hub() {
     // C sends to B directly (siblings, not parent-child)
     let envelope = json!({
         "id": "00000000-0000-0000-0000-000000000004",
-        "source": {"Agent": "sibling-c"},
-        "target": "sibling-b",
+        "source": {"Agent": {"hub": [], "agent": "sibling-c"}},
+        "target": {"hub": [], "agent": "sibling-b"},
         "content": {"text": "hey sibling", "images": []},
         "timestamp": "2026-01-01T00:00:00Z"
     });

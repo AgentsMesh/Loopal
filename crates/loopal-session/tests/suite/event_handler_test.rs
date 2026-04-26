@@ -48,7 +48,9 @@ fn test_apply_event_records_message_routed_to_feed() {
     apply_event(
         &mut state,
         AgentEvent::root(AgentEventPayload::MessageRouted {
-            source: "agent-a".into(),
+            source: loopal_protocol::MessageSource::Agent(
+                loopal_protocol::QualifiedAddress::local("agent-a"),
+            ),
             target: "agent-b".into(),
             content_preview: "test msg".into(),
         }),
@@ -73,7 +75,9 @@ fn test_apply_event_records_message_routed_to_agent_logs() {
     apply_event(
         &mut state,
         AgentEvent::root(AgentEventPayload::MessageRouted {
-            source: "sender".into(),
+            source: loopal_protocol::MessageSource::Agent(
+                loopal_protocol::QualifiedAddress::local("sender"),
+            ),
             target: "receiver".into(),
             content_preview: "hello".into(),
         }),

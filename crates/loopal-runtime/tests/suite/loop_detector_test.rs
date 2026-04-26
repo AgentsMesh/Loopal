@@ -128,9 +128,9 @@ fn loop_detector_different_inputs_independent() {
 fn loop_detector_multibyte_utf8_input_does_not_panic() {
     let mut det = LoopDetector::new();
     let mut ctx = make_ctx();
-    // Large CJK input — byte-slicing at SIGNATURE_INPUT_LIMIT (200) could land
-    // mid-character. This must not panic.
-    let cjk = "中".repeat(200); // 600 bytes, well over the 200-byte limit
+    // Large CJK input — we hash full JSON, so this only exercises UTF-8
+    // safety of the serialized string. Must not panic.
+    let cjk = "中".repeat(200); // 600 bytes
     let call = vec![("id".into(), "Write".into(), json!({"result": cjk}))];
     let action = det.on_before_tools(&mut ctx, &call);
     assert!(matches!(action, ObserverAction::Continue));

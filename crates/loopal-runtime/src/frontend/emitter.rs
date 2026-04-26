@@ -3,7 +3,7 @@ use tokio::sync::mpsc;
 
 use crate::frontend::traits::EventEmitter;
 use loopal_error::{LoopalError, Result};
-use loopal_protocol::{AgentEvent, AgentEventPayload};
+use loopal_protocol::{AgentEvent, AgentEventPayload, QualifiedAddress};
 
 /// Cloneable event emitter backed by an mpsc sender.
 ///
@@ -12,11 +12,13 @@ use loopal_protocol::{AgentEvent, AgentEventPayload};
 #[derive(Clone)]
 pub struct ChannelEventEmitter {
     tx: mpsc::Sender<AgentEvent>,
-    agent_name: Option<String>,
+    /// Stored as a qualified local address so emit doesn't reconvert.
+    /// Hub uplinks promote this to a full `hub/agent` form via SNAT.
+    agent_name: Option<QualifiedAddress>,
 }
 
 impl ChannelEventEmitter {
-    pub fn new(tx: mpsc::Sender<AgentEvent>, agent_name: Option<String>) -> Self {
+    pub fn new(tx: mpsc::Sender<AgentEvent>, agent_name: Option<QualifiedAddress>) -> Self {
         Self { tx, agent_name }
     }
 }

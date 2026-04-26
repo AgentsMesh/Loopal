@@ -10,7 +10,7 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, watch};
 
 use loopal_ipc::connection::Connection;
-use loopal_protocol::{AgentEvent, Envelope};
+use loopal_protocol::{AgentEvent, Envelope, QualifiedAddress};
 
 use crate::routing;
 use crate::topology::{AgentInfo, AgentLifecycle};
@@ -59,15 +59,17 @@ impl AgentRegistry {
         &mut self,
         name: &str,
         conn: Arc<Connection>,
-        parent: Option<&str>,
+        parent: Option<QualifiedAddress>,
         model: Option<&str>,
         completion_tx: Option<mpsc::Sender<Envelope>>,
     ) -> Result<(), String> {
         if self.agents.contains_key(name) {
             return Err(format!("agent '{name}' already registered"));
         }
-        if let Some(p) = parent
-            && let Some(pa) = self.agents.get_mut(p)
+        // Local children are tracked on the parent only when the parent is local.
+        if let Some(p) = &parent
+            && p.is_local()
+            && let Some(pa) = self.agents.get_mut(&p.agent)
         {
             pa.info.children.push(name.to_string());
         }
@@ -84,8 +86,9 @@ impl AgentRegistry {
 
     pub fn unregister_connection(&mut self, name: &str) {
         let parent = self.agents.get(name).and_then(|a| a.info.parent.clone());
-        if let Some(ref p) = parent
-            && let Some(pa) = self.agents.get_mut(p.as_str())
+        if let Some(p) = parent
+            && p.is_local()
+            && let Some(pa) = self.agents.get_mut(&p.agent)
         {
             pa.info.children.retain(|c| c != name);
         }
@@ -94,14 +97,11 @@ impl AgentRegistry {
     }
 
     /// Register a shadow entry for a remotely-spawned agent.
-    ///
-    /// The agent runs on another Hub but we need a local entry so that
-    /// `wait_agent` and `emit_agent_finished` work when the completion
-    /// notification arrives via MetaHub.
-    pub fn register_shadow(&mut self, name: &str, parent: &str) {
+    pub fn register_shadow(&mut self, name: &str, parent: QualifiedAddress) {
         use crate::topology::AgentInfo;
         use crate::types::{AgentConnectionState, ManagedAgent};
 
+        let parent_for_children = parent.clone();
         let mut info = AgentInfo::new(name, Some(parent), None);
         info.lifecycle = crate::AgentLifecycle::Running;
         self.agents.insert(
@@ -112,11 +112,14 @@ impl AgentRegistry {
                 completion_tx: None,
             },
         );
-        // Add to parent's children list (parent must be local bare name)
-        if let Some(pa) = self.agents.get_mut(parent) {
+        // Track in parent's children list when parent is local.
+        if parent_for_children.is_local()
+            && let Some(pa) = self.agents.get_mut(&parent_for_children.agent)
+        {
             pa.info.children.push(name.to_string());
         }
-        tracing::info!(agent = %name, parent = %parent, "shadow registered for remote agent");
+        tracing::info!(agent = %name, parent = %parent_for_children,
+            "shadow registered for remote agent");
     }
 
     // ── Queries ──────────────────────────────────────────────────
@@ -162,7 +165,7 @@ impl AgentRegistry {
 
     pub async fn route_message(&self, envelope: &Envelope) -> Result<(), String> {
         let conn = self
-            .get_agent_connection(&envelope.target)
+            .get_agent_connection(&envelope.target.agent)
             .ok_or_else(|| format!("no agent: '{}'", envelope.target))?;
         routing::route_to_agent(&conn, envelope, &self.event_tx).await
     }
@@ -193,7 +196,7 @@ impl AgentRegistry {
             .map(|(name, a)| {
                 serde_json::json!({
                     "name": name,
-                    "parent": a.info.parent,
+                    "parent": a.info.parent.as_ref().map(|p| p.to_string()),
                     "children": a.info.children,
                     "lifecycle": format!("{:?}", a.info.lifecycle),
                     "model": a.info.model,

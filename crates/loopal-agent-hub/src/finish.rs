@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use loopal_ipc::connection::Connection;
-use loopal_protocol::{Envelope, QualifiedAddress};
+use loopal_protocol::{Envelope, MessageSource, QualifiedAddress};
 
 use crate::hub::Hub;
 
@@ -14,7 +14,7 @@ use crate::hub::Hub;
 ///
 /// Handles both local parents (via completion_tx) and remote parents
 /// (via MetaHub uplink). Called after the agent IO loop exits.
-pub(crate) async fn finish_and_deliver(
+pub async fn finish_and_deliver(
     hub: &Arc<Mutex<Hub>>,
     name: &str,
     output: Option<String>,
@@ -22,7 +22,7 @@ pub(crate) async fn finish_and_deliver(
 ) {
     let output_text = output.as_deref().unwrap_or("(no output)").to_string();
 
-    let (pending, uplink, parent_name) = {
+    let (pending, uplink, parent_addr) = {
         let mut h = hub.lock().await;
         let parent = h
             .registry
@@ -37,21 +37,21 @@ pub(crate) async fn finish_and_deliver(
         if tx.send(envelope).await.is_err() {
             tracing::warn!(agent = %name, "parent completion channel closed");
         }
-    } else if let Some(parent) = parent_name {
-        let addr = QualifiedAddress::parse(&parent);
-        if addr.is_remote()
-            && let Some(ul) = uplink
-        {
-            let content = format!("<agent-result name=\"{name}\">\n{output_text}\n</agent-result>");
-            let envelope = Envelope::new(
-                loopal_protocol::MessageSource::System("agent-completed".into()),
-                &parent,
-                content,
-            );
-            if let Err(e) = ul.route(&envelope).await {
-                tracing::warn!(agent = %name, parent = %parent, error = %e,
-                    "failed to deliver completion to remote parent");
-            }
+    } else if let Some(parent) = parent_addr
+        && parent.is_remote()
+        && let Some(ul) = uplink
+    {
+        let content = format!("<agent-result name=\"{name}\">\n{output_text}\n</agent-result>");
+        // Use Agent(local(child)) so uplink SNAT stamps the origin hub.
+        // System("agent-completed") cannot carry hub info — see review #3.
+        let envelope = Envelope::new(
+            MessageSource::Agent(QualifiedAddress::local(name)),
+            parent.clone(),
+            content,
+        );
+        if let Err(e) = ul.route(&envelope).await {
+            tracing::warn!(agent = %name, parent = %parent, error = %e,
+                "failed to deliver completion to remote parent");
         }
     }
 

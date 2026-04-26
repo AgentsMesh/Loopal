@@ -24,16 +24,19 @@ async fn shadow_registered_with_correct_parent() {
     let (hub, _) = make_hub();
     let (_parent, _rx) = register_mock_agent(&hub, "parent", None).await;
 
-    hub.lock()
-        .await
-        .registry
-        .register_shadow("remote-child", "parent");
+    hub.lock().await.registry.register_shadow(
+        "remote-child",
+        loopal_protocol::QualifiedAddress::local("parent"),
+    );
 
     let h = hub.lock().await;
     let info = h.registry.agent_info("remote-child");
     assert!(info.is_some(), "shadow should exist");
     let info = info.unwrap();
-    assert_eq!(info.parent.as_deref(), Some("parent"));
+    assert_eq!(
+        info.parent.as_ref().map(|p| p.to_string()).as_deref(),
+        Some("parent")
+    );
     assert_eq!(format!("{:?}", info.lifecycle), "Running");
 
     // Shadow should be in parent's children
@@ -47,10 +50,10 @@ async fn wait_agent_resolves_on_shadow_completion() {
     let (hub, _) = make_hub();
     // Register parent + shadow manually (simulate post-spawn state)
     let (_parent, _rx) = register_mock_agent(&hub, "parent", None).await;
-    hub.lock()
-        .await
-        .registry
-        .register_shadow("remote-child", "parent");
+    hub.lock().await.registry.register_shadow(
+        "remote-child",
+        loopal_protocol::QualifiedAddress::local("parent"),
+    );
 
     // Start wait_agent in background
     let hub2 = hub.clone();
@@ -91,7 +94,10 @@ async fn wait_agent_resolves_on_shadow_completion() {
 async fn shadow_cleaned_up_after_completion() {
     let (hub, _) = make_hub();
     let (_parent, _rx) = register_mock_agent(&hub, "parent", None).await;
-    hub.lock().await.registry.register_shadow("child", "parent");
+    hub.lock()
+        .await
+        .registry
+        .register_shadow("child", loopal_protocol::QualifiedAddress::local("parent"));
 
     // Verify shadow exists
     assert!(hub.lock().await.registry.agent_info("child").is_some());
@@ -144,10 +150,10 @@ async fn orphan_cascade_skips_shadows() {
     )
     .await;
 
-    hub.lock()
-        .await
-        .registry
-        .register_shadow("shadow-child", "parent");
+    hub.lock().await.registry.register_shadow(
+        "shadow-child",
+        loopal_protocol::QualifiedAddress::local("parent"),
+    );
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Parent finishes → should cascade interrupt to real-child only
@@ -176,15 +182,15 @@ async fn orphan_cascade_skips_shadows() {
 async fn route_to_shadow_fails() {
     let (hub, _) = make_hub();
     let (_parent, _rx) = register_mock_agent(&hub, "parent", None).await;
-    hub.lock()
-        .await
-        .registry
-        .register_shadow("shadow-agent", "parent");
+    hub.lock().await.registry.register_shadow(
+        "shadow-agent",
+        loopal_protocol::QualifiedAddress::local("parent"),
+    );
 
     let envelope = json!({
         "id": "00000000-0000-0000-0000-000000000010",
-        "source": {"Agent": "sender"},
-        "target": "shadow-agent",
+        "source": {"Agent": {"hub": [], "agent": "sender"}},
+        "target": {"hub": [], "agent": "shadow-agent"},
         "content": {"text": "can you hear me?", "images": []},
         "timestamp": "2026-01-01T00:00:00Z"
     });
@@ -206,10 +212,10 @@ async fn route_to_shadow_fails() {
 async fn shadow_visible_in_agent_list() {
     let (hub, _) = make_hub();
     let (_parent, _rx) = register_mock_agent(&hub, "parent", None).await;
-    hub.lock()
-        .await
-        .registry
-        .register_shadow("remote-x", "parent");
+    hub.lock().await.registry.register_shadow(
+        "remote-x",
+        loopal_protocol::QualifiedAddress::local("parent"),
+    );
 
     let agents = hub.lock().await.registry.list_agents();
     let shadow = agents.iter().find(|(n, _)| n == "remote-x");

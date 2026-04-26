@@ -22,7 +22,7 @@ pub async fn route_to_agent(
         .map_err(|e| format!("delivery to '{}' failed: {e}", envelope.target))?;
 
     let event = AgentEvent::root(AgentEventPayload::MessageRouted {
-        source: envelope.source.label(),
+        source: envelope.source.clone(),
         target: envelope.target.clone(),
         content_preview: envelope.content_preview().to_string(),
     });

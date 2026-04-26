@@ -12,8 +12,6 @@ use super::turn_observer::{ObserverAction, TurnObserver};
 
 const WARN_THRESHOLD: u32 = 3;
 const ABORT_THRESHOLD: u32 = 5;
-/// Max bytes of input JSON used for signature (avoids hashing huge payloads).
-const SIGNATURE_INPUT_LIMIT: usize = 200;
 
 /// Tracks tool call signatures and their cumulative occurrence count.
 pub struct LoopDetector {
@@ -82,20 +80,16 @@ impl TurnObserver for LoopDetector {
     }
 }
 
-/// Build a stable signature from tool name + truncated input JSON.
+/// Build a stable signature from tool name + full input JSON.
+///
+/// We hash the **entire** serialized JSON (not a byte prefix). Prefix-based
+/// hashing collided when distinguishing fields sorted late in the JSON
+/// (e.g. `to` in `SendMessage`) were pushed past the cutoff by long
+/// earlier fields — causing legitimate fan-out calls to be flagged as
+/// loops. `serde_json::Value::Object` uses `BTreeMap`, so full-JSON
+/// serialization is deterministic across equivalent inputs.
 fn tool_signature(name: &str, input: &serde_json::Value) -> String {
-    let json = input.to_string();
-    let truncated = if json.len() > SIGNATURE_INPUT_LIMIT {
-        // Floor to a char boundary — byte slicing a multi-byte UTF-8 string panics.
-        let mut end = SIGNATURE_INPUT_LIMIT;
-        while end > 0 && !json.is_char_boundary(end) {
-            end -= 1;
-        }
-        &json[..end]
-    } else {
-        &json
-    };
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    truncated.hash(&mut hasher);
+    input.to_string().hash(&mut hasher);
     format!("{name}|{:x}", hasher.finish())
 }

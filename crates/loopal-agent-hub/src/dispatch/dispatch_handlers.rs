@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use loopal_ipc::protocol::methods;
-use loopal_protocol::{Envelope, QualifiedAddress};
+use loopal_protocol::Envelope;
 use serde_json::{Value, json};
 use tokio::sync::Mutex;
 use tracing::info;
@@ -15,10 +15,8 @@ pub async fn handle_route(hub: &Arc<Mutex<Hub>>, params: Value) -> Result<Value,
     let envelope: Envelope =
         serde_json::from_value(params).map_err(|e| format!("invalid envelope: {e}"))?;
 
-    let addr = QualifiedAddress::parse(&envelope.target);
-
-    // Remote address or local miss → try uplink
-    if addr.is_remote() {
+    // Remote address → uplink immediately (target carries the next hop).
+    if envelope.target.is_remote() {
         return route_via_uplink(hub, &envelope).await;
     }
 
@@ -26,7 +24,7 @@ pub async fn handle_route(hub: &Arc<Mutex<Hub>>, params: Value) -> Result<Value,
     let result = {
         let h = hub.lock().await;
         h.registry
-            .get_agent_connection(&addr.agent)
+            .get_agent_connection(&envelope.target.agent)
             .map(|conn| (conn, h.registry.event_sender()))
     };
 
@@ -134,7 +132,12 @@ pub async fn handle_spawn_agent(
             (Some(ul), Some(hn)) => {
                 let mut spawn_params = params.clone();
                 if let Some(obj) = spawn_params.as_object_mut() {
-                    obj.insert("parent".into(), json!(format!("{hn}/{from_agent}")));
+                    // Cross-hub spawn: child's parent is the local agent on
+                    // *this* hub. Encode as a qualified address (`hub/agent`)
+                    // so the receiving hub can route completions back.
+                    let parent_addr =
+                        loopal_protocol::QualifiedAddress::remote([hn.clone()], from_agent);
+                    obj.insert("parent".into(), json!(parent_addr.to_string()));
                 }
                 ul.spawn_agent(spawn_params).await
             }
@@ -146,7 +149,9 @@ pub async fn handle_spawn_agent(
             && let Some(name) = resp["name"].as_str()
         {
             let mut h = hub.lock().await;
-            h.registry.register_shadow(name, from_agent);
+            // Cross-hub child's parent lives on this hub locally.
+            h.registry
+                .register_shadow(name, loopal_protocol::QualifiedAddress::local(from_agent));
         }
         return result;
     }

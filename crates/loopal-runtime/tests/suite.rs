@@ -11,6 +11,8 @@ mod env_context_test;
 mod frontend_unified_edge_test;
 #[path = "suite/frontend_unified_test.rs"]
 mod frontend_unified_test;
+#[path = "suite/loop_detector_edge_test.rs"]
+mod loop_detector_edge_test;
 #[path = "suite/loop_detector_test.rs"]
 mod loop_detector_test;
 #[path = "suite/mode_test.rs"]

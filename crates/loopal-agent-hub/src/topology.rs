@@ -2,6 +2,8 @@
 
 use std::time::Instant;
 
+use loopal_protocol::QualifiedAddress;
+
 /// Lifecycle state of an agent managed by the Hub.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AgentLifecycle {
@@ -19,9 +21,12 @@ pub enum AgentLifecycle {
 #[derive(Debug, Clone)]
 pub struct AgentInfo {
     pub name: String,
-    /// Who spawned this agent (None for root agent).
-    pub parent: Option<String>,
-    /// Agents spawned by this agent.
+    /// Who spawned this agent. `None` for root.
+    /// Local parents have `hub.is_empty()`; remote (cross-hub) parents
+    /// carry a hub path stamped at spawn time.
+    pub parent: Option<QualifiedAddress>,
+    /// Locally-visible children (bare names; cross-hub children appear
+    /// here as shadow entries by their final-hop name).
     pub children: Vec<String>,
     pub lifecycle: AgentLifecycle,
     pub model: Option<String>,
@@ -29,10 +34,10 @@ pub struct AgentInfo {
 }
 
 impl AgentInfo {
-    pub fn new(name: &str, parent: Option<&str>, model: Option<&str>) -> Self {
+    pub fn new(name: &str, parent: Option<QualifiedAddress>, model: Option<&str>) -> Self {
         Self {
             name: name.to_string(),
-            parent: parent.map(String::from),
+            parent,
             children: Vec::new(),
             lifecycle: AgentLifecycle::Spawning,
             model: model.map(String::from),

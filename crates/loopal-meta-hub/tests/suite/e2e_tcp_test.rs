@@ -129,8 +129,8 @@ async fn tcp_cluster_cross_hub_route() {
     // Route from Hub-A to Hub-B's agent via uplink → MetaHub → Hub-B
     let envelope = json!({
         "id": "00000000-0000-0000-0000-000000000001",
-        "source": {"Agent": "sender"},
-        "target": "target",
+        "source": {"Agent": {"hub": [], "agent": "sender"}},
+        "target": {"hub": ["hub-b"], "agent": "target"},
         "content": {"text": "hello via TCP", "images": []},
         "timestamp": "2026-01-01T00:00:00Z"
     });
@@ -146,33 +146,6 @@ async fn tcp_cluster_cross_hub_route() {
         result.is_ok(),
         "TCP cross-hub route should succeed: {result:?}"
     );
-}
-
-#[tokio::test]
-async fn tcp_cluster_resolve_agent() {
-    let (addr, token, meta_hub) = boot_meta_hub().await;
-    let (hub_a, _) = make_hub();
-    let (hub_b, _) = make_hub();
-
-    let _conn_a = join_hub_tcp(&hub_a, &addr, &token, "hub-a").await;
-    let _conn_b = join_hub_tcp(&hub_b, &addr, &token, "hub-b").await;
-    tokio::time::sleep(Duration::from_millis(100)).await;
-
-    let (_agent, _rx) = register_mock(&hub_b, "researcher").await;
-    tokio::time::sleep(Duration::from_millis(50)).await;
-
-    // Resolve via MetaHub dispatch (simulating a meta/resolve from hub-a)
-    let result = loopal_meta_hub::dispatch::dispatch_meta_request(
-        &meta_hub,
-        methods::META_RESOLVE.name,
-        json!({"agent_name": "researcher"}),
-        "hub-a".into(),
-    )
-    .await
-    .unwrap();
-
-    assert_eq!(result["found"].as_bool(), Some(true));
-    assert_eq!(result["hub"].as_str(), Some("hub-b"));
 }
 
 #[tokio::test]

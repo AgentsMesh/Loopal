@@ -96,8 +96,8 @@ async fn register_agent_connection_makes_agent_routable() {
 
     let envelope = json!({
         "id": "00000000-0000-0000-0000-000000000001",
-        "source": {"Agent": "sender"},
-        "target": "mock-worker",
+        "source": {"Agent": {"hub": [], "agent": "sender"}},
+        "target": {"hub": [], "agent": "mock-worker"},
         "content": {"text": "hello mock", "images": []},
         "timestamp": "2026-01-01T00:00:00Z"
     });
@@ -204,8 +204,8 @@ async fn spawned_agent_routes_message_to_parent() {
     // Child sends hub/route targeting parent
     let envelope = json!({
         "id": "00000000-0000-0000-0000-000000000002",
-        "source": {"Agent": "child"},
-        "target": "parent",
+        "source": {"Agent": {"hub": [], "agent": "child"}},
+        "target": {"hub": [], "agent": "parent"},
         "content": {"text": "report from child", "images": []},
         "timestamp": "2026-01-01T00:00:00Z"
     });

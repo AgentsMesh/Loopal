@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::address::QualifiedAddress;
 use crate::event_id::{current_correlation_id, current_turn_id, next_event_id};
 use crate::event_payload::AgentEventPayload;
 
@@ -7,10 +8,12 @@ use crate::event_payload::AgentEventPayload;
 /// transported via event channel to consumers.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentEvent {
-    /// Agent that produced this event. Hub fills this in for all agents
-    /// (root = `Some("main")`, sub-agent = `Some("name")`).
-    /// `None` only in the agent process before Hub injection.
-    pub agent_name: Option<String>,
+    /// Agent that produced this event. `Some(local("main"))` for the
+    /// root agent on a hub; sub-agents carry their local name. The
+    /// MetaHub event aggregator stamps the originating hub via
+    /// [`QualifiedAddress::prepend_hub`] when relaying events upward.
+    /// `None` only inside the agent process before Hub injection.
+    pub agent_name: Option<QualifiedAddress>,
     /// Monotonically increasing process-unique ID (0 = unset).
     #[serde(default)]
     pub event_id: u64,
@@ -36,7 +39,8 @@ impl AgentEvent {
     }
 
     /// Convenience: create a named sub-agent event.
-    pub fn named(name: impl Into<String>, payload: AgentEventPayload) -> Self {
+    /// `name` may be a bare agent name or a qualified `hub/agent` form.
+    pub fn named(name: impl Into<QualifiedAddress>, payload: AgentEventPayload) -> Self {
         Self {
             agent_name: Some(name.into()),
             event_id: next_event_id(),

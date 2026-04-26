@@ -6,6 +6,7 @@
 use std::collections::VecDeque;
 
 use chrono::{DateTime, Utc};
+use loopal_protocol::{MessageSource, QualifiedAddress};
 
 /// Single entry in the message log (observation plane).
 #[derive(Debug, Clone)]
@@ -79,17 +80,39 @@ impl MessageFeed {
 }
 
 /// Record a MessageRouted event to the global feed and per-agent logs.
+///
+/// Per-agent attribution applies only when the source/target reference a
+/// **local** agent (the message log lives inside this hub's session state).
 pub(crate) fn record_message_routed(
     state: &mut crate::state::SessionState,
-    source: &str,
-    target: &str,
+    source: &MessageSource,
+    target: &QualifiedAddress,
     preview: &str,
 ) {
-    let entry = MessageLogEntry::new(source, target, preview);
+    let entry = MessageLogEntry::new(source.label(), target.to_string(), preview);
     state.message_feed.record(entry.clone());
-    for name in [source, target] {
-        if let Some(agent) = state.agents.get_mut(name) {
-            agent.message_log.push(entry.clone());
+
+    // Source-side attribution: only Agent / Channel sources name a local agent.
+    let source_local = match source {
+        MessageSource::Agent(addr) | MessageSource::Channel { from: addr, .. } => {
+            if addr.is_local() {
+                Some(&addr.agent)
+            } else {
+                None
+            }
         }
+        _ => None,
+    };
+    if let Some(name) = source_local
+        && let Some(agent) = state.agents.get_mut(name)
+    {
+        agent.message_log.push(entry.clone());
+    }
+
+    // Target-side attribution: same local-only rule.
+    if target.is_local()
+        && let Some(agent) = state.agents.get_mut(&target.agent)
+    {
+        agent.message_log.push(entry);
     }
 }

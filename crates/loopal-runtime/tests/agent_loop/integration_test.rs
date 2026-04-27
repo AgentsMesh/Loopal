@@ -9,7 +9,7 @@ use loopal_protocol::Envelope;
 use loopal_provider_api::{StopReason, StreamChunk};
 use loopal_runtime::frontend::{AutoCancelQuestionHandler, AutoDenyHandler};
 use loopal_runtime::{
-    AgentConfig, AgentDeps, AgentLoopParams, InterruptHandle, UnifiedFrontend, agent_loop,
+    AgentConfig, AgentDeps, AgentLoopParamsBuilder, InterruptHandle, UnifiedFrontend, agent_loop,
 };
 use loopal_test_support::TestFixture;
 use tokio::sync::mpsc;
@@ -46,26 +46,20 @@ async fn test_agent_loop_immediate_channel_close() {
     ));
 
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
-    let params = AgentLoopParams {
-        config: AgentConfig {
+    let params = AgentLoopParamsBuilder::new(
+        AgentConfig {
             ..Default::default()
         },
-        deps: AgentDeps {
+        AgentDeps {
             kernel,
             frontend,
             session_manager: fixture.session_manager(),
         },
-        session: fixture.test_session("test-loop"),
-        store: ContextStore::new(make_test_budget()),
-        interrupt: InterruptHandle::new(),
-        shared: None,
-        memory_channel: None,
-        scheduled_rx: None,
-        auto_classifier: None,
-        harness: loopal_config::HarnessConfig::default(),
-        rewake_rx: None,
-        message_snapshot: None,
-    };
+        fixture.test_session("test-loop"),
+        ContextStore::new(make_test_budget()),
+        InterruptHandle::new(),
+    )
+    .build();
 
     // Drop senders to close channels
     drop(mbox_tx);

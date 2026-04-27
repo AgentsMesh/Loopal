@@ -10,7 +10,9 @@ use loopal_protocol::{AgentEvent, AgentEventPayload, ControlCommand, Envelope};
 use loopal_provider_api::{Provider, StopReason, StreamChunk};
 use loopal_runtime::agent_loop::AgentLoopRunner;
 use loopal_runtime::frontend::{AutoCancelQuestionHandler, AutoDenyHandler};
-use loopal_runtime::{AgentConfig, AgentDeps, AgentLoopParams, InterruptHandle, UnifiedFrontend};
+use loopal_runtime::{
+    AgentConfig, AgentDeps, AgentLoopParamsBuilder, InterruptHandle, UnifiedFrontend,
+};
 use loopal_test_support::TestFixture;
 use loopal_test_support::mock_provider::MultiCallProvider;
 use loopal_tool_api::{PermissionLevel, PermissionMode, Tool, ToolContext, ToolResult};
@@ -113,27 +115,22 @@ pub fn make_auto_runner_with_setup(
     kernel.register_provider(provider);
     setup(&mut kernel);
     let classifier = Arc::new(AutoClassifier::new(String::new(), "/tmp/test".into()));
-    let params = AgentLoopParams {
-        config: AgentConfig {
+    let params = AgentLoopParamsBuilder::new(
+        AgentConfig {
             permission_mode: PermissionMode::Auto,
             ..Default::default()
         },
-        deps: AgentDeps {
+        AgentDeps {
             kernel: Arc::new(kernel),
             frontend,
             session_manager: fixture.session_manager(),
         },
-        session: fixture.test_session("auto-mode-test"),
-        store: ContextStore::new(make_test_budget()),
-        interrupt: InterruptHandle::new(),
-        shared: None,
-        memory_channel: None,
-        scheduled_rx: None,
-        auto_classifier: Some(classifier),
-        harness: loopal_config::HarnessConfig::default(),
-        rewake_rx: None,
-        message_snapshot: None,
-    };
+        fixture.test_session("auto-mode-test"),
+        ContextStore::new(make_test_budget()),
+        InterruptHandle::new(),
+    )
+    .auto_classifier(classifier)
+    .build();
     (AgentLoopRunner::new(params), event_rx)
 }
 

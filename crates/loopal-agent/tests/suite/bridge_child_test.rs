@@ -9,29 +9,15 @@ use tokio_util::sync::CancellationToken;
 
 use loopal_agent::bridge::bridge_child_events;
 use loopal_agent_client::AgentClient;
-use loopal_ipc::StdioTransport;
-use loopal_ipc::transport::Transport;
 use loopal_protocol::AgentEvent;
 use loopal_test_support::TestFixture;
 use loopal_test_support::chunks;
 use loopal_test_support::mock_provider::MultiCallProvider;
 use loopal_test_support::scenarios;
 
-const T: Duration = Duration::from_secs(10);
+pub(crate) use loopal_test_support::make_duplex_pair;
 
-pub(crate) fn make_duplex_pair() -> (Arc<dyn Transport>, Arc<dyn Transport>) {
-    let (a_tx, a_rx) = tokio::io::duplex(8192);
-    let (b_tx, b_rx) = tokio::io::duplex(8192);
-    let server_t: Arc<dyn Transport> = Arc::new(StdioTransport::new(
-        Box::new(tokio::io::BufReader::new(a_rx)),
-        Box::new(b_tx),
-    ));
-    let client_t: Arc<dyn Transport> = Arc::new(StdioTransport::new(
-        Box::new(tokio::io::BufReader::new(b_rx)),
-        Box::new(a_tx),
-    ));
-    (server_t, client_t)
-}
+const T: Duration = Duration::from_secs(10);
 
 /// Start a mock child server, return an initialized+started AgentClient.
 pub(crate) async fn start_bridge_client(

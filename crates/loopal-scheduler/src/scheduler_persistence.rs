@@ -1,8 +1,13 @@
-//! `CronScheduler` methods that touch the [`DurableStore`].
+//! `CronScheduler` methods that touch the [`SessionScopedCronStorage`].
 //!
-//! Split out so `scheduler.rs` stays focused on the in-memory CRUD
-//! path and the persistence integration has room to grow (loading,
-//! cleanup, retry bookkeeping).
+//! Split out so `scheduler.rs` stays focused on the in-memory CRUD path
+//! and persistence integration has room to grow (loading, retry, schema
+//! evolution).
+//!
+//! Both `persist_locked` and `load_persisted` consult
+//! [`crate::scheduler::ActiveBinding`] under the `active` mutex to fetch
+//! the current `(session_id, storage)`. Lock order is always
+//! `tasks` → `active` (see [`crate::scheduler`] module docs).
 
 use std::sync::atomic::Ordering;
 
@@ -11,12 +16,12 @@ use crate::scheduler::{CronScheduler, MAX_TASKS};
 use crate::task::ScheduledTask;
 
 impl CronScheduler {
-    /// Write the current durable-task snapshot to the attached store.
+    /// Write the current durable-task snapshot to the attached storage.
     ///
     /// Callers must hold the `tasks` write lock so concurrent mutations
-    /// don't interleave saves. A `None` store is a no-op. Failure is
-    /// logged and sets the `dirty` flag so the next tick or mutation
-    /// retries.
+    /// don't interleave saves. A `None` binding (no storage attached, or
+    /// session not yet bound) is a no-op. Failure is logged and sets the
+    /// `dirty` flag so the next tick or mutation retries.
     ///
     /// If `store_disabled` is latched (e.g. quarantine failed at load
     /// time), this becomes a silent no-op — preventing clobbering an
@@ -25,11 +30,15 @@ impl CronScheduler {
         if self.store_disabled.load(Ordering::Acquire) {
             return;
         }
-        let Some(store) = self.store.as_ref() else {
+        let active = self.active.lock().await;
+        let Some(binding) = active.as_ref() else {
+            return;
+        };
+        let Some(session_id) = binding.session_id.as_ref() else {
             return;
         };
         let snapshot = durable_snapshot(tasks);
-        match store.save_all(&snapshot).await {
+        match binding.storage.save_all(session_id, &snapshot).await {
             Ok(()) => {
                 self.dirty.store(false, Ordering::Release);
             }
@@ -40,7 +49,11 @@ impl CronScheduler {
         }
     }
 
-    /// Load persisted tasks from the store into memory.
+    /// Load persisted tasks from the storage into memory.
+    ///
+    /// Internal helper invoked by [`switch_session`](crate::CronScheduler::switch_session).
+    /// External callers should use `switch_session(id)` instead — it
+    /// performs flush + clear + load atomically.
     ///
     /// **Preconditions**: assumes the in-memory task list is empty —
     /// calling this on a populated scheduler panics in debug builds
@@ -55,30 +68,33 @@ impl CronScheduler {
     /// **Normalization**: for recurring tasks whose scheduled reference
     /// (`last_fired` or `created_at`) is in the past — which would
     /// otherwise cause an immediate "catch-up" fire on the next tick —
-    /// the `last_fired` field is clamped to `now`. This covers both
-    /// `last_fired = Some(past)` and `last_fired = None` with an old
-    /// `created_at`, honoring the "no catch-up" contract advertised by
-    /// the `CronCreate` tool.
+    /// the `last_fired` field is clamped to `now`.
     ///
     /// **Capacity**: if the on-disk set exceeds [`MAX_TASKS`], the
     /// extras are dropped with a warning so subsequent `add` calls can
     /// still succeed.
     ///
-    /// **Side effect**: rewrites the store only when the loaded set
+    /// **Side effect**: rewrites the storage only when the loaded set
     /// was actually filtered / truncated / clamped, to keep mtime
     /// stable on clean loads.
-    pub async fn load_persisted(&self) -> Result<usize, PersistError> {
-        let Some(store) = self.store.as_ref() else {
-            return Ok(0);
+    pub(crate) async fn load_persisted(&self) -> Result<usize, PersistError> {
+        // Lock order: tasks → active. Acquire `tasks` first to keep
+        // ordering symmetric with `persist_locked` callers (add/remove)
+        // and `switch_session`.
+        let mut guard = self.tasks.write().await;
+        let (storage, session_id) = {
+            let active = self.active.lock().await;
+            let Some(binding) = active.as_ref() else {
+                return Ok(0);
+            };
+            let Some(sid) = binding.session_id.as_ref() else {
+                return Ok(0);
+            };
+            (binding.storage.clone(), sid.clone())
         };
-        let persisted = match store.load().await {
+        let persisted = match storage.load(&session_id).await {
             Ok(p) => p,
             Err(e) => {
-                // A load error (corrupt file that couldn't be
-                // quarantined, permission denied, etc.) means the
-                // on-disk state is unknown. Latch `store_disabled` so
-                // subsequent mutations don't blindly overwrite the
-                // user's data with an empty snapshot.
                 self.store_disabled.store(true, Ordering::Release);
                 tracing::error!(
                     error = %e,
@@ -107,11 +123,6 @@ impl CronScheduler {
                     continue;
                 }
             } else {
-                // Recurring: prevent an immediate catch-up fire on the
-                // next tick by clamping `last_fired` to `now` whenever
-                // the scheduled reference lies in the past. Covers the
-                // `last_fired = None + old created_at` case the
-                // previous clamp guard missed.
                 let reference = task.last_fired.unwrap_or(task.created_at);
                 if task.cron.next_after(&reference).is_some_and(|t| t <= now) {
                     task.last_fired = Some(now);
@@ -132,15 +143,11 @@ impl CronScheduler {
             false
         };
 
-        let mut guard = self.tasks.write().await;
         debug_assert!(
             guard.is_empty(),
             "load_persisted assumes empty scheduler; found {} tasks",
             guard.len()
         );
-        // Dedup defensively in release builds. Duplicate IDs on disk
-        // are "can't happen" — assert in debug builds so the bug gets
-        // surfaced rather than silently normalized.
         let before_dedup = rehydrated.len();
         rehydrated.retain(|r| !guard.iter().any(|t| t.id == r.id));
         debug_assert_eq!(
@@ -151,8 +158,6 @@ impl CronScheduler {
         let count = rehydrated.len();
         guard.extend(rehydrated);
 
-        // Only rewrite when the loaded set actually changed, to keep
-        // mtime stable on a clean startup.
         if truncated || clamped_any || count != loaded_count {
             self.persist_locked(&guard).await;
         }

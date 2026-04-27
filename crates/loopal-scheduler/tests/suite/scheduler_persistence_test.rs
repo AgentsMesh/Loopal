@@ -7,7 +7,9 @@ use async_trait::async_trait;
 use chrono::Utc;
 use tokio::sync::Mutex;
 
-use loopal_scheduler::{CronScheduler, DurableStore, ManualClock, PersistError, PersistedTask};
+use loopal_scheduler::{
+    CronScheduler, ManualClock, PersistError, PersistedTask, SessionScopedCronStorage,
+};
 
 struct CountingStore {
     saved: Mutex<Vec<Vec<PersistedTask>>>,
@@ -41,11 +43,15 @@ impl CountingStore {
 }
 
 #[async_trait]
-impl DurableStore for CountingStore {
-    async fn load(&self) -> Result<Vec<PersistedTask>, PersistError> {
+impl SessionScopedCronStorage for CountingStore {
+    async fn load(&self, _session_id: &str) -> Result<Vec<PersistedTask>, PersistError> {
         Ok(Vec::new())
     }
-    async fn save_all(&self, tasks: &[PersistedTask]) -> Result<(), PersistError> {
+    async fn save_all(
+        &self,
+        _session_id: &str,
+        tasks: &[PersistedTask],
+    ) -> Result<(), PersistError> {
         if self.fail_next.swap(false, Ordering::SeqCst) {
             return Err(PersistError::Io(std::io::Error::other("armed failure")));
         }
@@ -54,15 +60,20 @@ impl DurableStore for CountingStore {
     }
 }
 
-fn build_scheduler(store: Arc<CountingStore>) -> CronScheduler {
-    let store_dyn: Arc<dyn DurableStore> = store;
-    CronScheduler::with_store_and_clock(store_dyn, Arc::new(ManualClock::new(Utc::now())))
+async fn build_scheduler(store: Arc<CountingStore>) -> CronScheduler {
+    let store_dyn: Arc<dyn SessionScopedCronStorage> = store;
+    let sched = CronScheduler::with_session_storage_and_clock(
+        store_dyn,
+        Arc::new(ManualClock::new(Utc::now())),
+    );
+    sched.switch_session("durable-test").await.unwrap();
+    sched
 }
 
 #[tokio::test]
 async fn add_non_durable_does_not_persist() {
     let store = CountingStore::new();
-    let sched = build_scheduler(store.clone());
+    let sched = build_scheduler(store.clone()).await;
     sched
         .add("*/5 * * * *", "p", true, false)
         .await
@@ -73,7 +84,7 @@ async fn add_non_durable_does_not_persist() {
 #[tokio::test]
 async fn add_durable_triggers_one_save() {
     let store = CountingStore::new();
-    let sched = build_scheduler(store.clone());
+    let sched = build_scheduler(store.clone()).await;
     let id = sched
         .add("*/5 * * * *", "p", true, true)
         .await
@@ -85,7 +96,7 @@ async fn add_durable_triggers_one_save() {
 #[tokio::test]
 async fn remove_durable_persists_new_set() {
     let store = CountingStore::new();
-    let sched = build_scheduler(store.clone());
+    let sched = build_scheduler(store.clone()).await;
     let id = sched
         .add("*/5 * * * *", "p", true, true)
         .await
@@ -99,7 +110,7 @@ async fn remove_durable_persists_new_set() {
 #[tokio::test]
 async fn remove_non_durable_does_not_persist() {
     let store = CountingStore::new();
-    let sched = build_scheduler(store.clone());
+    let sched = build_scheduler(store.clone()).await;
     let id = sched
         .add("*/5 * * * *", "p", true, false)
         .await
@@ -111,7 +122,7 @@ async fn remove_non_durable_does_not_persist() {
 #[tokio::test]
 async fn snapshot_includes_only_durable_tasks() {
     let store = CountingStore::new();
-    let sched = build_scheduler(store.clone());
+    let sched = build_scheduler(store.clone()).await;
     let _a = sched
         .add("*/5 * * * *", "non", true, false)
         .await
@@ -156,7 +167,7 @@ async fn subsequent_add_retries_after_save_failure() {
     // non-durable add must still retry the save so memory and disk
     // don't diverge indefinitely.
     let store = CountingStore::new();
-    let sched = build_scheduler(store.clone());
+    let sched = build_scheduler(store.clone()).await;
     store.arm_failure();
     let durable_id = sched
         .add("*/5 * * * *", "persist", true, true)

@@ -75,7 +75,7 @@ async fn no_provider_denies_gracefully() {
     use loopal_runtime::agent_loop::AgentLoopRunner;
     use loopal_runtime::frontend::{AutoCancelQuestionHandler, AutoDenyHandler};
     use loopal_runtime::{
-        AgentConfig, AgentDeps, AgentLoopParams, InterruptHandle, UnifiedFrontend,
+        AgentConfig, AgentDeps, AgentLoopParamsBuilder, InterruptHandle, UnifiedFrontend,
     };
     use loopal_test_support::TestFixture;
     use loopal_tool_api::PermissionMode;
@@ -98,27 +98,22 @@ async fn no_provider_denies_gracefully() {
     let kernel = Kernel::new(Settings::default()).unwrap();
     kernel.register_tool(Box::new(DummyTool::dangerous("DangerTool")));
     let classifier = Arc::new(AutoClassifier::new(String::new(), "/tmp".into()));
-    let params = AgentLoopParams {
-        config: AgentConfig {
+    let params = AgentLoopParamsBuilder::new(
+        AgentConfig {
             permission_mode: PermissionMode::Auto,
             ..Default::default()
         },
-        deps: AgentDeps {
+        AgentDeps {
             kernel: Arc::new(kernel),
             frontend,
             session_manager: fixture.session_manager(),
         },
-        session: fixture.test_session("no-provider"),
-        store: ContextStore::new(super::make_test_budget()),
-        interrupt: InterruptHandle::new(),
-        shared: None,
-        memory_channel: None,
-        scheduled_rx: None,
-        auto_classifier: Some(classifier),
-        harness: loopal_config::HarnessConfig::default(),
-        rewake_rx: None,
-        message_snapshot: None,
-    };
+        fixture.test_session("no-provider"),
+        ContextStore::new(super::make_test_budget()),
+        InterruptHandle::new(),
+    )
+    .auto_classifier(classifier)
+    .build();
     let mut runner = AgentLoopRunner::new(params);
 
     let tool_uses = vec![(

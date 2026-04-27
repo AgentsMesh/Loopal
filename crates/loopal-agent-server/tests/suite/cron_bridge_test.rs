@@ -6,9 +6,7 @@ use std::time::Duration;
 use loopal_protocol::AgentEventPayload;
 use loopal_scheduler::CronScheduler;
 
-use super::cron_bridge_helpers::{
-    CaptureFrontend, TEST_INTERVAL, count_cron_events, last_cron_ids,
-};
+use super::cron_bridge_helpers::{CaptureFrontend, count_cron_events, last_cron_ids};
 
 #[tokio::test]
 async fn durable_flag_propagates_to_snapshot() {
@@ -21,11 +19,8 @@ async fn durable_flag_propagates_to_snapshot() {
         .await
         .expect("add");
     let (frontend, events) = CaptureFrontend::new();
-    let bridge = loopal_agent_server::testing::cron_bridge_spawn_with_interval(
-        scheduler.clone(),
-        Arc::new(frontend),
-        TEST_INTERVAL,
-    );
+    let bridge =
+        loopal_agent_server::testing::cron_bridge_spawn(scheduler.clone(), Arc::new(frontend));
 
     tokio::time::sleep(Duration::from_millis(150)).await;
     bridge.abort();
@@ -48,11 +43,8 @@ async fn durable_flag_propagates_to_snapshot() {
 async fn emits_initial_empty_snapshot() {
     let scheduler = Arc::new(CronScheduler::new());
     let (frontend, events) = CaptureFrontend::new();
-    let bridge = loopal_agent_server::testing::cron_bridge_spawn_with_interval(
-        scheduler.clone(),
-        Arc::new(frontend),
-        TEST_INTERVAL,
-    );
+    let bridge =
+        loopal_agent_server::testing::cron_bridge_spawn(scheduler.clone(), Arc::new(frontend));
 
     tokio::time::sleep(Duration::from_millis(80)).await;
     bridge.abort();
@@ -70,11 +62,8 @@ async fn emits_initial_empty_snapshot() {
 async fn emits_after_scheduler_add() {
     let scheduler = Arc::new(CronScheduler::new());
     let (frontend, events) = CaptureFrontend::new();
-    let bridge = loopal_agent_server::testing::cron_bridge_spawn_with_interval(
-        scheduler.clone(),
-        Arc::new(frontend),
-        TEST_INTERVAL,
-    );
+    let bridge =
+        loopal_agent_server::testing::cron_bridge_spawn(scheduler.clone(), Arc::new(frontend));
 
     tokio::time::sleep(Duration::from_millis(80)).await;
     let id = scheduler
@@ -98,11 +87,8 @@ async fn emits_after_scheduler_remove() {
         .await
         .expect("add");
     let (frontend, events) = CaptureFrontend::new();
-    let bridge = loopal_agent_server::testing::cron_bridge_spawn_with_interval(
-        scheduler.clone(),
-        Arc::new(frontend),
-        TEST_INTERVAL,
-    );
+    let bridge =
+        loopal_agent_server::testing::cron_bridge_spawn(scheduler.clone(), Arc::new(frontend));
 
     tokio::time::sleep(Duration::from_millis(80)).await;
     assert!(scheduler.remove(&id).await);
@@ -122,11 +108,8 @@ async fn prompt_newlines_are_normalized() {
         .await
         .expect("add");
     let (frontend, events) = CaptureFrontend::new();
-    let bridge = loopal_agent_server::testing::cron_bridge_spawn_with_interval(
-        scheduler.clone(),
-        Arc::new(frontend),
-        TEST_INTERVAL,
-    );
+    let bridge =
+        loopal_agent_server::testing::cron_bridge_spawn(scheduler.clone(), Arc::new(frontend));
 
     tokio::time::sleep(Duration::from_millis(150)).await;
     bridge.abort();

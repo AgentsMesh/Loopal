@@ -1,7 +1,7 @@
 //! IPC acceptance test harness — full-stack IPC testing with mock provider.
 //!
 //! Wires up: AgentClient → IPC → Server(IpcFrontend + agent_loop) → IPC → Bridge → channels.
-//! Uses in-memory duplex streams (no real subprocess).
+//! Uses in-memory duplex streams from `loopal_ipc::duplex_pair` (no real subprocess).
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -9,13 +9,13 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 
 use loopal_error::LoopalError;
-use loopal_ipc::StdioTransport;
 use loopal_protocol::{
     AgentEvent, AgentEventPayload, ControlCommand, Envelope, UserQuestionResponse,
 };
 use loopal_provider_api::StreamChunk;
 
 use crate::fixture::TestFixture;
+use crate::make_duplex_pair;
 use crate::mock_provider::MultiCallProvider;
 
 /// Full-stack IPC test harness with TUI-side channel handles.
@@ -40,20 +40,9 @@ pub async fn build_ipc_harness(
     let cwd = fixture.path().to_path_buf();
     let session_dir = fixture.path().join("sessions");
 
-    // Create duplex pipe pair
-    let (client_tx, server_rx) = tokio::io::duplex(16384);
-    let (server_tx, client_rx) = tokio::io::duplex(16384);
-
-    let server_transport: Arc<dyn loopal_ipc::transport::Transport> =
-        Arc::new(StdioTransport::new(
-            Box::new(tokio::io::BufReader::new(server_rx)),
-            Box::new(server_tx),
-        ));
-    let client_transport: Arc<dyn loopal_ipc::transport::Transport> =
-        Arc::new(StdioTransport::new(
-            Box::new(tokio::io::BufReader::new(client_rx)),
-            Box::new(client_tx),
-        ));
+    // In-memory duplex transport pair — single source of truth for
+    // duplex transports across the test toolbox.
+    let (server_transport, client_transport) = make_duplex_pair();
 
     // Spawn server in background
     let provider =

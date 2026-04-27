@@ -52,6 +52,8 @@ rust_test(
         "//crates/loopal-ipc",
         "//crates/loopal-protocol",
         "//crates/loopal-provider-api",
+        "//crates/loopal-runtime",
+        "//crates/loopal-scheduler",
         "//crates/loopal-test-support",
         "//crates/loopal-tool-api",
         "@crates//:serde_json",
@@ -59,4 +61,5 @@ rust_test(
         "@crates//:tokio",
         "@crates//:tokio-util",
     ],
+    proc_macro_deps = ["@crates//:async-trait"],
 )

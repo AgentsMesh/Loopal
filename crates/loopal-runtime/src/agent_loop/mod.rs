@@ -18,6 +18,7 @@ pub mod loop_detector;
 pub(crate) mod message_build;
 pub(crate) mod model_config;
 mod params;
+mod params_builder;
 mod permission;
 mod pipeline_setup;
 mod question_parse;
@@ -52,6 +53,7 @@ use loopal_error::{AgentOutput, Result};
 pub use params::{
     AgentConfig, AgentDeps, AgentLoopParams, InterruptHandle, LifecycleMode, PlanModeState,
 };
+pub use params_builder::AgentLoopParamsBuilder;
 pub use runner::AgentLoopRunner;
 
 use finished_guard::FinishedGuard;

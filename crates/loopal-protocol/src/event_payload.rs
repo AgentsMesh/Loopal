@@ -154,6 +154,15 @@ pub enum AgentEventPayload {
         session_id: String,
         message_count: usize,
     },
+    /// One or more `SessionResumeHook` adapters reported a non-fatal
+    /// failure during a session swap. The resume itself completed
+    /// (message history is on the new session) but ancillary state
+    /// (cron / task list) may be stale or unloaded. Front-ends should
+    /// surface this so users can investigate.
+    SessionResumeWarnings {
+        session_id: String,
+        warnings: Vec<String>,
+    },
     /// Periodic snapshot of background tasks from agent process.
     BgTaskSpawned { id: String, description: String },
     /// Incremental output from a running background task.

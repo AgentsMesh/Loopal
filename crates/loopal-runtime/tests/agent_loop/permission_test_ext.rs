@@ -7,7 +7,9 @@ use loopal_protocol::ControlCommand;
 use loopal_protocol::Envelope;
 use loopal_runtime::agent_loop::AgentLoopRunner;
 use loopal_runtime::frontend::{AutoCancelQuestionHandler, RelayPermissionHandler};
-use loopal_runtime::{AgentConfig, AgentDeps, AgentLoopParams, InterruptHandle, UnifiedFrontend};
+use loopal_runtime::{
+    AgentConfig, AgentDeps, AgentLoopParamsBuilder, InterruptHandle, UnifiedFrontend,
+};
 use loopal_test_support::TestFixture;
 use loopal_tool_api::{PermissionDecision, PermissionMode};
 use tokio::sync::mpsc;
@@ -117,27 +119,21 @@ async fn test_check_permission_channel_closed_denies() {
     let fixture = TestFixture::new();
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
 
-    let params = AgentLoopParams {
-        config: AgentConfig {
+    let params = AgentLoopParamsBuilder::new(
+        AgentConfig {
             permission_mode: PermissionMode::Supervised,
             ..Default::default()
         },
-        deps: AgentDeps {
+        AgentDeps {
             kernel,
             frontend,
             session_manager: fixture.session_manager(),
         },
-        session: fixture.test_session("test-perm-closed"),
-        store: ContextStore::new(make_test_budget()),
-        interrupt: InterruptHandle::new(),
-        shared: None,
-        memory_channel: None,
-        scheduled_rx: None,
-        auto_classifier: None,
-        harness: loopal_config::HarnessConfig::default(),
-        rewake_rx: None,
-        message_snapshot: None,
-    };
+        fixture.test_session("test-perm-closed"),
+        ContextStore::new(make_test_budget()),
+        InterruptHandle::new(),
+    )
+    .build();
 
     let runner = AgentLoopRunner::new(params);
     // Close event_rx so send fails

@@ -144,6 +144,12 @@ pub(crate) fn apply_agent_event(state: &mut SessionState, name: &str, payload: A
             clear_all_panel_caches_for_resume(state, payload);
             return;
         }
+        AgentEventPayload::SessionResumeWarnings { .. } => {
+            // Warnings are surface-level diagnostics; the session-state
+            // layer doesn't react. Frontends (TUI, ACP) consume the
+            // event directly to display.
+            return;
+        }
         AgentEventPayload::BgTaskSpawned { .. }
         | AgentEventPayload::BgTaskOutput { .. }
         | AgentEventPayload::BgTaskCompleted { .. } => {

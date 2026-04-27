@@ -3,60 +3,30 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
 use tracing::info;
 
-use crate::clock::Clock;
-use crate::persistence::{DurableStore, durable_snapshot};
+use crate::persistence::durable_snapshot;
+use crate::scheduler::ActiveBinding;
 use crate::task::ScheduledTask;
+use crate::tick_context::TickContext;
 use crate::trigger::ScheduledTrigger;
 
-/// Core tick loop — runs every second, checks tasks, sends triggers.
+/// Core tick loop — every second, surveys + mutates tasks, sends triggers.
 ///
-/// Stops when `cancel` is triggered, `trigger_tx` receiver is dropped,
-/// or the channel-full send is interrupted by cancellation.
+/// Stops on `cancel`, dropped `trigger_tx` receiver, or send-cancellation race.
 ///
-/// Two-phase locking: first acquires a read lock to check for expiry /
-/// firing. When nothing needs to change (the common case), the loop
-/// releases the read lock and iterates — other readers (e.g. the bridge
-/// calling `list()`) never block. Only when tasks must be mutated does
-/// the loop upgrade to a write lock.
+/// **Two-phase locking** (intentional): read survey → write mutate. Concurrent
+/// `add` / `remove` between phases is safe (see helper docs).
 ///
-/// ## Durable persistence
-///
-/// When `store` is `Some`, the post-mutation snapshot of durable tasks
-/// is written while still holding the write lock, guaranteeing at most
-/// one save per tick regardless of how many tasks fired or expired.
-/// If the previous save failed (`dirty == true`) a retry is issued
-/// even when this tick produced no mutations.
-///
-/// ## Concurrency semantics
-///
-/// The read and write phases do not form an atomic transaction. Between
-/// `survey_tasks` releasing the read lock and `mutate_tasks` acquiring
-/// the write lock, concurrent calls to [`CronScheduler::add`] or
-/// [`CronScheduler::remove`] may arrive. This is **intentional** and
-/// safe:
-///
-/// - If a task identified as "to fire" is removed in the gap, `mutate_tasks`
-///   won't find its id and skips silently — which matches the caller's
-///   remove-to-cancel intent.
-/// - If a task identified as "expiring" is removed, same benign outcome.
-/// - Newly added tasks are never accidentally touched because mutation
-///   looks up by `id`, not by index, and `add` guarantees unique ids.
-///
-/// `now` is captured once per tick; both phases use the same value, so
-/// no task is double-counted or skipped due to clock drift within a
-/// tick.
+/// **Persistence**: post-mutation snapshot of durable tasks is saved while the
+/// write lock is still held — at most one save per tick. Retries fire on
+/// `dirty == true` even when no mutations occurred this tick.
 pub(crate) async fn tick_loop(
-    tasks: Arc<RwLock<Vec<ScheduledTask>>>,
+    ctx: TickContext,
     trigger_tx: tokio::sync::mpsc::Sender<ScheduledTrigger>,
     cancel: CancellationToken,
-    clock: Arc<dyn Clock>,
-    store: Option<Arc<dyn DurableStore>>,
-    dirty: Arc<AtomicBool>,
-    store_disabled: Arc<AtomicBool>,
 ) {
     let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -66,30 +36,38 @@ pub(crate) async fn tick_loop(
             () = cancel.cancelled() => break,
         }
 
-        let now = clock.now();
-        let (needs_write, expiring_ids, firing_ids) = survey_tasks(&tasks, &now).await;
-        let should_retry = dirty.load(Ordering::Acquire);
+        let now = ctx.clock.now();
+        let (needs_write, expiring_ids, firing_ids) = survey_tasks(&ctx.tasks, &now).await;
+        let should_retry = ctx.dirty.load(Ordering::Acquire);
         if !needs_write && !should_retry {
             continue;
         }
 
-        // Treat a disabled store as "no store" for this tick so the
+        // Treat a disabled store as "no binding" for this tick so the
         // retry path doesn't thrash trying to save into a file that
         // `load_persisted` already refused to normalize.
-        let effective_store = if store_disabled.load(Ordering::Acquire) {
+        let resolved_binding = if ctx.store_disabled.load(Ordering::Acquire) {
             None
         } else {
-            store.as_ref()
+            resolve_active(&ctx.active).await
         };
         let triggers = mutate_tasks(
-            &tasks,
+            &ctx.tasks,
             &now,
             &expiring_ids,
             &firing_ids,
-            effective_store,
-            &dirty,
+            resolved_binding,
+            &ctx.dirty,
         )
         .await;
+
+        // If anything was removed (one-shot fire, expiry) or fired (a
+        // recurring task's `last_fired` advanced), the job set's
+        // user-visible state changed — broadcast so observers re-snapshot.
+        // No-op when no receivers are attached.
+        if needs_write {
+            let _ = ctx.change_tx.send(());
+        }
 
         for trigger in triggers {
             tokio::select! {
@@ -102,6 +80,24 @@ pub(crate) async fn tick_loop(
             }
         }
     }
+}
+
+/// Snapshot the current `(storage, session_id)` from `active`, or `None`
+/// if either is unset. Cloning out lets `mutate_tasks` await the save
+/// without holding the active mutex while the storage I/O runs.
+async fn resolve_active(active: &Arc<Mutex<Option<ActiveBinding>>>) -> Option<ResolvedBinding> {
+    let guard = active.lock().await;
+    let binding = guard.as_ref()?;
+    let session_id = binding.session_id.as_ref()?.clone();
+    Some(ResolvedBinding {
+        storage: binding.storage.clone(),
+        session_id,
+    })
+}
+
+struct ResolvedBinding {
+    storage: Arc<dyn crate::persistence_session::SessionScopedCronStorage>,
+    session_id: String,
 }
 
 /// Read-only survey: identify task ids that need expiring or firing.
@@ -131,7 +127,7 @@ async fn mutate_tasks(
     now: &chrono::DateTime<chrono::Utc>,
     expiring_ids: &[String],
     firing_ids: &[String],
-    store: Option<&Arc<dyn DurableStore>>,
+    binding: Option<ResolvedBinding>,
     dirty: &Arc<AtomicBool>,
 ) -> Vec<ScheduledTrigger> {
     let mut guard = tasks.write().await;
@@ -163,9 +159,6 @@ async fn mutate_tasks(
         }
     }
 
-    // Indices are pushed in ascending order (enumerate over the vec) and
-    // each task hits at most one branch (if / else if), so `to_remove` is
-    // already sorted and unique — no `sort()` or `dedup()` required.
     debug_assert!(
         to_remove.windows(2).all(|w| w[0] < w[1]),
         "to_remove must be strictly ascending"
@@ -174,11 +167,11 @@ async fn mutate_tasks(
         guard.remove(i);
     }
 
-    if let Some(store) = store {
+    if let Some(b) = binding {
         let retry_pending = dirty.load(Ordering::Acquire);
         if durable_touched || retry_pending {
             let snapshot = durable_snapshot(&guard);
-            match store.save_all(&snapshot).await {
+            match b.storage.save_all(&b.session_id, &snapshot).await {
                 Ok(()) => dirty.store(false, Ordering::Release),
                 Err(e) => {
                     tracing::error!(error = %e, "cron durable save failed in tick");

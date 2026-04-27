@@ -1,32 +1,28 @@
 //! Internal agent loop setup — builds `AgentLoopParams` from resolved config.
+use crate::agent_setup_context::AgentSetupContext;
 use crate::agent_setup_helpers::{
     build_initial_messages, collect_feature_tags, spawn_sub_agent_forwarder,
 };
-use crate::params::{AgentSetupResult, StartParams};
+use crate::params::AgentSetupResult;
 use loopal_agent::shared::{AgentShared, SchedulerHandle};
-use loopal_agent::task_store::TaskStore;
-use loopal_config::ResolvedConfig;
+use loopal_context::ContextBudget;
 use loopal_context::system_prompt::build_system_prompt;
-use loopal_context::{ContextBudget, ContextStore};
-use loopal_kernel::Kernel;
-use loopal_protocol::InterruptSignal;
-use loopal_runtime::AgentLoopParams;
-use loopal_runtime::frontend::traits::AgentFrontend;
 use std::sync::Arc;
 
 /// Build `AgentLoopParams` with a pre-constructed frontend.
-#[allow(clippy::too_many_arguments)]
-pub fn build_with_frontend(
-    cwd: &std::path::Path,
-    config: &ResolvedConfig,
-    start: &StartParams,
-    frontend: Arc<dyn AgentFrontend>,
-    interrupt: InterruptSignal,
-    interrupt_tx: Arc<tokio::sync::watch::Sender<u64>>,
-    kernel: Arc<Kernel>,
-    hub_connection: Arc<loopal_ipc::connection::Connection>,
-    session_dir_override: Option<&std::path::Path>,
-) -> anyhow::Result<AgentSetupResult> {
+pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<AgentSetupResult> {
+    let AgentSetupContext {
+        cwd,
+        config,
+        start,
+        frontend,
+        interrupt,
+        interrupt_tx,
+        kernel,
+        hub_connection,
+        session_dir_override,
+        hub,
+    } = ctx;
     let router = loopal_provider_api::ModelRouter::from_parts(
         config.settings.model.clone(),
         config.settings.model_routing.clone(),
@@ -54,31 +50,23 @@ pub fn build_with_frontend(
     };
 
     let event_tx = spawn_sub_agent_forwarder(frontend.clone());
-    let tasks_dir = loopal_config::session_tasks_dir(&session.id)
-        .unwrap_or_else(|_| std::env::temp_dir().join("loopal/tasks"));
-    let task_store = Arc::new(TaskStore::new(tasks_dir));
-    // Only the root agent (depth = 0) gets a durable store. Sub-agents
-    // are ephemeral — persisting their cron would create orphan files
-    // that never get cleaned up, and `cron_bridge` only observes the
-    // root scheduler anyway.
-    let scheduler = if start.depth.unwrap_or(0) == 0 {
-        let cron_path = session_dir_override
-            .map(|base| base.join(&session.id).join("cron.json"))
-            .or_else(|| {
-                loopal_config::session_dir(&session.id)
-                    .ok()
-                    .map(|d| d.join("cron.json"))
-            })
-            .unwrap_or_else(|| std::env::temp_dir().join("loopal/cron.json"));
-        let durable_store: Arc<dyn loopal_scheduler::DurableStore> =
-            Arc::new(loopal_scheduler::FileDurableStore::new(cron_path));
-        Arc::new(loopal_scheduler::CronScheduler::with_store(durable_store))
-    } else {
-        Arc::new(loopal_scheduler::CronScheduler::new())
-    };
-    // Note: durable tasks are restored asynchronously by the caller
-    // (see `session_start::run`) right before the cron bridge spawns,
-    // because this builder is synchronous.
+
+    // Build task store + scheduler + resume hooks. Scheduler's async
+    // bind to the session id runs in `session_start::run` after this
+    // synchronous builder returns (covers both fresh and resumed
+    // sessions through one path).
+    let depth = start.depth.unwrap_or(0);
+    let crate::session_resources::SessionScopedResources {
+        task_store,
+        scheduler,
+        resume_hooks,
+    } = crate::session_resources::build_session_scoped_resources(
+        hub,
+        crate::session_resources::resolve_sessions_root(session_dir_override),
+        &session.id,
+        depth,
+    )
+    .await?;
     let (scheduler_handle, scheduled_rx) =
         SchedulerHandle::create_with_scheduler(scheduler.clone());
     let message_snapshot = Arc::new(std::sync::RwLock::new(Vec::new()));
@@ -87,7 +75,7 @@ pub fn build_with_frontend(
         task_store: task_store.clone(),
         hub_connection,
         cwd: cwd.to_path_buf(),
-        depth: start.depth.unwrap_or(0),
+        depth,
         agent_name: "main".into(),
         parent_event_tx: Some(event_tx),
         cancel_token: None,
@@ -102,18 +90,14 @@ pub fn build_with_frontend(
         &model,
     );
 
-    let auto_classifier = if permission_mode == loopal_tool_api::PermissionMode::Auto {
-        Some(Arc::new(
-            loopal_auto_mode::AutoClassifier::new_with_thresholds(
-                config.instructions.clone(),
-                cwd.to_string_lossy().into_owned(),
-                config.settings.harness.cb_max_consecutive_denials,
-                config.settings.harness.cb_max_total_denials,
-            ),
+    let auto_classifier = (permission_mode == loopal_tool_api::PermissionMode::Auto).then(|| {
+        Arc::new(loopal_auto_mode::AutoClassifier::new_with_thresholds(
+            config.instructions.clone(),
+            cwd.to_string_lossy().into_owned(),
+            config.settings.harness.cb_max_consecutive_denials,
+            config.settings.harness.cb_max_total_denials,
         ))
-    } else {
-        None
-    };
+    });
     let shared_any: Arc<dyn std::any::Any + Send + Sync> = Arc::new(agent_shared);
     let skills: Vec<_> = config.skills.values().map(|e| e.skill.clone()).collect();
     let skills_summary = loopal_config::format_skills_summary(&skills);
@@ -151,37 +135,38 @@ pub fn build_with_frontend(
         config.settings.harness.agent_max_depth,
     );
 
-    let params = AgentLoopParams {
-        config: loopal_runtime::AgentConfig {
-            lifecycle,
-            router,
-            system_prompt,
-            mode,
-            permission_mode,
-            tool_filter,
-            thinking_config,
-            context_tokens_cap: config.settings.max_context_tokens,
-            plan_state: None,
+    let params = crate::agent_loop_params_factory::assemble_agent_loop_params(
+        crate::agent_loop_params_factory::AgentLoopAssembly {
+            config: loopal_runtime::AgentConfig {
+                lifecycle,
+                router,
+                system_prompt,
+                mode,
+                permission_mode,
+                tool_filter,
+                thinking_config,
+                context_tokens_cap: config.settings.max_context_tokens,
+                plan_state: None,
+            },
+            deps: loopal_runtime::AgentDeps {
+                kernel,
+                frontend,
+                session_manager,
+            },
+            session,
+            messages,
+            budget,
+            interrupt,
+            interrupt_tx,
+            shared: shared_any,
+            scheduled_rx,
+            harness: config.settings.harness.clone(),
+            message_snapshot,
+            resume_hooks,
+            memory_channel,
+            auto_classifier,
         },
-        deps: loopal_runtime::AgentDeps {
-            kernel,
-            frontend,
-            session_manager,
-        },
-        session,
-        store: ContextStore::from_messages(messages, budget),
-        interrupt: loopal_runtime::InterruptHandle {
-            signal: interrupt,
-            tx: interrupt_tx,
-        },
-        shared: Some(shared_any),
-        memory_channel,
-        scheduled_rx: Some(scheduled_rx),
-        auto_classifier,
-        harness: config.settings.harness.clone(),
-        rewake_rx: None,
-        message_snapshot: Some(message_snapshot),
-    };
+    );
     Ok(AgentSetupResult {
         params,
         task_store,

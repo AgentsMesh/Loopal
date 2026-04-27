@@ -6,19 +6,14 @@ use std::time::Duration;
 
 use loopal_scheduler::CronScheduler;
 
-use super::cron_bridge_helpers::{
-    CaptureFrontend, FailingFrontend, TEST_INTERVAL, count_cron_events,
-};
+use super::cron_bridge_helpers::{CaptureFrontend, FailingFrontend, count_cron_events};
 
 #[tokio::test]
 async fn frontend_emit_errors_do_not_crash_bridge() {
     let scheduler = Arc::new(CronScheduler::new());
     let (frontend, emit_calls) = FailingFrontend::new();
-    let bridge = loopal_agent_server::testing::cron_bridge_spawn_with_interval(
-        scheduler.clone(),
-        Arc::new(frontend),
-        TEST_INTERVAL,
-    );
+    let bridge =
+        loopal_agent_server::testing::cron_bridge_spawn(scheduler.clone(), Arc::new(frontend));
 
     // Drive one change so the bridge tries to emit more than the initial frame.
     tokio::time::sleep(Duration::from_millis(80)).await;
@@ -46,11 +41,8 @@ async fn identical_job_set_skips_emit() {
         .await
         .expect("add");
     let (frontend, events) = CaptureFrontend::new();
-    let bridge = loopal_agent_server::testing::cron_bridge_spawn_with_interval(
-        scheduler.clone(),
-        Arc::new(frontend),
-        TEST_INTERVAL,
-    );
+    let bridge =
+        loopal_agent_server::testing::cron_bridge_spawn(scheduler.clone(), Arc::new(frontend));
 
     // Let several intervals pass with no job-set change.
     // Since diff is (id, prompt, recurring) — not next_fire — no extra emits.
@@ -73,11 +65,8 @@ async fn next_fire_changes_alone_do_not_re_emit() {
         .await
         .expect("add");
     let (frontend, events) = CaptureFrontend::new();
-    let bridge = loopal_agent_server::testing::cron_bridge_spawn_with_interval(
-        scheduler.clone(),
-        Arc::new(frontend),
-        TEST_INTERVAL,
-    );
+    let bridge =
+        loopal_agent_server::testing::cron_bridge_spawn(scheduler.clone(), Arc::new(frontend));
 
     // Multiple ticks pass; next_fire_unix_ms will differ each call, but the
     // bridge's diff ignores it and only emits once initially.

@@ -100,28 +100,35 @@ pub(crate) async fn start_session(
 
         let session_dir_override = hub.session_dir_override().await;
         let kernel_for_bridge = kernel.clone();
-        let setup = agent_setup::build_with_frontend(
-            &cwd,
-            &config,
-            &start,
-            frontend_placeholder.clone(),
-            interrupt.clone(),
-            interrupt_tx.clone(),
-            kernel,
-            connection.clone(),
-            session_dir_override.as_deref(),
-        )?;
+        let setup =
+            agent_setup::build_with_frontend(crate::agent_setup_context::AgentSetupContext::new(
+                &cwd,
+                &config,
+                &start,
+                frontend_placeholder.clone(),
+                interrupt.clone(),
+                interrupt_tx.clone(),
+                kernel,
+                connection.clone(),
+                session_dir_override.as_deref(),
+                hub,
+            ))
+            .await?;
         let agent_params = setup.params;
         let task_store_for_bridge = setup.task_store;
         let scheduler_for_bridge = setup.scheduler;
 
-        if start.resume.is_some()
-            && let Err(e) = scheduler_for_bridge.load_persisted().await
+        // Bind the scheduler to this session's id. Idempotent and
+        // unifies fresh-session and resumed-session code paths through
+        // a single SessionScopedCronStorage lookup.
+        if let Err(e) = scheduler_for_bridge
+            .switch_session(&agent_params.session().id)
+            .await
         {
-            tracing::warn!(error = %e, "failed to load persisted cron tasks");
+            tracing::warn!(error = %e, "failed to bind scheduler to session");
         }
 
-        let session_id = agent_params.session.id.clone();
+        let session_id = agent_params.session().id.clone();
         tracing::Span::current().record("session.id", session_id.as_str());
 
         let session = Arc::new(SharedSession {

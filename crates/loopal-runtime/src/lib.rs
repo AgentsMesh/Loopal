@@ -7,15 +7,18 @@ pub mod otel_metrics;
 pub mod permission;
 pub mod plan_file;
 pub mod session;
+pub mod session_resume_hook;
 pub mod tool_pipeline;
 
 pub use agent_loop::{
-    AgentConfig, AgentDeps, AgentLoopParams, InterruptHandle, LifecycleMode, agent_loop,
+    AgentConfig, AgentDeps, AgentLoopParams, AgentLoopParamsBuilder, InterruptHandle,
+    LifecycleMode, agent_loop,
 };
 pub use frontend::unified::UnifiedFrontend;
 pub use mode::AgentMode;
 pub use permission::check_permission;
 pub use session::SessionManager;
+pub use session_resume_hook::{SessionResumeError, SessionResumeHook};
 
 /// Build initial context budget from model info + settings cap.
 ///

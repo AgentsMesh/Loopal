@@ -10,7 +10,9 @@ use chrono::{TimeZone, Utc};
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 
-use loopal_scheduler::{CronScheduler, DurableStore, ManualClock, PersistError, PersistedTask};
+use loopal_scheduler::{
+    CronScheduler, ManualClock, PersistError, PersistedTask, SessionScopedCronStorage,
+};
 
 /// Mock store tracking save order + optional first-call failure.
 struct TickStore {
@@ -39,11 +41,15 @@ impl TickStore {
 }
 
 #[async_trait]
-impl DurableStore for TickStore {
-    async fn load(&self) -> Result<Vec<PersistedTask>, PersistError> {
+impl SessionScopedCronStorage for TickStore {
+    async fn load(&self, _session_id: &str) -> Result<Vec<PersistedTask>, PersistError> {
         Ok(Vec::new())
     }
-    async fn save_all(&self, tasks: &[PersistedTask]) -> Result<(), PersistError> {
+    async fn save_all(
+        &self,
+        _session_id: &str,
+        tasks: &[PersistedTask],
+    ) -> Result<(), PersistError> {
         if self.fail_next.swap(false, Ordering::SeqCst) {
             self.fail_count.fetch_add(1, Ordering::SeqCst);
             return Err(PersistError::Io(std::io::Error::other("armed failure")));
@@ -53,9 +59,13 @@ impl DurableStore for TickStore {
     }
 }
 
-fn build(store: Arc<TickStore>, clock: Arc<ManualClock>) -> Arc<CronScheduler> {
-    let store_dyn: Arc<dyn DurableStore> = store;
-    Arc::new(CronScheduler::with_store_and_clock(store_dyn, clock))
+async fn build(store: Arc<TickStore>, clock: Arc<ManualClock>) -> Arc<CronScheduler> {
+    let store_dyn: Arc<dyn SessionScopedCronStorage> = store;
+    let sched = Arc::new(CronScheduler::with_session_storage_and_clock(
+        store_dyn, clock,
+    ));
+    sched.switch_session("tick-test").await.unwrap();
+    sched
 }
 
 async fn pump_ticks(clock: &ManualClock, to: chrono::DateTime<chrono::Utc>, rounds: usize) {
@@ -71,7 +81,7 @@ async fn recurring_durable_fire_persists_last_fired() {
     let t0 = Utc.with_ymd_and_hms(2026, 4, 10, 10, 0, 30).unwrap();
     let clock = Arc::new(ManualClock::new(t0));
     let store = TickStore::new();
-    let sched = build(store.clone(), clock.clone());
+    let sched = build(store.clone(), clock.clone()).await;
     sched.add("* * * * *", "p", true, true).await.expect("add");
     // `add` with durable=true issues one initial save.
     let initial_saves = store.save_count().await;
@@ -107,7 +117,7 @@ async fn oneshot_durable_fire_removes_from_store() {
     let t0 = Utc.with_ymd_and_hms(2026, 4, 10, 10, 0, 30).unwrap();
     let clock = Arc::new(ManualClock::new(t0));
     let store = TickStore::new();
-    let sched = build(store.clone(), clock.clone());
+    let sched = build(store.clone(), clock.clone()).await;
     sched
         .add("* * * * *", "once", false, true)
         .await
@@ -137,7 +147,7 @@ async fn multiple_fires_in_one_tick_save_once() {
     let t0 = Utc.with_ymd_and_hms(2026, 4, 10, 10, 0, 30).unwrap();
     let clock = Arc::new(ManualClock::new(t0));
     let store = TickStore::new();
-    let sched = build(store.clone(), clock.clone());
+    let sched = build(store.clone(), clock.clone()).await;
     // Three durable tasks all firing at the same minute.
     sched.add("* * * * *", "a", true, true).await.expect("add");
     sched.add("* * * * *", "b", true, true).await.expect("add");
@@ -170,7 +180,7 @@ async fn save_failure_retries_on_next_tick() {
     let t0 = Utc.with_ymd_and_hms(2026, 4, 10, 10, 0, 30).unwrap();
     let clock = Arc::new(ManualClock::new(t0));
     let store = TickStore::new();
-    let sched = build(store.clone(), clock.clone());
+    let sched = build(store.clone(), clock.clone()).await;
     // First save (from add) will fail.
     store.arm_failure();
     sched.add("* * * * *", "p", true, true).await.expect("add");

@@ -2,15 +2,12 @@
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 use async_trait::async_trait;
 
 use loopal_error::{LoopalError, Result};
 use loopal_protocol::AgentEventPayload;
 use loopal_runtime::frontend::traits::EventEmitter;
-
-pub const TEST_INTERVAL: Duration = Duration::from_millis(30);
 
 pub struct CaptureEmitter {
     pub events: Arc<Mutex<Vec<AgentEventPayload>>>,

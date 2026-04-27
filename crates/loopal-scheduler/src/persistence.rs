@@ -1,23 +1,20 @@
-//! Durable storage for cron tasks — types, trait, and serialization.
+//! Cron-task storage types — schema, persisted form, codec, errors.
 //!
-//! Only tasks marked `durable = true` are persisted. The scheduler
-//! writes the full durable-task set on every mutation (add / remove /
-//! tick-fired / expired) so the on-disk file always reflects the
-//! latest scheduler state. This keeps the implementation trivially
-//! correct at the cost of rewriting a small JSON document (≤50 tasks)
-//! per mutation — acceptable for a feature that fires at most 50
-//! times a day.
+//! Each cron task marked with `durable = true` is persisted on every
+//! mutation (add / remove / tick-fired / expired), so the on-disk file
+//! always reflects the latest in-memory state. Rewriting a small JSON
+//! document (≤50 tasks) per mutation is acceptable for a feature that
+//! fires at most ~50 times a day.
 //!
-//! A crash window between the in-memory mutation and a successful
-//! `save_all` can cause a one-shot durable task to be re-fired
-//! exactly once after restart — see [`CronScheduler`](crate::CronScheduler)
-//! docs.
+//! A crash window between an in-memory mutation and a successful
+//! `save_all` can cause a one-shot durable task to re-fire **exactly
+//! once** after restart — see [`CronScheduler`](crate::CronScheduler) docs.
 //!
-//! The file-backed implementation lives in [`crate::persistence_file`].
-//! Scheduler integration (persist_locked / load_persisted) lives in
+//! Session-scoped trait + impl live in [`crate::persistence_session`]
+//! and [`crate::persistence_file_scoped`]. Scheduler integration
+//! (persist_locked / load_persisted) lives in
 //! [`crate::scheduler_persistence`].
 
-use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 use std::io;
@@ -30,16 +27,15 @@ use crate::task::ScheduledTask;
 /// rather than silently misreading.
 pub const SCHEMA_VERSION: u32 = 1;
 
-/// Errors surfaced from a [`DurableStore`] implementation.
+/// Errors surfaced from a [`SessionScopedCronStorage`](crate::SessionScopedCronStorage)
+/// implementation.
 #[derive(Debug, thiserror::Error)]
 pub enum PersistError {
-    #[error("durable store i/o: {0}")]
+    #[error("cron storage i/o: {0}")]
     Io(#[from] io::Error),
-    #[error("durable store serde: {0}")]
+    #[error("cron storage serde: {0}")]
     Serde(#[from] serde_json::Error),
-    #[error("unsupported schema version {0}")]
-    UnsupportedVersion(u32),
-    #[error("cron expression in durable file is invalid: {0}")]
+    #[error("cron expression in stored file is invalid: {0}")]
     BadCron(String),
 }
 
@@ -113,26 +109,6 @@ fn unix_ms_to_utc(ms: i64) -> DateTime<Utc> {
         .unwrap_or_else(Utc::now)
 }
 
-// ---------------------------------------------------------------------------
-// Store trait
-// ---------------------------------------------------------------------------
-
-/// Abstract storage for durable cron tasks.
-///
-/// Implementations must be safe to share via `Arc` and callable from
-/// any task. `save_all` fully replaces the stored set.
-#[async_trait]
-pub trait DurableStore: Send + Sync {
-    /// Load all previously persisted tasks. A missing file returns an
-    /// empty vector — first-ever use is not an error.
-    async fn load(&self) -> Result<Vec<PersistedTask>, PersistError>;
-
-    /// Replace the on-disk set with `tasks`. Must be atomic: a reader
-    /// either sees the previous contents or the new contents, never
-    /// partial.
-    async fn save_all(&self, tasks: &[PersistedTask]) -> Result<(), PersistError>;
-}
-
 /// Build the durable subset of `tasks` as [`PersistedTask`] entries.
 pub(crate) fn durable_snapshot(tasks: &[ScheduledTask]) -> Vec<PersistedTask> {
     tasks
@@ -140,4 +116,45 @@ pub(crate) fn durable_snapshot(tasks: &[ScheduledTask]) -> Vec<PersistedTask> {
         .filter(|t| t.durable)
         .map(PersistedTask::from_task)
         .collect()
+}
+
+// ---------------------------------------------------------------------------
+// On-disk codec — used by `FileScopedCronStore`
+// ---------------------------------------------------------------------------
+
+/// Result of classifying raw bytes against the [`PersistedFile`] schema.
+///
+/// The store layer translates each variant into either a returned task
+/// list or a quarantine + empty result.
+pub(crate) enum LoadedPayload {
+    Empty,
+    Tasks(Vec<PersistedTask>),
+    Quarantine(String),
+}
+
+/// Decode raw bytes into a [`LoadedPayload`].
+///
+/// Empty input is treated as a valid empty list (first-ever-use). Bad
+/// JSON or unsupported schema versions yield [`LoadedPayload::Quarantine`]
+/// with a human-readable reason for the audit log.
+pub(crate) fn classify_payload(bytes: &[u8]) -> LoadedPayload {
+    if bytes.is_empty() {
+        return LoadedPayload::Empty;
+    }
+    match serde_json::from_slice::<PersistedFile>(bytes) {
+        Ok(parsed) if parsed.version == SCHEMA_VERSION => LoadedPayload::Tasks(parsed.tasks),
+        Ok(parsed) => {
+            LoadedPayload::Quarantine(format!("unsupported schema version {}", parsed.version))
+        }
+        Err(e) => LoadedPayload::Quarantine(format!("serde: {e}")),
+    }
+}
+
+/// Encode `tasks` as pretty JSON wrapped in a current-version [`PersistedFile`].
+pub(crate) fn encode_payload(tasks: &[PersistedTask]) -> Result<Vec<u8>, serde_json::Error> {
+    let file = PersistedFile {
+        version: SCHEMA_VERSION,
+        tasks: tasks.to_vec(),
+    };
+    serde_json::to_vec_pretty(&file)
 }

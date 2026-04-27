@@ -24,7 +24,6 @@ rust_library(
         "@crates//:opentelemetry",
         "@crates//:serde",
         "@crates//:serde_json",
-        "@crates//:thiserror",
         "@crates//:tokio",
         "@crates//:tokio-util",
         "@crates//:tracing",

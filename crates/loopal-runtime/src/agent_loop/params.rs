@@ -89,6 +89,17 @@ impl Default for InterruptHandle {
     }
 }
 
+/// Parameters for the agent loop.
+///
+/// Use [`AgentLoopParamsBuilder`](crate::agent_loop::AgentLoopParamsBuilder)
+/// for construction — the struct is `#[non_exhaustive]` so external
+/// callers cannot use struct-literal init. New optional fields are
+/// added without breaking existing call sites because all defaults
+/// live in the builder.
+///
+/// `pub` fields stay readable for ergonomic field access on already-
+/// built instances; only construction is gated.
+#[non_exhaustive]
 pub struct AgentLoopParams {
     pub config: AgentConfig,
     pub deps: AgentDeps,
@@ -102,4 +113,18 @@ pub struct AgentLoopParams {
     pub harness: HarnessConfig,
     pub rewake_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
     pub message_snapshot: Option<Arc<std::sync::RwLock<Vec<loopal_message::Message>>>>,
+    /// Hooks invoked after `handle_resume_session` swaps the active
+    /// session, so per-session state (cron, task list, etc.) can follow.
+    /// Default is empty — runtime callers that don't supply hooks see no
+    /// behavioral change.
+    pub resume_hooks: Vec<Arc<dyn crate::session_resume_hook::SessionResumeHook>>,
+}
+
+impl AgentLoopParams {
+    pub fn session(&self) -> &Session {
+        &self.session
+    }
+    pub fn config(&self) -> &AgentConfig {
+        &self.config
+    }
 }

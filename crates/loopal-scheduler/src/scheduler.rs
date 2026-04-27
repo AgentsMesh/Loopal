@@ -1,38 +1,77 @@
+//! `CronScheduler` — central state and lifecycle.
+//!
+//! This module owns the struct definition, in-memory and session-scoped
+//! constructors, and the background tick loop entrypoint. CRUD operations
+//! (`add` / `remove` / `list`) live in [`crate::scheduler_crud`] and the
+//! legacy single-path `DurableStore` adapter is in [`crate::scheduler_legacy`].
+//!
+//! ## Lock ordering
+//!
+//! Two locks must always be acquired in the same order to prevent
+//! deadlock between [`switch_session`](crate::scheduler_session) and
+//! the persistence path:
+//!
+//!   1. `tasks` (read or write)
+//!   2. `active`
+//!
+//! `switch_session`, `persist_locked`, and `load_persisted` all observe
+//! this order.
+
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock, broadcast};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use crate::clock::{Clock, SystemClock};
-use crate::error::{SchedulerError, generate_task_id};
-use crate::expression::CronExpression;
-use crate::id::find_unique_id;
-use crate::persistence::DurableStore;
-use crate::task::{CronJobInfo, ScheduledTask, truncate_to_secs};
+use crate::persistence_session::SessionScopedCronStorage;
+use crate::task::ScheduledTask;
 use crate::trigger::ScheduledTrigger;
 
 /// Maximum number of concurrent scheduled tasks.
 pub(crate) const MAX_TASKS: usize = 50;
 
+/// Capacity for the change-notification broadcast channel.
+///
+/// Mirrors `loopal_agent::task_store::BROADCAST_CAPACITY`. Each subscriber
+/// gets an independent receiver; lagging consumers fall behind by at
+/// most this many pulses before getting `Lagged` and a forced
+/// re-snapshot, which is harmless because every pulse means
+/// "something changed — re-list".
+pub const BROADCAST_CAPACITY: usize = 16;
+
+/// Currently bound storage and session id.
+///
+/// `session_id` is `None` immediately after a session-scoped storage is
+/// attached but before [`CronScheduler::switch_session`](crate::CronScheduler::switch_session)
+/// is called — in that state persistence is a no-op (no session to save
+/// under). Once bound, it carries `Some(id)`, and all `load`/`save_all`
+/// calls flow through that id.
+///
+/// The legacy [`CronScheduler::with_store`](crate::CronScheduler::with_store)
+/// path constructs a binding with `session_id = Some(String::new())`
+/// plus a [`LegacyBindAdapter`](crate::scheduler_legacy::LegacyBindAdapter)
+/// that ignores the id, so existing single-path callers keep working.
+pub(crate) struct ActiveBinding {
+    pub(crate) session_id: Option<String>,
+    pub(crate) storage: Arc<dyn SessionScopedCronStorage>,
+}
+
 /// Cron-based scheduler that manages tasks and emits triggers.
 ///
-/// Thread-safe — the task list is guarded by an async `RwLock` so that
-/// concurrent read-only callers (`list()`) can proceed without blocking
-/// each other. Writers (`add`, `remove`, and the internal tick loop when
-/// it fires or expires a task) acquire an exclusive lock.
+/// Thread-safe — task list under async `RwLock`, persistence binding
+/// under async `Mutex`. See module-level docs for lock ordering rules.
 ///
-/// When a [`DurableStore`] is attached via [`with_store`](Self::with_store)
-/// or [`with_store_and_clock`](Self::with_store_and_clock), mutations
-/// that touch `durable = true` tasks are written through to the store
-/// while the `tasks` write lock is held, preventing interleaved saves
-/// from producing a stale on-disk view.
+/// Job-set changes (add / remove / switch_session / one-shot fire-and-
+/// remove) are advertised on a `tokio::sync::broadcast` channel
+/// `change_tx`. Subscribers re-snapshot on each pulse — the bridge
+/// layer no longer polls.
 pub struct CronScheduler {
     pub(crate) tasks: Arc<RwLock<Vec<ScheduledTask>>>,
-    started: AtomicBool,
+    pub(crate) started: AtomicBool,
     pub(crate) clock: Arc<dyn Clock>,
-    pub(crate) store: Option<Arc<dyn DurableStore>>,
+    pub(crate) active: Arc<Mutex<Option<ActiveBinding>>>,
     /// Set when a `save_all` call fails. The next tick (or next mutation)
     /// retries so transient disk errors don't permanently diverge
     /// memory from disk.
@@ -43,6 +82,9 @@ pub struct CronScheduler {
     /// overwrites unrecognized on-disk state. In-memory operation
     /// continues uninterrupted.
     pub(crate) store_disabled: Arc<AtomicBool>,
+    /// Broadcast channel signalling job-set changes. Capacity is small
+    /// (`BROADCAST_CAPACITY`) — pulses are coalesce-able by the consumer.
+    pub(crate) change_tx: broadcast::Sender<()>,
 }
 
 impl CronScheduler {
@@ -53,110 +95,60 @@ impl CronScheduler {
 
     /// Create an in-memory-only scheduler with a custom clock.
     pub fn with_clock(clock: Arc<dyn Clock>) -> Self {
+        let (change_tx, _) = broadcast::channel(BROADCAST_CAPACITY);
         Self {
             tasks: Arc::new(RwLock::new(Vec::new())),
             started: AtomicBool::new(false),
             clock,
-            store: None,
+            active: Arc::new(Mutex::new(None)),
             dirty: Arc::new(AtomicBool::new(false)),
             store_disabled: Arc::new(AtomicBool::new(false)),
+            change_tx,
         }
     }
 
-    /// Create a scheduler backed by `store`. Tasks added with
-    /// `durable = true` are written to the store; non-durable tasks
-    /// still live only in memory.
-    pub fn with_store(store: Arc<dyn DurableStore>) -> Self {
-        Self::with_store_and_clock(store, Arc::new(SystemClock))
+    /// Create a scheduler backed by a session-scoped `storage`. The
+    /// scheduler is unbound until
+    /// [`switch_session`](crate::CronScheduler::switch_session) is called
+    /// — `add` calls before that point write to memory only.
+    pub fn with_session_storage(storage: Arc<dyn SessionScopedCronStorage>) -> Self {
+        Self::with_session_storage_and_clock(storage, Arc::new(SystemClock))
     }
 
-    /// Like [`with_store`](Self::with_store) but with a custom clock
-    /// (for deterministic testing).
-    pub fn with_store_and_clock(store: Arc<dyn DurableStore>, clock: Arc<dyn Clock>) -> Self {
+    /// Like [`with_session_storage`](Self::with_session_storage) but with
+    /// a custom clock (for deterministic testing).
+    pub fn with_session_storage_and_clock(
+        storage: Arc<dyn SessionScopedCronStorage>,
+        clock: Arc<dyn Clock>,
+    ) -> Self {
+        let (change_tx, _) = broadcast::channel(BROADCAST_CAPACITY);
         Self {
             tasks: Arc::new(RwLock::new(Vec::new())),
             started: AtomicBool::new(false),
             clock,
-            store: Some(store),
+            active: Arc::new(Mutex::new(Some(ActiveBinding {
+                session_id: None,
+                storage,
+            }))),
             dirty: Arc::new(AtomicBool::new(false)),
             store_disabled: Arc::new(AtomicBool::new(false)),
+            change_tx,
         }
     }
 
-    /// Add a new scheduled task. Returns the 8-char task ID.
-    ///
-    /// When `durable` is `true` and the scheduler has a store attached,
-    /// the new task is persisted before this method returns.
-    pub async fn add(
-        &self,
-        cron_expr: &str,
-        prompt: &str,
-        recurring: bool,
-        durable: bool,
-    ) -> Result<String, SchedulerError> {
-        let now = self.clock.now();
-        let cron = CronExpression::parse_at(cron_expr, now).map_err(SchedulerError::InvalidCron)?;
-        let mut tasks = self.tasks.write().await;
-        if tasks.len() >= MAX_TASKS {
-            return Err(SchedulerError::TooManyTasks(MAX_TASKS));
-        }
-        let id = find_unique_id(&tasks, generate_task_id);
-        tasks.push(ScheduledTask {
-            id: id.clone(),
-            cron,
-            prompt: prompt.to_string(),
-            recurring,
-            created_at: now,
-            last_fired: None,
-            durable,
-        });
-        if durable || self.dirty.load(Ordering::Acquire) {
-            self.persist_locked(&tasks).await;
-        }
-        Ok(id)
+    /// Subscribe to job-set change notifications. Each call returns an
+    /// independent `broadcast::Receiver`; multiple subscribers (the
+    /// bridge layer, future metrics observers, …) coexist without
+    /// interfering. A pulse means "the cron job set changed — re-list".
+    pub fn subscribe(&self) -> broadcast::Receiver<()> {
+        self.change_tx.subscribe()
     }
 
-    /// Remove a task by ID. Returns `true` if found and removed.
-    ///
-    /// A durable removal is written through to the store inline.
-    pub async fn remove(&self, id: &str) -> bool {
-        let mut tasks = self.tasks.write().await;
-        let was_durable = tasks.iter().any(|t| t.id == id && t.durable);
-        let before = tasks.len();
-        tasks.retain(|t| t.id != id);
-        let removed = tasks.len() < before;
-        if removed && (was_durable || self.dirty.load(Ordering::Acquire)) {
-            self.persist_locked(&tasks).await;
-        }
-        removed
-    }
-
-    /// List all active tasks as read-only snapshots.
-    pub async fn list(&self) -> Vec<CronJobInfo> {
-        let tasks = self.tasks.read().await;
-        let now = self.clock.now();
-        tasks
-            .iter()
-            .map(|t| {
-                let reference = truncate_to_secs(t.last_fired.unwrap_or(t.created_at));
-                let next_fire = t.cron.next_after(&reference).and_then(|next| {
-                    if next > now {
-                        Some(next)
-                    } else {
-                        t.cron.next_after(&now)
-                    }
-                });
-                CronJobInfo {
-                    id: t.id.clone(),
-                    cron_expr: t.cron.as_str().to_string(),
-                    prompt: t.prompt.clone(),
-                    recurring: t.recurring,
-                    created_at: t.created_at,
-                    next_fire,
-                    durable: t.durable,
-                }
-            })
-            .collect()
+    pub(crate) fn notify_change(&self) {
+        // `send()` errors only when there are no receivers — that's
+        // expected during the windowed period between scheduler
+        // construction and any subscriber connecting. Drop the error.
+        let _ = self.change_tx.send(());
     }
 
     /// Start the background tick loop. Fires triggers on `trigger_tx`.
@@ -172,23 +164,15 @@ impl CronScheduler {
             !self.started.swap(true, Ordering::SeqCst),
             "CronScheduler::start() called more than once"
         );
-        let tasks = self.tasks.clone();
-        let clock = self.clock.clone();
-        let store = self.store.clone();
-        let dirty = self.dirty.clone();
-        let store_disabled = self.store_disabled.clone();
-        tokio::spawn(async move {
-            crate::tick::tick_loop(
-                tasks,
-                trigger_tx,
-                cancel,
-                clock,
-                store,
-                dirty,
-                store_disabled,
-            )
-            .await;
-        })
+        let ctx = crate::tick_context::TickContext {
+            tasks: self.tasks.clone(),
+            clock: self.clock.clone(),
+            active: self.active.clone(),
+            dirty: self.dirty.clone(),
+            store_disabled: self.store_disabled.clone(),
+            change_tx: self.change_tx.clone(),
+        };
+        tokio::spawn(crate::tick::tick_loop(ctx, trigger_tx, cancel))
     }
 }
 

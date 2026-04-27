@@ -40,6 +40,27 @@ pub fn token_usage(session_id: &str, usage: &Value) -> (String, Value) {
     ext_notification(session_id, "tokenUsage", usage.clone())
 }
 
+/// `_loopal/sessionResumeWarnings` — fires only on partial failures.
+/// Hooks that returned `Err` are listed; the resume itself completed.
+pub fn session_resume_warnings(session_id: &str, warnings: &[String]) -> (String, Value) {
+    ext_notification(
+        session_id,
+        "sessionResumeWarnings",
+        serde_json::json!({ "warnings": warnings }),
+    )
+}
+
+/// `_loopal/sessionResumed` — fires on every successful swap (warnings
+/// or not). Symmetric with `session_resume_warnings`, gives clients a
+/// guaranteed signal to refresh per-session UI.
+pub fn session_resumed(session_id: &str, message_count: usize) -> (String, Value) {
+    ext_notification(
+        session_id,
+        "sessionResumed",
+        serde_json::json!({ "messageCount": message_count }),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -58,5 +79,23 @@ mod tests {
         let (method, params) = token_usage("s1", &usage);
         assert_eq!(method, "_loopal/tokenUsage");
         assert_eq!(params["data"]["inputTokens"], 100);
+    }
+
+    #[test]
+    fn session_resume_warnings_format() {
+        let warnings = vec!["cron load failed".into(), "task store stale".into()];
+        let (method, params) = session_resume_warnings("s1", &warnings);
+        assert_eq!(method, "_loopal/sessionResumeWarnings");
+        assert_eq!(params["sessionId"], "s1");
+        assert_eq!(params["data"]["warnings"][0], "cron load failed");
+        assert_eq!(params["data"]["warnings"][1], "task store stale");
+    }
+
+    #[test]
+    fn session_resumed_format() {
+        let (method, params) = session_resumed("s1", 42);
+        assert_eq!(method, "_loopal/sessionResumed");
+        assert_eq!(params["sessionId"], "s1");
+        assert_eq!(params["data"]["messageCount"], 42);
     }
 }

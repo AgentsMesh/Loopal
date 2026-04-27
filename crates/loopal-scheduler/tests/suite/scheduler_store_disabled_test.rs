@@ -8,7 +8,9 @@ use async_trait::async_trait;
 use chrono::Utc;
 use tokio::sync::Mutex;
 
-use loopal_scheduler::{CronScheduler, DurableStore, ManualClock, PersistError, PersistedTask};
+use loopal_scheduler::{
+    CronScheduler, ManualClock, PersistError, PersistedTask, SessionScopedCronStorage,
+};
 
 /// A store whose `load` always fails — simulates quarantine-failed
 /// or unreadable on-disk state.
@@ -28,11 +30,15 @@ impl FailingLoadStore {
 }
 
 #[async_trait]
-impl DurableStore for FailingLoadStore {
-    async fn load(&self) -> Result<Vec<PersistedTask>, PersistError> {
+impl SessionScopedCronStorage for FailingLoadStore {
+    async fn load(&self, _session_id: &str) -> Result<Vec<PersistedTask>, PersistError> {
         Err(PersistError::Io(std::io::Error::other("unreadable")))
     }
-    async fn save_all(&self, _tasks: &[PersistedTask]) -> Result<(), PersistError> {
+    async fn save_all(
+        &self,
+        _session_id: &str,
+        _tasks: &[PersistedTask],
+    ) -> Result<(), PersistError> {
         *self.saves.lock().await += 1;
         Ok(())
     }
@@ -40,15 +46,17 @@ impl DurableStore for FailingLoadStore {
 
 #[tokio::test]
 async fn load_failure_latches_store_disabled_and_skips_subsequent_saves() {
-    // If `load_persisted` fails (e.g. quarantine could not move a
+    // If the storage `load` fails (e.g. quarantine could not move a
     // corrupt file aside), the scheduler must **refuse** to persist
     // afterwards, otherwise a later `add` atomically overwrites the
     // user's unrecognized on-disk state with an empty snapshot.
     let store = FailingLoadStore::new();
-    let store_dyn: Arc<dyn DurableStore> = store.clone();
-    let sched =
-        CronScheduler::with_store_and_clock(store_dyn, Arc::new(ManualClock::new(Utc::now())));
-    let err = sched.load_persisted().await.unwrap_err();
+    let store_dyn: Arc<dyn SessionScopedCronStorage> = store.clone();
+    let sched = CronScheduler::with_session_storage_and_clock(
+        store_dyn,
+        Arc::new(ManualClock::new(Utc::now())),
+    );
+    let err = sched.switch_session("test").await.unwrap_err();
     assert!(
         matches!(err, PersistError::Io(_)),
         "expected Io error, got {err:?}"
@@ -73,10 +81,12 @@ async fn remove_after_load_failure_also_skips_store() {
     // Same guarantee on the `remove` path — once the store is
     // disabled, neither add nor remove should clobber on-disk data.
     let store = FailingLoadStore::new();
-    let store_dyn: Arc<dyn DurableStore> = store.clone();
-    let sched =
-        CronScheduler::with_store_and_clock(store_dyn, Arc::new(ManualClock::new(Utc::now())));
-    let _ = sched.load_persisted().await;
+    let store_dyn: Arc<dyn SessionScopedCronStorage> = store.clone();
+    let sched = CronScheduler::with_session_storage_and_clock(
+        store_dyn,
+        Arc::new(ManualClock::new(Utc::now())),
+    );
+    let _ = sched.switch_session("test").await;
 
     let id = sched
         .add("*/5 * * * *", "x", true, true)

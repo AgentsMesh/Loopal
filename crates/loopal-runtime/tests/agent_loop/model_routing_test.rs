@@ -8,7 +8,9 @@ use loopal_protocol::{AgentEvent, ControlCommand, Envelope};
 use loopal_provider_api::{ModelRouter, TaskType};
 use loopal_runtime::agent_loop::AgentLoopRunner;
 use loopal_runtime::frontend::{AutoCancelQuestionHandler, AutoDenyHandler};
-use loopal_runtime::{AgentConfig, AgentDeps, AgentLoopParams, InterruptHandle, UnifiedFrontend};
+use loopal_runtime::{
+    AgentConfig, AgentDeps, AgentLoopParamsBuilder, InterruptHandle, UnifiedFrontend,
+};
 use loopal_test_support::TestFixture;
 use tokio::sync::mpsc;
 
@@ -37,27 +39,21 @@ fn make_runner_with_routing(
     routing.insert(TaskType::Summarization, summarization_model.to_string());
     let router = ModelRouter::from_parts("claude-sonnet-4-20250514".into(), routing);
 
-    let params = AgentLoopParams {
-        config: AgentConfig {
+    let params = AgentLoopParamsBuilder::new(
+        AgentConfig {
             router,
             ..Default::default()
         },
-        deps: AgentDeps {
+        AgentDeps {
             kernel,
             frontend,
             session_manager: fixture.session_manager(),
         },
-        session: fixture.test_session("test-routing"),
-        store: ContextStore::new(make_test_budget()),
-        interrupt: InterruptHandle::new(),
-        shared: None,
-        memory_channel: None,
-        scheduled_rx: None,
-        auto_classifier: None,
-        harness: loopal_config::HarnessConfig::default(),
-        rewake_rx: None,
-        message_snapshot: None,
-    };
+        fixture.test_session("test-routing"),
+        ContextStore::new(make_test_budget()),
+        InterruptHandle::new(),
+    )
+    .build();
     (AgentLoopRunner::new(params), event_rx)
 }
 
@@ -124,27 +120,21 @@ fn test_model_routing_default_override_via_config_model() {
     routing.insert(TaskType::Default, "claude-opus-4-6".into());
     let router = ModelRouter::from_parts("claude-sonnet-4-20250514".into(), routing);
 
-    let params = AgentLoopParams {
-        config: AgentConfig {
+    let params = AgentLoopParamsBuilder::new(
+        AgentConfig {
             router,
             ..Default::default()
         },
-        deps: AgentDeps {
+        AgentDeps {
             kernel,
             frontend,
             session_manager: fixture.session_manager(),
         },
-        session: fixture.test_session("test-default-override"),
-        store: ContextStore::new(make_test_budget()),
-        interrupt: InterruptHandle::new(),
-        shared: None,
-        memory_channel: None,
-        scheduled_rx: None,
-        auto_classifier: None,
-        harness: loopal_config::HarnessConfig::default(),
-        rewake_rx: None,
-        message_snapshot: None,
-    };
+        fixture.test_session("test-default-override"),
+        ContextStore::new(make_test_budget()),
+        InterruptHandle::new(),
+    )
+    .build();
     let (runner, _rx) = (AgentLoopRunner::new(params), event_rx);
 
     // config.model() should respect model_routing.default override

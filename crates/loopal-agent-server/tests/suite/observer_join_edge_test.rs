@@ -4,7 +4,8 @@ use std::sync::Arc;
 
 use loopal_ipc::connection::Connection;
 
-use super::observer_join_test::{init_client, make_duplex_pair};
+use super::bridge_helpers::make_duplex_pair;
+use super::observer_join_test::init_client;
 
 /// agent/join with no active session returns an error.
 #[tokio::test]

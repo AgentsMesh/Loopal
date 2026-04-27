@@ -17,7 +17,7 @@ use loopal_protocol::{Envelope, MessageSource};
 use loopal_provider_api::{ChatParams, ChatStream, Provider, StopReason, StreamChunk};
 use loopal_runtime::frontend::{AutoCancelQuestionHandler, AutoDenyHandler};
 use loopal_runtime::{
-    AgentConfig, AgentDeps, AgentLoopParams, InterruptHandle, UnifiedFrontend, agent_loop,
+    AgentConfig, AgentDeps, AgentLoopParamsBuilder, InterruptHandle, UnifiedFrontend, agent_loop,
 };
 use loopal_test_support::TestFixture;
 use tokio::sync::mpsc;
@@ -120,29 +120,23 @@ async fn test_subagent_drains_pending_before_exit() {
     kernel.register_provider(mock);
     let kernel = Arc::new(kernel);
 
-    let params = AgentLoopParams {
-        config: AgentConfig {
+    let params = AgentLoopParamsBuilder::new(
+        AgentConfig {
             ..Default::default()
         },
-        deps: AgentDeps {
+        AgentDeps {
             kernel,
             frontend,
             session_manager: fixture.session_manager(),
         },
-        session: fixture.test_session("drain-test"),
-        store: ContextStore::from_messages(
+        fixture.test_session("drain-test"),
+        ContextStore::from_messages(
             vec![loopal_message::Message::user("run task")],
             make_test_budget(),
         ),
-        interrupt: InterruptHandle::new(),
-        shared: None,
-        memory_channel: None,
-        scheduled_rx: None,
-        auto_classifier: None,
-        harness: loopal_config::HarnessConfig::default(),
-        rewake_rx: None,
-        message_snapshot: None,
-    };
+        InterruptHandle::new(),
+    )
+    .build();
 
     // Drain events in background so channels don't block
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });

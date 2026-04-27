@@ -15,7 +15,7 @@ fn test_model_info_defaults_for_unknown_model() {
     use loopal_runtime::agent_loop::AgentLoopRunner;
     use loopal_runtime::frontend::{AutoCancelQuestionHandler, AutoDenyHandler};
     use loopal_runtime::{
-        AgentConfig, AgentDeps, AgentLoopParams, InterruptHandle, UnifiedFrontend,
+        AgentConfig, AgentDeps, AgentLoopParamsBuilder, InterruptHandle, UnifiedFrontend,
     };
     use loopal_test_support::TestFixture;
     use loopal_tool_api::PermissionMode;
@@ -38,28 +38,22 @@ fn test_model_info_defaults_for_unknown_model() {
 
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
 
-    let params = AgentLoopParams {
-        config: AgentConfig {
+    let params = AgentLoopParamsBuilder::new(
+        AgentConfig {
             router: loopal_provider_api::ModelRouter::new("unknown-model-xyz".to_string()),
             permission_mode: PermissionMode::Supervised,
             ..Default::default()
         },
-        deps: AgentDeps {
+        AgentDeps {
             kernel,
             frontend,
             session_manager: fixture.session_manager(),
         },
-        session: fixture.test_session("test"),
-        store: loopal_context::ContextStore::new(super::make_test_budget()),
-        interrupt: InterruptHandle::new(),
-        shared: None,
-        memory_channel: None,
-        scheduled_rx: None,
-        auto_classifier: None,
-        harness: loopal_config::HarnessConfig::default(),
-        rewake_rx: None,
-        message_snapshot: None,
-    };
+        fixture.test_session("test"),
+        loopal_context::ContextStore::new(super::make_test_budget()),
+        InterruptHandle::new(),
+    )
+    .build();
 
     let runner = AgentLoopRunner::new(params);
     // Unknown model should fall back to defaults

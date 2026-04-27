@@ -23,7 +23,8 @@ pub enum AcpNotification {
 
 /// Convert an `AgentEventPayload` into an ACP notification.
 ///
-/// Returns `None` for events that have no ACP counterpart (e.g. `AwaitingInput`).
+/// Three-way dispatch: standard events → `SessionUpdate`; Loopal-specific
+/// events → `Extension` (`_loopal/*`); events with no IDE counterpart → `None`.
 pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<AcpNotification> {
     match payload {
         // ── Message streaming ────────────────────────────────────────
@@ -93,6 +94,20 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
             let (method, params) = ext::token_usage(session_id, &usage);
             Some(AcpNotification::Extension { method, params })
         }
+        AgentEventPayload::SessionResumeWarnings {
+            session_id: warned_session,
+            warnings,
+        } => {
+            let (method, params) = ext::session_resume_warnings(warned_session, warnings);
+            Some(AcpNotification::Extension { method, params })
+        }
+        AgentEventPayload::SessionResumed {
+            session_id: resumed_session,
+            message_count,
+        } => {
+            let (method, params) = ext::session_resumed(resumed_session, *message_count);
+            Some(AcpNotification::Extension { method, params })
+        }
 
         // ── Events with no ACP counterpart ───────────────────────────
         AgentEventPayload::AwaitingInput
@@ -115,7 +130,6 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
         | AgentEventPayload::SubAgentSpawned { .. }
         | AgentEventPayload::AutoModeDecision { .. }
         | AgentEventPayload::TurnCompleted { .. }
-        | AgentEventPayload::SessionResumed { .. }
         | AgentEventPayload::McpStatusReport { .. }
         | AgentEventPayload::BgTaskSpawned { .. }
         | AgentEventPayload::BgTaskOutput { .. }
@@ -126,54 +140,3 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
 }
 
 pub use tool_kind::map_tool_kind;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use loopal_protocol::AgentEventPayload;
-
-    #[test]
-    fn stream_returns_session_update() {
-        let r = translate_event(&AgentEventPayload::Stream { text: "hi".into() }, "s");
-        assert!(matches!(r, Some(AcpNotification::SessionUpdate(_))));
-    }
-
-    #[test]
-    fn thinking_returns_session_update() {
-        let r = translate_event(&AgentEventPayload::ThinkingStream { text: "t".into() }, "s");
-        assert!(matches!(r, Some(AcpNotification::SessionUpdate(_))));
-    }
-
-    #[test]
-    fn retry_error_returns_extension() {
-        let r = translate_event(
-            &AgentEventPayload::RetryError {
-                message: "e".into(),
-                attempt: 1,
-                max_attempts: 3,
-            },
-            "s",
-        );
-        assert!(matches!(r, Some(AcpNotification::Extension { .. })));
-    }
-
-    #[test]
-    fn none_events_return_none() {
-        let nones = vec![
-            AgentEventPayload::AwaitingInput,
-            AgentEventPayload::MaxTurnsReached { turns: 50 },
-            AgentEventPayload::Started,
-            AgentEventPayload::Running,
-            AgentEventPayload::Finished,
-            AgentEventPayload::Interrupted,
-            AgentEventPayload::RetryCleared,
-            AgentEventPayload::McpStatusReport { servers: vec![] },
-        ];
-        for ev in &nones {
-            assert!(
-                translate_event(ev, "s").is_none(),
-                "expected None for {ev:?}"
-            );
-        }
-    }
-}

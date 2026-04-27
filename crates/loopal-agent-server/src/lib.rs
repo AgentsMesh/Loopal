@@ -7,7 +7,9 @@
 //! This is the "Renderer Process" in the Chromium analogy — it owns the Kernel,
 //! LLM providers, tools, and context pipeline.
 
+mod agent_loop_params_factory;
 mod agent_setup;
+mod agent_setup_context;
 mod agent_setup_helpers;
 mod bg_task_bridge;
 mod cron_bridge;
@@ -29,7 +31,10 @@ mod server_init;
 mod session_forward;
 #[doc(hidden)]
 pub mod session_hub;
+mod session_hub_storage;
+mod session_resources;
 mod session_start;
+mod shared_session;
 mod spawn_policy;
 mod task_bridge;
 mod test_server;
@@ -69,14 +74,17 @@ pub fn hub_frontend_for_test(
 #[doc(hidden)]
 pub mod testing {
     pub use crate::agent_setup::build_with_frontend;
+    pub use crate::agent_setup_context::AgentSetupContext;
     pub use crate::agent_setup_helpers::{
         build_initial_messages, collect_feature_tags, spawn_sub_agent_forwarder,
     };
     pub use crate::bg_task_bridge::spawn as bg_task_bridge_spawn;
     pub use crate::cron_bridge::spawn as cron_bridge_spawn;
-    pub use crate::cron_bridge::spawn_with_interval as cron_bridge_spawn_with_interval;
+    pub use crate::cron_bridge::spawn_with_receiver as cron_bridge_spawn_with_receiver;
     pub use crate::params::AgentSetupResult;
     pub use crate::params::{StartParams, build_kernel_with_provider};
-    pub use crate::session_hub::SharedSession;
+    pub use crate::session_hub::{SessionHub, SharedSession};
+    pub use crate::session_hub_storage::SessionHubError;
+    pub use crate::session_resources::resolve_sessions_root;
     pub use loopal_runtime::agent_input::AgentInput;
 }

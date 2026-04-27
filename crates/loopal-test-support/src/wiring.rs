@@ -15,12 +15,12 @@ use loopal_context::ContextStore;
 use loopal_kernel::Kernel;
 use loopal_protocol::{AgentEvent, ControlCommand, Envelope, UserQuestionResponse};
 use loopal_provider_api::Provider;
+use loopal_runtime::UnifiedFrontend;
 use loopal_runtime::agent_loop::AgentLoopRunner;
 use loopal_runtime::frontend::PermissionHandler;
 use loopal_runtime::frontend::{
     AutoCancelQuestionHandler, AutoDenyHandler, RelayPermissionHandler,
 };
-use loopal_runtime::{AgentLoopParams, UnifiedFrontend};
 use loopal_session::SessionController;
 use loopal_tool_api::PermissionMode;
 
@@ -93,7 +93,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
     };
     let shared = Arc::new(AgentShared {
         kernel: kernel.clone(),
-        task_store: Arc::new(TaskStore::new(tasks_dir)),
+        task_store: Arc::new(TaskStore::with_sessions_root(tasks_dir)),
         hub_connection,
         cwd,
         depth: 0,
@@ -122,8 +122,8 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         0,
     );
 
-    let params = AgentLoopParams {
-        config: loopal_runtime::AgentConfig {
+    let params = loopal_runtime::AgentLoopParamsBuilder::new(
+        loopal_runtime::AgentConfig {
             lifecycle: builder.lifecycle,
             router: {
                 let mut routing = std::collections::HashMap::new();
@@ -140,28 +140,24 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
             context_tokens_cap: 200_000,
             plan_state: None,
         },
-        deps: loopal_runtime::AgentDeps {
+        loopal_runtime::AgentDeps {
             kernel,
             frontend,
             session_manager: fixture.session_manager(),
         },
-        session: if has_cwd_override {
+        if has_cwd_override {
             let mut s = fixture.test_session("integration-test");
             s.cwd = session_cwd.to_string_lossy().into_owned();
             s
         } else {
             fixture.test_session("integration-test")
         },
-        store: ContextStore::from_messages(builder.messages, budget),
+        ContextStore::from_messages(builder.messages, budget),
         interrupt,
-        shared: Some(shared_any),
-        memory_channel: None,
-        scheduled_rx: Some(scheduled_rx),
-        auto_classifier: None,
-        harness: loopal_config::HarnessConfig::default(),
-        rewake_rx: None,
-        message_snapshot: None,
-    };
+    )
+    .shared(shared_any)
+    .scheduled_rx(scheduled_rx)
+    .build();
 
     let harness = SpawnedHarness {
         event_rx,

@@ -5,7 +5,7 @@
 
 mod adapter;
 pub mod jsonrpc;
-mod translate;
+pub mod translate;
 pub mod types;
 
 use tokio::io::BufReader;

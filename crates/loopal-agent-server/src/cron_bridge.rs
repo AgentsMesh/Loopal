@@ -1,51 +1,63 @@
-//! Cron job bridge — polls the root agent's `CronScheduler` at a fixed
-//! interval and emits `CronsChanged` whenever the *job set* changes.
+//! Cron job bridge — subscribes to the root agent's `CronScheduler` change
+//! broadcast and emits `CronsChanged` whenever the job set changes.
 //!
-//! Diff-skip is based on the unordered set of `(id, prompt, recurring)` —
-//! **not** `next_fire`. Two reasons:
+//! ## Why diff-skip is still here
+//!
+//! The bridge consumes `CronScheduler::subscribe()` pulses (`()` —
+//! "something changed, re-list"). Pulses are emitted whenever the
+//! scheduler's job set may have changed:
+//!   - `add` / `remove` mutations
+//!   - `switch_session` (resume) installs a new set
+//!   - `tick_loop` fired/expired any task this tick (incl. recurring's
+//!     `last_fired` updates that don't change the user-visible set)
+//!
+//! That last source makes the diff-skip useful as a final filter:
+//! recurring `last_fired` updates pulse but don't change `(id, prompt,
+//! recurring, cron_expr, durable)`, so we silently drop those events.
+//!
+//! Diff-skip key is the **unordered set** of identity tuples — never
+//! `next_fire`. Two reasons:
 //! 1. `CronScheduler::list()` recomputes `next_fire` relative to the
 //!    current time on every call; including it in the diff would defeat
-//!    the optimization (every tick would look "changed").
-//! 2. `CronScheduler` internally calls `Vec::remove(index)` when one-shot
-//!    jobs fire, which shifts later entries left. An order-sensitive diff
-//!    would spuriously emit on every such fire even though the surviving
-//!    job set is unchanged.
+//!    the optimization (every pulse would look "changed").
+//! 2. `CronScheduler` internally calls `Vec::remove(index)` when
+//!    one-shot jobs fire, which shifts later entries left. An
+//!    order-sensitive diff would spuriously emit on every such fire
+//!    even though the surviving job set is unchanged.
 //!
 //! The countdown is recomputed by the TUI each frame via
 //! `cron_duration_format::format_next_fire_ms(now)`, so the TUI stays
 //! fresh without the bridge firing redundant events.
 //!
-//! Scope: only the root agent's scheduler is observed. Sub-agents maintain
-//! their own schedulers via `AgentShared`, but they are deliberately not
-//! exposed — consistent with how `bg_task_bridge` only reports root-level
-//! background tasks. Extending to sub-agents is YAGNI until requested.
+//! Scope: only the root agent's scheduler is observed. Sub-agents
+//! maintain their own schedulers via `AgentShared`, but they are
+//! deliberately not exposed — consistent with how `bg_task_bridge` only
+//! reports root-level background tasks. Extending to sub-agents is
+//! YAGNI until requested.
 
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
-use std::time::Duration;
 
+use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 
 use loopal_protocol::{AgentEventPayload, CronJobSnapshot};
 use loopal_runtime::frontend::traits::AgentFrontend;
 use loopal_scheduler::{CronJobInfo, CronScheduler};
 
-/// Default poll interval in production. Matches `bg_task_bridge`'s
-/// `OUTPUT_SAMPLE_INTERVAL` — both are "low-pressure observation" taps.
-pub const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(2);
-
 /// Stable identity for diff-skip. The `id` is kept verbatim (8 chars);
-/// the rest of the identifying payload (prompt, recurring, cron_expr) is
-/// reduced to a 64-bit hash to avoid cloning large prompt strings on
-/// every poll.
+/// the rest of the identifying payload (prompt, recurring, cron_expr,
+/// durable) is reduced to a 64-bit hash to avoid cloning large prompt
+/// strings on every pulse.
 ///
 /// **`content_hash` is not stable across Rust versions.** It is produced
 /// by [`std::collections::hash_map::DefaultHasher`] which may change its
 /// algorithm between releases. This is safe for the current use case
-/// because `CronIdentity` is only compared in-process during the lifetime
-/// of a single bridge. Do **not** persist `content_hash` to disk, embed
-/// it in IPC messages, or compare values produced by different processes.
+/// because `CronIdentity` is only compared in-process during the
+/// lifetime of a single bridge. Do **not** persist `content_hash` to
+/// disk, embed it in IPC messages, or compare values produced by
+/// different processes.
 ///
 /// If new identifying fields are added to [`CronJobSnapshot`], remember
 /// to extend [`From<&CronJobSnapshot>`] below or the diff-skip will
@@ -70,23 +82,26 @@ impl From<&CronJobSnapshot> for CronIdentity {
     }
 }
 
-/// Spawn a bridge polling at the default 2-second cadence.
+/// Spawn a bridge driven by the scheduler's change broadcast.
+///
+/// Subscribes to `scheduler.subscribe()` *before* the initial emit so
+/// no pulse arrives between the snapshot and the loop start. The
+/// initial emit is unconditional so observers attaching post-resume
+/// see the current job set without waiting for the next change.
 pub fn spawn(scheduler: Arc<CronScheduler>, frontend: Arc<dyn AgentFrontend>) -> JoinHandle<()> {
-    spawn_with_interval(scheduler, frontend, DEFAULT_POLL_INTERVAL)
+    let change_rx = scheduler.subscribe();
+    spawn_with_receiver(scheduler, frontend, change_rx)
 }
 
-/// Spawn a bridge with a custom poll interval (exposed for tests).
-pub fn spawn_with_interval(
+/// Spawn a bridge with an externally-provided change receiver. Useful
+/// for tests that want to subscribe before the spawn so they can
+/// observe every pulse without races.
+pub fn spawn_with_receiver(
     scheduler: Arc<CronScheduler>,
     frontend: Arc<dyn AgentFrontend>,
-    poll_interval: Duration,
+    mut change_rx: broadcast::Receiver<()>,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
-        // Skip missed ticks rather than bursting — cron polling is a sample,
-        // not an accumulator; replaying old ticks would just duplicate work.
-        let mut interval = tokio::time::interval(poll_interval);
-        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-
         let initial = snapshot_all(&scheduler).await;
         if let Err(e) = frontend
             .emit(AgentEventPayload::CronsChanged {
@@ -99,7 +114,16 @@ pub fn spawn_with_interval(
         let mut previous_ids = to_identity_set(&initial);
 
         loop {
-            interval.tick().await;
+            match change_rx.recv().await {
+                Ok(()) => {}
+                // Lagged: at most one re-snapshot covers any number of
+                // missed pulses (the consumer's correct response is
+                // identical regardless of pulse count).
+                Err(broadcast::error::RecvError::Lagged(_)) => {
+                    tracing::warn!("cron_bridge lagged; re-snapshotting");
+                }
+                Err(broadcast::error::RecvError::Closed) => return,
+            }
             let current = snapshot_all(&scheduler).await;
             let current_ids = to_identity_set(&current);
             if current_ids == previous_ids {

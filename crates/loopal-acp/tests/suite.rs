@@ -23,3 +23,5 @@ mod e2e_protocol_test;
 mod e2e_session_test;
 #[path = "suite/e2e_thinking_test.rs"]
 mod e2e_thinking_test;
+#[path = "suite/translate_event_test.rs"]
+mod translate_event_test;

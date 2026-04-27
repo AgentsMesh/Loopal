@@ -1,42 +1,62 @@
 //! Shared session registry for multi-client access.
+//!
+//! `SharedSession` + `ClientHandle` live in [`crate::shared_session`].
+//! Storage-singleton accessors (`cron_storage` / `task_storage` /
+//! `commit_storage_root`) and the [`SessionHubError`](crate::session_hub_storage::SessionHubError)
+//! type live in [`crate::session_hub_storage`]. This file owns only
+//! the registry struct + session lifecycle methods.
 
 #![allow(dead_code)] // agent/join + agent/list methods used when wired into dispatch_loop
 
 use std::sync::Arc;
 
+use loopal_agent::SessionScopedTaskStorage;
+use loopal_scheduler::SessionScopedCronStorage;
 use tokio::sync::Mutex;
 
-use loopal_ipc::connection::Connection;
-use loopal_protocol::InterruptSignal;
-use loopal_runtime::agent_input::AgentInput;
-
-/// A connected client handle within a shared session.
-pub struct ClientHandle {
-    pub id: String,
-    pub connection: Arc<Connection>,
-    /// True if this is the primary client (handles permissions/questions).
-    pub is_primary: bool,
-}
-
-/// A shared session that multiple clients can observe.
-pub struct SharedSession {
-    pub session_id: String,
-    pub clients: Mutex<Vec<ClientHandle>>,
-    /// Channel to send input into the agent loop.
-    pub input_tx: tokio::sync::mpsc::Sender<AgentInput>,
-    /// Interrupt signal shared with the agent loop.
-    pub interrupt: InterruptSignal,
-    pub interrupt_tx: Arc<tokio::sync::watch::Sender<u64>>,
-}
+pub use crate::shared_session::{ClientHandle, SharedSession};
 
 /// Server-wide session registry.
+///
+/// ## Lock ordering
+///
+/// `SessionHub` owns six independent `tokio::sync::Mutex` fields. The
+/// only path that ever holds two of them simultaneously is the storage
+/// accessors (in [`crate::session_hub_storage`]), which observe a
+/// strict order:
+///
+/// 1. `storage_root` (acquired in `commit_storage_root`)
+/// 2. `cron_storage` **xor** `task_storage` (never both at once)
+///
+/// The other three (`sessions`, `test_provider`, `session_dir_override`)
+/// are independent — no method takes more than one of them at a time.
+///
+/// **Future maintainers**: if you add a method that needs to hold two
+/// of these locks together, document the order here and follow the
+/// existing convention. Reversing `cron_storage`/`task_storage` and
+/// `storage_root` would risk deadlock against concurrent callers
+/// already holding the other.
 #[derive(Default)]
 pub struct SessionHub {
-    sessions: Mutex<Vec<Arc<SharedSession>>>,
+    pub(crate) sessions: Mutex<Vec<Arc<SharedSession>>>,
     /// Test-only: injected mock provider for session creation.
-    test_provider: Mutex<Option<Arc<dyn loopal_provider_api::Provider>>>,
+    pub(crate) test_provider: Mutex<Option<Arc<dyn loopal_provider_api::Provider>>>,
     /// Override base directory for session/message storage (test sandboxes).
-    session_dir_override: Mutex<Option<std::path::PathBuf>>,
+    pub(crate) session_dir_override: Mutex<Option<std::path::PathBuf>>,
+    /// Lazy-initialized file-backed cron storage shared by every root
+    /// agent in this server. Eliminates the "one `FileScopedCronStore`
+    /// per `build_session_scoped_resources` call" duplication that
+    /// existed in earlier revisions and matches the architectural
+    /// invariant "Layer 1 storage is a process-wide singleton".
+    pub(crate) cron_storage: Mutex<Option<Arc<dyn SessionScopedCronStorage>>>,
+    /// Counterpart for the agent task list.
+    pub(crate) task_storage: Mutex<Option<Arc<dyn SessionScopedTaskStorage>>>,
+    /// Sessions root committed at first storage init. Subsequent calls
+    /// to `cron_storage` / `task_storage` return [`SessionHubError::RootMismatch`]
+    /// (in [`crate::session_hub_storage`]) if a caller passes a different
+    /// root — silent root mismatch would let two agent setups share
+    /// storage they think is independent.
+    pub(crate) storage_root: Mutex<Option<std::path::PathBuf>>,
 }
 
 impl SessionHub {
@@ -45,6 +65,9 @@ impl SessionHub {
             sessions: Mutex::new(Vec::new()),
             test_provider: Mutex::new(None),
             session_dir_override: Mutex::new(None),
+            cron_storage: Mutex::new(None),
+            task_storage: Mutex::new(None),
+            storage_root: Mutex::new(None),
         }
     }
 
@@ -96,100 +119,5 @@ impl SessionHub {
     /// Remove a session when the agent loop completes.
     pub async fn remove_session(&self, id: &str) {
         self.sessions.lock().await.retain(|s| s.session_id != id);
-    }
-}
-
-impl SharedSession {
-    /// Create a placeholder session (for bootstrapping before session_id is known).
-    pub fn placeholder(
-        input_tx: tokio::sync::mpsc::Sender<AgentInput>,
-        interrupt: InterruptSignal,
-        interrupt_tx: Arc<tokio::sync::watch::Sender<u64>>,
-    ) -> Self {
-        Self {
-            session_id: String::new(),
-            clients: Mutex::new(Vec::new()),
-            input_tx,
-            interrupt,
-            interrupt_tx,
-        }
-    }
-
-    /// Add a client to this session. First client becomes primary.
-    pub async fn add_client(&self, id: String, connection: Arc<Connection>) {
-        let mut clients = self.clients.lock().await;
-        let is_primary = clients.is_empty();
-        clients.push(ClientHandle {
-            id,
-            connection,
-            is_primary,
-        });
-    }
-
-    /// Remove a client. If the removed client was primary, promote the next.
-    pub async fn remove_client(&self, client_id: &str) {
-        let mut clients = self.clients.lock().await;
-        let was_primary = clients
-            .iter()
-            .find(|c| c.id == client_id)
-            .is_some_and(|c| c.is_primary);
-        clients.retain(|c| c.id != client_id);
-        if was_primary && let Some(first) = clients.first_mut() {
-            first.is_primary = true;
-            tracing::info!(client = %first.id, "promoted to primary");
-        }
-    }
-
-    /// Get the primary client's connection (for permission/question routing).
-    pub async fn primary_connection(&self) -> Option<Arc<Connection>> {
-        self.clients
-            .lock()
-            .await
-            .iter()
-            .find(|c| c.is_primary)
-            .map(|c| c.connection.clone())
-    }
-
-    /// Get all client connections (for event broadcast).
-    pub async fn all_connections(&self) -> Vec<Arc<Connection>> {
-        self.clients
-            .lock()
-            .await
-            .iter()
-            .map(|c| c.connection.clone())
-            .collect()
-    }
-
-    /// Broadcast a raw AgentEvent to all clients (preserving agent_name).
-    /// Used for sub-agent event forwarding where agent_name must be retained.
-    pub async fn broadcast_event(&self, event: &loopal_protocol::AgentEvent) {
-        if let Ok(params) = serde_json::to_value(event) {
-            for conn in self.all_connections().await {
-                let _ = conn
-                    .send_notification(
-                        loopal_ipc::protocol::methods::AGENT_EVENT.name,
-                        params.clone(),
-                    )
-                    .await;
-            }
-        }
-    }
-
-    /// Remove disconnected clients by index (called by HubFrontend after broadcast).
-    pub async fn remove_dead_connections(&self, dead_indices: &[usize]) {
-        let mut clients = self.clients.lock().await;
-        // Remove in reverse order to preserve indices
-        for &idx in dead_indices.iter().rev() {
-            if idx < clients.len() {
-                let removed = clients.remove(idx);
-                tracing::info!(client = %removed.id, "removed dead connection");
-            }
-        }
-        // Promote new primary if needed
-        let has_primary = clients.iter().any(|c| c.is_primary);
-        if !has_primary && let Some(first) = clients.first_mut() {
-            first.is_primary = true;
-            tracing::info!(client = %first.id, "promoted to primary (dead cleanup)");
-        }
     }
 }

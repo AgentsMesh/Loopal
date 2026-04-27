@@ -8,7 +8,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use tokio::sync::Mutex;
 
 use loopal_scheduler::{
-    Clock, CronScheduler, DurableStore, ManualClock, PersistError, PersistedTask,
+    Clock, CronScheduler, ManualClock, PersistError, PersistedTask, SessionScopedCronStorage,
 };
 
 struct MockStore {
@@ -32,11 +32,15 @@ impl MockStore {
 }
 
 #[async_trait]
-impl DurableStore for MockStore {
-    async fn load(&self) -> Result<Vec<PersistedTask>, PersistError> {
+impl SessionScopedCronStorage for MockStore {
+    async fn load(&self, _session_id: &str) -> Result<Vec<PersistedTask>, PersistError> {
         Ok(self.preset.lock().await.clone())
     }
-    async fn save_all(&self, tasks: &[PersistedTask]) -> Result<(), PersistError> {
+    async fn save_all(
+        &self,
+        _session_id: &str,
+        tasks: &[PersistedTask],
+    ) -> Result<(), PersistError> {
         self.saved.lock().await.push(tasks.to_vec());
         Ok(())
     }
@@ -58,9 +62,9 @@ fn persisted(id: &str, cron: &str, recurring: bool, created_shift: i64) -> Persi
     }
 }
 
-fn scheduler_with(store: Arc<MockStore>, clock: Arc<dyn Clock>) -> CronScheduler {
-    let store_dyn: Arc<dyn DurableStore> = store;
-    CronScheduler::with_store_and_clock(store_dyn, clock)
+async fn scheduler_with(store: Arc<MockStore>, clock: Arc<dyn Clock>) -> CronScheduler {
+    let store_dyn: Arc<dyn SessionScopedCronStorage> = store;
+    CronScheduler::with_session_storage_and_clock(store_dyn, clock)
 }
 
 #[tokio::test]
@@ -69,8 +73,8 @@ async fn recurring_last_fired_is_clamped_to_now_on_load() {
     p.last_fired_unix_ms = Some((base_time() - chrono::Duration::minutes(5)).timestamp_millis());
     let store = MockStore::new(vec![p]);
     let clock = Arc::new(ManualClock::new(base_time()));
-    let sched = scheduler_with(store.clone(), clock);
-    let count = sched.load_persisted().await.unwrap();
+    let sched = scheduler_with(store.clone(), clock).await;
+    let count = sched.switch_session("test").await.unwrap();
     assert_eq!(count, 1);
     let tasks = sched.list().await;
     let next = tasks[0].next_fire.expect("has next fire");
@@ -88,8 +92,8 @@ async fn recurring_none_last_fired_with_old_created_at_is_clamped() {
     // slipped past the clamp.
     let store = MockStore::new(vec![persisted("recur", "*/5 * * * *", true, -10 * 60)]);
     let clock = Arc::new(ManualClock::new(base_time()));
-    let sched = scheduler_with(store.clone(), clock);
-    sched.load_persisted().await.unwrap();
+    let sched = scheduler_with(store.clone(), clock).await;
+    sched.switch_session("test").await.unwrap();
     let tasks = sched.list().await;
     let next = tasks[0].next_fire.expect("has next fire");
     assert!(
@@ -109,8 +113,8 @@ async fn durable_recurring_bypasses_three_day_lifetime() {
         -5 * 24 * 60 * 60,
     )]);
     let clock = Arc::new(ManualClock::new(base_time()));
-    let sched = scheduler_with(store.clone(), clock);
-    let count = sched.load_persisted().await.unwrap();
+    let sched = scheduler_with(store.clone(), clock).await;
+    let count = sched.switch_session("test").await.unwrap();
     assert_eq!(count, 1, "durable old task must survive lifetime cap");
     assert_eq!(sched.list().await[0].id, "old_but_durable");
 }
@@ -126,8 +130,8 @@ async fn durable_task_ignores_lifetime_cap() {
         -4 * 24 * 60 * 60,
     )]);
     let clock = Arc::new(ManualClock::new(base_time()));
-    let sched = scheduler_with(store.clone(), clock);
-    let count = sched.load_persisted().await.unwrap();
+    let sched = scheduler_with(store.clone(), clock).await;
+    let count = sched.switch_session("test").await.unwrap();
     assert_eq!(count, 1);
     assert_eq!(sched.list().await[0].id, "old1");
 }
@@ -145,8 +149,8 @@ async fn load_exceeding_max_tasks_is_truncated() {
     }
     let store = MockStore::new(payload);
     let clock = Arc::new(ManualClock::new(base_time()));
-    let sched = scheduler_with(store.clone(), clock);
-    let count = sched.load_persisted().await.unwrap();
+    let sched = scheduler_with(store.clone(), clock).await;
+    let count = sched.switch_session("test").await.unwrap();
     assert_eq!(count, 50);
     assert_eq!(store.save_count().await, 1);
     assert_eq!(store.last_saved().await.len(), 50);
@@ -162,8 +166,8 @@ async fn clean_load_does_not_rewrite_file() {
         persisted("b", "0 14 * * *", true, -60),
     ]);
     let clock = Arc::new(ManualClock::new(base_time()));
-    let sched = scheduler_with(store.clone(), clock);
-    let count = sched.load_persisted().await.unwrap();
+    let sched = scheduler_with(store.clone(), clock).await;
+    let count = sched.switch_session("test").await.unwrap();
     assert_eq!(count, 2);
     assert_eq!(
         store.save_count().await,

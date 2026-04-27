@@ -63,7 +63,7 @@ fn agent_tool_context_inner(
 
     let shared = Arc::new(AgentShared {
         kernel,
-        task_store: Arc::new(TaskStore::new(tasks_dir)),
+        task_store: Arc::new(TaskStore::with_sessions_root(tasks_dir)),
         hub_connection,
         cwd,
         depth: 0,

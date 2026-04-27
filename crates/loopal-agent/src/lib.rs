@@ -1,10 +1,22 @@
 pub mod bridge;
 pub mod config;
+pub mod session_resume_adapters;
 pub mod shared;
 pub mod spawn;
+pub mod task_file_storage;
+pub mod task_memory_storage;
+pub mod task_patch;
+pub mod task_session_storage;
 pub mod task_store;
+pub(crate) mod task_store_session;
 pub mod tools;
 pub mod types;
 
+pub use session_resume_adapters::{CronResumeAdapter, TaskResumeAdapter};
 pub use shared::AgentShared;
+pub use task_file_storage::FileScopedTaskStore;
+pub use task_memory_storage::InMemoryTaskStorage;
+pub use task_patch::TaskPatch;
+pub use task_session_storage::SessionScopedTaskStorage;
+pub use task_store::TaskStore;
 pub use types::{AgentId, Task, TaskId, TaskStatus};

@@ -13,7 +13,10 @@ use loopal_protocol::{AgentEvent, ControlCommand, Envelope};
 use loopal_provider_api::{Provider, StreamChunk};
 use loopal_runtime::agent_loop::AgentLoopRunner;
 use loopal_runtime::frontend::{AutoCancelQuestionHandler, AutoDenyHandler};
-use loopal_runtime::{AgentConfig, AgentDeps, AgentLoopParams, InterruptHandle, UnifiedFrontend};
+use loopal_runtime::{
+    AgentConfig, AgentDeps, AgentLoopParams, AgentLoopParamsBuilder, InterruptHandle,
+    UnifiedFrontend,
+};
 use loopal_test_support::TestFixture;
 use loopal_tool_api::PermissionMode;
 use tokio::sync::mpsc;
@@ -48,24 +51,18 @@ fn build_params_with_config(
     messages: Vec<loopal_message::Message>,
     config: AgentConfig,
 ) -> AgentLoopParams {
-    AgentLoopParams {
+    AgentLoopParamsBuilder::new(
         config,
-        deps: AgentDeps {
+        AgentDeps {
             kernel,
             frontend,
             session_manager: fixture.session_manager(),
         },
-        session: fixture.test_session("rt-test"),
-        store: ContextStore::from_messages(messages, make_test_budget()),
-        interrupt: InterruptHandle::new(),
-        shared: None,
-        memory_channel: None,
-        scheduled_rx: None,
-        auto_classifier: None,
-        harness: loopal_config::HarnessConfig::default(),
-        rewake_rx: None,
-        message_snapshot: None,
-    }
+        fixture.test_session("rt-test"),
+        ContextStore::from_messages(messages, make_test_budget()),
+        InterruptHandle::new(),
+    )
+    .build()
 }
 
 fn make_test_budget() -> ContextBudget {

@@ -3,29 +3,15 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use loopal_ipc::StdioTransport;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
-use loopal_ipc::transport::Transport;
 use loopal_protocol::{AgentEvent, AgentEventPayload};
 use loopal_test_support::TestFixture;
 use loopal_test_support::mock_provider::MultiCallProvider;
 
-pub const T: Duration = Duration::from_secs(10);
+pub use loopal_test_support::make_duplex_pair;
 
-pub fn make_duplex_pair() -> (Arc<dyn Transport>, Arc<dyn Transport>) {
-    let (a_tx, a_rx) = tokio::io::duplex(8192);
-    let (b_tx, b_rx) = tokio::io::duplex(8192);
-    let server_t: Arc<dyn Transport> = Arc::new(StdioTransport::new(
-        Box::new(tokio::io::BufReader::new(a_rx)),
-        Box::new(b_tx),
-    ));
-    let client_t: Arc<dyn Transport> = Arc::new(StdioTransport::new(
-        Box::new(tokio::io::BufReader::new(b_rx)),
-        Box::new(a_tx),
-    ));
-    (server_t, client_t)
-}
+pub const T: Duration = Duration::from_secs(10);
 
 /// Start a mock sub-agent server. Returns client connection + incoming receiver + join handle.
 pub async fn start_child_server(

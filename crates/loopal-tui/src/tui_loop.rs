@@ -78,6 +78,15 @@ where
                     {
                         load_resumed_display(app, session_id);
                     }
+                    if let AgentEventPayload::SessionResumeWarnings {
+                        session_id: _,
+                        ref warnings,
+                    } = agent_event.payload
+                    {
+                        for w in warnings {
+                            push_session_warning(app, w);
+                        }
+                    }
                     let is_mcp_report = matches!(
                         agent_event.payload,
                         AgentEventPayload::McpStatusReport { .. }
@@ -149,6 +158,14 @@ fn clamp_scroll_offsets(app: &mut App) {
         let section = app.section_mut(kind);
         section.scroll_offset = section.scroll_offset.min(count.saturating_sub(max));
     }
+}
+
+/// Surface a `SessionResumeWarnings` event to the user as a system
+/// message so failed-to-rehydrate per-session resources (cron, task list)
+/// don't drop silently.
+fn push_session_warning(app: &mut App, warning: &str) {
+    app.session
+        .push_system_message(format!("Session resume warning: {warning}"));
 }
 
 /// Load display history from storage after the agent confirms a session resume.

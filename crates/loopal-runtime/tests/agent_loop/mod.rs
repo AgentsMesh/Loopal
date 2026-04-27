@@ -10,7 +10,9 @@ use loopal_runtime::agent_loop::{AgentLoopRunner, cancel::TurnCancel};
 use loopal_runtime::frontend::{
     AutoCancelQuestionHandler, AutoDenyHandler, RelayPermissionHandler,
 };
-use loopal_runtime::{AgentConfig, AgentDeps, AgentLoopParams, InterruptHandle, UnifiedFrontend};
+use loopal_runtime::{
+    AgentConfig, AgentDeps, AgentLoopParamsBuilder, InterruptHandle, UnifiedFrontend,
+};
 use loopal_test_support::TestFixture;
 use loopal_tool_api::PermissionMode;
 use tokio::sync::mpsc;
@@ -56,11 +58,13 @@ mod cancel_test;
 mod context_budget_test;
 mod dispatch_test;
 mod model_routing_test;
+mod params_builder_test;
 mod permission_test_ext;
 mod plan_mode_filter_test;
 mod plan_mode_test;
 mod preflight_test;
 mod record_message_test;
+mod resume_session_hook_test;
 mod retry_cancel_test;
 mod run_test;
 mod stream_truncation_edge_test;
@@ -87,24 +91,18 @@ pub fn make_runner() -> (AgentLoopRunner, mpsc::Receiver<AgentEvent>) {
         Box::new(AutoCancelQuestionHandler),
     ));
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
-    let params = AgentLoopParams {
-        config: AgentConfig::default(),
-        deps: AgentDeps {
+    let params = AgentLoopParamsBuilder::new(
+        AgentConfig::default(),
+        AgentDeps {
             kernel,
             frontend,
             session_manager: fixture.session_manager(),
         },
-        session: fixture.test_session("test-minimal"),
-        store: ContextStore::new(make_test_budget()),
-        interrupt: InterruptHandle::new(),
-        shared: None,
-        memory_channel: None,
-        scheduled_rx: None,
-        auto_classifier: None,
-        harness: loopal_config::HarnessConfig::default(),
-        rewake_rx: None,
-        message_snapshot: None,
-    };
+        fixture.test_session("test-minimal"),
+        ContextStore::new(make_test_budget()),
+        InterruptHandle::new(),
+    )
+    .build();
     (AgentLoopRunner::new(params), event_rx)
 }
 
@@ -131,27 +129,21 @@ pub fn make_runner_with_channels() -> (
         Box::new(AutoCancelQuestionHandler),
     ));
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
-    let params = AgentLoopParams {
-        config: AgentConfig {
+    let params = AgentLoopParamsBuilder::new(
+        AgentConfig {
             permission_mode: PermissionMode::Supervised,
             ..Default::default()
         },
-        deps: AgentDeps {
+        AgentDeps {
             kernel,
             frontend,
             session_manager: fixture.session_manager(),
         },
-        session: fixture.test_session("test-channels"),
-        store: ContextStore::new(make_test_budget()),
-        interrupt: InterruptHandle::new(),
-        shared: None,
-        memory_channel: None,
-        scheduled_rx: None,
-        auto_classifier: None,
-        harness: loopal_config::HarnessConfig::default(),
-        rewake_rx: None,
-        message_snapshot: None,
-    };
+        fixture.test_session("test-channels"),
+        ContextStore::new(make_test_budget()),
+        InterruptHandle::new(),
+    )
+    .build();
     (
         AgentLoopRunner::new(params),
         event_rx,

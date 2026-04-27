@@ -113,12 +113,3 @@ fn to_snapshot_strips_newlines_from_prompt() {
     assert!(!snap.prompt.contains('\n'));
     assert!(!snap.prompt.contains('\r'));
 }
-
-#[test]
-fn default_poll_interval_is_two_seconds() {
-    // Production path: `spawn()` passes DEFAULT_POLL_INTERVAL to
-    // spawn_with_interval. Lock the constant so accidental edits don't
-    // silently shrink/grow cron polling pressure across releases.
-    use std::time::Duration;
-    assert_eq!(super::DEFAULT_POLL_INTERVAL, Duration::from_secs(2));
-}

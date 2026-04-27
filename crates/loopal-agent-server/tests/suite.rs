@@ -14,6 +14,8 @@ mod cron_bridge_edge_test;
 mod cron_bridge_helpers;
 #[path = "suite/cron_bridge_test.rs"]
 mod cron_bridge_test;
+#[path = "suite/cron_follows_control_resume_test.rs"]
+mod cron_follows_control_resume_test;
 #[path = "suite/cron_resume_e2e_test.rs"]
 mod cron_resume_e2e_test;
 #[path = "suite/dispatch_loop_test.rs"]
@@ -40,10 +42,16 @@ mod observer_join_edge_test;
 mod observer_join_test;
 #[path = "suite/params_test.rs"]
 mod params_test;
+#[path = "suite/resolve_sessions_root_test.rs"]
+mod resolve_sessions_root_test;
+#[path = "suite/resume_e2e_helpers.rs"]
+mod resume_e2e_helpers;
 #[path = "suite/server_info_test.rs"]
 mod server_info_test;
 #[path = "suite/server_test.rs"]
 mod server_test;
+#[path = "suite/session_hub_storage_test.rs"]
+mod session_hub_storage_test;
 #[path = "suite/session_start_test.rs"]
 mod session_start_test;
 #[path = "suite/tcp_multi_client_test.rs"]

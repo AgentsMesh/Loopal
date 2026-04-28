@@ -131,8 +131,7 @@ pub async fn handle_reverse_requests(
                         // so it works with the typed Agent source after SNAT.
                         if let Some(child) = extract_agent_result_name(&env) {
                             let output = env.content.text.clone();
-                            crate::finish::deliver_cross_hub_completion(&hub, &child, output)
-                                .await;
+                            crate::finish::deliver_cross_hub_completion(&hub, &child, output).await;
                         }
                         // Defense in depth: target should be local at this point
                         // (MetaHub router consumed the next-hop hub via DNAT).

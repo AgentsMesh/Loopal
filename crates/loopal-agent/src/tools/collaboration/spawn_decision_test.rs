@@ -7,10 +7,7 @@ use std::path::PathBuf;
 #[test]
 fn worktree_allowed_only_for_inhub() {
     assert!(worktree_allowed(&None, Some("worktree")));
-    assert!(!worktree_allowed(
-        &Some("hub-b".into()),
-        Some("worktree")
-    ));
+    assert!(!worktree_allowed(&Some("hub-b".into()), Some("worktree")));
     assert!(!worktree_allowed(&None, None));
     assert!(!worktree_allowed(&None, Some("other")));
 }

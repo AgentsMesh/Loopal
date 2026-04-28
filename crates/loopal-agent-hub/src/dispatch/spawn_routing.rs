@@ -86,8 +86,7 @@ pub async fn handle_spawn_remote_agent(
     from_agent: &str,
 ) -> Result<Value, String> {
     let default_cwd = hub.lock().await.default_cwd.clone();
-    let args =
-        super::spawn_prepare::prepare_remote_spawn_args(&params, from_agent, &default_cwd)?;
+    let args = super::spawn_prepare::prepare_remote_spawn_args(&params, from_agent, &default_cwd)?;
     info!(agent = %args.name, parent = ?args.parent, "handle_spawn_remote_agent start");
     spawn_via_manager(
         hub.clone(),

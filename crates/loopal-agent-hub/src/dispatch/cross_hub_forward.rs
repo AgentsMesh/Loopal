@@ -101,8 +101,10 @@ pub(super) async fn forward_cross_hub_spawn(
                 h.max_total_agents
             ));
         }
-        h.registry
-            .register_shadow(&pf.name, loopal_protocol::QualifiedAddress::local(from_agent))?;
+        h.registry.register_shadow(
+            &pf.name,
+            loopal_protocol::QualifiedAddress::local(from_agent),
+        )?;
     }
 
     let result = pf.uplink.spawn_agent(spawn_params).await;

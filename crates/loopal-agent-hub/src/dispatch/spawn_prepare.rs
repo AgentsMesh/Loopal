@@ -60,10 +60,7 @@ pub(crate) fn prepare_remote_spawn_args(
     // to make the child appear root-equivalent and bypass the receiver's
     // depth-based spawn-tool filter (`build_depth_tool_filter`). Cross-hub
     // is at least one hop, so depth must be > 0.
-    let depth = params["depth"]
-        .as_u64()
-        .map(|v| v as u32)
-        .map(|d| d.max(1));
+    let depth = params["depth"].as_u64().map(|v| v as u32).map(|d| d.max(1));
     let parent = match params["parent"].as_str() {
         Some(s) => {
             // Cross-hub parent MUST be a well-formed remote QualifiedAddress

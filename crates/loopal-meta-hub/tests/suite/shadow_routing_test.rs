@@ -38,10 +38,14 @@ async fn orphan_cascade_skips_shadows() {
     )
     .await;
 
-    hub.lock().await.registry.register_shadow(
-        "shadow-child",
-        loopal_protocol::QualifiedAddress::local("parent"),
-    ).unwrap();
+    hub.lock()
+        .await
+        .registry
+        .register_shadow(
+            "shadow-child",
+            loopal_protocol::QualifiedAddress::local("parent"),
+        )
+        .unwrap();
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Parent finishes → should cascade interrupt to real-child only
@@ -70,10 +74,14 @@ async fn orphan_cascade_skips_shadows() {
 async fn route_to_shadow_fails() {
     let (hub, _) = make_hub();
     let (_parent, _rx) = register_mock_agent(&hub, "parent", None).await;
-    hub.lock().await.registry.register_shadow(
-        "shadow-agent",
-        loopal_protocol::QualifiedAddress::local("parent"),
-    ).unwrap();
+    hub.lock()
+        .await
+        .registry
+        .register_shadow(
+            "shadow-agent",
+            loopal_protocol::QualifiedAddress::local("parent"),
+        )
+        .unwrap();
 
     let envelope = json!({
         "id": "00000000-0000-0000-0000-000000000010",
@@ -100,10 +108,14 @@ async fn route_to_shadow_fails() {
 async fn shadow_visible_in_agent_list() {
     let (hub, _) = make_hub();
     let (_parent, _rx) = register_mock_agent(&hub, "parent", None).await;
-    hub.lock().await.registry.register_shadow(
-        "remote-x",
-        loopal_protocol::QualifiedAddress::local("parent"),
-    ).unwrap();
+    hub.lock()
+        .await
+        .registry
+        .register_shadow(
+            "remote-x",
+            loopal_protocol::QualifiedAddress::local("parent"),
+        )
+        .unwrap();
 
     let agents = hub.lock().await.registry.list_agents();
     let shadow = agents.iter().find(|(n, _)| n == "remote-x");

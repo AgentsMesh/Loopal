@@ -66,11 +66,7 @@ pub async fn finish_and_deliver(
 /// envelope to the local parent's `completion_tx` if any. Mirrors the
 /// pending-then-deliver pattern in `finish_and_deliver` to ensure the
 /// parent agent's conversation actually receives the agent-result envelope.
-pub async fn deliver_cross_hub_completion(
-    hub: &Arc<Mutex<Hub>>,
-    child: &str,
-    output: String,
-) {
+pub async fn deliver_cross_hub_completion(hub: &Arc<Mutex<Hub>>, child: &str, output: String) {
     let pending = {
         let mut h = hub.lock().await;
         let pending = h.registry.emit_agent_finished(child, Some(output));

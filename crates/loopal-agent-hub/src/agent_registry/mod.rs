@@ -101,11 +101,7 @@ impl AgentRegistry {
     /// Returns Err if `name` is already registered (local or shadow). Callers
     /// should treat this as authoritative — never overwrite an existing entry,
     /// because that would silently destroy an active agent's state.
-    pub fn register_shadow(
-        &mut self,
-        name: &str,
-        parent: QualifiedAddress,
-    ) -> Result<(), String> {
+    pub fn register_shadow(&mut self, name: &str, parent: QualifiedAddress) -> Result<(), String> {
         if self.agents.contains_key(name) {
             return Err(format!("agent '{name}' already registered"));
         }

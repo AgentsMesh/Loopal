@@ -32,7 +32,10 @@ async fn rejects_cwd_field() {
     )
     .await;
     let err = result.expect_err("must reject cwd in cross-hub spawn");
-    assert!(err.contains("cwd"), "error must mention forbidden 'cwd' field, got: {err}");
+    assert!(
+        err.contains("cwd"),
+        "error must mention forbidden 'cwd' field, got: {err}"
+    );
 }
 
 #[tokio::test]
@@ -71,7 +74,10 @@ async fn rejects_resume_field() {
     )
     .await;
     let err = result.expect_err("must reject session resume");
-    assert!(err.contains("resume"), "error must mention 'resume', got: {err}");
+    assert!(
+        err.contains("resume"),
+        "error must mention 'resume', got: {err}"
+    );
 }
 
 #[tokio::test]

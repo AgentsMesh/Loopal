@@ -47,12 +47,8 @@ fn advisory_fields_are_propagated() {
 
 #[test]
 fn parent_falls_back_to_from_agent_when_unset() {
-    let args = prepare_remote_spawn_args(
-        &json!({"name": "child"}),
-        "the-caller",
-        cwd("/cwd"),
-    )
-    .unwrap();
+    let args =
+        prepare_remote_spawn_args(&json!({"name": "child"}), "the-caller", cwd("/cwd")).unwrap();
     assert_eq!(args.parent.as_deref(), Some("the-caller"));
 }
 
@@ -98,62 +94,44 @@ fn parent_rejects_empty_segment() {
 fn depth_zero_clamps_to_one() {
     // Malicious caller sending depth: 0 must not produce a "root-like"
     // child that bypasses the receiver's depth-based tool filter.
-    let args = prepare_remote_spawn_args(
-        &json!({"name": "child", "depth": 0}),
-        "caller",
-        cwd("/cwd"),
-    )
-    .unwrap();
+    let args =
+        prepare_remote_spawn_args(&json!({"name": "child", "depth": 0}), "caller", cwd("/cwd"))
+            .unwrap();
     assert_eq!(args.depth, Some(1));
 }
 
 #[test]
 fn depth_above_one_passes_through() {
-    let args = prepare_remote_spawn_args(
-        &json!({"name": "child", "depth": 5}),
-        "caller",
-        cwd("/cwd"),
-    )
-    .unwrap();
+    let args =
+        prepare_remote_spawn_args(&json!({"name": "child", "depth": 5}), "caller", cwd("/cwd"))
+            .unwrap();
     assert_eq!(args.depth, Some(5));
 }
 
 #[test]
 fn rejects_cwd() {
-    let err = prepare_remote_spawn_args(
-        &json!({"name": "x", "cwd": "/attacker"}),
-        "f",
-        cwd("/c"),
-    )
-    .unwrap_err();
+    let err = prepare_remote_spawn_args(&json!({"name": "x", "cwd": "/attacker"}), "f", cwd("/c"))
+        .unwrap_err();
     assert!(err.contains("cwd"));
 }
 
 #[test]
 fn rejects_fork_context() {
-    let err = prepare_remote_spawn_args(
-        &json!({"name": "x", "fork_context": []}),
-        "f",
-        cwd("/c"),
-    )
-    .unwrap_err();
+    let err = prepare_remote_spawn_args(&json!({"name": "x", "fork_context": []}), "f", cwd("/c"))
+        .unwrap_err();
     assert!(err.contains("fork_context"));
 }
 
 #[test]
 fn rejects_resume() {
-    let err = prepare_remote_spawn_args(
-        &json!({"name": "x", "resume": "session-1"}),
-        "f",
-        cwd("/c"),
-    )
-    .unwrap_err();
+    let err =
+        prepare_remote_spawn_args(&json!({"name": "x", "resume": "session-1"}), "f", cwd("/c"))
+            .unwrap_err();
     assert!(err.contains("resume"));
 }
 
 #[test]
 fn rejects_when_name_missing() {
-    let err =
-        prepare_remote_spawn_args(&json!({"prompt": "x"}), "f", cwd("/c")).unwrap_err();
+    let err = prepare_remote_spawn_args(&json!({"prompt": "x"}), "f", cwd("/c")).unwrap_err();
     assert!(err.contains("name"));
 }

@@ -22,10 +22,14 @@ async fn shadow_registered_with_correct_parent() {
     let (hub, _) = make_hub();
     let (_parent, _rx) = register_mock_agent(&hub, "parent", None).await;
 
-    hub.lock().await.registry.register_shadow(
-        "remote-child",
-        loopal_protocol::QualifiedAddress::local("parent"),
-    ).unwrap();
+    hub.lock()
+        .await
+        .registry
+        .register_shadow(
+            "remote-child",
+            loopal_protocol::QualifiedAddress::local("parent"),
+        )
+        .unwrap();
 
     let h = hub.lock().await;
     let info = h.registry.agent_info("remote-child");
@@ -48,10 +52,14 @@ async fn wait_agent_resolves_on_shadow_completion() {
     let (hub, _) = make_hub();
     // Register parent + shadow manually (simulate post-spawn state)
     let (_parent, _rx) = register_mock_agent(&hub, "parent", None).await;
-    hub.lock().await.registry.register_shadow(
-        "remote-child",
-        loopal_protocol::QualifiedAddress::local("parent"),
-    ).unwrap();
+    hub.lock()
+        .await
+        .registry
+        .register_shadow(
+            "remote-child",
+            loopal_protocol::QualifiedAddress::local("parent"),
+        )
+        .unwrap();
 
     // Start wait_agent in background
     let hub2 = hub.clone();
@@ -95,7 +103,8 @@ async fn shadow_cleaned_up_after_completion() {
     hub.lock()
         .await
         .registry
-        .register_shadow("child", loopal_protocol::QualifiedAddress::local("parent")).unwrap();
+        .register_shadow("child", loopal_protocol::QualifiedAddress::local("parent"))
+        .unwrap();
 
     // Verify shadow exists
     assert!(hub.lock().await.registry.agent_info("child").is_some());

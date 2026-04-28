@@ -57,7 +57,10 @@ pub struct SpawnResult {
 
 /// Build the IPC payload sent on `hub/spawn_agent`. Pure function — extracted
 /// for unit testing the InHub / CrossHub field selection.
-pub fn build_spawn_request(params: &SpawnParams, parent_cwd: &std::path::Path) -> serde_json::Value {
+pub fn build_spawn_request(
+    params: &SpawnParams,
+    parent_cwd: &std::path::Path,
+) -> serde_json::Value {
     let mut request = json!({
         "name": params.name,
         "model": params.model,

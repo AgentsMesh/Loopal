@@ -83,9 +83,18 @@ pub mod methods {
     /// Route a point-to-point message to another agent.
     pub const HUB_ROUTE: Method = Method { name: "hub/route" };
 
-    /// Spawn a new agent process.
+    /// Spawn a new agent process. In-hub semantics: caller may pass `cwd`
+    /// and `fork_context`; child inherits the caller's filesystem view.
     pub const HUB_SPAWN_AGENT: Method = Method {
         name: "hub/spawn_agent",
+    };
+
+    /// Spawn a new agent on this Hub on behalf of a remote (cross-hub) caller.
+    /// Forwarded by MetaHub. Receiving Hub MUST use its own `default_cwd`;
+    /// `cwd` / `fork_context` / `resume` fields are rejected by the handler
+    /// because the caller's filesystem view is not shared.
+    pub const HUB_SPAWN_REMOTE_AGENT: Method = Method {
+        name: "hub/spawn_remote_agent",
     };
 
     /// Wait for a spawned agent to finish and return its output.

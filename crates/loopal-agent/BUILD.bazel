@@ -50,6 +50,7 @@ rust_test(
         "//crates/loopal-backend",
         "//crates/loopal-error",
         "//crates/loopal-ipc",
+        "//crates/loopal-message",
         "//crates/loopal-protocol",
         "//crates/loopal-provider-api",
         "//crates/loopal-runtime",

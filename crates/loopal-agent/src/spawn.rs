@@ -8,23 +8,45 @@ use serde_json::json;
 
 use crate::shared::AgentShared;
 
+/// Where the sub-agent should be spawned — controls which fields cross IPC.
+///
+/// The two variants exist because in-hub and cross-hub spawns have
+/// fundamentally different trust / filesystem-view semantics:
+/// - **InHub**: child runs on the same Hub as the parent; cwd / env /
+///   parent conversation context (fork_context) can all be inherited
+///   safely because they share a filesystem.
+/// - **CrossHub** (same-machine cross-hub or remote, treated identically):
+///   child runs under a different Hub; the filesystem is NOT shared.
+///   `cwd` / `fork_context` / session `resume` MUST NOT cross the boundary —
+///   the receiver Hub uses its own `default_cwd`.
+pub enum SpawnTarget {
+    InHub {
+        /// Override the working directory (e.g. for worktree isolation).
+        cwd_override: Option<PathBuf>,
+        /// Compressed parent conversation injected as initial child context.
+        fork_context: Option<Vec<loopal_message::Message>>,
+    },
+    CrossHub {
+        /// Target hub identifier (e.g. "hub-b") registered on MetaHub.
+        hub_id: String,
+    },
+}
+
 /// Parameters for spawning a new sub-agent.
 pub struct SpawnParams {
     pub name: String,
     pub prompt: String,
     pub model: Option<String>,
-    /// Override the working directory (e.g. for worktree isolation).
-    pub cwd_override: Option<PathBuf>,
-    /// Permission mode to propagate from parent agent.
+    /// Permission mode hint propagated from parent. The receiver Hub's
+    /// permission policy is the enforcement point — for cross-hub spawns
+    /// this is an advisory signal, not a command.
     pub permission_mode: Option<String>,
-    /// Target hub for cross-hub spawn (e.g. "hub-b"). None = local hub.
-    pub target_hub: Option<String>,
     /// Agent type for fragment selection (e.g. "explore", "plan").
     pub agent_type: Option<String>,
     /// Nesting depth of the child agent (parent depth + 1).
     pub depth: u32,
-    /// Compressed parent conversation to inject as initial context.
-    pub fork_context: Option<Vec<loopal_message::Message>>,
+    /// In-hub vs cross-hub semantics.
+    pub target: SpawnTarget,
 }
 
 /// Result returned from Hub after spawning.
@@ -33,35 +55,54 @@ pub struct SpawnResult {
     pub name: String,
 }
 
-/// Request Hub to spawn a sub-agent. Hub handles fork, stdio, and registration.
-pub async fn spawn_agent(
-    shared: &Arc<AgentShared>,
-    params: SpawnParams,
-) -> Result<SpawnResult, String> {
-    let cwd = params
-        .cwd_override
-        .as_deref()
-        .unwrap_or(&shared.cwd)
-        .to_string_lossy()
-        .to_string();
-
+/// Build the IPC payload sent on `hub/spawn_agent`. Pure function — extracted
+/// for unit testing the InHub / CrossHub field selection.
+pub fn build_spawn_request(
+    params: &SpawnParams,
+    parent_cwd: &std::path::Path,
+) -> serde_json::Value {
     let mut request = json!({
         "name": params.name,
-        "cwd": cwd,
         "model": params.model,
         "prompt": params.prompt,
         "permission_mode": params.permission_mode,
         "agent_type": params.agent_type,
         "depth": params.depth,
     });
-    if let Some(ref hub) = params.target_hub {
-        request["target_hub"] = json!(hub);
+
+    match &params.target {
+        SpawnTarget::InHub {
+            cwd_override,
+            fork_context,
+        } => {
+            let cwd = cwd_override
+                .as_deref()
+                .unwrap_or(parent_cwd)
+                .to_string_lossy()
+                .to_string();
+            request["cwd"] = json!(cwd);
+            if let Some(fc) = fork_context
+                && let Ok(val) = serde_json::to_value(fc)
+            {
+                request["fork_context"] = val;
+            }
+        }
+        SpawnTarget::CrossHub { hub_id } => {
+            // CrossHub: no cwd, no fork_context, no resume. Receiver Hub's
+            // own default_cwd is used; filesystem is not shared.
+            request["target_hub"] = json!(hub_id);
+        }
     }
-    if let Some(ref fc) = params.fork_context
-        && let Ok(val) = serde_json::to_value(fc)
-    {
-        request["fork_context"] = val;
-    }
+
+    request
+}
+
+/// Request Hub to spawn a sub-agent. Hub handles fork, stdio, and registration.
+pub async fn spawn_agent(
+    shared: &Arc<AgentShared>,
+    params: SpawnParams,
+) -> Result<SpawnResult, String> {
+    let request = build_spawn_request(&params, &shared.cwd);
 
     tracing::info!(agent = %params.name, "sending hub/spawn_agent request");
     let response = shared

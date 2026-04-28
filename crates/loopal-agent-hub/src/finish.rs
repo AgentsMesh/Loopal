@@ -60,3 +60,25 @@ pub async fn finish_and_deliver(
     // return, allowing the process to exit cleanly.
     conn.close().await;
 }
+
+/// Deliver a cross-hub completion that arrived through the uplink reverse
+/// handler: emit the finished event, unregister, and dispatch the pending
+/// envelope to the local parent's `completion_tx` if any. Mirrors the
+/// pending-then-deliver pattern in `finish_and_deliver` to ensure the
+/// parent agent's conversation actually receives the agent-result envelope.
+pub async fn deliver_cross_hub_completion(hub: &Arc<Mutex<Hub>>, child: &str, output: String) {
+    let pending = {
+        let mut h = hub.lock().await;
+        let pending = h.registry.emit_agent_finished(child, Some(output));
+        h.registry.unregister_connection(child);
+        pending
+    };
+    if let Some((tx, envelope)) = pending
+        && tx.send(envelope).await.is_err()
+    {
+        tracing::warn!(
+            agent = %child,
+            "parent completion channel closed (cross-hub)"
+        );
+    }
+}

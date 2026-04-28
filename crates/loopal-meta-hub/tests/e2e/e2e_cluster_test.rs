@@ -3,6 +3,8 @@
 //! Boots a real MetaHub + real Hub instances with real agent processes
 //! to verify the complete cross-hub communication stack.
 
+mod cluster_cross_hub_spawn_happy_test;
+mod cluster_cross_hub_spawn_test;
 mod cluster_harness;
 
 use std::time::Duration;

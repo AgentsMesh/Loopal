@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tracing::{info, warn};
 
 use loopal_agent::shared::AgentShared;
-use loopal_agent::spawn::{SpawnParams, spawn_agent, wait_agent};
+use loopal_agent::spawn::{SpawnParams, SpawnTarget, spawn_agent, wait_agent};
 use loopal_memory::MEMORY_CONSOLIDATION_PROMPT;
 
 use super::memory_adapter::ServerMemoryProcessor;
@@ -36,12 +36,13 @@ pub fn trigger_consolidation(shared: &Arc<AgentShared>, model: &str) {
             name: name.clone(),
             prompt,
             model: Some(model),
-            cwd_override: None,
             permission_mode: None,
-            target_hub: None,
             agent_type: None,
             depth: shared.depth + 1,
-            fork_context: None,
+            target: SpawnTarget::InHub {
+                cwd_override: None,
+                fork_context: None,
+            },
         };
         match spawn_agent(&shared, params).await {
             Ok(_) => {

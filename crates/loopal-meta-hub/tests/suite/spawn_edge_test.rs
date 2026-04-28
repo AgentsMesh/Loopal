@@ -22,7 +22,7 @@ async fn spawn_without_uplink_fails_clearly() {
     let result = loopal_agent_hub::dispatch::dispatch_hub_request(
         &hub_a,
         methods::HUB_SPAWN_AGENT.name,
-        json!({"name": "worker", "target_hub": "hub-b", "cwd": "/tmp"}),
+        json!({"name": "worker", "target_hub": "hub-b"}),
         "parent".into(),
     )
     .await;
@@ -52,7 +52,7 @@ async fn spawn_injects_qualified_parent() {
     let result = loopal_agent_hub::dispatch::dispatch_hub_request(
         &hub_a,
         methods::HUB_SPAWN_AGENT.name,
-        json!({"name": "child", "target_hub": "hub-b", "cwd": "/tmp"}),
+        json!({"name": "child", "target_hub": "hub-b"}),
         "my-parent".into(),
     )
     .await;

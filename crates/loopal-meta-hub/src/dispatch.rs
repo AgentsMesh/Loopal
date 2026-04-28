@@ -60,11 +60,17 @@ async fn handle_meta_route(
 }
 
 /// Delegate agent spawn to a specific Sub-Hub.
+///
+/// Cross-hub spawn cannot share filesystem state with the originating hub,
+/// so `cwd` / `fork_context` / `resume` are forbidden in the payload —
+/// receiver Hub uses its local `default_cwd`.
 async fn handle_meta_spawn(meta_hub: &Arc<Mutex<MetaHub>>, params: Value) -> Result<Value, String> {
     let target_hub = params["target_hub"]
         .as_str()
         .ok_or("missing 'target_hub'")?
         .to_string();
+
+    loopal_ipc::cross_hub::validate_spawn_payload(&params)?;
 
     let conn = {
         let mh = meta_hub.lock().await;
@@ -73,13 +79,15 @@ async fn handle_meta_spawn(meta_hub: &Arc<Mutex<MetaHub>>, params: Value) -> Res
             .ok_or_else(|| format!("hub '{target_hub}' not connected"))?
     };
 
-    // Forward as hub/spawn_agent (strip target_hub field)
+    // Forward as hub/spawn_remote_agent (strip target_hub field). The new
+    // method signals to the receiver that filesystem-coupled fields must be
+    // ignored / rejected; receiver uses its own default_cwd.
     let mut spawn_params = params.clone();
     if let Some(obj) = spawn_params.as_object_mut() {
         obj.remove("target_hub");
     }
 
-    conn.send_request(methods::HUB_SPAWN_AGENT.name, spawn_params)
+    conn.send_request(methods::HUB_SPAWN_REMOTE_AGENT.name, spawn_params)
         .await
         .map_err(|e| format!("spawn on '{target_hub}' failed: {e}"))
 }

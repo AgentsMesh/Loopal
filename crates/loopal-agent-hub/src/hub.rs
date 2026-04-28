@@ -4,6 +4,7 @@
 //! Hub ties them together: agent events flow to UI via broadcast,
 //! permission requests flow from agents to UI clients via relay.
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use tokio::sync::mpsc;
@@ -28,28 +29,46 @@ pub struct Hub {
     pub listener_port: Option<u16>,
     /// Max total sub-agents allowed (set from HarnessConfig at bootstrap).
     pub max_total_agents: u32,
+    /// Working directory used as the cwd for cross-hub spawned agents.
+    /// In-hub spawns still take cwd from their parent agent's request.
+    pub default_cwd: PathBuf,
 }
 
 impl Hub {
     pub fn new(event_tx: mpsc::Sender<AgentEvent>) -> Self {
+        Self::with_cwd(event_tx, PathBuf::from("."))
+    }
+
+    /// Construct a Hub with an explicit `default_cwd` for cross-hub spawns.
+    /// Production callers should pass the directory the Hub process was
+    /// started in. Path is canonicalized so child processes spawned with
+    /// this cwd see an absolute path independent of their inherited cwd.
+    pub fn with_cwd(event_tx: mpsc::Sender<AgentEvent>, default_cwd: PathBuf) -> Self {
+        let canonical = match default_cwd.canonicalize() {
+            Ok(p) => p,
+            Err(e) => {
+                tracing::warn!(
+                    path = %default_cwd.display(),
+                    error = %e,
+                    "Hub::with_cwd: canonicalize failed, using path verbatim — \
+                     cross-hub spawns may inherit unpredictable cwd"
+                );
+                default_cwd
+            }
+        };
         Self {
             registry: AgentRegistry::new(event_tx),
             ui: UiDispatcher::new(),
             uplink: None,
             listener_port: None,
             max_total_agents: 16,
+            default_cwd: canonical,
         }
     }
 
     /// Create a no-op Hub (for tests that don't need real connections).
     pub fn noop() -> Self {
         let (tx, _rx) = mpsc::channel(1);
-        Self {
-            registry: AgentRegistry::new(tx),
-            ui: UiDispatcher::new(),
-            uplink: None,
-            listener_port: None,
-            max_total_agents: 16,
-        }
+        Self::with_cwd(tx, PathBuf::from("."))
     }
 }

@@ -6,7 +6,6 @@ use loopal_ipc::protocol::methods;
 use loopal_protocol::Envelope;
 use serde_json::{Value, json};
 use tokio::sync::Mutex;
-use tracing::info;
 
 use crate::hub::Hub;
 use crate::routing;
@@ -111,95 +110,4 @@ pub async fn handle_shutdown_agent(hub: &Arc<Mutex<Hub>>, params: Value) -> Resu
         .send_request(methods::AGENT_SHUTDOWN.name, json!({}))
         .await;
     Ok(json!({"ok": true}))
-}
-
-// ── Spawn + wait ──────────────────────────────────────────────────────
-pub async fn handle_spawn_agent(
-    hub: &Arc<Mutex<Hub>>,
-    params: Value,
-    from_agent: &str,
-) -> Result<Value, String> {
-    // Cross-hub spawn: delegate to MetaHub if target_hub specified
-    if params.get("target_hub").and_then(|v| v.as_str()).is_some() {
-        let (uplink, hub_name) = {
-            let h = hub.lock().await;
-            (
-                h.uplink.clone(),
-                h.uplink.as_ref().map(|u| u.hub_name().to_string()),
-            )
-        };
-        let result = match (uplink, hub_name) {
-            (Some(ul), Some(hn)) => {
-                let mut spawn_params = params.clone();
-                if let Some(obj) = spawn_params.as_object_mut() {
-                    // Cross-hub spawn: child's parent is the local agent on
-                    // *this* hub. Encode as a qualified address (`hub/agent`)
-                    // so the receiving hub can route completions back.
-                    let parent_addr =
-                        loopal_protocol::QualifiedAddress::remote([hn.clone()], from_agent);
-                    obj.insert("parent".into(), json!(parent_addr.to_string()));
-                }
-                ul.spawn_agent(spawn_params).await
-            }
-            _ => Err("target_hub specified but no MetaHub uplink".to_string()),
-        };
-        // On success, register a shadow entry so wait_agent can work locally.
-        // The completion will arrive via MetaHub → uplink → agent/message.
-        if let Ok(ref resp) = result
-            && let Some(name) = resp["name"].as_str()
-        {
-            let mut h = hub.lock().await;
-            // Cross-hub child's parent lives on this hub locally.
-            h.registry
-                .register_shadow(name, loopal_protocol::QualifiedAddress::local(from_agent));
-        }
-        return result;
-    }
-
-    // Local spawn
-    let name = params["name"]
-        .as_str()
-        .ok_or("missing 'name' field")?
-        .to_string();
-    let cwd = params["cwd"].as_str().unwrap_or(".").to_string();
-    let model = params["model"].as_str().map(String::from);
-    let prompt = params["prompt"].as_str().map(String::from);
-    let permission_mode = params["permission_mode"].as_str().map(String::from);
-    let agent_type = params["agent_type"].as_str().map(String::from);
-    let depth = params["depth"].as_u64().map(|v| v as u32);
-    let fork_context = params.get("fork_context").cloned();
-
-    // Parent: use explicit "parent" field from params if present (cross-hub),
-    // otherwise use from_agent (local spawn).
-    let parent = params["parent"]
-        .as_str()
-        .map(String::from)
-        .or_else(|| Some(from_agent.to_string()));
-
-    info!(agent = %name, parent = ?parent, "handle_spawn_agent start");
-    let hub_clone = hub.clone();
-    let name_clone = name.clone();
-    let handle = tokio::spawn(async move {
-        crate::spawn_manager::spawn_and_register(
-            hub_clone,
-            name_clone,
-            cwd,
-            model,
-            prompt,
-            parent,
-            permission_mode,
-            agent_type,
-            depth,
-            fork_context,
-        )
-        .await
-    });
-
-    let agent_id = handle
-        .await
-        .map_err(|e| format!("spawn task failed: {e}"))?
-        .map_err(|e| format!("spawn failed: {e}"))?;
-
-    info!(agent = %name, %agent_id, "handle_spawn_agent done");
-    Ok(json!({"agent_id": agent_id, "name": name}))
 }

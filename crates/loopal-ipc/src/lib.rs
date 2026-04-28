@@ -4,6 +4,7 @@
 //! protocol for communication between consumer, agent, and sub-agent processes.
 
 pub mod connection;
+pub mod cross_hub;
 pub mod duplex;
 pub mod jsonrpc;
 pub mod protocol;

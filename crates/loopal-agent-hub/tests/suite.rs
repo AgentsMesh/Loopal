@@ -29,6 +29,8 @@ mod race_condition_test;
 mod relay_test;
 #[path = "suite/spawn_lifecycle_test.rs"]
 mod spawn_lifecycle_test;
+#[path = "suite/spawn_remote_test.rs"]
+mod spawn_remote_test;
 #[path = "suite/transport_close_test.rs"]
 mod transport_close_test;
 #[path = "suite/wait_nonblocking_test.rs"]

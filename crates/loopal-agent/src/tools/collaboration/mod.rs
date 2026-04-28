@@ -6,6 +6,8 @@
 
 pub mod agent;
 mod agent_fork;
+mod agent_spawn;
 pub mod list_hubs;
 pub mod send_message;
 pub(crate) mod shared_extract;
+mod spawn_decision;

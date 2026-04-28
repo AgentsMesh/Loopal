@@ -6,12 +6,10 @@ use loopal_tool_api::{Tool, ToolContext, ToolResult};
 use serde_json::json;
 use std::sync::Arc;
 
-use super::shared_extract::{create_agent_worktree, extract_shared, require_str};
-use crate::config::load_agent_configs;
+use super::agent_spawn::action_spawn;
+use super::shared_extract::{extract_shared, require_str};
 use crate::shared::AgentShared;
-use crate::spawn::{SpawnParams, spawn_agent, wait_agent};
-
-use super::agent_fork::{build_fork_context, spawn_bg_cleanup};
+use crate::spawn::wait_agent;
 
 pub struct AgentTool;
 
@@ -70,107 +68,6 @@ impl Tool for AgentTool {
     }
 }
 
-async fn action_spawn(
-    shared: Arc<AgentShared>,
-    input: &serde_json::Value,
-    memory_channel: Option<&dyn loopal_tool_api::MemoryChannel>,
-) -> Result<ToolResult, LoopalError> {
-    let prompt = require_str(input, "prompt")?;
-    let name = input
-        .get("name")
-        .and_then(|v| v.as_str())
-        .map(String::from)
-        .unwrap_or_else(|| format!("agent-{}", &uuid::Uuid::new_v4().to_string()[..8]));
-    let subagent_type = input.get("subagent_type").and_then(|v| v.as_str());
-    let model_override = input
-        .get("model")
-        .and_then(|v| v.as_str())
-        .map(String::from);
-    let background = input
-        .get("run_in_background")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
-    let isolation = input.get("isolation").and_then(|v| v.as_str());
-    let target_hub = input
-        .get("target_hub")
-        .and_then(|v| v.as_str())
-        .map(String::from);
-
-    let mut config = subagent_type
-        .and_then(|t| load_agent_configs(&shared.cwd).remove(t))
-        .unwrap_or_default();
-    if let Some(ref m) = model_override {
-        config.model = Some(m.clone());
-    }
-    let wt = if isolation == Some("worktree") {
-        let uid = &uuid::Uuid::new_v4().to_string()[..8];
-        Some(create_agent_worktree(&shared.cwd, &name, uid)?)
-    } else {
-        None
-    };
-    let cwd_override = wt.as_ref().map(|(info, _)| info.path.clone());
-    let model = config
-        .model
-        .unwrap_or_else(|| shared.kernel.settings().model.clone());
-    let perm_mode = match shared.kernel.settings().permission_mode {
-        loopal_tool_api::PermissionMode::Bypass => "bypass",
-        loopal_tool_api::PermissionMode::Supervised => "supervised",
-        loopal_tool_api::PermissionMode::Auto => "auto",
-    };
-    let result = spawn_agent(
-        &shared,
-        SpawnParams {
-            name: name.clone(),
-            prompt: prompt.to_string(),
-            model: Some(model),
-            cwd_override,
-            permission_mode: Some(perm_mode.to_string()),
-            target_hub,
-            agent_type: subagent_type.map(String::from),
-            depth: shared.depth + 1,
-            fork_context: build_fork_context(&shared),
-        },
-    )
-    .await;
-    match result {
-        Ok(sr) => {
-            if background {
-                spawn_bg_cleanup(shared.clone(), name.clone(), wt);
-                let msg = format!(
-                    "Agent '{name}' spawned in background (agentId: {}).\n\
-                     Result will be injected into your conversation when it completes.",
-                    sr.agent_id,
-                );
-                Ok(ToolResult::success(msg))
-            } else {
-                let output = wait_agent(&shared, &name).await;
-                if let Some((info, root)) = wt {
-                    loopal_git::cleanup_if_clean(&root, &info);
-                }
-                match output {
-                    Ok(text) => {
-                        // Forward any memory suggestions from sub-agent to the memory channel
-                        if let Some(ch) = memory_channel {
-                            for suggestion in
-                                loopal_memory::extraction::extract_memory_suggestions(&text)
-                            {
-                                let _ = ch.try_send(suggestion);
-                            }
-                        }
-                        Ok(ToolResult::success(text))
-                    }
-                    Err(e) => Ok(ToolResult::error(e)),
-                }
-            }
-        }
-        Err(e) => {
-            if let Some((info, root)) = wt {
-                loopal_git::cleanup_if_clean(&root, &info);
-            }
-            Ok(ToolResult::error(format!("Failed to spawn agent: {e}")))
-        }
-    }
-}
 async fn action_result(
     shared: Arc<AgentShared>,
     input: &serde_json::Value,

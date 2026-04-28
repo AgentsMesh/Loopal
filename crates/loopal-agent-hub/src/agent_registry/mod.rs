@@ -3,6 +3,7 @@
 //! Contains only agent-related state. UI client management is in `UiDispatcher`.
 
 mod completion;
+mod queries;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -12,8 +13,7 @@ use tokio::sync::{mpsc, watch};
 use loopal_ipc::connection::Connection;
 use loopal_protocol::{AgentEvent, Envelope, QualifiedAddress};
 
-use crate::routing;
-use crate::topology::{AgentInfo, AgentLifecycle};
+use crate::topology::AgentInfo;
 use crate::types::{AgentConnectionState, LocalChannels, ManagedAgent};
 
 /// Pure agent registry — no UI client knowledge.
@@ -97,10 +97,18 @@ impl AgentRegistry {
     }
 
     /// Register a shadow entry for a remotely-spawned agent.
-    pub fn register_shadow(&mut self, name: &str, parent: QualifiedAddress) {
-        use crate::topology::AgentInfo;
-        use crate::types::{AgentConnectionState, ManagedAgent};
-
+    ///
+    /// Returns Err if `name` is already registered (local or shadow). Callers
+    /// should treat this as authoritative — never overwrite an existing entry,
+    /// because that would silently destroy an active agent's state.
+    pub fn register_shadow(
+        &mut self,
+        name: &str,
+        parent: QualifiedAddress,
+    ) -> Result<(), String> {
+        if self.agents.contains_key(name) {
+            return Err(format!("agent '{name}' already registered"));
+        }
         let parent_for_children = parent.clone();
         let mut info = AgentInfo::new(name, Some(parent), None);
         info.lifecycle = crate::AgentLifecycle::Running;
@@ -120,89 +128,6 @@ impl AgentRegistry {
         }
         tracing::info!(agent = %name, parent = %parent_for_children,
             "shadow registered for remote agent");
-    }
-
-    // ── Queries ──────────────────────────────────────────────────
-
-    pub fn agent_count(&self) -> usize {
-        self.agents.len()
-    }
-
-    /// Count only sub-agents (those with a parent). Excludes root "main".
-    pub fn sub_agent_count(&self) -> usize {
-        self.agents
-            .values()
-            .filter(|a| a.info.parent.is_some())
-            .count()
-    }
-
-    pub fn get_agent_connection(&self, name: &str) -> Option<Arc<Connection>> {
-        self.agents.get(name).and_then(|a| a.state.connection())
-    }
-
-    pub fn all_agent_connections(&self) -> Vec<(String, Arc<Connection>)> {
-        self.agents
-            .iter()
-            .filter_map(|(n, a)| a.state.connection().map(|c| (n.clone(), c)))
-            .collect()
-    }
-
-    pub fn list_agents(&self) -> Vec<(String, &'static str)> {
-        self.agents
-            .iter()
-            .map(|(n, a)| {
-                let l = match &a.state {
-                    AgentConnectionState::Local(_) => "local",
-                    AgentConnectionState::Connected(_) => "connected",
-                    AgentConnectionState::Shadow => "shadow",
-                };
-                (n.clone(), l)
-            })
-            .collect()
-    }
-
-    // ── Routing ──────────────────────────────────────────────────
-
-    pub async fn route_message(&self, envelope: &Envelope) -> Result<(), String> {
-        let conn = self
-            .get_agent_connection(&envelope.target.agent)
-            .ok_or_else(|| format!("no agent: '{}'", envelope.target))?;
-        routing::route_to_agent(&conn, envelope, &self.event_tx).await
-    }
-
-    // ── Topology ─────────────────────────────────────────────────
-
-    pub fn agent_info(&self, name: &str) -> Option<&AgentInfo> {
-        self.agents.get(name).map(|a| &a.info)
-    }
-
-    pub fn set_lifecycle(&mut self, name: &str, lifecycle: AgentLifecycle) {
-        if let Some(a) = self.agents.get_mut(name) {
-            a.info.lifecycle = lifecycle;
-        }
-    }
-
-    pub fn descendants(&self, name: &str) -> Vec<String> {
-        self.agents
-            .get(name)
-            .map(|a| a.info.descendants(&self.agents))
-            .unwrap_or_default()
-    }
-
-    pub fn topology_snapshot(&self) -> serde_json::Value {
-        let agents: Vec<serde_json::Value> = self
-            .agents
-            .iter()
-            .map(|(name, a)| {
-                serde_json::json!({
-                    "name": name,
-                    "parent": a.info.parent.as_ref().map(|p| p.to_string()),
-                    "children": a.info.children,
-                    "lifecycle": format!("{:?}", a.info.lifecycle),
-                    "model": a.info.model,
-                })
-            })
-            .collect();
-        serde_json::json!({ "agents": agents })
+        Ok(())
     }
 }

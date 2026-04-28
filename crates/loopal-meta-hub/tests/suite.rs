@@ -17,9 +17,13 @@ mod relay_event_test;
 mod routing_test;
 #[path = "suite/shadow_lifecycle_test.rs"]
 mod shadow_lifecycle_test;
+#[path = "suite/shadow_routing_test.rs"]
+mod shadow_routing_test;
 #[path = "suite/spawn_completion_test.rs"]
 mod spawn_completion_test;
 #[path = "suite/spawn_edge_test.rs"]
 mod spawn_edge_test;
+#[path = "suite/spawn_schema_test.rs"]
+mod spawn_schema_test;
 #[path = "suite/status_resolve_test.rs"]
 mod status_resolve_test;

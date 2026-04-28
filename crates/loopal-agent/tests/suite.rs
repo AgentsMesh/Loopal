@@ -11,6 +11,8 @@ mod cron_tool_test;
 mod in_memory_task_storage_test;
 #[path = "suite/session_resume_adapters_test.rs"]
 mod session_resume_adapters_test;
+#[path = "suite/spawn_params_test.rs"]
+mod spawn_params_test;
 #[path = "suite/task_file_storage_test.rs"]
 mod task_file_storage_test;
 #[path = "suite/task_store_concurrency_test.rs"]

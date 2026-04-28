@@ -8,7 +8,13 @@ use tokio::sync::Mutex;
 
 use crate::hub::Hub;
 
+mod cross_hub_forward;
 mod dispatch_handlers;
+mod spawn_prepare;
+#[cfg(test)]
+#[path = "spawn_prepare_test.rs"]
+mod spawn_prepare_test;
+mod spawn_routing;
 mod status_handler;
 mod topology_handlers;
 mod wait_handler;
@@ -21,6 +27,7 @@ pub async fn dispatch_hub_request(
     from_agent: String,
 ) -> Result<Value, String> {
     use dispatch_handlers::*;
+    use spawn_routing::{handle_spawn_agent, handle_spawn_remote_agent};
     use status_handler::handle_status;
     use topology_handlers::*;
     use wait_handler::handle_wait_agent;
@@ -33,6 +40,9 @@ pub async fn dispatch_hub_request(
         m if m == methods::HUB_SHUTDOWN_AGENT.name => handle_shutdown_agent(hub, params).await,
         m if m == methods::HUB_SPAWN_AGENT.name => {
             handle_spawn_agent(hub, params, &from_agent).await
+        }
+        m if m == methods::HUB_SPAWN_REMOTE_AGENT.name => {
+            handle_spawn_remote_agent(hub, params, &from_agent).await
         }
         m if m == methods::HUB_WAIT_AGENT.name => handle_wait_agent(hub, params).await,
         m if m == methods::HUB_AGENT_INFO.name => handle_agent_info(hub, params).await,

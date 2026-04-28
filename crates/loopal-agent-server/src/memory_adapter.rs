@@ -11,7 +11,7 @@ use tokio::sync::mpsc;
 use tracing::{info, warn};
 
 use loopal_agent::shared::AgentShared;
-use loopal_agent::spawn::{SpawnParams, spawn_agent, wait_agent};
+use loopal_agent::spawn::{SpawnParams, SpawnTarget, spawn_agent, wait_agent};
 use loopal_memory::{MEMORY_AGENT_PROMPT, MemoryProcessor};
 use loopal_tool_api::MemoryChannel;
 
@@ -59,12 +59,13 @@ impl ServerMemoryProcessor {
             name: name.to_string(),
             prompt,
             model: Some(self.model.clone()),
-            cwd_override: None,
             permission_mode: None,
-            target_hub: None,
             agent_type: None,
             depth: self.shared.depth + 1,
-            fork_context: None,
+            target: SpawnTarget::InHub {
+                cwd_override: None,
+                fork_context: None,
+            },
         };
         spawn_agent(&self.shared, params).await?;
         match wait_agent(&self.shared, name).await {

@@ -108,6 +108,23 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
             let (method, params) = ext::session_resumed(resumed_session, *message_count);
             Some(AcpNotification::Extension { method, params })
         }
+        AgentEventPayload::InboxEnqueued {
+            message_id,
+            source,
+            content,
+            summary,
+        } => {
+            if source.is_optimistically_rendered() {
+                return None;
+            }
+            let (method, params) =
+                ext::inbox_enqueued(session_id, message_id, source, content, summary.as_deref());
+            Some(AcpNotification::Extension { method, params })
+        }
+        AgentEventPayload::InboxConsumed { message_id } => {
+            let (method, params) = ext::inbox_consumed(session_id, message_id);
+            Some(AcpNotification::Extension { method, params })
+        }
 
         // ── Events with no ACP counterpart ───────────────────────────
         AgentEventPayload::AwaitingInput

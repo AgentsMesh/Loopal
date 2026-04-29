@@ -1,21 +1,15 @@
-/// Message lines conversion: SessionMessage → Vec<Line<'static>>.
-///
-/// Instruction model: user messages show in a tinted background block
-/// with a left accent bar for dark-mode readability. Assistant output
-/// flows directly without labels, tool calls are single-line work traces,
-/// thinking shows full content in dimmed gray-purple.
 use ratatui::prelude::*;
 use unicode_width::UnicodeWidthStr;
 
 use crate::markdown;
-use loopal_session::types::SessionMessage;
+use loopal_protocol::MessageSource;
+use loopal_session::types::{InboxOrigin, SessionMessage};
 
 use super::skill_display::render_skill_invoke;
 use super::thinking_render;
 use super::tool_display::render_tool_calls;
 use super::welcome::render_welcome;
 
-/// Convert a single SessionMessage into pre-wrapped styled Lines.
 pub fn message_to_lines(msg: &SessionMessage, width: u16) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
 
@@ -35,7 +29,6 @@ pub fn message_to_lines(msg: &SessionMessage, width: u16) -> Vec<Line<'static>> 
         ),
     }
 
-    // Tool calls — group-aware rendering
     if !msg.tool_calls.is_empty() {
         lines.extend(render_tool_calls(&msg.tool_calls, width));
     }
@@ -44,12 +37,15 @@ pub fn message_to_lines(msg: &SessionMessage, width: u16) -> Vec<Line<'static>> 
     lines
 }
 
-/// User message: tinted background block with left accent bar.
-/// Skill invocations render as a collapsed summary instead of the full body.
 fn render_user(lines: &mut Vec<Line<'static>>, msg: &SessionMessage, width: u16) {
     if let Some(skill) = &msg.skill_info {
         render_skill_invoke(lines, skill, width);
         return;
+    }
+    if let Some(origin) = &msg.inbox
+        && !matches!(origin.source, MessageSource::Human)
+    {
+        render_inbox_origin(lines, origin, width);
     }
 
     let w = (width as usize).max(1);
@@ -64,7 +60,6 @@ fn render_user(lines: &mut Vec<Line<'static>>, msg: &SessionMessage, width: u16)
         lines.push(user_line("", w, accent, text_style));
         return;
     }
-    // Wrap at (width - 3) to reserve space for "▎ " prefix (3 cols)
     let inner_w = w.saturating_sub(3).max(1);
     for line in msg.content.lines() {
         for cow in textwrap::wrap(line, inner_w) {
@@ -73,12 +68,27 @@ fn render_user(lines: &mut Vec<Line<'static>>, msg: &SessionMessage, width: u16)
     }
 }
 
-/// Build a single user-message line: `▎ text<padding>`.
-///
-/// Pads with spaces to fill `total_width` so the background covers the row.
+fn render_inbox_origin(lines: &mut Vec<Line<'static>>, origin: &InboxOrigin, width: u16) {
+    let label = match &origin.source {
+        MessageSource::Agent(addr) => format!("📨 from {addr}"),
+        MessageSource::Scheduled => "⏰ scheduled".to_string(),
+        MessageSource::Channel { channel, from } => format!("📡 #{channel}/{from}"),
+        MessageSource::System(kind) => format!("⚙ system:{kind}"),
+        MessageSource::Human => return,
+    };
+    let style = Style::default().fg(Color::Rgb(140, 170, 220)).italic();
+    lines.push(Line::from(Span::styled(label, style)));
+    if let Some(summary) = &origin.summary {
+        let dim = Style::default().fg(Color::Rgb(120, 125, 140));
+        for cow in textwrap::wrap(summary, (width as usize).max(1)) {
+            lines.push(Line::from(Span::styled(cow.into_owned(), dim)));
+        }
+    }
+}
+
 fn user_line(text: &str, total_width: usize, accent: Style, text_style: Style) -> Line<'static> {
     let prefix = "▎ ";
-    let prefix_w = 3; // ▎(2) + space(1)
+    let prefix_w = 3;
     let text_w = UnicodeWidthStr::width(text);
     let pad = total_width.saturating_sub(prefix_w + text_w);
     Line::from(vec![
@@ -88,14 +98,12 @@ fn user_line(text: &str, total_width: usize, accent: Style, text_style: Style) -
     ])
 }
 
-/// Assistant message: direct output, no label. Markdown rendered.
 fn render_assistant(lines: &mut Vec<Line<'static>>, msg: &SessionMessage, width: u16) {
     if !msg.content.is_empty() {
         lines.extend(markdown::render_markdown(&msg.content, width));
     }
 }
 
-/// Generic prefixed message (error, system, unknown roles).
 fn render_prefixed(
     lines: &mut Vec<Line<'static>>,
     msg: &SessionMessage,
@@ -112,12 +120,6 @@ fn render_prefixed(
     }
 }
 
-/// Convert streaming text into pre-wrapped styled Lines.
-///
-/// Uses full markdown rendering so users see formatted output incrementally,
-/// not raw markup that only resolves after the message completes.
-/// pulldown-cmark handles incomplete markdown gracefully (e.g. unclosed
-/// code fences render trailing content as code — correct during streaming).
 pub fn streaming_to_lines(text: &str, width: u16) -> Vec<Line<'static>> {
     if text.is_empty() {
         return Vec::new();
@@ -125,7 +127,6 @@ pub fn streaming_to_lines(text: &str, width: u16) -> Vec<Line<'static>> {
     markdown::render_markdown(text, width)
 }
 
-/// Wrap a single logical line into visual lines using textwrap.
 fn wrap_line(line: &str, width: u16) -> Vec<Line<'static>> {
     let w = (width as usize).max(1);
     textwrap::wrap(line, w)

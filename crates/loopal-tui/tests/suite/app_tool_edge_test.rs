@@ -53,6 +53,7 @@ fn test_tool_call_without_prior_assistant_message_creates_one() {
                 tool_calls: Vec::new(),
                 image_count: 0,
                 skill_info: None,
+                inbox: None,
             });
     }
     app.session
@@ -152,6 +153,7 @@ fn test_tool_result_with_multibyte_utf8_no_panic() {
                 }],
                 image_count: 0,
                 skill_info: None,
+                inbox: None,
             });
     }
 

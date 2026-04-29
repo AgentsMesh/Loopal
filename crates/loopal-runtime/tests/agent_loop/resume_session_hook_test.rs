@@ -204,6 +204,22 @@ async fn no_warnings_event_when_all_hooks_succeed() {
 }
 
 #[tokio::test]
+async fn resume_clears_pending_inbox_consumed_ids_from_previous_session() {
+    let mut h = build_harness(Vec::new());
+    h.runner
+        .pending_consumed_ids
+        .push("stale-id-from-old-session".into());
+    h.runner
+        .handle_resume_session(&h.target_id)
+        .await
+        .expect("resume must succeed");
+    assert!(
+        h.runner.pending_consumed_ids.is_empty(),
+        "resume must drop pending ids; otherwise next turn emits ghost InboxConsumed"
+    );
+}
+
+#[tokio::test]
 async fn empty_hooks_emits_no_warning() {
     let mut h = build_harness(Vec::new());
     h.runner.handle_resume_session(&h.target_id).await.unwrap();

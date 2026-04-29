@@ -8,6 +8,7 @@ fn user_msg(text: &str) -> SessionMessage {
         tool_calls: vec![],
         image_count: 0,
         skill_info: None,
+        inbox: None,
     }
 }
 
@@ -18,6 +19,7 @@ fn asst_msg(text: &str) -> SessionMessage {
         tool_calls: vec![],
         image_count: 0,
         skill_info: None,
+        inbox: None,
     }
 }
 
@@ -28,6 +30,7 @@ fn sys_msg(text: &str) -> SessionMessage {
         tool_calls: vec![],
         image_count: 0,
         skill_info: None,
+        inbox: None,
     }
 }
 

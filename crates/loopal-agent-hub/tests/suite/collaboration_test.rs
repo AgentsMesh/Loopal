@@ -208,6 +208,51 @@ async fn send_message_running_vs_finished() {
     );
 }
 
+#[tokio::test]
+async fn send_message_with_summary_propagates_through_hub() {
+    let (hub, _) = make_hub();
+
+    let (sender, sr) = hub_server::connect_local(hub.clone(), "sender");
+    tokio::spawn(async move {
+        let mut rx = sr;
+        while let Some(_msg) = rx.recv().await {}
+    });
+
+    let (recv_conn, recv_rx) = hub_server::connect_local(hub.clone(), "receiver");
+    let rc = recv_conn.clone();
+    let (tap_tx, mut tap_rx) = mpsc::channel::<serde_json::Value>(8);
+    tokio::spawn(async move {
+        let mut rx = recv_rx;
+        while let Some(msg) = rx.recv().await {
+            if let Incoming::Request { id, method, params } = msg {
+                if method == methods::AGENT_MESSAGE.name {
+                    let _ = tap_tx.send(params.clone()).await;
+                }
+                let _ = rc.respond(id, json!({"ok": true})).await;
+            }
+        }
+    });
+    tokio::time::sleep(Duration::from_millis(50)).await;
+
+    let envelope = json!({
+        "id": "00000000-0000-0000-0000-000000000003",
+        "source": {"Agent": {"hub": [], "agent": "sender"}},
+        "target": {"hub": [], "agent": "receiver"},
+        "content": {"text": "long body", "images": []},
+        "timestamp": "2026-01-01T00:00:00Z",
+        "summary": "ping"
+    });
+    let result = sender.send_request(methods::HUB_ROUTE.name, envelope).await;
+    assert!(result.is_ok());
+
+    let delivered = tokio::time::timeout(Duration::from_secs(2), tap_rx.recv())
+        .await
+        .expect("agent/message should arrive at receiver")
+        .unwrap();
+    assert_eq!(delivered["summary"], "ping");
+    assert_eq!(delivered["content"]["text"], "long body");
+}
+
 /// Cascade shutdown: parent finishes → children get interrupted.
 #[tokio::test]
 async fn cascade_shutdown_interrupts_children() {

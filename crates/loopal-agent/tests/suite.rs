@@ -9,6 +9,8 @@ mod config_test;
 mod cron_tool_test;
 #[path = "suite/in_memory_task_storage_test.rs"]
 mod in_memory_task_storage_test;
+#[path = "suite/send_message_tool_test.rs"]
+mod send_message_tool_test;
 #[path = "suite/session_resume_adapters_test.rs"]
 mod session_resume_adapters_test;
 #[path = "suite/spawn_params_test.rs"]

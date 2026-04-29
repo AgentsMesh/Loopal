@@ -39,6 +39,7 @@ pub(crate) fn handle_server_tool_use(
         tool_calls: vec![tc],
         image_count: 0,
         skill_info: None,
+        inbox: None,
     });
 }
 

@@ -99,6 +99,7 @@ impl AgentConversation {
                 tool_calls: Vec::new(),
                 image_count: 0,
                 skill_info: None,
+                inbox: None,
             });
             self.thinking_active = false;
         }
@@ -117,6 +118,7 @@ impl AgentConversation {
                 tool_calls: Vec::new(),
                 image_count: 0,
                 skill_info: None,
+                inbox: None,
             });
         }
     }

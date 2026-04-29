@@ -37,6 +37,10 @@ impl AgentLoopRunner {
         // Reset per-session counters
         self.turn_count = 0;
         self.tokens.reset();
+        // Drop pending InboxConsumed ids belonging to the previous session —
+        // emitting them after the swap would surface as ghost events on the
+        // resumed conversation.
+        self.pending_consumed_ids.clear();
 
         // Update tool context so subsequent tool calls persist to the new session
         self.tool_ctx.session_id.clone_from(&self.params.session.id);

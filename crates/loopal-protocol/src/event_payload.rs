@@ -29,10 +29,8 @@ pub enum AgentEventPayload {
         name: String,
         result: String,
         is_error: bool,
-        /// Wall-clock execution time in milliseconds (filled by runtime).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         duration_ms: Option<u64>,
-        /// Structured data from the tool (e.g. bytes_written for Write).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         metadata: Option<serde_json::Value>,
     },
@@ -40,9 +38,7 @@ pub enum AgentEventPayload {
     ToolProgress {
         id: String,
         name: String,
-        /// Latest output tail or status message.
         output_tail: String,
-        /// Elapsed time in milliseconds since tool started.
         elapsed_ms: u64,
     },
     /// Marks the start of a parallel tool batch (3+ tools executing concurrently).
@@ -84,20 +80,28 @@ pub enum AgentEventPayload {
     /// Agent loop started
     Started,
     /// Agent transitioned into active processing (turn begins).
-    /// Authoritative "started working" signal: emitted as soon as the runner
-    /// moves from `WaitingForInput` to `Running`, before any LLM call or tool.
+    /// Emitted on `WaitingForInput` → `Running`, before any LLM/tool call.
     Running,
     /// Agent loop finished
     Finished,
     /// Inter-agent message routed through MessageRouter (Observation Plane).
+    /// `target` carries the post-NAT view of the receiver.
     MessageRouted {
-        /// Origin: full `MessageSource` so observers see the kind
-        /// (Human/Agent/Channel/Scheduled/System) plus any qualified address.
         source: MessageSource,
-        /// Routed-to address. Carries the post-NAT view of the receiver.
         target: QualifiedAddress,
         content_preview: String,
     },
+    /// Inbox accepted a message (after `ingest_message`). Fires on the
+    /// receiving runtime once the message is enqueued, for any source.
+    InboxEnqueued {
+        message_id: String,
+        source: MessageSource,
+        content: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        summary: Option<String>,
+    },
+    /// LLM consumed an inbox message — pairs with `InboxEnqueued` by id.
+    InboxConsumed { message_id: String },
     /// Tool is requesting user to answer questions.
     UserQuestionRequest {
         id: String,
@@ -154,11 +158,8 @@ pub enum AgentEventPayload {
         session_id: String,
         message_count: usize,
     },
-    /// One or more `SessionResumeHook` adapters reported a non-fatal
-    /// failure during a session swap. The resume itself completed
-    /// (message history is on the new session) but ancillary state
-    /// (cron / task list) may be stale or unloaded. Front-ends should
-    /// surface this so users can investigate.
+    /// `SessionResumeHook` adapter(s) reported non-fatal failure during a
+    /// swap. Resume completed; cron/task state may be stale.
     SessionResumeWarnings {
         session_id: String,
         warnings: Vec<String>,
@@ -195,29 +196,4 @@ pub enum AgentEventPayload {
     TasksChanged { tasks: Vec<TaskSnapshot> },
     /// Full scheduled cron jobs snapshot (emitted by the periodic bridge).
     CronsChanged { crons: Vec<CronJobSnapshot> },
-}
-
-impl AgentEventPayload {
-    /// SNAT — stamp `self_hub` onto every still-local qualified address
-    /// inside this payload. Already-qualified (cross-hub) addresses are
-    /// left untouched. Called by the event aggregator before relaying an
-    /// event upward to the MetaHub broadcast plane so receivers see a
-    /// fully-qualified, self-describing payload.
-    pub fn prepend_self_hub(&mut self, self_hub: &str) {
-        match self {
-            Self::MessageRouted { source, target, .. } => {
-                source.prepend_hub_if_local(self_hub);
-                target.prepend_hub_if_local(self_hub);
-            }
-            Self::SubAgentSpawned {
-                parent: Some(p), ..
-            } => {
-                p.prepend_hub_if_local(self_hub);
-            }
-            // Other variants either carry no qualified address or carry
-            // local-only data (tool ids, token counts, etc.) that are
-            // meaningful only inside the originating hub.
-            _ => {}
-        }
-    }
 }

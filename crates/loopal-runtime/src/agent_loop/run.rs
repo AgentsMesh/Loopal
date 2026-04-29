@@ -31,15 +31,13 @@ impl AgentLoopRunner {
 
                 match self.params.config.lifecycle {
                     LifecycleMode::Ephemeral => {
-                        // Messages are delivered directly to the agent mailbox.
-                        // drain is reliable — no yield/timeout needed.
                         let pending = self.drain_pending_input().await;
                         if pending.is_empty() {
                             info!("ephemeral agent idle, exiting");
                             break;
                         }
                         for env in &pending {
-                            self.ingest_message(env);
+                            self.ingest_message(env).await;
                         }
                     }
                     LifecycleMode::Persistent => {
@@ -63,6 +61,7 @@ impl AgentLoopRunner {
                 "turn start"
             );
             self.transition(AgentStatus::Running).await?;
+            self.emit_inbox_consumed().await;
 
             let cancel = TurnCancel::new(self.interrupt.clone(), self.interrupt_tx.clone());
             let mut turn_ctx = TurnContext::new(self.turn_count, cancel);
@@ -124,6 +123,15 @@ impl AgentLoopRunner {
         info!("agent interrupted by user");
         self.status = AgentStatus::WaitingForInput;
         self.emit(AgentEventPayload::Interrupted).await
+    }
+
+    pub async fn emit_inbox_consumed(&mut self) {
+        let ids = std::mem::take(&mut self.pending_consumed_ids);
+        for message_id in ids {
+            let _ = self
+                .emit(AgentEventPayload::InboxConsumed { message_id })
+                .await;
+        }
     }
 }
 

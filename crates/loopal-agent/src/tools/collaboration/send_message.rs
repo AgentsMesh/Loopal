@@ -50,14 +50,23 @@ impl Tool for SendMessageTool {
             LoopalError::Tool(loopal_error::ToolError::InvalidInput("missing 'to'".into()))
         })?;
         let content = input["message"].as_str().unwrap_or("");
+        let summary = input
+            .get("summary")
+            .and_then(|v| v.as_str())
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string);
 
         // Source carries this agent's local view (no hub prefix). Hub-A's
         // uplink applies SNAT (`apply_snat`) before forwarding cross-hub.
-        let envelope = Envelope::new(
+        let mut envelope = Envelope::new(
             MessageSource::Agent(QualifiedAddress::local(shared.agent_name.clone())),
             QualifiedAddress::parse(target),
             content,
         );
+        if let Some(s) = summary {
+            envelope = envelope.with_summary(s);
+        }
         let params = serde_json::to_value(&envelope)
             .map_err(|e| LoopalError::Tool(loopal_error::ToolError::InvalidInput(e.to_string())))?;
 

@@ -28,7 +28,7 @@ impl AgentLoopRunner {
             let input = self.select_input().await;
             match input {
                 SelectResult::AgentInput(Some(AgentInput::Message(env))) => {
-                    let result = self.ingest_message(&env);
+                    let result = self.ingest_message(&env).await;
                     fire_hooks(
                         &self.params.deps.kernel,
                         loopal_config::HookEvent::PostInput,
@@ -48,7 +48,7 @@ impl AgentLoopRunner {
                     return Ok(None);
                 }
                 SelectResult::Envelope(env) => {
-                    return Ok(Some(self.ingest_message(&env)));
+                    return Ok(Some(self.ingest_message(&env).await));
                 }
                 SelectResult::ChannelClosed => continue,
             }
@@ -88,7 +88,7 @@ impl AgentLoopRunner {
     }
 
     /// Accept a message envelope: persist (if not ephemeral) and push to store.
-    pub(super) fn ingest_message(&mut self, env: &Envelope) -> WaitResult {
+    pub(super) async fn ingest_message(&mut self, env: &Envelope) -> WaitResult {
         let mut user_msg = build_user_message(env);
         let ephemeral = matches!(
             env.source,
@@ -103,7 +103,6 @@ impl AgentLoopRunner {
         {
             error!(error = %e, "failed to persist message");
         }
-        // Auto-generate session title from first non-ephemeral user message.
         if !ephemeral && self.params.session.title.is_empty() {
             let title = extract_title(&env.content.text);
             if !title.is_empty() {
@@ -119,6 +118,26 @@ impl AgentLoopRunner {
             }
         }
         self.params.store.push_user(user_msg);
+
+        let message_id = env.id.to_string();
+        // Emit before tracking the id: a failed emit must not leave an
+        // orphan `InboxConsumed` id without its enqueued counterpart.
+        match self
+            .emit(loopal_protocol::AgentEventPayload::InboxEnqueued {
+                message_id: message_id.clone(),
+                source: env.source.clone(),
+                content: env.content.text.clone(),
+                summary: env.summary.clone(),
+            })
+            .await
+        {
+            Ok(()) => self.pending_consumed_ids.push(message_id),
+            Err(e) => tracing::warn!(
+                error = %e,
+                "InboxEnqueued emit failed; LLM will see the message but UI/observers won't"
+            ),
+        }
+
         WaitResult::MessageAdded
     }
 

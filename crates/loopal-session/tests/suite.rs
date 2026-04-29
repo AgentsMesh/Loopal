@@ -21,6 +21,8 @@ mod cron_state_test;
 mod event_handler_edge_test;
 #[path = "suite/event_handler_test.rs"]
 mod event_handler_test;
+#[path = "suite/inbox_event_test.rs"]
+mod inbox_event_test;
 #[path = "suite/is_idle_test.rs"]
 mod is_idle_test;
 #[path = "suite/message_log_test.rs"]

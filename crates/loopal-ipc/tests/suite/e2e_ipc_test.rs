@@ -77,6 +77,7 @@ async fn e2e_message_then_event_roundtrip() {
         target: "main".into(),
         content: loopal_protocol::UserContent::text_only("hello"),
         timestamp: chrono::Utc::now(),
+        summary: None,
     };
     handles.mailbox_tx.send(envelope).await.unwrap();
 

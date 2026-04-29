@@ -61,6 +61,33 @@ pub fn session_resumed(session_id: &str, message_count: usize) -> (String, Value
     )
 }
 
+pub fn inbox_enqueued(
+    session_id: &str,
+    message_id: &str,
+    source: &loopal_protocol::MessageSource,
+    content: &str,
+    summary: Option<&str>,
+) -> (String, Value) {
+    ext_notification(
+        session_id,
+        "inbox.enqueued",
+        serde_json::json!({
+            "messageId": message_id,
+            "source": source,
+            "content": content,
+            "summary": summary,
+        }),
+    )
+}
+
+pub fn inbox_consumed(session_id: &str, message_id: &str) -> (String, Value) {
+    ext_notification(
+        session_id,
+        "inbox.consumed",
+        serde_json::json!({ "messageId": message_id }),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -97,5 +124,32 @@ mod tests {
         assert_eq!(method, "_loopal/sessionResumed");
         assert_eq!(params["sessionId"], "s1");
         assert_eq!(params["data"]["messageCount"], 42);
+    }
+
+    #[test]
+    fn inbox_enqueued_format_with_summary() {
+        let src =
+            loopal_protocol::MessageSource::Agent(loopal_protocol::QualifiedAddress::local("a"));
+        let (method, params) = inbox_enqueued("s1", "msg-1", &src, "hi", Some("ping"));
+        assert_eq!(method, "_loopal/inbox.enqueued");
+        assert_eq!(params["sessionId"], "s1");
+        assert_eq!(params["data"]["messageId"], "msg-1");
+        assert_eq!(params["data"]["content"], "hi");
+        assert_eq!(params["data"]["summary"], "ping");
+    }
+
+    #[test]
+    fn inbox_enqueued_format_without_summary() {
+        let src = loopal_protocol::MessageSource::Human;
+        let (method, params) = inbox_enqueued("s1", "msg-1", &src, "hi", None);
+        assert_eq!(method, "_loopal/inbox.enqueued");
+        assert!(params["data"]["summary"].is_null());
+    }
+
+    #[test]
+    fn inbox_consumed_format() {
+        let (method, params) = inbox_consumed("s1", "msg-1");
+        assert_eq!(method, "_loopal/inbox.consumed");
+        assert_eq!(params["data"]["messageId"], "msg-1");
     }
 }

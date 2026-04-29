@@ -18,6 +18,7 @@ pub fn handle_thinking_complete(conv: &mut AgentConversation, token_count: u32) 
             tool_calls: Vec::new(),
             image_count: 0,
             skill_info: None,
+            inbox: None,
         });
     }
 }

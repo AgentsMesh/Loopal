@@ -33,6 +33,16 @@ impl MessageSource {
         }
     }
 
+    /// True for sources whose UI representation is rendered optimistically
+    /// at the input site (e.g. human typing into the prompt) rather than
+    /// via the inbox event pipeline. Subscribers that re-render based on
+    /// `InboxEnqueued` must skip these to avoid duplicating the optimistic
+    /// row. Centralised here so adding a new source forces a deliberate
+    /// decision rather than silently inheriting one of the branches.
+    pub fn is_optimistically_rendered(&self) -> bool {
+        matches!(self, Self::Human)
+    }
+
     /// SNAT — prepend a hub name into any addressable origin field.
     /// Variants without an addressable origin (Human/Scheduled/System) are no-ops.
     pub fn prepend_hub(&mut self, self_hub: &str) {
@@ -67,10 +77,12 @@ pub struct Envelope {
     pub target: QualifiedAddress,
     pub content: UserContent,
     pub timestamp: DateTime<Utc>,
+    /// Sender-supplied UI preview, distinct from `content_preview()` truncation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
 }
 
 impl Envelope {
-    /// Create a new envelope with auto-generated ID and current timestamp.
     pub fn new(
         source: MessageSource,
         target: impl Into<QualifiedAddress>,
@@ -82,10 +94,15 @@ impl Envelope {
             target: target.into(),
             content: content.into(),
             timestamp: Utc::now(),
+            summary: None,
         }
     }
 
-    /// Short preview of the text content (max ~80 chars, safe for multi-byte).
+    pub fn with_summary(mut self, summary: impl Into<String>) -> Self {
+        self.summary = Some(summary.into());
+        self
+    }
+
     pub fn content_preview(&self) -> &str {
         self.content.text_preview()
     }

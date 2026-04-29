@@ -86,3 +86,56 @@ fn none_events_return_none() {
         );
     }
 }
+
+#[test]
+fn inbox_enqueued_human_returns_none_to_avoid_echoing_input_back() {
+    let r = translate_event(
+        &AgentEventPayload::InboxEnqueued {
+            message_id: "m".into(),
+            source: loopal_protocol::MessageSource::Human,
+            content: "hi".into(),
+            summary: None,
+        },
+        "s",
+    );
+    assert!(r.is_none());
+}
+
+#[test]
+fn inbox_enqueued_agent_returns_extension() {
+    let r = translate_event(
+        &AgentEventPayload::InboxEnqueued {
+            message_id: "m".into(),
+            source: loopal_protocol::MessageSource::Agent(
+                loopal_protocol::QualifiedAddress::local("worker"),
+            ),
+            content: "ping".into(),
+            summary: Some("hello".into()),
+        },
+        "s",
+    );
+    match r {
+        Some(AcpNotification::Extension { method, params }) => {
+            assert_eq!(method, "_loopal/inbox.enqueued");
+            assert_eq!(params["data"]["summary"], "hello");
+        }
+        _ => panic!("expected Extension notification"),
+    }
+}
+
+#[test]
+fn inbox_consumed_returns_extension() {
+    let r = translate_event(
+        &AgentEventPayload::InboxConsumed {
+            message_id: "m-7".into(),
+        },
+        "s",
+    );
+    match r {
+        Some(AcpNotification::Extension { method, params }) => {
+            assert_eq!(method, "_loopal/inbox.consumed");
+            assert_eq!(params["data"]["messageId"], "m-7");
+        }
+        _ => panic!("expected Extension notification"),
+    }
+}

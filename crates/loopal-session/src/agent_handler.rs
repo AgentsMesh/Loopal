@@ -139,7 +139,20 @@ pub(crate) fn apply_agent_event(state: &mut SessionState, name: &str, payload: A
         | AgentEventPayload::MessageRouted { .. }
         | AgentEventPayload::TurnDiffSummary { .. }
         | AgentEventPayload::TurnCompleted { .. }
+        | AgentEventPayload::InboxConsumed { .. }
         | AgentEventPayload::McpStatusReport { .. } => {}
+        AgentEventPayload::InboxEnqueued {
+            message_id,
+            source,
+            content,
+            summary,
+        } => {
+            if !source.is_optimistically_rendered() {
+                crate::conversation_display::push_inbox_msg(
+                    conv, message_id, source, content, summary,
+                );
+            }
+        }
         payload @ AgentEventPayload::SessionResumed { .. } => {
             clear_all_panel_caches_for_resume(state, payload);
             return;

@@ -13,6 +13,7 @@ fn skill_msg(name: &str, args: &str) -> SessionMessage {
             name: name.to_string(),
             user_args: args.to_string(),
         }),
+        inbox: None,
     }
 }
 
@@ -117,6 +118,7 @@ fn test_non_skill_user_message_unchanged() {
         tool_calls: Vec::new(),
         image_count: 0,
         skill_info: None,
+        inbox: None,
     };
     let lines = message_to_lines(&m, 80);
     let text = all_text(&lines);

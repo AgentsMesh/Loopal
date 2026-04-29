@@ -89,6 +89,7 @@ pub(crate) fn apply_error_event(
         tool_calls: Vec::new(),
         image_count: 0,
         skill_info: None,
+        inbox: None,
     });
     obs.status = AgentStatus::Error;
 }

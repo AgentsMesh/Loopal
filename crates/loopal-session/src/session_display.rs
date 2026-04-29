@@ -27,6 +27,7 @@ impl SessionController {
             tool_calls: Vec::new(),
             image_count: 0,
             skill_info: None,
+            inbox: None,
         });
     }
 
@@ -106,5 +107,6 @@ pub fn into_session_message(p: ProjectedMessage) -> SessionMessage {
             .collect(),
         image_count: p.image_count,
         skill_info: None,
+        inbox: None,
     }
 }

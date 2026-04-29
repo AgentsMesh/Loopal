@@ -88,6 +88,7 @@ fn test_flush_streaming_new_message_when_last_is_not_assistant() {
             tool_calls: Vec::new(),
             image_count: 0,
             skill_info: None,
+            inbox: None,
         });
         conv.streaming_text = "response".to_string();
     }
@@ -125,6 +126,7 @@ fn test_flush_streaming_new_message_when_assistant_has_tool_calls() {
             }],
             image_count: 0,
             skill_info: None,
+            inbox: None,
         });
         conv.streaming_text = "new response".to_string();
     }

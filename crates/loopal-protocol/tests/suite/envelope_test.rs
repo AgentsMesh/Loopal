@@ -186,3 +186,65 @@ fn test_snat_dnat_compose_for_round_trip() {
     );
     assert_eq!(reply.target, QualifiedAddress::local("alpha"));
 }
+
+#[test]
+fn test_envelope_summary_default_none() {
+    let env = Envelope::new(MessageSource::Human, "main", "hi");
+    assert!(env.summary.is_none());
+}
+
+#[test]
+fn test_envelope_with_summary_attaches_value() {
+    let env = Envelope::new(MessageSource::Human, "main", "long content...").with_summary("ping");
+    assert_eq!(env.summary.as_deref(), Some("ping"));
+}
+
+#[test]
+fn test_envelope_summary_serde_roundtrip() {
+    let env = Envelope::new(
+        MessageSource::Agent(QualifiedAddress::local("a")),
+        "b",
+        "full body",
+    )
+    .with_summary("status update");
+    let json = serde_json::to_string(&env).unwrap();
+    assert!(json.contains("\"summary\":\"status update\""));
+    let restored: Envelope = serde_json::from_str(&json).unwrap();
+    assert_eq!(restored.summary.as_deref(), Some("status update"));
+}
+
+#[test]
+fn test_envelope_summary_absent_in_json_when_none() {
+    let env = Envelope::new(MessageSource::Human, "main", "hi");
+    let json = serde_json::to_string(&env).unwrap();
+    assert!(!json.contains("summary"));
+}
+
+#[test]
+fn test_envelope_summary_missing_field_deserializes_to_none() {
+    let legacy = r#"{"id":"00000000-0000-0000-0000-000000000000",
+        "source":"Human","target":{"hub":[],"agent":"main"},
+        "content":{"text":"hi","images":[]},
+        "timestamp":"2026-01-01T00:00:00Z"}"#;
+    let restored: Envelope = serde_json::from_str(legacy).unwrap();
+    assert!(restored.summary.is_none());
+}
+
+#[test]
+fn test_human_source_is_optimistically_rendered() {
+    assert!(MessageSource::Human.is_optimistically_rendered());
+}
+
+#[test]
+fn test_non_human_sources_are_not_optimistically_rendered() {
+    assert!(!MessageSource::Scheduled.is_optimistically_rendered());
+    assert!(!MessageSource::System("rewake".into()).is_optimistically_rendered());
+    assert!(!MessageSource::Agent(QualifiedAddress::local("a")).is_optimistically_rendered());
+    assert!(
+        !MessageSource::Channel {
+            channel: "g".into(),
+            from: QualifiedAddress::local("b"),
+        }
+        .is_optimistically_rendered()
+    );
+}

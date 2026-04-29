@@ -5,7 +5,6 @@ use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_protocol::AgentEventPayload;
 use tracing::{error, info};
 
-use super::message_build::build_user_message;
 use super::runner::AgentLoopRunner;
 
 /// Build a successful ToolResult block.
@@ -61,26 +60,19 @@ impl AgentLoopRunner {
     }
 
     /// Drain pending input from the frontend and inject messages into the store.
+    /// Routes envelopes through `ingest_message` so InboxEnqueued is emitted
+    /// for messages that arrive mid-turn (e.g. agent-to-agent during tool exec).
     /// Control commands are processed inline.
     pub async fn inject_pending_messages(&mut self) {
         let pending = self.params.deps.frontend.drain_pending().await;
         for input in pending {
             match input {
                 crate::agent_input::AgentInput::Message(env) => {
-                    let mut user_msg = build_user_message(&env);
                     info!(
                         text_len = env.content.text.len(),
                         "injecting pending message"
                     );
-                    if let Err(e) = self
-                        .params
-                        .deps
-                        .session_manager
-                        .save_message(&self.params.session.id, &mut user_msg)
-                    {
-                        error!(error = %e, "failed to persist injected message");
-                    }
-                    self.params.store.push_user(user_msg);
+                    self.ingest_message(&env).await;
                 }
                 crate::agent_input::AgentInput::Control(cmd) => {
                     if let Err(e) = self.handle_control(cmd).await {

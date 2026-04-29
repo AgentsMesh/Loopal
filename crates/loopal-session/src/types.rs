@@ -5,18 +5,28 @@
 
 use std::time::Instant;
 
-use loopal_protocol::{Question, SkillInvocation};
+use loopal_protocol::{MessageSource, Question, SkillInvocation};
 
 /// A message to display in the chat view.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct SessionMessage {
     pub role: String,
     pub content: String,
     pub tool_calls: Vec<SessionToolCall>,
-    /// Number of images attached to this message (0 for text-only).
     pub image_count: usize,
-    /// Skill invocation origin — when set, TUI renders a collapsed summary.
     pub skill_info: Option<SkillInvocation>,
+    /// Set when the message originated from the inbox pipeline (Human input,
+    /// inter-agent SendMessage, scheduler trigger, channel broadcast,
+    /// system rewake). UI uses this to render origin chips.
+    pub inbox: Option<InboxOrigin>,
+}
+
+/// Origin metadata for an inbox-delivered message.
+#[derive(Debug, Clone)]
+pub struct InboxOrigin {
+    pub message_id: String,
+    pub source: MessageSource,
+    pub summary: Option<String>,
 }
 
 /// Lifecycle status of a single tool call.

@@ -99,6 +99,7 @@ async fn bridge_forwards_mailbox_messages_to_ipc() {
         target: "main".into(),
         content: loopal_protocol::UserContent::text_only("hello"),
         timestamp: chrono::Utc::now(),
+        summary: None,
     };
 
     handles.mailbox_tx.send(envelope).await.unwrap();

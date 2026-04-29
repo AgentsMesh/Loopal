@@ -42,6 +42,8 @@ impl AgentLoopRunner {
     }
 
     /// Construct, persist, and push a User message with the given text.
+    /// System-injected (auto-continuation, stop feedback) — bypasses the inbox
+    /// pipeline so it does not surface as an `InboxEnqueued` event to the UI.
     fn persist_and_push_user(&mut self, text: &str) {
         let mut msg = Message {
             id: None,

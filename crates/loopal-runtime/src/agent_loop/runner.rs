@@ -38,6 +38,9 @@ pub struct AgentLoopRunner {
     pub status: AgentStatus,
     /// Plan file for the current session (created lazily on first plan mode entry).
     pub plan_file: PlanFile,
+    /// Inbox message ids enqueued since the last turn began, drained as
+    /// `InboxConsumed` events when the runner transitions into `Running`.
+    pub pending_consumed_ids: Vec<String>,
 }
 
 impl AgentLoopRunner {
@@ -76,6 +79,7 @@ impl AgentLoopRunner {
             rewake_rx,
             status: AgentStatus::Starting,
             plan_file,
+            pending_consumed_ids: Vec::new(),
         }
     }
 
@@ -99,6 +103,11 @@ impl AgentLoopRunner {
 
         self.fire_session_hook(loopal_config::HookEvent::SessionEnd)
             .await;
+
+        // Drain any pending inbox ids before the agent finishes — without
+        // this, messages enqueued just before exit would lack their paired
+        // `InboxConsumed`, leaving observers with an incomplete life cycle.
+        self.emit_inbox_consumed().await;
 
         if let Err(ref e) = result {
             let _ = self.transition_error(e.to_string()).await;

@@ -111,6 +111,7 @@ impl SessionController {
             tool_calls: Vec::new(),
             image_count,
             skill_info: content.skill_info.clone(),
+            inbox: None,
         });
     }
 

@@ -8,6 +8,7 @@ fn msg(role: &str, content: &str) -> SessionMessage {
         tool_calls: Vec::new(),
         image_count: 0,
         skill_info: None,
+        inbox: None,
     }
 }
 

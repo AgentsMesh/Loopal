@@ -38,6 +38,8 @@ mod event_test;
 mod focus_mode_test;
 #[path = "suite/focus_panel_keys_test.rs"]
 mod focus_panel_keys_test;
+#[path = "suite/inbox_render_test.rs"]
+mod inbox_render_test;
 #[path = "suite/init_cmd_test.rs"]
 mod init_cmd_test;
 #[path = "suite/input_edge_test.rs"]

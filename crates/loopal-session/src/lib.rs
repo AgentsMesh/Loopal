@@ -27,5 +27,6 @@ pub use controller::SessionController;
 pub use session_display::into_session_message;
 pub use state::{PendingSubAgentRef, ROOT_AGENT};
 pub use types::{
-    PendingPermission, PendingQuestion, SessionMessage, SessionToolCall, ToolCallStatus,
+    InboxOrigin, PendingPermission, PendingQuestion, SessionMessage, SessionToolCall,
+    ToolCallStatus,
 };

@@ -10,6 +10,7 @@ fn msg(role: &str, content: &str) -> SessionMessage {
         tool_calls: Vec::new(),
         image_count: 0,
         skill_info: None,
+        inbox: None,
     }
 }
 
@@ -73,6 +74,7 @@ fn test_tool_call_mutation_detected() {
         }],
         image_count: 0,
         skill_info: None,
+        inbox: None,
     }];
     let fp1 = cache.update(&msgs, W);
 
@@ -137,6 +139,7 @@ fn test_tool_result_arrival_invalidates_cache() {
         }],
         image_count: 0,
         skill_info: None,
+        inbox: None,
     }];
     let n1 = cache.update(&msgs, W);
 

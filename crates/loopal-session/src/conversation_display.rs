@@ -1,9 +1,10 @@
 //! Display state helpers for conversation rendering.
 
-use crate::agent_conversation::AgentConversation;
-use crate::types::SessionMessage;
+use loopal_protocol::MessageSource;
 
-/// Extract a human-readable label from a ThinkingConfig JSON string.
+use crate::agent_conversation::AgentConversation;
+use crate::types::{InboxOrigin, SessionMessage};
+
 pub fn thinking_label_from_json(json: &str) -> String {
     let Ok(v) = serde_json::from_str::<serde_json::Value>(json) else {
         return "unknown".into();
@@ -26,18 +27,33 @@ pub fn thinking_label_from_json(json: &str) -> String {
     }
 }
 
-/// Push a system-role display message into the agent conversation.
 pub fn push_system_msg(conv: &mut AgentConversation, content: &str) {
     conv.messages.push(SessionMessage {
         role: "system".into(),
         content: content.into(),
-        tool_calls: Vec::new(),
-        image_count: 0,
-        skill_info: None,
+        ..Default::default()
     });
 }
 
-/// Handle token usage update event.
+pub fn push_inbox_msg(
+    conv: &mut AgentConversation,
+    message_id: String,
+    source: MessageSource,
+    content: String,
+    summary: Option<String>,
+) {
+    conv.messages.push(SessionMessage {
+        role: "user".into(),
+        content,
+        inbox: Some(InboxOrigin {
+            message_id,
+            source,
+            summary,
+        }),
+        ..Default::default()
+    });
+}
+
 pub fn handle_token_usage(
     conv: &mut AgentConversation,
     input: u32,
@@ -56,7 +72,6 @@ pub fn handle_token_usage(
     }
 }
 
-/// Handle auto-continuation event.
 pub fn handle_auto_continuation(conv: &mut AgentConversation, cont: u32, max: u32) {
     push_system_msg(
         conv,
@@ -64,7 +79,6 @@ pub fn handle_auto_continuation(conv: &mut AgentConversation, cont: u32, max: u3
     );
 }
 
-/// Handle context compaction event.
 pub fn handle_compaction(
     conv: &mut AgentConversation,
     kept: usize,

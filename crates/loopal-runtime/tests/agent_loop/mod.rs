@@ -45,6 +45,7 @@ pub mod auto_mode_helpers;
 mod auto_mode_test;
 mod cron_e2e_test;
 mod drain_pending_test;
+mod inbox_event_test;
 mod input_edge_test;
 mod input_image_test;
 mod input_scheduled_test;

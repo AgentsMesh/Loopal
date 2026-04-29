@@ -8,6 +8,7 @@ pub mod envelope;
 pub mod event;
 pub mod event_id;
 pub mod event_payload;
+mod event_snat;
 pub mod interrupt;
 pub mod mcp_snapshot;
 pub mod projected;

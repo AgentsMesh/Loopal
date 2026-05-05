@@ -20,7 +20,7 @@ async fn test_eof_with_text_no_done_sets_stream_error() {
     let msgs = runner.params.store.messages().to_vec();
     let cancel = make_cancel();
 
-    let result = runner.stream_llm_with(&msgs, &cancel).await.unwrap();
+    let result = runner.stream_llm_with(&msgs, None, &cancel).await.unwrap();
 
     assert_eq!(result.assistant_text, "Let me create the file.");
     assert!(
@@ -51,7 +51,7 @@ async fn test_eof_with_text_and_tool_no_done_sets_stream_error() {
     let msgs = runner.params.store.messages().to_vec();
     let cancel = make_cancel();
 
-    let result = runner.stream_llm_with(&msgs, &cancel).await.unwrap();
+    let result = runner.stream_llm_with(&msgs, None, &cancel).await.unwrap();
 
     assert_eq!(result.assistant_text, "Let me read.");
     assert!(result.stream_error);
@@ -76,7 +76,7 @@ async fn test_normal_response_with_done_no_stream_error() {
     let msgs = runner.params.store.messages().to_vec();
     let cancel = make_cancel();
 
-    let result = runner.stream_llm_with(&msgs, &cancel).await.unwrap();
+    let result = runner.stream_llm_with(&msgs, None, &cancel).await.unwrap();
 
     assert_eq!(result.assistant_text, "All done.");
     assert!(!result.stream_error);
@@ -99,7 +99,7 @@ async fn test_err_chunk_with_text_sets_stream_error() {
     let msgs = runner.params.store.messages().to_vec();
     let cancel = make_cancel();
 
-    let result = runner.stream_llm_with(&msgs, &cancel).await.unwrap();
+    let result = runner.stream_llm_with(&msgs, None, &cancel).await.unwrap();
 
     assert_eq!(result.assistant_text, "partial");
     assert!(result.stream_error);
@@ -122,7 +122,7 @@ async fn test_max_tokens_done_not_confused_with_truncation() {
     let msgs = runner.params.store.messages().to_vec();
     let cancel = make_cancel();
 
-    let result = runner.stream_llm_with(&msgs, &cancel).await.unwrap();
+    let result = runner.stream_llm_with(&msgs, None, &cancel).await.unwrap();
 
     assert!(
         !result.stream_error,

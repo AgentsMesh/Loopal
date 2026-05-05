@@ -10,7 +10,7 @@ use super::{make_cancel, make_runner, make_runner_with_mock_provider};
 fn test_prepare_chat_params_act_mode() {
     let (runner, _rx) = make_runner();
     let params = runner
-        .prepare_chat_params_with(runner.params.store.messages())
+        .prepare_chat_params_with(runner.params.store.messages(), None)
         .expect("should succeed");
 
     assert_eq!(params.model, "claude-sonnet-4-20250514");
@@ -34,7 +34,7 @@ fn test_prepare_chat_params_plan_mode_passes_through() {
     let (mut runner, _rx) = make_runner();
     runner.params.config.mode = AgentMode::Plan;
     let params = runner
-        .prepare_chat_params_with(runner.params.store.messages())
+        .prepare_chat_params_with(runner.params.store.messages(), None)
         .expect("should succeed");
 
     assert!(
@@ -57,7 +57,7 @@ fn test_prepare_chat_params_with_messages() {
         .push_assistant(Message::assistant("Hi there!"));
 
     let params = runner
-        .prepare_chat_params_with(runner.params.store.messages())
+        .prepare_chat_params_with(runner.params.store.messages(), None)
         .expect("should succeed");
     assert_eq!(params.messages.len(), 2);
     assert_eq!(params.messages[0].role, MessageRole::User);
@@ -88,7 +88,7 @@ async fn test_stream_llm_text_response() {
 
     let msgs = runner.params.store.messages().to_vec();
     let cancel = make_cancel();
-    let result = runner.stream_llm_with(&msgs, &cancel).await.unwrap();
+    let result = runner.stream_llm_with(&msgs, None, &cancel).await.unwrap();
     let text = result.assistant_text;
     let tool_uses = result.tool_uses;
     let stream_error = result.stream_error;
@@ -142,7 +142,7 @@ async fn test_stream_llm_tool_use_response() {
 
     let msgs = runner.params.store.messages().to_vec();
     let cancel = make_cancel();
-    let result = runner.stream_llm_with(&msgs, &cancel).await.unwrap();
+    let result = runner.stream_llm_with(&msgs, None, &cancel).await.unwrap();
     let text = result.assistant_text;
     let tool_uses = result.tool_uses;
     let stream_error = result.stream_error;
@@ -167,7 +167,7 @@ async fn test_stream_llm_error_in_stream() {
 
     let msgs = runner.params.store.messages().to_vec();
     let cancel = make_cancel();
-    let result = runner.stream_llm_with(&msgs, &cancel).await.unwrap();
+    let result = runner.stream_llm_with(&msgs, None, &cancel).await.unwrap();
     let text = result.assistant_text;
     let tool_uses = result.tool_uses;
     let stream_error = result.stream_error;
@@ -184,7 +184,7 @@ async fn test_stream_llm_empty_stream() {
 
     let msgs = runner.params.store.messages().to_vec();
     let cancel = make_cancel();
-    let result = runner.stream_llm_with(&msgs, &cancel).await.unwrap();
+    let result = runner.stream_llm_with(&msgs, None, &cancel).await.unwrap();
     let text = result.assistant_text;
     let tool_uses = result.tool_uses;
     let stream_error = result.stream_error;
@@ -215,7 +215,7 @@ fn report_real_system_prompt_tokens() {
     );
     runner.params.config.system_prompt = real_prompt.clone();
     let params = runner
-        .prepare_chat_params_with(runner.params.store.messages())
+        .prepare_chat_params_with(runner.params.store.messages(), None)
         .unwrap();
 
     let tokens = loopal_context::estimate_tokens(&params.system_prompt);

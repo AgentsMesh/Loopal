@@ -60,6 +60,7 @@ fn test_apply_override_all_fields() {
         quality: Some(QualityTier::Premium),
         supports_tools: Some(false),
         supports_vision: Some(true),
+        supports_prefill: Some(false),
         thinking: Some(ThinkingCapability::Adaptive),
     };
     let result = overlay::apply_override(base, &ov);
@@ -73,6 +74,7 @@ fn test_apply_override_all_fields() {
     assert_eq!(result.quality, QualityTier::Premium);
     assert!(!result.supports_tools);
     assert!(result.supports_vision);
+    assert!(!result.supports_prefill);
     assert_eq!(result.thinking, ThinkingCapability::Adaptive);
 }
 

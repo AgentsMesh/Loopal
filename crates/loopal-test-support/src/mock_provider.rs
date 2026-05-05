@@ -5,10 +5,11 @@
 //! (zero overhead, identical to previous behavior).
 
 use std::collections::VecDeque;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use loopal_error::LoopalError;
-use loopal_provider_api::{ChatParams, ChatStream, Provider, StreamChunk};
+use loopal_provider_api::{ChatParams, ChatStream, ContinuationIntent, Provider, StreamChunk};
 use tokio::time::Sleep;
 
 /// In-memory `Stream` with optional per-chunk delay.
@@ -103,6 +104,8 @@ pub struct MultiCallProvider {
     pub calls: std::sync::Mutex<VecDeque<Vec<Result<StreamChunk, LoopalError>>>>,
     /// Optional per-chunk delay applied to all returned streams.
     delay: Option<Duration>,
+    /// Per-call snapshot of `continuation_intent` for test assertions.
+    recorded_intents: Arc<Mutex<Vec<Option<ContinuationIntent>>>>,
 }
 
 impl MultiCallProvider {
@@ -110,6 +113,7 @@ impl MultiCallProvider {
         Self {
             calls: std::sync::Mutex::new(VecDeque::from(calls)),
             delay: None,
+            recorded_intents: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -118,6 +122,12 @@ impl MultiCallProvider {
         self.delay = Some(delay);
         self
     }
+
+    /// Shared handle so callers that wrap this provider in `Arc<dyn Provider>`
+    /// can still observe recorded intents from outside.
+    pub fn intents_handle(&self) -> Arc<Mutex<Vec<Option<ContinuationIntent>>>> {
+        Arc::clone(&self.recorded_intents)
+    }
 }
 
 #[async_trait::async_trait]
@@ -125,7 +135,11 @@ impl Provider for MultiCallProvider {
     fn name(&self) -> &str {
         "anthropic"
     }
-    async fn stream_chat(&self, _p: &ChatParams) -> Result<ChatStream, LoopalError> {
+    async fn stream_chat(&self, p: &ChatParams) -> Result<ChatStream, LoopalError> {
+        self.recorded_intents
+            .lock()
+            .unwrap()
+            .push(p.continuation_intent.clone());
         let chunks = self.calls.lock().unwrap().pop_front().unwrap_or_default();
         let mut stream = MockStreamChunks::new(VecDeque::from(chunks));
         if let Some(d) = self.delay {

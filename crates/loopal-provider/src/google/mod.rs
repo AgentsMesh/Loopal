@@ -5,7 +5,7 @@ mod thinking;
 
 use async_trait::async_trait;
 use loopal_error::{LoopalError, ProviderError};
-use loopal_provider_api::{ChatParams, ChatStream, Provider};
+use loopal_provider_api::{ChatParams, ChatStream, ErrorClass, Provider, default_classify_error};
 use serde_json::json;
 use std::collections::VecDeque;
 use std::time::Duration;
@@ -47,42 +47,47 @@ impl Provider for GoogleProvider {
             messages: normalized,
             ..params.clone()
         };
-        let contents = self.build_contents(&normalized_params);
-        let tools = self.build_tools(params);
+        let finalized = self.finalize_messages(&normalized_params).into_owned();
+        let final_params = ChatParams {
+            messages: finalized,
+            ..normalized_params
+        };
+        let contents = self.build_contents(&final_params);
+        let tools = self.build_tools(&final_params);
 
         let mut body = json!({
             "contents": contents,
             "generationConfig": {
-                "maxOutputTokens": params.max_tokens,
+                "maxOutputTokens": final_params.max_tokens,
             },
         });
 
-        if !params.system_prompt.is_empty() {
+        if !final_params.system_prompt.is_empty() {
             body["systemInstruction"] = json!({
-                "parts": [{"text": params.system_prompt}]
+                "parts": [{"text": final_params.system_prompt}]
             });
         }
         if !tools.is_empty() {
             body["tools"] = json!(tools);
         }
-        if let Some(temp) = params.temperature {
+        if let Some(temp) = final_params.temperature {
             body["generationConfig"]["temperature"] = json!(temp);
         }
-        if let Some(ref thinking_config) = params.thinking {
+        if let Some(ref thinking_config) = final_params.thinking {
             body["generationConfig"]["thinkingConfig"] =
                 thinking::to_google_thinking(thinking_config);
         }
 
         let url = format!(
             "{}/models/{}:streamGenerateContent?alt=sse&key={}",
-            self.base_url, params.model, self.api_key
+            self.base_url, final_params.model, self.api_key
         );
 
         tracing::info!(
-            model = %params.model,
-            messages = params.messages.len(),
-            tools = params.tools.len(),
-            max_tokens = params.max_tokens,
+            model = %final_params.model,
+            messages = final_params.messages.len(),
+            tools = final_params.tools.len(),
+            max_tokens = final_params.max_tokens,
             "API request"
         );
 
@@ -134,4 +139,23 @@ impl Provider for GoogleProvider {
         };
         Ok(Box::pin(stream))
     }
+
+    fn classify_error(&self, err: &LoopalError) -> ErrorClass {
+        if let LoopalError::Provider(ProviderError::Api {
+            status: 400,
+            message,
+        }) = err
+            && is_google_context_overflow_keyword(message)
+        {
+            return ErrorClass::ContextOverflow;
+        }
+        default_classify_error(err)
+    }
+}
+
+fn is_google_context_overflow_keyword(message: &str) -> bool {
+    // Gemini API surfaces context-window errors with these substrings.
+    message.contains("token count")
+        || message.contains("exceeds the maximum")
+        || message.contains("input is too long")
 }

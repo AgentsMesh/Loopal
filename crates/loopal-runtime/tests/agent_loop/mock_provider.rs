@@ -113,15 +113,16 @@ pub fn make_runner_with_mock_provider(
 pub fn make_multi_runner(
     calls: Vec<Vec<Result<StreamChunk, LoopalError>>>,
 ) -> (AgentLoopRunner, mpsc::Receiver<AgentEvent>) {
-    make_multi_runner_with_config(calls, AgentConfig::default())
+    let (runner, rx, _) = make_multi_runner_with_intents(calls);
+    (runner, rx)
 }
 
-/// Like `make_multi_runner` but accepts a custom `AgentConfig` (e.g. for
-/// testing with `ThinkingConfig::Disabled`).
-pub fn make_multi_runner_with_config(
+pub type IntentLog =
+    std::sync::Arc<std::sync::Mutex<Vec<Option<loopal_provider_api::ContinuationIntent>>>>;
+
+pub fn make_multi_runner_with_intents(
     calls: Vec<Vec<Result<StreamChunk, LoopalError>>>,
-    config: AgentConfig,
-) -> (AgentLoopRunner, mpsc::Receiver<AgentEvent>) {
+) -> (AgentLoopRunner, mpsc::Receiver<AgentEvent>, IntentLog) {
     let fixture = TestFixture::new();
     let (event_tx, event_rx) = mpsc::channel(64);
     let (_mbox_tx, mailbox_rx) = mpsc::channel::<Envelope>(16);
@@ -136,15 +137,17 @@ pub fn make_multi_runner_with_config(
         Box::new(AutoCancelQuestionHandler),
     ));
     let mut kernel = Kernel::new(Settings::default()).unwrap();
-    kernel.register_provider(Arc::new(MultiCallProvider::new(calls)) as Arc<dyn Provider>);
+    let mock = MultiCallProvider::new(calls);
+    let intents = mock.intents_handle();
+    kernel.register_provider(Arc::new(mock) as Arc<dyn Provider>);
     let params = build_params_with_config(
         Arc::new(kernel),
         frontend,
         &fixture,
         vec![loopal_message::Message::user("go")],
-        config,
+        AgentConfig::default(),
     );
-    (AgentLoopRunner::new(params), event_rx)
+    (AgentLoopRunner::new(params), event_rx, intents)
 }
 
 pub fn make_interactive_multi_runner(

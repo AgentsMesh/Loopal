@@ -28,6 +28,7 @@ mod runner;
 /// Sandbox path pre-check utilities for the tools_check phase.
 /// Public for integration testing; runtime consumers should use tools_check directly.
 pub mod sandbox_precheck;
+mod stop_feedback;
 pub(crate) mod streaming_tool_exec;
 pub(crate) mod token_accumulator;
 mod tool_collect;
@@ -39,11 +40,12 @@ mod tools_inject;
 pub(crate) mod tools_plan;
 mod tools_resolve;
 pub mod turn_context;
-mod turn_continue;
 mod turn_exec;
 pub(crate) mod turn_metrics;
 pub mod turn_observer;
 mod turn_observer_dispatch;
+mod turn_response;
+mod turn_state;
 mod turn_telemetry;
 mod turn_tool_phase;
 

@@ -12,35 +12,20 @@ impl ProviderError {
             ProviderError::RateLimited { .. } => true,
             // Network-level errors (connection reset, timeout, DNS) are transient.
             ProviderError::Http(_) => true,
-            ProviderError::Api { status, message } => {
-                // 400 with context overflow keywords is deterministic — never retryable.
-                // Generic "invalid_request_error" is excluded: it covers many
-                // non-overflow 400s (prefill rejection, malformed blocks, etc.).
-                if *status == 400
-                    && (message.contains("prompt is too long")
-                        || message.contains("maximum context length")
-                        || message.contains("exceed context limit"))
-                {
-                    return false;
-                }
-                matches!(status, 429 | 500 | 502 | 503 | 529)
-            }
+            ProviderError::Api { status, .. } => matches!(status, 429 | 500 | 502 | 503 | 529),
             ProviderError::ContextOverflow { .. } => false,
             _ => false,
         }
     }
 
-    /// Check if this error indicates the prompt exceeded the model's context window.
+    /// Whether the error is a context-window overflow.
+    ///
+    /// Only matches the explicit `ContextOverflow` variant. Each provider's
+    /// `Provider::classify_error` is responsible for translating its own 400-body
+    /// keywords into this classification — keeping protocol-specific text out
+    /// of the generic error layer.
     pub fn is_context_overflow(&self) -> bool {
-        match self {
-            ProviderError::ContextOverflow { .. } => true,
-            ProviderError::Api { status, message } if *status == 400 => {
-                message.contains("prompt is too long")
-                    || message.contains("maximum context length")
-                    || message.contains("exceed context limit")
-            }
-            _ => false,
-        }
+        matches!(self, ProviderError::ContextOverflow { .. })
     }
 
     /// Get the retry-after duration in milliseconds, if this is a rate limit error

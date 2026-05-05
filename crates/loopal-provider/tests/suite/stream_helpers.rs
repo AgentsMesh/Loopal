@@ -14,6 +14,7 @@ pub fn test_chat_params() -> ChatParams {
         max_tokens: 100,
         temperature: None,
         thinking: None,
+        continuation_intent: None,
         debug_dump_dir: None,
     }
 }

@@ -46,6 +46,7 @@ async fn call_classifier_inner(
         max_tokens: 256,
         temperature: Some(0.0),
         thinking: None,
+        continuation_intent: None,
         debug_dump_dir: None,
     };
 

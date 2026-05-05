@@ -9,6 +9,13 @@
 //! is clamped `>= 1`. Cross-network deployment must add receiver-side
 //! policy arbitration (per-hub allow-list, depth-floor from receiver
 //! config) before becoming safe.
+//!
+//! TODO(cross-hub-trust): `no_sandbox` is currently passed through verbatim
+//! from the caller hub. Unlike `permission_mode` this has no UI dependency,
+//! so no clamp is needed on functional grounds — but it grants caller-side
+//! ability to disable the receiver's OS sandbox. Same arbitration story
+//! as `permission_mode`: receiver-side allow-list / per-hub policy must
+//! gate this before cross-hub is production-safe.
 
 use std::path::Path;
 
@@ -23,6 +30,7 @@ pub(crate) struct RemoteSpawnArgs {
     pub agent_type: Option<String>,
     pub depth: Option<u32>,
     pub parent: Option<String>,
+    pub no_sandbox: bool,
 }
 
 /// Validate a cross-hub spawn payload and assemble args using the receiver
@@ -92,5 +100,6 @@ pub(crate) fn prepare_remote_spawn_args(
         agent_type,
         depth,
         parent,
+        no_sandbox: params["no_sandbox"].as_bool().unwrap_or(false),
     })
 }

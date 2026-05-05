@@ -55,6 +55,7 @@ impl ServerMemoryProcessor {
     }
 
     async fn spawn_and_wait(&self, name: &str, prompt: String) -> Result<(), String> {
+        let no_sandbox = self.shared.no_sandbox();
         let params = SpawnParams {
             name: name.to_string(),
             prompt,
@@ -62,6 +63,7 @@ impl ServerMemoryProcessor {
             permission_mode: None,
             agent_type: None,
             depth: self.shared.depth + 1,
+            no_sandbox,
             target: SpawnTarget::InHub {
                 cwd_override: None,
                 fork_context: None,

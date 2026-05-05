@@ -78,7 +78,9 @@ pub async fn bootstrap_hub_and_agent(
             no_sandbox: cli.no_sandbox,
             resume: resume.map(String::from),
             lifecycle: lifecycle_str.map(String::from),
-            ..Default::default()
+            agent_type: None,
+            depth: None,
+            fork_context: None,
         })
         .await?;
 

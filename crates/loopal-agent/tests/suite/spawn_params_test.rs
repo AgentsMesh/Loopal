@@ -12,6 +12,7 @@ fn base_params(target: SpawnTarget) -> SpawnParams {
         permission_mode: Some("supervised".into()),
         agent_type: None,
         depth: 1,
+        no_sandbox: false,
         target,
     }
 }
@@ -83,4 +84,39 @@ fn crosshub_still_carries_advisory_fields() {
     assert_eq!(req["permission_mode"], "supervised");
     assert_eq!(req["model"], "claude-opus-4-7");
     assert_eq!(req["depth"], 1);
+}
+
+#[test]
+fn inhub_propagates_no_sandbox_true() {
+    let parent_cwd = PathBuf::from("/parent/dir");
+    let mut params = base_params(SpawnTarget::InHub {
+        cwd_override: None,
+        fork_context: None,
+    });
+    params.no_sandbox = true;
+    let req = build_spawn_request(&params, &parent_cwd);
+    assert_eq!(req["no_sandbox"], true);
+}
+
+#[test]
+fn inhub_propagates_no_sandbox_false() {
+    let parent_cwd = PathBuf::from("/parent/dir");
+    let params = base_params(SpawnTarget::InHub {
+        cwd_override: None,
+        fork_context: None,
+    });
+    let req = build_spawn_request(&params, &parent_cwd);
+    assert_eq!(req["no_sandbox"], false);
+}
+
+#[test]
+fn crosshub_propagates_no_sandbox() {
+    let parent_cwd = PathBuf::from("/parent/dir");
+    let mut params = base_params(SpawnTarget::CrossHub {
+        hub_id: "hub-b".into(),
+    });
+    params.no_sandbox = true;
+    let req = build_spawn_request(&params, &parent_cwd);
+    // Behavior flag — not filesystem-coupled, so it crosses hub boundaries.
+    assert_eq!(req["no_sandbox"], true);
 }

@@ -22,6 +22,7 @@ pub async fn spawn_and_register(
     agent_type: Option<String>,
     depth: Option<u32>,
     fork_context: Option<serde_json::Value>,
+    no_sandbox: bool,
 ) -> Result<String, String> {
     // Pre-check budget BEFORE spawning process to avoid orphans.
     if parent.is_some() {
@@ -57,11 +58,12 @@ pub async fn spawn_and_register(
             mode: Some("act".to_string()),
             prompt,
             permission_mode,
+            no_sandbox,
+            resume: None,
             lifecycle: Some("ephemeral".to_string()), // sub-agents always exit on idle
             agent_type,
             depth,
             fork_context,
-            ..Default::default()
         })
         .await
     {

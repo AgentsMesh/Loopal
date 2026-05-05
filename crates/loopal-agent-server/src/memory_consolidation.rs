@@ -32,6 +32,7 @@ pub fn trigger_consolidation(shared: &Arc<AgentShared>, model: &str) {
         let today = loopal_memory::date::today_str();
         let name = ServerMemoryProcessor::make_agent_name("memory-consolidation");
         let prompt = format!("{MEMORY_CONSOLIDATION_PROMPT}\n\nToday: {today}");
+        let no_sandbox = shared.no_sandbox();
         let params = SpawnParams {
             name: name.clone(),
             prompt,
@@ -39,6 +40,7 @@ pub fn trigger_consolidation(shared: &Arc<AgentShared>, model: &str) {
             permission_mode: None,
             agent_type: None,
             depth: shared.depth + 1,
+            no_sandbox,
             target: SpawnTarget::InHub {
                 cwd_override: None,
                 fork_context: None,

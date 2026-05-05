@@ -55,6 +55,7 @@ async fn spawn_local(
     let agent_type = params["agent_type"].as_str().map(String::from);
     let depth = params["depth"].as_u64().map(|v| v as u32);
     let fork_context = params.get("fork_context").cloned();
+    let no_sandbox = params["no_sandbox"].as_bool().unwrap_or(false);
     let parent = params["parent"]
         .as_str()
         .map(String::from)
@@ -72,6 +73,7 @@ async fn spawn_local(
         agent_type,
         depth,
         fork_context,
+        no_sandbox,
     )
     .await
 }
@@ -99,6 +101,7 @@ pub async fn handle_spawn_remote_agent(
         args.agent_type,
         args.depth,
         None,
+        args.no_sandbox,
     )
     .await
 }
@@ -115,6 +118,7 @@ pub(super) async fn spawn_via_manager(
     agent_type: Option<String>,
     depth: Option<u32>,
     fork_context: Option<Value>,
+    no_sandbox: bool,
 ) -> Result<Value, String> {
     let name_clone = name.clone();
     // Detached on purpose: spawn_and_register may have already forked a
@@ -133,6 +137,7 @@ pub(super) async fn spawn_via_manager(
             agent_type,
             depth,
             fork_context,
+            no_sandbox,
         )
         .await
     });

@@ -24,7 +24,7 @@ use crate::fixture::TestFixture;
 /// The returned `Arc<AgentShared>` can be used for post-execution assertions
 /// (e.g., checking the scheduler's task list after a CronCreate call).
 pub fn agent_tool_context(fixture: &TestFixture) -> (ToolContext, Arc<AgentShared>) {
-    agent_tool_context_inner(fixture, Arc::new(CronScheduler::new()))
+    agent_tool_context_inner(fixture, Arc::new(CronScheduler::new()), Settings::default())
 }
 
 /// Variant with a custom `CronScheduler` (e.g., one using `ManualClock`).
@@ -32,14 +32,24 @@ pub fn agent_tool_context_with_scheduler(
     fixture: &TestFixture,
     scheduler: Arc<CronScheduler>,
 ) -> (ToolContext, Arc<AgentShared>) {
-    agent_tool_context_inner(fixture, scheduler)
+    agent_tool_context_inner(fixture, scheduler, Settings::default())
+}
+
+/// Variant with custom `Settings`. Use to test paths that depend on
+/// `kernel.settings()` (e.g., sandbox policy, model routing).
+pub fn agent_tool_context_with_settings(
+    fixture: &TestFixture,
+    settings: Settings,
+) -> (ToolContext, Arc<AgentShared>) {
+    agent_tool_context_inner(fixture, Arc::new(CronScheduler::new()), settings)
 }
 
 fn agent_tool_context_inner(
     fixture: &TestFixture,
     scheduler: Arc<CronScheduler>,
+    settings: Settings,
 ) -> (ToolContext, Arc<AgentShared>) {
-    let mut kernel = Kernel::new(Settings::default()).unwrap();
+    let mut kernel = Kernel::new(settings).unwrap();
     loopal_agent::tools::register_all(&mut kernel);
     let kernel = Arc::new(kernel);
 

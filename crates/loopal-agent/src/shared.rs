@@ -131,4 +131,14 @@ impl AgentShared {
             bg_tasks,
         }
     }
+
+    /// Single source of truth for spawn paths that need to propagate
+    /// the flag to children — derived from `kernel.settings()` so it
+    /// reflects post-`apply_start_overrides` state, not just config files.
+    pub fn no_sandbox(&self) -> bool {
+        matches!(
+            self.kernel.settings().sandbox.policy,
+            loopal_config::SandboxPolicy::Disabled
+        )
+    }
 }

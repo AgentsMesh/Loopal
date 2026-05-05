@@ -177,7 +177,6 @@ fn detach_from_tty(cmd: &mut Command) {
 
 #[cfg(windows)]
 fn detach_from_tty(cmd: &mut Command) {
-    use std::os::windows::process::CommandExt as _;
     const DETACHED_PROCESS: u32 = 0x0000_0008;
     const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
     cmd.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);

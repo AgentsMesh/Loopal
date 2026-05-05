@@ -1,3 +1,4 @@
+use std::os::windows::io::AsRawHandle as _;
 use std::time::Duration;
 
 use anyhow::{Context as _, Result};
@@ -9,6 +10,17 @@ use tracing::{debug, warn};
 use super::windows_sid::query_user_sid;
 
 const FETCH_TIMEOUT: Duration = Duration::from_secs(5);
+
+unsafe extern "system" {
+    fn GetNamedPipeClientProcessId(pipe: *mut std::ffi::c_void, pid: *mut u32) -> i32;
+}
+
+fn client_process_id(server: &NamedPipeServer) -> Option<u32> {
+    let handle = server.as_raw_handle() as *mut std::ffi::c_void;
+    let mut pid: u32 = 0;
+    let ok = unsafe { GetNamedPipeClientProcessId(handle, &mut pid) };
+    if ok != 0 { Some(pid) } else { None }
+}
 
 fn pipe_name(pid: u32) -> String {
     format!(r"\\.\pipe\loopal-hub-{pid}")
@@ -77,10 +89,10 @@ pub async fn fetch_token(pid: u32) -> Result<String> {
 }
 
 async fn serve_token(token: &str, mut server: NamedPipeServer) {
-    let client_pid = match server.client_process_id() {
-        Ok(p) => p,
-        Err(e) => {
-            warn!(error = %e, "GetNamedPipeClientProcessId failed; denying");
+    let client_pid = match client_process_id(&server) {
+        Some(p) => p,
+        None => {
+            warn!("GetNamedPipeClientProcessId failed; denying");
             let _ = server.shutdown().await;
             return;
         }

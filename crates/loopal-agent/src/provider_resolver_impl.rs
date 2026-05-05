@@ -31,6 +31,7 @@ impl OneShotChatService for AgentShared {
             max_tokens,
             temperature: Some(0.0),
             thinking: None,
+            continuation_intent: None,
             debug_dump_dir: None,
         };
         let result = tokio::time::timeout(ONE_SHOT_TIMEOUT, async {

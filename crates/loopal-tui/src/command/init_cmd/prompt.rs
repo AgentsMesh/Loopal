@@ -4,30 +4,48 @@ use std::path::Path;
 
 const INIT_PROMPT: &str = r#"Analyze this project and generate a comprehensive LOOPAL.md file.
 
-## Steps
+## Phase 1: Quick orientation
 
-1. **Detect project type**: Use Ls to scan the root directory. Look for:
-   - Cargo.toml (Rust), package.json (Node.js), pyproject.toml / setup.py (Python),
-     go.mod (Go), Makefile, CMakeLists.txt, pom.xml, build.gradle, Gemfile, etc.
+Use Ls on the project root. Identify:
+- Project type from manifest files (Cargo.toml / package.json / pyproject.toml /
+  setup.py / go.mod / Makefile / CMakeLists.txt / pom.xml / build.gradle / Gemfile)
+- Top-level source / module directories
+- Existing AI-tool config files (CLAUDE.md, AGENTS.md, .cursor/rules/, .cursorrules,
+  .github/copilot-instructions.md) — they often contain useful but possibly stale info
 
-2. **Read config files**: Read the detected build/config files to extract:
-   - Project name and version
-   - Build commands (build, test, lint, format, type-check)
-   - Dependency management approach
-   - Any workspace/monorepo structure
+## Phase 2: Deep exploration
 
-3. **Analyze project structure**: Use Ls on key directories (src/, lib/, tests/, etc.)
-   - Identify module layout and layering
-   - Note entry points (main.rs, index.ts, main.py, etc.)
-   - Estimate code organization pattern (flat, layered, feature-based, etc.)
+**Choose ONE branch based on what Phase 1 found:**
 
-4. **Identify code conventions**: Read 2-3 representative source files to observe:
-   - Naming style (snake_case, camelCase, PascalCase)
-   - File organization patterns
-   - Comment language (English, Chinese, etc.) and style
-   - Config files like .editorconfig, rustfmt.toml, .eslintrc, .prettierrc, etc.
+### Branch A — Small single-stack project
+(One manifest, ≤2 top-level source directories.)
 
-## Output
+Continue inline with Read/Grep on:
+- The build/config file(s) you detected — extract project name, version, and the
+  build / test / lint / format / type-check commands
+- 2-3 representative source files to observe naming style, file organization,
+  comment language (English / Chinese / etc.)
+- Style configs if present: .editorconfig, rustfmt.toml, .eslintrc, .prettierrc
+
+### Branch B — Medium / large project
+(≥3 top-level source directories OR multiple language stacks like iOS + Go + TS.)
+
+**You MUST spawn parallel `explore` sub-agents** — one per major area — in a
+single message with multiple Agent tool uses. Each sub-agent should report:
+- Build / test / lint commands specific to that area
+- Naming conventions and file-organization patterns observed
+- Module boundaries, key entry points, and notable internal APIs
+- Area-specific gotchas (env vars, build prerequisites, codegen steps)
+
+Wait for all sub-agents to return, then aggregate their findings before writing.
+
+## Phase 3: Read shared root configs
+
+Independently of Phase 2, read once at the root level: README, top-level Makefile
+(if present), root package manifest, and the existing CLAUDE.md / AGENTS.md
+contents (borrow but verify — these can be stale).
+
+## Phase 4: Write LOOPAL.md
 
 Use the **Write** tool to write the result to: `{path}/LOOPAL.md`
 

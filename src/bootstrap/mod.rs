@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use clap::Parser;
 
 use loopal_config::load_config;
@@ -7,13 +5,25 @@ use loopal_config::load_config;
 use crate::cli::Cli;
 
 mod acp;
+mod attach_bridge;
 mod attach_mode;
+mod discovery;
 mod hub_bootstrap;
+mod hub_cli;
+mod hub_only;
+mod hub_spawn;
 mod meta_hub;
 mod multiprocess;
 mod server_mode;
 mod sub_agent_resume;
+mod token_channel;
 mod uplink_bootstrap;
+mod worktree_session;
+
+use worktree_session::{
+    cleanup_session_worktree, create_session_worktree, print_detach_worktree_info,
+    print_error_worktree_info, print_resume_info, resolve_resume_for_cwd,
+};
 
 pub async fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
@@ -23,12 +33,32 @@ pub async fn run() -> anyhow::Result<()> {
     if let Some(repo_root) = loopal_git::repo_root(&cwd) {
         loopal_git::cleanup_stale_worktrees(&repo_root);
     }
+    discovery::cleanup_stale();
 
     let mut config = load_config(&cwd)?;
     cli.apply_overrides(&mut config.settings);
 
+    if cli.list_hubs {
+        hub_cli::run_list_hubs();
+        return Ok(());
+    }
+    if let Some(pid) = cli.kill_hub {
+        return hub_cli::run_kill_hub(pid).await;
+    }
+    if let Some(pid) = cli.attach_hub_pid {
+        return hub_cli::run_attach_pid(&cwd, &config, pid).await;
+    }
+
     if let Some(ref bind_addr) = cli.meta_hub {
         return meta_hub::run(bind_addr).await;
+    }
+
+    if cli.hub_only {
+        let resume = match cli.resume_intent() {
+            Some(crate::cli::ResumeIntent::Specific(id)) => Some(id),
+            _ => None,
+        };
+        return hub_only::run(&cli, &cwd, &config, resume.as_deref()).await;
     }
 
     if let Some(ref hub_addr) = cli.attach_hub {
@@ -54,7 +84,6 @@ pub async fn run() -> anyhow::Result<()> {
         return server_mode::run(&cli, &cwd, &config).await;
     }
 
-    // Worktree isolation: create worktree before agent starts, clean up after.
     let worktree = if cli.worktree {
         Some(create_session_worktree(&cwd)?)
     } else {
@@ -65,7 +94,6 @@ pub async fn run() -> anyhow::Result<()> {
         .map(|wt| wt.info.path.clone())
         .unwrap_or_else(|| cwd.clone());
 
-    // Resolve resume intent to a concrete session ID.
     let resume_session_id = match cli.resume_intent() {
         None => None,
         Some(crate::cli::ResumeIntent::Specific(id)) => Some(id),
@@ -75,94 +103,25 @@ pub async fn run() -> anyhow::Result<()> {
     let result =
         multiprocess::run(&cli, &effective_cwd, &config, resume_session_id.as_deref()).await;
 
-    // Clean up worktree: remove if no changes, keep otherwise.
-    // Note: If the process is killed by SIGKILL or panics, this cleanup won't run.
-    // Stale worktrees are caught by `cleanup_stale_worktrees()` on the next startup.
-    let worktree_kept = match worktree.as_ref() {
-        Some(wt) if !cleanup_session_worktree(wt) => Some(wt),
+    let worktree_kept = match (worktree.as_ref(), &result) {
+        (Some(wt), Ok(None)) => Some(wt),
+        (Some(wt), _) if !cleanup_session_worktree(wt) => Some(wt),
         _ => None,
     };
-    if let Ok(ref session_id) = result {
-        print_resume_info(session_id, worktree_kept);
+    match &result {
+        Ok(Some(session_id)) => print_resume_info(session_id, worktree_kept),
+        Ok(None) => print_detach_worktree_info(worktree_kept),
+        Err(_) => print_error_worktree_info(worktree_kept),
     }
 
     result.map(|_| ())
 }
 
-/// Holds worktree info for cleanup on exit.
-struct SessionWorktree {
-    info: loopal_git::WorktreeInfo,
-    repo_root: PathBuf,
-}
-
-fn create_session_worktree(cwd: &std::path::Path) -> anyhow::Result<SessionWorktree> {
-    let repo_root = loopal_git::repo_root(cwd)
-        .ok_or_else(|| anyhow::anyhow!("--worktree requires a git repository"))?;
-    let name = format!("session-{}", &uuid::Uuid::new_v4().to_string()[..8]);
-    let info = loopal_git::create_worktree(&repo_root, &name)
-        .map_err(|e| anyhow::anyhow!("failed to create worktree: {e}"))?;
-    tracing::info!(worktree = %info.path.display(), branch = %info.branch, "session worktree created");
-    Ok(SessionWorktree { info, repo_root })
-}
-
-fn cleanup_session_worktree(wt: &SessionWorktree) -> bool {
-    let removed = loopal_git::cleanup_if_clean(&wt.repo_root, &wt.info);
-    if removed {
-        tracing::info!("session worktree removed (no changes)");
-    } else {
-        tracing::info!(
-            worktree = %wt.info.path.display(),
-            "worktree has changes, keeping for manual review"
-        );
-    }
-    removed
-}
-
-/// Print session resume instructions to stderr after TUI exits.
-fn print_resume_info(session_id: &str, worktree: Option<&SessionWorktree>) {
-    eprintln!();
-    eprintln!("To resume this session:");
-    eprintln!("  loopal --resume {session_id}");
-    if let Some(wt) = worktree {
-        let display = abbreviate_home(&wt.info.path);
-        eprintln!();
-        eprintln!("Session worktree: {display}");
-        eprintln!("  cd {display} && loopal --resume {session_id}");
-    }
-}
-
-/// Replace the home directory prefix with `~` for compact display.
-fn abbreviate_home(path: &std::path::Path) -> String {
+pub(crate) fn abbreviate_home(path: &std::path::Path) -> String {
     if let Some(home) = dirs::home_dir()
         && let Ok(rel) = path.strip_prefix(&home)
     {
         return format!("~/{}", rel.display());
     }
     path.display().to_string()
-}
-
-/// Resolve `--resume` (no session ID) to the latest session for the given cwd.
-/// Returns `Some(session_id)` if found, `None` if no matching session exists.
-fn resolve_resume_for_cwd(cwd: &std::path::Path) -> Option<String> {
-    let sm = match loopal_runtime::SessionManager::new() {
-        Ok(sm) => sm,
-        Err(e) => {
-            tracing::warn!("failed to create session manager for resume: {e}");
-            return None;
-        }
-    };
-    match sm.latest_session_for_cwd(cwd) {
-        Ok(Some(session)) => {
-            tracing::info!(session_id = %session.id, "auto-resuming latest session for cwd");
-            Some(session.id)
-        }
-        Ok(None) => {
-            tracing::info!("no previous session found for cwd, starting fresh");
-            None
-        }
-        Err(e) => {
-            tracing::warn!("failed to query sessions for resume: {e}");
-            None
-        }
-    }
 }

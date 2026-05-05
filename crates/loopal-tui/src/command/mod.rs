@@ -2,8 +2,10 @@
 
 mod agent_cmd;
 mod builtin;
+mod detach_hub_cmd;
 mod help_cmd;
 pub(crate) mod init_cmd;
+mod kill_hub_cmd;
 mod mcp_cmd;
 mod model_cmd;
 pub mod registry;
@@ -29,8 +31,11 @@ pub enum CommandEffect {
     InboxPush(UserContent),
     /// Switch agent mode (plan / act).
     ModeSwitch(AgentMode),
-    /// Exit the application.
+    /// Exit the application — Hub may have been shut down by the command.
     Quit,
+    /// Exit the TUI process while leaving Hub & agents running. Bootstrap
+    /// uses this to print a re-attach hint after terminal restoration.
+    Detach,
     /// Resume a persisted session by ID (hot-swap agent context).
     ResumeSession(String),
 }

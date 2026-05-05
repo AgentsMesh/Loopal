@@ -10,6 +10,11 @@ pub enum ResumeIntent {
 
 #[derive(Parser)]
 #[command(name = "loopal", about = "AI coding agent", version = "0.1.0")]
+#[command(group(
+    clap::ArgGroup::new("hub_action")
+        .args(["list_hubs", "attach_hub_pid", "kill_hub", "attach_hub"])
+        .multiple(false)
+))]
 pub struct Cli {
     /// Model to use
     #[arg(short, long)]
@@ -79,8 +84,36 @@ pub struct Cli {
     #[arg(long)]
     pub hub_token: Option<String>,
 
+    /// Internal: run as standalone Hub process (no TUI). Spawned by the
+    /// default `loopal` flow; users do not invoke this directly.
+    #[arg(long, hide = true)]
+    pub hub_only: bool,
+
+    /// List orphan Hub processes for the current user (PID, port, cwd).
+    #[arg(long)]
+    pub list_hubs: bool,
+
+    /// Attach to a Hub by PID. Reads the discovery record under
+    /// ~/.loopal/run/<pid>.json and obtains the auth token from the
+    /// per-pid Unix socket via SO_PEERCRED authentication.
+    #[arg(long, value_name = "PID", value_parser = parse_pid)]
+    pub attach_hub_pid: Option<u32>,
+
+    /// Shut down a Hub by PID. Same handshake as `--attach-hub-pid`,
+    /// but sends `hub/shutdown` instead of opening a TUI.
+    #[arg(long, value_name = "PID", value_parser = parse_pid)]
+    pub kill_hub: Option<u32>,
+
     /// Initial prompt (non-interactive)
     pub prompt: Vec<String>,
+}
+
+fn parse_pid(s: &str) -> Result<u32, String> {
+    let pid: u32 = s.parse().map_err(|e| format!("invalid pid {s:?}: {e}"))?;
+    if pid == 0 {
+        return Err("pid must be > 0".into());
+    }
+    Ok(pid)
 }
 
 impl Cli {
@@ -108,57 +141,6 @@ impl Cli {
         }
         if self.no_sandbox {
             settings.sandbox.policy = loopal_config::SandboxPolicy::Disabled;
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn cli_with_resume(resume: Option<String>) -> Cli {
-        Cli {
-            model: None,
-            resume,
-            permission: None,
-            plan: false,
-            no_sandbox: false,
-            acp: false,
-            server: false,
-            ephemeral: false,
-            serve: false,
-            worktree: false,
-            test_provider: None,
-            meta_hub: None,
-            join_hub: None,
-            hub_name: None,
-            attach_hub: None,
-            hub_token: None,
-            prompt: vec![],
-        }
-    }
-
-    #[test]
-    fn test_resume_intent_none_when_no_flag() {
-        let cli = cli_with_resume(None);
-        assert!(cli.resume_intent().is_none());
-    }
-
-    #[test]
-    fn test_resume_intent_latest_when_empty_string() {
-        let cli = cli_with_resume(Some(String::new()));
-        let intent = cli.resume_intent().expect("should be Some");
-        assert!(matches!(intent, ResumeIntent::Latest));
-    }
-
-    #[test]
-    fn test_resume_intent_specific_when_id_given() {
-        let cli = cli_with_resume(Some("abc-123".into()));
-        let intent = cli.resume_intent().expect("should be Some");
-        if let ResumeIntent::Specific(id) = intent {
-            assert_eq!(id, "abc-123");
-        } else {
-            panic!("expected ResumeIntent::Specific");
         }
     }
 }

@@ -13,10 +13,13 @@ pub use types::*;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 use std::time::Instant;
 
 use indexmap::IndexMap;
 use loopal_protocol::{BgTaskDetail, ImageAttachment, UserContent};
+pub use loopal_session::HubReconnectInfo;
 use loopal_session::SessionController;
 
 use crate::command::CommandRegistry;
@@ -58,6 +61,24 @@ pub struct App {
     pub session: SessionController,
     pub content_scroll: ContentScroll,
     pub transient_status: Option<(String, Instant)>,
+
+    /// Bootstrap stashes the Hub addr+token here so a `/detach-hub`
+    /// exit can print a re-attach command after terminal restoration.
+    pub hub_reconnect_info: Option<HubReconnectInfo>,
+    /// Set by `/detach-hub` before triggering `CommandEffect::Quit`.
+    /// Bootstrap reads it post-`run_tui` to choose between the silent
+    /// resume banner and the loud detach banner.
+    pub detach_requested: bool,
+    /// Set by `/exit` and `/kill-hub` to mark a user-initiated Hub
+    /// shutdown. Lets bootstrap distinguish a clean kill (silent
+    /// post-exit) from an unexpected `connection_lost` (loud "Hub
+    /// crashed" warning).
+    pub shutdown_initiated: bool,
+    /// Flipped to `true` when the bootstrap-side bridge detects the
+    /// Hub TCP connection closing. Shared with the bridge task via Arc.
+    /// `attach_mode` reads it post-`run_tui` to suppress the misleading
+    /// "Hub continues running" message when Hub has actually died.
+    pub hub_connection_lost: Arc<AtomicBool>,
 }
 
 impl App {
@@ -104,6 +125,10 @@ impl App {
             session,
             content_scroll: ContentScroll::new(),
             transient_status: None,
+            hub_reconnect_info: None,
+            detach_requested: false,
+            shutdown_initiated: false,
+            hub_connection_lost: Arc::new(AtomicBool::new(false)),
         }
     }
 

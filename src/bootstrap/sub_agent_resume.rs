@@ -1,12 +1,19 @@
 //! Sub-agent session persistence and resume.
 //!
-//! Records sub-agent session references in the root session metadata so that
-//! sub-agent conversation history can be restored when resuming a session.
+//! `load_sub_agent_histories` reads sub-agent refs persisted by the Hub
+//! process and seeds TUI display state on resume.
+//!
+//! `hub_persist_watcher` runs in the Hub-only process: it subscribes to
+//! the Hub's event broadcast and writes a `SubAgentRef` to disk every
+//! time a sub-agent is spawned.
 
-use loopal_protocol::project_messages;
-use loopal_session::SessionController;
+use loopal_protocol::{AgentEventPayload, project_messages};
+use loopal_session::ROOT_AGENT;
 use loopal_storage::SubAgentRef;
+use tokio::sync::broadcast;
 use tracing::warn;
+
+use loopal_protocol::AgentEvent;
 
 /// Load sub-agent conversation histories from their persisted sessions.
 pub fn load_sub_agent_histories(
@@ -38,32 +45,66 @@ pub fn load_sub_agent_histories(
     }
 }
 
-/// Background loop: drain pending sub-agent refs and persist to disk.
+/// Hub-side persistence watcher.
 ///
-/// Runs until the tokio runtime shuts down (when `run_tui` returns).
-/// Holds an `Arc` clone of `SessionController`, so it won't outlive the state.
-pub async fn persist_sub_agent_refs_loop(ctrl: SessionController) {
-    let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
+/// Subscribes to the Hub event broadcast and writes a `SubAgentRef` to
+/// disk every time a sub-agent is spawned. Tracks `root_session_id` so
+/// that mid-session `/resume` of the root agent (which changes its
+/// session id) routes subsequent sub-agents to the new root.
+pub async fn hub_persist_watcher(
+    mut events: broadcast::Receiver<AgentEvent>,
+    initial_root_session_id: String,
+) {
+    let mut root_session_id = initial_root_session_id;
+    let session_manager = match loopal_runtime::SessionManager::new() {
+        Ok(sm) => sm,
+        Err(e) => {
+            warn!(error = %e, "hub persister: SessionManager init failed; sub-agents will not be persisted");
+            return;
+        }
+    };
     loop {
-        interval.tick().await;
-        if let Some((root_id, refs)) = ctrl.drain_pending_sub_agent_refs() {
-            let Ok(mgr) = loopal_runtime::SessionManager::new() else {
+        let event = match events.recv().await {
+            Ok(event) => event,
+            Err(broadcast::error::RecvError::Closed) => return,
+            Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                warn!(skipped, "hub persister: event stream lagged");
                 continue;
-            };
-            for r in refs {
+            }
+        };
+        match &event.payload {
+            AgentEventPayload::SessionResumed { session_id, .. } => {
+                let is_root = event
+                    .agent_name
+                    .as_ref()
+                    .map(|q| q.agent.as_str())
+                    .unwrap_or("")
+                    == ROOT_AGENT;
+                if is_root && !session_id.is_empty() {
+                    root_session_id = session_id.clone();
+                }
+            }
+            AgentEventPayload::SubAgentSpawned {
+                name,
+                session_id: Some(sid),
+                parent,
+                model,
+                ..
+            } => {
                 let sub_ref = SubAgentRef {
-                    name: r.name.clone(),
-                    session_id: r.session_id.clone(),
-                    parent: r.parent.clone(),
-                    model: r.model.clone(),
+                    name: name.clone(),
+                    session_id: sid.clone(),
+                    parent: parent.as_ref().map(|p| p.to_string()),
+                    model: model.clone(),
                 };
-                if let Err(e) = mgr.add_sub_agent(&root_id, sub_ref) {
-                    tracing::warn!(
-                        agent = %r.name, error = %e,
-                        "failed to persist sub-agent ref"
+                if let Err(e) = session_manager.add_sub_agent(&root_session_id, sub_ref) {
+                    warn!(
+                        agent = %name, error = %e,
+                        "hub persister: failed to persist sub-agent ref"
                     );
                 }
             }
+            _ => {}
         }
     }
 }

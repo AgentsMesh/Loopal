@@ -2,10 +2,10 @@
 //!
 //! Per-agent state (conversation, observable, tasks, crons, bg_tasks,
 //! mode, model) is owned by the per-agent `ViewClient` — `SessionState`
-//! only tracks active_view, root_session_id, mcp_status, and
-//! sub-agent ref persistence. Every variant of `AgentEventPayload` is
-//! listed explicitly so a future variant addition triggers a compile
-//! error here, forcing a deliberate decision.
+//! only tracks active_view, root_session_id, and mcp_status. Every
+//! variant of `AgentEventPayload` is listed explicitly so a future
+//! variant addition triggers a compile error here, forcing a
+//! deliberate decision.
 
 use loopal_protocol::{AgentEvent, AgentEventPayload};
 
@@ -13,23 +13,6 @@ use crate::state::{ROOT_AGENT, SessionState};
 
 pub fn apply_event(state: &mut SessionState, event: AgentEvent) {
     match &event.payload {
-        AgentEventPayload::SubAgentSpawned {
-            name,
-            parent,
-            model,
-            session_id: Some(sid),
-            ..
-        } => {
-            state
-                .pending_sub_agent_refs
-                .push(crate::state::PendingSubAgentRef {
-                    name: name.clone(),
-                    session_id: sid.clone(),
-                    parent: parent.as_ref().map(|p| p.to_string()),
-                    model: model.clone(),
-                });
-        }
-        AgentEventPayload::SubAgentSpawned { .. } => {}
         AgentEventPayload::SessionResumed { session_id, .. } => {
             state.root_session_id = Some(session_id.clone());
         }
@@ -48,7 +31,8 @@ pub fn apply_event(state: &mut SessionState, event: AgentEvent) {
             }
         }
         // Per-agent events handled by ViewClient reducer.
-        AgentEventPayload::Started
+        AgentEventPayload::SubAgentSpawned { .. }
+        | AgentEventPayload::Started
         | AgentEventPayload::Running
         | AgentEventPayload::AwaitingInput
         | AgentEventPayload::Interrupted

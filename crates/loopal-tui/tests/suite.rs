@@ -20,6 +20,10 @@ mod crons_panel_test;
 mod crons_provider_test;
 #[path = "suite/cycle_focus_test.rs"]
 mod cycle_focus_test;
+#[path = "suite/detach_exit_info_test.rs"]
+mod detach_exit_info_test;
+#[path = "suite/detach_hub_cmd_test.rs"]
+mod detach_hub_cmd_test;
 #[path = "suite/enter_panel_test.rs"]
 mod enter_panel_test;
 #[path = "suite/event_forwarding_test.rs"]
@@ -44,6 +48,8 @@ mod input_scroll_edge_test;
 mod input_scroll_test;
 #[path = "suite/input_test.rs"]
 mod input_test;
+#[path = "suite/kill_hub_cmd_test.rs"]
+mod kill_hub_cmd_test;
 #[path = "suite/line_cache_test.rs"]
 mod line_cache_test;
 #[path = "suite/markdown_code_test.rs"]

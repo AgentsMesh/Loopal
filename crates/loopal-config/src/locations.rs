@@ -107,6 +107,16 @@ pub fn session_dir(id: &str) -> Result<PathBuf, ConfigError> {
     Ok(sessions_dir()?.join(id))
 }
 
+/// Returns the runtime data directory: ~/.loopal/run/
+/// Used for hub discovery records (`<pid>.json`) and per-pid Unix
+/// sockets used for token handoff. Falls back to volatile temp dir
+/// when the home directory is unavailable.
+pub fn run_dir() -> PathBuf {
+    global_config_dir()
+        .map(|d| d.join("run"))
+        .unwrap_or_else(|_| volatile_dir().join("run"))
+}
+
 /// Returns the tasks directory for a session: ~/.loopal/sessions/{id}/tasks/
 pub fn session_tasks_dir(id: &str) -> Result<PathBuf, ConfigError> {
     Ok(session_dir(id)?.join("tasks"))

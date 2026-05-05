@@ -1,8 +1,7 @@
-//! Agent operations on SessionController: message routing, connection management.
-
 use loopal_protocol::UserContent;
 
 use crate::controller::SessionController;
+use crate::controller_ops::ControlBackend;
 use crate::state::ROOT_AGENT;
 
 impl SessionController {
@@ -12,9 +11,32 @@ impl SessionController {
         self.backend.route_to_agent(&target, content).await;
     }
 
-    /// List all agents with their connection state labels.
+    /// List all agents with their connection state labels. Queries the
+    /// Hub via `hub/list_agents` IPC. Returns empty for non-Hub backends.
     pub async fn list_agents(&self) -> Vec<(String, &'static str)> {
-        self.connections().lock().await.registry.list_agents()
+        let ControlBackend::Hub(client) = self.backend.as_ref() else {
+            return Vec::new();
+        };
+        let Ok(resp) = client.list_agents().await else {
+            return Vec::new();
+        };
+        resp.get("agents")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| {
+                        let name = v.get("name")?.as_str()?.to_string();
+                        let state = match v.get("state")?.as_str()? {
+                            "local" => "local",
+                            "connected" => "connected",
+                            "shadow" => "shadow",
+                            _ => "unknown",
+                        };
+                        Some((name, state))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     /// Switch the active view to `name`. Returns `false` if `name` is

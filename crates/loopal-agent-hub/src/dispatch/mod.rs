@@ -11,6 +11,7 @@ use crate::hub::Hub;
 mod cross_hub_forward;
 mod dispatch_handlers;
 mod relay_response_handlers;
+mod shutdown_handler;
 mod spawn_prepare;
 #[cfg(test)]
 #[path = "spawn_prepare_test.rs"]
@@ -29,6 +30,7 @@ pub async fn dispatch_hub_request(
 ) -> Result<Value, String> {
     use dispatch_handlers::*;
     use relay_response_handlers::{handle_permission_response, handle_question_response};
+    use shutdown_handler::handle_hub_shutdown;
     use spawn_routing::{handle_spawn_agent, handle_spawn_remote_agent};
     use status_handler::handle_status;
     use topology_handlers::*;
@@ -40,6 +42,7 @@ pub async fn dispatch_hub_request(
         m if m == methods::HUB_CONTROL.name => handle_control(hub, params).await,
         m if m == methods::HUB_INTERRUPT.name => handle_interrupt(hub, params).await,
         m if m == methods::HUB_SHUTDOWN_AGENT.name => handle_shutdown_agent(hub, params).await,
+        m if m == methods::HUB_SHUTDOWN.name => handle_hub_shutdown(hub).await,
         m if m == methods::HUB_PERMISSION_RESPONSE.name => {
             handle_permission_response(hub, params).await
         }

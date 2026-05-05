@@ -40,7 +40,7 @@ pub(crate) async fn push_to_inbox(app: &mut App, content: UserContent) {
     app.session.route_message(content).await;
 }
 
-pub(crate) async fn handle_effect(app: &mut App, effect: CommandEffect) -> bool {
+pub async fn handle_effect(app: &mut App, effect: CommandEffect) -> bool {
     match effect {
         CommandEffect::Done => false,
         CommandEffect::InboxPush(content) => {
@@ -52,6 +52,11 @@ pub(crate) async fn handle_effect(app: &mut App, effect: CommandEffect) -> bool 
             false
         }
         CommandEffect::Quit => {
+            app.exiting = true;
+            true
+        }
+        CommandEffect::Detach => {
+            app.detach_requested = true;
             app.exiting = true;
             true
         }

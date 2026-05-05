@@ -28,12 +28,9 @@ async fn open_status_page(app: &mut App) {
     let (mut session, usage) = collect_session_data(app);
     let config = collect_config_snapshot(app);
 
-    // Hub listener info requires async lock — resolve outside the sync session lock.
-    if let Some(port) = app.session.hub_listener_port().await {
-        session.hub_endpoint = format!("127.0.0.1:{port}");
-    }
-    if let Some(token) = app.session.hub_listener_token().await {
-        session.hub_token = token;
+    if let Some(info) = &app.hub_reconnect_info {
+        session.hub_endpoint = info.addr.clone();
+        session.hub_token = info.token.clone();
     }
 
     app.sub_page = Some(SubPage::StatusPage(Box::new(StatusPageState {

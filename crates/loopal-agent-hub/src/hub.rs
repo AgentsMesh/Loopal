@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use tokio::sync::mpsc;
+use tokio::sync::{Notify, mpsc};
 
 use loopal_protocol::AgentEvent;
 
@@ -35,6 +35,10 @@ pub struct Hub {
     /// Agent question requests suspended awaiting UI response. Keyed by
     /// `(agent_name, question_id)`.
     pub pending_questions: HashMap<(String, String), PendingQuestionInfo>,
+    /// Fired when an external `hub/shutdown` request arrives. The
+    /// standalone `--hub-only` driver awaits on this to know when to
+    /// tear down agents and exit. In-process Hubs ignore it.
+    pub shutdown_signal: Arc<Notify>,
 }
 
 impl Hub {
@@ -69,6 +73,7 @@ impl Hub {
             default_cwd: canonical,
             pending_permissions: HashMap::new(),
             pending_questions: HashMap::new(),
+            shutdown_signal: Arc::new(Notify::new()),
         }
     }
 

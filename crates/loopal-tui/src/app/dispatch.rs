@@ -65,6 +65,21 @@ impl App {
             ..Default::default()
         };
         if let Some(vc) = self.view_clients.get("main") {
+            // Only emit the welcome banner on fresh starts. If the main
+            // view already has a real conversation (e.g. attach pulled a
+            // `view/snapshot` for a long-running Hub) the banner would
+            // sit between the user and the assistant, which is jarring.
+            let has_real_messages = {
+                let guard = vc.state();
+                guard
+                    .conversation()
+                    .messages
+                    .iter()
+                    .any(|m| matches!(m.role.as_str(), "user" | "assistant"))
+            };
+            if has_real_messages {
+                return;
+            }
             vc.with_conversation_mut(|conv| conv.messages.push(banner));
         }
     }

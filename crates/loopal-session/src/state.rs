@@ -8,16 +8,7 @@ pub struct SessionState {
     /// from agent events — purely client-side.
     pub thinking_config: String,
     pub root_session_id: Option<String>,
-    pub pending_sub_agent_refs: Vec<PendingSubAgentRef>,
     pub mcp_status: Option<Vec<McpServerSnapshot>>,
-}
-
-#[derive(Debug, Clone)]
-pub struct PendingSubAgentRef {
-    pub name: String,
-    pub session_id: String,
-    pub parent: Option<String>,
-    pub model: Option<String>,
 }
 
 impl Default for SessionState {
@@ -32,7 +23,6 @@ impl SessionState {
             active_view: ROOT_AGENT.to_string(),
             thinking_config: "auto".to_string(),
             root_session_id: None,
-            pending_sub_agent_refs: Vec::new(),
             mcp_status: None,
         }
     }

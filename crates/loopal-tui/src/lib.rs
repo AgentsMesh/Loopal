@@ -28,9 +28,7 @@ pub use tui_loop::{ExitInfo, run_tui, run_tui_loop};
 /// Pure helpers re-exported for unit tests (synchronous, side-effect-free).
 #[doc(hidden)]
 pub mod dispatch_ops {
-    pub use crate::key_dispatch_ops::{
-        cycle_panel_focus, enter_panel, handle_effect, panel_tab,
-    };
+    pub use crate::key_dispatch_ops::{cycle_panel_focus, enter_panel, handle_effect, panel_tab};
     pub use crate::question_ops::{compute_question_answers, route_paste};
 }
 

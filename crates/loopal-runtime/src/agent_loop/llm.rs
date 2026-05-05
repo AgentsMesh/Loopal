@@ -5,16 +5,19 @@ use futures::StreamExt;
 use loopal_error::Result;
 use loopal_message::{ContentBlock, Message};
 use loopal_protocol::AgentEventPayload;
-use loopal_provider_api::StreamChunk;
+use loopal_provider_api::{ContinuationIntent, StreamChunk};
 use opentelemetry::KeyValue;
 use std::time::Instant;
 use tracing::{error, info, warn};
 
 impl AgentLoopRunner {
-    /// Stream the LLM response using a provided working copy of messages.
+    /// Stream the LLM response. `intent` carries continuation context that the
+    /// provider translates into protocol details (e.g. Anthropic appends a
+    /// synthetic User tail for non-prefill models).
     pub async fn stream_llm_with(
         &mut self,
         messages: &[Message],
+        intent: Option<ContinuationIntent>,
         cancel: &TurnCancel,
     ) -> Result<LlmStreamResult> {
         if cancel.is_cancelled() {
@@ -24,7 +27,7 @@ impl AgentLoopRunner {
             });
         }
 
-        let chat_params = self.prepare_chat_params_with(messages)?;
+        let chat_params = self.prepare_chat_params_with(messages, intent)?;
         let provider = self
             .params
             .deps

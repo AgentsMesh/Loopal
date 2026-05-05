@@ -35,6 +35,7 @@ impl HookExecutor for PromptExecutor {
             max_tokens: self.max_tokens,
             temperature: Some(0.0),
             thinking: None,
+            continuation_intent: None,
             debug_dump_dir: None,
         };
 

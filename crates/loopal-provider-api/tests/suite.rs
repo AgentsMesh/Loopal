@@ -5,5 +5,3 @@ mod middleware_test;
 mod model_router_test;
 #[path = "suite/model_types_test.rs"]
 mod model_types_test;
-#[path = "suite/thinking_capability_test.rs"]
-mod thinking_capability_test;

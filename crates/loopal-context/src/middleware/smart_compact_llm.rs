@@ -37,6 +37,7 @@ pub(super) async fn call_summarization_llm(
         max_tokens: 2048,
         temperature: Some(0.0),
         thinking: None,
+        continuation_intent: None,
         debug_dump_dir: None,
     };
 

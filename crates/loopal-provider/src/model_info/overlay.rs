@@ -53,6 +53,7 @@ pub fn synthesize(model_id: &str, provider: &str) -> ModelInfo {
         quality: QualityTier::Standard,
         supports_tools: true,
         supports_vision: false,
+        supports_prefill: true,
     }
 }
 
@@ -85,6 +86,9 @@ pub fn apply_override(mut base: ModelInfo, ov: &ModelOverride) -> ModelInfo {
     }
     if let Some(v) = ov.supports_vision {
         base.supports_vision = v;
+    }
+    if let Some(v) = ov.supports_prefill {
+        base.supports_prefill = v;
     }
     if let Some(v) = ov.thinking {
         base.thinking = v;

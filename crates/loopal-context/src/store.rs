@@ -93,6 +93,10 @@ impl ContextStore {
         &self.budget
     }
 
+    pub fn last_role(&self) -> Option<MessageRole> {
+        self.messages.last().map(|m| m.role)
+    }
+
     // --- Lifecycle ---
 
     pub fn clear(&mut self) {

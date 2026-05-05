@@ -61,6 +61,15 @@ pub struct ModelInfo {
     pub quality: QualityTier,
     pub supports_tools: bool,
     pub supports_vision: bool,
+    /// Whether the model accepts an assistant message as the last entry in the
+    /// `messages` array (Anthropic Adaptive/BudgetRequired models reject this).
+    /// Independent of thinking config — it's a model-level fact.
+    #[serde(default = "default_supports_prefill")]
+    pub supports_prefill: bool,
+}
+
+fn default_supports_prefill() -> bool {
+    true
 }
 
 /// User-provided model metadata override (settings.json `models` section).
@@ -85,6 +94,8 @@ pub struct ModelOverride {
     pub supports_tools: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub supports_vision: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub supports_prefill: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thinking: Option<ThinkingCapability>,
 }

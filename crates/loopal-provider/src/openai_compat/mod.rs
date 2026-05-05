@@ -3,7 +3,7 @@ mod stream;
 
 use async_trait::async_trait;
 use loopal_error::{LoopalError, ProviderError};
-use loopal_provider_api::{ChatParams, ChatStream, Provider};
+use loopal_provider_api::{ChatParams, ChatStream, ErrorClass, Provider, default_classify_error};
 use serde_json::json;
 use std::collections::VecDeque;
 use std::time::Duration;
@@ -40,29 +40,34 @@ impl Provider for OpenAiCompatProvider {
     }
 
     async fn stream_chat(&self, params: &ChatParams) -> Result<ChatStream, LoopalError> {
-        let messages = self.build_messages(params);
-        let tools = self.build_tools(params);
+        let finalized = self.finalize_messages(params).into_owned();
+        let final_params = ChatParams {
+            messages: finalized,
+            ..params.clone()
+        };
+        let messages = self.build_messages(&final_params);
+        let tools = self.build_tools(&final_params);
 
         let mut body = json!({
-            "model": params.model,
+            "model": final_params.model,
             "stream": true,
             "messages": messages,
-            "max_completion_tokens": params.max_tokens,
+            "max_completion_tokens": final_params.max_tokens,
         });
 
         if !tools.is_empty() {
             body["tools"] = json!(tools);
         }
-        if let Some(temp) = params.temperature {
+        if let Some(temp) = final_params.temperature {
             body["temperature"] = json!(temp);
         }
         body["stream_options"] = json!({"include_usage": true});
 
         tracing::info!(
-            model = %params.model,
+            model = %final_params.model,
             url = %format!("{}/v1/chat/completions", self.base_url),
-            messages = params.messages.len(),
-            tools = params.tools.len(),
+            messages = final_params.messages.len(),
+            tools = final_params.tools.len(),
             "API request"
         );
 
@@ -112,6 +117,26 @@ impl Provider for OpenAiCompatProvider {
         };
         Ok(Box::pin(stream))
     }
+
+    fn classify_error(&self, err: &LoopalError) -> ErrorClass {
+        if let LoopalError::Provider(ProviderError::Api {
+            status: 400,
+            message,
+        }) = err
+            && is_openai_compat_context_overflow_keyword(message)
+        {
+            return ErrorClass::ContextOverflow;
+        }
+        default_classify_error(err)
+    }
+}
+
+fn is_openai_compat_context_overflow_keyword(message: &str) -> bool {
+    message.contains("maximum context length")
+        || message.contains("context_length_exceeded")
+        || message.contains("exceeds the maximum")
+        || message.contains("too many tokens")
+        || message.contains("prompt is too long")
 }
 
 #[cfg(test)]

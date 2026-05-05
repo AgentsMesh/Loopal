@@ -21,6 +21,7 @@ fn make_params(
         max_tokens: 4096,
         temperature: None,
         thinking: None,
+        continuation_intent: None,
         debug_dump_dir: None,
     }
 }

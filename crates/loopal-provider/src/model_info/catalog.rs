@@ -12,6 +12,7 @@ pub(crate) struct ModelEntry {
     pub quality: QualityTier,
     pub supports_tools: bool,
     pub supports_vision: bool,
+    pub supports_prefill: bool,
 }
 
 impl ModelEntry {
@@ -28,13 +29,14 @@ impl ModelEntry {
             quality: self.quality,
             supports_tools: self.supports_tools,
             supports_vision: self.supports_vision,
+            supports_prefill: self.supports_prefill,
         }
     }
 }
 
 macro_rules! model {
     ($id:expr, $prov:expr, $name:expr, $ctx:expr, $out:expr, $think:ident,
-     $spd:ident, $cost:ident, $qual:ident, $tools:expr, $vis:expr) => {
+     $spd:ident, $cost:ident, $qual:ident, $tools:expr, $vis:expr, $prefill:expr) => {
         ModelEntry {
             id: $id,
             provider: $prov,
@@ -47,11 +49,15 @@ macro_rules! model {
             quality: QualityTier::$qual,
             supports_tools: $tools,
             supports_vision: $vis,
+            supports_prefill: $prefill,
         }
     };
 }
 
 // Abbreviations: T=ThinkingCapability, S=SpeedTier, C=CostTier, Q=QualityTier
+// supports_prefill: false for all Anthropic models with built-in thinking
+// (BudgetRequired/Adaptive) — these reject assistant-prefill at API level
+// regardless of `thinking` request field.
 pub(crate) static KNOWN_MODELS: &[ModelEntry] = &[
     // ── Anthropic ────────────────────────────────────────────────────
     model!(
@@ -65,7 +71,8 @@ pub(crate) static KNOWN_MODELS: &[ModelEntry] = &[
         Medium,
         Standard,
         true,
-        true
+        true,
+        false
     ),
     model!(
         "claude-sonnet-4-6",
@@ -78,7 +85,8 @@ pub(crate) static KNOWN_MODELS: &[ModelEntry] = &[
         Medium,
         Standard,
         true,
-        true
+        true,
+        false
     ),
     model!(
         "claude-opus-4-20250514",
@@ -91,7 +99,8 @@ pub(crate) static KNOWN_MODELS: &[ModelEntry] = &[
         High,
         Premium,
         true,
-        true
+        true,
+        false
     ),
     model!(
         "claude-opus-4-6",
@@ -104,7 +113,8 @@ pub(crate) static KNOWN_MODELS: &[ModelEntry] = &[
         High,
         Premium,
         true,
-        true
+        true,
+        false
     ),
     model!(
         "claude-opus-4-7",
@@ -117,7 +127,8 @@ pub(crate) static KNOWN_MODELS: &[ModelEntry] = &[
         High,
         Premium,
         true,
-        true
+        true,
+        false
     ),
     model!(
         "claude-haiku-3-5-20241022",
@@ -130,11 +141,13 @@ pub(crate) static KNOWN_MODELS: &[ModelEntry] = &[
         Low,
         Basic,
         true,
+        true,
         true
     ),
     // ── OpenAI ───────────────────────────────────────────────────────
     model!(
-        "gpt-4o", "openai", "GPT-4o", 128_000, 16_384, None, Medium, Medium, Standard, true, true
+        "gpt-4o", "openai", "GPT-4o", 128_000, 16_384, None, Medium, Medium, Standard, true, true,
+        true
     ),
     model!(
         "gpt-4o-mini",
@@ -147,11 +160,12 @@ pub(crate) static KNOWN_MODELS: &[ModelEntry] = &[
         Low,
         Basic,
         true,
+        true,
         true
     ),
     model!(
         "gpt-4.1", "openai", "GPT-4.1", 1_047_576, 32_768, None, Medium, Medium, Standard, true,
-        true
+        true, true
     ),
     model!(
         "gpt-4.1-mini",
@@ -163,6 +177,7 @@ pub(crate) static KNOWN_MODELS: &[ModelEntry] = &[
         Fast,
         Low,
         Basic,
+        true,
         true,
         true
     ),
@@ -177,6 +192,7 @@ pub(crate) static KNOWN_MODELS: &[ModelEntry] = &[
         Low,
         Basic,
         true,
+        true,
         true
     ),
     model!(
@@ -190,6 +206,7 @@ pub(crate) static KNOWN_MODELS: &[ModelEntry] = &[
         High,
         Premium,
         true,
+        true,
         true
     ),
     model!(
@@ -203,7 +220,8 @@ pub(crate) static KNOWN_MODELS: &[ModelEntry] = &[
         Medium,
         Standard,
         true,
-        false
+        false,
+        true
     ),
     model!(
         "o4-mini",
@@ -215,6 +233,7 @@ pub(crate) static KNOWN_MODELS: &[ModelEntry] = &[
         Medium,
         Medium,
         Standard,
+        true,
         true,
         true
     ),
@@ -230,6 +249,7 @@ pub(crate) static KNOWN_MODELS: &[ModelEntry] = &[
         Low,
         Basic,
         true,
+        true,
         true
     ),
     model!(
@@ -243,6 +263,7 @@ pub(crate) static KNOWN_MODELS: &[ModelEntry] = &[
         Medium,
         Standard,
         true,
+        true,
         true
     ),
     model!(
@@ -255,6 +276,7 @@ pub(crate) static KNOWN_MODELS: &[ModelEntry] = &[
         Fast,
         Low,
         Standard,
+        true,
         true,
         true
     ),
@@ -270,7 +292,8 @@ pub(crate) static KNOWN_MODELS: &[ModelEntry] = &[
         Low,
         Standard,
         true,
-        false
+        false,
+        true
     ),
     model!(
         "deepseek-reasoner",
@@ -283,6 +306,7 @@ pub(crate) static KNOWN_MODELS: &[ModelEntry] = &[
         Low,
         Standard,
         true,
-        false
+        false,
+        true
     ),
 ];

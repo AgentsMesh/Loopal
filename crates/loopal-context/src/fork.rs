@@ -70,7 +70,7 @@ fn compress_message(msg: &Message) -> Message {
     let content: Vec<ContentBlock> = msg.content.iter().filter_map(compress_block).collect();
     Message {
         id: msg.id.clone(),
-        role: msg.role.clone(),
+        role: msg.role,
         content,
     }
 }

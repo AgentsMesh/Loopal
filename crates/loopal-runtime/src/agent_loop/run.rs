@@ -1,14 +1,9 @@
-//! Outer loop: user-interaction granularity.
-//!
-//! The agent loop runs turns until:
-//! - Ephemeral agent: idle with no pending input → exit
-//! - Persistent agent: `wait_for_input` returns None (channel closed)
-//! - Unrecoverable error
-//!
-//! State machine: Starting → Running → WaitingForInput → Running → ... → Finished
-
 use loopal_error::{AgentOutput, LoopalError, Result, TerminateReason};
+use loopal_message::MessageRole;
 use loopal_protocol::{AgentEventPayload, AgentStatus};
+use loopal_provider_api::{
+    ContinuationIntent, ContinuationReason, ErrorClass, default_classify_error,
+};
 use tracing::{error, info};
 
 use super::LifecycleMode;
@@ -22,7 +17,12 @@ impl AgentLoopRunner {
         let mut last_output = String::new();
         let mut server_block_retry = false;
         let mut context_overflow_retry = false;
-        let mut needs_input = self.params.store.is_empty();
+        // Need user input whenever the last message is not a User message.
+        // Covers: empty store, resume-with-trailing-Assistant (crash recovery),
+        // and any unexpected non-User tail. ReadyToCall's invariant assumes a
+        // User tail (or pending continuation), so going straight to the running
+        // phase without a User tail would panic the debug_assert.
+        let mut needs_input = !matches!(self.params.store.last_role(), Some(MessageRole::User));
 
         loop {
             // ── Idle phase ──────────────────────────────────────────
@@ -40,16 +40,13 @@ impl AgentLoopRunner {
                             self.ingest_message(env).await;
                         }
                     }
-                    LifecycleMode::Persistent => {
-                        // Persistent: block until input arrives or channel closes.
-                        match self.wait_for_input().await? {
-                            Some(WaitResult::MessageAdded) => {
-                                self.interrupt.take();
-                                self.notify_observers_user_input();
-                            }
-                            None => break,
+                    LifecycleMode::Persistent => match self.wait_for_input().await? {
+                        Some(WaitResult::MessageAdded) => {
+                            self.interrupt.take();
+                            self.notify_observers_user_input();
                         }
-                    }
+                        None => break,
+                    },
                 }
             }
             needs_input = true;
@@ -65,6 +62,15 @@ impl AgentLoopRunner {
 
             let cancel = TurnCancel::new(self.interrupt.clone(), self.interrupt_tx.clone());
             let mut turn_ctx = TurnContext::new(self.turn_count, cancel);
+            // After try_recover, store may end with an Assistant message but
+            // turn_ctx is fresh (per-turn lifetime). Re-prime intent so
+            // ReadyToCall's invariant holds and Provider::finalize_messages
+            // receives the continuation context.
+            if !matches!(self.params.store.last_role(), Some(MessageRole::User)) {
+                turn_ctx.pending_continuation = Some(ContinuationIntent::AutoContinue {
+                    reason: ContinuationReason::RecoveryRetry,
+                });
+            }
 
             match self.execute_turn(&mut turn_ctx).await {
                 Ok(turn) => {
@@ -77,21 +83,11 @@ impl AgentLoopRunner {
                     }
                 }
                 Err(e) => {
-                    if !server_block_retry && is_server_block_error(&e) {
-                        server_block_retry = true;
-                        info!("condensing server blocks after API rejection, retrying");
-                        self.params.store.condense_server_blocks();
-                        needs_input = false;
-                        continue;
-                    }
-                    if !context_overflow_retry && e.is_context_overflow() {
-                        context_overflow_retry = true;
-                        info!("context overflow detected, emergency compacting and retrying");
-                        self.params.store.emergency_compact(5);
-                        self.emit(AgentEventPayload::Error {
-                            message: "Context overflow — compacting and retrying...".into(),
-                        })
+                    let class = self.classify_turn_error(&e);
+                    let recovered = self
+                        .try_recover(class, &mut server_block_retry, &mut context_overflow_retry)
                         .await?;
+                    if recovered {
                         needs_input = false;
                         continue;
                     }
@@ -111,6 +107,49 @@ impl AgentLoopRunner {
             result: last_output,
             terminate_reason: TerminateReason::Goal,
         })
+    }
+
+    fn classify_turn_error(&self, err: &LoopalError) -> ErrorClass {
+        match self
+            .params
+            .deps
+            .kernel
+            .resolve_provider(self.params.config.model())
+        {
+            Ok(provider) => provider.classify_error(err),
+            Err(_) => default_classify_error(err),
+        }
+    }
+
+    async fn try_recover(
+        &mut self,
+        class: ErrorClass,
+        server_block_retry: &mut bool,
+        context_overflow_retry: &mut bool,
+    ) -> Result<bool> {
+        match class {
+            ErrorClass::ServerBlockError if !*server_block_retry => {
+                *server_block_retry = true;
+                info!("condensing server blocks after API rejection, retrying");
+                self.params.store.condense_server_blocks();
+                Ok(true)
+            }
+            ErrorClass::ContextOverflow if !*context_overflow_retry => {
+                *context_overflow_retry = true;
+                info!("context overflow detected, emergency compacting and retrying");
+                self.params.store.emergency_compact(5);
+                self.emit(AgentEventPayload::Error {
+                    message: "Context overflow — compacting and retrying...".into(),
+                })
+                .await?;
+                Ok(true)
+            }
+            // PrefillRejected: provider's finalize_messages should have prevented
+            // this. If it leaks here, the model catalog is misconfigured (model
+            // marked supports_prefill=true when it isn't). Failing fast surfaces
+            // the bug instead of silently retrying without state change.
+            _ => Ok(false),
+        }
     }
 
     fn notify_observers_user_input(&mut self) {
@@ -133,10 +172,4 @@ impl AgentLoopRunner {
                 .await;
         }
     }
-}
-
-fn is_server_block_error(e: &LoopalError) -> bool {
-    let msg = e.to_string();
-    msg.contains("code_execution")
-        && (msg.contains("without a corresponding") || msg.contains("tool_result"))
 }

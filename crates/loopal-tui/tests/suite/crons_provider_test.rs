@@ -17,8 +17,6 @@ fn make_app() -> App {
     let (perm_tx, _) = mpsc::channel::<bool>(16);
     let (question_tx, _) = mpsc::channel::<UserQuestionResponse>(16);
     let session = SessionController::new(
-        "test-model".into(),
-        "act".into(),
         control_tx,
         perm_tx,
         question_tx,
@@ -67,12 +65,12 @@ fn provider_item_ids_empty_when_no_snapshots() {
 
 #[test]
 fn provider_item_ids_lists_all_snapshots_in_order() {
-    let mut app = make_app();
-    app.cron_snapshots = vec![
+    let app = make_app();
+    app.view_clients["main"].inject_crons_for_test(vec![
         snap("first", "p1", true),
         snap("second", "p2", false),
         snap("third", "p3", true),
-    ];
+    ]);
     let state = app.session.lock();
     let provider = app.panel_registry.by_kind(PanelKind::Crons).unwrap();
     assert_eq!(
@@ -91,8 +89,9 @@ fn provider_height_zero_when_empty() {
 
 #[test]
 fn provider_height_counts_snapshots() {
-    let mut app = make_app();
-    app.cron_snapshots = (0..3).map(|i| snap(&format!("id{i}"), "p", true)).collect();
+    let app = make_app();
+    app.view_clients["main"]
+        .inject_crons_for_test((0..3).map(|i| snap(&format!("id{i}"), "p", true)).collect());
     let state = app.session.lock();
     let provider = app.panel_registry.by_kind(PanelKind::Crons).unwrap();
     assert_eq!(provider.height(&app, &state), 3);
@@ -100,10 +99,12 @@ fn provider_height_counts_snapshots() {
 
 #[test]
 fn provider_height_capped_at_max_visible() {
-    let mut app = make_app();
-    app.cron_snapshots = (0..20)
-        .map(|i| snap(&format!("id{i}"), "p", true))
-        .collect();
+    let app = make_app();
+    app.view_clients["main"].inject_crons_for_test(
+        (0..20)
+            .map(|i| snap(&format!("id{i}"), "p", true))
+            .collect(),
+    );
     let state = app.session.lock();
     let provider = app.panel_registry.by_kind(PanelKind::Crons).unwrap();
     assert_eq!(provider.height(&app, &state) as usize, MAX_CRON_VISIBLE);
@@ -112,9 +113,11 @@ fn provider_height_capped_at_max_visible() {
 #[test]
 fn provider_render_no_panic_with_focus_and_offset() {
     let mut app = make_app();
-    app.cron_snapshots = (0..6)
-        .map(|i| snap(&format!("id{i:02}"), "prompt", true))
-        .collect();
+    app.view_clients["main"].inject_crons_for_test(
+        (0..6)
+            .map(|i| snap(&format!("id{i:02}"), "prompt", true))
+            .collect(),
+    );
     app.section_mut(PanelKind::Crons).scroll_offset = 2;
     let state = app.session.lock();
     let provider = app.panel_registry.by_kind(PanelKind::Crons).unwrap();
@@ -138,8 +141,8 @@ fn provider_render_no_panic_with_focus_and_offset() {
 
 #[test]
 fn provider_render_empty_area_is_noop() {
-    let mut app = make_app();
-    app.cron_snapshots = vec![snap("x", "y", true)];
+    let app = make_app();
+    app.view_clients["main"].inject_crons_for_test(vec![snap("x", "y", true)]);
     let state = app.session.lock();
     let provider = app.panel_registry.by_kind(PanelKind::Crons).unwrap();
 

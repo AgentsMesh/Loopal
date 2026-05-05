@@ -65,50 +65,38 @@ impl ControlBackend {
         }
     }
 
-    /// Approve a pending permission request.
-    ///
-    /// In Hub mode, sends the response via IPC using the relay request ID.
-    pub(crate) async fn approve_permission(&self, relay_request_id: Option<i64>) {
-        match self {
-            Self::Local(ch) => {
-                let _ = ch.permission_tx.send(true).await;
-            }
-            Self::Hub(client) => {
-                if let Some(id) = relay_request_id {
-                    client.respond_permission(id, true).await;
-                }
-            }
-        }
-    }
-
-    /// Deny a pending permission request.
-    pub(crate) async fn deny_permission(&self, relay_request_id: Option<i64>) {
-        match self {
-            Self::Local(ch) => {
-                let _ = ch.permission_tx.send(false).await;
-            }
-            Self::Hub(client) => {
-                if let Some(id) = relay_request_id {
-                    client.respond_permission(id, false).await;
-                }
-            }
-        }
-    }
-
-    /// Answer a pending question.
-    pub(crate) async fn answer_question(
+    pub(crate) async fn respond_permission(
         &self,
+        agent_name: &str,
+        tool_call_id: &str,
+        allow: bool,
+    ) {
+        match self {
+            Self::Local(ch) => {
+                let _ = ch.permission_tx.send(allow).await;
+            }
+            Self::Hub(client) => {
+                client
+                    .respond_permission(agent_name, tool_call_id, allow)
+                    .await;
+            }
+        }
+    }
+
+    pub(crate) async fn respond_question(
+        &self,
+        agent_name: &str,
+        question_id: &str,
         answers: Vec<String>,
-        relay_request_id: Option<i64>,
     ) {
         match self {
             Self::Local(ch) => {
                 let _ = ch.question_tx.send(UserQuestionResponse { answers }).await;
             }
             Self::Hub(client) => {
-                if let Some(id) = relay_request_id {
-                    client.respond_question(id, answers).await;
-                }
+                client
+                    .respond_question(agent_name, question_id, answers)
+                    .await;
             }
         }
     }

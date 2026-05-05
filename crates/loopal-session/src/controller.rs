@@ -4,9 +4,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use tokio::sync::{mpsc, watch};
 
-use loopal_protocol::{
-    AgentEvent, ControlCommand, InterruptSignal, UserContent, UserQuestionResponse,
-};
+use loopal_protocol::{AgentEvent, ControlCommand, InterruptSignal, UserQuestionResponse};
 
 use crate::controller_ops::ControlBackend;
 use crate::event_handler;
@@ -24,8 +22,6 @@ pub struct SessionController {
 impl SessionController {
     /// Create with in-process channels (for unit tests — no real Hub).
     pub fn new(
-        model: String,
-        mode: String,
         control_tx: mpsc::Sender<ControlCommand>,
         permission_tx: mpsc::Sender<bool>,
         question_tx: mpsc::Sender<UserQuestionResponse>,
@@ -41,21 +37,16 @@ impl SessionController {
             interrupt_tx,
         };
         Self {
-            state: Arc::new(Mutex::new(SessionState::new(model, mode))),
+            state: Arc::new(Mutex::new(SessionState::new())),
             backend: Arc::new(ControlBackend::Local(Arc::new(channels))),
             connections: Arc::new(tokio::sync::Mutex::new(Hub::noop())),
         }
     }
 
     /// Create with Hub Connection (production mode — all agents via Hub).
-    pub fn with_hub(
-        model: String,
-        mode: String,
-        client: Arc<HubClient>,
-        hub: Arc<tokio::sync::Mutex<Hub>>,
-    ) -> Self {
+    pub fn with_hub(client: Arc<HubClient>, hub: Arc<tokio::sync::Mutex<Hub>>) -> Self {
         Self {
-            state: Arc::new(Mutex::new(SessionState::new(model, mode))),
+            state: Arc::new(Mutex::new(SessionState::new())),
             backend: Arc::new(ControlBackend::Hub(client)),
             connections: hub,
         }
@@ -75,6 +66,12 @@ impl SessionController {
         self.connections.lock().await.listener_port
     }
 
+    /// Hub auth token required by `--attach-hub` clients. Returns `None`
+    /// for in-process test setups.
+    pub async fn hub_listener_token(&self) -> Option<String> {
+        self.connections.lock().await.listener_token.clone()
+    }
+
     pub(crate) fn active_target(&self) -> String {
         self.lock().active_view.clone()
     }
@@ -92,82 +89,25 @@ impl SessionController {
         self.backend.interrupt_target(name);
     }
 
-    /// Optimistic display update: append a user message to the conversation view.
-    ///
-    /// This is a pure display operation — it does NOT route the message to the
-    /// agent. Use `route_message()` separately for delivery to the agent mailbox.
-    /// Agent state (idle/busy) is NOT modified; it is derived from agent events.
-    pub fn append_user_display(&self, content: &UserContent) {
-        let mut state = self.lock();
-        let conv = state.active_conversation_mut();
-        let image_count = content.images.len();
-        let mut display_text = content.text.clone();
-        if image_count > 0 {
-            display_text.push_str(&format!(" [+{image_count} image(s)]"));
-        }
-        conv.messages.push(crate::types::SessionMessage {
-            role: "user".to_string(),
-            content: display_text,
-            tool_calls: Vec::new(),
-            image_count,
-            skill_info: content.skill_info.clone(),
-            inbox: None,
-        });
+    /// Resolve a `ToolPermissionRequest` event for `(agent_name, tool_call_id)`.
+    /// Caller clears `pending_permission` in the ViewClient.
+    pub async fn respond_permission(&self, agent_name: &str, tool_call_id: &str, allow: bool) {
+        self.backend
+            .respond_permission(agent_name, tool_call_id, allow)
+            .await;
     }
 
-    pub async fn approve_permission(&self) {
-        let relay_id = {
-            let mut state = self.lock();
-            let conv = state.active_conversation_mut();
-            let relay_id = conv
-                .pending_permission
-                .as_ref()
-                .and_then(|p| p.relay_request_id);
-            conv.pending_permission = None;
-            relay_id
-        };
-        self.backend.approve_permission(relay_id).await;
-    }
-
-    pub async fn deny_permission(&self) {
-        let relay_id = {
-            let mut state = self.lock();
-            let conv = state.active_conversation_mut();
-            let relay_id = conv
-                .pending_permission
-                .as_ref()
-                .and_then(|p| p.relay_request_id);
-            conv.pending_permission = None;
-            relay_id
-        };
-        self.backend.deny_permission(relay_id).await;
-    }
-
-    pub async fn answer_question(&self, answers: Vec<String>) {
-        let relay_id = {
-            let mut state = self.lock();
-            let conv = state.active_conversation_mut();
-            let relay_id = conv
-                .pending_question
-                .as_ref()
-                .and_then(|q| q.relay_request_id);
-            conv.pending_question = None;
-            relay_id
-        };
-        self.backend.answer_question(answers, relay_id).await;
-    }
-
-    // === Direct relay responses (for auto-approve mode) ===
-
-    /// Auto-approve a permission request using the relay ID directly.
-    /// Bypasses pending_permission state — avoids race with event broadcast.
-    pub async fn auto_approve_permission(&self, relay_id: i64) {
-        self.backend.approve_permission(Some(relay_id)).await;
-    }
-
-    /// Auto-answer a question using the relay ID directly.
-    pub async fn auto_answer_question(&self, relay_id: i64, answers: Vec<String>) {
-        self.backend.answer_question(answers, Some(relay_id)).await;
+    /// Resolve a `UserQuestionRequest` event for `(agent_name, question_id)`.
+    /// Caller clears `pending_question` in the ViewClient.
+    pub async fn respond_question(
+        &self,
+        agent_name: &str,
+        question_id: &str,
+        answers: Vec<String>,
+    ) {
+        self.backend
+            .respond_question(agent_name, question_id, answers)
+            .await;
     }
 
     // === Event handling ===
@@ -175,6 +115,44 @@ impl SessionController {
     pub fn handle_event(&self, event: AgentEvent) {
         let mut state = self.lock();
         event_handler::apply_event(&mut state, event);
+    }
+
+    /// Fetch the list of agent names from the Hub. Returns empty for
+    /// non-Hub backends.
+    pub async fn fetch_agent_names(&self) -> Vec<String> {
+        let ControlBackend::Hub(client) = self.backend.as_ref() else {
+            return Vec::new();
+        };
+        let Ok(resp) = client.list_agents().await else {
+            return Vec::new();
+        };
+        resp.get("agents")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Fetch the current `view/snapshot` for `agent` from the Hub.
+    pub async fn fetch_view_snapshot(
+        &self,
+        agent: &str,
+    ) -> Result<loopal_view_state::ViewSnapshot, String> {
+        let ControlBackend::Hub(client) = self.backend.as_ref() else {
+            return Err("not in hub mode".into());
+        };
+        let resp = client
+            .connection()
+            .send_request(
+                loopal_ipc::protocol::methods::VIEW_SNAPSHOT.name,
+                serde_json::json!({ "agent": agent }),
+            )
+            .await
+            .map_err(|e| format!("view/snapshot for {agent}: {e}"))?;
+        serde_json::from_value(resp).map_err(|e| format!("malformed snapshot for {agent}: {e}"))
     }
 
     /// Set the root session ID (for sub-agent ref persistence).

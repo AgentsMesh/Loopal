@@ -6,10 +6,12 @@ use tokio_util::sync::CancellationToken;
 use loopal_ipc::connection::Connection;
 use loopal_kernel::Kernel;
 use loopal_message::Message;
-use loopal_protocol::{AgentEvent, Envelope, MessageSource};
+use loopal_protocol::{AgentEvent, AgentStateSnapshot, Envelope, MessageSource};
 use loopal_scheduler::CronScheduler;
 
+use crate::state_snapshot::{cron_info_to_snapshot, task_to_snapshot};
 use crate::task_store::TaskStore;
+use crate::types::TaskStatus;
 
 /// Handle to the per-agent cron scheduler.
 ///
@@ -66,9 +68,14 @@ impl Drop for SchedulerHandle {
 
 /// Shared runtime context accessible by all agent tools via `ToolContext.shared`.
 ///
-/// Main agent and sub-agents are **homogeneous**: both hold an `AgentShared`
-/// with the same kernel and task_store references.
-/// Sub-agents differ only in `depth`, `agent_name`, and `cancel_token`.
+/// Each agent runs in its own OS process, so every `AgentShared` owns its
+/// own `Kernel` (and therefore its own `BackgroundTaskStore`), `TaskStore`,
+/// and `SchedulerHandle`. There is no cross-agent sharing of these stores —
+/// sub-agent state is fully isolated from the parent.
+///
+/// Sub-agents only differ from the root agent in `depth`, `agent_name`,
+/// `cancel_token`, and the file-vs-memory backing of their session
+/// storage (sub-agents use in-memory; root uses file-backed).
 pub struct AgentShared {
     pub kernel: Arc<Kernel>,
     pub task_store: Arc<TaskStore>,
@@ -90,4 +97,38 @@ pub struct AgentShared {
     /// Conversation snapshot updated by the runtime before each tool batch.
     /// The Agent tool reads this to build fork context for child agents.
     pub message_snapshot: Arc<RwLock<Vec<Message>>>,
+}
+
+impl AgentShared {
+    /// Aggregate the agent's observable state for `agent/state_snapshot` IPC.
+    ///
+    /// Returns task list (active only — same filter as `task_bridge`),
+    /// scheduled cron jobs, and running background processes.
+    /// Token usage / mode / status are intentionally absent: the Hub-side
+    /// reducer accumulates those from the live event stream, so including
+    /// them here would only duplicate fact and risk drift.
+    pub async fn snapshot_state(&self) -> AgentStateSnapshot {
+        let tasks = self
+            .task_store
+            .list()
+            .await
+            .into_iter()
+            .filter(|t| !matches!(t.status, TaskStatus::Completed))
+            .map(|t| task_to_snapshot(&t))
+            .collect();
+        let crons = self
+            .scheduler_handle
+            .scheduler
+            .list()
+            .await
+            .into_iter()
+            .map(cron_info_to_snapshot)
+            .collect();
+        let bg_tasks = self.kernel.bg_store().snapshot_running();
+        AgentStateSnapshot {
+            tasks,
+            crons,
+            bg_tasks,
+        }
+    }
 }

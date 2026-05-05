@@ -133,6 +133,25 @@ async fn route_request(
                 .respond(id, serde_json::json!({"ok": true}))
                 .await;
         }
+        m if m == methods::AGENT_STATE_SNAPSHOT.name => {
+            // Hub-side ViewState rebuild: dump tasks/crons/bg_tasks.
+            // Empty payload if no agent is bound yet (placeholder window)
+            // or if the agent has already exited (Weak ref upgraded fail).
+            let snapshot = session
+                .snapshot_agent_state()
+                .await
+                .unwrap_or_else(loopal_protocol::AgentStateSnapshot::empty);
+            match serde_json::to_value(&snapshot) {
+                Ok(payload) => {
+                    let _ = connection.respond(id, payload).await;
+                }
+                Err(e) => {
+                    let _ = connection
+                        .respond_error(id, jsonrpc::INTERNAL_ERROR, &e.to_string())
+                        .await;
+                }
+            }
+        }
         _ => {
             let _ = connection
                 .respond_error(id, jsonrpc::METHOD_NOT_FOUND, &format!("unknown: {method}"))

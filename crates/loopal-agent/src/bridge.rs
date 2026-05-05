@@ -4,7 +4,7 @@ use tokio::sync::mpsc;
 use tracing::info;
 
 use loopal_agent_client::{AgentClient, AgentClientEvent};
-use loopal_protocol::{AgentEvent, AgentEventPayload, UserQuestionResponse};
+use loopal_protocol::{AgentEvent, AgentEventPayload};
 use tokio_util::sync::CancellationToken;
 
 /// Track child completion and collect result text.
@@ -25,23 +25,12 @@ pub async fn bridge_child_events(
                         AgentEventPayload::Stream { text } => {
                             stream_text.push_str(text);
                         }
-                        // AwaitingInput = sub-agent finished its prompt and is
-                        // idle. For one-shot sub-agents this is the "done" signal.
                         AgentEventPayload::AwaitingInput
                         | AgentEventPayload::Finished => {
                             break;
                         }
                         _ => {}
                     }
-                }
-                Some(AgentClientEvent::PermissionRequest { id, .. }) => {
-                    let _ = client.respond_permission(id, false).await;
-                }
-                Some(AgentClientEvent::QuestionRequest { id, .. }) => {
-                    let resp = UserQuestionResponse {
-                        answers: vec!["(sub-agent: auto-cancelled)".into()],
-                    };
-                    let _ = client.respond_question(id, &resp).await;
                 }
                 None => break,
             },

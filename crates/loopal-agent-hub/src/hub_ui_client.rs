@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use loopal_ipc::connection::Connection;
 use loopal_ipc::protocol::methods;
-use loopal_protocol::{ControlCommand, Envelope, MessageSource, UserContent, UserQuestionResponse};
+use loopal_protocol::{ControlCommand, Envelope, MessageSource, UserContent};
 use serde_json::Value;
 use tracing::warn;
 
@@ -92,26 +92,43 @@ impl HubClient {
 
     // ── Permission / question response ───────────────────────────────
 
-    /// Respond to a permission relay request from Hub.
-    pub async fn respond_permission(&self, request_id: i64, allow: bool) {
+    /// Resolve a `ToolPermissionRequest` event by (agent, tool_call_id) via Hub.
+    pub async fn respond_permission(&self, agent_name: &str, tool_call_id: &str, allow: bool) {
+        let params = serde_json::json!({
+            "agent_name": agent_name,
+            "tool_call_id": tool_call_id,
+            "allow": allow,
+        });
         if let Err(e) = self
             .conn
-            .respond(request_id, serde_json::json!({"allow": allow}))
+            .send_request(methods::HUB_PERMISSION_RESPONSE.name, params)
             .await
         {
-            warn!("failed to send permission response: {e}");
+            warn!(
+                agent_name,
+                tool_call_id, "hub/permission_response failed: {e}"
+            );
         }
     }
 
-    /// Respond to a question relay request from Hub.
-    pub async fn respond_question(&self, request_id: i64, answers: Vec<String>) {
-        let resp = UserQuestionResponse { answers };
+    /// Resolve a `UserQuestionRequest` event by (agent, question_id) via Hub.
+    pub async fn respond_question(
+        &self,
+        agent_name: &str,
+        question_id: &str,
+        answers: Vec<String>,
+    ) {
+        let params = serde_json::json!({
+            "agent_name": agent_name,
+            "question_id": question_id,
+            "answers": answers,
+        });
         if let Err(e) = self
             .conn
-            .respond(request_id, serde_json::to_value(resp).unwrap_or_default())
+            .send_request(methods::HUB_QUESTION_RESPONSE.name, params)
             .await
         {
-            warn!("failed to send question response: {e}");
+            warn!(agent_name, question_id, "hub/question_response failed: {e}");
         }
     }
 

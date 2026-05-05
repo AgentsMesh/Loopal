@@ -1,81 +1,89 @@
-//! AgentEvent → SessionState update logic. Unified routing for all agents.
+//! AgentEvent → session-level state.
+//!
+//! Per-agent state (conversation, observable, tasks, crons, bg_tasks,
+//! mode, model) is owned by the per-agent `ViewClient` — `SessionState`
+//! only tracks active_view, root_session_id, mcp_status, and
+//! sub-agent ref persistence. Every variant of `AgentEventPayload` is
+//! listed explicitly so a future variant addition triggers a compile
+//! error here, forcing a deliberate decision.
 
 use loopal_protocol::{AgentEvent, AgentEventPayload};
 
-use crate::message_log::record_message_routed;
 use crate::state::{ROOT_AGENT, SessionState};
 
-/// Handle an AgentEvent. Updates display state only — messages are delivered
-/// directly to the agent mailbox.
 pub fn apply_event(state: &mut SessionState, event: AgentEvent) {
-    // Global logging for inter-agent messages
-    if let AgentEventPayload::MessageRouted {
-        ref source,
-        ref target,
-        ref content_preview,
-    } = event.payload
-    {
-        record_message_routed(state, source, target, content_preview);
-    }
-
-    // Topology registration for spawned agents
-    if let AgentEventPayload::SubAgentSpawned {
-        ref name,
-        ref parent,
-        ref model,
-        ref session_id,
-        ..
-    } = event.payload
-    {
-        // Session/UI deal in flat strings — flatten the qualified address.
-        let parent_str = parent.as_ref().map(|p| p.to_string());
-        crate::agent_lifecycle::register_spawned_agent(
-            state,
+    match &event.payload {
+        AgentEventPayload::SubAgentSpawned {
             name,
-            parent_str.as_deref(),
-            model.as_deref(),
-            session_id.as_deref(),
-        );
-        // Enqueue for persistence if session_id is known
-        if let Some(sid) = session_id {
+            parent,
+            model,
+            session_id: Some(sid),
+            ..
+        } => {
             state
                 .pending_sub_agent_refs
                 .push(crate::state::PendingSubAgentRef {
                     name: name.clone(),
                     session_id: sid.clone(),
-                    parent: parent_str,
+                    parent: parent.as_ref().map(|p| p.to_string()),
                     model: model.clone(),
                 });
         }
-    }
-
-    // Session-level mode sync: when the active agent's mode changes, update state.mode
-    if let AgentEventPayload::ModeChanged { ref mode } = event.payload {
-        let agent_name = event
-            .agent_name
-            .as_ref()
-            .map(|a| a.to_string())
-            .unwrap_or_else(|| ROOT_AGENT.to_string());
-        if agent_name == state.active_view && state.mode != *mode {
-            state.mode.clone_from(mode);
+        AgentEventPayload::SubAgentSpawned { .. } => {}
+        AgentEventPayload::SessionResumed { session_id, .. } => {
+            state.root_session_id = Some(session_id.clone());
         }
+        AgentEventPayload::McpStatusReport { servers } => {
+            state.mcp_status = Some(servers.clone());
+        }
+        AgentEventPayload::Finished | AgentEventPayload::Error { .. } => {
+            // Auto-return to root when the viewed agent terminates.
+            let agent_name = event
+                .agent_name
+                .as_ref()
+                .map(|a| a.to_string())
+                .unwrap_or_else(|| ROOT_AGENT.to_string());
+            if agent_name == state.active_view && agent_name != ROOT_AGENT {
+                state.active_view = ROOT_AGENT.to_string();
+            }
+        }
+        // Per-agent events handled by ViewClient reducer.
+        AgentEventPayload::Started
+        | AgentEventPayload::Running
+        | AgentEventPayload::AwaitingInput
+        | AgentEventPayload::Interrupted
+        | AgentEventPayload::Stream { .. }
+        | AgentEventPayload::ThinkingStream { .. }
+        | AgentEventPayload::ThinkingComplete { .. }
+        | AgentEventPayload::ToolCall { .. }
+        | AgentEventPayload::ToolResult { .. }
+        | AgentEventPayload::ToolBatchStart { .. }
+        | AgentEventPayload::ToolProgress { .. }
+        | AgentEventPayload::ToolPermissionRequest { .. }
+        | AgentEventPayload::ToolPermissionResolved { .. }
+        | AgentEventPayload::UserQuestionRequest { .. }
+        | AgentEventPayload::UserQuestionResolved { .. }
+        | AgentEventPayload::UserMessageQueued { .. }
+        | AgentEventPayload::TokenUsage { .. }
+        | AgentEventPayload::TurnCompleted { .. }
+        | AgentEventPayload::TurnDiffSummary { .. }
+        | AgentEventPayload::ModeChanged { .. }
+        | AgentEventPayload::RetryError { .. }
+        | AgentEventPayload::RetryCleared
+        | AgentEventPayload::AutoContinuation { .. }
+        | AgentEventPayload::AutoModeDecision { .. }
+        | AgentEventPayload::Compacted { .. }
+        | AgentEventPayload::Rewound { .. }
+        | AgentEventPayload::ServerToolUse { .. }
+        | AgentEventPayload::ServerToolResult { .. }
+        | AgentEventPayload::InboxEnqueued { .. }
+        | AgentEventPayload::InboxConsumed { .. }
+        | AgentEventPayload::MessageRouted { .. }
+        | AgentEventPayload::SessionResumeWarnings { .. }
+        | AgentEventPayload::BgTaskSpawned { .. }
+        | AgentEventPayload::BgTaskOutput { .. }
+        | AgentEventPayload::BgTaskCompleted { .. }
+        | AgentEventPayload::TasksChanged { .. }
+        | AgentEventPayload::CronsChanged { .. } => {}
     }
-
-    // Track new root session ID on resume
-    if let AgentEventPayload::SessionResumed { ref session_id, .. } = event.payload {
-        state.root_session_id = Some(session_id.clone());
-    }
-
-    // Cache MCP server status for display
-    if let AgentEventPayload::McpStatusReport { ref servers } = event.payload {
-        state.mcp_status = Some(servers.clone());
-    }
-
-    // Unified: route to agent conversation by name (root = "main")
-    let name = event
-        .agent_name
-        .as_ref()
-        .map(|a| a.to_string())
-        .unwrap_or_else(|| ROOT_AGENT.to_string());
-    crate::agent_handler::apply_agent_event(state, &name, event.payload);
 }

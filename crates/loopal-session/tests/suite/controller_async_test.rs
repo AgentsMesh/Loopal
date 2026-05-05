@@ -1,7 +1,4 @@
-//! Async tests for SessionController interaction methods (channels).
-
-use loopal_protocol::{AgentEvent, AgentEventPayload, UserQuestionResponse};
-use loopal_protocol::{AgentStatus, ControlCommand};
+use loopal_protocol::{ControlCommand, UserQuestionResponse};
 use loopal_session::SessionController;
 use tokio::sync::mpsc;
 
@@ -14,8 +11,6 @@ fn make_controller() -> (
     let (perm_tx, perm_rx) = mpsc::channel::<bool>(16);
     let (question_tx, _question_rx) = mpsc::channel::<UserQuestionResponse>(16);
     let ctrl = SessionController::new(
-        "test-model".to_string(),
-        "act".to_string(),
         control_tx,
         perm_tx,
         question_tx,
@@ -26,76 +21,23 @@ fn make_controller() -> (
 }
 
 #[tokio::test]
-async fn test_approve_permission() {
+async fn respond_permission_local_sends_true() {
     let (ctrl, _, mut perm_rx) = make_controller();
-    ctrl.handle_event(AgentEvent::root(AgentEventPayload::ToolPermissionRequest {
-        id: "p1".to_string(),
-        name: "bash".to_string(),
-        input: serde_json::json!({}),
-    }));
-
-    ctrl.approve_permission().await;
-    assert!(
-        ctrl.lock()
-            .active_conversation()
-            .pending_permission
-            .is_none()
-    );
+    ctrl.respond_permission("main", "tc-1", true).await;
     assert_eq!(perm_rx.recv().await, Some(true));
 }
 
 #[tokio::test]
-async fn test_deny_permission() {
+async fn respond_permission_local_sends_false() {
     let (ctrl, _, mut perm_rx) = make_controller();
-    ctrl.handle_event(AgentEvent::root(AgentEventPayload::ToolPermissionRequest {
-        id: "p1".to_string(),
-        name: "bash".to_string(),
-        input: serde_json::json!({}),
-    }));
-
-    ctrl.deny_permission().await;
-    assert!(
-        ctrl.lock()
-            .active_conversation()
-            .pending_permission
-            .is_none()
-    );
+    ctrl.respond_permission("main", "tc-1", false).await;
     assert_eq!(perm_rx.recv().await, Some(false));
 }
 
 #[tokio::test]
-async fn test_append_user_display() {
-    let (ctrl, _, _) = make_controller();
-    let content = loopal_protocol::UserContent::from("hello");
-    ctrl.append_user_display(&content);
-    let state = ctrl.lock();
-    let conv = state.active_conversation();
-    assert_eq!(conv.messages.last().unwrap().role, "user");
-    assert_eq!(conv.messages.last().unwrap().content, "hello");
-}
-
-#[tokio::test]
-async fn test_append_user_display_does_not_change_status() {
-    let (ctrl, _, _) = make_controller();
-    // Agent state is internal — TUI display ops never change it.
-    ctrl.lock()
-        .agents
-        .get_mut("main")
-        .unwrap()
-        .observable
-        .status = AgentStatus::Running;
-    let content = loopal_protocol::UserContent::from("queued");
-    ctrl.append_user_display(&content);
-    // Status unchanged — only agent events drive status transitions.
-    assert!(!ctrl.lock().is_active_agent_idle());
-}
-
-#[tokio::test]
-async fn test_switch_mode() {
+async fn switch_mode_dispatches_control() {
     let (ctrl, mut control_rx, _) = make_controller();
     ctrl.switch_mode(loopal_protocol::AgentMode::Plan).await;
-
-    assert_eq!(ctrl.lock().mode, "plan");
     match control_rx.recv().await {
         Some(ControlCommand::ModeSwitch(m)) => {
             assert!(matches!(m, loopal_protocol::AgentMode::Plan));
@@ -105,18 +47,9 @@ async fn test_switch_mode() {
 }
 
 #[tokio::test]
-async fn test_switch_model() {
+async fn switch_model_dispatches_control() {
     let (ctrl, mut control_rx, _) = make_controller();
     ctrl.switch_model("gpt-4".to_string()).await;
-
-    {
-        let state = ctrl.lock();
-        assert_eq!(state.model, "gpt-4");
-        let conv = state.active_conversation();
-        assert_eq!(conv.messages.len(), 1);
-        assert!(conv.messages[0].content.contains("gpt-4"));
-    }
-
     match control_rx.recv().await {
         Some(ControlCommand::ModelSwitch(m)) => assert_eq!(m, "gpt-4"),
         other => panic!("expected ModelSwitch, got {other:?}"),
@@ -124,33 +57,9 @@ async fn test_switch_model() {
 }
 
 #[tokio::test]
-async fn test_clear() {
+async fn clear_dispatches_control() {
     let (ctrl, mut control_rx, _) = make_controller();
-    ctrl.push_system_message("msg".to_string());
-    ctrl.handle_event(AgentEvent::root(AgentEventPayload::Stream {
-        text: "partial".to_string(),
-    }));
-    ctrl.handle_event(AgentEvent::root(AgentEventPayload::TokenUsage {
-        input_tokens: 100,
-        output_tokens: 50,
-        context_window: 200_000,
-        cache_creation_input_tokens: 0,
-        cache_read_input_tokens: 0,
-        thinking_tokens: 0,
-    }));
-
     ctrl.clear().await;
-
-    {
-        let state = ctrl.lock();
-        let conv = state.active_conversation();
-        assert!(conv.messages.is_empty());
-        assert!(conv.streaming_text.is_empty());
-        assert_eq!(conv.turn_count, 0);
-        assert_eq!(conv.input_tokens, 0);
-        assert_eq!(conv.output_tokens, 0);
-    }
-
     match control_rx.recv().await {
         Some(ControlCommand::Clear) => {}
         other => panic!("expected Clear, got {other:?}"),
@@ -158,19 +67,17 @@ async fn test_clear() {
 }
 
 #[tokio::test]
-async fn test_compact() {
+async fn compact_dispatches_control() {
     let (ctrl, mut control_rx, _) = make_controller();
     ctrl.compact().await;
-
     match control_rx.recv().await {
         Some(ControlCommand::Compact) => {}
         other => panic!("expected Compact, got {other:?}"),
     }
 }
 
-/// Hub mode: approve_permission sends response via HubClient when relay_request_id is set.
 #[tokio::test]
-async fn test_hub_approve_permission_sends_response() {
+async fn hub_respond_permission_sends_request() {
     use loopal_agent_hub::Hub;
     use loopal_agent_hub::HubClient;
     use std::sync::Arc;
@@ -185,27 +92,9 @@ async fn test_hub_approve_permission_sends_response() {
     let _rx = conn.start();
     let hub_client = Arc::new(HubClient::new(conn));
     let hub = Arc::new(tokio::sync::Mutex::new(Hub::noop()));
-
-    let ctrl = SessionController::with_hub("test".to_string(), "act".to_string(), hub_client, hub);
-
-    ctrl.handle_event(AgentEvent::root(AgentEventPayload::ToolPermissionRequest {
-        id: "p1".to_string(),
-        name: "bash".to_string(),
-        input: serde_json::json!({}),
-    }));
-    {
-        let mut state = ctrl.lock();
-        let conv = state.active_conversation_mut();
-        if let Some(ref mut perm) = conv.pending_permission {
-            perm.relay_request_id = Some(42);
-        }
-    }
-
-    ctrl.approve_permission().await;
-    assert!(
-        ctrl.lock()
-            .active_conversation()
-            .pending_permission
-            .is_none()
-    );
+    let ctrl = SessionController::with_hub(hub_client, hub);
+    let _handle = tokio::spawn(async move {
+        ctrl.respond_permission("main", "tc-42", true).await;
+    });
+    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 }

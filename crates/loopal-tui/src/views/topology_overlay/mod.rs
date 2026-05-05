@@ -10,7 +10,6 @@ use ratatui::widgets::{Block, Borders, Clear, canvas::Canvas};
 
 use loopal_protocol::AgentStatus;
 use loopal_session::ROOT_AGENT;
-use loopal_session::state::AgentViewState;
 
 use crate::views::unified_status::spinner_frame;
 use layout::abbreviate_model;
@@ -27,6 +26,19 @@ pub struct TopologyNode {
     pub children: Vec<String>,
 }
 
+/// Per-agent snapshot used to feed the topology extractor — read once
+/// from the per-agent `ViewClient` so the extractor itself does not need
+/// to acquire ViewClient locks.
+#[derive(Clone)]
+pub struct AgentTopologySnapshot {
+    pub status: AgentStatus,
+    pub model: String,
+    pub elapsed: Duration,
+    pub tools_in_flight: u32,
+    pub parent: Option<String>,
+    pub children: Vec<String>,
+}
+
 /// Positioned node with canvas coordinates for rendering.
 pub(crate) struct PlacedNode {
     pub node: TopologyNode,
@@ -34,31 +46,24 @@ pub(crate) struct PlacedNode {
     pub y: f64,
 }
 
-/// Extract topology snapshot from SessionState. Includes a virtual root node.
+/// Extract topology snapshot. Includes a virtual root node.
 ///
 /// Agents whose parent is absent or not a known sub-agent are treated as
-/// direct children of the virtual "root" node. This handles the case where
-/// the Hub registers the parent as "main" (the root agent process name).
+/// direct children of the virtual "root" node.
 pub fn extract_topology(
-    agents: &IndexMap<String, AgentViewState>,
+    agents: &IndexMap<String, AgentTopologySnapshot>,
     root_model: &str,
     root_status: AgentStatus,
     root_elapsed: Duration,
 ) -> Vec<TopologyNode> {
-    // Filter out the root agent (already represented by the virtual "root" node)
-    // and finished/errored agents — they are no longer active.
-    let live_agents: IndexMap<&String, &AgentViewState> = agents
+    let live_agents: IndexMap<&String, &AgentTopologySnapshot> = agents
         .iter()
         .filter(|(name, a)| {
             name.as_str() != ROOT_AGENT
-                && !matches!(
-                    a.observable.status,
-                    AgentStatus::Finished | AgentStatus::Error
-                )
+                && !matches!(a.status, AgentStatus::Finished | AgentStatus::Error)
         })
         .collect();
 
-    // An agent is a direct child of root if its parent is None or not in the agents map.
     let child_names: Vec<String> = live_agents
         .iter()
         .filter(|(_, a)| match &a.parent {
@@ -79,17 +84,16 @@ pub fn extract_topology(
     }];
 
     for (name, agent) in &live_agents {
-        // Remap parent to "root" if the parent is not a known live sub-agent.
         let parent = match &agent.parent {
             Some(p) if live_agents.contains_key(p) => Some(p.clone()),
             _ => Some("root".into()),
         };
         nodes.push(TopologyNode {
             name: (*name).clone(),
-            status: agent.observable.status,
-            model: abbreviate_model(&agent.observable.model),
-            elapsed: agent.elapsed(),
-            tools_in_flight: agent.observable.tools_in_flight,
+            status: agent.status,
+            model: abbreviate_model(&agent.model),
+            elapsed: agent.elapsed,
+            tools_in_flight: agent.tools_in_flight,
             parent,
             children: agent
                 .children

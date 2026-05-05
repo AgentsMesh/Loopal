@@ -4,6 +4,7 @@ use agent_client_protocol_schema::{
     PermissionOption, PermissionOptionId, PermissionOptionKind, RequestPermissionOutcome,
     RequestPermissionResponse, ToolCallId, ToolCallStatus, ToolCallUpdate, ToolCallUpdateFields,
 };
+use loopal_protocol::Question;
 use serde_json::Value;
 use tracing::warn;
 
@@ -11,19 +12,14 @@ use crate::adapter::AcpAdapter;
 use crate::translate::map_tool_kind;
 
 impl AcpAdapter {
-    /// Forward agent/permission request to IDE as session/request_permission.
-    ///
-    /// Uses full ACP `PermissionOption` model with allow_once/always + reject_once/always.
     pub(crate) async fn handle_permission_request(
         &self,
-        request_id: i64,
-        params: Value,
+        agent_name: String,
+        tool_call_id: String,
+        tool_name: String,
+        tool_input: Value,
         session_id: &str,
     ) {
-        let tool_call_id = params["tool_call_id"].as_str().unwrap_or("").to_string();
-        let tool_name = params["tool_name"].as_str().unwrap_or("").to_string();
-        let tool_input = params.get("tool_input").cloned().unwrap_or(Value::Null);
-
         let tool_call = ToolCallUpdate::new(
             ToolCallId::new(tool_call_id.as_str()),
             ToolCallUpdateFields::new()
@@ -75,14 +71,19 @@ impl AcpAdapter {
             }
         };
 
-        self.client.respond_permission(request_id, allow).await;
+        self.client
+            .respond_permission(&agent_name, &tool_call_id, allow)
+            .await;
     }
 
-    /// Forward agent/question as `_loopal/question` extension request.
-    /// Falls back to auto-respond if IDE doesn't support it.
-    pub(crate) async fn handle_question_request(&self, request_id: i64, params: Value) {
+    pub(crate) async fn handle_question_request(
+        &self,
+        agent_name: String,
+        question_id: String,
+        questions: Vec<Question>,
+    ) {
         let ext_params = serde_json::json!({
-            "questions": params.get("questions").cloned().unwrap_or(Value::Null),
+            "questions": serde_json::to_value(&questions).unwrap_or(Value::Null),
         });
 
         let answers = match self.acp_out.request("_loopal/question", ext_params).await {
@@ -97,13 +98,14 @@ impl AcpAdapter {
             Err(_) => vec!["(not supported in ACP mode)".into()],
         };
 
-        self.client.respond_question(request_id, answers).await;
+        self.client
+            .respond_question(&agent_name, &question_id, answers)
+            .await;
     }
 }
 
 /// Parse a `RequestPermissionResponse` to determine allow/deny.
 fn parse_permission_outcome(value: &Value) -> bool {
-    // Try official ACP format first
     if let Ok(resp) = serde_json::from_value::<RequestPermissionResponse>(value.clone()) {
         return match resp.outcome {
             RequestPermissionOutcome::Selected(sel) => {
@@ -111,10 +113,9 @@ fn parse_permission_outcome(value: &Value) -> bool {
                 oid.starts_with("allow")
             }
             RequestPermissionOutcome::Cancelled => false,
-            _ => false, // non_exhaustive fallback
+            _ => false,
         };
     }
-    // Legacy format: {"outcome": "allow"}
     value
         .get("outcome")
         .and_then(|v| v.as_str())

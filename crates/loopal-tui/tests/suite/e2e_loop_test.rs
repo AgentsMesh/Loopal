@@ -29,15 +29,7 @@ fn build_loop_rig() -> (
     let interrupt = InterruptSignal::new();
     let interrupt_tx = Arc::new(watch::channel(0u64).0);
 
-    let session_ctrl = SessionController::new(
-        "test-model".into(),
-        "act".into(),
-        ctrl_tx,
-        perm_tx,
-        q_tx,
-        interrupt,
-        interrupt_tx,
-    );
+    let session_ctrl = SessionController::new(ctrl_tx, perm_tx, q_tx, interrupt, interrupt_tx);
 
     let backend = TestBackend::new(80, 24);
     let terminal = Terminal::new(backend).unwrap();
@@ -91,8 +83,7 @@ async fn test_e2e_loop_renders_agent_event() {
     )
     .await;
 
-    let state = app.session.lock();
-    let conv = state.active_conversation();
+    let conv = app.snapshot_active_conversation();
     assert!(
         conv.streaming_text.contains("Agent says hi"),
         "expected streaming_text to contain 'Agent says hi', got: {:?}",

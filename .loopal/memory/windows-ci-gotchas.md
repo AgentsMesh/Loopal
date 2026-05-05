@@ -7,6 +7,7 @@ updated_at: 2026-04-15
 ttl_days: 90
 related:
   - release-ci.md
+  - codebase-scale.md
 ---
 
 ## PATH length limit with rules_rust

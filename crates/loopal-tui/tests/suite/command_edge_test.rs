@@ -11,8 +11,6 @@ fn make_app() -> App {
     let (perm_tx, _) = mpsc::channel::<bool>(16);
     let (question_tx, _) = mpsc::channel::<UserQuestionResponse>(16);
     let session = SessionController::new(
-        "test-model".into(),
-        "act".into(),
         control_tx,
         perm_tx,
         question_tx,
@@ -72,12 +70,8 @@ async fn test_help_cmd_shows_all_commands() {
     let handler = app.command_registry.find("/help").unwrap();
     let effect = handler.execute(&mut app, None).await;
     assert!(matches!(effect, loopal_tui::command::CommandEffect::Done));
-    let state = app.session.lock();
-    let last = state
-        .active_conversation()
-        .messages
-        .last()
-        .expect("expected help message");
+    let conv = app.snapshot_active_conversation();
+    let last = conv.messages.last().expect("expected help message");
     assert!(last.content.contains("/clear"));
     assert!(last.content.contains("/model"));
     assert!(last.content.contains("Shortcuts:"));
@@ -95,21 +89,21 @@ async fn test_model_cmd_opens_sub_page() {
 #[tokio::test]
 async fn test_rewind_on_idle_opens_sub_page() {
     let mut app = make_app();
-    {
-        let mut state = app.session.lock();
-        state.agents.get_mut("main").unwrap().observable.status = AgentStatus::WaitingForInput;
-        state
-            .active_conversation_mut()
-            .messages
-            .push(loopal_session::SessionMessage {
-                role: "user".into(),
-                content: "hello".into(),
-                tool_calls: Vec::new(),
-                image_count: 0,
-                skill_info: None,
-                inbox: None,
-            });
-    }
+    app.view_clients["main"].with_view_mut(|view| {
+        view.observable.status = AgentStatus::WaitingForInput;
+    });
+    app.with_active_conversation_mut(|conv| {
+        conv.messages.push(loopal_view_state::SessionMessage {
+            role: "user".into(),
+            content: "hello".into(),
+            tool_calls: Vec::new(),
+            image_count: 0,
+            skill_info: None,
+            inbox: None,
+            message_id: None,
+            ui_local: false,
+        });
+    });
     let handler = app.command_registry.find("/rewind").unwrap();
     handler.execute(&mut app, None).await;
     assert!(app.sub_page.is_some());
@@ -118,20 +112,14 @@ async fn test_rewind_on_idle_opens_sub_page() {
 #[tokio::test]
 async fn test_rewind_on_busy_agent_shows_error() {
     let mut app = make_app();
-    {
-        app.session
-            .lock()
-            .agents
-            .get_mut("main")
-            .unwrap()
-            .observable
-            .status = AgentStatus::Running;
-    }
+    app.view_clients["main"].with_view_mut(|view| {
+        view.observable.status = AgentStatus::Running;
+    });
     let handler = app.command_registry.find("/rewind").unwrap();
     handler.execute(&mut app, None).await;
     assert!(app.sub_page.is_none());
-    let state = app.session.lock();
-    let last = state.active_conversation().messages.last().unwrap();
+    let conv = app.snapshot_active_conversation();
+    let last = conv.messages.last().unwrap();
     assert!(last.content.contains("Cannot rewind"));
 }
 

@@ -14,8 +14,6 @@ fn make_app() -> App {
     let (perm_tx, _) = mpsc::channel::<bool>(16);
     let (question_tx, _) = mpsc::channel::<UserQuestionResponse>(16);
     let session = SessionController::new(
-        "test-model".into(),
-        "act".into(),
         control_tx,
         perm_tx,
         question_tx,
@@ -25,8 +23,8 @@ fn make_app() -> App {
     App::new(session, std::env::temp_dir())
 }
 
-fn spawn_agent(app: &App, name: &str) {
-    app.session.handle_event(AgentEvent::named(
+fn spawn_agent(app: &mut App, name: &str) {
+    app.dispatch_event(AgentEvent::named(
         name,
         AgentEventPayload::SubAgentSpawned {
             name: name.to_string(),
@@ -36,12 +34,11 @@ fn spawn_agent(app: &App, name: &str) {
             session_id: None,
         },
     ));
-    app.session
-        .handle_event(AgentEvent::named(name, AgentEventPayload::Started));
+    app.dispatch_event(AgentEvent::named(name, AgentEventPayload::Started));
 }
 
 fn add_cron(app: &mut App, id: &str, prompt: &str) {
-    app.cron_snapshots.push(CronJobSnapshot {
+    app.view_clients["main"].inject_crons_for_test(vec![CronJobSnapshot {
         id: id.into(),
         cron_expr: "*/5 * * * *".into(),
         prompt: prompt.into(),
@@ -49,13 +46,13 @@ fn add_cron(app: &mut App, id: &str, prompt: &str) {
         created_at_unix_ms: 1_700_000_000_000,
         next_fire_unix_ms: Some(1_700_000_000_000),
         durable: false,
-    });
+    }]);
 }
 
 #[test]
 fn tab_from_agents_to_crons_when_only_these_have_content() {
     let mut app = make_app();
-    spawn_agent(&app, "worker");
+    spawn_agent(&mut app, "worker");
     add_cron(&mut app, "c1", "daily report");
     app.section_mut(PanelKind::Agents).focused = Some("worker".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
@@ -70,20 +67,20 @@ fn tab_from_agents_to_crons_when_only_these_have_content() {
 fn tab_cycles_through_all_four_panels() {
     use loopal_protocol::{BgTaskSnapshot, BgTaskStatus, TaskSnapshot, TaskSnapshotStatus};
     let mut app = make_app();
-    spawn_agent(&app, "worker");
-    app.task_snapshots.push(TaskSnapshot {
+    spawn_agent(&mut app, "worker");
+    app.view_clients["main"].inject_tasks_for_test(vec![TaskSnapshot {
         id: "t1".into(),
         subject: "Task".into(),
         active_form: None,
         status: TaskSnapshotStatus::InProgress,
         blocked_by: Vec::new(),
-    });
-    app.bg_snapshots.push(BgTaskSnapshot {
+    }]);
+    app.view_clients["main"].inject_bg_for_test(vec![BgTaskSnapshot {
         id: "b1".into(),
         description: "bg".into(),
         status: BgTaskStatus::Running,
         exit_code: None,
-    });
+    }]);
     add_cron(&mut app, "c1", "cron");
 
     app.section_mut(PanelKind::Agents).focused = Some("worker".into());
@@ -103,13 +100,13 @@ fn tab_cycles_through_all_four_panels() {
 fn tab_skips_empty_crons_panel() {
     use loopal_protocol::{BgTaskSnapshot, BgTaskStatus};
     let mut app = make_app();
-    spawn_agent(&app, "worker");
-    app.bg_snapshots.push(BgTaskSnapshot {
+    spawn_agent(&mut app, "worker");
+    app.view_clients["main"].inject_bg_for_test(vec![BgTaskSnapshot {
         id: "b1".into(),
         description: "bg".into(),
         status: BgTaskStatus::Running,
         exit_code: None,
-    });
+    }]);
     // no cron snapshots
     app.section_mut(PanelKind::BgTasks).focused = Some("b1".into());
     app.focus_mode = FocusMode::Panel(PanelKind::BgTasks);

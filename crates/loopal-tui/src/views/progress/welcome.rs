@@ -1,7 +1,7 @@
 /// Welcome banner rendering: ASCII art logo + slogan + model/path info.
 use ratatui::prelude::*;
 
-use loopal_session::types::SessionMessage;
+use loopal_view_state::SessionMessage;
 
 /// Render the welcome banner.
 ///

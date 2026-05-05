@@ -98,7 +98,7 @@ pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<A
             config.settings.harness.cb_max_total_denials,
         ))
     });
-    let shared_any: Arc<dyn std::any::Any + Send + Sync> = Arc::new(agent_shared);
+    let shared_any: Arc<dyn std::any::Any + Send + Sync> = Arc::new(agent_shared.clone());
     let skills: Vec<_> = config.skills.values().map(|e| e.skill.clone()).collect();
     let skills_summary = loopal_config::format_skills_summary(&skills);
     let tool_defs = kernel.tool_definitions();
@@ -171,5 +171,6 @@ pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<A
         params,
         task_store,
         scheduler,
+        agent_shared,
     })
 }

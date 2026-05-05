@@ -29,9 +29,9 @@ pub enum AgentEventPayload {
         name: String,
         result: String,
         is_error: bool,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[serde(skip_serializing_if = "Option::is_none")]
         duration_ms: Option<u64>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[serde(skip_serializing_if = "Option::is_none")]
         metadata: Option<serde_json::Value>,
     },
     /// Periodic progress update for long-running tools (e.g. Bash).
@@ -97,16 +97,29 @@ pub enum AgentEventPayload {
         message_id: String,
         source: MessageSource,
         content: String,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[serde(skip_serializing_if = "Option::is_none")]
         summary: Option<String>,
     },
     /// LLM consumed an inbox message — pairs with `InboxEnqueued` by id.
     InboxConsumed { message_id: String },
+    UserMessageQueued {
+        message_id: String,
+        content: String,
+        image_count: usize,
+    },
     /// Tool is requesting user to answer questions.
     UserQuestionRequest {
         id: String,
         questions: Vec<Question>,
     },
+    /// Permission request resolved (some UI client responded). Broadcast
+    /// so all other UI clients clear their local `pending_permission`
+    /// dialog. `id` matches the originating `ToolPermissionRequest.id`.
+    ToolPermissionResolved { id: String },
+    /// Question request resolved (some UI client responded). Broadcast
+    /// so all other UI clients clear their local `pending_question`
+    /// dialog. `id` matches the originating `UserQuestionRequest.id`.
+    UserQuestionResolved { id: String },
     /// Conversation was rewound; remaining_turns is the count after truncation.
     Rewound { remaining_turns: usize },
     /// Conversation was compacted; old messages removed to reduce context.
@@ -138,11 +151,11 @@ pub enum AgentEventPayload {
         name: String,
         agent_id: String,
         /// Parent address (qualified when spawned cross-hub).
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[serde(skip_serializing_if = "Option::is_none")]
         parent: Option<QualifiedAddress>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[serde(skip_serializing_if = "Option::is_none")]
         model: Option<String>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[serde(skip_serializing_if = "Option::is_none")]
         session_id: Option<String>,
     },
     /// Auto-mode classifier made a permission decision.

@@ -10,26 +10,18 @@ use crate::panel_ops;
 pub use crate::panel_ops::{cycle_panel_focus, enter_panel, panel_tab};
 
 pub(crate) async fn tool_approve(app: &mut App) {
-    let has = app
-        .session
-        .lock()
-        .active_conversation()
-        .pending_permission
-        .is_some();
-    if has {
-        app.session.approve_permission().await;
+    let pending = app.with_active_conversation_mut(|conv| conv.pending_permission.take());
+    if let Some(p) = pending {
+        let agent = app.session.lock().active_view.clone();
+        app.session.respond_permission(&agent, &p.id, true).await;
     }
 }
 
 pub(crate) async fn tool_deny(app: &mut App) {
-    let has = app
-        .session
-        .lock()
-        .active_conversation()
-        .pending_permission
-        .is_some();
-    if has {
-        app.session.deny_permission().await;
+    let pending = app.with_active_conversation_mut(|conv| conv.pending_permission.take());
+    if let Some(p) = pending {
+        let agent = app.session.lock().active_view.clone();
+        app.session.respond_permission(&agent, &p.id, false).await;
     }
 }
 
@@ -41,7 +33,8 @@ pub(crate) async fn push_to_inbox(app: &mut App, content: UserContent) {
     };
     app.input_history.push(history_text);
     app.history_index = None;
-    app.session.append_user_display(&content);
+    // SSOT: do not write the user row locally — `route_to_agent` emits
+    // `UserMessageQueued` so every attached UI sees the same history.
     app.session.route_message(content).await;
 }
 

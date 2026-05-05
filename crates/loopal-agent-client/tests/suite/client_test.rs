@@ -76,44 +76,6 @@ async fn recv_delivers_agent_events() {
 }
 
 #[tokio::test]
-async fn recv_delivers_permission_request() {
-    let (transport, server) = make_pair();
-    let _server_rx = server.start();
-    let mut client = AgentClient::new(transport);
-
-    // Server sends permission request in background (it awaits response)
-    let server_clone = server.clone();
-    let server_handle = tokio::spawn(async move {
-        server_clone
-            .send_request(
-                methods::AGENT_PERMISSION.name,
-                serde_json::json!({
-                    "tool_call_id": "tc1",
-                    "tool_name": "Bash",
-                    "tool_input": {"command": "ls"},
-                }),
-            )
-            .await
-    });
-
-    let event = tokio::time::timeout(std::time::Duration::from_secs(2), client.recv())
-        .await
-        .unwrap();
-
-    match event {
-        Some(loopal_agent_client::AgentClientEvent::PermissionRequest { id, params }) => {
-            assert_eq!(params["tool_name"], "Bash");
-            client.respond_permission(id, true).await.unwrap();
-        }
-        other => panic!("expected PermissionRequest, got: {other:?}"),
-    }
-
-    // Server should have received the response
-    let resp = server_handle.await.unwrap().unwrap();
-    assert_eq!(resp["allow"], true);
-}
-
-#[tokio::test]
 async fn into_parts_transfers_connection() {
     let (transport, server) = make_pair();
     let _server_rx = server.start();

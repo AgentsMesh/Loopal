@@ -7,12 +7,15 @@ rust_library(
     visibility = ["//visibility:public"],
     deps = [
         "//crates/loopal-agent",
+        "//crates/loopal-agent-hub",
         "//crates/loopal-config",
+        "//crates/loopal-ipc",
         "//crates/loopal-protocol",
         "//crates/loopal-provider",
         "//crates/loopal-runtime",
         "//crates/loopal-session",
         "//crates/loopal-tool-api",
+        "//crates/loopal-view-state",
         "@crates//:anyhow",
         "@crates//:arboard",
         "@crates//:base64",
@@ -59,6 +62,7 @@ rust_test(
         "@crates//:crossterm",
         "//crates/loopal-protocol",
         "//crates/loopal-session",
+        "//crates/loopal-view-state",
     ],
     proc_macro_deps = ["@crates//:async-trait"],
 )

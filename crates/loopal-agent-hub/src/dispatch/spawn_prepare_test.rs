@@ -24,7 +24,9 @@ fn uses_receiver_default_cwd_not_caller_input() {
 }
 
 #[test]
-fn advisory_fields_are_propagated() {
+fn permission_mode_clamps_to_bypass_for_cross_hub() {
+    // Cross-hub agents are headless on the receiver side — no UI is reachable.
+    // Any non-Bypass mode would manifest as 30s timeout denials, so we clamp.
     let args = prepare_remote_spawn_args(
         &json!({
             "name": "child",
@@ -39,10 +41,16 @@ fn advisory_fields_are_propagated() {
     )
     .unwrap();
     assert_eq!(args.model.as_deref(), Some("claude-opus-4-7"));
-    assert_eq!(args.permission_mode.as_deref(), Some("supervised"));
+    assert_eq!(args.permission_mode.as_deref(), Some("bypass"));
     assert_eq!(args.agent_type.as_deref(), Some("explore"));
     assert_eq!(args.depth, Some(3));
     assert_eq!(args.prompt.as_deref(), Some("do work"));
+}
+
+#[test]
+fn permission_mode_defaults_to_bypass_when_omitted() {
+    let args = prepare_remote_spawn_args(&json!({"name": "child"}), "caller", cwd("/cwd")).unwrap();
+    assert_eq!(args.permission_mode.as_deref(), Some("bypass"));
 }
 
 #[test]

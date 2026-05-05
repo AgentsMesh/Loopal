@@ -5,7 +5,7 @@ use tracing::{info, warn};
 
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
-use loopal_protocol::{AgentEvent, AgentEventPayload, Envelope};
+use loopal_protocol::{AgentEvent, AgentEventPayload, Envelope, QualifiedAddress};
 
 use crate::hub::Hub;
 
@@ -164,13 +164,23 @@ pub async fn register_agent_connection(
 
     {
         let h = hub.lock().await;
-        let event = AgentEvent::root(AgentEventPayload::SubAgentSpawned {
-            name: name.to_string(),
-            agent_id: agent_id.clone(),
-            parent: parent_addr.clone(),
-            model: model.map(String::from),
-            session_id: session_id.map(String::from),
-        });
+        // Routed to the parent agent so the parent's ViewStateReducer
+        // appends `name` to its `children` field. Parent defaults to
+        // root "main" when unspecified (top-level spawn).
+        let parent_agent = parent_addr
+            .as_ref()
+            .map(|p| p.agent.clone())
+            .unwrap_or_else(|| "main".to_string());
+        let event = AgentEvent::named(
+            QualifiedAddress::local(parent_agent),
+            AgentEventPayload::SubAgentSpawned {
+                name: name.to_string(),
+                agent_id: agent_id.clone(),
+                parent: parent_addr.clone(),
+                model: model.map(String::from),
+                session_id: session_id.map(String::from),
+            },
+        );
         if h.registry.event_sender().try_send(event).is_err() {
             tracing::warn!(agent = %name, "SubAgentSpawned event dropped (channel full)");
         }

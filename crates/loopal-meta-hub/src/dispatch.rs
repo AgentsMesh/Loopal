@@ -19,10 +19,6 @@ pub async fn dispatch_meta_request(
         m if m == methods::META_SPAWN.name => handle_meta_spawn(meta_hub, params).await,
         m if m == methods::META_LIST_HUBS.name => handle_meta_list_hubs(meta_hub).await,
         m if m == methods::META_TOPOLOGY.name => handle_meta_topology(meta_hub).await,
-        // Permission/question relay from Sub-Hub agents → MetaHub UI clients
-        m if m == methods::AGENT_PERMISSION.name || m == methods::AGENT_QUESTION.name => {
-            handle_permission_relay(meta_hub, method, params, &from_hub).await
-        }
         _ => Err(format!("unknown meta method: {method}")),
     }
 }
@@ -134,45 +130,4 @@ async fn handle_meta_topology(meta_hub: &Arc<Mutex<MetaHub>>) -> Result<Value, S
         hubs.push(json!({"hub": name, "topology": topology}));
     }
     Ok(json!({"hubs": hubs}))
-}
-
-/// Relay permission/question request to MetaHub's own UI clients.
-async fn handle_permission_relay(
-    meta_hub: &Arc<Mutex<MetaHub>>,
-    method: &str,
-    params: Value,
-    from_hub: &str,
-) -> Result<Value, String> {
-    let ui_conns = {
-        let mh = meta_hub.lock().await;
-        mh.ui.get_client_connections()
-    };
-
-    if ui_conns.is_empty() {
-        tracing::warn!(hub = %from_hub, %method, "no MetaHub UI clients, denying");
-        return Ok(json!({"allow": false}));
-    }
-
-    // Relay to first available UI client with timeout
-    if let Some((client_name, conn)) = ui_conns.first() {
-        match tokio::time::timeout(
-            std::time::Duration::from_secs(30),
-            conn.send_request(method, params),
-        )
-        .await
-        {
-            Ok(Ok(resp)) => {
-                tracing::info!(hub = %from_hub, client = %client_name, %method, "relay succeeded");
-                return Ok(resp);
-            }
-            Ok(Err(e)) => {
-                tracing::warn!(hub = %from_hub, client = %client_name, error = %e, "relay failed");
-            }
-            Err(_) => {
-                tracing::warn!(hub = %from_hub, client = %client_name, "relay timed out (30s)");
-            }
-        }
-    }
-
-    Ok(json!({"allow": false}))
 }

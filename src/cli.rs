@@ -68,6 +68,17 @@ pub struct Cli {
     #[arg(long)]
     pub hub_name: Option<String>,
 
+    /// Attach to an existing Hub (`addr:port`) as an additional UI
+    /// client instead of starting a new Hub. Use the `Hub listening`
+    /// stderr line printed by the first instance to find the address.
+    #[arg(long)]
+    pub attach_hub: Option<String>,
+
+    /// Auth token required by `--attach-hub`. Printed on stderr by the
+    /// first instance alongside `Hub listening`.
+    #[arg(long)]
+    pub hub_token: Option<String>,
+
     /// Initial prompt (non-interactive)
     pub prompt: Vec<String>,
 }
@@ -121,6 +132,8 @@ mod tests {
             meta_hub: None,
             join_hub: None,
             hub_name: None,
+            attach_hub: None,
+            hub_token: None,
             prompt: vec![],
         }
     }

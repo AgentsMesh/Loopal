@@ -7,6 +7,7 @@ use loopal_config::load_config;
 use crate::cli::Cli;
 
 mod acp;
+mod attach_mode;
 mod hub_bootstrap;
 mod meta_hub;
 mod multiprocess;
@@ -28,6 +29,10 @@ pub async fn run() -> anyhow::Result<()> {
 
     if let Some(ref bind_addr) = cli.meta_hub {
         return meta_hub::run(bind_addr).await;
+    }
+
+    if let Some(ref hub_addr) = cli.attach_hub {
+        return attach_mode::run(&cli, &cwd, &config, hub_addr).await;
     }
 
     if cli.acp {

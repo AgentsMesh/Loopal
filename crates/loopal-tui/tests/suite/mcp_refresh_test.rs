@@ -7,8 +7,6 @@ fn make_app() -> App {
     let (perm_tx, _) = tokio::sync::mpsc::channel::<bool>(16);
     let (question_tx, _) = tokio::sync::mpsc::channel::<UserQuestionResponse>(16);
     let session = SessionController::new(
-        "m".to_string(),
-        "act".to_string(),
         control_tx,
         perm_tx,
         question_tx,
@@ -58,10 +56,9 @@ fn refresh(app: &mut App) {
 fn test_refresh_populates_unloaded_page() {
     let mut app = make_app();
     app.sub_page = Some(SubPage::McpPage(McpPageState::new(None)));
-    app.session
-        .handle_event(AgentEvent::root(AgentEventPayload::McpStatusReport {
-            servers: servers(),
-        }));
+    app.dispatch_event(AgentEvent::root(AgentEventPayload::McpStatusReport {
+        servers: servers(),
+    }));
     refresh(&mut app);
     let s = match app.sub_page.as_ref().unwrap() {
         SubPage::McpPage(s) => s,
@@ -79,10 +76,9 @@ fn test_refresh_clamps_selection() {
     state.scroll_offset = 1;
     app.sub_page = Some(SubPage::McpPage(state));
 
-    app.session
-        .handle_event(AgentEvent::root(AgentEventPayload::McpStatusReport {
-            servers: vec![servers()[0].clone()],
-        }));
+    app.dispatch_event(AgentEvent::root(AgentEventPayload::McpStatusReport {
+        servers: vec![servers()[0].clone()],
+    }));
     refresh(&mut app);
 
     let s = match app.sub_page.as_ref().unwrap() {
@@ -97,10 +93,9 @@ fn test_refresh_clamps_selection() {
 #[test]
 fn test_refresh_noop_when_page_closed() {
     let mut app = make_app();
-    app.session
-        .handle_event(AgentEvent::root(AgentEventPayload::McpStatusReport {
-            servers: servers(),
-        }));
+    app.dispatch_event(AgentEvent::root(AgentEventPayload::McpStatusReport {
+        servers: servers(),
+    }));
     refresh(&mut app);
     assert!(app.sub_page.is_none());
     assert!(app.session.lock().mcp_status.is_some());
@@ -110,10 +105,9 @@ fn test_refresh_noop_when_page_closed() {
 fn test_refresh_to_empty_list() {
     let mut app = make_app();
     app.sub_page = Some(SubPage::McpPage(McpPageState::new(Some(servers()))));
-    app.session
-        .handle_event(AgentEvent::root(AgentEventPayload::McpStatusReport {
-            servers: vec![],
-        }));
+    app.dispatch_event(AgentEvent::root(AgentEventPayload::McpStatusReport {
+        servers: vec![],
+    }));
     refresh(&mut app);
     let s = match app.sub_page.as_ref().unwrap() {
         SubPage::McpPage(s) => s,

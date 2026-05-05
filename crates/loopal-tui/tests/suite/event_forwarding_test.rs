@@ -7,7 +7,8 @@ use tokio::sync::mpsc;
 /// Helper: send an event and wait for a matching AppEvent::Agent variant.
 async fn send_and_recv(event: AgentEvent) -> AgentEvent {
     let (agent_tx, agent_rx) = mpsc::channel::<AgentEvent>(16);
-    let mut handler = EventHandler::new(agent_rx);
+    let (_resync_tx, resync_rx) = mpsc::channel::<()>(8);
+    let mut handler = EventHandler::new(agent_rx, resync_rx);
 
     agent_tx.send(event).await.unwrap();
 

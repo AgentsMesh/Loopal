@@ -47,9 +47,6 @@ async fn start_test_server(
     (client, rx, fixture)
 }
 
-/// Model override in agent/start should propagate to the agent loop.
-/// After the refactoring, session_start applies overrides to config before
-/// building the agent — this test guards against regression.
 #[tokio::test]
 async fn model_override_applied_in_session_start() {
     use loopal_test_support::chunks;

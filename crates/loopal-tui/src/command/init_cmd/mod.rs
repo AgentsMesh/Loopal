@@ -75,7 +75,7 @@ fn run_init(app: &mut App) -> CommandEffect {
     };
     lines.push(String::new());
     lines.push(action.to_string());
-    app.session.push_system_message(lines.join("\n"));
+    app.push_system_message(lines.join("\n"));
 
     // 5. Build prompt and inject into agent loop
     let prompt = build_init_prompt(cwd, existing_content.as_deref());

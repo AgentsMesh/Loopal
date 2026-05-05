@@ -4,23 +4,16 @@ use tokio::sync::mpsc;
 
 use crate::input::paste::PasteResult;
 
-/// Unified event type for the TUI main loop
 #[derive(Debug)]
 pub enum AppEvent {
-    /// Keyboard / terminal event
     Key(KeyEvent),
-    /// Mouse scroll up (wheel toward user → content scrolls toward top)
     ScrollUp,
-    /// Mouse scroll down (wheel away from user → content scrolls toward bottom)
     ScrollDown,
-    /// Resize event
     Resize(u16, u16),
-    /// Agent event from the runtime
     Agent(AgentEvent),
-    /// Clipboard paste completed (from background thread)
     Paste(PasteResult),
-    /// Tick for periodic UI refresh
     Tick,
+    Resync,
 }
 
 /// Merges crossterm terminal events with agent events into a single stream.
@@ -30,11 +23,10 @@ pub struct EventHandler {
 }
 
 impl EventHandler {
-    /// Create a new EventHandler.
-    ///
-    /// `agent_rx` receives AgentEvents from the runtime.
-    /// Terminal events are polled in a background task.
-    pub fn new(mut agent_rx: mpsc::Receiver<AgentEvent>) -> Self {
+    pub fn new(
+        mut agent_rx: mpsc::Receiver<AgentEvent>,
+        mut resync_rx: mpsc::Receiver<()>,
+    ) -> Self {
         // Use a large buffer so that agent events are never blocked by
         // slow UI rendering. The agent runtime sends events (Stream,
         // ToolCall, TokenUsage, …) via a bounded channel; if our
@@ -104,6 +96,15 @@ impl EventHandler {
         tokio::spawn(async move {
             while let Some(event) = agent_rx.recv().await {
                 if agent_tx.send(AppEvent::Agent(event)).await.is_err() {
+                    break;
+                }
+            }
+        });
+
+        let resync_fwd_tx = tx.clone();
+        tokio::spawn(async move {
+            while resync_rx.recv().await.is_some() {
+                if resync_fwd_tx.send(AppEvent::Resync).await.is_err() {
                     break;
                 }
             }

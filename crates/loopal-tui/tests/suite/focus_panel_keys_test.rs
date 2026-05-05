@@ -13,8 +13,6 @@ fn make_app() -> App {
     let (perm_tx, _) = mpsc::channel::<bool>(16);
     let (question_tx, _) = mpsc::channel::<UserQuestionResponse>(16);
     let session = SessionController::new(
-        "test-model".into(),
-        "act".into(),
         control_tx,
         perm_tx,
         question_tx,
@@ -32,8 +30,8 @@ fn ctrl(c: char) -> KeyEvent {
     KeyEvent::new(KeyCode::Char(c), KeyModifiers::CONTROL)
 }
 
-fn spawn_agent(app: &App, name: &str) {
-    app.session.handle_event(AgentEvent::named(
+fn spawn_agent(app: &mut App, name: &str) {
+    app.dispatch_event(AgentEvent::named(
         name,
         AgentEventPayload::SubAgentSpawned {
             name: name.to_string(),
@@ -43,8 +41,7 @@ fn spawn_agent(app: &App, name: &str) {
             session_id: None,
         },
     ));
-    app.session
-        .handle_event(AgentEvent::named(name, AgentEventPayload::Started));
+    app.dispatch_event(AgentEvent::named(name, AgentEventPayload::Started));
 }
 
 // === Up/Down in AgentPanel ===
@@ -52,8 +49,8 @@ fn spawn_agent(app: &App, name: &str) {
 #[test]
 fn down_in_agent_panel_returns_panel_down() {
     let mut app = make_app();
-    spawn_agent(&app, "a");
-    spawn_agent(&app, "b");
+    spawn_agent(&mut app, "a");
+    spawn_agent(&mut app, "b");
     app.section_mut(PanelKind::Agents).focused = Some("a".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     let action = handle_key(&mut app, key(KeyCode::Down));
@@ -63,7 +60,7 @@ fn down_in_agent_panel_returns_panel_down() {
 #[test]
 fn up_in_agent_panel_returns_panel_up() {
     let mut app = make_app();
-    spawn_agent(&app, "worker");
+    spawn_agent(&mut app, "worker");
     app.section_mut(PanelKind::Agents).focused = Some("worker".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     let action = handle_key(&mut app, key(KeyCode::Up));
@@ -73,7 +70,7 @@ fn up_in_agent_panel_returns_panel_up() {
 #[test]
 fn up_in_input_mode_ignores_agent_panel() {
     let mut app = make_app();
-    spawn_agent(&app, "worker");
+    spawn_agent(&mut app, "worker");
     app.section_mut(PanelKind::Agents).focused = Some("worker".into());
     app.focus_mode = FocusMode::Input;
     let action = handle_key(&mut app, key(KeyCode::Up));
@@ -85,7 +82,7 @@ fn up_in_input_mode_ignores_agent_panel() {
 #[test]
 fn ctrl_p_in_agent_panel_navigates_up() {
     let mut app = make_app();
-    spawn_agent(&app, "worker");
+    spawn_agent(&mut app, "worker");
     app.section_mut(PanelKind::Agents).focused = Some("worker".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     let action = handle_key(&mut app, ctrl('p'));
@@ -95,7 +92,7 @@ fn ctrl_p_in_agent_panel_navigates_up() {
 #[test]
 fn ctrl_n_in_agent_panel_navigates_down() {
     let mut app = make_app();
-    spawn_agent(&app, "worker");
+    spawn_agent(&mut app, "worker");
     app.section_mut(PanelKind::Agents).focused = Some("worker".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     let action = handle_key(&mut app, ctrl('n'));
@@ -116,7 +113,7 @@ fn ctrl_p_in_input_mode_does_history() {
 #[test]
 fn delete_in_agent_panel_terminates_agent() {
     let mut app = make_app();
-    spawn_agent(&app, "worker");
+    spawn_agent(&mut app, "worker");
     app.section_mut(PanelKind::Agents).focused = Some("worker".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     let action = handle_key(&mut app, key(KeyCode::Delete));
@@ -126,7 +123,7 @@ fn delete_in_agent_panel_terminates_agent() {
 #[test]
 fn delete_in_input_mode_deletes_char() {
     let mut app = make_app();
-    spawn_agent(&app, "worker");
+    spawn_agent(&mut app, "worker");
     app.section_mut(PanelKind::Agents).focused = Some("worker".into());
     app.focus_mode = FocusMode::Input;
     app.input = "hello".into();
@@ -141,7 +138,7 @@ fn delete_in_input_mode_deletes_char() {
 #[test]
 fn enter_in_agent_panel_returns_enter_agent_view() {
     let mut app = make_app();
-    spawn_agent(&app, "researcher");
+    spawn_agent(&mut app, "researcher");
     app.section_mut(PanelKind::Agents).focused = Some("researcher".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     let action = handle_key(&mut app, key(KeyCode::Enter));
@@ -151,7 +148,7 @@ fn enter_in_agent_panel_returns_enter_agent_view() {
 #[test]
 fn enter_in_input_mode_with_focus_also_drills_in() {
     let mut app = make_app();
-    spawn_agent(&app, "researcher");
+    spawn_agent(&mut app, "researcher");
     app.section_mut(PanelKind::Agents).focused = Some("researcher".into());
     app.focus_mode = FocusMode::Input;
     // Empty input + focused agent → drill in (backward-compat path via editing.rs)
@@ -162,13 +159,13 @@ fn enter_in_input_mode_with_focus_also_drills_in() {
 #[test]
 fn enter_in_tasks_panel_returns_none() {
     let mut app = make_app();
-    app.task_snapshots.push(loopal_protocol::TaskSnapshot {
+    app.view_clients["main"].inject_tasks_for_test(vec![loopal_protocol::TaskSnapshot {
         id: "1".into(),
         subject: "Task".into(),
         active_form: None,
         status: loopal_protocol::TaskSnapshotStatus::InProgress,
         blocked_by: Vec::new(),
-    });
+    }]);
     app.section_mut(PanelKind::Tasks).focused = Some("1".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Tasks);
     let action = handle_key(&mut app, key(KeyCode::Enter));

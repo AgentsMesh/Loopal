@@ -9,8 +9,6 @@ fn make_app() -> App {
     let (perm_tx, _) = tokio::sync::mpsc::channel::<bool>(16);
     let (question_tx, _) = tokio::sync::mpsc::channel::<UserQuestionResponse>(16);
     let session = SessionController::new(
-        "m".to_string(),
-        "act".to_string(),
         control_tx,
         perm_tx,
         question_tx,

@@ -117,6 +117,7 @@ pub(crate) async fn start_session(
         let agent_params = setup.params;
         let task_store_for_bridge = setup.task_store;
         let scheduler_for_bridge = setup.scheduler;
+        let agent_shared_for_session = setup.agent_shared;
 
         // Bind the scheduler to this session's id. Idempotent and
         // unifies fresh-session and resumed-session code paths through
@@ -137,8 +138,10 @@ pub(crate) async fn start_session(
             input_tx,
             interrupt: interrupt.clone(),
             interrupt_tx: interrupt_tx.clone(),
+            agent_shared: Mutex::new(None),
         });
         session.add_client("stdio".into(), connection.clone()).await;
+        session.set_agent_shared(&agent_shared_for_session).await;
         frontend_placeholder.replace_session(session.clone()).await;
         hub.register_session(session.clone()).await;
 

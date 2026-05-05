@@ -14,14 +14,16 @@ pub mod finish;
 mod hub;
 pub mod hub_server;
 mod hub_ui_client;
+pub mod pending_relay;
 mod routing;
 pub mod spawn_manager;
+mod tcp_ui_io;
 pub mod topology;
 mod types;
 mod ui_dispatcher;
-mod ui_relay;
 pub mod ui_session;
 pub mod uplink;
+pub mod view_router;
 
 pub use agent_registry::AgentRegistry;
 pub use event_router::start_event_loop;

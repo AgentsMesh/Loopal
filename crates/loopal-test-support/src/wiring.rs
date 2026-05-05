@@ -1,8 +1,10 @@
 //! Core channel wiring logic — mirrors `bootstrap.rs:75-186`.
 //!
 //! When `permission_mode == Bypass`, uses `AutoDenyHandler` (no channel needed).
-//! Otherwise, uses `RelayPermissionHandler` with a real permission channel so that
-//! `SessionController.approve_permission()` flows through to the agent loop.
+//! Otherwise, uses `RelayPermissionHandler` (test-only PermissionHandler that
+//! emits `ToolPermissionRequest` events and waits on a channel) so that
+//! `SessionController::respond_permission(tool_call_id, allow)` flows through
+//! to the agent loop in Local mode.
 
 use std::sync::Arc;
 
@@ -106,8 +108,6 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
     let shared_any: Arc<dyn std::any::Any + Send + Sync> = Arc::new(shared);
 
     let session_ctrl = SessionController::new(
-        builder.model.clone(),
-        "act".into(),
         control_tx.clone(),
         permission_tx,
         question_tx,

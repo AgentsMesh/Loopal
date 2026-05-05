@@ -41,11 +41,18 @@ check: clippy fmt test
 
 MODEL ?= claude-opus-4-7
 
+# Optional: attach to an existing Hub instead of starting a new one.
+# Example: make run ATTACH_HUB=127.0.0.1:54321 HUB_TOKEN=a3f4b9c...
+ATTACH_HUB ?=
+HUB_TOKEN ?=
+
+ATTACH_FLAGS = $(if $(ATTACH_HUB),--attach-hub $(ATTACH_HUB)) $(if $(HUB_TOKEN),--hub-token $(HUB_TOKEN))
+
 run: build
-	./bazel-bin/loopal -m $(MODEL) $(ARGS)
+	./bazel-bin/loopal -m $(MODEL) $(ATTACH_FLAGS) $(ARGS)
 
 debug: build
-	LOOPAL_LOG=debug ./bazel-bin/loopal -m $(MODEL) $(ARGS)
+	LOOPAL_LOG=debug ./bazel-bin/loopal -m $(MODEL) $(ATTACH_FLAGS) $(ARGS)
 
 # ── Dependencies ─────────────────────────────────────────────────────────────
 

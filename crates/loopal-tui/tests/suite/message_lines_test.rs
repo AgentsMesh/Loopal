@@ -1,5 +1,5 @@
-use loopal_session::types::SessionMessage;
 use loopal_tui::views::progress::{message_to_lines, streaming_to_lines};
+use loopal_view_state::SessionMessage;
 
 fn msg(role: &str, content: &str) -> SessionMessage {
     SessionMessage {
@@ -9,6 +9,8 @@ fn msg(role: &str, content: &str) -> SessionMessage {
         image_count: 0,
         skill_info: None,
         inbox: None,
+        message_id: None,
+        ui_local: false,
     }
 }
 

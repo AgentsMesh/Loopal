@@ -8,7 +8,7 @@ use ratatui::prelude::*;
 
 use crate::app::{App, PanelKind};
 use crate::panel_provider::PanelProvider;
-use crate::views::agent_panel;
+use crate::views::agent_panel::{self, AgentDisplayInfo};
 
 pub struct AgentPanelProvider;
 
@@ -22,15 +22,18 @@ impl PanelProvider for AgentPanelProvider {
     fn max_visible(&self) -> usize {
         agent_panel::MAX_VISIBLE
     }
-    fn item_ids(&self, _app: &App, state: &SessionState) -> Vec<String> {
-        live_agent_ids(state)
+    fn item_ids(&self, app: &App, state: &SessionState) -> Vec<String> {
+        live_agent_ids(app, state)
     }
-    fn count(&self, _app: &App, state: &SessionState) -> usize {
-        live_agents(state).count()
+    fn count(&self, app: &App, state: &SessionState) -> usize {
+        snapshot(app)
+            .into_iter()
+            .filter(|(name, info)| name != &state.active_view && is_live(&info.status))
+            .count()
     }
     fn height(&self, app: &App, state: &SessionState) -> u16 {
         let offset = app.section(PanelKind::Agents).scroll_offset;
-        agent_panel::panel_height(&state.agents, &state.active_view, offset)
+        agent_panel::panel_height(&snapshot(app), &state.active_view, offset)
     }
     fn render(
         &self,
@@ -44,7 +47,7 @@ impl PanelProvider for AgentPanelProvider {
         let offset = app.section(PanelKind::Agents).scroll_offset;
         agent_panel::render_agent_panel(
             f,
-            &state.agents,
+            &snapshot(app),
             focused,
             &state.active_view,
             offset,
@@ -53,21 +56,32 @@ impl PanelProvider for AgentPanelProvider {
     }
 }
 
-pub(crate) fn live_agent_ids(state: &SessionState) -> Vec<String> {
-    live_agents(state).map(|(k, _)| k.clone()).collect()
+pub(crate) fn live_agent_ids(app: &App, state: &SessionState) -> Vec<String> {
+    snapshot(app)
+        .into_iter()
+        .filter(|(name, info)| name != &state.active_view && is_live(&info.status))
+        .map(|(name, _)| name)
+        .collect()
 }
 
-/// Iterator over live sub-agents, excluding the currently active view.
-///
-/// Shared by `item_ids` (clones into a `Vec`) and `count` (just counts),
-/// so the filter predicate lives in one place.
-pub(crate) fn live_agents(
-    state: &SessionState,
-) -> impl Iterator<Item = (&String, &loopal_session::state::AgentViewState)> + '_ {
-    state
-        .agents
+/// Read each agent's display info from its `ViewClient` once per query.
+pub(crate) fn snapshot(app: &App) -> Vec<(String, AgentDisplayInfo)> {
+    app.view_clients
         .iter()
-        .filter(|(k, a)| k.as_str() != state.active_view && is_live(&a.observable.status))
+        .map(|(name, vc)| {
+            let guard = vc.state();
+            let view = &guard.state().agent;
+            (
+                name.clone(),
+                AgentDisplayInfo {
+                    status: view.observable.status,
+                    last_tool: view.observable.last_tool.clone(),
+                    tools_in_flight: view.observable.tools_in_flight,
+                    elapsed: view.elapsed(),
+                },
+            )
+        })
+        .collect()
 }
 
 fn is_live(status: &AgentStatus) -> bool {

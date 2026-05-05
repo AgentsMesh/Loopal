@@ -3,6 +3,7 @@ pub mod config;
 pub mod session_resume_adapters;
 pub mod shared;
 pub mod spawn;
+pub mod state_snapshot;
 pub mod task_file_storage;
 pub mod task_memory_storage;
 pub mod task_patch;
@@ -14,6 +15,7 @@ pub mod types;
 
 pub use session_resume_adapters::{CronResumeAdapter, TaskResumeAdapter};
 pub use shared::AgentShared;
+pub use state_snapshot::{cron_info_to_snapshot, task_to_snapshot};
 pub use task_file_storage::FileScopedTaskStore;
 pub use task_memory_storage::InMemoryTaskStorage;
 pub use task_patch::TaskPatch;

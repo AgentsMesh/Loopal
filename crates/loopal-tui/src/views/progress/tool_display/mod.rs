@@ -13,7 +13,7 @@ pub(crate) use output_format::{dim_style, expand_output, output_first_line, outp
 
 use ratatui::prelude::*;
 
-use loopal_session::types::{SessionToolCall, ToolCallStatus};
+use loopal_view_state::{SessionToolCall, ToolCallStatus};
 
 use crate::views::unified_status::spinner_frame;
 

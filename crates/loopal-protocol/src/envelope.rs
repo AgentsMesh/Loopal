@@ -78,7 +78,7 @@ pub struct Envelope {
     pub content: UserContent,
     pub timestamp: DateTime<Utc>,
     /// Sender-supplied UI preview, distinct from `content_preview()` truncation.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
 }
 

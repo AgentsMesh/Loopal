@@ -3,8 +3,6 @@ mod test_helpers;
 
 #[path = "suite/address_test.rs"]
 mod address_test;
-#[path = "suite/aggregator_snat_test.rs"]
-mod aggregator_snat_test;
 #[path = "suite/e2e_tcp_test.rs"]
 mod e2e_tcp_test;
 #[path = "suite/hub_lifecycle_test.rs"]

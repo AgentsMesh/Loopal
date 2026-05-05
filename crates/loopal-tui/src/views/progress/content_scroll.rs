@@ -12,7 +12,7 @@
 use ratatui::prelude::*;
 use ratatui::widgets::Paragraph;
 
-use loopal_session::state::SessionState;
+use loopal_view_state::AgentConversation;
 
 use super::line_cache::LineCache;
 use super::message_lines::streaming_to_lines;
@@ -66,13 +66,11 @@ impl ContentScroll {
     }
 
     /// Render the content area into the given frame region.
-    pub fn render(&mut self, f: &mut Frame, state: &SessionState, area: Rect) {
+    pub fn render(&mut self, f: &mut Frame, conv: &AgentConversation, area: Rect) {
         let visible_h = area.height as usize;
         if visible_h == 0 {
             return;
         }
-
-        let conv = state.active_conversation();
 
         self.line_cache.update(&conv.messages, area.width);
 

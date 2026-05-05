@@ -1,7 +1,6 @@
 pub mod cancel;
 mod compaction;
 mod context_pipeline;
-mod context_prep;
 pub mod diff_tracker;
 pub mod env_context;
 mod finished_guard;

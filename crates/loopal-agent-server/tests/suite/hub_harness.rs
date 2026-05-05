@@ -112,6 +112,7 @@ pub async fn build_hub_harness_with(
         input_tx: input_tx.clone(),
         interrupt: interrupt.clone(),
         interrupt_tx: interrupt_tx.clone(),
+        agent_shared: Mutex::new(None),
     });
     let (server_conn, client_conn, client_rx) = conn_pair();
     session.add_client("test".into(), server_conn).await;

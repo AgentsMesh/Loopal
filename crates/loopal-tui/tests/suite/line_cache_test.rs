@@ -1,5 +1,5 @@
-use loopal_session::types::{SessionMessage, SessionToolCall, ToolCallStatus};
 use loopal_tui::views::progress::LineCache;
+use loopal_view_state::{SessionMessage, SessionToolCall, ToolCallStatus};
 
 const W: u16 = 80;
 
@@ -11,6 +11,8 @@ fn msg(role: &str, content: &str) -> SessionMessage {
         image_count: 0,
         skill_info: None,
         inbox: None,
+        message_id: None,
+        ui_local: false,
     }
 }
 
@@ -75,6 +77,8 @@ fn test_tool_call_mutation_detected() {
         image_count: 0,
         skill_info: None,
         inbox: None,
+        message_id: None,
+        ui_local: false,
     }];
     let fp1 = cache.update(&msgs, W);
 
@@ -140,6 +144,8 @@ fn test_tool_result_arrival_invalidates_cache() {
         image_count: 0,
         skill_info: None,
         inbox: None,
+        message_id: None,
+        ui_local: false,
     }];
     let n1 = cache.update(&msgs, W);
 

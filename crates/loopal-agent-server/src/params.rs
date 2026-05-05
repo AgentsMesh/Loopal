@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use loopal_agent::AgentShared;
 use loopal_agent::task_store::TaskStore;
 use loopal_config::ResolvedConfig;
 use loopal_kernel::Kernel;
@@ -13,6 +14,10 @@ pub struct AgentSetupResult {
     pub params: AgentLoopParams,
     pub task_store: Arc<TaskStore>,
     pub scheduler: Arc<CronScheduler>,
+    /// Shared agent state, exposed for `agent/state_snapshot` IPC and
+    /// any future observers that need a typed handle (the same instance
+    /// is also stored type-erased inside `params.shared`).
+    pub agent_shared: Arc<AgentShared>,
 }
 
 pub struct StartParams {

@@ -2,17 +2,21 @@ use loopal_protocol::{AgentEvent, AgentEventPayload};
 use loopal_tui::event::{AppEvent, EventHandler};
 use tokio::sync::mpsc;
 
+fn handler_for(agent_rx: mpsc::Receiver<AgentEvent>) -> EventHandler {
+    let (_resync_tx, resync_rx) = mpsc::channel::<()>(8);
+    EventHandler::new(agent_rx, resync_rx)
+}
+
 #[tokio::test]
 async fn test_event_handler_construction() {
     let (_agent_tx, agent_rx) = mpsc::channel::<AgentEvent>(16);
-    let _handler = EventHandler::new(agent_rx);
-    // Construction should succeed without panic
+    let _handler = handler_for(agent_rx);
 }
 
 #[tokio::test]
 async fn test_try_next_returns_none_when_empty() {
     let (_agent_tx, agent_rx) = mpsc::channel::<AgentEvent>(16);
-    let mut handler = EventHandler::new(agent_rx);
+    let mut handler = handler_for(agent_rx);
 
     let result = handler.try_next();
     assert!(
@@ -24,7 +28,7 @@ async fn test_try_next_returns_none_when_empty() {
 #[tokio::test]
 async fn test_agent_events_come_through() {
     let (agent_tx, agent_rx) = mpsc::channel::<AgentEvent>(16);
-    let mut handler = EventHandler::new(agent_rx);
+    let mut handler = handler_for(agent_rx);
 
     agent_tx
         .send(AgentEvent::root(AgentEventPayload::Started))
@@ -45,7 +49,7 @@ async fn test_agent_events_come_through() {
 #[tokio::test]
 async fn test_agent_stream_event_forwarded() {
     let (agent_tx, agent_rx) = mpsc::channel::<AgentEvent>(16);
-    let mut handler = EventHandler::new(agent_rx);
+    let mut handler = handler_for(agent_rx);
 
     agent_tx
         .send(AgentEvent::root(AgentEventPayload::Stream {
@@ -71,7 +75,7 @@ async fn test_agent_stream_event_forwarded() {
 #[tokio::test]
 async fn test_tick_events_arrive() {
     let (_agent_tx, agent_rx) = mpsc::channel::<AgentEvent>(16);
-    let mut handler = EventHandler::new(agent_rx);
+    let mut handler = handler_for(agent_rx);
 
     let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(2);
     let mut got_tick = false;
@@ -94,7 +98,7 @@ async fn test_tick_events_arrive() {
 #[tokio::test]
 async fn test_dropping_sender_closes_agent_forwarding() {
     let (agent_tx, agent_rx) = mpsc::channel::<AgentEvent>(16);
-    let mut handler = EventHandler::new(agent_rx);
+    let mut handler = handler_for(agent_rx);
 
     agent_tx
         .send(AgentEvent::root(AgentEventPayload::Finished))
@@ -125,7 +129,7 @@ async fn test_dropping_sender_closes_agent_forwarding() {
 #[tokio::test]
 async fn test_multiple_agent_events_ordering() {
     let (agent_tx, agent_rx) = mpsc::channel::<AgentEvent>(16);
-    let mut handler = EventHandler::new(agent_rx);
+    let mut handler = handler_for(agent_rx);
 
     agent_tx
         .send(AgentEvent::root(AgentEventPayload::Started))

@@ -5,12 +5,12 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Skill invocation metadata (display-only, not serialized).
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Skill invocation metadata (display-side; serialized when carried inside
+/// per-agent `ViewSnapshot` payloads, but stripped from `UserContent`
+/// before IPC routing).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SkillInvocation {
-    /// Slash-command name, e.g. "/github-pr".
     pub name: String,
-    /// User-supplied arguments (empty string when none).
     pub user_args: String,
 }
 

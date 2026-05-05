@@ -14,8 +14,6 @@ fn make_app() -> App {
     let (perm_tx, _) = mpsc::channel::<bool>(16);
     let (question_tx, _) = mpsc::channel::<UserQuestionResponse>(16);
     let session = SessionController::new(
-        "test-model".into(),
-        "act".into(),
         control_tx,
         perm_tx,
         question_tx,
@@ -25,8 +23,8 @@ fn make_app() -> App {
     App::new(session, std::env::temp_dir())
 }
 
-fn spawn_agent(app: &App, name: &str) {
-    app.session.handle_event(AgentEvent::named(
+fn spawn_agent(app: &mut App, name: &str) {
+    app.dispatch_event(AgentEvent::named(
         name,
         AgentEventPayload::SubAgentSpawned {
             name: name.to_string(),
@@ -36,32 +34,30 @@ fn spawn_agent(app: &App, name: &str) {
             session_id: None,
         },
     ));
-    app.session
-        .handle_event(AgentEvent::named(name, AgentEventPayload::Started));
+    app.dispatch_event(AgentEvent::named(name, AgentEventPayload::Started));
 }
 
-fn finish_agent(app: &App, name: &str) {
-    app.session
-        .handle_event(AgentEvent::named(name, AgentEventPayload::Finished));
+fn finish_agent(app: &mut App, name: &str) {
+    app.dispatch_event(AgentEvent::named(name, AgentEventPayload::Finished));
 }
 
 fn add_bg_snapshot(app: &mut App, id: &str, desc: &str) {
-    app.bg_snapshots.push(BgTaskSnapshot {
+    app.view_clients["main"].inject_bg_for_test(vec![BgTaskSnapshot {
         id: id.into(),
         description: desc.into(),
         status: BgTaskStatus::Running,
         exit_code: None,
-    });
+    }]);
 }
 
 fn add_task_snapshot(app: &mut App, id: &str, subject: &str) {
-    app.task_snapshots.push(TaskSnapshot {
+    app.view_clients["main"].inject_tasks_for_test(vec![TaskSnapshot {
         id: id.into(),
         subject: subject.into(),
         active_form: None,
         status: TaskSnapshotStatus::InProgress,
         blocked_by: Vec::new(),
-    });
+    }]);
 }
 
 #[test]
@@ -75,8 +71,8 @@ fn noop_without_agents() {
 #[test]
 fn sets_mode_and_focuses_first() {
     let mut app = make_app();
-    spawn_agent(&app, "alpha");
-    spawn_agent(&app, "beta");
+    spawn_agent(&mut app, "alpha");
+    spawn_agent(&mut app, "beta");
     enter_panel(&mut app);
     assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Agents));
     assert_eq!(
@@ -88,8 +84,8 @@ fn sets_mode_and_focuses_first() {
 #[test]
 fn keeps_existing_live_focus() {
     let mut app = make_app();
-    spawn_agent(&app, "alpha");
-    spawn_agent(&app, "beta");
+    spawn_agent(&mut app, "alpha");
+    spawn_agent(&mut app, "beta");
     app.section_mut(PanelKind::Agents).focused = Some("beta".into());
     enter_panel(&mut app);
     assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Agents));
@@ -102,9 +98,9 @@ fn keeps_existing_live_focus() {
 #[test]
 fn refocuses_when_focused_agent_is_dead() {
     let mut app = make_app();
-    spawn_agent(&app, "alive");
-    spawn_agent(&app, "dead");
-    finish_agent(&app, "dead");
+    spawn_agent(&mut app, "alive");
+    spawn_agent(&mut app, "dead");
+    finish_agent(&mut app, "dead");
     app.section_mut(PanelKind::Agents).focused = Some("dead".into());
     enter_panel(&mut app);
     assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Agents));
@@ -118,8 +114,8 @@ fn refocuses_when_focused_agent_is_dead() {
 #[test]
 fn noop_when_only_finished_agents() {
     let mut app = make_app();
-    spawn_agent(&app, "done");
-    finish_agent(&app, "done");
+    spawn_agent(&mut app, "done");
+    finish_agent(&mut app, "done");
     enter_panel(&mut app);
     assert_eq!(app.focus_mode, FocusMode::Input);
 }
@@ -139,8 +135,8 @@ fn enters_bg_tasks_when_no_agents_but_bg_tasks() {
 #[test]
 fn enters_bg_tasks_when_only_finished_agents_and_bg_tasks() {
     let mut app = make_app();
-    spawn_agent(&app, "done");
-    finish_agent(&app, "done");
+    spawn_agent(&mut app, "done");
+    finish_agent(&mut app, "done");
     add_bg_snapshot(&mut app, "t2", "testing");
     enter_panel(&mut app);
     assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::BgTasks));
@@ -149,7 +145,7 @@ fn enters_bg_tasks_when_only_finished_agents_and_bg_tasks() {
 #[test]
 fn prefers_agents_over_bg_tasks() {
     let mut app = make_app();
-    spawn_agent(&app, "worker");
+    spawn_agent(&mut app, "worker");
     add_bg_snapshot(&mut app, "t3", "linting");
     enter_panel(&mut app);
     assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Agents));
@@ -167,7 +163,7 @@ fn enters_tasks_when_no_agents_but_tasks() {
 #[test]
 fn prefers_agents_over_tasks() {
     let mut app = make_app();
-    spawn_agent(&app, "worker");
+    spawn_agent(&mut app, "worker");
     add_task_snapshot(&mut app, "1", "Build thing");
     enter_panel(&mut app);
     assert_eq!(app.focus_mode, FocusMode::Panel(PanelKind::Agents));

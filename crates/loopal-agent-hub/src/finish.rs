@@ -22,6 +22,8 @@ pub async fn finish_and_deliver(
 ) {
     let output_text = output.as_deref().unwrap_or("(no output)").to_string();
 
+    crate::pending_relay::cleanup_pending_for_agent(hub, name).await;
+
     let (pending, uplink, parent_addr) = {
         let mut h = hub.lock().await;
         let parent = h
@@ -67,6 +69,7 @@ pub async fn finish_and_deliver(
 /// pending-then-deliver pattern in `finish_and_deliver` to ensure the
 /// parent agent's conversation actually receives the agent-result envelope.
 pub async fn deliver_cross_hub_completion(hub: &Arc<Mutex<Hub>>, child: &str, output: String) {
+    crate::pending_relay::cleanup_pending_for_agent(hub, child).await;
     let pending = {
         let mut h = hub.lock().await;
         let pending = h.registry.emit_agent_finished(child, Some(output));

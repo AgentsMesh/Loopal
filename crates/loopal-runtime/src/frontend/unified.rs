@@ -71,6 +71,7 @@ impl AgentFrontend for UnifiedFrontend {
             event_id: loopal_protocol::event_id::next_event_id(),
             turn_id: loopal_protocol::event_id::current_turn_id(),
             correlation_id: loopal_protocol::event_id::current_correlation_id(),
+            rev: None,
             payload,
         };
         if self.agent_name.is_some() {
@@ -145,6 +146,7 @@ impl AgentFrontend for UnifiedFrontend {
             event_id: loopal_protocol::event_id::next_event_id(),
             turn_id: loopal_protocol::event_id::current_turn_id(),
             correlation_id: loopal_protocol::event_id::current_correlation_id(),
+            rev: None,
             payload,
         };
         self.event_tx.try_send(event).is_ok()

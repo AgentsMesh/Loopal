@@ -1,7 +1,7 @@
 /// Skill invocation rendering tests: collapsed display, CJK truncation, args handling.
 use loopal_protocol::SkillInvocation;
-use loopal_session::types::SessionMessage;
 use loopal_tui::views::progress::message_to_lines;
+use loopal_view_state::SessionMessage;
 
 fn skill_msg(name: &str, args: &str) -> SessionMessage {
     SessionMessage {
@@ -14,6 +14,8 @@ fn skill_msg(name: &str, args: &str) -> SessionMessage {
             user_args: args.to_string(),
         }),
         inbox: None,
+        message_id: None,
+        ui_local: false,
     }
 }
 
@@ -119,6 +121,8 @@ fn test_non_skill_user_message_unchanged() {
         image_count: 0,
         skill_info: None,
         inbox: None,
+        message_id: None,
+        ui_local: false,
     };
     let lines = message_to_lines(&m, 80);
     let text = all_text(&lines);

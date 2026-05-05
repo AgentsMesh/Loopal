@@ -1,15 +1,7 @@
 // Single test binary — includes all test modules
 
-#[path = "suite/app_event_edge_test.rs"]
-mod app_event_edge_test;
-#[path = "suite/app_event_test.rs"]
-mod app_event_test;
 #[path = "suite/app_test.rs"]
 mod app_test;
-#[path = "suite/app_tool_edge_test.rs"]
-mod app_tool_edge_test;
-#[path = "suite/app_tool_test.rs"]
-mod app_tool_test;
 #[path = "suite/bg_task_focus_test.rs"]
 mod bg_task_focus_test;
 #[path = "suite/command_dispatch_test.rs"]
@@ -100,10 +92,8 @@ mod styled_wrap_test;
 mod tasks_panel_test;
 #[path = "suite/text_width_test.rs"]
 mod text_width_test;
-#[path = "suite/view_switch_panel_lifecycle_test.rs"]
-mod view_switch_panel_lifecycle_test;
-#[path = "suite/view_switch_test.rs"]
-mod view_switch_test;
+#[path = "suite/view_client_reset_test.rs"]
+mod view_client_reset_test;
 
 // E2E tests
 #[path = "suite/e2e_compact_edge_test.rs"]

@@ -1,6 +1,6 @@
 //! Agent operations on SessionController: message routing, connection management.
 
-use loopal_protocol::{AgentStatus, UserContent};
+use loopal_protocol::UserContent;
 
 use crate::controller::SessionController;
 use crate::state::ROOT_AGENT;
@@ -17,20 +17,16 @@ impl SessionController {
         self.connections().lock().await.registry.list_agents()
     }
 
-    /// Enter a sub-agent's conversation view. Returns false if agent not found or not live.
+    /// Switch the active view to `name`. Returns `false` if `name` is
+    /// already the active view. The caller is responsible for filtering
+    /// out non-live agents (use `App::is_agent_live`).
     pub fn enter_agent_view(&self, name: &str) -> bool {
         let mut state = self.lock();
-        if let Some(agent) = state.agents.get(name) {
-            let is_live = !matches!(
-                agent.observable.status,
-                AgentStatus::Finished | AgentStatus::Error
-            );
-            if is_live && name != state.active_view {
-                state.active_view = name.to_string();
-                return true;
-            }
+        if name == state.active_view {
+            return false;
         }
-        false
+        state.active_view = name.to_string();
+        true
     }
 
     /// Return to root view.

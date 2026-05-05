@@ -41,12 +41,14 @@ impl AgentRegistry {
     // ── Registration ─────────────────────────────────────────────
 
     pub fn set_local(&mut self, name: &str, channels: LocalChannels) {
+        let view = ManagedAgent::new_view_reducer(name);
         self.agents.insert(
             name.to_string(),
             ManagedAgent {
                 state: AgentConnectionState::Local(channels),
                 info: AgentInfo::new(name, None, None),
                 completion_tx: None,
+                view,
             },
         );
     }
@@ -73,12 +75,14 @@ impl AgentRegistry {
         {
             pa.info.children.push(name.to_string());
         }
+        let view = ManagedAgent::new_view_reducer(name);
         self.agents.insert(
             name.to_string(),
             ManagedAgent {
                 state: AgentConnectionState::Connected(conn),
                 info: AgentInfo::new(name, parent, model),
                 completion_tx,
+                view,
             },
         );
         Ok(())
@@ -108,12 +112,14 @@ impl AgentRegistry {
         let parent_for_children = parent.clone();
         let mut info = AgentInfo::new(name, Some(parent), None);
         info.lifecycle = crate::AgentLifecycle::Running;
+        let view = ManagedAgent::new_view_reducer(name);
         self.agents.insert(
             name.to_string(),
             ManagedAgent {
                 state: AgentConnectionState::Shadow,
                 info,
                 completion_tx: None,
+                view,
             },
         );
         // Track in parent's children list when parent is local.

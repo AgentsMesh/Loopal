@@ -10,7 +10,7 @@ use tracing::warn;
 
 /// Load sub-agent conversation histories from their persisted sessions.
 pub fn load_sub_agent_histories(
-    session_ctrl: &SessionController,
+    app: &mut loopal_tui::app::App,
     session: &loopal_storage::Session,
     session_manager: &loopal_runtime::SessionManager,
 ) {
@@ -28,7 +28,7 @@ pub fn load_sub_agent_histories(
         if messages.is_empty() {
             continue;
         }
-        session_ctrl.load_sub_agent_history(
+        app.load_sub_agent_history(
             &sub_ref.name,
             &sub_ref.session_id,
             sub_ref.parent.as_deref(),

@@ -63,7 +63,7 @@ pub(super) fn handle_ctrl_c(app: &mut App) -> InputAction {
     } else if app.section(PanelKind::Agents).focused.is_some() {
         app.section_mut(PanelKind::Agents).focused = None;
         InputAction::None
-    } else if !app.session.lock().is_active_agent_idle() {
+    } else if !app.is_active_agent_idle() {
         InputAction::Interrupt
     } else {
         InputAction::None

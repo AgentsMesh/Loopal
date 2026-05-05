@@ -13,8 +13,6 @@ fn make_app() -> App {
     let (perm_tx, _) = mpsc::channel::<bool>(16);
     let (question_tx, _) = mpsc::channel::<UserQuestionResponse>(16);
     let session = SessionController::new(
-        "test-model".into(),
-        "act".into(),
         control_tx,
         perm_tx,
         question_tx,
@@ -32,8 +30,8 @@ fn ctrl(c: char) -> KeyEvent {
     KeyEvent::new(KeyCode::Char(c), KeyModifiers::CONTROL)
 }
 
-fn spawn_agent(app: &App, name: &str) {
-    app.session.handle_event(AgentEvent::named(
+fn spawn_agent(app: &mut App, name: &str) {
+    app.dispatch_event(AgentEvent::named(
         name,
         AgentEventPayload::SubAgentSpawned {
             name: name.to_string(),
@@ -43,8 +41,7 @@ fn spawn_agent(app: &App, name: &str) {
             session_id: None,
         },
     ));
-    app.session
-        .handle_event(AgentEvent::named(name, AgentEventPayload::Started));
+    app.dispatch_event(AgentEvent::named(name, AgentEventPayload::Started));
 }
 
 // === Default state ===
@@ -60,7 +57,7 @@ fn default_focus_mode_is_input() {
 #[test]
 fn tab_returns_enter_agent_panel() {
     let mut app = make_app();
-    spawn_agent(&app, "worker");
+    spawn_agent(&mut app, "worker");
     let action = handle_key(&mut app, key(KeyCode::Tab));
     assert!(matches!(action, InputAction::EnterPanel));
 }
@@ -76,7 +73,7 @@ fn tab_without_agents_still_returns_enter_but_mode_unchanged() {
 #[test]
 fn tab_in_panel_returns_panel_tab() {
     let mut app = make_app();
-    spawn_agent(&app, "worker");
+    spawn_agent(&mut app, "worker");
     app.section_mut(PanelKind::Agents).focused = Some("worker".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     let action = handle_key(&mut app, key(KeyCode::Tab));
@@ -86,7 +83,7 @@ fn tab_in_panel_returns_panel_tab() {
 #[test]
 fn esc_exits_agent_panel() {
     let mut app = make_app();
-    spawn_agent(&app, "worker");
+    spawn_agent(&mut app, "worker");
     app.section_mut(PanelKind::Agents).focused = Some("worker".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     let action = handle_key(&mut app, key(KeyCode::Esc));
@@ -96,7 +93,7 @@ fn esc_exits_agent_panel() {
 #[test]
 fn esc_in_agent_panel_takes_priority_over_view_exit() {
     let mut app = make_app();
-    spawn_agent(&app, "worker");
+    spawn_agent(&mut app, "worker");
     app.session.enter_agent_view("worker");
     app.section_mut(PanelKind::Agents).focused = Some("worker".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
@@ -109,7 +106,7 @@ fn esc_in_agent_panel_takes_priority_over_view_exit() {
 #[test]
 fn char_in_agent_panel_switches_to_input_and_inserts() {
     let mut app = make_app();
-    spawn_agent(&app, "worker");
+    spawn_agent(&mut app, "worker");
     app.section_mut(PanelKind::Agents).focused = Some("worker".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     let action = handle_key(&mut app, key(KeyCode::Char('x')));
@@ -121,7 +118,7 @@ fn char_in_agent_panel_switches_to_input_and_inserts() {
 #[test]
 fn backspace_in_agent_panel_switches_to_input() {
     let mut app = make_app();
-    spawn_agent(&app, "worker");
+    spawn_agent(&mut app, "worker");
     app.section_mut(PanelKind::Agents).focused = Some("worker".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     app.input = "hi".into();
@@ -137,7 +134,7 @@ fn backspace_in_agent_panel_switches_to_input() {
 #[test]
 fn ctrl_c_clears_input_first_even_in_agent_panel() {
     let mut app = make_app();
-    spawn_agent(&app, "worker");
+    spawn_agent(&mut app, "worker");
     app.section_mut(PanelKind::Agents).focused = Some("worker".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     app.input = "text".into();
@@ -157,7 +154,7 @@ fn ctrl_c_clears_input_first_even_in_agent_panel() {
 #[test]
 fn ctrl_c_exits_agent_panel_and_clears_focus() {
     let mut app = make_app();
-    spawn_agent(&app, "worker");
+    spawn_agent(&mut app, "worker");
     app.section_mut(PanelKind::Agents).focused = Some("worker".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     app.section_mut(PanelKind::Agents).scroll_offset = 3;
@@ -170,7 +167,7 @@ fn ctrl_c_exits_agent_panel_and_clears_focus() {
 #[test]
 fn ctrl_c_clears_focus_in_input_mode() {
     let mut app = make_app();
-    spawn_agent(&app, "worker");
+    spawn_agent(&mut app, "worker");
     app.section_mut(PanelKind::Agents).focused = Some("worker".into());
     handle_key(&mut app, ctrl('c'));
     assert!(app.section(PanelKind::Agents).focused.is_none());
@@ -180,8 +177,7 @@ fn ctrl_c_clears_focus_in_input_mode() {
 #[test]
 fn ctrl_c_noop_when_idle_no_focus_no_input() {
     let mut app = make_app();
-    app.session
-        .handle_event(AgentEvent::named("main", AgentEventPayload::AwaitingInput));
+    app.dispatch_event(AgentEvent::named("main", AgentEventPayload::AwaitingInput));
     let action = handle_key(&mut app, ctrl('c'));
     assert!(matches!(action, InputAction::None));
 }
@@ -189,7 +185,7 @@ fn ctrl_c_noop_when_idle_no_focus_no_input() {
 #[test]
 fn ctrl_c_from_tasks_panel_preserves_agent_focus() {
     let mut app = make_app();
-    spawn_agent(&app, "worker");
+    spawn_agent(&mut app, "worker");
     app.section_mut(PanelKind::Agents).focused = Some("worker".into());
     app.section_mut(PanelKind::Tasks).focused = Some("1".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Tasks);

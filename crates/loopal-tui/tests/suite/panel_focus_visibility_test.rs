@@ -6,7 +6,7 @@
 //! render the panel zone, and count the ` ▸ ` occurrences — it must
 //! equal exactly one (the active panel) or zero (in Input mode).
 
-use loopal_protocol::{BgTaskDetail, BgTaskStatus, ControlCommand, UserQuestionResponse};
+use loopal_protocol::{BgTaskStatus, ControlCommand, UserQuestionResponse};
 use loopal_protocol::{TaskSnapshot, TaskSnapshotStatus};
 use loopal_session::SessionController;
 use loopal_tui::app::{App, FocusMode, PanelKind};
@@ -22,8 +22,6 @@ fn make_app() -> App {
     let (perm_tx, _) = mpsc::channel::<bool>(16);
     let (question_tx, _) = mpsc::channel::<UserQuestionResponse>(16);
     let session = SessionController::new(
-        "m".into(),
-        "act".into(),
         control_tx,
         perm_tx,
         question_tx,
@@ -35,30 +33,19 @@ fn make_app() -> App {
 
 fn setup_two_panels() -> App {
     let mut app = make_app();
-    app.task_snapshots = vec![TaskSnapshot {
+    app.view_clients["main"].inject_tasks_for_test(vec![TaskSnapshot {
         id: "1".into(),
         subject: "Task 1".into(),
         active_form: None,
         status: TaskSnapshotStatus::InProgress,
         blocked_by: Vec::new(),
-    }];
-    app.session.lock().bg_tasks.insert(
-        "bg_1".into(),
-        BgTaskDetail {
-            id: "bg_1".into(),
-            description: "bg".into(),
-            status: BgTaskStatus::Running,
-            exit_code: None,
-            output: String::new(),
-        },
-    );
-    app.bg_snapshots = app
-        .session
-        .lock()
-        .bg_tasks
-        .values()
-        .map(|t| t.to_snapshot())
-        .collect();
+    }]);
+    app.view_clients["main"].inject_bg_for_test(vec![loopal_protocol::BgTaskSnapshot {
+        id: "bg_1".into(),
+        description: "bg".into(),
+        status: BgTaskStatus::Running,
+        exit_code: None,
+    }]);
     // Both panels have a remembered selection in state.
     app.section_mut(PanelKind::Tasks).focused = Some("1".into());
     app.section_mut(PanelKind::BgTasks).focused = Some("bg_1".into());
@@ -162,14 +149,14 @@ fn arrow_follows_tab_switch() {
 #[test]
 fn single_panel_has_no_header() {
     // Only Tasks has content → no "━━ Tasks ━━" header should appear.
-    let mut app = make_app();
-    app.task_snapshots = vec![TaskSnapshot {
+    let app = make_app();
+    app.view_clients["main"].inject_tasks_for_test(vec![TaskSnapshot {
         id: "1".into(),
         subject: "Only task".into(),
         active_form: None,
         status: TaskSnapshotStatus::InProgress,
         blocked_by: Vec::new(),
-    }];
+    }]);
     let text = render_and_dump(&app, 40, 2);
     assert!(
         !text.contains("━"),

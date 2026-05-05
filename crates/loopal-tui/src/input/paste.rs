@@ -1,6 +1,3 @@
-//! Clipboard paste handler with large-paste folding.
-//! Large pastes (>5 lines or >500 chars) are folded into placeholders; expanded on submit.
-
 use std::collections::HashMap;
 
 use base64::Engine;
@@ -20,11 +17,6 @@ pub enum PasteResult {
     Unavailable,
 }
 
-const MAX_BASE64_BYTES: usize = 5 * 1024 * 1024;
-const MAX_DIMENSION: u32 = 2048;
-const LARGE_PASTE_LINE_THRESHOLD: usize = 5;
-const LARGE_PASTE_CHAR_THRESHOLD: usize = 500;
-
 /// Spawn a blocking clipboard read; result sent as `AppEvent::Paste`.
 pub fn spawn_paste(events: &EventHandler) {
     let tx = events.sender();
@@ -32,6 +24,11 @@ pub fn spawn_paste(events: &EventHandler) {
         let _ = tx.blocking_send(AppEvent::Paste(read_clipboard()));
     });
 }
+
+const MAX_BASE64_BYTES: usize = 5 * 1024 * 1024;
+const MAX_DIMENSION: u32 = 2048;
+const LARGE_PASTE_LINE_THRESHOLD: usize = 5;
+const LARGE_PASTE_CHAR_THRESHOLD: usize = 500;
 
 /// Apply paste result. Large text pastes are folded into placeholders.
 pub fn apply_paste_result(app: &mut App, result: PasteResult) {
@@ -51,8 +48,7 @@ pub fn apply_paste_result(app: &mut App, result: PasteResult) {
         }
         PasteResult::Empty => {}
         PasteResult::Unavailable => {
-            app.session
-                .push_system_message("Clipboard not available (SSH/headless session?)".into());
+            app.push_system_message("Clipboard not available (SSH/headless session?)".into());
         }
     }
 }

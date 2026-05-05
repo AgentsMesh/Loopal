@@ -1,4 +1,8 @@
 // Single test binary — includes all test modules
+#[path = "suite/agent_isolation_test.rs"]
+mod agent_isolation_test;
+#[path = "suite/agent_snapshot_test.rs"]
+mod agent_snapshot_test;
 #[path = "suite/bridge_chain_test.rs"]
 mod bridge_chain_test;
 #[path = "suite/bridge_child_test.rs"]

@@ -23,14 +23,13 @@ impl CommandHandler for AgentsCmd {
     async fn execute(&self, app: &mut App, _arg: Option<&str>) -> CommandEffect {
         let agents = app.session.list_agents().await;
         if agents.is_empty() {
-            app.session.push_system_message("No sub-agents".into());
+            app.push_system_message("No sub-agents".into());
         } else {
             let lines: Vec<String> = agents
                 .iter()
                 .map(|(name, state)| format!("  {name}: {state}"))
                 .collect();
-            app.session
-                .push_system_message(format!("Agents:\n{}", lines.join("\n")));
+            app.push_system_message(format!("Agents:\n{}", lines.join("\n")));
         }
         CommandEffect::Done
     }

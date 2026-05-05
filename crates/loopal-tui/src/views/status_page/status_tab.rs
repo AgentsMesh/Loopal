@@ -22,6 +22,12 @@ pub(super) fn render_status_tab(f: &mut Frame, state: &StatusPageState, area: Re
         Style::default().fg(Color::Green).bold()
     };
 
+    let attach_cmd = if s.hub_endpoint.is_empty() || s.hub_token.is_empty() {
+        String::new()
+    } else {
+        format!("ATTACH_HUB={} HUB_TOKEN={}", s.hub_endpoint, s.hub_token)
+    };
+
     let rows = [
         row("Session ID", &s.session_id, default_style()),
         row("CWD", &s.cwd, Style::default().fg(Color::White)),
@@ -37,6 +43,16 @@ pub(super) fn render_status_tab(f: &mut Frame, state: &StatusPageState, area: Re
             "Hub Endpoint",
             &display_or_none(&s.hub_endpoint),
             default_style(),
+        ),
+        row(
+            "Hub Token",
+            &display_or_none(&s.hub_token),
+            Style::default().fg(Color::Yellow),
+        ),
+        row(
+            "Attach",
+            &display_or_none(&attach_cmd),
+            Style::default().fg(Color::Green),
         ),
         row(
             "MCP Servers",

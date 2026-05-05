@@ -2,7 +2,7 @@
 
 use ratatui::prelude::*;
 
-use loopal_session::types::SessionToolCall;
+use loopal_view_state::SessionToolCall;
 
 use super::diff_style::{self, DIFF_MAX_LINES};
 use super::output_first_line;

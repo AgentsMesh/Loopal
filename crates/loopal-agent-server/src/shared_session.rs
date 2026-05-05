@@ -6,10 +6,11 @@
 //! tightly coupled (every `SharedSession` holds a `Vec<ClientHandle>`)
 //! but logically separate from the registry that owns sessions.
 
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use tokio::sync::Mutex;
 
+use loopal_agent::AgentShared;
 use loopal_ipc::connection::Connection;
 use loopal_protocol::InterruptSignal;
 use loopal_runtime::agent_input::AgentInput;
@@ -31,6 +32,13 @@ pub struct SharedSession {
     /// Interrupt signal shared with the agent loop.
     pub interrupt: InterruptSignal,
     pub interrupt_tx: Arc<tokio::sync::watch::Sender<u64>>,
+    /// Weak reference to the agent's runtime context, set after
+    /// `agent_setup` completes. `agent/state_snapshot` reads this to
+    /// produce a snapshot for Hub-side ViewState rebuild. Held as `Weak`
+    /// so this reference doesn't extend `AgentShared`'s lifetime —
+    /// otherwise the embedded `hub_connection` would prevent stdio EOF
+    /// and block server shutdown.
+    pub agent_shared: Mutex<Option<Weak<AgentShared>>>,
 }
 
 impl SharedSession {
@@ -46,7 +54,24 @@ impl SharedSession {
             input_tx,
             interrupt,
             interrupt_tx,
+            agent_shared: Mutex::new(None),
         }
+    }
+
+    /// Inject the typed `AgentShared` after `agent_setup` finishes.
+    /// Stored as `Weak` so this reference doesn't extend `AgentShared`'s
+    /// lifetime (see field doc).
+    pub async fn set_agent_shared(&self, shared: &Arc<AgentShared>) {
+        *self.agent_shared.lock().await = Some(Arc::downgrade(shared));
+    }
+
+    /// Snapshot per-agent state for `agent/state_snapshot` IPC.
+    /// Returns `None` if no agent has been bound yet, or if the agent
+    /// has already exited and its `AgentShared` was dropped.
+    pub async fn snapshot_agent_state(&self) -> Option<loopal_protocol::AgentStateSnapshot> {
+        let weak = self.agent_shared.lock().await.clone()?;
+        let shared = weak.upgrade()?;
+        Some(shared.snapshot_state().await)
     }
 
     /// Add a client to this session. First client becomes primary.

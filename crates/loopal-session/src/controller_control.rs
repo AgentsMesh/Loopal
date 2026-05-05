@@ -1,56 +1,31 @@
-//! Control command methods on SessionController (mode, model, thinking, clear, compact, rewind).
-
 use loopal_protocol::{AgentMode, ControlCommand};
 
 use crate::controller::SessionController;
 
 impl SessionController {
-    /// Send a raw control command to a specific agent target.
     pub async fn send_control(&self, target: String, cmd: ControlCommand) {
         self.backend.send_control_to_agent(&target, cmd).await;
     }
 
     pub async fn switch_mode(&self, mode: AgentMode) {
-        let target = {
-            let mut s = self.lock();
-            s.mode = match mode {
-                AgentMode::Plan => "plan",
-                AgentMode::Act => "act",
-            }
-            .to_string();
-            s.active_view.clone()
-        };
+        let target = self.active_target();
         self.backend
             .send_control_to_agent(&target, ControlCommand::ModeSwitch(mode))
             .await;
     }
 
     pub async fn switch_model(&self, model: String) {
-        let target = {
-            let mut s = self.lock();
-            s.model = model.clone();
-            let conv = s.active_conversation_mut();
-            crate::conversation_display::push_system_msg(
-                conv,
-                &format!("Switched model to: {model}"),
-            );
-            s.active_view.clone()
-        };
+        let target = self.active_target();
         self.backend
             .send_control_to_agent(&target, ControlCommand::ModelSwitch(model))
             .await;
     }
 
     pub async fn switch_thinking(&self, config_json: String) {
-        let label = crate::conversation_display::thinking_label_from_json(&config_json);
+        let label = thinking_label_from_json(&config_json);
         let target = {
             let mut s = self.lock();
-            s.thinking_config = label.clone();
-            let conv = s.active_conversation_mut();
-            crate::conversation_display::push_system_msg(
-                conv,
-                &format!("Switched thinking to: {label}"),
-            );
+            s.thinking_config = label;
             s.active_view.clone()
         };
         self.backend
@@ -59,20 +34,7 @@ impl SessionController {
     }
 
     pub async fn clear(&self) {
-        let target = {
-            let mut s = self.lock();
-            let conv = s.active_conversation_mut();
-            conv.messages.clear();
-            conv.streaming_text.clear();
-            conv.turn_count = 0;
-            conv.input_tokens = 0;
-            conv.output_tokens = 0;
-            conv.cache_creation_tokens = 0;
-            conv.cache_read_tokens = 0;
-            conv.retry_banner = None;
-            conv.reset_timer();
-            s.active_view.clone()
-        };
+        let target = self.active_target();
         self.backend
             .send_control_to_agent(&target, ControlCommand::Clear)
             .await;
@@ -92,24 +54,9 @@ impl SessionController {
             .await;
     }
 
-    /// Resume a persisted session by ID.
-    ///
-    /// Clears local display state and sends `ResumeSession` to the agent.
-    /// The agent loads the session context; the TUI reloads display history
-    /// when it receives the `SessionResumed` event.
     pub async fn resume_session(&self, session_id: &str) {
         let target = {
             let mut s = self.lock();
-            let conv = s.active_conversation_mut();
-            conv.messages.clear();
-            conv.streaming_text.clear();
-            conv.turn_count = 0;
-            conv.input_tokens = 0;
-            conv.output_tokens = 0;
-            conv.cache_creation_tokens = 0;
-            conv.cache_read_tokens = 0;
-            conv.retry_banner = None;
-            conv.reset_timer();
             s.root_session_id = Some(session_id.to_string());
             s.active_view.clone()
         };
@@ -120,4 +67,15 @@ impl SessionController {
             )
             .await;
     }
+}
+
+fn thinking_label_from_json(config_json: &str) -> String {
+    serde_json::from_str::<serde_json::Value>(config_json)
+        .ok()
+        .and_then(|v| {
+            v.get("type")
+                .and_then(|t| t.as_str())
+                .map(|s| s.to_string())
+        })
+        .unwrap_or_else(|| "auto".to_string())
 }

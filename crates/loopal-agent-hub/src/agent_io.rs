@@ -13,7 +13,7 @@ use loopal_protocol::{AgentEvent, Envelope};
 use crate::dispatch::dispatch_hub_request;
 use crate::finish::finish_and_deliver;
 use crate::hub::Hub;
-use crate::ui_relay::relay_to_ui_clients;
+use crate::pending_relay::{handle_agent_permission, handle_agent_question};
 
 /// Method name for hub/wait_agent — must not block the IO loop.
 const WAIT_AGENT_METHOD: &str = "hub/wait_agent";
@@ -40,16 +40,22 @@ pub async fn agent_io_loop(
                         .map(String::from);
                     info!(agent = %agent_name, has_result = agent_result.is_some(), "received agent/completed");
                     break;
-                } else if method == methods::AGENT_EVENT.name
-                    && let Ok(mut event) = serde_json::from_value::<AgentEvent>(params)
-                {
-                    if event.agent_name.is_none() {
-                        event.agent_name =
-                            Some(loopal_protocol::QualifiedAddress::local(agent_name.clone()));
-                    }
-                    let h = hub.lock().await;
-                    if h.registry.event_sender().try_send(event).is_err() {
-                        tracing::warn!(agent = %agent_name, "event dropped (channel full)");
+                } else if method == methods::AGENT_EVENT.name {
+                    match serde_json::from_value::<AgentEvent>(params) {
+                        Ok(mut event) => {
+                            if event.agent_name.is_none() {
+                                event.agent_name = Some(loopal_protocol::QualifiedAddress::local(
+                                    agent_name.clone(),
+                                ));
+                            }
+                            let h = hub.lock().await;
+                            if h.registry.event_sender().try_send(event).is_err() {
+                                tracing::warn!(agent = %agent_name, "event dropped (channel full)");
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!(agent = %agent_name, error = %e, "agent/event deserialize failed; dropping");
+                        }
                     }
                 }
             }
@@ -73,12 +79,10 @@ pub async fn agent_io_loop(
                         }
                     }
                     info!(agent = %agent_name, %method, "hub request completed");
-                } else if method == methods::AGENT_PERMISSION.name
-                    || method == methods::AGENT_QUESTION.name
-                {
-                    info!(agent = %agent_name, %method, "relaying to UI clients");
-                    relay_to_ui_clients(&hub, &conn, id, &method, params, &agent_name).await;
-                    info!(agent = %agent_name, %method, "relay complete");
+                } else if method == methods::AGENT_PERMISSION.name {
+                    handle_agent_permission(&hub, conn.clone(), id, params, &agent_name).await;
+                } else if method == methods::AGENT_QUESTION.name {
+                    handle_agent_question(&hub, conn.clone(), id, params, &agent_name).await;
                 } else {
                     warn!(agent = %agent_name, %method, "unknown request");
                     let _ = conn

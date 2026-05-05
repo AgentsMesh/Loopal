@@ -13,8 +13,6 @@ fn make_app_in(cwd: std::path::PathBuf) -> App {
     let (perm_tx, _) = mpsc::channel::<bool>(16);
     let (question_tx, _) = mpsc::channel::<UserQuestionResponse>(16);
     let session = SessionController::new(
-        "test-model".into(),
-        "act".into(),
         control_tx,
         perm_tx,
         question_tx,
@@ -119,12 +117,8 @@ async fn test_init_system_message_shows_generate() {
     let handler = app.command_registry.find("/init").unwrap();
     handler.execute(&mut app, None).await;
 
-    let state = app.session.lock();
-    let last = state
-        .active_conversation()
-        .messages
-        .last()
-        .expect("expected system message");
+    let conv = app.snapshot_active_conversation();
+    let last = conv.messages.last().expect("expected system message");
     assert!(last.content.contains("generate LOOPAL.md"));
 }
 
@@ -137,11 +131,7 @@ async fn test_init_system_message_shows_update_when_existing() {
     let handler = app.command_registry.find("/init").unwrap();
     handler.execute(&mut app, None).await;
 
-    let state = app.session.lock();
-    let last = state
-        .active_conversation()
-        .messages
-        .last()
-        .expect("expected system message");
+    let conv = app.snapshot_active_conversation();
+    let last = conv.messages.last().expect("expected system message");
     assert!(last.content.contains("update LOOPAL.md"));
 }

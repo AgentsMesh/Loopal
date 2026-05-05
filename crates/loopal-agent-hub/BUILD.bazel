@@ -9,6 +9,7 @@ rust_library(
         "//crates/loopal-agent-client",
         "//crates/loopal-ipc",
         "//crates/loopal-protocol",
+        "//crates/loopal-view-state",
         "@crates//:anyhow",
         "@crates//:chrono",
         "@crates//:serde",
@@ -36,5 +37,6 @@ rust_test(
         "//crates/loopal-agent-client",
         "//crates/loopal-ipc",
         "//crates/loopal-protocol",
+        "//crates/loopal-view-state",
     ],
 )

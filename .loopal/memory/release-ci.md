@@ -7,6 +7,7 @@ updated_at: 2026-04-15
 ttl_days: 90
 related:
   - windows-ci-gotchas.md
+  - codebase-scale.md
 ---
 
 ## Current Version

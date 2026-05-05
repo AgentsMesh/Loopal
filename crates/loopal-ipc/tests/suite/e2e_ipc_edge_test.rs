@@ -43,6 +43,7 @@ async fn e2e_streaming_events_ordered() {
             event_id: 0,
             turn_id: 0,
             correlation_id: 0,
+            rev: None,
             payload: AgentEventPayload::Stream {
                 text: format!("chunk-{i}"),
             },
@@ -94,54 +95,6 @@ async fn e2e_interrupt_notification() {
 }
 
 #[tokio::test]
-async fn e2e_question_roundtrip_via_bridge() {
-    let (client_t, server_conn, _server_rx) = ipc_pair();
-    let client = loopal_agent_client::AgentClient::new(client_t);
-    let (conn, incoming) = client.into_parts();
-    let handles = loopal_agent_client::start_bridge(conn, incoming);
-
-    let sc = server_conn.clone();
-    let q_handle = tokio::spawn(async move {
-        sc.send_request(
-            methods::AGENT_QUESTION.name,
-            serde_json::json!({
-                "questions": [{"question": "Pick", "options": [
-                    {"label": "A", "description": ""}, {"label": "B", "description": ""}
-                ], "allow_multiple": false}]
-            }),
-        )
-        .await
-    });
-
-    let mut rx = handles.agent_event_rx;
-    let ev = tokio::time::timeout(TIMEOUT, rx.recv())
-        .await
-        .unwrap()
-        .unwrap();
-    match &ev.payload {
-        AgentEventPayload::UserQuestionRequest { questions, .. } => {
-            assert_eq!(questions[0].question, "Pick");
-        }
-        other => panic!("expected UserQuestionRequest, got: {other:?}"),
-    }
-
-    handles
-        .question_tx
-        .send(loopal_protocol::UserQuestionResponse {
-            answers: vec!["B".into()],
-        })
-        .await
-        .unwrap();
-
-    let resp = tokio::time::timeout(TIMEOUT, q_handle)
-        .await
-        .unwrap()
-        .unwrap()
-        .unwrap();
-    assert_eq!(resp["answers"][0], "B");
-}
-
-#[tokio::test]
 async fn e2e_bridge_stops_on_incoming_close() {
     let (client_t, _server_conn, _server_rx) = ipc_pair();
     let client = loopal_agent_client::AgentClient::new(client_t);
@@ -155,6 +108,7 @@ async fn e2e_bridge_stops_on_incoming_close() {
         event_id: 0,
         turn_id: 0,
         correlation_id: 0,
+        rev: None,
         payload: AgentEventPayload::Stream { text: "one".into() },
     };
     fwd_tx

@@ -4,6 +4,7 @@
 //! Hub ties them together: agent events flow to UI via broadcast,
 //! permission requests flow from agents to UI clients via relay.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -12,26 +13,28 @@ use tokio::sync::mpsc;
 use loopal_protocol::AgentEvent;
 
 use crate::agent_registry::AgentRegistry;
+use crate::pending_relay::{PendingPermissionInfo, PendingQuestionInfo};
 use crate::ui_dispatcher::UiDispatcher;
 use crate::uplink::HubUplink;
 
-/// Central coordinator — delegates to specialized subsystems.
 pub struct Hub {
-    /// Agent connections, lifecycle, routing, completion.
     pub registry: AgentRegistry,
-    /// UI client connections, event broadcast, permission relay.
     pub ui: UiDispatcher,
-    /// Optional uplink to a parent MetaHub for cross-hub communication.
-    /// `None` = standalone mode (default, identical to pre-MetaHub behavior).
-    /// `Some(...)` = cluster mode (local misses escalate to MetaHub).
     pub uplink: Option<Arc<HubUplink>>,
-    /// TCP listener port, set after `start_hub_listener`. `None` if not listening.
     pub listener_port: Option<u16>,
-    /// Max total sub-agents allowed (set from HarnessConfig at bootstrap).
+    /// Auth token printed by the bootstrapping process; required by
+    /// `--attach-hub` clients. `None` for in-process tests / before the
+    /// listener has started.
+    pub listener_token: Option<String>,
     pub max_total_agents: u32,
-    /// Working directory used as the cwd for cross-hub spawned agents.
-    /// In-hub spawns still take cwd from their parent agent's request.
     pub default_cwd: PathBuf,
+    /// Agent permission requests suspended awaiting UI response. Keyed by
+    /// `(agent_name, tool_call_id)` so cross-agent reuse of the same
+    /// `tool_call_id` does not overwrite pending state.
+    pub pending_permissions: HashMap<(String, String), PendingPermissionInfo>,
+    /// Agent question requests suspended awaiting UI response. Keyed by
+    /// `(agent_name, question_id)`.
+    pub pending_questions: HashMap<(String, String), PendingQuestionInfo>,
 }
 
 impl Hub {
@@ -61,8 +64,11 @@ impl Hub {
             ui: UiDispatcher::new(),
             uplink: None,
             listener_port: None,
+            listener_token: None,
             max_total_agents: 16,
             default_cwd: canonical,
+            pending_permissions: HashMap::new(),
+            pending_questions: HashMap::new(),
         }
     }
 

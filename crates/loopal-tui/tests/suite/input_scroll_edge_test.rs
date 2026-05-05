@@ -14,8 +14,6 @@ fn make_app() -> App {
     let (perm_tx, _) = mpsc::channel::<bool>(16);
     let (question_tx, _) = mpsc::channel::<UserQuestionResponse>(16);
     let session = SessionController::new(
-        "test-model".into(),
-        "act".into(),
         control_tx,
         perm_tx,
         question_tx,
@@ -81,13 +79,9 @@ fn test_esc_preserves_scroll_offset() {
 #[test]
 fn test_up_navigates_history_when_agent_busy() {
     let mut app = make_app();
-    app.session
-        .lock()
-        .agents
-        .get_mut("main")
-        .unwrap()
-        .observable
-        .status = AgentStatus::Running;
+    app.view_clients["main"].with_view_mut(|view| {
+        view.observable.status = AgentStatus::Running;
+    });
     app.input_history.push("prev".into());
     handle_key(&mut app, key(KeyCode::Up));
     assert_eq!(

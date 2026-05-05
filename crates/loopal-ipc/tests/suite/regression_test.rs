@@ -54,6 +54,7 @@ async fn bridge_survives_malformed_event_notification() {
         event_id: 0,
         turn_id: 0,
         correlation_id: 0,
+        rev: None,
         payload: AgentEventPayload::AwaitingInput,
     };
     server_conn
@@ -71,43 +72,6 @@ async fn bridge_survives_malformed_event_notification() {
         .unwrap()
         .unwrap();
     assert!(matches!(ev.payload, AgentEventPayload::AwaitingInput));
-}
-
-/// Malformed question params should respond immediately, not hang 300s.
-#[tokio::test]
-async fn bridge_question_malformed_responds_immediately() {
-    let (client_t, server_conn, _server_rx) = ipc_pair();
-
-    let client = loopal_agent_client::AgentClient::new(client_t);
-    let (conn, incoming) = client.into_parts();
-    let _handles = loopal_agent_client::start_bridge(conn, incoming);
-
-    // Server sends question with malformed params (no "questions" array)
-    let start = tokio::time::Instant::now();
-    let resp = tokio::time::timeout(
-        Duration::from_secs(10),
-        server_conn.send_request(
-            methods::AGENT_QUESTION.name,
-            serde_json::json!({"wrong_key": "bad data"}),
-        ),
-    )
-    .await
-    .unwrap()
-    .unwrap();
-
-    let elapsed = start.elapsed();
-    // Should respond in <5s (not 300s timeout)
-    assert!(
-        elapsed < Duration::from_secs(5),
-        "took {elapsed:?}, expected <5s"
-    );
-    // Response should contain fallback answer
-    assert!(
-        resp["answers"][0]
-            .as_str()
-            .unwrap_or("")
-            .contains("parse error")
-    );
 }
 
 /// Client.recv() skips malformed events and delivers the next valid one.
@@ -130,6 +94,7 @@ async fn client_recv_survives_malformed_event() {
         event_id: 0,
         turn_id: 0,
         correlation_id: 0,
+        rev: None,
         payload: AgentEventPayload::Finished,
     };
     server_conn
@@ -148,6 +113,5 @@ async fn client_recv_survives_malformed_event() {
         loopal_agent_client::AgentClientEvent::AgentEvent(e) => {
             assert!(matches!(e.payload, AgentEventPayload::Finished));
         }
-        _ => panic!("expected AgentEvent"),
     }
 }

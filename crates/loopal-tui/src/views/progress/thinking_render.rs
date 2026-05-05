@@ -6,7 +6,7 @@
 use ratatui::prelude::*;
 use unicode_width::UnicodeWidthStr;
 
-use loopal_session::thinking_display::{format_token_display, parse_thinking_content};
+use loopal_view_state::{format_token_display, parse_thinking_content};
 
 /// Dimmed gray-lavender for thinking body text.
 const THINKING_TEXT: Color = Color::Rgb(155, 150, 170);

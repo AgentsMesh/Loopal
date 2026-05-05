@@ -42,9 +42,10 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 
+use loopal_agent::cron_info_to_snapshot;
 use loopal_protocol::{AgentEventPayload, CronJobSnapshot};
 use loopal_runtime::frontend::traits::AgentFrontend;
-use loopal_scheduler::{CronJobInfo, CronScheduler};
+use loopal_scheduler::CronScheduler;
 
 /// Stable identity for diff-skip. The `id` is kept verbatim (8 chars);
 /// the rest of the identifying payload (prompt, recurring, cron_expr,
@@ -151,27 +152,15 @@ async fn snapshot_all(scheduler: &CronScheduler) -> Vec<CronJobSnapshot> {
         .list()
         .await
         .into_iter()
-        .map(to_snapshot)
+        .map(cron_info_to_snapshot)
         .collect()
 }
 
-fn to_snapshot(info: CronJobInfo) -> CronJobSnapshot {
-    CronJobSnapshot {
-        id: info.id,
-        cron_expr: info.cron_expr,
-        prompt: info.prompt.replace('\n', " ").replace('\r', ""),
-        recurring: info.recurring,
-        created_at_unix_ms: info.created_at.timestamp_millis(),
-        next_fire_unix_ms: info.next_fire.map(|t| t.timestamp_millis()),
-        durable: info.durable,
-    }
-}
-
-// Expose private helpers to the sibling `cron_bridge_tests` module so that
-// branches like `to_snapshot` with `next_fire: None` can be unit-tested
-// directly (scheduler.list() never yields None for valid expressions).
+// Re-export the conversion helper under a stable name for sibling tests.
+// `cron_bridge_tests` covers branches like `next_fire: None` directly
+// (scheduler.list() never yields None for valid expressions).
 #[cfg(test)]
-pub(super) use to_snapshot as to_snapshot_for_test;
+pub(super) use loopal_agent::cron_info_to_snapshot as to_snapshot_for_test;
 
 #[cfg(test)]
 #[path = "cron_bridge_tests.rs"]

@@ -9,9 +9,10 @@ use tokio::sync::{Mutex, mpsc};
 use loopal_agent_hub::Hub;
 use loopal_agent_hub::hub_server;
 use loopal_agent_hub::spawn_manager::register_agent_connection;
+use loopal_agent_hub::start_event_loop;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
-use loopal_protocol::AgentEvent;
+use loopal_protocol::{AgentEvent, AgentEventPayload};
 use serde_json::json;
 
 fn make_hub() -> (Arc<Mutex<Hub>>, mpsc::Receiver<AgentEvent>) {
@@ -34,18 +35,21 @@ fn spawn_mock(conn: Arc<Connection>, rx: mpsc::Receiver<Incoming>) {
 
 #[tokio::test]
 async fn concurrent_permissions_from_two_agents() {
-    let (hub, _) = make_hub();
+    let (hub, raw_rx) = make_hub();
+    let _event_loop = start_event_loop(hub.clone(), raw_rx);
 
     let ui = loopal_agent_hub::UiSession::connect(hub.clone(), "tui").await;
     let ui_client = ui.client.clone();
     tokio::spawn(async move {
-        let mut rx = ui.relay_rx;
-        while let Some(msg) = rx.recv().await {
-            if let Incoming::Request { id, .. } = msg {
-                let _ = ui_client
-                    .connection()
-                    .respond(id, json!({"allow": true}))
-                    .await;
+        let mut event_rx = ui.event_rx;
+        while let Ok(event) = event_rx.recv().await {
+            if let AgentEventPayload::ToolPermissionRequest { id, .. } = event.payload {
+                let agent = event
+                    .agent_name
+                    .as_ref()
+                    .map(|q| q.agent.clone())
+                    .unwrap_or_else(|| "main".to_string());
+                ui_client.respond_permission(&agent, &id, true).await;
             }
         }
     });
@@ -54,7 +58,6 @@ async fn concurrent_permissions_from_two_agents() {
     let (conn_b, _) = hub_server::connect_local(hub.clone(), "agent-b");
     tokio::time::sleep(Duration::from_millis(50)).await;
 
-    // Both agents request permission concurrently
     let a_handle = {
         let c = conn_a.clone();
         tokio::spawn(async move {

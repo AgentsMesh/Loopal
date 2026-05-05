@@ -19,8 +19,6 @@ fn make_app() -> App {
     let (perm_tx, _) = mpsc::channel::<bool>(16);
     let (question_tx, _) = mpsc::channel::<UserQuestionResponse>(16);
     let session = SessionController::new(
-        "m".into(),
-        "act".into(),
         control_tx,
         perm_tx,
         question_tx,
@@ -30,8 +28,8 @@ fn make_app() -> App {
     App::new(session, std::env::temp_dir())
 }
 
-fn spawn_agent(app: &App, name: &str) {
-    app.session.handle_event(AgentEvent::named(
+fn spawn_agent(app: &mut App, name: &str) {
+    app.dispatch_event(AgentEvent::named(
         name,
         AgentEventPayload::SubAgentSpawned {
             name: name.to_string(),
@@ -41,8 +39,7 @@ fn spawn_agent(app: &App, name: &str) {
             session_id: None,
         },
     ));
-    app.session
-        .handle_event(AgentEvent::named(name, AgentEventPayload::Started));
+    app.dispatch_event(AgentEvent::named(name, AgentEventPayload::Started));
 }
 
 fn assert_count_matches_item_ids(
@@ -63,10 +60,10 @@ fn assert_count_matches_item_ids(
 
 #[test]
 fn agent_count_matches_live_agents() {
-    let app = make_app();
-    spawn_agent(&app, "w1");
-    spawn_agent(&app, "w2");
-    spawn_agent(&app, "w3");
+    let mut app = make_app();
+    spawn_agent(&mut app, "w1");
+    spawn_agent(&mut app, "w2");
+    spawn_agent(&mut app, "w3");
     let state = app.session.lock();
     let provider = app.panel_registry.by_kind(PanelKind::Agents).unwrap();
     assert_eq!(provider.count(&app, &state), 3);
@@ -85,8 +82,8 @@ fn agent_count_zero_when_no_live_agents() {
 fn agent_count_does_not_require_extra_lock() {
     // The caller holds the guard; `count` must read from the passed-in
     // `state` without re-acquiring. Success = no deadlock.
-    let app = make_app();
-    spawn_agent(&app, "w1");
+    let mut app = make_app();
+    spawn_agent(&mut app, "w1");
     let state = app.session.lock();
     let provider = app.panel_registry.by_kind(PanelKind::Agents).unwrap();
     let _ = provider.count(&app, &state);
@@ -96,8 +93,8 @@ fn agent_count_does_not_require_extra_lock() {
 
 #[test]
 fn tasks_count_matches_snapshots() {
-    let mut app = make_app();
-    app.task_snapshots = vec![
+    let app = make_app();
+    app.view_clients["main"].inject_tasks_for_test(vec![
         TaskSnapshot {
             id: "1".into(),
             subject: "a".into(),
@@ -119,7 +116,7 @@ fn tasks_count_matches_snapshots() {
             status: TaskSnapshotStatus::Completed,
             blocked_by: Vec::new(),
         },
-    ];
+    ]);
     let state = app.session.lock();
     let provider = app.panel_registry.by_kind(PanelKind::Tasks).unwrap();
     // Completed excluded by tasks_panel::task_ids.
@@ -131,8 +128,8 @@ fn tasks_count_matches_snapshots() {
 
 #[test]
 fn bg_tasks_count_matches_running_snapshots() {
-    let mut app = make_app();
-    app.bg_snapshots = vec![
+    let app = make_app();
+    app.view_clients["main"].inject_bg_for_test(vec![
         BgTaskDetail {
             id: "bg_1".into(),
             description: "a".into(),
@@ -149,7 +146,7 @@ fn bg_tasks_count_matches_running_snapshots() {
             output: String::new(),
         }
         .to_snapshot(),
-    ];
+    ]);
     let state = app.session.lock();
     let provider = app.panel_registry.by_kind(PanelKind::BgTasks).unwrap();
     // Completed excluded by bg_tasks_panel::task_ids.
@@ -161,18 +158,20 @@ fn bg_tasks_count_matches_running_snapshots() {
 
 #[test]
 fn crons_count_matches_snapshots() {
-    let mut app = make_app();
-    app.cron_snapshots = (0..3)
-        .map(|i| CronJobSnapshot {
-            id: format!("c{i}"),
-            cron_expr: "*/5 * * * *".into(),
-            prompt: "p".into(),
-            recurring: true,
-            created_at_unix_ms: 0,
-            next_fire_unix_ms: None,
-            durable: false,
-        })
-        .collect();
+    let app = make_app();
+    app.view_clients["main"].inject_crons_for_test(
+        (0..3)
+            .map(|i| CronJobSnapshot {
+                id: format!("c{i}"),
+                cron_expr: "*/5 * * * *".into(),
+                prompt: "p".into(),
+                recurring: true,
+                created_at_unix_ms: 0,
+                next_fire_unix_ms: None,
+                durable: false,
+            })
+            .collect(),
+    );
     let state = app.session.lock();
     let provider = app.panel_registry.by_kind(PanelKind::Crons).unwrap();
     assert_eq!(provider.count(&app, &state), 3);

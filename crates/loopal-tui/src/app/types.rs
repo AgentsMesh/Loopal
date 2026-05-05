@@ -1,5 +1,4 @@
-// Re-export display types from session crate
-pub use loopal_session::{PendingPermission, SessionMessage, SessionToolCall};
+pub use loopal_view_state::{PendingPermission, SessionMessage, SessionToolCall};
 
 use crate::command::CommandEntry;
 
@@ -93,7 +92,7 @@ pub enum SubPage {
     /// Session picker — user selects a session to resume.
     SessionPicker(PickerState),
     /// Status dashboard — tabbed view of session info, config, and usage.
-    StatusPage(StatusPageState),
+    StatusPage(Box<StatusPageState>),
     /// MCP server status page — list of MCP servers with connection state.
     McpPage(McpPageState),
     /// Skills page — list of loaded skills with source info.

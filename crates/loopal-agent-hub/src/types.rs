@@ -5,10 +5,11 @@
 
 use std::sync::Arc;
 
-use tokio::sync::mpsc;
+use tokio::sync::{Mutex, mpsc};
 
 use loopal_ipc::connection::Connection;
 use loopal_protocol::{ControlCommand, Envelope, InterruptSignal, UserQuestionResponse};
+use loopal_view_state::ViewStateReducer;
 
 use crate::topology::AgentInfo;
 
@@ -56,4 +57,18 @@ pub(crate) struct ManagedAgent {
     /// When a child of this agent finishes, Hub sends an Envelope here.
     /// None for agents that don't spawn children (or weren't given a channel).
     pub(crate) completion_tx: Option<mpsc::Sender<Envelope>>,
+    /// Per-agent ViewState reducer. The Hub event router applies each
+    /// incoming `AgentEvent` here so `view/snapshot` returns the latest
+    /// observable state. UI clients subscribe to the existing
+    /// `agent/event` broadcast for incremental updates and apply the
+    /// same events locally — there is no separate `view/delta` channel.
+    pub(crate) view: Arc<Mutex<ViewStateReducer>>,
+}
+
+impl ManagedAgent {
+    /// Build the ViewState reducer for a freshly registered agent.
+    /// Starts empty (rev=0) and is later reseeded by event flow.
+    pub(crate) fn new_view_reducer(agent_name: &str) -> Arc<Mutex<ViewStateReducer>> {
+        Arc::new(Mutex::new(ViewStateReducer::new(agent_name)))
+    }
 }

@@ -44,11 +44,13 @@ pub async fn build_tui_harness(
 }
 
 impl TuiTestHarness {
-    /// Collect agent events until idle, feeding each to SessionController.
+    /// Collect agent events until idle, dispatching each via
+    /// `App::dispatch_event` so the per-agent `ViewClient` map stays in
+    /// sync — mirrors production `tui_loop` behavior.
     pub async fn collect_until_idle(&mut self) -> Vec<AgentEventPayload> {
-        let session = &self.app.session;
+        let app = &mut self.app;
         events::collect_until_idle(&mut self.inner.event_rx, DEFAULT_TIMEOUT, |event| {
-            session.handle_event(event.clone());
+            app.dispatch_event(event.clone());
         })
         .await
     }
@@ -66,4 +68,11 @@ impl TuiTestHarness {
         }
         text
     }
+}
+
+/// Test-only re-export so suites that drive their own collect-loop
+/// (e.g. `e2e_permission_test`) can dispatch events the same way
+/// `collect_until_idle` does.
+pub fn dispatch_to_app(app: &mut App, event: loopal_protocol::AgentEvent) {
+    app.dispatch_event(event);
 }

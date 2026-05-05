@@ -1,12 +1,8 @@
-//! TUI event loop — main run loop for the terminal UI.
-
 use std::io;
-use std::path::PathBuf;
 
 use ratatui::prelude::*;
 
 use loopal_protocol::{AgentEvent, AgentEventPayload};
-use loopal_session::SessionController;
 use tokio::sync::mpsc;
 
 use crate::app::{App, SubPage};
@@ -14,20 +10,22 @@ use crate::event::{AppEvent, EventHandler};
 use crate::input::paste;
 use crate::key_dispatch::handle_key_action;
 use crate::render::draw;
+use crate::resume_display::{load_resumed_display, push_session_warning};
 use crate::terminal::TerminalGuard;
+use crate::tui_sync::sync_panel_caches;
 
-/// Run the TUI event loop with a real terminal (production entry point).
+/// `app` is supplied pre-initialized so the bootstrap can apply
+/// optimistic display updates before the event loop starts.
 pub async fn run_tui(
-    session: SessionController,
-    cwd: PathBuf,
+    mut app: App,
     agent_event_rx: mpsc::Receiver<AgentEvent>,
+    resync_rx: mpsc::Receiver<()>,
 ) -> anyhow::Result<()> {
     crate::terminal::install_panic_hook();
     let _guard = TerminalGuard::new()?;
     let backend = CrosstermBackend::new(io::stdout());
     let mut terminal = Terminal::new(backend)?;
-    let events = EventHandler::new(agent_event_rx);
-    let mut app = App::new(session, cwd);
+    let events = EventHandler::new(agent_event_rx, resync_rx);
 
     run_tui_loop(&mut terminal, events, &mut app).await?;
 
@@ -35,7 +33,6 @@ pub async fn run_tui(
     Ok(())
 }
 
-/// Backend-agnostic TUI event loop.
 pub async fn run_tui_loop<B: Backend>(
     terminal: &mut Terminal<B>,
     mut events: EventHandler,
@@ -58,54 +55,29 @@ where
         }
 
         let mut should_quit = false;
+        let mut should_resync = false;
         for event in batch {
             match event {
-                AppEvent::ScrollUp => {
-                    app.content_scroll.scroll_up(3);
-                }
-                AppEvent::ScrollDown => {
-                    app.content_scroll.scroll_down(3);
-                }
+                AppEvent::ScrollUp => app.content_scroll.scroll_up(3),
+                AppEvent::ScrollDown => app.content_scroll.scroll_down(3),
                 AppEvent::Key(key) => {
                     should_quit = handle_key_action(app, key, &events).await;
                     if should_quit {
                         break;
                     }
                 }
-                AppEvent::Agent(agent_event) => {
-                    if let AgentEventPayload::SessionResumed { ref session_id, .. } =
-                        agent_event.payload
-                    {
-                        load_resumed_display(app, session_id);
-                    }
-                    if let AgentEventPayload::SessionResumeWarnings {
-                        session_id: _,
-                        ref warnings,
-                    } = agent_event.payload
-                    {
-                        for w in warnings {
-                            push_session_warning(app, w);
-                        }
-                    }
-                    let is_mcp_report = matches!(
-                        agent_event.payload,
-                        AgentEventPayload::McpStatusReport { .. }
-                    );
-                    app.session.handle_event(agent_event);
-                    if is_mcp_report {
-                        refresh_mcp_page(app);
-                    }
-                }
-                AppEvent::Paste(result) => {
-                    paste::apply_paste_result(app, result);
-                }
-                AppEvent::Resize(_, _) => {}
-                AppEvent::Tick => {}
+                AppEvent::Agent(agent_event) => handle_agent_event(app, agent_event),
+                AppEvent::Paste(result) => paste::apply_paste_result(app, result),
+                AppEvent::Resync => should_resync = true,
+                AppEvent::Resize(_, _) | AppEvent::Tick => {}
             }
         }
 
         if should_quit || app.exiting {
             break;
+        }
+        if should_resync {
+            app.resync_view_clients().await;
         }
         sync_panel_caches(app);
         terminal.draw(|f| draw(f, app))?;
@@ -114,7 +86,25 @@ where
     Ok(())
 }
 
-/// Refresh the MCP sub-page data if it's currently open.
+fn handle_agent_event(app: &mut App, agent_event: AgentEvent) {
+    if let AgentEventPayload::SessionResumed { ref session_id, .. } = agent_event.payload {
+        load_resumed_display(app, session_id);
+    }
+    if let AgentEventPayload::SessionResumeWarnings { ref warnings, .. } = agent_event.payload {
+        for w in warnings {
+            push_session_warning(app, w);
+        }
+    }
+    let is_mcp_report = matches!(
+        agent_event.payload,
+        AgentEventPayload::McpStatusReport { .. }
+    );
+    app.dispatch_event(agent_event);
+    if is_mcp_report {
+        refresh_mcp_page(app);
+    }
+}
+
 fn refresh_mcp_page(app: &mut App) {
     if let Some(SubPage::McpPage(ref mut state)) = app.sub_page {
         let servers = app.session.lock().mcp_status.clone().unwrap_or_default();
@@ -123,76 +113,5 @@ fn refresh_mcp_page(app: &mut App) {
         state.servers = servers;
         state.loaded = true;
         state.action_menu = None;
-    }
-}
-
-/// Sync all panel caches from session state into App-level fields.
-///
-/// Copies bg_tasks, task_snapshots, and cron_snapshots. `bg_task_details`
-/// uses merge-and-retain so the log viewer can still access completed
-/// tasks after they're cleaned from session state.
-fn sync_panel_caches(app: &mut App) {
-    {
-        let mut state = app.session.lock();
-        app.bg_snapshots = state.bg_tasks.values().map(|t| t.to_snapshot()).collect();
-        crate::session_cleanup::merge_bg_details(&mut app.bg_task_details, &state.bg_tasks);
-        app.task_snapshots = state.task_snapshots.clone();
-        app.cron_snapshots = state.cron_snapshots.clone();
-        crate::session_cleanup::cleanup_session_state(&mut state);
-    }
-    crate::session_cleanup::cap_bg_details(&mut app.bg_task_details);
-    clamp_scroll_offsets(app);
-}
-
-/// Ensure scroll offsets don't exceed item counts after data changes.
-fn clamp_scroll_offsets(app: &mut App) {
-    let clamps: Vec<_> = {
-        let state = app.session.lock();
-        app.panel_registry
-            .providers()
-            .iter()
-            .map(|p| (p.kind(), p.item_ids(app, &state).len(), p.max_visible()))
-            .collect()
-    };
-    for (kind, count, max) in clamps {
-        let section = app.section_mut(kind);
-        section.scroll_offset = section.scroll_offset.min(count.saturating_sub(max));
-    }
-}
-
-/// Surface a `SessionResumeWarnings` event to the user as a system
-/// message so failed-to-rehydrate per-session resources (cron, task list)
-/// don't drop silently.
-fn push_session_warning(app: &mut App, warning: &str) {
-    app.session
-        .push_system_message(format!("Session resume warning: {warning}"));
-}
-
-/// Load display history from storage after the agent confirms a session resume.
-fn load_resumed_display(app: &mut App, session_id: &str) {
-    let Ok(sm) = loopal_runtime::SessionManager::new() else {
-        return;
-    };
-    let Ok((session, messages)) = sm.resume_session(session_id) else {
-        return;
-    };
-    let projected = loopal_protocol::project_messages(&messages);
-    app.session.load_display_history(projected);
-
-    // Restore sub-agent conversation views
-    for sub in &session.sub_agents {
-        let Ok(sub_msgs) = sm.load_messages(&sub.session_id) else {
-            continue;
-        };
-        if sub_msgs.is_empty() {
-            continue;
-        }
-        app.session.load_sub_agent_history(
-            &sub.name,
-            &sub.session_id,
-            sub.parent.as_deref(),
-            sub.model.as_deref(),
-            loopal_protocol::project_messages(&sub_msgs),
-        );
     }
 }

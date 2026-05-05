@@ -111,18 +111,21 @@ pub(super) async fn forward_cross_hub_spawn(
 
     match &result {
         Ok(resp) => {
-            // Emit SubAgentSpawned for parity with the in-hub path
-            // (spawn_manager.rs:167). Without this, UI/topology consumers
-            // see in-hub children but not cross-hub shadow children.
+            // Emit SubAgentSpawned routed to the parent so the parent's
+            // ViewStateReducer adds the new shadow child to its `children`.
             let agent_id = resp["agent_id"].as_str().unwrap_or("unknown").to_string();
             let model = params["model"].as_str().map(String::from);
-            let event = AgentEvent::root(AgentEventPayload::SubAgentSpawned {
-                name: pf.name.clone(),
-                agent_id,
-                parent: Some(loopal_protocol::QualifiedAddress::local(from_agent)),
-                model,
-                session_id: None,
-            });
+            let parent_addr = loopal_protocol::QualifiedAddress::local(from_agent);
+            let event = AgentEvent::named(
+                parent_addr.clone(),
+                AgentEventPayload::SubAgentSpawned {
+                    name: pf.name.clone(),
+                    agent_id,
+                    parent: Some(parent_addr),
+                    model,
+                    session_id: None,
+                },
+            );
             let h = hub.lock().await;
             if h.registry.event_sender().try_send(event).is_err() {
                 tracing::warn!(

@@ -7,8 +7,9 @@
 //! than fail — losing intermediate "something changed" pulses is fine
 //! because each pulse triggers the same `list()` call anyway.
 //!
-//! Snapshot conversion (Task → TaskSnapshot) lives here, not in TaskStore,
-//! keeping the store as a pure persistence layer.
+//! Snapshot conversion (`Task` → `TaskSnapshot`) lives in
+//! `loopal_agent::state_snapshot` so this bridge, `AgentShared::snapshot_state`,
+//! and any future observer share one definition.
 
 use std::sync::Arc;
 
@@ -16,8 +17,9 @@ use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 
 use loopal_agent::task_store::TaskStore;
-use loopal_agent::types::{Task, TaskStatus};
-use loopal_protocol::{AgentEventPayload, TaskSnapshot, TaskSnapshotStatus};
+use loopal_agent::task_to_snapshot;
+use loopal_agent::types::TaskStatus;
+use loopal_protocol::{AgentEventPayload, TaskSnapshot};
 use loopal_runtime::frontend::traits::AgentFrontend;
 
 pub fn spawn(
@@ -57,20 +59,4 @@ async fn snapshot_all(store: &TaskStore) -> Vec<TaskSnapshot> {
         .filter(|t| !matches!(t.status, TaskStatus::Completed))
         .map(|t| task_to_snapshot(&t))
         .collect()
-}
-
-fn task_to_snapshot(task: &Task) -> TaskSnapshot {
-    let status = match task.status {
-        TaskStatus::Pending => TaskSnapshotStatus::Pending,
-        TaskStatus::InProgress => TaskSnapshotStatus::InProgress,
-        // Unreachable: list() excludes Deleted, snapshot_all() excludes Completed
-        TaskStatus::Completed | TaskStatus::Deleted => TaskSnapshotStatus::Completed,
-    };
-    TaskSnapshot {
-        id: task.id.clone(),
-        subject: task.subject.replace('\n', " ").replace('\r', ""),
-        active_form: task.active_form.clone(),
-        status,
-        blocked_by: task.blocked_by.clone(),
-    }
 }

@@ -8,12 +8,12 @@
 ///    coder        ● Idle        0s
 ///    tester       ⠧ Working     5s  Bash(npm test)
 /// ```
-use indexmap::IndexMap;
+use std::time::Duration;
+
 use ratatui::prelude::*;
 use ratatui::widgets::Paragraph;
 
 use loopal_protocol::AgentStatus;
-use loopal_session::state::AgentViewState;
 
 use super::unified_status::{format_duration, spinner_frame};
 
@@ -21,16 +21,25 @@ use super::unified_status::{format_duration, spinner_frame};
 /// NOTE: must match `key_dispatch_ops::MAX_VISIBLE` (scroll calculation).
 pub const MAX_VISIBLE: usize = 5;
 
+/// Per-agent display data lifted out of `ViewClient` once per render.
+#[derive(Clone)]
+pub struct AgentDisplayInfo {
+    pub status: AgentStatus,
+    pub last_tool: Option<String>,
+    pub tools_in_flight: u32,
+    pub elapsed: Duration,
+}
+
 /// Compute the height needed for the agent panel.
 /// Excludes the currently viewed agent — it's the active conversation, not a switchable target.
 pub fn panel_height(
-    agents: &IndexMap<String, AgentViewState>,
+    agents: &[(String, AgentDisplayInfo)],
     active_view: &str,
     agent_panel_offset: usize,
 ) -> u16 {
     let live = agents
         .iter()
-        .filter(|(name, a)| name.as_str() != active_view && is_live(&a.observable.status))
+        .filter(|(name, a)| name.as_str() != active_view && is_live(&a.status))
         .count();
     if live == 0 {
         return 0;
@@ -47,7 +56,7 @@ pub fn panel_height(
 /// `active_view` is excluded from the list (it's the current conversation).
 pub fn render_agent_panel(
     f: &mut Frame,
-    agents: &IndexMap<String, AgentViewState>,
+    agents: &[(String, AgentDisplayInfo)],
     focused: Option<&str>,
     active_view: &str,
     agent_panel_offset: usize,
@@ -57,10 +66,15 @@ pub fn render_agent_panel(
         return;
     }
 
-    let max_name = agents.keys().map(|n| n.len()).max().unwrap_or(0).max(4);
+    let max_name = agents
+        .iter()
+        .map(|(n, _)| n.len())
+        .max()
+        .unwrap_or(0)
+        .max(4);
     let live_agents: Vec<_> = agents
         .iter()
-        .filter(|(name, a)| name.as_str() != active_view && is_live(&a.observable.status))
+        .filter(|(name, a)| name.as_str() != active_view && is_live(&a.status))
         .collect();
 
     let total = live_agents.len();
@@ -91,10 +105,9 @@ pub fn render_agent_panel(
     f.render_widget(Paragraph::new(lines).style(bg), area);
 }
 
-/// Render a single agent status line.
 fn render_agent_line(
     name: &str,
-    agent: &AgentViewState,
+    agent: &AgentDisplayInfo,
     is_focused: bool,
     name_width: usize,
 ) -> Line<'static> {
@@ -116,17 +129,11 @@ fn render_agent_line(
     spans.push(Span::styled(padded, name_style));
     spans.push(Span::raw("  "));
 
-    // Spinner/icon + status label
-    let elapsed = agent.elapsed();
-    let (icon, label, icon_style) = status_display(
-        &agent.observable.status,
-        agent.observable.tools_in_flight,
-        elapsed,
-    );
+    let elapsed = agent.elapsed;
+    let (icon, label, icon_style) = status_display(&agent.status, agent.tools_in_flight, elapsed);
     spans.push(Span::styled(format!("{icon} {label:<12}"), icon_style));
     spans.push(Span::raw(" "));
 
-    // Elapsed time
     let time_str = if elapsed.as_secs() > 0 {
         format_duration(elapsed)
     } else {
@@ -137,8 +144,7 @@ fn render_agent_line(
         Style::default().fg(Color::DarkGray),
     ));
 
-    // Last tool (truncated)
-    if let Some(ref tool) = agent.observable.last_tool {
+    if let Some(ref tool) = agent.last_tool {
         spans.push(Span::raw("  "));
         let display: String = tool.chars().take(20).collect();
         spans.push(Span::styled(
@@ -150,7 +156,6 @@ fn render_agent_line(
     Line::from(spans)
 }
 
-/// Map agent status to (icon, label, style) for display.
 fn status_display(
     status: &AgentStatus,
     tools_in_flight: u32,

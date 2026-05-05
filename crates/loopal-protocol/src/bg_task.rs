@@ -14,7 +14,10 @@ pub enum BgTaskStatus {
 }
 
 /// Minimal, read-only snapshot of a background task for panel display.
-#[derive(Debug, Clone)]
+///
+/// Serializable so it can ride inside `AgentStateSnapshot` across the
+/// `agent/state_snapshot` IPC boundary (Hub cold-start ViewState rebuild).
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BgTaskSnapshot {
     pub id: String,
     pub description: String,

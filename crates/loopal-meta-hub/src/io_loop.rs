@@ -42,15 +42,6 @@ pub async fn meta_hub_io_loop(
                     let agent_count = params["agent_count"].as_u64().unwrap_or(0) as usize;
                     let mut mh = meta_hub.lock().await;
                     let _ = mh.registry.heartbeat(&hub_name, agent_count);
-                } else if method == methods::AGENT_EVENT.name {
-                    // Forward to EventAggregator's unified broadcast
-                    if let Ok(mut event) =
-                        serde_json::from_value::<loopal_protocol::AgentEvent>(params)
-                    {
-                        crate::aggregator::prefix_agent_name(&mut event, &hub_name);
-                        let mh = meta_hub.lock().await;
-                        let _ = mh.aggregator.broadcaster().send(event);
-                    }
                 }
             }
         }

@@ -3,16 +3,12 @@
 //! that the receiver's `default_cwd` is used, not any value the caller sent —
 //! without depending on `spawn_manager` (which spawns real subprocesses).
 //!
-//! TODO(P3): `permission_mode` and `depth` are passed through to the
-//! receiving Hub's `apply_start_overrides` / `build_depth_tool_filter` after
-//! a minimal clamp (depth >= 1). A malicious cross-hub caller can still
-//! influence these — for example, requesting `Bypass` permission_mode, or
-//! sending `depth: 1` to keep spawn tools available longer than the local
-//! ancestor chain warrants. This is acceptable today because cross-hub
-//! Loopal instances are co-located on the same machine + same user. A
-//! separate PR must add receiver-side policy arbitration before any
-//! cross-network deployment (clamp Bypass → Supervised, configurable
-//! per-hub allow-list, depth-floor based on receiver configuration, etc.).
+//! `permission_mode` is always clamped to `bypass` for cross-hub agents
+//! because the receiver hub is assumed headless (no UI clients) — any
+//! non-Bypass mode would only manifest as 30s timeout denials. `depth`
+//! is clamped `>= 1`. Cross-network deployment must add receiver-side
+//! policy arbitration (per-hub allow-list, depth-floor from receiver
+//! config) before becoming safe.
 
 use std::path::Path;
 
@@ -46,15 +42,22 @@ pub(crate) fn prepare_remote_spawn_args(
         .to_string();
     let model = params["model"].as_str().map(String::from);
     let prompt = params["prompt"].as_str().map(String::from);
-    let permission_mode = params["permission_mode"].as_str().map(String::from);
-    if let Some(ref pm) = permission_mode {
-        // P3: receiver currently applies caller's mode without arbitration.
+    // Cross-hub agents have no path to reach UI clients for permission.
+    // The Hub-side `pending_relay::handle_agent_permission` fast-denies
+    // when no local UI is registered (worker hubs are headless), so any
+    // non-Bypass mode would manifest as 30s timeout denials. Clamp here
+    // so misconfigured callers get a working — if permissive — agent.
+    let requested = params["permission_mode"].as_str();
+    if let Some(pm) = requested
+        && pm != "bypass"
+    {
         tracing::warn!(
-            permission_mode = %pm,
-            agent = %name,
-            "cross-hub spawn: applying caller's permission_mode hint without local policy arbitration (P3)"
+            agent = %params["name"].as_str().unwrap_or(""),
+            requested = %pm,
+            "cross-hub spawn: clamping permission_mode to bypass (no UI on remote hub)"
         );
     }
+    let permission_mode = Some("bypass".to_string());
     let agent_type = params["agent_type"].as_str().map(String::from);
     // Clamp depth >= 1: a malicious cross-hub caller could send `depth: 0`
     // to make the child appear root-equivalent and bypass the receiver's

@@ -11,10 +11,13 @@ use crate::views::input_view;
 pub fn draw(f: &mut Frame, app: &mut App) {
     let size = f.area();
     let state = app.session.lock();
+    let active = state.active_view.clone();
+    let vc = app.view_client_for(&active);
+    let vc_guard = vc.state();
+    let conv = vc_guard.conversation();
 
     let pw = input_view::prefix_width(app.pending_image_count());
     let input_h = input_view::input_height(&app.input, size.width, pw);
-    let conv = state.active_conversation();
     let banner_h = views::retry_banner::banner_height(&conv.retry_banner);
     let breadcrumb_h = u16::from(state.active_view != loopal_session::ROOT_AGENT);
     let elapsed = conv.turn_elapsed();
@@ -24,28 +27,29 @@ pub fn draw(f: &mut Frame, app: &mut App) {
 
     if let Some(ref mut sub_page) = app.sub_page {
         render_sub_page(f, sub_page, &app.bg_task_details, layout.picker);
-        views::unified_status::render_unified_status(f, &state, layout.status);
+        views::unified_status::render_unified_status(f, app, &state, conv, layout.status);
         return;
     }
 
     if breadcrumb_h > 0 {
         views::breadcrumb::render_breadcrumb(f, &state.active_view, layout.breadcrumb);
     }
-    app.content_scroll.render(f, &state, layout.content);
+    app.content_scroll.render(f, conv, layout.content);
     crate::render_panel::render_panel_zone(f, app, &state, elapsed, layout.agents);
     views::separator::render_separator(f, layout.separator);
     if let Some(ref msg) = conv.retry_banner {
         views::retry_banner::render_retry_banner(f, msg, layout.retry_banner);
     }
-    views::unified_status::render_unified_status(f, &state, layout.status);
+    views::unified_status::render_unified_status(f, app, &state, conv, layout.status);
 
     let pending_perm = conv.pending_permission.clone();
     let pending_question = conv.pending_question.clone();
     let topology_data = if app.show_topology {
-        Some(extract_topology(&state, elapsed))
+        Some(extract_topology(app, &state, elapsed))
     } else {
         None
     };
+    drop(vc_guard);
     drop(state);
 
     let image_count = app.pending_image_count();
@@ -90,14 +94,44 @@ fn render_sub_page(
 }
 
 fn extract_topology(
+    app: &App,
     state: &loopal_session::state::SessionState,
     elapsed: std::time::Duration,
 ) -> Vec<views::topology_overlay::TopologyNode> {
+    use indexmap::IndexMap;
     use loopal_protocol::AgentStatus;
-    let root_status = if state.is_active_agent_idle() {
+    use views::topology_overlay::AgentTopologySnapshot;
+
+    let root_idle = matches!(
+        app.observable_for(&state.active_view).status,
+        AgentStatus::WaitingForInput | AgentStatus::Finished | AgentStatus::Error
+    );
+    let root_status = if root_idle {
         AgentStatus::WaitingForInput
     } else {
         AgentStatus::Running
     };
-    views::topology_overlay::extract_topology(&state.agents, &state.model, root_status, elapsed)
+
+    let agents: IndexMap<String, AgentTopologySnapshot> = app
+        .view_clients
+        .iter()
+        .map(|(name, vc)| {
+            let guard = vc.state();
+            let view = &guard.state().agent;
+            (
+                name.clone(),
+                AgentTopologySnapshot {
+                    status: view.observable.status,
+                    model: view.observable.model.clone(),
+                    elapsed: view.elapsed(),
+                    tools_in_flight: view.observable.tools_in_flight,
+                    parent: view.parent.clone(),
+                    children: view.children.clone(),
+                },
+            )
+        })
+        .collect();
+
+    let root_model = app.observable_for(&state.active_view).model;
+    views::topology_overlay::extract_topology(&agents, &root_model, root_status, elapsed)
 }

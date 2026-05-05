@@ -12,10 +12,13 @@ pub mod providers;
 pub mod render;
 mod render_layout;
 pub mod render_panel;
+mod resume_display;
 mod session_cleanup;
 pub mod terminal;
 pub(crate) mod text_util;
 mod tui_loop;
+mod tui_sync;
+pub mod view_client;
 pub mod views;
 
 pub use terminal::install_panic_hook;

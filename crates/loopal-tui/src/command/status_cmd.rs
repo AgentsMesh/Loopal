@@ -28,12 +28,15 @@ async fn open_status_page(app: &mut App) {
     let (mut session, usage) = collect_session_data(app);
     let config = collect_config_snapshot(app);
 
-    // Hub listener port requires async lock — resolve outside the sync session lock.
+    // Hub listener info requires async lock — resolve outside the sync session lock.
     if let Some(port) = app.session.hub_listener_port().await {
         session.hub_endpoint = format!("127.0.0.1:{port}");
     }
+    if let Some(token) = app.session.hub_listener_token().await {
+        session.hub_token = token;
+    }
 
-    app.sub_page = Some(SubPage::StatusPage(StatusPageState {
+    app.sub_page = Some(SubPage::StatusPage(Box::new(StatusPageState {
         active_tab: StatusTab::Status,
         session,
         config,
@@ -41,18 +44,15 @@ async fn open_status_page(app: &mut App) {
         scroll_offsets: [0; 3],
         filter: String::new(),
         filter_cursor: 0,
-    }));
+    })));
 }
 
 /// Extract session/agent data from the locked session state.
 fn collect_session_data(app: &App) -> (SessionSnapshot, UsageSnapshot) {
+    let (context_window, context_used) =
+        app.with_active_conversation(|conv| (conv.context_window, conv.token_count()));
     let state = app.session.lock();
-    let conv = state.active_conversation();
-    let agent = state
-        .agents
-        .get(&state.active_view)
-        .expect("active_view must exist in agents map");
-    let obs = &agent.observable;
+    let obs = app.observable_for(&state.active_view);
 
     let session = SessionSnapshot {
         session_id: state
@@ -60,16 +60,17 @@ fn collect_session_data(app: &App) -> (SessionSnapshot, UsageSnapshot) {
             .clone()
             .unwrap_or_else(|| "N/A".to_string()),
         cwd: app.cwd.display().to_string(),
-        model_display: state.model.clone(),
-        mode: state.mode.clone(),
+        model_display: obs.model.clone(),
+        mode: obs.mode.clone(),
         hub_endpoint: String::new(),
+        hub_token: String::new(),
     };
 
     let usage = UsageSnapshot {
         input_tokens: obs.input_tokens,
         output_tokens: obs.output_tokens,
-        context_window: conv.context_window,
-        context_used: conv.token_count(),
+        context_window,
+        context_used,
         turn_count: obs.turn_count,
         tool_count: obs.tool_count,
     };

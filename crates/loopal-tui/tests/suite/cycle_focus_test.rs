@@ -11,8 +11,6 @@ fn make_app() -> App {
     let (perm_tx, _) = mpsc::channel::<bool>(16);
     let (question_tx, _) = mpsc::channel::<UserQuestionResponse>(16);
     let session = SessionController::new(
-        "test-model".into(),
-        "act".into(),
         control_tx,
         perm_tx,
         question_tx,
@@ -22,8 +20,8 @@ fn make_app() -> App {
     App::new(session, std::env::temp_dir())
 }
 
-fn spawn_agent(app: &App, name: &str) {
-    app.session.handle_event(AgentEvent::named(
+fn spawn_agent(app: &mut App, name: &str) {
+    app.dispatch_event(AgentEvent::named(
         name,
         AgentEventPayload::SubAgentSpawned {
             name: name.to_string(),
@@ -33,13 +31,11 @@ fn spawn_agent(app: &App, name: &str) {
             session_id: None,
         },
     ));
-    app.session
-        .handle_event(AgentEvent::named(name, AgentEventPayload::Started));
+    app.dispatch_event(AgentEvent::named(name, AgentEventPayload::Started));
 }
 
-fn finish_agent(app: &App, name: &str) {
-    app.session
-        .handle_event(AgentEvent::named(name, AgentEventPayload::Finished));
+fn finish_agent(app: &mut App, name: &str) {
+    app.dispatch_event(AgentEvent::named(name, AgentEventPayload::Finished));
 }
 
 // === Basic cycling ===
@@ -47,9 +43,9 @@ fn finish_agent(app: &App, name: &str) {
 #[test]
 fn forward_through_agents() {
     let mut app = make_app();
-    spawn_agent(&app, "a");
-    spawn_agent(&app, "b");
-    spawn_agent(&app, "c");
+    spawn_agent(&mut app, "a");
+    spawn_agent(&mut app, "b");
+    spawn_agent(&mut app, "c");
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     cycle_panel_focus(&mut app, true);
     assert_eq!(app.section(PanelKind::Agents).focused.as_deref(), Some("a"));
@@ -62,8 +58,8 @@ fn forward_through_agents() {
 #[test]
 fn forward_wraps_around() {
     let mut app = make_app();
-    spawn_agent(&app, "a");
-    spawn_agent(&app, "b");
+    spawn_agent(&mut app, "a");
+    spawn_agent(&mut app, "b");
     app.section_mut(PanelKind::Agents).focused = Some("b".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     cycle_panel_focus(&mut app, true);
@@ -73,8 +69,8 @@ fn forward_wraps_around() {
 #[test]
 fn backward_wraps_around() {
     let mut app = make_app();
-    spawn_agent(&app, "a");
-    spawn_agent(&app, "b");
+    spawn_agent(&mut app, "a");
+    spawn_agent(&mut app, "b");
     app.section_mut(PanelKind::Agents).focused = Some("a".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     cycle_panel_focus(&mut app, false);
@@ -84,8 +80,8 @@ fn backward_wraps_around() {
 #[test]
 fn backward_from_none_selects_last() {
     let mut app = make_app();
-    spawn_agent(&app, "a");
-    spawn_agent(&app, "b");
+    spawn_agent(&mut app, "a");
+    spawn_agent(&mut app, "b");
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     cycle_panel_focus(&mut app, false);
     assert_eq!(app.section(PanelKind::Agents).focused.as_deref(), Some("b"));
@@ -96,9 +92,9 @@ fn backward_from_none_selects_last() {
 #[test]
 fn recovers_from_stale_focused_agent() {
     let mut app = make_app();
-    spawn_agent(&app, "live");
-    spawn_agent(&app, "dead");
-    finish_agent(&app, "dead");
+    spawn_agent(&mut app, "live");
+    spawn_agent(&mut app, "dead");
+    finish_agent(&mut app, "dead");
     app.section_mut(PanelKind::Agents).focused = Some("dead".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     cycle_panel_focus(&mut app, true);
@@ -113,8 +109,8 @@ fn recovers_from_stale_focused_agent() {
 #[test]
 fn empty_list_exits_agent_panel() {
     let mut app = make_app();
-    spawn_agent(&app, "worker");
-    finish_agent(&app, "worker");
+    spawn_agent(&mut app, "worker");
+    finish_agent(&mut app, "worker");
     app.section_mut(PanelKind::Agents).focused = Some("worker".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     app.section_mut(PanelKind::Agents).scroll_offset = 2;
@@ -130,7 +126,7 @@ fn empty_list_exits_agent_panel() {
 fn scroll_follows_focus_downward() {
     let mut app = make_app();
     for i in 0..7 {
-        spawn_agent(&app, &format!("a{i}"));
+        spawn_agent(&mut app, &format!("a{i}"));
     }
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
     for _ in 0..7 {
@@ -150,9 +146,9 @@ fn scroll_follows_focus_downward() {
 #[test]
 fn scroll_zero_when_few_agents() {
     let mut app = make_app();
-    spawn_agent(&app, "a");
-    spawn_agent(&app, "b");
-    spawn_agent(&app, "c");
+    spawn_agent(&mut app, "a");
+    spawn_agent(&mut app, "b");
+    spawn_agent(&mut app, "c");
     for _ in 0..3 {
         cycle_panel_focus(&mut app, true);
     }
@@ -163,7 +159,7 @@ fn scroll_zero_when_few_agents() {
 fn scroll_resets_on_wrap_to_first() {
     let mut app = make_app();
     for i in 0..7 {
-        spawn_agent(&app, &format!("a{i}"));
+        spawn_agent(&mut app, &format!("a{i}"));
     }
     app.section_mut(PanelKind::Agents).focused = Some("a6".into());
     app.section_mut(PanelKind::Agents).scroll_offset = 2;
@@ -180,7 +176,7 @@ fn scroll_resets_on_wrap_to_first() {
 fn scroll_adjusts_on_backward_past_window() {
     let mut app = make_app();
     for i in 0..7 {
-        spawn_agent(&app, &format!("a{i}"));
+        spawn_agent(&mut app, &format!("a{i}"));
     }
     app.section_mut(PanelKind::Agents).focused = Some("a3".into());
     app.section_mut(PanelKind::Agents).scroll_offset = 2; // window: a2..a6

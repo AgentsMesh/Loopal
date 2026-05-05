@@ -12,8 +12,6 @@ fn make_app() -> App {
     let (perm_tx, _) = mpsc::channel::<bool>(16);
     let (question_tx, _) = mpsc::channel::<UserQuestionResponse>(16);
     let session = SessionController::new(
-        "test-model".into(),
-        "act".into(),
         control_tx,
         perm_tx,
         question_tx,
@@ -24,12 +22,12 @@ fn make_app() -> App {
 }
 
 fn add_bg_snapshot(app: &mut App, id: &str, desc: &str) {
-    app.bg_snapshots.push(BgTaskSnapshot {
+    app.view_clients["main"].inject_bg_for_test(vec![BgTaskSnapshot {
         id: id.into(),
         description: desc.into(),
         status: BgTaskStatus::Running,
         exit_code: None,
-    });
+    }]);
 }
 
 fn snap(id: &str, desc: &str) -> BgTaskSnapshot {

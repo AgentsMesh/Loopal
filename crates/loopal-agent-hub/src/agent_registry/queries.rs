@@ -6,6 +6,8 @@ use std::sync::Arc;
 
 use loopal_ipc::connection::Connection;
 use loopal_protocol::Envelope;
+use loopal_view_state::ViewStateReducer;
+use tokio::sync::Mutex;
 
 use crate::routing;
 use crate::topology::{AgentInfo, AgentLifecycle};
@@ -28,6 +30,12 @@ impl AgentRegistry {
 
     pub fn get_agent_connection(&self, name: &str) -> Option<Arc<Connection>> {
         self.agents.get(name).and_then(|a| a.state.connection())
+    }
+
+    /// Per-agent ViewState reducer handle. Used by the hub event router
+    /// to apply incoming events and by `view/snapshot` to read state.
+    pub fn agent_view(&self, name: &str) -> Option<Arc<Mutex<ViewStateReducer>>> {
+        self.agents.get(name).map(|a| a.view.clone())
     }
 
     pub fn all_agent_connections(&self) -> Vec<(String, Arc<Connection>)> {

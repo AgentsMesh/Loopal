@@ -33,6 +33,7 @@ impl PermissionHandler for RelayPermissionHandler {
             event_id: loopal_protocol::event_id::next_event_id(),
             turn_id: loopal_protocol::event_id::current_turn_id(),
             correlation_id: loopal_protocol::event_id::current_correlation_id(),
+            rev: None,
             payload: AgentEventPayload::ToolPermissionRequest {
                 id: id.to_string(),
                 name: name.to_string(),

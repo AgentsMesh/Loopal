@@ -15,8 +15,6 @@ fn make_app() -> App {
     let (perm_tx, _) = mpsc::channel::<bool>(16);
     let (question_tx, _) = mpsc::channel::<UserQuestionResponse>(16);
     let session = SessionController::new(
-        "test-model".into(),
-        "act".into(),
         control_tx,
         perm_tx,
         question_tx,
@@ -70,13 +68,9 @@ fn test_down_navigates_history_forward() {
 #[test]
 fn test_up_navigates_history_when_idle() {
     let mut app = make_app();
-    app.session
-        .lock()
-        .agents
-        .get_mut("main")
-        .unwrap()
-        .observable
-        .status = AgentStatus::WaitingForInput;
+    app.view_clients["main"].with_view_mut(|view| {
+        view.observable.status = AgentStatus::WaitingForInput;
+    });
     app.input_history.push("older".into());
     app.input_history.push("recent".into());
     handle_key(&mut app, key(KeyCode::Up));
@@ -86,13 +80,9 @@ fn test_up_navigates_history_when_idle() {
 #[test]
 fn test_down_navigates_history_forward_when_idle() {
     let mut app = make_app();
-    app.session
-        .lock()
-        .agents
-        .get_mut("main")
-        .unwrap()
-        .observable
-        .status = AgentStatus::WaitingForInput;
+    app.view_clients["main"].with_view_mut(|view| {
+        view.observable.status = AgentStatus::WaitingForInput;
+    });
     app.input_history.push("first".into());
     app.input_history.push("second".into());
     handle_key(&mut app, key(KeyCode::Up));
@@ -105,13 +95,9 @@ fn test_down_navigates_history_forward_when_idle() {
 #[test]
 fn test_up_navigates_history_immediately() {
     let mut app = make_app();
-    app.session
-        .lock()
-        .agents
-        .get_mut("main")
-        .unwrap()
-        .observable
-        .status = AgentStatus::WaitingForInput;
+    app.view_clients["main"].with_view_mut(|view| {
+        view.observable.status = AgentStatus::WaitingForInput;
+    });
     app.input_history.push("previous command".into());
     let action = handle_key(&mut app, key(KeyCode::Up));
     assert!(matches!(action, InputAction::None));
@@ -126,13 +112,9 @@ fn test_up_navigates_history_immediately() {
 #[test]
 fn test_ctrl_p_navigates_history() {
     let mut app = make_app();
-    app.session
-        .lock()
-        .agents
-        .get_mut("main")
-        .unwrap()
-        .observable
-        .status = AgentStatus::WaitingForInput;
+    app.view_clients["main"].with_view_mut(|view| {
+        view.observable.status = AgentStatus::WaitingForInput;
+    });
     app.input_history.push("first".into());
     app.input_history.push("second".into());
     handle_key(&mut app, ctrl('p'));
@@ -142,13 +124,9 @@ fn test_ctrl_p_navigates_history() {
 #[test]
 fn test_ctrl_n_navigates_history_forward() {
     let mut app = make_app();
-    app.session
-        .lock()
-        .agents
-        .get_mut("main")
-        .unwrap()
-        .observable
-        .status = AgentStatus::WaitingForInput;
+    app.view_clients["main"].with_view_mut(|view| {
+        view.observable.status = AgentStatus::WaitingForInput;
+    });
     app.input_history.push("first".into());
     app.input_history.push("second".into());
     handle_key(&mut app, ctrl('p'));

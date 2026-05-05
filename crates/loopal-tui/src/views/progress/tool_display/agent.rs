@@ -2,7 +2,7 @@
 
 use ratatui::prelude::*;
 
-use loopal_session::types::SessionToolCall;
+use loopal_view_state::SessionToolCall;
 
 use super::{EXPAND_MAX_LINES, dim_style, expand_output, output_first_line, output_style};
 

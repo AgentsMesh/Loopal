@@ -11,8 +11,6 @@ fn make_app_with_rx() -> (App, mpsc::Receiver<ControlCommand>) {
     let (perm_tx, _) = mpsc::channel::<bool>(16);
     let (question_tx, _) = mpsc::channel::<UserQuestionResponse>(16);
     let session = SessionController::new(
-        "m".to_string(),
-        "act".to_string(),
         control_tx,
         perm_tx,
         question_tx,
@@ -94,28 +92,25 @@ fn test_selected_out_of_bounds() {
 
 #[test]
 fn test_mcp_status_caching() {
-    let app = make_app();
+    let mut app = make_app();
     assert!(app.session.lock().mcp_status.is_none());
-    app.session
-        .handle_event(AgentEvent::root(AgentEventPayload::McpStatusReport {
-            servers: servers(),
-        }));
+    app.dispatch_event(AgentEvent::root(AgentEventPayload::McpStatusReport {
+        servers: servers(),
+    }));
     assert_eq!(app.session.lock().mcp_status.as_ref().unwrap().len(), 2);
     // Update replaces previous
-    app.session
-        .handle_event(AgentEvent::root(AgentEventPayload::McpStatusReport {
-            servers: vec![servers()[0].clone()],
-        }));
+    app.dispatch_event(AgentEvent::root(AgentEventPayload::McpStatusReport {
+        servers: vec![servers()[0].clone()],
+    }));
     assert_eq!(app.session.lock().mcp_status.as_ref().unwrap().len(), 1);
 }
 
 #[test]
 fn test_empty_report_sets_some() {
-    let app = make_app();
-    app.session
-        .handle_event(AgentEvent::root(AgentEventPayload::McpStatusReport {
-            servers: vec![],
-        }));
+    let mut app = make_app();
+    app.dispatch_event(AgentEvent::root(AgentEventPayload::McpStatusReport {
+        servers: vec![],
+    }));
     assert!(app.session.lock().mcp_status.as_ref().unwrap().is_empty());
 }
 

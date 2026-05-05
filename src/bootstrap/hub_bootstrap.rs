@@ -20,6 +20,9 @@ pub struct BootstrapContext {
     pub agent_proc: loopal_agent_client::AgentProcess,
     /// Root agent's session ID (for sub-agent ref persistence).
     pub root_session_id: String,
+    /// TCP listener token — printed on stderr so external clients can
+    /// `--attach-hub` this Hub.
+    pub hub_token: String,
 }
 
 /// Create Hub, start TCP listener, spawn root agent, register as "main".
@@ -34,10 +37,15 @@ pub async fn bootstrap_hub_and_agent(
     hub.lock().await.max_total_agents = config.settings.harness.agent_max_total;
 
     let (listener, port, hub_token) = hub_server::start_hub_listener(hub.clone()).await?;
-    hub.lock().await.listener_port = Some(port);
+    {
+        let mut h = hub.lock().await;
+        h.listener_port = Some(port);
+        h.listener_token = Some(hub_token.clone());
+    }
     let hub_accept = hub.clone();
+    let token_for_loop = hub_token.clone();
     tokio::spawn(async move {
-        hub_server::accept_loop(listener, hub_accept, hub_token).await;
+        hub_server::accept_loop(listener, hub_accept, token_for_loop).await;
     });
 
     if let Some(ref meta_addr) = cli.join_hub {
@@ -83,5 +91,6 @@ pub async fn bootstrap_hub_and_agent(
         event_rx,
         agent_proc,
         root_session_id,
+        hub_token,
     })
 }

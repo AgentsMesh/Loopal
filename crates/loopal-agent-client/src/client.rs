@@ -9,7 +9,7 @@ use tracing::info;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
-use loopal_protocol::{AgentEvent, ControlCommand, Envelope, UserQuestionResponse};
+use loopal_protocol::{AgentEvent, ControlCommand, Envelope};
 
 /// Parameters for `agent/start` IPC request.
 #[derive(Debug, Default)]
@@ -166,46 +166,18 @@ impl AgentClient {
                         }
                     }
                 }
-                Incoming::Request { id, method, params } => {
-                    if method == methods::AGENT_PERMISSION.name {
-                        return Some(AgentClientEvent::PermissionRequest { id, params });
-                    }
-                    if method == methods::AGENT_QUESTION.name {
-                        return Some(AgentClientEvent::QuestionRequest { id, params });
-                    }
-                    // Unknown request — respond with error
+                Incoming::Request { id, method, .. } => {
                     let _ = self
                         .connection
                         .respond_error(
                             id,
                             loopal_ipc::jsonrpc::METHOD_NOT_FOUND,
-                            &format!("unknown method: {method}"),
+                            &format!("agent client does not handle: {method}"),
                         )
                         .await;
                 }
             }
         }
-    }
-
-    /// Respond to a permission request.
-    pub async fn respond_permission(&self, request_id: i64, allow: bool) -> anyhow::Result<()> {
-        self.connection
-            .respond(request_id, serde_json::json!({"allow": allow}))
-            .await
-            .map_err(|e| anyhow::anyhow!("permission response failed: {e}"))
-    }
-
-    /// Respond to a question request.
-    pub async fn respond_question(
-        &self,
-        request_id: i64,
-        response: &UserQuestionResponse,
-    ) -> anyhow::Result<()> {
-        let value = serde_json::to_value(response)?;
-        self.connection
-            .respond(request_id, value)
-            .await
-            .map_err(|e| anyhow::anyhow!("question response failed: {e}"))
     }
 
     /// Check if the underlying connection is alive.
@@ -224,8 +196,4 @@ impl AgentClient {
 pub enum AgentClientEvent {
     /// An agent event (stream text, tool calls, status, etc).
     AgentEvent(AgentEvent),
-    /// The agent requests tool permission from the client.
-    PermissionRequest { id: i64, params: Value },
-    /// The agent asks a question to the user.
-    QuestionRequest { id: i64, params: Value },
 }

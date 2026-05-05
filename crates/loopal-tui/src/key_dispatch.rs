@@ -90,6 +90,7 @@ pub(crate) async fn handle_key_action(
         }
         InputAction::EnterAgentView => {
             if let Some(name) = app.section(crate::app::PanelKind::Agents).focused.clone()
+                && app.is_agent_live(&name)
                 && app.session.enter_agent_view(&name)
             {
                 app.focus_mode = crate::app::FocusMode::Input;
@@ -117,46 +118,33 @@ pub(crate) async fn handle_key_action(
             false
         }
         InputAction::QuestionUp => {
-            if let Some(ref mut q) = app
-                .session
-                .lock()
-                .active_conversation_mut()
-                .pending_question
-            {
-                q.cursor_up();
-            }
+            app.with_active_conversation_mut(|conv| {
+                if let Some(ref mut q) = conv.pending_question {
+                    q.cursor_up();
+                }
+            });
             false
         }
         InputAction::QuestionDown => {
-            if let Some(ref mut q) = app
-                .session
-                .lock()
-                .active_conversation_mut()
-                .pending_question
-            {
-                q.cursor_down();
-            }
+            app.with_active_conversation_mut(|conv| {
+                if let Some(ref mut q) = conv.pending_question {
+                    q.cursor_down();
+                }
+            });
             false
         }
         InputAction::QuestionToggle => {
-            if let Some(ref mut q) = app
-                .session
-                .lock()
-                .active_conversation_mut()
-                .pending_question
-            {
-                q.toggle();
-            }
+            app.with_active_conversation_mut(|conv| {
+                if let Some(ref mut q) = conv.pending_question {
+                    q.toggle();
+                }
+            });
             false
         }
         InputAction::QuestionConfirm => {
-            let answers = app
-                .session
-                .lock()
-                .active_conversation()
-                .pending_question
-                .as_ref()
-                .map(|q| {
+            let pending = app.with_active_conversation_mut(|conv| conv.pending_question.take());
+            if let Some(q) = pending {
+                let answers = {
                     let ans = q.get_answers();
                     if ans.is_empty() && !q.questions[q.current_question].allow_multiple {
                         vec![
@@ -167,16 +155,20 @@ pub(crate) async fn handle_key_action(
                     } else {
                         ans
                     }
-                });
-            if let Some(answers) = answers {
-                app.session.answer_question(answers).await;
+                };
+                let agent = app.session.lock().active_view.clone();
+                app.session.respond_question(&agent, &q.id, answers).await;
             }
             false
         }
         InputAction::QuestionCancel => {
-            app.session
-                .answer_question(vec!["(cancelled)".into()])
-                .await;
+            let pending = app.with_active_conversation_mut(|conv| conv.pending_question.take());
+            if let Some(q) = pending {
+                let agent = app.session.lock().active_view.clone();
+                app.session
+                    .respond_question(&agent, &q.id, vec!["(cancelled)".into()])
+                    .await;
+            }
             false
         }
         InputAction::McpReconnect(server) => {

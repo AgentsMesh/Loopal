@@ -70,6 +70,7 @@ async fn event_forwarder_delivers_sub_agent_events() {
         event_id: 0,
         turn_id: 0,
         correlation_id: 0,
+        rev: None,
         payload: loopal_protocol::AgentEventPayload::Stream {
             text: "from sub-agent".into(),
         },

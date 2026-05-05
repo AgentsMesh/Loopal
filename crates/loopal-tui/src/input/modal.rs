@@ -9,13 +9,13 @@ use crate::app::App;
 /// Handle modal states that override all other key bindings.
 /// Returns `Some(action)` if a modal consumed the key, `None` to fall through.
 pub(super) fn handle_modal_keys(app: &mut App, key: &KeyEvent) -> Option<InputAction> {
-    if app
-        .session
-        .lock()
-        .active_conversation()
-        .pending_permission
-        .is_some()
-    {
+    let (has_perm, has_question) = app.with_active_conversation(|conv| {
+        (
+            conv.pending_permission.is_some(),
+            conv.pending_question.is_some(),
+        )
+    });
+    if has_perm {
         let is_ctrl_c =
             key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c');
         return Some(match key.code {
@@ -26,13 +26,7 @@ pub(super) fn handle_modal_keys(app: &mut App, key: &KeyEvent) -> Option<InputAc
             _ => InputAction::None,
         });
     }
-    if app
-        .session
-        .lock()
-        .active_conversation()
-        .pending_question
-        .is_some()
-    {
+    if has_question {
         let is_ctrl_c =
             key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c');
         return Some(match key.code {

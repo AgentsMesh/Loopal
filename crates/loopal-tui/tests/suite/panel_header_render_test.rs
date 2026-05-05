@@ -1,8 +1,7 @@
 //! Tests for section header rendering + `panel_zone_height`.
 
 use loopal_protocol::{
-    BgTaskDetail, BgTaskStatus, ControlCommand, TaskSnapshot, TaskSnapshotStatus,
-    UserQuestionResponse,
+    BgTaskStatus, ControlCommand, TaskSnapshot, TaskSnapshotStatus, UserQuestionResponse,
 };
 use loopal_session::SessionController;
 use loopal_tui::app::{App, FocusMode, PanelKind};
@@ -19,8 +18,6 @@ fn make_app() -> App {
     let (perm_tx, _) = mpsc::channel::<bool>(16);
     let (question_tx, _) = mpsc::channel::<UserQuestionResponse>(16);
     let session = SessionController::new(
-        "m".into(),
-        "act".into(),
         control_tx,
         perm_tx,
         question_tx,
@@ -40,13 +37,12 @@ fn task(id: &str, status: TaskSnapshotStatus) -> TaskSnapshot {
     }
 }
 
-fn bg(id: &str) -> BgTaskDetail {
-    BgTaskDetail {
+fn bg(id: &str) -> loopal_protocol::BgTaskSnapshot {
+    loopal_protocol::BgTaskSnapshot {
         id: id.into(),
         description: format!("desc {id}"),
         status: BgTaskStatus::Running,
         exit_code: None,
-        output: String::new(),
     }
 }
 
@@ -132,27 +128,17 @@ fn zone_height_zero_when_all_empty() {
 
 #[test]
 fn zone_height_single_panel_no_header_added() {
-    let mut app = make_app();
-    app.task_snapshots = vec![task("1", TaskSnapshotStatus::InProgress)];
+    let app = make_app();
+    app.view_clients["main"].inject_tasks_for_test(vec![task("1", TaskSnapshotStatus::InProgress)]);
     let state = app.session.lock();
     assert_eq!(panel_zone_height(&app, &state), 1);
 }
 
 #[test]
 fn zone_height_two_panels_adds_two_header_rows() {
-    let mut app = make_app();
-    app.task_snapshots = vec![task("1", TaskSnapshotStatus::InProgress)];
-    app.session
-        .lock()
-        .bg_tasks
-        .insert("bg_1".into(), bg("bg_1"));
-    app.bg_snapshots = app
-        .session
-        .lock()
-        .bg_tasks
-        .values()
-        .map(|t| t.to_snapshot())
-        .collect();
+    let app = make_app();
+    app.view_clients["main"].inject_tasks_for_test(vec![task("1", TaskSnapshotStatus::InProgress)]);
+    app.view_clients["main"].inject_bg_for_test(vec![bg("bg_1")]);
     let state = app.session.lock();
     // 1 tasks + 1 bg + 2 headers = 4
     assert_eq!(panel_zone_height(&app, &state), 4);
@@ -163,18 +149,8 @@ fn zone_height_two_panels_adds_two_header_rows() {
 #[test]
 fn render_two_panels_produces_two_header_lines() {
     let mut app = make_app();
-    app.task_snapshots = vec![task("1", TaskSnapshotStatus::InProgress)];
-    app.session
-        .lock()
-        .bg_tasks
-        .insert("bg_1".into(), bg("bg_1"));
-    app.bg_snapshots = app
-        .session
-        .lock()
-        .bg_tasks
-        .values()
-        .map(|t| t.to_snapshot())
-        .collect();
+    app.view_clients["main"].inject_tasks_for_test(vec![task("1", TaskSnapshotStatus::InProgress)]);
+    app.view_clients["main"].inject_bg_for_test(vec![bg("bg_1")]);
     app.focus_mode = FocusMode::Panel(PanelKind::Tasks);
 
     let backend = TestBackend::new(50, 4);

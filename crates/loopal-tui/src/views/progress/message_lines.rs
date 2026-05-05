@@ -3,7 +3,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::markdown;
 use loopal_protocol::MessageSource;
-use loopal_session::types::{InboxOrigin, SessionMessage};
+use loopal_view_state::{InboxOrigin, SessionMessage};
 
 use super::skill_display::render_skill_invoke;
 use super::thinking_render;

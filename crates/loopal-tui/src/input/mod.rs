@@ -69,7 +69,8 @@ fn handle_global_keys(app: &mut App, key: &KeyEvent) -> Option<InputAction> {
         }
     }
     if key.code == KeyCode::BackTab {
-        let current_mode = app.session.lock().mode.clone();
+        let active = app.session.lock().active_view.clone();
+        let current_mode = app.observable_for(&active).mode;
         let new_mode = if current_mode == "plan" {
             "act"
         } else {

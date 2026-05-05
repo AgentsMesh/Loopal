@@ -1,7 +1,7 @@
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
 
-use loopal_session::PendingQuestion;
+use loopal_view_state::PendingQuestion;
 
 /// Render the AskUser question dialog popup.
 pub fn render_question_dialog(f: &mut Frame, q: &PendingQuestion, area: Rect) {

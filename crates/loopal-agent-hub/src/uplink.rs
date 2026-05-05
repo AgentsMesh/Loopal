@@ -80,19 +80,6 @@ impl HubUplink {
         Ok(resp)
     }
 
-    /// Relay a permission/question request to MetaHub's UI clients.
-    pub async fn relay_permission(&self, method: &str, params: Value) -> Result<Value, String> {
-        let resp = self
-            .conn
-            .send_request(method, params)
-            .await
-            .map_err(|e| format!("uplink relay {method} failed: {e}"))?;
-        if let Some(msg) = resp.get("message").and_then(|m| m.as_str()) {
-            return Err(format!("uplink relay error: {msg}"));
-        }
-        Ok(resp)
-    }
-
     /// Send heartbeat to MetaHub with current agent count.
     pub async fn heartbeat(&self, agent_count: usize) -> Result<(), String> {
         self.conn

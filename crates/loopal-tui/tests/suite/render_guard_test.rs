@@ -14,8 +14,6 @@ fn make_app() -> App {
     let (perm_tx, _) = mpsc::channel::<bool>(16);
     let (question_tx, _) = mpsc::channel::<UserQuestionResponse>(16);
     let session = SessionController::new(
-        "test-model".into(),
-        "act".into(),
         control_tx,
         perm_tx,
         question_tx,
@@ -29,12 +27,12 @@ fn make_app() -> App {
 #[test]
 fn render_tiny_terminal_with_bg_tasks_no_panic() {
     let mut app = make_app();
-    app.bg_snapshots = vec![BgTaskSnapshot {
+    app.view_clients["main"].inject_bg_for_test(vec![BgTaskSnapshot {
         id: "bg_1".into(),
         description: "task".into(),
         status: BgTaskStatus::Running,
         exit_code: None,
-    }];
+    }]);
     let backend = TestBackend::new(80, 1);
     let mut terminal = Terminal::new(backend).unwrap();
     // Should not panic — zero-height guard prevents invalid split.
@@ -47,12 +45,12 @@ fn render_tiny_terminal_with_bg_tasks_no_panic() {
 #[test]
 fn render_small_terminal_no_panic() {
     let mut app = make_app();
-    app.bg_snapshots = vec![BgTaskSnapshot {
+    app.view_clients["main"].inject_bg_for_test(vec![BgTaskSnapshot {
         id: "bg_1".into(),
         description: "build".into(),
         status: BgTaskStatus::Running,
         exit_code: None,
-    }];
+    }]);
     let backend = TestBackend::new(80, 3);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal
@@ -60,8 +58,8 @@ fn render_small_terminal_no_panic() {
         .unwrap();
 }
 
-fn spawn_agent(app: &App, name: &str) {
-    app.session.handle_event(AgentEvent::named(
+fn spawn_agent(app: &mut App, name: &str) {
+    app.dispatch_event(AgentEvent::named(
         name,
         AgentEventPayload::SubAgentSpawned {
             name: name.to_string(),
@@ -71,20 +69,19 @@ fn spawn_agent(app: &App, name: &str) {
             session_id: None,
         },
     ));
-    app.session
-        .handle_event(AgentEvent::named(name, AgentEventPayload::Started));
+    app.dispatch_event(AgentEvent::named(name, AgentEventPayload::Started));
 }
 
 #[test]
 fn render_tasks_only_no_panic() {
     let mut app = make_app();
-    app.task_snapshots = vec![TaskSnapshot {
+    app.view_clients["main"].inject_tasks_for_test(vec![TaskSnapshot {
         id: "1".into(),
         subject: "Build feature".into(),
         active_form: Some("Building".into()),
         status: TaskSnapshotStatus::InProgress,
         blocked_by: Vec::new(),
-    }];
+    }]);
     let backend = TestBackend::new(80, 10);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal
@@ -96,20 +93,20 @@ fn render_tasks_only_no_panic() {
 fn render_all_three_panels_no_panic() {
     let mut app = make_app();
     app.show_topology = false;
-    spawn_agent(&app, "worker");
-    app.task_snapshots = vec![TaskSnapshot {
+    spawn_agent(&mut app, "worker");
+    app.view_clients["main"].inject_tasks_for_test(vec![TaskSnapshot {
         id: "1".into(),
         subject: "Task A".into(),
         active_form: None,
         status: TaskSnapshotStatus::Pending,
         blocked_by: Vec::new(),
-    }];
-    app.bg_snapshots = vec![BgTaskSnapshot {
+    }]);
+    app.view_clients["main"].inject_bg_for_test(vec![BgTaskSnapshot {
         id: "bg_1".into(),
         description: "lint".into(),
         status: BgTaskStatus::Running,
         exit_code: None,
-    }];
+    }]);
     let backend = TestBackend::new(80, 15);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal

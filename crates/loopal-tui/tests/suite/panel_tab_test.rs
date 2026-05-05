@@ -14,8 +14,6 @@ fn make_app() -> App {
     let (perm_tx, _) = mpsc::channel::<bool>(16);
     let (question_tx, _) = mpsc::channel::<UserQuestionResponse>(16);
     let session = SessionController::new(
-        "test-model".into(),
-        "act".into(),
         control_tx,
         perm_tx,
         question_tx,
@@ -25,8 +23,8 @@ fn make_app() -> App {
     App::new(session, std::env::temp_dir())
 }
 
-fn spawn_agent(app: &App, name: &str) {
-    app.session.handle_event(AgentEvent::named(
+fn spawn_agent(app: &mut App, name: &str) {
+    app.dispatch_event(AgentEvent::named(
         name,
         AgentEventPayload::SubAgentSpawned {
             name: name.to_string(),
@@ -36,27 +34,26 @@ fn spawn_agent(app: &App, name: &str) {
             session_id: None,
         },
     ));
-    app.session
-        .handle_event(AgentEvent::named(name, AgentEventPayload::Started));
+    app.dispatch_event(AgentEvent::named(name, AgentEventPayload::Started));
 }
 
 fn add_bg_snapshot(app: &mut App, id: &str, desc: &str) {
-    app.bg_snapshots.push(BgTaskSnapshot {
+    app.view_clients["main"].inject_bg_for_test(vec![BgTaskSnapshot {
         id: id.into(),
         description: desc.into(),
         status: BgTaskStatus::Running,
         exit_code: None,
-    });
+    }]);
 }
 
 fn add_task_snapshot(app: &mut App, id: &str, subject: &str) {
-    app.task_snapshots.push(TaskSnapshot {
+    app.view_clients["main"].inject_tasks_for_test(vec![TaskSnapshot {
         id: id.into(),
         subject: subject.into(),
         active_form: None,
         status: TaskSnapshotStatus::InProgress,
         blocked_by: Vec::new(),
-    });
+    }]);
 }
 
 // === Both panels have content: Tab switches between them ===
@@ -64,7 +61,7 @@ fn add_task_snapshot(app: &mut App, id: &str, subject: &str) {
 #[test]
 fn tab_switches_from_agents_to_bg_tasks() {
     let mut app = make_app();
-    spawn_agent(&app, "worker");
+    spawn_agent(&mut app, "worker");
     add_bg_snapshot(&mut app, "t1", "build");
     app.section_mut(PanelKind::Agents).focused = Some("worker".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
@@ -81,7 +78,7 @@ fn tab_switches_from_agents_to_bg_tasks() {
 #[test]
 fn tab_switches_from_bg_tasks_to_agents() {
     let mut app = make_app();
-    spawn_agent(&app, "worker");
+    spawn_agent(&mut app, "worker");
     add_bg_snapshot(&mut app, "t1", "build");
     app.section_mut(PanelKind::BgTasks).focused = Some("t1".into());
     app.focus_mode = FocusMode::Panel(PanelKind::BgTasks);
@@ -100,8 +97,8 @@ fn tab_switches_from_bg_tasks_to_agents() {
 #[test]
 fn tab_cycles_agents_when_only_agents() {
     let mut app = make_app();
-    spawn_agent(&app, "a");
-    spawn_agent(&app, "b");
+    spawn_agent(&mut app, "a");
+    spawn_agent(&mut app, "b");
     app.section_mut(PanelKind::Agents).focused = Some("a".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
 
@@ -138,7 +135,7 @@ fn tab_cycles_bg_tasks_when_only_bg_tasks() {
 #[test]
 fn tab_roundtrip_both_panels() {
     let mut app = make_app();
-    spawn_agent(&app, "alpha");
+    spawn_agent(&mut app, "alpha");
     add_bg_snapshot(&mut app, "t1", "deploy");
     app.section_mut(PanelKind::Agents).focused = Some("alpha".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
@@ -156,7 +153,7 @@ fn tab_roundtrip_both_panels() {
 #[test]
 fn tab_noop_when_single_agent() {
     let mut app = make_app();
-    spawn_agent(&app, "solo");
+    spawn_agent(&mut app, "solo");
     app.section_mut(PanelKind::Agents).focused = Some("solo".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Agents);
 
@@ -175,7 +172,7 @@ fn tab_noop_when_single_agent() {
 #[test]
 fn tab_cycles_three_panels() {
     let mut app = make_app();
-    spawn_agent(&app, "worker");
+    spawn_agent(&mut app, "worker");
     add_task_snapshot(&mut app, "1", "Build");
     add_bg_snapshot(&mut app, "bg1", "lint");
     app.section_mut(PanelKind::Agents).focused = Some("worker".into());

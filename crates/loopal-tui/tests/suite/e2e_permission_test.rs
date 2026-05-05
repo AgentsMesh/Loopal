@@ -33,8 +33,9 @@ async fn collect_until_perm(harness: &mut TuiTestHarness) -> Vec<AgentEventPaylo
                     &event.payload,
                     AgentEventPayload::ToolPermissionRequest { .. }
                 );
-                harness.app.session.handle_event(event.clone());
-                all_events.push(event.payload);
+                let payload = event.payload.clone();
+                super::e2e_harness::dispatch_to_app(&mut harness.app, event);
+                all_events.push(payload);
                 if is_perm {
                     break;
                 }
@@ -44,6 +45,15 @@ async fn collect_until_perm(harness: &mut TuiTestHarness) -> Vec<AgentEventPaylo
         }
     }
     all_events
+}
+
+fn take_pending_tool_call_id(app: &loopal_tui::app::App) -> String {
+    app.with_active_conversation_mut(|conv| {
+        conv.pending_permission
+            .take()
+            .map(|p| p.id)
+            .unwrap_or_default()
+    })
 }
 
 #[tokio::test]
@@ -68,7 +78,12 @@ async fn test_supervised_approve() {
 
     let mut harness = build_custom_tui(inner);
     let mut all_events = collect_until_perm(&mut harness).await;
-    harness.inner.session_ctrl.approve_permission().await;
+    let tool_call_id = take_pending_tool_call_id(&harness.app);
+    harness
+        .inner
+        .session_ctrl
+        .respond_permission("main", &tool_call_id, true)
+        .await;
     let rest = harness.collect_until_idle().await;
     all_events.extend(rest);
 
@@ -98,7 +113,12 @@ async fn test_supervised_deny() {
 
     let mut harness = build_custom_tui(inner);
     let mut all_events = collect_until_perm(&mut harness).await;
-    harness.inner.session_ctrl.deny_permission().await;
+    let tool_call_id = take_pending_tool_call_id(&harness.app);
+    harness
+        .inner
+        .session_ctrl
+        .respond_permission("main", &tool_call_id, false)
+        .await;
     let rest = harness.collect_until_idle().await;
     all_events.extend(rest);
 
@@ -164,6 +184,11 @@ async fn test_permission_dialog_render() {
     );
 
     // Approve so the loop can finish cleanly
-    harness.inner.session_ctrl.approve_permission().await;
+    let tool_call_id = take_pending_tool_call_id(&harness.app);
+    harness
+        .inner
+        .session_ctrl
+        .respond_permission("main", &tool_call_id, true)
+        .await;
     let _ = harness.collect_until_idle().await;
 }

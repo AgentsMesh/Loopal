@@ -2,6 +2,23 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⛔ HARD RULE — NO OVER-COMMENTING
+
+Code is the single source of truth. Before adding ANY comment, ask: does this line tell a fluent reader something they CANNOT see in the code itself? If no, do not write it.
+
+**FORBIDDEN by default:**
+- Module-level `//!` block comments that summarize what the module does
+- `///` doc comments above pub fn / pub struct that restate the signature
+- `///` doc comments above tests (the test name IS the doc)
+- Field-level doc comments that just describe the field's name in English
+- "Why we organize the file this way" / architecture narration in source files
+
+**Allowed only when truly needed:**
+- A short `// reason:` inline note when a line does something non-obvious that would otherwise look wrong (e.g. workaround for a bug, ordering constraint, performance hack)
+- Public API doc when the contract has invariants or panics that aren't visible in types
+
+When in doubt, delete. Re-deleting comments later is wasted effort.
+
 ## Build & Test Commands (Bazel)
 
 ```bash

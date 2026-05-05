@@ -4,7 +4,7 @@
 /// Supports windowed access to avoid full-clone of the entire history.
 use ratatui::prelude::*;
 
-use loopal_session::types::SessionMessage;
+use loopal_view_state::SessionMessage;
 
 use super::message_lines::message_to_lines;
 

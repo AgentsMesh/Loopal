@@ -54,6 +54,7 @@ fn make_session() -> (
         input_tx,
         interrupt,
         interrupt_tx: Arc::new(watch_tx),
+        agent_shared: Mutex::new(None),
     });
     (session, input_rx, watch_rx)
 }

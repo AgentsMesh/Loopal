@@ -1,6 +1,6 @@
 use loopal_protocol::{MessageSource, QualifiedAddress};
-use loopal_session::types::{InboxOrigin, SessionMessage};
 use loopal_tui::views::progress::message_to_lines;
+use loopal_view_state::{InboxOrigin, SessionMessage};
 
 fn flat(lines: &[ratatui::prelude::Line<'_>]) -> String {
     lines

@@ -21,20 +21,22 @@ impl PanelProvider for CronsPanelProvider {
     fn max_visible(&self) -> usize {
         crons_panel::MAX_CRON_VISIBLE
     }
-    fn item_ids(&self, app: &App, _state: &SessionState) -> Vec<String> {
-        crons_panel::cron_ids(&app.cron_snapshots)
+    fn item_ids(&self, app: &App, state: &SessionState) -> Vec<String> {
+        crons_panel::cron_ids(&app.view_client_for(&state.active_view).cron_snapshots())
     }
-    fn count(&self, app: &App, _state: &SessionState) -> usize {
-        app.cron_snapshots.len()
+    fn count(&self, app: &App, state: &SessionState) -> usize {
+        app.view_client_for(&state.active_view)
+            .cron_snapshots()
+            .len()
     }
-    fn height(&self, app: &App, _state: &SessionState) -> u16 {
-        crons_panel::crons_panel_height(&app.cron_snapshots)
+    fn height(&self, app: &App, state: &SessionState) -> u16 {
+        crons_panel::crons_panel_height(&app.view_client_for(&state.active_view).cron_snapshots())
     }
     fn render(
         &self,
         f: &mut Frame,
         app: &App,
-        _state: &SessionState,
+        state: &SessionState,
         focused: Option<&str>,
         _elapsed: Duration,
         area: Rect,
@@ -44,6 +46,7 @@ impl PanelProvider for CronsPanelProvider {
         // `render_crons_panel` from `Utc::now()` each frame, so the panel
         // refreshes through the TUI's existing 100ms redraw tick.
         let offset = app.section(PanelKind::Crons).scroll_offset;
-        crons_panel::render_crons_panel(f, &app.cron_snapshots, focused, offset, area);
+        let snapshots = app.view_client_for(&state.active_view).cron_snapshots();
+        crons_panel::render_crons_panel(f, &snapshots, focused, offset, area);
     }
 }

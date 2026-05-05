@@ -10,8 +10,6 @@ fn make_app() -> (App, mpsc::Receiver<ControlCommand>, mpsc::Receiver<bool>) {
     let (perm_tx, perm_rx) = mpsc::channel::<bool>(16);
     let (question_tx, _) = mpsc::channel::<UserQuestionResponse>(16);
     let session = SessionController::new(
-        "test-model".to_string(),
-        "act".to_string(),
         control_tx,
         perm_tx,
         question_tx,
@@ -29,16 +27,12 @@ fn test_app_new_initializes_correctly() {
     assert!(app.input.is_empty());
     assert_eq!(app.input_cursor, 0);
     assert_eq!(app.content_scroll.offset, 0);
-    let state = app.session.lock();
-    let conv = state.active_conversation();
+    let conv = app.snapshot_active_conversation();
     assert!(conv.messages.is_empty());
-    assert_eq!(state.model, "test-model");
-    assert_eq!(state.mode, "act");
     assert_eq!(conv.token_count(), 0);
     assert_eq!(conv.context_window, 0);
     assert_eq!(conv.turn_count, 0);
     assert!(conv.streaming_text.is_empty());
-    drop(state);
     assert!(app.input_history.is_empty());
     assert!(app.history_index.is_none());
 }
@@ -64,21 +58,17 @@ fn test_submit_input_returns_text_and_resets() {
 
 #[test]
 fn test_awaiting_input_sets_idle() {
-    let (app, _, _) = make_app();
-    assert!(!app.session.lock().is_active_agent_idle());
-    app.session
-        .handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
-    assert!(app.session.lock().is_active_agent_idle());
+    let (mut app, _, _) = make_app();
+    assert!(!app.is_active_agent_idle());
+    app.dispatch_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
+    assert!(app.is_active_agent_idle());
 }
 
 #[test]
 fn test_awaiting_input_does_not_auto_forward() {
-    let (app, _, _) = make_app();
-    // AwaitingInput no longer auto-forwards — messages go directly to agent mailbox.
-    app.session
-        .handle_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
-    let state = app.session.lock();
-    assert!(state.is_active_agent_idle());
+    let (mut app, _, _) = make_app();
+    app.dispatch_event(AgentEvent::root(AgentEventPayload::AwaitingInput));
+    assert!(app.is_active_agent_idle());
 }
 
 fn sample_image(label: &str) -> ImageAttachment {

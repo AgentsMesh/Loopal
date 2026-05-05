@@ -22,41 +22,36 @@ impl CommandHandler for RewindCmd {
 }
 
 fn open_rewind_picker(app: &mut App) {
-    let state = app.session.lock();
-    let conv = state.active_conversation();
-    if !state.is_active_agent_idle() {
-        drop(state);
-        app.session
-            .push_system_message("Cannot rewind while the agent is busy.".into());
+    if !app.is_active_agent_idle() {
+        app.push_system_message("Cannot rewind while the agent is busy.".into());
         return;
     }
-    let turns: Vec<RewindTurnItem> = conv
-        .messages
-        .iter()
-        .enumerate()
-        .filter(|(_, m)| m.role == "user")
-        .enumerate()
-        .map(|(turn_idx, (_, msg))| {
-            let preview = if msg.content.chars().count() > 60 {
-                let truncated: String = msg.content.chars().take(60).collect();
-                format!("{truncated}...")
-            } else {
-                msg.content.clone()
-            };
-            RewindTurnItem {
-                turn_index: turn_idx,
-                preview,
-            }
-        })
-        .collect::<Vec<_>>()
-        .into_iter()
-        .rev()
-        .collect();
-    drop(state);
+    let turns: Vec<RewindTurnItem> = app.with_active_conversation(|conv| {
+        conv.messages
+            .iter()
+            .enumerate()
+            .filter(|(_, m)| m.role == "user")
+            .enumerate()
+            .map(|(turn_idx, (_, msg))| {
+                let preview = if msg.content.chars().count() > 60 {
+                    let truncated: String = msg.content.chars().take(60).collect();
+                    format!("{truncated}...")
+                } else {
+                    msg.content.clone()
+                };
+                RewindTurnItem {
+                    turn_index: turn_idx,
+                    preview,
+                }
+            })
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect()
+    });
 
     if turns.is_empty() {
-        app.session
-            .push_system_message("No turns to rewind to.".into());
+        app.push_system_message("No turns to rewind to.".into());
         return;
     }
 

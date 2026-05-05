@@ -1,55 +1,60 @@
 //! Session state cleanup — prevents unbounded growth in long-running sessions.
 
-use loopal_protocol::{AgentStatus, BgTaskStatus};
-use loopal_session::state::SessionState;
+use indexmap::IndexMap;
+use loopal_protocol::AgentStatus;
 
-/// Remove completed bg_tasks and finished sub-agents from session state.
+use crate::view_client::ViewClient;
+
+/// Sweep finished sub-agents out of the per-agent ViewClient map.
 ///
-/// Called each frame after panel data has been synced to App-level caches.
-/// Safe because: panel already filters by status, log viewer uses App cache,
-/// topology filters live agents only.
-pub(crate) fn cleanup_session_state(state: &mut SessionState) {
-    state
-        .bg_tasks
-        .retain(|_, t| t.status == BgTaskStatus::Running);
-    cleanup_finished_agents(state);
-}
-
-fn cleanup_finished_agents(state: &mut SessionState) {
-    let active = state.active_view.clone();
-    let removable: Vec<String> = state
-        .agents
+/// The active view and root "main" are always preserved. Finished/errored
+/// agents are removed only after they've been observed as terminal —
+/// their final state has already been mirrored into `bg_task_details`
+/// where applicable.
+pub(crate) fn cleanup_view_clients(view_clients: &mut IndexMap<String, ViewClient>, active: &str) {
+    let removable: Vec<String> = view_clients
         .iter()
-        .filter(|(name, a)| {
-            let is_root = *name == loopal_session::ROOT_AGENT;
-            let is_active = *name == &active;
-            let is_finished = matches!(
-                a.observable.status,
-                AgentStatus::Finished | AgentStatus::Error
-            );
-            // Only remove if session was persisted. Sub-agents spawned via Hub
-            // always receive a session_id; agents without one are transient
-            // and will be cleaned on next spawn cycle.
-            !is_root && !is_active && is_finished && a.session_id.is_some()
+        .filter(|(name, vc)| {
+            if name.as_str() == "main" || name.as_str() == active {
+                return false;
+            }
+            let status = vc.state().state().agent.observable.status;
+            matches!(status, AgentStatus::Finished | AgentStatus::Error)
         })
         .map(|(name, _)| name.clone())
         .collect();
     for name in removable {
-        state.agents.shift_remove(&name);
+        view_clients.shift_remove(&name);
     }
 }
 
 const MAX_BG_DETAIL_ARCHIVE: usize = 50;
 
-pub(crate) fn merge_bg_details(
+/// Variant fed by the local `ViewClient` instead of `SessionState`.
+/// Each tuple is `(id, description, status, exit_code, output)` —
+/// matches the projection done in `tui_loop::sync_panel_caches`.
+pub(crate) fn merge_bg_details_from_view(
     details: &mut Vec<loopal_protocol::BgTaskDetail>,
-    source: &indexmap::IndexMap<String, loopal_protocol::BgTaskDetail>,
+    source: &[(
+        String,
+        String,
+        loopal_protocol::BgTaskStatus,
+        Option<i32>,
+        String,
+    )],
 ) {
-    for (id, detail) in source {
+    for (id, description, status, exit_code, output) in source {
+        let detail = loopal_protocol::BgTaskDetail {
+            id: id.clone(),
+            description: description.clone(),
+            status: *status,
+            exit_code: *exit_code,
+            output: output.clone(),
+        };
         if let Some(existing) = details.iter_mut().find(|d| d.id == *id) {
-            *existing = detail.clone();
+            *existing = detail;
         } else {
-            details.push(detail.clone());
+            details.push(detail);
         }
     }
 }

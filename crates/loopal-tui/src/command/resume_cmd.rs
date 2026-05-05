@@ -28,7 +28,7 @@ impl CommandHandler for ResumeCmd {
             Some(partial_id) => match resolve_session_id(&app.cwd, partial_id) {
                 Ok(full_id) => CommandEffect::ResumeSession(full_id),
                 Err(msg) => {
-                    app.session.push_system_message(msg);
+                    app.push_system_message(msg);
                     CommandEffect::Done
                 }
             },
@@ -66,16 +66,14 @@ fn open_session_picker(app: &mut App) {
     let sm = match loopal_runtime::SessionManager::new() {
         Ok(sm) => sm,
         Err(_) => {
-            app.session
-                .push_system_message("Failed to access sessions.".into());
+            app.push_system_message("Failed to access sessions.".into());
             return;
         }
     };
     let sessions = match sm.list_root_sessions_for_cwd(&app.cwd) {
         Ok(s) => s,
         Err(_) => {
-            app.session
-                .push_system_message("Failed to list sessions.".into());
+            app.push_system_message("Failed to list sessions.".into());
             return;
         }
     };
@@ -102,8 +100,7 @@ fn open_session_picker(app: &mut App) {
         .collect();
 
     if items.is_empty() {
-        app.session
-            .push_system_message("No previous sessions found for this project.".into());
+        app.push_system_message("No previous sessions found for this project.".into());
         return;
     }
 

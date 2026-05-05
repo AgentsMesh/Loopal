@@ -57,6 +57,7 @@ async fn e2e_message_then_event_roundtrip() {
                 event_id: 0,
                 turn_id: 0,
                 correlation_id: 0,
+                rev: None,
                 payload: AgentEventPayload::Stream {
                     text: "reply".into(),
                 },
@@ -91,95 +92,6 @@ async fn e2e_message_then_event_roundtrip() {
         AgentEventPayload::Stream { text } => assert_eq!(text, "reply"),
         other => panic!("expected Stream, got: {other:?}"),
     }
-}
-
-// ── Flow B: Permission round-trip through bridge ─────────────────────
-
-#[tokio::test]
-async fn e2e_permission_roundtrip_via_bridge() {
-    let (client_t, server_conn, _server_rx) = ipc_pair();
-
-    let client = loopal_agent_client::AgentClient::new(client_t);
-    let (conn, incoming) = client.into_parts();
-    let handles = loopal_agent_client::start_bridge(conn, incoming);
-
-    // Server sends permission request (blocks until response)
-    let sc = server_conn.clone();
-    let perm_handle = tokio::spawn(async move {
-        sc.send_request(
-            methods::AGENT_PERMISSION.name,
-            serde_json::json!({
-                "tool_call_id": "tc-1",
-                "tool_name": "Bash",
-                "tool_input": {"command": "echo hi"},
-            }),
-        )
-        .await
-    });
-
-    // Bridge forwards to TUI channel as ToolPermissionRequest
-    let mut rx = handles.agent_event_rx;
-    let ev = tokio::time::timeout(TIMEOUT, rx.recv())
-        .await
-        .unwrap()
-        .unwrap();
-    match &ev.payload {
-        AgentEventPayload::ToolPermissionRequest { name, .. } => {
-            assert_eq!(name, "Bash");
-        }
-        other => panic!("expected ToolPermissionRequest, got: {other:?}"),
-    }
-
-    // TUI approves
-    handles.permission_tx.send(true).await.unwrap();
-
-    // Server receives Allow
-    let resp = tokio::time::timeout(TIMEOUT, perm_handle)
-        .await
-        .unwrap()
-        .unwrap()
-        .unwrap();
-    assert_eq!(resp["allow"], true);
-}
-
-// ── Flow B (deny path): Permission denied ────────────────────────────
-
-#[tokio::test]
-async fn e2e_permission_denied_via_bridge() {
-    let (client_t, server_conn, _server_rx) = ipc_pair();
-
-    let client = loopal_agent_client::AgentClient::new(client_t);
-    let (conn, incoming) = client.into_parts();
-    let handles = loopal_agent_client::start_bridge(conn, incoming);
-
-    let sc = server_conn.clone();
-    let perm_handle = tokio::spawn(async move {
-        sc.send_request(
-            methods::AGENT_PERMISSION.name,
-            serde_json::json!({
-                "tool_call_id": "tc-2",
-                "tool_name": "Write",
-                "tool_input": {},
-            }),
-        )
-        .await
-    });
-
-    let mut rx = handles.agent_event_rx;
-    let _ = tokio::time::timeout(TIMEOUT, rx.recv())
-        .await
-        .unwrap()
-        .unwrap();
-
-    // TUI denies
-    handles.permission_tx.send(false).await.unwrap();
-
-    let resp = tokio::time::timeout(TIMEOUT, perm_handle)
-        .await
-        .unwrap()
-        .unwrap()
-        .unwrap();
-    assert_eq!(resp["allow"], false);
 }
 
 // ── Flow C: Control command flows through bridge ─────────────────────

@@ -9,9 +9,7 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 
 use loopal_error::LoopalError;
-use loopal_protocol::{
-    AgentEvent, AgentEventPayload, ControlCommand, Envelope, UserQuestionResponse,
-};
+use loopal_protocol::{AgentEvent, AgentEventPayload, ControlCommand, Envelope};
 use loopal_provider_api::StreamChunk;
 
 use crate::fixture::TestFixture;
@@ -23,8 +21,6 @@ pub struct IpcTestHarness {
     pub event_rx: mpsc::Receiver<AgentEvent>,
     pub mailbox_tx: mpsc::Sender<Envelope>,
     pub control_tx: mpsc::Sender<ControlCommand>,
-    pub permission_tx: mpsc::Sender<bool>,
-    pub question_tx: mpsc::Sender<UserQuestionResponse>,
     pub fixture: TestFixture,
 }
 
@@ -73,8 +69,6 @@ pub async fn build_ipc_harness(
         event_rx: handles.agent_event_rx,
         mailbox_tx: handles.mailbox_tx,
         control_tx: handles.control_tx,
-        permission_tx: handles.permission_tx,
-        question_tx: handles.question_tx,
         fixture,
     }
 }

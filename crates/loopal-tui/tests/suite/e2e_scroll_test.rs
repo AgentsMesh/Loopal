@@ -33,8 +33,6 @@ fn build_scroll_rig() -> (
     let (perm_tx, _) = mpsc::channel::<bool>(16);
     let (q_tx, _) = mpsc::channel::<UserQuestionResponse>(16);
     let session = SessionController::new(
-        "test-model".into(),
-        "act".into(),
         ctrl_tx,
         perm_tx,
         q_tx,

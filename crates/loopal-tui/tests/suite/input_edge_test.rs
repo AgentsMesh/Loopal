@@ -13,8 +13,6 @@ fn make_app() -> App {
     let (perm_tx, _) = mpsc::channel::<bool>(16);
     let (question_tx, _) = mpsc::channel::<UserQuestionResponse>(16);
     let session = SessionController::new(
-        "test-model".into(),
-        "act".into(),
         control_tx,
         perm_tx,
         question_tx,
@@ -37,16 +35,13 @@ fn ctrl(c: char) -> KeyEvent {
 #[test]
 fn test_ctrl_c_denies_permission() {
     let mut app = make_app();
-    {
-        let mut state = app.session.lock();
-        state.active_conversation_mut().pending_permission =
-            Some(loopal_session::types::PendingPermission {
-                id: "1".into(),
-                name: "Bash".into(),
-                input: "rm".into(),
-                relay_request_id: None,
-            });
-    }
+    app.with_active_conversation_mut(|conv| {
+        conv.pending_permission = Some(loopal_view_state::PendingPermission {
+            id: "1".into(),
+            name: "Bash".into(),
+            input: "rm".into(),
+        });
+    });
     let action = handle_key(&mut app, ctrl('c'));
     assert!(matches!(action, InputAction::ToolDeny));
 }
@@ -54,27 +49,25 @@ fn test_ctrl_c_denies_permission() {
 #[test]
 fn test_ctrl_c_cancels_question() {
     let mut app = make_app();
-    {
-        let mut state = app.session.lock();
-        state.active_conversation_mut().pending_question =
-            Some(loopal_session::types::PendingQuestion::new(
-                "q1".into(),
-                vec![Question {
-                    question: "Pick one".into(),
-                    options: vec![
-                        QuestionOption {
-                            label: "A".into(),
-                            description: "Option A".into(),
-                        },
-                        QuestionOption {
-                            label: "B".into(),
-                            description: "Option B".into(),
-                        },
-                    ],
-                    allow_multiple: false,
-                }],
-            ));
-    }
+    app.with_active_conversation_mut(|conv| {
+        conv.pending_question = Some(loopal_view_state::PendingQuestion::new(
+            "q1".into(),
+            vec![Question {
+                question: "Pick one".into(),
+                options: vec![
+                    QuestionOption {
+                        label: "A".into(),
+                        description: "Option A".into(),
+                    },
+                    QuestionOption {
+                        label: "B".into(),
+                        description: "Option B".into(),
+                    },
+                ],
+                allow_multiple: false,
+            }],
+        ));
+    });
     let action = handle_key(&mut app, ctrl('c'));
     assert!(matches!(action, InputAction::QuestionCancel));
 }

@@ -87,7 +87,7 @@ pub(super) fn handle_esc(app: &mut App) -> InputAction {
         tracing::info!(view = %active_view, "ESC: exit agent view (not root)");
         return InputAction::ExitAgentView;
     }
-    let is_idle = app.session.lock().is_active_agent_idle();
+    let is_idle = app.is_active_agent_idle();
     if !is_idle {
         tracing::info!("ESC: agent busy, sending interrupt");
         return InputAction::Interrupt;

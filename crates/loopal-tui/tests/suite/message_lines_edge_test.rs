@@ -1,6 +1,6 @@
-/// Message lines edge tests: thinking role, error/system prefixes, tool call integration.
-use loopal_session::types::{SessionMessage, SessionToolCall, ToolCallStatus};
 use loopal_tui::views::progress::message_to_lines;
+/// Message lines edge tests: thinking role, error/system prefixes, tool call integration.
+use loopal_view_state::{SessionMessage, SessionToolCall, ToolCallStatus};
 
 fn msg(role: &str, content: &str) -> SessionMessage {
     SessionMessage {
@@ -10,6 +10,8 @@ fn msg(role: &str, content: &str) -> SessionMessage {
         image_count: 0,
         skill_info: None,
         inbox: None,
+        message_id: None,
+        ui_local: false,
     }
 }
 
@@ -120,6 +122,8 @@ fn test_tool_call_single_line_summary() {
         image_count: 0,
         skill_info: None,
         inbox: None,
+        message_id: None,
+        ui_local: false,
     };
     let lines = message_to_lines(&m, 80);
     let text = all_text(&lines);
@@ -148,6 +152,8 @@ fn test_tool_call_error_shows_cross() {
         image_count: 0,
         skill_info: None,
         inbox: None,
+        message_id: None,
+        ui_local: false,
     };
     let lines = message_to_lines(&m, 80);
     let text = all_text(&lines);
@@ -175,6 +181,8 @@ fn test_tool_call_pending_shows_spinner() {
         image_count: 0,
         skill_info: None,
         inbox: None,
+        message_id: None,
+        ui_local: false,
     };
     let lines = message_to_lines(&m, 80);
     let text = all_text(&lines);
@@ -205,6 +213,8 @@ fn test_assistant_with_content_and_tools() {
         image_count: 0,
         skill_info: None,
         inbox: None,
+        message_id: None,
+        ui_local: false,
     };
     let lines = message_to_lines(&m, 80);
     let text = all_text(&lines);

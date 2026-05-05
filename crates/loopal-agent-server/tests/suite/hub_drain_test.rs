@@ -26,6 +26,7 @@ fn make_session() -> (
         input_tx: input_tx.clone(),
         interrupt,
         interrupt_tx: Arc::new(watch_tx),
+        agent_shared: Mutex::new(None),
     });
     (session, input_tx, input_rx, watch_rx)
 }

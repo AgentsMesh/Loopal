@@ -41,6 +41,8 @@ pub enum TaskType {
     Summarization,
     /// Auto-mode permission classification.
     Classification,
+    /// Tool-output refinement (Fetch large pages, etc.).
+    Refine,
 }
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 pub mod bridge;
 pub mod config;
+pub mod provider_resolver_impl;
 pub mod session_resume_adapters;
 pub mod shared;
 pub mod spawn;

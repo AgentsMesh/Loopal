@@ -22,6 +22,10 @@ fn all_fragments_parse() {
         ids.contains(&"tasks/avoid-over-engineering"),
         "missing tasks/avoid-over-engineering"
     );
+    assert!(
+        ids.contains(&"tools/tool-output-efficiency"),
+        "missing tools/tool-output-efficiency"
+    );
 }
 
 #[test]
@@ -90,6 +94,10 @@ fn full_prompt_build() {
         prompt.contains("Executing Actions with Care"),
         "safety fragment missing"
     );
+    assert!(
+        prompt.contains("Tool Output Efficiency"),
+        "tool-output-efficiency fragment missing"
+    );
     // cwd is injected per-turn via env_context for root agent, not in static prompt.
     // Sub-agent fragments (which do use cwd) are excluded when is_subagent=false.
 }
@@ -132,11 +140,11 @@ fn conditional_tool_fragments() {
 #[test]
 fn fragment_count() {
     let frags = system_fragments();
-    // core/6 + tasks/12 + tools/6 + modes/2 + agents/3 + styles/2 = 31
+    // core/6 + tasks/12 + tools/7 + modes/2 + agents/3 + styles/2 = 32
     assert_eq!(
         frags.len(),
-        31,
-        "expected 31 fragments, got {}: {:?}",
+        32,
+        "expected 32 fragments, got {}: {:?}",
         frags.len(),
         frags.iter().map(|f| &f.id).collect::<Vec<_>>()
     );

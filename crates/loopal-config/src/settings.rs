@@ -66,6 +66,10 @@ pub struct Settings {
     /// OpenTelemetry configuration
     #[serde(default)]
     pub telemetry: TelemetryConfig,
+
+    /// Fetch tool LLM-refiner configuration: large pages summarized against the user prompt.
+    #[serde(default)]
+    pub fetch_refiner: FetchRefinerConfig,
 }
 
 impl Default for Settings {
@@ -85,6 +89,7 @@ impl Default for Settings {
             harness: HarnessConfig::default(),
             output_style: String::new(),
             telemetry: TelemetryConfig::default(),
+            fetch_refiner: FetchRefinerConfig::default(),
         }
     }
 }
@@ -181,6 +186,11 @@ fn default_true() -> bool {
 fn default_mcp_timeout() -> u64 {
     30_000
 }
+
+/// Fetch tool LLM-refiner: when a page exceeds `threshold_bytes`,
+/// the body is summarized by `model` against the user-supplied `prompt`.
+/// Raw markdown is saved to disk so the agent can re-read on demand.
+pub use crate::fetch_refiner::FetchRefinerConfig;
 
 /// Auto-memory configuration: controls the Memory tool + Observer sidebar.
 #[derive(Debug, Clone, Serialize, Deserialize)]

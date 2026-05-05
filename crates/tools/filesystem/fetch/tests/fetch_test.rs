@@ -1,19 +1,16 @@
 use loopal_tool_api::{PermissionLevel, Tool, ToolContext};
 use loopal_tool_fetch::FetchTool;
 
+#[path = "fetch_refiner_test.rs"]
+mod fetch_refiner_test;
+
 fn make_ctx() -> ToolContext {
     let backend = loopal_backend::LocalBackend::new(
         std::env::temp_dir(),
         None,
         loopal_backend::ResourceLimits::default(),
     );
-    ToolContext {
-        backend,
-        session_id: "t".into(),
-        shared: None,
-        memory_channel: None,
-        output_tail: None,
-    }
+    ToolContext::new(backend, "t")
 }
 
 #[test]

@@ -6,10 +6,12 @@ rust_library(
     edition = "2024",
     visibility = ["//visibility:public"],
     deps = [
+        "//crates/loopal-config:loopal-config",
         "//crates/loopal-error:loopal-error",
         "//crates/loopal-tool-api:loopal-tool-api",
         "@crates//:html2text",
         "@crates//:serde_json",
+        "@crates//:tracing",
     ],
     proc_macro_deps = ["@crates//:async-trait"],
 )
@@ -22,9 +24,11 @@ rust_test(
     deps = [
         ":loopal-tool-fetch",
         "//crates/loopal-backend:loopal-backend",
+        "//crates/loopal-config:loopal-config",
+        "//crates/loopal-tool-api",
+        "@crates//:serde_json",
         "@crates//:tempfile",
         "@crates//:tokio",
-        "@crates//:serde_json",
-        "//crates/loopal-tool-api",
     ],
+    proc_macro_deps = ["@crates//:async-trait"],
 )

@@ -85,13 +85,7 @@ fn agent_tool_context_inner(
     });
 
     let shared_any: Arc<dyn std::any::Any + Send + Sync> = Arc::new(shared.clone());
-    let ctx = ToolContext {
-        backend,
-        session_id: "test-session".into(),
-        shared: Some(shared_any),
-        memory_channel: None,
-        output_tail: None,
-    };
+    let ctx = ToolContext::new(backend, "test-session").with_shared(shared_any);
 
     (ctx, shared)
 }

@@ -8,13 +8,7 @@ fn make_ctx() -> ToolContext {
         None,
         loopal_backend::ResourceLimits::default(),
     );
-    ToolContext {
-        backend,
-        session_id: "test".into(),
-        shared: None,
-        memory_channel: None,
-        output_tail: None,
-    }
+    ToolContext::new(backend, "test")
 }
 
 #[test]

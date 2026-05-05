@@ -16,13 +16,7 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
         None,
         loopal_backend::ResourceLimits::default(),
     );
-    ToolContext {
-        session_id: "test".into(),
-        shared: None,
-        memory_channel: None,
-        output_tail: None,
-        backend,
-    }
+    ToolContext::new(backend, "test")
 }
 
 #[test]

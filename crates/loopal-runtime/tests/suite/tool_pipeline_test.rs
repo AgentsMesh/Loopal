@@ -14,25 +14,13 @@ fn make_ctx() -> ToolContext {
         None,
         loopal_backend::ResourceLimits::default(),
     );
-    ToolContext {
-        backend,
-        session_id: "test-session".to_string(),
-        shared: None,
-        memory_channel: None,
-        output_tail: None,
-    }
+    ToolContext::new(backend, "test-session".to_string())
 }
 
 fn make_ctx_for(cwd: PathBuf) -> ToolContext {
     let backend =
         loopal_backend::LocalBackend::new(cwd, None, loopal_backend::ResourceLimits::default());
-    ToolContext {
-        backend,
-        session_id: "test-session".to_string(),
-        shared: None,
-        memory_channel: None,
-        output_tail: None,
-    }
+    ToolContext::new(backend, "test-session".to_string())
 }
 
 #[tokio::test]

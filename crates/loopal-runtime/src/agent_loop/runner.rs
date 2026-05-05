@@ -45,16 +45,17 @@ pub struct AgentLoopRunner {
 
 impl AgentLoopRunner {
     pub fn new(mut params: AgentLoopParams) -> Self {
-        let tool_ctx = ToolContext {
-            backend: params
+        let tool_ctx = ToolContext::new(
+            params
                 .deps
                 .kernel
                 .create_backend(std::path::Path::new(&params.session.cwd)),
-            session_id: params.session.id.clone(),
-            shared: params.shared.clone(),
-            memory_channel: params.memory_channel.clone(),
-            output_tail: None,
-        };
+            params.session.id.clone(),
+        )
+        .with_shared_opt(params.shared.clone())
+        .with_memory_channel_opt(params.memory_channel.clone())
+        .with_one_shot_chat_opt(params.one_shot_chat.clone())
+        .with_fetch_refiner_policy_opt(params.fetch_refiner_policy.clone());
         let model_config = ModelConfig::from_model(
             params.config.model(),
             params.config.thinking_config.clone(),

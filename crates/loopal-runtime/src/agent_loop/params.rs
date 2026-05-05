@@ -7,7 +7,7 @@ use loopal_kernel::Kernel;
 use loopal_protocol::InterruptSignal;
 use loopal_provider_api::{ModelRouter, ThinkingConfig};
 use loopal_storage::Session;
-use loopal_tool_api::{MemoryChannel, PermissionMode};
+use loopal_tool_api::{FetchRefinerPolicy, MemoryChannel, OneShotChatService, PermissionMode};
 use tokio::sync::watch;
 
 use crate::frontend::traits::AgentFrontend;
@@ -108,6 +108,8 @@ pub struct AgentLoopParams {
     pub interrupt: InterruptHandle,
     pub shared: Option<Arc<dyn std::any::Any + Send + Sync>>,
     pub memory_channel: Option<Arc<dyn MemoryChannel>>,
+    pub one_shot_chat: Option<Arc<dyn OneShotChatService>>,
+    pub fetch_refiner_policy: Option<Arc<dyn FetchRefinerPolicy>>,
     pub scheduled_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
     pub auto_classifier: Option<Arc<loopal_auto_mode::AutoClassifier>>,
     pub harness: HarnessConfig,

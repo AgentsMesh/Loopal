@@ -4,13 +4,7 @@ use serde_json::json;
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     let backend = loopal_backend::LocalBackend::new(cwd.to_path_buf(), None, Default::default());
-    ToolContext {
-        backend,
-        session_id: "test".into(),
-        shared: None,
-        memory_channel: None,
-        output_tail: None,
-    }
+    ToolContext::new(backend, "test")
 }
 
 #[test]

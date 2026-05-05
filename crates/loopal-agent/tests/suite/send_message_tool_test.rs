@@ -48,13 +48,7 @@ fn make_ctx_with_hub_peer(fixture: &TestFixture) -> (ToolContext, Arc<Connection
     });
     let shared_any: Arc<dyn std::any::Any + Send + Sync> = Arc::new(shared);
     (
-        ToolContext {
-            backend,
-            session_id: "test-session".into(),
-            shared: Some(shared_any),
-            memory_channel: None,
-            output_tail: None,
-        },
+        ToolContext::new(backend, "test-session").with_shared(shared_any),
         hub_peer,
     )
 }

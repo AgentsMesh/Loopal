@@ -25,6 +25,7 @@ rust_library(
         "//crates/loopal-tool-api",
         "//crates/tools/process/background:loopal-tool-background",
         "@crates//:chrono",
+        "@crates//:futures",
         "@crates//:serde",
         "@crates//:serde_json",
         "@crates//:tokio",

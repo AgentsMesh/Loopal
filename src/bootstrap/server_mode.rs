@@ -24,9 +24,12 @@ pub async fn run(
     info!("starting in server mode (ephemeral={})", cli.ephemeral);
 
     let ctx = super::hub_bootstrap::bootstrap_hub_and_agent(cli, cwd, config, None).await?;
-    let _event_loop = loopal_agent_hub::start_event_loop(ctx.hub.clone(), ctx.event_rx);
+    // Subscribe BEFORE starting the broadcast forwarder so we do not
+    // miss early events emitted during agent boot (Started, model
+    // info, AwaitingInput, etc.).
     let ui_session = UiSession::connect(ctx.hub.clone(), "server").await;
     info!("server client connected to Hub");
+    let _event_loop = loopal_agent_hub::start_event_loop(ctx.hub.clone(), ctx.event_rx);
 
     let output = consume_events(ui_session.event_rx, ui_session.client.clone()).await;
 

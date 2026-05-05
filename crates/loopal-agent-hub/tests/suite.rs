@@ -19,6 +19,8 @@ mod event_router_test;
 mod hub_integration_test;
 #[path = "suite/hub_lifecycle_test.rs"]
 mod hub_lifecycle_test;
+#[path = "suite/hub_shutdown_test.rs"]
+mod hub_shutdown_test;
 #[path = "suite/multi_agent_test.rs"]
 mod multi_agent_test;
 #[path = "suite/multi_ui_attach_test.rs"]

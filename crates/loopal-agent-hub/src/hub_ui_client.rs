@@ -181,6 +181,19 @@ impl HubClient {
         }
     }
 
+    /// Request the entire Hub process to shut down — kills all agents,
+    /// closes the listener, and exits the standalone Hub. UI clients see
+    /// a TCP disconnect after this returns.
+    pub async fn shutdown_hub(&self) {
+        if let Err(e) = self
+            .conn
+            .send_request(methods::HUB_SHUTDOWN.name, serde_json::json!({}))
+            .await
+        {
+            warn!("failed to send hub/shutdown: {e}");
+        }
+    }
+
     /// Access the underlying Hub connection (for custom IPC if needed).
     pub fn connection(&self) -> &Arc<Connection> {
         &self.conn

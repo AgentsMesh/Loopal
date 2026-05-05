@@ -30,6 +30,7 @@ rust_binary(
         "//crates/loopal-agent-client",
         "//crates/loopal-ipc",
         "//crates/loopal-git",
+        "@crates//:serde",
         "@crates//:serde_json",
         "@crates//:tokio",
         "@crates//:clap",
@@ -60,5 +61,24 @@ rust_test(
         "@crates//:serde_json",
         "@crates//:tokio",
         "@crates//:tempfile",
+    ],
+)
+
+# Hub lifecycle e2e — covers --hub-only handshake, discovery record,
+# token-channel handoff, and shutdown cleanup.
+rust_test(
+    name = "hub_lifecycle_test",
+    srcs = ["tests/hub_lifecycle_test.rs"],
+    edition = "2024",
+    data = [":loopal"],
+    env = {
+        "LOOPAL_BINARY": "$(rootpath :loopal)",
+    },
+    local = True,
+    deps = [
+        "@crates//:tokio",
+        "@crates//:tempfile",
+        "@crates//:anyhow",
+        "@crates//:serde_json",
     ],
 )

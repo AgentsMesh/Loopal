@@ -78,7 +78,6 @@ async fn compact_dispatches_control() {
 
 #[tokio::test]
 async fn hub_respond_permission_sends_request() {
-    use loopal_agent_hub::Hub;
     use loopal_agent_hub::HubClient;
     use std::sync::Arc;
 
@@ -91,10 +90,55 @@ async fn hub_respond_permission_sends_request() {
     let conn = Arc::new(loopal_ipc::connection::Connection::new(client_transport));
     let _rx = conn.start();
     let hub_client = Arc::new(HubClient::new(conn));
-    let hub = Arc::new(tokio::sync::Mutex::new(Hub::noop()));
-    let ctrl = SessionController::with_hub(hub_client, hub);
+    let ctrl = SessionController::with_hub(hub_client);
     let _handle = tokio::spawn(async move {
         ctrl.respond_permission("main", "tc-42", true).await;
     });
     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+}
+
+#[tokio::test]
+async fn shutdown_hub_local_mode_is_noop() {
+    let (ctrl, mut control_rx, mut perm_rx) = make_controller();
+    ctrl.shutdown_hub().await;
+    assert!(control_rx.try_recv().is_err());
+    assert!(perm_rx.try_recv().is_err());
+}
+
+#[tokio::test]
+async fn shutdown_hub_with_hub_backend_sends_request() {
+    use loopal_agent_hub::HubClient;
+    use std::sync::Arc;
+    use tokio::io::AsyncReadExt as _;
+
+    let (client_end, server_end) = tokio::io::duplex(4096);
+    let (client_reader, client_writer) = tokio::io::split(client_end);
+    let (mut server_reader, _server_writer) = tokio::io::split(server_end);
+    let client_transport: Arc<dyn loopal_ipc::transport::Transport> =
+        Arc::new(loopal_ipc::StdioTransport::new(
+            Box::new(tokio::io::BufReader::new(client_reader)),
+            Box::new(client_writer),
+        ));
+    let conn = Arc::new(loopal_ipc::connection::Connection::new(client_transport));
+    let _rx = conn.start();
+    let hub_client = Arc::new(HubClient::new(conn));
+    let ctrl = SessionController::with_hub(hub_client);
+
+    let send = tokio::spawn(async move { ctrl.shutdown_hub().await });
+
+    let mut buf = vec![0u8; 1024];
+    let n = tokio::time::timeout(
+        std::time::Duration::from_millis(500),
+        server_reader.read(&mut buf),
+    )
+    .await
+    .expect("server side must receive a request")
+    .expect("read ok");
+    assert!(n > 0);
+    let body = String::from_utf8_lossy(&buf[..n]);
+    assert!(
+        body.contains("\"hub/shutdown\""),
+        "expected hub/shutdown in {body}"
+    );
+    send.abort();
 }

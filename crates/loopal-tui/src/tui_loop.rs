@@ -1,11 +1,12 @@
 use std::io;
+use std::sync::atomic::Ordering;
 
 use ratatui::prelude::*;
 
 use loopal_protocol::{AgentEvent, AgentEventPayload};
 use tokio::sync::mpsc;
 
-use crate::app::{App, SubPage};
+use crate::app::{App, HubReconnectInfo, SubPage};
 use crate::event::{AppEvent, EventHandler};
 use crate::input::paste;
 use crate::key_dispatch::handle_key_action;
@@ -14,13 +15,26 @@ use crate::resume_display::{load_resumed_display, push_session_warning};
 use crate::terminal::TerminalGuard;
 use crate::tui_sync::sync_panel_caches;
 
+/// Surfaced to bootstrap after `run_tui` returns. `detach_requested` lets
+/// bootstrap distinguish a `/detach-hub` exit (print re-attach instructions)
+/// from a `/exit` or `/kill-hub` exit (silent / shutdown). `connection_lost`
+/// indicates Hub TCP closed before the user issued an exit command.
+/// `shutdown_initiated` distinguishes user-driven shutdown (silent) from
+/// an unexpected Hub crash (loud "lost" warning).
+pub struct ExitInfo {
+    pub detach_requested: bool,
+    pub reconnect_info: Option<HubReconnectInfo>,
+    pub connection_lost: bool,
+    pub shutdown_initiated: bool,
+}
+
 /// `app` is supplied pre-initialized so the bootstrap can apply
 /// optimistic display updates before the event loop starts.
 pub async fn run_tui(
     mut app: App,
     agent_event_rx: mpsc::Receiver<AgentEvent>,
     resync_rx: mpsc::Receiver<()>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<ExitInfo> {
     crate::terminal::install_panic_hook();
     let _guard = TerminalGuard::new()?;
     let backend = CrosstermBackend::new(io::stdout());
@@ -30,7 +44,13 @@ pub async fn run_tui(
     run_tui_loop(&mut terminal, events, &mut app).await?;
 
     terminal.show_cursor()?;
-    Ok(())
+    let connection_lost = app.hub_connection_lost.load(Ordering::Relaxed);
+    Ok(ExitInfo {
+        detach_requested: app.detach_requested,
+        reconnect_info: app.hub_reconnect_info.clone(),
+        connection_lost,
+        shutdown_initiated: app.shutdown_initiated,
+    })
 }
 
 pub async fn run_tui_loop<B: Backend>(

@@ -87,9 +87,11 @@ impl CommandHandler for ExitCmd {
         "/exit"
     }
     fn description(&self) -> &str {
-        "Exit the application"
+        "Shut down Hub and all agents, then exit"
     }
-    async fn execute(&self, _app: &mut App, _arg: Option<&str>) -> CommandEffect {
+    async fn execute(&self, app: &mut App, _arg: Option<&str>) -> CommandEffect {
+        app.shutdown_initiated = true;
+        app.session.shutdown_hub().await;
         CommandEffect::Quit
     }
 }
@@ -108,6 +110,8 @@ pub fn register_all(registry: &mut CommandRegistry) {
     registry.register(Arc::new(super::init_cmd::InitCmd));
     registry.register(Arc::new(super::help_cmd::HelpCmd));
     registry.register(Arc::new(ExitCmd));
+    registry.register(Arc::new(super::detach_hub_cmd::DetachHubCmd));
+    registry.register(Arc::new(super::kill_hub_cmd::KillHubCmd));
     registry.register(Arc::new(super::agent_cmd::AgentsCmd));
     registry.register(Arc::new(super::topology_cmd::TopologyCmd));
     registry.register(Arc::new(super::skills_cmd::SkillsCmd));

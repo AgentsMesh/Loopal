@@ -58,7 +58,14 @@ async fn route_via_uplink(hub: &Arc<Mutex<Hub>>, envelope: &Envelope) -> Result<
 }
 
 pub async fn handle_list_agents(hub: &Arc<Mutex<Hub>>) -> Result<Value, String> {
-    let agents: Vec<String> = hub.lock().await.registry.agents.keys().cloned().collect();
+    let agents: Vec<Value> = hub
+        .lock()
+        .await
+        .registry
+        .list_agents()
+        .into_iter()
+        .map(|(name, state)| json!({"name": name, "state": state}))
+        .collect();
     Ok(json!({"agents": agents}))
 }
 

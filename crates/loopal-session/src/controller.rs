@@ -9,14 +9,13 @@ use loopal_protocol::{AgentEvent, ControlCommand, InterruptSignal, UserQuestionR
 use crate::controller_ops::ControlBackend;
 use crate::event_handler;
 use crate::state::SessionState;
-use loopal_agent_hub::{Hub, HubClient, LocalChannels};
+use loopal_agent_hub::{HubClient, LocalChannels};
 
 /// External handle — cheaply cloneable, shareable across consumers.
 #[derive(Clone)]
 pub struct SessionController {
     state: Arc<Mutex<SessionState>>,
     pub(crate) backend: Arc<ControlBackend>,
-    connections: Arc<tokio::sync::Mutex<Hub>>,
 }
 
 impl SessionController {
@@ -39,37 +38,20 @@ impl SessionController {
         Self {
             state: Arc::new(Mutex::new(SessionState::new())),
             backend: Arc::new(ControlBackend::Local(Arc::new(channels))),
-            connections: Arc::new(tokio::sync::Mutex::new(Hub::noop())),
         }
     }
 
-    /// Create with Hub Connection (production mode — all agents via Hub).
-    pub fn with_hub(client: Arc<HubClient>, hub: Arc<tokio::sync::Mutex<Hub>>) -> Self {
+    /// Create with a remote Hub IPC client (production mode — TCP attached).
+    pub fn with_hub(client: Arc<HubClient>) -> Self {
         Self {
             state: Arc::new(Mutex::new(SessionState::new())),
             backend: Arc::new(ControlBackend::Hub(client)),
-            connections: hub,
         }
     }
 
     /// Acquire the session state lock. Panics if the lock is poisoned.
     pub fn lock(&self) -> MutexGuard<'_, SessionState> {
         self.state.lock().expect("session state lock poisoned")
-    }
-
-    pub(crate) fn connections(&self) -> &Arc<tokio::sync::Mutex<Hub>> {
-        &self.connections
-    }
-
-    /// Hub TCP listener port (if listening). Returns `None` for in-process test setups.
-    pub async fn hub_listener_port(&self) -> Option<u16> {
-        self.connections.lock().await.listener_port
-    }
-
-    /// Hub auth token required by `--attach-hub` clients. Returns `None`
-    /// for in-process test setups.
-    pub async fn hub_listener_token(&self) -> Option<String> {
-        self.connections.lock().await.listener_token.clone()
     }
 
     pub(crate) fn active_target(&self) -> String {
@@ -115,6 +97,15 @@ impl SessionController {
         self.backend.cancel_question(agent_name, question_id).await;
     }
 
+    /// Send `hub/shutdown` to the Hub, asking it to shut down all agents
+    /// and exit. No-op for in-process test backends without a real Hub.
+    pub async fn shutdown_hub(&self) {
+        let ControlBackend::Hub(client) = self.backend.as_ref() else {
+            return;
+        };
+        client.shutdown_hub().await;
+    }
+
     // === Event handling ===
 
     pub fn handle_event(&self, event: AgentEvent) {
@@ -135,7 +126,7 @@ impl SessionController {
             .and_then(|v| v.as_array())
             .map(|arr| {
                 arr.iter()
-                    .filter_map(|v| v.as_str().map(String::from))
+                    .filter_map(|v| v.get("name").and_then(|n| n.as_str()).map(String::from))
                     .collect()
             })
             .unwrap_or_default()
@@ -167,20 +158,5 @@ impl SessionController {
 
     pub fn root_session_id(&self) -> Option<String> {
         self.lock().root_session_id.clone()
-    }
-
-    /// Drain pending sub-agent refs that need to be persisted.
-    /// Returns `(root_session_id, refs)`. The caller is responsible for
-    /// writing them to disk via `SessionManager::add_sub_agent`.
-    pub fn drain_pending_sub_agent_refs(
-        &self,
-    ) -> Option<(String, Vec<crate::state::PendingSubAgentRef>)> {
-        let mut state = self.lock();
-        if state.pending_sub_agent_refs.is_empty() {
-            return None;
-        }
-        let refs = std::mem::take(&mut state.pending_sub_agent_refs);
-        let root_id = state.root_session_id.clone()?;
-        Some((root_id, refs))
     }
 }

@@ -45,6 +45,10 @@ pub struct SpawnParams {
     pub agent_type: Option<String>,
     /// Nesting depth of the child agent (parent depth + 1).
     pub depth: u32,
+    /// Reflects the parent's effective `settings.sandbox.policy == Disabled`.
+    /// Behavior flag — not filesystem-coupled, so it crosses hub boundaries
+    /// safely (unlike `cwd` / `fork_context`).
+    pub no_sandbox: bool,
     /// In-hub vs cross-hub semantics.
     pub target: SpawnTarget,
 }
@@ -68,6 +72,7 @@ pub fn build_spawn_request(
         "permission_mode": params.permission_mode,
         "agent_type": params.agent_type,
         "depth": params.depth,
+        "no_sandbox": params.no_sandbox,
     });
 
     match &params.target {

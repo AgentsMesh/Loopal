@@ -143,3 +143,20 @@ fn rejects_when_name_missing() {
     let err = prepare_remote_spawn_args(&json!({"prompt": "x"}), "f", cwd("/c")).unwrap_err();
     assert!(err.contains("name"));
 }
+
+#[test]
+fn no_sandbox_passed_through_when_present() {
+    let args = prepare_remote_spawn_args(
+        &json!({"name": "child", "no_sandbox": true}),
+        "caller",
+        cwd("/cwd"),
+    )
+    .unwrap();
+    assert!(args.no_sandbox);
+}
+
+#[test]
+fn no_sandbox_defaults_false_when_missing() {
+    let args = prepare_remote_spawn_args(&json!({"name": "child"}), "caller", cwd("/cwd")).unwrap();
+    assert!(!args.no_sandbox);
+}

@@ -62,6 +62,7 @@ pub(super) async fn action_spawn(
         loopal_tool_api::PermissionMode::Supervised => "supervised",
         loopal_tool_api::PermissionMode::Auto => "auto",
     };
+    let no_sandbox = shared.no_sandbox();
     let target = build_spawn_target(target_hub, cwd_override, build_fork_context(&shared));
     let result = spawn_agent(
         &shared,
@@ -72,6 +73,7 @@ pub(super) async fn action_spawn(
             permission_mode: Some(perm_mode.to_string()),
             agent_type: subagent_type.map(String::from),
             depth: shared.depth + 1,
+            no_sandbox,
             target,
         },
     )

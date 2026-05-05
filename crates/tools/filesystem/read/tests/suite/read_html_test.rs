@@ -7,13 +7,7 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
         None,
         loopal_backend::ResourceLimits::default(),
     );
-    ToolContext {
-        session_id: "t".into(),
-        shared: None,
-        memory_channel: None,
-        output_tail: None,
-        backend,
-    }
+    ToolContext::new(backend, "t")
 }
 
 #[tokio::test]

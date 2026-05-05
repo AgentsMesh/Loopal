@@ -21,13 +21,7 @@ fn temp_file(name: &str, content: &str) -> (std::path::PathBuf, ToolContext) {
         None,
         loopal_backend::ResourceLimits::default(),
     );
-    let ctx = ToolContext {
-        backend,
-        session_id: format!("test-{name}"),
-        shared: None,
-        memory_channel: None,
-        output_tail: None,
-    };
+    let ctx = ToolContext::new(backend, format!("test-{name}"));
     (path, ctx)
 }
 

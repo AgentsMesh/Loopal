@@ -99,6 +99,8 @@ pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<A
         ))
     });
     let shared_any: Arc<dyn std::any::Any + Send + Sync> = Arc::new(agent_shared.clone());
+    let one_shot_chat: Arc<dyn loopal_tool_api::OneShotChatService> = agent_shared.clone();
+    let fetch_refiner_policy: Arc<dyn loopal_tool_api::FetchRefinerPolicy> = agent_shared.clone();
     let skills: Vec<_> = config.skills.values().map(|e| e.skill.clone()).collect();
     let skills_summary = loopal_config::format_skills_summary(&skills);
     let tool_defs = kernel.tool_definitions();
@@ -165,6 +167,8 @@ pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<A
             resume_hooks,
             memory_channel,
             auto_classifier,
+            one_shot_chat: Some(one_shot_chat),
+            fetch_refiner_policy: Some(fetch_refiner_policy),
         },
     );
     Ok(AgentSetupResult {

@@ -12,7 +12,7 @@ use loopal_runtime::{
     SessionResumeHook,
 };
 use loopal_storage::Session;
-use loopal_tool_api::MemoryChannel;
+use loopal_tool_api::{FetchRefinerPolicy, MemoryChannel, OneShotChatService};
 
 /// Aggregate inputs for [`assemble_agent_loop_params`] — collapses what
 /// would otherwise be a 14-argument helper into a single value so the
@@ -32,10 +32,12 @@ pub(crate) struct AgentLoopAssembly {
     pub resume_hooks: Vec<Arc<dyn SessionResumeHook>>,
     pub memory_channel: Option<Arc<dyn MemoryChannel>>,
     pub auto_classifier: Option<Arc<loopal_auto_mode::AutoClassifier>>,
+    pub one_shot_chat: Option<Arc<dyn OneShotChatService>>,
+    pub fetch_refiner_policy: Option<Arc<dyn FetchRefinerPolicy>>,
 }
 
 pub(crate) fn assemble_agent_loop_params(a: AgentLoopAssembly) -> AgentLoopParams {
-    AgentLoopParamsBuilder::new(
+    let builder = AgentLoopParamsBuilder::new(
         a.config,
         a.deps,
         a.session,
@@ -51,6 +53,14 @@ pub(crate) fn assemble_agent_loop_params(a: AgentLoopAssembly) -> AgentLoopParam
     .message_snapshot(a.message_snapshot)
     .resume_hooks(a.resume_hooks)
     .memory_channel_opt(a.memory_channel)
-    .auto_classifier_opt(a.auto_classifier)
-    .build()
+    .auto_classifier_opt(a.auto_classifier);
+    let builder = match a.one_shot_chat {
+        Some(s) => builder.one_shot_chat(s),
+        None => builder,
+    };
+    let builder = match a.fetch_refiner_policy {
+        Some(p) => builder.fetch_refiner_policy(p),
+        None => builder,
+    };
+    builder.build()
 }

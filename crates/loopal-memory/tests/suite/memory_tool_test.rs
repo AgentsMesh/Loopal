@@ -39,13 +39,7 @@ fn make_ctx(channel: Option<Arc<dyn MemoryChannel>>) -> ToolContext {
         None,
         loopal_backend::ResourceLimits::default(),
     );
-    ToolContext {
-        backend,
-        session_id: "test".into(),
-        shared: None,
-        memory_channel: channel,
-        output_tail: None,
-    }
+    ToolContext::new(backend, "test").with_memory_channel_opt(channel)
 }
 
 #[test]

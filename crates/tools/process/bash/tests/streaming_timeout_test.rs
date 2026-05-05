@@ -10,13 +10,7 @@ fn make_streaming_ctx(cwd: &std::path::Path) -> ToolContext {
         None,
         loopal_backend::ResourceLimits::default(),
     );
-    ToolContext {
-        session_id: "test".into(),
-        shared: None,
-        memory_channel: None,
-        output_tail: Some(Arc::new(OutputTail::new(20))),
-        backend,
-    }
+    ToolContext::new(backend, "test").with_output_tail(Arc::new(OutputTail::new(20)))
 }
 
 /// Streaming timeout produces a success result (converted to background),
@@ -74,13 +68,7 @@ async fn non_streaming_timeout_is_hard_error() {
         None,
         loopal_backend::ResourceLimits::default(),
     );
-    let ctx = ToolContext {
-        session_id: "test".into(),
-        shared: None,
-        memory_channel: None,
-        output_tail: None,
-        backend,
-    };
+    let ctx = ToolContext::new(backend, "test");
 
     let result = bash
         .execute(json!({"command": "sleep 60", "timeout": 0}), &ctx)

@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use loopal_protocol::{MessageSource, Question, SkillInvocation};
+use loopal_protocol::{MessageSource, SkillInvocation};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -73,59 +73,4 @@ pub struct PendingPermission {
     pub id: String,
     pub name: String,
     pub input: serde_json::Value,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PendingQuestion {
-    pub id: String,
-    pub questions: Vec<Question>,
-    pub selected: Vec<Vec<bool>>,
-    pub current_question: usize,
-    pub cursor: usize,
-}
-
-impl PendingQuestion {
-    pub fn new(id: String, questions: Vec<Question>) -> Self {
-        let selected: Vec<Vec<bool>> = questions
-            .iter()
-            .map(|q| vec![false; q.options.len()])
-            .collect();
-        Self {
-            id,
-            questions,
-            selected,
-            current_question: 0,
-            cursor: 0,
-        }
-    }
-
-    pub fn cursor_up(&mut self) {
-        if self.cursor > 0 {
-            self.cursor -= 1;
-        }
-    }
-
-    pub fn cursor_down(&mut self) {
-        let q = &self.questions[self.current_question];
-        if self.cursor + 1 < q.options.len() {
-            self.cursor += 1;
-        }
-    }
-
-    pub fn toggle(&mut self) {
-        let sel = &mut self.selected[self.current_question];
-        sel[self.cursor] = !sel[self.cursor];
-    }
-
-    /// Collect selected labels for current question.
-    pub fn get_answers(&self) -> Vec<String> {
-        let q = &self.questions[self.current_question];
-        let sel = &self.selected[self.current_question];
-        q.options
-            .iter()
-            .zip(sel.iter())
-            .filter(|(_, s)| **s)
-            .map(|(opt, _)| opt.label.clone())
-            .collect()
-    }
 }

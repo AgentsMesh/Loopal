@@ -118,10 +118,15 @@ impl HubClient {
         question_id: &str,
         answers: Vec<String>,
     ) {
+        debug_assert!(
+            !question_id.is_empty(),
+            "respond_question requires non-empty question_id"
+        );
+        let response = loopal_protocol::UserQuestionResponse::answered(question_id, answers);
         let params = serde_json::json!({
             "agent_name": agent_name,
             "question_id": question_id,
-            "answers": answers,
+            "response": response,
         });
         if let Err(e) = self
             .conn
@@ -129,6 +134,27 @@ impl HubClient {
             .await
         {
             warn!(agent_name, question_id, "hub/question_response failed: {e}");
+        }
+    }
+
+    /// Cancel an in-flight `UserQuestionRequest` by (agent, question_id) via Hub.
+    pub async fn cancel_question(&self, agent_name: &str, question_id: &str) {
+        debug_assert!(
+            !question_id.is_empty(),
+            "cancel_question requires non-empty question_id"
+        );
+        let response = loopal_protocol::UserQuestionResponse::cancelled(question_id);
+        let params = serde_json::json!({
+            "agent_name": agent_name,
+            "question_id": question_id,
+            "response": response,
+        });
+        if let Err(e) = self
+            .conn
+            .send_request(methods::HUB_QUESTION_RESPONSE.name, params)
+            .await
+        {
+            warn!(agent_name, question_id, "hub/question_cancel failed: {e}");
         }
     }
 

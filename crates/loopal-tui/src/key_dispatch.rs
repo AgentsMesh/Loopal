@@ -118,57 +118,51 @@ pub(crate) async fn handle_key_action(
             false
         }
         InputAction::QuestionUp => {
-            app.with_active_conversation_mut(|conv| {
-                if let Some(ref mut q) = conv.pending_question {
-                    q.cursor_up();
-                }
-            });
+            crate::question_ops::cursor_up(app);
             false
         }
         InputAction::QuestionDown => {
-            app.with_active_conversation_mut(|conv| {
-                if let Some(ref mut q) = conv.pending_question {
-                    q.cursor_down();
-                }
-            });
+            crate::question_ops::cursor_down(app);
             false
         }
         InputAction::QuestionToggle => {
-            app.with_active_conversation_mut(|conv| {
-                if let Some(ref mut q) = conv.pending_question {
-                    q.toggle();
-                }
-            });
+            crate::question_ops::toggle(app);
             false
         }
         InputAction::QuestionConfirm => {
-            let pending = app.with_active_conversation_mut(|conv| conv.pending_question.take());
-            if let Some(q) = pending {
-                let answers = {
-                    let ans = q.get_answers();
-                    if ans.is_empty() && !q.questions[q.current_question].allow_multiple {
-                        vec![
-                            q.questions[q.current_question].options[q.cursor]
-                                .label
-                                .clone(),
-                        ]
-                    } else {
-                        ans
-                    }
-                };
-                let agent = app.session.lock().active_view.clone();
-                app.session.respond_question(&agent, &q.id, answers).await;
-            }
+            crate::question_ops::confirm(app).await;
             false
         }
         InputAction::QuestionCancel => {
-            let pending = app.with_active_conversation_mut(|conv| conv.pending_question.take());
-            if let Some(q) = pending {
-                let agent = app.session.lock().active_view.clone();
-                app.session
-                    .respond_question(&agent, &q.id, vec!["(cancelled)".into()])
-                    .await;
-            }
+            crate::question_ops::cancel(app).await;
+            false
+        }
+        InputAction::QuestionFreeTextChar(c) => {
+            crate::question_ops::free_text_char(app, c);
+            false
+        }
+        InputAction::QuestionFreeTextBackspace => {
+            crate::question_ops::free_text_backspace(app);
+            false
+        }
+        InputAction::QuestionFreeTextDelete => {
+            crate::question_ops::free_text_delete(app);
+            false
+        }
+        InputAction::QuestionFreeTextCursorLeft => {
+            crate::question_ops::free_text_cursor_left(app);
+            false
+        }
+        InputAction::QuestionFreeTextCursorRight => {
+            crate::question_ops::free_text_cursor_right(app);
+            false
+        }
+        InputAction::QuestionFreeTextHome => {
+            crate::question_ops::free_text_home(app);
+            false
+        }
+        InputAction::QuestionFreeTextEnd => {
+            crate::question_ops::free_text_end(app);
             false
         }
         InputAction::McpReconnect(server) => {

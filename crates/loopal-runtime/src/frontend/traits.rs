@@ -66,8 +66,11 @@ pub trait AgentFrontend: Send + Sync {
 
     /// Ask the user questions via the frontend (AskUser tool interception).
     /// Default returns "(not supported)" for sub-agents.
-    async fn ask_user(&self, _questions: Vec<Question>) -> Vec<String> {
-        vec!["(not supported)".into()]
+    async fn ask_user(&self, _questions: Vec<Question>) -> loopal_protocol::UserQuestionResponse {
+        loopal_protocol::UserQuestionResponse::unsupported(
+            "",
+            "AskUser not supported in this context",
+        )
     }
 
     /// Request user approval for a plan (ExitPlanMode interception).

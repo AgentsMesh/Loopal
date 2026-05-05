@@ -1,6 +1,7 @@
 use loopal_protocol::UserContent;
 
 /// Result from a sub-page picker confirmation.
+#[derive(Debug)]
 pub enum SubPageResult {
     /// A model was selected from the picker.
     ModelSelected(String),
@@ -16,6 +17,7 @@ pub enum SubPageResult {
 }
 
 /// Action resulting from input handling.
+#[derive(Debug)]
 pub enum InputAction {
     /// No action needed
     None,
@@ -64,6 +66,20 @@ pub enum InputAction {
     QuestionToggle,
     /// Cancel question dialog
     QuestionCancel,
+    /// Insert a character into the free-text answer (cursor on Other row)
+    QuestionFreeTextChar(char),
+    /// Delete previous char in free-text
+    QuestionFreeTextBackspace,
+    /// Delete char under cursor in free-text
+    QuestionFreeTextDelete,
+    /// Move free-text cursor left
+    QuestionFreeTextCursorLeft,
+    /// Move free-text cursor right
+    QuestionFreeTextCursorRight,
+    /// Move free-text cursor to start
+    QuestionFreeTextHome,
+    /// Move free-text cursor to end
+    QuestionFreeTextEnd,
     /// User pressed Ctrl+V — caller should spawn async clipboard read
     PasteRequested,
     /// Reconnect an MCP server by name

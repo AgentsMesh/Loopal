@@ -61,6 +61,7 @@ rust_test(
         "@crates//:ratatui",
         "@crates//:crossterm",
         "//crates/loopal-protocol",
+        "//crates/loopal-runtime",
         "//crates/loopal-session",
         "//crates/loopal-view-state",
     ],

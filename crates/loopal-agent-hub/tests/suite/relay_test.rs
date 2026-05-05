@@ -97,7 +97,9 @@ async fn question_resolved_by_ui_response() {
         .await;
 
     assert!(result.is_ok());
-    assert_eq!(result.unwrap()["answers"][0], "yes");
+    let resp = result.unwrap();
+    assert_eq!(resp["kind"], "answered");
+    assert_eq!(resp["answers"][0], "yes");
 }
 
 #[tokio::test]

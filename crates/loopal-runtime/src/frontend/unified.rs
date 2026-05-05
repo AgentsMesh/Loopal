@@ -57,8 +57,10 @@ impl UnifiedFrontend {
         }
     }
 
-    /// Ask the user a question via the frontend (AskUser tool support).
-    pub async fn ask_user(&self, questions: Vec<loopal_protocol::Question>) -> Vec<String> {
+    pub async fn ask_user(
+        &self,
+        questions: Vec<loopal_protocol::Question>,
+    ) -> loopal_protocol::UserQuestionResponse {
         self.question_handler.ask(questions).await
     }
 }
@@ -136,7 +138,10 @@ impl AgentFrontend for UnifiedFrontend {
         inputs
     }
 
-    async fn ask_user(&self, questions: Vec<loopal_protocol::Question>) -> Vec<String> {
+    async fn ask_user(
+        &self,
+        questions: Vec<loopal_protocol::Question>,
+    ) -> loopal_protocol::UserQuestionResponse {
         self.question_handler.ask(questions).await
     }
 

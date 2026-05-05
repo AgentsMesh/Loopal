@@ -112,3 +112,12 @@ pub fn assert_has_mode_changed(events: &[AgentEventPayload], expected_mode: &str
         &format!("expected ModeChanged({expected_mode})"),
     );
 }
+
+pub fn find_tool_result(events: &[AgentEventPayload], tool_name: &str) -> Option<String> {
+    events.iter().find_map(|e| match e {
+        AgentEventPayload::ToolResult { name, result, .. } if name == tool_name => {
+            Some(result.clone())
+        }
+        _ => None,
+    })
+}

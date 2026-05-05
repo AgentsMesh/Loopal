@@ -56,10 +56,17 @@ fn protocol_types_serialize() {
         _ => panic!("roundtrip failed"),
     }
 
-    let resp = UserQuestionResponse {
-        answers: vec!["yes".into()],
-    };
+    let resp = UserQuestionResponse::answered("qid-1", vec!["yes".into()]);
     let json = serde_json::to_string(&resp).unwrap();
     let resp2: UserQuestionResponse = serde_json::from_str(&json).unwrap();
-    assert_eq!(resp2.answers, vec!["yes"]);
+    match resp2 {
+        UserQuestionResponse::Answered {
+            ref question_id,
+            ref answers,
+        } => {
+            assert_eq!(question_id, "qid-1");
+            assert_eq!(answers, &vec!["yes".to_string()]);
+        }
+        _ => panic!("expected Answered variant"),
+    }
 }

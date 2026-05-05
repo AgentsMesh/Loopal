@@ -8,6 +8,7 @@ mod modal;
 pub(crate) mod multiline;
 mod navigation;
 pub(crate) mod paste;
+mod paste_clipboard;
 mod skills_page_keys;
 mod status_page_keys;
 mod sub_page;

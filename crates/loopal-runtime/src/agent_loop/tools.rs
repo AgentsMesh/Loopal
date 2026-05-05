@@ -5,7 +5,7 @@ use loopal_protocol::AgentEventPayload;
 use tracing::{error, info};
 
 use super::cancel::TurnCancel;
-use super::question_parse::{format_answers, parse_questions};
+use super::question_parse::{format_response, parse_questions};
 use super::runner::AgentLoopRunner;
 use super::streaming_tool_exec::StreamingToolHandle;
 use super::tool_exec::execute_approved_tools;
@@ -255,8 +255,18 @@ impl AgentLoopRunner {
                 }
                 "AskUser" => {
                     let questions = parse_questions(input);
-                    let answers = self.params.deps.frontend.ask_user(questions).await;
-                    intercepted.push((idx, success_block(id, &format_answers(&answers))));
+                    let response = self.params.deps.frontend.ask_user(questions.clone()).await;
+                    let (result, is_error) = format_response(&response, &questions);
+                    self.emit(loopal_protocol::AgentEventPayload::ToolResult {
+                        id: id.clone(),
+                        name: name.clone(),
+                        result: result.clone(),
+                        is_error,
+                        duration_ms: None,
+                        metadata: None,
+                    })
+                    .await?;
+                    intercepted.push((idx, success_block(id, &result)));
                 }
                 _ => remaining.push((id.clone(), name.clone(), input.clone())),
             }

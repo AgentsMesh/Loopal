@@ -45,7 +45,7 @@ pub async fn resolve_question(
     hub: &Arc<Mutex<Hub>>,
     agent_name: &str,
     question_id: &str,
-    answers: Vec<String>,
+    response: loopal_protocol::UserQuestionResponse,
 ) -> bool {
     let key = (agent_name.to_string(), question_id.to_string());
     let info = {
@@ -55,8 +55,13 @@ pub async fn resolve_question(
     let Some(info) = info else {
         return false;
     };
-    info!(agent = %info.agent_name, question_id, "question resolved");
-    let resp = serde_json::json!({"answers": answers});
+    info!(
+        agent = %info.agent_name,
+        question_id,
+        kind = ?std::mem::discriminant(&response),
+        "question resolved"
+    );
+    let resp = serde_json::to_value(&response).unwrap_or(serde_json::Value::Null);
     let _ = info.agent_conn.respond(info.agent_ipc_id, resp).await;
     let resolved = AgentEvent::named(
         QualifiedAddress::local(&info.agent_name),

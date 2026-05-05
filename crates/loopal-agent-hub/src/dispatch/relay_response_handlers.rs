@@ -40,17 +40,15 @@ pub async fn handle_question_response(
     let question_id = params
         .get("question_id")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| "missing question_id".to_string())?
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "missing or empty question_id".to_string())?
         .to_string();
-    let answers: Vec<String> = params
-        .get("answers")
-        .and_then(|v| v.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str().map(String::from))
-                .collect()
-        })
-        .ok_or_else(|| "missing answers".to_string())?;
-    let resolved = pending_relay::resolve_question(hub, &agent_name, &question_id, answers).await;
+    let response_value = params
+        .get("response")
+        .ok_or_else(|| "missing response field".to_string())?
+        .clone();
+    let response: loopal_protocol::UserQuestionResponse =
+        serde_json::from_value(response_value).map_err(|e| format!("bad response: {e}"))?;
+    let resolved = pending_relay::resolve_question(hub, &agent_name, &question_id, response).await;
     Ok(json!({"resolved": resolved}))
 }

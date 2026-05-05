@@ -17,7 +17,12 @@ impl Tool for AskUserTool {
          - Users can always select 'Other' to provide custom text input.\n\
          - Use multiSelect: true when choices are not mutually exclusive.\n\
          - In plan mode: use this to clarify requirements BEFORE finalizing the plan. \
-         Do NOT use it to ask 'Is my plan ready?' — use ExitPlanMode for that."
+         Do NOT use it to ask 'Is my plan ready?' — use ExitPlanMode for that.\n\
+         \n\
+         Tool result format: per-question lines `Q{i} ({question}): {answer}` \
+         joined by newline. Special tokens: `(cancelled by user)`, \
+         `(no selection)`, `(unsupported: ...)` mean the user did not provide \
+         a real answer."
     }
 
     fn parameters_schema(&self) -> Value {

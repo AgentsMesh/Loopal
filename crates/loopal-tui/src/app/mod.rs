@@ -57,6 +57,7 @@ pub struct App {
 
     pub session: SessionController,
     pub content_scroll: ContentScroll,
+    pub transient_status: Option<(String, Instant)>,
 }
 
 impl App {
@@ -102,6 +103,7 @@ impl App {
             bg_task_details: Vec::new(),
             session,
             content_scroll: ContentScroll::new(),
+            transient_status: None,
         }
     }
 

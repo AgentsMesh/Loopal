@@ -1,6 +1,10 @@
 // Single test binary — includes all test modules
 #[path = "suite/conversation_serde_test.rs"]
 mod conversation_serde_test;
+#[path = "suite/free_text_test.rs"]
+mod free_text_test;
+#[path = "suite/pending_question_test.rs"]
+mod pending_question_test;
 #[path = "suite/reducer_aggregate_test.rs"]
 mod reducer_aggregate_test;
 #[path = "suite/reducer_bg_test.rs"]

@@ -154,11 +154,11 @@ impl AgentFrontend for HubFrontend {
         })
     }
 
-    async fn ask_user(&self, questions: Vec<Question>) -> Vec<String> {
+    async fn ask_user(&self, questions: Vec<Question>) -> UserQuestionResponse {
         debug!(count = questions.len(), "asking user via hub");
         let session = self.get_session().await;
         let Some(conn) = session.primary_connection().await else {
-            return vec!["(no primary client)".into()];
+            return UserQuestionResponse::cancelled("");
         };
         let params = serde_json::json!({ "questions": questions });
         match conn
@@ -166,9 +166,8 @@ impl AgentFrontend for HubFrontend {
             .await
         {
             Ok(value) => serde_json::from_value::<UserQuestionResponse>(value)
-                .map(|r| r.answers)
-                .unwrap_or_else(|_| vec!["(parse error)".into()]),
-            Err(_) => vec!["(IPC error)".into()],
+                .unwrap_or_else(|_| UserQuestionResponse::cancelled("")),
+            Err(_) => UserQuestionResponse::cancelled(""),
         }
     }
 

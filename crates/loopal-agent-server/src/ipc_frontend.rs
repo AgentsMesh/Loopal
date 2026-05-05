@@ -164,7 +164,7 @@ impl AgentFrontend for IpcFrontend {
         })
     }
 
-    async fn ask_user(&self, questions: Vec<Question>) -> Vec<String> {
+    async fn ask_user(&self, questions: Vec<Question>) -> UserQuestionResponse {
         debug!(count = questions.len(), "asking user via IPC");
         let params = serde_json::json!({ "questions": questions });
         match self
@@ -172,14 +172,9 @@ impl AgentFrontend for IpcFrontend {
             .send_request(methods::AGENT_QUESTION.name, params)
             .await
         {
-            Ok(value) => {
-                if let Ok(resp) = serde_json::from_value::<UserQuestionResponse>(value) {
-                    resp.answers
-                } else {
-                    vec!["(IPC parse error)".into()]
-                }
-            }
-            Err(_) => vec!["(IPC error)".into()],
+            Ok(value) => serde_json::from_value::<UserQuestionResponse>(value)
+                .unwrap_or_else(|_| UserQuestionResponse::cancelled("")),
+            Err(_) => UserQuestionResponse::cancelled(""),
         }
     }
 

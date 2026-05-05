@@ -17,10 +17,28 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     let conv = vc_guard.conversation();
 
     let pw = input_view::prefix_width(app.pending_image_count());
-    let input_h = input_view::input_height(&app.input, size.width, pw);
     let banner_h = views::retry_banner::banner_height(&conv.retry_banner);
     let breadcrumb_h = u16::from(state.active_view != loopal_session::ROOT_AGENT);
     let elapsed = conv.turn_elapsed();
+
+    // PendingQuestion is cloned here so we can drop `vc_guard` before the
+    // input area renders below. Questions are typically 1-4 short strings
+    // and TUI redraws are event-driven (not 60fps), so the clone cost is
+    // negligible. Permission uses the lighter `prepare` borrow path because
+    // its `input` JSON can be much larger.
+    let pending_question = conv.pending_question.clone();
+    let prepared_perm = conv
+        .pending_permission
+        .as_ref()
+        .map(views::permission_inline::prepare);
+
+    let input_h = if let Some(ref q) = pending_question {
+        views::question_inline::height(q, size.width)
+    } else if let Some(ref prep) = prepared_perm {
+        views::permission_inline::height_of(prep)
+    } else {
+        input_view::input_height(&app.input, size.width, pw)
+    };
 
     let panel_zone_h = crate::render_panel::panel_zone_height(app, &state);
     let layout = FrameLayout::compute(size, breadcrumb_h, panel_zone_h, banner_h, input_h);
@@ -42,8 +60,6 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     }
     views::unified_status::render_unified_status(f, app, &state, conv, layout.status);
 
-    let pending_perm = conv.pending_permission.clone();
-    let pending_question = conv.pending_question.clone();
     let topology_data = if app.show_topology {
         Some(extract_topology(app, &state, elapsed))
     } else {
@@ -52,23 +68,25 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     drop(vc_guard);
     drop(state);
 
-    let image_count = app.pending_image_count();
-    views::input_view::render_input(
-        f,
-        &app.input,
-        app.input_cursor,
-        image_count,
-        app.input_scroll,
-        layout.input,
-    );
-    if let Some(ref perm) = pending_perm {
-        views::tool_confirm::render_tool_confirm(f, &perm.name, &perm.input, size);
-    }
     if let Some(ref question) = pending_question {
-        views::question_dialog::render_question_dialog(f, question, size);
-    }
-    if let Some(ref ac) = app.autocomplete {
-        views::command_menu::render_command_menu(f, ac, layout.input);
+        let status = app.current_transient_status().map(String::from);
+        views::question_inline::render(f, question, layout.input, status.as_deref());
+    } else if let Some(ref prep) = prepared_perm {
+        let status = app.current_transient_status().map(String::from);
+        views::permission_inline::render_prepared(f, prep, layout.input, status.as_deref());
+    } else {
+        let image_count = app.pending_image_count();
+        views::input_view::render_input(
+            f,
+            &app.input,
+            app.input_cursor,
+            image_count,
+            app.input_scroll,
+            layout.input,
+        );
+        if let Some(ref ac) = app.autocomplete {
+            views::command_menu::render_command_menu(f, ac, layout.input);
+        }
     }
     if let Some(ref nodes) = topology_data {
         views::topology_overlay::render_topology_overlay(f, nodes, size);

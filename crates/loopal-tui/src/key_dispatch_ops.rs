@@ -10,6 +10,7 @@ use crate::panel_ops;
 pub use crate::panel_ops::{cycle_panel_focus, enter_panel, panel_tab};
 
 pub(crate) async fn tool_approve(app: &mut App) {
+    app.clear_transient_status();
     let pending = app.with_active_conversation_mut(|conv| conv.pending_permission.take());
     if let Some(p) = pending {
         let agent = app.session.lock().active_view.clone();
@@ -18,6 +19,7 @@ pub(crate) async fn tool_approve(app: &mut App) {
 }
 
 pub(crate) async fn tool_deny(app: &mut App) {
+    app.clear_transient_status();
     let pending = app.with_active_conversation_mut(|conv| conv.pending_permission.take());
     if let Some(p) = pending {
         let agent = app.session.lock().active_view.clone();

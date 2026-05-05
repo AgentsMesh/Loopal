@@ -86,7 +86,8 @@ impl AcpAdapter {
             "questions": serde_json::to_value(&questions).unwrap_or(Value::Null),
         });
 
-        let answers = match self.acp_out.request("_loopal/question", ext_params).await {
+        let answers: Vec<String> = match self.acp_out.request("_loopal/question", ext_params).await
+        {
             Ok(value) => value["answers"]
                 .as_array()
                 .map(|arr| {
@@ -94,13 +95,17 @@ impl AcpAdapter {
                         .filter_map(|v| v.as_str().map(String::from))
                         .collect()
                 })
-                .unwrap_or_else(|| vec!["(no answer)".into()]),
-            Err(_) => vec!["(not supported in ACP mode)".into()],
+                .unwrap_or_default(),
+            Err(_) => Vec::new(),
         };
 
-        self.client
-            .respond_question(&agent_name, &question_id, answers)
-            .await;
+        if answers.is_empty() {
+            self.client.cancel_question(&agent_name, &question_id).await;
+        } else {
+            self.client
+                .respond_question(&agent_name, &question_id, answers)
+                .await;
+        }
     }
 }
 

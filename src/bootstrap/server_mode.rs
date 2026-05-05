@@ -67,20 +67,18 @@ async fn consume_events(
                         info!(agent = %agent_name, tool_call_id = %id, "server: auto-approving permission");
                         client.respond_permission(&agent_name, &id, true).await;
                     }
-                    AgentEventPayload::UserQuestionRequest { id, .. } => {
+                    AgentEventPayload::UserQuestionRequest { id, questions } => {
                         info!(agent = %agent_name, question_id = %id, "server: auto-answering question");
-                        client
-                            .respond_question(
-                                &agent_name,
-                                &id,
-                                vec![
-                                    "Running non-interactively. \
-                                     Use your best judgment and proceed. \
-                                     Do not wait for user input."
-                                        .into(),
-                                ],
-                            )
-                            .await;
+                        let answers: Vec<String> = questions
+                            .iter()
+                            .map(|_| {
+                                "Running non-interactively. \
+                                 Use your best judgment and proceed. \
+                                 Do not wait for user input."
+                                    .to_string()
+                            })
+                            .collect();
+                        client.respond_question(&agent_name, &id, answers).await;
                     }
                     AgentEventPayload::AwaitingInput if seen_stream => break,
                     AgentEventPayload::Finished => break,

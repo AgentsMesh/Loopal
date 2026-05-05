@@ -20,9 +20,7 @@ use loopal_provider_api::Provider;
 use loopal_runtime::UnifiedFrontend;
 use loopal_runtime::agent_loop::AgentLoopRunner;
 use loopal_runtime::frontend::PermissionHandler;
-use loopal_runtime::frontend::{
-    AutoCancelQuestionHandler, AutoDenyHandler, RelayPermissionHandler,
-};
+use loopal_runtime::frontend::{AutoDenyHandler, RelayPermissionHandler};
 use loopal_session::SessionController;
 use loopal_tool_api::PermissionMode;
 
@@ -40,7 +38,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
     let (mailbox_tx, mailbox_rx) = mpsc::channel::<Envelope>(16);
     let (control_tx, control_rx) = mpsc::channel::<ControlCommand>(16);
     let (permission_tx, permission_rx) = mpsc::channel::<bool>(16);
-    let (question_tx, _question_rx) = mpsc::channel::<UserQuestionResponse>(16);
+    let (question_tx, question_rx) = mpsc::channel::<UserQuestionResponse>(16);
     let interrupt = loopal_runtime::InterruptHandle::new();
 
     // Permission handler: Bypass → auto-deny; Supervised/Default → real channel
@@ -58,7 +56,10 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         control_rx,
         None,
         perm_handler,
-        Box::new(AutoCancelQuestionHandler),
+        Box::new(loopal_runtime::frontend::RelayQuestionHandler::new(
+            event_tx.clone(),
+            question_rx,
+        )),
     ));
 
     // Kernel: register builtin tools + agent tools + mock provider

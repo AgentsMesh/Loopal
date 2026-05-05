@@ -2,8 +2,9 @@ use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
+use super::pending_question::PendingQuestion;
 use super::thinking_display::format_thinking_content;
-use super::types::{PendingPermission, PendingQuestion, SessionMessage};
+use super::types::{PendingPermission, SessionMessage};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AgentConversation {

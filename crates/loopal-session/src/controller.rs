@@ -110,6 +110,11 @@ impl SessionController {
             .await;
     }
 
+    /// Cancel an in-flight `UserQuestionRequest`.
+    pub async fn cancel_question(&self, agent_name: &str, question_id: &str) {
+        self.backend.cancel_question(agent_name, question_id).await;
+    }
+
     // === Event handling ===
 
     pub fn handle_event(&self, event: AgentEvent) {

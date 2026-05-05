@@ -34,6 +34,8 @@ mod focus_panel_keys_test;
 mod inbox_render_test;
 #[path = "suite/init_cmd_test.rs"]
 mod init_cmd_test;
+#[path = "suite/inline_render_test.rs"]
+mod inline_render_test;
 #[path = "suite/input_edge_test.rs"]
 mod input_edge_test;
 #[path = "suite/input_scroll_edge_test.rs"]
@@ -64,6 +66,8 @@ mod mcp_refresh_test;
 mod message_lines_edge_test;
 #[path = "suite/message_lines_test.rs"]
 mod message_lines_test;
+#[path = "suite/multi_question_test.rs"]
+mod multi_question_test;
 #[path = "suite/panel_focus_visibility_test.rs"]
 mod panel_focus_visibility_test;
 #[path = "suite/panel_header_render_test.rs"]
@@ -74,6 +78,14 @@ mod panel_provider_count_test;
 mod panel_tab_crons_test;
 #[path = "suite/panel_tab_test.rs"]
 mod panel_tab_test;
+#[path = "suite/question_confirm_test.rs"]
+mod question_confirm_test;
+#[path = "suite/question_edge_test.rs"]
+mod question_edge_test;
+#[path = "suite/question_input_test.rs"]
+mod question_input_test;
+#[path = "suite/question_paste_test.rs"]
+mod question_paste_test;
 #[path = "suite/render_guard_test.rs"]
 mod render_guard_test;
 #[path = "suite/scroll_compensation_test.rs"]
@@ -122,6 +134,8 @@ mod e2e_mcp_test;
 mod e2e_multi_turn_test;
 #[path = "suite/e2e_permission_test.rs"]
 mod e2e_permission_test;
+#[path = "suite/e2e_question_test.rs"]
+mod e2e_question_test;
 #[path = "suite/e2e_scroll_test.rs"]
 mod e2e_scroll_test;
 #[path = "suite/e2e_session_test.rs"]

@@ -33,6 +33,30 @@ impl App {
         });
     }
 
+    pub fn set_transient_status(&mut self, msg: impl Into<String>) {
+        self.transient_status = Some((msg.into(), std::time::Instant::now()));
+    }
+
+    /// Clear transient status, but only if it has been visible for at least
+    /// 1 second — short flashes (e.g. paste failed → user immediately confirms
+    /// modal) must remain readable until 3s natural expiry.
+    pub fn clear_transient_status(&mut self) {
+        if let Some((_, t)) = self.transient_status.as_ref()
+            && t.elapsed() >= std::time::Duration::from_secs(1)
+        {
+            self.transient_status = None;
+        }
+    }
+
+    pub fn current_transient_status(&self) -> Option<&str> {
+        let (msg, t) = self.transient_status.as_ref()?;
+        if t.elapsed() < std::time::Duration::from_secs(3) {
+            Some(msg.as_str())
+        } else {
+            None
+        }
+    }
+
     pub fn push_welcome(&self, model: &str, path: &str) {
         let banner = loopal_view_state::SessionMessage {
             role: "welcome".into(),

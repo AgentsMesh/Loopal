@@ -20,7 +20,7 @@ mod params;
 mod params_builder;
 mod permission;
 mod pipeline_setup;
-mod question_parse;
+pub mod question_parse;
 mod resume_session;
 pub mod rewind;
 mod run;

@@ -91,12 +91,29 @@ impl ControlBackend {
     ) {
         match self {
             Self::Local(ch) => {
-                let _ = ch.question_tx.send(UserQuestionResponse { answers }).await;
+                let _ = ch
+                    .question_tx
+                    .send(UserQuestionResponse::answered(question_id, answers))
+                    .await;
             }
             Self::Hub(client) => {
                 client
                     .respond_question(agent_name, question_id, answers)
                     .await;
+            }
+        }
+    }
+
+    pub(crate) async fn cancel_question(&self, agent_name: &str, question_id: &str) {
+        match self {
+            Self::Local(ch) => {
+                let _ = ch
+                    .question_tx
+                    .send(UserQuestionResponse::cancelled(question_id))
+                    .await;
+            }
+            Self::Hub(client) => {
+                client.cancel_question(agent_name, question_id).await;
             }
         }
     }

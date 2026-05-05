@@ -1,14 +1,10 @@
 use std::collections::HashMap;
 
-use base64::Engine;
-use base64::engine::general_purpose::STANDARD as BASE64;
-use tracing::warn;
-
 use crate::app::App;
 use crate::event::{AppEvent, EventHandler};
+use crate::input::paste_clipboard::read_clipboard;
 use loopal_protocol::ImageAttachment;
 
-/// Result of an async clipboard read operation.
 #[derive(Debug)]
 pub enum PasteResult {
     Image(ImageAttachment),
@@ -17,7 +13,6 @@ pub enum PasteResult {
     Unavailable,
 }
 
-/// Spawn a blocking clipboard read; result sent as `AppEvent::Paste`.
 pub fn spawn_paste(events: &EventHandler) {
     let tx = events.sender();
     tokio::task::spawn_blocking(move || {
@@ -25,16 +20,29 @@ pub fn spawn_paste(events: &EventHandler) {
     });
 }
 
-const MAX_BASE64_BYTES: usize = 5 * 1024 * 1024;
-const MAX_DIMENSION: u32 = 2048;
 const LARGE_PASTE_LINE_THRESHOLD: usize = 5;
 const LARGE_PASTE_CHAR_THRESHOLD: usize = 500;
 
-/// Apply paste result. Large text pastes are folded into placeholders.
 pub fn apply_paste_result(app: &mut App, result: PasteResult) {
+    let in_modal = app.with_active_conversation(|conv| {
+        conv.pending_question.is_some() || conv.pending_permission.is_some()
+    });
     match result {
-        PasteResult::Image(attachment) => app.attach_image(attachment),
+        PasteResult::Image(attachment) => {
+            if in_modal {
+                app.set_transient_status("Image paste ignored — close the dialog first.");
+                return;
+            }
+            app.attach_image(attachment);
+        }
         PasteResult::Text(text) => {
+            if in_modal && crate::question_ops::route_paste(app, &text) {
+                return;
+            }
+            if in_modal {
+                app.set_transient_status("Paste ignored — focus the Other-input row.");
+                return;
+            }
             let line_count = text.lines().count().max(1);
             if line_count > LARGE_PASTE_LINE_THRESHOLD || text.len() > LARGE_PASTE_CHAR_THRESHOLD {
                 let placeholder = generate_placeholder(&text, line_count, &app.paste_map);
@@ -48,7 +56,7 @@ pub fn apply_paste_result(app: &mut App, result: PasteResult) {
         }
         PasteResult::Empty => {}
         PasteResult::Unavailable => {
-            app.push_system_message("Clipboard not available (SSH/headless session?)".into());
+            app.set_transient_status("Clipboard not available (SSH/headless session?)");
         }
     }
 }
@@ -82,7 +90,6 @@ fn generate_placeholder(
     if !existing.contains_key(&base) {
         return base;
     }
-    // Hash collision (extremely rare) — append suffix
     let mut suffix = 2u64;
     loop {
         suffix.hash(&mut hasher);
@@ -92,57 +99,6 @@ fn generate_placeholder(
         }
         suffix += 1;
     }
-}
-
-fn read_clipboard() -> PasteResult {
-    let Ok(mut clipboard) = arboard::Clipboard::new() else {
-        warn!("failed to open clipboard");
-        return PasteResult::Unavailable;
-    };
-    if let Ok(img_data) = clipboard.get_image()
-        && let Some(attachment) = encode_clipboard_image(img_data)
-    {
-        return PasteResult::Image(attachment);
-    }
-    if let Ok(text) = clipboard.get_text()
-        && !text.is_empty()
-    {
-        return PasteResult::Text(text);
-    }
-    PasteResult::Empty
-}
-
-fn encode_clipboard_image(img_data: arboard::ImageData<'_>) -> Option<ImageAttachment> {
-    let (width, height) = (img_data.width as u32, img_data.height as u32);
-    let img = image::RgbaImage::from_raw(width, height, img_data.bytes.into_owned())?;
-    let img = if width > MAX_DIMENSION || height > MAX_DIMENSION {
-        image::DynamicImage::ImageRgba8(img).resize(
-            MAX_DIMENSION,
-            MAX_DIMENSION,
-            image::imageops::FilterType::Lanczos3,
-        )
-    } else {
-        image::DynamicImage::ImageRgba8(img)
-    };
-    let mut png_buf = Vec::new();
-    img.write_to(
-        &mut std::io::Cursor::new(&mut png_buf),
-        image::ImageFormat::Png,
-    )
-    .ok()?;
-    let b64 = BASE64.encode(&png_buf);
-    if b64.len() > MAX_BASE64_BYTES {
-        warn!(
-            size = b64.len(),
-            max = MAX_BASE64_BYTES,
-            "clipboard image too large"
-        );
-        return None;
-    }
-    Some(ImageAttachment {
-        media_type: "image/png".to_string(),
-        data: b64,
-    })
 }
 
 #[cfg(test)]

@@ -25,8 +25,7 @@ impl CommandHandler for HelpCmd {
         } else {
             build_full_help(&entries)
         };
-        app.push_system_message(content);
-        CommandEffect::Done
+        CommandEffect::Reply(content)
     }
 }
 

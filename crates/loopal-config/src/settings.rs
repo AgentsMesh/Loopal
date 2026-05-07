@@ -71,8 +71,6 @@ pub struct Settings {
     #[serde(default)]
     pub fetch_refiner: FetchRefinerConfig,
 
-    /// Thread goal feature: per-session long-running objective tracking with
-    /// automatic continuation between turns. Disabled by default.
     #[serde(default)]
     pub goals: GoalSettings,
 }
@@ -103,7 +101,6 @@ impl Default for Settings {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct GoalSettings {
-    pub enabled: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_token_budget: Option<u64>,
     pub barren_continuation_limit: u32,
@@ -112,7 +109,6 @@ pub struct GoalSettings {
 impl Default for GoalSettings {
     fn default() -> Self {
         Self {
-            enabled: false,
             default_token_budget: None,
             barren_continuation_limit: 2,
         }

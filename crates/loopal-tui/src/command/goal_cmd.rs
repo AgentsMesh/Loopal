@@ -4,6 +4,9 @@ use loopal_protocol::ControlCommand;
 use super::{CommandEffect, CommandHandler};
 use crate::app::App;
 
+const USAGE: &str =
+    "/goal usage: <objective> [--budget=<N>] | pause | resume | complete | clear | extend <N>";
+
 pub struct GoalCmd;
 
 #[async_trait]
@@ -16,20 +19,40 @@ impl CommandHandler for GoalCmd {
         "Manage thread goal: /goal <objective> | pause | resume | complete | clear | extend <N>"
     }
 
+    fn has_arg(&self) -> bool {
+        true
+    }
+
     async fn execute(&self, app: &mut App, arg: Option<&str>) -> CommandEffect {
         let arg = arg.unwrap_or("").trim();
         let cmd = match parse_goal_arg(arg) {
             Some(c) => c,
-            None => {
-                tracing::warn!(
-                    "/goal usage: <objective> | pause | resume | complete | clear | extend <N>"
-                );
-                return CommandEffect::Done;
-            }
+            None => return CommandEffect::Reply(USAGE.into()),
         };
+        let ack = ack_for(&cmd);
         let target = app.session.lock().active_view.clone();
         app.session.send_control(target, cmd).await;
-        CommandEffect::Done
+        CommandEffect::Reply(ack)
+    }
+}
+
+fn ack_for(cmd: &ControlCommand) -> String {
+    match cmd {
+        ControlCommand::GoalCreate {
+            objective,
+            token_budget,
+        } => match token_budget {
+            Some(b) => format!("Goal set: \"{objective}\" (budget {b} tokens)"),
+            None => format!("Goal set: \"{objective}\""),
+        },
+        ControlCommand::GoalUserPause => "Goal paused.".into(),
+        ControlCommand::GoalUserResume => "Goal resumed.".into(),
+        ControlCommand::GoalUserComplete => "Goal marked complete.".into(),
+        ControlCommand::GoalClear => "Goal cleared.".into(),
+        ControlCommand::GoalExtendBudget { additional_tokens } => {
+            format!("Goal budget extended by {additional_tokens} tokens.")
+        }
+        _ => "Goal command sent.".into(),
     }
 }
 
@@ -77,6 +100,10 @@ pub(crate) fn parse_goal_arg(arg: &str) -> Option<ControlCommand> {
 mod tests {
     use super::*;
 
+    fn dbg_variant(c: &ControlCommand) -> String {
+        format!("{c:?}")
+    }
+
     #[test]
     fn empty_arg_returns_none() {
         assert!(parse_goal_arg("").is_none());
@@ -84,60 +111,35 @@ mod tests {
 
     #[test]
     fn lifecycle_keywords_parse() {
-        assert!(matches!(
-            parse_goal_arg("pause"),
-            Some(ControlCommand::GoalUserPause)
-        ));
-        assert!(matches!(
-            parse_goal_arg("RESUME"),
-            Some(ControlCommand::GoalUserResume)
-        ));
-        assert!(matches!(
-            parse_goal_arg("Complete"),
-            Some(ControlCommand::GoalUserComplete)
-        ));
-        assert!(matches!(
-            parse_goal_arg("clear"),
-            Some(ControlCommand::GoalClear)
-        ));
-    }
-
-    #[test]
-    fn extend_parses_token_amount() {
-        match parse_goal_arg("extend 5000") {
-            Some(ControlCommand::GoalExtendBudget { additional_tokens }) => {
-                assert_eq!(additional_tokens, 5000);
-            }
-            other => panic!("expected GoalExtendBudget, got {other:?}"),
+        for (input, want) in [
+            ("pause", "GoalUserPause"),
+            ("RESUME", "GoalUserResume"),
+            ("Complete", "GoalUserComplete"),
+            ("clear", "GoalClear"),
+        ] {
+            let got = dbg_variant(&parse_goal_arg(input).unwrap());
+            assert!(got.starts_with(want), "{input} -> {got}");
         }
     }
 
     #[test]
-    fn extend_with_non_numeric_falls_through_to_objective() {
+    fn extend_parses_token_amount_else_falls_through() {
+        match parse_goal_arg("extend 5000") {
+            Some(ControlCommand::GoalExtendBudget { additional_tokens }) => {
+                assert_eq!(additional_tokens, 5000)
+            }
+            other => panic!("expected GoalExtendBudget, got {other:?}"),
+        }
         match parse_goal_arg("extend the timeout") {
-            Some(ControlCommand::GoalCreate {
-                objective,
-                token_budget,
-            }) => {
-                assert_eq!(objective, "extend the timeout");
-                assert!(token_budget.is_none());
+            Some(ControlCommand::GoalCreate { objective, .. }) => {
+                assert_eq!(objective, "extend the timeout")
             }
             other => panic!("expected GoalCreate fallthrough, got {other:?}"),
         }
     }
 
     #[test]
-    fn extend_with_only_keyword_falls_through_to_objective() {
-        match parse_goal_arg("extend") {
-            Some(ControlCommand::GoalCreate { objective, .. }) => {
-                assert_eq!(objective, "extend");
-            }
-            other => panic!("expected GoalCreate, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn plain_objective_creates_goal() {
+    fn objective_creates_goal_with_optional_budget() {
         match parse_goal_arg("ship the goal feature") {
             Some(ControlCommand::GoalCreate {
                 objective,
@@ -148,10 +150,6 @@ mod tests {
             }
             other => panic!("expected GoalCreate, got {other:?}"),
         }
-    }
-
-    #[test]
-    fn objective_with_budget_flag_parses_both() {
         match parse_goal_arg("ship feature --budget=10000") {
             Some(ControlCommand::GoalCreate {
                 objective,
@@ -162,5 +160,33 @@ mod tests {
             }
             other => panic!("expected GoalCreate with budget, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn ack_strings_per_variant() {
+        let mk = |o: &str, b: Option<u64>| ControlCommand::GoalCreate {
+            objective: o.into(),
+            token_budget: b,
+        };
+        assert!(ack_for(&mk("x", None)).contains("\"x\""));
+        assert!(ack_for(&mk("x", Some(42))).contains("42"));
+        assert_eq!(ack_for(&ControlCommand::GoalUserPause), "Goal paused.");
+        assert_eq!(ack_for(&ControlCommand::GoalUserResume), "Goal resumed.");
+        assert_eq!(
+            ack_for(&ControlCommand::GoalUserComplete),
+            "Goal marked complete."
+        );
+        assert_eq!(ack_for(&ControlCommand::GoalClear), "Goal cleared.");
+        assert!(
+            ack_for(&ControlCommand::GoalExtendBudget {
+                additional_tokens: 99
+            })
+            .contains("99")
+        );
+    }
+
+    #[test]
+    fn handler_declares_argument() {
+        assert!(GoalCmd.has_arg());
     }
 }

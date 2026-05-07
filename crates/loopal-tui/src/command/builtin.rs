@@ -26,6 +26,9 @@ impl CommandHandler for ClearCmd {
     fn description(&self) -> &str {
         "Clear conversation history"
     }
+    fn has_arg(&self) -> bool {
+        false
+    }
     async fn execute(&self, app: &mut App, _arg: Option<&str>) -> CommandEffect {
         app.pending_images.clear();
         app.session.clear().await;
@@ -43,6 +46,9 @@ impl CommandHandler for CompactCmd {
     fn description(&self) -> &str {
         "Compact old messages"
     }
+    fn has_arg(&self) -> bool {
+        false
+    }
     async fn execute(&self, app: &mut App, _arg: Option<&str>) -> CommandEffect {
         app.session.compact().await;
         CommandEffect::Done
@@ -59,6 +65,9 @@ impl CommandHandler for PlanCmd {
     fn description(&self) -> &str {
         "Switch to Plan mode"
     }
+    fn has_arg(&self) -> bool {
+        false
+    }
     async fn execute(&self, _app: &mut App, _arg: Option<&str>) -> CommandEffect {
         CommandEffect::ModeSwitch(AgentMode::Plan)
     }
@@ -74,6 +83,9 @@ impl CommandHandler for ActCmd {
     fn description(&self) -> &str {
         "Switch to Act mode"
     }
+    fn has_arg(&self) -> bool {
+        false
+    }
     async fn execute(&self, _app: &mut App, _arg: Option<&str>) -> CommandEffect {
         CommandEffect::ModeSwitch(AgentMode::Act)
     }
@@ -88,6 +100,9 @@ impl CommandHandler for ExitCmd {
     }
     fn description(&self) -> &str {
         "Shut down Hub and all agents, then exit"
+    }
+    fn has_arg(&self) -> bool {
+        false
     }
     async fn execute(&self, app: &mut App, _arg: Option<&str>) -> CommandEffect {
         app.shutdown_initiated = true;

@@ -13,6 +13,9 @@ impl CommandHandler for KillHubCmd {
     fn description(&self) -> &str {
         "Shut down Hub and all agents, then exit TUI"
     }
+    fn has_arg(&self) -> bool {
+        false
+    }
     async fn execute(&self, app: &mut App, _arg: Option<&str>) -> CommandEffect {
         app.shutdown_initiated = true;
         app.session.shutdown_hub().await;

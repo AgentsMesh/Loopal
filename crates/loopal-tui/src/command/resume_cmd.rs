@@ -27,15 +27,12 @@ impl CommandHandler for ResumeCmd {
         match arg {
             Some(partial_id) => match resolve_session_id(&app.cwd, partial_id) {
                 Ok(full_id) => CommandEffect::ResumeSession(full_id),
-                Err(msg) => {
-                    app.push_system_message(msg);
-                    CommandEffect::Done
-                }
+                Err(msg) => CommandEffect::Reply(msg),
             },
-            None => {
-                open_session_picker(app);
-                CommandEffect::Done
-            }
+            None => match open_session_picker(app) {
+                Ok(()) => CommandEffect::Done,
+                Err(msg) => CommandEffect::Reply(msg),
+            },
         }
     }
 }
@@ -62,21 +59,12 @@ fn resolve_session_id(cwd: &Path, partial: &str) -> Result<String, String> {
 
 // ── Picker ─────────────────────────────────────────────────────────
 
-fn open_session_picker(app: &mut App) {
-    let sm = match loopal_runtime::SessionManager::new() {
-        Ok(sm) => sm,
-        Err(_) => {
-            app.push_system_message("Failed to access sessions.".into());
-            return;
-        }
-    };
-    let sessions = match sm.list_root_sessions_for_cwd(&app.cwd) {
-        Ok(s) => s,
-        Err(_) => {
-            app.push_system_message("Failed to list sessions.".into());
-            return;
-        }
-    };
+fn open_session_picker(app: &mut App) -> Result<(), String> {
+    let sm = loopal_runtime::SessionManager::new()
+        .map_err(|_| String::from("Failed to access sessions."))?;
+    let sessions = sm
+        .list_root_sessions_for_cwd(&app.cwd)
+        .map_err(|_| String::from("Failed to list sessions."))?;
 
     // Exclude current session
     let current_id = app.session.lock().root_session_id.clone();
@@ -100,8 +88,7 @@ fn open_session_picker(app: &mut App) {
         .collect();
 
     if items.is_empty() {
-        app.push_system_message("No previous sessions found for this project.".into());
-        return;
+        return Err("No previous sessions found for this project.".into());
     }
 
     app.sub_page = Some(SubPage::SessionPicker(PickerState {
@@ -113,4 +100,5 @@ fn open_session_picker(app: &mut App) {
         thinking_options: vec![],
         thinking_selected: 0,
     }));
+    Ok(())
 }

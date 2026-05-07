@@ -15,6 +15,9 @@ impl CommandHandler for ModelCmd {
     fn description(&self) -> &str {
         "Switch model"
     }
+    fn has_arg(&self) -> bool {
+        false
+    }
     async fn execute(&self, app: &mut App, _arg: Option<&str>) -> CommandEffect {
         open_model_picker(app);
         CommandEffect::Done

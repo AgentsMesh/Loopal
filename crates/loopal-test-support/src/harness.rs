@@ -179,6 +179,11 @@ impl IntegrationHarness {
 
 /// Harness with `agent_loop` running in a background task.
 pub struct SpawnedHarness {
+    /// Clone of the channel sender backing `event_rx`. Tests that need to
+    /// inject synthetic `AgentEvent`s (e.g. wrapping a `GoalRuntimeSession`
+    /// `EventEmitter` so its `ThreadGoalUpdated` payloads ride the same
+    /// pipe the runner uses) push through here.
+    pub event_tx: mpsc::Sender<AgentEvent>,
     pub event_rx: mpsc::Receiver<AgentEvent>,
     pub mailbox_tx: mpsc::Sender<Envelope>,
     pub control_tx: mpsc::Sender<ControlCommand>,

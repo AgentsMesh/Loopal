@@ -70,7 +70,7 @@ pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<A
     let (scheduler_handle, scheduled_rx) =
         SchedulerHandle::create_with_scheduler(scheduler.clone());
     let message_snapshot = Arc::new(std::sync::RwLock::new(Vec::new()));
-    let goal_session = if config.settings.goals.enabled && depth == 0 {
+    let goal_session = if depth == 0 {
         let goal_store = session_manager.goal_store();
         Some(std::sync::Arc::new(
             loopal_runtime::GoalRuntimeSession::new(

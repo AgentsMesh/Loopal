@@ -63,16 +63,15 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
     ));
 
     // Kernel: register builtin tools + agent tools + mock provider.
-    // Auto-enable goals when a goal_session is provided so the goal tools
-    // appear in the LLM tool list during e2e tests.
-    let mut settings = Settings {
+    // Goal tools are root-only — only register when the test wired a goal_session.
+    let settings = Settings {
         hooks: builder.hooks,
         ..Settings::default()
     };
-    if builder.goal_session.is_some() {
-        settings.goals.enabled = true;
-    }
     let mut kernel = Kernel::new(settings).unwrap();
+    if builder.goal_session.is_some() {
+        kernel.register_goal_tools();
+    }
     loopal_agent::tools::register_all(&mut kernel);
     kernel.register_provider(Arc::new(MultiCallProvider::new(builder.calls)) as Arc<dyn Provider>);
     if let Some(setup) = builder.kernel_setup {
@@ -106,7 +105,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         cwd,
         depth: 0,
         agent_name: "main".to_string(),
-        parent_event_tx: Some(event_tx),
+        parent_event_tx: Some(event_tx.clone()),
         cancel_token: None,
         scheduler_handle,
         message_snapshot: Arc::new(std::sync::RwLock::new(Vec::new())),
@@ -168,6 +167,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
     .build();
 
     let harness = SpawnedHarness {
+        event_tx: event_tx.clone(),
         event_rx,
         mailbox_tx,
         control_tx,

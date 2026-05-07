@@ -128,6 +128,10 @@ mod e2e_error_test;
 mod e2e_fetch_test;
 #[path = "suite/e2e_git_test.rs"]
 mod e2e_git_test;
+#[path = "suite/e2e_goal_support.rs"]
+mod e2e_goal_support;
+#[path = "suite/e2e_goal_test.rs"]
+mod e2e_goal_test;
 #[path = "suite/e2e_harness.rs"]
 mod e2e_harness;
 #[path = "suite/e2e_hooks_test.rs"]

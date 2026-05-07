@@ -41,11 +41,16 @@ pub struct StartParams {
 
 /// Build a Kernel from config (production path: MCP, tools).
 /// Caller should apply start overrides to config.settings before calling.
+/// `depth` controls role-scoped tool registration (root only registers goal tools).
 pub(crate) async fn build_kernel_from_config(
     config: &ResolvedConfig,
     production: bool,
+    depth: u32,
 ) -> anyhow::Result<Arc<Kernel>> {
     let mut kernel = Kernel::new(config.settings.clone())?;
+    if depth == 0 {
+        kernel.register_goal_tools();
+    }
     if production {
         // Wire up MCP sampling: resolve the default model's provider and inject.
         if let Ok(provider) = kernel.resolve_provider(&config.settings.model) {
@@ -88,9 +93,5 @@ pub(crate) fn apply_start_overrides(settings: &mut loopal_config::Settings, star
     }
     if start.no_sandbox {
         settings.sandbox.policy = loopal_config::SandboxPolicy::Disabled;
-    }
-    if start.depth.unwrap_or(0) > 0 {
-        // sub-agents are not the goal-bearing thread
-        settings.goals.enabled = false;
     }
 }

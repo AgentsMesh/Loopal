@@ -2,6 +2,7 @@ use std::fmt;
 use std::sync::Arc;
 
 use crate::backend::Backend;
+use crate::goal_session::GoalSession;
 use crate::memory_channel::MemoryChannel;
 use crate::output_tail::OutputTail;
 use crate::provider_resolver::{FetchRefinerPolicy, OneShotChatService};
@@ -15,6 +16,7 @@ pub struct ToolContext {
     pub output_tail: Option<Arc<OutputTail>>,
     pub one_shot_chat: Option<Arc<dyn OneShotChatService>>,
     pub fetch_refiner_policy: Option<Arc<dyn FetchRefinerPolicy>>,
+    pub goal_session: Option<Arc<dyn GoalSession>>,
 }
 
 impl ToolContext {
@@ -27,6 +29,7 @@ impl ToolContext {
             output_tail: None,
             one_shot_chat: None,
             fetch_refiner_policy: None,
+            goal_session: None,
         }
     }
 
@@ -74,6 +77,16 @@ impl ToolContext {
         self.fetch_refiner_policy = p;
         self
     }
+
+    pub fn with_goal_session(mut self, g: Arc<dyn GoalSession>) -> Self {
+        self.goal_session = Some(g);
+        self
+    }
+
+    pub fn with_goal_session_opt(mut self, g: Option<Arc<dyn GoalSession>>) -> Self {
+        self.goal_session = g;
+        self
+    }
 }
 
 impl Clone for ToolContext {
@@ -86,6 +99,7 @@ impl Clone for ToolContext {
             output_tail: self.output_tail.clone(),
             one_shot_chat: self.one_shot_chat.clone(),
             fetch_refiner_policy: self.fetch_refiner_policy.clone(),
+            goal_session: self.goal_session.clone(),
         }
     }
 }

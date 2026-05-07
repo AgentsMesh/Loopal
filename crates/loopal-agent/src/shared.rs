@@ -7,6 +7,7 @@ use loopal_ipc::connection::Connection;
 use loopal_kernel::Kernel;
 use loopal_message::Message;
 use loopal_protocol::{AgentEvent, AgentStateSnapshot, Envelope, MessageSource};
+use loopal_runtime::GoalRuntimeSession;
 use loopal_scheduler::CronScheduler;
 
 use crate::state_snapshot::{cron_info_to_snapshot, task_to_snapshot};
@@ -97,6 +98,10 @@ pub struct AgentShared {
     /// Conversation snapshot updated by the runtime before each tool batch.
     /// The Agent tool reads this to build fork context for child agents.
     pub message_snapshot: Arc<RwLock<Vec<Message>>>,
+    /// Persistent goal session for this agent. None when the goal feature
+    /// is disabled in settings. Shared with the runtime so multi-UI clients
+    /// see the same single source of truth.
+    pub goal_session: Option<Arc<GoalRuntimeSession>>,
 }
 
 impl AgentShared {
@@ -125,10 +130,15 @@ impl AgentShared {
             .map(cron_info_to_snapshot)
             .collect();
         let bg_tasks = self.kernel.bg_store().snapshot_running();
+        let thread_goal = match self.goal_session.as_ref() {
+            Some(s) => s.snapshot().await.ok().flatten(),
+            None => None,
+        };
         AgentStateSnapshot {
             tasks,
             crons,
             bg_tasks,
+            thread_goal,
         }
     }
 

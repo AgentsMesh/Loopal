@@ -3,6 +3,7 @@
 mod agent_cmd;
 mod builtin;
 mod detach_hub_cmd;
+mod goal_cmd;
 mod help_cmd;
 pub(crate) mod init_cmd;
 mod kill_hub_cmd;

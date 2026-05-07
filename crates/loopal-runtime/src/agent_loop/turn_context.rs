@@ -10,6 +10,7 @@ use std::time::Instant;
 use loopal_provider_api::ContinuationIntent;
 
 use super::cancel::TurnCancel;
+use super::token_accumulator::TokenAccumulator;
 use super::turn_metrics::TurnMetrics;
 
 /// Mutable context for a single turn (LLM → [tools → LLM]* → done).
@@ -30,6 +31,18 @@ pub struct TurnContext {
     pub pending_continuation: Option<ContinuationIntent>,
     /// Aggregated telemetry counters for this turn.
     pub metrics: TurnMetrics,
+    /// Snapshot of cumulative token counters at turn start. Used to compute
+    /// the per-turn delta charged against the active goal's budget. Lazily
+    /// set by `execute_turn` so non-goal sessions pay no overhead.
+    pub token_baseline: Option<TokenAccumulator>,
+    /// Cumulative tokens already charged to the active goal during this
+    /// turn. Mid-turn flushes update this; turn-end charge uses it as the
+    /// low watermark to avoid double-billing.
+    pub cumulative_charged_to_goal: u64,
+    /// True once a `budget_limit` warning has been pushed to
+    /// `pending_warnings` for the active goal in this turn. Prevents
+    /// repeated injection across multiple LLM iterations within one turn.
+    pub budget_limit_warning_pushed: bool,
 }
 
 impl TurnContext {
@@ -42,6 +55,9 @@ impl TurnContext {
             pending_warnings: Vec::new(),
             pending_continuation: None,
             metrics: TurnMetrics::default(),
+            token_baseline: None,
+            cumulative_charged_to_goal: 0,
+            budget_limit_warning_pushed: false,
         }
     }
 }

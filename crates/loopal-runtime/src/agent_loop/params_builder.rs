@@ -20,6 +20,7 @@ use loopal_storage::Session;
 use loopal_tool_api::{FetchRefinerPolicy, MemoryChannel, OneShotChatService};
 
 use super::params::{AgentConfig, AgentDeps, AgentLoopParams, InterruptHandle};
+use crate::goal::GoalRuntimeSession;
 use crate::session_resume_hook::SessionResumeHook;
 
 pub struct AgentLoopParamsBuilder {
@@ -32,6 +33,7 @@ pub struct AgentLoopParamsBuilder {
     memory_channel: Option<Arc<dyn MemoryChannel>>,
     one_shot_chat: Option<Arc<dyn OneShotChatService>>,
     fetch_refiner_policy: Option<Arc<dyn FetchRefinerPolicy>>,
+    goal_session: Option<Arc<GoalRuntimeSession>>,
     scheduled_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
     auto_classifier: Option<Arc<loopal_auto_mode::AutoClassifier>>,
     harness: HarnessConfig,
@@ -58,6 +60,7 @@ impl AgentLoopParamsBuilder {
             memory_channel: None,
             one_shot_chat: None,
             fetch_refiner_policy: None,
+            goal_session: None,
             scheduled_rx: None,
             auto_classifier: None,
             harness: HarnessConfig::default(),
@@ -85,6 +88,14 @@ impl AgentLoopParamsBuilder {
     }
     pub fn fetch_refiner_policy(mut self, p: Arc<dyn FetchRefinerPolicy>) -> Self {
         self.fetch_refiner_policy = Some(p);
+        self
+    }
+    pub fn goal_session(mut self, g: Arc<GoalRuntimeSession>) -> Self {
+        self.goal_session = Some(g);
+        self
+    }
+    pub fn goal_session_opt(mut self, g: Option<Arc<GoalRuntimeSession>>) -> Self {
+        self.goal_session = g;
         self
     }
     pub fn scheduled_rx(
@@ -130,6 +141,7 @@ impl AgentLoopParamsBuilder {
             memory_channel: self.memory_channel,
             one_shot_chat: self.one_shot_chat,
             fetch_refiner_policy: self.fetch_refiner_policy,
+            goal_session: self.goal_session,
             scheduled_rx: self.scheduled_rx,
             auto_classifier: self.auto_classifier,
             harness: self.harness,

@@ -8,8 +8,8 @@ use loopal_context::ContextStore;
 use loopal_message::Message;
 use loopal_protocol::{Envelope, InterruptSignal};
 use loopal_runtime::{
-    AgentConfig, AgentDeps, AgentLoopParams, AgentLoopParamsBuilder, InterruptHandle,
-    SessionResumeHook,
+    AgentConfig, AgentDeps, AgentLoopParams, AgentLoopParamsBuilder, GoalRuntimeSession,
+    InterruptHandle, SessionResumeHook,
 };
 use loopal_storage::Session;
 use loopal_tool_api::{FetchRefinerPolicy, MemoryChannel, OneShotChatService};
@@ -34,6 +34,7 @@ pub(crate) struct AgentLoopAssembly {
     pub auto_classifier: Option<Arc<loopal_auto_mode::AutoClassifier>>,
     pub one_shot_chat: Option<Arc<dyn OneShotChatService>>,
     pub fetch_refiner_policy: Option<Arc<dyn FetchRefinerPolicy>>,
+    pub goal_session: Option<Arc<GoalRuntimeSession>>,
 }
 
 pub(crate) fn assemble_agent_loop_params(a: AgentLoopAssembly) -> AgentLoopParams {
@@ -62,5 +63,6 @@ pub(crate) fn assemble_agent_loop_params(a: AgentLoopAssembly) -> AgentLoopParam
         Some(p) => builder.fetch_refiner_policy(p),
         None => builder,
     };
+    let builder = builder.goal_session_opt(a.goal_session);
     builder.build()
 }

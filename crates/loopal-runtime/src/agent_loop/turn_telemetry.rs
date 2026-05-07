@@ -21,6 +21,9 @@ impl AgentLoopRunner {
         async {
             loopal_protocol::event_id::set_current_turn_id(turn_ctx.turn_id);
             crate::otel_metrics::active_turns().add(1, &[]);
+            if self.params.goal_session.is_some() {
+                turn_ctx.token_baseline = Some(self.tokens.clone());
+            }
             for obs in &mut self.observers {
                 obs.on_turn_start(turn_ctx);
             }
@@ -83,6 +86,9 @@ impl AgentLoopRunner {
                     modified_files: files,
                 })
                 .await;
+
+            self.record_turn_for_barren_tracking(&turn_ctx.metrics);
+            self.charge_goal_for_turn(turn_ctx, duration_ms).await;
 
             // Reset turn context — events outside turns carry turn_id/correlation_id = 0.
             loopal_protocol::event_id::set_current_turn_id(0);

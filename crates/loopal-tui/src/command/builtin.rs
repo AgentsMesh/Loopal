@@ -115,4 +115,5 @@ pub fn register_all(registry: &mut CommandRegistry) {
     registry.register(Arc::new(super::agent_cmd::AgentsCmd));
     registry.register(Arc::new(super::topology_cmd::TopologyCmd));
     registry.register(Arc::new(super::skills_cmd::SkillsCmd));
+    registry.register(Arc::new(super::goal_cmd::GoalCmd));
 }

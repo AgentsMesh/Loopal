@@ -26,6 +26,7 @@ fn from_snapshot_starts_with_rev_one() {
         }],
         crons: vec![],
         bg_tasks: vec![],
+        thread_goal: None,
     };
     let r = ViewStateReducer::from_snapshot("root", snap);
     assert_eq!(r.rev(), 1);

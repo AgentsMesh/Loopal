@@ -89,4 +89,8 @@ pub(crate) fn apply_start_overrides(settings: &mut loopal_config::Settings, star
     if start.no_sandbox {
         settings.sandbox.policy = loopal_config::SandboxPolicy::Disabled;
     }
+    if start.depth.unwrap_or(0) > 0 {
+        // sub-agents are not the goal-bearing thread
+        settings.goals.enabled = false;
+    }
 }

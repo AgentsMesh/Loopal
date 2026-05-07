@@ -37,10 +37,16 @@ impl AgentLoopRunner {
         // Reset per-session counters
         self.turn_count = 0;
         self.tokens.reset();
-        // Drop pending InboxConsumed ids belonging to the previous session —
-        // emitting them after the swap would surface as ghost events on the
-        // resumed conversation.
         self.pending_consumed_ids.clear();
+        self.barren_continuation_count = 0;
+        self.last_continuation_goal_id = None;
+        if let Some(goal_session) = self.params.goal_session.as_ref()
+            && let Err(err) = goal_session
+                .set_session_id(self.params.session.id.clone())
+                .await
+        {
+            tracing::warn!(error = %err, "failed to switch goal session id on resume");
+        }
 
         // Update tool context so subsequent tool calls persist to the new session
         self.tool_ctx.session_id.clone_from(&self.params.session.id);

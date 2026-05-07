@@ -153,7 +153,8 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
         | AgentEventPayload::BgTaskCompleted { .. }
         | AgentEventPayload::TasksChanged { .. }
         | AgentEventPayload::CronsChanged { .. }
-        | AgentEventPayload::UserMessageQueued { .. } => None,
+        | AgentEventPayload::UserMessageQueued { .. }
+        | AgentEventPayload::ThreadGoalUpdated { .. } => None,
         AgentEventPayload::ToolPermissionResolved { id } => Some(AcpNotification::Extension {
             method: "_loopal/permission_resolved".into(),
             params: serde_json::json!({

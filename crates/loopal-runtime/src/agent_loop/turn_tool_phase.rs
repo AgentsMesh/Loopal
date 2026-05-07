@@ -43,6 +43,9 @@ impl AgentLoopRunner {
         turn_ctx.metrics.tool_errors += stats.errors;
         info!("tool exec complete");
 
+        // budget_limit must queue before pending_warnings drains
+        self.maybe_inject_budget_limit_warning(turn_ctx).await;
+
         let warnings = std::mem::take(&mut turn_ctx.pending_warnings);
         self.params.store.append_warnings_to_last_user(warnings);
 

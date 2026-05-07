@@ -1,11 +1,20 @@
 use std::sync::Arc;
 
+use loopal_config::Settings;
 use loopal_tool_background::BackgroundTaskStore;
 
 use crate::registry::ToolRegistry;
 
 /// Register all built-in tools with the given registry.
-pub fn register_all(registry: &ToolRegistry, bg_store: Arc<BackgroundTaskStore>) {
+///
+/// `settings` gates feature-flagged tool families: when a feature is
+/// disabled the tools simply don't appear in the LLM tool list, so the
+/// model never sees an option it cannot exercise.
+pub fn register_all(
+    registry: &ToolRegistry,
+    bg_store: Arc<BackgroundTaskStore>,
+    settings: &Settings,
+) {
     registry.register(Box::new(loopal_tool_apply_patch::ApplyPatchTool));
     registry.register(Box::new(loopal_tool_read::ReadTool));
     registry.register(Box::new(loopal_tool_write::WriteTool));
@@ -22,4 +31,9 @@ pub fn register_all(registry: &ToolRegistry, bg_store: Arc<BackgroundTaskStore>)
     registry.register(Box::new(loopal_tool_file_ops::move_file::MoveFileTool));
     registry.register(Box::new(loopal_tool_file_ops::delete::DeleteTool));
     registry.register(Box::new(loopal_tool_file_ops::copy::CopyFileTool));
+    if settings.goals.enabled {
+        registry.register(Box::new(loopal_tool_goal::GetGoalTool));
+        registry.register(Box::new(loopal_tool_goal::CreateGoalTool));
+        registry.register(Box::new(loopal_tool_goal::UpdateGoalTool));
+    }
 }

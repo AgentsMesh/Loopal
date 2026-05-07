@@ -82,3 +82,33 @@ rust_test(
         "@crates//:serde_json",
     ],
 )
+
+# Join-hub e2e — regression guard for the spawn-shim bug where
+# `--join-hub` / `--hub-name` were silently dropped from the hub-only
+# child argv. Verifies a real spawned hub TCP-connects to the address
+# and sends `meta/register` with the env token + flag-supplied name.
+rust_test(
+    name = "join_hub_e2e_test",
+    srcs = ["tests/join_hub_e2e_test.rs"],
+    edition = "2024",
+    data = [":loopal"],
+    env = {
+        "LOOPAL_BINARY": "$(rootpath :loopal)",
+    },
+    local = True,
+    deps = [
+        "@crates//:tokio",
+        "@crates//:tempfile",
+        "@crates//:anyhow",
+        "@crates//:serde_json",
+    ],
+)
+
+# Unit tests for #[cfg(test)] modules in src/ — currently covers the
+# CLI passthrough invariants (ChildPassthroughArgs::to_args completeness,
+# round-trip, parent-only-flag isolation, resume_intent, apply_overrides).
+rust_test(
+    name = "loopal-unit-test",
+    crate = ":loopal",
+    edition = "2024",
+)

@@ -38,22 +38,22 @@ pub async fn run() -> anyhow::Result<()> {
     let mut config = load_config(&cwd)?;
     cli.apply_overrides(&mut config.settings);
 
-    if cli.list_hubs {
+    if cli.parent_only.list_hubs {
         hub_cli::run_list_hubs();
         return Ok(());
     }
-    if let Some(pid) = cli.kill_hub {
+    if let Some(pid) = cli.parent_only.kill_hub {
         return hub_cli::run_kill_hub(pid).await;
     }
-    if let Some(pid) = cli.attach_hub_pid {
+    if let Some(pid) = cli.parent_only.attach_hub_pid {
         return hub_cli::run_attach_pid(&cwd, &config, pid).await;
     }
 
-    if let Some(ref bind_addr) = cli.meta_hub {
+    if let Some(ref bind_addr) = cli.parent_only.meta_hub {
         return meta_hub::run(bind_addr).await;
     }
 
-    if cli.hub_only {
+    if cli.parent_only.hub_only {
         let resume = match cli.resume_intent() {
             Some(crate::cli::ResumeIntent::Specific(id)) => Some(id),
             _ => None,
@@ -61,16 +61,17 @@ pub async fn run() -> anyhow::Result<()> {
         return hub_only::run(&cli, &cwd, &config, resume.as_deref()).await;
     }
 
-    if let Some(ref hub_addr) = cli.attach_hub {
+    if let Some(ref hub_addr) = cli.parent_only.attach_hub {
         return attach_mode::run(&cli, &cwd, &config, hub_addr).await;
     }
 
-    if cli.acp {
+    if cli.parent_only.acp {
         return acp::run(&cli, &cwd, &config).await;
     }
 
-    if cli.serve {
+    if cli.parent_only.serve {
         let test_provider = cli
+            .parent_only
             .test_provider
             .clone()
             .or_else(|| std::env::var("LOOPAL_TEST_PROVIDER").ok());
@@ -80,11 +81,11 @@ pub async fn run() -> anyhow::Result<()> {
         return loopal_agent_server::run_agent_server().await;
     }
 
-    if cli.server {
+    if cli.parent_only.server {
         return server_mode::run(&cli, &cwd, &config).await;
     }
 
-    let worktree = if cli.worktree {
+    let worktree = if cli.parent_only.worktree {
         Some(create_session_worktree(&cwd)?)
     } else {
         None

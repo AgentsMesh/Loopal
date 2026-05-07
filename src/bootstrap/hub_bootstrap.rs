@@ -48,22 +48,26 @@ pub async fn bootstrap_hub_and_agent(
         hub_server::accept_loop(listener, hub_accept, token_for_loop).await;
     });
 
-    if let Some(ref meta_addr) = cli.join_hub {
-        super::uplink_bootstrap::connect_to_meta_hub(&hub, meta_addr, cli.hub_name.as_deref())
-            .await?;
+    if let Some(ref meta_addr) = cli.child.join_hub {
+        super::uplink_bootstrap::connect_to_meta_hub(
+            &hub,
+            meta_addr,
+            cli.child.hub_name.as_deref(),
+        )
+        .await?;
     }
 
     let agent_proc = loopal_agent_client::AgentProcess::spawn(None).await?;
     let client = loopal_agent_client::AgentClient::new(agent_proc.transport());
     client.initialize().await?;
 
-    let mode_str = if cli.plan { "plan" } else { "act" };
+    let mode_str = if cli.child.plan { "plan" } else { "act" };
     let prompt = if cli.prompt.is_empty() {
         None
     } else {
         Some(cli.prompt.join(" "))
     };
-    let lifecycle_str = if cli.ephemeral {
+    let lifecycle_str = if cli.child.ephemeral {
         Some("ephemeral")
     } else {
         None // default: persistent (server decides based on prompt)
@@ -74,8 +78,8 @@ pub async fn bootstrap_hub_and_agent(
             model: Some(config.settings.model.clone()),
             mode: Some(mode_str.to_string()),
             prompt: prompt.clone(),
-            permission_mode: cli.permission.clone(),
-            no_sandbox: cli.no_sandbox,
+            permission_mode: cli.child.permission.clone(),
+            no_sandbox: cli.child.no_sandbox,
             resume: resume.map(String::from),
             lifecycle: lifecycle_str.map(String::from),
             agent_type: None,

@@ -21,7 +21,10 @@ pub async fn run(
     cwd: &std::path::Path,
     config: &loopal_config::ResolvedConfig,
 ) -> anyhow::Result<()> {
-    info!("starting in server mode (ephemeral={})", cli.ephemeral);
+    info!(
+        "starting in server mode (ephemeral={})",
+        cli.child.ephemeral
+    );
 
     let ctx = super::hub_bootstrap::bootstrap_hub_and_agent(cli, cwd, config, None).await?;
     // Subscribe BEFORE starting the broadcast forwarder so we do not

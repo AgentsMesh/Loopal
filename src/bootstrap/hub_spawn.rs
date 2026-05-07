@@ -37,7 +37,7 @@ pub async fn spawn_hub_subprocess(
 
     let mut cmd = Command::new(&exe);
     cmd.arg("--hub-only");
-    push_passthrough_args(&mut cmd, cli, resume);
+    cmd.args(build_hub_only_argv(cli, resume));
     cmd.current_dir(cwd);
     cmd.stdin(Stdio::null());
     cmd.stdout(Stdio::piped());
@@ -136,29 +136,21 @@ fn format_skipped_lines(skipped: &[String]) -> String {
     )
 }
 
-fn push_passthrough_args(cmd: &mut Command, cli: &Cli, resume: Option<&str>) {
-    if let Some(model) = &cli.model {
-        cmd.arg("--model").arg(model);
-    }
-    if let Some(perm) = &cli.permission {
-        cmd.arg("--permission").arg(perm);
-    }
-    if cli.plan {
-        cmd.arg("--plan");
-    }
-    if cli.no_sandbox {
-        cmd.arg("--no-sandbox");
-    }
-    if cli.ephemeral {
-        cmd.arg("--ephemeral");
-    }
+fn build_hub_only_argv(cli: &Cli, resume: Option<&str>) -> Vec<std::ffi::OsString> {
+    let mut argv = cli.child.to_args();
     if let Some(id) = resume {
-        cmd.arg("--resume").arg(id);
+        argv.push("--resume".into());
+        argv.push(id.into());
     }
     for word in &cli.prompt {
-        cmd.arg(word);
+        argv.push(word.into());
     }
+    argv
 }
+
+#[cfg(test)]
+#[path = "hub_spawn_argv_test.rs"]
+mod hub_spawn_argv_test;
 
 #[cfg(unix)]
 fn detach_from_tty(cmd: &mut Command) {

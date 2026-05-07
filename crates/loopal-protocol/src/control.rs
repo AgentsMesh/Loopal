@@ -22,7 +22,9 @@ pub enum ControlCommand {
     ModelSwitch(String),
     /// Rewind conversation to a specific turn (0-indexed from oldest).
     /// Discards the target turn and all subsequent messages.
-    Rewind { turn_index: usize },
+    Rewind {
+        turn_index: usize,
+    },
     /// Switch thinking config at runtime. JSON string of ThinkingConfig.
     ThinkingSwitch(String),
     /// Resume (hot-swap) to a different persisted session by ID.
@@ -30,7 +32,25 @@ pub enum ControlCommand {
     /// Request MCP server status snapshot (agent responds with McpStatusReport event).
     QueryMcpStatus,
     /// Reconnect a specific MCP server by name.
-    McpReconnect { server: String },
+    McpReconnect {
+        server: String,
+    },
     /// Disconnect a specific MCP server by name.
-    McpDisconnect { server: String },
+    McpDisconnect {
+        server: String,
+    },
+    /// Create a new thread goal. Fails if a goal already exists.
+    GoalCreate {
+        objective: String,
+        token_budget: Option<u64>,
+    },
+    /// User-initiated lifecycle change. The runtime validates allowed
+    /// transitions; illegal targets are rejected without changing state.
+    GoalUserPause,
+    GoalUserResume,
+    GoalUserComplete,
+    GoalExtendBudget {
+        additional_tokens: u64,
+    },
+    GoalClear,
 }

@@ -9,6 +9,7 @@ rust_library(
         "//crates/loopal-config",
         "//crates/loopal-error",
         "//crates/loopal-message",
+        "//crates/loopal-protocol",
         "@crates//:chrono",
         "@crates//:serde",
         "@crates//:serde_json",
@@ -25,9 +26,11 @@ rust_test(
     edition = "2024",
     deps = [
         ":loopal-storage",
-        "@crates//:chrono",
-        "@crates//:tempfile",
-        "@crates//:serde_json",
+        "//crates/loopal-error",
         "//crates/loopal-message",
+        "//crates/loopal-protocol",
+        "@crates//:chrono",
+        "@crates//:serde_json",
+        "@crates//:tempfile",
     ],
 )

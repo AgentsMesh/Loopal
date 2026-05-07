@@ -17,6 +17,7 @@ use loopal_protocol::{AgentEvent, ControlCommand, Envelope};
 use loopal_provider_api::{StreamChunk, ThinkingConfig};
 use loopal_runtime::AgentMode;
 use loopal_runtime::agent_loop::AgentLoopRunner;
+use loopal_runtime::goal::GoalRuntimeSession;
 use loopal_session::SessionController;
 use loopal_tool_api::PermissionMode;
 
@@ -41,6 +42,7 @@ pub struct HarnessBuilder {
     #[allow(clippy::type_complexity)]
     pub(crate) kernel_setup: Option<Box<dyn FnOnce(&mut Kernel)>>,
     pub(crate) scheduler: Option<Arc<loopal_scheduler::CronScheduler>>,
+    pub(crate) goal_session: Option<Arc<GoalRuntimeSession>>,
 }
 
 impl Default for HarnessBuilder {
@@ -66,6 +68,7 @@ impl HarnessBuilder {
             cwd: None,
             kernel_setup: None,
             scheduler: None,
+            goal_session: None,
         }
     }
 
@@ -119,6 +122,10 @@ impl HarnessBuilder {
     }
     pub fn scheduler(mut self, s: Arc<loopal_scheduler::CronScheduler>) -> Self {
         self.scheduler = Some(s);
+        self
+    }
+    pub fn goal_session(mut self, g: Arc<GoalRuntimeSession>) -> Self {
+        self.goal_session = Some(g);
         self
     }
 

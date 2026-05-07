@@ -1,4 +1,4 @@
-use loopal_protocol::{AgentStatus, ObservableAgentState};
+use loopal_protocol::{AgentStatus, ObservableAgentState, ThreadGoal};
 use loopal_view_state::AgentConversation;
 
 use super::App;
@@ -23,6 +23,12 @@ impl App {
             .get(agent)
             .map(|vc| vc.state().state().agent.observable.clone())
             .unwrap_or_default()
+    }
+
+    pub fn thread_goal_for(&self, agent: &str) -> Option<ThreadGoal> {
+        self.view_clients
+            .get(agent)
+            .and_then(|vc| vc.state().state().thread_goal.clone())
     }
 
     pub fn is_agent_live(&self, agent: &str) -> bool {

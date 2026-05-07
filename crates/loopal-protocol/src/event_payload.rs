@@ -7,6 +7,7 @@ use crate::envelope::MessageSource;
 use crate::mcp_snapshot::McpServerSnapshot;
 use crate::question::Question;
 use crate::task_snapshot::TaskSnapshot;
+use crate::thread_goal::{GoalTransitionReason, ThreadGoal};
 
 /// Event payload. Runner/LLM/Tools only construct this enum.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -209,4 +210,9 @@ pub enum AgentEventPayload {
     TasksChanged { tasks: Vec<TaskSnapshot> },
     /// Full scheduled cron jobs snapshot (emitted by the periodic bridge).
     CronsChanged { crons: Vec<CronJobSnapshot> },
+    /// Thread goal lifecycle event. `goal: None` means the goal was cleared.
+    ThreadGoalUpdated {
+        goal: Option<ThreadGoal>,
+        reason: GoalTransitionReason,
+    },
 }

@@ -1,15 +1,17 @@
 use std::path::Path;
+use std::sync::Arc;
 
 use loopal_error::Result;
 use loopal_message::Message;
 use loopal_storage::entry::{Marker, TaggedEntry};
-use loopal_storage::{MessageStore, Session, SessionStore, SubAgentRef};
+use loopal_storage::{GoalStore, MessageStore, Session, SessionStore, SubAgentRef};
 use tracing::info;
 
 /// Manages session creation, resumption, and message persistence.
 pub struct SessionManager {
     session_store: SessionStore,
     message_store: MessageStore,
+    goal_store: Arc<GoalStore>,
 }
 
 impl SessionManager {
@@ -17,6 +19,7 @@ impl SessionManager {
         Ok(Self {
             session_store: SessionStore::new()?,
             message_store: MessageStore::new()?,
+            goal_store: Arc::new(GoalStore::from_default_dir()?),
         })
     }
 
@@ -25,8 +28,13 @@ impl SessionManager {
     pub fn with_base_dir(base_dir: std::path::PathBuf) -> Self {
         Self {
             session_store: SessionStore::with_base_dir(base_dir.clone()),
-            message_store: MessageStore::with_base_dir(base_dir),
+            message_store: MessageStore::with_base_dir(base_dir.clone()),
+            goal_store: Arc::new(GoalStore::with_base_dir(base_dir)),
         }
+    }
+
+    pub fn goal_store(&self) -> Arc<GoalStore> {
+        Arc::clone(&self.goal_store)
     }
 
     /// Create a new session.

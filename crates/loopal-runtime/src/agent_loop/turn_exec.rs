@@ -1,7 +1,7 @@
 use loopal_error::Result;
 use loopal_message::MessageRole;
 use loopal_provider_api::ContinuationIntent;
-use tracing::info;
+use tracing::{info, warn};
 
 use super::TurnOutput;
 use super::runner::AgentLoopRunner;
@@ -14,6 +14,13 @@ impl AgentLoopRunner {
         &mut self,
         turn_ctx: &mut TurnContext,
     ) -> Result<TurnOutput> {
+        if !self.continuation_still_consistent().await {
+            warn!("skipping continuation turn: goal changed before turn started");
+            self.last_continuation_goal_id = None;
+            return Ok(TurnOutput {
+                output: String::new(),
+            });
+        }
         let mut c = TurnLoopCounters {
             last_text: String::new(),
             continuation_count: 0,

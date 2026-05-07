@@ -1,4 +1,4 @@
-use loopal_protocol::{CronJobSnapshot, McpServerSnapshot, TaskSnapshot};
+use loopal_protocol::{CronJobSnapshot, McpServerSnapshot, TaskSnapshot, ThreadGoal};
 
 use crate::state::SessionViewState;
 
@@ -30,5 +30,14 @@ pub(super) fn session_resumed(state: &mut SessionViewState, session_id: &str) ->
     state.tasks.clear();
     state.crons.clear();
     state.bg_tasks.clear();
+    state.thread_goal = None;
+    true
+}
+
+pub(super) fn thread_goal_updated(state: &mut SessionViewState, goal: &Option<ThreadGoal>) -> bool {
+    if state.thread_goal.as_ref() == goal.as_ref() {
+        return false;
+    }
+    state.thread_goal = goal.clone();
     true
 }

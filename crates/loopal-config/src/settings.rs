@@ -70,6 +70,11 @@ pub struct Settings {
     /// Fetch tool LLM-refiner configuration: large pages summarized against the user prompt.
     #[serde(default)]
     pub fetch_refiner: FetchRefinerConfig,
+
+    /// Thread goal feature: per-session long-running objective tracking with
+    /// automatic continuation between turns. Disabled by default.
+    #[serde(default)]
+    pub goals: GoalSettings,
 }
 
 impl Default for Settings {
@@ -90,6 +95,26 @@ impl Default for Settings {
             output_style: String::new(),
             telemetry: TelemetryConfig::default(),
             fetch_refiner: FetchRefinerConfig::default(),
+            goals: GoalSettings::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct GoalSettings {
+    pub enabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_token_budget: Option<u64>,
+    pub barren_continuation_limit: u32,
+}
+
+impl Default for GoalSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            default_token_budget: None,
+            barren_continuation_limit: 2,
         }
     }
 }

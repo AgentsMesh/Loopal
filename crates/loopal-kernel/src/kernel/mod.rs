@@ -35,7 +35,7 @@ impl Kernel {
     pub fn new(settings: Settings) -> Result<Self> {
         let bg_store = BackgroundTaskStore::new();
         let tool_registry = ToolRegistry::new();
-        loopal_tools::builtin::register_all(&tool_registry, bg_store.clone());
+        loopal_tools::builtin::register_all(&tool_registry, bg_store.clone(), &settings);
 
         let mut provider_registry = ProviderRegistry::new();
         provider_registry::register_providers(&settings, &mut provider_registry);

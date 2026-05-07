@@ -16,6 +16,7 @@ pub mod projected;
 pub mod projection;
 pub mod question;
 pub mod task_snapshot;
+pub mod thread_goal;
 pub mod user_content;
 
 pub use address::QualifiedAddress;
@@ -34,4 +35,5 @@ pub use projected::{ProjectedMessage, ProjectedToolCall};
 pub use projection::project_messages;
 pub use question::{Question, QuestionOption, UserQuestionResponse};
 pub use task_snapshot::{TaskSnapshot, TaskSnapshotStatus};
+pub use thread_goal::{GoalTransitionReason, ThreadGoal, ThreadGoalStatus};
 pub use user_content::{ImageAttachment, SkillInvocation, UserContent};

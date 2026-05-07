@@ -1,5 +1,6 @@
 pub mod backend;
 pub mod backend_types;
+pub mod goal_session;
 pub mod memory_channel;
 pub mod output_tail;
 pub mod permission;
@@ -15,6 +16,7 @@ pub use backend_types::{
     GlobSearchResult, GrepOptions, GrepSearchResult, LsEntry, LsResult, MatchGroup, MatchLine,
     ReadResult, TimeoutSecs, WriteResult,
 };
+pub use goal_session::{GoalSession, GoalSessionError};
 pub use memory_channel::MemoryChannel;
 pub use output_tail::OutputTail;
 pub use permission::{PermissionDecision, PermissionLevel, PermissionMode};

@@ -7,8 +7,10 @@ rust_library(
     visibility = ["//visibility:public"],
     deps = [
         "//crates/loopal-error",
+        "//crates/loopal-protocol",
         "@crates//:serde",
         "@crates//:serde_json",
+        "@crates//:thiserror",
     ],
     proc_macro_deps = ["@crates//:async-trait"],
 )

@@ -82,6 +82,7 @@ fn agent_tool_context_inner(
         cancel_token: None,
         scheduler_handle,
         message_snapshot: Arc::new(std::sync::RwLock::new(Vec::new())),
+        goal_session: None,
     });
 
     let shared_any: Arc<dyn std::any::Any + Send + Sync> = Arc::new(shared.clone());

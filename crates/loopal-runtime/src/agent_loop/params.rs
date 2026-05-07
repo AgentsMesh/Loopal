@@ -110,6 +110,7 @@ pub struct AgentLoopParams {
     pub memory_channel: Option<Arc<dyn MemoryChannel>>,
     pub one_shot_chat: Option<Arc<dyn OneShotChatService>>,
     pub fetch_refiner_policy: Option<Arc<dyn FetchRefinerPolicy>>,
+    pub goal_session: Option<Arc<crate::goal::GoalRuntimeSession>>,
     pub scheduled_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
     pub auto_classifier: Option<Arc<loopal_auto_mode::AutoClassifier>>,
     pub harness: HarnessConfig,

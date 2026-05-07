@@ -27,26 +27,31 @@ impl AgentLoopRunner {
         loop {
             // ── Idle phase ──────────────────────────────────────────
             if needs_input {
-                self.transition(AgentStatus::WaitingForInput).await?;
+                let injected_continuation =
+                    matches!(self.params.config.lifecycle, LifecycleMode::Persistent)
+                        && self.goal_continuation_check().await?;
+                if !injected_continuation {
+                    self.transition(AgentStatus::WaitingForInput).await?;
 
-                match self.params.config.lifecycle {
-                    LifecycleMode::Ephemeral => {
-                        let pending = self.drain_pending_input().await;
-                        if pending.is_empty() {
-                            info!("ephemeral agent idle, exiting");
-                            break;
+                    match self.params.config.lifecycle {
+                        LifecycleMode::Ephemeral => {
+                            let pending = self.drain_pending_input().await;
+                            if pending.is_empty() {
+                                info!("ephemeral agent idle, exiting");
+                                break;
+                            }
+                            for env in &pending {
+                                self.ingest_message(env).await;
+                            }
                         }
-                        for env in &pending {
-                            self.ingest_message(env).await;
-                        }
+                        LifecycleMode::Persistent => match self.wait_for_input().await? {
+                            Some(WaitResult::MessageAdded) => {
+                                self.interrupt.take();
+                                self.notify_observers_user_input();
+                            }
+                            None => break,
+                        },
                     }
-                    LifecycleMode::Persistent => match self.wait_for_input().await? {
-                        Some(WaitResult::MessageAdded) => {
-                            self.interrupt.take();
-                            self.notify_observers_user_input();
-                        }
-                        None => break,
-                    },
                 }
             }
             needs_input = true;

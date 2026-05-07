@@ -3,7 +3,7 @@ use std::sync::Arc;
 use loopal_context::ContextPipeline;
 use loopal_error::{AgentOutput, Result};
 use loopal_protocol::{AgentEventPayload, AgentStatus, InterruptSignal};
-use loopal_tool_api::ToolContext;
+use loopal_tool_api::{GoalSession, ToolContext};
 use tokio::sync::watch;
 use tracing::{Instrument, info, info_span};
 
@@ -12,6 +12,8 @@ use super::model_config::ModelConfig;
 use super::token_accumulator::TokenAccumulator;
 use super::turn_observer::TurnObserver;
 use crate::fire_hooks::fire_hooks;
+use crate::goal::GoalSessionToolAdapter;
+use crate::goal::prompts::DEFAULT_MAX_BARREN_CONTINUATIONS;
 use crate::plan_file::PlanFile;
 
 /// Encapsulates the agent loop state and behavior.
@@ -41,10 +43,23 @@ pub struct AgentLoopRunner {
     /// Inbox message ids enqueued since the last turn began, drained as
     /// `InboxConsumed` events when the runner transitions into `Running`.
     pub pending_consumed_ids: Vec<String>,
+    /// Number of consecutive continuation turns that produced no useful
+    /// work (no tool call and no substantive assistant text). Reset by any
+    /// productive turn. Demotes goal to BudgetLimited when threshold met.
+    pub barren_continuation_count: u32,
+    /// Configurable threshold for `barren_continuation_count`.
+    pub max_barren_continuations: u32,
+    /// `goal_id` of the most recent continuation envelope injected — used
+    /// by accounting and barren detection to bind a turn to its source goal.
+    pub last_continuation_goal_id: Option<String>,
 }
 
 impl AgentLoopRunner {
     pub fn new(mut params: AgentLoopParams) -> Self {
+        let goal_adapter: Option<Arc<dyn GoalSession>> = params
+            .goal_session
+            .as_ref()
+            .map(|s| Arc::new(GoalSessionToolAdapter::new(Arc::clone(s))) as Arc<dyn GoalSession>);
         let tool_ctx = ToolContext::new(
             params
                 .deps
@@ -55,7 +70,8 @@ impl AgentLoopRunner {
         .with_shared_opt(params.shared.clone())
         .with_memory_channel_opt(params.memory_channel.clone())
         .with_one_shot_chat_opt(params.one_shot_chat.clone())
-        .with_fetch_refiner_policy_opt(params.fetch_refiner_policy.clone());
+        .with_fetch_refiner_policy_opt(params.fetch_refiner_policy.clone())
+        .with_goal_session_opt(goal_adapter);
         let model_config = ModelConfig::from_model(
             params.config.model(),
             params.config.thinking_config.clone(),
@@ -81,6 +97,9 @@ impl AgentLoopRunner {
             status: AgentStatus::Starting,
             plan_file,
             pending_consumed_ids: Vec::new(),
+            barren_continuation_count: 0,
+            max_barren_continuations: DEFAULT_MAX_BARREN_CONTINUATIONS,
+            last_continuation_goal_id: None,
         }
     }
 

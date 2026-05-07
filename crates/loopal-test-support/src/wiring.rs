@@ -62,11 +62,16 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         )),
     ));
 
-    // Kernel: register builtin tools + agent tools + mock provider
-    let settings = Settings {
+    // Kernel: register builtin tools + agent tools + mock provider.
+    // Auto-enable goals when a goal_session is provided so the goal tools
+    // appear in the LLM tool list during e2e tests.
+    let mut settings = Settings {
         hooks: builder.hooks,
         ..Settings::default()
     };
+    if builder.goal_session.is_some() {
+        settings.goals.enabled = true;
+    }
     let mut kernel = Kernel::new(settings).unwrap();
     loopal_agent::tools::register_all(&mut kernel);
     kernel.register_provider(Arc::new(MultiCallProvider::new(builder.calls)) as Arc<dyn Provider>);
@@ -105,6 +110,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         cancel_token: None,
         scheduler_handle,
         message_snapshot: Arc::new(std::sync::RwLock::new(Vec::new())),
+        goal_session: builder.goal_session.clone(),
     });
     let shared_any: Arc<dyn std::any::Any + Send + Sync> = Arc::new(shared);
 
@@ -158,6 +164,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
     )
     .shared(shared_any)
     .scheduled_rx(scheduled_rx)
+    .goal_session_opt(builder.goal_session)
     .build();
 
     let harness = SpawnedHarness {

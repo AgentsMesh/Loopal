@@ -127,6 +127,7 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
         McpStatusReport { servers } => aggregate::mcp_status(state, servers),
         SubAgentSpawned { name, .. } => aggregate::sub_agent_spawned(state, name),
         SessionResumed { session_id, .. } => aggregate::session_resumed(state, session_id),
+        ThreadGoalUpdated { goal, .. } => aggregate::thread_goal_updated(state, goal),
         MessageRouted { .. }
         | InboxConsumed { .. }
         | TurnDiffSummary { .. }

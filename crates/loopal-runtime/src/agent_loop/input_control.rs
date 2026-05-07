@@ -79,6 +79,14 @@ impl AgentLoopRunner {
             ControlCommand::McpDisconnect { server } => {
                 self.handle_mcp_disconnect(server).await?;
             }
+            ctrl @ (ControlCommand::GoalCreate { .. }
+            | ControlCommand::GoalUserPause
+            | ControlCommand::GoalUserResume
+            | ControlCommand::GoalUserComplete
+            | ControlCommand::GoalExtendBudget { .. }
+            | ControlCommand::GoalClear) => {
+                self.handle_goal_control(ctrl).await?;
+            }
         }
         Ok(())
     }

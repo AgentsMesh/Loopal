@@ -2,6 +2,7 @@ pub mod agent_input;
 pub mod agent_loop;
 pub mod fire_hooks;
 pub mod frontend;
+pub mod goal;
 pub mod mode;
 pub mod otel_metrics;
 pub mod permission;
@@ -15,6 +16,7 @@ pub use agent_loop::{
     LifecycleMode, agent_loop,
 };
 pub use frontend::unified::UnifiedFrontend;
+pub use goal::{GoalRuntimeSession, GoalSessionToolAdapter};
 pub use mode::AgentMode;
 pub use permission::check_permission;
 pub use session::SessionManager;

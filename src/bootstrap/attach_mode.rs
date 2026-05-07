@@ -27,6 +27,7 @@ pub async fn run(
     hub_addr: &str,
 ) -> anyhow::Result<()> {
     let token = cli
+        .parent_only
         .hub_token
         .clone()
         .ok_or_else(|| anyhow::anyhow!("--attach-hub requires --hub-token"))?;

@@ -15,16 +15,20 @@ impl CommandHandler for RewindCmd {
     fn description(&self) -> &str {
         "Rewind to a previous turn"
     }
+    fn has_arg(&self) -> bool {
+        false
+    }
     async fn execute(&self, app: &mut App, _arg: Option<&str>) -> CommandEffect {
-        open_rewind_picker(app);
-        CommandEffect::Done
+        match open_rewind_picker(app) {
+            Ok(()) => CommandEffect::Done,
+            Err(msg) => CommandEffect::Reply(msg),
+        }
     }
 }
 
-fn open_rewind_picker(app: &mut App) {
+fn open_rewind_picker(app: &mut App) -> Result<(), String> {
     if !app.is_active_agent_idle() {
-        app.push_system_message("Cannot rewind while the agent is busy.".into());
-        return;
+        return Err("Cannot rewind while the agent is busy.".into());
     }
     let turns: Vec<RewindTurnItem> = app.with_active_conversation(|conv| {
         conv.messages
@@ -51,12 +55,12 @@ fn open_rewind_picker(app: &mut App) {
     });
 
     if turns.is_empty() {
-        app.push_system_message("No turns to rewind to.".into());
-        return;
+        return Err("No turns to rewind to.".into());
     }
 
     app.sub_page = Some(SubPage::RewindPicker(RewindPickerState {
         turns,
         selected: 0,
     }));
+    Ok(())
 }

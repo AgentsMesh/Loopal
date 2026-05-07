@@ -15,6 +15,9 @@ impl CommandHandler for TopologyCmd {
     fn description(&self) -> &str {
         "Toggle agent topology graph overlay"
     }
+    fn has_arg(&self) -> bool {
+        false
+    }
     async fn execute(&self, app: &mut App, _arg: Option<&str>) -> CommandEffect {
         app.show_topology = !app.show_topology;
         CommandEffect::Done

@@ -15,6 +15,9 @@ impl CommandHandler for SkillsCmd {
     fn description(&self) -> &str {
         "List loaded skills and sources"
     }
+    fn has_arg(&self) -> bool {
+        false
+    }
     async fn execute(&self, app: &mut App, _arg: Option<&str>) -> CommandEffect {
         let state = build_skills_page_state(app);
         app.sub_page = Some(SubPage::SkillsPage(state));

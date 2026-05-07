@@ -72,12 +72,13 @@ pub(crate) async fn start_session(
 
         let mut config = load_config(&cwd)?;
         crate::params::apply_start_overrides(&mut config.settings, &start);
+        let depth = start.depth.unwrap_or(0);
         let kernel = if is_production {
-            crate::params::build_kernel_from_config(&config, true).await?
+            crate::params::build_kernel_from_config(&config, true, depth).await?
         } else {
             match hub.get_test_provider().await {
                 Some(provider) => crate::params::build_kernel_with_provider(provider)?,
-                None => crate::params::build_kernel_from_config(&config, false).await?,
+                None => crate::params::build_kernel_from_config(&config, false, depth).await?,
             }
         };
 

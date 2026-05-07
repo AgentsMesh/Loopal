@@ -16,6 +16,9 @@ impl CommandHandler for McpCmd {
     fn description(&self) -> &str {
         "Show MCP server status"
     }
+    fn has_arg(&self) -> bool {
+        false
+    }
     async fn execute(&self, app: &mut App, _arg: Option<&str>) -> CommandEffect {
         open_mcp_page(app).await;
         CommandEffect::Done

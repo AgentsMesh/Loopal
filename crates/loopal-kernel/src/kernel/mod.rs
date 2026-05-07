@@ -35,7 +35,7 @@ impl Kernel {
     pub fn new(settings: Settings) -> Result<Self> {
         let bg_store = BackgroundTaskStore::new();
         let tool_registry = ToolRegistry::new();
-        loopal_tools::builtin::register_all(&tool_registry, bg_store.clone(), &settings);
+        loopal_tools::builtin::register_all(&tool_registry, bg_store.clone());
 
         let mut provider_registry = ProviderRegistry::new();
         provider_registry::register_providers(&settings, &mut provider_registry);
@@ -63,6 +63,12 @@ impl Kernel {
     /// Register an additional tool (thread-safe, can be called after Arc wrapping).
     pub fn register_tool(&self, tool: Box<dyn loopal_tool_api::Tool>) {
         self.tool_registry.register(tool);
+    }
+
+    /// Register thread-goal tools — only valid for the root agent that
+    /// owns a `goal_session`. Sub-agents must not call this.
+    pub fn register_goal_tools(&self) {
+        loopal_tools::builtin::register_goal_tools(&self.tool_registry);
     }
 
     /// Register an additional provider (useful for testing with mock providers).

@@ -69,12 +69,13 @@ async fn test_help_cmd_shows_all_commands() {
     let mut app = make_app();
     let handler = app.command_registry.find("/help").unwrap();
     let effect = handler.execute(&mut app, None).await;
-    assert!(matches!(effect, loopal_tui::command::CommandEffect::Done));
-    let conv = app.snapshot_active_conversation();
-    let last = conv.messages.last().expect("expected help message");
-    assert!(last.content.contains("/clear"));
-    assert!(last.content.contains("/model"));
-    assert!(last.content.contains("Shortcuts:"));
+    let body = match effect {
+        loopal_tui::command::CommandEffect::Reply(s) => s,
+        other => panic!("expected Reply, got {:?}", std::mem::discriminant(&other)),
+    };
+    assert!(body.contains("/clear"));
+    assert!(body.contains("/model"));
+    assert!(body.contains("Shortcuts:"));
 }
 
 #[tokio::test]
@@ -116,11 +117,13 @@ async fn test_rewind_on_busy_agent_shows_error() {
         view.observable.status = AgentStatus::Running;
     });
     let handler = app.command_registry.find("/rewind").unwrap();
-    handler.execute(&mut app, None).await;
+    let effect = handler.execute(&mut app, None).await;
     assert!(app.sub_page.is_none());
-    let conv = app.snapshot_active_conversation();
-    let last = conv.messages.last().unwrap();
-    assert!(last.content.contains("Cannot rewind"));
+    let body = match effect {
+        loopal_tui::command::CommandEffect::Reply(s) => s,
+        other => panic!("expected Reply, got {:?}", std::mem::discriminant(&other)),
+    };
+    assert!(body.contains("Cannot rewind"));
 }
 
 // ---------------------------------------------------------------------------

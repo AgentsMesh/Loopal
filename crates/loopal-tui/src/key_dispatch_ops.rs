@@ -43,6 +43,10 @@ pub(crate) async fn push_to_inbox(app: &mut App, content: UserContent) {
 pub async fn handle_effect(app: &mut App, effect: CommandEffect) -> bool {
     match effect {
         CommandEffect::Done => false,
+        CommandEffect::Reply(msg) => {
+            app.push_system_message(msg);
+            false
+        }
         CommandEffect::InboxPush(content) => {
             push_to_inbox(app, content).await;
             false

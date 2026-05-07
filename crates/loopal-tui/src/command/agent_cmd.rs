@@ -20,17 +20,19 @@ impl CommandHandler for AgentsCmd {
         "List agents and their connection status"
     }
 
+    fn has_arg(&self) -> bool {
+        false
+    }
+
     async fn execute(&self, app: &mut App, _arg: Option<&str>) -> CommandEffect {
         let agents = app.session.list_agents().await;
         if agents.is_empty() {
-            app.push_system_message("No sub-agents".into());
-        } else {
-            let lines: Vec<String> = agents
-                .iter()
-                .map(|(name, state)| format!("  {name}: {state}"))
-                .collect();
-            app.push_system_message(format!("Agents:\n{}", lines.join("\n")));
+            return CommandEffect::Reply("No sub-agents".into());
         }
-        CommandEffect::Done
+        let lines: Vec<String> = agents
+            .iter()
+            .map(|(name, state)| format!("  {name}: {state}"))
+            .collect();
+        CommandEffect::Reply(format!("Agents:\n{}", lines.join("\n")))
     }
 }

@@ -13,6 +13,9 @@ impl CommandHandler for DetachHubCmd {
     fn description(&self) -> &str {
         "Detach TUI from Hub (Hub & agents keep running)"
     }
+    fn has_arg(&self) -> bool {
+        false
+    }
     async fn execute(&self, _app: &mut App, _arg: Option<&str>) -> CommandEffect {
         CommandEffect::Detach
     }

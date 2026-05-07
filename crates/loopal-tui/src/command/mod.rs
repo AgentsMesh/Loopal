@@ -26,8 +26,14 @@ use crate::app::App;
 /// Result of executing a slash command.
 /// `key_dispatch` maps these to concrete side-effects.
 pub enum CommandEffect {
-    /// Command completed all work internally (e.g. push_system_message, open SubPage).
+    /// Command completed all work internally (e.g. opened a SubPage).
     Done,
+    /// Show one system message in the conversation, then Done. Use this
+    /// for parameter errors, single-line acknowledgements, and short
+    /// result summaries — the dispatch layer pushes it via the canonical
+    /// `App::push_system_message` channel so the message is visible
+    /// regardless of where the handler runs.
+    Reply(String),
     /// Push expanded content to the agent for processing.
     InboxPush(UserContent),
     /// Switch agent mode (plan / act).
@@ -52,9 +58,10 @@ pub trait CommandHandler: Send + Sync {
     /// Short description for autocomplete / help display.
     fn description(&self) -> &str;
     /// Whether the command accepts an argument after the name.
-    fn has_arg(&self) -> bool {
-        false
-    }
+    /// Required (no default): forgetting to declare this is the kind of
+    /// silent UX bug that lets autocomplete dispatch a parameterised
+    /// command with no argument.
+    fn has_arg(&self) -> bool;
     /// Whether this handler originates from a skill file.
     fn is_skill(&self) -> bool {
         false

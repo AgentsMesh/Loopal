@@ -26,6 +26,9 @@ impl CommandHandler for InitCmd {
     fn description(&self) -> &str {
         "Initialize project config (agent-powered)"
     }
+    fn has_arg(&self) -> bool {
+        false
+    }
     async fn execute(&self, app: &mut App, _arg: Option<&str>) -> CommandEffect {
         run_init(app)
     }
@@ -75,6 +78,11 @@ fn run_init(app: &mut App) -> CommandEffect {
     };
     lines.push(String::new());
     lines.push(action.to_string());
+    // reason: this command emits two distinct things in one shot — a
+    // user-visible scaffolding summary and a prompt fed back to the LLM.
+    // CommandEffect::Reply can only carry one message and the dispatch
+    // returns a single Effect, so we push the summary directly here and
+    // let the returned InboxPush carry the prompt.
     app.push_system_message(lines.join("\n"));
 
     // 5. Build prompt and inject into agent loop

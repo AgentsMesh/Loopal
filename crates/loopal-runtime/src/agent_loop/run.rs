@@ -49,6 +49,13 @@ impl AgentLoopRunner {
                                 self.interrupt.take();
                                 self.notify_observers_user_input();
                             }
+                            Some(WaitResult::ContinuationInjected) => {
+                                // Mirror the idle-phase continuation path:
+                                // skip `on_user_input` so loop-detector
+                                // signatures and other observer state are
+                                // not reset by a system-injected envelope.
+                                self.interrupt.take();
+                            }
                             None => break,
                         },
                     }

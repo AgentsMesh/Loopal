@@ -56,6 +56,7 @@ mod turn_tool_phase;
 
 use loopal_error::{AgentOutput, Result};
 
+pub use input::WaitResult;
 pub use params::{
     AgentConfig, AgentDeps, AgentLoopParams, InterruptHandle, LifecycleMode, PlanModeState,
 };

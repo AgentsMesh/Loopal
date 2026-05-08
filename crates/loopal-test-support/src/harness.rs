@@ -128,6 +128,10 @@ impl HarnessBuilder {
         self.goal_session = Some(g);
         self
     }
+    pub fn lifecycle(mut self, l: loopal_runtime::LifecycleMode) -> Self {
+        self.lifecycle = l;
+        self
+    }
 
     /// Build harness without spawning — caller drives `runner.run()`.
     pub async fn build(self) -> IntegrationHarness {

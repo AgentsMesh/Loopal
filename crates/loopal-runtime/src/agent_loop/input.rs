@@ -11,9 +11,15 @@ use super::runner::AgentLoopRunner;
 use crate::fire_hooks::fire_hooks;
 
 /// Result of waiting for user input.
+#[derive(Debug)]
 pub enum WaitResult {
     /// A user message was added to the conversation
     MessageAdded,
+    /// A goal-kickoff continuation envelope was injected by `handle_control`.
+    /// Semantically equivalent to the idle-phase `goal_continuation_check`
+    /// path: callers must enter the running phase but must NOT treat this as
+    /// fresh user input (no `on_user_input` observer notification).
+    ContinuationInjected,
 }
 
 impl AgentLoopRunner {
@@ -41,7 +47,9 @@ impl AgentLoopRunner {
                     return Ok(Some(result));
                 }
                 SelectResult::AgentInput(Some(AgentInput::Control(ctrl))) => {
-                    self.handle_control(ctrl).await?;
+                    if self.handle_control(ctrl).await? {
+                        return Ok(Some(WaitResult::ContinuationInjected));
+                    }
                 }
                 SelectResult::AgentInput(None) => {
                     info!("input channel closed, ending agent loop");

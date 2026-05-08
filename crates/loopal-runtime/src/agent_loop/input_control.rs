@@ -9,8 +9,10 @@ use super::rewind::detect_turn_boundaries;
 use super::runner::AgentLoopRunner;
 
 impl AgentLoopRunner {
-    /// Handle a control command; caller resumes waiting for user input.
-    pub(super) async fn handle_control(&mut self, ctrl: ControlCommand) -> Result<()> {
+    /// Handle a control command. Returns `true` when handling injected a
+    /// synthetic User envelope (currently only goal kickoff) — idle-phase
+    /// callers must propagate that as `WaitResult::MessageAdded`.
+    pub(super) async fn handle_control(&mut self, ctrl: ControlCommand) -> Result<bool> {
         match ctrl {
             ControlCommand::ModeSwitch(new_mode) => {
                 self.params.config.mode = AgentMode::from(new_mode);
@@ -85,10 +87,10 @@ impl AgentLoopRunner {
             | ControlCommand::GoalUserComplete
             | ControlCommand::GoalExtendBudget { .. }
             | ControlCommand::GoalClear) => {
-                self.handle_goal_control(ctrl).await?;
+                return self.handle_goal_control(ctrl).await;
             }
         }
-        Ok(())
+        Ok(false)
     }
 
     pub(super) async fn handle_rewind(&mut self, turn_index: usize) -> Result<()> {

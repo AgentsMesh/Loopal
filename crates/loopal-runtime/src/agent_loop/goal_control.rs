@@ -6,17 +6,25 @@ use tracing::warn;
 use super::runner::AgentLoopRunner;
 
 impl AgentLoopRunner {
-    /// User-initiated goal lifecycle commands. Validates allowed transitions
-    /// against the state machine; illegal targets are warned but do not abort
-    /// the agent loop.
-    pub(super) async fn handle_goal_control(&mut self, ctrl: ControlCommand) -> Result<()> {
+    /// User-initiated goal lifecycle commands. Returns `true` when the
+    /// command transitions the goal into `Active` and a continuation
+    /// envelope was injected — callers in idle context must treat this as
+    /// "input added" and exit `wait_for_input` immediately.
+    pub(super) async fn handle_goal_control(&mut self, ctrl: ControlCommand) -> Result<bool> {
         let session = match self.params.goal_session.as_ref() {
             Some(s) => s.clone(),
             None => {
                 warn!("goal control received but goal feature is disabled");
-                return Ok(());
+                return Ok(false);
             }
         };
+        let kickoff_eligible = matches!(
+            &ctrl,
+            ControlCommand::GoalCreate { .. }
+                | ControlCommand::GoalUserResume
+                | ControlCommand::GoalExtendBudget { .. }
+        );
+        let is_clear = matches!(&ctrl, ControlCommand::GoalClear);
         let outcome: std::result::Result<Option<ThreadGoal>, GoalSessionError> = match ctrl {
             ControlCommand::GoalCreate {
                 objective,
@@ -49,21 +57,29 @@ impl AgentLoopRunner {
             ControlCommand::GoalExtendBudget { additional_tokens } => {
                 session.extend_budget(additional_tokens).await.map(Some)
             }
-            ControlCommand::GoalClear => {
-                // any in-flight continuation envelope is bound to the cleared goal
-                self.last_continuation_goal_id = None;
-                self.barren_continuation_count = 0;
-                session.clear().await.map(|()| None)
-            }
+            ControlCommand::GoalClear => session.clear().await.map(|()| None),
             other => {
                 warn!(?other, "non-goal control routed through goal handler");
-                return Ok(());
+                return Ok(false);
             }
         };
         if let Err(err) = outcome {
             warn!(error = %err, "goal control rejected");
+            return Ok(false);
         }
-        Ok(())
+        if is_clear {
+            // Only after clear() succeeded — failed clears must not orphan
+            // the runner's continuation tracking from the on-disk goal.
+            self.last_continuation_goal_id = None;
+            self.barren_continuation_count = 0;
+        }
+        if kickoff_eligible {
+            // Resume restarts the barren window too: pause/resume implies
+            // "try again", aligned with create/extend semantics.
+            self.barren_continuation_count = 0;
+            return self.goal_continuation_check().await;
+        }
+        Ok(false)
     }
 }
 

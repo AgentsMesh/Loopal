@@ -22,7 +22,7 @@ use tempfile::TempDir;
 /// tests can assert on the broadcast surface independently of the frontend
 /// event channel (the test fixture wires those separately).
 #[derive(Default, Clone)]
-struct EventLog {
+pub(super) struct EventLog {
     events: Arc<std::sync::Mutex<Vec<AgentEventPayload>>>,
 }
 
@@ -35,12 +35,12 @@ impl EventEmitter for EventLog {
 }
 
 impl EventLog {
-    fn snapshot(&self) -> Vec<AgentEventPayload> {
+    pub(super) fn snapshot(&self) -> Vec<AgentEventPayload> {
         self.events.lock().unwrap().clone()
     }
 }
 
-fn make_goal_session(session_id: &str) -> (TempDir, Arc<GoalRuntimeSession>, EventLog) {
+pub(super) fn make_goal_session(session_id: &str) -> (TempDir, Arc<GoalRuntimeSession>, EventLog) {
     let tmp = TempDir::new().unwrap();
     let store = Arc::new(GoalStore::with_base_dir(tmp.path().to_path_buf()));
     let log = EventLog::default();
@@ -52,7 +52,7 @@ fn make_goal_session(session_id: &str) -> (TempDir, Arc<GoalRuntimeSession>, Eve
 /// shows up, or panic on timeout. Avoids racing with the runner — once
 /// the predicate sees the event, the underlying mutation is durably
 /// persisted.
-async fn wait_for_goal_reason(log: &EventLog, expected: GoalTransitionReason) {
+pub(super) async fn wait_for_goal_reason(log: &EventLog, expected: GoalTransitionReason) {
     let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
     loop {
         if log.snapshot().iter().any(|p| {

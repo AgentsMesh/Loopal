@@ -5,6 +5,10 @@ common --enable_bzlmod
 build --jobs=auto
 build --experimental_reuse_sandbox_directories
 
+# Version stamping (LOOPAL_VERSION from git describe)
+build --stamp
+build --workspace_status_command=tools/version_stamp.sh
+
 # Test
 test --test_output=errors
 test --notest_verbose_timeout_warnings

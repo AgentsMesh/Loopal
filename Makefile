@@ -11,7 +11,12 @@ build-all:
 
 INSTALL_DIR ?= $(HOME)/.local/bin
 
-release:
+# Fetch latest tags from origin so version_stamp.sh sees up-to-date refs
+.PHONY: fetch-tags
+fetch-tags:
+	@git fetch --tags --quiet origin 2>/dev/null || true
+
+release: fetch-tags
 	bazel build //:loopal -c opt
 
 install: release

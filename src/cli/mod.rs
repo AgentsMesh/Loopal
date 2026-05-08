@@ -13,7 +13,7 @@ pub enum ResumeIntent {
 }
 
 #[derive(Parser)]
-#[command(name = "loopal", about = "AI coding agent", version = "0.1.0")]
+#[command(name = "loopal", about = "AI coding agent", version = env!("LOOPAL_VERSION"))]
 #[command(group(
     clap::ArgGroup::new("hub_action")
         .args(["list_hubs", "attach_hub_pid", "kill_hub", "attach_hub"])

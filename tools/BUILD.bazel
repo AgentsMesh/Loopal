@@ -1,0 +1,3 @@
+exports_files([
+    "version_stamp.sh",
+])

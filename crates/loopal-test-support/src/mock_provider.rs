@@ -74,6 +74,39 @@ impl futures::Stream for MockStreamChunks {
 
 impl Unpin for MockStreamChunks {}
 
+/// Stream that yields nothing and never finishes — for tests that need the
+/// runner to enter Running but stay there indefinitely (e.g. asserting on
+/// transient goal states without barren-continuation demotion racing the
+/// assertion). The wake-up never fires, so the task simply parks.
+pub struct PendingStream;
+
+impl futures::Stream for PendingStream {
+    type Item = Result<StreamChunk, LoopalError>;
+    fn poll_next(
+        self: std::pin::Pin<&mut Self>,
+        _: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        std::task::Poll::Pending
+    }
+}
+
+impl Unpin for PendingStream {}
+
+/// Provider whose `stream_chat` always returns a never-completing stream.
+/// Use to keep the runner parked in Running so goal status remains stable
+/// for assertions; control commands queue until the test drops the harness.
+pub struct HangingProvider;
+
+#[async_trait::async_trait]
+impl Provider for HangingProvider {
+    fn name(&self) -> &str {
+        "anthropic"
+    }
+    async fn stream_chat(&self, _params: &ChatParams) -> Result<ChatStream, LoopalError> {
+        Ok(Box::pin(PendingStream))
+    }
+}
+
 // ── Providers ──────────────────────────────────────────────────────
 
 /// Single-call mock provider. Returns the configured chunks once, then empty.

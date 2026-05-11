@@ -9,7 +9,7 @@ fn base_params(target: SpawnTarget) -> SpawnParams {
         name: "child".into(),
         prompt: "do work".into(),
         model: Some("claude-opus-4-7".into()),
-        permission_mode: Some("supervised".into()),
+        permission: Some("{\"mode\":\"ask_any_write\",\"decision\":\"manual\"}".into()),
         agent_type: None,
         depth: 1,
         no_sandbox: false,
@@ -79,9 +79,10 @@ fn crosshub_still_carries_advisory_fields() {
         hub_id: "hub-b".into(),
     });
     let req = build_spawn_request(&params, &parent_cwd);
-    // permission_mode / model / agent_type / depth are advisory hints — receiver
-    // policy is the enforcement point — but they must still be transmitted.
-    assert_eq!(req["permission_mode"], "supervised");
+    assert_eq!(
+        req["permission"],
+        "{\"mode\":\"ask_any_write\",\"decision\":\"manual\"}"
+    );
     assert_eq!(req["model"], "claude-opus-4-7");
     assert_eq!(req["depth"], 1);
 }

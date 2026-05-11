@@ -8,6 +8,7 @@ rust_library(
     deps = [
         "//crates/loopal-error",
         "//crates/loopal-message",
+        "//crates/loopal-protocol",
         "//crates/loopal-provider-api",
         "//crates/loopal-tool-api",
         "@crates//:futures",
@@ -25,6 +26,7 @@ rust_test(
     deps = [
         ":loopal-auto-mode",
         "//crates/loopal-error",
+        "//crates/loopal-protocol",
         "//crates/loopal-provider-api",
         "//crates/loopal-tool-api",
         "@crates//:futures",

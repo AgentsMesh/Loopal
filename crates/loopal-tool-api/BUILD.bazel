@@ -22,5 +22,6 @@ rust_test(
     edition = "2024",
     deps = [
         ":loopal-tool-api",
+        "@crates//:serde_json",
     ],
 )

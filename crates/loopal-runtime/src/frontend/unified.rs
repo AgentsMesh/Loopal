@@ -16,17 +16,7 @@ use super::emitter::ChannelEventEmitter;
 use super::permission_handler::PermissionHandler;
 use super::question_handler::QuestionHandler;
 
-/// In-process channel-based frontend for the test harness.
-///
-/// Production code uses `HubFrontend` (IPC-based, in `loopal-agent-server`).
-/// This implementation bridges channel-based Envelope/ControlCommand/Permission
-/// flows into the `AgentInput`-based interface consumed by the agent loop,
-/// making it ideal for integration tests that need deterministic control.
-///
-/// - Root agent:  `agent_name = None`, uses `RelayPermissionHandler`
-/// - Sub-agent:   `agent_name = Some(name)`, uses `AutoDenyHandler`
 pub struct UnifiedFrontend {
-    /// Pre-converted local qualified address; reused on every emit.
     agent_name: Option<QualifiedAddress>,
     event_tx: mpsc::Sender<AgentEvent>,
     mailbox_rx: Mutex<mpsc::Receiver<Envelope>>,
@@ -56,32 +46,16 @@ impl UnifiedFrontend {
             question_handler,
         }
     }
-
-    pub async fn ask_user(
-        &self,
-        questions: Vec<loopal_protocol::Question>,
-    ) -> loopal_protocol::UserQuestionResponse {
-        self.question_handler.ask(questions).await
-    }
 }
 
 #[async_trait]
 impl AgentFrontend for UnifiedFrontend {
     async fn emit(&self, payload: AgentEventPayload) -> Result<()> {
-        let event = AgentEvent {
-            agent_name: self.agent_name.clone(),
-            event_id: loopal_protocol::event_id::next_event_id(),
-            turn_id: loopal_protocol::event_id::current_turn_id(),
-            correlation_id: loopal_protocol::event_id::current_correlation_id(),
-            rev: None,
-            payload,
-        };
+        let event = AgentEvent::for_agent(self.agent_name.clone(), payload);
         if self.agent_name.is_some() {
-            // Sub-agent: best-effort
             let _ = self.event_tx.send(event).await;
             Ok(())
         } else {
-            // Root: propagate send errors
             self.event_tx.send(event).await.map_err(|e| {
                 warn!(error = %e, "event channel closed");
                 loopal_error::LoopalError::Other("event channel closed".into())
@@ -115,7 +89,10 @@ impl AgentFrontend for UnifiedFrontend {
         name: &str,
         input: &serde_json::Value,
     ) -> PermissionDecision {
-        self.permission_handler.decide(id, name, input).await
+        let outcome = self.permission_handler.decide(id, name, input).await;
+        let (decision, payload) = super::dispatch::into_permission_decided(name, outcome);
+        let _ = self.emit(payload).await;
+        decision
     }
 
     fn event_emitter(&self) -> Box<dyn EventEmitter> {
@@ -142,18 +119,15 @@ impl AgentFrontend for UnifiedFrontend {
         &self,
         questions: Vec<loopal_protocol::Question>,
     ) -> loopal_protocol::UserQuestionResponse {
-        self.question_handler.ask(questions).await
+        let n = questions.len() as u32;
+        let outcome = self.question_handler.ask(questions).await;
+        let (response, payload) = super::dispatch::into_question_decided(n, outcome);
+        let _ = self.emit(payload).await;
+        response
     }
 
     fn try_emit(&self, payload: AgentEventPayload) -> bool {
-        let event = AgentEvent {
-            agent_name: self.agent_name.clone(),
-            event_id: loopal_protocol::event_id::next_event_id(),
-            turn_id: loopal_protocol::event_id::current_turn_id(),
-            correlation_id: loopal_protocol::event_id::current_correlation_id(),
-            rev: None,
-            payload,
-        };
+        let event = AgentEvent::for_agent(self.agent_name.clone(), payload);
         self.event_tx.try_send(event).is_ok()
     }
 }

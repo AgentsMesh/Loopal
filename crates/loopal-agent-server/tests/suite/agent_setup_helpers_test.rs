@@ -71,7 +71,7 @@ fn blank_start() -> StartParams {
         model: None,
         mode: None,
         prompt: None,
-        permission_mode: None,
+        permission: None,
         no_sandbox: false,
         resume: None,
         lifecycle: loopal_runtime::LifecycleMode::Ephemeral,

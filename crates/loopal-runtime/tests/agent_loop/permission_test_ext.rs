@@ -6,7 +6,7 @@ use loopal_kernel::Kernel;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::Envelope;
 use loopal_runtime::agent_loop::AgentLoopRunner;
-use loopal_runtime::frontend::{AutoCancelQuestionHandler, RelayPermissionHandler};
+use loopal_runtime::frontend::{ManualPermissionHandler, UnsupportedQuestionHandler};
 use loopal_runtime::{
     AgentConfig, AgentDeps, AgentLoopParamsBuilder, InterruptHandle, UnifiedFrontend,
 };
@@ -43,7 +43,7 @@ async fn test_check_permission_bypass_mode() {
 #[tokio::test]
 async fn test_check_permission_supervised_mode_allows_read() {
     let (mut runner, _event_rx, _mbox_tx, _ctrl_tx, _perm_tx) = make_runner_with_channels();
-    runner.params.config.permission_mode = PermissionMode::Supervised;
+    runner.params.config.permission_mode = PermissionMode::AskAnyWrite;
 
     let decision = runner
         .check_permission("id1", "Read", &serde_json::json!({}))
@@ -55,7 +55,7 @@ async fn test_check_permission_supervised_mode_allows_read() {
 #[tokio::test]
 async fn test_check_permission_ask_mode_approved() {
     let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx, perm_tx) = make_runner_with_channels();
-    runner.params.config.permission_mode = PermissionMode::Supervised;
+    runner.params.config.permission_mode = PermissionMode::AskAnyWrite;
 
     let perm_tx_clone = perm_tx.clone();
     tokio::spawn(async move {
@@ -73,7 +73,7 @@ async fn test_check_permission_ask_mode_approved() {
 #[tokio::test]
 async fn test_check_permission_ask_mode_denied() {
     let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx, perm_tx) = make_runner_with_channels();
-    runner.params.config.permission_mode = PermissionMode::Supervised;
+    runner.params.config.permission_mode = PermissionMode::AskAnyWrite;
 
     let perm_tx_clone = perm_tx.clone();
     tokio::spawn(async move {
@@ -112,8 +112,8 @@ async fn test_check_permission_channel_closed_denies() {
         mailbox_rx,
         control_rx,
         None,
-        Box::new(RelayPermissionHandler::new(event_tx, permission_rx)),
-        Box::new(AutoCancelQuestionHandler),
+        Box::new(ManualPermissionHandler::new(event_tx, permission_rx)),
+        Box::new(UnsupportedQuestionHandler),
     ));
 
     let fixture = TestFixture::new();
@@ -121,13 +121,14 @@ async fn test_check_permission_channel_closed_denies() {
 
     let params = AgentLoopParamsBuilder::new(
         AgentConfig {
-            permission_mode: PermissionMode::Supervised,
+            permission_mode: PermissionMode::AskAnyWrite,
             ..Default::default()
         },
         AgentDeps {
             kernel,
             frontend,
             session_manager: fixture.session_manager(),
+            decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
         },
         fixture.test_session("test-perm-closed"),
         ContextStore::new(make_test_budget()),
@@ -149,7 +150,7 @@ async fn test_check_permission_channel_closed_denies() {
 #[tokio::test]
 async fn test_check_permission_rx_closed_denies() {
     let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx, perm_tx) = make_runner_with_channels();
-    runner.params.config.permission_mode = PermissionMode::Supervised;
+    runner.params.config.permission_mode = PermissionMode::AskAnyWrite;
 
     // Drop perm_tx so recv returns None
     drop(perm_tx);

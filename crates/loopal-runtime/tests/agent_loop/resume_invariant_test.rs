@@ -6,7 +6,7 @@ use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_protocol::{AgentEvent, ControlCommand, Envelope};
 use loopal_provider_api::{ChatParams, ChatStream, Provider, StopReason, StreamChunk};
 use loopal_runtime::agent_loop::AgentLoopRunner;
-use loopal_runtime::frontend::{AutoCancelQuestionHandler, AutoDenyHandler};
+use loopal_runtime::frontend::{DenyAllHandler, UnsupportedQuestionHandler};
 use loopal_runtime::{
     AgentConfig, AgentDeps, AgentLoopParams, AgentLoopParamsBuilder, InterruptHandle,
     UnifiedFrontend,
@@ -77,8 +77,8 @@ fn make_runner_with_history(
         mailbox_rx,
         control_rx,
         None,
-        Box::new(AutoDenyHandler),
-        Box::new(AutoCancelQuestionHandler),
+        Box::new(DenyAllHandler),
+        Box::new(UnsupportedQuestionHandler),
     ));
     let mut kernel = Kernel::new(Settings::default()).unwrap();
     let call_count = Arc::new(AtomicUsize::new(0));
@@ -95,6 +95,7 @@ fn make_runner_with_history(
             kernel: Arc::new(kernel),
             frontend,
             session_manager: fixture.session_manager(),
+            decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
         },
         fixture.test_session("rt-test"),
         ContextStore::from_messages(history, make_test_budget()),

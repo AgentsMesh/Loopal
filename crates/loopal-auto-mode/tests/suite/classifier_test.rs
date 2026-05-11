@@ -66,12 +66,13 @@ impl Provider for MockClassifierProvider {
 async fn allow_response_returns_allow() {
     let provider =
         MockClassifierProvider::ok(r#"{"should_block": false, "reason": "Normal test execution"}"#);
-    let classifier = AutoClassifier::new(String::new(), "/tmp/test".into());
+    let classifier = AutoClassifier::new(String::new());
     let result = classifier
         .classify(
             "Bash",
             &serde_json::json!({"command": "cargo test"}),
             "",
+            "/tmp/test",
             &*provider,
             "test",
         )
@@ -85,12 +86,13 @@ async fn block_response_returns_deny() {
     let provider = MockClassifierProvider::ok(
         r#"{"should_block": true, "reason": "Dangerous delete command"}"#,
     );
-    let classifier = AutoClassifier::new(String::new(), "/tmp/test".into());
+    let classifier = AutoClassifier::new(String::new());
     let result = classifier
         .classify(
             "Bash",
             &serde_json::json!({"command": "rm -rf /"}),
             "",
+            "/tmp/test",
             &*provider,
             "test",
         )
@@ -103,9 +105,16 @@ async fn block_response_returns_deny() {
 async fn markdown_fenced_json_parsed() {
     let provider =
         MockClassifierProvider::ok("```json\n{\"should_block\": false, \"reason\": \"ok\"}\n```");
-    let classifier = AutoClassifier::new(String::new(), "/tmp/test".into());
+    let classifier = AutoClassifier::new(String::new());
     let result = classifier
-        .classify("Bash", &serde_json::json!({}), "", &*provider, "test")
+        .classify(
+            "Bash",
+            &serde_json::json!({}),
+            "",
+            "/tmp/test",
+            &*provider,
+            "test",
+        )
         .await;
     assert_eq!(result.decision, PermissionDecision::Allow);
 }
@@ -113,9 +122,16 @@ async fn markdown_fenced_json_parsed() {
 #[tokio::test]
 async fn malformed_json_returns_deny() {
     let provider = MockClassifierProvider::ok("not json at all");
-    let classifier = AutoClassifier::new(String::new(), "/tmp/test".into());
+    let classifier = AutoClassifier::new(String::new());
     let result = classifier
-        .classify("Bash", &serde_json::json!({}), "", &*provider, "test")
+        .classify(
+            "Bash",
+            &serde_json::json!({}),
+            "",
+            "/tmp/test",
+            &*provider,
+            "test",
+        )
         .await;
     assert_eq!(result.decision, PermissionDecision::Deny);
     assert!(result.reason.contains("parse failure"));
@@ -124,9 +140,16 @@ async fn malformed_json_returns_deny() {
 #[tokio::test]
 async fn empty_response_returns_deny() {
     let provider = MockClassifierProvider::ok("");
-    let classifier = AutoClassifier::new(String::new(), "/tmp/test".into());
+    let classifier = AutoClassifier::new(String::new());
     let result = classifier
-        .classify("Bash", &serde_json::json!({}), "", &*provider, "test")
+        .classify(
+            "Bash",
+            &serde_json::json!({}),
+            "",
+            "/tmp/test",
+            &*provider,
+            "test",
+        )
         .await;
     assert_eq!(result.decision, PermissionDecision::Deny);
 }
@@ -134,9 +157,16 @@ async fn empty_response_returns_deny() {
 #[tokio::test]
 async fn provider_error_returns_deny() {
     let provider = MockClassifierProvider::err();
-    let classifier = AutoClassifier::new(String::new(), "/tmp/test".into());
+    let classifier = AutoClassifier::new(String::new());
     let result = classifier
-        .classify("Bash", &serde_json::json!({}), "", &*provider, "test")
+        .classify(
+            "Bash",
+            &serde_json::json!({}),
+            "",
+            "/tmp/test",
+            &*provider,
+            "test",
+        )
         .await;
     assert_eq!(result.decision, PermissionDecision::Deny);
     assert!(result.reason.contains("error"));
@@ -144,12 +174,19 @@ async fn provider_error_returns_deny() {
 
 #[tokio::test]
 async fn circuit_breaker_degrades_after_repeated_errors() {
-    let classifier = AutoClassifier::new(String::new(), "/tmp/test".into());
+    let classifier = AutoClassifier::new(String::new());
     // 3 errors → degraded
     for _ in 0..3 {
         let provider = MockClassifierProvider::err();
         classifier
-            .classify("Bash", &serde_json::json!({}), "", &*provider, "test")
+            .classify(
+                "Bash",
+                &serde_json::json!({}),
+                "",
+                "/tmp/test",
+                &*provider,
+                "test",
+            )
             .await;
     }
     assert!(classifier.is_degraded());
@@ -157,11 +194,18 @@ async fn circuit_breaker_degrades_after_repeated_errors() {
 
 #[tokio::test]
 async fn human_approval_resets_degradation() {
-    let classifier = AutoClassifier::new(String::new(), "/tmp/test".into());
+    let classifier = AutoClassifier::new(String::new());
     for _ in 0..3 {
         let provider = MockClassifierProvider::err();
         classifier
-            .classify("Bash", &serde_json::json!({}), "", &*provider, "test")
+            .classify(
+                "Bash",
+                &serde_json::json!({}),
+                "",
+                "/tmp/test",
+                &*provider,
+                "test",
+            )
             .await;
     }
     assert!(classifier.is_degraded());

@@ -86,7 +86,7 @@ impl StreamingToolHandle {
 ///
 /// Called by turn_exec after `stream_llm_with` returns but BEFORE the normal
 /// permission pipeline runs. This way ReadOnly tools start executing while
-/// Supervised/Dangerous tools go through permission checks.
+/// Write/Dangerous tools go through permission checks.
 pub fn feed_tool(
     handle: &mut StreamingToolHandle,
     kernel: &Arc<Kernel>,

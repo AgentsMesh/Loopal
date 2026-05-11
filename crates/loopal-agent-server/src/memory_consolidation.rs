@@ -37,7 +37,7 @@ pub fn trigger_consolidation(shared: &Arc<AgentShared>, model: &str) {
             name: name.clone(),
             prompt,
             model: Some(model),
-            permission_mode: None,
+            permission: None,
             agent_type: None,
             depth: shared.depth + 1,
             no_sandbox,

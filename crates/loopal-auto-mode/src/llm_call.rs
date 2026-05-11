@@ -1,7 +1,3 @@
-//! LLM call and response parsing for the classifier.
-//!
-//! Split from `classifier.rs` to keep files under 200 lines.
-
 use std::time::Duration;
 
 use futures::StreamExt;
@@ -11,10 +7,8 @@ use loopal_provider_api::{ChatParams, Provider, StreamChunk};
 
 use crate::prompt;
 
-/// Maximum time to wait for a classifier LLM response.
-const CLASSIFIER_TIMEOUT: Duration = Duration::from_secs(30);
+pub(crate) const CLASSIFIER_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// Make a lightweight LLM call to the classifier with timeout.
 pub(crate) async fn call_classifier(
     provider: &dyn Provider,
     model: &str,
@@ -65,7 +59,6 @@ async fn call_classifier_inner(
     Ok(response)
 }
 
-/// Parse the classifier JSON response, handling markdown fences.
 pub(crate) fn parse_response(raw: &str) -> Option<(bool, String)> {
     let json_str = raw
         .trim()

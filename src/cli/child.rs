@@ -11,6 +11,9 @@ pub struct ChildPassthroughArgs {
     pub permission: Option<String>,
 
     #[arg(long)]
+    pub decision: Option<String>,
+
+    #[arg(long)]
     pub plan: bool,
 
     #[arg(long)]
@@ -36,6 +39,10 @@ impl ChildPassthroughArgs {
         if let Some(perm) = &self.permission {
             out.push("--permission".into());
             out.push(perm.into());
+        }
+        if let Some(decision) = &self.decision {
+            out.push("--decision".into());
+            out.push(decision.into());
         }
         if self.plan {
             out.push("--plan".into());

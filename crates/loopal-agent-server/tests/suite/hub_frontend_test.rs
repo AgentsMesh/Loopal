@@ -72,8 +72,9 @@ async fn hub_emit_broadcasts_to_all_clients() {
     session.add_client("a".into(), srv_a).await;
     session.add_client("b".into(), srv_b).await;
 
-    let frontend =
-        loopal_agent_server::hub_frontend::HubFrontend::new(session, input_rx, None, watch_rx);
+    let frontend = loopal_agent_server::hub_frontend::HubFrontend::new_for_test(
+        session, input_rx, None, watch_rx,
+    );
     frontend
         .emit(AgentEventPayload::Stream {
             text: "hello".into(),
@@ -112,9 +113,11 @@ async fn hub_permission_routes_to_primary() {
     session.add_client("primary".into(), srv_a).await;
     session.add_client("observer".into(), srv_b).await;
 
-    let frontend = Arc::new(loopal_agent_server::hub_frontend::HubFrontend::new(
-        session, input_rx, None, watch_rx,
-    ));
+    let frontend = Arc::new(
+        loopal_agent_server::hub_frontend::HubFrontend::new_for_test(
+            session, input_rx, None, watch_rx,
+        ),
+    );
 
     let f2 = frontend.clone();
     let perm_task = tokio::spawn(async move {
@@ -141,12 +144,16 @@ async fn hub_permission_routes_to_primary() {
         loopal_tool_api::PermissionDecision::Allow
     ));
 
-    // Observer should NOT have received anything
-    let obs = tokio::time::timeout(Duration::from_millis(100), rx_b.recv()).await;
-    assert!(
-        obs.is_err(),
-        "observer should not receive permission request"
-    );
+    // Observer should NOT receive a permission *request*, but does receive the
+    // broadcast `PermissionDecided` notification (events broadcast to all clients).
+    let obs = tokio::time::timeout(Duration::from_millis(200), rx_b.recv()).await;
+    if let Ok(Some(Incoming::Notification { method, .. })) = obs {
+        assert_eq!(
+            method,
+            methods::AGENT_EVENT.name,
+            "observer should only receive agent/event notifications, never request"
+        );
+    }
 }
 
 /// Primary client disconnects → next client promoted.
@@ -176,8 +183,9 @@ async fn hub_interrupt_wakes_recv_input() {
     let (session, input_rx, watch_rx) = make_session();
     let interrupt_tx = session.interrupt_tx.clone();
 
-    let frontend =
-        loopal_agent_server::hub_frontend::HubFrontend::new(session, input_rx, None, watch_rx);
+    let frontend = loopal_agent_server::hub_frontend::HubFrontend::new_for_test(
+        session, input_rx, None, watch_rx,
+    );
 
     let recv_task = tokio::spawn(async move { frontend.recv_input().await });
 

@@ -56,6 +56,10 @@ pub fn apply_env_overrides(value: &mut serde_json::Value) {
         value["permission_mode"] = serde_json::Value::String(mode);
     }
 
+    if let Ok(mode) = std::env::var("LOOPAL_DECISION_MODE") {
+        value["decision_mode"] = serde_json::Value::String(mode);
+    }
+
     if let Ok(sandbox) = std::env::var("LOOPAL_SANDBOX") {
         value["sandbox"]["policy"] = serde_json::Value::String(sandbox);
     }

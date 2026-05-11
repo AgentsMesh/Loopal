@@ -1,19 +1,21 @@
-//! Single-tool permission check.
-//!
-//! Used for unit testing and non-batch permission queries.
-//! Batch classification lives in `tools_resolve.rs`.
-
 use loopal_error::Result;
-use loopal_tool_api::{PermissionDecision, PermissionMode};
+use loopal_tool_api::PermissionDecision;
 
 use super::runner::AgentLoopRunner;
 
 impl AgentLoopRunner {
-    /// Check permission for a single tool call (fast-path only).
-    ///
-    /// Returns `Allow` or `Ask` based on `PermissionMode::check()`.
-    /// For `Ask`, falls back to the frontend (human approval via TUI/IPC).
-    /// Auto-mode batch classification uses `resolve_pending()` instead.
+    /// Refresh the shared `DecisionContext` cell so any `Auto*Handler` reading
+    /// it sees up-to-date conversation history. Manual handlers ignore the
+    /// cell, so this is harmless when running in non-Auto mode.
+    pub(super) async fn refresh_decision_context(&self) {
+        let recent = loopal_auto_mode::prompt::build_recent_context(self.params.store.messages());
+        self.params.deps.decision_context.set_recent(recent).await;
+    }
+
+    /// Single-tool permission check — short-circuits when the policy yields
+    /// `Allow` or `Deny` directly; otherwise dispatches to the frontend.
+    /// Used by integration tests; batch tools take the parallel path in
+    /// `tools_resolve::resolve_pending`.
     pub async fn check_permission(
         &self,
         id: &str,
@@ -29,25 +31,7 @@ impl AgentLoopRunner {
             return Ok(decision);
         }
 
-        // Auto mode with classifier: defer to auto_classify.
-        if self.params.config.permission_mode == PermissionMode::Auto
-            && let Some(ref classifier) = self.params.auto_classifier
-        {
-            let context =
-                loopal_auto_mode::prompt::build_recent_context(self.params.store.messages());
-            let model = self
-                .params
-                .config
-                .router
-                .resolve(loopal_provider_api::TaskType::Classification);
-            let provider = self.params.deps.kernel.resolve_provider(model)?;
-            let result = classifier
-                .classify(name, input, &context, provider.as_ref(), model)
-                .await;
-            return Ok(result.decision);
-        }
-
-        // Fall through to human approval.
+        self.refresh_decision_context().await;
         Ok(self
             .params
             .deps

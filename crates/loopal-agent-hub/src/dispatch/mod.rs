@@ -12,10 +12,8 @@ mod cross_hub_forward;
 mod dispatch_handlers;
 mod relay_response_handlers;
 mod shutdown_handler;
-mod spawn_prepare;
-#[cfg(test)]
-#[path = "spawn_prepare_test.rs"]
-mod spawn_prepare_test;
+#[doc(hidden)]
+pub mod spawn_prepare;
 mod spawn_routing;
 mod status_handler;
 mod topology_handlers;

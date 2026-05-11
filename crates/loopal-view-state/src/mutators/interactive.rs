@@ -126,26 +126,48 @@ pub(super) fn inbox_enqueued(
     true
 }
 
-pub(super) fn auto_mode_decision(
+pub(super) fn permission_decided(
     state: &mut SessionViewState,
     tool_name: &str,
     decision: &str,
     reason: &str,
     duration_ms: u64,
 ) -> bool {
-    let label = if decision == "allow" {
-        "auto-allowed"
-    } else {
-        "auto-denied"
+    let label = match decision {
+        "allow" => "permission allowed",
+        "deny" => "permission denied",
+        _ => "permission",
     };
-    let t = if duration_ms > 0 {
-        format!("({duration_ms}ms)")
+    let suffix = if duration_ms > 0 {
+        format!(" ({duration_ms}ms)")
     } else {
-        "(cached)".into()
+        String::new()
     };
-    conversation_display::push_system_msg(
-        &mut state.agent.conversation,
-        &format!("[{label}] {tool_name}: {reason} {t}"),
-    );
+    let line = if reason.is_empty() {
+        format!("[{label}] {tool_name}{suffix}")
+    } else {
+        format!("[{label}] {tool_name}: {reason}{suffix}")
+    };
+    conversation_display::push_system_msg(&mut state.agent.conversation, &line);
+    true
+}
+
+pub(super) fn question_decided(
+    state: &mut SessionViewState,
+    question_count: u32,
+    reason: &str,
+    duration_ms: u64,
+) -> bool {
+    let suffix = if duration_ms > 0 {
+        format!(" ({duration_ms}ms)")
+    } else {
+        String::new()
+    };
+    let line = if reason.is_empty() {
+        format!("[ask-user resolved] {question_count} question(s){suffix}")
+    } else {
+        format!("[ask-user resolved] {question_count} question(s): {reason}{suffix}")
+    };
+    conversation_display::push_system_msg(&mut state.agent.conversation, &line);
     true
 }

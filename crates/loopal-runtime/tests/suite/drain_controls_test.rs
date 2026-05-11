@@ -4,7 +4,7 @@ use loopal_protocol::ControlCommand;
 use loopal_protocol::{AgentMode, Envelope, MessageSource};
 use loopal_runtime::agent_input::AgentInput;
 use loopal_runtime::frontend::UnifiedFrontend;
-use loopal_runtime::frontend::{AgentFrontend, AutoCancelQuestionHandler, AutoDenyHandler};
+use loopal_runtime::frontend::{AgentFrontend, DenyAllHandler, UnsupportedQuestionHandler};
 use tokio::sync::mpsc;
 
 fn make_unified(
@@ -18,8 +18,8 @@ fn make_unified(
         mailbox_rx,
         control_rx,
         None,
-        Box::new(AutoDenyHandler),
-        Box::new(AutoCancelQuestionHandler),
+        Box::new(DenyAllHandler),
+        Box::new(UnsupportedQuestionHandler),
     )
 }
 

@@ -32,7 +32,7 @@ async fn hub_provider_error_then_new_message_succeeds() {
     assert!(has_stream(&ev2, "recovered"), "should succeed on retry");
 }
 
-/// Path 5: Supervised mode → Bash tool → permission denied via IPC →
+/// Path 5: AskAnyWrite mode → Bash tool → permission denied via IPC →
 /// LLM receives denied result → responds with adjusted text.
 #[tokio::test]
 async fn hub_permission_denied_then_llm_adjusts() {
@@ -41,7 +41,7 @@ async fn hub_permission_denied_then_llm_adjusts() {
         chunks::text_turn("adjusted approach"),
     ];
     let mut h =
-        build_hub_harness_with(calls, Some(loopal_tool_api::PermissionMode::Supervised)).await;
+        build_hub_harness_with(calls, Some(loopal_tool_api::PermissionMode::AskAnyWrite)).await;
     h.wait_ready().await;
     h.send_message("run a command").await;
 

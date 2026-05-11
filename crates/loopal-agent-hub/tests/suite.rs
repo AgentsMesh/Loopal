@@ -39,6 +39,8 @@ mod race_condition_test;
 mod relay_test;
 #[path = "suite/spawn_lifecycle_test.rs"]
 mod spawn_lifecycle_test;
+#[path = "suite/spawn_prepare_test.rs"]
+mod spawn_prepare_test;
 #[path = "suite/spawn_remote_test.rs"]
 mod spawn_remote_test;
 #[path = "suite/tcp_ui_cleanup_test.rs"]

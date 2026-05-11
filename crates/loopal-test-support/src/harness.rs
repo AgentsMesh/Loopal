@@ -1,8 +1,3 @@
-//! Configurable integration test harness with correct channel wiring.
-//!
-//! Mirrors the production wiring in `bootstrap.rs` — SessionController holds
-//! TX ends while UnifiedFrontend holds RX ends of the same channels.
-
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -23,9 +18,6 @@ use loopal_tool_api::PermissionMode;
 
 use crate::fixture::TestFixture;
 
-// ── Builder ────────────────────────────────────────────────────────
-
-/// Configurable builder for integration test harnesses.
 pub struct HarnessBuilder {
     pub(crate) calls: Vec<Vec<Result<StreamChunk, LoopalError>>>,
     pub(crate) model: String,
@@ -133,14 +125,11 @@ impl HarnessBuilder {
         self
     }
 
-    /// Build harness without spawning — caller drives `runner.run()`.
     pub async fn build(self) -> IntegrationHarness {
         let (harness, runner) = self.into_wired().await;
         IntegrationHarness::from_parts(harness, runner)
     }
 
-    /// Build and spawn `agent_loop` in a background task.
-    /// Forces Persistent lifecycle since spawned tests send messages over time.
     pub async fn build_spawned(mut self) -> SpawnedHarness {
         self.lifecycle = loopal_runtime::LifecycleMode::Persistent;
         let (harness, runner) = self.into_wired().await;
@@ -156,9 +145,6 @@ impl HarnessBuilder {
     }
 }
 
-// ── Output types ───────────────────────────────────────────────────
-
-/// Harness with an unstarted `AgentLoopRunner`.
 pub struct IntegrationHarness {
     pub runner: AgentLoopRunner,
     pub event_rx: mpsc::Receiver<AgentEvent>,
@@ -181,12 +167,7 @@ impl IntegrationHarness {
     }
 }
 
-/// Harness with `agent_loop` running in a background task.
 pub struct SpawnedHarness {
-    /// Clone of the channel sender backing `event_rx`. Tests that need to
-    /// inject synthetic `AgentEvent`s (e.g. wrapping a `GoalRuntimeSession`
-    /// `EventEmitter` so its `ThreadGoalUpdated` payloads ride the same
-    /// pipe the runner uses) push through here.
     pub event_tx: mpsc::Sender<AgentEvent>,
     pub event_rx: mpsc::Receiver<AgentEvent>,
     pub mailbox_tx: mpsc::Sender<Envelope>,

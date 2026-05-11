@@ -10,11 +10,11 @@ use loopal_storage::Session;
 use loopal_tool_api::{FetchRefinerPolicy, MemoryChannel, OneShotChatService, PermissionMode};
 use tokio::sync::watch;
 
+use crate::frontend::DecisionContext;
 use crate::frontend::traits::AgentFrontend;
 use crate::mode::AgentMode;
 use crate::session::SessionManager;
 
-/// Agent lifecycle mode — determines idle behavior after turn completion.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum LifecycleMode {
     #[default]
@@ -22,7 +22,6 @@ pub enum LifecycleMode {
     Ephemeral,
 }
 
-/// Agent configuration — mostly immutable, some fields switchable at runtime.
 pub struct AgentConfig {
     pub lifecycle: LifecycleMode,
     pub router: ModelRouter,
@@ -37,6 +36,9 @@ pub struct AgentConfig {
 
 pub struct PlanModeState {
     pub previous_mode: AgentMode,
+    // reason: snapshot of permission_mode taken on EnterPlanMode so we can
+    // restore it on exit. DecisionMode is not tracked by the runtime — it
+    // lives only in the frontend handler chain (Manual vs Auto wraps).
     pub previous_permission_mode: PermissionMode,
     pub tool_filter: HashSet<String>,
 }
@@ -67,6 +69,7 @@ pub struct AgentDeps {
     pub kernel: Arc<Kernel>,
     pub frontend: Arc<dyn AgentFrontend>,
     pub session_manager: SessionManager,
+    pub decision_context: DecisionContext,
 }
 
 pub struct InterruptHandle {
@@ -112,7 +115,6 @@ pub struct AgentLoopParams {
     pub fetch_refiner_policy: Option<Arc<dyn FetchRefinerPolicy>>,
     pub goal_session: Option<Arc<crate::goal::GoalRuntimeSession>>,
     pub scheduled_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
-    pub auto_classifier: Option<Arc<loopal_auto_mode::AutoClassifier>>,
     pub harness: HarnessConfig,
     pub rewake_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
     pub message_snapshot: Option<Arc<std::sync::RwLock<Vec<loopal_message::Message>>>>,

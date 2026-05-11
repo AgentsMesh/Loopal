@@ -84,8 +84,8 @@ pub enum PathDecision {
     /// Hard deny — cannot be overridden (ReadOnly mode, path resolution failure).
     Deny(String),
     /// Soft deny — the operation is outside normal sandbox bounds but can be
-    /// approved through the permission system (Bypass auto-allows, Supervised
-    /// asks the user, Auto asks the LLM classifier).
+    /// approved through the permission system: `Bypass` auto-allows; under
+    /// `AskAnyWrite` / `AskDangerous` the handler chain (Manual or Auto) decides.
     RequiresApproval(String),
 }
 

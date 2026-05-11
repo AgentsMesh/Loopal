@@ -34,3 +34,5 @@ pub use settings::{
 };
 pub use skills::{Skill, format_skills_summary, scan_skills_dir};
 pub use telemetry::TelemetryConfig;
+#[doc(hidden)]
+pub use validate::known_keys;

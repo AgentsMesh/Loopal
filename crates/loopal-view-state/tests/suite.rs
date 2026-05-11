@@ -1,6 +1,8 @@
 // Single test binary — includes all test modules
 #[path = "suite/conversation_serde_test.rs"]
 mod conversation_serde_test;
+#[path = "suite/decided_mutators_test.rs"]
+mod decided_mutators_test;
 #[path = "suite/free_text_test.rs"]
 mod free_text_test;
 #[path = "suite/pending_question_test.rs"]

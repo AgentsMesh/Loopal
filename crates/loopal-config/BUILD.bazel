@@ -6,6 +6,7 @@ rust_library(
     edition = "2024",
     visibility = ["//visibility:public"],
     deps = [
+        "//crates/loopal-decision-api",
         "//crates/loopal-error",
         "//crates/loopal-provider-api",
         "//crates/loopal-tool-api",
@@ -25,6 +26,7 @@ rust_test(
     edition = "2024",
     deps = [
         ":loopal-config",
+        "//crates/loopal-decision-api",
         "//crates/loopal-provider-api",
         "//crates/loopal-tool-api",
         "@crates//:filetime",

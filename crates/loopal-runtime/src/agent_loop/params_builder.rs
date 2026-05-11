@@ -35,7 +35,6 @@ pub struct AgentLoopParamsBuilder {
     fetch_refiner_policy: Option<Arc<dyn FetchRefinerPolicy>>,
     goal_session: Option<Arc<GoalRuntimeSession>>,
     scheduled_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
-    auto_classifier: Option<Arc<loopal_auto_mode::AutoClassifier>>,
     harness: HarnessConfig,
     rewake_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
     message_snapshot: Option<Arc<std::sync::RwLock<Vec<Message>>>>,
@@ -62,7 +61,6 @@ impl AgentLoopParamsBuilder {
             fetch_refiner_policy: None,
             goal_session: None,
             scheduled_rx: None,
-            auto_classifier: None,
             harness: HarnessConfig::default(),
             rewake_rx: None,
             message_snapshot: None,
@@ -105,14 +103,6 @@ impl AgentLoopParamsBuilder {
         self.scheduled_rx = Some(rx);
         self
     }
-    pub fn auto_classifier(mut self, c: Arc<loopal_auto_mode::AutoClassifier>) -> Self {
-        self.auto_classifier = Some(c);
-        self
-    }
-    pub fn auto_classifier_opt(mut self, c: Option<Arc<loopal_auto_mode::AutoClassifier>>) -> Self {
-        self.auto_classifier = c;
-        self
-    }
     pub fn harness(mut self, h: HarnessConfig) -> Self {
         self.harness = h;
         self
@@ -143,7 +133,6 @@ impl AgentLoopParamsBuilder {
             fetch_refiner_policy: self.fetch_refiner_policy,
             goal_session: self.goal_session,
             scheduled_rx: self.scheduled_rx,
-            auto_classifier: self.auto_classifier,
             harness: self.harness,
             rewake_rx: self.rewake_rx,
             message_snapshot: self.message_snapshot,

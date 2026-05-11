@@ -127,7 +127,7 @@ pub async fn build_hub_harness_with(
         model: None,
         mode: None,
         prompt: None,
-        permission_mode: None,
+        permission: None,
         no_sandbox: true,
         resume: None,
         lifecycle: loopal_runtime::LifecycleMode::Persistent,
@@ -151,6 +151,7 @@ pub async fn build_hub_harness_with(
             hub_connection,
             Some(fixture.path()),
             &hub,
+            loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
         ),
     )
     .await

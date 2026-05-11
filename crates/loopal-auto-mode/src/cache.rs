@@ -6,15 +6,9 @@ use loopal_tool_api::PermissionDecision;
 
 use crate::ClassifierResult;
 
-/// Time-to-live for cached classification results.
 const CACHE_TTL_SECS: u64 = 60;
-/// Maximum number of cached entries.
 const CACHE_MAX_ENTRIES: usize = 128;
 
-/// Simple time-bounded cache for classifier decisions.
-///
-/// Key: `(tool_name, serialized_input)` for exact match (no hash collisions).
-/// Entries expire after `CACHE_TTL_SECS` and are evicted on access.
 pub(crate) struct ClassifierCache {
     inner: Mutex<HashMap<CacheKey, CacheEntry>>,
 }
@@ -34,7 +28,6 @@ impl ClassifierCache {
         }
     }
 
-    /// Look up a cached decision. Returns `None` if not found or expired.
     pub fn get(&self, tool_name: &str, input: &serde_json::Value) -> Option<ClassifierResult> {
         let key = make_key(tool_name, input);
         let mut map = self.inner.lock().unwrap();
@@ -43,18 +36,11 @@ impl ClassifierCache {
             map.remove(&key);
             return None;
         }
-        Some(ClassifierResult {
-            decision: entry.decision,
-            reason: entry.reason.clone(),
-            duration_ms: 0,
-        })
+        Some(ClassifierResult::ok(entry.decision, entry.reason.clone()))
     }
 
-    /// Store a classification result. Evicts oldest entries if over capacity.
     pub fn put(&self, tool_name: &str, input: &serde_json::Value, result: &ClassifierResult) {
-        // Only cache definitive decisions, not errors that defaulted to Deny.
-        if result.reason.starts_with("Classifier error:") || result.reason.contains("parse failure")
-        {
+        if result.error.is_some() {
             return;
         }
         let key = make_key(tool_name, input);

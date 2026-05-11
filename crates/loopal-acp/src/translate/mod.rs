@@ -145,7 +145,8 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
         | AgentEventPayload::ServerToolResult { .. }
         | AgentEventPayload::RetryCleared
         | AgentEventPayload::SubAgentSpawned { .. }
-        | AgentEventPayload::AutoModeDecision { .. }
+        | AgentEventPayload::PermissionDecided { .. }
+        | AgentEventPayload::QuestionDecided { .. }
         | AgentEventPayload::TurnCompleted { .. }
         | AgentEventPayload::McpStatusReport { .. }
         | AgentEventPayload::BgTaskSpawned { .. }

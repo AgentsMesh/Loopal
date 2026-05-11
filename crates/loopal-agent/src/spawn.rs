@@ -37,10 +37,11 @@ pub struct SpawnParams {
     pub name: String,
     pub prompt: String,
     pub model: Option<String>,
-    /// Permission mode hint propagated from parent. The receiver Hub's
-    /// permission policy is the enforcement point — for cross-hub spawns
-    /// this is an advisory signal, not a command.
-    pub permission_mode: Option<String>,
+    /// JSON-encoded permission hint: `{"mode":"<permission_mode>","decision":"<decision_mode>"}`
+    /// (e.g. `{"mode":"ask_dangerous","decision":"auto"}`).
+    /// Cross-hub clamps force `{"mode":"bypass","decision":"manual"}`. The receiver
+    /// Hub's permission policy is the enforcement point — this is advisory.
+    pub permission: Option<String>,
     /// Agent type for fragment selection (e.g. "explore", "plan").
     pub agent_type: Option<String>,
     /// Nesting depth of the child agent (parent depth + 1).
@@ -69,7 +70,7 @@ pub fn build_spawn_request(
         "name": params.name,
         "model": params.model,
         "prompt": params.prompt,
-        "permission_mode": params.permission_mode,
+        "permission": params.permission,
         "agent_type": params.agent_type,
         "depth": params.depth,
         "no_sandbox": params.no_sandbox,

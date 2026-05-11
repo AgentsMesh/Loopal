@@ -1,8 +1,14 @@
 // Single test binary — includes all test modules
 #[path = "agent_loop/mod.rs"]
 mod agent_loop;
+#[path = "suite/auto_permission_handler_test.rs"]
+mod auto_permission_handler_test;
+#[path = "suite/auto_question_handler_test.rs"]
+mod auto_question_handler_test;
 #[path = "suite/diff_tracker_test.rs"]
 mod diff_tracker_test;
+#[path = "suite/dispatch_test.rs"]
+mod dispatch_test;
 #[path = "suite/drain_controls_test.rs"]
 mod drain_controls_test;
 #[path = "suite/env_context_test.rs"]

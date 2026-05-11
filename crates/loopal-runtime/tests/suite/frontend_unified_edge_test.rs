@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use loopal_protocol::{AgentEventPayload, UserQuestionResponse};
 use loopal_runtime::frontend::{
-    PermissionHandler, QuestionHandler, RelayPermissionHandler, RelayQuestionHandler,
+    ManualPermissionHandler, ManualQuestionHandler, PermissionHandler, QuestionHandler,
 };
 use loopal_tool_api::PermissionDecision;
 use tokio::sync::mpsc;
@@ -12,7 +12,7 @@ async fn test_relay_permission_handler_approved() {
     let (event_tx, mut event_rx) = mpsc::channel(16);
     let (perm_tx, perm_rx) = mpsc::channel(16);
 
-    let handler = Arc::new(RelayPermissionHandler::new(event_tx, perm_rx));
+    let handler = Arc::new(ManualPermissionHandler::new(event_tx, perm_rx));
     let handler_clone = Arc::clone(&handler);
 
     tokio::spawn(async move {
@@ -27,7 +27,7 @@ async fn test_relay_permission_handler_approved() {
     let d = handler_clone
         .decide("id1", "Write", &serde_json::json!({}))
         .await;
-    assert_eq!(d, PermissionDecision::Allow);
+    assert_eq!(d.decision, PermissionDecision::Allow);
 }
 
 #[tokio::test]
@@ -35,7 +35,7 @@ async fn test_relay_permission_handler_denied() {
     let (event_tx, mut event_rx) = mpsc::channel(16);
     let (perm_tx, perm_rx) = mpsc::channel(16);
 
-    let handler = RelayPermissionHandler::new(event_tx, perm_rx);
+    let handler = ManualPermissionHandler::new(event_tx, perm_rx);
 
     tokio::spawn(async move {
         let _ = event_rx.recv().await;
@@ -43,7 +43,7 @@ async fn test_relay_permission_handler_denied() {
     });
 
     let d = handler.decide("id1", "Write", &serde_json::json!({})).await;
-    assert_eq!(d, PermissionDecision::Deny);
+    assert_eq!(d.decision, PermissionDecision::Deny);
 }
 
 #[tokio::test]
@@ -52,19 +52,19 @@ async fn test_relay_permission_handler_closed_channel_denies() {
     let (_perm_tx, perm_rx) = mpsc::channel(16);
     drop(event_rx); // close the event receiver
 
-    let handler = RelayPermissionHandler::new(event_tx, perm_rx);
+    let handler = ManualPermissionHandler::new(event_tx, perm_rx);
     let d = handler.decide("id1", "Write", &serde_json::json!({})).await;
-    assert_eq!(d, PermissionDecision::Deny);
+    assert_eq!(d.decision, PermissionDecision::Deny);
 }
 
-// ── RelayQuestionHandler tests ──────────────────────────────────
+// ── ManualQuestionHandler tests ──────────────────────────────────
 
 #[tokio::test]
 async fn test_relay_question_handler_returns_answers() {
     let (event_tx, mut event_rx) = mpsc::channel(16);
     let (resp_tx, resp_rx) = mpsc::channel(16);
 
-    let handler = RelayQuestionHandler::new(event_tx, resp_rx);
+    let handler = ManualQuestionHandler::new(event_tx, resp_rx);
 
     tokio::spawn(async move {
         let ev = event_rx.recv().await.unwrap();
@@ -86,7 +86,7 @@ async fn test_relay_question_handler_returns_answers() {
         options: vec![],
         allow_multiple: false,
     }];
-    let response = handler.ask(questions).await;
+    let response = handler.ask(questions).await.response;
     match response {
         UserQuestionResponse::Answered { answers, .. } => {
             assert_eq!(answers.len(), 2);
@@ -103,8 +103,8 @@ async fn test_relay_question_handler_closed_channel() {
     let (_resp_tx, resp_rx) = mpsc::channel::<UserQuestionResponse>(16);
     drop(event_rx);
 
-    let handler = RelayQuestionHandler::new(event_tx, resp_rx);
-    let response = handler.ask(vec![]).await;
+    let handler = ManualQuestionHandler::new(event_tx, resp_rx);
+    let response = handler.ask(vec![]).await.response;
     assert!(matches!(response, UserQuestionResponse::Cancelled { .. }));
 }
 
@@ -113,7 +113,7 @@ async fn test_relay_question_handler_discards_stale_id() {
     let (event_tx, mut event_rx) = mpsc::channel(16);
     let (resp_tx, resp_rx) = mpsc::channel(16);
 
-    let handler = RelayQuestionHandler::new(event_tx, resp_rx);
+    let handler = ManualQuestionHandler::new(event_tx, resp_rx);
 
     tokio::spawn(async move {
         let ev = event_rx.recv().await.unwrap();
@@ -144,7 +144,7 @@ async fn test_relay_question_handler_discards_stale_id() {
         options: vec![],
         allow_multiple: false,
     }];
-    let response = handler.ask(questions).await;
+    let response = handler.ask(questions).await.response;
     match response {
         UserQuestionResponse::Answered { answers, .. } => {
             assert_eq!(answers, vec!["fresh".to_string()]);
@@ -176,7 +176,7 @@ async fn test_relay_question_handler_drains_after_pre_existing_stale() {
         .await
         .unwrap();
 
-    let handler = RelayQuestionHandler::new(event_tx, resp_rx);
+    let handler = ManualQuestionHandler::new(event_tx, resp_rx);
 
     tokio::spawn(async move {
         let ev = event_rx.recv().await.unwrap();
@@ -193,7 +193,7 @@ async fn test_relay_question_handler_drains_after_pre_existing_stale() {
             .unwrap();
     });
 
-    let response = handler.ask(vec![]).await;
+    let response = handler.ask(vec![]).await.response;
     match response {
         UserQuestionResponse::Answered { answers, .. } => {
             assert_eq!(answers, vec!["fresh".to_string()]);
@@ -207,19 +207,19 @@ async fn test_relay_question_handler_accepts_empty_id_as_self_sentinel() {
     let (event_tx, mut event_rx) = mpsc::channel(16);
     let (resp_tx, resp_rx) = mpsc::channel(16);
 
-    let handler = RelayQuestionHandler::new(event_tx, resp_rx);
+    let handler = ManualQuestionHandler::new(event_tx, resp_rx);
 
     tokio::spawn(async move {
         let _ev = event_rx.recv().await.unwrap();
         // Frontend IPC fallback constructs cancelled with empty id —
-        // RelayQuestionHandler must treat this as self-sentinel, not discard.
+        // ManualQuestionHandler must treat this as self-sentinel, not discard.
         resp_tx
             .send(UserQuestionResponse::cancelled(""))
             .await
             .unwrap();
     });
 
-    let response = handler.ask(vec![]).await;
+    let response = handler.ask(vec![]).await.response;
     match response {
         UserQuestionResponse::Cancelled { question_id } => {
             assert!(

@@ -55,7 +55,8 @@ pub fn apply_event(state: &mut SessionState, event: AgentEvent) {
         | AgentEventPayload::RetryError { .. }
         | AgentEventPayload::RetryCleared
         | AgentEventPayload::AutoContinuation { .. }
-        | AgentEventPayload::AutoModeDecision { .. }
+        | AgentEventPayload::PermissionDecided { .. }
+        | AgentEventPayload::QuestionDecided { .. }
         | AgentEventPayload::Compacted { .. }
         | AgentEventPayload::Rewound { .. }
         | AgentEventPayload::ServerToolUse { .. }

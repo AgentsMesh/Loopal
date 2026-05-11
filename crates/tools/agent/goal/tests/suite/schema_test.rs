@@ -11,8 +11,8 @@ fn names_are_snake_case() {
 #[test]
 fn permission_levels_match_intent() {
     assert_eq!(GetGoalTool.permission(), PermissionLevel::ReadOnly);
-    assert_eq!(CreateGoalTool.permission(), PermissionLevel::Supervised);
-    assert_eq!(UpdateGoalTool.permission(), PermissionLevel::Supervised);
+    assert_eq!(CreateGoalTool.permission(), PermissionLevel::Write);
+    assert_eq!(UpdateGoalTool.permission(), PermissionLevel::Write);
 }
 
 #[test]

@@ -60,7 +60,7 @@ impl ServerMemoryProcessor {
             name: name.to_string(),
             prompt,
             model: Some(self.model.clone()),
-            permission_mode: None,
+            permission: None,
             agent_type: None,
             depth: self.shared.depth + 1,
             no_sandbox,

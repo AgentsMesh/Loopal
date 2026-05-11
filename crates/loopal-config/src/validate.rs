@@ -1,9 +1,9 @@
-/// Known top-level keys in settings.json, derived from `Settings` struct fields.
 const KNOWN_KEYS: &[&str] = &[
     "model",
     "model_routing",
     "models",
     "permission_mode",
+    "decision_mode",
     "max_context_tokens",
     "providers",
     "hooks",
@@ -11,11 +11,13 @@ const KNOWN_KEYS: &[&str] = &[
     "sandbox",
     "thinking",
     "memory",
+    "harness",
+    "output_style",
+    "telemetry",
+    "fetch_refiner",
+    "goals",
 ];
 
-/// Log warnings for any unrecognised top-level keys in the merged config.
-/// Called before `serde_json::from_value` so that typos (e.g. `"modle"`)
-/// are surfaced instead of silently ignored.
 pub fn warn_unknown_keys(merged: &serde_json::Value) {
     let obj = match merged.as_object() {
         Some(o) => o,
@@ -26,4 +28,9 @@ pub fn warn_unknown_keys(merged: &serde_json::Value) {
             tracing::warn!(key = %key, "unknown key in settings.json (typo?)");
         }
     }
+}
+
+#[doc(hidden)]
+pub fn known_keys() -> &'static [&'static str] {
+    KNOWN_KEYS
 }

@@ -13,7 +13,7 @@ fn test_model_info_defaults_for_unknown_model() {
     use loopal_config::Settings;
     use loopal_kernel::Kernel;
     use loopal_runtime::agent_loop::AgentLoopRunner;
-    use loopal_runtime::frontend::{AutoCancelQuestionHandler, AutoDenyHandler};
+    use loopal_runtime::frontend::{DenyAllHandler, UnsupportedQuestionHandler};
     use loopal_runtime::{
         AgentConfig, AgentDeps, AgentLoopParamsBuilder, InterruptHandle, UnifiedFrontend,
     };
@@ -32,8 +32,8 @@ fn test_model_info_defaults_for_unknown_model() {
         mailbox_rx,
         control_rx,
         None,
-        Box::new(AutoDenyHandler),
-        Box::new(AutoCancelQuestionHandler),
+        Box::new(DenyAllHandler),
+        Box::new(UnsupportedQuestionHandler),
     ));
 
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
@@ -41,13 +41,14 @@ fn test_model_info_defaults_for_unknown_model() {
     let params = AgentLoopParamsBuilder::new(
         AgentConfig {
             router: loopal_provider_api::ModelRouter::new("unknown-model-xyz".to_string()),
-            permission_mode: PermissionMode::Supervised,
+            permission_mode: PermissionMode::AskAnyWrite,
             ..Default::default()
         },
         AgentDeps {
             kernel,
             frontend,
             session_manager: fixture.session_manager(),
+            decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
         },
         fixture.test_session("test"),
         loopal_context::ContextStore::new(super::make_test_budget()),

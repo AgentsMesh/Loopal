@@ -14,7 +14,7 @@ use loopal_protocol::{AgentEvent, AgentEventPayload, ControlCommand};
 const TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Create a connected pair: (client_transport, server_connection + server_rx).
-/// Client transport goes to AgentClient; server connection simulates IpcFrontend.
+/// Client transport goes to AgentClient; server connection simulates HubFrontend.
 fn ipc_pair() -> (
     Arc<dyn loopal_ipc::transport::Transport>,
     Arc<Connection>,

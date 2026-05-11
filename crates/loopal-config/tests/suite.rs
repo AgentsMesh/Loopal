@@ -33,3 +33,5 @@ mod skills_parser_test;
 mod telemetry_edge_test;
 #[path = "suite/telemetry_test.rs"]
 mod telemetry_test;
+#[path = "suite/validate_test.rs"]
+mod validate_test;

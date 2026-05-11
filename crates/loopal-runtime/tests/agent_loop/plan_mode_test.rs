@@ -22,7 +22,7 @@ async fn enter_plan_mode_denied_by_default_frontend() {
         .await
         .unwrap();
 
-    // AutoDenyHandler returns Deny for request_permission → mode stays Act.
+    // DenyAllHandler returns Deny for request_permission → mode stays Act.
     assert_eq!(runner.params.config.mode, AgentMode::Act);
 }
 

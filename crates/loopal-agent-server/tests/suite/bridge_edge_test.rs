@@ -13,7 +13,7 @@ use super::bridge_helpers::{T, collect_agent_events, init_and_start_with, start_
 
 // ── Tests ────────────────────────────────────────────────────────────
 
-/// Supervised mode: sub-agent Bash tool triggers permission request -> parent denies.
+/// AskAnyWrite mode: sub-agent Bash tool triggers permission request -> parent denies.
 #[tokio::test]
 async fn child_permission_request_denied() {
     let calls = vec![
@@ -25,7 +25,7 @@ async fn child_permission_request_denied() {
         &conn,
         &fixture,
         "run a command",
-        serde_json::json!({"permission_mode": "default"}),
+        serde_json::json!({"permission": "{\"mode\":\"ask_any_write\",\"decision\":\"manual\"}"}),
     )
     .await;
 

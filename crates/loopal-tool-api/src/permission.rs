@@ -1,61 +1,82 @@
 use serde::{Deserialize, Serialize};
 
-/// Permission level required by a tool
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PermissionLevel {
-    /// Read-only operations (e.g., Read, Glob, Grep, Ls)
     ReadOnly,
-    /// Supervised operations requiring approval (e.g., Write, Edit)
-    Supervised,
-    /// Dangerous operations (e.g., Bash, destructive commands)
+    Write,
     Dangerous,
 }
 
-/// Permission mode set by user.
-///
-/// Three modes: Bypass (trust everything), Auto (LLM classifies danger),
-/// Supervised (human approves everything non-readonly).
-///
-/// File tools have an additional app-level layer: path_checker +
-/// deny_write_globs route sensitive-file writes through RequiresApproval.
-/// Bash commands rely solely on the permission mode for gating.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PermissionMode {
-    /// All tools auto-allowed, no approval needed.
     Bypass,
-    /// ReadOnly auto-allowed; Supervised and Dangerous require human approval.
-    Supervised,
-    /// ReadOnly + Supervised auto-allowed; Dangerous goes to LLM classifier.
-    /// Falls back to human approval when classifier is unavailable or degraded.
-    Auto,
+    AskDangerous,
+    AskAnyWrite,
 }
 
-/// Decision from permission check
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsePermissionModeError(pub String);
+
+impl std::fmt::Display for ParsePermissionModeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "invalid permission mode '{}', expected one of: bypass, ask_dangerous, ask_any_write",
+            self.0
+        )
+    }
+}
+
+impl std::error::Error for ParsePermissionModeError {}
+
+impl std::str::FromStr for PermissionMode {
+    type Err = ParsePermissionModeError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "bypass" => Ok(Self::Bypass),
+            "ask_dangerous" => Ok(Self::AskDangerous),
+            "ask_any_write" => Ok(Self::AskAnyWrite),
+            other => Err(ParsePermissionModeError(other.to_string())),
+        }
+    }
+}
+
+impl std::fmt::Display for PermissionMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Bypass => "bypass",
+            Self::AskDangerous => "ask_dangerous",
+            Self::AskAnyWrite => "ask_any_write",
+        })
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PermissionDecision {
-    /// Automatically allowed
     Allow,
-    /// Requires user confirmation (or classifier in Auto mode)
     Ask,
-    /// Denied
     Deny,
 }
 
-impl PermissionMode {
-    pub fn check(&self, level: PermissionLevel) -> PermissionDecision {
+impl PermissionDecision {
+    pub fn as_str(self) -> &'static str {
         match self {
-            PermissionMode::Bypass => PermissionDecision::Allow,
-            PermissionMode::Auto => match level {
-                PermissionLevel::ReadOnly | PermissionLevel::Supervised => {
-                    PermissionDecision::Allow
-                }
-                PermissionLevel::Dangerous => PermissionDecision::Ask,
-            },
-            PermissionMode::Supervised => match level {
-                PermissionLevel::ReadOnly => PermissionDecision::Allow,
-                _ => PermissionDecision::Ask,
-            },
+            Self::Allow => "allow",
+            Self::Ask => "ask",
+            Self::Deny => "deny",
+        }
+    }
+}
+
+impl PermissionMode {
+    pub fn check(self, level: PermissionLevel) -> PermissionDecision {
+        match (self, level) {
+            (Self::Bypass, _) => PermissionDecision::Allow,
+            (Self::AskDangerous, PermissionLevel::Dangerous) => PermissionDecision::Ask,
+            (Self::AskDangerous, _) => PermissionDecision::Allow,
+            (Self::AskAnyWrite, PermissionLevel::ReadOnly) => PermissionDecision::Allow,
+            (Self::AskAnyWrite, _) => PermissionDecision::Ask,
         }
     }
 }

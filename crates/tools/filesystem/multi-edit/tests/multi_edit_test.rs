@@ -20,7 +20,7 @@ fn test_multi_edit_name() {
 #[test]
 fn test_multi_edit_permission() {
     let tool = MultiEditTool;
-    assert_eq!(tool.permission(), PermissionLevel::Supervised);
+    assert_eq!(tool.permission(), PermissionLevel::Write);
 }
 
 #[test]

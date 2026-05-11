@@ -31,7 +31,6 @@ pub(crate) struct AgentLoopAssembly {
     pub message_snapshot: Arc<std::sync::RwLock<Vec<Message>>>,
     pub resume_hooks: Vec<Arc<dyn SessionResumeHook>>,
     pub memory_channel: Option<Arc<dyn MemoryChannel>>,
-    pub auto_classifier: Option<Arc<loopal_auto_mode::AutoClassifier>>,
     pub one_shot_chat: Option<Arc<dyn OneShotChatService>>,
     pub fetch_refiner_policy: Option<Arc<dyn FetchRefinerPolicy>>,
     pub goal_session: Option<Arc<GoalRuntimeSession>>,
@@ -53,8 +52,7 @@ pub(crate) fn assemble_agent_loop_params(a: AgentLoopAssembly) -> AgentLoopParam
     .harness(a.harness)
     .message_snapshot(a.message_snapshot)
     .resume_hooks(a.resume_hooks)
-    .memory_channel_opt(a.memory_channel)
-    .auto_classifier_opt(a.auto_classifier);
+    .memory_channel_opt(a.memory_channel);
     let builder = match a.one_shot_chat {
         Some(s) => builder.one_shot_chat(s),
         None => builder,

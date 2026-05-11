@@ -15,7 +15,7 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
 fn test_name_and_permission() {
     let tool = ApplyPatchTool;
     assert_eq!(tool.name(), "ApplyPatch");
-    assert_eq!(tool.permission(), PermissionLevel::Supervised);
+    assert_eq!(tool.permission(), PermissionLevel::Write);
 }
 
 #[tokio::test]

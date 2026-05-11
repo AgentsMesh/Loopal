@@ -165,7 +165,7 @@ fn test_edit_description() {
 #[test]
 fn test_edit_permission() {
     let tool = EditTool;
-    assert_eq!(tool.permission(), PermissionLevel::Supervised);
+    assert_eq!(tool.permission(), PermissionLevel::Write);
 }
 
 #[test]

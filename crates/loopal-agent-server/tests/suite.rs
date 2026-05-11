@@ -34,14 +34,14 @@ mod hub_interaction_edge_test;
 mod hub_interaction_test;
 #[path = "suite/interrupt_filter_test.rs"]
 mod interrupt_filter_test;
-#[path = "suite/ipc_frontend_test.rs"]
-mod ipc_frontend_test;
 #[path = "suite/observer_join_edge_test.rs"]
 mod observer_join_edge_test;
 #[path = "suite/observer_join_test.rs"]
 mod observer_join_test;
 #[path = "suite/params_test.rs"]
 mod params_test;
+#[path = "suite/parse_permission_argv_test.rs"]
+mod parse_permission_argv_test;
 #[path = "suite/resolve_sessions_root_test.rs"]
 mod resolve_sessions_root_test;
 #[path = "suite/resume_e2e_helpers.rs"]
@@ -50,9 +50,13 @@ mod resume_e2e_helpers;
 mod server_info_test;
 #[path = "suite/server_test.rs"]
 mod server_test;
+#[path = "suite/session_handlers_factory_test.rs"]
+mod session_handlers_factory_test;
 #[path = "suite/session_hub_storage_test.rs"]
 mod session_hub_storage_test;
 #[path = "suite/session_start_test.rs"]
 mod session_start_test;
+#[path = "suite/spawn_policy_test.rs"]
+mod spawn_policy_test;
 #[path = "suite/tcp_multi_client_test.rs"]
 mod tcp_multi_client_test;

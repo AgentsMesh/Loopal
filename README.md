@@ -223,13 +223,20 @@ Use `/compact` to trigger compaction manually.
 
 ### Sandbox & Permissions
 
-Three permission modes to control what the agent can do:
+Permission has two orthogonal dimensions. **Permission mode** controls *when* the agent must ask:
 
-| Mode | Behavior |
+| `permission_mode` | Behavior |
 |---|---|
-| `bypass` | Auto-approve everything |
-| `auto` | Smart approval based on intent classification |
-| `supervised` | Require user confirmation for writes and commands |
+| `bypass` (default) | Auto-approve everything |
+| `ask_dangerous` | Ask only for `Dangerous` tools; reads/writes auto-allow |
+| `ask_any_write` | Ask for `Write` and `Dangerous` tools; only reads auto-allow |
+
+**Decision mode** controls *who answers* when the agent must ask:
+
+| `decision_mode` | Behavior |
+|---|---|
+| `manual` (default) | Real user via TUI/IPC |
+| `auto` | LLM classifier answers (uses `TaskType::Classification` model) |
 
 Sandbox policies control filesystem and command restrictions:
 
@@ -306,7 +313,8 @@ Key settings:
 ```json
 {
   "model": "claude-opus-4-7",
-  "permission_mode": "supervised",
+  "permission_mode": "bypass",
+  "decision_mode": "manual",
   "thinking": { "type": "auto" },
   "providers": {
     "anthropic": { "api_key": "..." }
@@ -392,7 +400,8 @@ Arguments:
 Options:
   -m, --model <MODEL>         Model to use
   -r, --resume <SESSION>      Resume a previous session
-  -P, --permission <MODE>     Permission mode (bypass/auto/supervised)
+  -P, --permission <MODE>     Permission mode (bypass/ask_dangerous/ask_any_write)
+      --decision <MODE>       Decision mode (manual/auto)
       --plan                  Start in plan mode (read-only)
       --server                Run without TUI (server mode)
       --ephemeral             Exit after completing current task

@@ -115,11 +115,18 @@ Environment variable overrides use `LOOPAL_` prefix. Key settings: `model` (defa
 
 ## Permission System
 
-Tools declare a `PermissionLevel` (ReadOnly / Supervised / Dangerous). The runtime's `PermissionMode` determines handling:
-- `Bypass` — all tools auto-approved
-- `AcceptEdits` — read-only auto-approved, writes need confirmation
-- `Supervised` (default) — supervised/dangerous need user confirmation via TUI
-- `Plan` — only read-only tools allowed
+Permission has two orthogonal dimensions:
+
+**PermissionMode** (when to ask): set via `permission_mode` setting or `--permission` flag
+- `bypass` (default) — all tools auto-approved, never ask
+- `ask_dangerous` — only `Dangerous` tools ask; reads/writes auto-allow
+- `ask_any_write` — any `Write` or `Dangerous` tool asks; only reads auto-allow
+
+**DecisionMode** (who answers when asked): set via `decision_mode` setting or `--decision` flag
+- `manual` (default) — real user via TUI/IPC
+- `auto` — LLM classifier answers (uses `TaskType::Classification` model)
+
+Tools declare a `PermissionLevel` (`ReadOnly` / `Write` / `Dangerous`); `PermissionMode::check(level)` decides whether to short-circuit (Allow/Deny) or dispatch to the handler chain (Ask). The decision handler chain — picked at session setup by `DecisionMode` — answers `Ask`s.
 
 ## Dependencies
 

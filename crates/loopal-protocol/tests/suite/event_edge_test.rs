@@ -47,6 +47,20 @@ fn test_event_root_agent_name_is_none() {
 }
 
 #[test]
+fn test_event_for_agent_with_some_matches_named() {
+    let qa = QualifiedAddress::local("worker");
+    let via_for_agent =
+        AgentEvent::for_agent(Some(qa.clone()), AgentEventPayload::Started);
+    assert_eq!(via_for_agent.agent_name, Some(qa));
+}
+
+#[test]
+fn test_event_for_agent_with_none_matches_root() {
+    let via_for_agent = AgentEvent::for_agent(None, AgentEventPayload::Started);
+    assert!(via_for_agent.agent_name.is_none());
+}
+
+#[test]
 fn test_event_retry_error_serde_roundtrip() {
     let event = AgentEvent::root(AgentEventPayload::RetryError {
         message: "502 Bad Gateway. Retrying in 2.0s".into(),

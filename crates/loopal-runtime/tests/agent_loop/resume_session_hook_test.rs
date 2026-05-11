@@ -15,7 +15,7 @@ use loopal_runtime::{
     AgentConfig, AgentDeps, AgentLoopParamsBuilder, InterruptHandle, SessionResumeError,
     SessionResumeHook, UnifiedFrontend,
     agent_loop::AgentLoopRunner,
-    frontend::{AutoCancelQuestionHandler, RelayPermissionHandler},
+    frontend::{UnsupportedQuestionHandler, ManualPermissionHandler},
 };
 use loopal_test_support::TestFixture;
 use tokio::sync::mpsc;
@@ -93,8 +93,8 @@ fn build_harness(hooks: Vec<Arc<dyn SessionResumeHook>>) -> Harness {
         mailbox_rx,
         control_rx,
         None,
-        Box::new(RelayPermissionHandler::new(event_tx, permission_rx)),
-        Box::new(AutoCancelQuestionHandler),
+        Box::new(ManualPermissionHandler::new(event_tx, permission_rx)),
+        Box::new(UnsupportedQuestionHandler),
     ));
     let kernel = Arc::new(loopal_kernel::Kernel::new(Default::default()).unwrap());
     let params = AgentLoopParamsBuilder::new(
@@ -103,6 +103,7 @@ fn build_harness(hooks: Vec<Arc<dyn SessionResumeHook>>) -> Harness {
             kernel,
             frontend,
             session_manager: fixture.session_manager(),
+            decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
         },
         primary,
         loopal_context::ContextStore::new(super::make_test_budget()),

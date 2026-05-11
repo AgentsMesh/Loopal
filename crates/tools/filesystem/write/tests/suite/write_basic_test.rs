@@ -80,7 +80,7 @@ fn test_write_description() {
 #[test]
 fn test_write_permission() {
     let tool = WriteTool;
-    assert_eq!(tool.permission(), PermissionLevel::Supervised);
+    assert_eq!(tool.permission(), PermissionLevel::Write);
 }
 
 #[test]

@@ -26,21 +26,18 @@ pub struct AgentEvent {
 impl AgentEvent {
     /// Convenience: create a root-agent event.
     pub fn root(payload: AgentEventPayload) -> Self {
-        Self {
-            agent_name: None,
-            event_id: next_event_id(),
-            turn_id: current_turn_id(),
-            correlation_id: current_correlation_id(),
-            rev: None,
-            payload,
-        }
+        Self::for_agent(None, payload)
     }
 
     /// Convenience: create a named sub-agent event.
     /// `name` may be a bare agent name or a qualified `hub/agent` form.
     pub fn named(name: impl Into<QualifiedAddress>, payload: AgentEventPayload) -> Self {
+        Self::for_agent(Some(name.into()), payload)
+    }
+
+    pub fn for_agent(agent_name: Option<QualifiedAddress>, payload: AgentEventPayload) -> Self {
         Self {
-            agent_name: Some(name.into()),
+            agent_name,
             event_id: next_event_id(),
             turn_id: current_turn_id(),
             correlation_id: current_correlation_id(),

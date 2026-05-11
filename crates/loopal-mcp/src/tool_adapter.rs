@@ -54,7 +54,7 @@ impl Tool for McpToolAdapter {
     }
 
     fn permission(&self) -> PermissionLevel {
-        PermissionLevel::Supervised
+        PermissionLevel::Write
     }
 
     async fn execute(&self, input: Value, _ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
@@ -170,7 +170,7 @@ mod tests {
     #[test]
     fn test_permission_returns_supervised() {
         let adapter = make_adapter();
-        assert_eq!(adapter.permission(), PermissionLevel::Supervised);
+        assert_eq!(adapter.permission(), PermissionLevel::Write);
     }
 
     #[test]

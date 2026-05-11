@@ -1,22 +1,17 @@
-//! Agent loop parameter construction for the IPC server.
-
 use std::sync::Arc;
 
 use loopal_agent::AgentShared;
 use loopal_agent::task_store::TaskStore;
 use loopal_config::ResolvedConfig;
+use loopal_decision_api::DecisionMode;
 use loopal_kernel::Kernel;
 use loopal_runtime::AgentLoopParams;
 use loopal_scheduler::CronScheduler;
 
-/// Return value from `build_with_frontend` — agent loop params + bridge handles.
 pub struct AgentSetupResult {
     pub params: AgentLoopParams,
     pub task_store: Arc<TaskStore>,
     pub scheduler: Arc<CronScheduler>,
-    /// Shared agent state, exposed for `agent/state_snapshot` IPC and
-    /// any future observers that need a typed handle (the same instance
-    /// is also stored type-erased inside `params.shared`).
     pub agent_shared: Arc<AgentShared>,
 }
 
@@ -26,22 +21,18 @@ pub struct StartParams {
     pub model: Option<String>,
     pub mode: Option<String>,
     pub prompt: Option<String>,
-    pub permission_mode: Option<String>,
+    /// JSON-encoded `{"mode": "<permission_mode>", "decision": "<decision_mode>"}`
+    /// (e.g. `{"mode":"ask_dangerous","decision":"auto"}`).
+    /// Both fields are required; see `parse_permission_argv`.
+    pub permission: Option<String>,
     pub no_sandbox: bool,
     pub resume: Option<String>,
-    /// Explicit lifecycle mode. Ephemeral exits on idle, Persistent waits.
     pub lifecycle: loopal_runtime::LifecycleMode,
-    /// Agent type for fragment selection (e.g. "explore", "plan").
     pub agent_type: Option<String>,
-    /// Nesting depth (0 = root). Propagated from parent via IPC.
     pub depth: Option<u32>,
-    /// Fork context: compressed parent messages (JSON Value, deserialized in agent_setup).
     pub fork_context: Option<serde_json::Value>,
 }
 
-/// Build a Kernel from config (production path: MCP, tools).
-/// Caller should apply start overrides to config.settings before calling.
-/// `depth` controls role-scoped tool registration (root only registers goal tools).
 pub(crate) async fn build_kernel_from_config(
     config: &ResolvedConfig,
     production: bool,
@@ -52,7 +43,6 @@ pub(crate) async fn build_kernel_from_config(
         kernel.register_goal_tools();
     }
     if production {
-        // Wire up MCP sampling: resolve the default model's provider and inject.
         if let Ok(provider) = kernel.resolve_provider(&config.settings.model) {
             let adapter =
                 loopal_kernel::McpSamplingAdapter::new(provider, config.settings.model.clone());
@@ -68,7 +58,6 @@ pub(crate) async fn build_kernel_from_config(
     Ok(Arc::new(kernel))
 }
 
-/// Build a Kernel with injected provider (test path).
 pub fn build_kernel_with_provider(
     provider: Arc<dyn loopal_provider_api::Provider>,
 ) -> anyhow::Result<Arc<Kernel>> {
@@ -79,19 +68,36 @@ pub fn build_kernel_with_provider(
     Ok(Arc::new(kernel))
 }
 
-/// Apply CLI overrides from StartParams to Settings before Kernel creation.
 pub(crate) fn apply_start_overrides(settings: &mut loopal_config::Settings, start: &StartParams) {
     if let Some(ref model) = start.model {
         settings.model = model.clone();
     }
-    if let Some(ref perm) = start.permission_mode {
-        settings.permission_mode = match perm.as_str() {
-            "bypass" | "yolo" => loopal_tool_api::PermissionMode::Bypass,
-            "auto" => loopal_tool_api::PermissionMode::Auto,
-            _ => loopal_tool_api::PermissionMode::Supervised,
-        };
+    if let Some(ref perm) = start.permission {
+        match parse_permission_argv(perm) {
+            Ok((mode, decision)) => {
+                settings.permission_mode = mode;
+                settings.decision_mode = decision;
+            }
+            Err(e) => {
+                tracing::warn!(input = %perm, error = %e, "invalid permission spawn arg, ignoring");
+            }
+        }
     }
     if start.no_sandbox {
         settings.sandbox.policy = loopal_config::SandboxPolicy::Disabled;
     }
+}
+
+#[derive(serde::Deserialize)]
+struct PermissionEncoding {
+    mode: loopal_tool_api::PermissionMode,
+    decision: DecisionMode,
+}
+
+pub fn parse_permission_argv(
+    s: &str,
+) -> Result<(loopal_tool_api::PermissionMode, DecisionMode), String> {
+    let parsed: PermissionEncoding =
+        serde_json::from_str(s).map_err(|e| format!("invalid permission JSON: {e}"))?;
+    Ok((parsed.mode, parsed.decision))
 }

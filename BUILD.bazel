@@ -20,6 +20,7 @@ rust_binary(
     deps = [
         "//crates/loopal-protocol",
         "//crates/loopal-tool-api",
+        "//crates/loopal-decision-api",
         "//crates/loopal-config",
         "//crates/loopal-telemetry",
         "//crates/loopal-runtime",

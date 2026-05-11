@@ -1,4 +1,3 @@
-/// Build the classifier system prompt.
 pub fn system_prompt() -> &'static str {
     "\
 You are a security classifier for an AI coding agent. Your job is to decide \
@@ -42,7 +41,6 @@ or
 The reason must be one concise sentence."
 }
 
-/// Build the classifier user prompt for a specific tool call.
 pub fn user_prompt(
     tool_name: &str,
     input: &serde_json::Value,
@@ -64,12 +62,10 @@ pub fn user_prompt(
     prompt
 }
 
-/// Truncate a string to at most `max_chars` bytes at a valid UTF-8 boundary.
-fn truncate(s: &str, max_chars: usize) -> &str {
+pub(crate) fn truncate(s: &str, max_chars: usize) -> &str {
     if s.len() <= max_chars {
         return s;
     }
-    // Find a char boundary at or before max_chars.
     let mut end = max_chars;
     while end > 0 && !s.is_char_boundary(end) {
         end -= 1;
@@ -77,10 +73,6 @@ fn truncate(s: &str, max_chars: usize) -> &str {
     &s[..end]
 }
 
-/// Build recent context from conversation messages (last 6 messages).
-///
-/// Includes both text and tool call summaries so the classifier
-/// understands the conversation flow, not just user/assistant text.
 pub fn build_recent_context(messages: &[loopal_message::Message]) -> String {
     let start = messages.len().saturating_sub(6);
     let mut context = String::new();

@@ -44,7 +44,7 @@ impl Tool for AgentTool {
         })
     }
     fn permission(&self) -> PermissionLevel {
-        PermissionLevel::Supervised
+        PermissionLevel::Write
     }
 
     async fn execute(

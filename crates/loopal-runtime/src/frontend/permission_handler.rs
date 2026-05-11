@@ -1,27 +1,37 @@
 use async_trait::async_trait;
 use loopal_tool_api::PermissionDecision;
 
-/// Permission handler trait for agent permission decisions.
-///
-/// `UnifiedFrontend` delegates `request_permission` to this trait,
-/// enabling pluggable strategies: auto-deny for sub-agents, relay forwarding
-/// for root agents, or custom logic.
-#[async_trait]
-pub trait PermissionHandler: Send + Sync {
-    async fn decide(&self, id: &str, name: &str, input: &serde_json::Value) -> PermissionDecision;
+#[derive(Debug, Clone)]
+pub struct PermissionOutcome {
+    pub decision: PermissionDecision,
+    pub reason: String,
+    pub duration_ms: u64,
 }
 
-/// Default handler: deny all permission requests (no human in the loop).
-pub struct AutoDenyHandler;
+impl PermissionOutcome {
+    pub fn allow() -> Self {
+        Self {
+            decision: PermissionDecision::Allow,
+            reason: String::new(),
+            duration_ms: 0,
+        }
+    }
+
+    pub fn deny(reason: impl Into<String>) -> Self {
+        Self {
+            decision: PermissionDecision::Deny,
+            reason: reason.into(),
+            duration_ms: 0,
+        }
+    }
+}
 
 #[async_trait]
-impl PermissionHandler for AutoDenyHandler {
+pub trait PermissionHandler: Send + Sync {
     async fn decide(
         &self,
-        _id: &str,
-        _name: &str,
-        _input: &serde_json::Value,
-    ) -> PermissionDecision {
-        PermissionDecision::Deny
-    }
+        id: &str,
+        name: &str,
+        input: &serde_json::Value,
+    ) -> PermissionOutcome;
 }

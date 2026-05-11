@@ -39,7 +39,7 @@ pub enum TaskType {
     Default,
     /// Context compaction / summarization.
     Summarization,
-    /// Auto-mode permission classification.
+    /// Auto-mode decisions: permission classification and AskUser auto-answer.
     Classification,
     /// Tool-output refinement (Fetch large pages, etc.).
     Refine,

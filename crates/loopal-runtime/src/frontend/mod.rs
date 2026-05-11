@@ -1,13 +1,20 @@
+mod decision_context;
+mod degraded;
+mod dispatch;
 mod emitter;
-mod permission_handler;
+pub mod permission;
+pub mod permission_handler;
+pub mod question;
 pub mod question_handler;
-pub mod relay_permission;
 pub mod traits;
 pub mod unified;
 
-pub use emitter::ChannelEventEmitter;
-pub use permission_handler::{AutoDenyHandler, PermissionHandler};
-pub use question_handler::{AutoCancelQuestionHandler, QuestionHandler, RelayQuestionHandler};
-pub use relay_permission::RelayPermissionHandler;
+pub use decision_context::DecisionContext;
+pub use degraded::DegradedAction;
+pub use dispatch::{into_permission_decided, into_question_decided};
+pub use permission::{AutoPermissionHandler, DenyAllHandler, ManualPermissionHandler};
+pub use permission_handler::{PermissionHandler, PermissionOutcome};
+pub use question::{AutoQuestionHandler, ManualQuestionHandler, UnsupportedQuestionHandler};
+pub use question_handler::{QuestionHandler, QuestionOutcome};
 pub use traits::{AgentFrontend, EventEmitter};
 pub use unified::UnifiedFrontend;

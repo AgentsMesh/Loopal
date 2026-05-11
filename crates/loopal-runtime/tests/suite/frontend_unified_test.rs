@@ -4,7 +4,7 @@ use loopal_protocol::ControlCommand;
 use loopal_protocol::{Envelope, MessageSource};
 use loopal_runtime::agent_input::AgentInput;
 use loopal_runtime::frontend::AgentFrontend;
-use loopal_runtime::frontend::{AutoCancelQuestionHandler, AutoDenyHandler, UnifiedFrontend};
+use loopal_runtime::frontend::{UnsupportedQuestionHandler, DenyAllHandler, UnifiedFrontend};
 use loopal_tool_api::PermissionDecision;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
@@ -24,7 +24,7 @@ fn make_unified(
         control_rx,
         cancel_token,
         handler,
-        Box::new(AutoCancelQuestionHandler),
+        Box::new(UnsupportedQuestionHandler),
     )
 }
 
@@ -42,7 +42,7 @@ async fn test_unified_emit_root_delivers_event() {
         mb_rx,
         ctrl_rx,
         None,
-        Box::new(AutoDenyHandler),
+        Box::new(DenyAllHandler),
     );
     f.emit(AgentEventPayload::Started).await.unwrap();
 
@@ -63,7 +63,7 @@ async fn test_unified_emit_wraps_agent_name() {
         mb_rx,
         ctrl_rx,
         None,
-        Box::new(AutoDenyHandler),
+        Box::new(DenyAllHandler),
     );
     f.emit(AgentEventPayload::Finished).await.unwrap();
 
@@ -87,7 +87,7 @@ async fn test_unified_emit_subagent_best_effort() {
         mb_rx,
         ctrl_rx,
         None,
-        Box::new(AutoDenyHandler),
+        Box::new(DenyAllHandler),
     );
     // Should NOT error — best-effort for sub-agents
     assert!(f.emit(AgentEventPayload::Started).await.is_ok());
@@ -107,7 +107,7 @@ async fn test_unified_recv_input_from_envelope() {
         mb_rx,
         ctrl_rx,
         None,
-        Box::new(AutoDenyHandler),
+        Box::new(DenyAllHandler),
     );
 
     let env = Envelope::new(MessageSource::Human, "main", "hello");
@@ -137,7 +137,7 @@ async fn test_unified_recv_input_from_control_mode_switch() {
         mb_rx,
         ctrl_rx,
         None,
-        Box::new(AutoDenyHandler),
+        Box::new(DenyAllHandler),
     );
     ctrl_tx
         .send(ControlCommand::ModeSwitch(AgentMode::Plan))
@@ -165,7 +165,7 @@ async fn test_unified_recv_input_from_control_clear() {
         mb_rx,
         ctrl_rx,
         None,
-        Box::new(AutoDenyHandler),
+        Box::new(DenyAllHandler),
     );
     ctrl_tx.send(ControlCommand::Clear).await.unwrap();
 
@@ -189,7 +189,7 @@ async fn test_unified_shutdown_returns_none() {
         mb_rx,
         ctrl_rx,
         None,
-        Box::new(AutoDenyHandler),
+        Box::new(DenyAllHandler),
     );
     drop(mb_tx);
     drop(ctrl_tx);
@@ -212,7 +212,7 @@ async fn test_unified_cancel_token_breaks_recv() {
         mb_rx,
         ctrl_rx,
         Some(token.clone()),
-        Box::new(AutoDenyHandler),
+        Box::new(DenyAllHandler),
     );
     tokio::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
@@ -236,7 +236,7 @@ async fn test_unified_drain_pending() {
         mb_rx,
         ctrl_rx,
         None,
-        Box::new(AutoDenyHandler),
+        Box::new(DenyAllHandler),
     );
 
     let e1 = Envelope::new(MessageSource::Agent("lead".into()), "sub", "task A");
@@ -273,7 +273,7 @@ async fn test_unified_permission_auto_deny() {
         mb_rx,
         ctrl_rx,
         None,
-        Box::new(AutoDenyHandler),
+        Box::new(DenyAllHandler),
     );
     let d = f
         .request_permission("id1", "Bash", &serde_json::json!({}))

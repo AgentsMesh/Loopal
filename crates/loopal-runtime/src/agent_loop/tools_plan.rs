@@ -32,6 +32,7 @@ impl AgentLoopRunner {
             ));
         }
 
+        self.refresh_decision_context().await;
         let decision = self
             .params
             .deps

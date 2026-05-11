@@ -16,6 +16,7 @@ use loopal_runtime::agent_loop;
 use crate::agent_setup;
 use crate::hub_frontend::HubFrontend;
 use crate::params::StartParams;
+use crate::session_handlers_factory::build_session_handlers;
 use crate::session_hub::{SessionHub, SharedSession};
 
 /// Handle returned to the dispatch loop after starting a session.
@@ -61,7 +62,7 @@ pub(crate) async fn start_session(
             model: params["model"].as_str().map(String::from),
             mode: params["mode"].as_str().map(String::from),
             prompt: params["prompt"].as_str().map(String::from),
-            permission_mode: params["permission_mode"].as_str().map(String::from),
+            permission: params["permission"].as_str().map(String::from),
             no_sandbox: params["no_sandbox"].as_bool().unwrap_or(false),
             resume: params["resume"].as_str().map(String::from),
             lifecycle,
@@ -88,15 +89,27 @@ pub(crate) async fn start_session(
         let (watch_tx, watch_rx) = tokio::sync::watch::channel(0u64);
         let interrupt_tx = Arc::new(watch_tx);
 
-        let frontend_placeholder = Arc::new(HubFrontend::new(
-            Arc::new(SharedSession::placeholder(
+        let session_holder: crate::ipc_handlers::SessionRef =
+            Arc::new(tokio::sync::RwLock::new(Arc::new(SharedSession::placeholder(
                 input_tx.clone(),
                 interrupt.clone(),
                 interrupt_tx.clone(),
-            )),
+            ))));
+        let decision_context =
+            loopal_runtime::frontend::DecisionContext::with_cwd(cwd.to_string_lossy().into_owned());
+        let (perm_handler, q_handler) = build_session_handlers(
+            &config,
+            &kernel,
+            session_holder.clone(),
+            decision_context.clone(),
+        );
+        let frontend_placeholder = Arc::new(HubFrontend::new(
+            session_holder,
             input_rx,
             None,
             watch_rx,
+            perm_handler,
+            q_handler,
         ));
 
         let session_dir_override = hub.session_dir_override().await;
@@ -113,6 +126,7 @@ pub(crate) async fn start_session(
                 connection.clone(),
                 session_dir_override.as_deref(),
                 hub,
+                decision_context,
             ))
             .await?;
         let agent_params = setup.params;

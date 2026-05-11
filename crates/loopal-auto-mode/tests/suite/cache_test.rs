@@ -40,17 +40,17 @@ impl Provider for AllowProvider {
 
 #[tokio::test]
 async fn second_call_returns_cached_result() {
-    let classifier = AutoClassifier::new(String::new(), "/tmp".into());
+    let classifier = AutoClassifier::new(String::new());
     let provider = Arc::new(AllowProvider);
     let input = serde_json::json!({"command": "cargo test"});
 
     let r1 = classifier
-        .classify("Bash", &input, "", &*provider, "m")
+        .classify("Bash", &input, "", "/tmp", &*provider, "m")
         .await;
     assert_eq!(r1.decision, PermissionDecision::Allow);
 
     let r2 = classifier
-        .classify("Bash", &input, "", &*provider, "m")
+        .classify("Bash", &input, "", "/tmp", &*provider, "m")
         .await;
     assert_eq!(r2.decision, PermissionDecision::Allow);
     assert_eq!(r2.duration_ms, 0); // cached → 0ms
@@ -58,16 +58,16 @@ async fn second_call_returns_cached_result() {
 
 #[tokio::test]
 async fn different_tool_name_is_cache_miss() {
-    let classifier = AutoClassifier::new(String::new(), "/tmp".into());
+    let classifier = AutoClassifier::new(String::new());
     let provider = Arc::new(AllowProvider);
     let input = serde_json::json!({"command": "cargo test"});
 
     classifier
-        .classify("Bash", &input, "", &*provider, "m")
+        .classify("Bash", &input, "", "/tmp", &*provider, "m")
         .await;
     // Same input but different tool name → should call LLM again
     let r2 = classifier
-        .classify("Write", &input, "", &*provider, "m")
+        .classify("Write", &input, "", "/tmp", &*provider, "m")
         .await;
     // Provider always returns allow, so this succeeds
     assert_eq!(r2.decision, PermissionDecision::Allow);
@@ -75,7 +75,7 @@ async fn different_tool_name_is_cache_miss() {
 
 #[tokio::test]
 async fn different_input_is_cache_miss() {
-    let classifier = AutoClassifier::new(String::new(), "/tmp".into());
+    let classifier = AutoClassifier::new(String::new());
     let provider = Arc::new(AllowProvider);
 
     classifier
@@ -83,6 +83,7 @@ async fn different_input_is_cache_miss() {
             "Bash",
             &serde_json::json!({"command": "ls"}),
             "",
+            "/tmp",
             &*provider,
             "m",
         )
@@ -92,6 +93,7 @@ async fn different_input_is_cache_miss() {
             "Bash",
             &serde_json::json!({"command": "rm -rf /"}),
             "",
+            "/tmp",
             &*provider,
             "m",
         )
@@ -102,7 +104,7 @@ async fn different_input_is_cache_miss() {
 
 #[tokio::test]
 async fn error_results_are_not_cached() {
-    let classifier = AutoClassifier::new(String::new(), "/tmp".into());
+    let classifier = AutoClassifier::new(String::new());
 
     // ErrorProvider returns LLM error
     struct ErrorProvider;
@@ -120,13 +122,13 @@ async fn error_results_are_not_cached() {
     let input = serde_json::json!({"command": "test"});
 
     let r1 = classifier
-        .classify("Bash", &input, "", &*provider, "m")
+        .classify("Bash", &input, "", "/tmp", &*provider, "m")
         .await;
     assert_eq!(r1.decision, PermissionDecision::Deny);
 
     // Second call should NOT return cached error — it should call LLM again
     let r2 = classifier
-        .classify("Bash", &input, "", &*provider, "m")
+        .classify("Bash", &input, "", "/tmp", &*provider, "m")
         .await;
     assert_eq!(r2.decision, PermissionDecision::Deny);
     // Both are Deny from LLM error, not from cache

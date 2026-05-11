@@ -22,6 +22,7 @@ pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<A
         hub_connection,
         session_dir_override,
         hub,
+        decision_context,
     } = ctx;
     let router = loopal_provider_api::ModelRouter::from_parts(
         config.settings.model.clone(),
@@ -103,14 +104,6 @@ pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<A
         &model,
     );
 
-    let auto_classifier = (permission_mode == loopal_tool_api::PermissionMode::Auto).then(|| {
-        Arc::new(loopal_auto_mode::AutoClassifier::new_with_thresholds(
-            config.instructions.clone(),
-            cwd.to_string_lossy().into_owned(),
-            config.settings.harness.cb_max_consecutive_denials,
-            config.settings.harness.cb_max_total_denials,
-        ))
-    });
     let shared_any: Arc<dyn std::any::Any + Send + Sync> = Arc::new(agent_shared.clone());
     let one_shot_chat: Arc<dyn loopal_tool_api::OneShotChatService> = agent_shared.clone();
     let fetch_refiner_policy: Arc<dyn loopal_tool_api::FetchRefinerPolicy> = agent_shared.clone();
@@ -167,6 +160,7 @@ pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<A
                 kernel,
                 frontend,
                 session_manager,
+                decision_context,
             },
             session,
             messages,
@@ -179,7 +173,6 @@ pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<A
             message_snapshot,
             resume_hooks,
             memory_channel,
-            auto_classifier,
             one_shot_chat: Some(one_shot_chat),
             fetch_refiner_policy: Some(fetch_refiner_policy),
             goal_session,

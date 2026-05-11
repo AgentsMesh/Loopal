@@ -57,12 +57,13 @@ pub(super) async fn action_spawn(
     let model = config
         .model
         .unwrap_or_else(|| shared.kernel.settings().model.clone());
-    let perm_mode = match shared.kernel.settings().permission_mode {
-        loopal_tool_api::PermissionMode::Bypass => "bypass",
-        loopal_tool_api::PermissionMode::Supervised => "supervised",
-        loopal_tool_api::PermissionMode::Auto => "auto",
-    };
     let no_sandbox = shared.no_sandbox();
+    let settings = shared.kernel.settings();
+    let permission = serde_json::json!({
+        "mode": settings.permission_mode,
+        "decision": settings.decision_mode,
+    })
+    .to_string();
     let target = build_spawn_target(target_hub, cwd_override, build_fork_context(&shared));
     let result = spawn_agent(
         &shared,
@@ -70,7 +71,7 @@ pub(super) async fn action_spawn(
             name: name.clone(),
             prompt: prompt.to_string(),
             model: Some(model),
-            permission_mode: Some(perm_mode.to_string()),
+            permission: Some(permission),
             agent_type: subagent_type.map(String::from),
             depth: shared.depth + 1,
             no_sandbox,

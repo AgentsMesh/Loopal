@@ -29,7 +29,7 @@ impl Tool for MoveFileTool {
     }
 
     fn permission(&self) -> PermissionLevel {
-        PermissionLevel::Supervised
+        PermissionLevel::Write
     }
 
     async fn execute(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult, LoopalError> {

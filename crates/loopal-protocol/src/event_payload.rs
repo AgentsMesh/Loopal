@@ -159,13 +159,19 @@ pub enum AgentEventPayload {
         #[serde(skip_serializing_if = "Option::is_none")]
         session_id: Option<String>,
     },
-    /// Auto-mode classifier made a permission decision.
-    AutoModeDecision {
+    PermissionDecided {
         tool_name: String,
         decision: String,
         reason: String,
         #[serde(default)]
         duration_ms: u64,
+    },
+    QuestionDecided {
+        #[serde(default)]
+        question_count: u32,
+        #[serde(default)]
+        duration_ms: u64,
+        reason: String,
     },
     /// Session context was replaced by resuming a persisted session.
     SessionResumed {

@@ -7,6 +7,7 @@ use crate::harness::HarnessConfig;
 use crate::hook::HookConfig;
 use crate::sandbox::SandboxConfig;
 use crate::telemetry::TelemetryConfig;
+use loopal_decision_api::DecisionMode;
 use loopal_provider_api::{ModelOverride, TaskType, ThinkingConfig};
 use loopal_tool_api::PermissionMode;
 
@@ -27,6 +28,10 @@ pub struct Settings {
 
     /// Permission mode
     pub permission_mode: PermissionMode,
+
+    /// Decision mode — who answers when user input is needed (Manual / Auto).
+    #[serde(default)]
+    pub decision_mode: DecisionMode,
 
     /// Maximum context tokens cap (0 = auto: use model's context_window).
     pub max_context_tokens: u32,
@@ -82,6 +87,7 @@ impl Default for Settings {
             model_routing: HashMap::new(),
             models: HashMap::new(),
             permission_mode: PermissionMode::Bypass,
+            decision_mode: DecisionMode::Manual,
             max_context_tokens: 0,
             providers: ProvidersConfig::default(),
             hooks: Vec::new(),

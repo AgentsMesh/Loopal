@@ -8,7 +8,7 @@ use loopal_protocol::ControlCommand;
 use loopal_protocol::Envelope;
 use loopal_runtime::agent_loop::{AgentLoopRunner, cancel::TurnCancel};
 use loopal_runtime::frontend::{
-    AutoCancelQuestionHandler, AutoDenyHandler, RelayPermissionHandler,
+    UnsupportedQuestionHandler, DenyAllHandler, ManualPermissionHandler,
 };
 use loopal_runtime::{
     AgentConfig, AgentDeps, AgentLoopParamsBuilder, InterruptHandle, UnifiedFrontend,
@@ -39,10 +39,6 @@ pub fn make_test_budget() -> ContextBudget {
 
 mod auto_continue_edge_test;
 mod auto_continue_test;
-mod auto_mode_batch_test;
-mod auto_mode_degradation_test;
-pub mod auto_mode_helpers;
-mod auto_mode_test;
 mod cron_e2e_test;
 mod drain_pending_test;
 mod goal_e2e_test;
@@ -97,8 +93,8 @@ pub fn make_runner() -> (AgentLoopRunner, mpsc::Receiver<AgentEvent>) {
         mailbox_rx,
         control_rx,
         None,
-        Box::new(AutoDenyHandler),
-        Box::new(AutoCancelQuestionHandler),
+        Box::new(DenyAllHandler),
+        Box::new(UnsupportedQuestionHandler),
     ));
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
     let params = AgentLoopParamsBuilder::new(
@@ -107,6 +103,7 @@ pub fn make_runner() -> (AgentLoopRunner, mpsc::Receiver<AgentEvent>) {
             kernel,
             frontend,
             session_manager: fixture.session_manager(),
+            decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
         },
         fixture.test_session("test-minimal"),
         ContextStore::new(make_test_budget()),
@@ -135,19 +132,20 @@ pub fn make_runner_with_channels() -> (
         mailbox_rx,
         control_rx,
         None,
-        Box::new(RelayPermissionHandler::new(event_tx, permission_rx)),
-        Box::new(AutoCancelQuestionHandler),
+        Box::new(ManualPermissionHandler::new(event_tx, permission_rx)),
+        Box::new(UnsupportedQuestionHandler),
     ));
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
     let params = AgentLoopParamsBuilder::new(
         AgentConfig {
-            permission_mode: PermissionMode::Supervised,
+            permission_mode: PermissionMode::AskAnyWrite,
             ..Default::default()
         },
         AgentDeps {
             kernel,
             frontend,
             session_manager: fixture.session_manager(),
+            decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
         },
         fixture.test_session("test-channels"),
         ContextStore::new(make_test_budget()),

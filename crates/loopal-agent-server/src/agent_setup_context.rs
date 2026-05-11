@@ -36,14 +36,10 @@ pub struct AgentSetupContext<'a> {
     pub hub_connection: Arc<loopal_ipc::connection::Connection>,
     pub session_dir_override: Option<&'a std::path::Path>,
     pub hub: &'a crate::session_hub::SessionHub,
+    pub decision_context: loopal_runtime::frontend::DecisionContext,
 }
 
 impl<'a> AgentSetupContext<'a> {
-    /// Construct with every required dependency.
-    ///
-    /// Prefer this over `pub` field struct-literal init from external
-    /// crates: any new field added here forces every caller to update,
-    /// rather than picking up a default that may not be what they want.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         cwd: &'a std::path::Path,
@@ -56,6 +52,7 @@ impl<'a> AgentSetupContext<'a> {
         hub_connection: Arc<loopal_ipc::connection::Connection>,
         session_dir_override: Option<&'a std::path::Path>,
         hub: &'a crate::session_hub::SessionHub,
+        decision_context: loopal_runtime::frontend::DecisionContext,
     ) -> Self {
         Self {
             cwd,
@@ -68,6 +65,7 @@ impl<'a> AgentSetupContext<'a> {
             hub_connection,
             session_dir_override,
             hub,
+            decision_context,
         }
     }
 }

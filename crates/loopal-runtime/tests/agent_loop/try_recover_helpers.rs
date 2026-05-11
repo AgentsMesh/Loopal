@@ -13,7 +13,7 @@ use loopal_provider_api::{
     default_classify_error,
 };
 use loopal_runtime::agent_loop::AgentLoopRunner;
-use loopal_runtime::frontend::{AutoCancelQuestionHandler, AutoDenyHandler};
+use loopal_runtime::frontend::{UnsupportedQuestionHandler, DenyAllHandler};
 use loopal_runtime::{
     AgentConfig, AgentDeps, AgentLoopParams, AgentLoopParamsBuilder, InterruptHandle,
     UnifiedFrontend,
@@ -121,8 +121,8 @@ pub fn make_runner_with_intents(
         mailbox_rx,
         control_rx,
         None,
-        Box::new(AutoDenyHandler),
-        Box::new(AutoCancelQuestionHandler),
+        Box::new(DenyAllHandler),
+        Box::new(UnsupportedQuestionHandler),
     ));
     let mut kernel = Kernel::new(Settings::default()).unwrap();
     let (provider, call_count, intents) = SequencedProvider::new(outcomes);
@@ -136,6 +136,7 @@ pub fn make_runner_with_intents(
             kernel: Arc::new(kernel),
             frontend,
             session_manager: fixture.session_manager(),
+            decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
         },
         fixture.test_session("rt-test"),
         loopal_context::ContextStore::from_messages(

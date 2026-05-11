@@ -255,7 +255,13 @@ impl AgentLoopRunner {
                 }
                 "AskUser" => {
                     let questions = parse_questions(input);
-                    let response = self.params.deps.frontend.ask_user(questions.clone()).await;
+                    self.refresh_decision_context().await;
+                    let response = self
+                        .params
+                        .deps
+                        .frontend
+                        .ask_user(questions.clone())
+                        .await;
                     let (result, is_error) = format_response(&response, &questions);
                     self.emit(loopal_protocol::AgentEventPayload::ToolResult {
                         id: id.clone(),

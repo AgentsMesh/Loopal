@@ -49,9 +49,9 @@ async fn test_execute_tools_bypass_mode() {
 
 #[tokio::test]
 async fn test_execute_tools_supervised_denies_without_approval() {
-    // Supervised mode sends Ask → no response from perm channel → Deny
+    // AskAnyWrite mode sends Ask → no response from perm channel → Deny
     let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx, perm_tx) = make_runner_with_channels();
-    runner.params.config.permission_mode = PermissionMode::Supervised;
+    runner.params.config.permission_mode = PermissionMode::AskAnyWrite;
 
     // Drop perm_tx so the ask returns Deny
     drop(perm_tx);
@@ -85,9 +85,9 @@ async fn test_execute_tools_supervised_denies_without_approval() {
 
 #[tokio::test]
 async fn test_execute_tools_read_allowed_write_denied_in_supervised() {
-    // Tests the interleaving: Read (ReadOnly → Allow) and Write (Supervised → Ask → Deny)
+    // Tests the interleaving: Read (ReadOnly → Allow) and Write (Write → Ask → Deny)
     let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx, perm_tx) = make_runner_with_channels();
-    runner.params.config.permission_mode = PermissionMode::Supervised;
+    runner.params.config.permission_mode = PermissionMode::AskAnyWrite;
 
     // Drop perm_tx so the ask returns Deny
     drop(perm_tx);
@@ -129,7 +129,7 @@ async fn test_execute_tools_read_allowed_write_denied_in_supervised() {
     // tc-1 (Read) should succeed, tc-2 (Write) should be denied
     match &msg.content[0] {
         ContentBlock::ToolResult { is_error, .. } => {
-            assert!(!is_error, "Read should succeed in Supervised mode");
+            assert!(!is_error, "Read should succeed in AskAnyWrite mode");
         }
         other => panic!("expected ToolResult, got {other:?}"),
     }

@@ -21,7 +21,7 @@ impl SessionResumeHook for NoopHook {
 }
 
 fn deps_for(fixture: &TestFixture) -> AgentDeps {
-    use loopal_runtime::frontend::{AutoCancelQuestionHandler, AutoDenyHandler, UnifiedFrontend};
+    use loopal_runtime::frontend::{UnsupportedQuestionHandler, DenyAllHandler, UnifiedFrontend};
     let (event_tx, _event_rx) = tokio::sync::mpsc::channel(8);
     let (_mbox_tx, mbox_rx) = tokio::sync::mpsc::channel(8);
     let (_ctrl_tx, ctrl_rx) = tokio::sync::mpsc::channel(8);
@@ -31,13 +31,14 @@ fn deps_for(fixture: &TestFixture) -> AgentDeps {
         mbox_rx,
         ctrl_rx,
         None,
-        Box::new(AutoDenyHandler),
-        Box::new(AutoCancelQuestionHandler),
+        Box::new(DenyAllHandler),
+        Box::new(UnsupportedQuestionHandler),
     ));
     AgentDeps {
         kernel: Arc::new(loopal_kernel::Kernel::new(Default::default()).unwrap()),
         frontend,
         session_manager: fixture.session_manager(),
+            decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
     }
 }
 
@@ -73,7 +74,6 @@ async fn builder_default_optionals_yield_none_or_empty() {
     assert!(params.shared.is_none());
     assert!(params.memory_channel.is_none());
     assert!(params.scheduled_rx.is_none());
-    assert!(params.auto_classifier.is_none());
     assert!(params.rewake_rx.is_none());
     assert!(params.message_snapshot.is_none());
     assert!(params.resume_hooks.is_empty());

@@ -1,7 +1,7 @@
 //! Core channel wiring logic — mirrors `bootstrap.rs:75-186`.
 //!
-//! When `permission_mode == Bypass`, uses `AutoDenyHandler` (no channel needed).
-//! Otherwise, uses `RelayPermissionHandler` (test-only PermissionHandler that
+//! When `permission_mode == Bypass`, uses `DenyAllHandler` (no channel needed).
+//! Otherwise, uses `ManualPermissionHandler` (test-only PermissionHandler that
 //! emits `ToolPermissionRequest` events and waits on a channel) so that
 //! `SessionController::respond_permission(tool_call_id, allow)` flows through
 //! to the agent loop in Local mode.
@@ -20,7 +20,7 @@ use loopal_provider_api::Provider;
 use loopal_runtime::UnifiedFrontend;
 use loopal_runtime::agent_loop::AgentLoopRunner;
 use loopal_runtime::frontend::PermissionHandler;
-use loopal_runtime::frontend::{AutoDenyHandler, RelayPermissionHandler};
+use loopal_runtime::frontend::{DenyAllHandler, ManualPermissionHandler};
 use loopal_session::SessionController;
 use loopal_tool_api::PermissionMode;
 
@@ -41,12 +41,14 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
     let (question_tx, question_rx) = mpsc::channel::<UserQuestionResponse>(16);
     let interrupt = loopal_runtime::InterruptHandle::new();
 
-    // Permission handler: Bypass → auto-deny; Supervised/Default → real channel
+    // Bypass policy never returns Ask, so the handler is unreachable —
+    // use DenyAllHandler as a no-op that flags misconfig if it is ever called.
+    // Other modes need a real channel so tests can drive permission responses.
     let perm_handler: Box<dyn PermissionHandler> =
         if builder.permission_mode == PermissionMode::Bypass {
-            Box::new(AutoDenyHandler)
+            Box::new(DenyAllHandler)
         } else {
-            Box::new(RelayPermissionHandler::new(event_tx.clone(), permission_rx))
+            Box::new(ManualPermissionHandler::new(event_tx.clone(), permission_rx))
         };
 
     let frontend = Arc::new(UnifiedFrontend::new(
@@ -56,7 +58,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         control_rx,
         None,
         perm_handler,
-        Box::new(loopal_runtime::frontend::RelayQuestionHandler::new(
+        Box::new(loopal_runtime::frontend::ManualQuestionHandler::new(
             event_tx.clone(),
             question_rx,
         )),
@@ -150,6 +152,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
             kernel,
             frontend,
             session_manager: fixture.session_manager(),
+            decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
         },
         if has_cwd_override {
             let mut s = fixture.test_session("integration-test");

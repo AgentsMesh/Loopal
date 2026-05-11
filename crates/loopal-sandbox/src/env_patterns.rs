@@ -124,6 +124,7 @@ pub const SAFE_ENV_ALLOWLIST: &[&str] = &[
     // Loopal's own env vars are always kept
     "LOOPAL_MODEL",
     "LOOPAL_PERMISSION_MODE",
+    "LOOPAL_DECISION_MODE",
     "LOOPAL_LOG",
     "LOOPAL_SANDBOX",
     "LOOPAL_OTEL_ENABLED",

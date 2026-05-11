@@ -44,8 +44,6 @@ pub trait AgentFrontend: Send + Sync {
     /// cancellation, or channel close (shutdown signal).
     async fn recv_input(&self) -> Option<AgentInput>;
 
-    /// Atomic permission request — combines event emission and response
-    /// waiting. Only called when `PermissionMode::check()` returns `Ask`.
     async fn request_permission(
         &self,
         id: &str,
@@ -53,39 +51,26 @@ pub trait AgentFrontend: Send + Sync {
         input: &serde_json::Value,
     ) -> PermissionDecision;
 
-    /// Create a cloneable event emitter for use in `tokio::spawn` blocks.
     fn event_emitter(&self) -> Box<dyn EventEmitter>;
 
-    /// Non-blocking drain of all pending input from the mailbox.
-    ///
-    /// Returns both data messages and control commands so that ephemeral
-    /// agents can process controls before exiting. Default returns empty.
     async fn drain_pending(&self) -> Vec<AgentInput> {
         Vec::new()
     }
 
-    /// Ask the user questions via the frontend (AskUser tool interception).
-    /// Default returns "(not supported)" for sub-agents.
-    async fn ask_user(&self, _questions: Vec<Question>) -> loopal_protocol::UserQuestionResponse {
+    async fn ask_user(
+        &self,
+        _questions: Vec<Question>,
+    ) -> loopal_protocol::UserQuestionResponse {
         loopal_protocol::UserQuestionResponse::unsupported(
             "",
             "AskUser not supported in this context",
         )
     }
 
-    /// Request user approval for a plan (ExitPlanMode interception).
-    ///
-    /// Presents the plan content and returns the user's decision.
-    /// Default auto-approves for sub-agents and headless mode.
     async fn request_plan_approval(&self, _plan_content: &str, _plan_path: &str) -> PlanApproval {
         PlanApproval::Approve
     }
 
-    /// Non-blocking, synchronous event emission for use in `Drop` guards.
-    ///
-    /// Returns `true` if the event was enqueued, `false` if the channel
-    /// was full or closed. Safe to call from non-async contexts (e.g. panic
-    /// unwinding). Default returns `false`.
     fn try_emit(&self, _payload: AgentEventPayload) -> bool {
         false
     }

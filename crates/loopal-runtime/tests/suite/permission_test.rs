@@ -48,7 +48,7 @@ fn test_bypass_readonly_allows() {
 #[test]
 fn test_bypass_supervised_allows() {
     let tool = DummyTool {
-        perm: PermissionLevel::Supervised,
+        perm: PermissionLevel::Write,
     };
     assert_eq!(
         check_permission(&PermissionMode::Bypass, &tool),
@@ -77,7 +77,7 @@ fn test_auto_readonly_allows() {
         perm: PermissionLevel::ReadOnly,
     };
     assert_eq!(
-        check_permission(&PermissionMode::Auto, &tool),
+        check_permission(&PermissionMode::AskDangerous, &tool),
         PermissionDecision::Allow
     );
 }
@@ -85,10 +85,10 @@ fn test_auto_readonly_allows() {
 #[test]
 fn test_auto_supervised_allows() {
     let tool = DummyTool {
-        perm: PermissionLevel::Supervised,
+        perm: PermissionLevel::Write,
     };
     assert_eq!(
-        check_permission(&PermissionMode::Auto, &tool),
+        check_permission(&PermissionMode::AskDangerous, &tool),
         PermissionDecision::Allow
     );
 }
@@ -99,7 +99,7 @@ fn test_auto_dangerous_asks() {
         perm: PermissionLevel::Dangerous,
     };
     assert_eq!(
-        check_permission(&PermissionMode::Auto, &tool),
+        check_permission(&PermissionMode::AskDangerous, &tool),
         PermissionDecision::Ask
     );
 }
@@ -110,7 +110,7 @@ fn test_supervised_readonly_allows() {
         perm: PermissionLevel::ReadOnly,
     };
     assert_eq!(
-        check_permission(&PermissionMode::Supervised, &tool),
+        check_permission(&PermissionMode::AskAnyWrite, &tool),
         PermissionDecision::Allow
     );
 }
@@ -118,10 +118,10 @@ fn test_supervised_readonly_allows() {
 #[test]
 fn test_supervised_supervised_asks() {
     let tool = DummyTool {
-        perm: PermissionLevel::Supervised,
+        perm: PermissionLevel::Write,
     };
     assert_eq!(
-        check_permission(&PermissionMode::Supervised, &tool),
+        check_permission(&PermissionMode::AskAnyWrite, &tool),
         PermissionDecision::Ask
     );
 }
@@ -132,7 +132,7 @@ fn test_supervised_dangerous_asks() {
         perm: PermissionLevel::Dangerous,
     };
     assert_eq!(
-        check_permission(&PermissionMode::Supervised, &tool),
+        check_permission(&PermissionMode::AskAnyWrite, &tool),
         PermissionDecision::Ask
     );
 }

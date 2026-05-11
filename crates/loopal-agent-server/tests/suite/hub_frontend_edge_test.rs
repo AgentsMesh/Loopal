@@ -47,7 +47,7 @@ async fn stale_interrupt_does_not_exit_recv_input() {
     // This simulates the interrupt that was already handled by TurnCancel.
     interrupt_tx.send_modify(|v| *v = v.wrapping_add(1));
 
-    let frontend = HubFrontend::new(session, input_rx, None, watch_rx);
+    let frontend = HubFrontend::new_for_test(session, input_rx, None, watch_rx);
 
     // Spawn recv_input — it should block (stale interrupt consumed), not return None.
     let recv_task = tokio::spawn(async move { frontend.recv_input().await });
@@ -78,7 +78,7 @@ async fn interrupt_then_continue_cycle() {
     let (session, input_tx, input_rx, watch_rx) = make_session();
     let interrupt_tx = session.interrupt_tx.clone();
 
-    let frontend = Arc::new(HubFrontend::new(session, input_rx, None, watch_rx));
+    let frontend = Arc::new(HubFrontend::new_for_test(session, input_rx, None, watch_rx));
 
     // ── Round 1: live interrupt while recv_input is waiting ──
     let f1 = frontend.clone();
@@ -126,7 +126,7 @@ async fn multiple_stale_interrupts_all_consumed() {
         interrupt_tx.send_modify(|v| *v = v.wrapping_add(1));
     }
 
-    let frontend = HubFrontend::new(session, input_rx, None, watch_rx);
+    let frontend = HubFrontend::new_for_test(session, input_rx, None, watch_rx);
 
     let recv_task = tokio::spawn(async move { frontend.recv_input().await });
 

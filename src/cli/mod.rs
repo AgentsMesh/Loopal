@@ -43,11 +43,17 @@ impl Cli {
             settings.model = model.clone();
         }
         if let Some(perm) = &self.child.permission {
-            settings.permission_mode = match perm.as_str() {
-                "bypass" | "yolo" => loopal_tool_api::PermissionMode::Bypass,
-                "auto" => loopal_tool_api::PermissionMode::Auto,
-                _ => loopal_tool_api::PermissionMode::Supervised,
-            };
+            let normalized = if perm == "yolo" { "bypass" } else { perm.as_str() };
+            if let Ok(mode) = normalized.parse::<loopal_tool_api::PermissionMode>() {
+                settings.permission_mode = mode;
+            } else {
+                settings.permission_mode = loopal_tool_api::PermissionMode::AskAnyWrite;
+            }
+        }
+        if let Some(decision) = &self.child.decision
+            && let Ok(mode) = decision.parse::<loopal_decision_api::DecisionMode>()
+        {
+            settings.decision_mode = mode;
         }
         if self.child.no_sandbox {
             settings.sandbox.policy = loopal_config::SandboxPolicy::Disabled;

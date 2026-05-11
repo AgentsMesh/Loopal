@@ -33,7 +33,7 @@ impl Tool for ApplyPatchTool {
     }
 
     fn permission(&self) -> PermissionLevel {
-        PermissionLevel::Supervised
+        PermissionLevel::Write
     }
 
     async fn execute(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult, LoopalError> {

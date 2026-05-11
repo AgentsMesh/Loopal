@@ -34,7 +34,7 @@ fn make_session() -> (
 #[tokio::test]
 async fn test_hub_drain_pending_messages() {
     let (session, input_tx, input_rx, watch_rx) = make_session();
-    let frontend = HubFrontend::new(session, input_rx, None, watch_rx);
+    let frontend = HubFrontend::new_for_test(session, input_rx, None, watch_rx);
 
     let env = Envelope::new(MessageSource::Human, "main", "hello");
     input_tx.send(AgentInput::Message(env)).await.unwrap();
@@ -50,7 +50,7 @@ async fn test_hub_drain_pending_messages() {
 #[tokio::test]
 async fn test_hub_drain_pending_controls() {
     let (session, input_tx, input_rx, watch_rx) = make_session();
-    let frontend = HubFrontend::new(session, input_rx, None, watch_rx);
+    let frontend = HubFrontend::new_for_test(session, input_rx, None, watch_rx);
 
     input_tx
         .send(AgentInput::Control(ControlCommand::Clear))

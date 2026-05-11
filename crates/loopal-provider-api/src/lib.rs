@@ -1,5 +1,6 @@
 pub mod model;
 pub mod model_router;
+pub mod resolver;
 pub mod thinking;
 
 use std::borrow::Cow;
@@ -16,6 +17,7 @@ use loopal_tool_api::ToolDefinition;
 
 pub use model::*;
 pub use model_router::ModelRouter;
+pub use resolver::ProviderResolver;
 pub use thinking::*;
 
 // ---------------------------------------------------------------------------

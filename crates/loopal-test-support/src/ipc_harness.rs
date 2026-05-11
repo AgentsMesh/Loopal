@@ -1,6 +1,6 @@
 //! IPC acceptance test harness — full-stack IPC testing with mock provider.
 //!
-//! Wires up: AgentClient → IPC → Server(IpcFrontend + agent_loop) → IPC → Bridge → channels.
+//! Wires up: AgentClient → IPC → Server(HubFrontend + agent_loop) → IPC → Bridge → channels.
 //! Uses in-memory duplex streams from `loopal_ipc::duplex_pair` (no real subprocess).
 
 use std::sync::Arc;
@@ -26,7 +26,7 @@ pub struct IpcTestHarness {
 
 /// Build a full-stack IPC harness with mock provider.
 ///
-/// The server runs in a background task with IpcFrontend + agent_loop.
+/// The server runs in a background task with HubFrontend + agent_loop.
 /// The client side uses AgentClient → into_parts → bridge.
 /// Returns TUI-side channel handles for sending messages and collecting events.
 pub async fn build_ipc_harness(

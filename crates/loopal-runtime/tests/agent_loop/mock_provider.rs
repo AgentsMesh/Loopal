@@ -12,7 +12,7 @@ use loopal_kernel::Kernel;
 use loopal_protocol::{AgentEvent, ControlCommand, Envelope};
 use loopal_provider_api::{Provider, StreamChunk};
 use loopal_runtime::agent_loop::AgentLoopRunner;
-use loopal_runtime::frontend::{AutoCancelQuestionHandler, AutoDenyHandler};
+use loopal_runtime::frontend::{UnsupportedQuestionHandler, DenyAllHandler};
 use loopal_runtime::{
     AgentConfig, AgentDeps, AgentLoopParams, AgentLoopParamsBuilder, InterruptHandle,
     UnifiedFrontend,
@@ -57,6 +57,7 @@ fn build_params_with_config(
             kernel,
             frontend,
             session_manager: fixture.session_manager(),
+            decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
         },
         fixture.test_session("rt-test"),
         ContextStore::from_messages(messages, make_test_budget()),
@@ -95,8 +96,8 @@ pub fn make_runner_with_mock_provider(
         mailbox_rx,
         control_rx,
         None,
-        Box::new(AutoDenyHandler),
-        Box::new(AutoCancelQuestionHandler),
+        Box::new(DenyAllHandler),
+        Box::new(UnsupportedQuestionHandler),
     ));
     let mut kernel = Kernel::new(Settings::default()).unwrap();
     kernel.register_provider(Arc::new(MockProvider::new(chunks)) as Arc<dyn Provider>);
@@ -133,8 +134,8 @@ pub fn make_multi_runner_with_intents(
         mailbox_rx,
         control_rx,
         None,
-        Box::new(AutoDenyHandler),
-        Box::new(AutoCancelQuestionHandler),
+        Box::new(DenyAllHandler),
+        Box::new(UnsupportedQuestionHandler),
     ));
     let mut kernel = Kernel::new(Settings::default()).unwrap();
     let mock = MultiCallProvider::new(calls);
@@ -169,8 +170,8 @@ pub fn make_interactive_multi_runner(
         mailbox_rx,
         control_rx,
         None,
-        Box::new(AutoDenyHandler),
-        Box::new(AutoCancelQuestionHandler),
+        Box::new(DenyAllHandler),
+        Box::new(UnsupportedQuestionHandler),
     ));
     let mut kernel = Kernel::new(Settings::default()).unwrap();
     kernel.register_provider(Arc::new(MultiCallProvider::new(calls)) as Arc<dyn Provider>);

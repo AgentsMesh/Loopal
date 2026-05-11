@@ -8,6 +8,7 @@ fn test_load_settings_all_env_var_scenarios() {
     unsafe {
         std::env::remove_var("LOOPAL_MODEL");
         std::env::remove_var("LOOPAL_PERMISSION_MODE");
+        std::env::remove_var("LOOPAL_DECISION_MODE");
     }
 
     // --- Scenario 1: Defaults (no config files, no env vars) ---
@@ -73,14 +74,14 @@ fn test_load_settings_all_env_var_scenarios() {
     // --- Scenario 5: LOOPAL_PERMISSION_MODE override ---
     {
         unsafe {
-            std::env::set_var("LOOPAL_PERMISSION_MODE", "supervised");
+            std::env::set_var("LOOPAL_PERMISSION_MODE", "ask_any_write");
         }
 
         let tmp = TempDir::new().unwrap();
         let settings = load_config(tmp.path()).unwrap().settings;
         assert_eq!(
             settings.permission_mode,
-            loopal_tool_api::PermissionMode::Supervised,
+            loopal_tool_api::PermissionMode::AskAnyWrite,
             "env var should override permission mode"
         );
 
@@ -105,6 +106,25 @@ fn test_load_settings_all_env_var_scenarios() {
 
         unsafe {
             std::env::remove_var("LOOPAL_SANDBOX");
+        }
+    }
+
+    // --- Scenario 7: LOOPAL_DECISION_MODE override ---
+    {
+        unsafe {
+            std::env::set_var("LOOPAL_DECISION_MODE", "auto");
+        }
+
+        let tmp = TempDir::new().unwrap();
+        let settings = load_config(tmp.path()).unwrap().settings;
+        assert_eq!(
+            settings.decision_mode,
+            loopal_decision_api::DecisionMode::Auto,
+            "env var should override decision mode"
+        );
+
+        unsafe {
+            std::env::remove_var("LOOPAL_DECISION_MODE");
         }
     }
 }

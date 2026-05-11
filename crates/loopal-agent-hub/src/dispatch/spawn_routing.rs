@@ -51,7 +51,7 @@ async fn spawn_local(
     let cwd = params["cwd"].as_str().unwrap_or(".").to_string();
     let model = params["model"].as_str().map(String::from);
     let prompt = params["prompt"].as_str().map(String::from);
-    let permission_mode = params["permission_mode"].as_str().map(String::from);
+    let permission = params["permission"].as_str().map(String::from);
     let agent_type = params["agent_type"].as_str().map(String::from);
     let depth = params["depth"].as_u64().map(|v| v as u32);
     let fork_context = params.get("fork_context").cloned();
@@ -69,7 +69,7 @@ async fn spawn_local(
         model,
         prompt,
         parent,
-        permission_mode,
+        permission,
         agent_type,
         depth,
         fork_context,
@@ -97,7 +97,7 @@ pub async fn handle_spawn_remote_agent(
         args.model,
         args.prompt,
         args.parent,
-        args.permission_mode,
+        args.permission,
         args.agent_type,
         args.depth,
         None,
@@ -114,17 +114,13 @@ pub(super) async fn spawn_via_manager(
     model: Option<String>,
     prompt: Option<String>,
     parent: Option<String>,
-    permission_mode: Option<String>,
+    permission: Option<String>,
     agent_type: Option<String>,
     depth: Option<u32>,
     fork_context: Option<Value>,
     no_sandbox: bool,
 ) -> Result<Value, String> {
     let name_clone = name.clone();
-    // Detached on purpose: spawn_and_register may have already forked a
-    // child process, and we don't want outer cancellation to leave the
-    // child as an orphan. We still .await for the agent_id so the IPC
-    // response carries it back to the caller.
     let handle = tokio::spawn(async move {
         crate::spawn_manager::spawn_and_register(
             hub,
@@ -133,7 +129,7 @@ pub(super) async fn spawn_via_manager(
             model,
             prompt,
             parent,
-            permission_mode,
+            permission,
             agent_type,
             depth,
             fork_context,

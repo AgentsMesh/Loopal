@@ -106,12 +106,17 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
             content,
             summary,
         } => interactive::inbox_enqueued(state, message_id, source, content, summary.as_deref()),
-        AutoModeDecision {
+        PermissionDecided {
             tool_name,
             decision,
             reason,
             duration_ms,
-        } => interactive::auto_mode_decision(state, tool_name, decision, reason, *duration_ms),
+        } => interactive::permission_decided(state, tool_name, decision, reason, *duration_ms),
+        QuestionDecided {
+            question_count,
+            duration_ms,
+            reason,
+        } => interactive::question_decided(state, *question_count, reason, *duration_ms),
         ModeChanged { mode } => observable::mode_changed(state, mode),
         TurnCompleted { .. } => observable::turn_completed(state),
         TasksChanged { tasks } => aggregate::tasks_changed(state, tasks),

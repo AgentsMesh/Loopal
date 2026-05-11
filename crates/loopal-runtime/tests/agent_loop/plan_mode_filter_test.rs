@@ -12,7 +12,7 @@ use super::{make_cancel, make_runner_with_channels};
 fn setup_plan_state(runner: &mut loopal_runtime::agent_loop::AgentLoopRunner) {
     runner.params.config.plan_state = Some(PlanModeState {
         previous_mode: AgentMode::Act,
-        previous_permission_mode: PermissionMode::Supervised,
+        previous_permission_mode: PermissionMode::AskAnyWrite,
         tool_filter: build_plan_mode_filter(&runner.params.deps.kernel),
     });
     runner.params.config.mode = AgentMode::Plan;

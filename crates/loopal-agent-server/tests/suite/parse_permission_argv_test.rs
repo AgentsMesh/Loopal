@@ -4,8 +4,7 @@ use loopal_tool_api::PermissionMode;
 
 #[test]
 fn parses_valid_json() {
-    let result =
-        parse_permission_argv(r#"{"mode":"ask_dangerous","decision":"auto"}"#).unwrap();
+    let result = parse_permission_argv(r#"{"mode":"ask_dangerous","decision":"auto"}"#).unwrap();
     assert_eq!(result, (PermissionMode::AskDangerous, DecisionMode::Auto));
 }
 

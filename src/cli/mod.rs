@@ -43,7 +43,11 @@ impl Cli {
             settings.model = model.clone();
         }
         if let Some(perm) = &self.child.permission {
-            let normalized = if perm == "yolo" { "bypass" } else { perm.as_str() };
+            let normalized = if perm == "yolo" {
+                "bypass"
+            } else {
+                perm.as_str()
+            };
             if let Ok(mode) = normalized.parse::<loopal_tool_api::PermissionMode>() {
                 settings.permission_mode = mode;
             } else {

@@ -4,7 +4,7 @@ use loopal_protocol::ControlCommand;
 use loopal_protocol::{AgentMode, Envelope, MessageSource};
 use loopal_runtime::agent_input::AgentInput;
 use loopal_runtime::frontend::UnifiedFrontend;
-use loopal_runtime::frontend::{AgentFrontend, UnsupportedQuestionHandler, DenyAllHandler};
+use loopal_runtime::frontend::{AgentFrontend, DenyAllHandler, UnsupportedQuestionHandler};
 use tokio::sync::mpsc;
 
 fn make_unified(

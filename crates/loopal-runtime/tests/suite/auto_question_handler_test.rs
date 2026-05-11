@@ -15,10 +15,7 @@ use loopal_runtime::frontend::{AutoQuestionHandler, DecisionContext};
 struct FailingResolver;
 
 impl ProviderResolver for FailingResolver {
-    fn resolve_for(
-        &self,
-        _task: TaskType,
-    ) -> Result<(String, Arc<dyn Provider>), LoopalError> {
+    fn resolve_for(&self, _task: TaskType) -> Result<(String, Arc<dyn Provider>), LoopalError> {
         Err(LoopalError::Other("resolver failure".into()))
     }
 }
@@ -29,10 +26,7 @@ struct MockResolver {
 }
 
 impl ProviderResolver for MockResolver {
-    fn resolve_for(
-        &self,
-        _task: TaskType,
-    ) -> Result<(String, Arc<dyn Provider>), LoopalError> {
+    fn resolve_for(&self, _task: TaskType) -> Result<(String, Arc<dyn Provider>), LoopalError> {
         Ok((self.model.clone(), self.provider.clone()))
     }
 }
@@ -141,7 +135,10 @@ async fn empty_questions_still_falls_back() {
 async fn degraded_classifier_skips_provider_and_falls_back() {
     let classifier = Arc::new(AutoClassifier::new("".into()));
     classifier.force_degraded_for_test("@question");
-    assert!(classifier.is_degraded(), "precondition: classifier degraded");
+    assert!(
+        classifier.is_degraded(),
+        "precondition: classifier degraded"
+    );
 
     let fb_count = Arc::new(AtomicUsize::new(0));
     let fb = RecordingFallback {
@@ -303,9 +300,7 @@ async fn happy_path_multi_select_joins_labels_with_comma() {
 async fn answer_count_mismatch_falls_back() {
     let classifier = Arc::new(AutoClassifier::new("".into()));
     // Two questions but LLM returns only one answer
-    let provider = MockProvider::returning(
-        r#"{"answers": [["yes"]], "reason": "incomplete"}"#,
-    );
+    let provider = MockProvider::returning(r#"{"answers": [["yes"]], "reason": "incomplete"}"#);
     let resolver = Arc::new(MockResolver {
         provider,
         model: "claude-haiku".into(),

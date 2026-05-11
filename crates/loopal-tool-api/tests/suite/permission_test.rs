@@ -7,10 +7,7 @@ fn bypass_allows_all_levels() {
         PermissionLevel::Write,
         PermissionLevel::Dangerous,
     ] {
-        assert_eq!(
-            PermissionMode::Bypass.check(lvl),
-            PermissionDecision::Allow
-        );
+        assert_eq!(PermissionMode::Bypass.check(lvl), PermissionDecision::Allow);
     }
 }
 

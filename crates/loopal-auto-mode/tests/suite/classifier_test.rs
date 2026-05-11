@@ -107,7 +107,14 @@ async fn markdown_fenced_json_parsed() {
         MockClassifierProvider::ok("```json\n{\"should_block\": false, \"reason\": \"ok\"}\n```");
     let classifier = AutoClassifier::new(String::new());
     let result = classifier
-        .classify("Bash", &serde_json::json!({}), "", "/tmp/test", &*provider, "test")
+        .classify(
+            "Bash",
+            &serde_json::json!({}),
+            "",
+            "/tmp/test",
+            &*provider,
+            "test",
+        )
         .await;
     assert_eq!(result.decision, PermissionDecision::Allow);
 }
@@ -117,7 +124,14 @@ async fn malformed_json_returns_deny() {
     let provider = MockClassifierProvider::ok("not json at all");
     let classifier = AutoClassifier::new(String::new());
     let result = classifier
-        .classify("Bash", &serde_json::json!({}), "", "/tmp/test", &*provider, "test")
+        .classify(
+            "Bash",
+            &serde_json::json!({}),
+            "",
+            "/tmp/test",
+            &*provider,
+            "test",
+        )
         .await;
     assert_eq!(result.decision, PermissionDecision::Deny);
     assert!(result.reason.contains("parse failure"));
@@ -128,7 +142,14 @@ async fn empty_response_returns_deny() {
     let provider = MockClassifierProvider::ok("");
     let classifier = AutoClassifier::new(String::new());
     let result = classifier
-        .classify("Bash", &serde_json::json!({}), "", "/tmp/test", &*provider, "test")
+        .classify(
+            "Bash",
+            &serde_json::json!({}),
+            "",
+            "/tmp/test",
+            &*provider,
+            "test",
+        )
         .await;
     assert_eq!(result.decision, PermissionDecision::Deny);
 }
@@ -138,7 +159,14 @@ async fn provider_error_returns_deny() {
     let provider = MockClassifierProvider::err();
     let classifier = AutoClassifier::new(String::new());
     let result = classifier
-        .classify("Bash", &serde_json::json!({}), "", "/tmp/test", &*provider, "test")
+        .classify(
+            "Bash",
+            &serde_json::json!({}),
+            "",
+            "/tmp/test",
+            &*provider,
+            "test",
+        )
         .await;
     assert_eq!(result.decision, PermissionDecision::Deny);
     assert!(result.reason.contains("error"));
@@ -151,7 +179,14 @@ async fn circuit_breaker_degrades_after_repeated_errors() {
     for _ in 0..3 {
         let provider = MockClassifierProvider::err();
         classifier
-            .classify("Bash", &serde_json::json!({}), "", "/tmp/test", &*provider, "test")
+            .classify(
+                "Bash",
+                &serde_json::json!({}),
+                "",
+                "/tmp/test",
+                &*provider,
+                "test",
+            )
             .await;
     }
     assert!(classifier.is_degraded());
@@ -163,7 +198,14 @@ async fn human_approval_resets_degradation() {
     for _ in 0..3 {
         let provider = MockClassifierProvider::err();
         classifier
-            .classify("Bash", &serde_json::json!({}), "", "/tmp/test", &*provider, "test")
+            .classify(
+                "Bash",
+                &serde_json::json!({}),
+                "",
+                "/tmp/test",
+                &*provider,
+                "test",
+            )
             .await;
     }
     assert!(classifier.is_degraded());

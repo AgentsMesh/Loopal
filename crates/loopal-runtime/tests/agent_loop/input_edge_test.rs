@@ -13,7 +13,7 @@ fn test_model_info_defaults_for_unknown_model() {
     use loopal_config::Settings;
     use loopal_kernel::Kernel;
     use loopal_runtime::agent_loop::AgentLoopRunner;
-    use loopal_runtime::frontend::{UnsupportedQuestionHandler, DenyAllHandler};
+    use loopal_runtime::frontend::{DenyAllHandler, UnsupportedQuestionHandler};
     use loopal_runtime::{
         AgentConfig, AgentDeps, AgentLoopParamsBuilder, InterruptHandle, UnifiedFrontend,
     };

@@ -31,12 +31,7 @@ impl IpcPermissionHandler {
 
 #[async_trait]
 impl PermissionHandler for IpcPermissionHandler {
-    async fn decide(
-        &self,
-        id: &str,
-        name: &str,
-        input: &serde_json::Value,
-    ) -> PermissionOutcome {
+    async fn decide(&self, id: &str, name: &str, input: &serde_json::Value) -> PermissionOutcome {
         info!(tool = name, "requesting permission via IPC");
         let Some(conn) = primary_connection(&self.session).await else {
             warn!(tool = name, "permission denied: no primary connection");

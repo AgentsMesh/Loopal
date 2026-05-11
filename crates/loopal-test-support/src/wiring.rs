@@ -48,7 +48,10 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         if builder.permission_mode == PermissionMode::Bypass {
             Box::new(DenyAllHandler)
         } else {
-            Box::new(ManualPermissionHandler::new(event_tx.clone(), permission_rx))
+            Box::new(ManualPermissionHandler::new(
+                event_tx.clone(),
+                permission_rx,
+            ))
         };
 
     let frontend = Arc::new(UnifiedFrontend::new(

@@ -98,7 +98,11 @@ impl QuestionHandler for AutoQuestionHandler {
                 "auto-question answer count mismatch"
             );
             return self
-                .fall_back("answer count mismatch".into(), result.duration_ms, questions)
+                .fall_back(
+                    "answer count mismatch".into(),
+                    result.duration_ms,
+                    questions,
+                )
                 .await;
         }
         let id = uuid::Uuid::new_v4().to_string();

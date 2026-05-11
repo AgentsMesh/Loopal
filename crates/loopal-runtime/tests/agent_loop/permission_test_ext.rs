@@ -6,7 +6,7 @@ use loopal_kernel::Kernel;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::Envelope;
 use loopal_runtime::agent_loop::AgentLoopRunner;
-use loopal_runtime::frontend::{UnsupportedQuestionHandler, ManualPermissionHandler};
+use loopal_runtime::frontend::{ManualPermissionHandler, UnsupportedQuestionHandler};
 use loopal_runtime::{
     AgentConfig, AgentDeps, AgentLoopParamsBuilder, InterruptHandle, UnifiedFrontend,
 };

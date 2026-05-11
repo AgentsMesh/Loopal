@@ -39,9 +39,15 @@ fn permission_decided_deny_without_duration() {
         duration_ms: 0,
     });
     let msg = last_message_content(&r);
-    assert!(msg.contains("permission denied"), "deny label missing: {msg}");
+    assert!(
+        msg.contains("permission denied"),
+        "deny label missing: {msg}"
+    );
     assert!(msg.contains("rm -rf"), "tool name missing: {msg}");
-    assert!(!msg.contains("(0ms)"), "zero duration must be omitted: {msg}");
+    assert!(
+        !msg.contains("(0ms)"),
+        "zero duration must be omitted: {msg}"
+    );
 }
 
 #[test]
@@ -58,7 +64,10 @@ fn permission_decided_empty_reason_omits_colon() {
         !msg.contains(": "),
         "no reason → no ': reason' segment, got: {msg}"
     );
-    assert!(msg.contains("(12ms)"), "duration should still appear: {msg}");
+    assert!(
+        msg.contains("(12ms)"),
+        "duration should still appear: {msg}"
+    );
     assert!(msg.contains("Read"));
 }
 
@@ -90,7 +99,10 @@ fn question_decided_with_reason_and_duration() {
     let msg = last_message_content(&r);
     assert!(msg.contains("ask-user resolved"), "label missing: {msg}");
     assert!(msg.contains("3 question(s)"), "count missing: {msg}");
-    assert!(msg.contains("chose conservative defaults"), "reason missing: {msg}");
+    assert!(
+        msg.contains("chose conservative defaults"),
+        "reason missing: {msg}"
+    );
     assert!(msg.contains("(150ms)"), "duration missing: {msg}");
 }
 

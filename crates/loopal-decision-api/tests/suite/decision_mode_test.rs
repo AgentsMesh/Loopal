@@ -40,7 +40,10 @@ fn copy_and_eq_semantics() {
 
 #[test]
 fn from_str_accepts_known_variants() {
-    assert_eq!("manual".parse::<DecisionMode>().unwrap(), DecisionMode::Manual);
+    assert_eq!(
+        "manual".parse::<DecisionMode>().unwrap(),
+        DecisionMode::Manual
+    );
     assert_eq!("auto".parse::<DecisionMode>().unwrap(), DecisionMode::Auto);
 }
 
@@ -49,7 +52,10 @@ fn from_str_rejects_unknown_with_descriptive_error() {
     let err = "magic".parse::<DecisionMode>().unwrap_err();
     let msg = err.to_string();
     assert!(msg.contains("magic"), "error must mention input: {msg}");
-    assert!(msg.contains("manual"), "error must mention valid variant: {msg}");
+    assert!(
+        msg.contains("manual"),
+        "error must mention valid variant: {msg}"
+    );
 }
 
 #[test]

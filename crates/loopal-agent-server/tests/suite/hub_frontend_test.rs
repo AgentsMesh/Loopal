@@ -72,8 +72,9 @@ async fn hub_emit_broadcasts_to_all_clients() {
     session.add_client("a".into(), srv_a).await;
     session.add_client("b".into(), srv_b).await;
 
-    let frontend =
-        loopal_agent_server::hub_frontend::HubFrontend::new_for_test(session, input_rx, None, watch_rx);
+    let frontend = loopal_agent_server::hub_frontend::HubFrontend::new_for_test(
+        session, input_rx, None, watch_rx,
+    );
     frontend
         .emit(AgentEventPayload::Stream {
             text: "hello".into(),
@@ -112,9 +113,11 @@ async fn hub_permission_routes_to_primary() {
     session.add_client("primary".into(), srv_a).await;
     session.add_client("observer".into(), srv_b).await;
 
-    let frontend = Arc::new(loopal_agent_server::hub_frontend::HubFrontend::new_for_test(
-        session, input_rx, None, watch_rx,
-    ));
+    let frontend = Arc::new(
+        loopal_agent_server::hub_frontend::HubFrontend::new_for_test(
+            session, input_rx, None, watch_rx,
+        ),
+    );
 
     let f2 = frontend.clone();
     let perm_task = tokio::spawn(async move {
@@ -180,8 +183,9 @@ async fn hub_interrupt_wakes_recv_input() {
     let (session, input_rx, watch_rx) = make_session();
     let interrupt_tx = session.interrupt_tx.clone();
 
-    let frontend =
-        loopal_agent_server::hub_frontend::HubFrontend::new_for_test(session, input_rx, None, watch_rx);
+    let frontend = loopal_agent_server::hub_frontend::HubFrontend::new_for_test(
+        session, input_rx, None, watch_rx,
+    );
 
     let recv_task = tokio::spawn(async move { frontend.recv_input().await });
 

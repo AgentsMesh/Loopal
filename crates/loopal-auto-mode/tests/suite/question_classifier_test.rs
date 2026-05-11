@@ -34,12 +34,16 @@ mod llm_path {
 
     #[async_trait]
     impl Provider for OkProvider {
-        fn name(&self) -> &str { "ok" }
+        fn name(&self) -> &str {
+            "ok"
+        }
         async fn stream_chat(&self, _p: &ChatParams) -> Result<ChatStream, LoopalError> {
             let t = self.text.lock().unwrap().take().unwrap();
             let chunks = VecDeque::from(vec![
                 Ok(StreamChunk::Text { text: t }),
-                Ok(StreamChunk::Done { stop_reason: StopReason::EndTurn }),
+                Ok(StreamChunk::Done {
+                    stop_reason: StopReason::EndTurn,
+                }),
             ]);
             Ok(Box::pin(S(chunks)))
         }
@@ -47,7 +51,9 @@ mod llm_path {
 
     #[async_trait]
     impl Provider for StreamErrProvider {
-        fn name(&self) -> &str { "stream-err" }
+        fn name(&self) -> &str {
+            "stream-err"
+        }
         async fn stream_chat(&self, _p: &ChatParams) -> Result<ChatStream, LoopalError> {
             Err(LoopalError::Other("stream open failed".into()))
         }
@@ -55,9 +61,16 @@ mod llm_path {
 
     #[async_trait]
     impl Provider for ChunkErrProvider {
-        fn name(&self) -> &str { "chunk-err" }
+        fn name(&self) -> &str {
+            "chunk-err"
+        }
         async fn stream_chat(&self, _p: &ChatParams) -> Result<ChatStream, LoopalError> {
-            let pre = self.text_before_err.lock().unwrap().take().unwrap_or_default();
+            let pre = self
+                .text_before_err
+                .lock()
+                .unwrap()
+                .take()
+                .unwrap_or_default();
             let chunks = VecDeque::from(vec![
                 Ok(StreamChunk::Text { text: pre }),
                 Err(LoopalError::Other("chunk read failed mid-stream".into())),
@@ -69,7 +82,10 @@ mod llm_path {
     fn one_question() -> Vec<Question> {
         vec![Question {
             question: "go?".into(),
-            options: vec![QuestionOption { label: "yes".into(), description: "".into() }],
+            options: vec![QuestionOption {
+                label: "yes".into(),
+                description: "".into(),
+            }],
             allow_multiple: false,
         }]
     }
@@ -78,9 +94,7 @@ mod llm_path {
     async fn success_returns_parsed_result_and_records_approval() {
         let classifier = AutoClassifier::new(String::new());
         let provider = Arc::new(OkProvider {
-            text: std::sync::Mutex::new(Some(
-                r#"{"answers": [["yes"]], "reason": "ok"}"#.into(),
-            )),
+            text: std::sync::Mutex::new(Some(r#"{"answers": [["yes"]], "reason": "ok"}"#.into())),
         });
         let r = classifier
             .classify_question(&one_question(), "", "/tmp", &*provider, "model")
@@ -167,9 +181,7 @@ mod llm_path {
         }
         assert!(!classifier.is_degraded(), "2 errors below threshold");
         let provider = Arc::new(OkProvider {
-            text: std::sync::Mutex::new(Some(
-                r#"{"answers": [["yes"]], "reason": "ok"}"#.into(),
-            )),
+            text: std::sync::Mutex::new(Some(r#"{"answers": [["yes"]], "reason": "ok"}"#.into())),
         });
         let _ = classifier
             .classify_question(&one_question(), "", "/tmp", &*provider, "model")

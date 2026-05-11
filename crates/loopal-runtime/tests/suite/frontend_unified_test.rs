@@ -4,7 +4,7 @@ use loopal_protocol::ControlCommand;
 use loopal_protocol::{Envelope, MessageSource};
 use loopal_runtime::agent_input::AgentInput;
 use loopal_runtime::frontend::AgentFrontend;
-use loopal_runtime::frontend::{UnsupportedQuestionHandler, DenyAllHandler, UnifiedFrontend};
+use loopal_runtime::frontend::{DenyAllHandler, UnifiedFrontend, UnsupportedQuestionHandler};
 use loopal_tool_api::PermissionDecision;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;

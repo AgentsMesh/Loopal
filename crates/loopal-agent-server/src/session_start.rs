@@ -89,12 +89,13 @@ pub(crate) async fn start_session(
         let (watch_tx, watch_rx) = tokio::sync::watch::channel(0u64);
         let interrupt_tx = Arc::new(watch_tx);
 
-        let session_holder: crate::ipc_handlers::SessionRef =
-            Arc::new(tokio::sync::RwLock::new(Arc::new(SharedSession::placeholder(
+        let session_holder: crate::ipc_handlers::SessionRef = Arc::new(tokio::sync::RwLock::new(
+            Arc::new(SharedSession::placeholder(
                 input_tx.clone(),
                 interrupt.clone(),
                 interrupt_tx.clone(),
-            ))));
+            )),
+        ));
         let decision_context =
             loopal_runtime::frontend::DecisionContext::with_cwd(cwd.to_string_lossy().into_owned());
         let (perm_handler, q_handler) = build_session_handlers(

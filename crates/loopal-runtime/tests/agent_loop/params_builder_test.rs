@@ -21,7 +21,7 @@ impl SessionResumeHook for NoopHook {
 }
 
 fn deps_for(fixture: &TestFixture) -> AgentDeps {
-    use loopal_runtime::frontend::{UnsupportedQuestionHandler, DenyAllHandler, UnifiedFrontend};
+    use loopal_runtime::frontend::{DenyAllHandler, UnifiedFrontend, UnsupportedQuestionHandler};
     let (event_tx, _event_rx) = tokio::sync::mpsc::channel(8);
     let (_mbox_tx, mbox_rx) = tokio::sync::mpsc::channel(8);
     let (_ctrl_tx, ctrl_rx) = tokio::sync::mpsc::channel(8);
@@ -38,7 +38,7 @@ fn deps_for(fixture: &TestFixture) -> AgentDeps {
         kernel: Arc::new(loopal_kernel::Kernel::new(Default::default()).unwrap()),
         frontend,
         session_manager: fixture.session_manager(),
-            decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
+        decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
     }
 }
 

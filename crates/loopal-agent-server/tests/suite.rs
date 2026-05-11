@@ -50,10 +50,10 @@ mod resume_e2e_helpers;
 mod server_info_test;
 #[path = "suite/server_test.rs"]
 mod server_test;
-#[path = "suite/session_hub_storage_test.rs"]
-mod session_hub_storage_test;
 #[path = "suite/session_handlers_factory_test.rs"]
 mod session_handlers_factory_test;
+#[path = "suite/session_hub_storage_test.rs"]
+mod session_hub_storage_test;
 #[path = "suite/session_start_test.rs"]
 mod session_start_test;
 #[path = "suite/spawn_policy_test.rs"]

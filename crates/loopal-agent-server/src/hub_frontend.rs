@@ -76,8 +76,7 @@ impl AgentFrontend for HubFrontend {
         input: &serde_json::Value,
     ) -> PermissionDecision {
         let outcome = self.permission_handler.decide(id, name, input).await;
-        let (decision, payload) =
-            loopal_runtime::frontend::into_permission_decided(name, outcome);
+        let (decision, payload) = loopal_runtime::frontend::into_permission_decided(name, outcome);
         let _ = self.broadcaster.broadcast(payload).await;
         decision
     }

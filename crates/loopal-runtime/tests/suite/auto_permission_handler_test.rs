@@ -15,10 +15,7 @@ use loopal_tool_api::PermissionDecision;
 struct FailingResolver;
 
 impl ProviderResolver for FailingResolver {
-    fn resolve_for(
-        &self,
-        _task: TaskType,
-    ) -> Result<(String, Arc<dyn Provider>), LoopalError> {
+    fn resolve_for(&self, _task: TaskType) -> Result<(String, Arc<dyn Provider>), LoopalError> {
         Err(LoopalError::Other("test resolver failure".into()))
     }
 }
@@ -29,10 +26,7 @@ struct MockResolver {
 }
 
 impl ProviderResolver for MockResolver {
-    fn resolve_for(
-        &self,
-        _task: TaskType,
-    ) -> Result<(String, Arc<dyn Provider>), LoopalError> {
+    fn resolve_for(&self, _task: TaskType) -> Result<(String, Arc<dyn Provider>), LoopalError> {
         Ok((self.model.clone(), self.provider.clone()))
     }
 }
@@ -185,7 +179,10 @@ async fn provider_error_with_deny_action_does_not_call_fallback() {
 async fn degraded_classifier_skips_provider_and_falls_back() {
     let classifier = Arc::new(AutoClassifier::new("".into()));
     classifier.force_degraded_for_test("Bash");
-    assert!(classifier.is_degraded(), "precondition: classifier degraded");
+    assert!(
+        classifier.is_degraded(),
+        "precondition: classifier degraded"
+    );
 
     let called = Arc::new(AtomicBool::new(false));
     let fallback = RecordingHandler {
@@ -218,9 +215,8 @@ async fn degraded_classifier_skips_provider_and_falls_back() {
 #[tokio::test]
 async fn happy_path_classifier_allow_returns_allow_without_fallback() {
     let classifier = Arc::new(AutoClassifier::new("".into()));
-    let provider = MockProvider::returning(
-        r#"{"should_block": false, "reason": "normal cargo test"}"#,
-    );
+    let provider =
+        MockProvider::returning(r#"{"should_block": false, "reason": "normal cargo test"}"#);
     let resolver = Arc::new(MockResolver {
         provider,
         model: "claude-haiku".into(),
@@ -237,7 +233,11 @@ async fn happy_path_classifier_allow_returns_allow_without_fallback() {
         DecisionContext::with_cwd("/tmp/test"),
     );
     let outcome = auto
-        .decide("id-happy-allow", "Bash", &serde_json::json!({"command": "cargo test"}))
+        .decide(
+            "id-happy-allow",
+            "Bash",
+            &serde_json::json!({"command": "cargo test"}),
+        )
         .await;
     assert_eq!(
         outcome.decision,
@@ -258,9 +258,8 @@ async fn happy_path_classifier_allow_returns_allow_without_fallback() {
 #[tokio::test]
 async fn happy_path_classifier_block_returns_deny_without_fallback() {
     let classifier = Arc::new(AutoClassifier::new("".into()));
-    let provider = MockProvider::returning(
-        r#"{"should_block": true, "reason": "deletes data outside cwd"}"#,
-    );
+    let provider =
+        MockProvider::returning(r#"{"should_block": true, "reason": "deletes data outside cwd"}"#);
     let resolver = Arc::new(MockResolver {
         provider,
         model: "claude-haiku".into(),
@@ -277,7 +276,11 @@ async fn happy_path_classifier_block_returns_deny_without_fallback() {
         DecisionContext::with_cwd("/tmp/test"),
     );
     let outcome = auto
-        .decide("id-happy-block", "Bash", &serde_json::json!({"command": "rm -rf /"}))
+        .decide(
+            "id-happy-block",
+            "Bash",
+            &serde_json::json!({"command": "rm -rf /"}),
+        )
         .await;
     assert_eq!(
         outcome.decision,

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use loopal_protocol::{AgentEventPayload, UserQuestionResponse};
 use loopal_runtime::frontend::{
-    PermissionHandler, QuestionHandler, ManualPermissionHandler, ManualQuestionHandler,
+    ManualPermissionHandler, ManualQuestionHandler, PermissionHandler, QuestionHandler,
 };
 use loopal_tool_api::PermissionDecision;
 use tokio::sync::mpsc;

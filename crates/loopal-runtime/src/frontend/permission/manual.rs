@@ -22,12 +22,7 @@ impl ManualPermissionHandler {
 
 #[async_trait]
 impl PermissionHandler for ManualPermissionHandler {
-    async fn decide(
-        &self,
-        id: &str,
-        name: &str,
-        input: &serde_json::Value,
-    ) -> PermissionOutcome {
+    async fn decide(&self, id: &str, name: &str, input: &serde_json::Value) -> PermissionOutcome {
         let event = AgentEvent::root(AgentEventPayload::ToolPermissionRequest {
             id: id.to_string(),
             name: name.to_string(),

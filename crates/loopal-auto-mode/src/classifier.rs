@@ -51,11 +51,7 @@ impl AutoClassifier {
         }
     }
 
-    pub fn new_with_thresholds(
-        instructions: String,
-        max_consecutive: u32,
-        max_total: u32,
-    ) -> Self {
+    pub fn new_with_thresholds(instructions: String, max_consecutive: u32, max_total: u32) -> Self {
         Self {
             circuit_breaker: CircuitBreaker::with_thresholds(max_consecutive, max_total),
             cache: ClassifierCache::new(),
@@ -119,13 +115,8 @@ impl AutoClassifier {
         provider: &dyn Provider,
         model: &str,
     ) -> ClassifierResult {
-        let user_prompt = prompt::user_prompt(
-            tool_name,
-            input,
-            &self.instructions,
-            recent_context,
-            cwd,
-        );
+        let user_prompt =
+            prompt::user_prompt(tool_name, input, &self.instructions, recent_context, cwd);
 
         let result = call_classifier(provider, model, &user_prompt).await;
 

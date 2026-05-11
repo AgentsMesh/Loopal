@@ -51,12 +51,8 @@ impl AutoClassifier {
         model: &str,
     ) -> QuestionResult {
         let start = Instant::now();
-        let user_prompt = question_prompt::user_prompt(
-            questions,
-            self.instructions(),
-            recent_context,
-            cwd,
-        );
+        let user_prompt =
+            question_prompt::user_prompt(questions, self.instructions(), recent_context, cwd);
         let params = ChatParams {
             model: model.to_string(),
             messages: vec![Message::user(&user_prompt)],
@@ -69,11 +65,8 @@ impl AutoClassifier {
             debug_dump_dir: None,
         };
 
-        let stream_res = tokio::time::timeout(
-            CLASSIFIER_TIMEOUT,
-            provider.stream_chat(&params),
-        )
-        .await;
+        let stream_res =
+            tokio::time::timeout(CLASSIFIER_TIMEOUT, provider.stream_chat(&params)).await;
         let mut stream = match stream_res {
             Ok(Ok(s)) => s,
             Ok(Err(e)) => {
@@ -87,10 +80,7 @@ impl AutoClassifier {
             Err(_) => {
                 warn!("auto-question LLM call timed out");
                 self.breaker().record_error(QUESTION_BREAKER_KEY);
-                return QuestionResult::error(
-                    start.elapsed().as_millis() as u64,
-                    "LLM timeout",
-                );
+                return QuestionResult::error(start.elapsed().as_millis() as u64, "LLM timeout");
             }
         };
 

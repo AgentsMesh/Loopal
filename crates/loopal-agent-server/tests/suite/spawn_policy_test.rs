@@ -21,8 +21,8 @@ fn root_agent_under_budget_returns_none() {
 #[test]
 fn sub_agent_below_budget_removes_ask_user_only() {
     let kernel = kernel_with_tools();
-    let filter = build_depth_tool_filter(&kernel, 1, 2)
-        .expect("sub-agent should always impose a filter");
+    let filter =
+        build_depth_tool_filter(&kernel, 1, 2).expect("sub-agent should always impose a filter");
     assert!(
         !filter.contains("AskUser"),
         "AskUser must not be allowed in sub-agent context"
@@ -78,8 +78,8 @@ fn sub_agent_at_max_depth_removes_both_ask_user_and_spawn() {
 #[test]
 fn sub_agent_above_max_depth_strips_all_dangerous() {
     let kernel = kernel_with_tools();
-    let filter = build_depth_tool_filter(&kernel, 5, 2)
-        .expect("filter required when both flags trigger");
+    let filter =
+        build_depth_tool_filter(&kernel, 5, 2).expect("filter required when both flags trigger");
     assert!(!filter.contains("AskUser"));
     assert!(!filter.contains("Agent"));
     assert!(filter.contains("Read"));

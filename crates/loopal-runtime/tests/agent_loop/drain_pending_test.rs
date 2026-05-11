@@ -15,7 +15,7 @@ use loopal_protocol::AgentEvent;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::{Envelope, MessageSource};
 use loopal_provider_api::{ChatParams, ChatStream, Provider, StopReason, StreamChunk};
-use loopal_runtime::frontend::{UnsupportedQuestionHandler, DenyAllHandler};
+use loopal_runtime::frontend::{DenyAllHandler, UnsupportedQuestionHandler};
 use loopal_runtime::{
     AgentConfig, AgentDeps, AgentLoopParamsBuilder, InterruptHandle, UnifiedFrontend, agent_loop,
 };

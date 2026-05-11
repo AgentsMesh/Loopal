@@ -6,8 +6,5 @@ use crate::Provider;
 use crate::model::TaskType;
 
 pub trait ProviderResolver: Send + Sync {
-    fn resolve_for(
-        &self,
-        task: TaskType,
-    ) -> Result<(String, Arc<dyn Provider>), LoopalError>;
+    fn resolve_for(&self, task: TaskType) -> Result<(String, Arc<dyn Provider>), LoopalError>;
 }

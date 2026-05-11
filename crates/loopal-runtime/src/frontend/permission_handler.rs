@@ -28,10 +28,5 @@ impl PermissionOutcome {
 
 #[async_trait]
 pub trait PermissionHandler: Send + Sync {
-    async fn decide(
-        &self,
-        id: &str,
-        name: &str,
-        input: &serde_json::Value,
-    ) -> PermissionOutcome;
+    async fn decide(&self, id: &str, name: &str, input: &serde_json::Value) -> PermissionOutcome;
 }

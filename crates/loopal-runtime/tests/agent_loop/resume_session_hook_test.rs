@@ -15,7 +15,7 @@ use loopal_runtime::{
     AgentConfig, AgentDeps, AgentLoopParamsBuilder, InterruptHandle, SessionResumeError,
     SessionResumeHook, UnifiedFrontend,
     agent_loop::AgentLoopRunner,
-    frontend::{UnsupportedQuestionHandler, ManualPermissionHandler},
+    frontend::{ManualPermissionHandler, UnsupportedQuestionHandler},
 };
 use loopal_test_support::TestFixture;
 use tokio::sync::mpsc;

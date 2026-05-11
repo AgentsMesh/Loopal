@@ -57,10 +57,7 @@ pub trait AgentFrontend: Send + Sync {
         Vec::new()
     }
 
-    async fn ask_user(
-        &self,
-        _questions: Vec<Question>,
-    ) -> loopal_protocol::UserQuestionResponse {
+    async fn ask_user(&self, _questions: Vec<Question>) -> loopal_protocol::UserQuestionResponse {
         loopal_protocol::UserQuestionResponse::unsupported(
             "",
             "AskUser not supported in this context",

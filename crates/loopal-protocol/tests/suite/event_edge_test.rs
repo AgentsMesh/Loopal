@@ -49,8 +49,7 @@ fn test_event_root_agent_name_is_none() {
 #[test]
 fn test_event_for_agent_with_some_matches_named() {
     let qa = QualifiedAddress::local("worker");
-    let via_for_agent =
-        AgentEvent::for_agent(Some(qa.clone()), AgentEventPayload::Started);
+    let via_for_agent = AgentEvent::for_agent(Some(qa.clone()), AgentEventPayload::Started);
     assert_eq!(via_for_agent.agent_name, Some(qa));
 }
 

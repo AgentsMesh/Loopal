@@ -75,12 +75,7 @@ impl AutoPermissionHandler {
 
 #[async_trait]
 impl PermissionHandler for AutoPermissionHandler {
-    async fn decide(
-        &self,
-        id: &str,
-        name: &str,
-        input: &serde_json::Value,
-    ) -> PermissionOutcome {
+    async fn decide(&self, id: &str, name: &str, input: &serde_json::Value) -> PermissionOutcome {
         if self.classifier.is_degraded() {
             warn!(tool = name, "auto classifier degraded");
             return self
@@ -92,12 +87,7 @@ impl PermissionHandler for AutoPermissionHandler {
             Err(e) => {
                 warn!(tool = name, error = %e, "auto provider lookup failed");
                 return self
-                    .apply_provider_error(
-                        format!("provider lookup failed: {e}"),
-                        id,
-                        name,
-                        input,
-                    )
+                    .apply_provider_error(format!("provider lookup failed: {e}"), id, name, input)
                     .await;
             }
         };

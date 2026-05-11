@@ -13,7 +13,7 @@ use loopal_provider_api::{
     default_classify_error,
 };
 use loopal_runtime::agent_loop::AgentLoopRunner;
-use loopal_runtime::frontend::{UnsupportedQuestionHandler, DenyAllHandler};
+use loopal_runtime::frontend::{DenyAllHandler, UnsupportedQuestionHandler};
 use loopal_runtime::{
     AgentConfig, AgentDeps, AgentLoopParams, AgentLoopParamsBuilder, InterruptHandle,
     UnifiedFrontend,

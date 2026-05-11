@@ -51,9 +51,8 @@ pub fn hub_frontend_for_test(
 ) -> std::sync::Arc<dyn loopal_runtime::frontend::traits::AgentFrontend> {
     let session_ref: ipc_handlers::SessionRef =
         std::sync::Arc::new(tokio::sync::RwLock::new(session));
-    let perm: Box<dyn loopal_runtime::frontend::permission_handler::PermissionHandler> = Box::new(
-        ipc_handlers::IpcPermissionHandler::new(session_ref.clone()),
-    );
+    let perm: Box<dyn loopal_runtime::frontend::permission_handler::PermissionHandler> =
+        Box::new(ipc_handlers::IpcPermissionHandler::new(session_ref.clone()));
     let question: Box<dyn loopal_runtime::frontend::question_handler::QuestionHandler> =
         Box::new(ipc_handlers::IpcQuestionHandler::new(session_ref.clone()));
     std::sync::Arc::new(hub_frontend::HubFrontend::new(

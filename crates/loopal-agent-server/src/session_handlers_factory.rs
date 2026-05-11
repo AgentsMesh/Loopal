@@ -32,8 +32,7 @@ pub fn build_session_handlers(
     session: SessionRef,
     context: DecisionContext,
 ) -> (Box<dyn PermissionHandler>, Box<dyn QuestionHandler>) {
-    let ipc_perm: Box<dyn PermissionHandler> =
-        Box::new(IpcPermissionHandler::new(session.clone()));
+    let ipc_perm: Box<dyn PermissionHandler> = Box::new(IpcPermissionHandler::new(session.clone()));
     let ipc_q: Box<dyn QuestionHandler> = Box::new(IpcQuestionHandler::new(session));
     if config.settings.decision_mode != DecisionMode::Auto {
         return (ipc_perm, ipc_q);
@@ -58,10 +57,7 @@ pub fn build_session_handlers(
         context.clone(),
     ));
     let auto_q: Box<dyn QuestionHandler> = Box::new(AutoQuestionHandler::new(
-        classifier,
-        ipc_q,
-        resolver,
-        context,
+        classifier, ipc_q, resolver, context,
     ));
     (auto_perm, auto_q)
 }

@@ -8,7 +8,7 @@ use loopal_protocol::ControlCommand;
 use loopal_protocol::Envelope;
 use loopal_runtime::agent_loop::{AgentLoopRunner, cancel::TurnCancel};
 use loopal_runtime::frontend::{
-    UnsupportedQuestionHandler, DenyAllHandler, ManualPermissionHandler,
+    DenyAllHandler, ManualPermissionHandler, UnsupportedQuestionHandler,
 };
 use loopal_runtime::{
     AgentConfig, AgentDeps, AgentLoopParamsBuilder, InterruptHandle, UnifiedFrontend,

@@ -1,4 +1,4 @@
-use loopal_protocol::{MessageSource, ResolveSource};
+use loopal_protocol::MessageSource;
 
 use crate::SessionMessage;
 use crate::conversation::{PendingPermission, conversation_display};
@@ -112,10 +112,13 @@ pub(super) fn permission_decided(
     reason: &str,
     duration_ms: u64,
 ) -> bool {
-    let label = match decision {
-        "allow" => "permission allowed",
-        "deny" => "permission denied",
-        _ => "permission",
+    if decision == "allow" {
+        return false;
+    }
+    let label = if decision == "deny" {
+        "permission denied"
+    } else {
+        "permission"
     };
     let suffix = if duration_ms > 0 {
         format!(" ({duration_ms}ms)")
@@ -126,28 +129,6 @@ pub(super) fn permission_decided(
         format!("[{label}] {tool_name}{suffix}")
     } else {
         format!("[{label}] {tool_name}: {reason}{suffix}")
-    };
-    conversation_display::push_system_msg(&mut state.agent.conversation, &line);
-    true
-}
-
-pub(super) fn question_decided(
-    state: &mut SessionViewState,
-    question_count: u32,
-    reason: &str,
-    duration_ms: u64,
-    source: ResolveSource,
-) -> bool {
-    let suffix = if duration_ms > 0 {
-        format!(" ({duration_ms}ms)")
-    } else {
-        String::new()
-    };
-    let label = format!("[ask-user] {}", source.as_str());
-    let line = if reason.is_empty() {
-        format!("{label}: {question_count} question(s){suffix}")
-    } else {
-        format!("{label}: {reason}{suffix}")
     };
     conversation_display::push_system_msg(&mut state.agent.conversation, &line);
     true

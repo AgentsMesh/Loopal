@@ -25,6 +25,7 @@ pub fn into_question_decided(
         question_count,
         duration_ms: outcome.duration_ms,
         reason: outcome.reason,
+        source: outcome.source,
     };
     (outcome.response, payload)
 }

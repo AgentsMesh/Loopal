@@ -70,6 +70,9 @@ pub fn apply_event(state: &mut SessionState, event: AgentEvent) {
         | AgentEventPayload::BgTaskCompleted { .. }
         | AgentEventPayload::TasksChanged { .. }
         | AgentEventPayload::CronsChanged { .. }
-        | AgentEventPayload::ThreadGoalUpdated { .. } => {}
+        | AgentEventPayload::ThreadGoalUpdated { .. }
+        | AgentEventPayload::ClassifierProgress { .. }
+        | AgentEventPayload::ClassifierFailed { .. }
+        | AgentEventPayload::ClassifierCompleted { .. } => {}
     }
 }

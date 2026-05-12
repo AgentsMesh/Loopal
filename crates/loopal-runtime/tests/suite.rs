@@ -1,16 +1,24 @@
 // Single test binary — includes all test modules
 #[path = "agent_loop/mod.rs"]
 mod agent_loop;
-#[path = "suite/auto_permission_handler_test.rs"]
-mod auto_permission_handler_test;
-#[path = "suite/auto_question_handler_test.rs"]
-mod auto_question_handler_test;
+#[path = "suite/classifier_permission_handler_support.rs"]
+mod classifier_permission_handler_support;
+#[path = "suite/classifier_permission_handler_test.rs"]
+mod classifier_permission_handler_test;
+#[path = "suite/classifier_question_handler_edge_test.rs"]
+mod classifier_question_handler_edge_test;
+#[path = "suite/classifier_question_handler_support.rs"]
+mod classifier_question_handler_support;
+#[path = "suite/classifier_question_handler_test.rs"]
+mod classifier_question_handler_test;
 #[path = "suite/diff_tracker_test.rs"]
 mod diff_tracker_test;
 #[path = "suite/dispatch_test.rs"]
 mod dispatch_test;
 #[path = "suite/drain_controls_test.rs"]
 mod drain_controls_test;
+#[path = "suite/e2e_abstain_full_chain_test.rs"]
+mod e2e_abstain_full_chain_test;
 #[path = "suite/env_context_test.rs"]
 mod env_context_test;
 #[path = "suite/frontend_unified_edge_test.rs"]
@@ -33,6 +41,8 @@ mod loop_detector_edge_test;
 mod loop_detector_test;
 #[path = "suite/mode_test.rs"]
 mod mode_test;
+#[path = "suite/outraced_telemetry_test.rs"]
+mod outraced_telemetry_test;
 #[path = "suite/permission_test.rs"]
 mod permission_test;
 #[path = "suite/plan_file_test.rs"]

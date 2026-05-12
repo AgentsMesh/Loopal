@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use loopal_provider_api::Provider;
 use loopal_tool_api::PermissionDecision;
@@ -6,7 +6,7 @@ use tracing::{info, warn};
 
 use crate::cache::ClassifierCache;
 use crate::circuit_breaker::CircuitBreaker;
-use crate::llm_call::{call_classifier, parse_response};
+use crate::llm_call::{DEFAULT_CLASSIFIER_TIMEOUT, call_classifier, parse_response};
 use crate::prompt;
 
 pub struct ClassifierResult {
@@ -36,18 +36,22 @@ impl ClassifierResult {
     }
 }
 
-pub struct AutoClassifier {
+pub struct ClassifierEngine {
     circuit_breaker: CircuitBreaker,
     cache: ClassifierCache,
     instructions: String,
+    timeout: Duration,
+    question_system_prompt_override: Option<String>,
 }
 
-impl AutoClassifier {
+impl ClassifierEngine {
     pub fn new(instructions: String) -> Self {
         Self {
             circuit_breaker: CircuitBreaker::new(),
             cache: ClassifierCache::new(),
             instructions,
+            timeout: DEFAULT_CLASSIFIER_TIMEOUT,
+            question_system_prompt_override: None,
         }
     }
 
@@ -56,6 +60,32 @@ impl AutoClassifier {
             circuit_breaker: CircuitBreaker::with_thresholds(max_consecutive, max_total),
             cache: ClassifierCache::new(),
             instructions,
+            timeout: DEFAULT_CLASSIFIER_TIMEOUT,
+            question_system_prompt_override: None,
+        }
+    }
+
+    pub fn with_timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = timeout;
+        self
+    }
+
+    pub fn with_question_system_prompt(mut self, prompt: Option<String>) -> Self {
+        self.question_system_prompt_override = prompt;
+        self
+    }
+
+    pub(crate) fn timeout(&self) -> Duration {
+        self.timeout
+    }
+
+    /// Returns the active system prompt for question classification.
+    /// If a user override was injected via `with_question_system_prompt`,
+    /// that string is returned; otherwise the built-in default.
+    pub fn question_system_prompt(&self) -> &str {
+        match &self.question_system_prompt_override {
+            Some(s) => s.as_str(),
+            None => crate::question_prompt::system_prompt(),
         }
     }
 
@@ -66,6 +96,10 @@ impl AutoClassifier {
     pub fn on_human_approval(&self, tool_name: &str) {
         self.circuit_breaker.record_approval(tool_name);
         self.circuit_breaker.reset_degradation();
+    }
+
+    pub fn on_outraced(&self, tool_name: &str) {
+        self.circuit_breaker.record_outraced(tool_name);
     }
 
     #[doc(hidden)]
@@ -93,7 +127,7 @@ impl AutoClassifier {
         model: &str,
     ) -> ClassifierResult {
         if let Some(cached) = self.cache.get(tool_name, input) {
-            info!(tool = tool_name, decision = ?cached.decision, "auto-mode (cached)");
+            info!(tool = tool_name, decision = ?cached.decision, "classifier (cached)");
             return cached;
         }
 
@@ -118,7 +152,7 @@ impl AutoClassifier {
         let user_prompt =
             prompt::user_prompt(tool_name, input, &self.instructions, recent_context, cwd);
 
-        let result = call_classifier(provider, model, &user_prompt).await;
+        let result = call_classifier(provider, model, &user_prompt, self.timeout).await;
 
         match result {
             Ok(response) => match parse_response(&response) {
@@ -130,7 +164,7 @@ impl AutoClassifier {
                         self.circuit_breaker.record_approval(tool_name);
                         PermissionDecision::Allow
                     };
-                    info!(tool = tool_name, ?decision, reason = %reason, "auto-mode");
+                    info!(tool = tool_name, ?decision, reason = %reason, "classifier");
                     ClassifierResult::ok(decision, reason)
                 }
                 None => {

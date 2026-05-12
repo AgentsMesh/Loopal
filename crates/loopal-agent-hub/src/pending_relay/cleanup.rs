@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::warn;
 
-use loopal_protocol::{AgentEvent, AgentEventPayload, QualifiedAddress};
+use loopal_protocol::{AgentEvent, AgentEventPayload, QualifiedAddress, ResolveSource};
 
 use crate::hub::Hub;
 
@@ -55,7 +55,10 @@ pub(crate) async fn cleanup_pending_for_agent(hub: &Arc<Mutex<Hub>>, agent_name:
     for id in question_ids {
         let event = AgentEvent::named(
             address.clone(),
-            AgentEventPayload::UserQuestionResolved { id },
+            AgentEventPayload::UserQuestionResolved {
+                id,
+                by: ResolveSource::Manual,
+            },
         );
         if event_tx.try_send(event).is_err() {
             warn!(agent = %agent_name, "stranded UserQuestionResolved dropped");

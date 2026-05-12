@@ -8,7 +8,7 @@ use loopal_ipc::connection::Connection;
 use loopal_ipc::protocol::methods;
 use loopal_protocol::{Question, UserQuestionResponse};
 use loopal_runtime::frontend::permission_handler::{PermissionHandler, PermissionOutcome};
-use loopal_runtime::frontend::question_handler::{QuestionHandler, QuestionOutcome};
+use loopal_runtime::frontend::question_handler::{AskOptions, QuestionHandler, QuestionOutcome};
 
 use crate::session_hub::SharedSession;
 
@@ -76,11 +76,26 @@ impl IpcQuestionHandler {
 #[async_trait]
 impl QuestionHandler for IpcQuestionHandler {
     async fn ask(&self, questions: Vec<Question>) -> QuestionOutcome {
+        self.ask_with_options(questions, AskOptions::manual(String::new()))
+            .await
+    }
+
+    async fn ask_with_options(
+        &self,
+        questions: Vec<Question>,
+        options: AskOptions,
+    ) -> QuestionOutcome {
         debug!(count = questions.len(), "asking user via hub");
         let Some(conn) = primary_connection(&self.session).await else {
             return QuestionOutcome::cancelled("", "no primary connection");
         };
-        let params = serde_json::json!({ "questions": questions });
+        let mut params = serde_json::json!({ "questions": questions });
+        if !options.id.is_empty() {
+            params["question_id"] = serde_json::Value::String(options.id.clone());
+        }
+        if options.classifier_running {
+            params["classifier_running"] = serde_json::Value::Bool(true);
+        }
         match conn
             .send_request(methods::AGENT_QUESTION.name, params)
             .await

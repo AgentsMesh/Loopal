@@ -19,6 +19,7 @@ fn empty_config(decision: DecisionMode) -> ResolvedConfig {
         hooks: Vec::new(),
         instructions: String::new(),
         memory: String::new(),
+        classifier_prompt: None,
         layers: Vec::new(),
     }
 }
@@ -58,7 +59,7 @@ async fn manual_decision_yields_ipc_only_no_primary_connection() {
 
 #[tokio::test]
 async fn auto_decision_wraps_with_auto_handlers_and_falls_back() {
-    let config = empty_config(DecisionMode::Auto);
+    let config = empty_config(DecisionMode::Classifier);
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
     let session = dummy_session();
     let (perm, _q) = build_session_handlers(
@@ -75,12 +76,12 @@ async fn auto_decision_wraps_with_auto_handlers_and_falls_back() {
     );
     assert!(
         outcome.reason.contains("provider lookup failed"),
-        "Auto path should record the trigger reason, got: {}",
+        "Classifier path should record the trigger reason, got: {}",
         outcome.reason
     );
     assert!(
         outcome.reason.contains("fallback:"),
-        "Auto path should chain the fallback's reason after the trigger, got: {}",
+        "Classifier path should chain the fallback's reason after the trigger, got: {}",
         outcome.reason
     );
 }
@@ -113,7 +114,7 @@ async fn manual_question_path_cancels_without_connection() {
 
 #[tokio::test]
 async fn auto_question_path_chains_fallback_when_provider_unresolvable() {
-    let config = empty_config(DecisionMode::Auto);
+    let config = empty_config(DecisionMode::Classifier);
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
     let session = dummy_session();
     let (_perm, q) = build_session_handlers(
@@ -131,13 +132,39 @@ async fn auto_question_path_chains_fallback_when_provider_unresolvable() {
         "auto -> fallback ipc -> no connection should cancel"
     );
     assert!(
-        outcome.reason.contains("provider lookup failed"),
-        "Auto question path should record provider failure, got: {}",
+        outcome.reason.contains("no primary connection"),
+        "Classifier path with no provider should short-circuit to manual fallback, got: {}",
         outcome.reason
     );
+}
+
+#[tokio::test]
+async fn agent_decision_falls_back_to_classifier_path_today() {
+    // Agent mode is not yet implemented; factory must transparently fall
+    // back to Classifier behaviour so existing setups keep working.
+    let config = empty_config(DecisionMode::Agent);
+    let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
+    let session = dummy_session();
+    let (perm, q) = build_session_handlers(
+        &config,
+        &kernel,
+        session,
+        DecisionContext::with_cwd("/tmp/test"),
+    );
+    // Permission path: Agent → Classifier → IpcPermission fallback denies (no conn)
+    let outcome = perm.decide("id1", "Bash", &serde_json::json!({})).await;
+    assert_eq!(
+        outcome.decision,
+        loopal_tool_api::PermissionDecision::Deny,
+        "Agent mode must fall through to Classifier permission path"
+    );
+    // Question path: Agent → Classifier → IpcQuestion fallback cancels (no conn)
+    let q_outcome = q.ask(vec![]).await;
     assert!(
-        outcome.reason.contains("fallback:"),
-        "Auto question path should chain fallback reason, got: {}",
-        outcome.reason
+        matches!(
+            q_outcome.response,
+            loopal_protocol::UserQuestionResponse::Cancelled { .. }
+        ),
+        "Agent mode question path should reach the manual fallback (no conn)"
     );
 }

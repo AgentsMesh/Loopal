@@ -6,7 +6,7 @@ rust_library(
     edition = "2024",
     visibility = ["//visibility:public"],
     deps = [
-        "//crates/loopal-auto-mode",
+        "//crates/loopal-classifier",
         "//crates/loopal-config",
         "//crates/loopal-context",
         "//crates/loopal-error",
@@ -39,7 +39,7 @@ rust_test(
     edition = "2024",
     deps = [
         ":loopal-runtime",
-        "//crates/loopal-auto-mode",
+        "//crates/loopal-classifier",
         "//crates/loopal-backend",
         "//crates/loopal-test-support",
         "@crates//:chrono",
@@ -59,6 +59,7 @@ rust_test(
         "//crates/loopal-scheduler",
         "//crates/loopal-storage",
         "//crates/loopal-tool-api",
+        "//crates/loopal-view-state",
     ],
     proc_macro_deps = ["@crates//:async-trait"],
 )

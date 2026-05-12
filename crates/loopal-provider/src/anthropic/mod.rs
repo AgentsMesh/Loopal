@@ -1,4 +1,5 @@
 mod accumulator;
+pub mod capability;
 mod error_classify;
 mod finalize;
 mod request;

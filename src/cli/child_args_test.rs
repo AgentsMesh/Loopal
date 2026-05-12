@@ -8,7 +8,7 @@ fn full_child() -> ChildPassthroughArgs {
     ChildPassthroughArgs {
         model: Some("opus".into()),
         permission: Some("ask_dangerous".into()),
-        decision: Some("auto".into()),
+        decision: Some("classifier".into()),
         plan: true,
         no_sandbox: true,
         ephemeral: true,
@@ -77,7 +77,7 @@ fn round_trip_each_field_individually() {
             ..Default::default()
         },
         ChildPassthroughArgs {
-            decision: Some("auto".into()),
+            decision: Some("classifier".into()),
             ..Default::default()
         },
         ChildPassthroughArgs {

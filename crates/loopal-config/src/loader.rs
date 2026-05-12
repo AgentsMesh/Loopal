@@ -63,6 +63,16 @@ pub fn apply_env_overrides(value: &mut serde_json::Value) {
     if let Ok(sandbox) = std::env::var("LOOPAL_SANDBOX") {
         value["sandbox"]["policy"] = serde_json::Value::String(sandbox);
     }
+
+    if let Ok(t) = std::env::var("LOOPAL_CLASSIFIER_TIMEOUT_SECS")
+        && let Ok(parsed) = t.parse::<u64>()
+    {
+        if !value["harness"].is_object() {
+            value["harness"] = serde_json::json!({});
+        }
+        value["harness"]["classifier_timeout_secs"] =
+            serde_json::Value::Number(serde_json::Number::from(parsed));
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -110,13 +120,10 @@ pub(crate) fn extract_typed_fields(
     (mcp, hooks)
 }
 
-/// Read optional text from a file path if it exists.
+/// Read optional text from a file path if it exists. Bounded at MAX_TEXT_BYTES
+/// to prevent OOM on misconfigured / binary files.
 pub(crate) fn read_optional_text(path: &Path) -> Option<String> {
-    if path.exists() {
-        std::fs::read_to_string(path).ok()
-    } else {
-        None
-    }
+    read_text_bounded(path, MAX_TEXT_BYTES)
 }
 
 // ---------------------------------------------------------------------------
@@ -167,11 +174,41 @@ pub fn load_layer_from_dir(
     let instr_path = instructions_path
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| dir.join("LOOPAL.md"));
-    layer.instructions = read_optional_text(&instr_path);
+    layer.instructions = read_text_bounded(&instr_path, MAX_TEXT_BYTES);
 
     // memory/MEMORY.md — core memory file (agent writes via Write/Edit tools)
     let memory_path = dir.join("memory").join("MEMORY.md");
-    layer.memory = read_optional_text(&memory_path);
+    layer.memory = read_text_bounded(&memory_path, MAX_TEXT_BYTES);
+
+    // classifier.md — optional user-supplied system prompt for Classifier mode.
+    layer.classifier_prompt = read_text_bounded(&dir.join("classifier.md"), MAX_TEXT_BYTES);
 
     Ok(layer)
+}
+
+// reason: cap config-injected text at 100KB so an oversized or binary file
+// can't blow up the agent's context window or OOM the loader.
+const MAX_TEXT_BYTES: u64 = 100 * 1024;
+
+fn read_text_bounded(path: &Path, max_bytes: u64) -> Option<String> {
+    if !path.exists() {
+        return None;
+    }
+    let meta = std::fs::metadata(path).ok()?;
+    if meta.len() > max_bytes {
+        tracing::warn!(
+            path = %path.display(),
+            bytes = meta.len(),
+            limit = max_bytes,
+            "skipping oversize text file"
+        );
+        return None;
+    }
+    match std::fs::read_to_string(path) {
+        Ok(s) => Some(s),
+        Err(e) => {
+            tracing::warn!(path = %path.display(), error = %e, "text file read failed (non-UTF8?)");
+            None
+        }
+    }
 }

@@ -155,7 +155,10 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
         | AgentEventPayload::TasksChanged { .. }
         | AgentEventPayload::CronsChanged { .. }
         | AgentEventPayload::UserMessageQueued { .. }
-        | AgentEventPayload::ThreadGoalUpdated { .. } => None,
+        | AgentEventPayload::ThreadGoalUpdated { .. }
+        | AgentEventPayload::ClassifierProgress { .. }
+        | AgentEventPayload::ClassifierFailed { .. }
+        | AgentEventPayload::ClassifierCompleted { .. } => None,
         AgentEventPayload::ToolPermissionResolved { id } => Some(AcpNotification::Extension {
             method: "_loopal/permission_resolved".into(),
             params: serde_json::json!({
@@ -163,7 +166,7 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
                 "toolCallId": id,
             }),
         }),
-        AgentEventPayload::UserQuestionResolved { id } => Some(AcpNotification::Extension {
+        AgentEventPayload::UserQuestionResolved { id, .. } => Some(AcpNotification::Extension {
             method: "_loopal/question_resolved".into(),
             params: serde_json::json!({
                 "sessionId": session_id,

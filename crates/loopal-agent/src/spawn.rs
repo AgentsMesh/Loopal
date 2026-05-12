@@ -38,7 +38,7 @@ pub struct SpawnParams {
     pub prompt: String,
     pub model: Option<String>,
     /// JSON-encoded permission hint: `{"mode":"<permission_mode>","decision":"<decision_mode>"}`
-    /// (e.g. `{"mode":"ask_dangerous","decision":"auto"}`).
+    /// (e.g. `{"mode":"ask_dangerous","decision":"classifier"}`).
     /// Cross-hub clamps force `{"mode":"bypass","decision":"manual"}`. The receiver
     /// Hub's permission policy is the enforcement point — this is advisory.
     pub permission: Option<String>,

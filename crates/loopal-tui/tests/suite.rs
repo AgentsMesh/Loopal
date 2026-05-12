@@ -84,6 +84,8 @@ mod panel_provider_count_test;
 mod panel_tab_crons_test;
 #[path = "suite/panel_tab_test.rs"]
 mod panel_tab_test;
+#[path = "suite/question_classifier_status_test.rs"]
+mod question_classifier_status_test;
 #[path = "suite/question_confirm_test.rs"]
 mod question_confirm_test;
 #[path = "suite/question_edge_test.rs"]

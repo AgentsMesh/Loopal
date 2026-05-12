@@ -1,6 +1,7 @@
 //! Per-agent conversation state and event-driven mutation.
 
 mod agent_conversation;
+mod classifier_status;
 pub(crate) mod conversation_display;
 mod pending_question;
 mod question_state;
@@ -11,6 +12,7 @@ pub(crate) mod truncate;
 mod types;
 
 pub use agent_conversation::AgentConversation;
+pub use classifier_status::ClassifierStatus;
 pub use pending_question::PendingQuestion;
 pub use question_state::QuestionState;
 pub use server_tool_display::format_server_tool_content;

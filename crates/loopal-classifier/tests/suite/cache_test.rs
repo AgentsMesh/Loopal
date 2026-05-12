@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use loopal_auto_mode::AutoClassifier;
+use loopal_classifier::ClassifierEngine;
 use loopal_error::LoopalError;
 use loopal_provider_api::{ChatParams, ChatStream, Provider, StopReason, StreamChunk};
 use loopal_tool_api::PermissionDecision;
@@ -40,7 +40,7 @@ impl Provider for AllowProvider {
 
 #[tokio::test]
 async fn second_call_returns_cached_result() {
-    let classifier = AutoClassifier::new(String::new());
+    let classifier = ClassifierEngine::new(String::new());
     let provider = Arc::new(AllowProvider);
     let input = serde_json::json!({"command": "cargo test"});
 
@@ -58,7 +58,7 @@ async fn second_call_returns_cached_result() {
 
 #[tokio::test]
 async fn different_tool_name_is_cache_miss() {
-    let classifier = AutoClassifier::new(String::new());
+    let classifier = ClassifierEngine::new(String::new());
     let provider = Arc::new(AllowProvider);
     let input = serde_json::json!({"command": "cargo test"});
 
@@ -75,7 +75,7 @@ async fn different_tool_name_is_cache_miss() {
 
 #[tokio::test]
 async fn different_input_is_cache_miss() {
-    let classifier = AutoClassifier::new(String::new());
+    let classifier = ClassifierEngine::new(String::new());
     let provider = Arc::new(AllowProvider);
 
     classifier
@@ -104,7 +104,7 @@ async fn different_input_is_cache_miss() {
 
 #[tokio::test]
 async fn error_results_are_not_cached() {
-    let classifier = AutoClassifier::new(String::new());
+    let classifier = ClassifierEngine::new(String::new());
 
     // ErrorProvider returns LLM error
     struct ErrorProvider;

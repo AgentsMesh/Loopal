@@ -1,7 +1,7 @@
-use loopal_protocol::{MessageSource, Question};
+use loopal_protocol::{MessageSource, ResolveSource};
 
 use crate::SessionMessage;
-use crate::conversation::{PendingPermission, PendingQuestion, conversation_display};
+use crate::conversation::{PendingPermission, conversation_display};
 use crate::state::SessionViewState;
 
 pub(super) fn tool_permission_request(
@@ -25,27 +25,6 @@ pub(super) fn tool_permission_request(
 pub(super) fn tool_permission_resolved(state: &mut SessionViewState, id: &str) -> bool {
     let pending = &mut state.agent.conversation.pending_permission;
     if pending.as_ref().is_some_and(|p| p.id == id) {
-        *pending = None;
-        true
-    } else {
-        false
-    }
-}
-
-pub(super) fn user_question_request(
-    state: &mut SessionViewState,
-    id: &str,
-    questions: &[Question],
-) -> bool {
-    let conv = &mut state.agent.conversation;
-    conv.flush_streaming();
-    conv.pending_question = Some(PendingQuestion::new(id.to_string(), questions.to_vec()));
-    true
-}
-
-pub(super) fn user_question_resolved(state: &mut SessionViewState, id: &str) -> bool {
-    let pending = &mut state.agent.conversation.pending_question;
-    if pending.as_ref().is_some_and(|q| q.id == id) {
         *pending = None;
         true
     } else {
@@ -157,16 +136,18 @@ pub(super) fn question_decided(
     question_count: u32,
     reason: &str,
     duration_ms: u64,
+    source: ResolveSource,
 ) -> bool {
     let suffix = if duration_ms > 0 {
         format!(" ({duration_ms}ms)")
     } else {
         String::new()
     };
+    let label = format!("[ask-user] {}", source.as_str());
     let line = if reason.is_empty() {
-        format!("[ask-user resolved] {question_count} question(s){suffix}")
+        format!("{label}: {question_count} question(s){suffix}")
     } else {
-        format!("[ask-user resolved] {question_count} question(s): {reason}{suffix}")
+        format!("{label}: {reason}{suffix}")
     };
     conversation_display::push_system_msg(&mut state.agent.conversation, &line);
     true

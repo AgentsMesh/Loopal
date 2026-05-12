@@ -20,6 +20,9 @@ pub struct ResolvedConfig {
     pub instructions: String,
     /// Concatenated memory content from all layers
     pub memory: String,
+    /// Optional Classifier-mode system prompt loaded from `.loopal/classifier.md`.
+    /// Highest-priority non-empty layer wins. None means "use the built-in default".
+    pub classifier_prompt: Option<String>,
     /// Layer sources in merge order (for debugging)
     pub layers: Vec<LayerSource>,
 }

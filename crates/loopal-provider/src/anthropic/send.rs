@@ -6,6 +6,7 @@ use serde_json::json;
 use tracing::Instrument;
 
 use super::AnthropicProvider;
+use super::capability;
 use super::stream::{
     AnthropicStream, ServerToolAccumulator, ThinkingAccumulator, ToolUseAccumulator,
 };
@@ -90,8 +91,15 @@ impl AnthropicProvider {
         if !tools.is_empty() {
             body["tools"] = json!(tools);
         }
-        if let Some(temp) = final_params.temperature {
+        if let Some(temp) = final_params.temperature
+            && capability::supports_temperature(&final_params.model)
+        {
             body["temperature"] = json!(temp);
+        } else if final_params.temperature.is_some() {
+            tracing::debug!(
+                model = %final_params.model,
+                "dropping temperature for model not on Anthropic temperature allowlist"
+            );
         }
         if let Some(ref thinking_config) = final_params.thinking {
             body["thinking"] =

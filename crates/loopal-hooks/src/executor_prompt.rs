@@ -1,6 +1,6 @@
 //! Prompt hook executor — uses a lightweight LLM call as hook logic.
 //!
-//! Reuses the same pattern as `loopal-auto-mode/src/llm_call.rs`:
+//! Reuses the same pattern as `loopal-classifier/src/llm_call.rs`:
 //! small max_tokens, temperature 0, no tools. The hook's `prompt` field
 //! becomes the system prompt; the hook input JSON becomes the user message.
 

@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
 
-use loopal_auto_mode::AutoClassifier;
+use loopal_classifier::ClassifierEngine;
 use loopal_error::LoopalError;
 use loopal_provider_api::{ChatParams, ChatStream, Provider, StopReason, StreamChunk};
 use loopal_tool_api::PermissionDecision;
@@ -66,7 +66,7 @@ impl Provider for MockClassifierProvider {
 async fn allow_response_returns_allow() {
     let provider =
         MockClassifierProvider::ok(r#"{"should_block": false, "reason": "Normal test execution"}"#);
-    let classifier = AutoClassifier::new(String::new());
+    let classifier = ClassifierEngine::new(String::new());
     let result = classifier
         .classify(
             "Bash",
@@ -86,7 +86,7 @@ async fn block_response_returns_deny() {
     let provider = MockClassifierProvider::ok(
         r#"{"should_block": true, "reason": "Dangerous delete command"}"#,
     );
-    let classifier = AutoClassifier::new(String::new());
+    let classifier = ClassifierEngine::new(String::new());
     let result = classifier
         .classify(
             "Bash",
@@ -105,7 +105,7 @@ async fn block_response_returns_deny() {
 async fn markdown_fenced_json_parsed() {
     let provider =
         MockClassifierProvider::ok("```json\n{\"should_block\": false, \"reason\": \"ok\"}\n```");
-    let classifier = AutoClassifier::new(String::new());
+    let classifier = ClassifierEngine::new(String::new());
     let result = classifier
         .classify(
             "Bash",
@@ -122,7 +122,7 @@ async fn markdown_fenced_json_parsed() {
 #[tokio::test]
 async fn malformed_json_returns_deny() {
     let provider = MockClassifierProvider::ok("not json at all");
-    let classifier = AutoClassifier::new(String::new());
+    let classifier = ClassifierEngine::new(String::new());
     let result = classifier
         .classify(
             "Bash",
@@ -140,7 +140,7 @@ async fn malformed_json_returns_deny() {
 #[tokio::test]
 async fn empty_response_returns_deny() {
     let provider = MockClassifierProvider::ok("");
-    let classifier = AutoClassifier::new(String::new());
+    let classifier = ClassifierEngine::new(String::new());
     let result = classifier
         .classify(
             "Bash",
@@ -157,7 +157,7 @@ async fn empty_response_returns_deny() {
 #[tokio::test]
 async fn provider_error_returns_deny() {
     let provider = MockClassifierProvider::err();
-    let classifier = AutoClassifier::new(String::new());
+    let classifier = ClassifierEngine::new(String::new());
     let result = classifier
         .classify(
             "Bash",
@@ -174,7 +174,7 @@ async fn provider_error_returns_deny() {
 
 #[tokio::test]
 async fn circuit_breaker_degrades_after_repeated_errors() {
-    let classifier = AutoClassifier::new(String::new());
+    let classifier = ClassifierEngine::new(String::new());
     // 3 errors → degraded
     for _ in 0..3 {
         let provider = MockClassifierProvider::err();
@@ -194,7 +194,7 @@ async fn circuit_breaker_degrades_after_repeated_errors() {
 
 #[tokio::test]
 async fn human_approval_resets_degradation() {
-    let classifier = AutoClassifier::new(String::new());
+    let classifier = ClassifierEngine::new(String::new());
     for _ in 0..3 {
         let provider = MockClassifierProvider::err();
         classifier

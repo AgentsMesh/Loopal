@@ -1,7 +1,7 @@
 load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 
 rust_library(
-    name = "loopal-auto-mode",
+    name = "loopal-classifier",
     srcs = glob(["src/**/*.rs"]),
     edition = "2024",
     visibility = ["//visibility:public"],
@@ -24,13 +24,15 @@ rust_test(
     crate_root = "tests/suite.rs",
     edition = "2024",
     deps = [
-        ":loopal-auto-mode",
+        ":loopal-classifier",
+        "//crates/loopal-config",
         "//crates/loopal-error",
         "//crates/loopal-protocol",
         "//crates/loopal-provider-api",
         "//crates/loopal-tool-api",
         "@crates//:futures",
         "@crates//:serde_json",
+        "@crates//:tempfile",
         "@crates//:tokio",
     ],
     proc_macro_deps = ["@crates//:async-trait"],

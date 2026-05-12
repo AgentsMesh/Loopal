@@ -1,11 +1,11 @@
-use loopal_auto_mode::parse_question_response_for_test;
+use loopal_classifier::parse_question_response_for_test;
 
 mod llm_path {
     use std::collections::VecDeque;
     use std::sync::Arc;
 
     use async_trait::async_trait;
-    use loopal_auto_mode::AutoClassifier;
+    use loopal_classifier::ClassifierEngine;
     use loopal_error::LoopalError;
     use loopal_protocol::{Question, QuestionOption};
     use loopal_provider_api::{ChatParams, ChatStream, Provider, StopReason, StreamChunk};
@@ -92,7 +92,7 @@ mod llm_path {
 
     #[tokio::test]
     async fn success_returns_parsed_result_and_records_approval() {
-        let classifier = AutoClassifier::new(String::new());
+        let classifier = ClassifierEngine::new(String::new());
         let provider = Arc::new(OkProvider {
             text: std::sync::Mutex::new(Some(r#"{"answers": [["yes"]], "reason": "ok"}"#.into())),
         });
@@ -110,7 +110,7 @@ mod llm_path {
 
     #[tokio::test]
     async fn stream_open_error_records_breaker_error() {
-        let classifier = AutoClassifier::new(String::new());
+        let classifier = ClassifierEngine::new(String::new());
         let provider = Arc::new(StreamErrProvider);
         // Trip breaker (3 consecutive errors)
         for _ in 0..3 {
@@ -131,7 +131,7 @@ mod llm_path {
 
     #[tokio::test]
     async fn chunk_error_mid_stream_records_error() {
-        let classifier = AutoClassifier::new(String::new());
+        let classifier = ClassifierEngine::new(String::new());
         let provider = Arc::new(ChunkErrProvider {
             text_before_err: std::sync::Mutex::new(Some("partial".into())),
         });
@@ -151,7 +151,7 @@ mod llm_path {
 
     #[tokio::test]
     async fn parse_failure_records_error_and_breaker_eventually_trips() {
-        let classifier = AutoClassifier::new(String::new());
+        let classifier = ClassifierEngine::new(String::new());
         // Make 3 calls with non-JSON response — parse failure each time
         for _ in 0..3 {
             let provider = Arc::new(OkProvider {
@@ -171,7 +171,7 @@ mod llm_path {
 
     #[tokio::test]
     async fn success_resets_consecutive_breaker_counter() {
-        let classifier = AutoClassifier::new(String::new());
+        let classifier = ClassifierEngine::new(String::new());
         // 2 errors, then 1 success → no trip
         for _ in 0..2 {
             let provider = Arc::new(StreamErrProvider);

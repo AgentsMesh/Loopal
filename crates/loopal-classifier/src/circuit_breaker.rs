@@ -53,6 +53,14 @@ impl CircuitBreaker {
         self.record_denial(tool_name);
     }
 
+    /// Classifier produced a result but the user answered faster (race).
+    /// This is neither a success nor a failure — clear consecutive counter
+    /// (so future failures get a fresh window) but don't bump total_denials.
+    pub fn record_outraced(&self, tool_name: &str) {
+        let mut inner = self.inner.lock().unwrap();
+        inner.consecutive.remove(tool_name);
+    }
+
     pub fn is_degraded(&self) -> bool {
         self.inner.lock().unwrap().degraded
     }

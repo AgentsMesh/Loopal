@@ -53,7 +53,7 @@ impl AcpAdapter {
                 .await;
                 return None;
             }
-            AgentEventPayload::UserQuestionRequest { id, questions } => {
+            AgentEventPayload::UserQuestionRequest { id, questions, .. } => {
                 let agent_name = event
                     .agent_name
                     .as_ref()

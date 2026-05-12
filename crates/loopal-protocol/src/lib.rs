@@ -33,7 +33,7 @@ pub use interrupt::InterruptSignal;
 pub use mcp_snapshot::McpServerSnapshot;
 pub use projected::{ProjectedMessage, ProjectedToolCall};
 pub use projection::project_messages;
-pub use question::{Question, QuestionOption, UserQuestionResponse};
+pub use question::{Question, QuestionOption, ResolveSource, UserQuestionResponse};
 pub use task_snapshot::{TaskSnapshot, TaskSnapshotStatus};
 pub use thread_goal::{GoalTransitionReason, ThreadGoal, ThreadGoalStatus};
 pub use user_content::{ImageAttachment, SkillInvocation, UserContent};

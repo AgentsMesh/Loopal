@@ -1,4 +1,6 @@
 // Single test binary — includes all test modules
+#[path = "suite/anthropic_capability_test.rs"]
+mod anthropic_capability_test;
 #[path = "suite/anthropic_finalize_e2e_test.rs"]
 mod anthropic_finalize_e2e_test;
 #[path = "suite/anthropic_finalize_test.rs"]

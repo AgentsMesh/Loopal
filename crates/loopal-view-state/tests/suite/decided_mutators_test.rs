@@ -1,4 +1,4 @@
-use loopal_protocol::AgentEventPayload;
+use loopal_protocol::{AgentEventPayload, ResolveSource};
 use loopal_view_state::ViewStateReducer;
 
 fn last_message_content(r: &ViewStateReducer) -> String {
@@ -94,11 +94,11 @@ fn question_decided_with_reason_and_duration() {
         question_count: 3,
         duration_ms: 150,
         reason: "chose conservative defaults".into(),
+        source: ResolveSource::Manual,
     });
     assert!(bumped.is_some(), "question_decided must bump rev");
     let msg = last_message_content(&r);
-    assert!(msg.contains("ask-user resolved"), "label missing: {msg}");
-    assert!(msg.contains("3 question(s)"), "count missing: {msg}");
+    assert!(msg.contains("[ask-user] manual"), "label missing: {msg}");
     assert!(
         msg.contains("chose conservative defaults"),
         "reason missing: {msg}"
@@ -107,18 +107,49 @@ fn question_decided_with_reason_and_duration() {
 }
 
 #[test]
-fn question_decided_empty_reason_omits_colon() {
+fn question_decided_empty_reason_falls_back_to_count() {
     let mut r = ViewStateReducer::new("root");
     r.apply(AgentEventPayload::QuestionDecided {
         question_count: 1,
         duration_ms: 0,
         reason: String::new(),
+        source: ResolveSource::Manual,
     });
     let msg = last_message_content(&r);
     assert!(msg.contains("1 question(s)"), "count missing: {msg}");
-    assert!(
-        !msg.contains(": "),
-        "empty reason → no ': reason' segment, got: {msg}"
-    );
     assert!(!msg.contains("(0ms)"), "zero duration must be omitted");
+}
+
+#[test]
+fn question_decided_classifier_source_in_label() {
+    let mut r = ViewStateReducer::new("root");
+    r.apply(AgentEventPayload::QuestionDecided {
+        question_count: 1,
+        duration_ms: 8200,
+        reason: "代码探索".into(),
+        source: ResolveSource::Classifier,
+    });
+    let msg = last_message_content(&r);
+    assert!(
+        msg.contains("[ask-user] classifier"),
+        "classifier label missing: {msg}"
+    );
+    assert!(msg.contains("代码探索"), "answer missing: {msg}");
+    assert!(msg.contains("(8200ms)"));
+}
+
+#[test]
+fn question_decided_agent_source_in_label() {
+    let mut r = ViewStateReducer::new("root");
+    r.apply(AgentEventPayload::QuestionDecided {
+        question_count: 1,
+        duration_ms: 24500,
+        reason: "looked at git status".into(),
+        source: ResolveSource::Agent,
+    });
+    let msg = last_message_content(&r);
+    assert!(
+        msg.contains("[ask-user] agent"),
+        "agent label missing: {msg}"
+    );
 }

@@ -1,10 +1,9 @@
 use std::collections::HashSet;
-use std::fs::OpenOptions;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::GitError;
+use crate::gitignore::ensure_loopal_gitignore;
 
 /// Information about a created worktree.
 #[derive(Debug, Clone)]
@@ -43,7 +42,7 @@ pub fn create_worktree(repo_root: &Path, name: &str) -> Result<WorktreeInfo, Git
         std::fs::create_dir_all(parent)?;
     }
 
-    ensure_gitignore_entry(repo_root);
+    ensure_loopal_gitignore(&repo_root.join(".loopal"));
 
     let output = Command::new("git")
         .args(["worktree", "add", "-b", &branch])
@@ -172,29 +171,4 @@ fn validate_name(name: &str) -> Result<(), GitError> {
         return Err(GitError::InvalidName(name.to_string()));
     }
     Ok(())
-}
-
-/// Append `.loopal/worktrees/` to `.gitignore` if not already present.
-fn ensure_gitignore_entry(repo_root: &Path) {
-    let gitignore = repo_root.join(".gitignore");
-    let entry = ".loopal/worktrees/";
-
-    let content = std::fs::read_to_string(&gitignore).unwrap_or_default();
-    if content.lines().any(|line| line.trim() == entry) {
-        return;
-    }
-
-    // Append-only write to avoid TOCTOU overwrite of concurrent modifications
-    if let Ok(mut file) = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&gitignore)
-    {
-        let prefix = if content.is_empty() || content.ends_with('\n') {
-            ""
-        } else {
-            "\n"
-        };
-        let _ = writeln!(file, "{prefix}{entry}");
-    }
 }

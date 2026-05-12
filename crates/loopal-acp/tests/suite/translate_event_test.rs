@@ -139,3 +139,42 @@ fn inbox_consumed_returns_extension() {
         _ => panic!("expected Extension notification"),
     }
 }
+
+#[test]
+fn cleared_returns_extension() {
+    let r = translate_event(
+        &AgentEventPayload::Cleared {
+            context_window: 200_000,
+        },
+        "s",
+    );
+    match r {
+        Some(AcpNotification::Extension { method, params }) => {
+            assert_eq!(method, "_loopal/cleared");
+            assert_eq!(params["data"]["contextWindow"], 200_000);
+        }
+        _ => panic!("expected Extension notification"),
+    }
+}
+
+#[test]
+fn model_changed_has_no_ide_counterpart() {
+    let r = translate_event(
+        &AgentEventPayload::ModelChanged {
+            model: "claude-opus-4-7".into(),
+        },
+        "s",
+    );
+    assert!(r.is_none());
+}
+
+#[test]
+fn thinking_changed_has_no_ide_counterpart() {
+    let r = translate_event(
+        &AgentEventPayload::ThinkingChanged {
+            thinking_config: r#"{"type":"effort"}"#.into(),
+        },
+        "s",
+    );
+    assert!(r.is_none());
+}

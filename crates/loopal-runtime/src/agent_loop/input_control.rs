@@ -15,44 +15,50 @@ impl AgentLoopRunner {
     pub(super) async fn handle_control(&mut self, ctrl: ControlCommand) -> Result<bool> {
         match ctrl {
             ControlCommand::ModeSwitch(new_mode) => {
-                self.params.config.mode = AgentMode::from(new_mode);
-                let mode_str = match new_mode {
-                    loopal_protocol::AgentMode::Plan => "plan",
-                    loopal_protocol::AgentMode::Act => "act",
-                };
+                // Emit-first: if the event drops, leave the runner's mode
+                // untouched so view-state and agent stay aligned.
                 self.emit(AgentEventPayload::ModeChanged {
-                    mode: mode_str.to_string(),
+                    mode: new_mode.as_str().to_string(),
                 })
                 .await?;
+                self.params.config.mode = AgentMode::from(new_mode);
             }
             ControlCommand::Clear => {
                 info!("clearing conversation history");
+                let context_window = self.params.store.budget().context_window;
+                // Emit before mutating local state: if the receiver is gone
+                // the runner stays in a state where the next view/snapshot
+                // is still coherent rather than `agent: empty, view: full`.
+                self.emit(AgentEventPayload::Cleared { context_window })
+                    .await?;
                 if let Err(e) = self
                     .params
                     .deps
                     .session_manager
                     .clear_history(&self.params.session.id)
                 {
+                    // Best-effort persist: a failure here leaves the on-disk
+                    // marker missing while view + in-memory store are wiped.
+                    // The agent will reload pre-clear history on next restart
+                    // — acceptable because the alternative (abort the clear,
+                    // leave view confused) is worse UX.
                     error!(error = %e, "failed to persist clear marker");
                 }
                 self.params.store.clear();
                 self.turn_count = 0;
                 self.tokens.reset();
-                self.emit(AgentEventPayload::TokenUsage {
-                    input_tokens: 0,
-                    output_tokens: 0,
-                    context_window: self.params.store.budget().context_window,
-                    cache_creation_input_tokens: 0,
-                    cache_read_input_tokens: 0,
-                    thinking_tokens: 0,
-                })
-                .await?;
             }
             ControlCommand::Compact => {
                 self.force_compact().await?;
             }
             ControlCommand::ModelSwitch(new_model) => {
                 info!(from = %self.params.config.model(), to = %new_model, "switching model");
+                // Emit-first; abort the swap on emit failure so the model
+                // surfaced to view-state matches the runner.
+                self.emit(AgentEventPayload::ModelChanged {
+                    model: new_model.clone(),
+                })
+                .await?;
                 self.model_config.update_model(&new_model);
                 self.params.config.router.set_default(new_model);
                 self.recalculate_budget();
@@ -64,6 +70,12 @@ impl AgentLoopRunner {
                 match serde_json::from_str::<loopal_provider_api::ThinkingConfig>(&json) {
                     Ok(config) => {
                         info!(thinking = ?config, "switching thinking config");
+                        // Emit-first; on failure the runner keeps the old
+                        // thinking config and view-state is not misinformed.
+                        self.emit(AgentEventPayload::ThinkingChanged {
+                            thinking_config: json,
+                        })
+                        .await?;
                         self.model_config.thinking = config;
                     }
                     Err(e) => error!(error = %e, "invalid thinking config"),

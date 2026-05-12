@@ -69,11 +69,6 @@ pub(super) fn token_usage(
     true
 }
 
-pub(super) fn mode_changed(state: &mut SessionViewState, mode: &str) -> bool {
-    state.agent.observable.mode = mode.to_string();
-    true
-}
-
 pub(super) fn turn_completed(state: &mut SessionViewState) -> bool {
     let obs = &mut state.agent.observable;
     obs.turn_count = obs.turn_count.saturating_add(1);

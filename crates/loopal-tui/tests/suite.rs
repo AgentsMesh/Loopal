@@ -120,6 +120,10 @@ mod view_client_reset_test;
 mod e2e_compact_edge_test;
 #[path = "suite/e2e_compact_test.rs"]
 mod e2e_compact_test;
+#[path = "suite/e2e_control_completeness_test.rs"]
+mod e2e_control_completeness_test;
+#[path = "suite/e2e_control_lifecycle_test.rs"]
+mod e2e_control_lifecycle_test;
 #[path = "suite/e2e_control_test.rs"]
 mod e2e_control_test;
 #[path = "suite/e2e_edge_test.rs"]

@@ -10,6 +10,7 @@ rust_library(
         "@crates//:chrono",
         "@crates//:serde",
         "@crates//:serde_json",
+        "@crates//:strum",
         "@crates//:uuid",
     ],
 )
@@ -17,11 +18,17 @@ rust_library(
 rust_test(
     name = "loopal-protocol_test",
     srcs = glob(["tests/**/*.rs"]),
+    compile_data = [
+        "src/control.rs",
+        "src/event_payload.rs",
+        "src/event_summary.rs",
+    ],
     crate_root = "tests/suite.rs",
     edition = "2024",
     deps = [
         ":loopal-protocol",
         "//crates/loopal-message",
         "@crates//:serde_json",
+        "@crates//:strum",
     ],
 )

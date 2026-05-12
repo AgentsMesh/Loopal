@@ -66,7 +66,7 @@ async fn test_manual_compact_reduces_messages() {
     let evts = drain_events(&mut h.event_rx).await;
     assert!(
         evts.iter()
-            .any(|e| matches!(e, AgentEventPayload::Compacted { .. })),
+            .any(|e| matches!(e, AgentEventPayload::Compacted(_))),
         "expected Compacted event, got: {evts:?}"
     );
 }
@@ -92,12 +92,7 @@ async fn test_compact_emits_event_payload() {
 
     let evts = drain_events(&mut h.event_rx).await;
     let compacted = evts.iter().find_map(|e| match e {
-        AgentEventPayload::Compacted {
-            kept,
-            removed,
-            strategy,
-            ..
-        } => Some((kept, removed, strategy.clone())),
+        AgentEventPayload::Compacted(s) => Some((&s.kept, &s.removed, s.strategy.clone())),
         _ => None,
     });
     let (kept, removed, strategy) = compacted.expect("Compacted event missing");

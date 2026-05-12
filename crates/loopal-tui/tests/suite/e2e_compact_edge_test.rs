@@ -75,7 +75,7 @@ async fn test_auto_compact_on_large_context() {
     let evts = drain_events(&mut h.event_rx).await;
     let has_compacted = evts
         .iter()
-        .any(|e| matches!(e, AgentEventPayload::Compacted { .. }));
+        .any(|e| matches!(e, AgentEventPayload::Compacted(_)));
     assert!(has_compacted, "expected Compacted event from auto-compact");
 }
 

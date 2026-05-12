@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use strum::EnumIter;
 
 use crate::command::AgentMode;
 
@@ -10,7 +11,7 @@ use crate::command::AgentMode;
 ///
 /// Shutdown is signalled by dropping the `control_tx` sender — the receiver
 /// in `UnifiedFrontend::recv_input()` returns `None`, terminating the loop.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, EnumIter)]
 pub enum ControlCommand {
     /// Switch agent operating mode (Act / Plan).
     ModeSwitch(AgentMode),

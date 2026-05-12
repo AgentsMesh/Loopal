@@ -41,11 +41,19 @@ pub struct ObservableAgentState {
     pub output_tokens: u32,
     /// Active model identifier (e.g. "claude-sonnet-4-20250514").
     pub model: String,
+    /// Active thinking config label ("auto", "disabled", "effort", "budget").
+    /// Normalized form of the JSON sent via `ControlCommand::ThinkingSwitch`.
+    #[serde(default = "default_thinking_config")]
+    pub thinking_config: String,
     /// Current operating mode (e.g. "act", "plan").
     pub mode: String,
     /// Number of tools currently executing in parallel.
     #[serde(default)]
     pub tools_in_flight: u32,
+}
+
+fn default_thinking_config() -> String {
+    "auto".to_string()
 }
 
 impl Default for ObservableAgentState {
@@ -58,6 +66,7 @@ impl Default for ObservableAgentState {
             input_tokens: 0,
             output_tokens: 0,
             model: String::new(),
+            thinking_config: default_thinking_config(),
             mode: "act".to_string(),
             tools_in_flight: 0,
         }

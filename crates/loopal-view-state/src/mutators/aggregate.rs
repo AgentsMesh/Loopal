@@ -27,6 +27,7 @@ pub(super) fn sub_agent_spawned(state: &mut SessionViewState, name: &str) -> boo
 
 pub(super) fn session_resumed(state: &mut SessionViewState, session_id: &str) -> bool {
     state.agent.session_id = Some(session_id.to_string());
+    state.agent.conversation.clear_history();
     state.tasks.clear();
     state.crons.clear();
     state.bg_tasks.clear();

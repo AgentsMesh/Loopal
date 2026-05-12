@@ -53,8 +53,8 @@ async fn register_agent_connection_makes_agent_routable() {
     let event = tokio::time::timeout(Duration::from_secs(1), event_rx.recv()).await;
     assert!(event.is_ok());
     let evt = event.unwrap().unwrap();
-    if let AgentEventPayload::SubAgentSpawned { name, .. } = evt.payload {
-        assert_eq!(name, "mock-worker");
+    if let AgentEventPayload::SubAgentSpawned(s) = evt.payload {
+        assert_eq!(s.name, "mock-worker");
     } else {
         panic!("expected SubAgentSpawned, got {:?}", evt.payload);
     }

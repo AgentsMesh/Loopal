@@ -168,13 +168,15 @@ impl AgentLoopRunner {
             warn!(error = %e, "failed to write compact marker");
         }
 
-        self.emit(AgentEventPayload::Compacted {
-            kept: after,
-            removed,
-            tokens_before,
-            tokens_after,
-            strategy: strategy.to_string(),
-        })
+        self.emit(AgentEventPayload::Compacted(
+            loopal_protocol::CompactionSummary {
+                kept: after,
+                removed,
+                tokens_before,
+                tokens_after,
+                strategy: strategy.to_string(),
+            },
+        ))
         .await?;
 
         info!(

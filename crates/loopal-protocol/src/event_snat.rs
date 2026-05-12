@@ -13,10 +13,10 @@ impl AgentEventPayload {
                 source.prepend_hub_if_local(self_hub);
                 target.prepend_hub_if_local(self_hub);
             }
-            Self::SubAgentSpawned {
-                parent: Some(p), ..
-            } => {
-                p.prepend_hub_if_local(self_hub);
+            Self::SubAgentSpawned(s) => {
+                if let Some(p) = s.parent.as_mut() {
+                    p.prepend_hub_if_local(self_hub);
+                }
             }
             Self::InboxEnqueued { source, .. } => {
                 source.prepend_hub_if_local(self_hub);

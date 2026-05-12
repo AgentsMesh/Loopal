@@ -1,6 +1,7 @@
 mod aggregate;
 mod bg;
 mod interactive;
+mod lifecycle;
 mod observable;
 mod question;
 mod stream;
@@ -90,19 +91,13 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
             continuation,
             max_continuations,
         } => interactive::auto_continuation(state, *continuation, *max_continuations),
-        Compacted {
-            kept,
-            removed,
-            tokens_before,
-            tokens_after,
-            strategy,
-        } => interactive::compacted(
+        Compacted(s) => interactive::compacted(
             state,
-            *kept,
-            *removed,
-            *tokens_before,
-            *tokens_after,
-            strategy,
+            s.kept,
+            s.removed,
+            s.tokens_before,
+            s.tokens_after,
+            &s.strategy,
         ),
         Rewound { remaining_turns } => stream::rewound(state, *remaining_turns),
         ServerToolUse { id, name, input } => tool::server_tool_use(state, id, name, input),
@@ -128,8 +123,11 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
             reason,
             source,
         } => interactive::question_decided(state, *question_count, reason, *duration_ms, *source),
-        ModeChanged { mode } => observable::mode_changed(state, mode),
-        TurnCompleted { .. } => observable::turn_completed(state),
+        ModeChanged { mode } => lifecycle::mode_changed(state, mode),
+        ModelChanged { model } => lifecycle::model_changed(state, model),
+        ThinkingChanged { thinking_config } => lifecycle::thinking_changed(state, thinking_config),
+        Cleared { context_window } => lifecycle::cleared(state, *context_window),
+        TurnCompleted(_) => observable::turn_completed(state),
         TasksChanged { tasks } => aggregate::tasks_changed(state, tasks),
         CronsChanged { crons } => aggregate::crons_changed(state, crons),
         BgTaskSpawned { id, description } => bg::spawned(state, id, description),
@@ -141,7 +139,7 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
             output,
         } => bg::completed(state, id, *status, *exit_code, output),
         McpStatusReport { servers } => aggregate::mcp_status(state, servers),
-        SubAgentSpawned { name, .. } => aggregate::sub_agent_spawned(state, name),
+        SubAgentSpawned(s) => aggregate::sub_agent_spawned(state, &s.name),
         SessionResumed { session_id, .. } => aggregate::session_resumed(state, session_id),
         ThreadGoalUpdated { goal, .. } => aggregate::thread_goal_updated(state, goal),
         MessageRouted { .. }

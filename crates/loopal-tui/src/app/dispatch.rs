@@ -2,19 +2,15 @@ use super::App;
 
 impl App {
     pub fn dispatch_event(&mut self, event: loopal_protocol::AgentEvent) {
-        if let loopal_protocol::AgentEventPayload::SubAgentSpawned {
-            ref name,
-            ref parent,
-            ..
-        } = event.payload
-            && !self.view_clients.contains_key(name)
+        if let loopal_protocol::AgentEventPayload::SubAgentSpawned(ref s) = event.payload
+            && !self.view_clients.contains_key(&s.name)
         {
-            let parent_name = parent.as_ref().map(|p| p.agent.clone());
-            let vc = crate::view_client::ViewClient::empty(name);
+            let parent_name = s.parent.as_ref().map(|p| p.agent.clone());
+            let vc = crate::view_client::ViewClient::empty(&s.name);
             if let Some(parent_name) = parent_name {
                 vc.with_view_mut(|view| view.parent = Some(parent_name));
             }
-            self.view_clients.insert(name.clone(), vc);
+            self.view_clients.insert(s.name.clone(), vc);
         }
         for vc in self.view_clients.values() {
             vc.apply_event(&event);

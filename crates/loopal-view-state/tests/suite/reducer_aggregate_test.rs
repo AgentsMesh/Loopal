@@ -71,25 +71,29 @@ fn mcp_status_report_replaces_servers() {
 #[test]
 fn sub_agent_spawned_appends_child() {
     let mut r = ViewStateReducer::new("root");
-    r.apply(AgentEventPayload::SubAgentSpawned {
-        name: "researcher".into(),
-        agent_id: "a-001".into(),
-        parent: None,
-        model: None,
-        session_id: None,
-    });
+    r.apply(AgentEventPayload::SubAgentSpawned(
+        loopal_protocol::SubAgentSpawn {
+            name: "researcher".into(),
+            agent_id: "a-001".into(),
+            parent: None,
+            model: None,
+            session_id: None,
+        },
+    ));
     assert_eq!(r.state().agent.children, vec!["researcher".to_string()]);
 }
 
 #[test]
 fn duplicate_sub_agent_spawn_is_noop() {
     let mut r = ViewStateReducer::new("root");
-    let evt = || AgentEventPayload::SubAgentSpawned {
-        name: "researcher".into(),
-        agent_id: "a-001".into(),
-        parent: None,
-        model: None,
-        session_id: None,
+    let evt = || {
+        AgentEventPayload::SubAgentSpawned(loopal_protocol::SubAgentSpawn {
+            name: "researcher".into(),
+            agent_id: "a-001".into(),
+            parent: None,
+            model: None,
+            session_id: None,
+        })
     };
     r.apply(evt());
     let after_first = r.rev();
@@ -117,4 +121,28 @@ fn session_resumed_clears_session_state_and_records_id() {
     assert!(r.state().tasks.is_empty());
     assert!(r.state().bg_tasks.is_empty());
     assert!(r.state().crons.is_empty());
+}
+
+#[test]
+fn session_resumed_wipes_previous_conversation_history() {
+    let mut r = ViewStateReducer::new("root");
+    r.apply(AgentEventPayload::Running);
+    r.apply(AgentEventPayload::Stream {
+        text: "old session reply".into(),
+    });
+    r.apply(AgentEventPayload::AwaitingInput);
+
+    r.apply(AgentEventPayload::SessionResumed {
+        session_id: "session-xyz".into(),
+        message_count: 0,
+    });
+
+    let conv = &r.state().agent.conversation;
+    assert!(
+        conv.messages.is_empty(),
+        "SessionResumed must wipe stale conversation, got {} rows",
+        conv.messages.len()
+    );
+    assert!(conv.streaming_text.is_empty());
+    assert_eq!(conv.turn_count, 0);
 }

@@ -355,16 +355,16 @@ async fn cross_hub_spawn_carries_qualified_parent_through_event_and_registry() {
             .await
             .expect("waiting for SubAgentSpawned timed out")
             .expect("event channel open");
-        if matches!(event.payload, AgentEventPayload::SubAgentSpawned { .. }) {
+        if matches!(event.payload, AgentEventPayload::SubAgentSpawned(_)) {
             break event;
         }
     };
-    let AgentEventPayload::SubAgentSpawned { name, parent, .. } = spawned.payload else {
+    let AgentEventPayload::SubAgentSpawned(s) = spawned.payload else {
         unreachable!()
     };
-    assert_eq!(name, "child");
+    assert_eq!(s.name, "child");
     assert_eq!(
-        parent,
+        s.parent,
         Some(QualifiedAddress::remote(["hub-a"], "alpha")),
         "event parent must be a typed qualified address"
     );

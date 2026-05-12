@@ -125,6 +125,10 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
             let (method, params) = ext::inbox_consumed(session_id, message_id);
             Some(AcpNotification::Extension { method, params })
         }
+        AgentEventPayload::Cleared { context_window } => {
+            let (method, params) = ext::cleared(session_id, *context_window);
+            Some(AcpNotification::Extension { method, params })
+        }
 
         // ── Events with no ACP counterpart ───────────────────────────
         AgentEventPayload::AwaitingInput
@@ -137,17 +141,17 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
         | AgentEventPayload::UserQuestionRequest { .. }
         | AgentEventPayload::ThinkingComplete { .. }
         | AgentEventPayload::Rewound { .. }
-        | AgentEventPayload::Compacted { .. }
+        | AgentEventPayload::Compacted(_)
         | AgentEventPayload::ToolBatchStart { .. }
         | AgentEventPayload::Interrupted
         | AgentEventPayload::TurnDiffSummary { .. }
         | AgentEventPayload::ServerToolUse { .. }
         | AgentEventPayload::ServerToolResult { .. }
         | AgentEventPayload::RetryCleared
-        | AgentEventPayload::SubAgentSpawned { .. }
+        | AgentEventPayload::SubAgentSpawned(_)
         | AgentEventPayload::PermissionDecided { .. }
         | AgentEventPayload::QuestionDecided { .. }
-        | AgentEventPayload::TurnCompleted { .. }
+        | AgentEventPayload::TurnCompleted(_)
         | AgentEventPayload::McpStatusReport { .. }
         | AgentEventPayload::BgTaskSpawned { .. }
         | AgentEventPayload::BgTaskOutput { .. }
@@ -155,6 +159,8 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
         | AgentEventPayload::TasksChanged { .. }
         | AgentEventPayload::CronsChanged { .. }
         | AgentEventPayload::UserMessageQueued { .. }
+        | AgentEventPayload::ModelChanged { .. }
+        | AgentEventPayload::ThinkingChanged { .. }
         | AgentEventPayload::ThreadGoalUpdated { .. }
         | AgentEventPayload::ClassifierProgress { .. }
         | AgentEventPayload::ClassifierFailed { .. }

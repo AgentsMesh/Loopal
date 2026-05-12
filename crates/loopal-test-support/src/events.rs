@@ -43,6 +43,41 @@ pub async fn collect_until_idle(
     collected
 }
 
+/// Collect events until `predicate` returns true on the most recent event.
+/// Use when waiting on a single control-induced emission (e.g. `Cleared`)
+/// — these never push the runner through a Running → AwaitingInput
+/// terminal, so `collect_until_idle` would block forever.
+pub async fn collect_until<P>(
+    rx: &mut mpsc::Receiver<AgentEvent>,
+    timeout: Duration,
+    mut predicate: P,
+    mut observer: impl FnMut(&AgentEvent),
+) -> Vec<AgentEventPayload>
+where
+    P: FnMut(&AgentEventPayload) -> bool,
+{
+    let mut collected = Vec::new();
+    let deadline = tokio::time::Instant::now() + timeout;
+    loop {
+        match tokio::time::timeout_at(deadline, rx.recv()).await {
+            Ok(Some(event)) => {
+                let matched = predicate(&event.payload);
+                observer(&event);
+                collected.push(event.payload);
+                if matched {
+                    break;
+                }
+            }
+            Ok(None) => break,
+            Err(_) => panic!(
+                "collect_until timed out after {timeout:?} — collected {} events",
+                collected.len()
+            ),
+        }
+    }
+    collected
+}
+
 /// Concatenate all `Stream { text }` payloads into a single string.
 pub fn extract_texts(events: &[AgentEventPayload]) -> String {
     let mut out = String::new();

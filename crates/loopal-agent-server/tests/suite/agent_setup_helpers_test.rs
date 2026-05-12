@@ -180,13 +180,15 @@ async fn sub_agent_forwarder_emits_spawned_events_only() {
         events: events.clone(),
     });
     let tx = spawn_sub_agent_forwarder(frontend);
-    tx.send(AgentEvent::root(AgentEventPayload::SubAgentSpawned {
-        name: "child".into(),
-        agent_id: "aid".into(),
-        parent: None,
-        model: None,
-        session_id: None,
-    }))
+    tx.send(AgentEvent::root(AgentEventPayload::SubAgentSpawned(
+        loopal_protocol::SubAgentSpawn {
+            name: "child".into(),
+            agent_id: "aid".into(),
+            parent: None,
+            model: None,
+            session_id: None,
+        },
+    )))
     .await
     .unwrap();
     tx.send(AgentEvent::root(AgentEventPayload::Started))
@@ -195,10 +197,7 @@ async fn sub_agent_forwarder_emits_spawned_events_only() {
     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
     let captured = events.lock().unwrap();
     assert_eq!(captured.len(), 1);
-    assert!(matches!(
-        captured[0],
-        AgentEventPayload::SubAgentSpawned { .. }
-    ));
+    assert!(matches!(captured[0], AgentEventPayload::SubAgentSpawned(_)));
 }
 
 #[tokio::test]

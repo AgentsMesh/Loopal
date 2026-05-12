@@ -118,13 +118,13 @@ pub(super) async fn forward_cross_hub_spawn(
             let parent_addr = loopal_protocol::QualifiedAddress::local(from_agent);
             let event = AgentEvent::named(
                 parent_addr.clone(),
-                AgentEventPayload::SubAgentSpawned {
+                AgentEventPayload::SubAgentSpawned(loopal_protocol::SubAgentSpawn {
                     name: pf.name.clone(),
                     agent_id,
                     parent: Some(parent_addr),
                     model,
                     session_id: None,
-                },
+                }),
             );
             let h = hub.lock().await;
             if h.registry.event_sender().try_send(event).is_err() {

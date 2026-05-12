@@ -1,74 +1,52 @@
-// E2E: ResolveSource (protocol enum) → AgentEventPayload::QuestionDecided
-// → view-state mutator → conversation system message string.
-// Locks the wire-to-UI contract for each of the three sources.
-
 use loopal_protocol::{AgentEventPayload, ResolveSource};
 use loopal_view_state::ViewStateReducer;
 
-fn last_system_line(r: &ViewStateReducer) -> String {
-    r.state()
-        .agent
-        .conversation
-        .messages
-        .last()
-        .expect("a message should have been pushed")
-        .content
-        .clone()
+fn message_count(r: &ViewStateReducer) -> usize {
+    r.state().agent.conversation.messages.len()
 }
 
-fn apply_decided(r: &mut ViewStateReducer, source: ResolveSource, reason: &str) {
+fn apply_decided(r: &mut ViewStateReducer, source: ResolveSource, reason: &str) -> Option<u64> {
     r.apply(AgentEventPayload::QuestionDecided {
         question_count: 1,
         duration_ms: 1234,
         reason: reason.into(),
         source,
-    });
+    })
 }
 
 #[test]
-fn manual_source_propagates_to_system_msg() {
+fn manual_source_does_not_emit_system_msg() {
     let mut r = ViewStateReducer::new("root");
-    apply_decided(&mut r, ResolveSource::Manual, "user picked X");
-    let msg = last_system_line(&r);
-    assert!(
-        msg.contains("[ask-user] manual"),
-        "manual label missing: {msg}"
-    );
-    assert!(msg.contains("user picked X"), "reason missing: {msg}");
-    assert!(msg.contains("(1234ms)"), "duration missing: {msg}");
+    let before = message_count(&r);
+    let bumped = apply_decided(&mut r, ResolveSource::Manual, "user picked X");
+    assert!(bumped.is_none(), "manual must not bump rev");
+    assert_eq!(message_count(&r), before);
 }
 
 #[test]
-fn classifier_source_propagates_to_system_msg() {
+fn classifier_source_does_not_emit_system_msg() {
     let mut r = ViewStateReducer::new("root");
-    apply_decided(&mut r, ResolveSource::Classifier, "classifier inferred");
-    let msg = last_system_line(&r);
-    assert!(
-        msg.contains("[ask-user] classifier"),
-        "classifier label missing: {msg}"
-    );
-    assert!(msg.contains("classifier inferred"));
+    let before = message_count(&r);
+    let bumped = apply_decided(&mut r, ResolveSource::Classifier, "classifier inferred");
+    assert!(bumped.is_none(), "classifier must not bump rev");
+    assert_eq!(message_count(&r), before);
 }
 
 #[test]
-fn agent_source_propagates_to_system_msg() {
+fn agent_source_does_not_emit_system_msg() {
     let mut r = ViewStateReducer::new("root");
-    apply_decided(
+    let before = message_count(&r);
+    let bumped = apply_decided(
         &mut r,
         ResolveSource::Agent,
         "sub-agent looked at git status",
     );
-    let msg = last_system_line(&r);
-    assert!(
-        msg.contains("[ask-user] agent"),
-        "agent label missing: {msg}"
-    );
-    assert!(msg.contains("sub-agent looked at git status"));
+    assert!(bumped.is_none(), "agent must not bump rev");
+    assert_eq!(message_count(&r), before);
 }
 
 #[test]
 fn resolve_source_serde_canonical_roundtrip() {
-    // Round-trip via JSON to lock the wire encoding for each variant.
     for (variant, expected) in [
         (ResolveSource::Manual, "\"manual\""),
         (ResolveSource::Classifier, "\"classifier\""),

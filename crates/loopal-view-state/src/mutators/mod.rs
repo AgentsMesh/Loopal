@@ -117,12 +117,6 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
             reason,
             duration_ms,
         } => interactive::permission_decided(state, tool_name, decision, reason, *duration_ms),
-        QuestionDecided {
-            question_count,
-            duration_ms,
-            reason,
-            source,
-        } => interactive::question_decided(state, *question_count, reason, *duration_ms, *source),
         ModeChanged { mode } => lifecycle::mode_changed(state, mode),
         ModelChanged { model } => lifecycle::model_changed(state, model),
         ThinkingChanged { thinking_config } => lifecycle::thinking_changed(state, thinking_config),
@@ -145,6 +139,7 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
         MessageRouted { .. }
         | InboxConsumed { .. }
         | TurnDiffSummary { .. }
-        | SessionResumeWarnings { .. } => false,
+        | SessionResumeWarnings { .. }
+        | QuestionDecided { .. } => false,
     }
 }

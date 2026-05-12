@@ -1,4 +1,5 @@
 pub mod cancel;
+mod cold_start_emit;
 mod compaction;
 mod context_pipeline;
 pub mod diff_tracker;

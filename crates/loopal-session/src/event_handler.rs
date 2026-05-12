@@ -31,7 +31,7 @@ pub fn apply_event(state: &mut SessionState, event: AgentEvent) {
             }
         }
         // Per-agent events handled by ViewClient reducer.
-        AgentEventPayload::SubAgentSpawned { .. }
+        AgentEventPayload::SubAgentSpawned(_)
         | AgentEventPayload::Started
         | AgentEventPayload::Running
         | AgentEventPayload::AwaitingInput
@@ -49,15 +49,18 @@ pub fn apply_event(state: &mut SessionState, event: AgentEvent) {
         | AgentEventPayload::UserQuestionResolved { .. }
         | AgentEventPayload::UserMessageQueued { .. }
         | AgentEventPayload::TokenUsage { .. }
-        | AgentEventPayload::TurnCompleted { .. }
+        | AgentEventPayload::TurnCompleted(_)
         | AgentEventPayload::TurnDiffSummary { .. }
         | AgentEventPayload::ModeChanged { .. }
+        | AgentEventPayload::ModelChanged { .. }
+        | AgentEventPayload::ThinkingChanged { .. }
+        | AgentEventPayload::Cleared { .. }
         | AgentEventPayload::RetryError { .. }
         | AgentEventPayload::RetryCleared
         | AgentEventPayload::AutoContinuation { .. }
         | AgentEventPayload::PermissionDecided { .. }
         | AgentEventPayload::QuestionDecided { .. }
-        | AgentEventPayload::Compacted { .. }
+        | AgentEventPayload::Compacted(_)
         | AgentEventPayload::Rewound { .. }
         | AgentEventPayload::ServerToolUse { .. }
         | AgentEventPayload::ServerToolResult { .. }

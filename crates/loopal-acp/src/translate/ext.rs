@@ -88,6 +88,17 @@ pub fn inbox_consumed(session_id: &str, message_id: &str) -> (String, Value) {
     )
 }
 
+/// `_loopal/cleared` — TUI / IDE clients drop their conversation view.
+/// `contextWindow` lets the receiver re-render the context indicator
+/// without waiting for a paired TokenUsage event.
+pub fn cleared(session_id: &str, context_window: u32) -> (String, Value) {
+    ext_notification(
+        session_id,
+        "cleared",
+        serde_json::json!({ "contextWindow": context_window }),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -151,5 +162,13 @@ mod tests {
         let (method, params) = inbox_consumed("s1", "msg-1");
         assert_eq!(method, "_loopal/inbox.consumed");
         assert_eq!(params["data"]["messageId"], "msg-1");
+    }
+
+    #[test]
+    fn cleared_format() {
+        let (method, params) = cleared("s1", 200_000);
+        assert_eq!(method, "_loopal/cleared");
+        assert_eq!(params["sessionId"], "s1");
+        assert_eq!(params["data"]["contextWindow"], 200_000);
     }
 }

@@ -79,13 +79,13 @@ pub async fn register_agent_connection(
             .unwrap_or_else(|| "main".to_string());
         let event = AgentEvent::named(
             QualifiedAddress::local(parent_agent),
-            AgentEventPayload::SubAgentSpawned {
+            AgentEventPayload::SubAgentSpawned(loopal_protocol::SubAgentSpawn {
                 name: name.to_string(),
                 agent_id: agent_id.clone(),
                 parent: parent_addr.clone(),
                 model: model.map(String::from),
                 session_id: session_id.map(String::from),
-            },
+            }),
         );
         if h.registry.event_sender().try_send(event).is_err() {
             tracing::warn!(agent = %name, "SubAgentSpawned event dropped (channel full)");

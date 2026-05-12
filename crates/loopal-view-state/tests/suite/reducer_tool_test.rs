@@ -78,19 +78,21 @@ fn mode_changed_updates_mode_string() {
 #[test]
 fn turn_completed_increments_turn_count() {
     let mut r = ViewStateReducer::new("root");
-    r.apply(AgentEventPayload::TurnCompleted {
-        turn_id: 1,
-        duration_ms: 100,
-        llm_calls: 1,
-        tool_calls_requested: 0,
-        tool_calls_approved: 0,
-        tool_calls_denied: 0,
-        tool_errors: 0,
-        auto_continuations: 0,
-        warnings_injected: 0,
-        tokens_in: 0,
-        tokens_out: 0,
-        modified_files: vec![],
-    });
+    r.apply(AgentEventPayload::TurnCompleted(
+        loopal_protocol::TurnSummary {
+            turn_id: 1,
+            duration_ms: 100,
+            llm_calls: 1,
+            tool_calls_requested: 0,
+            tool_calls_approved: 0,
+            tool_calls_denied: 0,
+            tool_errors: 0,
+            auto_continuations: 0,
+            warnings_injected: 0,
+            tokens_in: 0,
+            tokens_out: 0,
+            modified_files: vec![],
+        },
+    ));
     assert_eq!(r.state().agent.observable.turn_count, 1);
 }

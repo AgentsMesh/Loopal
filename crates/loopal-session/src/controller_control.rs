@@ -22,12 +22,7 @@ impl SessionController {
     }
 
     pub async fn switch_thinking(&self, config_json: String) {
-        let label = thinking_label_from_json(&config_json);
-        let target = {
-            let mut s = self.lock();
-            s.thinking_config = label;
-            s.active_view.clone()
-        };
+        let target = self.active_target();
         self.backend
             .send_control_to_agent(&target, ControlCommand::ThinkingSwitch(config_json))
             .await;
@@ -67,15 +62,4 @@ impl SessionController {
             )
             .await;
     }
-}
-
-fn thinking_label_from_json(config_json: &str) -> String {
-    serde_json::from_str::<serde_json::Value>(config_json)
-        .ok()
-        .and_then(|v| {
-            v.get("type")
-                .and_then(|t| t.as_str())
-                .map(|s| s.to_string())
-        })
-        .unwrap_or_else(|| "auto".to_string())
 }

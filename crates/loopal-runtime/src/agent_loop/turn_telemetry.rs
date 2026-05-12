@@ -71,20 +71,22 @@ impl AgentLoopRunner {
             crate::otel_metrics::token_usage().add(m.tokens_out as u64, attrs);
 
             let _ = self
-                .emit(AgentEventPayload::TurnCompleted {
-                    turn_id: turn_ctx.turn_id,
-                    duration_ms,
-                    llm_calls: m.llm_calls,
-                    tool_calls_requested: m.tool_calls_requested,
-                    tool_calls_approved: m.tool_calls_approved,
-                    tool_calls_denied: m.tool_calls_denied,
-                    tool_errors: m.tool_errors,
-                    auto_continuations: m.auto_continuations,
-                    warnings_injected: m.warnings_injected,
-                    tokens_in: m.tokens_in,
-                    tokens_out: m.tokens_out,
-                    modified_files: files,
-                })
+                .emit(AgentEventPayload::TurnCompleted(
+                    loopal_protocol::TurnSummary {
+                        turn_id: turn_ctx.turn_id,
+                        duration_ms,
+                        llm_calls: m.llm_calls,
+                        tool_calls_requested: m.tool_calls_requested,
+                        tool_calls_approved: m.tool_calls_approved,
+                        tool_calls_denied: m.tool_calls_denied,
+                        tool_errors: m.tool_errors,
+                        auto_continuations: m.auto_continuations,
+                        warnings_injected: m.warnings_injected,
+                        tokens_in: m.tokens_in,
+                        tokens_out: m.tokens_out,
+                        modified_files: files,
+                    },
+                ))
                 .await;
 
             self.record_turn_for_barren_tracking(&turn_ctx.metrics);

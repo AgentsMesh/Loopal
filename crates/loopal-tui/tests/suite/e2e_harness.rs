@@ -55,6 +55,25 @@ impl TuiTestHarness {
         .await
     }
 
+    /// Collect events until `predicate` matches the most recent payload.
+    /// Used to await control-induced emissions (e.g. `Cleared`) which
+    /// don't drive a Running → AwaitingInput cycle.
+    pub async fn collect_until<P>(&mut self, predicate: P) -> Vec<AgentEventPayload>
+    where
+        P: FnMut(&AgentEventPayload) -> bool,
+    {
+        let app = &mut self.app;
+        events::collect_until(
+            &mut self.inner.event_rx,
+            DEFAULT_TIMEOUT,
+            predicate,
+            |event| {
+                app.dispatch_event(event.clone());
+            },
+        )
+        .await
+    }
+
     /// Render the current state and return the buffer as plain text.
     pub fn render_text(&mut self) -> String {
         self.terminal.draw(|f| draw(f, &mut self.app)).unwrap();

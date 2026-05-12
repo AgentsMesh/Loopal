@@ -26,8 +26,9 @@ impl CommandHandler for ModelCmd {
 
 fn open_model_picker(app: &mut App) {
     let active = app.session.lock().active_view.clone();
-    let current_model = app.observable_for(&active).model;
-    let current_thinking = app.session.lock().thinking_config.clone();
+    let observable = app.observable_for(&active);
+    let current_model = observable.model;
+    let current_thinking = observable.thinking_config;
 
     let models = loopal_provider::list_all_models();
     let items: Vec<PickerItem> = models

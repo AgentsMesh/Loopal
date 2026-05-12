@@ -28,4 +28,11 @@ impl AgentMode {
             AgentMode::Plan => "",
         }
     }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            AgentMode::Act => "act",
+            AgentMode::Plan => "plan",
+        }
+    }
 }

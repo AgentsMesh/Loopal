@@ -84,22 +84,21 @@ pub async fn hub_persist_watcher(
                     root_session_id = session_id.clone();
                 }
             }
-            AgentEventPayload::SubAgentSpawned {
-                name,
-                session_id: Some(sid),
-                parent,
-                model,
-                ..
-            } => {
+            AgentEventPayload::SubAgentSpawned(s) => {
+                let Some(session_id) = s.session_id.clone() else {
+                    // Sub-agents without a persisted session aren't resumable;
+                    // skip silently — they'll re-spawn fresh on parent resume.
+                    continue;
+                };
                 let sub_ref = SubAgentRef {
-                    name: name.clone(),
-                    session_id: sid.clone(),
-                    parent: parent.as_ref().map(|p| p.to_string()),
-                    model: model.clone(),
+                    name: s.name.clone(),
+                    session_id,
+                    parent: s.parent.as_ref().map(|p| p.to_string()),
+                    model: s.model.clone(),
                 };
                 if let Err(e) = session_manager.add_sub_agent(&root_session_id, sub_ref) {
                     warn!(
-                        agent = %name, error = %e,
+                        agent = %s.name, error = %e,
                         "hub persister: failed to persist sub-agent ref"
                     );
                 }

@@ -48,6 +48,7 @@ mod goal_kickoff_runner_test;
 mod goal_kickoff_test;
 mod inbox_event_test;
 mod input_edge_test;
+mod input_emit_fail_edge_test;
 mod input_image_test;
 mod input_scheduled_test;
 mod input_test;

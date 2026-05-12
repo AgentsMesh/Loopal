@@ -21,7 +21,7 @@ pub fn spawn_sub_agent_forwarder(
     let (event_tx, mut event_rx) = tokio::sync::mpsc::channel::<AgentEvent>(256);
     tokio::spawn(async move {
         while let Some(event) = event_rx.recv().await {
-            if matches!(event.payload, AgentEventPayload::SubAgentSpawned { .. }) {
+            if matches!(event.payload, AgentEventPayload::SubAgentSpawned(_)) {
                 let _ = frontend.emit(event.payload).await;
             }
         }

@@ -45,6 +45,7 @@ fn test_observable_agent_state_default() {
     assert_eq!(state.input_tokens, 0);
     assert_eq!(state.output_tokens, 0);
     assert!(state.model.is_empty());
+    assert_eq!(state.thinking_config, "auto");
     assert_eq!(state.mode, "act");
     assert_eq!(state.tools_in_flight, 0);
 }
@@ -59,6 +60,7 @@ fn test_observable_agent_state_serde_roundtrip() {
         input_tokens: 1000,
         output_tokens: 500,
         model: "claude-sonnet".to_string(),
+        thinking_config: "effort".to_string(),
         mode: "plan".to_string(),
         tools_in_flight: 0,
     };
@@ -68,4 +70,21 @@ fn test_observable_agent_state_serde_roundtrip() {
     assert_eq!(restored.tool_count, 5);
     assert_eq!(restored.last_tool, Some("Read".to_string()));
     assert_eq!(restored.turn_count, 3);
+    assert_eq!(restored.thinking_config, "effort");
+}
+
+#[test]
+fn test_observable_thinking_config_defaults_when_absent() {
+    let legacy_json = r#"{
+        "status": "Running",
+        "tool_count": 0,
+        "last_tool": null,
+        "turn_count": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "model": "claude-x",
+        "mode": "act"
+    }"#;
+    let restored: ObservableAgentState = serde_json::from_str(legacy_json).unwrap();
+    assert_eq!(restored.thinking_config, "auto");
 }

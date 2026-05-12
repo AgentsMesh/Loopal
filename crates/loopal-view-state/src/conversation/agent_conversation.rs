@@ -81,6 +81,38 @@ impl AgentConversation {
         self.last_active_at = None;
     }
 
+    /// Wipe the conversation back to its post-construction state. Used by
+    /// the `Cleared` event mutator. Pending permission/question dialogs
+    /// are dropped along with the rows that referenced them — a multi-
+    /// client race that produced a pending dialog elsewhere must not leave
+    /// a zombie popup pointing at a tool_call_id whose message has just
+    /// been wiped.
+    pub fn clear_all(&mut self, context_window: u32) {
+        self.clear_history();
+        self.context_window = context_window;
+    }
+
+    /// Variant of `clear_all` for callers that must NOT touch the budget
+    /// indicator — the follow-up `TokenUsage` event will reset
+    /// `context_window`, so resetting it here would briefly show 0 then
+    /// flicker back. Used by the `SessionResumed` mutator.
+    pub fn clear_history(&mut self) {
+        self.messages.clear();
+        self.streaming_text.clear();
+        self.streaming_thinking.clear();
+        self.thinking_active = false;
+        self.retry_banner = None;
+        self.turn_count = 0;
+        self.input_tokens = 0;
+        self.output_tokens = 0;
+        self.cache_creation_tokens = 0;
+        self.cache_read_tokens = 0;
+        self.thinking_tokens = 0;
+        self.pending_permission = None;
+        self.pending_question = None;
+        self.reset_timer();
+    }
+
     /// Flush buffered streaming text and thinking into SessionMessages.
     pub fn flush_streaming(&mut self) {
         if !self.streaming_thinking.is_empty() {

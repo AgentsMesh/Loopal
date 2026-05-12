@@ -54,6 +54,7 @@ rust_test(
         "//crates/loopal-test-support",
         "//crates/loopal-tool-api",
         "@crates//:chrono",
+        "@crates//:strum",
         "@crates//:tempfile",
         "@crates//:tokio",
         "@crates//:wiremock",

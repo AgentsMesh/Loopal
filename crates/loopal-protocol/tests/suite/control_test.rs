@@ -1,4 +1,5 @@
 use loopal_protocol::{AgentMode, ControlCommand};
+use strum::IntoEnumIterator;
 
 #[test]
 fn test_control_command_mode_switch() {
@@ -89,5 +90,25 @@ fn test_control_command_mcp_disconnect_serde_roundtrip() {
         assert_eq!(server, "my-mcp");
     } else {
         panic!("expected McpDisconnect after roundtrip");
+    }
+}
+
+#[test]
+fn test_all_control_commands_serde_roundtrip() {
+    // Reflective: every variant must survive JSON roundtrip. Discriminant
+    // equality is enough — payload fidelity for specific variants is
+    // covered by the dedicated tests above. The point of iterating here is
+    // to catch a future variant that forgets a serde-friendly type or that
+    // breaks our public IPC contract.
+    for original in ControlCommand::iter() {
+        let json = serde_json::to_string(&original)
+            .unwrap_or_else(|_| panic!("variant {original:?} failed to serialize"));
+        let restored: ControlCommand = serde_json::from_str(&json)
+            .unwrap_or_else(|_| panic!("variant {original:?} failed to deserialize from {json}"));
+        assert_eq!(
+            std::mem::discriminant(&restored),
+            std::mem::discriminant(&original),
+            "discriminant changed across roundtrip for {original:?}"
+        );
     }
 }

@@ -41,19 +41,52 @@ async fn test_clear_command() {
         .await
         .unwrap();
 
-    // Collect first turn
+    // Complete first turn
     let ev1 = harness.collect_until_idle().await;
     assertions::assert_has_stream(&ev1);
 
-    // Send Clear then next message
+    // Snapshot pre-clear conversation has the user prompt + assistant reply
+    let pre_messages = harness.app.snapshot_active_conversation().messages.len();
+    assert!(
+        pre_messages > 0,
+        "expected non-empty conversation before clear"
+    );
+
+    // Send Clear — view-state must drop every persisted row before the
+    // next turn lands. Wait for the Cleared event to round-trip back.
     harness
         .inner
         .control_tx
         .send(ControlCommand::Clear)
         .await
         .unwrap();
-    tokio::task::yield_now().await;
+    let clear_evts = harness
+        .collect_until(|e| matches!(e, AgentEventPayload::Cleared { .. }))
+        .await;
+    assert!(
+        clear_evts
+            .iter()
+            .any(|e| matches!(e, AgentEventPayload::Cleared { .. })),
+        "expected Cleared event in stream"
+    );
 
+    let conv = harness.app.snapshot_active_conversation();
+    assert!(
+        conv.messages.is_empty(),
+        "conversation.messages must be empty after Clear, got {} rows",
+        conv.messages.len()
+    );
+    assert_eq!(conv.turn_count, 0, "turn_count must reset to 0");
+    assert_eq!(conv.input_tokens, 0, "input_tokens must reset to 0");
+    assert_eq!(conv.output_tokens, 0, "output_tokens must reset to 0");
+    let obs = harness.app.observable_for("main");
+    assert_eq!(obs.tool_count, 0, "observable.tool_count must reset");
+    assert!(
+        obs.last_tool.is_none(),
+        "observable.last_tool must be cleared"
+    );
+
+    // Next turn should still run cleanly.
     let envelope = Envelope::new(MessageSource::Human, "main", "continue");
     harness.inner.mailbox_tx.send(envelope).await.unwrap();
 
@@ -85,42 +118,6 @@ async fn test_compact_command() {
         .inner
         .control_tx
         .send(ControlCommand::Compact)
-        .await
-        .unwrap();
-    tokio::task::yield_now().await;
-
-    let envelope = Envelope::new(MessageSource::Human, "main", "go");
-    harness.inner.mailbox_tx.send(envelope).await.unwrap();
-
-    let ev = harness.collect_until_idle().await;
-    assertions::assert_has_stream(&ev);
-}
-
-#[tokio::test]
-async fn test_thinking_switch() {
-    let calls = scenarios::two_turn("Before switch.", "After switch.");
-    let inner = HarnessBuilder::new()
-        .calls(calls)
-        .messages(vec![])
-        .build_spawned()
-        .await;
-    let mut harness = wrap_tui(inner);
-    // Drain initial AwaitingInput (store empty, agent waits for first message)
-    let _ = harness.collect_until_idle().await;
-    harness
-        .inner
-        .mailbox_tx
-        .send(Envelope::new(MessageSource::Human, "main", "hello"))
-        .await
-        .unwrap();
-
-    let _ = harness.collect_until_idle().await;
-
-    let json = serde_json::json!({"type": "disabled"}).to_string();
-    harness
-        .inner
-        .control_tx
-        .send(ControlCommand::ThinkingSwitch(json))
         .await
         .unwrap();
     tokio::task::yield_now().await;

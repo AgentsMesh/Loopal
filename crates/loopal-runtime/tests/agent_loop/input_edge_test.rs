@@ -111,14 +111,7 @@ async fn test_handle_control_clear_resets_state() {
     assert_eq!(runner.tokens.output, 0);
 
     let e1 = event_rx.recv().await.unwrap();
-    assert!(matches!(
-        e1.payload,
-        AgentEventPayload::TokenUsage {
-            input_tokens: 0,
-            output_tokens: 0,
-            ..
-        }
-    ));
+    assert!(matches!(e1.payload, AgentEventPayload::Cleared { .. }));
 }
 
 #[tokio::test]

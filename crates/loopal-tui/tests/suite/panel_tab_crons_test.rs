@@ -26,13 +26,13 @@ fn make_app() -> App {
 fn spawn_agent(app: &mut App, name: &str) {
     app.dispatch_event(AgentEvent::named(
         name,
-        AgentEventPayload::SubAgentSpawned {
+        AgentEventPayload::SubAgentSpawned(loopal_protocol::SubAgentSpawn {
             name: name.to_string(),
             agent_id: format!("id-{name}"),
             parent: Some("main".into()),
             model: Some("test-model".into()),
             session_id: None,
-        },
+        }),
     ));
     app.dispatch_event(AgentEvent::named(name, AgentEventPayload::Started));
 }

@@ -43,6 +43,9 @@ pub struct FetchResult {
     pub status: u16,
     /// Path to an overflow file when body exceeded fetch size limit.
     pub overflow_path: Option<String>,
+    /// Final URL after redirects, populated only when the host differs from
+    /// the requested URL so the caller can decide whether to follow.
+    pub final_url: Option<String>,
 }
 
 /// Metadata about a single file or directory.

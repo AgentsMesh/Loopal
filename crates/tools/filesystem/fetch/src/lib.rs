@@ -81,6 +81,11 @@ impl Tool for FetchTool {
             .unwrap_or("application/octet-stream");
         let ext = extension_from_content_type(content_type);
         let prompt = input["prompt"].as_str();
+        let redirect_prefix = fetch_result
+            .final_url
+            .as_deref()
+            .map(|u| format!("Final-URL: {u}\n\n"))
+            .unwrap_or_default();
 
         if let Some(p) = prompt {
             let converted = if ext == "html" {
@@ -89,11 +94,12 @@ impl Tool for FetchTool {
                 fetch_result.body
             };
 
-            if let Some(refined) = __try_refine_internal(ctx, p, url, &converted).await {
+            if let Some(mut refined) = __try_refine_internal(ctx, p, url, &converted).await {
+                refined.content = format!("{redirect_prefix}{}", refined.content);
                 return Ok(refined);
             }
 
-            let output = format!("[User prompt: {p}]\n\n{converted}");
+            let output = format!("{redirect_prefix}[User prompt: {p}]\n\n{converted}");
             return Ok(ToolResult::success(loopal_tool_api::truncate_output(
                 &output, 2000, 512_000,
             )));
@@ -102,7 +108,7 @@ impl Tool for FetchTool {
         let size = fetch_result.body.len();
         let path_str = save_to_tmp(ctx, &fetch_result.body, ext).await?;
         Ok(ToolResult::success(format!(
-            "Downloaded to: {path_str}\nContent-Type: {content_type}\nSize: {size} bytes"
+            "{redirect_prefix}Downloaded to: {path_str}\nContent-Type: {content_type}\nSize: {size} bytes"
         )))
     }
 }

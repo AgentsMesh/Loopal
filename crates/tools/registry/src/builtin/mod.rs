@@ -20,6 +20,11 @@ pub fn register_all(registry: &ToolRegistry, bg_store: Arc<BackgroundTaskStore>)
     registry.register(Box::new(loopal_tool_bash::BashTool::new(bg_store)));
     registry.register(Box::new(loopal_tool_ls::LsTool));
     registry.register(Box::new(loopal_tool_fetch::FetchTool));
+    // reason: WebSearch is a client-side placeholder that the Anthropic/Google/
+    // OpenAI providers detect by name and replace with their server-side
+    // `web_search` declaration; without registering it here the providers
+    // never inject the server tool and the model loses search capability.
+    registry.register(Box::new(loopal_tool_web_search::WebSearchTool));
     registry.register(Box::new(loopal_tool_ask_user::AskUserTool));
     registry.register(Box::new(loopal_tool_plan_mode::EnterPlanModeTool));
     registry.register(Box::new(loopal_tool_plan_mode::ExitPlanModeTool));

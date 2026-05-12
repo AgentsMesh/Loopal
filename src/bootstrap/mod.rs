@@ -25,6 +25,8 @@ use worktree_session::{
     print_error_worktree_info, print_resume_info, resolve_resume_for_cwd,
 };
 
+pub(crate) use discovery::is_alive;
+
 pub async fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let cwd = std::env::current_dir()?;

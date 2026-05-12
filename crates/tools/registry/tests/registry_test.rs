@@ -151,3 +151,18 @@ fn dispatch_contract_for_builtin_tools() {
     assert_eq!(ReadTool.dispatch(), ToolDispatch::Pipeline);
     assert_eq!(MockTool::new("Foo").dispatch(), ToolDispatch::Pipeline);
 }
+
+// reason: providers detect a client-side `WebSearch` placeholder by name and
+// rewrite it as their server-side `web_search` declaration; if this registration
+// is ever dropped again, search capability silently disappears across all
+// Anthropic/OpenAI/Google sessions.
+#[test]
+fn register_all_includes_web_search_placeholder() {
+    let registry = ToolRegistry::new();
+    let bg = loopal_tool_background::BackgroundTaskStore::new();
+    loopal_tools::builtin::register_all(&registry, bg);
+    assert!(
+        registry.get("WebSearch").is_some(),
+        "WebSearch placeholder must be registered so providers can swap in server-side web_search"
+    );
+}

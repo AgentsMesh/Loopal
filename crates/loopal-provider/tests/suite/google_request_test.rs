@@ -138,6 +138,56 @@ fn test_build_tools_with_declarations() {
     assert_eq!(declarations[1]["description"], "Read a file");
 }
 
+// reason: protects the WebSearch contract — `WebSearch` placeholder from the
+// client-side registry must be filtered out of functionDeclarations and
+// emitted as Google's native `google_search` server tool instead.
+#[test]
+fn test_build_tools_swaps_web_search_for_google_search() {
+    let provider = make_provider();
+    let params = make_params(
+        vec![],
+        vec![
+            ToolDefinition {
+                name: "WebSearch".to_string(),
+                description: "Search the web".to_string(),
+                input_schema: json!({}),
+            },
+            ToolDefinition {
+                name: "bash".to_string(),
+                description: "Run command".to_string(),
+                input_schema: json!({}),
+            },
+        ],
+    );
+    let tools = provider.build_tools(&params);
+    let has_function_declarations = tools
+        .iter()
+        .any(|t| t.get("functionDeclarations").is_some());
+    let has_google_search = tools
+        .iter()
+        .any(|t| t.get("googleSearch").is_some() || t.get("google_search").is_some());
+    assert!(
+        has_function_declarations,
+        "non-WebSearch tools must still appear under functionDeclarations; got: {tools:?}"
+    );
+    assert!(
+        has_google_search,
+        "WebSearch placeholder must trigger Google's server-side search declaration; got: {tools:?}"
+    );
+    // bash should still be in functionDeclarations, WebSearch should not.
+    let fn_decls = tools
+        .iter()
+        .find_map(|t| t.get("functionDeclarations"))
+        .and_then(|d| d.as_array())
+        .expect("functionDeclarations present");
+    let names: Vec<&str> = fn_decls.iter().filter_map(|d| d["name"].as_str()).collect();
+    assert!(names.contains(&"bash"), "bash must remain in declarations");
+    assert!(
+        !names.contains(&"WebSearch"),
+        "WebSearch placeholder must NOT leak into functionDeclarations"
+    );
+}
+
 #[test]
 fn test_build_contents_with_image() {
     let provider = make_provider();

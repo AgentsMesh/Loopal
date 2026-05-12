@@ -23,6 +23,12 @@ rust_library(
 )
 
 rust_test(
+    name = "loopal-backend-unit-test",
+    crate = ":loopal-backend",
+    edition = "2024",
+)
+
+rust_test(
     name = "loopal-backend_test",
     srcs = glob(["tests/**/*.rs"]),
     crate_root = "tests/suite.rs",

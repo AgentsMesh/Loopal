@@ -150,3 +150,42 @@ fn test_build_tools_with_entries() {
         "string"
     );
 }
+
+// reason: protects the WebSearch contract — registry registers a client-side
+// "WebSearch" placeholder, this provider must rewrite it as the server-side
+// `web_search` tool. Skipping this turns Claude's search capability off in
+// every session, as happened with PR #41.
+#[test]
+fn test_build_tools_replaces_web_search_placeholder() {
+    let provider = make_provider();
+    let params = make_params(
+        vec![],
+        vec![
+            ToolDefinition {
+                name: "WebSearch".to_string(),
+                description: "Search the web".to_string(),
+                input_schema: json!({}),
+            },
+            ToolDefinition {
+                name: "Read".to_string(),
+                description: "Read a file".to_string(),
+                input_schema: json!({}),
+            },
+        ],
+    );
+    let tools = provider.build_tools(&params);
+    assert_eq!(tools.len(), 2);
+    assert_eq!(
+        tools[0]["name"], "web_search",
+        "WebSearch placeholder must be rewritten as Anthropic server-side web_search"
+    );
+    assert!(
+        tools[0]["type"]
+            .as_str()
+            .map(|s| s.starts_with("web_search_"))
+            .unwrap_or(false),
+        "rewritten tool must carry a versioned web_search_* type; got: {:?}",
+        tools[0]["type"]
+    );
+    assert_eq!(tools[1]["name"], "Read");
+}

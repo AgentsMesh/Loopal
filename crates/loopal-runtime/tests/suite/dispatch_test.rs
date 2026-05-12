@@ -1,4 +1,4 @@
-use loopal_protocol::{AgentEventPayload, UserQuestionResponse};
+use loopal_protocol::{AgentEventPayload, ResolveSource, UserQuestionResponse};
 use loopal_runtime::frontend::permission_handler::PermissionOutcome;
 use loopal_runtime::frontend::question_handler::QuestionOutcome;
 use loopal_runtime::frontend::{into_permission_decided, into_question_decided};
@@ -50,10 +50,33 @@ fn question_decided_preserves_response_and_count() {
             question_count,
             duration_ms,
             reason,
+            source,
         } => {
             assert_eq!(question_count, 3);
             assert_eq!(duration_ms, 0);
             assert_eq!(reason, "timed out");
+            assert_eq!(source, ResolveSource::Manual);
+        }
+        other => panic!("expected QuestionDecided, got {other:?}"),
+    }
+}
+
+#[test]
+fn question_decided_carries_auto_source() {
+    let outcome = QuestionOutcome::classifier(
+        UserQuestionResponse::answered("q-9", vec!["代码探索".into()]),
+        "classifier high confidence".into(),
+        842,
+    );
+    let (_, payload) = into_question_decided(1, outcome);
+    match payload {
+        AgentEventPayload::QuestionDecided {
+            source,
+            duration_ms,
+            ..
+        } => {
+            assert_eq!(source, ResolveSource::Classifier);
+            assert_eq!(duration_ms, 842);
         }
         other => panic!("expected QuestionDecided, got {other:?}"),
     }

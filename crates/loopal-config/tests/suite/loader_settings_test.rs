@@ -112,14 +112,14 @@ fn test_load_settings_all_env_var_scenarios() {
     // --- Scenario 7: LOOPAL_DECISION_MODE override ---
     {
         unsafe {
-            std::env::set_var("LOOPAL_DECISION_MODE", "auto");
+            std::env::set_var("LOOPAL_DECISION_MODE", "classifier");
         }
 
         let tmp = TempDir::new().unwrap();
         let settings = load_config(tmp.path()).unwrap().settings;
         assert_eq!(
             settings.decision_mode,
-            loopal_decision_api::DecisionMode::Auto,
+            loopal_decision_api::DecisionMode::Classifier,
             "env var should override decision mode"
         );
 

@@ -108,12 +108,22 @@ TUI Process ──stdio IPC──→ Agent Server Process ←──TCP──→ 
 
 ```
 ~/.loopal/settings.json          Global settings
-~/.loopal/LOOPAL.md           Global instructions (injected into system prompt)
+~/.loopal/LOOPAL.md              Global instructions (injected into system prompt)
+~/.loopal/classifier.md          Optional custom Classifier-mode system prompt
 <project>/.loopal/settings.json  Project settings
+<project>/.loopal/classifier.md  Project-level Classifier prompt override
 <project>/.loopal/settings.local.json  Local overrides (gitignored)
 ```
 
-Environment variable overrides use `LOOPAL_` prefix. Key settings: `model` (default: `claude-opus-4-7`), `permission_mode`.
+`classifier.md` is loaded in the same global → project → local order as settings, but with **replace semantics** (highest-priority non-empty layer wins; not concatenated). Absent on every layer ⇒ the built-in default prompt is used.
+
+Environment variable overrides use `LOOPAL_` prefix. Key settings:
+- `LOOPAL_MODEL` — default model id (default: `claude-opus-4-7`)
+- `LOOPAL_PERMISSION_MODE` — `bypass` / `ask_dangerous` / `ask_any_write`
+- `LOOPAL_DECISION_MODE` — `manual` / `classifier` / `agent`
+- `LOOPAL_CLASSIFIER_TIMEOUT_SECS` — Classifier LLM timeout (default 180s)
+- `LOOPAL_TELEMETRY_DIR` — override telemetry dir (default `~/.loopal/telemetry/`); JSONL files like `classifier_outraced.jsonl` are written here
+- `LOOPAL_SANDBOX` — sandbox policy
 
 ## Code Conventions
 
@@ -128,9 +138,11 @@ Environment variable overrides use `LOOPAL_` prefix. Key settings: `model` (defa
 Permission is decomposed into two orthogonal dimensions:
 
 **PermissionMode** (when to ask): `bypass` (default) / `ask_dangerous` / `ask_any_write`
-**DecisionMode** (who answers): `manual` (default) / `auto` (LLM classifier)
+**DecisionMode** (who answers): `manual` (default) / `classifier` / `agent`
 
 Tools declare a `PermissionLevel` (`ReadOnly` / `Write` / `Dangerous`). `PermissionMode::check(level)` returns `Allow` / `Ask` / `Deny`; `Ask` outcomes are dispatched to the handler chain selected by `DecisionMode` at session setup.
+
+`Classifier` mode runs a single LLM call (≤180s) against `classifier.md` (or built-in default) and races the user. `Agent` mode is reserved for a future sub-agent implementation; today the factory transparently falls back to `Classifier` with a warning. For `AskUser` questions in Classifier mode, the classifier may **abstain** (empty inner array) on subjective preferences, which transparently defers the question to the user.
 
 ## Principles
 

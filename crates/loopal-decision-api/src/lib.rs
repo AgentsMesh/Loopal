@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 pub enum DecisionMode {
     #[default]
     Manual,
-    Auto,
+    Classifier,
+    Agent,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -15,7 +16,7 @@ impl std::fmt::Display for ParseDecisionModeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "invalid decision mode '{}', expected 'manual' or 'auto'",
+            "invalid decision mode '{}', expected 'manual', 'classifier', or 'agent'",
             self.0
         )
     }
@@ -28,7 +29,8 @@ impl std::str::FromStr for DecisionMode {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "manual" => Ok(Self::Manual),
-            "auto" => Ok(Self::Auto),
+            "classifier" => Ok(Self::Classifier),
+            "agent" => Ok(Self::Agent),
             other => Err(ParseDecisionModeError(other.to_string())),
         }
     }
@@ -38,7 +40,8 @@ impl std::fmt::Display for DecisionMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
             Self::Manual => "manual",
-            Self::Auto => "auto",
+            Self::Classifier => "classifier",
+            Self::Agent => "agent",
         })
     }
 }

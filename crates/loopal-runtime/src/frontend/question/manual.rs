@@ -30,6 +30,7 @@ impl QuestionHandler for ManualQuestionHandler {
         let event = AgentEvent::root(AgentEventPayload::UserQuestionRequest {
             id: id.clone(),
             questions,
+            classifier_running: false,
         });
         if self.event_tx.send(event).await.is_err() {
             warn!("question event channel closed");

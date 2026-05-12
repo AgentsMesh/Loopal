@@ -1,4 +1,8 @@
 // Single test binary — includes all test modules
+#[path = "suite/classifier_prompt_test.rs"]
+mod classifier_prompt_test;
+#[path = "suite/classifier_timeout_test.rs"]
+mod classifier_timeout_test;
 #[path = "suite/config_test.rs"]
 mod config_test;
 #[path = "suite/hook_test.rs"]

@@ -6,8 +6,12 @@ use loopal_kernel::Kernel;
 use loopal_provider_api::{ModelRouter, Provider, ProviderResolver, TaskType};
 use loopal_runtime::frontend::permission_handler::PermissionHandler;
 use loopal_runtime::frontend::question_handler::QuestionHandler;
-use loopal_runtime::frontend::{AutoPermissionHandler, AutoQuestionHandler, DecisionContext};
+use loopal_runtime::frontend::traits::EventEmitter;
+use loopal_runtime::frontend::{
+    ClassifierPermissionHandler, ClassifierQuestionHandler, DecisionContext,
+};
 
+use crate::hub_broadcaster::HubBroadcaster;
 use crate::ipc_handlers::{IpcPermissionHandler, IpcQuestionHandler, SessionRef};
 
 struct KernelProviderResolver {
@@ -33,15 +37,30 @@ pub fn build_session_handlers(
     context: DecisionContext,
 ) -> (Box<dyn PermissionHandler>, Box<dyn QuestionHandler>) {
     let ipc_perm: Box<dyn PermissionHandler> = Box::new(IpcPermissionHandler::new(session.clone()));
-    let ipc_q: Box<dyn QuestionHandler> = Box::new(IpcQuestionHandler::new(session));
-    if config.settings.decision_mode != DecisionMode::Auto {
-        return (ipc_perm, ipc_q);
+    let ipc_q_arc: Arc<dyn QuestionHandler> = Arc::new(IpcQuestionHandler::new(session.clone()));
+    match config.settings.decision_mode {
+        DecisionMode::Manual => {
+            let ipc_q: Box<dyn QuestionHandler> = Box::new(IpcQuestionHandler::new(session));
+            return (ipc_perm, ipc_q);
+        }
+        DecisionMode::Classifier => {}
+        DecisionMode::Agent => {
+            tracing::warn!(
+                "DecisionMode::Agent is not yet implemented; falling back to Classifier"
+            );
+        }
     }
-    let classifier = Arc::new(loopal_auto_mode::AutoClassifier::new_with_thresholds(
-        config.instructions.clone(),
-        config.settings.harness.cb_max_consecutive_denials,
-        config.settings.harness.cb_max_total_denials,
-    ));
+    let classifier = Arc::new(
+        loopal_classifier::ClassifierEngine::new_with_thresholds(
+            config.instructions.clone(),
+            config.settings.harness.cb_max_consecutive_denials,
+            config.settings.harness.cb_max_total_denials,
+        )
+        .with_timeout(std::time::Duration::from_secs(
+            config.settings.harness.classifier_timeout_secs,
+        ))
+        .with_question_system_prompt(config.classifier_prompt.clone()),
+    );
     let router = ModelRouter::from_parts(
         config.settings.model.clone(),
         config.settings.model_routing.clone(),
@@ -50,14 +69,15 @@ pub fn build_session_handlers(
         kernel: kernel.clone(),
         router,
     });
-    let auto_perm: Box<dyn PermissionHandler> = Box::new(AutoPermissionHandler::new(
+    let emitter: Arc<dyn EventEmitter> = Arc::new(HubBroadcaster::new(session, None));
+    let auto_perm: Box<dyn PermissionHandler> = Box::new(ClassifierPermissionHandler::new(
         classifier.clone(),
         ipc_perm,
         resolver.clone(),
         context.clone(),
     ));
-    let auto_q: Box<dyn QuestionHandler> = Box::new(AutoQuestionHandler::new(
-        classifier, ipc_q, resolver, context,
+    let auto_q: Box<dyn QuestionHandler> = Box::new(ClassifierQuestionHandler::new(
+        classifier, ipc_q_arc, resolver, context, emitter,
     ));
     (auto_perm, auto_q)
 }

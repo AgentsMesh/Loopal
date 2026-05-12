@@ -155,10 +155,10 @@ mod build_permission_argv_tests {
 
     #[test]
     fn decision_only_fills_default_ask_any_write_mode() {
-        let s = build_permission_argv(None, Some("auto")).unwrap();
+        let s = build_permission_argv(None, Some("classifier")).unwrap();
         assert!(
-            s.contains(r#""decision":"auto""#),
-            "decision must be passed through: {s}"
+            s.contains(r#""decision":"classifier""#),
+            "classifier decision must serialize: {s}"
         );
         assert!(
             s.contains(r#""mode":"ask_any_write""#),
@@ -168,9 +168,9 @@ mod build_permission_argv_tests {
 
     #[test]
     fn both_provided_encodes_both() {
-        let s = build_permission_argv(Some("bypass"), Some("auto")).unwrap();
+        let s = build_permission_argv(Some("bypass"), Some("classifier")).unwrap();
         assert!(s.contains(r#""mode":"bypass""#));
-        assert!(s.contains(r#""decision":"auto""#));
+        assert!(s.contains(r#""decision":"classifier""#));
     }
 
     #[test]
@@ -185,7 +185,7 @@ mod build_permission_argv_tests {
 
     #[test]
     fn unknown_permission_falls_back_to_ask_any_write() {
-        let s = build_permission_argv(Some("garbage"), Some("auto")).unwrap();
+        let s = build_permission_argv(Some("garbage"), Some("classifier")).unwrap();
         assert!(
             s.contains(r#""mode":"ask_any_write""#),
             "garbage perm should fall back to ask_any_write: {s}"
@@ -203,9 +203,9 @@ mod build_permission_argv_tests {
 
     #[test]
     fn returns_valid_json() {
-        let s = build_permission_argv(Some("ask_dangerous"), Some("auto")).unwrap();
+        let s = build_permission_argv(Some("ask_dangerous"), Some("classifier")).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&s).expect("must be valid JSON");
         assert_eq!(parsed["mode"], "ask_dangerous");
-        assert_eq!(parsed["decision"], "auto");
+        assert_eq!(parsed["decision"], "classifier");
     }
 }

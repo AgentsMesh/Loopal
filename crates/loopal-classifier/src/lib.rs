@@ -7,7 +7,7 @@ mod question_classifier;
 mod question_prompt;
 
 pub use circuit_breaker::CircuitBreaker;
-pub use classifier::{AutoClassifier, ClassifierResult};
+pub use classifier::{ClassifierEngine, ClassifierResult};
 pub use question_classifier::QuestionResult;
 
 #[doc(hidden)]

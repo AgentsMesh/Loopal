@@ -4,8 +4,12 @@ use loopal_tool_api::PermissionMode;
 
 #[test]
 fn parses_valid_json() {
-    let result = parse_permission_argv(r#"{"mode":"ask_dangerous","decision":"auto"}"#).unwrap();
-    assert_eq!(result, (PermissionMode::AskDangerous, DecisionMode::Auto));
+    let result =
+        parse_permission_argv(r#"{"mode":"ask_dangerous","decision":"classifier"}"#).unwrap();
+    assert_eq!(
+        result,
+        (PermissionMode::AskDangerous, DecisionMode::Classifier)
+    );
 }
 
 #[test]
@@ -22,7 +26,7 @@ fn rejects_invalid_json() {
 
 #[test]
 fn rejects_unknown_mode() {
-    let err = parse_permission_argv(r#"{"mode":"banana","decision":"auto"}"#).unwrap_err();
+    let err = parse_permission_argv(r#"{"mode":"banana","decision":"classifier"}"#).unwrap_err();
     assert!(err.contains("invalid"));
 }
 

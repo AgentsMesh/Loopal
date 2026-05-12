@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use loopal_protocol::{Question, UserQuestionResponse};
+use loopal_protocol::{Question, ResolveSource, UserQuestionResponse};
 
 use super::super::question_handler::{QuestionHandler, QuestionOutcome};
 
@@ -16,6 +16,7 @@ impl QuestionHandler for UnsupportedQuestionHandler {
             ),
             reason: "sub-agent context".into(),
             duration_ms: 0,
+            source: ResolveSource::Manual,
         }
     }
 }

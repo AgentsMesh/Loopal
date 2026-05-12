@@ -73,7 +73,7 @@ async fn consume_events(
                         info!(agent = %agent_name, tool_call_id = %id, "server: auto-approving permission");
                         client.respond_permission(&agent_name, &id, true).await;
                     }
-                    AgentEventPayload::UserQuestionRequest { id, questions } => {
+                    AgentEventPayload::UserQuestionRequest { id, questions, .. } => {
                         info!(agent = %agent_name, question_id = %id, "server: auto-answering question");
                         let answers: Vec<String> = questions
                             .iter()

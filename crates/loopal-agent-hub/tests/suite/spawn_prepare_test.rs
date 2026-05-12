@@ -28,7 +28,7 @@ fn permission_clamps_to_bypass_manual_when_caller_sends_non_clamped() {
             "name": "child",
             "prompt": "do work",
             "model": "claude-opus-4-7",
-            "permission": r#"{"mode":"ask_dangerous","decision":"auto"}"#,
+            "permission": r#"{"mode":"ask_dangerous","decision":"classifier"}"#,
             "agent_type": "explore",
             "depth": 3,
         }),

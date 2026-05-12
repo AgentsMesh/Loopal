@@ -5,8 +5,7 @@ use loopal_protocol::Question;
 use loopal_provider_api::{ChatParams, Provider, StreamChunk};
 use tracing::{info, warn};
 
-use crate::AutoClassifier;
-use crate::llm_call::CLASSIFIER_TIMEOUT;
+use crate::ClassifierEngine;
 use crate::question_prompt;
 use futures::StreamExt;
 
@@ -41,7 +40,7 @@ impl QuestionResult {
     }
 }
 
-impl AutoClassifier {
+impl ClassifierEngine {
     pub async fn classify_question(
         &self,
         questions: &[Question],
@@ -56,7 +55,7 @@ impl AutoClassifier {
         let params = ChatParams {
             model: model.to_string(),
             messages: vec![Message::user(&user_prompt)],
-            system_prompt: question_prompt::system_prompt().to_string(),
+            system_prompt: self.question_system_prompt().to_string(),
             tools: vec![],
             max_tokens: 512,
             temperature: Some(0.0),
@@ -65,12 +64,11 @@ impl AutoClassifier {
             debug_dump_dir: None,
         };
 
-        let stream_res =
-            tokio::time::timeout(CLASSIFIER_TIMEOUT, provider.stream_chat(&params)).await;
+        let stream_res = tokio::time::timeout(self.timeout(), provider.stream_chat(&params)).await;
         let mut stream = match stream_res {
             Ok(Ok(s)) => s,
             Ok(Err(e)) => {
-                warn!(error = %e, "auto-question LLM stream failed");
+                warn!(error = %e, "classifier-question LLM stream failed");
                 self.breaker().record_error(QUESTION_BREAKER_KEY);
                 return QuestionResult::error(
                     start.elapsed().as_millis() as u64,
@@ -78,7 +76,7 @@ impl AutoClassifier {
                 );
             }
             Err(_) => {
-                warn!("auto-question LLM call timed out");
+                warn!("classifier-question LLM call timed out");
                 self.breaker().record_error(QUESTION_BREAKER_KEY);
                 return QuestionResult::error(start.elapsed().as_millis() as u64, "LLM timeout");
             }
@@ -90,7 +88,7 @@ impl AutoClassifier {
                 Ok(StreamChunk::Text { text }) => response.push_str(&text),
                 Ok(StreamChunk::Done { .. }) => break,
                 Err(e) => {
-                    warn!(error = %e, "auto-question stream chunk error");
+                    warn!(error = %e, "classifier-question stream chunk error");
                     self.breaker().record_error(QUESTION_BREAKER_KEY);
                     return QuestionResult::error(
                         start.elapsed().as_millis() as u64,
@@ -122,7 +120,7 @@ fn parse_question_response(raw: &str, duration_ms: u64) -> QuestionResult {
     let value: serde_json::Value = match serde_json::from_str(json_str) {
         Ok(v) => v,
         Err(e) => {
-            warn!(error = %e, response = %raw, "auto-question parse failure");
+            warn!(error = %e, response = %raw, "classifier-question parse failure");
             return QuestionResult::error(duration_ms, format!("parse failure: {e}"));
         }
     };
@@ -151,7 +149,7 @@ fn parse_question_response(raw: &str, duration_ms: u64) -> QuestionResult {
         .unwrap_or("")
         .to_string();
 
-    info!(reason = %reason, count = answers.len(), "auto-question");
+    info!(reason = %reason, count = answers.len(), "classifier-question");
     QuestionResult::ok(answers, reason, duration_ms)
 }
 

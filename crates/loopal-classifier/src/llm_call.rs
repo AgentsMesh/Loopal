@@ -7,23 +7,20 @@ use loopal_provider_api::{ChatParams, Provider, StreamChunk};
 
 use crate::prompt;
 
-pub(crate) const CLASSIFIER_TIMEOUT: Duration = Duration::from_secs(30);
+pub const DEFAULT_CLASSIFIER_TIMEOUT: Duration = Duration::from_secs(180);
 
 pub(crate) async fn call_classifier(
     provider: &dyn Provider,
     model: &str,
     user_prompt: &str,
+    timeout: Duration,
 ) -> Result<String, LoopalError> {
-    match tokio::time::timeout(
-        CLASSIFIER_TIMEOUT,
-        call_classifier_inner(provider, model, user_prompt),
-    )
-    .await
-    {
+    match tokio::time::timeout(timeout, call_classifier_inner(provider, model, user_prompt)).await {
         Ok(result) => result,
-        Err(_) => Err(LoopalError::Other(
-            "classifier LLM call timed out (30s)".into(),
-        )),
+        Err(_) => Err(LoopalError::Other(format!(
+            "classifier LLM call timed out ({}s)",
+            timeout.as_secs()
+        ))),
     }
 }
 

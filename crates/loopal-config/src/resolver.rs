@@ -35,6 +35,7 @@ impl ConfigResolver {
         let mut hooks: Vec<HookEntry> = Vec::new();
         let mut instruction_parts: Vec<String> = Vec::new();
         let mut memory_parts: Vec<String> = Vec::new();
+        let mut classifier_prompt: Option<String> = None;
         let mut sources: Vec<LayerSource> = Vec::new();
 
         for layer in self.layers {
@@ -113,6 +114,14 @@ impl ConfigResolver {
                     memory_parts.push(format!("{label}\n\n{trimmed}"));
                 }
             }
+
+            // Classifier prompt: replace (not concat); later layer overrides.
+            if let Some(text) = layer.classifier_prompt {
+                let trimmed = text.trim();
+                if !trimmed.is_empty() {
+                    classifier_prompt = Some(trimmed.to_string());
+                }
+            }
         }
 
         // Warn about unrecognised keys before deserialising
@@ -136,6 +145,7 @@ impl ConfigResolver {
             hooks,
             instructions: instruction_parts.join("\n\n"),
             memory: memory_parts.join("\n\n"),
+            classifier_prompt,
             layers: sources,
         })
     }

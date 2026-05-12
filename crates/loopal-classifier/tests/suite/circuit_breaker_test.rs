@@ -1,4 +1,4 @@
-use loopal_auto_mode::CircuitBreaker;
+use loopal_classifier::CircuitBreaker;
 
 #[test]
 fn starts_not_degraded() {
@@ -101,4 +101,31 @@ fn different_tools_have_independent_consecutive_counts() {
     assert!(!cb.is_degraded());
     cb.record_denial("Bash"); // Bash 3rd → degrade
     assert!(cb.is_degraded());
+}
+
+#[test]
+fn outraced_resets_consecutive_but_does_not_count_as_denial() {
+    let cb = CircuitBreaker::new();
+    cb.record_denial("@question");
+    cb.record_denial("@question");
+    cb.record_outraced("@question"); // reset consecutive
+    cb.record_denial("@question");
+    cb.record_denial("@question");
+    // only 2 consecutive after outraced, must not degrade
+    assert!(!cb.is_degraded());
+}
+
+#[test]
+fn outraced_does_not_increment_total_denials() {
+    let cb = CircuitBreaker::new();
+    // 19 denials of different tools; one more would degrade
+    for i in 0..19 {
+        cb.record_denial(&format!("Tool{i}"));
+    }
+    assert!(!cb.is_degraded());
+    // 100 outraced events must NOT push total over the threshold
+    for _ in 0..100 {
+        cb.record_outraced("@question");
+    }
+    assert!(!cb.is_degraded());
 }

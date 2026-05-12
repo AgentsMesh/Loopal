@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{info, warn};
 
-use loopal_protocol::{AgentEvent, AgentEventPayload, QualifiedAddress};
+use loopal_protocol::{AgentEvent, AgentEventPayload, QualifiedAddress, ResolveSource};
 
 use crate::hub::Hub;
 
@@ -67,6 +67,7 @@ pub async fn resolve_question(
         QualifiedAddress::local(&info.agent_name),
         AgentEventPayload::UserQuestionResolved {
             id: question_id.to_string(),
+            by: ResolveSource::Manual,
         },
     );
     let h = hub.lock().await;

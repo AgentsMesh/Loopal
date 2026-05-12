@@ -5,7 +5,7 @@ use crate::bg_task::BgTaskStatus;
 use crate::cron_snapshot::CronJobSnapshot;
 use crate::envelope::MessageSource;
 use crate::mcp_snapshot::McpServerSnapshot;
-use crate::question::Question;
+use crate::question::{Question, ResolveSource};
 use crate::task_snapshot::TaskSnapshot;
 use crate::thread_goal::{GoalTransitionReason, ThreadGoal};
 
@@ -112,15 +112,36 @@ pub enum AgentEventPayload {
     UserQuestionRequest {
         id: String,
         questions: Vec<Question>,
+        /// True if a classifier is racing the user. UI should render a
+        /// "thinking" status strip alongside the option dialog.
+        #[serde(default)]
+        classifier_running: bool,
     },
     /// Permission request resolved (some UI client responded). Broadcast
     /// so all other UI clients clear their local `pending_permission`
     /// dialog. `id` matches the originating `ToolPermissionRequest.id`.
     ToolPermissionResolved { id: String },
-    /// Question request resolved (some UI client responded). Broadcast
-    /// so all other UI clients clear their local `pending_question`
-    /// dialog. `id` matches the originating `UserQuestionRequest.id`.
-    UserQuestionResolved { id: String },
+    /// Question request resolved. Broadcast so all UI clients clear their
+    /// local `pending_question` dialog. `by` records who answered first.
+    UserQuestionResolved {
+        id: String,
+        #[serde(default)]
+        by: ResolveSource,
+    },
+    /// Auto classifier progress heartbeat. Backend ticks this every ~500ms
+    /// while the classifier runs so multiple UIs see consistent elapsed time.
+    ClassifierProgress { id: String, elapsed_ms: u64 },
+    /// Auto classifier finished unsuccessfully. UI flips the status strip
+    /// to "failed" and the user must answer manually.
+    ClassifierFailed { id: String, reason: String },
+    /// Auto classifier finished successfully — `UserQuestionResolved{by: Auto}`
+    /// will follow shortly. Carried separately so the UI can briefly display
+    /// the chosen answer before the dialog closes.
+    ClassifierCompleted {
+        id: String,
+        answers: Vec<String>,
+        duration_ms: u64,
+    },
     /// Conversation was rewound; remaining_turns is the count after truncation.
     Rewound { remaining_turns: usize },
     /// Conversation was compacted; old messages removed to reduce context.
@@ -172,6 +193,8 @@ pub enum AgentEventPayload {
         #[serde(default)]
         duration_ms: u64,
         reason: String,
+        #[serde(default)]
+        source: ResolveSource,
     },
     /// Session context was replaced by resuming a persisted session.
     SessionResumed {

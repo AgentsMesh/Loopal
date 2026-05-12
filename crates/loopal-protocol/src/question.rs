@@ -1,5 +1,24 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ResolveSource {
+    #[default]
+    Manual,
+    Classifier,
+    Agent,
+}
+
+impl ResolveSource {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Manual => "manual",
+            Self::Classifier => "classifier",
+            Self::Agent => "agent",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Question {
     pub question: String,

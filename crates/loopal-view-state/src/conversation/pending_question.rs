@@ -1,6 +1,7 @@
 use loopal_protocol::Question;
 use serde::{Deserialize, Serialize};
 
+use super::classifier_status::ClassifierStatus;
 use super::question_state::QuestionState;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -10,6 +11,8 @@ pub struct PendingQuestion {
     #[serde(default)]
     pub states: Vec<QuestionState>,
     pub current_question: usize,
+    #[serde(default)]
+    pub classifier_status: ClassifierStatus,
 }
 
 impl PendingQuestion {
@@ -23,7 +26,15 @@ impl PendingQuestion {
             questions,
             states,
             current_question: 0,
+            classifier_status: ClassifierStatus::None,
         }
+    }
+
+    pub fn with_classifier_running(mut self, running: bool) -> Self {
+        if running {
+            self.classifier_status = ClassifierStatus::Running { elapsed_ms: 0 };
+        }
+        self
     }
 
     fn current(&self) -> Option<(&Question, &QuestionState)> {

@@ -2,6 +2,7 @@ mod aggregate;
 mod bg;
 mod interactive;
 mod observable;
+mod question;
 mod stream;
 mod tool;
 
@@ -43,10 +44,19 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
             interactive::tool_permission_request(state, id, name, input)
         }
         ToolPermissionResolved { id } => interactive::tool_permission_resolved(state, id),
-        UserQuestionRequest { id, questions } => {
-            interactive::user_question_request(state, id, questions)
+        UserQuestionRequest {
+            id,
+            questions,
+            classifier_running,
+        } => question::user_question_request(state, id, questions, *classifier_running),
+        UserQuestionResolved { id, .. } => question::user_question_resolved(state, id),
+        ClassifierProgress { id, elapsed_ms } => {
+            question::classifier_progress(state, id, *elapsed_ms)
         }
-        UserQuestionResolved { id } => interactive::user_question_resolved(state, id),
+        ClassifierFailed { id, reason } => question::classifier_failed(state, id, reason),
+        ClassifierCompleted { id, answers, .. } => {
+            question::classifier_completed(state, id, answers)
+        }
         UserMessageQueued {
             message_id,
             content,
@@ -116,7 +126,8 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
             question_count,
             duration_ms,
             reason,
-        } => interactive::question_decided(state, *question_count, reason, *duration_ms),
+            source,
+        } => interactive::question_decided(state, *question_count, reason, *duration_ms, *source),
         ModeChanged { mode } => observable::mode_changed(state, mode),
         TurnCompleted { .. } => observable::turn_completed(state),
         TasksChanged { tasks } => aggregate::tasks_changed(state, tasks),

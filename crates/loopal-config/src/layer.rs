@@ -55,4 +55,7 @@ pub struct ConfigLayer {
     pub instructions: Option<String>,
     /// Memory content (from memory/MEMORY.md)
     pub memory: Option<String>,
+    /// Optional system prompt for Classifier mode (from classifier.md).
+    /// Higher-priority layers replace lower ones (not concatenated).
+    pub classifier_prompt: Option<String>,
 }

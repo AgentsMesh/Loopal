@@ -21,6 +21,7 @@ fn empty_resolved_config() -> ResolvedConfig {
         hooks: Vec::new(),
         instructions: String::new(),
         memory: String::new(),
+        classifier_prompt: None,
         layers: Vec::new(),
     }
 }

@@ -107,12 +107,22 @@ pub async fn handle_agent_question(
                 return;
             }
         };
-    let question_id = Uuid::new_v4().to_string();
+    let question_id = params
+        .get("question_id")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
+    let classifier_running = params
+        .get("classifier_running")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     let event = AgentEvent::named(
         QualifiedAddress::local(agent_name),
         AgentEventPayload::UserQuestionRequest {
             id: question_id.clone(),
             questions,
+            classifier_running,
         },
     );
     let key = (agent_name.to_string(), question_id.clone());

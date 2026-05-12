@@ -1,7 +1,7 @@
-pub mod auto;
+pub mod classifier;
 pub mod deny;
 pub mod manual;
 
-pub use auto::AutoPermissionHandler;
+pub use classifier::ClassifierPermissionHandler;
 pub use deny::DenyAllHandler;
 pub use manual::ManualPermissionHandler;

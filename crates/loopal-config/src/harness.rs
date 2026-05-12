@@ -26,6 +26,8 @@ pub struct HarnessConfig {
     /// Max total sub-agents across the entire Hub (default: 16).
     /// Excludes root agent — only counts spawned children.
     pub agent_max_total: u32,
+    /// Auto classifier LLM call timeout in seconds (default: 180).
+    pub classifier_timeout_secs: u64,
 }
 
 impl Default for HarnessConfig {
@@ -39,6 +41,7 @@ impl Default for HarnessConfig {
             max_stop_feedback: 2,
             agent_max_depth: 2,
             agent_max_total: 16,
+            classifier_timeout_secs: 180,
         }
     }
 }

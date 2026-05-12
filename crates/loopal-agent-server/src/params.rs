@@ -22,7 +22,7 @@ pub struct StartParams {
     pub mode: Option<String>,
     pub prompt: Option<String>,
     /// JSON-encoded `{"mode": "<permission_mode>", "decision": "<decision_mode>"}`
-    /// (e.g. `{"mode":"ask_dangerous","decision":"auto"}`).
+    /// (e.g. `{"mode":"ask_dangerous","decision":"classifier"}`).
     /// Both fields are required; see `parse_permission_argv`.
     pub permission: Option<String>,
     pub no_sandbox: bool,

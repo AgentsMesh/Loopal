@@ -52,22 +52,28 @@ fn test_worktree_has_changes_detects_modifications() {
 }
 
 #[test]
-fn test_ensure_gitignore_entry() {
+fn test_worktree_creation_writes_loopal_gitignore() {
     let dir = tempfile::tempdir().unwrap();
     init_repo(dir.path());
 
     create_worktree(dir.path(), "gi-test").unwrap();
 
-    let content = std::fs::read_to_string(dir.path().join(".gitignore")).unwrap();
-    assert!(content.contains(".loopal/worktrees/"));
+    let gi = dir.path().join(".loopal").join(".gitignore");
+    let content = std::fs::read_to_string(&gi).unwrap();
+    assert!(content.contains("worktrees/"));
+    assert!(content.contains("plans/"));
+    assert!(content.contains("settings.local.json"));
+    assert!(content.contains("LOOPAL.local.md"));
 
-    // Second create should not duplicate the entry
+    // Outer .gitignore must NOT be touched by the new mechanism.
+    assert!(!dir.path().join(".gitignore").exists());
+
+    // Second create remains idempotent: same content, no duplication.
+    let before = std::fs::read_to_string(&gi).unwrap();
     remove_worktree(dir.path(), "gi-test", false).unwrap();
     create_worktree(dir.path(), "gi-test2").unwrap();
-
-    let content = std::fs::read_to_string(dir.path().join(".gitignore")).unwrap();
-    let count = content.matches(".loopal/worktrees/").count();
-    assert_eq!(count, 1, "gitignore entry should not be duplicated");
+    let after = std::fs::read_to_string(&gi).unwrap();
+    assert_eq!(before, after);
 
     remove_worktree(dir.path(), "gi-test2", false).unwrap();
 }

@@ -84,6 +84,12 @@ impl AgentLoopRunner {
             ));
         }
 
+        if let Some(plans_dir) = self.plan_file.path().parent()
+            && let Some(loopal_dir) = plans_dir.parent()
+        {
+            loopal_git::ensure_loopal_gitignore(loopal_dir);
+        }
+
         let plan_path = self.plan_file.path().display();
         let file_info = if self.plan_file.exists() {
             format!("A plan file already exists at {plan_path}. Read it and edit incrementally.")

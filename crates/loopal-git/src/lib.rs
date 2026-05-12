@@ -1,8 +1,10 @@
 pub mod cleanup;
+pub mod gitignore;
 pub mod repo;
 pub mod worktree;
 
 pub use cleanup::cleanup_stale_worktrees;
+pub use gitignore::ensure_loopal_gitignore;
 pub use repo::{current_branch, is_git_repo, repo_root};
 pub use worktree::{
     WorktreeInfo, cleanup_if_clean, create_worktree, remove_worktree, worktree_has_changes,

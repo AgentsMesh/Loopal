@@ -1,4 +1,6 @@
 // Single test binary — includes all test modules
+#[path = "suite/gitignore_test.rs"]
+mod gitignore_test;
 #[path = "suite/repo_test.rs"]
 mod repo_test;
 #[path = "suite/validate_test.rs"]

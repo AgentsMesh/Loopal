@@ -111,13 +111,26 @@ pub fn compute_overlay_width(placed: &[PlacedNode], max_w: u16) -> u16 {
         .max()
         .unwrap_or(12);
     let span = ((x_max - x_min) / 4.0).ceil() as u16 + 1;
-    (span.max(max_label as u16) + 4).clamp(24, max_w * 60 / 100)
+    let desired = span.max(max_label as u16) + 4;
+    let upper = max_w.saturating_mul(60) / 100;
+    safe_clamp(desired, 24, upper)
 }
 
 pub fn compute_overlay_height(placed: &[PlacedNode], max_h: u16) -> u16 {
     let (_, _, y_min, y_max) = canvas_bounds(placed);
     let depth = ((y_max - y_min) / 4.0).ceil() as u16 + 1;
-    (depth * 3 + 2).clamp(8, max_h / 2)
+    let desired = depth.saturating_mul(3) + 2;
+    safe_clamp(desired, 8, max_h / 2)
+}
+
+// reason: u16::clamp panics if lower > upper; in TUI render paths the upper
+// bound is derived from a runtime area size that can drop below the lower
+// constant on tiny terminals. Collapse the lower bound onto the upper so the
+// invariant holds, then expand the upper to never sit below the lower.
+fn safe_clamp(value: u16, lower: u16, upper: u16) -> u16 {
+    let lo = lower.min(upper);
+    let hi = upper.max(lo);
+    value.clamp(lo, hi)
 }
 
 #[cfg(test)]
@@ -180,5 +193,37 @@ mod tests {
         // Check they are evenly spaced
         assert_eq!(xs.len(), 3);
         assert!((xs[1] - xs[0] - H_SPACING).abs() < 0.01);
+    }
+
+    #[test]
+    fn overlay_width_does_not_panic_on_tiny_terminal() {
+        let placed = compute_layout(&[
+            make_node("root", None, &["a"]),
+            make_node("a", Some("root"), &[]),
+        ]);
+        for w in [0u16, 1, 10, 20, 39, 40, 80, 200] {
+            let _ = compute_overlay_width(&placed, w);
+        }
+    }
+
+    #[test]
+    fn overlay_height_does_not_panic_on_tiny_terminal() {
+        let placed = compute_layout(&[
+            make_node("root", None, &["a"]),
+            make_node("a", Some("root"), &[]),
+        ]);
+        for h in [0u16, 1, 7, 14, 15, 16, 24, 100] {
+            let _ = compute_overlay_height(&placed, h);
+        }
+    }
+
+    #[test]
+    fn safe_clamp_handles_inverted_bounds() {
+        assert_eq!(safe_clamp(10, 8, 4), 4);
+        assert_eq!(safe_clamp(2, 8, 4), 4);
+        assert_eq!(safe_clamp(100, 8, 0), 0);
+        assert_eq!(safe_clamp(50, 10, 80), 50);
+        assert_eq!(safe_clamp(5, 10, 80), 10);
+        assert_eq!(safe_clamp(200, 10, 80), 80);
     }
 }

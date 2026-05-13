@@ -10,6 +10,7 @@ fn all_fragments_parse() {
         ids.contains(&"core/identity"),
         "missing core/identity, got: {ids:?}"
     );
+    assert!(ids.contains(&"core/soul"), "missing core/soul, got: {ids:?}");
     assert!(
         ids.contains(&"core/output-efficiency"),
         "missing core/output-efficiency"
@@ -91,6 +92,22 @@ fn full_prompt_build() {
         "output efficiency fragment missing"
     );
     assert!(
+        prompt.contains("Prime Axioms"),
+        "soul fragment missing from full prompt"
+    );
+    assert!(
+        prompt.contains("Resist Entropy Growth"),
+        "soul Axiom 1 missing from full prompt"
+    );
+    assert!(
+        prompt.contains("Harness Selection Pressure"),
+        "soul Axiom 4 missing from full prompt"
+    );
+    assert!(
+        prompt.contains("Calibrate Beliefs as Probabilities"),
+        "soul Axiom 5 missing from full prompt"
+    );
+    assert!(
         prompt.contains("Executing Actions with Care"),
         "safety fragment missing"
     );
@@ -140,11 +157,11 @@ fn conditional_tool_fragments() {
 #[test]
 fn fragment_count() {
     let frags = system_fragments();
-    // core/6 + tasks/12 + tools/7 + modes/2 + agents/3 + styles/2 = 32
+    // core/7 + tasks/12 + tools/7 + modes/2 + agents/3 + styles/2 = 33
     assert_eq!(
         frags.len(),
-        32,
-        "expected 32 fragments, got {}: {:?}",
+        33,
+        "expected 33 fragments, got {}: {:?}",
         frags.len(),
         frags.iter().map(|f| &f.id).collect::<Vec<_>>()
     );

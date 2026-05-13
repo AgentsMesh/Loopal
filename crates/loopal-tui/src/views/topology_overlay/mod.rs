@@ -111,6 +111,9 @@ pub fn render_topology_overlay(f: &mut Frame, nodes: &[TopologyNode], area: Rect
     if nodes.len() <= 1 {
         return; // Only root, no sub-agents
     }
+    if area.width < 40 || area.height < 16 {
+        return; // Terminal too small to host overlay
+    }
 
     let placed = layout::compute_layout(nodes);
     if placed.is_empty() {

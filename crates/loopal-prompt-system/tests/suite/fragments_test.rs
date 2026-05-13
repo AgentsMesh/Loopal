@@ -10,7 +10,10 @@ fn all_fragments_parse() {
         ids.contains(&"core/identity"),
         "missing core/identity, got: {ids:?}"
     );
-    assert!(ids.contains(&"core/soul"), "missing core/soul, got: {ids:?}");
+    assert!(
+        ids.contains(&"core/soul"),
+        "missing core/soul, got: {ids:?}"
+    );
     assert!(
         ids.contains(&"core/output-efficiency"),
         "missing core/output-efficiency"

@@ -8,6 +8,7 @@ rust_library(
     deps = [
         "//crates/loopal-error:loopal-error",
         "//crates/loopal-tool-api:loopal-tool-api",
+        "//crates/loopal-tool-invocation:loopal-tool-invocation",
         "//crates/tools/filesystem/edit-core:loopal-edit-core",
         "@crates//:serde_json",
     ],

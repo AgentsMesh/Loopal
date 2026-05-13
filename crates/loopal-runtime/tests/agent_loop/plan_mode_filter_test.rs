@@ -31,7 +31,11 @@ async fn plan_mode_blocks_bash() {
         serde_json::json!({"command": "echo hello"}),
     )];
     runner
-        .execute_tools(tool_uses, &make_cancel())
+        .execute_tools(
+            tool_uses,
+            &make_cancel(),
+            loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+        )
         .await
         .unwrap();
 
@@ -69,7 +73,11 @@ async fn plan_mode_allows_read_with_reminder() {
         serde_json::json!({"file_path": tmp.to_str().unwrap()}),
     )];
     runner
-        .execute_tools(tool_uses, &make_cancel())
+        .execute_tools(
+            tool_uses,
+            &make_cancel(),
+            loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+        )
         .await
         .unwrap();
 
@@ -101,7 +109,11 @@ async fn plan_mode_write_blocks_non_plan_path() {
         serde_json::json!({"file_path": "/tmp/not-a-plan.txt", "content": "hack"}),
     )];
     runner
-        .execute_tools(tool_uses, &make_cancel())
+        .execute_tools(
+            tool_uses,
+            &make_cancel(),
+            loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+        )
         .await
         .unwrap();
 

@@ -36,7 +36,7 @@ impl AgentLoopRunner {
         let cancel = &turn_ctx.cancel;
         turn_ctx.metrics.tool_calls_requested += tool_uses.len() as u32;
         let stats = self
-            .execute_tools_with_early(tool_uses.clone(), cancel, early_handle)
+            .execute_tools(tool_uses.clone(), cancel, early_handle)
             .await?;
         turn_ctx.metrics.tool_calls_approved += stats.approved;
         turn_ctx.metrics.tool_calls_denied += stats.denied;

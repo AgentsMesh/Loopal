@@ -136,8 +136,9 @@ async fn snapshot_includes_completed_tool_call() {
     let snapshot: ViewSnapshot = serde_json::from_value(resp).expect("parse snapshot");
 
     let tc = &snapshot.state.agent.conversation.messages[0].tool_calls[0];
-    assert_eq!(tc.id, "tc-1");
+    assert_eq!(tc.id.as_str(), "tc-1");
     assert_eq!(tc.name, "Read");
-    assert_eq!(tc.duration_ms, Some(7));
-    assert_eq!(tc.result.as_deref(), Some("snapshot payload"));
+    let outcome = tc.state.outcome().expect("Done state expected");
+    assert_eq!(outcome.content(), "snapshot payload");
+    assert!(!outcome.is_error());
 }

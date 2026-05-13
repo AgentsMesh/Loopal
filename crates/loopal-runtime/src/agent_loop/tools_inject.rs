@@ -3,26 +3,22 @@
 use loopal_error::Result;
 use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_protocol::AgentEventPayload;
+use loopal_tool_invocation::{CancelCause, ToolResultMetadata};
 use tracing::{error, info};
 
 use super::runner::AgentLoopRunner;
 
-/// Build a successful ToolResult block.
-pub(super) fn success_block(id: &str, content: &str) -> ContentBlock {
+pub(super) fn tool_result_block(
+    id: &str,
+    content: &str,
+    is_error: bool,
+    metadata: Option<ToolResultMetadata>,
+) -> ContentBlock {
     ContentBlock::ToolResult {
         tool_use_id: id.to_string(),
         content: content.to_string(),
-        is_error: false,
-        metadata: None,
-    }
-}
-
-pub(super) fn error_block(id: &str, content: &str) -> ContentBlock {
-    ContentBlock::ToolResult {
-        tool_use_id: id.to_string(),
-        content: content.to_string(),
-        is_error: true,
-        metadata: None,
+        is_error,
+        metadata,
     }
 }
 
@@ -34,6 +30,7 @@ impl AgentLoopRunner {
     ) -> Result<()> {
         info!("cancelled, skipping tool execution");
         let mut blocks = Vec::with_capacity(tool_uses.len());
+        let cancel_md = ToolResultMetadata::cancelled(CancelCause::UserInterrupt);
         for (id, name, _) in tool_uses {
             self.emit(AgentEventPayload::ToolResult {
                 id: id.clone(),
@@ -41,15 +38,15 @@ impl AgentLoopRunner {
                 result: "Interrupted by user".into(),
                 is_error: true,
                 duration_ms: None,
-                metadata: None,
+                metadata: Some(cancel_md.clone()),
             })
             .await?;
-            blocks.push(ContentBlock::ToolResult {
-                tool_use_id: id.clone(),
-                content: "Interrupted by user".into(),
-                is_error: true,
-                metadata: None,
-            });
+            blocks.push(tool_result_block(
+                id,
+                "Interrupted by user",
+                true,
+                Some(cancel_md.clone()),
+            ));
         }
         let mut msg = Message {
             id: None,
@@ -68,10 +65,6 @@ impl AgentLoopRunner {
         Ok(())
     }
 
-    /// Drain pending input from the frontend and inject messages into the store.
-    /// Routes envelopes through `ingest_message` so InboxEnqueued is emitted
-    /// for messages that arrive mid-turn (e.g. agent-to-agent during tool exec).
-    /// Control commands are processed inline.
     pub async fn inject_pending_messages(&mut self) {
         let pending = self.params.deps.frontend.drain_pending().await;
         for input in pending {

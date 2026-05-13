@@ -1,3 +1,4 @@
+use loopal_tool_invocation::ToolResultMetadata;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -103,7 +104,7 @@ pub enum ContentBlock {
         content: String,
         is_error: bool,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        metadata: Option<serde_json::Value>,
+        metadata: Option<ToolResultMetadata>,
     },
     Image {
         source: ImageSource,

@@ -179,9 +179,18 @@ impl AgentLoopRunner {
     pub async fn emit_inbox_consumed(&mut self) {
         let ids = std::mem::take(&mut self.pending_consumed_ids);
         for message_id in ids {
-            let _ = self
-                .emit(AgentEventPayload::InboxConsumed { message_id })
-                .await;
+            if let Err(e) = self
+                .emit(AgentEventPayload::InboxConsumed {
+                    message_id: message_id.clone(),
+                })
+                .await
+            {
+                tracing::error!(
+                    error = %e,
+                    message_id = %message_id,
+                    "agent_loop::run::emit_inbox_consumed emit failed"
+                );
+            }
         }
     }
 }

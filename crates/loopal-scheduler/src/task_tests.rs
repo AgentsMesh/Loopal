@@ -1,6 +1,6 @@
 //! Unit tests for ScheduledTask, should_fire, is_expired, truncate_to_secs.
 
-use chrono::{TimeZone, Utc};
+use chrono::{TimeZone, Timelike, Utc};
 
 use crate::expression::CronExpression;
 use crate::task::{ScheduledTask, truncate_to_secs};

@@ -13,8 +13,16 @@ mod cron_snapshot_test;
 mod envelope_test;
 #[path = "suite/event_edge_test.rs"]
 mod event_edge_test;
+#[path = "suite/event_id_test.rs"]
+mod event_id_test;
+#[path = "suite/event_inbox_edge_test.rs"]
+mod event_inbox_edge_test;
 #[path = "suite/event_lifecycle_test.rs"]
 mod event_lifecycle_test;
+#[path = "suite/event_metadata_test.rs"]
+mod event_metadata_test;
+#[path = "suite/event_session_edge_test.rs"]
+mod event_session_edge_test;
 #[path = "suite/event_test.rs"]
 mod event_test;
 #[path = "suite/file_size_cap_test.rs"]
@@ -23,6 +31,8 @@ mod file_size_cap_test;
 mod mcp_snapshot_test;
 #[path = "suite/projection_edge_test.rs"]
 mod projection_edge_test;
+#[path = "suite/projection_metadata_test.rs"]
+mod projection_metadata_test;
 #[path = "suite/projection_test.rs"]
 mod projection_test;
 #[path = "suite/thread_goal_test.rs"]

@@ -27,8 +27,3 @@ pub fn cleanup_old_files_once(tmp_dir: &Path) {
         }
     }
 }
-
-#[cfg(test)]
-pub fn reset_for_test() {
-    CLEANED.store(false, Ordering::Relaxed);
-}

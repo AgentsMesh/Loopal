@@ -111,9 +111,9 @@ fn cleared_event_resets_conversation_and_counters() {
     assert_eq!(state.agent.observable.input_tokens, 0);
     assert_eq!(state.agent.observable.output_tokens, 0);
     assert_eq!(state.agent.observable.turn_count, 0);
-    assert_eq!(state.agent.observable.tool_count, 0);
-    assert_eq!(state.agent.observable.tools_in_flight, 0);
-    assert!(state.agent.observable.last_tool.is_none());
+    assert_eq!(state.agent.tool_count(), 0);
+    assert_eq!(state.agent.tools_in_flight(), 0);
+    assert!(state.agent.last_tool().is_none());
 }
 
 #[test]

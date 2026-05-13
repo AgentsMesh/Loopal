@@ -4,37 +4,39 @@ use loopal_protocol::AgentStatus;
 
 use crate::state::SessionViewState;
 
-pub(super) fn started(state: &mut SessionViewState) -> bool {
+use super::MutationEffect;
+
+pub(super) fn started(state: &mut SessionViewState) -> MutationEffect {
     state.agent.observable.status = AgentStatus::Running;
     state.agent.conversation.mark_active();
     ensure_started_at(state);
-    true
+    MutationEffect::Mutated
 }
 
-pub(super) fn running(state: &mut SessionViewState) -> bool {
+pub(super) fn running(state: &mut SessionViewState) -> MutationEffect {
     state.agent.observable.status = AgentStatus::Running;
     state.agent.conversation.begin_turn();
     state.agent.conversation.mark_active();
     ensure_started_at(state);
-    true
+    MutationEffect::Mutated
 }
 
-pub(super) fn awaiting_input(state: &mut SessionViewState) -> bool {
+pub(super) fn awaiting_input(state: &mut SessionViewState) -> MutationEffect {
     set_idle(state, AgentStatus::WaitingForInput);
-    true
+    MutationEffect::MutatedEndedTurn
 }
 
-pub(super) fn finished(state: &mut SessionViewState) -> bool {
+pub(super) fn finished(state: &mut SessionViewState) -> MutationEffect {
     set_idle(state, AgentStatus::Finished);
-    true
+    MutationEffect::MutatedEndedTurn
 }
 
-pub(super) fn interrupted(state: &mut SessionViewState) -> bool {
+pub(super) fn interrupted(state: &mut SessionViewState) -> MutationEffect {
     set_idle(state, AgentStatus::WaitingForInput);
-    true
+    MutationEffect::MutatedEndedTurn
 }
 
-pub(super) fn error(state: &mut SessionViewState, message: &str) -> bool {
+pub(super) fn error(state: &mut SessionViewState, message: &str) -> MutationEffect {
     let conv = &mut state.agent.conversation;
     conv.flush_streaming();
     conv.retry_banner = None;
@@ -44,7 +46,7 @@ pub(super) fn error(state: &mut SessionViewState, message: &str) -> bool {
         ..Default::default()
     });
     state.agent.observable.status = AgentStatus::Error;
-    true
+    MutationEffect::MutatedEndedTurn
 }
 
 pub(super) fn token_usage(
@@ -54,7 +56,7 @@ pub(super) fn token_usage(
     context_window: u32,
     cache_creation: u32,
     cache_read: u32,
-) -> bool {
+) -> MutationEffect {
     let obs = &mut state.agent.observable;
     obs.input_tokens = input;
     obs.output_tokens = output;
@@ -66,13 +68,13 @@ pub(super) fn token_usage(
         cache_creation,
         cache_read,
     );
-    true
+    MutationEffect::Mutated
 }
 
-pub(super) fn turn_completed(state: &mut SessionViewState) -> bool {
+pub(super) fn turn_completed(state: &mut SessionViewState) -> MutationEffect {
     let obs = &mut state.agent.observable;
     obs.turn_count = obs.turn_count.saturating_add(1);
-    true
+    MutationEffect::MutatedEndedTurn
 }
 
 fn set_idle(state: &mut SessionViewState, status: AgentStatus) {

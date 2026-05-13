@@ -4,12 +4,14 @@ use crate::SessionMessage;
 use crate::conversation::{PendingPermission, conversation_display};
 use crate::state::SessionViewState;
 
+use super::MutationEffect;
+
 pub(super) fn tool_permission_request(
     state: &mut SessionViewState,
     id: &str,
     name: &str,
     input: &serde_json::Value,
-) -> bool {
+) -> MutationEffect {
     let conv = &mut state.agent.conversation;
     conv.flush_streaming();
     conv.pending_permission = Some(PendingPermission {
@@ -17,18 +19,18 @@ pub(super) fn tool_permission_request(
         name: name.to_string(),
         input: input.clone(),
     });
-    true
+    MutationEffect::Mutated
 }
 
 /// Clear `pending_permission` if its id matches the resolved request.
 /// Broadcast on race resolution so non-winning UIs hide the dialog.
-pub(super) fn tool_permission_resolved(state: &mut SessionViewState, id: &str) -> bool {
+pub(super) fn tool_permission_resolved(state: &mut SessionViewState, id: &str) -> MutationEffect {
     let pending = &mut state.agent.conversation.pending_permission;
     if pending.as_ref().is_some_and(|p| p.id == id) {
         *pending = None;
-        true
+        MutationEffect::Mutated
     } else {
-        false
+        MutationEffect::NoOp
     }
 }
 
@@ -37,7 +39,7 @@ pub(super) fn user_message_queued(
     message_id: &str,
     content: &str,
     image_count: usize,
-) -> bool {
+) -> MutationEffect {
     let already_present = state
         .agent
         .conversation
@@ -45,7 +47,7 @@ pub(super) fn user_message_queued(
         .iter()
         .any(|m| m.role == "user" && m.message_id.as_deref() == Some(message_id));
     if already_present {
-        return false;
+        return MutationEffect::NoOp;
     }
     let mut text = content.to_string();
     if image_count > 0 {
@@ -58,12 +60,16 @@ pub(super) fn user_message_queued(
         message_id: Some(message_id.to_string()),
         ..Default::default()
     });
-    true
+    MutationEffect::Mutated
 }
 
-pub(super) fn auto_continuation(state: &mut SessionViewState, cont: u32, max: u32) -> bool {
+pub(super) fn auto_continuation(
+    state: &mut SessionViewState,
+    cont: u32,
+    max: u32,
+) -> MutationEffect {
     conversation_display::handle_auto_continuation(&mut state.agent.conversation, cont, max);
-    true
+    MutationEffect::Mutated
 }
 
 pub(super) fn compacted(
@@ -73,7 +79,7 @@ pub(super) fn compacted(
     tokens_before: u32,
     tokens_after: u32,
     strategy: &str,
-) -> bool {
+) -> MutationEffect {
     conversation_display::handle_compaction(
         &mut state.agent.conversation,
         kept,
@@ -82,7 +88,7 @@ pub(super) fn compacted(
         tokens_after,
         strategy,
     );
-    true
+    MutationEffect::Mutated
 }
 
 pub(super) fn inbox_enqueued(
@@ -91,9 +97,9 @@ pub(super) fn inbox_enqueued(
     source: &MessageSource,
     content: &str,
     summary: Option<&str>,
-) -> bool {
+) -> MutationEffect {
     if source.is_optimistically_rendered() {
-        return false;
+        return MutationEffect::NoOp;
     }
     conversation_display::push_inbox_msg(
         &mut state.agent.conversation,
@@ -102,7 +108,7 @@ pub(super) fn inbox_enqueued(
         content.to_string(),
         summary.map(String::from),
     );
-    true
+    MutationEffect::Mutated
 }
 
 pub(super) fn permission_decided(
@@ -111,9 +117,9 @@ pub(super) fn permission_decided(
     decision: &str,
     reason: &str,
     duration_ms: u64,
-) -> bool {
+) -> MutationEffect {
     if decision == "allow" {
-        return false;
+        return MutationEffect::NoOp;
     }
     let label = if decision == "deny" {
         "permission denied"
@@ -131,5 +137,5 @@ pub(super) fn permission_decided(
         format!("[{label}] {tool_name}: {reason}{suffix}")
     };
     conversation_display::push_system_msg(&mut state.agent.conversation, &line);
-    true
+    MutationEffect::Mutated
 }

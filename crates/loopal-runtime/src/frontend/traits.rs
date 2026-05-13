@@ -6,42 +6,44 @@ use loopal_protocol::AgentEventPayload;
 use loopal_protocol::Question;
 use loopal_tool_api::PermissionDecision;
 
-/// Outcome of a plan approval request.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PlanApproval {
-    /// User approved the plan as-is.
     Approve,
-    /// User rejected — agent should revise and retry.
     Reject,
-    /// User edited the plan content before approving.
     ApproveWithEdits(String),
 }
 
-/// Unified abstraction for agent-to-consumer communication.
+/// Agent → consumer event/control surface.
 ///
-/// Production uses `HubFrontend` (in `loopal-agent-server`), which broadcasts
-/// events to IPC clients and routes permissions via the primary connection.
-/// `UnifiedFrontend` (in this crate) is an in-process channel-based
-/// implementation used by the test harness.
+/// `emit` is fallible — the root agent loop uses `?` to abort when the
+/// consumer channel closes. Parallel/background tasks call `emit_best_effort`.
 ///
-/// ## Emission semantics
-///
-/// `emit()` behaviour depends on the agent role:
-/// - **Root agent**: propagates errors (consumer disconnect is fatal).
-/// - **Sub-agent**: best-effort — silently drops events if the parent
-///   channel is closed, so that a dying parent does not crash children.
-///
-/// Callers should NOT rely on `emit()` failures for control flow.
+/// `emit_in_turn` is the capability-checked variant: it builds the envelope
+/// via `AgentEvent::for_agent_in_turn`, which **panics** (in any build
+/// profile) if called outside a `TurnContext::scope_turn` scope. Use this
+/// for emit sites that MUST be inside a turn so mis-scoped sites surface
+/// loudly instead of silently emitting `turn_id=0`.
 #[async_trait]
 pub trait AgentFrontend: Send + Sync {
-    /// Emit a payload to the observer (consumer or parent agent).
-    ///
-    /// Best-effort for sub-agents: may silently succeed even if the
-    /// event was not delivered. See trait-level documentation.
     async fn emit(&self, payload: AgentEventPayload) -> Result<()>;
 
-    /// Wait for the next input. Returns `None` on disconnect,
-    /// cancellation, or channel close (shutdown signal).
+    /// Capability-checked emit: panics if called outside `scope_turn`.
+    /// Default impl falls back to `emit` for trait objects that don't
+    /// override — implementations should override when they construct
+    /// the `AgentEvent` envelope themselves.
+    async fn emit_in_turn(&self, payload: AgentEventPayload) -> Result<()> {
+        // Force the panic check even in the default impl by reading
+        // require_current explicitly before delegating to emit().
+        let _ctx = loopal_protocol::event_id::TurnContext::require_current();
+        self.emit(payload).await
+    }
+
+    async fn emit_best_effort(&self, payload: AgentEventPayload, ctx: &str) {
+        if let Err(e) = self.emit(payload).await {
+            tracing::error!(ctx = ctx, error = %e, "event emit failed");
+        }
+    }
+
     async fn recv_input(&self) -> Option<AgentInput>;
 
     async fn request_permission(
@@ -73,12 +75,13 @@ pub trait AgentFrontend: Send + Sync {
     }
 }
 
-/// Lightweight, `Send + Sync` event emitter for parallel tool execution.
-///
-/// Best-effort: errors are logged but not propagated, since tool tasks
-/// may outlive the consumer or parent agent.
 #[async_trait]
 pub trait EventEmitter: Send + Sync {
-    /// Emit a payload (best-effort in spawned tasks).
     async fn emit(&self, payload: AgentEventPayload) -> Result<()>;
+
+    async fn emit_best_effort(&self, payload: AgentEventPayload, ctx: &str) {
+        if let Err(e) = self.emit(payload).await {
+            tracing::error!(ctx = ctx, error = %e, "event emit failed");
+        }
+    }
 }

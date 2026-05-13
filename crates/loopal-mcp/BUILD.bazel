@@ -25,6 +25,12 @@ rust_library(
 )
 
 rust_test(
+    name = "loopal-mcp-unit-test",
+    crate = ":loopal-mcp",
+    edition = "2024",
+)
+
+rust_test(
     name = "loopal-mcp_test",
     srcs = glob(["tests/**/*.rs"]),
     crate_root = "tests/suite.rs",

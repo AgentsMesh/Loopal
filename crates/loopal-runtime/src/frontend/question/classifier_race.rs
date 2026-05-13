@@ -134,20 +134,26 @@ async fn commit_classifier(
     cancel.cancel();
     manual_handle.abort();
     let flat: Vec<String> = cls.answers.iter().map(|labels| labels.join(", ")).collect();
-    let _ = handler
+    handler
         .emitter
-        .emit(AgentEventPayload::ClassifierCompleted {
-            id: question_id.clone(),
-            answers: flat.clone(),
-            duration_ms: cls.duration_ms,
-        })
+        .emit_best_effort(
+            AgentEventPayload::ClassifierCompleted {
+                id: question_id.clone(),
+                answers: flat.clone(),
+                duration_ms: cls.duration_ms,
+            },
+            "classifier_race::commit_classifier::ClassifierCompleted",
+        )
         .await;
-    let _ = handler
+    handler
         .emitter
-        .emit(AgentEventPayload::UserQuestionResolved {
-            id: question_id.clone(),
-            by: ResolveSource::Classifier,
-        })
+        .emit_best_effort(
+            AgentEventPayload::UserQuestionResolved {
+                id: question_id.clone(),
+                by: ResolveSource::Classifier,
+            },
+            "classifier_race::commit_classifier::UserQuestionResolved",
+        )
         .await;
     QuestionOutcome::classifier(
         UserQuestionResponse::answered(&question_id, flat),
@@ -162,12 +168,15 @@ async fn defer_to_manual(
     reason: String,
     manual_handle: JoinHandle<QuestionOutcome>,
 ) -> QuestionOutcome {
-    let _ = handler
+    handler
         .emitter
-        .emit(AgentEventPayload::ClassifierFailed {
-            id: question_id.to_string(),
-            reason,
-        })
+        .emit_best_effort(
+            AgentEventPayload::ClassifierFailed {
+                id: question_id.to_string(),
+                reason,
+            },
+            "classifier_race::defer_to_manual::ClassifierFailed",
+        )
         .await;
     manual_handle
         .await

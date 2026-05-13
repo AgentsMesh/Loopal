@@ -40,9 +40,16 @@ pub fn project_messages(messages: &[Message]) -> Vec<ProjectedMessage> {
                     tool_use_id,
                     content,
                     is_error,
-                    ..
+                    metadata,
                 } => {
-                    back_patch(&mut output, &tool_index, tool_use_id, content, *is_error);
+                    back_patch(
+                        &mut output,
+                        &tool_index,
+                        tool_use_id,
+                        content,
+                        *is_error,
+                        metadata.as_ref(),
+                    );
                 }
                 ContentBlock::Image { .. } => {
                     content_parts.push("[image]".to_string());
@@ -87,13 +94,13 @@ pub fn project_messages(messages: &[Message]) -> Vec<ProjectedMessage> {
     output
 }
 
-/// Back-patch a ToolResult into the matching ProjectedToolCall.
 fn back_patch(
     output: &mut [ProjectedMessage],
     index: &HashMap<String, (usize, usize, String)>,
     tool_use_id: &str,
     result: &str,
     is_error: bool,
+    metadata: Option<&loopal_tool_invocation::ToolResultMetadata>,
 ) {
     let Some(&(di, ti, ref _name)) = index.get(tool_use_id) else {
         return;
@@ -103,6 +110,7 @@ fn back_patch(
     {
         tc.is_error = is_error;
         tc.result = Some(truncate_result(result));
+        tc.metadata = metadata.cloned();
     }
 }
 

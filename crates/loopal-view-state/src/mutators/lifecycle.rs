@@ -1,30 +1,29 @@
 use crate::state::SessionViewState;
 
-pub(super) fn cleared(state: &mut SessionViewState, context_window: u32) -> bool {
+use super::MutationEffect;
+
+pub(super) fn cleared(state: &mut SessionViewState, context_window: u32) -> MutationEffect {
     state.agent.conversation.clear_all(context_window);
     let obs = &mut state.agent.observable;
     obs.input_tokens = 0;
     obs.output_tokens = 0;
     obs.turn_count = 0;
-    obs.tool_count = 0;
-    obs.last_tool = None;
-    obs.tools_in_flight = 0;
-    true
+    MutationEffect::Mutated
 }
 
-pub(super) fn model_changed(state: &mut SessionViewState, model: &str) -> bool {
+pub(super) fn model_changed(state: &mut SessionViewState, model: &str) -> MutationEffect {
     state.agent.observable.model = model.to_string();
-    true
+    MutationEffect::Mutated
 }
 
-pub(super) fn mode_changed(state: &mut SessionViewState, mode: &str) -> bool {
+pub(super) fn mode_changed(state: &mut SessionViewState, mode: &str) -> MutationEffect {
     state.agent.observable.mode = mode.to_string();
-    true
+    MutationEffect::Mutated
 }
 
-pub(super) fn thinking_changed(state: &mut SessionViewState, raw_json: &str) -> bool {
+pub(super) fn thinking_changed(state: &mut SessionViewState, raw_json: &str) -> MutationEffect {
     state.agent.observable.thinking_config = normalize_thinking_label(raw_json);
-    true
+    MutationEffect::Mutated
 }
 
 /// Map the raw `ThinkingConfig` JSON to its short label form for status-bar

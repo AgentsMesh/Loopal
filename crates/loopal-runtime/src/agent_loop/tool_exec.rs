@@ -58,15 +58,22 @@ pub async fn execute_approved_tools(
 
         join_set.spawn(
             async move {
-                // Start progress reporter for long-running tools
                 let progress =
                     maybe_spawn_progress(&name, &input, id.clone(), progress_emitter, tail);
 
                 let tool_start = Instant::now();
-                let result = execute_tool(&kernel, &name, input, &tool_ctx, &mode).await;
+                let watchdog_deadline = super::tool_watchdog::watchdog_deadline(&name, &input);
+                let result = if let Some(deadline) = watchdog_deadline {
+                    let exec = execute_tool(&kernel, &name, input, &tool_ctx, &mode);
+                    match tokio::time::timeout(deadline, exec).await {
+                        Ok(r) => r,
+                        Err(_) => Ok(super::tool_watchdog::timeout_result(deadline)),
+                    }
+                } else {
+                    execute_tool(&kernel, &name, input, &tool_ctx, &mode).await
+                };
                 let tool_duration = tool_start.elapsed();
 
-                // Stop progress reporter
                 if let Some(h) = progress {
                     h.abort();
                 }
@@ -122,7 +129,9 @@ pub async fn execute_approved_tools(
                     }
                 };
 
-                let _ = emitter.emit(tool_result_event).await;
+                emitter
+                    .emit_best_effort(tool_result_event, "agent_loop::tool_exec::tool_result")
+                    .await;
                 (original_idx, content_block)
             }
             .instrument(span),

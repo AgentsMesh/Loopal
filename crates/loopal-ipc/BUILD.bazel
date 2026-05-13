@@ -17,6 +17,12 @@ rust_library(
 )
 
 rust_test(
+    name = "loopal-ipc-unit-test",
+    crate = ":loopal-ipc",
+    edition = "2024",
+)
+
+rust_test(
     name = "loopal-ipc_test",
     srcs = glob(["tests/**/*.rs"]),
     crate_root = "tests/suite.rs",

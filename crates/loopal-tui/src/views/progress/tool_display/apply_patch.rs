@@ -1,23 +1,19 @@
-//! ApplyPatch tool rendering — shows colored diff from patch input.
-
 use ratatui::prelude::*;
 
-use loopal_view_state::SessionToolCall;
+use loopal_view_state::ToolInvocation;
 
 use super::diff_style::{self, DIFF_MAX_LINES};
 use super::output_first_line;
 
-/// Header detail: count of file operations in the patch.
 pub fn extract_detail(input: &serde_json::Value) -> Option<String> {
     let patch = input.get("patch")?.as_str()?;
     let n = patch.lines().filter(|l| l.starts_with("*** ")).count();
     Some(format!("{n} file(s)"))
 }
 
-/// Body: parse patch for file headers / +/- lines, render colored diff.
-pub fn render_body(tc: &SessionToolCall) -> Vec<Line<'static>> {
+pub fn render_body(tc: &ToolInvocation) -> Vec<Line<'static>> {
     let Some(patch) = tc
-        .tool_input
+        .input
         .as_ref()
         .and_then(|i| i.get("patch"))
         .and_then(|v| v.as_str())
@@ -52,10 +48,8 @@ pub fn render_body(tc: &SessionToolCall) -> Vec<Line<'static>> {
                 shown += 1;
             }
         }
-        // Context lines (space prefix) and @@ hunk markers are skipped for compactness
     }
 
-    // Build: summary first, then diff lines, then fold indicator
     let summary = format_patch_summary(files, added, removed);
     let mut lines = vec![output_first_line(&summary)];
     lines.extend(diff_lines);

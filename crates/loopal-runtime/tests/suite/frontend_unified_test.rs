@@ -1,11 +1,9 @@
-use loopal_protocol::AgentEventPayload;
 use loopal_protocol::AgentMode;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::{Envelope, MessageSource};
 use loopal_runtime::agent_input::AgentInput;
 use loopal_runtime::frontend::AgentFrontend;
 use loopal_runtime::frontend::{DenyAllHandler, UnifiedFrontend, UnsupportedQuestionHandler};
-use loopal_tool_api::PermissionDecision;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
@@ -26,71 +24,6 @@ fn make_unified(
         handler,
         Box::new(UnsupportedQuestionHandler),
     )
-}
-
-// --- emit ---
-
-#[tokio::test]
-async fn test_unified_emit_root_delivers_event() {
-    let (event_tx, mut event_rx) = mpsc::channel(16);
-    let (_mb_tx, mb_rx) = mpsc::channel(16);
-    let (_ctrl_tx, ctrl_rx) = mpsc::channel(16);
-
-    let f = make_unified(
-        None,
-        event_tx,
-        mb_rx,
-        ctrl_rx,
-        None,
-        Box::new(DenyAllHandler),
-    );
-    f.emit(AgentEventPayload::Started).await.unwrap();
-
-    let event = event_rx.recv().await.unwrap();
-    assert!(event.agent_name.is_none());
-    assert!(matches!(event.payload, AgentEventPayload::Started));
-}
-
-#[tokio::test]
-async fn test_unified_emit_wraps_agent_name() {
-    let (event_tx, mut event_rx) = mpsc::channel(16);
-    let (_mb_tx, mb_rx) = mpsc::channel(16);
-    let (_ctrl_tx, ctrl_rx) = mpsc::channel(16);
-
-    let f = make_unified(
-        Some("researcher".into()),
-        event_tx,
-        mb_rx,
-        ctrl_rx,
-        None,
-        Box::new(DenyAllHandler),
-    );
-    f.emit(AgentEventPayload::Finished).await.unwrap();
-
-    let event = event_rx.recv().await.unwrap();
-    assert_eq!(
-        event.agent_name.as_ref().map(|a| a.to_string()).as_deref(),
-        Some("researcher")
-    );
-}
-
-#[tokio::test]
-async fn test_unified_emit_subagent_best_effort() {
-    let (event_tx, event_rx) = mpsc::channel(16);
-    let (_mb_tx, mb_rx) = mpsc::channel(16);
-    let (_ctrl_tx, ctrl_rx) = mpsc::channel(16);
-    drop(event_rx);
-
-    let f = make_unified(
-        Some("sub".into()),
-        event_tx,
-        mb_rx,
-        ctrl_rx,
-        None,
-        Box::new(DenyAllHandler),
-    );
-    // Should NOT error — best-effort for sub-agents
-    assert!(f.emit(AgentEventPayload::Started).await.is_ok());
 }
 
 // --- recv_input from envelope ---
@@ -257,26 +190,4 @@ async fn test_unified_drain_pending() {
     assert_eq!(env0.content.text, "task A");
     assert_eq!(env1.source.label(), "peer");
     assert_eq!(env1.content.text, "task B");
-}
-
-// --- permission: auto deny ---
-
-#[tokio::test]
-async fn test_unified_permission_auto_deny() {
-    let (event_tx, _event_rx) = mpsc::channel(16);
-    let (_mb_tx, mb_rx) = mpsc::channel(16);
-    let (_ctrl_tx, ctrl_rx) = mpsc::channel(16);
-
-    let f = make_unified(
-        Some("sub".into()),
-        event_tx,
-        mb_rx,
-        ctrl_rx,
-        None,
-        Box::new(DenyAllHandler),
-    );
-    let d = f
-        .request_permission("id1", "Bash", &serde_json::json!({}))
-        .await;
-    assert_eq!(d, PermissionDecision::Deny);
 }

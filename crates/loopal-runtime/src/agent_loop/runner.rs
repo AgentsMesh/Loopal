@@ -124,17 +124,16 @@ impl AgentLoopRunner {
 
         self.fire_session_hook(loopal_config::HookEvent::SessionEnd)
             .await;
-
-        // Drain any pending inbox ids before the agent finishes — without
-        // this, messages enqueued just before exit would lack their paired
-        // `InboxConsumed`, leaving observers with an incomplete life cycle.
         self.emit_inbox_consumed().await;
 
-        if let Err(ref e) = result {
-            let _ = self.transition_error(e.to_string()).await;
+        if let Err(ref e) = result
+            && let Err(te) = self.transition_error(e.to_string()).await
+        {
+            tracing::error!(error = %te, original = %e, "transition_error during shutdown");
         }
-
-        let _ = self.transition(AgentStatus::Finished).await;
+        if let Err(e) = self.transition(AgentStatus::Finished).await {
+            tracing::error!(error = %e, "transition to Finished during shutdown");
+        }
         result
     }
 
@@ -155,6 +154,13 @@ impl AgentLoopRunner {
     /// Send an event payload via the frontend.
     pub async fn emit(&self, payload: AgentEventPayload) -> Result<()> {
         self.params.deps.frontend.emit(payload).await
+    }
+
+    /// Capability-checked emit — panics if called outside `scope_turn`.
+    /// Use from in-turn emit sites that MUST be scoped so missing scope
+    /// is a loud failure instead of a silent `turn_id=0`.
+    pub async fn emit_in_turn(&self, payload: AgentEventPayload) -> Result<()> {
+        self.params.deps.frontend.emit_in_turn(payload).await
     }
 
     /// Transition to a new agent status. Skips if already in target (idempotent).

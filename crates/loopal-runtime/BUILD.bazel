@@ -19,6 +19,7 @@ rust_library(
         "//crates/loopal-provider-api",
         "//crates/loopal-storage",
         "//crates/loopal-tool-api",
+        "//crates/loopal-tool-invocation",
         "@crates//:chrono",
         "@crates//:futures",
         "@crates//:opentelemetry",
@@ -30,6 +31,12 @@ rust_library(
         "@crates//:uuid",
     ],
     proc_macro_deps = ["@crates//:async-trait"],
+)
+
+rust_test(
+    name = "loopal-runtime-unit-test",
+    crate = ":loopal-runtime",
+    edition = "2024",
 )
 
 rust_test(

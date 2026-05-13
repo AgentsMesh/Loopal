@@ -75,8 +75,8 @@ pub(crate) fn snapshot(app: &App) -> Vec<(String, AgentDisplayInfo)> {
                 name.clone(),
                 AgentDisplayInfo {
                     status: view.observable.status,
-                    last_tool: view.observable.last_tool.clone(),
-                    tools_in_flight: view.observable.tools_in_flight,
+                    last_tool: view.last_tool(),
+                    tools_in_flight: view.tools_in_flight(),
                     elapsed: view.elapsed(),
                 },
             )

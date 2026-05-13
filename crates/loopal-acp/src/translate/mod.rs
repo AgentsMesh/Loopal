@@ -64,9 +64,10 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
             id,
             result,
             is_error,
+            metadata,
             ..
         } => {
-            let u = tools::translate_tool_result(id, result, *is_error);
+            let u = tools::translate_tool_result(id, result, *is_error, metadata.as_ref());
             Some(AcpNotification::SessionUpdate(make_session_notification(
                 session_id, u,
             )))

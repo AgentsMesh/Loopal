@@ -82,6 +82,33 @@ impl AgentView {
         self.started_at
             .map_or(std::time::Duration::ZERO, |t| t.elapsed())
     }
+
+    pub fn tools_in_flight(&self) -> u32 {
+        self.conversation
+            .messages
+            .iter()
+            .flat_map(|m| m.tool_calls.iter())
+            .filter(|tc| tc.state.is_active())
+            .count() as u32
+    }
+
+    pub fn tool_count(&self) -> u32 {
+        self.conversation
+            .messages
+            .iter()
+            .map(|m| m.tool_calls.len() as u32)
+            .sum()
+    }
+
+    pub fn last_tool(&self) -> Option<String> {
+        self.conversation
+            .messages
+            .iter()
+            .rev()
+            .flat_map(|m| m.tool_calls.iter().rev())
+            .find(|tc| tc.state.is_active())
+            .map(|tc| tc.summary.clone())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

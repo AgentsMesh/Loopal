@@ -22,7 +22,9 @@ pub fn spawn_sub_agent_forwarder(
     tokio::spawn(async move {
         while let Some(event) = event_rx.recv().await {
             if matches!(event.payload, AgentEventPayload::SubAgentSpawned(_)) {
-                let _ = frontend.emit(event.payload).await;
+                frontend
+                    .emit_best_effort(event.payload, "agent_setup_helpers::sub_agent_spawned")
+                    .await;
             }
         }
     });

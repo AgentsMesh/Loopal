@@ -69,15 +69,21 @@ pub(super) async fn collect_results(
             .iter()
             .position(|(tid, _, _)| tid == id)
             .unwrap_or(0);
-        let _ = emitter
-            .emit(AgentEventPayload::ToolResult {
-                id: id.clone(),
-                name: name.clone(),
-                result: "Interrupted by user".into(),
-                is_error: true,
-                duration_ms: None,
-                metadata: None,
-            })
+        let cancel_metadata = loopal_tool_invocation::ToolResultMetadata::cancelled(
+            loopal_tool_invocation::CancelCause::UserInterrupt,
+        );
+        emitter
+            .emit_best_effort(
+                AgentEventPayload::ToolResult {
+                    id: id.clone(),
+                    name: name.clone(),
+                    result: "Interrupted by user".into(),
+                    is_error: true,
+                    duration_ms: None,
+                    metadata: Some(cancel_metadata.clone()),
+                },
+                "agent_loop::tool_collect::interrupted",
+            )
             .await;
         results.push((
             orig_idx,
@@ -85,7 +91,7 @@ pub(super) async fn collect_results(
                 tool_use_id: id.clone(),
                 content: "Interrupted by user".into(),
                 is_error: true,
-                metadata: None,
+                metadata: Some(cancel_metadata),
             },
         ));
     }

@@ -52,15 +52,10 @@ impl UnifiedFrontend {
 impl AgentFrontend for UnifiedFrontend {
     async fn emit(&self, payload: AgentEventPayload) -> Result<()> {
         let event = AgentEvent::for_agent(self.agent_name.clone(), payload);
-        if self.agent_name.is_some() {
-            let _ = self.event_tx.send(event).await;
-            Ok(())
-        } else {
-            self.event_tx.send(event).await.map_err(|e| {
-                warn!(error = %e, "event channel closed");
-                loopal_error::LoopalError::Other("event channel closed".into())
-            })
-        }
+        self.event_tx.send(event).await.map_err(|e| {
+            warn!(error = %e, "event channel closed");
+            loopal_error::LoopalError::Other("event channel closed".into())
+        })
     }
 
     async fn recv_input(&self) -> Option<AgentInput> {
@@ -91,7 +86,9 @@ impl AgentFrontend for UnifiedFrontend {
     ) -> PermissionDecision {
         let outcome = self.permission_handler.decide(id, name, input).await;
         let (decision, payload) = super::dispatch::into_permission_decided(name, outcome);
-        let _ = self.emit(payload).await;
+        if let Err(e) = self.emit(payload).await {
+            tracing::error!(ctx = "unified::permission_decided", error = %e, "event emit failed");
+        }
         decision
     }
 
@@ -122,7 +119,9 @@ impl AgentFrontend for UnifiedFrontend {
         let n = questions.len() as u32;
         let outcome = self.question_handler.ask(questions).await;
         let (response, payload) = super::dispatch::into_question_decided(n, outcome);
-        let _ = self.emit(payload).await;
+        if let Err(e) = self.emit(payload).await {
+            tracing::error!(ctx = "unified::question_decided", error = %e, "event emit failed");
+        }
         response
     }
 

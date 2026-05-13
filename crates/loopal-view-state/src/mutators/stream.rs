@@ -2,30 +2,32 @@ use loopal_protocol::AgentStatus;
 
 use crate::state::SessionViewState;
 
-pub(super) fn stream(state: &mut SessionViewState, text: &str) -> bool {
+use super::MutationEffect;
+
+pub(super) fn stream(state: &mut SessionViewState, text: &str) -> MutationEffect {
     let conv = &mut state.agent.conversation;
     conv.begin_turn();
     conv.mark_active();
     conv.streaming_text.push_str(text);
     state.agent.observable.status = AgentStatus::Running;
-    true
+    MutationEffect::Mutated
 }
 
-pub(super) fn thinking_stream(state: &mut SessionViewState, text: &str) -> bool {
+pub(super) fn thinking_stream(state: &mut SessionViewState, text: &str) -> MutationEffect {
     let conv = &mut state.agent.conversation;
     conv.begin_turn();
     conv.mark_active();
     conv.thinking_active = true;
     conv.streaming_thinking.push_str(text);
     state.agent.observable.status = AgentStatus::Running;
-    true
+    MutationEffect::Mutated
 }
 
-pub(super) fn thinking_complete(state: &mut SessionViewState, token_count: u32) -> bool {
+pub(super) fn thinking_complete(state: &mut SessionViewState, token_count: u32) -> MutationEffect {
     let conv = &mut state.agent.conversation;
     conv.mark_active();
     crate::conversation::thinking_display::handle_thinking_complete(conv, token_count);
-    true
+    MutationEffect::Mutated
 }
 
 pub(super) fn retry_error(
@@ -33,33 +35,33 @@ pub(super) fn retry_error(
     message: &str,
     attempt: u32,
     max: u32,
-) -> bool {
+) -> MutationEffect {
     let conv = &mut state.agent.conversation;
     conv.retry_banner = Some(format!("{message} ({attempt}/{max})"));
     conv.mark_active();
     state.agent.observable.status = AgentStatus::Running;
-    true
+    MutationEffect::Mutated
 }
 
-pub(super) fn retry_cleared(state: &mut SessionViewState) -> bool {
+pub(super) fn retry_cleared(state: &mut SessionViewState) -> MutationEffect {
     state.agent.conversation.retry_banner = None;
-    true
+    MutationEffect::Mutated
 }
 
-pub(super) fn rewound(state: &mut SessionViewState, remaining_turns: usize) -> bool {
+pub(super) fn rewound(state: &mut SessionViewState, remaining_turns: usize) -> MutationEffect {
     let conv = &mut state.agent.conversation;
     if remaining_turns == 0 {
         conv.messages.clear();
         conv.streaming_text.clear();
         conv.turn_count = 0;
         conv.reset_timer();
-        return true;
+        return MutationEffect::Mutated;
     }
     let cut = find_display_cut_index(&conv.messages, remaining_turns);
     conv.messages.truncate(cut);
     conv.streaming_text.clear();
     conv.turn_count = remaining_turns as u32;
-    true
+    MutationEffect::Mutated
 }
 
 fn find_display_cut_index(messages: &[crate::SessionMessage], remaining_turns: usize) -> usize {

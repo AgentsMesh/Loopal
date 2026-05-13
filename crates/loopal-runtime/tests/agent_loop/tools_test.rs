@@ -25,7 +25,11 @@ async fn test_execute_tools_bypass_mode() {
     )];
 
     runner
-        .execute_tools(tool_uses, &make_cancel())
+        .execute_tools(
+            tool_uses,
+            &make_cancel(),
+            loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+        )
         .await
         .unwrap();
 
@@ -65,7 +69,11 @@ async fn test_execute_tools_supervised_denies_without_approval() {
     )];
 
     runner
-        .execute_tools(tool_uses, &make_cancel())
+        .execute_tools(
+            tool_uses,
+            &make_cancel(),
+            loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+        )
         .await
         .unwrap();
 
@@ -117,7 +125,11 @@ async fn test_execute_tools_read_allowed_write_denied_in_supervised() {
     ];
 
     runner
-        .execute_tools(tool_uses, &make_cancel())
+        .execute_tools(
+            tool_uses,
+            &make_cancel(),
+            loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+        )
         .await
         .unwrap();
 

@@ -90,26 +90,49 @@ impl LineCache {
     }
 }
 
-/// Cheap fingerprint of a SessionMessage capturing all mutable parts.
 fn fingerprint(msg: &SessionMessage) -> u64 {
     let mut h: u64 = 0xcbf29ce484222325;
-    h = mix(h, msg.content.len() as u64);
+    h = mix(h, hash_str(&msg.content));
     h = mix(h, msg.tool_calls.len() as u64);
     for tc in &msg.tool_calls {
-        h = mix(h, tc.status as u64);
-        h = mix(h, tc.summary.len() as u64);
-        h = mix(h, tc.result.as_ref().map_or(0, |r| r.len()) as u64);
-        h = mix(h, tc.duration_ms.unwrap_or(0));
-        h = mix(h, tc.progress_tail.as_ref().map_or(0, |t| t.len()) as u64);
-        // Running/pending tools: include sub-second elapsed for timer refresh.
-        if tc.status.is_active() {
+        h = mix(h, fingerprint_variant(&tc.state));
+        h = mix(h, hash_str(&tc.summary));
+        h = mix(h, tc.state.progress_tail().map_or(0, hash_str));
+        if let Some(o) = tc.state.outcome() {
+            h = mix(h, hash_str(o.content()));
+        }
+        if let Some(d) = tc.state.duration() {
+            h = mix(h, d.as_millis() as u64);
+        }
+        if tc.state.is_active() {
             h = mix(
                 h,
-                tc.started_at
-                    .map_or(0, |t| t.elapsed().as_millis() as u64 / 200),
+                tc.elapsed(std::time::Instant::now()).as_millis() as u64 / 200,
             );
         }
     }
+    h
+}
+
+fn fingerprint_variant(state: &loopal_view_state::InvocationState) -> u64 {
+    use loopal_view_state::InvocationState::*;
+    match state {
+        Pending => 1,
+        Running { .. } => 2,
+        Done { .. } => 3,
+        Stale { .. } => 4,
+        Cancelled { .. } => 5,
+    }
+}
+
+fn hash_str(s: &str) -> u64 {
+    // FNV-1a — fast content hash, no allocations.
+    let mut h: u64 = 0xcbf29ce484222325;
+    for b in s.as_bytes() {
+        h ^= *b as u64;
+        h = h.wrapping_mul(0x100000001b3);
+    }
+    h ^= s.len() as u64;
     h
 }
 

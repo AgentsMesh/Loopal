@@ -41,11 +41,18 @@ pub(crate) mod token_accumulator;
 mod tool_collect;
 pub(crate) mod tool_exec;
 mod tool_progress;
+mod tool_watchdog;
 mod tools;
 mod tools_ask_user;
 mod tools_check;
+mod tools_check_emit;
+mod tools_check_one;
+mod tools_finalize;
 mod tools_inject;
+mod tools_intercept;
+mod tools_phase;
 pub(crate) mod tools_plan;
+mod tools_plan_exit;
 mod tools_resolve;
 pub mod turn_context;
 mod turn_exec;
@@ -65,6 +72,7 @@ pub use params::{
 };
 pub use params_builder::AgentLoopParamsBuilder;
 pub use runner::AgentLoopRunner;
+pub use streaming_tool_exec::StreamingToolHandle;
 
 use finished_guard::FinishedGuard;
 

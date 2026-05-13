@@ -1,5 +1,3 @@
-//! Integration tests for Plan mode EnterPlanMode / ExitPlanMode interception.
-
 use loopal_message::ContentBlock;
 use loopal_runtime::AgentMode;
 use loopal_runtime::agent_loop::LifecycleMode;
@@ -18,7 +16,11 @@ async fn enter_plan_mode_denied_by_default_frontend() {
         serde_json::json!({}),
     )];
     runner
-        .execute_tools(tool_uses, &make_cancel())
+        .execute_tools(
+            tool_uses,
+            &make_cancel(),
+            loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+        )
         .await
         .unwrap();
 
@@ -37,7 +39,11 @@ async fn enter_plan_when_already_in_plan_returns_error() {
         serde_json::json!({}),
     )];
     runner
-        .execute_tools(tool_uses, &make_cancel())
+        .execute_tools(
+            tool_uses,
+            &make_cancel(),
+            loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+        )
         .await
         .unwrap();
 
@@ -64,7 +70,11 @@ async fn enter_plan_blocked_for_task_lifecycle() {
         serde_json::json!({}),
     )];
     runner
-        .execute_tools(tool_uses, &make_cancel())
+        .execute_tools(
+            tool_uses,
+            &make_cancel(),
+            loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+        )
         .await
         .unwrap();
 
@@ -91,7 +101,11 @@ async fn exit_plan_when_not_in_plan_returns_error() {
         serde_json::json!({}),
     )];
     runner
-        .execute_tools(tool_uses, &make_cancel())
+        .execute_tools(
+            tool_uses,
+            &make_cancel(),
+            loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+        )
         .await
         .unwrap();
 
@@ -118,7 +132,11 @@ async fn exit_plan_without_plan_file_returns_error() {
         serde_json::json!({}),
     )];
     runner
-        .execute_tools(tool_uses, &make_cancel())
+        .execute_tools(
+            tool_uses,
+            &make_cancel(),
+            loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+        )
         .await
         .unwrap();
 
@@ -157,7 +175,11 @@ async fn exit_plan_with_plan_file_approves_and_restores_mode() {
         serde_json::json!({}),
     )];
     runner
-        .execute_tools(tool_uses, &make_cancel())
+        .execute_tools(
+            tool_uses,
+            &make_cancel(),
+            loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+        )
         .await
         .unwrap();
 

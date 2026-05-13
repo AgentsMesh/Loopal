@@ -39,36 +39,28 @@ fn test_agent_status_serde_roundtrip() {
 fn test_observable_agent_state_default() {
     let state = ObservableAgentState::default();
     assert_eq!(state.status, AgentStatus::Starting);
-    assert_eq!(state.tool_count, 0);
-    assert!(state.last_tool.is_none());
     assert_eq!(state.turn_count, 0);
     assert_eq!(state.input_tokens, 0);
     assert_eq!(state.output_tokens, 0);
     assert!(state.model.is_empty());
     assert_eq!(state.thinking_config, "auto");
     assert_eq!(state.mode, "act");
-    assert_eq!(state.tools_in_flight, 0);
 }
 
 #[test]
 fn test_observable_agent_state_serde_roundtrip() {
     let state = ObservableAgentState {
         status: AgentStatus::Running,
-        tool_count: 5,
-        last_tool: Some("Read".to_string()),
         turn_count: 3,
         input_tokens: 1000,
         output_tokens: 500,
         model: "claude-sonnet".to_string(),
         thinking_config: "effort".to_string(),
         mode: "plan".to_string(),
-        tools_in_flight: 0,
     };
     let json = serde_json::to_string(&state).unwrap();
     let restored: ObservableAgentState = serde_json::from_str(&json).unwrap();
     assert_eq!(restored.status, AgentStatus::Running);
-    assert_eq!(restored.tool_count, 5);
-    assert_eq!(restored.last_tool, Some("Read".to_string()));
     assert_eq!(restored.turn_count, 3);
     assert_eq!(restored.thinking_config, "effort");
 }
@@ -77,8 +69,6 @@ fn test_observable_agent_state_serde_roundtrip() {
 fn test_observable_thinking_config_defaults_when_absent() {
     let legacy_json = r#"{
         "status": "Running",
-        "tool_count": 0,
-        "last_tool": null,
         "turn_count": 0,
         "input_tokens": 0,
         "output_tokens": 0,

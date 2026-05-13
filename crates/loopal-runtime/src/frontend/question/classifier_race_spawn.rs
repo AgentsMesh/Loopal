@@ -49,11 +49,14 @@ pub(super) fn spawn_progress_ticker(
             tokio::select! {
                 _ = tokio::time::sleep(interval) => {
                     let elapsed_ms = start.elapsed().as_millis() as u64;
-                    let _ = emitter
-                        .emit(AgentEventPayload::ClassifierProgress {
-                            id: question_id.clone(),
-                            elapsed_ms,
-                        })
+                    emitter
+                        .emit_best_effort(
+                            AgentEventPayload::ClassifierProgress {
+                                id: question_id.clone(),
+                                elapsed_ms,
+                            },
+                            "frontend::question::classifier_progress",
+                        )
                         .await;
                 }
                 _ = cancel.cancelled() => break,

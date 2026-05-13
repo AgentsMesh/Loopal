@@ -8,10 +8,18 @@ rust_library(
     deps = [
         "//crates/loopal-protocol",
         "//crates/loopal-tool-api",
+        "//crates/loopal-tool-invocation",
         "@crates//:indexmap",
         "@crates//:serde",
         "@crates//:serde_json",
+        "@crates//:tracing",
     ],
+)
+
+rust_test(
+    name = "loopal-view-state-unit-test",
+    crate = ":loopal-view-state",
+    edition = "2024",
 )
 
 rust_test(
@@ -22,6 +30,7 @@ rust_test(
     deps = [
         ":loopal-view-state",
         "//crates/loopal-protocol",
+        "//crates/loopal-tool-invocation",
         "@crates//:serde_json",
     ],
 )

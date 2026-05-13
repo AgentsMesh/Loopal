@@ -1,12 +1,10 @@
-//! Translate tool-related agent events to ACP SessionUpdate.
-
 use agent_client_protocol_schema::{
     SessionUpdate, ToolCall, ToolCallId, ToolCallStatus, ToolCallUpdate, ToolCallUpdateFields,
 };
+use loopal_tool_invocation::ToolResultMetadata;
 
 use super::tool_kind::map_tool_kind;
 
-/// `ToolCall { id, name, .. }` → `SessionUpdate::ToolCall`
 pub fn translate_tool_call(id: &str, name: &str) -> SessionUpdate {
     SessionUpdate::ToolCall(
         ToolCall::new(ToolCallId::new(id), name.to_string())
@@ -15,20 +13,36 @@ pub fn translate_tool_call(id: &str, name: &str) -> SessionUpdate {
     )
 }
 
-/// `ToolResult { id, result, is_error, .. }` → `SessionUpdate::ToolCallUpdate`
-pub fn translate_tool_result(id: &str, result: &str, is_error: bool) -> SessionUpdate {
-    let status = if is_error {
-        ToolCallStatus::Failed
-    } else {
-        ToolCallStatus::Completed
+pub fn translate_tool_result(
+    id: &str,
+    result: &str,
+    is_error: bool,
+    metadata: Option<&ToolResultMetadata>,
+) -> SessionUpdate {
+    let (status, output) = match metadata {
+        Some(ToolResultMetadata::Stale { reason }) => (
+            ToolCallStatus::Failed,
+            serde_json::Value::String(format!("Stale ({reason}): {result}")),
+        ),
+        Some(ToolResultMetadata::Cancelled { cause }) => (
+            ToolCallStatus::Failed,
+            serde_json::Value::String(format!("Cancelled ({cause}): {result}")),
+        ),
+        _ => {
+            let status = if is_error {
+                ToolCallStatus::Failed
+            } else {
+                ToolCallStatus::Completed
+            };
+            (status, serde_json::Value::String(result.to_string()))
+        }
     };
     let fields = ToolCallUpdateFields::new()
         .status(status)
-        .raw_output(serde_json::Value::String(result.to_string()));
+        .raw_output(output);
     SessionUpdate::ToolCallUpdate(ToolCallUpdate::new(ToolCallId::new(id), fields))
 }
 
-/// `ToolProgress { id, output_tail, .. }` → `SessionUpdate::ToolCallUpdate { InProgress }`
 pub fn translate_tool_progress(id: &str, output_tail: &str) -> SessionUpdate {
     let fields = ToolCallUpdateFields::new()
         .status(ToolCallStatus::InProgress)
@@ -39,6 +53,7 @@ pub fn translate_tool_progress(id: &str, output_tail: &str) -> SessionUpdate {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use loopal_tool_invocation::{CancelCause, StaleReason};
 
     #[test]
     fn tool_call_has_pending_status() {
@@ -47,13 +62,14 @@ mod tests {
         assert_eq!(val["sessionUpdate"], "tool_call");
         assert_eq!(val["toolCallId"], "tc-1");
         assert_eq!(val["title"], "Read");
-        assert_eq!(val["status"], "pending");
+        // ACP schema serializes `status: Pending` as absent (default + skip_serializing_if).
+        assert!(val.get("status").is_none() || val["status"].is_null());
         assert_eq!(val["kind"], "read");
     }
 
     #[test]
     fn tool_result_success_is_completed() {
-        let update = translate_tool_result("tc-1", "file contents", false);
+        let update = translate_tool_result("tc-1", "file contents", false, None);
         let val = serde_json::to_value(&update).unwrap();
         assert_eq!(val["sessionUpdate"], "tool_call_update");
         assert_eq!(val["toolCallId"], "tc-1");
@@ -63,9 +79,39 @@ mod tests {
 
     #[test]
     fn tool_result_error_is_failed() {
-        let update = translate_tool_result("tc-1", "not found", true);
+        let update = translate_tool_result("tc-1", "not found", true, None);
         let val = serde_json::to_value(&update).unwrap();
         assert_eq!(val["status"], "failed");
+    }
+
+    #[test]
+    fn tool_result_stale_maps_to_failed_with_reason() {
+        let md = ToolResultMetadata::stale(StaleReason::WatchdogTimeout);
+        let update = translate_tool_result("tc-1", "no response", true, Some(&md));
+        let val = serde_json::to_value(&update).unwrap();
+        assert_eq!(val["status"], "failed");
+        let out = val["rawOutput"].as_str().unwrap();
+        assert!(out.contains("Stale"));
+        assert!(out.contains("watchdog timeout"));
+    }
+
+    #[test]
+    fn tool_result_with_bytes_written_metadata_passes_through() {
+        let md = ToolResultMetadata::bytes_written(100);
+        let update = translate_tool_result("tc-1", "ok", false, Some(&md));
+        let val = serde_json::to_value(&update).unwrap();
+        assert_eq!(val["status"], "completed");
+    }
+
+    #[test]
+    fn tool_result_cancel_maps_to_failed_with_cause() {
+        let md = ToolResultMetadata::cancelled(CancelCause::UserInterrupt);
+        let update = translate_tool_result("tc-1", "Interrupted by user", true, Some(&md));
+        let val = serde_json::to_value(&update).unwrap();
+        assert_eq!(val["status"], "failed");
+        let out = val["rawOutput"].as_str().unwrap();
+        assert!(out.contains("Cancelled"));
+        assert!(out.contains("user interrupt"));
     }
 
     #[test]

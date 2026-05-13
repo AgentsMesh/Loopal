@@ -20,6 +20,16 @@ rust_library(
 )
 
 rust_test(
+    name = "loopal-config-unit-test",
+    crate = ":loopal-config",
+    edition = "2024",
+    deps = [
+        "@crates//:filetime",
+        "@crates//:tempfile",
+    ],
+)
+
+rust_test(
     name = "loopal-config_test",
     srcs = glob(["tests/**/*.rs"]),
     crate_root = "tests/suite.rs",

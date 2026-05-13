@@ -178,7 +178,9 @@ pub fn feed_tool(
             }
         };
 
-        let _ = emitter.emit(event).await;
+        emitter
+            .emit_best_effort(event, "agent_loop::streaming_tool_exec::tool_result")
+            .await;
         (idx, block)
     });
 

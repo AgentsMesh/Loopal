@@ -27,7 +27,11 @@ async fn ask_user_intercepted_no_fallback_leak() {
         }),
     )];
     runner
-        .execute_tools(tool_uses, &make_cancel())
+        .execute_tools(
+            tool_uses,
+            &make_cancel(),
+            loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+        )
         .await
         .unwrap();
 
@@ -43,8 +47,11 @@ async fn ask_user_intercepted_no_fallback_leak() {
             ..
         } => {
             assert_eq!(tool_use_id, "tc-ask");
-            assert!(!is_error);
-            // Must NOT contain the fallback from Tool::execute()
+            assert!(
+                *is_error,
+                "Unsupported question handler must yield is_error=true so LLM sees the failure"
+            );
+            assert!(content.contains("unsupported"));
             assert!(
                 !content.contains("intercepted by runner"),
                 "fallback from execute() leaked: {content}"
@@ -89,7 +96,11 @@ async fn ask_user_plus_read_no_duplicate_tool_result() {
     ];
 
     runner
-        .execute_tools(tool_uses, &make_cancel())
+        .execute_tools(
+            tool_uses,
+            &make_cancel(),
+            loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+        )
         .await
         .unwrap();
 

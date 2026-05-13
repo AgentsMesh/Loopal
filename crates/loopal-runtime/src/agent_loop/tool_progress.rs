@@ -51,13 +51,16 @@ pub fn maybe_spawn_progress(
                 Some(t) => t.snapshot(),
                 None => String::new(),
             };
-            let _ = emitter
-                .emit(AgentEventPayload::ToolProgress {
-                    id: tool_id.clone(),
-                    name: name.clone(),
-                    output_tail,
-                    elapsed_ms,
-                })
+            emitter
+                .emit_best_effort(
+                    AgentEventPayload::ToolProgress {
+                        id: tool_id.clone(),
+                        name: name.clone(),
+                        output_tail,
+                        elapsed_ms,
+                    },
+                    "agent_loop::tool_progress",
+                )
                 .await;
         }
     }))

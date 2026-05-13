@@ -17,6 +17,15 @@ pub(super) fn success_block(id: &str, content: &str) -> ContentBlock {
     }
 }
 
+pub(super) fn error_block(id: &str, content: &str) -> ContentBlock {
+    ContentBlock::ToolResult {
+        tool_use_id: id.to_string(),
+        content: content.to_string(),
+        is_error: true,
+        metadata: None,
+    }
+}
+
 impl AgentLoopRunner {
     /// Emit interrupted results for all tools (early cancel path).
     pub(super) async fn emit_all_interrupted(

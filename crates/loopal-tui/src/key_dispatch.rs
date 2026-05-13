@@ -125,6 +125,14 @@ pub(crate) async fn handle_key_action(
             crate::question_ops::cursor_down(app);
             false
         }
+        InputAction::QuestionPrev => {
+            crate::question_ops::prev_question(app);
+            false
+        }
+        InputAction::QuestionNext => {
+            crate::question_ops::next_question(app);
+            false
+        }
         InputAction::QuestionToggle => {
             crate::question_ops::toggle(app);
             false

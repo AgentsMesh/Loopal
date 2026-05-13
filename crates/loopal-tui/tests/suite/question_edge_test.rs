@@ -18,6 +18,7 @@ fn make_q(opts: &[&str], multi: bool) -> Question {
         question: "?".into(),
         options: opts.iter().map(|l| opt(l)).collect(),
         allow_multiple: multi,
+        header: None,
     }
 }
 
@@ -74,7 +75,7 @@ fn height_below_min_renders_fallback() {
 fn unsupported_response_format_includes_reason() {
     let resp = UserQuestionResponse::unsupported("qid", "AskUser not supported in this context");
     let (formatted, is_error) =
-        loopal_runtime::agent_loop::question_parse::format_response_for_test(&resp, &[]);
+        loopal_runtime::agent_loop::question_format::format_response_for_test(&resp, &[]);
     assert_eq!(
         formatted,
         "(unsupported: AskUser not supported in this context)"
@@ -86,7 +87,7 @@ fn unsupported_response_format_includes_reason() {
 fn cancelled_response_format_is_fixed_token() {
     let resp = UserQuestionResponse::cancelled("qid");
     let (formatted, is_error) =
-        loopal_runtime::agent_loop::question_parse::format_response_for_test(&resp, &[]);
+        loopal_runtime::agent_loop::question_format::format_response_for_test(&resp, &[]);
     assert_eq!(formatted, "(cancelled by user)");
     assert!(!is_error, "cancelled should be is_error=false");
 }
@@ -95,7 +96,7 @@ fn cancelled_response_format_is_fixed_token() {
 fn answered_response_protocol_mismatch_is_warned() {
     let resp = UserQuestionResponse::answered("qid", vec!["a".to_string(), "b".to_string()]);
     let (formatted, is_error) =
-        loopal_runtime::agent_loop::question_parse::format_response_for_test(&resp, &[]);
+        loopal_runtime::agent_loop::question_format::format_response_for_test(&resp, &[]);
     assert!(formatted.contains("protocol mismatch"));
     assert!(is_error, "protocol mismatch should be is_error=true");
 }

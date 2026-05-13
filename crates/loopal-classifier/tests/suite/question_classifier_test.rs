@@ -87,6 +87,7 @@ mod llm_path {
                 description: "".into(),
             }],
             allow_multiple: false,
+            header: None,
         }]
     }
 

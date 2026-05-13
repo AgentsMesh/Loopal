@@ -16,6 +16,7 @@ fn make(opts: Vec<QuestionOption>, multi: bool) -> PendingQuestion {
             question: "Q?".into(),
             options: opts,
             allow_multiple: multi,
+            header: None,
         }],
     )
 }
@@ -153,16 +154,18 @@ fn multi_question_returns_one_answer_per_question() {
                 question: "Q1".into(),
                 options: vec![opt("A"), opt("B")],
                 allow_multiple: false,
+                header: None,
             },
             Question {
                 question: "Q2".into(),
                 options: vec![],
                 allow_multiple: false,
+                header: None,
             },
         ],
     );
     set_cursor(&mut q, 1);
-    q.advance_to_next();
+    q.next_question();
     "second".chars().for_each(|c| q.free_text_insert_char(c));
     assert_eq!(answers(&q), vec!["B".to_string(), "second".to_string()]);
 }

@@ -22,6 +22,7 @@ fn pq(opts: Vec<QuestionOption>, multi: bool) -> PendingQuestion {
             question: "Pick".into(),
             options: opts,
             allow_multiple: multi,
+            header: None,
         }],
     )
 }
@@ -135,6 +136,7 @@ fn question_long_text_wraps_into_multiple_lines() {
             question: "very ".repeat(30) + "long question",
             options: opts(&["A"]),
             allow_multiple: false,
+            header: None,
         }],
     );
     let h = question_inline::height(&q, 30);

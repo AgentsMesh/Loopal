@@ -8,6 +8,7 @@ fn empty_q() -> PendingQuestion {
             question: "?".into(),
             options: vec![],
             allow_multiple: false,
+            header: None,
         }],
     )
 }
@@ -28,6 +29,7 @@ fn make_q(opts_count: usize, multi: bool) -> PendingQuestion {
                 })
                 .collect(),
             allow_multiple: multi,
+            header: None,
         }],
     )
 }

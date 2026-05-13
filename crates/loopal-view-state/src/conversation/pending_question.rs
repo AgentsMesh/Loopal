@@ -131,9 +131,18 @@ impl PendingQuestion {
             .collect()
     }
 
-    pub fn advance_to_next(&mut self) -> bool {
+    pub fn next_question(&mut self) -> bool {
         if self.current_question + 1 < self.questions.len() {
             self.current_question += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn prev_question(&mut self) -> bool {
+        if self.current_question > 0 {
+            self.current_question -= 1;
             true
         } else {
             false

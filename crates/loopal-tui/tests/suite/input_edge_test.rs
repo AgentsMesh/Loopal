@@ -65,6 +65,7 @@ fn test_ctrl_c_cancels_question() {
                     },
                 ],
                 allow_multiple: false,
+                header: None,
             }],
         ));
     });

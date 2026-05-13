@@ -43,6 +43,7 @@ fn one_question() -> Question {
             },
         ],
         allow_multiple: false,
+        header: None,
     }
 }
 

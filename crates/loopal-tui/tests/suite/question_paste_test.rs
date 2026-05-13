@@ -33,6 +33,7 @@ fn install_question(app: &mut App, opts: Vec<&str>, multi: bool) {
                 question: "?".into(),
                 options,
                 allow_multiple: multi,
+                header: None,
             }],
         ));
     });

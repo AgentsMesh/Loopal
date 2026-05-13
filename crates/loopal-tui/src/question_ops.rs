@@ -62,6 +62,18 @@ pub(crate) fn cursor_down(app: &mut App) {
     with_question(app, |q| q.cursor_down());
 }
 
+pub(crate) fn prev_question(app: &mut App) {
+    with_question(app, |q| {
+        q.prev_question();
+    });
+}
+
+pub(crate) fn next_question(app: &mut App) {
+    with_question(app, |q| {
+        q.next_question();
+    });
+}
+
 pub(crate) fn toggle(app: &mut App) {
     with_question(app, |q| q.toggle());
 }
@@ -149,7 +161,7 @@ pub(crate) async fn confirm(app: &mut App) {
     let advanced = app.with_active_conversation_mut(|conv| {
         conv.pending_question
             .as_mut()
-            .map(|q| q.advance_to_next())
+            .map(|q| q.next_question())
             .unwrap_or(false)
     });
     if advanced {

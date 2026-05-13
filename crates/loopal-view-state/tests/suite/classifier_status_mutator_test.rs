@@ -10,6 +10,7 @@ fn one_question() -> Question {
             description: "".into(),
         }],
         allow_multiple: false,
+        header: None,
     }
 }
 

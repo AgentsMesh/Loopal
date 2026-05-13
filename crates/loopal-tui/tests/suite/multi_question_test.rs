@@ -18,6 +18,7 @@ fn make_q(opts: &[&str], multi: bool) -> Question {
         question: "?".into(),
         options: opts.iter().map(|l| opt(l)).collect(),
         allow_multiple: multi,
+        header: None,
     }
 }
 
@@ -107,7 +108,7 @@ fn multi_question_independent_state() {
     q.toggle();
     "first".chars().for_each(|c| q.free_text_insert_char(c));
 
-    q.advance_to_next();
+    q.next_question();
     if let Some(s) = q.states.get_mut(q.current_question) {
         s.cursor = 2;
         s.interacted = true;
@@ -127,7 +128,7 @@ fn multi_question_question_2_of_3_title_format() {
             make_q(&["C"], false),
         ],
     );
-    q.advance_to_next();
+    q.next_question();
     let s = render_to_buffer(60, 6, |f, area| question_inline::render(f, &q, area, None));
     assert!(s.contains("(2/3)"), "title should show 2/3, got:\n{s}");
 }

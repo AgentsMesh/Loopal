@@ -85,6 +85,7 @@ async fn test_relay_question_handler_returns_answers() {
         question: "Continue?".into(),
         options: vec![],
         allow_multiple: false,
+        header: None,
     }];
     let response = handler.ask(questions).await.response;
     match response {
@@ -143,6 +144,7 @@ async fn test_relay_question_handler_discards_stale_id() {
         question: "Q?".into(),
         options: vec![],
         allow_multiple: false,
+        header: None,
     }];
     let response = handler.ask(questions).await.response;
     match response {

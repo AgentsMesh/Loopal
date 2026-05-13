@@ -94,6 +94,8 @@ mod question_edge_test;
 mod question_input_test;
 #[path = "suite/question_paste_test.rs"]
 mod question_paste_test;
+#[path = "suite/question_title_test.rs"]
+mod question_title_test;
 #[path = "suite/render_guard_test.rs"]
 mod render_guard_test;
 #[path = "suite/scroll_compensation_test.rs"]

@@ -70,6 +70,8 @@ fn question_action(key: &KeyEvent, st: &ModalState, is_ctrl_c: bool) -> InputAct
         KeyCode::Home if st.on_other => InputAction::QuestionFreeTextHome,
         KeyCode::End if st.on_other => InputAction::QuestionFreeTextEnd,
         KeyCode::Char(c) if st.on_other && !ctrl => InputAction::QuestionFreeTextChar(c),
+        KeyCode::Left => InputAction::QuestionPrev,
+        KeyCode::Right => InputAction::QuestionNext,
         _ => InputAction::None,
     }
 }

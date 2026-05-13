@@ -4,6 +4,7 @@ use ratatui::widgets::Paragraph;
 use loopal_view_state::PendingQuestion;
 
 use super::question_layout::compose;
+use super::question_title::title_lines;
 use super::text_width::display_width;
 
 pub(super) const OTHER_LABEL: &str = "Other（自定义输入）";
@@ -14,12 +15,8 @@ pub(super) fn render_main(f: &mut Frame, q: &PendingQuestion, area: Rect, status
         return;
     };
 
-    let title_lines = wrapped_lines(&title_line(q, cur), area.width);
-    let title_height = title_lines.len();
-    let title_styled: Vec<Line> = title_lines
-        .into_iter()
-        .map(|s| Line::from(Span::styled(s, Style::default().fg(Color::Cyan).bold())))
-        .collect();
+    let title_styled = title_lines(q, area.width);
+    let title_height = title_styled.len();
 
     let other_cursor = q.cursor_on_other();
     let other_selected = if cur.allow_multiple {
@@ -55,7 +52,8 @@ pub(super) fn render_main(f: &mut Frame, q: &PendingQuestion, area: Rect, status
         None
     };
 
-    let hint_widget = hint_line(cur.allow_multiple, status);
+    let multi_question = q.questions.len() > 1;
+    let hint_widget = hint_line(cur.allow_multiple, multi_question, status);
 
     let (lines, free_text_row) = compose(
         area.height as usize,
@@ -77,19 +75,6 @@ pub(super) fn render_main(f: &mut Frame, q: &PendingQuestion, area: Rect, status
         let cursor_col = area.x + prefix_w + typed_w;
         let cursor_row = area.y + row as u16;
         f.set_cursor_position((cursor_col, cursor_row));
-    }
-}
-
-pub(super) fn title_line(q: &PendingQuestion, cur: &loopal_protocol::Question) -> String {
-    if q.questions.len() > 1 {
-        format!(
-            "? {} ({}/{})",
-            cur.question,
-            q.current_question + 1,
-            q.questions.len()
-        )
-    } else {
-        format!("? {}", cur.question)
     }
 }
 
@@ -132,13 +117,20 @@ fn option_line(label: &str, is_cursor: bool, is_selected: bool, multi: bool) -> 
     Line::from(Span::styled(format!("{prefix}{mark}{label}"), style))
 }
 
-fn hint_line(multi: bool, status: Option<&str>) -> Line<'static> {
+fn hint_line(multi_select: bool, multi_question: bool, status: Option<&str>) -> Line<'static> {
     let hint_text = if let Some(s) = status {
         format!("⚠ {s}")
-    } else if multi {
-        "↑↓ Nav · Space Toggle · ⏎ Submit · Esc Cancel".to_string()
     } else {
-        "↑↓ Nav · ⏎ Submit · Esc Cancel".to_string()
+        let mut parts: Vec<&str> = vec!["↑↓ Nav"];
+        if multi_select {
+            parts.push("Space Toggle");
+        }
+        parts.push("⏎ Submit");
+        if multi_question {
+            parts.push("←→ Switch");
+        }
+        parts.push("Esc Cancel");
+        parts.join(" · ")
     };
     let hint_style = if status.is_some() {
         Style::default().fg(Color::Yellow).bold()

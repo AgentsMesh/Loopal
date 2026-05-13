@@ -24,6 +24,8 @@ pub struct Question {
     pub question: String,
     pub options: Vec<QuestionOption>,
     pub allow_multiple: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub header: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

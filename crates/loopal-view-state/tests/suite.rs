@@ -9,6 +9,8 @@ mod decided_mutators_test;
 mod e2e_resolve_source_propagation_test;
 #[path = "suite/free_text_test.rs"]
 mod free_text_test;
+#[path = "suite/pending_question_nav_test.rs"]
+mod pending_question_nav_test;
 #[path = "suite/pending_question_test.rs"]
 mod pending_question_test;
 #[path = "suite/reducer_aggregate_test.rs"]

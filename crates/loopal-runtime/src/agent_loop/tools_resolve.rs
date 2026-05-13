@@ -3,7 +3,7 @@ use loopal_tool_api::PermissionDecision;
 use tracing::info;
 
 use super::runner::AgentLoopRunner;
-use super::tools_check::error_block;
+use super::tools_inject::error_block;
 
 impl AgentLoopRunner {
     pub(super) async fn resolve_pending(

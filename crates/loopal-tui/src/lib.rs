@@ -46,6 +46,8 @@ pub mod key_dispatch_for_test {
             InputAction::QuestionCancel => crate::question_ops::cancel(app).await,
             InputAction::QuestionUp => crate::question_ops::cursor_up(app),
             InputAction::QuestionDown => crate::question_ops::cursor_down(app),
+            InputAction::QuestionPrev => crate::question_ops::prev_question(app),
+            InputAction::QuestionNext => crate::question_ops::next_question(app),
             InputAction::QuestionToggle => crate::question_ops::toggle(app),
             InputAction::QuestionFreeTextChar(c) => crate::question_ops::free_text_char(app, c),
             InputAction::QuestionFreeTextBackspace => crate::question_ops::free_text_backspace(app),

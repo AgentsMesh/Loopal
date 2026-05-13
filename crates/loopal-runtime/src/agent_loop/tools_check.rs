@@ -8,6 +8,7 @@ use tracing::{Instrument, info};
 use super::cancel::TurnCancel;
 use super::runner::AgentLoopRunner;
 use super::sandbox_precheck;
+use super::tools_inject::error_block;
 
 /// Result of the precheck + permission phase.
 pub(super) struct CheckResult {
@@ -187,14 +188,5 @@ impl AgentLoopRunner {
             .and_then(|v| v.as_str())
             .unwrap_or("");
         self.plan_file.matches_path(target)
-    }
-}
-
-pub(super) fn error_block(id: &str, content: &str) -> ContentBlock {
-    ContentBlock::ToolResult {
-        tool_use_id: id.to_string(),
-        content: content.to_string(),
-        is_error: true,
-        metadata: None,
     }
 }

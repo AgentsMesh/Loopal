@@ -7,8 +7,7 @@ use tracing::{debug, info, warn};
 
 use super::PlanModeState;
 use super::runner::AgentLoopRunner;
-use super::tools_check::error_block;
-use super::tools_inject::success_block;
+use super::tools_inject::{error_block, success_block};
 use crate::frontend::traits::PlanApproval;
 use crate::mode::AgentMode;
 use crate::plan_file::build_plan_mode_filter;

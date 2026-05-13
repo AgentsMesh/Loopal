@@ -4,7 +4,8 @@ use ratatui::widgets::Paragraph;
 use loopal_view_state::PendingQuestion;
 use loopal_view_state::conversation::ClassifierStatus;
 
-use super::question_inline_body::{render_main, title_line, wrapped_lines};
+use super::question_inline_body::render_main;
+use super::question_title::title_lines;
 
 const MAX_HEIGHT: u16 = 12;
 const MIN_HEIGHT: u16 = 3;
@@ -13,8 +14,7 @@ pub fn height(q: &PendingQuestion, width: u16) -> u16 {
     let Some(cur) = q.questions.get(q.current_question) else {
         return MIN_HEIGHT;
     };
-    let title = title_line(q, cur);
-    let question_lines = wrapped_lines(&title, width).len() as u16;
+    let question_lines = title_lines(q, width).len() as u16;
     let options_lines = cur.options.len() as u16;
     let other_line: u16 = 1;
     let free_text_line: u16 = if q.cursor_on_other() { 1 } else { 0 };

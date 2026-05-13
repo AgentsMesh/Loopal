@@ -5,11 +5,9 @@ use loopal_protocol::AgentEventPayload;
 use tracing::{error, info};
 
 use super::cancel::TurnCancel;
-use super::question_parse::{format_response, parse_questions};
 use super::runner::AgentLoopRunner;
 use super::streaming_tool_exec::StreamingToolHandle;
 use super::tool_exec::execute_approved_tools;
-use super::tools_inject::success_block;
 use super::turn_metrics::ToolExecStats;
 use crate::mode::AgentMode;
 use crate::plan_file::wrap_plan_reminder;
@@ -254,20 +252,7 @@ impl AgentLoopRunner {
                     intercepted.push(self.handle_exit_plan(idx, id).await?);
                 }
                 "AskUser" => {
-                    let questions = parse_questions(input);
-                    self.refresh_decision_context().await;
-                    let response = self.params.deps.frontend.ask_user(questions.clone()).await;
-                    let (result, is_error) = format_response(&response, &questions);
-                    self.emit(loopal_protocol::AgentEventPayload::ToolResult {
-                        id: id.clone(),
-                        name: name.clone(),
-                        result: result.clone(),
-                        is_error,
-                        duration_ms: None,
-                        metadata: None,
-                    })
-                    .await?;
-                    intercepted.push((idx, success_block(id, &result)));
+                    intercepted.push(self.handle_ask_user(idx, id, name, input).await?);
                 }
                 _ => remaining.push((id.clone(), name.clone(), input.clone())),
             }

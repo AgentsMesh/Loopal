@@ -15,6 +15,7 @@ pub mod progress;
 pub mod question_inline;
 mod question_inline_body;
 mod question_layout;
+mod question_title;
 pub mod retry_banner;
 pub mod rewind_picker;
 pub mod separator;

@@ -47,6 +47,10 @@ mod outraced_telemetry_test;
 mod permission_test;
 #[path = "suite/plan_file_test.rs"]
 mod plan_file_test;
+#[path = "suite/question_parse_edge_test.rs"]
+mod question_parse_edge_test;
+#[path = "suite/question_parse_test.rs"]
+mod question_parse_test;
 #[path = "suite/rewind_test.rs"]
 mod rewind_test;
 #[path = "suite/sandbox_precheck_test.rs"]

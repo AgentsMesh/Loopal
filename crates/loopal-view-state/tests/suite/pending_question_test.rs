@@ -13,6 +13,7 @@ fn q_with_opts(n: usize, multi: bool) -> Question {
         question: "?".into(),
         options: (0..n).map(|i| opt(&format!("opt{i}"))).collect(),
         allow_multiple: multi,
+        header: None,
     }
 }
 
@@ -130,31 +131,6 @@ fn other_index_uses_current_question() {
 }
 
 #[test]
-fn advance_to_next_returns_false_at_last_question() {
-    let mut q = PendingQuestion::new("id".into(), vec![q_with_opts(1, false)]);
-    assert!(!q.advance_to_next());
-    assert_eq!(q.current_question, 0);
-}
-
-#[test]
-fn advance_to_next_progresses_through_questions() {
-    let mut q = PendingQuestion::new(
-        "id".into(),
-        vec![
-            q_with_opts(1, false),
-            q_with_opts(2, true),
-            q_with_opts(0, false),
-        ],
-    );
-    assert!(q.advance_to_next());
-    assert_eq!(q.current_question, 1);
-    assert!(q.advance_to_next());
-    assert_eq!(q.current_question, 2);
-    assert!(!q.advance_to_next());
-    assert_eq!(q.current_question, 2);
-}
-
-#[test]
 fn per_question_state_is_independent() {
     let mut q = PendingQuestion::new(
         "id".into(),
@@ -164,7 +140,7 @@ fn per_question_state_is_independent() {
     q.toggle();
     "first".chars().for_each(|c| q.free_text_insert_char(c));
 
-    q.advance_to_next();
+    q.next_question();
     assert_eq!(q.cursor(), 0);
     assert_eq!(q.free_text(), "");
     assert_eq!(q.selection(), &[false, false, false]);

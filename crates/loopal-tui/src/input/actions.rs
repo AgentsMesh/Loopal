@@ -60,6 +60,10 @@ pub enum InputAction {
     QuestionUp,
     /// Navigate down in question options
     QuestionDown,
+    /// Switch to previous question in multi-question dialog
+    QuestionPrev,
+    /// Switch to next question in multi-question dialog
+    QuestionNext,
     /// Confirm current selection (submit answer)
     QuestionConfirm,
     /// Toggle option selection (multi-select)

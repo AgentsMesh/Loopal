@@ -1,5 +1,3 @@
-//! Parallel regex content search with context lines and binary detection.
-
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -8,15 +6,16 @@ use globset::Glob;
 use ignore::WalkState;
 use loopal_error::ToolIoError;
 use loopal_tool_api::backend_types::{FileMatchResult, GrepOptions, GrepSearchResult};
-use loopal_tool_api::save_to_overflow_file;
 use parking_lot::Mutex;
 use regex::RegexBuilder;
 
 use crate::limits::ResourceLimits;
-use crate::search::{binary, grep_match, overflow_fmt, walker};
+use crate::search::grep_file::{
+    empty_result, maybe_save_overflow, search_one_file, search_single_file,
+};
+use crate::search::walker;
 
-/// Build a compiled regex from `GrepOptions`.
-fn build_regex(opts: &GrepOptions) -> Result<regex::Regex, ToolIoError> {
+pub(crate) fn build_regex(opts: &GrepOptions) -> Result<regex::Regex, ToolIoError> {
     let pat = if opts.fixed_strings {
         regex::escape(&opts.pattern)
     } else {
@@ -31,7 +30,6 @@ fn build_regex(opts: &GrepOptions) -> Result<regex::Regex, ToolIoError> {
         .map_err(|e| ToolIoError::Other(format!("invalid regex: {e}")))
 }
 
-/// Execute a parallel grep search across files.
 pub fn grep_search(
     opts: &GrepOptions,
     cwd: &Path,
@@ -114,91 +112,4 @@ fn matches_glob(path: &Path, root: &Path, gm: Option<&globset::GlobMatcher>) -> 
     let Some(gm) = gm else { return true };
     let rel = path.strip_prefix(root).unwrap_or(path);
     gm.is_match(rel) || gm.is_match(path.file_name().unwrap_or_default())
-}
-
-#[allow(clippy::too_many_arguments)]
-fn search_one_file(
-    path: &Path,
-    re: &regex::Regex,
-    multiline: bool,
-    ctx_before: usize,
-    ctx_after: usize,
-    max: usize,
-    total: &AtomicUsize,
-    done: &AtomicBool,
-) -> Option<FileMatchResult> {
-    if binary::is_likely_binary(path) {
-        return None;
-    }
-    let content = std::fs::read_to_string(path).ok()?;
-    let lines: Vec<&str> = content.lines().collect();
-    let indices = grep_match::find_match_indices(&content, &lines, re, multiline);
-    if indices.is_empty() {
-        return None;
-    }
-    let prev = total.fetch_add(indices.len(), Ordering::Relaxed);
-    if prev + indices.len() >= max {
-        done.store(true, Ordering::Relaxed);
-    }
-    let groups = grep_match::collect_context_groups(&lines, &indices, ctx_before, ctx_after);
-    Some(FileMatchResult {
-        path: path.to_string_lossy().into_owned(),
-        groups,
-    })
-}
-
-fn empty_result() -> GrepSearchResult {
-    GrepSearchResult {
-        file_matches: Vec::new(),
-        total_match_count: 0,
-        overflow_path: None,
-    }
-}
-
-fn maybe_save_overflow(truncated: bool, matches: &[FileMatchResult]) -> Option<String> {
-    if truncated {
-        Some(save_to_overflow_file(
-            &overflow_fmt::serialize_grep_results(matches),
-            "grep_results",
-        ))
-    } else {
-        None
-    }
-}
-
-fn search_single_file(
-    opts: &GrepOptions,
-    path: &Path,
-    limits: &ResourceLimits,
-) -> Result<GrepSearchResult, ToolIoError> {
-    if binary::is_likely_binary(path) {
-        return Ok(empty_result());
-    }
-    let re = build_regex(opts)?;
-    let Ok(content) = std::fs::read_to_string(path) else {
-        return Ok(empty_result());
-    };
-    let lines: Vec<&str> = content.lines().collect();
-    let indices = grep_match::find_match_indices(&content, &lines, &re, opts.multiline);
-    if indices.is_empty() {
-        return Ok(empty_result());
-    }
-    let truncated = indices.len() > limits.max_grep_matches;
-    let count = indices.len().min(limits.max_grep_matches);
-    let groups = grep_match::collect_context_groups(
-        &lines,
-        &indices,
-        opts.context_before,
-        opts.context_after,
-    );
-    let file_matches = vec![FileMatchResult {
-        path: path.to_string_lossy().into_owned(),
-        groups,
-    }];
-    let overflow_path = maybe_save_overflow(truncated, &file_matches);
-    Ok(GrepSearchResult {
-        total_match_count: count,
-        file_matches,
-        overflow_path,
-    })
 }

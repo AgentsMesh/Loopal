@@ -32,7 +32,7 @@ impl AgentLoopRunner {
         self.refresh_decision_context().await;
         let response = self.params.deps.frontend.ask_user(questions.clone()).await;
         let (content, is_error) = format_response(&response, &questions);
-        self.emit(AgentEventPayload::ToolResult {
+        self.emit_in_turn(AgentEventPayload::ToolResult {
             id: id.to_string(),
             name: name.to_string(),
             result: content.clone(),
@@ -59,7 +59,7 @@ impl AgentLoopRunner {
         name: &str,
         err_msg: String,
     ) -> loopal_error::Result<(usize, ContentBlock)> {
-        self.emit(AgentEventPayload::ToolResult {
+        self.emit_in_turn(AgentEventPayload::ToolResult {
             id: id.to_string(),
             name: name.to_string(),
             result: err_msg.clone(),

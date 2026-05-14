@@ -41,7 +41,7 @@ impl AgentLoopRunner {
         tool_uses: &[(String, String, serde_json::Value)],
         cancel: &TurnCancel,
     ) -> Result<Vec<(usize, ContentBlock)>> {
-        self.emit(AgentEventPayload::ToolBatchStart { tool_ids })
+        self.emit_in_turn(AgentEventPayload::ToolBatchStart { tool_ids })
             .await?;
         self.execute_batch(approved, tool_uses, cancel).await
     }

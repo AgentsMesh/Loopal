@@ -32,8 +32,21 @@ impl HubBroadcaster {
         AgentEvent::for_agent(self.agent_name.clone(), payload)
     }
 
+    fn build_event_in_turn(&self, payload: AgentEventPayload) -> AgentEvent {
+        AgentEvent::for_agent_in_turn(self.agent_name.clone(), payload)
+    }
+
     pub async fn broadcast(&self, payload: AgentEventPayload) -> Result<()> {
         let event = self.build_event(payload);
+        self.dispatch(event).await
+    }
+
+    pub async fn broadcast_in_turn(&self, payload: AgentEventPayload) -> Result<()> {
+        let event = self.build_event_in_turn(payload);
+        self.dispatch(event).await
+    }
+
+    async fn dispatch(&self, event: AgentEvent) -> Result<()> {
         let params = serde_json::to_value(&event)
             .map_err(|e| LoopalError::Ipc(format!("serialize event: {e}")))?;
         let session = self.session.read().await.clone();

@@ -58,6 +58,16 @@ impl AgentFrontend for UnifiedFrontend {
         })
     }
 
+    async fn emit_in_turn(&self, payload: AgentEventPayload) -> Result<()> {
+        // Build envelope via for_agent_in_turn so missing scope_turn panics
+        // at envelope construction (not at a later silent turn_id=0).
+        let event = AgentEvent::for_agent_in_turn(self.agent_name.clone(), payload);
+        self.event_tx.send(event).await.map_err(|e| {
+            warn!(error = %e, "event channel closed");
+            loopal_error::LoopalError::Other("event channel closed".into())
+        })
+    }
+
     async fn recv_input(&self) -> Option<AgentInput> {
         let mut mbox = self.mailbox_rx.lock().await;
         let mut ctrl = self.control_rx.lock().await;

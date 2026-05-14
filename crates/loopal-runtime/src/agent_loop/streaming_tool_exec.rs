@@ -123,66 +123,68 @@ pub fn feed_tool(
     let input = tool_use.input.clone();
     let idx = tool_use.index;
 
-    handle.join_set.spawn(async move {
-        let tool_start = Instant::now();
-        let result = execute_tool(&kernel, &name, input, &tool_ctx, &mode).await;
-        let tool_duration = tool_start.elapsed();
+    handle
+        .join_set
+        .spawn(loopal_protocol::event_id::propagate_to_spawn(async move {
+            let tool_start = Instant::now();
+            let result = execute_tool(&kernel, &name, input, &tool_ctx, &mode).await;
+            let tool_duration = tool_start.elapsed();
 
-        let (block, event) = match result {
-            Ok(r) => {
-                info!(
-                    tool = name.as_str(),
-                    duration_ms = tool_duration.as_millis() as u64,
-                    ok = !r.is_error,
-                    "tool exec (early)"
-                );
-                let event = AgentEventPayload::ToolResult {
-                    id: id.clone(),
-                    name: name.clone(),
-                    result: r.content.clone(),
-                    is_error: r.is_error,
-                    duration_ms: Some(tool_duration.as_millis() as u64),
-                    metadata: r.metadata.clone(),
-                };
-                let block = ContentBlock::ToolResult {
-                    tool_use_id: id,
-                    content: r.content,
-                    is_error: r.is_error,
-                    metadata: r.metadata,
-                };
-                (block, event)
-            }
-            Err(e) => {
-                let err_msg = e.to_string();
-                info!(
-                    tool = name.as_str(),
-                    duration_ms = tool_duration.as_millis() as u64,
-                    ok = false, error = %err_msg,
-                    "tool exec (early)"
-                );
-                let event = AgentEventPayload::ToolResult {
-                    id: id.clone(),
-                    name: name.clone(),
-                    result: err_msg.clone(),
-                    is_error: true,
-                    duration_ms: Some(tool_duration.as_millis() as u64),
-                    metadata: None,
-                };
-                let block = ContentBlock::ToolResult {
-                    tool_use_id: id,
-                    content: err_msg,
-                    is_error: true,
-                    metadata: None,
-                };
-                (block, event)
-            }
-        };
+            let (block, event) = match result {
+                Ok(r) => {
+                    info!(
+                        tool = name.as_str(),
+                        duration_ms = tool_duration.as_millis() as u64,
+                        ok = !r.is_error,
+                        "tool exec (early)"
+                    );
+                    let event = AgentEventPayload::ToolResult {
+                        id: id.clone(),
+                        name: name.clone(),
+                        result: r.content.clone(),
+                        is_error: r.is_error,
+                        duration_ms: Some(tool_duration.as_millis() as u64),
+                        metadata: r.metadata.clone(),
+                    };
+                    let block = ContentBlock::ToolResult {
+                        tool_use_id: id,
+                        content: r.content,
+                        is_error: r.is_error,
+                        metadata: r.metadata,
+                    };
+                    (block, event)
+                }
+                Err(e) => {
+                    let err_msg = e.to_string();
+                    info!(
+                        tool = name.as_str(),
+                        duration_ms = tool_duration.as_millis() as u64,
+                        ok = false, error = %err_msg,
+                        "tool exec (early)"
+                    );
+                    let event = AgentEventPayload::ToolResult {
+                        id: id.clone(),
+                        name: name.clone(),
+                        result: err_msg.clone(),
+                        is_error: true,
+                        duration_ms: Some(tool_duration.as_millis() as u64),
+                        metadata: None,
+                    };
+                    let block = ContentBlock::ToolResult {
+                        tool_use_id: id,
+                        content: err_msg,
+                        is_error: true,
+                        metadata: None,
+                    };
+                    (block, event)
+                }
+            };
 
-        emitter
-            .emit_best_effort(event, "agent_loop::streaming_tool_exec::tool_result")
-            .await;
-        (idx, block)
-    });
+            emitter
+                .emit_best_effort(event, "agent_loop::streaming_tool_exec::tool_result")
+                .await;
+            (idx, block)
+        }));
 
     handle.early_ids.insert(tool_use.id.clone());
     true

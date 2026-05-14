@@ -1,5 +1,6 @@
 use loopal_protocol::event_id::{
-    TurnContext, current_correlation_id, next_event_id, scope_correlation, scope_turn,
+    TurnContext, current_correlation_id, next_event_id, propagate_to_spawn, scope_correlation,
+    scope_turn,
 };
 
 #[tokio::test]
@@ -58,4 +59,30 @@ async fn require_current_inside_scope_succeeds() {
         assert_eq!(ctx.turn_id, 7);
     })
     .await;
+}
+
+#[tokio::test]
+async fn propagate_to_spawn_carries_context_across_tokio_spawn() {
+    let observed = scope_turn(123, async {
+        scope_correlation(456, async {
+            tokio::spawn(propagate_to_spawn(async move {
+                // Inside spawned task — without propagate, this would be None.
+                TurnContext::try_current().map(|c| (c.turn_id, c.correlation_id))
+            }))
+            .await
+            .unwrap()
+        })
+        .await
+    })
+    .await;
+    assert_eq!(observed, Some((123, 456)));
+}
+
+#[tokio::test]
+async fn propagate_to_spawn_outside_scope_yields_no_scope() {
+    // No parent scope_turn; spawned task should also have no scope.
+    let observed = tokio::spawn(propagate_to_spawn(async { TurnContext::try_current() }))
+        .await
+        .unwrap();
+    assert!(observed.is_none());
 }

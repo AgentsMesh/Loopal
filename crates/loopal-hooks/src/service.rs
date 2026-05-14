@@ -10,7 +10,8 @@ use tracing::warn;
 
 use crate::executor::ExecutorFactory;
 use crate::input::{HookContext, build_hook_input};
-use crate::output::{HookOutput, interpret_output, interpret_pre_tool_output};
+use crate::output::{HookOutput, interpret_output};
+use crate::output_pre_tool::interpret_pre_tool_output;
 use crate::registry::HookRegistry;
 
 /// Central hook orchestration service.

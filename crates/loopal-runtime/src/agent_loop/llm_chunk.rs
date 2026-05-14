@@ -1,0 +1,108 @@
+use loopal_error::Result;
+use loopal_message::ContentBlock;
+use loopal_protocol::AgentEventPayload;
+use loopal_provider_api::StreamChunk;
+use tracing::error;
+
+use super::llm_result::LlmStreamResult;
+use super::runner::AgentLoopRunner;
+
+impl AgentLoopRunner {
+    /// Process a single stream chunk. Returns false to break the loop.
+    pub(super) async fn handle_stream_chunk(
+        &mut self,
+        chunk: std::result::Result<StreamChunk, loopal_error::LoopalError>,
+        result: &mut LlmStreamResult,
+        received_done: &mut bool,
+    ) -> Result<bool> {
+        match chunk {
+            Ok(StreamChunk::Text { text }) => {
+                result.assistant_text.push_str(&text);
+                self.emit_in_turn(AgentEventPayload::Stream { text })
+                    .await?;
+            }
+            Ok(StreamChunk::Thinking { text }) => {
+                result.thinking_text.push_str(&text);
+                self.emit_in_turn(AgentEventPayload::ThinkingStream { text })
+                    .await?;
+            }
+            Ok(StreamChunk::ThinkingSignature { signature }) => {
+                result.thinking_signature = Some(signature);
+            }
+            Ok(StreamChunk::ToolUse { id, name, input }) => {
+                self.emit_in_turn(AgentEventPayload::ToolCall {
+                    id: id.clone(),
+                    name: name.clone(),
+                    input: input.clone(),
+                })
+                .await?;
+                result.tool_uses.push((id, name, input));
+            }
+            Ok(StreamChunk::ServerToolUse { id, name, input }) => {
+                self.emit_in_turn(AgentEventPayload::ServerToolUse {
+                    id: id.clone(),
+                    name: name.clone(),
+                    input: input.clone(),
+                })
+                .await?;
+                result
+                    .server_blocks
+                    .push(ContentBlock::ServerToolUse { id, name, input });
+            }
+            Ok(StreamChunk::ServerToolResult {
+                block_type,
+                tool_use_id,
+                content,
+            }) => {
+                self.emit_in_turn(AgentEventPayload::ServerToolResult {
+                    tool_use_id: tool_use_id.clone(),
+                    content: content.clone(),
+                })
+                .await?;
+                result.server_blocks.push(ContentBlock::ServerToolResult {
+                    block_type,
+                    tool_use_id,
+                    content,
+                });
+            }
+            Ok(StreamChunk::Usage {
+                input_tokens,
+                output_tokens,
+                cache_creation_input_tokens,
+                cache_read_input_tokens,
+                thinking_tokens,
+            }) => {
+                self.tokens.input += input_tokens;
+                self.tokens.output += output_tokens;
+                self.tokens.cache_creation += cache_creation_input_tokens;
+                self.tokens.cache_read += cache_read_input_tokens;
+                self.tokens.thinking += thinking_tokens;
+                result.thinking_tokens += thinking_tokens;
+                self.emit_in_turn(AgentEventPayload::TokenUsage {
+                    input_tokens,
+                    output_tokens,
+                    context_window: self.params.store.budget().context_window,
+                    cache_creation_input_tokens,
+                    cache_read_input_tokens,
+                    thinking_tokens,
+                })
+                .await?;
+            }
+            Ok(StreamChunk::Done { stop_reason }) => {
+                *received_done = true;
+                result.stop_reason = stop_reason;
+                return Ok(false);
+            }
+            Err(e) => {
+                error!(error = %e, turn = self.turn_count, model = %self.params.config.model(), "stream error");
+                self.emit_in_turn(AgentEventPayload::Error {
+                    message: e.to_string(),
+                })
+                .await?;
+                result.stream_error = true;
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+}

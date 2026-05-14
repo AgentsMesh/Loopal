@@ -3,7 +3,7 @@ use loopal_tool_api::PermissionDecision;
 use tracing::info;
 
 use super::runner::AgentLoopRunner;
-use super::tools_check_emit::error_block;
+use super::tools_inject::tool_result_block;
 
 impl AgentLoopRunner {
     pub(super) async fn resolve_pending(
@@ -30,7 +30,7 @@ impl AgentLoopRunner {
             } else {
                 info!(tool = name.as_str(), decision = "deny", "permission");
                 let msg = format!("Permission denied: tool '{name}' not allowed");
-                denied.push((orig_idx, error_block(&id, &msg)));
+                denied.push((orig_idx, tool_result_block(&id, &msg, true, None)));
                 self.emit_tool_error(&id, &name, "Permission denied")
                     .await?;
             }

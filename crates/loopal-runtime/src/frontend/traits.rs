@@ -28,12 +28,12 @@ pub trait AgentFrontend: Send + Sync {
     async fn emit(&self, payload: AgentEventPayload) -> Result<()>;
 
     /// Capability-checked emit: panics if called outside `scope_turn`.
-    /// Default impl falls back to `emit` for trait objects that don't
-    /// override — implementations should override when they construct
-    /// the `AgentEvent` envelope themselves.
+    /// Implementations should override to construct the envelope via
+    /// `AgentEvent::for_agent_in_turn` (panic-checked at build time).
+    /// The default impl pre-checks via `require_current()` then delegates
+    /// to `emit` — functionally identical inside a scope, but loses the
+    /// architectural intent of "in-turn envelope construction".
     async fn emit_in_turn(&self, payload: AgentEventPayload) -> Result<()> {
-        // Force the panic check even in the default impl by reading
-        // require_current explicitly before delegating to emit().
         let _ctx = loopal_protocol::event_id::TurnContext::require_current();
         self.emit(payload).await
     }

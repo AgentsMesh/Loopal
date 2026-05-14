@@ -5,6 +5,8 @@ pub mod hook_condition;
 pub mod housekeeping;
 pub mod layer;
 pub mod loader;
+mod loader_env;
+mod loader_text;
 pub mod locations;
 pub mod mcp_json;
 pub mod pipeline;

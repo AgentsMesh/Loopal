@@ -34,6 +34,7 @@ mod session_handlers_factory;
 pub mod session_hub;
 mod session_hub_storage;
 mod session_resources;
+mod session_spawn;
 mod session_start;
 mod shared_session;
 mod spawn_policy;

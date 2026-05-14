@@ -4,7 +4,7 @@ use tracing::info;
 
 use super::runner::AgentLoopRunner;
 use super::sandbox_precheck;
-use super::tools_check_emit::error_block;
+use super::tools_inject::tool_result_block;
 
 pub(super) enum CheckOne {
     Denied(ContentBlock),
@@ -24,13 +24,13 @@ impl AgentLoopRunner {
                 info!(tool = name, "plan mode: tool not allowed");
                 let msg = "Plan mode: this tool is not available. Use read-only tools only.";
                 self.emit_tool_error(id, name, msg).await?;
-                return Ok(CheckOne::Denied(error_block(id, msg)));
+                return Ok(CheckOne::Denied(tool_result_block(id, msg, true, None)));
             }
             if (name == "Write" || name == "Edit") && !self.is_plan_file_target(input) {
                 let plan_path = self.plan_file.path().display();
                 let msg = format!("Plan mode: only the plan file ({plan_path}) can be edited.");
                 self.emit_tool_error(id, name, &msg).await?;
-                return Ok(CheckOne::Denied(error_block(id, &msg)));
+                return Ok(CheckOne::Denied(tool_result_block(id, &msg, true, None)));
             }
         }
 
@@ -44,7 +44,7 @@ impl AgentLoopRunner {
             info!(tool = name, reason = %reason, "sandbox rejected");
             let msg = format!("Sandbox: {reason}");
             self.emit_tool_error(id, name, &msg).await?;
-            return Ok(CheckOne::Denied(error_block(id, &msg)));
+            return Ok(CheckOne::Denied(tool_result_block(id, &msg, true, None)));
         }
 
         let extracted = sandbox_precheck::extract_paths(name, input);

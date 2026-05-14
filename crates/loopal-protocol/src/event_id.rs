@@ -78,3 +78,24 @@ pub async fn scope_correlation<F: Future>(correlation_id: u64, f: F) -> F::Outpu
     ctx.correlation_id = correlation_id;
     TURN_CTX.scope(ctx, f).await
 }
+
+/// Capture the current `TurnContext` and return a future that re-installs
+/// it before running `f`. Use before `tokio::spawn` so spawned tasks
+/// inherit the parent's turn/correlation IDs — otherwise `task_local!` is
+/// reset to default at task boundary and emit sites would carry
+/// `turn_id=0` silently.
+///
+/// Outside any scope, the captured context is the default (`turn_id=0`),
+/// matching what `current_or_default` would produce — no scope is entered.
+pub fn propagate_to_spawn<F>(f: F) -> impl Future<Output = F::Output>
+where
+    F: Future,
+{
+    let captured = TurnContext::try_current();
+    async move {
+        match captured {
+            Some(ctx) => TURN_CTX.scope(ctx, f).await,
+            None => f.await,
+        }
+    }
+}

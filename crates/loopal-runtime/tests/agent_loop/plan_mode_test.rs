@@ -3,7 +3,7 @@ use loopal_runtime::AgentMode;
 use loopal_runtime::agent_loop::LifecycleMode;
 use loopal_tool_api::PermissionMode;
 
-use super::{make_cancel, make_runner};
+use super::{in_turn, make_cancel, make_runner};
 
 #[tokio::test]
 async fn enter_plan_mode_denied_by_default_frontend() {
@@ -15,14 +15,13 @@ async fn enter_plan_mode_denied_by_default_frontend() {
         "EnterPlanMode".to_string(),
         serde_json::json!({}),
     )];
-    runner
-        .execute_tools(
-            tool_uses,
-            &make_cancel(),
-            loopal_runtime::agent_loop::StreamingToolHandle::empty(),
-        )
-        .await
-        .unwrap();
+    in_turn(runner.execute_tools(
+        tool_uses,
+        &make_cancel(),
+        loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+    ))
+    .await
+    .unwrap();
 
     // DenyAllHandler returns Deny for request_permission → mode stays Act.
     assert_eq!(runner.params.config.mode, AgentMode::Act);
@@ -38,14 +37,13 @@ async fn enter_plan_when_already_in_plan_returns_error() {
         "EnterPlanMode".to_string(),
         serde_json::json!({}),
     )];
-    runner
-        .execute_tools(
-            tool_uses,
-            &make_cancel(),
-            loopal_runtime::agent_loop::StreamingToolHandle::empty(),
-        )
-        .await
-        .unwrap();
+    in_turn(runner.execute_tools(
+        tool_uses,
+        &make_cancel(),
+        loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+    ))
+    .await
+    .unwrap();
 
     let msg = &runner.params.store.messages()[0];
     match &msg.content[0] {
@@ -69,14 +67,13 @@ async fn enter_plan_blocked_for_task_lifecycle() {
         "EnterPlanMode".to_string(),
         serde_json::json!({}),
     )];
-    runner
-        .execute_tools(
-            tool_uses,
-            &make_cancel(),
-            loopal_runtime::agent_loop::StreamingToolHandle::empty(),
-        )
-        .await
-        .unwrap();
+    in_turn(runner.execute_tools(
+        tool_uses,
+        &make_cancel(),
+        loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+    ))
+    .await
+    .unwrap();
 
     let msg = &runner.params.store.messages()[0];
     match &msg.content[0] {
@@ -100,14 +97,13 @@ async fn exit_plan_when_not_in_plan_returns_error() {
         "ExitPlanMode".to_string(),
         serde_json::json!({}),
     )];
-    runner
-        .execute_tools(
-            tool_uses,
-            &make_cancel(),
-            loopal_runtime::agent_loop::StreamingToolHandle::empty(),
-        )
-        .await
-        .unwrap();
+    in_turn(runner.execute_tools(
+        tool_uses,
+        &make_cancel(),
+        loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+    ))
+    .await
+    .unwrap();
 
     let msg = &runner.params.store.messages()[0];
     match &msg.content[0] {
@@ -131,14 +127,13 @@ async fn exit_plan_without_plan_file_returns_error() {
         "ExitPlanMode".to_string(),
         serde_json::json!({}),
     )];
-    runner
-        .execute_tools(
-            tool_uses,
-            &make_cancel(),
-            loopal_runtime::agent_loop::StreamingToolHandle::empty(),
-        )
-        .await
-        .unwrap();
+    in_turn(runner.execute_tools(
+        tool_uses,
+        &make_cancel(),
+        loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+    ))
+    .await
+    .unwrap();
 
     let msg = &runner.params.store.messages()[0];
     match &msg.content[0] {
@@ -174,14 +169,13 @@ async fn exit_plan_with_plan_file_approves_and_restores_mode() {
         "ExitPlanMode".to_string(),
         serde_json::json!({}),
     )];
-    runner
-        .execute_tools(
-            tool_uses,
-            &make_cancel(),
-            loopal_runtime::agent_loop::StreamingToolHandle::empty(),
-        )
-        .await
-        .unwrap();
+    in_turn(runner.execute_tools(
+        tool_uses,
+        &make_cancel(),
+        loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+    ))
+    .await
+    .unwrap();
 
     assert_eq!(runner.params.config.mode, AgentMode::Act);
     assert!(runner.params.config.plan_state.is_none());

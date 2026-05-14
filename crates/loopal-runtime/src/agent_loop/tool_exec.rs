@@ -57,7 +57,7 @@ pub async fn execute_approved_tools(
         };
 
         join_set.spawn(
-            async move {
+            loopal_protocol::event_id::propagate_to_spawn(async move {
                 let progress =
                     maybe_spawn_progress(&name, &input, id.clone(), progress_emitter, tail);
 
@@ -133,7 +133,7 @@ pub async fn execute_approved_tools(
                     .emit_best_effort(tool_result_event, "agent_loop::tool_exec::tool_result")
                     .await;
                 (original_idx, content_block)
-            }
+            })
             .instrument(span),
         );
     }

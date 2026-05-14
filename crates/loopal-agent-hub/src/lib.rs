@@ -14,6 +14,7 @@ pub mod finish;
 mod hub;
 pub mod hub_server;
 mod hub_ui_client;
+mod hub_ui_client_responses;
 pub mod pending_relay;
 mod routing;
 pub mod spawn_manager;

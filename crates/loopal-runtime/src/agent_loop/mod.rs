@@ -15,6 +15,7 @@ mod input;
 mod input_control;
 mod input_mcp;
 mod llm;
+mod llm_chunk;
 mod llm_params;
 mod llm_record;
 pub(crate) mod llm_result;
@@ -32,6 +33,7 @@ mod resume_session;
 pub mod rewind;
 mod run;
 mod runner;
+mod runner_transition;
 /// Sandbox path pre-check utilities for the tools_check phase.
 /// Public for integration testing; runtime consumers should use tools_check directly.
 pub mod sandbox_precheck;

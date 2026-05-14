@@ -3,7 +3,6 @@ use loopal_protocol::AgentEventPayload;
 use tracing::{debug, info, warn};
 
 use super::runner::AgentLoopRunner;
-use super::tools_check_emit::error_block;
 use super::tools_inject::tool_result_block;
 use crate::frontend::traits::PlanApproval;
 use crate::mode::AgentMode;
@@ -19,10 +18,12 @@ impl AgentLoopRunner {
         if self.params.config.mode != AgentMode::Plan {
             return Ok((
                 idx,
-                error_block(
+                tool_result_block(
                     id,
                     "You are not in plan mode. If your plan was already approved, \
                  continue with implementation.",
+                    true,
+                    None,
                 ),
             ));
         }
@@ -32,12 +33,14 @@ impl AgentLoopRunner {
             None => {
                 return Ok((
                     idx,
-                    error_block(
+                    tool_result_block(
                         id,
                         &format!(
                             "No plan file at {}. Write your plan before calling ExitPlanMode.",
                             self.plan_file.path().display()
                         ),
+                        true,
+                        None,
                     ),
                 ));
             }
@@ -90,7 +93,7 @@ impl AgentLoopRunner {
             AgentMode::Act => "act",
             AgentMode::Plan => "plan",
         };
-        self.emit(AgentEventPayload::ModeChanged {
+        self.emit_in_turn(AgentEventPayload::ModeChanged {
             mode: mode_str.into(),
         })
         .await?;

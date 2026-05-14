@@ -9,6 +9,7 @@ use loopal_protocol::InterruptSignal;
 use loopal_provider_api::{ChatParams, ChatStream, Provider, StopReason, StreamChunk};
 use loopal_runtime::agent_loop::cancel::TurnCancel;
 
+use super::in_turn;
 use super::mock_provider::{MockStreamChunks, make_runner_with_mock_provider};
 
 /// Provider that fails N times with retryable 502 errors, then succeeds.
@@ -108,7 +109,7 @@ async fn test_cancel_during_retry_sleep() {
     // retry_stream_chat should exit early due to cancel
     let result = tokio::time::timeout(
         Duration::from_secs(5),
-        runner.retry_stream_chat(&params, &*provider, &cancel),
+        in_turn(runner.retry_stream_chat(&params, &*provider, &cancel)),
     )
     .await;
 
@@ -150,8 +151,7 @@ async fn test_cancel_before_stream_chat_attempt() {
         .resolve_provider(runner.params.config.model())
         .unwrap();
 
-    let stream = runner
-        .retry_stream_chat(&params, &*provider, &cancel)
+    let stream = in_turn(runner.retry_stream_chat(&params, &*provider, &cancel))
         .await
         .expect("should not error");
 

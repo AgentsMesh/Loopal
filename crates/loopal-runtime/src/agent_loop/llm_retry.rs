@@ -29,7 +29,7 @@ impl AgentLoopRunner {
                 result = provider.stream_chat(params) => result,
                 _ = cancel.cancelled() => {
                     if retry_count > 0 {
-                        self.emit(AgentEventPayload::RetryCleared).await?;
+                        self.emit_in_turn(AgentEventPayload::RetryCleared).await?;
                     }
                     return Ok(Box::pin(futures::stream::empty()));
                 }
@@ -37,7 +37,7 @@ impl AgentLoopRunner {
             match stream_result {
                 Ok(s) => {
                     if retry_count > 0 {
-                        self.emit(AgentEventPayload::RetryCleared).await?;
+                        self.emit_in_turn(AgentEventPayload::RetryCleared).await?;
                     }
                     return Ok(s);
                 }
@@ -49,7 +49,7 @@ impl AgentLoopRunner {
                         retry = retry_count, max_retries = MAX_RETRIES,
                         wait_ms, error = %e, "retrying"
                     );
-                    self.emit(AgentEventPayload::RetryError {
+                    self.emit_in_turn(AgentEventPayload::RetryError {
                         message: format!("{}. Retrying in {:.1}s", e, wait_ms as f64 / 1000.0,),
                         attempt: retry_count,
                         max_attempts: MAX_RETRIES,
@@ -59,7 +59,7 @@ impl AgentLoopRunner {
                         _ = tokio::time::sleep(std::time::Duration::from_millis(wait_ms)) => {}
                         _ = cancel.cancelled() => {
                             info!("cancelled during retry wait");
-                            self.emit(AgentEventPayload::RetryCleared).await?;
+                            self.emit_in_turn(AgentEventPayload::RetryCleared).await?;
                             return Ok(Box::pin(futures::stream::empty()));
                         }
                     }
@@ -81,7 +81,7 @@ impl AgentLoopRunner {
                 .thinking_tokens
                 .max(result.thinking_text.len() as u32 / 4)
         };
-        self.emit(AgentEventPayload::ThinkingComplete { token_count })
+        self.emit_in_turn(AgentEventPayload::ThinkingComplete { token_count })
             .await
     }
 }

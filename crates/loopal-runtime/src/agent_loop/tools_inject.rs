@@ -32,7 +32,7 @@ impl AgentLoopRunner {
         let mut blocks = Vec::with_capacity(tool_uses.len());
         let cancel_md = ToolResultMetadata::cancelled(CancelCause::UserInterrupt);
         for (id, name, _) in tool_uses {
-            self.emit(AgentEventPayload::ToolResult {
+            self.emit_in_turn(AgentEventPayload::ToolResult {
                 id: id.clone(),
                 name: name.clone(),
                 result: "Interrupted by user".into(),

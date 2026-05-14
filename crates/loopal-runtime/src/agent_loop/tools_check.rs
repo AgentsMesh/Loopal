@@ -1,11 +1,12 @@
 use loopal_message::ContentBlock;
+use loopal_tool_invocation::{CancelCause, ToolResultMetadata};
 use tracing::Instrument;
 
 use super::cancel::TurnCancel;
 use super::runner::AgentLoopRunner;
 use super::sandbox_precheck;
-use super::tools_check_emit::cancel_block;
 use super::tools_check_one::CheckOne;
+use super::tools_inject::tool_result_block;
 
 pub(super) struct CheckResult {
     pub approved: Vec<(String, String, serde_json::Value)>,
@@ -71,7 +72,15 @@ impl AgentLoopRunner {
                 .iter()
                 .position(|(tid, _, _)| tid == id)
                 .unwrap_or(0);
-            denied.push((orig_idx, cancel_block(id, "Interrupted by user")));
+            denied.push((
+                orig_idx,
+                tool_result_block(
+                    id,
+                    "Interrupted by user",
+                    true,
+                    Some(ToolResultMetadata::cancelled(CancelCause::UserInterrupt)),
+                ),
+            ));
             self.emit_tool_cancelled(id, name, "Interrupted by user")
                 .await?;
         }

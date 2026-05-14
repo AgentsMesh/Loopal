@@ -5,7 +5,6 @@ use tracing::{debug, info, warn};
 
 use super::PlanModeState;
 use super::runner::AgentLoopRunner;
-use super::tools_check_emit::error_block;
 use super::tools_inject::tool_result_block;
 use crate::mode::AgentMode;
 use crate::plan_file::build_plan_mode_filter;
@@ -19,12 +18,20 @@ impl AgentLoopRunner {
         debug!(tool = "EnterPlanMode", "intercepted");
 
         if self.params.config.mode == AgentMode::Plan {
-            return Ok((idx, error_block(id, "Already in plan mode.")));
+            return Ok((
+                idx,
+                tool_result_block(id, "Already in plan mode.", true, None),
+            ));
         }
         if self.params.config.lifecycle == super::LifecycleMode::Ephemeral {
             return Ok((
                 idx,
-                error_block(id, "EnterPlanMode cannot be used in agent contexts"),
+                tool_result_block(
+                    id,
+                    "EnterPlanMode cannot be used in agent contexts",
+                    true,
+                    None,
+                ),
             ));
         }
 
@@ -54,7 +61,7 @@ impl AgentLoopRunner {
         });
         self.params.config.mode = AgentMode::Plan;
 
-        self.emit(AgentEventPayload::ModeChanged {
+        self.emit_in_turn(AgentEventPayload::ModeChanged {
             mode: "plan".into(),
         })
         .await?;
@@ -68,16 +75,18 @@ impl AgentLoopRunner {
                 self.params.config.permission_mode = s.previous_permission_mode;
             }
             if let Err(emit_err) = self
-                .emit(AgentEventPayload::ModeChanged { mode: "act".into() })
+                .emit_in_turn(AgentEventPayload::ModeChanged { mode: "act".into() })
                 .await
             {
                 tracing::error!(error = %emit_err, "ModeChanged rollback emit failed");
             }
             return Ok((
                 idx,
-                error_block(
+                tool_result_block(
                     id,
                     &format!("Cannot create plans directory: {e}. Plan mode was not entered."),
+                    true,
+                    None,
                 ),
             ));
         }

@@ -6,7 +6,7 @@ use loopal_runtime::agent_loop::PlanModeState;
 use loopal_runtime::plan_file::build_plan_mode_filter;
 use loopal_tool_api::PermissionMode;
 
-use super::{make_cancel, make_runner_with_channels};
+use super::{in_turn, make_cancel, make_runner_with_channels};
 
 /// Helper: set up a runner in plan mode with proper PlanModeState.
 fn setup_plan_state(runner: &mut loopal_runtime::agent_loop::AgentLoopRunner) {
@@ -30,14 +30,13 @@ async fn plan_mode_blocks_bash() {
         "Bash".to_string(),
         serde_json::json!({"command": "echo hello"}),
     )];
-    runner
-        .execute_tools(
-            tool_uses,
-            &make_cancel(),
-            loopal_runtime::agent_loop::StreamingToolHandle::empty(),
-        )
-        .await
-        .unwrap();
+    in_turn(runner.execute_tools(
+        tool_uses,
+        &make_cancel(),
+        loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+    ))
+    .await
+    .unwrap();
 
     let msg = &runner.params.store.messages()[0];
     match &msg.content[0] {
@@ -72,14 +71,13 @@ async fn plan_mode_allows_read_with_reminder() {
         "Read".to_string(),
         serde_json::json!({"file_path": tmp.to_str().unwrap()}),
     )];
-    runner
-        .execute_tools(
-            tool_uses,
-            &make_cancel(),
-            loopal_runtime::agent_loop::StreamingToolHandle::empty(),
-        )
-        .await
-        .unwrap();
+    in_turn(runner.execute_tools(
+        tool_uses,
+        &make_cancel(),
+        loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+    ))
+    .await
+    .unwrap();
 
     let msg = &runner.params.store.messages()[0];
     match &msg.content[0] {
@@ -108,14 +106,13 @@ async fn plan_mode_write_blocks_non_plan_path() {
         "Write".to_string(),
         serde_json::json!({"file_path": "/tmp/not-a-plan.txt", "content": "hack"}),
     )];
-    runner
-        .execute_tools(
-            tool_uses,
-            &make_cancel(),
-            loopal_runtime::agent_loop::StreamingToolHandle::empty(),
-        )
-        .await
-        .unwrap();
+    in_turn(runner.execute_tools(
+        tool_uses,
+        &make_cancel(),
+        loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+    ))
+    .await
+    .unwrap();
 
     let msg = &runner.params.store.messages()[0];
     match &msg.content[0] {

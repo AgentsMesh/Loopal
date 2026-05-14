@@ -38,30 +38,32 @@ pub fn maybe_spawn_progress(
     }
 
     let name = tool_name.to_string();
-    Some(tokio::spawn(async move {
-        let start = Instant::now();
-        let mut interval = tokio::time::interval(REPORT_INTERVAL);
-        interval.tick().await; // skip first immediate tick
-        loop {
-            interval.tick().await;
-            let elapsed_ms = start.elapsed().as_millis() as u64;
-            // output_tail carries only real stdout content (time info is
-            // rendered independently by the consumer from started_at/tool_input).
-            let output_tail = match &tail {
-                Some(t) => t.snapshot(),
-                None => String::new(),
-            };
-            emitter
-                .emit_best_effort(
-                    AgentEventPayload::ToolProgress {
-                        id: tool_id.clone(),
-                        name: name.clone(),
-                        output_tail,
-                        elapsed_ms,
-                    },
-                    "agent_loop::tool_progress",
-                )
-                .await;
-        }
-    }))
+    Some(tokio::spawn(loopal_protocol::event_id::propagate_to_spawn(
+        async move {
+            let start = Instant::now();
+            let mut interval = tokio::time::interval(REPORT_INTERVAL);
+            interval.tick().await; // skip first immediate tick
+            loop {
+                interval.tick().await;
+                let elapsed_ms = start.elapsed().as_millis() as u64;
+                // output_tail carries only real stdout content (time info is
+                // rendered independently by the consumer from started_at/tool_input).
+                let output_tail = match &tail {
+                    Some(t) => t.snapshot(),
+                    None => String::new(),
+                };
+                emitter
+                    .emit_best_effort(
+                        AgentEventPayload::ToolProgress {
+                            id: tool_id.clone(),
+                            name: name.clone(),
+                            output_tail,
+                            elapsed_ms,
+                        },
+                        "agent_loop::tool_progress",
+                    )
+                    .await;
+            }
+        },
+    )))
 }

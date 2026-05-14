@@ -105,3 +105,45 @@ async fn test_unified_emit_best_effort_swallows_closed_channel() {
     );
     f.emit_best_effort(AgentEventPayload::Started, "test").await;
 }
+
+#[tokio::test]
+#[should_panic(expected = "require_current called outside scope_turn")]
+async fn test_unified_emit_in_turn_panics_outside_scope() {
+    let (event_tx, _event_rx) = mpsc::channel(16);
+    let (_mb_tx, mb_rx) = mpsc::channel(16);
+    let (_ctrl_tx, ctrl_rx) = mpsc::channel(16);
+
+    let f = make_unified(
+        None,
+        event_tx,
+        mb_rx,
+        ctrl_rx,
+        None,
+        Box::new(DenyAllHandler),
+    );
+    // No scope_turn around this call — must panic via for_agent_in_turn.
+    let _ = f.emit_in_turn(AgentEventPayload::Started).await;
+}
+
+#[tokio::test]
+async fn test_unified_emit_in_turn_succeeds_inside_scope() {
+    let (event_tx, mut event_rx) = mpsc::channel(16);
+    let (_mb_tx, mb_rx) = mpsc::channel(16);
+    let (_ctrl_tx, ctrl_rx) = mpsc::channel(16);
+
+    let f = make_unified(
+        None,
+        event_tx,
+        mb_rx,
+        ctrl_rx,
+        None,
+        Box::new(DenyAllHandler),
+    );
+    loopal_protocol::event_id::scope_turn(7, async {
+        f.emit_in_turn(AgentEventPayload::Started).await.unwrap();
+    })
+    .await;
+
+    let event = event_rx.recv().await.unwrap();
+    assert_eq!(event.turn_id, 7, "envelope must carry scoped turn_id");
+}

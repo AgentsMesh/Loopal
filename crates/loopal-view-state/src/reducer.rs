@@ -54,20 +54,18 @@ impl ViewStateReducer {
     }
 
     pub fn apply(&mut self, event: AgentEventPayload) -> Option<u64> {
-        let effect = mutate(&mut self.state, &event);
-        if !effect.changed() {
-            return None;
-        }
-        if effect.requires_turn_end_reconcile() {
-            crate::conversation::tool_result_handler::handle_turn_end_reconcile(
-                &mut self.state.agent.conversation,
-            );
-        }
+        self.apply_inner(event)?;
         self.rev += 1;
         Some(self.rev)
     }
 
     pub fn apply_with_rev(&mut self, event: AgentEventPayload, target_rev: u64) -> Option<u64> {
+        self.apply_inner(event)?;
+        self.rev = target_rev;
+        Some(self.rev)
+    }
+
+    fn apply_inner(&mut self, event: AgentEventPayload) -> Option<()> {
         let effect = mutate(&mut self.state, &event);
         if !effect.changed() {
             return None;
@@ -77,7 +75,6 @@ impl ViewStateReducer {
                 &mut self.state.agent.conversation,
             );
         }
-        self.rev = target_rev;
-        Some(self.rev)
+        Some(())
     }
 }

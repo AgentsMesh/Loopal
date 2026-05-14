@@ -2,7 +2,7 @@ use loopal_message::{ContentBlock, MessageRole};
 use loopal_protocol::AgentEventPayload;
 use loopal_tool_api::PermissionMode;
 
-use super::{make_cancel, make_runner_with_channels};
+use super::{in_turn, make_cancel, make_runner_with_channels};
 
 #[tokio::test]
 async fn test_execute_tools_bypass_mode() {
@@ -24,14 +24,13 @@ async fn test_execute_tools_bypass_mode() {
         serde_json::json!({"file_path": tmp.to_str().unwrap()}),
     )];
 
-    runner
-        .execute_tools(
-            tool_uses,
-            &make_cancel(),
-            loopal_runtime::agent_loop::StreamingToolHandle::empty(),
-        )
-        .await
-        .unwrap();
+    in_turn(runner.execute_tools(
+        tool_uses,
+        &make_cancel(),
+        loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+    ))
+    .await
+    .unwrap();
 
     // Should have added tool result message
     assert_eq!(runner.params.store.len(), 1);
@@ -68,14 +67,13 @@ async fn test_execute_tools_supervised_denies_without_approval() {
         serde_json::json!({"file_path": "/tmp/nope.txt", "content": "x"}),
     )];
 
-    runner
-        .execute_tools(
-            tool_uses,
-            &make_cancel(),
-            loopal_runtime::agent_loop::StreamingToolHandle::empty(),
-        )
-        .await
-        .unwrap();
+    in_turn(runner.execute_tools(
+        tool_uses,
+        &make_cancel(),
+        loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+    ))
+    .await
+    .unwrap();
 
     // Should have added a denied tool result message
     assert_eq!(runner.params.store.len(), 1);
@@ -124,14 +122,13 @@ async fn test_execute_tools_read_allowed_write_denied_in_supervised() {
         ),
     ];
 
-    runner
-        .execute_tools(
-            tool_uses,
-            &make_cancel(),
-            loopal_runtime::agent_loop::StreamingToolHandle::empty(),
-        )
-        .await
-        .unwrap();
+    in_turn(runner.execute_tools(
+        tool_uses,
+        &make_cancel(),
+        loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+    ))
+    .await
+    .unwrap();
 
     // Should have 1 message with 2 tool results
     assert_eq!(runner.params.store.len(), 1);

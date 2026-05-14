@@ -65,6 +65,10 @@ impl AgentFrontend for HubFrontend {
         self.broadcaster.broadcast(payload).await
     }
 
+    async fn emit_in_turn(&self, payload: AgentEventPayload) -> Result<()> {
+        self.broadcaster.broadcast_in_turn(payload).await
+    }
+
     async fn recv_input(&self) -> Option<AgentInput> {
         self.input.next().await
     }

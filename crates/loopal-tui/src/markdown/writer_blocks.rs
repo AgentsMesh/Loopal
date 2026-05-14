@@ -1,14 +1,11 @@
-/// Block-level markdown event handling: paragraphs, headings, code blocks,
-/// lists, blockquotes, horizontal rules, images, and tables.
 use pulldown_cmark::{CodeBlockKind, Tag, TagEnd};
 use ratatui::prelude::*;
 
 use super::highlight::highlight_code_to_lines;
 use super::styled_wrap::styled_wrap;
-use super::writer::{IndentCtx, ListKind, MdWriter};
+use super::writer::MdWriter;
 
 impl MdWriter {
-    /// Handle start of a block-level tag.
     pub(super) fn start_tag(&mut self, tag: Tag) {
         match tag {
             Tag::Paragraph => {}
@@ -23,7 +20,6 @@ impl MdWriter {
             Tag::TableHead => self.start_table_head(),
             Tag::TableRow => self.start_table_row(),
             Tag::TableCell => self.start_table_cell(),
-            // Inline tags — delegated to writer_inline
             Tag::Emphasis => self.start_emphasis(),
             Tag::Strong => self.start_strong(),
             Tag::Strikethrough => self.start_strikethrough(),
@@ -33,7 +29,6 @@ impl MdWriter {
         }
     }
 
-    /// Handle end of a block-level tag.
     pub(super) fn end_tag(&mut self, tag: TagEnd) {
         match tag {
             TagEnd::Paragraph => self.end_paragraph(),
@@ -46,7 +41,6 @@ impl MdWriter {
             TagEnd::TableHead => self.end_table_head(),
             TagEnd::TableRow => self.end_table_row(),
             TagEnd::TableCell => self.end_table_cell(),
-            // Inline tags — delegated to writer_inline
             TagEnd::Emphasis => self.end_emphasis(),
             TagEnd::Strong => self.end_strong(),
             TagEnd::Strikethrough => self.end_strikethrough(),
@@ -56,20 +50,15 @@ impl MdWriter {
         }
     }
 
-    // ---- Paragraphs ----
-
     fn end_paragraph(&mut self) {
         self.flush_pending();
         self.lines.push(Line::from(""));
     }
 
-    // ---- Headings ----
-
     fn end_heading(&mut self) {
         let level = self.heading_level.take().unwrap_or(1);
         let heading_style = self.styles.heading(level);
 
-        // Collect pending spans and apply heading style
         let spans: Vec<Span<'static>> = std::mem::take(&mut self.pending_spans)
             .into_iter()
             .map(|s| Span::styled(s.content.into_owned(), s.style.patch(heading_style)))
@@ -90,8 +79,6 @@ impl MdWriter {
             .map(|ctx| ctx.prefix.iter().map(|s| s.content.len()).sum::<usize>() as u16)
             .sum()
     }
-
-    // ---- Code blocks ----
 
     fn start_code_block(&mut self, kind: CodeBlockKind) {
         self.flush_pending();
@@ -120,68 +107,6 @@ impl MdWriter {
         }
         self.lines.push(Line::from(""));
     }
-
-    // ---- Lists ----
-
-    fn start_list(&mut self, start: Option<u64>) {
-        self.flush_pending();
-        match start {
-            Some(n) => self.list_stack.push(ListKind::Ordered(n)),
-            None => self.list_stack.push(ListKind::Unordered),
-        }
-    }
-
-    fn end_list(&mut self) {
-        self.flush_pending();
-        self.list_stack.pop();
-        // Add blank line after top-level list
-        if self.list_stack.is_empty() {
-            self.lines.push(Line::from(""));
-        }
-    }
-
-    fn start_item(&mut self) {
-        self.flush_pending();
-        let marker_style = self.styles.list_marker;
-        let (marker_text, indent_text) = match self.list_stack.last_mut() {
-            Some(ListKind::Unordered) => ("- ".to_string(), "  ".to_string()),
-            Some(ListKind::Ordered(n)) => {
-                let m = format!("{n}. ");
-                let indent = " ".repeat(m.len());
-                *n += 1;
-                (m, indent)
-            }
-            None => ("- ".to_string(), "  ".to_string()),
-        };
-
-        self.indent_stack.push(IndentCtx {
-            prefix: vec![Span::raw(indent_text)],
-            marker: Some(vec![Span::styled(marker_text, marker_style)]),
-        });
-    }
-
-    fn end_item(&mut self) {
-        self.flush_pending();
-        self.indent_stack.pop();
-    }
-
-    // ---- Blockquotes ----
-
-    fn start_blockquote(&mut self) {
-        self.flush_pending();
-        let style = self.styles.blockquote_marker;
-        self.indent_stack.push(IndentCtx {
-            prefix: vec![Span::styled("> ", style)],
-            marker: None,
-        });
-    }
-
-    fn end_blockquote(&mut self) {
-        self.flush_pending();
-        self.indent_stack.pop();
-    }
-
-    // ---- Horizontal rule ----
 
     pub(super) fn on_rule(&mut self) {
         self.flush_pending();

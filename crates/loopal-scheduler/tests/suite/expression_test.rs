@@ -60,11 +60,29 @@ fn parse_at_with_fixed_time() {
 }
 
 #[test]
-fn parse_at_rejects_no_occurrence_within_lifetime() {
-    // Use February 30 which never exists — no valid occurrence ever.
+fn parse_at_rejects_never_firing_expression() {
+    // February 30 never exists — the expression has no future occurrence ever.
     let now = Utc.with_ymd_and_hms(2026, 3, 29, 10, 0, 0).unwrap();
     let err = CronExpression::parse_at("0 0 30 2 *", now).unwrap_err();
     assert_eq!(err, CronParseError::NoOccurrence);
+    assert_eq!(err.to_string(), "cron expression will never fire");
+}
+
+#[test]
+fn parse_at_accepts_weekly_past_this_weeks_fire() {
+    // Monday 2026-03-30 10:00 — `0 9 * * 1` next fires the following
+    // Monday 09:00, ~6d 23h away. The old 3-day lifetime gate would
+    // reject this; the new rule accepts.
+    let monday_after_fire = Utc.with_ymd_and_hms(2026, 3, 30, 10, 0, 0).unwrap();
+    let expr = CronExpression::parse_at("0 9 * * 1", monday_after_fire).unwrap();
+    let next = expr.next_after(&monday_after_fire).unwrap();
+    let delta = next - monday_after_fire;
+    // Must be strictly more than 3 days — proves the lifetime cap is gone.
+    assert!(
+        delta > chrono::Duration::days(3),
+        "delta was {delta:?}, next={next}"
+    );
+    assert!(delta <= chrono::Duration::days(7));
 }
 
 #[test]

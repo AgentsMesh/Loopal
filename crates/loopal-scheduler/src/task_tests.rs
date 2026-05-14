@@ -1,4 +1,4 @@
-//! Unit tests for ScheduledTask, should_fire, is_expired, truncate_to_secs.
+//! Unit tests for ScheduledTask, should_fire, truncate_to_secs.
 
 use chrono::{TimeZone, Timelike, Utc};
 
@@ -71,31 +71,11 @@ fn should_fire_no_double_fire_same_minute() {
 }
 
 #[test]
-fn is_expired_after_max_lifetime() {
-    let created = Utc.with_ymd_and_hms(2026, 3, 25, 10, 0, 0).unwrap();
-    let task = make_task("* * * * *", created);
-    // 4 days later → expired (> 3 days)
-    let now = Utc.with_ymd_and_hms(2026, 3, 29, 10, 0, 0).unwrap();
-    assert!(task.is_expired(&now));
-}
-
-#[test]
-fn is_expired_false_within_lifetime() {
-    let created = Utc.with_ymd_and_hms(2026, 3, 29, 10, 0, 0).unwrap();
-    let task = make_task("* * * * *", created);
-    // 1 hour later → not expired
-    let now = Utc.with_ymd_and_hms(2026, 3, 29, 11, 0, 0).unwrap();
-    assert!(!task.is_expired(&now));
-}
-
-#[test]
-fn durable_task_never_expires() {
-    // R5: durable tasks bypass the 3-day lifetime cap so persisted
-    // schedules survive indefinitely across restarts.
+fn should_fire_after_long_idle_period() {
+    // Tasks created days ago must still fire when their cadence comes
+    // around — there's no more lifetime cap to silently drop them.
     let created = Utc.with_ymd_and_hms(2026, 3, 20, 10, 0, 0).unwrap();
-    let mut task = make_task("* * * * *", created);
-    task.durable = true;
-    // 30 days later — non-durable would be expired, durable is not.
-    let now = Utc.with_ymd_and_hms(2026, 4, 19, 10, 0, 0).unwrap();
-    assert!(!task.is_expired(&now));
+    let task = make_task("* * * * *", created);
+    let now = Utc.with_ymd_and_hms(2026, 3, 29, 10, 0, 5).unwrap();
+    assert!(task.should_fire(&now));
 }

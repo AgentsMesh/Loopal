@@ -22,7 +22,7 @@ pub use persistence::{PersistError, PersistedTask};
 pub use persistence_file_scoped::FileScopedCronStore;
 pub use persistence_session::SessionScopedCronStorage;
 pub use scheduler::{BROADCAST_CAPACITY, CronScheduler};
-pub use task::{CronJobInfo, MAX_LIFETIME_SECS};
+pub use task::CronJobInfo;
 pub use trigger::ScheduledTrigger;
 
 #[cfg(test)]

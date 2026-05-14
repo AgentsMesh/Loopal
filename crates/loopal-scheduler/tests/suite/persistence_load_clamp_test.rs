@@ -1,5 +1,5 @@
-//! Tests for R1 (clamp), R5 (durable lifetime), capacity & clean-load
-//! rewrite behavior in `load_persisted`.
+//! Tests for R1 (clamp), capacity & clean-load rewrite behavior in
+//! `load_persisted`.
 
 use std::sync::Arc;
 
@@ -104,10 +104,11 @@ async fn recurring_none_last_fired_with_old_created_at_is_clamped() {
 }
 
 #[tokio::test]
-async fn durable_recurring_bypasses_three_day_lifetime() {
-    // R5: durable tasks are exempt from the 3-day lifetime cap.
+async fn task_with_old_created_at_survives_load() {
+    // Tasks persisted days ago must come back on load — there is no
+    // longer a lifetime cap on durable cron jobs.
     let store = MockStore::new(vec![persisted(
-        "old_but_durable",
+        "old_durable",
         "*/5 * * * *",
         true,
         -5 * 24 * 60 * 60,
@@ -115,25 +116,23 @@ async fn durable_recurring_bypasses_three_day_lifetime() {
     let clock = Arc::new(ManualClock::new(base_time()));
     let sched = scheduler_with(store.clone(), clock).await;
     let count = sched.switch_session("test").await.unwrap();
-    assert_eq!(count, 1, "durable old task must survive lifetime cap");
-    assert_eq!(sched.list().await[0].id, "old_but_durable");
+    assert_eq!(count, 1, "old task must survive load");
+    assert_eq!(sched.list().await[0].id, "old_durable");
 }
 
 #[tokio::test]
-async fn durable_task_ignores_lifetime_cap() {
-    // R5 alternate phrasing — ensures the load path mirrors the
-    // underlying `ScheduledTask::is_expired` exemption.
+async fn very_old_task_still_loads() {
     let store = MockStore::new(vec![persisted(
-        "old1",
+        "ancient",
         "*/5 * * * *",
         true,
-        -4 * 24 * 60 * 60,
+        -30 * 24 * 60 * 60,
     )]);
     let clock = Arc::new(ManualClock::new(base_time()));
     let sched = scheduler_with(store.clone(), clock).await;
     let count = sched.switch_session("test").await.unwrap();
     assert_eq!(count, 1);
-    assert_eq!(sched.list().await[0].id, "old1");
+    assert_eq!(sched.list().await[0].id, "ancient");
 }
 
 #[tokio::test]

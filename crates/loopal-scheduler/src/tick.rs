@@ -37,7 +37,7 @@ pub(crate) async fn tick_loop(
         }
 
         let now = ctx.clock.now();
-        let (needs_write, expiring_ids, firing_ids) = survey_tasks(&ctx.tasks, &now).await;
+        let (needs_write, firing_ids) = survey_tasks(&ctx.tasks, &now).await;
         let should_retry = ctx.dirty.load(Ordering::Acquire);
         if !needs_write && !should_retry {
             continue;
@@ -51,18 +51,11 @@ pub(crate) async fn tick_loop(
         } else {
             resolve_active(&ctx.active).await
         };
-        let triggers = mutate_tasks(
-            &ctx.tasks,
-            &now,
-            &expiring_ids,
-            &firing_ids,
-            resolved_binding,
-            &ctx.dirty,
-        )
-        .await;
+        let triggers =
+            mutate_tasks(&ctx.tasks, &now, &firing_ids, resolved_binding, &ctx.dirty).await;
 
-        // If anything was removed (one-shot fire, expiry) or fired (a
-        // recurring task's `last_fired` advanced), the job set's
+        // If anything fired (a recurring task's `last_fired` advanced,
+        // or a one-shot was removed after firing), the job set's
         // user-visible state changed — broadcast so observers re-snapshot.
         // No-op when no receivers are attached.
         if needs_write {
@@ -100,32 +93,28 @@ struct ResolvedBinding {
     session_id: String,
 }
 
-/// Read-only survey: identify task ids that need expiring or firing.
+/// Read-only survey: identify task ids that need firing.
 async fn survey_tasks(
     tasks: &Arc<RwLock<Vec<ScheduledTask>>>,
     now: &chrono::DateTime<chrono::Utc>,
-) -> (bool, Vec<String>, Vec<String>) {
+) -> (bool, Vec<String>) {
     let guard = tasks.read().await;
-    let mut expiring = Vec::new();
     let mut firing = Vec::new();
     for task in guard.iter() {
-        if task.is_expired(now) {
-            expiring.push(task.id.clone());
-        } else if task.should_fire(now) {
+        if task.should_fire(now) {
             firing.push(task.id.clone());
         }
     }
-    let needs_write = !expiring.is_empty() || !firing.is_empty();
-    (needs_write, expiring, firing)
+    let needs_write = !firing.is_empty();
+    (needs_write, firing)
 }
 
 /// Exclusive mutation: stamp `last_fired`, build triggers, remove
-/// expired/one-shot tasks, then persist if any durable task changed
+/// one-shot tasks after firing, then persist if any durable task changed
 /// (or if the previous save failed). Returns the triggers to dispatch.
 async fn mutate_tasks(
     tasks: &Arc<RwLock<Vec<ScheduledTask>>>,
     now: &chrono::DateTime<chrono::Utc>,
-    expiring_ids: &[String],
     firing_ids: &[String],
     binding: Option<ResolvedBinding>,
     dirty: &Arc<AtomicBool>,
@@ -136,13 +125,7 @@ async fn mutate_tasks(
     let mut durable_touched = false;
 
     for (i, task) in guard.iter_mut().enumerate() {
-        if expiring_ids.contains(&task.id) {
-            info!(task_id = %task.id, "cron job expired");
-            if task.durable {
-                durable_touched = true;
-            }
-            to_remove.push(i);
-        } else if firing_ids.contains(&task.id) {
+        if firing_ids.contains(&task.id) {
             info!(task_id = %task.id, "cron job fired");
             triggers.push(ScheduledTrigger {
                 task_id: task.id.clone(),

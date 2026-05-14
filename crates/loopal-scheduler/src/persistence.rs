@@ -79,11 +79,9 @@ impl PersistedTask {
     /// entries coming off disk.
     ///
     /// `parse_reference` is the clock value used when revalidating the
-    /// cron expression. It must be "now" (not the persisted
-    /// `created_at`), otherwise an expression like `"0 9 * * *"` saved
-    /// 2.9 days ago would fail to parse as "no occurrence within the
-    /// 3-day lifetime from created_at" even though it has many
-    /// occurrences going forward.
+    /// cron expression — must be "now", not the persisted `created_at`,
+    /// so the `NoOccurrence` check sees the same forward window the
+    /// live `add()` path does.
     pub(crate) fn into_task(
         self,
         parse_reference: DateTime<Utc>,

@@ -60,8 +60,6 @@ impl CronScheduler {
     /// and silently prefers existing IDs in release builds.
     ///
     /// **Filter rules** (drop-on-load, no catch-up):
-    /// - expired (`is_expired(now)`) — past the 3-day lifetime (durable
-    ///   tasks are exempt)
     /// - one-shot already fired (`last_fired.is_some()`)
     /// - one-shot whose next fire time has passed (`next_after(created_at) ≤ now`)
     ///
@@ -112,9 +110,6 @@ impl CronScheduler {
                 tracing::warn!("dropping persisted task with unparsable cron");
                 continue;
             };
-            if task.is_expired(&now) {
-                continue;
-            }
             if !task.recurring {
                 let fired = task.last_fired.is_some();
                 let next = task.cron.next_after(&task.created_at);

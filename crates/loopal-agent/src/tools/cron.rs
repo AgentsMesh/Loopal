@@ -38,7 +38,7 @@ impl Tool for CronCreateTool {
          between a one-shot firing and the post-fire save, it may re-fire \
          exactly once on the next resume. \
          Jobs only fire while the agent is idle. \
-         Recurring jobs auto-expire after 3 days. Max 50 concurrent jobs."
+         Max 50 concurrent jobs."
     }
 
     fn parameters_schema(&self) -> Value {

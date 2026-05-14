@@ -3,9 +3,6 @@ use serde::Serialize;
 
 use crate::expression::CronExpression;
 
-/// Maximum lifetime of a scheduled task (3 days).
-pub const MAX_LIFETIME_SECS: i64 = 3 * 24 * 60 * 60;
-
 /// A scheduled task managed by [`CronScheduler`](crate::CronScheduler).
 pub(crate) struct ScheduledTask {
     pub id: String,
@@ -37,20 +34,6 @@ impl ScheduledTask {
         self.cron
             .next_after(&reference)
             .is_some_and(|next| next <= *now)
-    }
-
-    /// Whether this task has aged past its maximum lifetime.
-    ///
-    /// Durable tasks (backed by a `DurableStore`) are exempt from the
-    /// lifetime cap: users who explicitly opt into persistence expect
-    /// their schedules to survive indefinitely across restarts.
-    /// Non-durable (in-memory) tasks still expire after
-    /// [`MAX_LIFETIME_SECS`] to keep ephemeral entries from piling up.
-    pub fn is_expired(&self, now: &DateTime<Utc>) -> bool {
-        if self.durable {
-            return false;
-        }
-        now.signed_duration_since(self.created_at).num_seconds() > MAX_LIFETIME_SECS
     }
 }
 

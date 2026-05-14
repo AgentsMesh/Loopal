@@ -27,14 +27,11 @@ impl CronExpression {
         if fields.len() != 5 {
             return Err(CronParseError::InvalidFieldCount(fields.len()));
         }
-        // Convert 5-field → 7-field for the `cron` crate: "sec min hour dom mon dow year"
         let seven_field = format!("0 {expr} *");
         let schedule = Schedule::from_str(&seven_field)
             .map_err(|e| CronParseError::ParseFailed(e.to_string()))?;
 
-        // Validate that at least one occurrence exists before the task expires.
-        let limit = now + chrono::Duration::seconds(crate::task::MAX_LIFETIME_SECS);
-        if schedule.after(&now).next().is_none_or(|t| t > limit) {
+        if schedule.after(&now).next().is_none() {
             return Err(CronParseError::NoOccurrence);
         }
 
@@ -68,7 +65,7 @@ pub enum CronParseError {
     InvalidFieldCount(usize),
     /// Underlying cron parser error.
     ParseFailed(String),
-    /// Expression never matches within the task lifetime (3 days).
+    /// Expression has no future occurrence (e.g. February 30).
     NoOccurrence,
 }
 
@@ -79,12 +76,7 @@ impl std::fmt::Display for CronParseError {
                 write!(f, "expected 5 fields in cron expression, got {n}")
             }
             Self::ParseFailed(msg) => write!(f, "invalid cron expression: {msg}"),
-            Self::NoOccurrence => {
-                write!(
-                    f,
-                    "expression has no occurrence within the task lifetime (3 days)"
-                )
-            }
+            Self::NoOccurrence => write!(f, "cron expression will never fire"),
         }
     }
 }

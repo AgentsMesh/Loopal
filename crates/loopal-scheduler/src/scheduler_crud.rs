@@ -1,23 +1,14 @@
-//! CRUD operations on [`CronScheduler`]: `add` / `remove` / `list`.
-//!
-//! Split out so [`crate::scheduler`] keeps its focus on lifecycle
-//! (constructors, `start`) and persistence integration lives in
-//! [`crate::scheduler_persistence`].
-
 use std::sync::atomic::Ordering;
 
-use crate::error::{SchedulerError, generate_task_id};
+use crate::error::SchedulerError;
 use crate::expression::CronExpression;
-use crate::id::find_unique_id;
+use crate::id::{find_unique_id, generate_task_id};
 use crate::scheduler::{CronScheduler, MAX_TASKS};
-use crate::task::{CronJobInfo, ScheduledTask, truncate_to_secs};
+use crate::task::{CronJobInfo, ScheduledTask};
 
 impl CronScheduler {
-    /// Add a new scheduled task. Returns the 8-char task ID.
-    ///
-    /// When `durable` is `true` and the scheduler is bound to a session
-    /// (or attached to a legacy single-path store), the new task is
-    /// persisted before this method returns.
+    /// Returns the 8-char task ID. Durable tasks are persisted before
+    /// this method returns when the scheduler is session-bound.
     pub async fn add(
         &self,
         cron_expr: &str,
@@ -49,9 +40,8 @@ impl CronScheduler {
         Ok(id)
     }
 
-    /// Remove a task by ID. Returns `true` if found and removed.
-    ///
-    /// A durable removal is written through to the store inline.
+    /// Returns `true` if found and removed. A durable removal is written
+    /// through to the store inline.
     pub async fn remove(&self, id: &str) -> bool {
         let mut tasks = self.tasks.write().await;
         let was_durable = tasks.iter().any(|t| t.id == id && t.durable);
@@ -68,15 +58,13 @@ impl CronScheduler {
         removed
     }
 
-    /// List all active tasks as read-only snapshots.
     pub async fn list(&self) -> Vec<CronJobInfo> {
         let tasks = self.tasks.read().await;
         let now = self.clock.now();
         tasks
             .iter()
             .map(|t| {
-                let reference = truncate_to_secs(t.last_fired.unwrap_or(t.created_at));
-                let next_fire = t.cron.next_after(&reference).and_then(|next| {
+                let next_fire = t.next_fire().and_then(|next| {
                     if next > now {
                         Some(next)
                     } else {

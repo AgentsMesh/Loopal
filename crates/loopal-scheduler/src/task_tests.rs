@@ -1,5 +1,3 @@
-//! Unit tests for ScheduledTask, should_fire, truncate_to_secs.
-
 use chrono::{TimeZone, Timelike, Utc};
 
 use crate::expression::CronExpression;
@@ -71,11 +69,30 @@ fn should_fire_no_double_fire_same_minute() {
 }
 
 #[test]
-fn should_fire_after_long_idle_period() {
-    // Tasks created days ago must still fire when their cadence comes
-    // around — there's no more lifetime cap to silently drop them.
-    let created = Utc.with_ymd_and_hms(2026, 3, 20, 10, 0, 0).unwrap();
+fn next_fire_starts_from_created_at_when_not_fired() {
+    let created = Utc.with_ymd_and_hms(2026, 3, 29, 10, 0, 0).unwrap();
+    let task = make_task("0 12 * * *", created);
+    // Daily at 12:00 — next after 10:00 created_at is same day 12:00.
+    let expected = Utc.with_ymd_and_hms(2026, 3, 29, 12, 0, 0).unwrap();
+    assert_eq!(task.next_fire(), Some(expected));
+}
+
+#[test]
+fn next_fire_advances_after_last_fired() {
+    let created = Utc.with_ymd_and_hms(2026, 3, 29, 10, 0, 0).unwrap();
+    let mut task = make_task("0 12 * * *", created);
+    task.last_fired = Some(Utc.with_ymd_and_hms(2026, 3, 29, 12, 0, 0).unwrap());
+    // Already fired today's 12:00 — next is tomorrow's 12:00.
+    let expected = Utc.with_ymd_and_hms(2026, 3, 30, 12, 0, 0).unwrap();
+    assert_eq!(task.next_fire(), Some(expected));
+}
+
+#[test]
+fn next_fire_truncates_sub_second_reference() {
+    let created = Utc.with_ymd_and_hms(2026, 3, 29, 10, 0, 30).unwrap()
+        + chrono::Duration::nanoseconds(999_999);
     let task = make_task("* * * * *", created);
-    let now = Utc.with_ymd_and_hms(2026, 3, 29, 10, 0, 5).unwrap();
-    assert!(task.should_fire(&now));
+    // Truncated reference 10:00:30 → next at 10:01:00.
+    let expected = Utc.with_ymd_and_hms(2026, 3, 29, 10, 1, 0).unwrap();
+    assert_eq!(task.next_fire(), Some(expected));
 }

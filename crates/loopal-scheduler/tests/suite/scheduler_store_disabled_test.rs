@@ -1,56 +1,19 @@
-//! R2: tests for `store_disabled` — when `load_persisted` fails, the
-//! scheduler must refuse to persist afterwards so later writes don't
-//! clobber an unrecognized on-disk file.
-
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use chrono::Utc;
-use tokio::sync::Mutex;
 
-use loopal_scheduler::{
-    CronScheduler, ManualClock, PersistError, PersistedTask, SessionScopedCronStorage,
-};
+use loopal_scheduler::{CronScheduler, ManualClock, PersistError, SessionScopedCronStorage};
 
-/// A store whose `load` always fails — simulates quarantine-failed
-/// or unreadable on-disk state.
-struct FailingLoadStore {
-    saves: Mutex<usize>,
-}
-
-impl FailingLoadStore {
-    fn new() -> Arc<Self> {
-        Arc::new(Self {
-            saves: Mutex::new(0),
-        })
-    }
-    async fn save_count(&self) -> usize {
-        *self.saves.lock().await
-    }
-}
-
-#[async_trait]
-impl SessionScopedCronStorage for FailingLoadStore {
-    async fn load(&self, _session_id: &str) -> Result<Vec<PersistedTask>, PersistError> {
-        Err(PersistError::Io(std::io::Error::other("unreadable")))
-    }
-    async fn save_all(
-        &self,
-        _session_id: &str,
-        _tasks: &[PersistedTask],
-    ) -> Result<(), PersistError> {
-        *self.saves.lock().await += 1;
-        Ok(())
-    }
-}
+use crate::mock_storage::MockStorage;
 
 #[tokio::test]
 async fn load_failure_latches_store_disabled_and_skips_subsequent_saves() {
     // If the storage `load` fails (e.g. quarantine could not move a
-    // corrupt file aside), the scheduler must **refuse** to persist
+    // corrupt file aside), the scheduler must refuse to persist
     // afterwards, otherwise a later `add` atomically overwrites the
     // user's unrecognized on-disk state with an empty snapshot.
-    let store = FailingLoadStore::new();
+    let store = MockStorage::new();
+    store.arm_load_failure_always();
     let store_dyn: Arc<dyn SessionScopedCronStorage> = store.clone();
     let sched = CronScheduler::with_session_storage_and_clock(
         store_dyn,
@@ -62,8 +25,6 @@ async fn load_failure_latches_store_disabled_and_skips_subsequent_saves() {
         "expected Io error, got {err:?}"
     );
 
-    // Further durable adds must succeed in memory but MUST NOT reach
-    // the store — otherwise the corrupt file gets clobbered.
     let _id = sched
         .add("*/5 * * * *", "after-disable", true, true)
         .await
@@ -78,9 +39,8 @@ async fn load_failure_latches_store_disabled_and_skips_subsequent_saves() {
 
 #[tokio::test]
 async fn remove_after_load_failure_also_skips_store() {
-    // Same guarantee on the `remove` path — once the store is
-    // disabled, neither add nor remove should clobber on-disk data.
-    let store = FailingLoadStore::new();
+    let store = MockStorage::new();
+    store.arm_load_failure_always();
     let store_dyn: Arc<dyn SessionScopedCronStorage> = store.clone();
     let sched = CronScheduler::with_session_storage_and_clock(
         store_dyn,

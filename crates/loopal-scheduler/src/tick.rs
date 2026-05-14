@@ -1,31 +1,34 @@
-//! Background tick loop — runs every second, checks tasks, sends triggers.
-
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::{Mutex, RwLock, mpsc};
 use tokio_util::sync::CancellationToken;
 use tracing::info;
 
 use crate::persistence::durable_snapshot;
+use crate::save_worker::{SaveMessage, SaveRequest};
 use crate::scheduler::ActiveBinding;
 use crate::task::ScheduledTask;
 use crate::tick_context::TickContext;
 use crate::trigger::ScheduledTrigger;
 
-/// Core tick loop — every second, surveys + mutates tasks, sends triggers.
+/// Two-phase locking (intentional): read survey → write mutate.
+/// Concurrent `add` / `remove` between phases is safe — the id-set
+/// snapshot taken in survey is matched against ids in mutate, so a
+/// task removed between phases is simply skipped.
 ///
-/// Stops on `cancel`, dropped `trigger_tx` receiver, or send-cancellation race.
+/// Persistence: post-mutation snapshot of durable tasks is pushed to
+/// the save-worker channel while still under `tasks.write`. The worker
+/// runs `save_all` (fsync) outside any task lock, so concurrent
+/// `list`/`add`/`remove` never wait on disk I/O. At most one save
+/// request per tick. Retries fire on `dirty == true` even when no
+/// mutations occurred.
 ///
-/// **Two-phase locking** (intentional): read survey → write mutate. Concurrent
-/// `add` / `remove` between phases is safe (see helper docs).
-///
-/// **Persistence**: post-mutation snapshot of durable tasks is saved while the
-/// write lock is still held — at most one save per tick. Retries fire on
-/// `dirty == true` even when no mutations occurred this tick.
+/// Stops on `cancel`, dropped `trigger_tx` receiver, or send-cancel race.
 pub(crate) async fn tick_loop(
     ctx: TickContext,
-    trigger_tx: tokio::sync::mpsc::Sender<ScheduledTrigger>,
+    trigger_tx: mpsc::Sender<ScheduledTrigger>,
     cancel: CancellationToken,
 ) {
     let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
@@ -43,21 +46,24 @@ pub(crate) async fn tick_loop(
             continue;
         }
 
-        // Treat a disabled store as "no binding" for this tick so the
-        // retry path doesn't thrash trying to save into a file that
-        // `load_persisted` already refused to normalize.
+        // Treat a disabled store as "no binding" so the retry path
+        // doesn't thrash against a file `load_persisted` already refused.
         let resolved_binding = if ctx.store_disabled.load(Ordering::Acquire) {
             None
         } else {
             resolve_active(&ctx.active).await
         };
-        let triggers =
-            mutate_tasks(&ctx.tasks, &now, &firing_ids, resolved_binding, &ctx.dirty).await;
+        let triggers = mutate_tasks(
+            &ctx.tasks,
+            &now,
+            &firing_ids,
+            resolved_binding,
+            &ctx.dirty,
+            &ctx.store_disabled,
+            &ctx.save_tx,
+        )
+        .await;
 
-        // If anything fired (a recurring task's `last_fired` advanced,
-        // or a one-shot was removed after firing), the job set's
-        // user-visible state changed — broadcast so observers re-snapshot.
-        // No-op when no receivers are attached.
         if needs_write {
             let _ = ctx.change_tx.send(());
         }
@@ -75,9 +81,6 @@ pub(crate) async fn tick_loop(
     }
 }
 
-/// Snapshot the current `(storage, session_id)` from `active`, or `None`
-/// if either is unset. Cloning out lets `mutate_tasks` await the save
-/// without holding the active mutex while the storage I/O runs.
 async fn resolve_active(active: &Arc<Mutex<Option<ActiveBinding>>>) -> Option<ResolvedBinding> {
     let guard = active.lock().await;
     let binding = guard.as_ref()?;
@@ -93,31 +96,30 @@ struct ResolvedBinding {
     session_id: String,
 }
 
-/// Read-only survey: identify task ids that need firing.
 async fn survey_tasks(
     tasks: &Arc<RwLock<Vec<ScheduledTask>>>,
     now: &chrono::DateTime<chrono::Utc>,
-) -> (bool, Vec<String>) {
+) -> (bool, HashSet<String>) {
     let guard = tasks.read().await;
-    let mut firing = Vec::new();
+    let mut firing = HashSet::new();
     for task in guard.iter() {
         if task.should_fire(now) {
-            firing.push(task.id.clone());
+            firing.insert(task.id.clone());
         }
     }
     let needs_write = !firing.is_empty();
     (needs_write, firing)
 }
 
-/// Exclusive mutation: stamp `last_fired`, build triggers, remove
-/// one-shot tasks after firing, then persist if any durable task changed
-/// (or if the previous save failed). Returns the triggers to dispatch.
+#[allow(clippy::too_many_arguments)]
 async fn mutate_tasks(
     tasks: &Arc<RwLock<Vec<ScheduledTask>>>,
     now: &chrono::DateTime<chrono::Utc>,
-    firing_ids: &[String],
+    firing_ids: &HashSet<String>,
     binding: Option<ResolvedBinding>,
     dirty: &Arc<AtomicBool>,
+    store_disabled: &Arc<AtomicBool>,
+    save_tx: &mpsc::Sender<SaveMessage>,
 ) -> Vec<ScheduledTrigger> {
     let mut guard = tasks.write().await;
     let mut triggers = Vec::new();
@@ -154,11 +156,31 @@ async fn mutate_tasks(
         let retry_pending = dirty.load(Ordering::Acquire);
         if durable_touched || retry_pending {
             let snapshot = durable_snapshot(&guard);
-            match b.storage.save_all(&b.session_id, &snapshot).await {
-                Ok(()) => dirty.store(false, Ordering::Release),
-                Err(e) => {
-                    tracing::error!(error = %e, "cron durable save failed in tick");
+            // Drop the tasks write lock before queuing the save so the
+            // worker's I/O cannot block other mutations.
+            drop(guard);
+            let req = SaveRequest {
+                storage: b.storage,
+                session_id: b.session_id,
+                snapshot,
+                dirty: dirty.clone(),
+                store_disabled: store_disabled.clone(),
+            };
+            // try_send (not send().await) mirrors `persist_locked` — a
+            // backed-up worker shouldn't extend the tick interval; the
+            // dirty flag will trigger a retry on the next tick once the
+            // worker drains.
+            match save_tx.try_send(SaveMessage::Save(req)) {
+                Ok(()) => {}
+                Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
+                    tracing::warn!("cron save worker queue full; deferring to next tick");
                     dirty.store(true, Ordering::Release);
+                }
+                Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {
+                    tracing::error!(
+                        "cron save worker channel closed; latching store_disabled to stop retries"
+                    );
+                    store_disabled.store(true, Ordering::Release);
                 }
             }
         }

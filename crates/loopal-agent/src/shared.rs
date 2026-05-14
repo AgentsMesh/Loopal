@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
+use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 use loopal_ipc::connection::Connection;
@@ -8,7 +9,7 @@ use loopal_kernel::Kernel;
 use loopal_message::Message;
 use loopal_protocol::{AgentEvent, AgentStateSnapshot, Envelope, MessageSource};
 use loopal_runtime::GoalRuntimeSession;
-use loopal_scheduler::CronScheduler;
+use loopal_scheduler::{CronScheduler, ScheduledTrigger};
 
 use crate::state_snapshot::{cron_info_to_snapshot, task_to_snapshot};
 use crate::task_store::TaskStore;
@@ -16,32 +17,33 @@ use crate::types::TaskStatus;
 
 /// Handle to the per-agent cron scheduler.
 ///
-/// Owns the `CronScheduler` (for tool access) and the `CancellationToken`
-/// (to stop the tick loop on drop).
+/// The tick loop does NOT start at construction. Callers must invoke
+/// [`start`](SchedulerHandle::start) after binding the scheduler to a
+/// session via `switch_session` so the first survey sees the loaded
+/// task set rather than running empty.
 pub struct SchedulerHandle {
     pub scheduler: Arc<CronScheduler>,
     cancel: CancellationToken,
+    /// Trigger sender held until `start()` activates the tick loop.
+    /// `None` after `start()` returns, or when constructed via `new`
+    /// (which expects the caller to drive lifecycle manually).
+    pending: std::sync::Mutex<Option<mpsc::Sender<ScheduledTrigger>>>,
 }
 
 impl SchedulerHandle {
-    /// Create a fully wired scheduler pipeline.
-    ///
-    /// Starts the tick loop and an adapter task that converts
-    /// `ScheduledTrigger` → `Envelope` for the agent loop.
-    /// Returns the handle (for tools) and a receiver (for `AgentLoopParams`).
-    pub fn create() -> (Self, tokio::sync::mpsc::Receiver<Envelope>) {
+    pub fn create() -> (Self, mpsc::Receiver<Envelope>) {
         Self::create_with_scheduler(Arc::new(CronScheduler::new()))
     }
 
-    /// Create with a custom `CronScheduler` (e.g., one using `ManualClock`).
+    /// Build a handle wrapping `scheduler`. Spawns the trigger→Envelope
+    /// adapter so the returned receiver is wired immediately, but the
+    /// cron tick loop stays idle until `start()` is called.
     pub fn create_with_scheduler(
         scheduler: Arc<CronScheduler>,
-    ) -> (Self, tokio::sync::mpsc::Receiver<Envelope>) {
+    ) -> (Self, mpsc::Receiver<Envelope>) {
         let cancel = CancellationToken::new();
-        let (trigger_tx, mut trigger_rx) = tokio::sync::mpsc::channel(16);
-        scheduler.start(trigger_tx, cancel.clone());
-
-        let (env_tx, env_rx) = tokio::sync::mpsc::channel(16);
+        let (trigger_tx, mut trigger_rx) = mpsc::channel::<ScheduledTrigger>(16);
+        let (env_tx, env_rx) = mpsc::channel(16);
         tokio::spawn(async move {
             while let Some(t) = trigger_rx.recv().await {
                 let env = Envelope::new(MessageSource::Scheduled, "self", t.prompt);
@@ -51,13 +53,37 @@ impl SchedulerHandle {
             }
         });
 
-        (Self { scheduler, cancel }, env_rx)
+        (
+            Self {
+                scheduler,
+                cancel,
+                pending: std::sync::Mutex::new(Some(trigger_tx)),
+            },
+            env_rx,
+        )
     }
 
-    /// Create a handle without starting the pipeline (for tests that
-    /// manage the scheduler lifecycle manually).
+    /// Start the cron tick loop. Idempotent at this layer: the second
+    /// call observes `pending == None` and returns silently. The
+    /// underlying `CronScheduler::start` still asserts single-start —
+    /// this wrapper's `pending.take()` ensures that contract is only
+    /// reached once even when `start()` is invoked repeatedly.
+    pub fn start(&self) {
+        let tx = match self.pending.lock().unwrap().take() {
+            Some(tx) => tx,
+            None => return,
+        };
+        self.scheduler.start(tx, self.cancel.clone());
+    }
+
+    /// Construct without the adapter pipeline — for tests that drive
+    /// the scheduler lifecycle directly.
     pub fn new(scheduler: Arc<CronScheduler>, cancel: CancellationToken) -> Self {
-        Self { scheduler, cancel }
+        Self {
+            scheduler,
+            cancel,
+            pending: std::sync::Mutex::new(None),
+        }
     }
 }
 

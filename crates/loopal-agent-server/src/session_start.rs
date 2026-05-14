@@ -102,6 +102,14 @@ pub(crate) async fn start_session(
         {
             tracing::warn!(error = %e, "failed to bind scheduler to session");
         }
+        // Wait for the previous session's flush + this session's
+        // normalization save to land on disk before the tick loop
+        // starts firing. Setup-time block is acceptable; tick-time
+        // saves remain fire-and-forget.
+        scheduler_for_bridge.wait_idle().await;
+        // Tick loop activates after switch_session so the first survey
+        // sees the loaded task set, not an empty in-memory state.
+        agent_shared_for_session.scheduler_handle.start();
 
         let session_id = agent_params.session().id.clone();
         tracing::Span::current().record("session.id", session_id.as_str());

@@ -1,20 +1,3 @@
-//! Atomic JSON file I/O helpers shared by cron persistence stores.
-//!
-//! Centralizes three operations that every file-backed store needs:
-//!
-//! 1. [`read_or_empty`] — read a file, treating "missing" as empty bytes
-//!    so first-ever-use is not an error.
-//! 2. [`write_atomic`] — write via `<path>.tmp` + `fsync` + `rename`.
-//!    POSIX guarantees rename is atomic within a filesystem, so readers
-//!    always see either the previous or the new contents — never partial.
-//! 3. [`quarantine_path`] — rename a structurally-invalid file aside to
-//!    `<path>.bad-<unix-ms>` so the next save starts clean without
-//!    silently overwriting the user's durable state on schema upgrades.
-//!
-//! All functions are free functions (no struct state) so the same logic
-//! is reused by [`crate::persistence_file::FileDurableStore`] (single-path
-//! adapter) and the upcoming session-scoped store.
-
 use std::ffi::OsString;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -31,10 +14,9 @@ pub async fn read_or_empty(path: &Path) -> Result<Vec<u8>, PersistError> {
     }
 }
 
-/// Atomically replace `path` with `bytes`. Creates parent directories.
-///
-/// Sequence: write to `<name>.tmp` → `sync_all` → `rename` over `path`.
-/// The temp file does not linger after a successful call.
+/// Atomically replace `path` with `bytes` via `<name>.tmp` → `sync_all`
+/// → `rename`. POSIX guarantees rename is atomic within a filesystem;
+/// readers see either the previous or the new contents, never partial.
 pub async fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), PersistError> {
     if let Some(parent) = path.parent()
         && !parent.as_os_str().is_empty()
@@ -51,11 +33,8 @@ pub async fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), PersistError>
 }
 
 /// Move a corrupt or schema-incompatible file aside to `<path>.bad-<ts>`.
-///
-/// On success the original `path` no longer exists and the next save
-/// starts from empty. On rename failure the original is preserved and
-/// the error is returned — callers must refuse further writes to avoid
-/// clobbering data they cannot interpret.
+/// On rename failure the original is preserved — callers must refuse
+/// further writes to avoid clobbering data they cannot interpret.
 pub async fn quarantine_path(path: &Path, reason: &str) -> Result<(), PersistError> {
     let ts = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -84,10 +63,6 @@ pub async fn quarantine_path(path: &Path, reason: &str) -> Result<(), PersistErr
     }
 }
 
-/// Build a sibling path with `<original-filename><suffix>`.
-///
-/// Falls back to `cron.json<suffix>` if `path` has no file name component
-/// (extremely unlikely in practice, but guards against panic).
 fn sibling_with_extension(path: &Path, suffix: &str) -> PathBuf {
     let mut tmp = path.to_path_buf();
     let name = tmp

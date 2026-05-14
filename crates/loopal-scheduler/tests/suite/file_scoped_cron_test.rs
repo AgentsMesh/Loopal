@@ -87,8 +87,8 @@ async fn load_quarantines_corrupt_session_file() {
 
 #[tokio::test]
 async fn legacy_cron_json_loads_unchanged() {
-    // Backward-compat: a fixture matching the v1 schema written by the
-    // legacy `FileDurableStore` must decode identically here.
+    // Backward-compat: a fixture matching the v1 schema must decode
+    // identically here.
     let dir = tempdir().unwrap();
     let session_dir = dir.path().join("legacy");
     tokio::fs::create_dir_all(&session_dir).await.unwrap();
@@ -101,6 +101,44 @@ async fn legacy_cron_json_loads_unchanged() {
     assert_eq!(out.len(), 1);
     assert_eq!(out[0].id, "abc12345");
     assert_eq!(out[0].prompt, "hello");
+    assert!(out[0].last_fired_unix_ms.is_none());
+}
+
+#[tokio::test]
+async fn future_schema_extra_fields_are_ignored() {
+    // Forward-compat: a future writer adding extra fields must still
+    // decode here (extras silently dropped), not quarantine the file.
+    let dir = tempdir().unwrap();
+    let session_dir = dir.path().join("future");
+    tokio::fs::create_dir_all(&session_dir).await.unwrap();
+    let payload = br#"{"version":1,"tasks":[{"id":"future01","cron":"*/5 * * * *","prompt":"hi","recurring":true,"created_at_unix_ms":1700000000000,"future_field":"ignored","priority":42}]}"#;
+    tokio::fs::write(session_dir.join("cron.json"), payload)
+        .await
+        .unwrap();
+    let store = FileScopedCronStore::new(dir.path().to_path_buf());
+    let out = store.load("future").await.unwrap();
+    assert_eq!(out.len(), 1);
+    assert_eq!(out[0].id, "future01");
+}
+
+#[tokio::test]
+async fn missing_optional_fields_load_with_defaults() {
+    // Forward-compat: a task missing every optional field must still
+    // load — `id` and `cron` provide hard floors via into_task validation.
+    let dir = tempdir().unwrap();
+    let session_dir = dir.path().join("sparse");
+    tokio::fs::create_dir_all(&session_dir).await.unwrap();
+    let payload = br#"{"version":1,"tasks":[{"id":"sparse01","cron":"*/5 * * * *"}]}"#;
+    tokio::fs::write(session_dir.join("cron.json"), payload)
+        .await
+        .unwrap();
+    let store = FileScopedCronStore::new(dir.path().to_path_buf());
+    let out = store.load("sparse").await.unwrap();
+    assert_eq!(out.len(), 1);
+    assert_eq!(out[0].id, "sparse01");
+    assert_eq!(out[0].prompt, "");
+    assert!(!out[0].recurring);
+    assert_eq!(out[0].created_at_unix_ms, 0);
     assert!(out[0].last_fired_unix_ms.is_none());
 }
 

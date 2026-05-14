@@ -3,25 +3,19 @@ use std::str::FromStr;
 use chrono::{DateTime, Utc};
 use cron::Schedule;
 
-/// Parsed cron expression wrapper.
-///
-/// Uses the 7-field `cron` crate format internally (seconds + 5-field + year),
-/// but accepts standard 5-field input by prepending `0` (seconds) and
-/// appending `*` (year).
+/// Standard 5-field cron expression. Stored as the 7-field form
+/// (`sec min hour dom mon dow year`) the `cron` crate expects.
 #[derive(Debug, Clone)]
 pub struct CronExpression {
     schedule: Schedule,
-    /// Original 5-field expression string for display.
     raw: String,
 }
 
 impl CronExpression {
-    /// Parse a standard 5-field cron expression (minute hour dom month dow).
     pub fn parse(expr: &str) -> Result<Self, CronParseError> {
         Self::parse_at(expr, Utc::now())
     }
 
-    /// Parse with an explicit reference time (for deterministic testing).
     pub fn parse_at(expr: &str, now: DateTime<Utc>) -> Result<Self, CronParseError> {
         let fields: Vec<&str> = expr.split_whitespace().collect();
         if fields.len() != 5 {
@@ -41,12 +35,10 @@ impl CronExpression {
         })
     }
 
-    /// Return the next occurrence strictly after `after`.
     pub fn next_after(&self, after: &DateTime<Utc>) -> Option<DateTime<Utc>> {
         self.schedule.after(after).next()
     }
 
-    /// Original 5-field expression string.
     pub fn as_str(&self) -> &str {
         &self.raw
     }
@@ -58,12 +50,9 @@ impl std::fmt::Display for CronExpression {
     }
 }
 
-/// Errors when parsing a cron expression.
 #[derive(Debug, Clone, PartialEq)]
 pub enum CronParseError {
-    /// Expected exactly 5 fields.
     InvalidFieldCount(usize),
-    /// Underlying cron parser error.
     ParseFailed(String),
     /// Expression has no future occurrence (e.g. February 30).
     NoOccurrence,

@@ -1,84 +1,78 @@
-//! `CronScheduler` methods that touch the [`SessionScopedCronStorage`].
-//!
-//! Split out so `scheduler.rs` stays focused on the in-memory CRUD path
-//! and persistence integration has room to grow (loading, retry, schema
-//! evolution).
-//!
-//! Both `persist_locked` and `load_persisted` consult
-//! [`crate::scheduler::ActiveBinding`] under the `active` mutex to fetch
-//! the current `(session_id, storage)`. Lock order is always
-//! `tasks` → `active` (see [`crate::scheduler`] module docs).
-
 use std::sync::atomic::Ordering;
 
 use crate::persistence::{PersistError, durable_snapshot};
+use crate::save_worker::{SaveMessage, SaveRequest};
 use crate::scheduler::{CronScheduler, MAX_TASKS};
 use crate::task::ScheduledTask;
 
 impl CronScheduler {
-    /// Write the current durable-task snapshot to the attached storage.
+    /// Called with `tasks` write lock held. Snapshots the durable
+    /// subset and enqueues the save on the background worker — the
+    /// actual fsync runs without holding any task lock. Failure to
+    /// enqueue (full or closed channel) sets `dirty` so the next tick
+    /// retries.
     ///
-    /// Callers must hold the `tasks` write lock so concurrent mutations
-    /// don't interleave saves. A `None` binding (no storage attached, or
-    /// session not yet bound) is a no-op. Failure is logged and sets the
-    /// `dirty` flag so the next tick or mutation retries.
-    ///
-    /// If `store_disabled` is latched (e.g. quarantine failed at load
-    /// time), this becomes a silent no-op — preventing clobbering an
-    /// unrecognized on-disk file with an empty in-memory set.
+    /// No-op when no binding, `store_disabled` is latched, or there's
+    /// no session yet (the latter prevents clobbering on-disk state
+    /// during the brief window between session storage attach and
+    /// `switch_session`).
     pub(crate) async fn persist_locked(&self, tasks: &[ScheduledTask]) {
         if self.store_disabled.load(Ordering::Acquire) {
             return;
         }
-        let active = self.active.lock().await;
-        let Some(binding) = active.as_ref() else {
-            return;
-        };
-        let Some(session_id) = binding.session_id.as_ref() else {
-            return;
+        let (storage, session_id) = {
+            let active = self.active.lock().await;
+            let Some(binding) = active.as_ref() else {
+                return;
+            };
+            let Some(sid) = binding.session_id.as_ref() else {
+                return;
+            };
+            (binding.storage.clone(), sid.clone())
         };
         let snapshot = durable_snapshot(tasks);
-        match binding.storage.save_all(session_id, &snapshot).await {
-            Ok(()) => {
-                self.dirty.store(false, Ordering::Release);
-            }
-            Err(e) => {
-                tracing::error!(error = %e, "cron durable save failed; will retry");
+        let req = SaveRequest {
+            storage,
+            session_id,
+            snapshot,
+            dirty: self.dirty.clone(),
+            store_disabled: self.store_disabled.clone(),
+        };
+        // try_send so a full channel doesn't block the caller (which
+        // still holds tasks.write). Worst case: dirty=true → next tick
+        // retries after the worker drains.
+        match self.save_tx.try_send(SaveMessage::Save(req)) {
+            Ok(()) => {}
+            Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
+                tracing::warn!("cron save worker queue full; deferring to next tick");
                 self.dirty.store(true, Ordering::Release);
+            }
+            Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {
+                tracing::error!(
+                    "cron save worker channel closed; latching store_disabled to stop retries"
+                );
+                self.store_disabled.store(true, Ordering::Release);
             }
         }
     }
 
-    /// Load persisted tasks from the storage into memory.
-    ///
-    /// Internal helper invoked by [`switch_session`](crate::CronScheduler::switch_session).
-    /// External callers should use `switch_session(id)` instead — it
+    /// Internal — external callers use `switch_session(id)` which
     /// performs flush + clear + load atomically.
     ///
-    /// **Preconditions**: assumes the in-memory task list is empty —
-    /// calling this on a populated scheduler panics in debug builds
-    /// and silently prefers existing IDs in release builds.
-    ///
-    /// **Filter rules** (drop-on-load, no catch-up):
+    /// Filter rules (drop-on-load, no catch-up):
     /// - one-shot already fired (`last_fired.is_some()`)
-    /// - one-shot whose next fire time has passed (`next_after(created_at) ≤ now`)
+    /// - one-shot whose next fire time has passed
     ///
-    /// **Normalization**: for recurring tasks whose scheduled reference
-    /// (`last_fired` or `created_at`) is in the past — which would
-    /// otherwise cause an immediate "catch-up" fire on the next tick —
-    /// the `last_fired` field is clamped to `now`.
+    /// Normalization: for recurring tasks whose `next_after(reference)`
+    /// is already in the past, `last_fired` is clamped to `now` to
+    /// prevent an immediate catch-up fire on the next tick.
     ///
-    /// **Capacity**: if the on-disk set exceeds [`MAX_TASKS`], the
-    /// extras are dropped with a warning so subsequent `add` calls can
-    /// still succeed.
-    ///
-    /// **Side effect**: rewrites the storage only when the loaded set
-    /// was actually filtered / truncated / clamped, to keep mtime
-    /// stable on clean loads.
+    /// Capacity: if the on-disk set exceeds `MAX_TASKS`, extras are
+    /// dropped with a warning. Rewrites the storage only when the
+    /// loaded set was actually filtered, truncated, or clamped — so
+    /// clean loads keep mtime stable.
     pub(crate) async fn load_persisted(&self) -> Result<usize, PersistError> {
-        // Lock order: tasks → active. Acquire `tasks` first to keep
-        // ordering symmetric with `persist_locked` callers (add/remove)
-        // and `switch_session`.
+        // Lock order: tasks → active.
         let mut guard = self.tasks.write().await;
         let (storage, session_id) = {
             let active = self.active.lock().await;

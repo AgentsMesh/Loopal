@@ -25,7 +25,7 @@ async fn child_permission_request_denied() {
         &conn,
         &fixture,
         "run a command",
-        serde_json::json!({"permission": "{\"mode\":\"ask_any_write\",\"decision\":\"manual\"}"}),
+        serde_json::json!({"permission_mode": "ask_any_write", "decision_mode": "manual"}),
     )
     .await;
 

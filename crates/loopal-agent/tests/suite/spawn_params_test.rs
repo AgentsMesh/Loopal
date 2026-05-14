@@ -9,7 +9,8 @@ fn base_params(target: SpawnTarget) -> SpawnParams {
         name: "child".into(),
         prompt: "do work".into(),
         model: Some("claude-opus-4-7".into()),
-        permission: Some("{\"mode\":\"ask_any_write\",\"decision\":\"manual\"}".into()),
+        permission_mode: Some("ask_any_write".into()),
+        decision_mode: Some("manual".into()),
         agent_type: None,
         depth: 1,
         no_sandbox: false,
@@ -79,10 +80,8 @@ fn crosshub_still_carries_advisory_fields() {
         hub_id: "hub-b".into(),
     });
     let req = build_spawn_request(&params, &parent_cwd);
-    assert_eq!(
-        req["permission"],
-        "{\"mode\":\"ask_any_write\",\"decision\":\"manual\"}"
-    );
+    assert_eq!(req["permission_mode"], "ask_any_write");
+    assert_eq!(req["decision_mode"], "manual");
     assert_eq!(req["model"], "claude-opus-4-7");
     assert_eq!(req["depth"], 1);
 }
@@ -118,6 +117,5 @@ fn crosshub_propagates_no_sandbox() {
     });
     params.no_sandbox = true;
     let req = build_spawn_request(&params, &parent_cwd);
-    // Behavior flag — not filesystem-coupled, so it crosses hub boundaries.
     assert_eq!(req["no_sandbox"], true);
 }

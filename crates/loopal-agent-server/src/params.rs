@@ -21,10 +21,8 @@ pub struct StartParams {
     pub model: Option<String>,
     pub mode: Option<String>,
     pub prompt: Option<String>,
-    /// JSON-encoded `{"mode": "<permission_mode>", "decision": "<decision_mode>"}`
-    /// (e.g. `{"mode":"ask_dangerous","decision":"classifier"}`).
-    /// Both fields are required; see `parse_permission_argv`.
-    pub permission: Option<String>,
+    pub permission_mode: Option<String>,
+    pub decision_mode: Option<String>,
     pub no_sandbox: bool,
     pub resume: Option<String>,
     pub lifecycle: loopal_runtime::LifecycleMode,
@@ -68,36 +66,25 @@ pub fn build_kernel_with_provider(
     Ok(Arc::new(kernel))
 }
 
-pub(crate) fn apply_start_overrides(settings: &mut loopal_config::Settings, start: &StartParams) {
+pub fn apply_start_overrides(settings: &mut loopal_config::Settings, start: &StartParams) {
     if let Some(ref model) = start.model {
         settings.model = model.clone();
     }
-    if let Some(ref perm) = start.permission {
-        match parse_permission_argv(perm) {
-            Ok((mode, decision)) => {
-                settings.permission_mode = mode;
-                settings.decision_mode = decision;
-            }
-            Err(e) => {
-                tracing::warn!(input = %perm, error = %e, "invalid permission spawn arg, ignoring");
-            }
+    if let Some(ref mode) = start.permission_mode {
+        if let Ok(parsed) = mode.parse::<loopal_tool_api::PermissionMode>() {
+            settings.permission_mode = parsed;
+        } else {
+            tracing::warn!(input = %mode, "invalid permission_mode, ignoring");
+        }
+    }
+    if let Some(ref decision) = start.decision_mode {
+        if let Ok(parsed) = decision.parse::<DecisionMode>() {
+            settings.decision_mode = parsed;
+        } else {
+            tracing::warn!(input = %decision, "invalid decision_mode, ignoring");
         }
     }
     if start.no_sandbox {
         settings.sandbox.policy = loopal_config::SandboxPolicy::Disabled;
     }
-}
-
-#[derive(serde::Deserialize)]
-struct PermissionEncoding {
-    mode: loopal_tool_api::PermissionMode,
-    decision: DecisionMode,
-}
-
-pub fn parse_permission_argv(
-    s: &str,
-) -> Result<(loopal_tool_api::PermissionMode, DecisionMode), String> {
-    let parsed: PermissionEncoding =
-        serde_json::from_str(s).map_err(|e| format!("invalid permission JSON: {e}"))?;
-    Ok((parsed.mode, parsed.decision))
 }

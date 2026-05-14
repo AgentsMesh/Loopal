@@ -8,7 +8,8 @@ pub struct RemoteSpawnArgs {
     pub cwd: String,
     pub model: Option<String>,
     pub prompt: Option<String>,
-    pub permission: Option<String>,
+    pub permission_mode: Option<String>,
+    pub decision_mode: Option<String>,
     pub agent_type: Option<String>,
     pub depth: Option<u32>,
     pub parent: Option<String>,
@@ -30,18 +31,20 @@ pub fn prepare_remote_spawn_args(
     let prompt = params["prompt"].as_str().map(String::from);
     // reason: cross-hub child has no path to a UI; force Bypass + Manual so misconfigured
     // callers get a working—if permissive—agent rather than 30s timeout denials.
-    let bypass_manual = serde_json::json!({"mode": "bypass", "decision": "manual"}).to_string();
-    let requested = params["permission"].as_str();
-    if let Some(pm) = requested
-        && pm != bypass_manual
+    let requested_mode = params["permission_mode"].as_str();
+    let requested_decision = params["decision_mode"].as_str();
+    if requested_mode.is_some_and(|m| m != "bypass")
+        || requested_decision.is_some_and(|d| d != "manual")
     {
         tracing::warn!(
             agent = %params["name"].as_str().unwrap_or(""),
-            requested = %pm,
-            "cross-hub spawn: clamping permission to Bypass + Manual (no UI on remote hub)"
+            requested_mode = ?requested_mode,
+            requested_decision = ?requested_decision,
+            "cross-hub spawn: clamping to Bypass + Manual (no UI on remote hub)"
         );
     }
-    let permission = Some(bypass_manual);
+    let permission_mode = Some("bypass".to_string());
+    let decision_mode = Some("manual".to_string());
     let agent_type = params["agent_type"].as_str().map(String::from);
     let depth = params["depth"].as_u64().map(|v| v as u32).map(|d| d.max(1));
     let parent = match params["parent"].as_str() {
@@ -62,7 +65,8 @@ pub fn prepare_remote_spawn_args(
         cwd: default_cwd.to_string_lossy().into_owned(),
         model,
         prompt,
-        permission,
+        permission_mode,
+        decision_mode,
         agent_type,
         depth,
         parent,

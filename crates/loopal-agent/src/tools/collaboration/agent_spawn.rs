@@ -59,11 +59,6 @@ pub(super) async fn action_spawn(
         .unwrap_or_else(|| shared.kernel.settings().model.clone());
     let no_sandbox = shared.no_sandbox();
     let settings = shared.kernel.settings();
-    let permission = serde_json::json!({
-        "mode": settings.permission_mode,
-        "decision": settings.decision_mode,
-    })
-    .to_string();
     let target = build_spawn_target(target_hub, cwd_override, build_fork_context(&shared));
     let result = spawn_agent(
         &shared,
@@ -71,7 +66,8 @@ pub(super) async fn action_spawn(
             name: name.clone(),
             prompt: prompt.to_string(),
             model: Some(model),
-            permission: Some(permission),
+            permission_mode: Some(settings.permission_mode.to_string()),
+            decision_mode: Some(settings.decision_mode.to_string()),
             agent_type: subagent_type.map(String::from),
             depth: shared.depth + 1,
             no_sandbox,

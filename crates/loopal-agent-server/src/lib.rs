@@ -77,7 +77,7 @@ pub mod testing {
     pub use crate::cron_bridge::spawn_with_receiver as cron_bridge_spawn_with_receiver;
     pub use crate::ipc_handlers::SessionRef;
     pub use crate::params::AgentSetupResult;
-    pub use crate::params::{StartParams, build_kernel_with_provider, parse_permission_argv};
+    pub use crate::params::{StartParams, apply_start_overrides, build_kernel_with_provider};
     pub use crate::session_handlers_factory::build_session_handlers;
     pub use crate::session_hub::{SessionHub, SharedSession};
     pub use crate::session_hub_storage::SessionHubError;

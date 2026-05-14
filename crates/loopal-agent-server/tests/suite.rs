@@ -1,5 +1,7 @@
 #[path = "suite/agent_setup_helpers_test.rs"]
 mod agent_setup_helpers_test;
+#[path = "suite/apply_start_overrides_test.rs"]
+mod apply_start_overrides_test;
 #[path = "suite/bg_task_bridge_test.rs"]
 mod bg_task_bridge_test;
 #[path = "suite/bridge_basic_test.rs"]
@@ -40,8 +42,8 @@ mod observer_join_edge_test;
 mod observer_join_test;
 #[path = "suite/params_test.rs"]
 mod params_test;
-#[path = "suite/parse_permission_argv_test.rs"]
-mod parse_permission_argv_test;
+#[path = "suite/permission_mode_e2e_test.rs"]
+mod permission_mode_e2e_test;
 #[path = "suite/resolve_sessions_root_test.rs"]
 mod resolve_sessions_root_test;
 #[path = "suite/resume_e2e_helpers.rs"]

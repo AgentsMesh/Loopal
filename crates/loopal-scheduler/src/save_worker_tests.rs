@@ -98,7 +98,11 @@ async fn save_failure_sets_dirty() {
     ack_rx.await.unwrap();
 
     assert!(dirty.load(Ordering::Acquire), "failure must latch dirty");
-    assert_eq!(probe.save_count().await, 0, "save_all errored before recording");
+    assert_eq!(
+        probe.save_count().await,
+        0,
+        "save_all errored before recording"
+    );
     drop(tx);
 }
 
@@ -136,7 +140,11 @@ async fn store_disabled_skips_save() {
     tx.send(SaveMessage::Barrier(ack_tx)).await.unwrap();
     ack_rx.await.unwrap();
 
-    assert_eq!(probe.save_count().await, 0, "disabled store must not be hit");
+    assert_eq!(
+        probe.save_count().await,
+        0,
+        "disabled store must not be hit"
+    );
     assert!(
         dirty.load(Ordering::Acquire),
         "dirty must not be cleared when save was skipped"

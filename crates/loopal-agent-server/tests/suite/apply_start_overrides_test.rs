@@ -117,9 +117,11 @@ fn invalid_decision_mode_ignored() {
 
 #[test]
 fn settings_file_values_preserved_when_cli_unspecified() {
-    let mut settings = Settings::default();
-    settings.permission_mode = PermissionMode::AskDangerous;
-    settings.decision_mode = DecisionMode::Classifier;
+    let mut settings = Settings {
+        permission_mode: PermissionMode::AskDangerous,
+        decision_mode: DecisionMode::Classifier,
+        ..Default::default()
+    };
 
     let start = default_start_params();
 

@@ -88,16 +88,16 @@ async fn collect_events_until_terminal(
     while tokio::time::Instant::now() < deadline {
         match tokio::time::timeout(Duration::from_secs(3), rx.recv()).await {
             Ok(Some(Incoming::Notification { method, params })) => {
-                if method == methods::AGENT_EVENT.name {
-                    if let Ok(ev) = serde_json::from_value::<AgentEvent>(params) {
-                        let terminal = matches!(
-                            ev.payload,
-                            AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
-                        );
-                        events.push(ev.payload);
-                        if terminal {
-                            break;
-                        }
+                if method == methods::AGENT_EVENT.name
+                    && let Ok(ev) = serde_json::from_value::<AgentEvent>(params)
+                {
+                    let terminal = matches!(
+                        ev.payload,
+                        AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
+                    );
+                    events.push(ev.payload);
+                    if terminal {
+                        break;
                     }
                 }
             }
@@ -126,17 +126,17 @@ async fn collect_events_until_terminal(
 async fn only_decision_mode_keeps_permission_bypass() {
     // Simple tool call that would trigger permission check if mode != Bypass
     let calls = vec![
-        chunks::tool_turn("tc-read", "Read", serde_json::json!({"file_path": "/tmp/test.txt"})),
+        chunks::tool_turn(
+            "tc-read",
+            "Read",
+            serde_json::json!({"file_path": "/tmp/test.txt"}),
+        ),
         chunks::text_turn("done"),
     ];
     let (client, mut rx, _fixture) = start_test_server(calls).await;
 
     // Start with ONLY decision_mode specified — permission_mode should remain Bypass
-    let resp = init_and_start(
-        &client,
-        serde_json::json!({"decision_mode": "classifier"}),
-    )
-    .await;
+    let resp = init_and_start(&client, serde_json::json!({"decision_mode": "classifier"})).await;
     assert!(resp.get("session_id").is_some());
 
     let events = collect_events_until_terminal(&mut rx, &client).await;
@@ -185,7 +185,10 @@ async fn only_permission_mode_keeps_decision_manual() {
             AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
         )
     });
-    assert!(finished, "session should complete normally with manual decision mode");
+    assert!(
+        finished,
+        "session should complete normally with manual decision mode"
+    );
 }
 
 /// Verify that specifying neither keeps both at defaults (Bypass + Manual).
@@ -207,5 +210,8 @@ async fn neither_specified_uses_defaults() {
             AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
         )
     });
-    assert!(finished, "session should complete normally with default settings");
+    assert!(
+        finished,
+        "session should complete normally with default settings"
+    );
 }

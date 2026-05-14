@@ -25,6 +25,26 @@ impl App {
             .unwrap_or_default()
     }
 
+    pub fn tool_count_for(&self, agent: &str) -> u32 {
+        self.view_clients
+            .get(agent)
+            .map(|vc| vc.state().state().agent.tool_count())
+            .unwrap_or(0)
+    }
+
+    pub fn tools_in_flight_for(&self, agent: &str) -> u32 {
+        self.view_clients
+            .get(agent)
+            .map(|vc| vc.state().state().agent.tools_in_flight())
+            .unwrap_or(0)
+    }
+
+    pub fn last_tool_for(&self, agent: &str) -> Option<String> {
+        self.view_clients
+            .get(agent)
+            .and_then(|vc| vc.state().state().agent.last_tool())
+    }
+
     pub fn thread_goal_for(&self, agent: &str) -> Option<ThreadGoal> {
         self.view_clients
             .get(agent)

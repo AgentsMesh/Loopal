@@ -11,10 +11,16 @@ fn tool_call_increments_count_and_in_flight_and_records_last_tool() {
         name: "Bash".into(),
         input: serde_json::json!({}),
     });
-    let obs = &r.state().agent.observable;
-    assert_eq!(obs.tool_count, 1);
-    assert_eq!(obs.tools_in_flight, 1);
-    assert_eq!(obs.last_tool.as_deref(), Some("Bash"));
+    let obs = &r.state().agent; /* observable now lifted to AgentView methods */
+    assert_eq!(obs.tool_count(), 1);
+    assert_eq!(obs.tools_in_flight(), 1);
+    assert!(
+        obs.last_tool()
+            .as_ref()
+            .is_some_and(|s| s.starts_with("Bash")),
+        "expected last_tool to start with 'Bash', got {:?}",
+        obs.last_tool()
+    );
 }
 
 #[test]
@@ -33,7 +39,57 @@ fn tool_result_decrements_in_flight() {
         duration_ms: None,
         metadata: None,
     });
-    assert_eq!(r.state().agent.observable.tools_in_flight, 0);
+    assert_eq!(r.state().agent.tools_in_flight(), 0);
+}
+
+#[test]
+fn tool_result_clears_last_tool_when_no_in_flight_remaining() {
+    let mut r = ViewStateReducer::new("root");
+    r.apply(AgentEventPayload::ToolCall {
+        id: "1".into(),
+        name: "Bash".into(),
+        input: serde_json::json!({}),
+    });
+    r.apply(AgentEventPayload::ToolResult {
+        id: "1".into(),
+        name: "Bash".into(),
+        result: "ok".into(),
+        is_error: false,
+        duration_ms: None,
+        metadata: None,
+    });
+    assert!(
+        r.state().agent.last_tool().is_none(),
+        "last_tool must clear when no tool in flight"
+    );
+}
+
+#[test]
+fn tool_result_keeps_last_tool_while_other_tools_active() {
+    let mut r = ViewStateReducer::new("root");
+    r.apply(AgentEventPayload::ToolCall {
+        id: "1".into(),
+        name: "Bash".into(),
+        input: serde_json::json!({}),
+    });
+    r.apply(AgentEventPayload::ToolCall {
+        id: "2".into(),
+        name: "Read".into(),
+        input: serde_json::json!({}),
+    });
+    r.apply(AgentEventPayload::ToolResult {
+        id: "1".into(),
+        name: "Bash".into(),
+        result: "ok".into(),
+        is_error: false,
+        duration_ms: None,
+        metadata: None,
+    });
+    assert_eq!(r.state().agent.tools_in_flight(), 1);
+    assert!(
+        r.state().agent.last_tool().is_some(),
+        "last_tool must persist while other tools still in flight"
+    );
 }
 
 #[test]
@@ -47,7 +103,7 @@ fn tool_result_does_not_underflow_when_no_call_in_flight() {
         duration_ms: None,
         metadata: None,
     });
-    assert_eq!(r.state().agent.observable.tools_in_flight, 0);
+    assert_eq!(r.state().agent.tools_in_flight(), 0);
 }
 
 #[test]
@@ -61,9 +117,9 @@ fn token_usage_replaces_input_output_counters() {
         cache_read_input_tokens: 0,
         thinking_tokens: 0,
     });
-    let obs = &r.state().agent.observable;
-    assert_eq!(obs.input_tokens, 100);
-    assert_eq!(obs.output_tokens, 50);
+    let obs = &r.state().agent; /* observable now lifted to AgentView methods */
+    assert_eq!(obs.observable.input_tokens, 100);
+    assert_eq!(obs.observable.output_tokens, 50);
 }
 
 #[test]

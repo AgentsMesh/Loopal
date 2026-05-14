@@ -3,53 +3,31 @@ use serde::{Deserialize, Serialize};
 /// Lifecycle status of an agent.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AgentStatus {
-    /// Agent is initializing.
     #[default]
     Starting,
-    /// Agent is actively processing (LLM call or tool execution).
     Running,
-    /// Agent is idle, waiting for the next message.
     WaitingForInput,
-    /// Agent has completed its task and exited normally.
     Finished,
-    /// Agent terminated due to an error.
     Error,
 }
 
-/// Observable state snapshot of a single agent.
+/// Observable agent state.
 ///
-/// Collected on the Observation Plane and consumed by the frontend to render
-/// per-agent status panels. All fields are cheap to clone.
-///
-/// **Status contract**: `status` is derived solely from agent events
-/// (`AwaitingInput`, `Finished`, `Error`, `Stream`, `ToolCall`, etc.).
-/// The agent loop's internal status field is for local idempotency only;
-/// this observable copy is the authoritative view for all external consumers.
+/// Tool-call counts (`tools_in_flight` / `tool_count` / `last_tool`) are
+/// **derived from the conversation transcript**, not stored here. Consumers
+/// call `AgentView::tools_in_flight()` / `tool_count()` / `last_tool()` to
+/// compute them on demand. This crate (`loopal-protocol`) has no access to
+/// the conversation, so the methods live on `AgentView`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ObservableAgentState {
-    /// Current lifecycle status.
     pub status: AgentStatus,
-    /// Total number of tool calls executed.
-    pub tool_count: u32,
-    /// Name of the most recently invoked tool, if any.
-    pub last_tool: Option<String>,
-    /// Number of completed LLM turns.
     pub turn_count: u32,
-    /// Cumulative input tokens consumed.
     pub input_tokens: u32,
-    /// Cumulative output tokens generated.
     pub output_tokens: u32,
-    /// Active model identifier (e.g. "claude-sonnet-4-20250514").
     pub model: String,
-    /// Active thinking config label ("auto", "disabled", "effort", "budget").
-    /// Normalized form of the JSON sent via `ControlCommand::ThinkingSwitch`.
     #[serde(default = "default_thinking_config")]
     pub thinking_config: String,
-    /// Current operating mode (e.g. "act", "plan").
     pub mode: String,
-    /// Number of tools currently executing in parallel.
-    #[serde(default)]
-    pub tools_in_flight: u32,
 }
 
 fn default_thinking_config() -> String {
@@ -60,15 +38,12 @@ impl Default for ObservableAgentState {
     fn default() -> Self {
         Self {
             status: AgentStatus::default(),
-            tool_count: 0,
-            last_tool: None,
             turn_count: 0,
             input_tokens: 0,
             output_tokens: 0,
             model: String::new(),
             thinking_config: default_thinking_config(),
             mode: "act".to_string(),
-            tools_in_flight: 0,
         }
     }
 }

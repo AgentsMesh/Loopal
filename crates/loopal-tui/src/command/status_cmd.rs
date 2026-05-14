@@ -72,7 +72,7 @@ fn collect_session_data(app: &App) -> (SessionSnapshot, UsageSnapshot) {
         context_window,
         context_used,
         turn_count: obs.turn_count,
-        tool_count: obs.tool_count,
+        tool_count: app.tool_count_for(&state.active_view),
     };
     (session, usage)
 }

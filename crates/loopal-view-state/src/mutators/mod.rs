@@ -11,7 +11,31 @@ use loopal_protocol::AgentEventPayload;
 
 use crate::state::SessionViewState;
 
-pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) -> bool {
+/// Outcome of a single mutator. Each mutator function returns one of these
+/// directly — there is no central "which event ends a turn" table. The
+/// mutator's domain logic decides the effect, and the reducer consumes it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum MutationEffect {
+    /// Event was a no-op (unrecognised, duplicate, empty-id rejected).
+    NoOp,
+    /// State changed; no turn lifecycle implication.
+    Mutated,
+    /// State changed AND this mutator marks turn-end — reducer must
+    /// reconcile still-active tool invocations into terminal states.
+    MutatedEndedTurn,
+}
+
+impl MutationEffect {
+    pub fn changed(self) -> bool {
+        !matches!(self, Self::NoOp)
+    }
+
+    pub fn requires_turn_end_reconcile(self) -> bool {
+        matches!(self, Self::MutatedEndedTurn)
+    }
+}
+
+pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) -> MutationEffect {
     use AgentEventPayload::*;
     match event {
         Started => observable::started(state),
@@ -26,17 +50,9 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
             name,
             result,
             is_error,
-            duration_ms,
             metadata,
-        } => tool::tool_result(
-            state,
-            id,
-            name,
-            result,
-            *is_error,
-            *duration_ms,
-            metadata.clone(),
-        ),
+            ..
+        } => tool::tool_result(state, id, name, result, *is_error, metadata.clone()),
         ToolBatchStart { tool_ids } => tool::tool_batch_start(state, tool_ids),
         ToolProgress {
             id, output_tail, ..
@@ -140,6 +156,6 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
         | InboxConsumed { .. }
         | TurnDiffSummary { .. }
         | SessionResumeWarnings { .. }
-        | QuestionDecided { .. } => false,
+        | QuestionDecided { .. } => MutationEffect::NoOp,
     }
 }

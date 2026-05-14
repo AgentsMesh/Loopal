@@ -142,7 +142,7 @@ fn extract_topology(
                     status: view.observable.status,
                     model: view.observable.model.clone(),
                     elapsed: view.elapsed(),
-                    tools_in_flight: view.observable.tools_in_flight,
+                    tools_in_flight: view.tools_in_flight(),
                     parent: view.parent.clone(),
                     children: view.children.clone(),
                 },

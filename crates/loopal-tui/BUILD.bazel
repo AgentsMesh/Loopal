@@ -15,6 +15,7 @@ rust_library(
         "//crates/loopal-runtime",
         "//crates/loopal-session",
         "//crates/loopal-tool-api",
+        "//crates/loopal-tool-invocation",
         "//crates/loopal-view-state",
         "@crates//:anyhow",
         "@crates//:arboard",
@@ -35,6 +36,13 @@ rust_library(
         "@crates//:unicode-width",
     ],
     proc_macro_deps = ["@crates//:async-trait"],
+)
+
+rust_test(
+    name = "loopal-tui-unit-test",
+    crate = ":loopal-tui",
+    edition = "2024",
+    deps = ["@crates//:tempfile"],
 )
 
 rust_test(
@@ -65,6 +73,7 @@ rust_test(
         "//crates/loopal-runtime",
         "//crates/loopal-session",
         "//crates/loopal-storage",
+        "//crates/loopal-tool-invocation",
         "//crates/loopal-view-state",
     ],
     proc_macro_deps = ["@crates//:async-trait"],

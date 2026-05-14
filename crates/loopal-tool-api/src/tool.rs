@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use loopal_tool_invocation::ToolResultMetadata;
 use serde::{Deserialize, Serialize};
 
 use loopal_error::LoopalError;
@@ -39,7 +40,7 @@ pub struct ToolResult {
     pub content: String,
     pub is_error: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<serde_json::Value>,
+    pub metadata: Option<ToolResultMetadata>,
 }
 
 impl ToolResult {
@@ -59,7 +60,7 @@ impl ToolResult {
         }
     }
 
-    pub fn with_metadata(mut self, metadata: serde_json::Value) -> Self {
+    pub fn with_metadata(mut self, metadata: ToolResultMetadata) -> Self {
         self.metadata = Some(metadata);
         self
     }

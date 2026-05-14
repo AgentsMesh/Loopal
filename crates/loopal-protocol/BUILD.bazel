@@ -7,10 +7,12 @@ rust_library(
     visibility = ["//visibility:public"],
     deps = [
         "//crates/loopal-message",
+        "//crates/loopal-tool-invocation",
         "@crates//:chrono",
         "@crates//:serde",
         "@crates//:serde_json",
         "@crates//:strum",
+        "@crates//:tokio",
         "@crates//:uuid",
     ],
 )
@@ -28,7 +30,9 @@ rust_test(
     deps = [
         ":loopal-protocol",
         "//crates/loopal-message",
+        "//crates/loopal-tool-invocation",
         "@crates//:serde_json",
         "@crates//:strum",
+        "@crates//:tokio",
     ],
 )

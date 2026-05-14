@@ -1,36 +1,32 @@
-//! Projection helpers from persisted history (`ProjectedMessage`) to
-//! display state (`SessionMessage`). The TUI calls
-//! `App::load_display_history` / `App::load_sub_agent_history`, both of
-//! which delegate here for the message-shape conversion.
+use std::time::{Duration, Instant};
 
 use loopal_protocol::ProjectedMessage;
-use loopal_view_state::{SessionMessage, SessionToolCall, ToolCallStatus};
+use loopal_view_state::{
+    FailureKind, InvocationId, InvocationState, Outcome, SessionMessage, StaleReason,
+    ToolInvocation, ToolResultMetadata,
+};
 
 pub fn into_session_message(p: ProjectedMessage) -> SessionMessage {
+    let now = Instant::now();
     SessionMessage {
         role: p.role,
         content: p.content,
         tool_calls: p
             .tool_calls
             .into_iter()
-            .map(|tc| SessionToolCall {
-                id: tc.id,
-                name: tc.name.clone(),
-                status: if tc.is_error {
-                    ToolCallStatus::Error
-                } else if tc.result.is_some() {
-                    ToolCallStatus::Success
-                } else {
-                    ToolCallStatus::Pending
-                },
-                summary: tc.summary,
-                result: tc.result,
-                tool_input: tc.input,
-                batch_id: None,
-                started_at: None,
-                duration_ms: None,
-                progress_tail: None,
-                metadata: tc.metadata,
+            .filter_map(|tc| {
+                let id = InvocationId::new(tc.id).ok()?;
+                let state = derive_state(&tc.result, tc.is_error, tc.metadata.as_ref());
+                Some(ToolInvocation {
+                    id,
+                    name: tc.name,
+                    summary: tc.summary,
+                    input: tc.input,
+                    started_at: now,
+                    state,
+                    batch_id: None,
+                    metadata: tc.metadata,
+                })
             })
             .collect(),
         image_count: p.image_count,
@@ -38,5 +34,41 @@ pub fn into_session_message(p: ProjectedMessage) -> SessionMessage {
         inbox: None,
         message_id: None,
         ui_local: false,
+    }
+}
+
+fn derive_state(
+    result: &Option<String>,
+    is_error: bool,
+    metadata: Option<&ToolResultMetadata>,
+) -> InvocationState {
+    match metadata {
+        Some(ToolResultMetadata::Stale { reason }) => InvocationState::Stale {
+            duration: Duration::ZERO,
+            reason: *reason,
+        },
+        Some(ToolResultMetadata::Cancelled { cause }) => InvocationState::Cancelled {
+            duration: Duration::ZERO,
+            cause: *cause,
+        },
+        _ => match (result, is_error) {
+            (Some(content), true) => InvocationState::Done {
+                duration: Duration::ZERO,
+                outcome: Outcome::Failure {
+                    error: content.clone(),
+                    kind: FailureKind::ToolError,
+                },
+            },
+            (Some(content), false) => InvocationState::Done {
+                duration: Duration::ZERO,
+                outcome: Outcome::Success {
+                    content: content.clone(),
+                },
+            },
+            (None, _) => InvocationState::Stale {
+                duration: Duration::ZERO,
+                reason: StaleReason::ConnectionLost,
+            },
+        },
     }
 }

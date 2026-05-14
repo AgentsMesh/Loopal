@@ -1,13 +1,10 @@
-//! Write tool rendering — shows bytes written + content preview.
-
 use ratatui::prelude::*;
 
-use loopal_view_state::SessionToolCall;
+use loopal_view_state::{ToolInvocation, ToolResultMetadata};
 
 use super::diff_style::{self, DIFF_MAX_LINES};
 use super::output_first_line;
 
-/// Header detail: file path.
 pub fn extract_detail(input: &serde_json::Value) -> Option<String> {
     input
         .get("file_path")
@@ -15,18 +12,18 @@ pub fn extract_detail(input: &serde_json::Value) -> Option<String> {
         .map(|s| s.to_string())
 }
 
-/// Body: show bytes written + content preview (green `+` lines via diff_style).
-pub fn render_body(tc: &SessionToolCall) -> Vec<Line<'static>> {
+pub fn render_body(tc: &ToolInvocation) -> Vec<Line<'static>> {
     let msg = tc
         .metadata
         .as_ref()
-        .and_then(|m| m.get("bytes_written"))
-        .and_then(|v| v.as_u64())
-        .map(format_bytes)
+        .and_then(|m| match m {
+            ToolResultMetadata::BytesWritten { count } => Some(format_bytes(*count)),
+            _ => None,
+        })
         .or_else(|| {
-            // Fallback: parse legacy string format for backward compat
-            tc.result.as_deref().and_then(|r| {
-                r.trim()
+            tc.state.outcome().and_then(|o| {
+                o.content()
+                    .trim()
                     .strip_prefix("Successfully wrote ")
                     .and_then(|s| s.split(' ').next())
                     .and_then(|n| n.parse::<u64>().ok())
@@ -37,9 +34,8 @@ pub fn render_body(tc: &SessionToolCall) -> Vec<Line<'static>> {
 
     let mut lines = vec![output_first_line(&msg)];
 
-    // Content preview: treat as all-new (old="", new=content)
     if let Some(content) = tc
-        .tool_input
+        .input
         .as_ref()
         .and_then(|i| i.get("content"))
         .and_then(|v| v.as_str())

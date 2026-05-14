@@ -20,6 +20,12 @@ rust_library(
 )
 
 rust_test(
+    name = "loopal-scheduler-unit-test",
+    crate = ":loopal-scheduler",
+    edition = "2024",
+)
+
+rust_test(
     name = "suite",
     srcs = glob(["tests/**/*.rs"]),
     crate_root = "tests/suite.rs",

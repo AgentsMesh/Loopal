@@ -105,7 +105,7 @@ impl AgentLoopRunner {
         }
         c.continuation_count += 1;
         turn_ctx.metrics.auto_continuations = c.continuation_count;
-        self.emit(AgentEventPayload::AutoContinuation {
+        self.emit_in_turn(AgentEventPayload::AutoContinuation {
             continuation: c.continuation_count,
             max_continuations: c.max_continuations,
         })
@@ -129,7 +129,7 @@ impl AgentLoopRunner {
         if stop_reason == StopReason::MaxTokens && c.continuation_count < c.max_continuations {
             c.continuation_count += 1;
             turn_ctx.metrics.auto_continuations = c.continuation_count;
-            self.emit(AgentEventPayload::AutoContinuation {
+            self.emit_in_turn(AgentEventPayload::AutoContinuation {
                 continuation: c.continuation_count,
                 max_continuations: c.max_continuations,
             })

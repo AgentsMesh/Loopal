@@ -15,6 +15,7 @@ mod input;
 mod input_control;
 mod input_mcp;
 mod llm;
+mod llm_chunk;
 mod llm_params;
 mod llm_record;
 pub(crate) mod llm_result;
@@ -32,6 +33,7 @@ mod resume_session;
 pub mod rewind;
 mod run;
 mod runner;
+mod runner_transition;
 /// Sandbox path pre-check utilities for the tools_check phase.
 /// Public for integration testing; runtime consumers should use tools_check directly.
 pub mod sandbox_precheck;
@@ -41,11 +43,18 @@ pub(crate) mod token_accumulator;
 mod tool_collect;
 pub(crate) mod tool_exec;
 mod tool_progress;
+mod tool_watchdog;
 mod tools;
 mod tools_ask_user;
 mod tools_check;
+mod tools_check_emit;
+mod tools_check_one;
+mod tools_finalize;
 mod tools_inject;
+mod tools_intercept;
+mod tools_phase;
 pub(crate) mod tools_plan;
+mod tools_plan_exit;
 mod tools_resolve;
 pub mod turn_context;
 mod turn_exec;
@@ -65,6 +74,7 @@ pub use params::{
 };
 pub use params_builder::AgentLoopParamsBuilder;
 pub use runner::AgentLoopRunner;
+pub use streaming_tool_exec::StreamingToolHandle;
 
 use finished_guard::FinishedGuard;
 

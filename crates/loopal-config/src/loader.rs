@@ -3,13 +3,13 @@ use std::path::Path;
 use indexmap::IndexMap;
 
 use crate::layer::{ConfigLayer, LayerSource};
+use crate::loader_text::{TEXT_BYTE_LIMIT, read_text_bounded};
 use crate::settings::McpServerConfig;
 use crate::skills::scan_skills_dir;
 use loopal_error::{ConfigError, LoopalError};
 
-// ---------------------------------------------------------------------------
-// Low-level helpers (public for unit tests)
-// ---------------------------------------------------------------------------
+pub use crate::loader_env::apply_env_overrides;
+pub(crate) use crate::loader_text::read_optional_text;
 
 /// Deep-merge two JSON values. Objects are merged recursively; all other types
 /// (including arrays) are replaced by the overlay value.
@@ -41,43 +41,6 @@ pub fn load_json_file(path: &Path) -> Result<serde_json::Value, LoopalError> {
         Err(e) => Err(LoopalError::Io(e)),
     }
 }
-
-/// Apply environment variable overrides to a JSON value.
-pub fn apply_env_overrides(value: &mut serde_json::Value) {
-    if !value.is_object() {
-        *value = serde_json::json!({});
-    }
-
-    if let Ok(model) = std::env::var("LOOPAL_MODEL") {
-        value["model"] = serde_json::Value::String(model);
-    }
-
-    if let Ok(mode) = std::env::var("LOOPAL_PERMISSION_MODE") {
-        value["permission_mode"] = serde_json::Value::String(mode);
-    }
-
-    if let Ok(mode) = std::env::var("LOOPAL_DECISION_MODE") {
-        value["decision_mode"] = serde_json::Value::String(mode);
-    }
-
-    if let Ok(sandbox) = std::env::var("LOOPAL_SANDBOX") {
-        value["sandbox"]["policy"] = serde_json::Value::String(sandbox);
-    }
-
-    if let Ok(t) = std::env::var("LOOPAL_CLASSIFIER_TIMEOUT_SECS")
-        && let Ok(parsed) = t.parse::<u64>()
-    {
-        if !value["harness"].is_object() {
-            value["harness"] = serde_json::json!({});
-        }
-        value["harness"]["classifier_timeout_secs"] =
-            serde_json::Value::Number(serde_json::Number::from(parsed));
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Helpers: extract typed fields from settings JSON
-// ---------------------------------------------------------------------------
 
 /// Extract `mcp_servers` and `hooks` from a settings JSON value into typed
 /// fields, removing them from the raw value to avoid double-counting.
@@ -120,16 +83,6 @@ pub(crate) fn extract_typed_fields(
     (mcp, hooks)
 }
 
-/// Read optional text from a file path if it exists. Bounded at MAX_TEXT_BYTES
-/// to prevent OOM on misconfigured / binary files.
-pub(crate) fn read_optional_text(path: &Path) -> Option<String> {
-    read_text_bounded(path, MAX_TEXT_BYTES)
-}
-
-// ---------------------------------------------------------------------------
-// Isomorphic directory loader
-// ---------------------------------------------------------------------------
-
 /// Load a `ConfigLayer` from a directory following the isomorphic convention:
 ///
 /// ```text
@@ -139,8 +92,6 @@ pub(crate) fn read_optional_text(path: &Path) -> Option<String> {
 /// ├── skills/           # skill markdown files
 /// └── LOOPAL.md         # instruction text
 /// ```
-///
-/// Missing files/directories are silently ignored.
 pub fn load_layer_from_dir(
     dir: &Path,
     source: LayerSource,
@@ -151,7 +102,6 @@ pub fn load_layer_from_dir(
         ..Default::default()
     };
 
-    // settings.json — extract mcp_servers and hooks before storing raw JSON
     let mut settings_value = load_json_file(&dir.join("settings.json"))?;
 
     if !settings_value.is_null() {
@@ -161,54 +111,22 @@ pub fn load_layer_from_dir(
         layer.settings = settings_value;
     }
 
-    // .mcp.json — industry-standard format, overrides settings.json by name
     let mcp_json = crate::mcp_json::load_mcp_json(&dir.join(".mcp.json"));
     for (name, config) in mcp_json {
         layer.mcp_servers.insert(name, config);
     }
 
-    // skills/ directory
     layer.skills = scan_skills_dir(&dir.join("skills"));
 
-    // Instructions: use explicit path if given, otherwise <dir>/LOOPAL.md
     let instr_path = instructions_path
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| dir.join("LOOPAL.md"));
-    layer.instructions = read_text_bounded(&instr_path, MAX_TEXT_BYTES);
+    layer.instructions = read_text_bounded(&instr_path, TEXT_BYTE_LIMIT);
 
-    // memory/MEMORY.md — core memory file (agent writes via Write/Edit tools)
     let memory_path = dir.join("memory").join("MEMORY.md");
-    layer.memory = read_text_bounded(&memory_path, MAX_TEXT_BYTES);
+    layer.memory = read_text_bounded(&memory_path, TEXT_BYTE_LIMIT);
 
-    // classifier.md — optional user-supplied system prompt for Classifier mode.
-    layer.classifier_prompt = read_text_bounded(&dir.join("classifier.md"), MAX_TEXT_BYTES);
+    layer.classifier_prompt = read_text_bounded(&dir.join("classifier.md"), TEXT_BYTE_LIMIT);
 
     Ok(layer)
-}
-
-// reason: cap config-injected text at 100KB so an oversized or binary file
-// can't blow up the agent's context window or OOM the loader.
-const MAX_TEXT_BYTES: u64 = 100 * 1024;
-
-fn read_text_bounded(path: &Path, max_bytes: u64) -> Option<String> {
-    if !path.exists() {
-        return None;
-    }
-    let meta = std::fs::metadata(path).ok()?;
-    if meta.len() > max_bytes {
-        tracing::warn!(
-            path = %path.display(),
-            bytes = meta.len(),
-            limit = max_bytes,
-            "skipping oversize text file"
-        );
-        return None;
-    }
-    match std::fs::read_to_string(path) {
-        Ok(s) => Some(s),
-        Err(e) => {
-            tracing::warn!(path = %path.display(), error = %e, "text file read failed (non-UTF8?)");
-            None
-        }
-    }
 }

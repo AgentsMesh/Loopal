@@ -14,6 +14,12 @@ rust_library(
 )
 
 rust_test(
+    name = "loopal-tool-ls-unit-test",
+    crate = ":loopal-tool-ls",
+    edition = "2024",
+)
+
+rust_test(
     name = "loopal-tool-ls-test",
     srcs = glob(["tests/**/*.rs"]),
     crate_root = "tests/suite.rs",

@@ -38,15 +38,18 @@ impl ControlBackend {
     pub(crate) async fn send_control_to_agent(&self, target: &str, cmd: ControlCommand) {
         match self {
             Self::Local(ch) => {
-                let _ = ch.control_tx.send(cmd).await;
+                if let Err(e) = ch.control_tx.send(cmd).await {
+                    tracing::warn!(target = %target, error = %e, "controller_ops local control send failed");
+                }
             }
             Self::Hub(client) => {
-                let _ = client.send_control_to(target, &cmd).await;
+                if let Err(e) = client.send_control_to(target, &cmd).await {
+                    tracing::warn!(target = %target, error = %e, "controller_ops hub control send failed");
+                }
             }
         }
     }
 
-    /// Route a message to a specific named agent via Hub.
     pub(crate) async fn route_to_agent(&self, target: &str, content: UserContent) {
         match self {
             Self::Local(ch) => {
@@ -56,7 +59,9 @@ impl ControlBackend {
                         target,
                         content,
                     );
-                    let _ = tx.send(envelope).await;
+                    if let Err(e) = tx.send(envelope).await {
+                        tracing::warn!(target = %target, error = %e, "controller_ops local route_to_agent failed");
+                    }
                 }
             }
             Self::Hub(client) => {
@@ -73,7 +78,9 @@ impl ControlBackend {
     ) {
         match self {
             Self::Local(ch) => {
-                let _ = ch.permission_tx.send(allow).await;
+                if let Err(e) = ch.permission_tx.send(allow).await {
+                    tracing::warn!(error = %e, "controller_ops local permission send failed");
+                }
             }
             Self::Hub(client) => {
                 client
@@ -91,10 +98,13 @@ impl ControlBackend {
     ) {
         match self {
             Self::Local(ch) => {
-                let _ = ch
+                if let Err(e) = ch
                     .question_tx
                     .send(UserQuestionResponse::answered(question_id, answers))
-                    .await;
+                    .await
+                {
+                    tracing::warn!(question_id = %question_id, error = %e, "controller_ops local question answered send failed");
+                }
             }
             Self::Hub(client) => {
                 client
@@ -107,10 +117,13 @@ impl ControlBackend {
     pub(crate) async fn cancel_question(&self, agent_name: &str, question_id: &str) {
         match self {
             Self::Local(ch) => {
-                let _ = ch
+                if let Err(e) = ch
                     .question_tx
                     .send(UserQuestionResponse::cancelled(question_id))
-                    .await;
+                    .await
+                {
+                    tracing::warn!(question_id = %question_id, error = %e, "controller_ops local question cancelled send failed");
+                }
             }
             Self::Hub(client) => {
                 client.cancel_question(agent_name, question_id).await;

@@ -23,6 +23,10 @@ mod e2e_abstain_full_chain_test;
 mod env_context_test;
 #[path = "suite/frontend_unified_edge_test.rs"]
 mod frontend_unified_edge_test;
+#[path = "suite/frontend_unified_emit_test.rs"]
+mod frontend_unified_emit_test;
+#[path = "suite/frontend_unified_permission_test.rs"]
+mod frontend_unified_permission_test;
 #[path = "suite/frontend_unified_test.rs"]
 mod frontend_unified_test;
 #[path = "suite/goal_continuation_test.rs"]

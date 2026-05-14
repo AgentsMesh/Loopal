@@ -80,11 +80,16 @@ async fn test_clear_command() {
     assert_eq!(conv.input_tokens, 0, "input_tokens must reset to 0");
     assert_eq!(conv.output_tokens, 0, "output_tokens must reset to 0");
     let obs = harness.app.observable_for("main");
-    assert_eq!(obs.tool_count, 0, "observable.tool_count must reset");
-    assert!(
-        obs.last_tool.is_none(),
-        "observable.last_tool must be cleared"
+    assert_eq!(
+        harness.app.tool_count_for("main"),
+        0,
+        "tool_count must reset"
     );
+    assert!(
+        harness.app.last_tool_for("main").is_none(),
+        "last_tool must be cleared"
+    );
+    let _ = obs;
 
     // Next turn should still run cleanly.
     let envelope = Envelope::new(MessageSource::Human, "main", "continue");

@@ -5,7 +5,7 @@ use std::collections::HashSet;
 
 use loopal_message::ContentBlock;
 
-use super::{make_cancel, make_runner};
+use super::{in_turn, make_cancel, make_runner};
 
 /// AskUser is intercepted: produces exactly one ToolResult with the frontend
 /// answer, NOT the fallback "(intercepted by runner)" from Tool::execute().
@@ -26,10 +26,13 @@ async fn ask_user_intercepted_no_fallback_leak() {
             }]
         }),
     )];
-    runner
-        .execute_tools(tool_uses, &make_cancel())
-        .await
-        .unwrap();
+    in_turn(runner.execute_tools(
+        tool_uses,
+        &make_cancel(),
+        loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+    ))
+    .await
+    .unwrap();
 
     assert_eq!(runner.params.store.len(), 1);
     let msg = &runner.params.store.messages()[0];
@@ -43,8 +46,11 @@ async fn ask_user_intercepted_no_fallback_leak() {
             ..
         } => {
             assert_eq!(tool_use_id, "tc-ask");
-            assert!(!is_error);
-            // Must NOT contain the fallback from Tool::execute()
+            assert!(
+                *is_error,
+                "Unsupported question handler must yield is_error=true so LLM sees the failure"
+            );
+            assert!(content.contains("unsupported"));
             assert!(
                 !content.contains("intercepted by runner"),
                 "fallback from execute() leaked: {content}"
@@ -88,10 +94,13 @@ async fn ask_user_plus_read_no_duplicate_tool_result() {
         ),
     ];
 
-    runner
-        .execute_tools(tool_uses, &make_cancel())
-        .await
-        .unwrap();
+    in_turn(runner.execute_tools(
+        tool_uses,
+        &make_cancel(),
+        loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+    ))
+    .await
+    .unwrap();
 
     let msg = &runner.params.store.messages()[0];
     assert_eq!(msg.content.len(), 2, "expected exactly 2 ToolResult blocks");

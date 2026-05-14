@@ -5,7 +5,7 @@ use loopal_provider_api::{
     CostTier, ModelInfo, ModelOverride, QualityTier, SpeedTier, ThinkingCapability,
 };
 
-use super::catalog::KNOWN_MODELS;
+use super::catalog::known_models;
 
 static USER_OVERRIDES: OnceLock<HashMap<String, ModelInfo>> = OnceLock::new();
 
@@ -15,8 +15,7 @@ static USER_OVERRIDES: OnceLock<HashMap<String, ModelInfo>> = OnceLock::new();
 pub fn init_user_models(raw: &HashMap<String, ModelOverride>) {
     let mut map = HashMap::with_capacity(raw.len());
     for (id, ov) in raw {
-        let base = KNOWN_MODELS
-            .iter()
+        let base = known_models()
             .find(|m| m.id == id)
             .map(|m| m.to_model_info())
             .unwrap_or_else(|| synthesize(id, ov.provider.as_deref().unwrap_or("openai_compat")));

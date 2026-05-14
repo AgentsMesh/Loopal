@@ -1,13 +1,10 @@
-//! File system operations with built-in safety (size limits, binary detection, atomic writes).
-
 use std::path::Path;
 
 use loopal_error::ToolIoError;
-use loopal_tool_api::backend_types::{EditResult, FileInfo, ReadResult, WriteResult};
+use loopal_tool_api::backend_types::{FileInfo, ReadResult};
 
 use crate::limits::ResourceLimits;
 
-/// Read a text file with offset/limit pagination and line numbering.
 pub async fn read_file(
     path: &Path,
     offset: usize,
@@ -53,7 +50,6 @@ pub async fn read_file(
     })
 }
 
-/// Read raw file content with size check and binary detection (no line numbering).
 pub async fn read_raw_file(path: &Path, limits: &ResourceLimits) -> Result<String, ToolIoError> {
     let meta = tokio::fs::metadata(path).await.map_err(|e| {
         if e.kind() == std::io::ErrorKind::NotFound {
@@ -80,86 +76,8 @@ pub async fn read_raw_file(path: &Path, limits: &ResourceLimits) -> Result<Strin
     Ok(String::from_utf8_lossy(&bytes).into_owned())
 }
 
-/// Atomic write: write to tmp → fsync → rename.
-///
-/// On Windows, rename-over can fail with `\\?\` extended paths, so we
-/// fall back to remove + rename when we get ACCESS_DENIED.
-pub async fn write_file(path: &Path, content: &str) -> Result<WriteResult, ToolIoError> {
-    if let Some(parent) = path.parent() {
-        tokio::fs::create_dir_all(parent).await?;
-    }
+pub use crate::fs_write::{edit_file, write_file};
 
-    // Use pid in temp name to avoid collision with concurrent processes
-    let stem = path.file_name().unwrap_or_default().to_string_lossy();
-    let tmp_name = format!(".{stem}.{}.loopal.tmp", std::process::id());
-    let tmp_path = path.with_file_name(tmp_name);
-    tokio::fs::write(&tmp_path, content).await?;
-
-    // fsync the temp file for durability.
-    // Must open with write access — Windows FlushFileBuffers requires GENERIC_WRITE.
-    let f = tokio::fs::OpenOptions::new()
-        .write(true)
-        .open(&tmp_path)
-        .await?;
-    f.sync_all().await?;
-    drop(f);
-
-    if let Err(e) = tokio::fs::rename(&tmp_path, path).await {
-        // Windows: rename-over existing file can fail with ACCESS_DENIED (os error 5)
-        // when paths use the \\?\ extended prefix. Fall back to remove + rename.
-        if cfg!(windows) && e.raw_os_error() == Some(5) && path.exists() {
-            tokio::fs::remove_file(path).await?;
-            tokio::fs::rename(&tmp_path, path).await?;
-        } else {
-            // Clean up temp file on failure
-            let _ = tokio::fs::remove_file(&tmp_path).await;
-            return Err(e.into());
-        }
-    }
-
-    Ok(WriteResult {
-        bytes_written: content.len(),
-    })
-}
-
-/// Search-and-replace edit using edit-core's search_replace.
-pub async fn edit_file(
-    path: &Path,
-    old: &str,
-    new: &str,
-    replace_all: bool,
-) -> Result<EditResult, ToolIoError> {
-    let content = tokio::fs::read_to_string(path).await.map_err(|e| {
-        if e.kind() == std::io::ErrorKind::NotFound {
-            ToolIoError::NotFound(format!("{}", path.display()))
-        } else {
-            ToolIoError::Io(e)
-        }
-    })?;
-
-    use loopal_edit_core::search_replace::{SearchReplaceResult, search_replace};
-    match search_replace(&content, old, new, replace_all) {
-        SearchReplaceResult::Ok(new_content) => {
-            let count = if replace_all {
-                content.matches(old).count()
-            } else {
-                1
-            };
-            write_file(path, &new_content).await?;
-            Ok(EditResult {
-                replacements: count,
-            })
-        }
-        SearchReplaceResult::NotFound => {
-            Err(ToolIoError::Other("old_string not found in file".into()))
-        }
-        SearchReplaceResult::MultipleMatches(n) => Err(ToolIoError::Other(format!(
-            "old_string found {n} times — use replace_all or provide more context"
-        ))),
-    }
-}
-
-/// Query file metadata including binary detection.
 pub async fn get_file_info(path: &Path) -> Result<FileInfo, ToolIoError> {
     let meta = tokio::fs::metadata(path).await.map_err(|e| {
         if e.kind() == std::io::ErrorKind::NotFound {
@@ -196,7 +114,6 @@ pub async fn get_file_info(path: &Path) -> Result<FileInfo, ToolIoError> {
     })
 }
 
-/// Detect binary content by checking for null bytes in the first 8 KB.
 fn is_binary(data: &[u8]) -> bool {
     let check_len = data.len().min(8192);
     data[..check_len].contains(&0)

@@ -1,13 +1,10 @@
-//! Edit / MultiEdit tool rendering — shows inline diff with -/+ markers.
-
 use ratatui::prelude::*;
 
-use loopal_view_state::SessionToolCall;
+use loopal_view_state::ToolInvocation;
 
 use super::diff_style::{self, DIFF_MAX_LINES};
 use super::output_first_line;
 
-/// Header detail: file path.
 pub fn extract_detail(input: &serde_json::Value) -> Option<String> {
     input
         .get("file_path")
@@ -15,11 +12,8 @@ pub fn extract_detail(input: &serde_json::Value) -> Option<String> {
         .map(|s| s.to_string())
 }
 
-// ── Edit (single) ──
-
-/// Body: show summary + inline diff content.
-pub fn render_body(tc: &SessionToolCall) -> Vec<Line<'static>> {
-    let Some(ref input) = tc.tool_input else {
+pub fn render_body(tc: &ToolInvocation) -> Vec<Line<'static>> {
+    let Some(ref input) = tc.input else {
         return vec![output_first_line("edited")];
     };
     let old = input
@@ -41,12 +35,9 @@ pub fn render_body(tc: &SessionToolCall) -> Vec<Line<'static>> {
     lines
 }
 
-// ── MultiEdit ──
-
-/// Body: iterate edits array, aggregate diff across all edits.
-pub fn render_multi_edit_body(tc: &SessionToolCall) -> Vec<Line<'static>> {
+pub fn render_multi_edit_body(tc: &ToolInvocation) -> Vec<Line<'static>> {
     let edits = tc
-        .tool_input
+        .input
         .as_ref()
         .and_then(|i| i.get("edits"))
         .and_then(|v| v.as_array());

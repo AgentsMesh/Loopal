@@ -25,6 +25,12 @@ rust_library(
 )
 
 rust_test(
+    name = "loopal-hooks-unit-test",
+    crate = ":loopal-hooks",
+    edition = "2024",
+)
+
+rust_test(
     name = "loopal-hooks_test",
     srcs = glob(["tests/**/*.rs"]),
     crate_root = "tests/suite.rs",

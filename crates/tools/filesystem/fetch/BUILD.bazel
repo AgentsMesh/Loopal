@@ -17,6 +17,12 @@ rust_library(
 )
 
 rust_test(
+    name = "loopal-tool-fetch-unit-test",
+    crate = ":loopal-tool-fetch",
+    edition = "2024",
+)
+
+rust_test(
     name = "loopal-tool-fetch-test",
     srcs = glob(["tests/**/*.rs"]),
     crate_root = "tests/fetch_test.rs",

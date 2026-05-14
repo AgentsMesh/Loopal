@@ -25,3 +25,13 @@ mod reducer_lifecycle_test;
 mod reducer_status_test;
 #[path = "suite/reducer_tool_test.rs"]
 mod reducer_tool_test;
+#[path = "suite/server_tool_format_test.rs"]
+mod server_tool_format_test;
+#[path = "suite/tool_handler_batch_test.rs"]
+mod tool_handler_batch_test;
+#[path = "suite/tool_handler_edge_test.rs"]
+mod tool_handler_edge_test;
+#[path = "suite/tool_handler_stale_test.rs"]
+mod tool_handler_stale_test;
+#[path = "suite/turn_end_reconcile_test.rs"]
+mod turn_end_reconcile_test;

@@ -34,7 +34,7 @@ pub enum AgentEventPayload {
         #[serde(skip_serializing_if = "Option::is_none")]
         duration_ms: Option<u64>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        metadata: Option<serde_json::Value>,
+        metadata: Option<loopal_tool_invocation::ToolResultMetadata>,
     },
     /// Periodic progress update for long-running tools (e.g. Bash).
     ToolProgress {

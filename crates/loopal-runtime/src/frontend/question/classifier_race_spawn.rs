@@ -4,6 +4,7 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use loopal_classifier::QuestionResult;
+use loopal_protocol::event_id::propagate_to_spawn;
 use loopal_protocol::{AgentEventPayload, Question};
 
 use super::super::question_handler::{AskOptions, QuestionOutcome};
@@ -19,7 +20,9 @@ pub(super) fn spawn_fallback(
         id: question_id.to_string(),
         classifier_running: true,
     };
-    tokio::spawn(async move { fallback.ask_with_options(questions, opts).await })
+    tokio::spawn(propagate_to_spawn(async move {
+        fallback.ask_with_options(questions, opts).await
+    }))
 }
 
 pub(super) fn spawn_classifier(
@@ -28,12 +31,12 @@ pub(super) fn spawn_classifier(
     cancel: CancellationToken,
 ) -> JoinHandle<Result<(QuestionResult, usize), String>> {
     let ctx = handler.classifier_ctx();
-    tokio::spawn(async move {
+    tokio::spawn(propagate_to_spawn(async move {
         tokio::select! {
             r = ctx.run(questions) => r,
             _ = cancel.cancelled() => Err("cancelled by race".into()),
         }
-    })
+    }))
 }
 
 pub(super) fn spawn_progress_ticker(
@@ -44,22 +47,25 @@ pub(super) fn spawn_progress_ticker(
 ) -> JoinHandle<()> {
     let emitter = handler.emitter.clone();
     let interval = handler.progress_interval;
-    tokio::spawn(async move {
+    tokio::spawn(propagate_to_spawn(async move {
         loop {
             tokio::select! {
                 _ = tokio::time::sleep(interval) => {
                     let elapsed_ms = start.elapsed().as_millis() as u64;
-                    let _ = emitter
-                        .emit(AgentEventPayload::ClassifierProgress {
-                            id: question_id.clone(),
-                            elapsed_ms,
-                        })
+                    emitter
+                        .emit_best_effort(
+                            AgentEventPayload::ClassifierProgress {
+                                id: question_id.clone(),
+                                elapsed_ms,
+                            },
+                            "frontend::question::classifier_progress",
+                        )
                         .await;
                 }
                 _ = cancel.cancelled() => break,
             }
         }
-    })
+    }))
 }
 
 pub(super) fn flatten(

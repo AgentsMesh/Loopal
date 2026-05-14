@@ -7,10 +7,13 @@ pub mod view_proto;
 
 pub use conversation::{
     AgentConversation, InboxOrigin, PendingPermission, PendingQuestion, SessionMessage,
-    SessionToolCall, ToolCallStatus, format_thinking_content, format_token_display,
-    parse_thinking_content,
+    format_thinking_content, format_token_display, parse_thinking_content,
 };
 pub use delta::ViewSnapshot;
+pub use loopal_tool_invocation::{
+    CancelCause, FailureKind, InvocationId, InvocationState, Outcome, ProgressSnapshot,
+    StaleReason, ToolInvocation, ToolResultMetadata,
+};
 pub use reducer::ViewStateReducer;
 pub use state::{AgentView, BgTaskView, SessionViewState};
 pub use view_proto::ViewSnapshotRequest;

@@ -70,6 +70,10 @@ mod mcp_page_test;
 mod mcp_refresh_test;
 #[path = "suite/message_lines_edge_test.rs"]
 mod message_lines_edge_test;
+#[path = "suite/message_lines_fixture.rs"]
+mod message_lines_fixture;
+#[path = "suite/message_lines_terminal_state_test.rs"]
+mod message_lines_terminal_state_test;
 #[path = "suite/message_lines_test.rs"]
 mod message_lines_test;
 #[path = "suite/multi_question_test.rs"]

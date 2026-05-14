@@ -1,6 +1,3 @@
-//! Session creation — handles `agent/start` by building HubFrontend + agent loop.
-
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use tokio::sync::Mutex;
@@ -11,24 +8,20 @@ use loopal_error::AgentOutput;
 use loopal_ipc::connection::Connection;
 use loopal_protocol::InterruptSignal;
 use loopal_runtime::agent_input::AgentInput;
-use loopal_runtime::agent_loop;
 
 use crate::agent_setup;
 use crate::hub_frontend::HubFrontend;
-use crate::params::StartParams;
 use crate::session_handlers_factory::build_session_handlers;
 use crate::session_hub::{SessionHub, SharedSession};
+use crate::session_spawn::{parse_start_params, spawn_agent_and_bridges};
 
-/// Handle returned to the dispatch loop after starting a session.
 pub(crate) struct SessionHandle {
     pub session_id: String,
     pub session: Arc<SharedSession>,
     pub agent_task: tokio::task::JoinHandle<Option<AgentOutput>>,
-    /// Lifecycle mode — Ephemeral exits after completion, Persistent stays alive.
     pub lifecycle: loopal_runtime::LifecycleMode,
 }
 
-/// Create a session: build Kernel, HubFrontend, spawn agent loop.
 pub(crate) async fn start_session(
     connection: &Arc<Connection>,
     request_id: i64,
@@ -38,39 +31,7 @@ pub(crate) async fn start_session(
 ) -> anyhow::Result<SessionHandle> {
     let session_span = tracing::info_span!("session_start", session.id = tracing::field::Empty);
     async {
-        let cwd_str = params["cwd"].as_str().map(String::from);
-        let cwd = cwd_str
-            .as_deref()
-            .map(PathBuf::from)
-            .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
-
-        // Lifecycle: explicit from params, default based on prompt presence.
-        let lifecycle = match params["lifecycle"].as_str() {
-            Some("ephemeral") => loopal_runtime::LifecycleMode::Ephemeral,
-            Some("persistent") => loopal_runtime::LifecycleMode::Persistent,
-            Some(unknown) => {
-                anyhow::bail!(
-                    "unknown lifecycle mode: '{unknown}' (expected 'ephemeral' or 'persistent')"
-                );
-            }
-            None if params["prompt"].as_str().is_some() => loopal_runtime::LifecycleMode::Ephemeral,
-            None => loopal_runtime::LifecycleMode::Persistent,
-        };
-
-        let start = StartParams {
-            cwd: cwd_str,
-            model: params["model"].as_str().map(String::from),
-            mode: params["mode"].as_str().map(String::from),
-            prompt: params["prompt"].as_str().map(String::from),
-            permission_mode: params["permission_mode"].as_str().map(String::from),
-            decision_mode: params["decision_mode"].as_str().map(String::from),
-            no_sandbox: params["no_sandbox"].as_bool().unwrap_or(false),
-            resume: params["resume"].as_str().map(String::from),
-            lifecycle,
-            agent_type: params["agent_type"].as_str().map(String::from),
-            depth: params["depth"].as_u64().map(|v| v as u32),
-            fork_context: params.get("fork_context").cloned(),
-        };
+        let (start, cwd, lifecycle) = parse_start_params(&params)?;
 
         let mut config = load_config(&cwd)?;
         crate::params::apply_start_overrides(&mut config.settings, &start);
@@ -84,7 +45,6 @@ pub(crate) async fn start_session(
             }
         };
 
-        // Create session infrastructure
         let (input_tx, input_rx) = tokio::sync::mpsc::channel::<AgentInput>(16);
         let interrupt = InterruptSignal::new();
         let (watch_tx, watch_rx) = tokio::sync::watch::channel(0u64);
@@ -136,9 +96,6 @@ pub(crate) async fn start_session(
         let scheduler_for_bridge = setup.scheduler;
         let agent_shared_for_session = setup.agent_shared;
 
-        // Bind the scheduler to this session's id. Idempotent and
-        // unifies fresh-session and resumed-session code paths through
-        // a single SessionScopedCronStorage lookup.
         if let Err(e) = scheduler_for_bridge
             .switch_session(&agent_params.session().id)
             .await
@@ -168,41 +125,13 @@ pub(crate) async fn start_session(
         info!(session.id = %session_id, "session started");
 
         let spawn_rx = kernel_for_bridge.bg_store().subscribe_spawns();
-        let bridge_task = crate::bg_task_bridge::spawn(spawn_rx, frontend_placeholder.clone());
-        let task_change_rx = task_store_for_bridge.subscribe();
-        let task_bridge_task = crate::task_bridge::spawn(
-            task_change_rx,
+        let agent_task = spawn_agent_and_bridges(
+            agent_params,
             task_store_for_bridge,
-            frontend_placeholder.clone(),
+            scheduler_for_bridge,
+            spawn_rx,
+            frontend_placeholder,
         );
-        let cron_bridge_task =
-            crate::cron_bridge::spawn(scheduler_for_bridge, frontend_placeholder.clone());
-
-        let agent_task = tokio::spawn(async move {
-            match agent_loop(agent_params).await {
-                Ok(output) => {
-                    info!(reason = ?output.terminate_reason, "agent loop completed");
-                    Some(output)
-                }
-                Err(e) => {
-                    tracing::error!(error = %e, "agent loop error");
-                    None
-                }
-            }
-        });
-
-        let agent_task = {
-            let bridge_abort = bridge_task.abort_handle();
-            let task_bridge_abort = task_bridge_task.abort_handle();
-            let cron_bridge_abort = cron_bridge_task.abort_handle();
-            tokio::spawn(async move {
-                let result = agent_task.await;
-                bridge_abort.abort();
-                task_bridge_abort.abort();
-                cron_bridge_abort.abort();
-                result.ok().flatten()
-            })
-        };
 
         Ok(SessionHandle {
             session_id,

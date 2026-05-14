@@ -37,6 +37,12 @@ rust_library(
 )
 
 rust_test(
+    name = "loopal-agent-unit-test",
+    crate = ":loopal-agent",
+    edition = "2024",
+)
+
+rust_test(
     name = "loopal-agent_test",
     srcs = glob(["tests/**/*.rs"]),
     crate_root = "tests/suite.rs",

@@ -25,6 +25,17 @@ pub fn make_cancel() -> TurnCancel {
     )
 }
 
+/// Wrap an async block in `scope_turn(1, ...)` so in-turn emit sites
+/// (`emit_in_turn`) can run inside the capability scope without panicking.
+/// Use whenever a test directly calls runner methods that internally use
+/// `emit_in_turn` (i.e. anything reachable from `execute_turn_body`).
+pub async fn in_turn<F, R>(f: F) -> R
+where
+    F: std::future::Future<Output = R>,
+{
+    loopal_protocol::event_id::scope_turn(1, f).await
+}
+
 pub fn make_test_budget() -> ContextBudget {
     ContextBudget {
         context_window: 200_000,
@@ -37,6 +48,7 @@ pub fn make_test_budget() -> ContextBudget {
     }
 }
 
+mod ask_user_schema_err_test;
 mod auto_continue_edge_test;
 mod auto_continue_test;
 mod cron_e2e_test;

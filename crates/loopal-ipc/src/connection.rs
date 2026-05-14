@@ -1,17 +1,15 @@
-//! Bidirectional JSON-RPC connection over a `Transport`.
-
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 
 use serde_json::Value;
 use tokio::sync::{Mutex, mpsc, oneshot};
-use tracing::{debug, warn};
+use tracing::debug;
 
-use crate::jsonrpc::{self, IncomingMessage};
+use crate::connection_reader::spawn_reader_loop;
+use crate::jsonrpc;
 use crate::transport::Transport;
 
-/// An incoming message dispatched by the reader loop.
 #[derive(Debug)]
 pub enum Incoming {
     Request {
@@ -25,7 +23,7 @@ pub enum Incoming {
     },
 }
 
-type PendingMap = Arc<Mutex<HashMap<i64, oneshot::Sender<Value>>>>;
+pub(crate) type PendingMap = Arc<Mutex<HashMap<i64, oneshot::Sender<Value>>>>;
 
 /// Bidirectional JSON-RPC over a `Transport`. Call `start()` first,
 /// then use `send_request`, `send_notification`, `respond`, `respond_error`.
@@ -44,79 +42,8 @@ impl Connection {
         }
     }
 
-    /// Spawn the background reader loop. Returns a receiver for incoming
-    /// requests and notifications. The loop runs until the transport disconnects.
     pub fn start(&self) -> mpsc::Receiver<Incoming> {
-        let (tx, rx) = mpsc::channel::<Incoming>(256);
-        let transport = self.transport.clone();
-        let pending = self.pending.clone();
-
-        tokio::spawn(async move {
-            debug!("IPC reader loop started");
-            loop {
-                let data = match transport.recv().await {
-                    Ok(Some(data)) => data,
-                    Ok(None) => {
-                        debug!("IPC connection: EOF, reader loop exiting");
-                        break;
-                    }
-                    Err(e) => {
-                        warn!("IPC connection read error: {e}");
-                        break;
-                    }
-                };
-
-                let Some(msg) = jsonrpc::parse_message(&data) else {
-                    warn!("IPC connection: malformed message, skipping");
-                    continue;
-                };
-
-                match msg {
-                    IncomingMessage::Response { id, result, error } => {
-                        let value = if let Some(err) = error {
-                            serde_json::to_value(err).unwrap_or(Value::Null)
-                        } else {
-                            result.unwrap_or(Value::Null)
-                        };
-                        if let Some(sender) = pending.lock().await.remove(&id) {
-                            let _ = sender.send(value);
-                        }
-                    }
-                    IncomingMessage::Request { id, method, params } => {
-                        if tx
-                            .send(Incoming::Request { id, method, params })
-                            .await
-                            .is_err()
-                        {
-                            debug!("IPC reader: incoming channel closed, exiting");
-                            break;
-                        }
-                    }
-                    IncomingMessage::Notification { method, params } => {
-                        if tx
-                            .send(Incoming::Notification { method, params })
-                            .await
-                            .is_err()
-                        {
-                            debug!("IPC reader: incoming channel closed, exiting");
-                            break;
-                        }
-                    }
-                }
-            }
-
-            // Cleanup: drop all pending request senders so callers get Err
-            let mut map = pending.lock().await;
-            if !map.is_empty() {
-                warn!(
-                    "IPC reader: dropping {} pending requests on exit",
-                    map.len()
-                );
-                map.clear();
-            }
-        });
-
-        rx
+        spawn_reader_loop(self.transport.clone(), self.pending.clone())
     }
 
     /// Send a JSON-RPC request and wait for the response.
@@ -133,7 +60,6 @@ impl Connection {
             return Err(format!("transport send failed: {e}"));
         }
 
-        // Guard: remove pending entry if this future is cancelled (dropped)
         let pending = self.pending.clone();
         let guard = PendingGuard {
             id,
@@ -144,7 +70,6 @@ impl Connection {
         result
     }
 
-    /// Send a JSON-RPC notification (fire-and-forget, no response expected).
     pub async fn send_notification(&self, method: &str, params: Value) -> Result<(), String> {
         debug!(method, "IPC send_notification");
         let data = jsonrpc::encode_notification(method, params);
@@ -154,7 +79,6 @@ impl Connection {
             .map_err(|e| format!("transport send failed: {e}"))
     }
 
-    /// Send a successful response to an incoming request.
     pub async fn respond(&self, id: i64, result: Value) -> Result<(), String> {
         debug!(id, "IPC respond ok");
         let data = jsonrpc::encode_response(id, result);
@@ -164,7 +88,6 @@ impl Connection {
             .map_err(|e| format!("transport send failed: {e}"))
     }
 
-    /// Send an error response to an incoming request.
     pub async fn respond_error(&self, id: i64, code: i64, message: &str) -> Result<(), String> {
         debug!(id, code, message, "IPC respond_error");
         let data = jsonrpc::encode_error(id, code, message);
@@ -174,7 +97,6 @@ impl Connection {
             .map_err(|e| format!("transport send failed: {e}"))
     }
 
-    /// Check whether the underlying transport is still connected.
     pub fn is_connected(&self) -> bool {
         self.transport.is_connected()
     }
@@ -185,8 +107,6 @@ impl Connection {
         self.transport.close().await;
     }
 }
-
-// ── Cancellation guard ───────────────────────────────────────────────
 
 /// Removes a pending request entry on drop (cancellation safety).
 /// Call `disarm()` on success to skip cleanup. Uses `try_lock` in Drop
@@ -209,6 +129,6 @@ impl Drop for PendingGuard {
         {
             map.remove(&self.id);
         }
-        // If lock is held, the entry leaks — reader loop cleanup reclaims it.
+        // reason: if lock is held, entry leaks — reader loop cleanup reclaims it.
     }
 }

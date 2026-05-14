@@ -9,6 +9,7 @@ rust_library(
         "//crates/loopal-agent-hub",
         "//crates/loopal-ipc",
         "//crates/loopal-protocol",
+        "//crates/loopal-tool-invocation",
         "@crates//:agent-client-protocol-schema",
         "@crates//:anyhow",
         "@crates//:serde",
@@ -17,6 +18,12 @@ rust_library(
         "@crates//:tracing",
         "@crates//:uuid",
     ],
+)
+
+rust_test(
+    name = "loopal-acp-unit-test",
+    crate = ":loopal-acp",
+    edition = "2024",
 )
 
 rust_test(

@@ -73,10 +73,11 @@ fn snapshot_round_trips_completed_tool_call() {
         serde_json::from_str(&json).expect("deserialize");
 
     let tc = &restored.state.agent.conversation.messages[0].tool_calls[0];
-    assert_eq!(tc.id, "tc-1");
+    assert_eq!(tc.id.as_str(), "tc-1");
     assert_eq!(tc.name, "Read");
-    assert_eq!(tc.duration_ms, Some(42));
-    assert_eq!(tc.result.as_deref(), Some("file contents"));
+    let outcome = tc.state.outcome().expect("Done state expected");
+    assert_eq!(outcome.content(), "file contents");
+    assert!(!outcome.is_error());
 }
 
 #[test]
@@ -89,4 +90,66 @@ fn snapshot_preserves_observable_status() {
         serde_json::from_str(&json).expect("deserialize");
 
     assert_eq!(restored.state.agent.observable.status, AgentStatus::Running);
+}
+
+#[test]
+fn snapshot_round_trips_stale_tool_call() {
+    use loopal_tool_invocation::{StaleReason, ToolResultMetadata};
+    use loopal_view_state::InvocationState;
+    let mut r = ViewStateReducer::new("main");
+    r.apply(AgentEventPayload::ToolCall {
+        id: "tc-stale".into(),
+        name: "Bash".into(),
+        input: serde_json::json!({"command": "sleep 99"}),
+    });
+    r.apply(AgentEventPayload::ToolResult {
+        id: "tc-stale".into(),
+        name: "Bash".into(),
+        result: "Watchdog timeout".into(),
+        is_error: true,
+        duration_ms: Some(330_000),
+        metadata: Some(ToolResultMetadata::stale(StaleReason::WatchdogTimeout)),
+    });
+
+    let json = serde_json::to_string(&r.snapshot()).expect("serialize");
+    let restored: loopal_view_state::ViewSnapshot =
+        serde_json::from_str(&json).expect("deserialize");
+
+    let tc = &restored.state.agent.conversation.messages[0].tool_calls[0];
+    assert!(
+        matches!(tc.state, InvocationState::Stale { .. }),
+        "expected Stale, got {:?}",
+        tc.state.variant_name()
+    );
+}
+
+#[test]
+fn snapshot_round_trips_cancelled_tool_call() {
+    use loopal_tool_invocation::{CancelCause, ToolResultMetadata};
+    use loopal_view_state::InvocationState;
+    let mut r = ViewStateReducer::new("main");
+    r.apply(AgentEventPayload::ToolCall {
+        id: "tc-cancel".into(),
+        name: "Bash".into(),
+        input: serde_json::json!({"command": "long-running"}),
+    });
+    r.apply(AgentEventPayload::ToolResult {
+        id: "tc-cancel".into(),
+        name: "Bash".into(),
+        result: "Interrupted by user".into(),
+        is_error: true,
+        duration_ms: Some(1_200),
+        metadata: Some(ToolResultMetadata::cancelled(CancelCause::UserInterrupt)),
+    });
+
+    let json = serde_json::to_string(&r.snapshot()).expect("serialize");
+    let restored: loopal_view_state::ViewSnapshot =
+        serde_json::from_str(&json).expect("deserialize");
+
+    let tc = &restored.state.agent.conversation.messages[0].tool_calls[0];
+    assert!(
+        matches!(tc.state, InvocationState::Cancelled { .. }),
+        "expected Cancelled, got {:?}",
+        tc.state.variant_name()
+    );
 }

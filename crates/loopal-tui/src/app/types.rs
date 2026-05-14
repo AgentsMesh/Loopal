@@ -1,4 +1,4 @@
-pub use loopal_view_state::{PendingPermission, SessionMessage, SessionToolCall};
+pub use loopal_view_state::{PendingPermission, SessionMessage, ToolInvocation};
 
 use crate::command::CommandEntry;
 

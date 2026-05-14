@@ -26,7 +26,7 @@ impl AgentLoopRunner {
                 }
                 ObserverAction::AbortTurn(reason) => {
                     warn!(%reason, "observer aborted turn");
-                    self.emit(AgentEventPayload::Error { message: reason })
+                    self.emit_in_turn(AgentEventPayload::Error { message: reason })
                         .await?;
                     return Ok(true);
                 }

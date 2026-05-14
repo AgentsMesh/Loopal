@@ -8,6 +8,7 @@ mod styles;
 mod writer;
 mod writer_blocks;
 mod writer_inline;
+mod writer_lists;
 mod writer_table;
 
 use ratatui::prelude::*;

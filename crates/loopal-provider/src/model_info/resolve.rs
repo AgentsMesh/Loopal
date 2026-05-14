@@ -1,6 +1,6 @@
 use loopal_provider_api::ThinkingCapability;
 
-use super::catalog::KNOWN_MODELS;
+use super::catalog::known_models;
 use super::overlay;
 
 /// Resolve provider name from model id.
@@ -9,7 +9,7 @@ use super::overlay;
 /// User overlay is NOT checked here — `ProviderRegistry::resolve()` handles
 /// that via `get_model_info()` before reaching this function.
 pub fn resolve_provider(model_id: &str) -> &'static str {
-    if let Some(entry) = KNOWN_MODELS.iter().find(|m| m.id == model_id) {
+    if let Some(entry) = known_models().find(|m| m.id == model_id) {
         return entry.provider;
     }
     resolve_provider_by_prefix(model_id)
@@ -38,7 +38,7 @@ pub fn get_thinking_capability(model_id: &str) -> ThinkingCapability {
     if let Some(info) = overlay::get_user_model(model_id) {
         return info.thinking;
     }
-    if let Some(entry) = KNOWN_MODELS.iter().find(|m| m.id == model_id) {
+    if let Some(entry) = known_models().find(|m| m.id == model_id) {
         return entry.thinking;
     }
     if model_id.starts_with("o1") || model_id.starts_with("o3") || model_id.starts_with("o4") {

@@ -8,7 +8,7 @@
 //! scheduler's job set may have changed:
 //!   - `add` / `remove` mutations
 //!   - `switch_session` (resume) installs a new set
-//!   - `tick_loop` fired/expired any task this tick (incl. recurring's
+//!   - `tick_loop` fired any task this tick (incl. recurring's
 //!     `last_fired` updates that don't change the user-visible set)
 //!
 //! That last source makes the diff-skip useful as a final filter:

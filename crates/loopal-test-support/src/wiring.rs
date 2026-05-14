@@ -103,6 +103,8 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
     } else {
         loopal_agent::shared::SchedulerHandle::create()
     };
+    // Test fixtures don't switch sessions; activate the tick loop now.
+    scheduler_handle.start();
     let shared = Arc::new(AgentShared {
         kernel: kernel.clone(),
         task_store: Arc::new(TaskStore::with_sessions_root(tasks_dir)),

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use loopal_error::LoopalError;
-use loopal_scheduler::CronScheduler;
+use loopal_scheduler::{CronScheduler, MAX_PROMPT_CHARS};
 use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
 use serde_json::{Value, json};
 
@@ -38,7 +38,7 @@ impl Tool for CronCreateTool {
          between a one-shot firing and the post-fire save, it may re-fire \
          exactly once on the next resume. \
          Jobs only fire while the agent is idle. \
-         Recurring jobs auto-expire after 3 days. Max 50 concurrent jobs."
+         Max 50 concurrent jobs."
     }
 
     fn parameters_schema(&self) -> Value {
@@ -79,8 +79,10 @@ impl Tool for CronCreateTool {
         let prompt = input["prompt"].as_str().ok_or(LoopalError::Tool(
             loopal_error::ToolError::InvalidInput("prompt is required".into()),
         ))?;
-        if prompt.len() > 4096 {
-            return Ok(ToolResult::error("prompt exceeds 4096 character limit"));
+        if prompt.chars().count() > MAX_PROMPT_CHARS {
+            return Ok(ToolResult::error(format!(
+                "prompt exceeds {MAX_PROMPT_CHARS} character limit"
+            )));
         }
         if prompt.is_empty() {
             return Ok(ToolResult::error("prompt cannot be empty"));

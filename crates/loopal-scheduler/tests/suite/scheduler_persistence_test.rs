@@ -1,66 +1,12 @@
-//! Tests for `CronScheduler` durable add / remove persistence hooks.
-
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 
-use async_trait::async_trait;
 use chrono::Utc;
-use tokio::sync::Mutex;
 
-use loopal_scheduler::{
-    CronScheduler, ManualClock, PersistError, PersistedTask, SessionScopedCronStorage,
-};
+use loopal_scheduler::{CronScheduler, ManualClock, SessionScopedCronStorage};
 
-struct CountingStore {
-    saved: Mutex<Vec<Vec<PersistedTask>>>,
-    fail_next: AtomicBool,
-}
+use crate::mock_storage::MockStorage;
 
-impl CountingStore {
-    fn new() -> Arc<Self> {
-        Arc::new(Self {
-            saved: Mutex::new(Vec::new()),
-            fail_next: AtomicBool::new(false),
-        })
-    }
-    fn arm_failure(&self) {
-        self.fail_next.store(true, Ordering::SeqCst);
-    }
-    async fn save_count(&self) -> usize {
-        self.saved.lock().await.len()
-    }
-    async fn last_ids(&self) -> Vec<String> {
-        self.saved
-            .lock()
-            .await
-            .last()
-            .cloned()
-            .unwrap_or_default()
-            .into_iter()
-            .map(|t| t.id)
-            .collect()
-    }
-}
-
-#[async_trait]
-impl SessionScopedCronStorage for CountingStore {
-    async fn load(&self, _session_id: &str) -> Result<Vec<PersistedTask>, PersistError> {
-        Ok(Vec::new())
-    }
-    async fn save_all(
-        &self,
-        _session_id: &str,
-        tasks: &[PersistedTask],
-    ) -> Result<(), PersistError> {
-        if self.fail_next.swap(false, Ordering::SeqCst) {
-            return Err(PersistError::Io(std::io::Error::other("armed failure")));
-        }
-        self.saved.lock().await.push(tasks.to_vec());
-        Ok(())
-    }
-}
-
-async fn build_scheduler(store: Arc<CountingStore>) -> CronScheduler {
+async fn build_scheduler(store: Arc<MockStorage>) -> CronScheduler {
     let store_dyn: Arc<dyn SessionScopedCronStorage> = store;
     let sched = CronScheduler::with_session_storage_and_clock(
         store_dyn,
@@ -72,7 +18,7 @@ async fn build_scheduler(store: Arc<CountingStore>) -> CronScheduler {
 
 #[tokio::test]
 async fn add_non_durable_does_not_persist() {
-    let store = CountingStore::new();
+    let store = MockStorage::new();
     let sched = build_scheduler(store.clone()).await;
     sched
         .add("*/5 * * * *", "p", true, false)
@@ -83,25 +29,27 @@ async fn add_non_durable_does_not_persist() {
 
 #[tokio::test]
 async fn add_durable_triggers_one_save() {
-    let store = CountingStore::new();
+    let store = MockStorage::new();
     let sched = build_scheduler(store.clone()).await;
     let id = sched
         .add("*/5 * * * *", "p", true, true)
         .await
         .expect("add");
+    sched.wait_idle().await;
     assert_eq!(store.save_count().await, 1);
     assert_eq!(store.last_ids().await, vec![id]);
 }
 
 #[tokio::test]
 async fn remove_durable_persists_new_set() {
-    let store = CountingStore::new();
+    let store = MockStorage::new();
     let sched = build_scheduler(store.clone()).await;
     let id = sched
         .add("*/5 * * * *", "p", true, true)
         .await
         .expect("add");
     assert!(sched.remove(&id).await);
+    sched.wait_idle().await;
     // One save on add, one on remove.
     assert_eq!(store.save_count().await, 2);
     assert!(store.last_ids().await.is_empty());
@@ -109,19 +57,20 @@ async fn remove_durable_persists_new_set() {
 
 #[tokio::test]
 async fn remove_non_durable_does_not_persist() {
-    let store = CountingStore::new();
+    let store = MockStorage::new();
     let sched = build_scheduler(store.clone()).await;
     let id = sched
         .add("*/5 * * * *", "p", true, false)
         .await
         .expect("add");
     assert!(sched.remove(&id).await);
+    sched.wait_idle().await;
     assert_eq!(store.save_count().await, 0);
 }
 
 #[tokio::test]
 async fn snapshot_includes_only_durable_tasks() {
-    let store = CountingStore::new();
+    let store = MockStorage::new();
     let sched = build_scheduler(store.clone()).await;
     let _a = sched
         .add("*/5 * * * *", "non", true, false)
@@ -131,7 +80,7 @@ async fn snapshot_includes_only_durable_tasks() {
         .add("*/7 * * * *", "dur", true, true)
         .await
         .expect("add");
-    // The durable save must only carry `b`.
+    sched.wait_idle().await;
     let ids = store.last_ids().await;
     assert_eq!(ids, vec![b]);
 }
@@ -166,22 +115,22 @@ async fn subsequent_add_retries_after_save_failure() {
     // First durable save fails → dirty flag latches. A later
     // non-durable add must still retry the save so memory and disk
     // don't diverge indefinitely.
-    let store = CountingStore::new();
+    let store = MockStorage::new();
     let sched = build_scheduler(store.clone()).await;
-    store.arm_failure();
+    store.arm_save_failure();
     let durable_id = sched
         .add("*/5 * * * *", "persist", true, true)
         .await
         .expect("add durable");
-    // Armed failure was consumed; no successful save yet.
+    sched.wait_idle().await;
     assert_eq!(store.save_count().await, 0);
+    assert_eq!(store.fail_save_attempts(), 1);
 
-    // A non-durable add should still trigger a retry because dirty=true.
     let _transient = sched
         .add("*/7 * * * *", "transient", true, false)
         .await
         .expect("add transient");
+    sched.wait_idle().await;
     assert_eq!(store.save_count().await, 1);
-    // The persisted set still contains only the durable task.
     assert_eq!(store.last_ids().await, vec![durable_id]);
 }

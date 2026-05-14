@@ -1,19 +1,6 @@
-//! Cron-task storage types — schema, persisted form, codec, errors.
-//!
-//! Each cron task marked with `durable = true` is persisted on every
-//! mutation (add / remove / tick-fired / expired), so the on-disk file
-//! always reflects the latest in-memory state. Rewriting a small JSON
-//! document (≤50 tasks) per mutation is acceptable for a feature that
-//! fires at most ~50 times a day.
-//!
 //! A crash window between an in-memory mutation and a successful
 //! `save_all` can cause a one-shot durable task to re-fire **exactly
-//! once** after restart — see [`CronScheduler`](crate::CronScheduler) docs.
-//!
-//! Session-scoped trait + impl live in [`crate::persistence_session`]
-//! and [`crate::persistence_file_scoped`]. Scheduler integration
-//! (persist_locked / load_persisted) lives in
-//! [`crate::scheduler_persistence`].
+//! once** after restart — see `CronScheduler` docs.
 
 use chrono::{DateTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
@@ -22,13 +9,10 @@ use std::io;
 use crate::expression::CronExpression;
 use crate::task::ScheduledTask;
 
-/// Current on-disk schema version. Bump if the layout changes
-/// incompatibly; `load` tolerates unknown future versions by refusing
-/// rather than silently misreading.
+/// On-disk schema version. Bump if the layout changes incompatibly;
+/// `load` refuses unknown future versions rather than misreading.
 pub const SCHEMA_VERSION: u32 = 1;
 
-/// Errors surfaced from a [`SessionScopedCronStorage`](crate::SessionScopedCronStorage)
-/// implementation.
 #[derive(Debug, thiserror::Error)]
 pub enum PersistError {
     #[error("cron storage i/o: {0}")]
@@ -39,20 +23,14 @@ pub enum PersistError {
     BadCron(String),
 }
 
-// ---------------------------------------------------------------------------
-// On-disk shape
-// ---------------------------------------------------------------------------
-
-/// Serializable form of a [`ScheduledTask`]. Uses Unix ms timestamps to
-/// avoid requiring chrono's serde feature.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(default)]
 pub struct PersistedTask {
     pub id: String,
     pub cron: String,
     pub prompt: String,
     pub recurring: bool,
     pub created_at_unix_ms: i64,
-    #[serde(default)]
     pub last_fired_unix_ms: Option<i64>,
 }
 
@@ -63,7 +41,7 @@ pub(crate) struct PersistedFile {
 }
 
 impl PersistedTask {
-    /// Build from an in-memory task. Caller ensures `durable == true`.
+    /// Caller ensures `durable == true`.
     pub(crate) fn from_task(task: &ScheduledTask) -> Self {
         Self {
             id: task.id.clone(),
@@ -75,19 +53,18 @@ impl PersistedTask {
         }
     }
 
-    /// Reconstruct an in-memory task. `durable` is always `true` for
-    /// entries coming off disk.
-    ///
-    /// `parse_reference` is the clock value used when revalidating the
-    /// cron expression. It must be "now" (not the persisted
-    /// `created_at`), otherwise an expression like `"0 9 * * *"` saved
-    /// 2.9 days ago would fail to parse as "no occurrence within the
-    /// 3-day lifetime from created_at" even though it has many
-    /// occurrences going forward.
+    /// `parse_reference` must be "now", not the persisted `created_at`,
+    /// so the `NoOccurrence` check sees the same forward window the
+    /// live `add()` path does. Rejects entries with an empty `id` so
+    /// missing-required-field cases land in the drop-on-load filter
+    /// rather than silently surfacing as a zero-id task.
     pub(crate) fn into_task(
         self,
         parse_reference: DateTime<Utc>,
     ) -> Result<ScheduledTask, PersistError> {
+        if self.id.is_empty() {
+            return Err(PersistError::BadCron("missing task id".into()));
+        }
         let created_at = unix_ms_to_utc(self.created_at_unix_ms);
         let cron = CronExpression::parse_at(&self.cron, parse_reference)
             .map_err(|e| PersistError::BadCron(format!("{e}")))?;
@@ -109,7 +86,6 @@ fn unix_ms_to_utc(ms: i64) -> DateTime<Utc> {
         .unwrap_or_else(Utc::now)
 }
 
-/// Build the durable subset of `tasks` as [`PersistedTask`] entries.
 pub(crate) fn durable_snapshot(tasks: &[ScheduledTask]) -> Vec<PersistedTask> {
     tasks
         .iter()
@@ -118,25 +94,15 @@ pub(crate) fn durable_snapshot(tasks: &[ScheduledTask]) -> Vec<PersistedTask> {
         .collect()
 }
 
-// ---------------------------------------------------------------------------
-// On-disk codec — used by `FileScopedCronStore`
-// ---------------------------------------------------------------------------
-
-/// Result of classifying raw bytes against the [`PersistedFile`] schema.
-///
-/// The store layer translates each variant into either a returned task
-/// list or a quarantine + empty result.
 pub(crate) enum LoadedPayload {
     Empty,
     Tasks(Vec<PersistedTask>),
     Quarantine(String),
 }
 
-/// Decode raw bytes into a [`LoadedPayload`].
-///
 /// Empty input is treated as a valid empty list (first-ever-use). Bad
-/// JSON or unsupported schema versions yield [`LoadedPayload::Quarantine`]
-/// with a human-readable reason for the audit log.
+/// JSON or unsupported schema versions yield `Quarantine` with a
+/// human-readable reason.
 pub(crate) fn classify_payload(bytes: &[u8]) -> LoadedPayload {
     if bytes.is_empty() {
         return LoadedPayload::Empty;
@@ -150,7 +116,6 @@ pub(crate) fn classify_payload(bytes: &[u8]) -> LoadedPayload {
     }
 }
 
-/// Encode `tasks` as pretty JSON wrapped in a current-version [`PersistedFile`].
 pub(crate) fn encode_payload(tasks: &[PersistedTask]) -> Result<Vec<u8>, serde_json::Error> {
     let file = PersistedFile {
         version: SCHEMA_VERSION,

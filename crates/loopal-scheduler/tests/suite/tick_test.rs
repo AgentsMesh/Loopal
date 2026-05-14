@@ -73,7 +73,7 @@ async fn tick_removes_oneshot_after_fire() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn tick_expires_after_3_days() {
+async fn tick_keeps_recurring_task_beyond_three_days() {
     let t0 = Utc.with_ymd_and_hms(2026, 3, 29, 10, 0, 0).unwrap();
     let clock = Arc::new(ManualClock::new(t0));
 
@@ -86,7 +86,11 @@ async fn tick_expires_after_3_days() {
         tokio::task::yield_now().await;
     }
 
-    assert!(sched.list().await.is_empty(), "task should have expired");
+    assert_eq!(
+        sched.list().await.len(),
+        1,
+        "recurring task must survive past the old 3-day lifetime cap"
+    );
     cancel.cancel();
 }
 

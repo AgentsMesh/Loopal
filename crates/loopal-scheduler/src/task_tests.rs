@@ -1,5 +1,3 @@
-//! Unit tests for ScheduledTask, should_fire, is_expired, truncate_to_secs.
-
 use chrono::{TimeZone, Timelike, Utc};
 
 use crate::expression::CronExpression;
@@ -71,31 +69,30 @@ fn should_fire_no_double_fire_same_minute() {
 }
 
 #[test]
-fn is_expired_after_max_lifetime() {
-    let created = Utc.with_ymd_and_hms(2026, 3, 25, 10, 0, 0).unwrap();
-    let task = make_task("* * * * *", created);
-    // 4 days later → expired (> 3 days)
-    let now = Utc.with_ymd_and_hms(2026, 3, 29, 10, 0, 0).unwrap();
-    assert!(task.is_expired(&now));
-}
-
-#[test]
-fn is_expired_false_within_lifetime() {
+fn next_fire_starts_from_created_at_when_not_fired() {
     let created = Utc.with_ymd_and_hms(2026, 3, 29, 10, 0, 0).unwrap();
-    let task = make_task("* * * * *", created);
-    // 1 hour later → not expired
-    let now = Utc.with_ymd_and_hms(2026, 3, 29, 11, 0, 0).unwrap();
-    assert!(!task.is_expired(&now));
+    let task = make_task("0 12 * * *", created);
+    // Daily at 12:00 — next after 10:00 created_at is same day 12:00.
+    let expected = Utc.with_ymd_and_hms(2026, 3, 29, 12, 0, 0).unwrap();
+    assert_eq!(task.next_fire(), Some(expected));
 }
 
 #[test]
-fn durable_task_never_expires() {
-    // R5: durable tasks bypass the 3-day lifetime cap so persisted
-    // schedules survive indefinitely across restarts.
-    let created = Utc.with_ymd_and_hms(2026, 3, 20, 10, 0, 0).unwrap();
-    let mut task = make_task("* * * * *", created);
-    task.durable = true;
-    // 30 days later — non-durable would be expired, durable is not.
-    let now = Utc.with_ymd_and_hms(2026, 4, 19, 10, 0, 0).unwrap();
-    assert!(!task.is_expired(&now));
+fn next_fire_advances_after_last_fired() {
+    let created = Utc.with_ymd_and_hms(2026, 3, 29, 10, 0, 0).unwrap();
+    let mut task = make_task("0 12 * * *", created);
+    task.last_fired = Some(Utc.with_ymd_and_hms(2026, 3, 29, 12, 0, 0).unwrap());
+    // Already fired today's 12:00 — next is tomorrow's 12:00.
+    let expected = Utc.with_ymd_and_hms(2026, 3, 30, 12, 0, 0).unwrap();
+    assert_eq!(task.next_fire(), Some(expected));
+}
+
+#[test]
+fn next_fire_truncates_sub_second_reference() {
+    let created = Utc.with_ymd_and_hms(2026, 3, 29, 10, 0, 30).unwrap()
+        + chrono::Duration::nanoseconds(999_999);
+    let task = make_task("* * * * *", created);
+    // Truncated reference 10:00:30 → next at 10:01:00.
+    let expected = Utc.with_ymd_and_hms(2026, 3, 29, 10, 1, 0).unwrap();
+    assert_eq!(task.next_fire(), Some(expected));
 }

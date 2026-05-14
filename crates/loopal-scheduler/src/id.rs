@@ -1,14 +1,17 @@
-//! Unique task-ID selection.
-//!
-//! Extracted from `scheduler.rs` for testability: the production path
-//! uses [`generate_task_id`](crate::error::generate_task_id) which returns
-//! random 8-char strings with statistically negligible collision
-//! probability. The retry loop is only exercised by injecting a
-//! deterministic generator in tests.
-
 use crate::task::ScheduledTask;
 
-/// Draw IDs from `id_source` until one is not already taken by `tasks`.
+pub(crate) fn generate_task_id() -> String {
+    use rand::Rng;
+    const CHARSET: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
+    let mut rng = rand::rng();
+    (0..8)
+        .map(|_| {
+            let idx = rng.random_range(0..CHARSET.len());
+            CHARSET[idx] as char
+        })
+        .collect()
+}
+
 pub(crate) fn find_unique_id(
     tasks: &[ScheduledTask],
     mut id_source: impl FnMut() -> String,

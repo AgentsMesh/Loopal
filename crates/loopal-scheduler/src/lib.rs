@@ -6,6 +6,7 @@ pub(crate) mod json_file_io;
 pub mod persistence;
 pub mod persistence_file_scoped;
 pub mod persistence_session;
+pub(crate) mod save_worker;
 pub mod scheduler;
 pub(crate) mod scheduler_crud;
 pub(crate) mod scheduler_persistence;
@@ -21,10 +22,14 @@ pub use expression::{CronExpression, CronParseError};
 pub use persistence::{PersistError, PersistedTask};
 pub use persistence_file_scoped::FileScopedCronStore;
 pub use persistence_session::SessionScopedCronStorage;
-pub use scheduler::{BROADCAST_CAPACITY, CronScheduler};
-pub use task::{CronJobInfo, MAX_LIFETIME_SECS};
+pub use scheduler::{BROADCAST_CAPACITY, CronScheduler, MAX_PROMPT_CHARS};
+pub use task::CronJobInfo;
 pub use trigger::ScheduledTrigger;
 
 #[cfg(test)]
 #[path = "task_tests.rs"]
 mod task_tests;
+
+#[cfg(test)]
+#[path = "save_worker_tests.rs"]
+mod save_worker_tests;

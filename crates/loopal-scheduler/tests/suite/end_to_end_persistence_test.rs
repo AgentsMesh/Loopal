@@ -30,6 +30,7 @@ async fn durable_tasks_survive_scheduler_restart() {
         .add("*/7 * * * *", "vanish", true, false)
         .await
         .expect("transient add");
+    writer.wait_idle().await;
 
     drop(writer);
 
@@ -65,6 +66,7 @@ async fn load_persisted_cleans_up_missed_one_shot() {
         .add("5 10 * * *", "once", false, true)
         .await
         .expect("add");
+    sched.wait_idle().await;
     drop(sched);
 
     // Reload at 11:00 — one-shot time is in the past → dropped.
@@ -75,6 +77,7 @@ async fn load_persisted_cleans_up_missed_one_shot() {
     ));
     let reader = CronScheduler::with_session_storage_and_clock(store_b, clock_b);
     let count = reader.switch_session(SESSION).await.expect("load");
+    reader.wait_idle().await;
     assert_eq!(count, 0);
     assert!(reader.list().await.is_empty());
 

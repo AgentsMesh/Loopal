@@ -59,9 +59,18 @@ data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_1\",\"usage\"
             _ => {}
         }
     }
-    assert!(got_thinking, "expected Thinking chunk from reasoning_summary_text.delta");
-    assert!(got_signature, "expected ThinkingSignature from reasoning output_item.done");
-    assert!(got_server_tool_use, "expected ServerToolUse from web_search_call");
+    assert!(
+        got_thinking,
+        "expected Thinking chunk from reasoning_summary_text.delta"
+    );
+    assert!(
+        got_signature,
+        "expected ThinkingSignature from reasoning output_item.done"
+    );
+    assert!(
+        got_server_tool_use,
+        "expected ServerToolUse from web_search_call"
+    );
     assert!(got_text, "expected Text chunk");
 }
 

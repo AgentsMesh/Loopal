@@ -140,6 +140,7 @@ fn test_read_parameters_schema() {
     assert!(schema["properties"]["file_path"].is_object());
     assert!(schema["properties"]["offset"].is_object());
     assert!(schema["properties"]["limit"].is_object());
+    assert!(schema["properties"]["pages"].is_null());
 }
 
 #[tokio::test]

@@ -102,6 +102,67 @@ fn thinking_with_empty_signature_skipped() {
 }
 
 #[test]
+fn multiple_reasoning_items_paired_with_web_search_calls() {
+    let provider = make_provider();
+    let params = make_params(
+        vec![
+            Message::user("search for rust and python"),
+            Message {
+                id: None,
+                role: MessageRole::Assistant,
+                content: vec![
+                    ContentBlock::Thinking {
+                        thinking: "Search rust".to_string(),
+                        signature: Some("rs_001".to_string()),
+                    },
+                    ContentBlock::ServerToolUse {
+                        id: "ws_001".to_string(),
+                        name: "web_search".to_string(),
+                        input: json!({"query": "rust"}),
+                    },
+                    ContentBlock::ServerToolResult {
+                        block_type: "web_search_tool_result".to_string(),
+                        tool_use_id: "ws_001".to_string(),
+                        content: json!({"status": "completed"}),
+                    },
+                    ContentBlock::Thinking {
+                        thinking: "Search python".to_string(),
+                        signature: Some("rs_002".to_string()),
+                    },
+                    ContentBlock::ServerToolUse {
+                        id: "ws_002".to_string(),
+                        name: "web_search".to_string(),
+                        input: json!({"query": "python"}),
+                    },
+                    ContentBlock::ServerToolResult {
+                        block_type: "web_search_tool_result".to_string(),
+                        tool_use_id: "ws_002".to_string(),
+                        content: json!({"status": "completed"}),
+                    },
+                    ContentBlock::Text {
+                        text: "Here are the results.".to_string(),
+                    },
+                ],
+            },
+        ],
+        "",
+    );
+    let input = provider.build_input(&params);
+    assert_eq!(input[0]["type"], "message");
+    assert_eq!(input[0]["role"], "user");
+    assert_eq!(input[1]["type"], "reasoning");
+    assert_eq!(input[1]["id"], "rs_001");
+    assert_eq!(input[2]["type"], "web_search_call");
+    assert_eq!(input[2]["id"], "ws_001");
+    assert_eq!(input[3]["type"], "reasoning");
+    assert_eq!(input[3]["id"], "rs_002");
+    assert_eq!(input[4]["type"], "web_search_call");
+    assert_eq!(input[4]["id"], "ws_002");
+    assert_eq!(input[5]["type"], "message");
+    assert_eq!(input[5]["role"], "assistant");
+}
+
+#[test]
 fn multi_turn_reasoning_before_web_search() {
     let provider = make_provider();
     let params = make_params(

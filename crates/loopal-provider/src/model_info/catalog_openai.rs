@@ -115,4 +115,18 @@ pub(super) static OPENAI_MODELS: &[ModelEntry] = &[
         supports_vision: true,
         supports_prefill: true,
     },
+    ModelEntry {
+        id: "gpt-5.5",
+        provider: "openai",
+        display_name: "GPT-5.5",
+        context_window: 1_000_000,
+        max_output_tokens: 128_000,
+        thinking: ThinkingCapability::None,
+        speed: SpeedTier::Medium,
+        cost: CostTier::High,
+        quality: QualityTier::Premium,
+        supports_tools: true,
+        supports_vision: true,
+        supports_prefill: true,
+    },
 ];

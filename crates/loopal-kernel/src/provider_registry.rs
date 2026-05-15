@@ -61,10 +61,17 @@ pub fn register_providers(settings: &Settings, registry: &mut ProviderRegistry) 
 
     if let Some(api_key) = openai_key {
         let mut provider = OpenAiProvider::new(api_key);
-        if let Some(ref config) = providers.openai
-            && let Some(ref base_url) = config.base_url
-        {
-            provider = provider.with_base_url(base_url.clone());
+        let base_url = providers
+            .openai
+            .as_ref()
+            .and_then(|c| c.base_url.clone())
+            .or_else(|| {
+                std::env::var("OPENAI_BASE_URL")
+                    .ok()
+                    .filter(|u| !u.is_empty())
+            });
+        if let Some(url) = base_url {
+            provider = provider.with_base_url(url);
         }
         registry.register(Arc::new(provider));
         info!("registered openai provider");

@@ -16,6 +16,7 @@ pub fn normalize_schema(mut schema: Value) -> Value {
 
     inline_refs_recursive(&mut schema, &definitions);
     strip_titles_recursive(&mut schema);
+    ensure_object_properties_recursive(&mut schema);
     schema
 }
 
@@ -64,5 +65,30 @@ fn strip_titles_recursive(value: &mut Value) {
             }
         }
         _ => {}
+    }
+}
+
+fn ensure_object_properties_recursive(value: &mut Value) {
+    let Value::Object(map) = value else { return };
+
+    let is_object_type = map
+        .get("type")
+        .and_then(|v| v.as_str())
+        .is_some_and(|t| t == "object");
+
+    if is_object_type && !map.contains_key("properties") {
+        map.insert("properties".into(), Value::Object(Map::new()));
+    }
+
+    for v in map.values_mut() {
+        match v {
+            Value::Object(_) => ensure_object_properties_recursive(v),
+            Value::Array(arr) => {
+                for item in arr.iter_mut() {
+                    ensure_object_properties_recursive(item);
+                }
+            }
+            _ => {}
+        }
     }
 }

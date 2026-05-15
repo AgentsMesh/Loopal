@@ -133,3 +133,67 @@ fn handles_unresolvable_ref_gracefully() {
     let result = normalize_schema(schema);
     assert_eq!(result["properties"]["x"]["$ref"], "#/definitions/Missing");
 }
+
+#[test]
+fn adds_properties_to_empty_object_schema() {
+    let schema = json!({"type": "object"});
+    let result = normalize_schema(schema);
+    assert_eq!(result, json!({"type": "object", "properties": {}}));
+}
+
+#[test]
+fn preserves_existing_properties() {
+    let schema = json!({
+        "type": "object",
+        "properties": {"name": {"type": "string"}}
+    });
+    let result = normalize_schema(schema);
+    assert_eq!(result["properties"]["name"]["type"], "string");
+}
+
+#[test]
+fn adds_properties_to_nested_object_without_properties() {
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "nested": {"type": "object"}
+        }
+    });
+    let result = normalize_schema(schema);
+    assert_eq!(
+        result["properties"]["nested"],
+        json!({"type": "object", "properties": {}})
+    );
+}
+
+#[test]
+fn adds_properties_to_object_in_array_items() {
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "list": {
+                "type": "array",
+                "items": {"type": "object"}
+            }
+        }
+    });
+    let result = normalize_schema(schema);
+    assert_eq!(
+        result["properties"]["list"]["items"],
+        json!({"type": "object", "properties": {}})
+    );
+}
+
+#[test]
+fn does_not_add_properties_to_non_object_types() {
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "count": {"type": "integer"},
+            "tags": {"type": "array", "items": {"type": "string"}}
+        }
+    });
+    let result = normalize_schema(schema);
+    assert!(result["properties"]["count"].get("properties").is_none());
+    assert!(result["properties"]["tags"].get("properties").is_none());
+}

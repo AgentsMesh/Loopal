@@ -22,10 +22,8 @@ impl Tool for ReadTool {
          but it's recommended to read the whole file by not providing these parameters.\n\
          - Results are returned using cat -n format, with line numbers starting at 1.\n\
          - This tool can read images (PNG, JPG, etc). When reading an image file the contents are presented visually.\n\
-         - This tool can read PDF files (.pdf). For large PDFs (more than 10 pages), you MUST provide the pages \
-         parameter to read specific page ranges (e.g., pages: \"1-5\"). Max 20 pages per request.\n\
          - This tool can read Jupyter notebooks (.ipynb files) and returns all cells with their outputs.\n\
-         - Supports HTML files — auto-converted to markdown.\n\
+         - For PDF files, use the ReadPdf tool. For HTML files, use the ReadHtml tool.\n\
          - This tool can only read files, not directories. To read a directory, use Ls or an ls command via Bash.\n\
          - If the user provides a path to a screenshot, ALWAYS use this tool to view the file at the path.\n\
          - If you read a file that exists but has empty contents you will receive a system reminder warning."
@@ -47,10 +45,6 @@ impl Tool for ReadTool {
                 "limit": {
                     "type": "integer",
                     "description": "Maximum number of lines to read"
-                },
-                "pages": {
-                    "type": "string",
-                    "description": "Page range for PDF files (e.g., '1-5', '3')"
                 }
             }
         })
@@ -66,36 +60,7 @@ impl Tool for ReadTool {
                 "file_path is required".into(),
             ))
         })?;
-        let pages = input["pages"].as_str().map(|s| s.to_string());
 
-        // Resolve path (checks traversal for relative paths)
-        let path = match ctx.backend.resolve_path(file_path, false) {
-            Ok(p) => p,
-            Err(e) => return Ok(ToolResult::error(e.to_string())),
-        };
-
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-
-        // PDF handling (sync extraction, doesn't use backend)
-        if ext.eq_ignore_ascii_case("pdf") {
-            return match crate::read_pdf::extract_pdf_text(&path, pages.as_deref()) {
-                Ok(text) => Ok(ToolResult::success(text)),
-                Err(e) => Ok(ToolResult::error(e)),
-            };
-        }
-
-        if pages.is_some() {
-            return Ok(ToolResult::error(
-                "pages parameter is only supported for PDF files",
-            ));
-        }
-
-        // HTML handling — sync read + convert to plain text/markdown
-        if ext.eq_ignore_ascii_case("html") || ext.eq_ignore_ascii_case("htm") {
-            return read_html(&path);
-        }
-
-        // Text file via backend (handles size check, binary detection, line numbering)
         let offset = input["offset"].as_u64().unwrap_or(1).max(1) as usize;
         let limit = input["limit"].as_u64().unwrap_or(2000) as usize;
 
@@ -104,15 +69,4 @@ impl Tool for ReadTool {
             Err(e) => Ok(ToolResult::error(e.to_string())),
         }
     }
-}
-
-fn read_html(path: &std::path::Path) -> Result<ToolResult, LoopalError> {
-    let raw = std::fs::read_to_string(path).map_err(|e| {
-        LoopalError::Tool(loopal_error::ToolError::ExecutionFailed(format!(
-            "Failed to read {}: {e}",
-            path.display()
-        )))
-    })?;
-    let converted = html2text::from_read(raw.as_bytes(), 120);
-    Ok(ToolResult::success(converted))
 }

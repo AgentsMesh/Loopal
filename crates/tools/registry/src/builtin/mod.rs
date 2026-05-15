@@ -12,6 +12,8 @@ use crate::registry::ToolRegistry;
 pub fn register_all(registry: &ToolRegistry, bg_store: Arc<BackgroundTaskStore>) {
     registry.register(Box::new(loopal_tool_apply_patch::ApplyPatchTool));
     registry.register(Box::new(loopal_tool_read::ReadTool));
+    registry.register(Box::new(loopal_tool_read_pdf::ReadPdfTool));
+    registry.register(Box::new(loopal_tool_read_html::ReadHtmlTool));
     registry.register(Box::new(loopal_tool_write::WriteTool));
     registry.register(Box::new(loopal_tool_edit::EditTool));
     registry.register(Box::new(loopal_tool_multi_edit::MultiEditTool));

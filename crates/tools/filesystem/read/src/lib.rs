@@ -1,4 +1,3 @@
-pub mod read;
-pub mod read_pdf;
+mod read;
 
 pub use read::ReadTool;

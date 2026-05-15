@@ -73,7 +73,10 @@ async fn test_read_pdf_empty_pages_treated_as_none() {
     let ctx = make_ctx(tmp.path());
 
     let result = tool
-        .execute(json!({"file_path": file.to_str().unwrap(), "pages": ""}), &ctx)
+        .execute(
+            json!({"file_path": file.to_str().unwrap(), "pages": ""}),
+            &ctx,
+        )
         .await
         .unwrap();
 

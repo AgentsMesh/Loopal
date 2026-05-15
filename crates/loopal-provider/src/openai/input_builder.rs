@@ -127,8 +127,22 @@ fn build_assistant_items(blocks: &[ContentBlock], input: &mut Vec<Value>) {
                     "action": {"type": "search", "query": args.get("query").and_then(|v| v.as_str()).unwrap_or("")}
                 }));
             }
-            ContentBlock::Thinking { .. }
-            | ContentBlock::ServerToolResult { .. }
+            ContentBlock::Thinking {
+                thinking,
+                signature,
+            } => {
+                flush_assistant_text(&mut text_parts, input);
+                // reason: OpenAI requires reasoning item before web_search_call in multi-turn
+                let id = signature.clone().unwrap_or_default();
+                if !id.is_empty() {
+                    input.push(json!({
+                        "type": "reasoning",
+                        "id": id,
+                        "summary": [{"type": "summary_text", "text": thinking}]
+                    }));
+                }
+            }
+            ContentBlock::ServerToolResult { .. }
             | ContentBlock::Image { .. }
             | ContentBlock::ToolResult { .. } => {}
         }

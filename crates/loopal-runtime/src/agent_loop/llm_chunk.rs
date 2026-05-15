@@ -29,12 +29,10 @@ impl AgentLoopRunner {
             Ok(StreamChunk::ThinkingSignature { signature }) => {
                 // reason: OpenAI emits multiple reasoning items (one per web_search_call);
                 // flush each as a Thinking block in stream order so replay has correct pairing
-                result
-                    .server_blocks
-                    .push(ContentBlock::Thinking {
-                        thinking: std::mem::take(&mut result.thinking_text),
-                        signature: Some(signature),
-                    });
+                result.server_blocks.push(ContentBlock::Thinking {
+                    thinking: std::mem::take(&mut result.thinking_text),
+                    signature: Some(signature),
+                });
             }
             Ok(StreamChunk::ToolUse { id, name, input }) => {
                 self.emit_in_turn(AgentEventPayload::ToolCall {

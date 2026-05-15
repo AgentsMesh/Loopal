@@ -23,6 +23,10 @@ mod model_info_overlay_test;
 mod model_info_test;
 #[path = "suite/model_supports_prefill_test.rs"]
 mod model_supports_prefill_test;
+#[path = "suite/openai_reasoning_e2e_test.rs"]
+mod openai_reasoning_e2e_test;
+#[path = "suite/openai_reasoning_test.rs"]
+mod openai_reasoning_test;
 #[path = "suite/openai_request_test.rs"]
 mod openai_request_test;
 #[path = "suite/openai_stream_edge_test.rs"]

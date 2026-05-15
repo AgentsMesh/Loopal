@@ -20,7 +20,9 @@ impl AgentLoopRunner {
         // Thinking block goes first (Anthropic API requires this order).
         // Skip if signature is missing — an unsigned thinking block (e.g. from
         // an interrupted stream) fails API validation on the next multi-turn call.
-        if !thinking_text.is_empty() && thinking_signature.is_some() {
+        // For OpenAI, signature stores the reasoning item ID — save even if text is empty.
+        if thinking_signature.is_some() && (!thinking_text.is_empty() || !server_blocks.is_empty())
+        {
             assistant_content.push(ContentBlock::Thinking {
                 thinking: thinking_text.to_string(),
                 signature: thinking_signature.map(String::from),

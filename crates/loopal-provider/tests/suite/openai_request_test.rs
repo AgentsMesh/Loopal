@@ -145,6 +145,5 @@ fn test_system_prompt_not_in_input() {
     let provider = make_provider();
     let params = make_params(vec![], vec![], "You are helpful");
     let input = provider.build_input(&params);
-    // System prompt goes to `instructions`, not in input array
     assert!(input.is_empty());
 }

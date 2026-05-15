@@ -162,6 +162,13 @@ fn parse_output_item_done(item: &Value, chunks: &mut Vec<Result<StreamChunk, Loo
                 content: json!({"status": "completed"}),
             }));
         }
+        "reasoning" => {
+            // reason: OpenAI requires the reasoning item ID when replaying web_search_call
+            let id = item["id"].as_str().unwrap_or("").to_string();
+            if !id.is_empty() {
+                chunks.push(Ok(StreamChunk::ThinkingSignature { signature: id }));
+            }
+        }
         _ => {}
     }
 }

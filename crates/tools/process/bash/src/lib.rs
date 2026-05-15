@@ -101,7 +101,7 @@ impl Tool for BashTool {
     }
 
     async fn execute(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
-        if let Some(pid) = input["process_id"].as_str() {
+        if let Some(pid) = input["process_id"].as_str().filter(|s| !s.is_empty()) {
             if input["stop"].as_bool().unwrap_or(false) {
                 return Ok(bg_ops::bg_stop(&self.store, pid));
             }

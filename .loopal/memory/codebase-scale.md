@@ -3,7 +3,7 @@ name: Codebase Scale & Limits
 description: Project size metrics, runtime limits, and complexity hotspots for planning
 type: project
 created_at: 2026-04-14
-updated_at: 2026-04-14
+updated_at: 2026-05-15
 ttl_days: 90
 related:
   - windows-ci-gotchas.md
@@ -13,7 +13,7 @@ related:
 ## Scale
 
 - ~186K LOC Rust, ~33 internal crates
-- Rust 1.94.0, edition 2024, Bazel 8.1.0 (pinned in MODULE.bazel L30-32)
+- Rust 1.94.0, edition 2024, Bazel 8.1.0 baseline (Rust is pinned in `/Users/stone/Works/Loopal/MODULE.bazel`)
 
 ## Largest Crates (LOC)
 
@@ -27,5 +27,5 @@ These five crates account for ~50K LOC (~27% of total). Refactoring or large cha
 
 ## Runtime Limits
 
-- Hub supports up to **16 sub-agents** (`hub.rs` `max_total_agents: 16`)
-- Optional **MetaHub** enables cross-hub clustering — sub-hubs register via uplink (`loopal-agent-hub/src/uplink.rs`), agents can spawn on remote hubs via `target_hub` parameter
+- Hub supports up to **16 sub-agents** (`crates/loopal-agent-hub/src/hub.rs` `max_total_agents: 16`)
+- Optional **MetaHub** enables cross-hub clustering — sub-hubs register via uplink (`crates/loopal-agent-hub/src/uplink.rs`), agents can spawn on remote hubs via `target_hub` parameter

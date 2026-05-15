@@ -1,12 +1,10 @@
-//! Background process operations — query output and stop running tasks.
-
 use std::sync::Arc;
 use std::time::Duration;
 
 use loopal_tool_api::ToolResult;
-use loopal_tool_background::{BackgroundTaskStore, TaskStatus};
 
-/// Read output from a background process (blocking or non-blocking).
+use crate::{BackgroundTaskStore, TaskStatus};
+
 pub async fn bg_output(
     store: &BackgroundTaskStore,
     process_id: &str,
@@ -48,21 +46,14 @@ pub async fn bg_output(
     format_bg_status(&output, &status, exit_code)
 }
 
-/// Stop a background process.
-///
-/// Lock order: `child` → `status` (matches the monitor task).
-/// Always returns success — even if the monitor already set a terminal
-/// status (race between kill and monitor is benign).
 pub fn bg_stop(store: &BackgroundTaskStore, process_id: &str) -> ToolResult {
     let result = store.with_task(process_id, |task| {
-        // Kill child (if monitor hasn't taken it already).
         {
             if let Some(child) = task.child.lock().unwrap().as_mut() {
                 let _ = child.start_kill();
             }
         }
 
-        // Force status to Failed if still Running.
         let mut status = task.status.lock().unwrap();
         if *status == TaskStatus::Running {
             *status = TaskStatus::Failed;

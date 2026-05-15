@@ -1,5 +1,5 @@
-use loopal_tool_api::{Tool, ToolContext};
-use loopal_tool_write::WriteTool;
+use loopal_tool_api::{Tool, ToolContext, TypedBridge};
+use loopal_tool_write::{WriteParams, WriteTool};
 use serde_json::json;
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
@@ -11,12 +11,16 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext::new(backend, "test")
 }
 
+fn make_tool() -> TypedBridge<WriteTool, WriteParams> {
+    TypedBridge::new(WriteTool)
+}
+
 #[tokio::test]
 async fn test_write_missing_content_returns_error() {
     let tmp = tempfile::tempdir().unwrap();
     let file = tmp.path().join("no_content.txt");
 
-    let tool = WriteTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool
@@ -31,7 +35,7 @@ async fn test_write_reports_byte_count() {
     let tmp = tempfile::tempdir().unwrap();
     let file = tmp.path().join("bytes.txt");
 
-    let tool = WriteTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let content = "hello world";
@@ -53,9 +57,8 @@ async fn test_write_reports_byte_count() {
 #[tokio::test]
 async fn test_write_with_relative_path() {
     let tmp = tempfile::tempdir().unwrap();
-    // Canonicalize to handle macOS /tmp -> /private/tmp symlink
     let canon = tmp.path().canonicalize().unwrap();
-    let tool = WriteTool;
+    let tool = make_tool();
     let ctx = make_ctx(&canon);
 
     let result = tool
@@ -77,12 +80,10 @@ async fn test_write_with_relative_path() {
 #[tokio::test]
 #[cfg(not(windows))]
 async fn test_write_absolute_path_bypasses_traversal_check() {
-    // L62: absolute path skips the traversal check entirely (is_absolute() is true)
     let tmp = tempfile::tempdir().unwrap();
     let file = tmp.path().join("absolute_test.txt");
 
-    let tool = WriteTool;
-    // cwd is different from where we write, but since path is absolute, it's allowed
+    let tool = make_tool();
     let ctx = make_ctx(std::path::Path::new("/"));
 
     let result = tool
@@ -103,13 +104,12 @@ async fn test_write_absolute_path_bypasses_traversal_check() {
 
 #[tokio::test]
 async fn test_write_relative_path_existing_file_within_cwd() {
-    // L64: path.exists() is true, canonicalize check
     let tmp = tempfile::tempdir().unwrap();
     let canon = tmp.path().canonicalize().unwrap();
     let file = canon.join("existing.txt");
     std::fs::write(&file, "original").unwrap();
 
-    let tool = WriteTool;
+    let tool = make_tool();
     let ctx = make_ctx(&canon);
 
     let result = tool
@@ -130,16 +130,12 @@ async fn test_write_relative_path_existing_file_within_cwd() {
 
 #[tokio::test]
 async fn test_write_relative_new_file_parent_doesnt_exist() {
-    // L68: path doesn't exist AND parent doesn't exist
-    // When both the path and parent don't exist, check_path is None.
-    // In that case, the if-let at L75 doesn't match, so the write proceeds.
     let tmp = tempfile::tempdir().unwrap();
     let canon = tmp.path().canonicalize().unwrap();
 
-    let tool = WriteTool;
+    let tool = make_tool();
     let ctx = make_ctx(&canon);
 
-    // "nonexistent_dir/file.txt" relative to cwd
     let result = tool
         .execute(
             json!({

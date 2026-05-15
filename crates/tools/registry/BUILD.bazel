@@ -28,6 +28,7 @@ rust_library(
         "//crates/tools/filesystem/write:loopal-tool-write",
         "//crates/tools/process/background:loopal-tool-background",
         "//crates/tools/process/bash:loopal-tool-bash",
+        "//crates/tools/process/bash-process:loopal-tool-bash-process",
         "@crates//:serde_json",
     ],
 )

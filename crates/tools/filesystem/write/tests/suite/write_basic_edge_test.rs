@@ -1,5 +1,5 @@
-use loopal_tool_api::{Tool, ToolContext};
-use loopal_tool_write::WriteTool;
+use loopal_tool_api::{Tool, ToolContext, TypedBridge};
+use loopal_tool_write::{WriteParams, WriteTool};
 use serde_json::json;
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
@@ -11,6 +11,10 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext::new(backend, "test")
 }
 
+fn make_tool() -> TypedBridge<WriteTool, WriteParams> {
+    TypedBridge::new(WriteTool)
+}
+
 #[tokio::test]
 async fn test_write_relative_path_existing_file_within_cwd() {
     let tmp = tempfile::tempdir().unwrap();
@@ -18,7 +22,7 @@ async fn test_write_relative_path_existing_file_within_cwd() {
     let file = canon.join("existing.txt");
     std::fs::write(&file, "original").unwrap();
 
-    let tool = WriteTool;
+    let tool = make_tool();
     let ctx = make_ctx(&canon);
 
     let result = tool
@@ -42,7 +46,7 @@ async fn test_write_relative_new_file_parent_doesnt_exist() {
     let tmp = tempfile::tempdir().unwrap();
     let canon = tmp.path().canonicalize().unwrap();
 
-    let tool = WriteTool;
+    let tool = make_tool();
     let ctx = make_ctx(&canon);
 
     let result = tool

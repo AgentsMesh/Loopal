@@ -1,15 +1,22 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
-use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
+use loopal_tool_api::{PermissionLevel, ToolContext, ToolResult, TypedTool};
 use loopal_tool_invocation::ToolResultMetadata;
-use serde_json::{Value, json};
+use schemars::JsonSchema;
+use serde::Deserialize;
 
 use loopal_edit_core::omission_detector::detect_omissions;
 
 pub struct WriteTool;
 
+#[derive(Deserialize, JsonSchema)]
+pub struct WriteParams {
+    pub file_path: String,
+    pub content: String,
+}
+
 #[async_trait]
-impl Tool for WriteTool {
+impl TypedTool<WriteParams> for WriteTool {
     fn name(&self) -> &str {
         "Write"
     }
@@ -22,40 +29,18 @@ impl Tool for WriteTool {
          - Only use emojis if the user explicitly requests it."
     }
 
-    fn parameters_schema(&self) -> Value {
-        json!({
-            "type": "object",
-            "required": ["file_path", "content"],
-            "properties": {
-                "file_path": {
-                    "type": "string",
-                    "description": "Absolute path to the file to write"
-                },
-                "content": {
-                    "type": "string",
-                    "description": "Content to write to the file"
-                }
-            }
-        })
-    }
-
     fn permission(&self) -> PermissionLevel {
         PermissionLevel::Write
     }
 
-    async fn execute(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
-        let file_path = input["file_path"].as_str().ok_or_else(|| {
-            LoopalError::Tool(loopal_error::ToolError::InvalidInput(
-                "file_path is required".into(),
-            ))
-        })?;
-        let content = input["content"].as_str().ok_or_else(|| {
-            LoopalError::Tool(loopal_error::ToolError::InvalidInput(
-                "content is required".into(),
-            ))
-        })?;
+    async fn execute(
+        &self,
+        input: WriteParams,
+        ctx: &ToolContext,
+    ) -> Result<ToolResult, LoopalError> {
+        let file_path = &input.file_path;
+        let content = &input.content;
 
-        // Check content for LLM omission patterns before writing
         let omissions = detect_omissions(content);
         if !omissions.is_empty() {
             return Ok(ToolResult::error(format!(
@@ -64,7 +49,6 @@ impl Tool for WriteTool {
             )));
         }
 
-        // Backend handles: path resolution, traversal check, mkdir, atomic write
         match ctx.backend.write(file_path, content).await {
             Ok(result) => Ok(ToolResult::success(format!(
                 "Successfully wrote {} bytes to {}",

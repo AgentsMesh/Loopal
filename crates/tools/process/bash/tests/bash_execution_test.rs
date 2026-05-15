@@ -1,13 +1,17 @@
-use loopal_tool_api::Tool;
-use loopal_tool_bash::BashTool;
+use loopal_tool_api::{Tool, TypedBridge};
+use loopal_tool_bash::{BashParams, BashTool};
 use serde_json::json;
 
 use super::{make_ctx, make_store};
 
+fn make_tool() -> TypedBridge<BashTool, BashParams> {
+    TypedBridge::new(BashTool::new(make_store()))
+}
+
 #[tokio::test]
 async fn test_bash_simple_echo() {
     let tmp = tempfile::tempdir().unwrap();
-    let tool = BashTool::new(make_store());
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool
@@ -22,7 +26,7 @@ async fn test_bash_simple_echo() {
 #[tokio::test]
 async fn test_bash_nonzero_exit_code() {
     let tmp = tempfile::tempdir().unwrap();
-    let tool = BashTool::new(make_store());
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool
@@ -37,7 +41,7 @@ async fn test_bash_nonzero_exit_code() {
 #[tokio::test]
 async fn test_bash_missing_command_returns_error() {
     let tmp = tempfile::tempdir().unwrap();
-    let tool = BashTool::new(make_store());
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool.execute(json!({}), &ctx).await;
@@ -48,7 +52,7 @@ async fn test_bash_missing_command_returns_error() {
 #[tokio::test]
 async fn test_bash_captures_stderr() {
     let tmp = tempfile::tempdir().unwrap();
-    let tool = BashTool::new(make_store());
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool
@@ -62,7 +66,7 @@ async fn test_bash_captures_stderr() {
 #[tokio::test]
 async fn test_bash_stdout_and_stderr_combined() {
     let tmp = tempfile::tempdir().unwrap();
-    let tool = BashTool::new(make_store());
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool
@@ -82,7 +86,7 @@ async fn test_bash_stdout_and_stderr_combined() {
 #[cfg(not(windows))]
 async fn test_bash_runs_in_cwd() {
     let tmp = tempfile::tempdir().unwrap();
-    let tool = BashTool::new(make_store());
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool.execute(json!({"command": "pwd"}), &ctx).await.unwrap();
@@ -97,7 +101,7 @@ async fn test_bash_runs_in_cwd() {
 #[tokio::test]
 async fn test_bash_with_custom_timeout() {
     let tmp = tempfile::tempdir().unwrap();
-    let tool = BashTool::new(make_store());
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool
@@ -118,7 +122,7 @@ async fn test_bash_with_custom_timeout() {
 #[tokio::test]
 async fn test_bash_timeout_triggers_error() {
     let tmp = tempfile::tempdir().unwrap();
-    let tool = BashTool::new(make_store());
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool
@@ -138,7 +142,7 @@ async fn test_bash_timeout_triggers_error() {
 #[cfg(not(windows))]
 async fn test_bash_command_with_nonzero_exit_and_stderr() {
     let tmp = tempfile::tempdir().unwrap();
-    let tool = BashTool::new(make_store());
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool

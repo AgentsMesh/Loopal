@@ -1,14 +1,25 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
-use loopal_tool_api::{LsEntry, PermissionLevel, Tool, ToolContext, ToolResult};
-use serde_json::{Value, json};
+use loopal_tool_api::{LsEntry, PermissionLevel, ToolContext, ToolResult, TypedTool};
+use schemars::JsonSchema;
+use serde::Deserialize;
 
 use crate::ls_format;
 
 pub struct LsTool;
 
+#[derive(Deserialize, JsonSchema)]
+pub struct LsParams {
+    #[serde(default)]
+    pub path: Option<String>,
+    #[serde(default)]
+    pub long: Option<bool>,
+    #[serde(default)]
+    pub all: Option<bool>,
+}
+
 #[async_trait]
-impl Tool for LsTool {
+impl TypedTool<LsParams> for LsTool {
     fn name(&self) -> &str {
         "Ls"
     }
@@ -20,40 +31,18 @@ impl Tool for LsTool {
          - Use this tool instead of running `ls` via Bash — it provides structured output."
     }
 
-    fn parameters_schema(&self) -> Value {
-        json!({
-            "type": "object",
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "Directory or file path (default: cwd)"
-                },
-                "long": {
-                    "type": "boolean",
-                    "description": "Show permissions, size, and modification time (default: false)"
-                },
-                "all": {
-                    "type": "boolean",
-                    "description": "Include hidden files starting with '.' (default: false)"
-                }
-            }
-        })
-    }
-
     fn permission(&self) -> PermissionLevel {
         PermissionLevel::ReadOnly
     }
 
-    async fn execute(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
-        let raw_path = input["path"].as_str().unwrap_or(".");
+    async fn execute(&self, input: LsParams, ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
+        let raw_path = input.path.as_deref().unwrap_or(".");
 
-        // Resolve path via backend (handles sandbox policy)
         let target = match ctx.backend.resolve_path(raw_path, false) {
             Ok(p) => p,
             Err(e) => return Ok(ToolResult::error(e.to_string())),
         };
 
-        // Single file -> stat-like output via backend
         let info = match ctx.backend.file_info(target.to_str().unwrap_or(".")).await {
             Ok(i) => i,
             Err(e) => return Ok(ToolResult::error(e.to_string())),
@@ -65,9 +54,8 @@ impl Tool for LsTool {
             )));
         }
 
-        // Directory listing via backend
-        let long = input["long"].as_bool().unwrap_or(false);
-        let show_all = input["all"].as_bool().unwrap_or(false);
+        let long = input.long.unwrap_or(false);
+        let show_all = input.all.unwrap_or(false);
 
         let ls_result = match ctx.backend.ls(target.to_str().unwrap_or(".")).await {
             Ok(r) => r,

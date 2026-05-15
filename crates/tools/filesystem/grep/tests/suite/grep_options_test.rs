@@ -1,5 +1,5 @@
-use loopal_tool_api::{Tool, ToolContext};
-use loopal_tool_grep::GrepTool;
+use loopal_tool_api::{Tool, ToolContext, TypedBridge};
+use loopal_tool_grep::{GrepParams, GrepTool};
 use serde_json::json;
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
@@ -11,11 +11,15 @@ fn make_file(dir: &std::path::Path, name: &str, content: &str) {
     std::fs::write(dir.join(name), content).unwrap();
 }
 
+fn make_tool() -> TypedBridge<GrepTool, GrepParams> {
+    TypedBridge::new(GrepTool)
+}
+
 #[tokio::test]
 async fn case_insensitive_matches() {
     let tmp = tempfile::tempdir().unwrap();
     make_file(tmp.path(), "f.txt", "Hello World\nhello world\nHELLO WORLD");
-    let tool = GrepTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(
@@ -33,7 +37,7 @@ async fn case_insensitive_matches() {
 async fn case_insensitive_default_is_sensitive() {
     let tmp = tempfile::tempdir().unwrap();
     make_file(tmp.path(), "f.txt", "Hello World\nhello world");
-    let tool = GrepTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(json!({"pattern": "hello", "output_mode": "content"}), &ctx)
@@ -47,7 +51,7 @@ async fn case_insensitive_default_is_sensitive() {
 async fn multiline_matches_across_lines() {
     let tmp = tempfile::tempdir().unwrap();
     make_file(tmp.path(), "f.txt", "start\nhello\nworld\nend");
-    let tool = GrepTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(
@@ -56,7 +60,6 @@ async fn multiline_matches_across_lines() {
         )
         .await
         .unwrap();
-    // Both lines 2 and 3 should appear as matches
     assert!(r.content.contains("hello"));
     assert!(r.content.contains("world"));
 }
@@ -66,7 +69,7 @@ async fn type_filter_rust_only() {
     let tmp = tempfile::tempdir().unwrap();
     make_file(tmp.path(), "code.rs", "fn main() {}");
     make_file(tmp.path(), "script.py", "fn main() {}");
-    let tool = GrepTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(
@@ -83,7 +86,7 @@ async fn type_filter_rust_only() {
 async fn type_filter_unknown_returns_no_results() {
     let tmp = tempfile::tempdir().unwrap();
     make_file(tmp.path(), "code.rs", "fn main() {}");
-    let tool = GrepTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(json!({"pattern": "fn main", "type": "brainfuck"}), &ctx)
@@ -97,7 +100,7 @@ async fn offset_skips_results() {
     let tmp = tempfile::tempdir().unwrap();
     let lines: String = (0..10).map(|i| format!("match_{i}\n")).collect();
     make_file(tmp.path(), "f.txt", &lines);
-    let tool = GrepTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(
@@ -117,7 +120,7 @@ async fn offset_with_head_limit_pagination() {
     let tmp = tempfile::tempdir().unwrap();
     let lines: String = (0..20).map(|i| format!("line_{i}\n")).collect();
     make_file(tmp.path(), "f.txt", &lines);
-    let tool = GrepTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(
@@ -126,7 +129,6 @@ async fn offset_with_head_limit_pagination() {
         )
         .await
         .unwrap();
-    // Should show pagination hint
     assert!(r.content.contains("offset=10"));
 }
 
@@ -134,7 +136,7 @@ async fn offset_with_head_limit_pagination() {
 async fn line_numbers_disabled() {
     let tmp = tempfile::tempdir().unwrap();
     make_file(tmp.path(), "f.txt", "hello world\ngoodbye world");
-    let tool = GrepTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(
@@ -143,7 +145,6 @@ async fn line_numbers_disabled() {
         )
         .await
         .unwrap();
-    // Should not have :1: line number prefix
     assert!(!r.content.contains(":1:"));
     assert!(r.content.contains("hello world"));
 }

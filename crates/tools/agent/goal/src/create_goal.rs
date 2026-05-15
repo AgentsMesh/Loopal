@@ -1,23 +1,23 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
-use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
+use loopal_tool_api::{PermissionLevel, ToolContext, ToolResult, TypedTool};
+use schemars::JsonSchema;
 use serde::Deserialize;
-use serde_json::{Value, json};
 
 use crate::errors::format_session_error;
 use crate::get_goal::render_response;
 
 pub struct CreateGoalTool;
 
-#[derive(Deserialize)]
-struct CreateGoalArgs {
-    objective: String,
+#[derive(Deserialize, JsonSchema)]
+pub struct CreateGoalParams {
+    pub objective: String,
     #[serde(default)]
-    token_budget: Option<u64>,
+    pub token_budget: Option<u64>,
 }
 
 #[async_trait]
-impl Tool for CreateGoalTool {
+impl TypedTool<CreateGoalParams> for CreateGoalTool {
     fn name(&self) -> &str {
         "create_goal"
     }
@@ -29,30 +29,15 @@ impl Tool for CreateGoalTool {
          only to mark an existing goal complete."
     }
 
-    fn parameters_schema(&self) -> Value {
-        json!({
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["objective"],
-            "properties": {
-                "objective": {
-                    "type": "string",
-                    "description": "Required. The concrete objective to start pursuing. Must be non-empty."
-                },
-                "token_budget": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "description": "Optional positive token budget for the new active goal."
-                }
-            }
-        })
-    }
-
     fn permission(&self) -> PermissionLevel {
         PermissionLevel::Write
     }
 
-    async fn execute(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
+    async fn execute(
+        &self,
+        input: CreateGoalParams,
+        ctx: &ToolContext,
+    ) -> Result<ToolResult, LoopalError> {
         let session = match ctx.goal_session.as_ref() {
             Some(s) => s,
             None => {
@@ -61,14 +46,10 @@ impl Tool for CreateGoalTool {
                 ));
             }
         };
-        let args: CreateGoalArgs = match serde_json::from_value(input) {
-            Ok(a) => a,
-            Err(e) => return Ok(ToolResult::error(format!("invalid arguments: {e}"))),
-        };
-        if args.objective.trim().is_empty() {
+        if input.objective.trim().is_empty() {
             return Ok(ToolResult::error("objective must be a non-empty string"));
         }
-        match session.create(args.objective, args.token_budget).await {
+        match session.create(input.objective, input.token_budget).await {
             Ok(goal) => Ok(ToolResult::success(render_response(&Some(goal)))),
             Err(err) => Ok(ToolResult::error(format_session_error(err))),
         }

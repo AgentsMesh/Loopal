@@ -1,14 +1,19 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
-use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
-use serde_json::{Value, json};
-
-use crate::require_str;
+use loopal_tool_api::{PermissionLevel, ToolContext, ToolResult, TypedTool};
+use schemars::JsonSchema;
+use serde::Deserialize;
 
 pub struct CopyFileTool;
 
+#[derive(Deserialize, JsonSchema)]
+pub struct CopyFileParams {
+    pub src: String,
+    pub dst: String,
+}
+
 #[async_trait]
-impl Tool for CopyFileTool {
+impl TypedTool<CopyFileParams> for CopyFileTool {
     fn name(&self) -> &str {
         "CopyFile"
     }
@@ -17,27 +22,16 @@ impl Tool for CopyFileTool {
         "Copy a file to a new location."
     }
 
-    fn parameters_schema(&self) -> Value {
-        json!({
-            "type": "object",
-            "required": ["src", "dst"],
-            "properties": {
-                "src": { "type": "string", "description": "Source file path" },
-                "dst": { "type": "string", "description": "Destination path" }
-            }
-        })
-    }
-
     fn permission(&self) -> PermissionLevel {
         PermissionLevel::Write
     }
 
-    async fn execute(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
-        let src_raw = require_str(&input, "src")?;
-        let dst_raw = require_str(&input, "dst")?;
-
-        // Validate source exists and is a file
-        let src_info = match ctx.backend.file_info(src_raw).await {
+    async fn execute(
+        &self,
+        input: CopyFileParams,
+        ctx: &ToolContext,
+    ) -> Result<ToolResult, LoopalError> {
+        let src_info = match ctx.backend.file_info(&input.src).await {
             Ok(i) => i,
             Err(e) => return Ok(ToolResult::error(e.to_string())),
         };
@@ -47,31 +41,30 @@ impl Tool for CopyFileTool {
             ));
         }
 
-        // If dst is an existing directory, copy into it
-        let final_dst = match ctx.backend.file_info(dst_raw).await {
+        let final_dst = match ctx.backend.file_info(&input.dst).await {
             Ok(info) if info.is_dir => {
-                let src_path = std::path::Path::new(src_raw);
+                let src_path = std::path::Path::new(&input.src);
                 let name = src_path.file_name().ok_or_else(|| {
                     LoopalError::Tool(loopal_error::ToolError::InvalidInput(
                         "source has no file name".into(),
                     ))
                 })?;
-                let dst_path = std::path::Path::new(dst_raw).join(name);
+                let dst_path = std::path::Path::new(&input.dst).join(name);
                 dst_path.to_string_lossy().into_owned()
             }
-            _ => dst_raw.to_string(),
+            _ => input.dst.clone(),
         };
 
-        // Ensure parent directory exists
         if let Some(parent) = std::path::Path::new(&final_dst).parent()
             && let Err(e) = ctx.backend.create_dir_all(&parent.to_string_lossy()).await
         {
             return Ok(ToolResult::error(e.to_string()));
         }
 
-        match ctx.backend.copy(src_raw, &final_dst).await {
+        match ctx.backend.copy(&input.src, &final_dst).await {
             Ok(()) => Ok(ToolResult::success(format!(
-                "Copied {src_raw} → {final_dst}"
+                "Copied {} → {final_dst}",
+                input.src
             ))),
             Err(e) => Ok(ToolResult::error(e.to_string())),
         }

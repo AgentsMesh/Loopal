@@ -1,15 +1,21 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
-use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
-use serde_json::{Value, json};
+use loopal_tool_api::{PermissionLevel, ToolContext, ToolResult, TypedTool};
+use schemars::JsonSchema;
+use serde::Deserialize;
 
 use loopal_edit_core::patch_apply::apply_file_ops;
 use loopal_edit_core::patch_parser::parse_patch;
 
 pub struct ApplyPatchTool;
 
+#[derive(Deserialize, JsonSchema)]
+pub struct ApplyPatchParams {
+    pub patch: String,
+}
+
 #[async_trait]
-impl Tool for ApplyPatchTool {
+impl TypedTool<ApplyPatchParams> for ApplyPatchTool {
     fn name(&self) -> &str {
         "ApplyPatch"
     }
@@ -19,34 +25,21 @@ impl Tool for ApplyPatchTool {
          Uses a unified diff-like format with context lines for reliable matching."
     }
 
-    fn parameters_schema(&self) -> Value {
-        json!({
-            "type": "object",
-            "required": ["patch"],
-            "properties": {
-                "patch": {
-                    "type": "string",
-                    "description": "Patch text in the Codex V4A format"
-                }
-            }
-        })
-    }
-
     fn permission(&self) -> PermissionLevel {
         PermissionLevel::Write
     }
 
-    async fn execute(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
-        let patch = input["patch"]
-            .as_str()
-            .ok_or_else(|| tool_input("patch is required"))?;
-
-        let ops = parse_patch(patch).map_err(|e| tool_input(&format!("parse error: {e}")))?;
+    async fn execute(
+        &self,
+        input: ApplyPatchParams,
+        ctx: &ToolContext,
+    ) -> Result<ToolResult, LoopalError> {
+        let ops =
+            parse_patch(&input.patch).map_err(|e| tool_input(&format!("parse error: {e}")))?;
         if ops.is_empty() {
             return Ok(ToolResult::error("patch contains no file operations"));
         }
 
-        // Path validation via backend (write mode)
         for op in &ops {
             let rel = op.path();
             let path_str = rel.to_string_lossy();
@@ -55,12 +48,10 @@ impl Tool for ApplyPatchTool {
             }
         }
 
-        // Apply in memory — read files using std::fs on backend-resolved paths
         let cwd = ctx.backend.cwd().to_path_buf();
         let writes = apply_file_ops(&ops, &cwd, |p| std::fs::read_to_string(p))
             .map_err(|e| tool_input(&e.to_string()))?;
 
-        // Write phase via backend
         let (mut created, mut updated, mut deleted) = (0u32, 0u32, 0u32);
         for w in &writes {
             let path_str = w.path.to_string_lossy();

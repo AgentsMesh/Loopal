@@ -1,10 +1,14 @@
-use loopal_tool_api::{Tool, ToolContext};
-use loopal_tool_glob::GlobTool;
+use loopal_tool_api::{Tool, ToolContext, TypedBridge};
+use loopal_tool_glob::{GlobParams, GlobTool};
 use serde_json::json;
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     let backend = loopal_backend::LocalBackend::new(cwd.to_path_buf(), None, Default::default());
     ToolContext::new(backend, "test")
+}
+
+fn make_tool() -> TypedBridge<GlobTool, GlobParams> {
+    TypedBridge::new(GlobTool)
 }
 
 #[tokio::test]
@@ -13,7 +17,7 @@ async fn test_glob_output_format_includes_stats() {
     std::fs::write(tmp.path().join("a.rs"), "").unwrap();
     std::fs::write(tmp.path().join("b.rs"), "").unwrap();
 
-    let tool = GlobTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool
@@ -32,10 +36,9 @@ async fn test_glob_pagination_with_offset() {
         std::fs::write(tmp.path().join(format!("file{i}.txt")), "").unwrap();
     }
 
-    let tool = GlobTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
-    // First page: limit=2, offset=0
     let r1 = tool
         .execute(json!({"pattern": "*.txt", "limit": 2, "offset": 0}), &ctx)
         .await
@@ -43,7 +46,6 @@ async fn test_glob_pagination_with_offset() {
     assert!(r1.content.contains("Found 5 files. Showing 1-2:"));
     assert!(r1.content.contains("Use offset=2"));
 
-    // Second page: offset=2
     let r2 = tool
         .execute(json!({"pattern": "*.txt", "limit": 2, "offset": 2}), &ctx)
         .await
@@ -51,7 +53,6 @@ async fn test_glob_pagination_with_offset() {
     assert!(r2.content.contains("Showing 3-4:"));
     assert!(r2.content.contains("Use offset=4"));
 
-    // Last page: offset=4
     let r3 = tool
         .execute(json!({"pattern": "*.txt", "limit": 2, "offset": 4}), &ctx)
         .await
@@ -67,7 +68,7 @@ async fn test_glob_default_limit_is_100() {
         std::fs::write(tmp.path().join(format!("f{i:03}.txt")), "").unwrap();
     }
 
-    let tool = GlobTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool

@@ -1,5 +1,5 @@
-use loopal_tool_api::{Tool, ToolContext};
-use loopal_tool_read_html::ReadHtmlTool;
+use loopal_tool_api::{Tool, ToolContext, TypedBridge};
+use loopal_tool_read_html::{ReadHtmlParams, ReadHtmlTool};
 use serde_json::json;
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
@@ -9,6 +9,10 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
         loopal_backend::ResourceLimits::default(),
     );
     ToolContext::new(backend, "test")
+}
+
+fn make_tool() -> TypedBridge<ReadHtmlTool, ReadHtmlParams> {
+    TypedBridge::new(ReadHtmlTool)
 }
 
 #[tokio::test]
@@ -22,7 +26,8 @@ async fn test_read_html_converts_to_text() {
     .unwrap();
 
     let ctx = make_ctx(dir.path());
-    let result = ReadHtmlTool
+    let tool = make_tool();
+    let result = tool
         .execute(json!({"file_path": html_path.to_str().unwrap()}), &ctx)
         .await
         .unwrap();
@@ -40,7 +45,8 @@ async fn test_read_htm_extension_also_works() {
     std::fs::write(&htm_path, "<html><body><b>Bold</b></body></html>").unwrap();
 
     let ctx = make_ctx(dir.path());
-    let result = ReadHtmlTool
+    let tool = make_tool();
+    let result = tool
         .execute(json!({"file_path": htm_path.to_str().unwrap()}), &ctx)
         .await
         .unwrap();
@@ -57,7 +63,8 @@ async fn test_read_html_rejects_non_html() {
     std::fs::write(&txt_path, "plain text").unwrap();
 
     let ctx = make_ctx(dir.path());
-    let result = ReadHtmlTool
+    let tool = make_tool();
+    let result = tool
         .execute(json!({"file_path": txt_path.to_str().unwrap()}), &ctx)
         .await
         .unwrap();
@@ -72,7 +79,8 @@ async fn test_read_html_nonexistent_file() {
     let path = dir.path().join("missing.html");
 
     let ctx = make_ctx(dir.path());
-    let result = ReadHtmlTool
+    let tool = make_tool();
+    let result = tool
         .execute(json!({"file_path": path.to_str().unwrap()}), &ctx)
         .await
         .unwrap();
@@ -82,12 +90,14 @@ async fn test_read_html_nonexistent_file() {
 
 #[test]
 fn test_read_html_name() {
-    assert_eq!(ReadHtmlTool.name(), "ReadHtml");
+    let tool = make_tool();
+    assert_eq!(tool.name(), "ReadHtml");
 }
 
 #[test]
 fn test_read_html_schema() {
-    let schema = ReadHtmlTool.parameters_schema();
+    let tool = make_tool();
+    let schema = tool.parameters_schema();
     assert_eq!(schema["type"], "object");
     let required = schema["required"].as_array().unwrap();
     assert!(required.contains(&json!("file_path")));

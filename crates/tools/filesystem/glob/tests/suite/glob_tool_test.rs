@@ -1,5 +1,5 @@
-use loopal_tool_api::{PermissionLevel, Tool, ToolContext};
-use loopal_tool_glob::GlobTool;
+use loopal_tool_api::{PermissionLevel, Tool, ToolContext, TypedBridge};
+use loopal_tool_glob::{GlobParams, GlobTool};
 use serde_json::json;
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
@@ -7,15 +7,19 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext::new(backend, "test")
 }
 
+fn make_tool() -> TypedBridge<GlobTool, GlobParams> {
+    TypedBridge::new(GlobTool)
+}
+
 #[test]
 fn test_glob_name() {
-    let tool = GlobTool;
+    let tool = make_tool();
     assert_eq!(tool.name(), "Glob");
 }
 
 #[test]
 fn test_glob_description() {
-    let tool = GlobTool;
+    let tool = make_tool();
     let desc = tool.description();
     assert!(!desc.is_empty());
     assert!(desc.contains("glob"));
@@ -23,13 +27,13 @@ fn test_glob_description() {
 
 #[test]
 fn test_glob_permission() {
-    let tool = GlobTool;
+    let tool = make_tool();
     assert_eq!(tool.permission(), PermissionLevel::ReadOnly);
 }
 
 #[test]
 fn test_glob_parameters_schema() {
-    let tool = GlobTool;
+    let tool = make_tool();
     let schema = tool.parameters_schema();
     assert_eq!(schema["type"], "object");
     let required = schema["required"].as_array().unwrap();
@@ -46,7 +50,7 @@ async fn test_glob_matching_files_in_temp_dir() {
     std::fs::write(tmp.path().join("bar.rs"), "fn bar() {}").unwrap();
     std::fs::write(tmp.path().join("readme.md"), "# Hello").unwrap();
 
-    let tool = GlobTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool
@@ -68,7 +72,7 @@ async fn test_glob_recursive_pattern() {
     std::fs::write(tmp.path().join("top.rs"), "top").unwrap();
     std::fs::write(sub.join("nested.rs"), "nested").unwrap();
 
-    let tool = GlobTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool
@@ -86,7 +90,7 @@ async fn test_glob_no_matches_returns_message() {
     let tmp = tempfile::tempdir().unwrap();
     std::fs::write(tmp.path().join("file.txt"), "hello").unwrap();
 
-    let tool = GlobTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool
@@ -101,7 +105,7 @@ async fn test_glob_no_matches_returns_message() {
 #[tokio::test]
 async fn test_glob_invalid_pattern_returns_error() {
     let tmp = tempfile::tempdir().unwrap();
-    let tool = GlobTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool.execute(json!({"pattern": "[invalid"}), &ctx).await;
@@ -112,7 +116,7 @@ async fn test_glob_invalid_pattern_returns_error() {
 #[tokio::test]
 async fn test_glob_missing_pattern_returns_error() {
     let tmp = tempfile::tempdir().unwrap();
-    let tool = GlobTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool.execute(json!({}), &ctx).await;
@@ -128,7 +132,7 @@ async fn test_glob_with_explicit_path_absolute() {
     std::fs::write(sub.join("a.txt"), "a").unwrap();
     std::fs::write(tmp.path().join("b.txt"), "b").unwrap();
 
-    let tool = GlobTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool
@@ -154,7 +158,7 @@ async fn test_glob_with_explicit_path_relative() {
     std::fs::create_dir_all(&sub).unwrap();
     std::fs::write(sub.join("c.txt"), "c").unwrap();
 
-    let tool = GlobTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool
@@ -175,7 +179,7 @@ async fn test_glob_with_explicit_path_relative() {
 #[tokio::test]
 async fn test_glob_empty_directory() {
     let tmp = tempfile::tempdir().unwrap();
-    let tool = GlobTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool
@@ -183,6 +187,5 @@ async fn test_glob_empty_directory() {
         .await
         .unwrap();
 
-    // An empty directory has no .txt files so nothing matches
     assert!(result.content.contains("No files matched"));
 }

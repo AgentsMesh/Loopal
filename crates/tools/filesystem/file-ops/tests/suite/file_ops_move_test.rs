@@ -1,5 +1,5 @@
-use loopal_tool_api::{Tool, ToolContext};
-use loopal_tool_file_ops::move_file::MoveFileTool;
+use loopal_tool_api::{Tool, ToolContext, TypedBridge};
+use loopal_tool_file_ops::{MoveFileParams, MoveFileTool};
 use serde_json::json;
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
@@ -11,11 +11,15 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext::new(backend, "test")
 }
 
+fn make_tool() -> impl Tool {
+    TypedBridge::<MoveFileTool, MoveFileParams>::new(MoveFileTool)
+}
+
 #[tokio::test]
 async fn move_same_directory() {
     let tmp = tempfile::tempdir().unwrap();
     std::fs::write(tmp.path().join("a.txt"), "hello").unwrap();
-    let tool = MoveFileTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(json!({"src": "a.txt", "dst": "b.txt"}), &ctx)
@@ -33,7 +37,7 @@ async fn move_same_directory() {
 async fn move_across_directories() {
     let tmp = tempfile::tempdir().unwrap();
     std::fs::write(tmp.path().join("a.txt"), "data").unwrap();
-    let tool = MoveFileTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(json!({"src": "a.txt", "dst": "sub/dir/a.txt"}), &ctx)
@@ -47,7 +51,7 @@ async fn move_across_directories() {
 #[tokio::test]
 async fn move_src_not_found() {
     let tmp = tempfile::tempdir().unwrap();
-    let tool = MoveFileTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(json!({"src": "nope.txt", "dst": "b.txt"}), &ctx)
@@ -66,7 +70,7 @@ async fn move_dst_is_directory() {
     let tmp = tempfile::tempdir().unwrap();
     std::fs::write(tmp.path().join("a.txt"), "hello").unwrap();
     std::fs::create_dir(tmp.path().join("dest")).unwrap();
-    let tool = MoveFileTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(json!({"src": "a.txt", "dst": "dest"}), &ctx)
@@ -80,12 +84,11 @@ async fn move_dst_is_directory() {
 async fn move_path_traversal_rejected() {
     let tmp = tempfile::tempdir().unwrap();
     std::fs::write(tmp.path().join("a.txt"), "x").unwrap();
-    let tool = MoveFileTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(json!({"src": "a.txt", "dst": "/tmp/outside.txt"}), &ctx)
         .await;
-    // Path traversal should be rejected either as error result or LoopalError
     assert!(
         r.is_err() || r.as_ref().is_ok_and(|r| r.is_error),
         "path traversal should be rejected"

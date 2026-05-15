@@ -1,5 +1,5 @@
-use loopal_tool_api::{PermissionLevel, Tool, ToolContext};
-use loopal_tool_write::WriteTool;
+use loopal_tool_api::{PermissionLevel, Tool, ToolContext, TypedBridge};
+use loopal_tool_write::{WriteParams, WriteTool};
 use serde_json::json;
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
@@ -11,12 +11,16 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext::new(backend, "test")
 }
 
+fn make_tool() -> TypedBridge<WriteTool, WriteParams> {
+    TypedBridge::new(WriteTool)
+}
+
 #[tokio::test]
 async fn test_write_valid_content_creates_file() {
     let tmp = tempfile::tempdir().unwrap();
     let file = tmp.path().join("output.txt");
 
-    let tool = WriteTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool
@@ -42,7 +46,7 @@ async fn test_write_creates_parent_directories() {
     let tmp = tempfile::tempdir().unwrap();
     let file = tmp.path().join("a").join("b").join("c").join("file.txt");
 
-    let tool = WriteTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool
@@ -65,13 +69,13 @@ async fn test_write_creates_parent_directories() {
 
 #[test]
 fn test_write_name() {
-    let tool = WriteTool;
+    let tool = make_tool();
     assert_eq!(tool.name(), "Write");
 }
 
 #[test]
 fn test_write_description() {
-    let tool = WriteTool;
+    let tool = make_tool();
     let desc = tool.description();
     assert!(!desc.is_empty());
     assert!(desc.contains("Write"));
@@ -79,13 +83,13 @@ fn test_write_description() {
 
 #[test]
 fn test_write_permission() {
-    let tool = WriteTool;
+    let tool = make_tool();
     assert_eq!(tool.permission(), PermissionLevel::Write);
 }
 
 #[test]
 fn test_write_parameters_schema() {
-    let tool = WriteTool;
+    let tool = make_tool();
     let schema = tool.parameters_schema();
     assert_eq!(schema["type"], "object");
     let required = schema["required"].as_array().unwrap();
@@ -101,7 +105,7 @@ async fn test_write_overwrite_existing_file() {
     let file = tmp.path().join("overwrite.txt");
     std::fs::write(&file, "original content").unwrap();
 
-    let tool = WriteTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool
@@ -127,7 +131,7 @@ async fn test_write_reports_byte_count() {
     let tmp = tempfile::tempdir().unwrap();
     let file = tmp.path().join("bytes.txt");
 
-    let tool = WriteTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let content = "hello world";
@@ -150,7 +154,7 @@ async fn test_write_reports_byte_count() {
 async fn test_write_with_relative_path() {
     let tmp = tempfile::tempdir().unwrap();
     let canon = tmp.path().canonicalize().unwrap();
-    let tool = WriteTool;
+    let tool = make_tool();
     let ctx = make_ctx(&canon);
 
     let result = tool
@@ -175,7 +179,7 @@ async fn test_write_absolute_path_bypasses_traversal_check() {
     let tmp = tempfile::tempdir().unwrap();
     let file = tmp.path().join("absolute_test.txt");
 
-    let tool = WriteTool;
+    let tool = make_tool();
     let ctx = make_ctx(std::path::Path::new("/"));
 
     let result = tool

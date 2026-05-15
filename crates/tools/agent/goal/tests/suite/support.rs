@@ -9,7 +9,24 @@ use loopal_tool_api::backend_types::{
     EditResult, ExecResult, FetchResult, FileInfo, GlobOptions, GlobSearchResult, GrepOptions,
     GrepSearchResult, LsResult, ReadResult, WriteResult,
 };
-use loopal_tool_api::{Backend, ExecOutcome, GoalSession, GoalSessionError, ToolContext};
+use loopal_tool_api::{
+    Backend, ExecOutcome, GoalSession, GoalSessionError, Tool, ToolContext, TypedBridge,
+};
+use loopal_tool_goal::{
+    CreateGoalParams, CreateGoalTool, GetGoalParams, GetGoalTool, UpdateGoalParams, UpdateGoalTool,
+};
+
+pub fn make_get_goal_tool() -> impl Tool {
+    TypedBridge::<GetGoalTool, GetGoalParams>::new(GetGoalTool)
+}
+
+pub fn make_create_goal_tool() -> impl Tool {
+    TypedBridge::<CreateGoalTool, CreateGoalParams>::new(CreateGoalTool)
+}
+
+pub fn make_update_goal_tool() -> impl Tool {
+    TypedBridge::<UpdateGoalTool, UpdateGoalParams>::new(UpdateGoalTool)
+}
 
 pub struct PanicBackend;
 

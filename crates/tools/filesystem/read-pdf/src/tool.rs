@@ -2,15 +2,23 @@ use std::path::Path;
 
 use async_trait::async_trait;
 use loopal_error::LoopalError;
-use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
-use serde_json::{Value, json};
+use loopal_tool_api::{PermissionLevel, ToolContext, ToolResult, TypedTool};
+use schemars::JsonSchema;
+use serde::Deserialize;
 
 use crate::page_range::parse_page_range;
 
 pub struct ReadPdfTool;
 
+#[derive(Deserialize, JsonSchema)]
+pub struct ReadPdfParams {
+    pub file_path: String,
+    #[serde(default)]
+    pub pages: Option<String>,
+}
+
 #[async_trait]
-impl Tool for ReadPdfTool {
+impl TypedTool<ReadPdfParams> for ReadPdfTool {
     fn name(&self) -> &str {
         "ReadPdf"
     }
@@ -25,37 +33,17 @@ impl Tool for ReadPdfTool {
          - PDFs containing only images will return a notice that no text was extractable."
     }
 
-    fn parameters_schema(&self) -> Value {
-        json!({
-            "type": "object",
-            "required": ["file_path"],
-            "properties": {
-                "file_path": {
-                    "type": "string",
-                    "description": "Absolute path to the PDF file"
-                },
-                "pages": {
-                    "type": "string",
-                    "description": "Page range (e.g., '1-5', '3', '10-20'). Pages are 1-based."
-                }
-            }
-        })
-    }
-
     fn permission(&self) -> PermissionLevel {
         PermissionLevel::ReadOnly
     }
 
-    async fn execute(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
-        let file_path = input["file_path"].as_str().ok_or_else(|| {
-            LoopalError::Tool(loopal_error::ToolError::InvalidInput(
-                "file_path is required".into(),
-            ))
-        })?;
-        let pages = input["pages"]
-            .as_str()
-            .filter(|s| !s.is_empty())
-            .map(|s| s.to_string());
+    async fn execute(
+        &self,
+        input: ReadPdfParams,
+        ctx: &ToolContext,
+    ) -> Result<ToolResult, LoopalError> {
+        let file_path = &input.file_path;
+        let pages = input.pages.filter(|s| !s.is_empty());
 
         let path = match ctx.backend.resolve_path(file_path, false) {
             Ok(p) => p,

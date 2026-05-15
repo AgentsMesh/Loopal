@@ -1,14 +1,15 @@
 use loopal_tool_api::Tool;
-use loopal_tool_goal::UpdateGoalTool;
 use serde_json::json;
 
-use super::support::{FakeGoalSession, ctx_with_goal_session, ctx_without_goal_session};
+use super::support::{
+    FakeGoalSession, ctx_with_goal_session, ctx_without_goal_session, make_update_goal_tool,
+};
 
 #[tokio::test]
 async fn marks_active_goal_complete() {
     let session = FakeGoalSession::with_active("ship", None);
     let ctx = ctx_with_goal_session(session.clone());
-    let result = UpdateGoalTool
+    let result = make_update_goal_tool()
         .execute(json!({"status": "complete"}), &ctx)
         .await
         .unwrap();
@@ -22,22 +23,10 @@ async fn marks_active_goal_complete() {
 }
 
 #[tokio::test]
-async fn rejects_status_other_than_complete() {
-    let session = FakeGoalSession::with_active("ship", None);
-    let ctx = ctx_with_goal_session(session);
-    let result = UpdateGoalTool
-        .execute(json!({"status": "paused"}), &ctx)
-        .await
-        .unwrap();
-    assert!(result.is_error);
-    assert!(result.content.contains("status must be \"complete\""));
-}
-
-#[tokio::test]
 async fn rejects_when_no_goal_exists() {
     let session = FakeGoalSession::empty();
     let ctx = ctx_with_goal_session(session);
-    let result = UpdateGoalTool
+    let result = make_update_goal_tool()
         .execute(json!({"status": "complete"}), &ctx)
         .await
         .unwrap();
@@ -48,7 +37,7 @@ async fn rejects_when_no_goal_exists() {
 #[tokio::test]
 async fn surfaces_disabled_when_no_goal_session() {
     let ctx = ctx_without_goal_session();
-    let result = UpdateGoalTool
+    let result = make_update_goal_tool()
         .execute(json!({"status": "complete"}), &ctx)
         .await
         .unwrap();

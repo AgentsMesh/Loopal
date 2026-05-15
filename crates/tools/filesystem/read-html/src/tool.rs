@@ -1,12 +1,18 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
-use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
-use serde_json::{Value, json};
+use loopal_tool_api::{PermissionLevel, ToolContext, ToolResult, TypedTool};
+use schemars::JsonSchema;
+use serde::Deserialize;
 
 pub struct ReadHtmlTool;
 
+#[derive(Deserialize, JsonSchema)]
+pub struct ReadHtmlParams {
+    pub file_path: String,
+}
+
 #[async_trait]
-impl Tool for ReadHtmlTool {
+impl TypedTool<ReadHtmlParams> for ReadHtmlTool {
     fn name(&self) -> &str {
         "ReadHtml"
     }
@@ -19,29 +25,16 @@ impl Tool for ReadHtmlTool {
          - Useful for extracting text content from web pages saved locally."
     }
 
-    fn parameters_schema(&self) -> Value {
-        json!({
-            "type": "object",
-            "required": ["file_path"],
-            "properties": {
-                "file_path": {
-                    "type": "string",
-                    "description": "Absolute path to the HTML file"
-                }
-            }
-        })
-    }
-
     fn permission(&self) -> PermissionLevel {
         PermissionLevel::ReadOnly
     }
 
-    async fn execute(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
-        let file_path = input["file_path"].as_str().ok_or_else(|| {
-            LoopalError::Tool(loopal_error::ToolError::InvalidInput(
-                "file_path is required".into(),
-            ))
-        })?;
+    async fn execute(
+        &self,
+        input: ReadHtmlParams,
+        ctx: &ToolContext,
+    ) -> Result<ToolResult, LoopalError> {
+        let file_path = &input.file_path;
 
         let path = match ctx.backend.resolve_path(file_path, false) {
             Ok(p) => p,

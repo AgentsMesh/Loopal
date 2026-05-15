@@ -9,6 +9,7 @@ rust_library(
         "//crates/loopal-error",
         "//crates/loopal-protocol",
         "//crates/loopal-tool-invocation",
+        "@crates//:schemars",
         "@crates//:serde",
         "@crates//:serde_json",
         "@crates//:thiserror",
@@ -23,6 +24,12 @@ rust_test(
     edition = "2024",
     deps = [
         ":loopal-tool-api",
+        "//crates/loopal-backend",
+        "//crates/loopal-error",
+        "@crates//:schemars",
+        "@crates//:serde",
         "@crates//:serde_json",
+        "@crates//:tokio",
     ],
+    proc_macro_deps = ["@crates//:async-trait"],
 )

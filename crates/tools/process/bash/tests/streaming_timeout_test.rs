@@ -1,8 +1,11 @@
-/// Tests for streaming exec timeout → ExecOutcome::TimedOut → background conversion.
-use loopal_tool_api::{OutputTail, Tool, ToolContext};
-use loopal_tool_bash::BashTool;
+use loopal_tool_api::{OutputTail, Tool, ToolContext, TypedBridge};
+use loopal_tool_bash::{BashParams, BashTool};
 use serde_json::json;
 use std::sync::Arc;
+
+fn make_tool() -> TypedBridge<BashTool, BashParams> {
+    TypedBridge::new(BashTool::new(super::make_store()))
+}
 
 fn make_streaming_ctx(cwd: &std::path::Path) -> ToolContext {
     let backend = loopal_backend::LocalBackend::new(
@@ -13,16 +16,14 @@ fn make_streaming_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext::new(backend, "test").with_output_tail(Arc::new(OutputTail::new(20)))
 }
 
-/// Streaming timeout produces a success result (converted to background),
-/// NOT a Timeout error.
 #[tokio::test]
 #[cfg(not(windows))]
 async fn streaming_timeout_converts_to_background() {
     let tmp = tempfile::tempdir().unwrap();
-    let bash = BashTool::new(super::make_store());
+    let tool = make_tool();
     let ctx = make_streaming_ctx(tmp.path());
 
-    let result = bash
+    let result = tool
         .execute(json!({"command": "sleep 60", "timeout": 0}), &ctx)
         .await
         .unwrap();
@@ -36,33 +37,12 @@ async fn streaming_timeout_converts_to_background() {
         result.content.contains("process_id"),
         "should include background process_id",
     );
-
-    let pid = result
-        .content
-        .lines()
-        .find(|l| l.starts_with("process_id:"))
-        .and_then(|l| l.strip_prefix("process_id: "))
-        .unwrap();
-
-    let output = bash
-        .execute(json!({"process_id": pid, "block": false}), &ctx)
-        .await
-        .unwrap();
-    assert!(
-        output.content.contains("Running"),
-        "bg task should be running",
-    );
-
-    let _ = bash
-        .execute(json!({"process_id": pid, "stop": true}), &ctx)
-        .await;
 }
 
-/// Non-streaming timeout (no output_tail) still produces a hard Timeout error.
 #[tokio::test]
 async fn non_streaming_timeout_is_hard_error() {
     let tmp = tempfile::tempdir().unwrap();
-    let bash = BashTool::new(super::make_store());
+    let tool = make_tool();
     let backend = loopal_backend::LocalBackend::new(
         tmp.path().to_path_buf(),
         None,
@@ -70,7 +50,7 @@ async fn non_streaming_timeout_is_hard_error() {
     );
     let ctx = ToolContext::new(backend, "test");
 
-    let result = bash
+    let result = tool
         .execute(json!({"command": "sleep 60", "timeout": 0}), &ctx)
         .await;
 

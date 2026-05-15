@@ -1,5 +1,5 @@
-use loopal_tool_api::{Tool, ToolContext};
-use loopal_tool_glob::GlobTool;
+use loopal_tool_api::{Tool, ToolContext, TypedBridge};
+use loopal_tool_glob::{GlobParams, GlobTool};
 use serde_json::json;
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
@@ -11,13 +11,17 @@ fn make_file(dir: &std::path::Path, name: &str) {
     std::fs::write(dir.join(name), "content").unwrap();
 }
 
+fn make_tool() -> TypedBridge<GlobTool, GlobParams> {
+    TypedBridge::new(GlobTool)
+}
+
 #[tokio::test]
 async fn type_filter_rust_only() {
     let tmp = tempfile::tempdir().unwrap();
     make_file(tmp.path(), "main.rs");
     make_file(tmp.path(), "script.py");
     make_file(tmp.path(), "lib.rs");
-    let tool = GlobTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(json!({"pattern": "**/*", "type": "rust"}), &ctx)
@@ -32,7 +36,7 @@ async fn type_filter_rust_only() {
 async fn type_filter_unknown_empty() {
     let tmp = tempfile::tempdir().unwrap();
     make_file(tmp.path(), "code.rs");
-    let tool = GlobTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(json!({"pattern": "**/*", "type": "brainfuck"}), &ctx)
@@ -49,7 +53,7 @@ async fn type_with_glob_combined() {
     make_file(&sub, "main.rs");
     make_file(&sub, "helper.py");
     make_file(tmp.path(), "root.rs");
-    let tool = GlobTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(json!({"pattern": "src/**/*", "type": "rust"}), &ctx)

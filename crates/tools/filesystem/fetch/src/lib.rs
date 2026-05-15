@@ -3,15 +3,23 @@ mod refiner;
 
 use async_trait::async_trait;
 use loopal_error::LoopalError;
-use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
-use serde_json::{Value, json};
+use loopal_tool_api::{PermissionLevel, ToolContext, ToolResult, TypedTool};
+use schemars::JsonSchema;
+use serde::Deserialize;
 
 pub use refiner::__try_refine_internal;
 
 pub struct FetchTool;
 
+#[derive(Deserialize, JsonSchema)]
+pub struct FetchParams {
+    pub url: String,
+    #[serde(default)]
+    pub prompt: Option<String>,
+}
+
 #[async_trait]
-impl Tool for FetchTool {
+impl TypedTool<FetchParams> for FetchTool {
     fn name(&self) -> &str {
         "Fetch"
     }
@@ -29,44 +37,25 @@ impl Tool for FetchTool {
            make a new request with it."
     }
 
-    fn parameters_schema(&self) -> Value {
-        json!({
-            "type": "object",
-            "required": ["url"],
-            "properties": {
-                "url": {
-                    "type": "string",
-                    "description": "The URL to download"
-                },
-                "prompt": {
-                    "type": "string",
-                    "description": "What you want extracted from the page. \
-                        Large pages are summarized by a fast model against this intent — \
-                        be specific (e.g. 'find the API auth header format' beats 'summarize'). \
-                        Without a prompt, the page is saved to a temp file."
-                }
-            }
-        })
-    }
-
     fn permission(&self) -> PermissionLevel {
         PermissionLevel::ReadOnly
     }
 
-    async fn execute(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
-        let url = input["url"].as_str().ok_or_else(|| {
-            LoopalError::Tool(loopal_error::ToolError::InvalidInput(
-                "url is required".into(),
-            ))
-        })?;
-
-        if !url.starts_with("http://") && !url.starts_with("https://") {
+    async fn execute(
+        &self,
+        input: FetchParams,
+        ctx: &ToolContext,
+    ) -> Result<ToolResult, LoopalError> {
+        if !input.url.starts_with("http://") && !input.url.starts_with("https://") {
             return Err(LoopalError::Tool(loopal_error::ToolError::InvalidInput(
-                format!("invalid URL (must start with http:// or https://): {url}"),
+                format!(
+                    "invalid URL (must start with http:// or https://): {}",
+                    input.url
+                ),
             )));
         }
 
-        let fetch_result = match ctx.backend.fetch(url).await {
+        let fetch_result = match ctx.backend.fetch(&input.url).await {
             Ok(r) => r,
             Err(e) => return Ok(ToolResult::error(e.to_string())),
         };
@@ -80,21 +69,20 @@ impl Tool for FetchTool {
             .as_deref()
             .unwrap_or("application/octet-stream");
         let ext = extension_from_content_type(content_type);
-        let prompt = input["prompt"].as_str();
         let redirect_prefix = fetch_result
             .final_url
             .as_deref()
             .map(|u| format!("Final-URL: {u}\n\n"))
             .unwrap_or_default();
 
-        if let Some(p) = prompt {
+        if let Some(p) = &input.prompt {
             let converted = if ext == "html" {
                 html2text::from_read(fetch_result.body.as_bytes(), 120)
             } else {
                 fetch_result.body
             };
 
-            if let Some(mut refined) = __try_refine_internal(ctx, p, url, &converted).await {
+            if let Some(mut refined) = __try_refine_internal(ctx, p, &input.url, &converted).await {
                 refined.content = format!("{redirect_prefix}{}", refined.content);
                 return Ok(refined);
             }
@@ -113,7 +101,6 @@ impl Tool for FetchTool {
     }
 }
 
-/// Internal helper used by `Tool::execute` and by `refiner::__try_refine_internal`.
 pub(crate) async fn save_to_tmp(
     ctx: &ToolContext,
     body: &str,

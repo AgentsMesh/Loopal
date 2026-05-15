@@ -1,5 +1,5 @@
-use loopal_tool_api::{Tool, ToolContext};
-use loopal_tool_grep::GrepTool;
+use loopal_tool_api::{Tool, ToolContext, TypedBridge};
+use loopal_tool_grep::{GrepParams, GrepTool};
 use serde_json::json;
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
@@ -11,13 +11,17 @@ fn make_file(dir: &std::path::Path, name: &str, content: &str) {
     std::fs::write(dir.join(name), content).unwrap();
 }
 
+fn make_tool() -> TypedBridge<GrepTool, GrepParams> {
+    TypedBridge::new(GrepTool)
+}
+
 const FIVE_LINES: &str = "alpha\nbeta\ngamma\ndelta\nepsilon";
 
 #[tokio::test]
 async fn context_after_shows_lines_after_match() {
     let tmp = tempfile::tempdir().unwrap();
     make_file(tmp.path(), "f.txt", FIVE_LINES);
-    let tool = GrepTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(
@@ -35,7 +39,7 @@ async fn context_after_shows_lines_after_match() {
 async fn context_before_shows_lines_before_match() {
     let tmp = tempfile::tempdir().unwrap();
     make_file(tmp.path(), "f.txt", FIVE_LINES);
-    let tool = GrepTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(
@@ -53,7 +57,7 @@ async fn context_before_shows_lines_before_match() {
 async fn context_c_sets_both_directions() {
     let tmp = tempfile::tempdir().unwrap();
     make_file(tmp.path(), "f.txt", FIVE_LINES);
-    let tool = GrepTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(
@@ -70,9 +74,8 @@ async fn context_c_sets_both_directions() {
 #[tokio::test]
 async fn context_merges_overlapping_ranges() {
     let tmp = tempfile::tempdir().unwrap();
-    // Matches at line 2 (beta) and line 4 (delta); -C=1 → ranges [1,3] and [3,5] merge → [1,5]
     make_file(tmp.path(), "f.txt", FIVE_LINES);
-    let tool = GrepTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(
@@ -81,7 +84,6 @@ async fn context_merges_overlapping_ranges() {
         )
         .await
         .unwrap();
-    // All 5 lines should be in one contiguous group (no -- separator)
     assert!(
         !r.content.contains("--"),
         "ranges should merge, no separator"
@@ -94,10 +96,9 @@ async fn context_merges_overlapping_ranges() {
 async fn context_at_file_boundary() {
     let tmp = tempfile::tempdir().unwrap();
     make_file(tmp.path(), "f.txt", FIVE_LINES);
-    let tool = GrepTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
-    // Match first line with -B=5 → should not panic, just clamp
     let r = tool
         .execute(
             json!({"pattern": "alpha", "output_mode": "content", "-B": 5}),
@@ -107,7 +108,6 @@ async fn context_at_file_boundary() {
         .unwrap();
     assert!(r.content.contains(":1:alpha"));
 
-    // Match last line with -A=5 → should not panic, just clamp
     let r = tool
         .execute(
             json!({"pattern": "epsilon", "output_mode": "content", "-A": 5}),
@@ -121,10 +121,8 @@ async fn context_at_file_boundary() {
 #[tokio::test]
 async fn context_separator_between_groups() {
     let tmp = tempfile::tempdir().unwrap();
-    // Matches at line 1 (alpha) and line 5 (epsilon); -A=0 -B=0 but -C=0 → no context
-    // Use -C=1 so groups don't merge: ranges [0,2] and [4,4+1] → gap at line 3
     make_file(tmp.path(), "f.txt", "aaa\nbbb\nccc\nddd\neee");
-    let tool = GrepTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(
@@ -133,7 +131,6 @@ async fn context_separator_between_groups() {
         )
         .await
         .unwrap();
-    // Two groups with gap → should have -- separator
     assert!(r.content.contains("--"), "groups should be separated by --");
 }
 
@@ -141,7 +138,7 @@ async fn context_separator_between_groups() {
 async fn context_zero_has_no_effect() {
     let tmp = tempfile::tempdir().unwrap();
     make_file(tmp.path(), "f.txt", FIVE_LINES);
-    let tool = GrepTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(

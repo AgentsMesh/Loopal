@@ -1,5 +1,5 @@
-use loopal_tool_api::{PermissionLevel, Tool, ToolContext};
-use loopal_tool_multi_edit::MultiEditTool;
+use loopal_tool_api::{PermissionLevel, Tool, ToolContext, TypedBridge};
+use loopal_tool_multi_edit::{MultiEditParams, MultiEditTool};
 use serde_json::json;
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
@@ -11,21 +11,25 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext::new(backend, "test")
 }
 
+fn make_tool() -> impl Tool {
+    TypedBridge::<MultiEditTool, MultiEditParams>::new(MultiEditTool)
+}
+
 #[test]
 fn test_multi_edit_name() {
-    let tool = MultiEditTool;
+    let tool = make_tool();
     assert_eq!(tool.name(), "MultiEdit");
 }
 
 #[test]
 fn test_multi_edit_permission() {
-    let tool = MultiEditTool;
+    let tool = make_tool();
     assert_eq!(tool.permission(), PermissionLevel::Write);
 }
 
 #[test]
 fn test_multi_edit_parameters_schema() {
-    let tool = MultiEditTool;
+    let tool = make_tool();
     let schema = tool.parameters_schema();
     assert_eq!(schema["type"], "object");
     let required = schema["required"].as_array().unwrap();
@@ -39,7 +43,7 @@ async fn test_multi_edit_success() {
     let file = tmp.path().join("test.txt");
     std::fs::write(&file, "hello world\nfoo bar\n").unwrap();
 
-    let tool = MultiEditTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool
@@ -69,10 +73,9 @@ async fn test_multi_edit_atomic_rollback() {
     let file = tmp.path().join("test.txt");
     std::fs::write(&file, "aaa bbb").unwrap();
 
-    let tool = MultiEditTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
-    // First edit succeeds, second edit fails (not found)
     let result = tool
         .execute(
             json!({
@@ -91,7 +94,6 @@ async fn test_multi_edit_atomic_rollback() {
     assert!(result.content.contains("Edit 1"));
     assert!(result.content.contains("not found"));
 
-    // File must be unchanged (atomic -- nothing written)
     let content = std::fs::read_to_string(&file).unwrap();
     assert_eq!(content, "aaa bbb");
 }
@@ -102,7 +104,7 @@ async fn test_multi_edit_omission_detection() {
     let file = tmp.path().join("test.rs");
     std::fs::write(&file, "fn main() {}").unwrap();
 
-    let tool = MultiEditTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool
@@ -131,7 +133,7 @@ async fn test_multi_edit_not_found() {
     let file = tmp.path().join("test.txt");
     std::fs::write(&file, "hello").unwrap();
 
-    let tool = MultiEditTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool

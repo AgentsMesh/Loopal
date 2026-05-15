@@ -1,5 +1,5 @@
-use loopal_tool_api::{PermissionLevel, Tool, ToolContext};
-use loopal_tool_apply_patch::ApplyPatchTool;
+use loopal_tool_api::{PermissionLevel, Tool, ToolContext, TypedBridge};
+use loopal_tool_apply_patch::{ApplyPatchParams, ApplyPatchTool};
 use serde_json::json;
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
@@ -11,9 +11,13 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext::new(backend, "test")
 }
 
+fn make_tool() -> impl Tool {
+    TypedBridge::<ApplyPatchTool, ApplyPatchParams>::new(ApplyPatchTool)
+}
+
 #[test]
 fn test_name_and_permission() {
-    let tool = ApplyPatchTool;
+    let tool = make_tool();
     assert_eq!(tool.name(), "ApplyPatch");
     assert_eq!(tool.permission(), PermissionLevel::Write);
 }
@@ -21,7 +25,7 @@ fn test_name_and_permission() {
 #[tokio::test]
 async fn test_create_file() {
     let tmp = tempfile::tempdir().unwrap();
-    let tool = ApplyPatchTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let patch = "*** Add File: hello.txt\n+hello world\n";
@@ -39,7 +43,7 @@ async fn test_update_file() {
     let file = tmp.path().join("lib.rs");
     std::fs::write(&file, "fn main() {\n    old_call();\n}\n").unwrap();
 
-    let tool = ApplyPatchTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let patch = "\
@@ -64,7 +68,7 @@ async fn test_delete_file() {
     let file = tmp.path().join("old.txt");
     std::fs::write(&file, "bye").unwrap();
 
-    let tool = ApplyPatchTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let r = tool
@@ -84,7 +88,7 @@ async fn test_multi_file_atomic() {
     let to_delete = tmp.path().join("b.rs");
     std::fs::write(&to_delete, "bye").unwrap();
 
-    let tool = ApplyPatchTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let patch = "\
@@ -118,7 +122,7 @@ async fn test_trim_whitespace_fallback() {
     let file = tmp.path().join("x.rs");
     std::fs::write(&file, "  hello  \n").unwrap();
 
-    let tool = ApplyPatchTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let patch = "\
@@ -138,7 +142,7 @@ async fn test_line_hint_disambiguation() {
     let file = tmp.path().join("dup.rs");
     std::fs::write(&file, "marker\nAAA\nBBB\nmarker\nCCC\n").unwrap();
 
-    let tool = ApplyPatchTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let patch = "\

@@ -1,14 +1,18 @@
 pub mod backend;
 pub mod backend_types;
 pub mod goal_session;
+pub mod input_normalize;
 pub mod memory_channel;
 pub mod output_tail;
 pub mod permission;
 pub mod provider_resolver;
+pub mod schema_normalize;
 mod tool;
 mod tool_context;
 pub mod truncate;
 pub mod truncate_middle;
+pub mod typed_bridge;
+pub mod typed_tool;
 
 pub use backend::{Backend, ExecOutcome};
 pub use backend_types::{
@@ -29,3 +33,5 @@ pub use truncate::{
     truncate_tail,
 };
 pub use truncate_middle::truncate_middle;
+pub use typed_bridge::TypedBridge;
+pub use typed_tool::{Params, TypedTool};

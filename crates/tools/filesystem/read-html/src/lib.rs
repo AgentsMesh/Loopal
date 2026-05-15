@@ -1,3 +1,3 @@
 mod tool;
 
-pub use tool::ReadHtmlTool;
+pub use tool::{ReadHtmlParams, ReadHtmlTool};

@@ -1,5 +1,5 @@
-use loopal_tool_api::{Tool, ToolContext};
-use loopal_tool_apply_patch::ApplyPatchTool;
+use loopal_tool_api::{Tool, ToolContext, TypedBridge};
+use loopal_tool_apply_patch::{ApplyPatchParams, ApplyPatchTool};
 use serde_json::json;
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
@@ -11,10 +11,14 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext::new(backend, "test")
 }
 
+fn make_tool() -> impl Tool {
+    TypedBridge::<ApplyPatchTool, ApplyPatchParams>::new(ApplyPatchTool)
+}
+
 #[tokio::test]
 async fn test_omission_in_add() {
     let tmp = tempfile::tempdir().unwrap();
-    let tool = ApplyPatchTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let patch = "*** Add File: x.rs\n+fn main() {\n+    // ... existing code\n+}\n";
@@ -28,7 +32,7 @@ async fn test_omission_in_update_add_lines() {
     let file = tmp.path().join("a.rs");
     std::fs::write(&file, "fn main() {}\n").unwrap();
 
-    let tool = ApplyPatchTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let patch = "\
@@ -46,7 +50,7 @@ async fn test_omission_in_update_add_lines() {
 #[tokio::test]
 async fn test_path_traversal_rejected() {
     let tmp = tempfile::tempdir().unwrap();
-    let tool = ApplyPatchTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let patch = "*** Add File: ../escape.txt\n+evil\n";
@@ -65,7 +69,7 @@ async fn test_add_existing_file_error() {
     let tmp = tempfile::tempdir().unwrap();
     std::fs::write(tmp.path().join("dup.txt"), "exists").unwrap();
 
-    let tool = ApplyPatchTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let patch = "*** Add File: dup.txt\n+new\n";
@@ -76,7 +80,7 @@ async fn test_add_existing_file_error() {
 #[tokio::test]
 async fn test_delete_missing_file_error() {
     let tmp = tempfile::tempdir().unwrap();
-    let tool = ApplyPatchTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let r = tool
@@ -90,7 +94,7 @@ async fn test_hunk_not_found_error() {
     let tmp = tempfile::tempdir().unwrap();
     std::fs::write(tmp.path().join("a.rs"), "hello\n").unwrap();
 
-    let tool = ApplyPatchTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let patch = "\
@@ -106,7 +110,7 @@ async fn test_hunk_not_found_error() {
 #[tokio::test]
 async fn test_empty_patch_error() {
     let tmp = tempfile::tempdir().unwrap();
-    let tool = ApplyPatchTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let r = tool.execute(json!({"patch": ""}), &ctx).await.unwrap();
@@ -117,7 +121,7 @@ async fn test_empty_patch_error() {
 #[tokio::test]
 async fn test_missing_patch_param_error() {
     let tmp = tempfile::tempdir().unwrap();
-    let tool = ApplyPatchTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let r = tool.execute(json!({}), &ctx).await;
@@ -127,7 +131,7 @@ async fn test_missing_patch_param_error() {
 #[tokio::test]
 async fn test_parse_error_forwarded() {
     let tmp = tempfile::tempdir().unwrap();
-    let tool = ApplyPatchTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let r = tool.execute(json!({"patch": "garbage input"}), &ctx).await;

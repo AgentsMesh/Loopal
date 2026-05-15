@@ -1,14 +1,19 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
-use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
-use serde_json::{Value, json};
-
-use crate::require_str;
+use loopal_tool_api::{PermissionLevel, ToolContext, ToolResult, TypedTool};
+use schemars::JsonSchema;
+use serde::Deserialize;
 
 pub struct MoveFileTool;
 
+#[derive(Deserialize, JsonSchema)]
+pub struct MoveFileParams {
+    pub src: String,
+    pub dst: String,
+}
+
 #[async_trait]
-impl Tool for MoveFileTool {
+impl TypedTool<MoveFileParams> for MoveFileTool {
     fn name(&self) -> &str {
         "MoveFile"
     }
@@ -17,67 +22,54 @@ impl Tool for MoveFileTool {
         "Move or rename a file or directory."
     }
 
-    fn parameters_schema(&self) -> Value {
-        json!({
-            "type": "object",
-            "required": ["src", "dst"],
-            "properties": {
-                "src": { "type": "string", "description": "Source path" },
-                "dst": { "type": "string", "description": "Destination path" }
-            }
-        })
-    }
-
     fn permission(&self) -> PermissionLevel {
         PermissionLevel::Write
     }
 
-    async fn execute(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
-        let src_raw = require_str(&input, "src")?;
-        let dst_raw = require_str(&input, "dst")?;
-
-        // Validate source exists
-        if let Err(e) = ctx.backend.file_info(src_raw).await {
+    async fn execute(
+        &self,
+        input: MoveFileParams,
+        ctx: &ToolContext,
+    ) -> Result<ToolResult, LoopalError> {
+        if let Err(e) = ctx.backend.file_info(&input.src).await {
             return Ok(ToolResult::error(e.to_string()));
         }
 
-        // If dst is an existing directory, move src inside it
-        let final_dst = match ctx.backend.file_info(dst_raw).await {
+        let final_dst = match ctx.backend.file_info(&input.dst).await {
             Ok(info) if info.is_dir => {
-                let src_path = std::path::Path::new(src_raw);
+                let src_path = std::path::Path::new(&input.src);
                 let name = src_path.file_name().ok_or_else(|| {
                     LoopalError::Tool(loopal_error::ToolError::InvalidInput(
                         "source has no file name".into(),
                     ))
                 })?;
-                let dst_path = std::path::Path::new(dst_raw).join(name);
+                let dst_path = std::path::Path::new(&input.dst).join(name);
                 dst_path.to_string_lossy().into_owned()
             }
-            _ => dst_raw.to_string(),
+            _ => input.dst.clone(),
         };
 
-        // Ensure parent directory exists
         if let Some(parent) = std::path::Path::new(&final_dst).parent()
             && let Err(e) = ctx.backend.create_dir_all(&parent.to_string_lossy()).await
         {
             return Ok(ToolResult::error(e.to_string()));
         }
 
-        // Try rename first; fall back to copy+remove for cross-device moves
-        match ctx.backend.rename(src_raw, &final_dst).await {
+        match ctx.backend.rename(&input.src, &final_dst).await {
             Ok(()) => {}
             Err(_) => {
-                if let Err(e) = ctx.backend.copy(src_raw, &final_dst).await {
+                if let Err(e) = ctx.backend.copy(&input.src, &final_dst).await {
                     return Ok(ToolResult::error(e.to_string()));
                 }
-                if let Err(e) = ctx.backend.remove(src_raw).await {
+                if let Err(e) = ctx.backend.remove(&input.src).await {
                     return Ok(ToolResult::error(e.to_string()));
                 }
             }
         }
 
         Ok(ToolResult::success(format!(
-            "Moved {src_raw} → {final_dst}"
+            "Moved {} → {final_dst}",
+            input.src
         )))
     }
 }

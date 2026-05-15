@@ -1,5 +1,5 @@
-use loopal_tool_api::{Tool, ToolContext};
-use loopal_tool_file_ops::copy::CopyFileTool;
+use loopal_tool_api::{Tool, ToolContext, TypedBridge};
+use loopal_tool_file_ops::{CopyFileParams, CopyFileTool};
 use serde_json::json;
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
@@ -11,11 +11,15 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext::new(backend, "test")
 }
 
+fn make_tool() -> impl Tool {
+    TypedBridge::<CopyFileTool, CopyFileParams>::new(CopyFileTool)
+}
+
 #[tokio::test]
 async fn copy_basic() {
     let tmp = tempfile::tempdir().unwrap();
     std::fs::write(tmp.path().join("a.txt"), "hello").unwrap();
-    let tool = CopyFileTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(json!({"src": "a.txt", "dst": "b.txt"}), &ctx)
@@ -36,7 +40,7 @@ async fn copy_basic() {
 #[tokio::test]
 async fn copy_src_not_found() {
     let tmp = tempfile::tempdir().unwrap();
-    let tool = CopyFileTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(json!({"src": "nope.txt", "dst": "b.txt"}), &ctx)
@@ -50,7 +54,7 @@ async fn copy_dst_is_directory() {
     let tmp = tempfile::tempdir().unwrap();
     std::fs::write(tmp.path().join("a.txt"), "data").unwrap();
     std::fs::create_dir(tmp.path().join("dest")).unwrap();
-    let tool = CopyFileTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(json!({"src": "a.txt", "dst": "dest"}), &ctx)
@@ -64,7 +68,7 @@ async fn copy_dst_is_directory() {
 async fn copy_creates_parent_dirs() {
     let tmp = tempfile::tempdir().unwrap();
     std::fs::write(tmp.path().join("a.txt"), "data").unwrap();
-    let tool = CopyFileTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(json!({"src": "a.txt", "dst": "deep/nested/b.txt"}), &ctx)
@@ -78,7 +82,7 @@ async fn copy_creates_parent_dirs() {
 async fn copy_path_traversal_rejected() {
     let tmp = tempfile::tempdir().unwrap();
     std::fs::write(tmp.path().join("a.txt"), "x").unwrap();
-    let tool = CopyFileTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(json!({"src": "a.txt", "dst": "/tmp/outside.txt"}), &ctx)

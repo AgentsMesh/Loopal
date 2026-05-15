@@ -1,14 +1,25 @@
-use loopal_tool_api::{PermissionLevel, Tool};
-use loopal_tool_plan_mode::{EnterPlanModeTool, ExitPlanModeTool};
+use loopal_tool_api::{PermissionLevel, Tool, TypedBridge};
+use loopal_tool_plan_mode::{
+    EnterPlanModeParams, EnterPlanModeTool, ExitPlanModeParams, ExitPlanModeTool,
+};
+
+fn make_enter_tool() -> impl Tool {
+    TypedBridge::<EnterPlanModeTool, EnterPlanModeParams>::new(EnterPlanModeTool)
+}
+
+fn make_exit_tool() -> impl Tool {
+    TypedBridge::<ExitPlanModeTool, ExitPlanModeParams>::new(ExitPlanModeTool)
+}
 
 #[test]
 fn enter_plan_mode_name() {
-    assert_eq!(EnterPlanModeTool.name(), "EnterPlanMode");
+    assert_eq!(make_enter_tool().name(), "EnterPlanMode");
 }
 
 #[test]
 fn enter_plan_mode_description() {
-    let desc = EnterPlanModeTool.description();
+    let tool = make_enter_tool();
+    let desc = tool.description();
     assert!(!desc.is_empty());
     assert!(desc.contains("plan mode"), "should mention plan mode");
     assert!(
@@ -19,17 +30,18 @@ fn enter_plan_mode_description() {
 
 #[test]
 fn enter_plan_mode_permission() {
-    assert_eq!(EnterPlanModeTool.permission(), PermissionLevel::ReadOnly);
+    assert_eq!(make_enter_tool().permission(), PermissionLevel::ReadOnly);
 }
 
 #[test]
 fn exit_plan_mode_name() {
-    assert_eq!(ExitPlanModeTool.name(), "ExitPlanMode");
+    assert_eq!(make_exit_tool().name(), "ExitPlanMode");
 }
 
 #[test]
 fn exit_plan_mode_description() {
-    let desc = ExitPlanModeTool.description();
+    let tool = make_exit_tool();
+    let desc = tool.description();
     assert!(!desc.is_empty());
     assert!(desc.contains("plan"), "should mention plan");
     assert!(
@@ -40,5 +52,5 @@ fn exit_plan_mode_description() {
 
 #[test]
 fn exit_plan_mode_permission() {
-    assert_eq!(ExitPlanModeTool.permission(), PermissionLevel::ReadOnly);
+    assert_eq!(make_exit_tool().permission(), PermissionLevel::ReadOnly);
 }

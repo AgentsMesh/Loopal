@@ -138,17 +138,24 @@ fn test_unregister_nonexistent_returns_false() {
 /// `ToolDispatch::RunnerDirect`; all other builtin tools default to `Pipeline`.
 #[test]
 fn dispatch_contract_for_builtin_tools() {
-    use loopal_tool_ask_user::AskUserTool;
-    use loopal_tool_plan_mode::{EnterPlanModeTool, ExitPlanModeTool};
-    use loopal_tool_read::ReadTool;
+    use loopal_tool_api::TypedBridge;
+    use loopal_tool_ask_user::{AskUserParams, AskUserTool};
+    use loopal_tool_plan_mode::{
+        EnterPlanModeParams, EnterPlanModeTool, ExitPlanModeParams, ExitPlanModeTool,
+    };
+    use loopal_tool_read::{ReadParams, ReadTool};
 
     // Runner-direct tools
-    assert_eq!(AskUserTool.dispatch(), ToolDispatch::RunnerDirect);
-    assert_eq!(EnterPlanModeTool.dispatch(), ToolDispatch::RunnerDirect);
-    assert_eq!(ExitPlanModeTool.dispatch(), ToolDispatch::RunnerDirect);
+    let ask_user = TypedBridge::<AskUserTool, AskUserParams>::new(AskUserTool);
+    let enter_plan = TypedBridge::<EnterPlanModeTool, EnterPlanModeParams>::new(EnterPlanModeTool);
+    let exit_plan = TypedBridge::<ExitPlanModeTool, ExitPlanModeParams>::new(ExitPlanModeTool);
+    assert_eq!(ask_user.dispatch(), ToolDispatch::RunnerDirect);
+    assert_eq!(enter_plan.dispatch(), ToolDispatch::RunnerDirect);
+    assert_eq!(exit_plan.dispatch(), ToolDispatch::RunnerDirect);
 
     // Pipeline tools (default)
-    assert_eq!(ReadTool.dispatch(), ToolDispatch::Pipeline);
+    let read = TypedBridge::<ReadTool, ReadParams>::new(ReadTool);
+    assert_eq!(read.dispatch(), ToolDispatch::Pipeline);
     assert_eq!(MockTool::new("Foo").dispatch(), ToolDispatch::Pipeline);
 }
 

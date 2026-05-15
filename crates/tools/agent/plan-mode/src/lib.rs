@@ -1,16 +1,16 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
-use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolDispatch, ToolResult};
-use serde_json::{Value, json};
-
-// ---------------------------------------------------------------------------
-// EnterPlanMode
-// ---------------------------------------------------------------------------
+use loopal_tool_api::{PermissionLevel, ToolContext, ToolDispatch, ToolResult, TypedTool};
+use schemars::JsonSchema;
+use serde::Deserialize;
 
 pub struct EnterPlanModeTool;
 
+#[derive(Deserialize, JsonSchema)]
+pub struct EnterPlanModeParams {}
+
 #[async_trait]
-impl Tool for EnterPlanModeTool {
+impl TypedTool<EnterPlanModeParams> for EnterPlanModeTool {
     fn name(&self) -> &str {
         "EnterPlanMode"
     }
@@ -23,10 +23,6 @@ impl Tool for EnterPlanModeTool {
          In plan mode, only read-only tools are available for safe exploration and planning."
     }
 
-    fn parameters_schema(&self) -> Value {
-        json!({ "type": "object", "properties": {} })
-    }
-
     fn permission(&self) -> PermissionLevel {
         PermissionLevel::ReadOnly
     }
@@ -35,22 +31,24 @@ impl Tool for EnterPlanModeTool {
         ToolDispatch::RunnerDirect
     }
 
-    async fn execute(&self, _input: Value, _ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
-        // Intercepted by the agent loop runner before reaching here.
+    async fn execute(
+        &self,
+        _input: EnterPlanModeParams,
+        _ctx: &ToolContext,
+    ) -> Result<ToolResult, LoopalError> {
         Ok(ToolResult::success(
             "Entered plan mode (intercepted by runner)",
         ))
     }
 }
 
-// ---------------------------------------------------------------------------
-// ExitPlanMode
-// ---------------------------------------------------------------------------
-
 pub struct ExitPlanModeTool;
 
+#[derive(Deserialize, JsonSchema)]
+pub struct ExitPlanModeParams {}
+
 #[async_trait]
-impl Tool for ExitPlanModeTool {
+impl TypedTool<ExitPlanModeParams> for ExitPlanModeTool {
     fn name(&self) -> &str {
         "ExitPlanMode"
     }
@@ -62,10 +60,6 @@ impl Tool for ExitPlanModeTool {
          Do NOT use AskUserQuestion to ask 'Is this plan okay?' — use ExitPlanMode instead, which inherently requests approval."
     }
 
-    fn parameters_schema(&self) -> Value {
-        json!({ "type": "object", "properties": {} })
-    }
-
     fn permission(&self) -> PermissionLevel {
         PermissionLevel::ReadOnly
     }
@@ -74,8 +68,11 @@ impl Tool for ExitPlanModeTool {
         ToolDispatch::RunnerDirect
     }
 
-    async fn execute(&self, _input: Value, _ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
-        // Intercepted by the agent loop runner before reaching here.
+    async fn execute(
+        &self,
+        _input: ExitPlanModeParams,
+        _ctx: &ToolContext,
+    ) -> Result<ToolResult, LoopalError> {
         Ok(ToolResult::success(
             "Exited plan mode (intercepted by runner)",
         ))

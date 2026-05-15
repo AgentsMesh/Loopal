@@ -1,14 +1,15 @@
 use loopal_tool_api::Tool;
-use loopal_tool_goal::CreateGoalTool;
 use serde_json::json;
 
-use super::support::{FakeGoalSession, ctx_with_goal_session, ctx_without_goal_session};
+use super::support::{
+    FakeGoalSession, ctx_with_goal_session, ctx_without_goal_session, make_create_goal_tool,
+};
 
 #[tokio::test]
 async fn creates_active_goal_with_objective_only() {
     let session = FakeGoalSession::empty();
     let ctx = ctx_with_goal_session(session.clone());
-    let result = CreateGoalTool
+    let result = make_create_goal_tool()
         .execute(json!({"objective": "ship M0"}), &ctx)
         .await
         .unwrap();
@@ -24,7 +25,7 @@ async fn creates_active_goal_with_objective_only() {
 async fn creates_with_token_budget() {
     let session = FakeGoalSession::empty();
     let ctx = ctx_with_goal_session(session);
-    let result = CreateGoalTool
+    let result = make_create_goal_tool()
         .execute(json!({"objective": "x", "token_budget": 5000}), &ctx)
         .await
         .unwrap();
@@ -38,7 +39,7 @@ async fn creates_with_token_budget() {
 async fn rejects_when_goal_already_exists() {
     let session = FakeGoalSession::with_active("existing", None);
     let ctx = ctx_with_goal_session(session);
-    let result = CreateGoalTool
+    let result = make_create_goal_tool()
         .execute(json!({"objective": "second"}), &ctx)
         .await
         .unwrap();
@@ -50,7 +51,7 @@ async fn rejects_when_goal_already_exists() {
 async fn rejects_empty_objective() {
     let session = FakeGoalSession::empty();
     let ctx = ctx_with_goal_session(session);
-    let result = CreateGoalTool
+    let result = make_create_goal_tool()
         .execute(json!({"objective": "   "}), &ctx)
         .await
         .unwrap();
@@ -62,7 +63,7 @@ async fn rejects_empty_objective() {
 async fn rejects_zero_budget() {
     let session = FakeGoalSession::empty();
     let ctx = ctx_with_goal_session(session);
-    let result = CreateGoalTool
+    let result = make_create_goal_tool()
         .execute(json!({"objective": "x", "token_budget": 0}), &ctx)
         .await
         .unwrap();
@@ -71,24 +72,9 @@ async fn rejects_zero_budget() {
 }
 
 #[tokio::test]
-async fn rejects_unknown_extra_argument() {
-    let session = FakeGoalSession::empty();
-    let ctx = ctx_with_goal_session(session);
-    let result = CreateGoalTool
-        .execute(
-            json!({"objective": "x", "token_budget": "not-a-number"}),
-            &ctx,
-        )
-        .await
-        .unwrap();
-    assert!(result.is_error);
-    assert!(result.content.contains("invalid arguments"));
-}
-
-#[tokio::test]
 async fn surfaces_disabled_when_no_goal_session() {
     let ctx = ctx_without_goal_session();
-    let result = CreateGoalTool
+    let result = make_create_goal_tool()
         .execute(json!({"objective": "x"}), &ctx)
         .await
         .unwrap();

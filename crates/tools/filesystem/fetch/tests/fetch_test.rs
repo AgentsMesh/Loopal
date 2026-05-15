@@ -1,5 +1,5 @@
-use loopal_tool_api::{PermissionLevel, Tool, ToolContext};
-use loopal_tool_fetch::FetchTool;
+use loopal_tool_api::{PermissionLevel, Tool, ToolContext, TypedBridge};
+use loopal_tool_fetch::{FetchParams, FetchTool};
 
 #[path = "fetch_refiner_test.rs"]
 mod fetch_refiner_test;
@@ -13,26 +13,31 @@ fn make_ctx() -> ToolContext {
     ToolContext::new(backend, "t")
 }
 
+fn make_tool() -> TypedBridge<FetchTool, FetchParams> {
+    TypedBridge::new(FetchTool)
+}
+
 #[test]
 fn test_fetch_name() {
-    assert_eq!(FetchTool.name(), "Fetch");
+    assert_eq!(make_tool().name(), "Fetch");
 }
 
 #[test]
 fn test_fetch_description() {
-    let desc = FetchTool.description();
+    let tool = make_tool();
+    let desc = tool.description();
     assert!(!desc.is_empty());
     assert!(desc.contains("URL"));
 }
 
 #[test]
 fn test_fetch_permission() {
-    assert_eq!(FetchTool.permission(), PermissionLevel::ReadOnly);
+    assert_eq!(make_tool().permission(), PermissionLevel::ReadOnly);
 }
 
 #[test]
 fn test_fetch_schema_requires_url() {
-    let schema = FetchTool.parameters_schema();
+    let schema = make_tool().parameters_schema();
     let required = schema["required"].as_array().unwrap();
     assert!(required.iter().any(|v| v.as_str() == Some("url")));
     assert!(schema["properties"]["url"].is_object());
@@ -41,15 +46,14 @@ fn test_fetch_schema_requires_url() {
 #[tokio::test]
 async fn test_fetch_missing_url_returns_error() {
     let ctx = make_ctx();
-    let result = FetchTool.execute(serde_json::json!({}), &ctx).await;
+    let result = make_tool().execute(serde_json::json!({}), &ctx).await;
     assert!(result.is_err());
 }
 
 #[tokio::test]
 async fn test_fetch_invalid_url_returns_error() {
     let ctx = make_ctx();
-    // URL without http(s) scheme is rejected at validation, no network I/O
-    let result = FetchTool
+    let result = make_tool()
         .execute(serde_json::json!({"url": "not-a-url"}), &ctx)
         .await;
     assert!(result.is_err());

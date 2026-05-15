@@ -1,5 +1,5 @@
-use loopal_tool_api::{Tool, ToolContext};
-use loopal_tool_grep::GrepTool;
+use loopal_tool_api::{Tool, ToolContext, TypedBridge};
+use loopal_tool_grep::{GrepParams, GrepTool};
 use serde_json::json;
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
@@ -11,11 +11,15 @@ fn make_file(dir: &std::path::Path, name: &str, content: &str) {
     std::fs::write(dir.join(name), content).unwrap();
 }
 
+fn make_tool() -> TypedBridge<GrepTool, GrepParams> {
+    TypedBridge::new(GrepTool)
+}
+
 #[tokio::test]
 async fn fixed_strings_escapes_special_chars() {
     let tmp = tempfile::tempdir().unwrap();
     make_file(tmp.path(), "f.rs", "let x = foo.bar();\nlet y = fooXbar();");
-    let tool = GrepTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(
@@ -24,7 +28,6 @@ async fn fixed_strings_escapes_special_chars() {
         )
         .await
         .unwrap();
-    // Should match the literal "foo.bar()" but not "fooXbar()"
     assert!(r.content.contains("foo.bar()"));
     assert!(!r.content.contains("fooXbar()"));
 }
@@ -33,7 +36,7 @@ async fn fixed_strings_escapes_special_chars() {
 async fn fixed_strings_default_false() {
     let tmp = tempfile::tempdir().unwrap();
     make_file(tmp.path(), "f.rs", "let x = foo.bar();\nlet y = fooXbar();");
-    let tool = GrepTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(
@@ -42,7 +45,6 @@ async fn fixed_strings_default_false() {
         )
         .await
         .unwrap();
-    // Without fixed_strings, "." matches any char → both lines match
     assert!(r.content.contains("foo.bar()"));
     assert!(r.content.contains("fooXbar()"));
 }

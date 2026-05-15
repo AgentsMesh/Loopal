@@ -1,7 +1,4 @@
-//! Background task store — owns running/completed background process state.
-//!
-//! `BackgroundTaskStore` is an injectable instance (not a global singleton)
-//! so that tests can create isolated stores without cross-contamination.
+pub mod ops;
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};

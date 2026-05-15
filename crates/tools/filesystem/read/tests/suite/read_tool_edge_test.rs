@@ -1,5 +1,5 @@
-use loopal_tool_api::{Tool, ToolContext};
-use loopal_tool_read::ReadTool;
+use loopal_tool_api::{Tool, ToolContext, TypedBridge};
+use loopal_tool_read::{ReadParams, ReadTool};
 use serde_json::json;
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
@@ -11,14 +11,17 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext::new(backend, "test")
 }
 
+fn make_tool() -> TypedBridge<ReadTool, ReadParams> {
+    TypedBridge::new(ReadTool)
+}
+
 #[tokio::test]
 async fn test_read_with_relative_path() {
     let tmp = tempfile::tempdir().unwrap();
-    // Canonicalize to handle macOS /tmp -> /private/tmp symlink
     let canon = tmp.path().canonicalize().unwrap();
     std::fs::write(canon.join("rel.txt"), "relative content").unwrap();
 
-    let tool = ReadTool;
+    let tool = make_tool();
     let ctx = make_ctx(&canon);
 
     let result = tool
@@ -36,7 +39,7 @@ async fn test_read_output_has_line_numbers() {
     let file = tmp.path().join("numbered.txt");
     std::fs::write(&file, "alpha\nbeta\ngamma").unwrap();
 
-    let tool = ReadTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool
@@ -45,7 +48,6 @@ async fn test_read_output_has_line_numbers() {
         .unwrap();
 
     assert!(!result.is_error);
-    // cat -n format: right-aligned line numbers followed by tab
     assert!(result.content.contains("1\talpha"));
     assert!(result.content.contains("2\tbeta"));
     assert!(result.content.contains("3\tgamma"));
@@ -57,7 +59,7 @@ async fn test_read_offset_beyond_file_length() {
     let file = tmp.path().join("short.txt");
     std::fs::write(&file, "only one line").unwrap();
 
-    let tool = ReadTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool
@@ -69,7 +71,6 @@ async fn test_read_offset_beyond_file_length() {
         .unwrap();
 
     assert!(!result.is_error);
-    // Offset beyond file length should return empty content
     assert!(result.content.is_empty() || result.content.trim().is_empty());
 }
 
@@ -82,7 +83,7 @@ async fn test_read_path_traversal_protection() {
     let cwd = tmp.path().join("inner");
     std::fs::create_dir_all(&cwd).unwrap();
 
-    let tool = ReadTool;
+    let tool = make_tool();
     let ctx = make_ctx(&cwd);
 
     let result = tool
@@ -92,4 +93,25 @@ async fn test_read_path_traversal_protection() {
 
     assert!(result.is_error);
     assert!(result.content.contains("path escapes working directory"));
+}
+
+#[tokio::test]
+async fn test_read_empty_string_optional_fields_ignored() {
+    let tmp = tempfile::tempdir().unwrap();
+    let file = tmp.path().join("test.txt");
+    std::fs::write(&file, "content here").unwrap();
+
+    let tool = make_tool();
+    let ctx = make_ctx(tmp.path());
+
+    let result = tool
+        .execute(
+            json!({"file_path": file.to_str().unwrap(), "offset": null, "limit": null}),
+            &ctx,
+        )
+        .await
+        .unwrap();
+
+    assert!(!result.is_error);
+    assert!(result.content.contains("content here"));
 }

@@ -1,5 +1,5 @@
-use loopal_tool_api::{Tool, ToolContext};
-use loopal_tool_file_ops::delete::DeleteTool;
+use loopal_tool_api::{Tool, ToolContext, TypedBridge};
+use loopal_tool_file_ops::{DeleteParams, DeleteTool};
 use serde_json::json;
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
@@ -11,11 +11,15 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext::new(backend, "test")
 }
 
+fn make_tool() -> impl Tool {
+    TypedBridge::<DeleteTool, DeleteParams>::new(DeleteTool)
+}
+
 #[tokio::test]
 async fn delete_file() {
     let tmp = tempfile::tempdir().unwrap();
     std::fs::write(tmp.path().join("f.txt"), "x").unwrap();
-    let tool = DeleteTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool.execute(json!({"path": "f.txt"}), &ctx).await.unwrap();
     assert!(!r.is_error, "unexpected error: {}", r.content);
@@ -30,7 +34,7 @@ async fn delete_directory() {
     std::fs::create_dir(&sub).unwrap();
     std::fs::write(sub.join("a.txt"), "a").unwrap();
     std::fs::write(sub.join("b.txt"), "b").unwrap();
-    let tool = DeleteTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool.execute(json!({"path": "subdir"}), &ctx).await.unwrap();
     assert!(!r.is_error, "unexpected error: {}", r.content);
@@ -41,7 +45,7 @@ async fn delete_directory() {
 #[tokio::test]
 async fn delete_not_found() {
     let tmp = tempfile::tempdir().unwrap();
-    let tool = DeleteTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool
         .execute(json!({"path": "nope.txt"}), &ctx)
@@ -58,7 +62,7 @@ async fn delete_not_found() {
 #[tokio::test]
 async fn delete_path_traversal_rejected() {
     let tmp = tempfile::tempdir().unwrap();
-    let tool = DeleteTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
     let r = tool.execute(json!({"path": "/tmp"}), &ctx).await;
     assert!(

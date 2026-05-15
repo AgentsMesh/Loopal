@@ -1,3 +1,3 @@
 mod read;
 
-pub use read::ReadTool;
+pub use read::{ReadParams, ReadTool};

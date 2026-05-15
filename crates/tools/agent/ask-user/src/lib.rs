@@ -1,12 +1,35 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
-use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolDispatch, ToolResult};
-use serde_json::{Value, json};
+use loopal_tool_api::{PermissionLevel, ToolContext, ToolDispatch, ToolResult, TypedTool};
+use schemars::JsonSchema;
+use serde::Deserialize;
 
 pub struct AskUserTool;
 
+#[derive(Deserialize, JsonSchema)]
+pub struct AskUserOption {
+    pub label: String,
+    pub description: String,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct AskUserQuestion {
+    pub question: String,
+    #[serde(default)]
+    pub header: Option<String>,
+    pub options: Vec<AskUserOption>,
+    #[serde(default)]
+    #[serde(rename = "multiSelect")]
+    pub multi_select: Option<bool>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct AskUserParams {
+    pub questions: Vec<AskUserQuestion>,
+}
+
 #[async_trait]
-impl Tool for AskUserTool {
+impl TypedTool<AskUserParams> for AskUserTool {
     fn name(&self) -> &str {
         "AskUser"
     }
@@ -25,55 +48,6 @@ impl Tool for AskUserTool {
          a real answer."
     }
 
-    fn parameters_schema(&self) -> Value {
-        json!({
-            "type": "object",
-            "required": ["questions"],
-            "properties": {
-                "questions": {
-                    "type": "array",
-                    "description": "List of questions to present to the user",
-                    "items": {
-                        "type": "object",
-                        "required": ["question", "options"],
-                        "properties": {
-                            "question": {
-                                "type": "string",
-                                "description": "The question text"
-                            },
-                            "header": {
-                                "type": "string",
-                                "description": "Short label displayed as a chip/tag (max 12 chars)"
-                            },
-                            "options": {
-                                "type": "array",
-                                "description": "Available answer options (2-4 items)",
-                                "items": {
-                                    "type": "object",
-                                    "required": ["label", "description"],
-                                    "properties": {
-                                        "label": {
-                                            "type": "string",
-                                            "description": "Short label for the option"
-                                        },
-                                        "description": {
-                                            "type": "string",
-                                            "description": "Explanation of what this option means"
-                                        }
-                                    }
-                                }
-                            },
-                            "multiSelect": {
-                                "type": "boolean",
-                                "description": "Allow selecting multiple options (default: false)"
-                            }
-                        }
-                    }
-                }
-            }
-        })
-    }
-
     fn permission(&self) -> PermissionLevel {
         PermissionLevel::ReadOnly
     }
@@ -82,8 +56,11 @@ impl Tool for AskUserTool {
         ToolDispatch::RunnerDirect
     }
 
-    async fn execute(&self, _input: Value, _ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
-        // Intercepted by the agent loop runner before reaching here.
+    async fn execute(
+        &self,
+        _input: AskUserParams,
+        _ctx: &ToolContext,
+    ) -> Result<ToolResult, LoopalError> {
         Ok(ToolResult::success("(intercepted by runner)"))
     }
 }

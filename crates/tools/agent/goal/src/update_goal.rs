@@ -1,27 +1,27 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
-use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
+use loopal_tool_api::{PermissionLevel, ToolContext, ToolResult, TypedTool};
+use schemars::JsonSchema;
 use serde::Deserialize;
-use serde_json::{Value, json};
 
 use crate::errors::format_session_error;
 use crate::get_goal::render_response;
 
 pub struct UpdateGoalTool;
 
-#[derive(Deserialize)]
-struct UpdateGoalArgs {
-    status: ModelStatusInput,
-}
-
-#[derive(Deserialize, Debug, PartialEq, Eq)]
+#[derive(Deserialize, JsonSchema, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-enum ModelStatusInput {
+pub enum GoalStatusInput {
     Complete,
 }
 
+#[derive(Deserialize, JsonSchema)]
+pub struct UpdateGoalParams {
+    pub status: GoalStatusInput,
+}
+
 #[async_trait]
-impl Tool for UpdateGoalTool {
+impl TypedTool<UpdateGoalParams> for UpdateGoalTool {
     fn name(&self) -> &str {
         "update_goal"
     }
@@ -34,26 +34,15 @@ impl Tool for UpdateGoalTool {
          budget-limit a goal; those status changes are controlled by the user or system."
     }
 
-    fn parameters_schema(&self) -> Value {
-        json!({
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["status"],
-            "properties": {
-                "status": {
-                    "type": "string",
-                    "enum": ["complete"],
-                    "description": "Required. Only `complete` is permitted; the model cannot pause or budget-limit a goal."
-                }
-            }
-        })
-    }
-
     fn permission(&self) -> PermissionLevel {
         PermissionLevel::Write
     }
 
-    async fn execute(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
+    async fn execute(
+        &self,
+        input: UpdateGoalParams,
+        ctx: &ToolContext,
+    ) -> Result<ToolResult, LoopalError> {
         let session = match ctx.goal_session.as_ref() {
             Some(s) => s,
             None => {
@@ -62,15 +51,7 @@ impl Tool for UpdateGoalTool {
                 ));
             }
         };
-        let args: UpdateGoalArgs = match serde_json::from_value(input) {
-            Ok(a) => a,
-            Err(e) => {
-                return Ok(ToolResult::error(format!(
-                    "invalid arguments: {e}; status must be \"complete\""
-                )));
-            }
-        };
-        let _ = args.status;
+        let _ = input.status;
         match session.complete_by_model().await {
             Ok(goal) => Ok(ToolResult::success(render_response(&Some(goal)))),
             Err(err) => Ok(ToolResult::error(format_session_error(err))),

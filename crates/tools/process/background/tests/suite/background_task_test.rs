@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use loopal_tool_api::{PermissionLevel, Tool, ToolContext};
+use loopal_tool_api::{PermissionLevel, Tool, ToolContext, TypedBridge};
 use loopal_tool_background::{BackgroundTask, BackgroundTaskStore, TaskStatus};
-use loopal_tool_bash::BashTool;
+use loopal_tool_bash::{BashParams, BashTool};
 use serde_json::json;
 use std::sync::Mutex;
 
@@ -17,6 +17,10 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
         loopal_backend::ResourceLimits::default(),
     );
     ToolContext::new(backend, "test")
+}
+
+fn make_bash(store: Arc<BackgroundTaskStore>) -> TypedBridge<BashTool, BashParams> {
+    TypedBridge::new(BashTool::new(store))
 }
 
 #[test]
@@ -45,12 +49,11 @@ fn test_generate_task_id_is_unique() {
     assert!(id1.starts_with("bg_"));
 }
 
-/// Bash tool handles background execution and output retrieval.
 #[tokio::test]
 async fn test_bash_background_and_output() {
     let tmp = tempfile::tempdir().unwrap();
     let store = make_store();
-    let bash = BashTool::new(store);
+    let bash = make_bash(store.clone());
     let ctx = make_ctx(tmp.path());
 
     let result = bash
@@ -70,13 +73,8 @@ async fn test_bash_background_and_output() {
         .and_then(|l| l.strip_prefix("process_id: "))
         .unwrap();
 
-    let output = bash
-        .execute(
-            json!({"process_id": pid, "block": true, "timeout": 5}),
-            &ctx,
-        )
-        .await
-        .unwrap();
+    use loopal_tool_background::ops::bg_output;
+    let output = bg_output(&store, pid, true, std::time::Duration::from_secs(5)).await;
     assert!(!output.is_error);
     assert!(
         output.content.contains("bg_hello"),
@@ -86,13 +84,12 @@ async fn test_bash_background_and_output() {
     assert!(output.content.contains("Completed"));
 }
 
-/// Bash tool handles stopping background processes.
 #[tokio::test]
 #[cfg(not(windows))]
 async fn test_bash_stop_background() {
     let tmp = tempfile::tempdir().unwrap();
     let store = make_store();
-    let bash = BashTool::new(store);
+    let bash = make_bash(store.clone());
     let ctx = make_ctx(tmp.path());
 
     let result = bash
@@ -111,10 +108,8 @@ async fn test_bash_stop_background() {
 
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
-    let stop = bash
-        .execute(json!({"process_id": pid, "stop": true}), &ctx)
-        .await
-        .unwrap();
+    use loopal_tool_background::ops::bg_stop;
+    let stop = bg_stop(&store, pid);
     assert!(
         !stop.is_error,
         "bg_stop returned error for {pid}: {}",
@@ -130,10 +125,9 @@ async fn test_bash_stop_background() {
 #[test]
 fn test_bash_schema_includes_background_fields() {
     let store = make_store();
-    let tool = BashTool::new(store);
+    let tool = make_bash(store);
     let schema = tool.parameters_schema();
     assert!(schema["properties"]["run_in_background"].is_object());
-    assert!(schema["properties"]["process_id"].is_object());
-    assert!(schema["properties"]["stop"].is_object());
+    assert!(schema["properties"]["process_id"].is_null());
     assert_eq!(tool.permission(), PermissionLevel::Dangerous);
 }

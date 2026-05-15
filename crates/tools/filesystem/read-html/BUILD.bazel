@@ -9,7 +9,8 @@ rust_library(
         "//crates/loopal-error:loopal-error",
         "//crates/loopal-tool-api:loopal-tool-api",
         "@crates//:html2text",
-        "@crates//:serde_json",
+        "@crates//:schemars",
+        "@crates//:serde",
     ],
     proc_macro_deps = ["@crates//:async-trait"],
 )

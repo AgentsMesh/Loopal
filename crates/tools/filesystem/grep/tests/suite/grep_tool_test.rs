@@ -1,5 +1,5 @@
-use loopal_tool_api::{PermissionLevel, Tool, ToolContext};
-use loopal_tool_grep::GrepTool;
+use loopal_tool_api::{PermissionLevel, Tool, ToolContext, TypedBridge};
+use loopal_tool_grep::{GrepParams, GrepTool};
 use serde_json::json;
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
@@ -7,15 +7,19 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext::new(backend, "test")
 }
 
+fn make_tool() -> TypedBridge<GrepTool, GrepParams> {
+    TypedBridge::new(GrepTool)
+}
+
 #[test]
 fn test_grep_name() {
-    let tool = GrepTool;
+    let tool = make_tool();
     assert_eq!(tool.name(), "Grep");
 }
 
 #[test]
 fn test_grep_description() {
-    let tool = GrepTool;
+    let tool = make_tool();
     let desc = tool.description();
     assert!(!desc.is_empty());
     assert!(desc.contains("regex"));
@@ -23,13 +27,13 @@ fn test_grep_description() {
 
 #[test]
 fn test_grep_permission() {
-    let tool = GrepTool;
+    let tool = make_tool();
     assert_eq!(tool.permission(), PermissionLevel::ReadOnly);
 }
 
 #[test]
 fn test_grep_parameters_schema() {
-    let tool = GrepTool;
+    let tool = make_tool();
     let schema = tool.parameters_schema();
     assert_eq!(schema["type"], "object");
     let required = schema["required"].as_array().unwrap();
@@ -50,7 +54,7 @@ async fn test_grep_matching_pattern_in_file() {
     )
     .unwrap();
 
-    let tool = GrepTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool
@@ -61,7 +65,6 @@ async fn test_grep_matching_pattern_in_file() {
     assert!(!result.is_error);
     assert!(result.content.contains("hello world"));
     assert!(result.content.contains("hello again"));
-    // Should include line numbers
     assert!(result.content.contains(":1:"));
     assert!(result.content.contains(":3:"));
 }
@@ -71,7 +74,7 @@ async fn test_grep_no_matches() {
     let tmp = tempfile::tempdir().unwrap();
     std::fs::write(tmp.path().join("file.txt"), "nothing here").unwrap();
 
-    let tool = GrepTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool
@@ -92,7 +95,7 @@ async fn test_grep_regex_pattern() {
     )
     .unwrap();
 
-    let tool = GrepTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool
@@ -112,7 +115,7 @@ async fn test_grep_regex_pattern() {
 #[tokio::test]
 async fn test_grep_missing_pattern_returns_error() {
     let tmp = tempfile::tempdir().unwrap();
-    let tool = GrepTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool.execute(json!({}), &ctx).await;
@@ -123,7 +126,7 @@ async fn test_grep_missing_pattern_returns_error() {
 #[tokio::test]
 async fn test_grep_invalid_regex_returns_error() {
     let tmp = tempfile::tempdir().unwrap();
-    let tool = GrepTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool.execute(json!({"pattern": "(unclosed"}), &ctx).await;
@@ -137,7 +140,7 @@ async fn test_grep_with_include_glob_filter() {
     std::fs::write(tmp.path().join("code.rs"), "hello rust").unwrap();
     std::fs::write(tmp.path().join("readme.md"), "hello markdown").unwrap();
 
-    let tool = GrepTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool
@@ -163,7 +166,7 @@ async fn test_grep_with_explicit_file_path() {
     let file = tmp.path().join("single.txt");
     std::fs::write(&file, "line alpha\nline beta\nline gamma").unwrap();
 
-    let tool = GrepTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool

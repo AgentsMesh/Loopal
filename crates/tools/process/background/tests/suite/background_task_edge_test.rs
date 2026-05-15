@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
-use loopal_tool_api::{Tool, ToolContext};
+use loopal_tool_api::{Tool, ToolContext, TypedBridge};
 use loopal_tool_background::BackgroundTaskStore;
+use loopal_tool_bash::{BashParams, BashTool};
 use serde_json::json;
 
 fn make_store() -> Arc<BackgroundTaskStore> {
@@ -17,46 +18,34 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext::new(backend, "test")
 }
 
-/// Bash(process_id=nonexistent) returns error.
+fn make_bash(store: Arc<BackgroundTaskStore>) -> TypedBridge<BashTool, BashParams> {
+    TypedBridge::new(BashTool::new(store))
+}
+
 #[tokio::test]
 async fn test_output_nonexistent_process() {
-    let tmp = tempfile::tempdir().unwrap();
-    let bash = loopal_tool_bash::BashTool::new(make_store());
-    let ctx = make_ctx(tmp.path());
-
-    let result = bash
-        .execute(json!({"process_id": "bg_nonexistent_99999"}), &ctx)
-        .await
-        .unwrap();
-    assert!(result.is_error);
-    assert!(result.content.contains("not found"));
+    let store = make_store();
+    let timeout = std::time::Duration::from_secs(1);
+    let output =
+        loopal_tool_background::ops::bg_output(&store, "bg_nonexistent_99999", true, timeout).await;
+    assert!(output.is_error);
+    assert!(output.content.contains("not found"));
 }
 
-/// Bash(process_id=nonexistent, stop=true) returns error.
 #[tokio::test]
 async fn test_stop_nonexistent_process() {
-    let tmp = tempfile::tempdir().unwrap();
-    let bash = loopal_tool_bash::BashTool::new(make_store());
-    let ctx = make_ctx(tmp.path());
-
-    let result = bash
-        .execute(
-            json!({"process_id": "bg_nonexistent_99999", "stop": true}),
-            &ctx,
-        )
-        .await
-        .unwrap();
+    let store = make_store();
+    let result = loopal_tool_background::ops::bg_stop(&store, "bg_nonexistent_99999");
     assert!(result.is_error);
     assert!(result.content.contains("not found"));
 }
 
-/// Non-blocking output returns Running immediately.
 #[tokio::test]
 #[cfg(not(windows))]
 async fn test_non_blocking_output() {
     let tmp = tempfile::tempdir().unwrap();
     let store = make_store();
-    let bash = loopal_tool_bash::BashTool::new(store);
+    let bash = make_bash(store.clone());
     let ctx = make_ctx(tmp.path());
 
     let result = bash
@@ -73,24 +62,19 @@ async fn test_non_blocking_output() {
         .and_then(|l| l.strip_prefix("process_id: "))
         .unwrap();
 
-    let output = bash
-        .execute(json!({"process_id": pid, "block": false}), &ctx)
-        .await
-        .unwrap();
+    let timeout = std::time::Duration::from_secs(1);
+    let output = loopal_tool_background::ops::bg_output(&store, pid, false, timeout).await;
     assert!(output.content.contains("[Status: Running]"));
 
-    let _ = bash
-        .execute(json!({"process_id": pid, "stop": true}), &ctx)
-        .await;
+    loopal_tool_background::ops::bg_stop(&store, pid);
 }
 
-/// Blocking with short timeout returns timed-out status.
 #[tokio::test]
 #[cfg(not(windows))]
 async fn test_output_timeout() {
     let tmp = tempfile::tempdir().unwrap();
     let store = make_store();
-    let bash = loopal_tool_bash::BashTool::new(store);
+    let bash = make_bash(store.clone());
     let ctx = make_ctx(tmp.path());
 
     let result = bash
@@ -107,16 +91,9 @@ async fn test_output_timeout() {
         .and_then(|l| l.strip_prefix("process_id: "))
         .unwrap();
 
-    let output = bash
-        .execute(
-            json!({"process_id": pid, "block": true, "timeout": 1}),
-            &ctx,
-        )
-        .await
-        .unwrap();
+    let timeout = std::time::Duration::from_secs(1);
+    let output = loopal_tool_background::ops::bg_output(&store, pid, true, timeout).await;
     assert!(output.content.contains("timed out"));
 
-    let _ = bash
-        .execute(json!({"process_id": pid, "stop": true}), &ctx)
-        .await;
+    loopal_tool_background::ops::bg_stop(&store, pid);
 }

@@ -1,14 +1,27 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
-use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult};
-use serde_json::{Value, json};
+use loopal_tool_api::{PermissionLevel, ToolContext, ToolResult, TypedTool};
+use schemars::JsonSchema;
+use serde::Deserialize;
 
 use loopal_edit_core::omission_detector::detect_omissions;
 
 pub struct MultiEditTool;
 
+#[derive(Deserialize, JsonSchema)]
+pub struct EditItem {
+    pub old_string: String,
+    pub new_string: String,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct MultiEditParams {
+    pub file_path: String,
+    pub edits: Vec<EditItem>,
+}
+
 #[async_trait]
-impl Tool for MultiEditTool {
+impl TypedTool<MultiEditParams> for MultiEditTool {
     fn name(&self) -> &str {
         "MultiEdit"
     }
@@ -18,58 +31,27 @@ impl Tool for MultiEditTool {
          All edits succeed or none are applied."
     }
 
-    fn parameters_schema(&self) -> Value {
-        json!({
-            "type": "object",
-            "required": ["file_path", "edits"],
-            "properties": {
-                "file_path": {
-                    "type": "string",
-                    "description": "Path to the file to edit"
-                },
-                "edits": {
-                    "type": "array",
-                    "description": "Ordered list of search-and-replace edits",
-                    "items": {
-                        "type": "object",
-                        "required": ["old_string", "new_string"],
-                        "properties": {
-                            "old_string": { "type": "string" },
-                            "new_string": { "type": "string" }
-                        }
-                    }
-                }
-            }
-        })
-    }
-
     fn permission(&self) -> PermissionLevel {
         PermissionLevel::Write
     }
 
-    async fn execute(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
-        let file_path = require_str(&input, "file_path")?;
-        let edits = input["edits"]
-            .as_array()
-            .ok_or_else(|| tool_err("edits array is required"))?;
-
-        if edits.is_empty() {
+    async fn execute(
+        &self,
+        input: MultiEditParams,
+        ctx: &ToolContext,
+    ) -> Result<ToolResult, LoopalError> {
+        if input.edits.is_empty() {
             return Ok(ToolResult::error("edits array must not be empty"));
         }
 
-        // Read raw content via backend (path check + size limit + binary detect)
-        let content = match ctx.backend.read_raw(file_path).await {
+        let content = match ctx.backend.read_raw(&input.file_path).await {
             Ok(c) => c,
             Err(e) => return Ok(ToolResult::error(e.to_string())),
         };
 
-        // Apply all edits on an in-memory copy
         let mut current = content;
-        for (i, edit) in edits.iter().enumerate() {
-            let old_str = edit["old_string"].as_str().unwrap_or("");
-            let new_str = edit["new_string"].as_str().unwrap_or("");
-
-            let omissions = detect_omissions(new_str);
+        for (i, edit) in input.edits.iter().enumerate() {
+            let omissions = detect_omissions(&edit.new_string);
             if !omissions.is_empty() {
                 return Ok(ToolResult::error(format!(
                     "Edit {i}: omission detected in new_string: {}",
@@ -77,14 +59,14 @@ impl Tool for MultiEditTool {
                 )));
             }
 
-            let count = current.matches(old_str).count();
+            let count = current.matches(&edit.old_string).count();
             match count {
                 0 => {
                     return Ok(ToolResult::error(format!(
                         "Edit {i}: old_string not found in current content"
                     )));
                 }
-                1 => current = current.replacen(old_str, new_str, 1),
+                1 => current = current.replacen(&edit.old_string, &edit.new_string, 1),
                 n => {
                     return Ok(ToolResult::error(format!(
                         "Edit {i}: old_string found {n} times; must be unique"
@@ -93,23 +75,13 @@ impl Tool for MultiEditTool {
             }
         }
 
-        // Atomic write via backend
-        match ctx.backend.write(file_path, &current).await {
+        match ctx.backend.write(&input.file_path, &current).await {
             Ok(_) => Ok(ToolResult::success(format!(
-                "Applied {} edit(s) to {file_path}",
-                edits.len()
+                "Applied {} edit(s) to {}",
+                input.edits.len(),
+                input.file_path
             ))),
             Err(e) => Ok(ToolResult::error(e.to_string())),
         }
     }
-}
-
-fn require_str<'a>(input: &'a Value, key: &str) -> Result<&'a str, LoopalError> {
-    input[key]
-        .as_str()
-        .ok_or_else(|| tool_err(&format!("{key} is required")))
-}
-
-fn tool_err(msg: &str) -> LoopalError {
-    LoopalError::Tool(loopal_error::ToolError::InvalidInput(msg.into()))
 }

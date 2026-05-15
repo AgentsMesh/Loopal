@@ -1,5 +1,5 @@
-use loopal_tool_api::{Tool, ToolContext};
-use loopal_tool_write::WriteTool;
+use loopal_tool_api::{Tool, ToolContext, TypedBridge};
+use loopal_tool_write::{WriteParams, WriteTool};
 use serde_json::json;
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
@@ -11,12 +11,16 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     ToolContext::new(backend, "test")
 }
 
+fn make_tool() -> TypedBridge<WriteTool, WriteParams> {
+    TypedBridge::new(WriteTool)
+}
+
 #[tokio::test]
 async fn test_write_omission_in_content_returns_error() {
     let tmp = tempfile::tempdir().unwrap();
     let file = tmp.path().join("test.rs");
 
-    let tool = WriteTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool
@@ -32,7 +36,6 @@ async fn test_write_omission_in_content_returns_error() {
 
     assert!(result.is_error);
     assert!(result.content.contains("Omission detected"));
-    // File should not have been created
     assert!(!file.exists());
 }
 
@@ -42,7 +45,7 @@ async fn test_write_path_traversal_protection() {
     let cwd = tmp.path().join("inner");
     std::fs::create_dir_all(&cwd).unwrap();
 
-    let tool = WriteTool;
+    let tool = make_tool();
     let ctx = make_ctx(&cwd);
 
     let result = tool
@@ -58,15 +61,13 @@ async fn test_write_path_traversal_protection() {
 
     assert!(result.is_error);
     assert!(result.content.contains("path escapes working directory"));
-
-    // Verify file was not created outside cwd
     assert!(!tmp.path().join("outside.txt").exists());
 }
 
 #[tokio::test]
 async fn test_write_missing_file_path_returns_error() {
     let tmp = tempfile::tempdir().unwrap();
-    let tool = WriteTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool.execute(json!({"content": "something"}), &ctx).await;
@@ -79,7 +80,7 @@ async fn test_write_missing_content_returns_error() {
     let tmp = tempfile::tempdir().unwrap();
     let file = tmp.path().join("no_content.txt");
 
-    let tool = WriteTool;
+    let tool = make_tool();
     let ctx = make_ctx(tmp.path());
 
     let result = tool

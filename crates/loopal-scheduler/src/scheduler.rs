@@ -142,6 +142,10 @@ impl CronScheduler {
     /// processed by the background worker. Useful for tests and tooling
     /// that need a synchronization point against on-disk state without
     /// polling. No-op if the worker channel has closed.
+    ///
+    /// **Warning**: This method blocks until all pending saves complete.
+    /// Do NOT use in production startup paths — disk I/O latency would
+    /// block handshake and cause timeouts. Use only in tests or tooling.
     pub async fn wait_idle(&self) {
         let (tx, rx) = tokio::sync::oneshot::channel();
         if self.save_tx.send(SaveMessage::Barrier(tx)).await.is_err() {

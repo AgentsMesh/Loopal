@@ -37,6 +37,10 @@ impl Tool for MockExternalTool {
     fn permission(&self) -> PermissionLevel {
         PermissionLevel::ReadOnly
     }
+    fn secret_eligible_params(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     async fn execute(&self, input: Value, _ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
         let query = input["query"].as_str().unwrap_or("none");
         Ok(ToolResult::success(format!(
@@ -62,6 +66,10 @@ impl Tool for FailingExternalTool {
     fn permission(&self) -> PermissionLevel {
         PermissionLevel::ReadOnly
     }
+    fn secret_eligible_params(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     async fn execute(&self, _: Value, _: &ToolContext) -> Result<ToolResult, LoopalError> {
         Err(LoopalError::Tool(loopal_error::ToolError::ExecutionFailed(
             "simulated MCP transport failure".into(),

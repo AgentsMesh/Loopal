@@ -39,6 +39,10 @@ impl Tool for MockTool {
         PermissionLevel::ReadOnly
     }
 
+    fn secret_eligible_params(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     async fn execute(&self, _input: Value, _ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
         Ok(ToolResult::success("mock result"))
     }

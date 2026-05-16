@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
+use loopal_secret_runtime::{SECRET_REJECTION_MESSAGE, WIRE_REF_MARKER};
 use loopal_tool_api::{PermissionLevel, ToolContext, ToolResult, TypedTool};
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -33,6 +34,22 @@ impl TypedTool<MultiEditParams> for MultiEditTool {
 
     fn permission(&self) -> PermissionLevel {
         PermissionLevel::Write
+    }
+
+    fn secret_eligible_params(&self) -> &'static [&'static str] {
+        &[]
+    }
+
+    fn precheck(&self, input: &MultiEditParams) -> Option<String> {
+        if input.file_path.contains(WIRE_REF_MARKER) {
+            return Some(SECRET_REJECTION_MESSAGE.into());
+        }
+        for e in &input.edits {
+            if e.old_string.contains(WIRE_REF_MARKER) || e.new_string.contains(WIRE_REF_MARKER) {
+                return Some(SECRET_REJECTION_MESSAGE.into());
+            }
+        }
+        None
     }
 
     async fn execute(

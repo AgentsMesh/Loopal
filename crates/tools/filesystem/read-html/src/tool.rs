@@ -29,6 +29,10 @@ impl TypedTool<ReadHtmlParams> for ReadHtmlTool {
         PermissionLevel::ReadOnly
     }
 
+    fn secret_eligible_params(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     async fn execute(
         &self,
         input: ReadHtmlParams,

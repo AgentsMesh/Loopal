@@ -1,0 +1,42 @@
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+rust_library(
+    name = "loopal-secret-runtime",
+    srcs = glob(["src/**/*.rs"]),
+    edition = "2024",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//crates/loopal-vault-api",
+        "@crates//:aho-corasick",
+        "@crates//:chrono",
+        "@crates//:dirs",
+        "@crates//:once_cell",
+        "@crates//:regex",
+        "@crates//:secrecy",
+        "@crates//:serde",
+        "@crates//:serde_json",
+        "@crates//:tokio",
+        "@crates//:tracing",
+    ],
+    proc_macro_deps = [
+        "@crates//:async-trait",
+    ],
+)
+
+rust_test(
+    name = "loopal-secret-runtime_test",
+    srcs = glob(["tests/**/*.rs"], allow_empty = True),
+    crate_root = "tests/suite.rs",
+    edition = "2024",
+    deps = [
+        ":loopal-secret-runtime",
+        "//crates/loopal-vault-api",
+        "@crates//:secrecy",
+        "@crates//:serde_json",
+        "@crates//:tempfile",
+        "@crates//:tokio",
+    ],
+    proc_macro_deps = [
+        "@crates//:async-trait",
+    ],
+)

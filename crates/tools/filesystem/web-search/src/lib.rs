@@ -44,6 +44,10 @@ impl TypedTool<WebSearchParams> for WebSearchTool {
         PermissionLevel::ReadOnly
     }
 
+    fn secret_eligible_params(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     async fn execute(
         &self,
         input: WebSearchParams,

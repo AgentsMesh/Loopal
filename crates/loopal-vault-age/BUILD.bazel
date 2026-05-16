@@ -1,0 +1,41 @@
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+rust_library(
+    name = "loopal-vault-age",
+    srcs = glob(["src/**/*.rs"]),
+    edition = "2024",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//crates/loopal-vault-api",
+        "@crates//:age",
+        "@crates//:clap",
+        "@crates//:dirs",
+        "@crates//:once_cell",
+        "@crates//:regex",
+        "@crates//:secrecy",
+        "@crates//:serde",
+        "@crates//:serde_yaml",
+        "@crates//:tokio",
+    ],
+    proc_macro_deps = [
+        "@crates//:async-trait",
+    ],
+)
+
+rust_test(
+    name = "loopal-vault-age_test",
+    srcs = glob(["tests/**/*.rs"], allow_empty = True),
+    crate_root = "tests/suite.rs",
+    edition = "2024",
+    deps = [
+        ":loopal-vault-age",
+        "//crates/loopal-secret-runtime",
+        "//crates/loopal-vault-api",
+        "@crates//:secrecy",
+        "@crates//:tempfile",
+        "@crates//:tokio",
+    ],
+    proc_macro_deps = [
+        "@crates//:async-trait",
+    ],
+)

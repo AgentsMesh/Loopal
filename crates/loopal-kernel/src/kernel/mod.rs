@@ -11,6 +11,7 @@ use loopal_mcp::{McpManager, McpToolAdapter};
 use loopal_provider::ProviderRegistry;
 use loopal_tool_api::ToolDefinition;
 use loopal_tools::ToolRegistry;
+use loopal_vault_api::Vault;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 
@@ -29,6 +30,7 @@ pub struct Kernel {
     pub(super) mcp_prompts: Vec<(String, McpPrompt)>,
     settings: Settings,
     bg_store: Arc<BackgroundTaskStore>,
+    secrets: Option<Arc<dyn Vault>>,
 }
 
 impl Kernel {
@@ -57,7 +59,19 @@ impl Kernel {
             mcp_prompts: Vec::new(),
             settings,
             bg_store,
+            secrets: None,
         })
+    }
+
+    /// Inject the resolved secret store. Subsequent operations that need
+    /// secret access (MCP spawn, runtime tool args, prompt translation) use it.
+    pub fn set_secrets(&mut self, store: Arc<dyn Vault>) {
+        self.secrets = Some(store);
+    }
+
+    /// The currently-configured secret store, if any.
+    pub fn secrets(&self) -> Option<&Arc<dyn Vault>> {
+        self.secrets.as_ref()
     }
 
     /// Register an additional tool (thread-safe, can be called after Arc wrapping).
@@ -80,6 +94,9 @@ impl Kernel {
     pub async fn start_mcp(&mut self) -> Result<()> {
         if !self.settings.mcp_servers.is_empty() {
             let mut mgr = self.mcp_manager.write().await;
+            if let Some(ref store) = self.secrets {
+                mgr.set_secrets(store.clone());
+            }
             mgr.start_all(&self.settings.mcp_servers).await?;
             info!(
                 count = self.settings.mcp_servers.len(),

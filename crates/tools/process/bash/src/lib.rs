@@ -1,8 +1,10 @@
 mod bg_convert;
 mod bg_monitor;
+mod env_inject;
 pub mod format;
 pub mod strategy;
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -16,6 +18,8 @@ use serde::Deserialize;
 use loopal_config::CommandDecision;
 use loopal_sandbox::command_checker::check_command;
 use loopal_sandbox::security_inspector::{SecurityVerdict, inspect_command};
+
+use crate::env_inject::{build_env_override, validate_env};
 
 pub struct BashTool {
     store: Arc<BackgroundTaskStore>,
@@ -39,6 +43,12 @@ pub struct BashParams {
     pub run_in_background: Option<bool>,
     #[serde(default)]
     pub description: Option<String>,
+    /// Extra environment variables for the command. Values may contain
+    /// `<secret_ref:NAME>` placeholders that the runtime substitutes before
+    /// exec. Keys must match `^[A-Z_][A-Z0-9_]*$` and cannot override
+    /// PATH/LD_*/DYLD_*/HOME.
+    #[serde(default)]
+    pub env: Option<HashMap<String, String>>,
 }
 
 #[async_trait]
@@ -69,14 +79,24 @@ impl TypedTool<BashParams> for BashTool {
            - If dependent, chain them with '&&' in a single Bash call.\n\
            - DO NOT use newlines to separate commands.\n\
          - Avoid unnecessary `sleep` commands — diagnose root causes instead of retry loops.\n\
-         - For git commands: prefer new commits over amending; never skip hooks (--no-verify) unless asked."
+         - For git commands: prefer new commits over amending; never skip hooks (--no-verify) unless asked.\n\
+         - For secrets: use the `env` field with `<secret_ref:NAME>` placeholders\n\
+           (e.g. `env: { TOKEN: \"<secret_ref:openai_key>\" }`) instead of inlining \
+           secrets into `command` — env injection avoids leaking values to `ps`."
     }
 
     fn permission(&self) -> PermissionLevel {
         PermissionLevel::Dangerous
     }
 
+    fn secret_eligible_params(&self) -> &'static [&'static str] {
+        &["command", "env"]
+    }
+
     fn precheck(&self, input: &BashParams) -> Option<String> {
+        if let Some(reason) = validate_env(input.env.as_ref()) {
+            return Some(reason);
+        }
         if let CommandDecision::Deny(reason) = check_command(&input.command) {
             return Some(reason);
         }
@@ -91,9 +111,10 @@ impl TypedTool<BashParams> for BashTool {
         input: BashParams,
         ctx: &ToolContext,
     ) -> Result<ToolResult, LoopalError> {
+        let env = build_env_override(input.env.as_ref());
         if input.run_in_background.unwrap_or(false) {
             let desc = input.description.as_deref().unwrap_or(&input.command);
-            return match ctx.backend.exec_background(&input.command).await {
+            return match ctx.backend.exec_background(&input.command, &env).await {
                 Ok(handle) => {
                     let task_id = bg_convert::register_spawned(&self.store, handle, desc)
                         .unwrap_or_else(|| "(unknown)".into());
@@ -105,13 +126,14 @@ impl TypedTool<BashParams> for BashTool {
             };
         }
 
-        exec_foreground(&self.store, &input, ctx).await
+        exec_foreground(&self.store, &input, &env, ctx).await
     }
 }
 
 async fn exec_foreground(
     store: &BackgroundTaskStore,
     input: &BashParams,
+    env: &loopal_tool_api::backend_types::EnvOverride,
     ctx: &ToolContext,
 ) -> Result<ToolResult, LoopalError> {
     let timeout_secs = input.timeout.unwrap_or(DEFAULT_TIMEOUT_SECS);
@@ -119,11 +141,11 @@ async fn exec_foreground(
 
     let exec_result = if let Some(ref tail) = ctx.output_tail {
         ctx.backend
-            .exec_streaming(&input.command, timeout, tail.clone())
+            .exec_streaming(&input.command, timeout, env, tail.clone())
             .await
     } else {
         ctx.backend
-            .exec(&input.command, timeout)
+            .exec(&input.command, timeout, env)
             .await
             .map(ExecOutcome::Completed)
     };

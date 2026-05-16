@@ -41,6 +41,10 @@ impl TypedTool<FetchParams> for FetchTool {
         PermissionLevel::ReadOnly
     }
 
+    fn secret_eligible_params(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     async fn execute(
         &self,
         input: FetchParams,

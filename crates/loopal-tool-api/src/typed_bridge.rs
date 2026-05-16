@@ -66,6 +66,10 @@ impl<T: TypedTool<P>, P: Params> Tool for TypedBridge<T, P> {
         self.inner.dispatch()
     }
 
+    fn secret_eligible_params(&self) -> &'static [&'static str] {
+        self.inner.secret_eligible_params()
+    }
+
     fn precheck(&self, input: &Value) -> Option<String> {
         let mut normalized = input.clone();
         strip_empty_optionals(&mut normalized, &self.required_fields());

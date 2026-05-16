@@ -36,7 +36,14 @@ pub(crate) async fn build_kernel_from_config(
     production: bool,
     depth: u32,
 ) -> anyhow::Result<Arc<Kernel>> {
-    let mut kernel = Kernel::new(config.settings.clone())?;
+    let mut settings = config.settings.clone();
+    if let Some(store) = config.secrets.as_ref() {
+        expand_provider_secrets(&mut settings, store.as_ref()).await;
+    }
+    let mut kernel = Kernel::new(settings)?;
+    if let Some(store) = config.secrets.as_ref() {
+        kernel.set_secrets(store.clone());
+    }
     if depth == 0 {
         kernel.register_goal_tools();
     }
@@ -86,5 +93,31 @@ pub fn apply_start_overrides(settings: &mut loopal_config::Settings, start: &Sta
     }
     if start.no_sandbox {
         settings.sandbox.policy = loopal_config::SandboxPolicy::Disabled;
+    }
+}
+
+async fn expand_provider_secrets(
+    settings: &mut loopal_config::Settings,
+    store: &dyn loopal_vault_api::Vault,
+) {
+    for slot in [
+        &mut settings.providers.anthropic,
+        &mut settings.providers.openai,
+        &mut settings.providers.google,
+    ] {
+        if let Some(cfg) = slot.as_mut() {
+            if let Some(k) = cfg.api_key.as_mut() {
+                *k = loopal_secret_runtime::expand_to_plaintext(k, store).await;
+            }
+            if let Some(u) = cfg.base_url.as_mut() {
+                *u = loopal_secret_runtime::expand_to_plaintext(u, store).await;
+            }
+        }
+    }
+    for cfg in settings.providers.openai_compat.iter_mut() {
+        cfg.base_url = loopal_secret_runtime::expand_to_plaintext(&cfg.base_url, store).await;
+        if let Some(k) = cfg.api_key.as_mut() {
+            *k = loopal_secret_runtime::expand_to_plaintext(k, store).await;
+        }
     }
 }

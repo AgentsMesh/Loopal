@@ -1,4 +1,7 @@
+use std::sync::Arc;
+
 use indexmap::IndexMap;
+use loopal_vault_api::Vault;
 
 use crate::hook::HookConfig;
 use crate::layer::LayerSource;
@@ -6,7 +9,7 @@ use crate::settings::{McpServerConfig, Settings};
 use crate::skills::Skill;
 
 /// Fully resolved configuration after merging all layers.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ResolvedConfig {
     /// Deserialized settings (model, providers, sandbox, etc.)
     pub settings: Settings,
@@ -25,6 +28,26 @@ pub struct ResolvedConfig {
     pub classifier_prompt: Option<String>,
     /// Layer sources in merge order (for debugging)
     pub layers: Vec<LayerSource>,
+    /// Encrypted secrets vault. None when no vault is configured, or when SSH
+    /// identity discovery failed. The store is lazy: instantiating it does not
+    /// decrypt the vault.
+    pub secrets: Option<Arc<dyn Vault>>,
+}
+
+impl std::fmt::Debug for ResolvedConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ResolvedConfig")
+            .field("settings", &self.settings)
+            .field("mcp_servers", &self.mcp_servers)
+            .field("skills", &self.skills)
+            .field("hooks", &self.hooks)
+            .field("instructions", &self.instructions)
+            .field("memory", &self.memory)
+            .field("classifier_prompt", &self.classifier_prompt)
+            .field("layers", &self.layers)
+            .field("secrets", &self.secrets.is_some())
+            .finish()
+    }
 }
 
 /// An MCP server config with its originating layer.

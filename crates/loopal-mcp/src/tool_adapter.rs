@@ -57,6 +57,10 @@ impl Tool for McpToolAdapter {
         PermissionLevel::Write
     }
 
+    fn secret_eligible_params(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     async fn execute(&self, input: Value, _ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
         let mcp_span =
             tracing::info_span!("mcp_tool_call", mcp.tool = self.definition.name.as_str());

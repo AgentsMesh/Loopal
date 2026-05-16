@@ -7,6 +7,7 @@ rust_library(
     visibility = ["//visibility:public"],
     deps = [
         "//crates/loopal-error:loopal-error",
+        "//crates/loopal-secret-runtime",
         "//crates/loopal-tool-api:loopal-tool-api",
         "//crates/tools/filesystem/edit-core:loopal-edit-core",
         "@crates//:schemars",

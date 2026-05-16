@@ -1,6 +1,8 @@
 use std::fmt;
 use std::sync::Arc;
 
+use loopal_vault_api::Vault;
+
 use crate::backend::Backend;
 use crate::goal_session::GoalSession;
 use crate::memory_channel::MemoryChannel;
@@ -17,6 +19,7 @@ pub struct ToolContext {
     pub one_shot_chat: Option<Arc<dyn OneShotChatService>>,
     pub fetch_refiner_policy: Option<Arc<dyn FetchRefinerPolicy>>,
     pub goal_session: Option<Arc<dyn GoalSession>>,
+    pub secrets: Option<Arc<dyn Vault>>,
 }
 
 impl ToolContext {
@@ -30,6 +33,7 @@ impl ToolContext {
             one_shot_chat: None,
             fetch_refiner_policy: None,
             goal_session: None,
+            secrets: None,
         }
     }
 
@@ -87,6 +91,16 @@ impl ToolContext {
         self.goal_session = g;
         self
     }
+
+    pub fn with_secrets(mut self, s: Arc<dyn Vault>) -> Self {
+        self.secrets = Some(s);
+        self
+    }
+
+    pub fn with_secrets_opt(mut self, s: Option<Arc<dyn Vault>>) -> Self {
+        self.secrets = s;
+        self
+    }
 }
 
 impl Clone for ToolContext {
@@ -100,6 +114,7 @@ impl Clone for ToolContext {
             one_shot_chat: self.one_shot_chat.clone(),
             fetch_refiner_policy: self.fetch_refiner_policy.clone(),
             goal_session: self.goal_session.clone(),
+            secrets: self.secrets.clone(),
         }
     }
 }

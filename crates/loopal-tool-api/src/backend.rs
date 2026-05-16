@@ -6,8 +6,8 @@ use async_trait::async_trait;
 use loopal_error::{ProcessHandle, ToolIoError};
 
 use crate::backend_types::{
-    EditResult, ExecResult, FetchResult, FileInfo, GlobOptions, GlobSearchResult, GrepOptions,
-    GrepSearchResult, LsResult, ReadResult, WriteResult,
+    EditResult, EnvOverride, ExecResult, FetchResult, FileInfo, GlobOptions, GlobSearchResult,
+    GrepOptions, GrepSearchResult, LsResult, ReadResult, WriteResult,
 };
 use crate::output_tail::OutputTail;
 
@@ -100,7 +100,15 @@ pub trait Backend: Send + Sync {
     // --- Command execution ---
 
     /// Execute a shell command synchronously (with timeout).
-    async fn exec(&self, command: &str, timeout: Duration) -> Result<ExecResult, ToolIoError>;
+    ///
+    /// `env` overrides are applied AFTER sandbox env_clear, so secret values
+    /// reliably reach the child process without being stripped.
+    async fn exec(
+        &self,
+        command: &str,
+        timeout: Duration,
+        env: &EnvOverride,
+    ) -> Result<ExecResult, ToolIoError>;
 
     /// Execute a shell command with streaming output capture.
     ///
@@ -114,9 +122,10 @@ pub trait Backend: Send + Sync {
         &self,
         command: &str,
         timeout: Duration,
+        env: &EnvOverride,
         _tail: Arc<OutputTail>,
     ) -> Result<ExecOutcome, ToolIoError> {
-        self.exec(command, timeout)
+        self.exec(command, timeout, env)
             .await
             .map(ExecOutcome::Completed)
     }
@@ -126,7 +135,11 @@ pub trait Backend: Send + Sync {
     /// Returns a [`ProcessHandle`](loopal_error::ProcessHandle) carrying the
     /// child process.  The caller is responsible for registering it in the
     /// background task store and monitoring it.
-    async fn exec_background(&self, command: &str) -> Result<ProcessHandle, ToolIoError>;
+    async fn exec_background(
+        &self,
+        command: &str,
+        env: &EnvOverride,
+    ) -> Result<ProcessHandle, ToolIoError>;
 
     // --- Network ---
 

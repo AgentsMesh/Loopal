@@ -9,12 +9,14 @@ use indexmap::IndexMap;
 use loopal_config::McpServerConfig;
 use loopal_error::McpError;
 use loopal_tool_api::ToolDefinition;
+use loopal_vault_api::Vault;
 use rmcp::model::CallToolResult;
 use serde_json::Value;
 use tracing::{debug, info, warn};
 
 use crate::connection::McpConnection;
 use crate::handler::SamplingCallback;
+use crate::secret_expand::expand_mcp_config;
 
 /// Manages multiple MCP server connections and tool routing.
 pub struct McpManager {
@@ -23,6 +25,9 @@ pub struct McpManager {
     pub(crate) tool_map: HashMap<String, String>,
     /// Shared sampling callback for all connections.
     sampling: Option<Arc<dyn SamplingCallback>>,
+    /// Optional secret store for resolving `{{secret:X}}` placeholders in
+    /// env / headers / url at spawn time.
+    secrets: Option<Arc<dyn Vault>>,
 }
 
 impl McpManager {
@@ -31,12 +36,19 @@ impl McpManager {
             connections: IndexMap::new(),
             tool_map: HashMap::new(),
             sampling: None,
+            secrets: None,
         }
     }
 
     /// Set the sampling callback for MCP server-initiated LLM calls.
     pub fn set_sampling(&mut self, callback: Arc<dyn SamplingCallback>) {
         self.sampling = Some(callback);
+    }
+
+    /// Configure the secret store used to expand `{{secret:X}}` placeholders
+    /// in MCP server configs before spawn.
+    pub fn set_secrets(&mut self, store: Arc<dyn Vault>) {
+        self.secrets = Some(store);
     }
 
     /// Start all configured MCP servers.
@@ -47,9 +59,16 @@ impl McpManager {
         &mut self,
         configs: &IndexMap<String, McpServerConfig>,
     ) -> Result<(), McpError> {
+        // Phase 0: expand secret placeholders in configs.
+        let mut expanded: IndexMap<String, McpServerConfig> = IndexMap::new();
+        for (name, cfg) in configs {
+            let resolved = expand_mcp_config(cfg.clone(), self.secrets.as_ref()).await;
+            expanded.insert(name.clone(), resolved);
+        }
+
         // Phase 1: connect all enabled servers concurrently.
         let mut futures = Vec::new();
-        for (name, config) in configs {
+        for (name, config) in &expanded {
             if !config.enabled() {
                 info!(server = %name, "MCP server disabled, skipping");
                 continue;

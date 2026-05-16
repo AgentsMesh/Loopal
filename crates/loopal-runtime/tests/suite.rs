@@ -1,6 +1,8 @@
 // Single test binary — includes all test modules
 #[path = "agent_loop/mod.rs"]
 mod agent_loop;
+#[path = "suite/bash_real_subprocess_test.rs"]
+mod bash_real_subprocess_test;
 #[path = "suite/classifier_permission_handler_support.rs"]
 mod classifier_permission_handler_support;
 #[path = "suite/classifier_permission_handler_test.rs"]
@@ -59,6 +61,8 @@ mod question_parse_test;
 mod rewind_test;
 #[path = "suite/sandbox_precheck_test.rs"]
 mod sandbox_precheck_test;
+#[path = "suite/secrets_pipeline_test.rs"]
+mod secrets_pipeline_test;
 #[path = "suite/session_manager_test.rs"]
 mod session_manager_test;
 #[path = "suite/session_test.rs"]
@@ -67,3 +71,5 @@ mod session_test;
 mod tool_pipeline_hooks_test;
 #[path = "suite/tool_pipeline_test.rs"]
 mod tool_pipeline_test;
+#[path = "suite/tracing_sentinel_test.rs"]
+mod tracing_sentinel_test;

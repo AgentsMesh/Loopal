@@ -21,6 +21,10 @@ impl Tool for DummyTool {
     fn permission(&self) -> PermissionLevel {
         self.perm
     }
+    fn secret_eligible_params(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     async fn execute(
         &self,
         _input: serde_json::Value,

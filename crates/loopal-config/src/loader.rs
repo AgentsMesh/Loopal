@@ -128,5 +128,32 @@ pub fn load_layer_from_dir(
 
     layer.classifier_prompt = read_text_bounded(&dir.join("classifier.md"), TEXT_BYTE_LIMIT);
 
+    // vaults/ — directory containing N <name>.vault/ subdirs (path-only;
+    // lazy decryption in runtime). For Project layer we walk up the tree so
+    // a sub-agent with cwd_override into a sub-directory still resolves to
+    // the parent's vaults.
+    layer.vaults_dir = find_vaults_dir(dir);
+
     Ok(layer)
+}
+
+fn find_vaults_dir(start: &Path) -> Option<std::path::PathBuf> {
+    let direct = start.join("vaults");
+    if direct.is_dir() {
+        return Some(direct);
+    }
+    // Walk up looking for `.loopal/vaults/` — Project layer's dir is
+    // `<root>/.loopal`, so we ascend from its parent.
+    let mut current = start.parent()?.parent()?;
+    loop {
+        let candidate = current.join(".loopal").join("vaults");
+        if candidate.is_dir() {
+            return Some(candidate);
+        }
+        current = match current.parent() {
+            Some(p) => p,
+            None => break,
+        };
+    }
+    None
 }

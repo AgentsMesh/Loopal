@@ -70,7 +70,8 @@ impl AgentLoopRunner {
         .with_memory_channel_opt(params.memory_channel.clone())
         .with_one_shot_chat_opt(params.one_shot_chat.clone())
         .with_fetch_refiner_policy_opt(params.fetch_refiner_policy.clone())
-        .with_goal_session_opt(goal_adapter);
+        .with_goal_session_opt(goal_adapter)
+        .with_secrets_opt(params.deps.kernel.secrets().cloned());
         let model_config = ModelConfig::from_model(
             params.config.model(),
             params.config.thinking_config.clone(),

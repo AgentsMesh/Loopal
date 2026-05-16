@@ -189,3 +189,23 @@ impl std::fmt::Display for TimeoutSecs {
         write!(f, "{}s", self.0)
     }
 }
+
+#[derive(Debug, Clone, Default)]
+pub struct EnvOverride {
+    pub vars: std::collections::HashMap<String, String>,
+}
+
+impl EnvOverride {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.vars.insert(key.into(), value.into());
+        self
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.vars.is_empty()
+    }
+}

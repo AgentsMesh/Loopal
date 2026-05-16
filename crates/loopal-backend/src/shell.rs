@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use loopal_config::ResolvedPolicy;
 use loopal_error::ToolIoError;
-use loopal_tool_api::backend_types::ExecResult;
+use loopal_tool_api::backend_types::{EnvOverride, ExecResult};
 use loopal_tool_api::handle_overflow;
 use tokio::process::Command;
 
@@ -20,6 +20,7 @@ pub async fn exec_command(
     cwd: &Path,
     policy: Option<&ResolvedPolicy>,
     command: &str,
+    env_overrides: &EnvOverride,
     timeout: Duration,
     limits: &ResourceLimits,
 ) -> Result<ExecResult, ToolIoError> {
@@ -32,6 +33,9 @@ pub async fn exec_command(
         for (k, v) in env_map {
             cmd.env(k, v);
         }
+    }
+    for (k, v) in &env_overrides.vars {
+        cmd.env(k, v);
     }
 
     let output = tokio::time::timeout(timeout, cmd.output())
@@ -74,6 +78,7 @@ pub async fn exec_background(
     cwd: &Path,
     policy: Option<&ResolvedPolicy>,
     command: &str,
+    env_overrides: &EnvOverride,
 ) -> Result<SpawnedBackgroundData, ToolIoError> {
     use std::process::Stdio;
 
@@ -90,6 +95,9 @@ pub async fn exec_background(
         for (k, v) in env_map {
             cmd.env(k, v);
         }
+    }
+    for (k, v) in &env_overrides.vars {
+        cmd.env(k, v);
     }
 
     let child = cmd

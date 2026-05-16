@@ -25,6 +25,9 @@ mod bash_execution_test;
 #[path = "bash_precheck_test.rs"]
 mod bash_precheck_test;
 
+#[path = "bash_env_test.rs"]
+mod bash_env_test;
+
 #[path = "bash_format_test.rs"]
 mod bash_format_test;
 

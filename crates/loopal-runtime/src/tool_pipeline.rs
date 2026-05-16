@@ -63,6 +63,16 @@ pub async fn execute_tool(
         }
     }
 
+    // ── Hook 2: Resolve <secret_ref:NAME> → plaintext (whitelist only) ─
+    let redactor_seed = loopal_secret_runtime::apply_resolver(
+        name,
+        &mut effective_input,
+        tool.secret_eligible_params(),
+        ctx.secrets.as_ref(),
+        &ctx.session_id,
+    )
+    .await;
+
     // ── Execute ────────────────────────────────────────────────
     let tool_span = tracing::info_span!("tool_exec", tool.name = name);
     let result = async {
@@ -84,6 +94,18 @@ pub async fn execute_tool(
     }
     .instrument(tool_span)
     .await?;
+
+    // ── Hook 3: Redact plaintext → <secret_ref:NAME> BEFORE overflow ────
+    let result = ToolResult {
+        content: loopal_secret_runtime::apply_redactor(
+            name,
+            result.content,
+            &redactor_seed,
+            &ctx.session_id,
+        ),
+        is_error: result.is_error,
+        metadata: result.metadata,
+    };
 
     // ── Overflow-to-file ───────────────────────────────────────
     let overflow = handle_overflow(&result.content, MAX_RESULT_LINES, MAX_RESULT_BYTES, name);

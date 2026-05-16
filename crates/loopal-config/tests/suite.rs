@@ -17,6 +17,8 @@ mod loader_settings_test;
 mod loader_unit_test;
 #[path = "suite/locations_test.rs"]
 mod locations_test;
+#[path = "suite/local_writer_test.rs"]
+mod local_writer_test;
 #[path = "suite/mcp_json_test.rs"]
 mod mcp_json_test;
 #[path = "suite/plugin_test.rs"]

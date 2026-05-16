@@ -23,12 +23,12 @@ pub fn update_local_settings_field(
     if current.is_null() {
         current = serde_json::Value::Object(serde_json::Map::new());
     }
-    let obj = current.as_object_mut().ok_or_else(|| {
-        ConfigError::InvalidValue {
+    let obj = current
+        .as_object_mut()
+        .ok_or_else(|| ConfigError::InvalidValue {
             field: path.display().to_string(),
             reason: "top-level JSON is not an object".into(),
-        }
-    })?;
+        })?;
     obj.insert(key.to_string(), value);
 
     if let Some(parent) = path.parent() {
@@ -41,11 +41,9 @@ pub fn update_local_settings_field(
 
 fn atomic_write(path: &Path, data: &[u8]) -> Result<(), LoopalError> {
     use std::io::Write;
-    let parent = path.parent().ok_or_else(|| {
-        ConfigError::InvalidValue {
-            field: path.display().to_string(),
-            reason: "path has no parent directory".into(),
-        }
+    let parent = path.parent().ok_or_else(|| ConfigError::InvalidValue {
+        field: path.display().to_string(),
+        reason: "path has no parent directory".into(),
     })?;
     let tmp = parent.join(format!(
         ".{}.tmp.{}",

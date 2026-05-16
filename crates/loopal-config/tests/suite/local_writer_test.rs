@@ -66,11 +66,7 @@ fn overwrites_existing_key() {
         v["thinking"],
         serde_json::json!({"type": "effort", "level": "low"})
     );
-    assert_eq!(
-        v.as_object().unwrap().len(),
-        1,
-        "no duplicate key entries"
-    );
+    assert_eq!(v.as_object().unwrap().len(), 1, "no duplicate key entries");
 }
 
 #[test]
@@ -83,7 +79,10 @@ fn rejects_non_object_root() {
     let err = update_local_settings_field(tmp.path(), "thinking", serde_json::json!({}))
         .expect_err("should fail on non-object root");
     let msg = format!("{err}");
-    assert!(msg.contains("not an object"), "error should mention object: {msg}");
+    assert!(
+        msg.contains("not an object"),
+        "error should mention object: {msg}"
+    );
 }
 
 #[test]

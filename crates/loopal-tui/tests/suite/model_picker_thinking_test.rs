@@ -32,11 +32,26 @@ fn picker_with_five_thinking() -> PickerState {
         filter_cursor: 0,
         selected: 0,
         thinking_options: vec![
-            ThinkingOption { label: "Auto", value: r#"{"type":"auto"}"#.into() },
-            ThinkingOption { label: "Low", value: r#"{"type":"effort","level":"low"}"#.into() },
-            ThinkingOption { label: "Medium", value: r#"{"type":"effort","level":"medium"}"#.into() },
-            ThinkingOption { label: "High", value: r#"{"type":"effort","level":"high"}"#.into() },
-            ThinkingOption { label: "Disabled", value: r#"{"type":"disabled"}"#.into() },
+            ThinkingOption {
+                label: "Auto",
+                value: r#"{"type":"auto"}"#.into(),
+            },
+            ThinkingOption {
+                label: "Low",
+                value: r#"{"type":"effort","level":"low"}"#.into(),
+            },
+            ThinkingOption {
+                label: "Medium",
+                value: r#"{"type":"effort","level":"medium"}"#.into(),
+            },
+            ThinkingOption {
+                label: "High",
+                value: r#"{"type":"effort","level":"high"}"#.into(),
+            },
+            ThinkingOption {
+                label: "Disabled",
+                value: r#"{"type":"disabled"}"#.into(),
+            },
         ],
         thinking_selected: 0,
     }
@@ -62,7 +77,11 @@ fn left_arrow_wraps_to_last() {
     let mut app = make_app();
     app.sub_page = Some(SubPage::ModelPicker(picker_with_five_thinking()));
     handle_key(&mut app, key(KeyCode::Left));
-    assert_eq!(read_thinking_selected(&app), 4, "Left from 0 must wrap to last");
+    assert_eq!(
+        read_thinking_selected(&app),
+        4,
+        "Left from 0 must wrap to last"
+    );
 }
 
 fn key_release(code: KeyCode) -> KeyEvent {
@@ -118,5 +137,9 @@ fn filter_chars_do_not_affect_thinking_selected() {
     }];
     app.sub_page = Some(SubPage::ModelPicker(p));
     handle_key(&mut app, key(KeyCode::Char('c')));
-    assert_eq!(read_thinking_selected(&app), 0, "typing filter must not move thinking");
+    assert_eq!(
+        read_thinking_selected(&app),
+        0,
+        "typing filter must not move thinking"
+    );
 }

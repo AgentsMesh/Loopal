@@ -72,6 +72,10 @@ impl Tool for CronCreateTool {
         PermissionLevel::Write
     }
 
+    fn secret_eligible_params(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     async fn execute(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
         let cron_expr = input["cron"].as_str().ok_or(LoopalError::Tool(
             loopal_error::ToolError::InvalidInput("cron is required".into()),
@@ -136,6 +140,10 @@ impl Tool for CronDeleteTool {
         PermissionLevel::Write
     }
 
+    fn secret_eligible_params(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     async fn execute(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
         let id = input["id"].as_str().ok_or(LoopalError::Tool(
             loopal_error::ToolError::InvalidInput("id is required".into()),
@@ -174,6 +182,10 @@ impl Tool for CronListTool {
 
     fn permission(&self) -> PermissionLevel {
         PermissionLevel::ReadOnly
+    }
+
+    fn secret_eligible_params(&self) -> &'static [&'static str] {
+        &[]
     }
 
     async fn execute(&self, _input: Value, ctx: &ToolContext) -> Result<ToolResult, LoopalError> {

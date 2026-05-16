@@ -16,9 +16,9 @@ pub mod typed_tool;
 
 pub use backend::{Backend, ExecOutcome};
 pub use backend_types::{
-    EditResult, ExecResult, FetchResult, FileInfo, FileMatchResult, GlobEntry, GlobOptions,
-    GlobSearchResult, GrepOptions, GrepSearchResult, LsEntry, LsResult, MatchGroup, MatchLine,
-    ReadResult, TimeoutSecs, WriteResult,
+    EditResult, EnvOverride, ExecResult, FetchResult, FileInfo, FileMatchResult, GlobEntry,
+    GlobOptions, GlobSearchResult, GrepOptions, GrepSearchResult, LsEntry, LsResult, MatchGroup,
+    MatchLine, ReadResult, TimeoutSecs, WriteResult,
 };
 pub use goal_session::{GoalSession, GoalSessionError};
 pub use memory_channel::MemoryChannel;

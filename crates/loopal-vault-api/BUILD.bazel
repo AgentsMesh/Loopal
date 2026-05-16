@@ -1,0 +1,22 @@
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+rust_library(
+    name = "loopal-vault-api",
+    srcs = glob(["src/**/*.rs"]),
+    edition = "2024",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@crates//:secrecy",
+        "@crates//:serde",
+        "@crates//:thiserror",
+    ],
+    proc_macro_deps = [
+        "@crates//:async-trait",
+    ],
+)
+
+rust_test(
+    name = "loopal-vault-api-unit-test",
+    crate = ":loopal-vault-api",
+    edition = "2024",
+)

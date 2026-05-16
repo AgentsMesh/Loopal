@@ -27,6 +27,10 @@ impl TypedTool<EnterPlanModeParams> for EnterPlanModeTool {
         PermissionLevel::ReadOnly
     }
 
+    fn secret_eligible_params(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     fn dispatch(&self) -> ToolDispatch {
         ToolDispatch::RunnerDirect
     }
@@ -62,6 +66,10 @@ impl TypedTool<ExitPlanModeParams> for ExitPlanModeTool {
 
     fn permission(&self) -> PermissionLevel {
         PermissionLevel::ReadOnly
+    }
+
+    fn secret_eligible_params(&self) -> &'static [&'static str] {
+        &[]
     }
 
     fn dispatch(&self) -> ToolDispatch {

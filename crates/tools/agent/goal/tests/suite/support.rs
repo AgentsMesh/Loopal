@@ -6,8 +6,8 @@ use async_trait::async_trait;
 use loopal_error::{ProcessHandle, ToolIoError};
 use loopal_protocol::{ThreadGoal, ThreadGoalStatus};
 use loopal_tool_api::backend_types::{
-    EditResult, ExecResult, FetchResult, FileInfo, GlobOptions, GlobSearchResult, GrepOptions,
-    GrepSearchResult, LsResult, ReadResult, WriteResult,
+    EditResult, EnvOverride, ExecResult, FetchResult, FileInfo, GlobOptions, GlobSearchResult,
+    GrepOptions, GrepSearchResult, LsResult, ReadResult, WriteResult,
 };
 use loopal_tool_api::{
     Backend, ExecOutcome, GoalSession, GoalSessionError, Tool, ToolContext, TypedBridge,
@@ -74,18 +74,23 @@ impl Backend for PanicBackend {
     fn cwd(&self) -> &Path {
         Path::new("/tmp")
     }
-    async fn exec(&self, _: &str, _: Duration) -> Result<ExecResult, ToolIoError> {
+    async fn exec(&self, _: &str, _: Duration, _: &EnvOverride) -> Result<ExecResult, ToolIoError> {
         unimplemented!()
     }
     async fn exec_streaming(
         &self,
         _: &str,
         _: Duration,
+        _: &EnvOverride,
         _: Arc<loopal_tool_api::output_tail::OutputTail>,
     ) -> Result<ExecOutcome, ToolIoError> {
         unimplemented!()
     }
-    async fn exec_background(&self, _: &str) -> Result<ProcessHandle, ToolIoError> {
+    async fn exec_background(
+        &self,
+        _: &str,
+        _: &EnvOverride,
+    ) -> Result<ProcessHandle, ToolIoError> {
         unimplemented!()
     }
     async fn fetch(&self, _: &str) -> Result<FetchResult, ToolIoError> {

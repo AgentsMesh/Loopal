@@ -28,8 +28,39 @@ use worktree_session::{
 pub(crate) use discovery::is_alive;
 
 pub async fn run() -> anyhow::Result<()> {
-    let cli = Cli::parse();
+    let raw_args: Vec<String> = std::env::args().collect();
     let cwd = std::env::current_dir()?;
+
+    // Peek for `loopal vault[@name] <...>` or `loopal vaults <...>` and
+    // dispatch to the independent clap parsers inside loopal-vault-age.
+    // Done before main `Cli::parse()` so it doesn't conflict with the prompt
+    // positional. To prompt the agent about vault topics, quote the string:
+    // `loopal "explain vault ..."`.
+    if let Some(first) = raw_args.get(1).map(|s| s.as_str()) {
+        if first == "vaults" {
+            let mut sub_argv = vec!["loopal vaults".to_string()];
+            sub_argv.extend(raw_args.iter().skip(2).cloned());
+            let code = loopal_vault_age::cli::dispatch_vaults(sub_argv, &cwd).await;
+            std::process::exit(code);
+        }
+        if first == "vault" || first.starts_with("vault@") {
+            let vault_name = if first == "vault" {
+                loopal_vault_age::cli::DEFAULT_VAULT_NAME.to_string()
+            } else {
+                first.trim_start_matches("vault@").to_string()
+            };
+            if let Err(e) = loopal_vault_age::cli::validate_vault_name(&vault_name) {
+                eprintln!("{e}");
+                std::process::exit(2);
+            }
+            let mut sub_argv = vec!["loopal vault".to_string()];
+            sub_argv.extend(raw_args.iter().skip(2).cloned());
+            let code = loopal_vault_age::cli::dispatch_vault(sub_argv, &cwd, &vault_name).await;
+            std::process::exit(code);
+        }
+    }
+
+    let cli = Cli::parse();
 
     loopal_config::housekeeping::startup_cleanup();
     if let Some(repo_root) = loopal_git::repo_root(&cwd) {

@@ -144,11 +144,17 @@ impl Backend for LocalBackend {
         &self.cwd
     }
 
-    async fn exec(&self, command: &str, timeout: Duration) -> Result<ExecResult, ToolIoError> {
+    async fn exec(
+        &self,
+        command: &str,
+        timeout: Duration,
+        env: &loopal_tool_api::backend_types::EnvOverride,
+    ) -> Result<ExecResult, ToolIoError> {
         shell::exec_command(
             &self.cwd,
             self.policy.as_ref(),
             command,
+            env,
             timeout,
             &self.limits,
         )
@@ -159,12 +165,14 @@ impl Backend for LocalBackend {
         &self,
         command: &str,
         timeout: Duration,
+        env: &loopal_tool_api::backend_types::EnvOverride,
         tail: Arc<loopal_tool_api::OutputTail>,
     ) -> Result<ExecOutcome, ToolIoError> {
         shell_stream::exec_command_streaming(
             &self.cwd,
             self.policy.as_ref(),
             command,
+            env,
             timeout,
             &self.limits,
             tail,
@@ -172,8 +180,12 @@ impl Backend for LocalBackend {
         .await
     }
 
-    async fn exec_background(&self, command: &str) -> Result<ProcessHandle, ToolIoError> {
-        let data = shell::exec_background(&self.cwd, self.policy.as_ref(), command).await?;
+    async fn exec_background(
+        &self,
+        command: &str,
+        env: &loopal_tool_api::backend_types::EnvOverride,
+    ) -> Result<ProcessHandle, ToolIoError> {
+        let data = shell::exec_background(&self.cwd, self.policy.as_ref(), command, env).await?;
         Ok(ProcessHandle(Box::new(data)))
     }
 

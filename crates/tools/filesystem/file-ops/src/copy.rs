@@ -26,6 +26,10 @@ impl TypedTool<CopyFileParams> for CopyFileTool {
         PermissionLevel::Write
     }
 
+    fn secret_eligible_params(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     async fn execute(
         &self,
         input: CopyFileParams,

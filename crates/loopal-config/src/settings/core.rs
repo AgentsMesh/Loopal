@@ -65,6 +65,9 @@ pub struct Settings {
 
     #[serde(default)]
     pub goals: GoalSettings,
+
+    #[serde(default)]
+    pub secrets: super::secrets::SecretsSettings,
 }
 
 impl Default for Settings {
@@ -87,6 +90,7 @@ impl Default for Settings {
             telemetry: TelemetryConfig::default(),
             fetch_refiner: FetchRefinerConfig::default(),
             goals: GoalSettings::default(),
+            secrets: super::secrets::SecretsSettings::default(),
         }
     }
 }

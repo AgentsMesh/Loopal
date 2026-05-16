@@ -33,6 +33,10 @@ impl TypedTool<CreateGoalParams> for CreateGoalTool {
         PermissionLevel::Write
     }
 
+    fn secret_eligible_params(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     async fn execute(
         &self,
         input: CreateGoalParams,

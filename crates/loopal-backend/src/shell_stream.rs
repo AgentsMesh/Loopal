@@ -15,7 +15,7 @@ use std::time::Duration;
 use loopal_config::ResolvedPolicy;
 use loopal_error::{ProcessHandle, ToolIoError};
 use loopal_tool_api::ExecOutcome;
-use loopal_tool_api::backend_types::ExecResult;
+use loopal_tool_api::backend_types::{EnvOverride, ExecResult};
 use loopal_tool_api::handle_overflow;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Child;
@@ -50,6 +50,7 @@ pub async fn exec_command_streaming(
     cwd: &Path,
     policy: Option<&ResolvedPolicy>,
     command: &str,
+    env_overrides: &EnvOverride,
     timeout: Duration,
     limits: &ResourceLimits,
     tail: Arc<OutputTail>,
@@ -67,6 +68,9 @@ pub async fn exec_command_streaming(
         for (k, v) in env_map {
             cmd.env(k, v);
         }
+    }
+    for (k, v) in &env_overrides.vars {
+        cmd.env(k, v);
     }
 
     let mut child = cmd

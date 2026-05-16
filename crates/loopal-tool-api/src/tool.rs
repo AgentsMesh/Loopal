@@ -28,6 +28,19 @@ pub trait Tool: Send + Sync {
         None
     }
 
+    /// JSON parameter names whose string values may contain `<secret_ref:NAME>`
+    /// placeholders that the runtime should substitute with plaintext before
+    /// `execute()` is called.
+    ///
+    /// **No default**: every Tool MUST declare this explicitly so adding a new
+    /// tool forces an explicit choice about secret exposure.
+    ///
+    /// - Read-only / file-writing tools (Read/Glob/Grep/Write/Edit/...) → `&[]`
+    /// - Shell/network tools that legitimately consume secrets (Bash) →
+    ///   list of field names, e.g. `&["command", "env"]`
+    /// - MCP adapter / sub-agent tools → `&[]` (secrets flow via env at spawn)
+    fn secret_eligible_params(&self) -> &'static [&'static str];
+
     async fn execute(
         &self,
         input: serde_json::Value,

@@ -99,10 +99,164 @@ TUI Process ──stdio IPC──→ Agent Server Process ←──TCP──→ 
 
 ### Extension points
 
-- **New tool**: Implement `Tool` trait → register in `builtin/mod.rs`
+- **New tool**: Implement `Tool` (or `TypedTool<P>`) → register in `builtin/mod.rs`. **MUST** declare `secret_eligible_params()` (no default — forces explicit choice about secret exposure). Bash returns `&["command", "env"]`; everything else returns `&[]`. Write-tools also add `precheck` rejecting `<secret_ref:...>` via `loopal_secret_runtime::WIRE_REF_MARKER`.
 - **New LLM provider**: Implement `Provider` trait → register in `kernel/provider_registry.rs`
 - **New middleware**: Implement `Middleware` trait → add to pipeline in `bootstrap.rs`
 - **MCP tools**: Configure `mcp_servers` in settings.json → auto-discovered at startup
+
+## Vault + Secret runtime
+
+Zero-trust secret management. LLM never sees plaintext. Architecture is split
+into two layers: a **generic vault** (encrypted KV storage) and a **Loopal-specific
+runtime** (LLM-facing placeholder + redaction).
+
+### Layered architecture
+
+```
+loopal-vault-api      Vault trait + AuditSink trait + VaultError + VaultOp
+    ↑                 (~80 lines; pure trait crate, depended on by all downstream)
+loopal-vault-age      AgeVault impl + identity/recipients/editor + `loopal vault` CLI
+    ↑                 (age+yaml backend; swappable for keychain/KMS in future)
+loopal-secret-runtime template + resolver + redactor + hooks + JsonlAuditSink
+    ↑                 (LLM-safety layer; depends only on vault-api trait)
+loopal-config         build_secret_store: instantiates AgeVault with JsonlAuditSink
+loopal-mcp/kernel/    inject Arc<dyn Vault>; expand_to_plaintext for spawn-time secrets
+loopal-runtime        tool_pipeline hooks: apply_resolver + apply_redactor
+```
+
+### Data flow (three directions)
+
+```
+            ┌─────────────────────────────────────┐
+            │  LLM (only sees <secret_ref:NAME>)  │
+            └──▲────────────────────────────────▲─┘
+               │ outbound                       │ tool_result (redacted)
+   prompt assembly                              │
+   ────────────────                             │
+   {{secret:X}} → <secret_ref:X>                │
+   loopal-secret-runtime::translate_outbound    │
+                                                │
+                                  ┌─────────────┴─────────────┐
+                                  │  Redactor                 │
+                                  │  plaintext → placeholder  │
+                                  │  (BEFORE overflow-to-file)│
+                                  └─────────────▲─────────────┘
+                                                │
+                              tool stdout (plaintext briefly here)
+                                                │
+                              ┌─────────────────┴─────────────────┐
+                              │  Tool execute (Bash/Fetch/MCP)    │
+                              │  ↑ plaintext only in child env    │
+                              └─────────────────▲─────────────────┘
+                                                │ resolved tool args
+                              ┌─────────────────┴─────────────────┐
+                              │  Resolver (whitelist only)        │
+                              │  <secret_ref:X> → plaintext       │
+                              └─────────────────▲─────────────────┘
+                                                │ tool_use (placeholder)
+                                                │ from LLM
+```
+
+### Components
+
+- `loopal-vault-api::Vault` — async trait `get / list_names / put / delete / rekey`
+- `loopal-vault-api::AuditSink` — trait the vault calls on every op; `VaultOp` enum covers Decrypted / Encrypted / Rekeyed / RecipientChanged
+- `loopal-vault-age::AgeVault` — default per-vault impl (age + yaml + SSH identity + recipients); `loopal-vault-age::cli` is the `loopal vault[@name]` + `loopal vaults` subcommands
+- `loopal-secret-runtime::MergedVault` — composes multiple named vaults into a single flat `Vault` view (default-first + alphabetical, conflict warn)
+- `loopal-secret-runtime::{template, resolver, redactor, hooks}` — placeholder syntax + tool argument substitution + output scrubbing
+- `loopal-secret-runtime::JsonlAuditSink` — `impl AuditSink` writing `~/.loopal/telemetry/secret_access.jsonl` with mode 0600; also records runtime `Resolved` / `Redacted` events
+- `loopal-config::build_secret_store` — instantiates `AgeVault::with_audit(..., JsonlAuditSink)` so vault ops and runtime hooks share one audit log
+- `loopal-runtime::tool_pipeline` — calls `loopal_secret_runtime::apply_resolver` (Hook 2) before execute, `apply_redactor` (Hook 3) before overflow-to-file
+
+### Per-tool checklist (adding a new tool)
+
+`Tool::secret_eligible_params() -> &'static [&'static str]` has **no default**.
+You must declare it explicitly. For typed tools (`TypedTool<P>`), the same method
+is on the typed trait — the `TypedBridge` forwards it to `Tool` automatically,
+so a missing declaration is a compile error in either path.
+
+| Tool kind | Return |
+|---|---|
+| Reads only (Read/Glob/Grep/Ls/...) | `&[]` |
+| Writes to user files (Write/Edit/MultiEdit/ApplyPatch) | `&[]` AND add `precheck` rejecting `<secret_ref:...>` (check string fields for `WIRE_REF_MARKER`) |
+| Executes shell/network with secret-bearing args (Bash) | List of field names whose string values may legitimately contain `<secret_ref:NAME>`, e.g. `&["command", "env"]` |
+| MCP tool adapter | `&[]` (MCP gets secrets via spawn-time env, not tool args) |
+
+### Vault file layout
+
+```
+<project>/.loopal/vaults/
+├── default.vault/                  # implicit default (init creates it)
+│   ├── store.age                   # age-encrypted YAML (input: git ✓)
+│   ├── recipients                  # SSH pubkeys, one per line (input: git ✓)
+│   ├── .gitignore                  # auto-generated, excludes *.lock + *.tmp.*
+│   ├── store.age.lock              # cross-process write lock (gitignored)
+│   └── store.age.tmp.<pid>         # atomic-write tempfile (gitignored)
+├── production.vault/               # additional vault, independent recipients/ACL
+│   └── ...
+└── personal.vault/                 # can be added to root .gitignore to keep local-only
+    └── ...
+```
+
+CLI commands:
+
+- **Vault set operations** (`loopal vaults <op>`):
+  - `init [<name>]` — create a vault; name defaults to `default`
+  - `list` — list all vaults (`*` marks the default)
+  - `remove <name>` — delete a vault (forces `'rotated'` confirmation)
+- **Single-vault operations** (`loopal vault[@<name>] <op>`):
+  - `vault <op>` is shorthand for `vault@default <op>`
+  - Ops: `set <k> [<v>]` (stdin), `get <k>`, `list`, `edit`, `rekey`, `recipients {add <pubkey> | remove <label> | list}`
+
+Settings (all optional, `.loopal/settings.json`):
+```json
+{
+  "secrets": {
+    "vaults_dir": ".loopal/vaults",   // default; overrideable
+    "default_vault": "default"        // default; e.g. "production"
+  }
+}
+```
+
+### Multi-vault and the merged view
+
+LLM-bound code (system prompt, tool args) only sees a flat
+`<secret_ref:NAME>` placeholder set. When multiple vaults exist, runtime
+exposes a single `MergedVault` whose `list_names` is the union of all
+vaults. Conflicts (same name in multiple vaults) resolve as:
+
+1. The default vault wins.
+2. Among non-default vaults, alphabetical order wins.
+
+A `warn!` is emitted at startup for each shadowed key, naming the winner
+and the shadowed vault. Writes (`put` / `delete`) target the default
+vault; vault-specific operations remain available through the CLI.
+
+### Threat model
+
+**Protected against**:
+- Disk theft / lost laptop (vault is age-encrypted)
+- Accidental `git add` of plaintext (`{{secret:X}}` author syntax is harmless placeholder)
+- LLM provider seeing plaintext (LLM only ever sees `<secret_ref:X>` placeholders)
+- Session persistence leakage (`~/.loopal/sessions/` stores placeholders, never plaintext)
+- Tool stdout/stderr echoing plaintext (Redactor scrubs before tool_result returns to LLM)
+- Concurrent vault writes (cross-process `.lock` file)
+- Tracing logs leaking plaintext (sentinel test in `loopal-runtime/tests/suite/tracing_sentinel_test.rs`)
+
+**NOT protected against**:
+- Compromised SSH private key (whoever has the key has the vault)
+- Plaintext lifetime in tool child process memory (Bash → `curl` → token in `curl`'s heap)
+- `ps`-visibility of `Bash.command` field when secret is substituted there (audit emits warn — prefer `env` field)
+- Removed git recipients who already cloned the repo (must rotate values at provider side after `vaults remove <name>` or `vault@<name> recipients remove`)
+- LLM prompt-injection writing secrets it learns to plaintext stdout (LLM never has plaintext to inject; redactor scrubs known plaintext)
+- Memory dumps / swap files / core dumps containing plaintext during the brief window in resolver cache
+
+### Author vs wire placeholder syntax
+
+- **Author syntax** `{{secret:NAME}}` — used in `<project>/.loopal/memory/`, `LOOPAL.md`, `settings.json` field values, provider `api_key`, MCP `env`/`headers`/`url`. Translated to wire form (or expanded to plaintext for provider/MCP) before LLM or subprocess sees anything.
+- **Wire syntax** `<secret_ref:NAME>` — what the LLM sees in system prompt and writes back in tool_use arguments. Resolver substitutes plaintext only for fields listed in `secret_eligible_params`. Redactor scrubs known plaintext back to wire form before tool_result returns to LLM.
+
+Both syntaxes use the strict regex `[a-z][a-z0-9_]*` for NAME.
 
 ## Configuration
 

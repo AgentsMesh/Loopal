@@ -29,6 +29,10 @@ impl TypedTool<TestParams> for CaptureTool {
     fn permission(&self) -> PermissionLevel {
         PermissionLevel::ReadOnly
     }
+
+    fn secret_eligible_params(&self) -> &'static [&'static str] {
+        &[]
+    }
     async fn execute(
         &self,
         input: TestParams,
@@ -139,6 +143,10 @@ impl TypedTool<NestedParams> for NestedTool {
     }
     fn permission(&self) -> PermissionLevel {
         PermissionLevel::ReadOnly
+    }
+
+    fn secret_eligible_params(&self) -> &'static [&'static str] {
+        &[]
     }
     async fn execute(
         &self,

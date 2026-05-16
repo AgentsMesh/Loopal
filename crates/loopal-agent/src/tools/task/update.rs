@@ -45,6 +45,10 @@ impl Tool for TaskUpdateTool {
         PermissionLevel::ReadOnly
     }
 
+    fn secret_eligible_params(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     async fn execute(
         &self,
         input: serde_json::Value,

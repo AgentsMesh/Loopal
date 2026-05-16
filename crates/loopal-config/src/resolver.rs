@@ -1,6 +1,12 @@
+use std::path::PathBuf;
+use std::sync::Arc;
+
 use indexmap::IndexMap;
 
 use loopal_error::{ConfigError, LoopalError};
+use loopal_secret_runtime::{JsonlAuditSink, MergedVault, default_telemetry_dir};
+use loopal_vault_age::AgeVault;
+use loopal_vault_api::Vault;
 
 use crate::layer::{ConfigLayer, LayerSource};
 use crate::loader::deep_merge;
@@ -36,6 +42,7 @@ impl ConfigResolver {
         let mut instruction_parts: Vec<String> = Vec::new();
         let mut memory_parts: Vec<String> = Vec::new();
         let mut classifier_prompt: Option<String> = None;
+        let mut vaults_dir: Option<PathBuf> = None;
         let mut sources: Vec<LayerSource> = Vec::new();
 
         for layer in self.layers {
@@ -122,6 +129,11 @@ impl ConfigResolver {
                     classifier_prompt = Some(trimmed.to_string());
                 }
             }
+
+            // Vaults dir: highest-priority non-None wins (replace semantics).
+            if let Some(path) = layer.vaults_dir {
+                vaults_dir = Some(path);
+            }
         }
 
         // Warn about unrecognised keys before deserialising
@@ -139,6 +151,10 @@ impl ConfigResolver {
         settings.hooks = hooks.iter().map(|h| h.config.clone()).collect();
 
         Ok(ResolvedConfig {
+            secrets: build_secret_store(
+                settings.secrets.vaults_dir.clone().or(vaults_dir),
+                settings.secrets.default_vault.as_deref(),
+            ),
             settings,
             mcp_servers,
             skills,
@@ -148,6 +164,81 @@ impl ConfigResolver {
             classifier_prompt,
             layers: sources,
         })
+    }
+}
+
+fn build_secret_store(
+    vaults_dir: Option<PathBuf>,
+    default_vault_name: Option<&str>,
+) -> Option<Arc<dyn Vault>> {
+    let dir = vaults_dir?;
+    let default_name = default_vault_name.unwrap_or("default");
+
+    let all_names = loopal_vault_age::list_initialized_vaults(&dir);
+    if all_names.is_empty() {
+        return None;
+    }
+
+    let identity = match loopal_vault_age::discover() {
+        Ok(i) => Arc::new(i),
+        Err(e) => {
+            tracing::warn!(
+                error = %e,
+                "vaults present but SSH identity discovery failed; vaults disabled"
+            );
+            return None;
+        }
+    };
+
+    let audit: Arc<dyn loopal_vault_api::AuditSink> = match default_telemetry_dir() {
+        Some(td) => Arc::new(JsonlAuditSink::new(td)),
+        None => Arc::new(loopal_vault_api::NoopAuditSink),
+    };
+
+    let mk = |name: &str| -> Arc<dyn Vault> {
+        let store = dir.join(format!("{name}.vault")).join("store.age");
+        let recipients = dir.join(format!("{name}.vault")).join("recipients");
+        Arc::new(AgeVault::with_audit(
+            store,
+            recipients,
+            identity.clone(),
+            audit.clone(),
+        ))
+    };
+
+    let default = if all_names.iter().any(|n| n == default_name) {
+        (default_name.to_string(), mk(default_name))
+    } else if default_vault_name.is_some() {
+        // User explicitly configured a default_vault name that does not exist.
+        // Fail-fast rather than silently falling back: an explicit config
+        // pointing at a missing vault is a bug the user must see.
+        tracing::error!(
+            requested = default_name,
+            available = ?all_names,
+            "configured default_vault not found; vault subsystem disabled"
+        );
+        return None;
+    } else {
+        // No explicit configuration; fall back to alphabetical first.
+        let first = all_names[0].clone();
+        if first != "default" {
+            tracing::info!(
+                using = first.as_str(),
+                "no 'default' vault present; using first alphabetical as default"
+            );
+        }
+        (first.clone(), mk(&first))
+    };
+    let others: Vec<(String, Arc<dyn Vault>)> = all_names
+        .iter()
+        .filter(|n| n.as_str() != default.0)
+        .map(|n| (n.clone(), mk(n)))
+        .collect();
+
+    if others.is_empty() {
+        Some(default.1)
+    } else {
+        Some(Arc::new(MergedVault::new(default, others)))
     }
 }
 

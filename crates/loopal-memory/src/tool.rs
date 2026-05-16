@@ -41,6 +41,10 @@ impl Tool for MemoryTool {
         PermissionLevel::ReadOnly
     }
 
+    fn secret_eligible_params(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     async fn execute(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
         let observation = input["observation"].as_str().ok_or_else(|| {
             LoopalError::Tool(loopal_error::ToolError::InvalidInput(

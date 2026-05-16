@@ -113,13 +113,27 @@ pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<A
 
     let features = collect_feature_tags(config, memory_channel.is_some());
 
+    // Outbound secret translation: replace `{{secret:X}}` author placeholders
+    // in instructions + memory with `<secret_ref:X>` wire-form placeholders
+    // BEFORE they enter the prompt. Plaintext is never materialized here.
+    let translation_view = if let Some(store) = config.secrets.as_ref() {
+        let names = store.list_names().await;
+        Some(loopal_secret_runtime::TranslationView::from_names(names))
+    } else {
+        None
+    };
+    let (instructions_out, _) =
+        loopal_secret_runtime::translate_outbound(&config.instructions, translation_view.as_ref());
+    let (memory_out, _) =
+        loopal_secret_runtime::translate_outbound(&config.memory, translation_view.as_ref());
+
     let mut system_prompt = build_system_prompt(
-        &config.instructions,
+        &instructions_out,
         &tool_defs,
         mode_str,
         &cwd.to_string_lossy(),
         &skills_summary,
-        &config.memory,
+        &memory_out,
         start.agent_type.as_deref(),
         features,
         start.depth.unwrap_or(0),

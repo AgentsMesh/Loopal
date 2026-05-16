@@ -78,5 +78,8 @@ pub fn collect_feature_tags(config: &ResolvedConfig, has_memory_channel: bool) -
     if !config.settings.output_style.is_empty() {
         features.push(format!("style_{}", config.settings.output_style));
     }
+    if config.secrets.is_some() {
+        features.push("secrets".into());
+    }
     features
 }

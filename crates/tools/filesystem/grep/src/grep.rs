@@ -68,6 +68,10 @@ impl TypedTool<GrepParams> for GrepTool {
         PermissionLevel::ReadOnly
     }
 
+    fn secret_eligible_params(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     async fn execute(
         &self,
         input: GrepParams,

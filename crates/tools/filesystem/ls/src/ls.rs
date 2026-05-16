@@ -35,6 +35,10 @@ impl TypedTool<LsParams> for LsTool {
         PermissionLevel::ReadOnly
     }
 
+    fn secret_eligible_params(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     async fn execute(&self, input: LsParams, ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
         let raw_path = input.path.as_deref().unwrap_or(".");
 

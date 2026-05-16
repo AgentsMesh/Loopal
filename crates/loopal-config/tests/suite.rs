@@ -1,4 +1,6 @@
 // Single test binary — includes all test modules
+#[path = "suite/build_secret_store_test.rs"]
+mod build_secret_store_test;
 #[path = "suite/classifier_prompt_test.rs"]
 mod classifier_prompt_test;
 #[path = "suite/classifier_timeout_test.rs"]

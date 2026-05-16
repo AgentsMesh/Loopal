@@ -5,6 +5,7 @@ pub mod manager;
 mod manager_query;
 pub mod oauth;
 pub mod reconnect;
+pub mod secret_expand;
 pub mod tool_adapter;
 pub mod transport;
 pub mod types;

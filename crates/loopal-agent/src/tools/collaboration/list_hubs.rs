@@ -26,6 +26,10 @@ impl Tool for ListHubsTool {
         PermissionLevel::ReadOnly
     }
 
+    fn secret_eligible_params(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     async fn execute(
         &self,
         _input: serde_json::Value,

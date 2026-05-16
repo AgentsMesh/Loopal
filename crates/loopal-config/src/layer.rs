@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use indexmap::IndexMap;
 
 use crate::hook::HookConfig;
@@ -58,4 +60,7 @@ pub struct ConfigLayer {
     /// Optional system prompt for Classifier mode (from classifier.md).
     /// Higher-priority layers replace lower ones (not concatenated).
     pub classifier_prompt: Option<String>,
+    /// Path to the vaults directory (.loopal/vaults/). Only the directory is
+    /// recorded — individual vaults stay encrypted on disk; decryption is lazy.
+    pub vaults_dir: Option<PathBuf>,
 }

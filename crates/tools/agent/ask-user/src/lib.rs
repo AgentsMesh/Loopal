@@ -52,6 +52,10 @@ impl TypedTool<AskUserParams> for AskUserTool {
         PermissionLevel::ReadOnly
     }
 
+    fn secret_eligible_params(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     fn dispatch(&self) -> ToolDispatch {
         ToolDispatch::RunnerDirect
     }

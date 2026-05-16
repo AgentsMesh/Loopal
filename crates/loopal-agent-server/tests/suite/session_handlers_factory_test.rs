@@ -21,6 +21,7 @@ fn empty_config(decision: DecisionMode) -> ResolvedConfig {
         memory: String::new(),
         classifier_prompt: None,
         layers: Vec::new(),
+        secrets: None,
     }
 }
 

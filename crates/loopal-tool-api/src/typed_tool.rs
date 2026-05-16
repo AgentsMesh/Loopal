@@ -25,5 +25,10 @@ pub trait TypedTool<P: Params>: Send + Sync {
         None
     }
 
+    /// See `Tool::secret_eligible_params`. **No default** — every TypedTool
+    /// MUST declare this explicitly to force an explicit choice about
+    /// secret exposure.
+    fn secret_eligible_params(&self) -> &'static [&'static str];
+
     async fn execute(&self, input: P, ctx: &ToolContext) -> Result<ToolResult, LoopalError>;
 }

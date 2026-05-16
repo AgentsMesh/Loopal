@@ -27,10 +27,14 @@ impl CommandHandler for ModelCmd {
 fn open_model_picker(app: &mut App) {
     let active = app.session.lock().active_view.clone();
     let observable = app.observable_for(&active);
-    let current_model = observable.model;
+    let current_model = observable.model.clone();
     let current_thinking = observable.thinking_config;
 
-    let models = loopal_provider::list_all_models();
+    let mut models = loopal_provider::list_all_models();
+    if let Some(idx) = models.iter().position(|m| m.id == current_model) {
+        let current = models.remove(idx);
+        models.insert(0, current);
+    }
     let items: Vec<PickerItem> = models
         .into_iter()
         .map(|m| {

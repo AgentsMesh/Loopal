@@ -16,7 +16,7 @@ mod sub_page_rewind;
 
 pub use actions::*;
 
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
 use crate::app::{App, FocusMode, PanelKind};
 use autocomplete::{handle_autocomplete_key, update_autocomplete};
@@ -27,6 +27,11 @@ use navigation::{
 
 /// Process a key event and update the app's input state.
 pub fn handle_key(app: &mut App, key: KeyEvent) -> InputAction {
+    // reason: kitty/iTerm2 keyboard enhancement reports Press + Release for every
+    // keystroke; without this guard cycle handlers (picker Left/Right) double-fire.
+    if !matches!(key.kind, KeyEventKind::Press | KeyEventKind::Repeat) {
+        return InputAction::None;
+    }
     if let Some(action) = modal::handle_modal_keys(app, &key) {
         return action;
     }
@@ -82,7 +87,6 @@ fn handle_global_keys(app: &mut App, key: &KeyEvent) -> Option<InputAction> {
     None
 }
 
-/// Handle normal input keys — dispatch by current focus mode.
 fn handle_normal_key(app: &mut App, key: &KeyEvent) -> InputAction {
     match app.focus_mode {
         FocusMode::Panel(_) => handle_panel_key(app, key),
@@ -90,7 +94,6 @@ fn handle_normal_key(app: &mut App, key: &KeyEvent) -> InputAction {
     }
 }
 
-/// Keys in Panel mode: Up/Down navigate, Enter drills in (agents), Tab switches/cycles.
 fn handle_panel_key(app: &mut App, key: &KeyEvent) -> InputAction {
     let kind = match app.focus_mode {
         FocusMode::Panel(k) => k,
@@ -125,7 +128,6 @@ fn handle_panel_key(app: &mut App, key: &KeyEvent) -> InputAction {
     }
 }
 
-/// Keys in Input mode: typing, navigation, submit.
 fn handle_input_mode_key(app: &mut App, key: &KeyEvent) -> InputAction {
     // Auto-scroll to bottom on input interaction (except scroll/panel/escape keys).
     if !matches!(

@@ -1,5 +1,7 @@
 //! Control command handling — mode switch, clear, compact, rewind, etc.
 
+use std::path::PathBuf;
+
 use crate::mode::AgentMode;
 use loopal_error::Result;
 use loopal_protocol::{AgentEventPayload, ControlCommand};
@@ -7,6 +9,13 @@ use tracing::{error, info};
 
 use super::rewind::detect_turn_boundaries;
 use super::runner::AgentLoopRunner;
+
+fn persist_local_setting(cwd: &str, key: &str, value: serde_json::Value) {
+    let cwd = PathBuf::from(cwd);
+    if let Err(e) = loopal_config::update_local_settings_field(&cwd, key, value) {
+        error!(error = %e, key, "failed to persist setting to settings.local.json");
+    }
+}
 
 impl AgentLoopRunner {
     /// Handle a control command. Returns `true` when handling injected a
@@ -60,8 +69,13 @@ impl AgentLoopRunner {
                 })
                 .await?;
                 self.model_config.update_model(&new_model);
-                self.params.config.router.set_default(new_model);
+                self.params.config.router.set_default(new_model.clone());
                 self.recalculate_budget();
+                persist_local_setting(
+                    &self.params.session.cwd,
+                    "model",
+                    serde_json::Value::String(new_model),
+                );
             }
             ControlCommand::Rewind { turn_index } => {
                 self.handle_rewind(turn_index).await?;
@@ -76,7 +90,10 @@ impl AgentLoopRunner {
                             thinking_config: json,
                         })
                         .await?;
-                        self.model_config.thinking = config;
+                        self.model_config.thinking = config.clone();
+                        if let Ok(value) = serde_json::to_value(&config) {
+                            persist_local_setting(&self.params.session.cwd, "thinking", value);
+                        }
                     }
                     Err(e) => error!(error = %e, "invalid thinking config"),
                 }

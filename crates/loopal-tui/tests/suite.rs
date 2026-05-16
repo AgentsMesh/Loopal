@@ -76,6 +76,8 @@ mod message_lines_fixture;
 mod message_lines_terminal_state_test;
 #[path = "suite/message_lines_test.rs"]
 mod message_lines_test;
+#[path = "suite/model_picker_thinking_test.rs"]
+mod model_picker_thinking_test;
 #[path = "suite/multi_question_test.rs"]
 mod multi_question_test;
 #[path = "suite/panel_focus_visibility_test.rs"]

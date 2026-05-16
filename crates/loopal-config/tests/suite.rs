@@ -15,6 +15,8 @@ mod loader_settings_merge_test;
 mod loader_settings_test;
 #[path = "suite/loader_unit_test.rs"]
 mod loader_unit_test;
+#[path = "suite/local_writer_test.rs"]
+mod local_writer_test;
 #[path = "suite/locations_test.rs"]
 mod locations_test;
 #[path = "suite/mcp_json_test.rs"]

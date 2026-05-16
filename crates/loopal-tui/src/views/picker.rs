@@ -119,10 +119,12 @@ fn render_thinking_indicator(f: &mut Frame, picker: &PickerState, area: Rect) {
         Span::styled(label, Style::default().fg(Color::Magenta).bold()),
         Span::styled(" ▶ ", Style::default().fg(Color::Magenta)),
     ]);
-    // Estimate width: " Thinking: ◀ {label} ▶ " ~ 18 + label.len()
-    let budget = area.width.saturating_sub(2) as usize;
-    let w = (18 + label.len()).min(budget) as u16;
-    let x = area.x + area.width.saturating_sub(w + 1); // -1 for right border
+    let w = indicator.width() as u16;
+    let budget = area.width.saturating_sub(2);
+    if w > budget {
+        return;
+    }
+    let x = area.x + area.width.saturating_sub(w + 1);
     let indicator_area = Rect::new(x, area.y, w, 1);
     f.render_widget(Paragraph::new(indicator), indicator_area);
 }

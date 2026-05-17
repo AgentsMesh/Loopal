@@ -173,7 +173,7 @@ pub enum AgentEventPayload {
         session_id: String,
         warnings: Vec<String>,
     },
-    BgTaskSpawned { id: String, description: String },
+    BgTaskSpawned { id: String, description: String, created_at_unix_ms: u64 },
     BgTaskOutput { id: String, output_delta: String },
     /// Authoritative final state.
     BgTaskCompleted {

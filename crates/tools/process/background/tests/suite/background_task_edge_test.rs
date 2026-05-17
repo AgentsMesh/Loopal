@@ -1,52 +1,38 @@
-use std::sync::Arc;
+use std::time::Duration;
 
-use loopal_tool_api::{Tool, ToolContext, TypedBridge};
-use loopal_tool_background::BackgroundTaskStore;
-use loopal_tool_bash::{BashParams, BashTool};
+use loopal_tool_api::Tool;
 use serde_json::json;
 
-fn make_store() -> Arc<BackgroundTaskStore> {
-    BackgroundTaskStore::new()
-}
-
-fn make_ctx(cwd: &std::path::Path) -> ToolContext {
-    let backend = loopal_backend::LocalBackend::new(
-        cwd.to_path_buf(),
-        None,
-        loopal_backend::ResourceLimits::default(),
-    );
-    ToolContext::new(backend, "test")
-}
-
-fn make_bash(store: Arc<BackgroundTaskStore>) -> TypedBridge<BashTool, BashParams> {
-    TypedBridge::new(BashTool::new(store))
-}
+use crate::test_support::{extract_pid, make_bash, make_ctx, make_store};
 
 #[tokio::test]
-async fn test_output_nonexistent_process() {
+async fn output_returns_error_for_unknown_id() {
     let store = make_store();
-    let timeout = std::time::Duration::from_secs(1);
-    let output =
-        loopal_tool_background::ops::bg_output(&store, "bg_nonexistent_99999", true, timeout).await;
+    let output = loopal_tool_background::ops::bg_output(
+        &store,
+        "bg_nonexistent_99999",
+        true,
+        Duration::from_secs(1),
+    )
+    .await;
     assert!(output.is_error);
     assert!(output.content.contains("not found"));
 }
 
 #[tokio::test]
-async fn test_stop_nonexistent_process() {
+async fn stop_returns_error_for_unknown_id() {
     let store = make_store();
-    let result = loopal_tool_background::ops::bg_stop(&store, "bg_nonexistent_99999");
+    let result = loopal_tool_background::ops::bg_stop(&store, "bg_nonexistent_99999").await;
     assert!(result.is_error);
     assert!(result.content.contains("not found"));
 }
 
 #[tokio::test]
 #[cfg(not(windows))]
-async fn test_non_blocking_output() {
-    let tmp = tempfile::tempdir().unwrap();
+async fn non_blocking_output_returns_status_running_for_long_command() {
     let store = make_store();
     let bash = make_bash(store.clone());
-    let ctx = make_ctx(tmp.path());
+    let ctx = make_ctx();
 
     let result = bash
         .execute(
@@ -55,27 +41,21 @@ async fn test_non_blocking_output() {
         )
         .await
         .unwrap();
-    let pid = result
-        .content
-        .lines()
-        .find(|l| l.starts_with("process_id:"))
-        .and_then(|l| l.strip_prefix("process_id: "))
-        .unwrap();
+    let pid = extract_pid(&result.content);
 
-    let timeout = std::time::Duration::from_secs(1);
-    let output = loopal_tool_background::ops::bg_output(&store, pid, false, timeout).await;
+    let output =
+        loopal_tool_background::ops::bg_output(&store, &pid, false, Duration::from_secs(1)).await;
     assert!(output.content.contains("[Status: Running]"));
 
-    loopal_tool_background::ops::bg_stop(&store, pid);
+    let _ = loopal_tool_background::ops::bg_stop(&store, &pid).await;
 }
 
 #[tokio::test]
 #[cfg(not(windows))]
-async fn test_output_timeout() {
-    let tmp = tempfile::tempdir().unwrap();
+async fn blocking_output_times_out_while_command_runs() {
     let store = make_store();
     let bash = make_bash(store.clone());
-    let ctx = make_ctx(tmp.path());
+    let ctx = make_ctx();
 
     let result = bash
         .execute(
@@ -84,16 +64,11 @@ async fn test_output_timeout() {
         )
         .await
         .unwrap();
-    let pid = result
-        .content
-        .lines()
-        .find(|l| l.starts_with("process_id:"))
-        .and_then(|l| l.strip_prefix("process_id: "))
-        .unwrap();
+    let pid = extract_pid(&result.content);
 
-    let timeout = std::time::Duration::from_secs(1);
-    let output = loopal_tool_background::ops::bg_output(&store, pid, true, timeout).await;
+    let output =
+        loopal_tool_background::ops::bg_output(&store, &pid, true, Duration::from_secs(1)).await;
     assert!(output.content.contains("timed out"));
 
-    loopal_tool_background::ops::bg_stop(&store, pid);
+    let _ = loopal_tool_background::ops::bg_stop(&store, &pid).await;
 }

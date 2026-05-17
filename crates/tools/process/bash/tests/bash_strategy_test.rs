@@ -5,7 +5,10 @@ fn er(stdout: &str, stderr: &str, exit_code: i32) -> ExecResult {
     ExecResult {
         stdout: stdout.into(),
         stderr: stderr.into(),
+        stdout_truncated: false,
+        stderr_truncated: false,
         exit_code,
+        log_path: std::path::PathBuf::new(),
     }
 }
 

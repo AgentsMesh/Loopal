@@ -41,8 +41,10 @@ fn add_bg_snapshot(app: &mut App, id: &str, desc: &str) {
     app.view_clients["main"].inject_bg_for_test(vec![BgTaskSnapshot {
         id: id.into(),
         description: desc.into(),
+
         status: BgTaskStatus::Running,
         exit_code: None,
+        created_at_unix_ms: 0,
     }]);
 }
 

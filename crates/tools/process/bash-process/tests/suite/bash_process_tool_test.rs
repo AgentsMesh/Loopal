@@ -6,8 +6,12 @@ use std::sync::Arc;
 
 fn make_ctx() -> ToolContext {
     let tmp = std::env::temp_dir();
-    let backend =
-        loopal_backend::LocalBackend::new(tmp, None, loopal_backend::ResourceLimits::default());
+    let backend = loopal_backend::LocalBackend::new(
+        tmp,
+        None,
+        loopal_backend::ResourceLimits::default(),
+        "test-session",
+    );
     ToolContext::new(backend, "test")
 }
 

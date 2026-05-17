@@ -37,6 +37,7 @@ fn build_ctx(store: Arc<dyn Vault>) -> (Arc<dyn Backend>, ToolContext) {
         std::env::temp_dir(),
         None,
         loopal_backend::ResourceLimits::default(),
+        "bash-e2e",
     );
     let ctx = ToolContext::new(backend.clone(), "bash-e2e").with_secrets(store);
     (backend, ctx)

@@ -20,6 +20,8 @@ use crate::provider_registry;
 
 use loopal_tool_background::BackgroundTaskStore;
 
+use crate::bg_gc::spawn_bg_gc_tick;
+
 pub struct Kernel {
     pub(super) tool_registry: ToolRegistry,
     provider_registry: ProviderRegistry,
@@ -35,7 +37,8 @@ pub struct Kernel {
 
 impl Kernel {
     pub fn new(settings: Settings) -> Result<Self> {
-        let bg_store = BackgroundTaskStore::new();
+        let bg_config = settings.bg_tasks.clone();
+        let bg_store = BackgroundTaskStore::with_config(bg_config.clone());
         let tool_registry = ToolRegistry::new();
         loopal_tools::builtin::register_all(&tool_registry, bg_store.clone());
 
@@ -46,6 +49,8 @@ impl Kernel {
         let factory = Arc::new(DefaultExecutorFactory::new(None));
         let hook_service = HookService::new(hook_registry, factory);
         let mcp_manager = Arc::new(RwLock::new(McpManager::new()));
+
+        spawn_bg_gc_tick(bg_store.clone(), bg_config);
 
         info!("kernel initialized");
 
@@ -135,7 +140,11 @@ impl Kernel {
         Ok(())
     }
 
-    pub fn create_backend(&self, cwd: &std::path::Path) -> Arc<dyn loopal_tool_api::Backend> {
+    pub fn create_backend(
+        &self,
+        cwd: &std::path::Path,
+        session_id: &str,
+    ) -> Arc<dyn loopal_tool_api::Backend> {
         use loopal_config::SandboxPolicy;
         let policy = if self.settings.sandbox.policy != SandboxPolicy::Disabled {
             Some(loopal_sandbox::resolve_policy(&self.settings.sandbox, cwd))
@@ -146,6 +155,7 @@ impl Kernel {
             cwd.to_path_buf(),
             policy,
             loopal_backend::ResourceLimits::default(),
+            session_id,
         )
     }
 

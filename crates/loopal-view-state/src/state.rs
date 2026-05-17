@@ -118,6 +118,7 @@ pub struct BgTaskView {
     pub status: BgTaskStatus,
     pub exit_code: Option<i32>,
     pub output: String,
+    pub created_at_unix_ms: u64,
 }
 
 impl BgTaskView {
@@ -128,6 +129,7 @@ impl BgTaskView {
             status: s.status,
             exit_code: s.exit_code,
             output: String::new(),
+            created_at_unix_ms: s.created_at_unix_ms,
         }
     }
 
@@ -138,6 +140,7 @@ impl BgTaskView {
             status: d.status,
             exit_code: d.exit_code,
             output: d.output,
+            created_at_unix_ms: d.created_at_unix_ms,
         }
     }
 }

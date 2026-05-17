@@ -28,11 +28,20 @@ pub struct EditResult {
 }
 
 /// Result of a shell command execution.
+///
+/// reason: `stdout` is the HeadTail preview (short → full content; long →
+/// head + tail with elision marker). `stderr` is a capped in-memory buffer
+/// (≤ 8 KB; longer content is trimmed front-first). `log_path` always points
+/// to the merged tmp file holding the full interleaved output (stderr lines
+/// prefixed with `[err] `), so callers needing complete output can `Read` it.
 #[derive(Debug, Clone)]
 pub struct ExecResult {
     pub stdout: String,
     pub stderr: String,
+    pub stdout_truncated: bool,
+    pub stderr_truncated: bool,
     pub exit_code: i32,
+    pub log_path: std::path::PathBuf,
 }
 
 /// Result of an HTTP fetch operation.

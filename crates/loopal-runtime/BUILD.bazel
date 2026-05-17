@@ -6,6 +6,7 @@ rust_library(
     edition = "2024",
     visibility = ["//visibility:public"],
     deps = [
+        "//crates/loopal-backend",
         "//crates/loopal-classifier",
         "//crates/loopal-config",
         "//crates/loopal-context",
@@ -22,6 +23,7 @@ rust_library(
         "//crates/loopal-tool-api",
         "//crates/loopal-tool-invocation",
         "//crates/loopal-vault-api",
+        "//crates/tools/process/background:loopal-tool-background",
         "@crates//:chrono",
         "@crates//:dirs",
         "@crates//:futures",

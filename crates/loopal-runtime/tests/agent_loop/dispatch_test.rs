@@ -71,6 +71,7 @@ async fn ask_user_plus_read_no_duplicate_tool_result() {
         std::env::temp_dir(),
         None,
         loopal_backend::ResourceLimits::default(),
+        "test-session",
     );
 
     let tool_uses = vec![

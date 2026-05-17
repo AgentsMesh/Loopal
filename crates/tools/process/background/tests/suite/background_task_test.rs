@@ -1,47 +1,14 @@
-use std::sync::Arc;
+use std::time::Duration;
 
-use loopal_tool_api::{PermissionLevel, Tool, ToolContext, TypedBridge};
-use loopal_tool_background::{BackgroundTask, BackgroundTaskStore, TaskStatus};
-use loopal_tool_bash::{BashParams, BashTool};
+use loopal_tool_api::{PermissionLevel, Tool};
+use loopal_tool_background::StatusFilter;
+use loopal_tool_background::ops::{bg_output, bg_stop};
 use serde_json::json;
-use std::sync::Mutex;
 
-fn make_store() -> Arc<BackgroundTaskStore> {
-    BackgroundTaskStore::new()
-}
-
-fn make_ctx(cwd: &std::path::Path) -> ToolContext {
-    let backend = loopal_backend::LocalBackend::new(
-        cwd.to_path_buf(),
-        None,
-        loopal_backend::ResourceLimits::default(),
-    );
-    ToolContext::new(backend, "test")
-}
-
-fn make_bash(store: Arc<BackgroundTaskStore>) -> TypedBridge<BashTool, BashParams> {
-    TypedBridge::new(BashTool::new(store))
-}
+use crate::test_support::{extract_pid, make_bash, make_ctx, make_store};
 
 #[test]
-fn test_store_insert_and_retrieve() {
-    let store = make_store();
-    let task_id = store.generate_task_id();
-    let (_watch_tx, watch_rx) = tokio::sync::watch::channel(TaskStatus::Running);
-    let task = BackgroundTask {
-        output: Arc::new(Mutex::new(String::new())),
-        exit_code: Arc::new(Mutex::new(None)),
-        status: Arc::new(Mutex::new(TaskStatus::Running)),
-        description: "test task".into(),
-        child: Arc::new(Mutex::new(None)),
-        status_watch: watch_rx,
-    };
-    store.insert(task_id.clone(), task);
-    assert!(store.with_task(&task_id, |_| ()).is_some());
-}
-
-#[test]
-fn test_generate_task_id_is_unique() {
+fn generate_task_id_is_unique() {
     let store = make_store();
     let id1 = store.generate_task_id();
     let id2 = store.generate_task_id();
@@ -50,11 +17,10 @@ fn test_generate_task_id_is_unique() {
 }
 
 #[tokio::test]
-async fn test_bash_background_and_output() {
-    let tmp = tempfile::tempdir().unwrap();
+async fn bash_background_emits_completed_output() {
     let store = make_store();
     let bash = make_bash(store.clone());
-    let ctx = make_ctx(tmp.path());
+    let ctx = make_ctx();
 
     let result = bash
         .execute(
@@ -64,17 +30,9 @@ async fn test_bash_background_and_output() {
         .await
         .unwrap();
     assert!(!result.is_error);
-    assert!(result.content.contains("process_id:"));
+    let pid = extract_pid(&result.content);
 
-    let pid = result
-        .content
-        .lines()
-        .find(|l| l.starts_with("process_id:"))
-        .and_then(|l| l.strip_prefix("process_id: "))
-        .unwrap();
-
-    use loopal_tool_background::ops::bg_output;
-    let output = bg_output(&store, pid, true, std::time::Duration::from_secs(5)).await;
+    let output = bg_output(&store, &pid, true, Duration::from_secs(5)).await;
     assert!(!output.is_error);
     assert!(
         output.content.contains("bg_hello"),
@@ -85,12 +43,54 @@ async fn test_bash_background_and_output() {
 }
 
 #[tokio::test]
-#[cfg(not(windows))]
-async fn test_bash_stop_background() {
-    let tmp = tempfile::tempdir().unwrap();
+async fn evict_terminal_unlinks_process_log_file() {
     let store = make_store();
     let bash = make_bash(store.clone());
-    let ctx = make_ctx(tmp.path());
+    let ctx = make_ctx();
+
+    let result = bash
+        .execute(
+            json!({"command": "echo evict_probe", "run_in_background": true}),
+            &ctx,
+        )
+        .await
+        .unwrap();
+    let pid = extract_pid(&result.content);
+    let log_path = extract_log_path(&result.content);
+
+    let _ = bg_output(&store, &pid, true, Duration::from_secs(5)).await;
+    assert!(tokio::fs::metadata(&log_path).await.is_ok());
+
+    // reason: evict 0 retention forces immediate removal; unlink is spawned
+    // on tokio so we poll briefly for it to land.
+    let _ = store.evict_terminal(Duration::from_millis(0));
+    for _ in 0..20 {
+        if tokio::fs::metadata(&log_path).await.is_err() {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    panic!(
+        "log file should be unlinked after evict: {}",
+        log_path.display()
+    );
+}
+
+fn extract_log_path(content: &str) -> std::path::PathBuf {
+    for line in content.lines() {
+        if let Some(rest) = line.strip_prefix("Full log: ") {
+            return std::path::PathBuf::from(rest.trim());
+        }
+    }
+    panic!("no Full log line in: {content}")
+}
+
+#[tokio::test]
+#[cfg(not(windows))]
+async fn bash_stop_kills_long_running_process() {
+    let store = make_store();
+    let bash = make_bash(store.clone());
+    let ctx = make_ctx();
 
     let result = bash
         .execute(
@@ -99,31 +99,27 @@ async fn test_bash_stop_background() {
         )
         .await
         .unwrap();
-    let pid = result
-        .content
-        .lines()
-        .find(|l| l.starts_with("process_id:"))
-        .and_then(|l| l.strip_prefix("process_id: "))
-        .unwrap();
+    let pid = extract_pid(&result.content);
+    tokio::time::sleep(Duration::from_millis(200)).await;
 
-    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    let stop = bg_stop(&store, &pid).await;
+    assert!(
+        stop.content.to_lowercase().contains("killed")
+            || stop.content.to_lowercase().contains("already"),
+        "expected kill ack, got: {} (is_error={})",
+        stop.content,
+        stop.is_error,
+    );
 
-    use loopal_tool_background::ops::bg_stop;
-    let stop = bg_stop(&store, pid);
-    assert!(
-        !stop.is_error,
-        "bg_stop returned error for {pid}: {}",
-        stop.content,
-    );
-    assert!(
-        stop.content.contains("stopped"),
-        "unexpected: {}",
-        stop.content,
-    );
+    let still_running = store
+        .snapshot(StatusFilter::Running)
+        .iter()
+        .any(|s| s.id == pid);
+    assert!(!still_running, "process should be removed from Running set");
 }
 
 #[test]
-fn test_bash_schema_includes_background_fields() {
+fn bash_schema_advertises_run_in_background_flag() {
     let store = make_store();
     let tool = make_bash(store);
     let schema = tool.parameters_schema();

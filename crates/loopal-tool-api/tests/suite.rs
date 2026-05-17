@@ -1,4 +1,6 @@
 // Single test binary — includes all test modules
+#[path = "suite/head_tail_test.rs"]
+mod head_tail_test;
 #[path = "suite/input_normalize_test.rs"]
 mod input_normalize_test;
 #[path = "suite/permission_test.rs"]

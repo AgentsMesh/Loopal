@@ -41,8 +41,10 @@ fn bg(id: &str) -> loopal_protocol::BgTaskSnapshot {
     loopal_protocol::BgTaskSnapshot {
         id: id.into(),
         description: format!("desc {id}"),
+
         status: BgTaskStatus::Running,
         exit_code: None,
+        created_at_unix_ms: 0,
     }
 }
 

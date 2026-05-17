@@ -78,8 +78,10 @@ fn tab_cycles_through_all_four_panels() {
     app.view_clients["main"].inject_bg_for_test(vec![BgTaskSnapshot {
         id: "b1".into(),
         description: "bg".into(),
+
         status: BgTaskStatus::Running,
         exit_code: None,
+        created_at_unix_ms: 0,
     }]);
     add_cron(&mut app, "c1", "cron");
 
@@ -104,8 +106,10 @@ fn tab_skips_empty_crons_panel() {
     app.view_clients["main"].inject_bg_for_test(vec![BgTaskSnapshot {
         id: "b1".into(),
         description: "bg".into(),
+
         status: BgTaskStatus::Running,
         exit_code: None,
+        created_at_unix_ms: 0,
     }]);
     // no cron snapshots
     app.section_mut(PanelKind::BgTasks).focused = Some("b1".into());

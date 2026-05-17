@@ -5,7 +5,9 @@ use loopal_error::Result;
 use loopal_protocol::AgentEventPayload;
 use tracing::info;
 
+use super::pipeline_setup::build_context_pipeline;
 use super::runner::AgentLoopRunner;
+use crate::plan_file::PlanFile;
 
 impl AgentLoopRunner {
     /// Replace the agent's session context with a different persisted session.
@@ -48,8 +50,21 @@ impl AgentLoopRunner {
             tracing::warn!(error = %err, "failed to switch goal session id on resume");
         }
 
-        // Update tool context so subsequent tool calls persist to the new session
+        // reason: LocalBackend caches cwd + session_id; without rebuild,
+        // bash logs would leak to the old session's tmp dir and sandbox
+        // path checks would use the old cwd.
         self.tool_ctx.session_id.clone_from(&self.params.session.id);
+        self.tool_ctx.backend = self.params.deps.kernel.create_backend(
+            std::path::Path::new(&self.params.session.cwd),
+            &self.params.session.id,
+        );
+        // reason: PlanFile caches cwd, so plan-mode writes would land in
+        // the old cwd's `.loopal/plans/`.
+        self.plan_file = PlanFile::new(std::path::Path::new(&self.params.session.cwd));
+        // reason: ConfigRefreshMiddleware holds FileSnapshot entries with
+        // cwd-resolved paths; without rebuild the new session inherits the
+        // old project's MEMORY.md / instructions / settings.
+        self.pipeline = build_context_pipeline(&self.params.session.cwd);
 
         // Clear the shared message snapshot — the previous session's
         // entries must not leak into a sub-agent fork that happens

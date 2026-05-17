@@ -65,21 +65,40 @@ async fn two_agents_have_isolated_schedulers() {
 
 #[tokio::test]
 async fn two_agents_have_isolated_bg_stores() {
+    use loopal_tool_api::{Tool, ToolContext, TypedBridge};
+    use loopal_tool_bash::{BashParams, BashTool};
+    use serde_json::json;
+
     let fixture_a = TestFixture::new();
     let fixture_b = TestFixture::new();
     let (_ctx_a, shared_a) = agent_tool_context(&fixture_a);
     let (_ctx_b, shared_b) = agent_tool_context(&fixture_b);
 
-    shared_a
-        .kernel
-        .bg_store()
-        .register_proxy("bg_a_1".into(), "background on A".into());
+    // reason: real bash spawn against agent A's bg_store. The task runs long
+    // enough to remain in Running while we sample both stores' snapshots.
+    let bash: TypedBridge<BashTool, BashParams> =
+        TypedBridge::new(BashTool::new(shared_a.kernel.bg_store().clone()));
+    let backend = loopal_backend::LocalBackend::new(
+        std::env::temp_dir(),
+        None,
+        loopal_backend::ResourceLimits::default(),
+        "test-session-a",
+    );
+    let ctx = ToolContext::new(backend, "test-a");
+    let _ = bash
+        .execute(
+            json!({"command": "sleep 30", "run_in_background": true}),
+            &ctx,
+        )
+        .await
+        .expect("spawn");
+    tokio::time::sleep(std::time::Duration::from_millis(40)).await;
 
     let snap_a = shared_a.snapshot_state().await;
     let snap_b = shared_b.snapshot_state().await;
 
     assert_eq!(snap_a.bg_tasks.len(), 1);
-    assert_eq!(snap_a.bg_tasks[0].id, "bg_a_1");
+    assert!(snap_a.bg_tasks[0].description.contains("sleep 30"));
     assert!(
         snap_b.bg_tasks.is_empty(),
         "agent B must not see agent A's background task"

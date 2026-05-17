@@ -1,18 +1,24 @@
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 use loopal_agent::task_store::TaskStore;
 use loopal_error::AgentOutput;
 use loopal_runtime::AgentLoopParams;
 use loopal_runtime::agent_loop;
 use loopal_scheduler::CronScheduler;
-use loopal_tool_background::SpawnNotification;
-use tokio::sync::mpsc;
+use loopal_tool_background::{BackgroundTaskStore, SpawnNotification};
+use tokio::sync::{broadcast, oneshot};
 use tokio::task::JoinHandle;
 use tracing::info;
 
 use crate::hub_frontend::HubFrontend;
 use crate::params::StartParams;
+
+// reason: bridge graceful shutdown budget. We send a signal and give the
+// bridge up to this long to drain in-flight events before falling back to
+// abort. 1s covers the worst case where a per-task monitor is mid-emit.
+const BRIDGE_SHUTDOWN_GRACE: Duration = Duration::from_secs(1);
 
 pub(crate) fn parse_start_params(
     params: &serde_json::Value,
@@ -57,10 +63,13 @@ pub(crate) fn spawn_agent_and_bridges(
     agent_params: AgentLoopParams,
     task_store: Arc<TaskStore>,
     scheduler: Arc<CronScheduler>,
-    bg_spawn_rx: mpsc::UnboundedReceiver<SpawnNotification>,
+    bg_spawn_rx: broadcast::Receiver<SpawnNotification>,
+    bg_store: Arc<BackgroundTaskStore>,
     frontend: Arc<HubFrontend>,
 ) -> JoinHandle<Option<AgentOutput>> {
-    let bridge_task = crate::bg_task_bridge::spawn(bg_spawn_rx, frontend.clone());
+    let (bridge_shutdown_tx, bridge_shutdown_rx) = oneshot::channel();
+    let bridge_task =
+        crate::bg_task_bridge::spawn(bg_spawn_rx, bg_store, frontend.clone(), bridge_shutdown_rx);
     let task_change_rx = task_store.subscribe();
     let task_bridge_task = crate::task_bridge::spawn(task_change_rx, task_store, frontend.clone());
     let cron_bridge_task = crate::cron_bridge::spawn(scheduler, frontend);
@@ -83,7 +92,16 @@ pub(crate) fn spawn_agent_and_bridges(
     let cron_bridge_abort = cron_bridge_task.abort_handle();
     tokio::spawn(async move {
         let result = agent_task.await;
-        bridge_abort.abort();
+        let _ = bridge_shutdown_tx.send(());
+        // reason: graceful first — let bridge drain BgTaskCompleted events
+        // that may still be in flight. Fall back to abort if it takes too
+        // long, to avoid leaking the task indefinitely.
+        if tokio::time::timeout(BRIDGE_SHUTDOWN_GRACE, bridge_task)
+            .await
+            .is_err()
+        {
+            bridge_abort.abort();
+        }
         task_bridge_abort.abort();
         cron_bridge_abort.abort();
         result.ok().flatten()

@@ -155,7 +155,10 @@ impl AgentShared {
             .into_iter()
             .map(cron_info_to_snapshot)
             .collect();
-        let bg_tasks = self.kernel.bg_store().snapshot_running();
+        let bg_tasks = self
+            .kernel
+            .bg_store()
+            .snapshot(loopal_tool_background::StatusFilter::All);
         let thread_goal = match self.goal_session.as_ref() {
             Some(s) => s.snapshot().await.ok().flatten(),
             None => None,

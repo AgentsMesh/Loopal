@@ -39,6 +39,7 @@ impl ViewClient {
                 description: v.description.clone(),
                 status: v.status,
                 exit_code: v.exit_code,
+                created_at_unix_ms: v.created_at_unix_ms,
             })
             .collect()
     }

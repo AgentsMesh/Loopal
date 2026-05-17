@@ -16,7 +16,12 @@ fn make_backend(cwd: &std::path::Path) -> Arc<LocalBackend> {
         deny_read_globs: vec![],
         network: NetworkPolicy::default(),
     };
-    LocalBackend::new(cwd.to_path_buf(), Some(policy), ResourceLimits::default())
+    LocalBackend::new(
+        cwd.to_path_buf(),
+        Some(policy),
+        ResourceLimits::default(),
+        "test-session",
+    )
 }
 
 fn make_readonly_backend(cwd: &std::path::Path) -> Arc<LocalBackend> {
@@ -27,7 +32,12 @@ fn make_readonly_backend(cwd: &std::path::Path) -> Arc<LocalBackend> {
         deny_read_globs: vec![],
         network: NetworkPolicy::default(),
     };
-    LocalBackend::new(cwd.to_path_buf(), Some(policy), ResourceLimits::default())
+    LocalBackend::new(
+        cwd.to_path_buf(),
+        Some(policy),
+        ResourceLimits::default(),
+        "test-session",
+    )
 }
 
 // ── check_sandbox_path ───────────────────────────────────────────

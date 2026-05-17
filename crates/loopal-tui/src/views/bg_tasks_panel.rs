@@ -81,6 +81,7 @@ fn render_task_line(
         ),
         BgTaskStatus::Completed => ("✓".into(), Style::default().fg(Color::Green)),
         BgTaskStatus::Failed => ("✗".into(), Style::default().fg(Color::Red)),
+        BgTaskStatus::Killed => ("⊘".into(), Style::default().fg(Color::Red)),
     };
     let (desc, _) = truncate_to_width(&task.description, 40);
     let id_style = if is_focused {

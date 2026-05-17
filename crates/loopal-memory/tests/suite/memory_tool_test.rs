@@ -38,6 +38,7 @@ fn make_ctx(channel: Option<Arc<dyn MemoryChannel>>) -> ToolContext {
         std::env::temp_dir(),
         None,
         loopal_backend::ResourceLimits::default(),
+        "test-session",
     );
     ToolContext::new(backend, "test").with_memory_channel_opt(channel)
 }

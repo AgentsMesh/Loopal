@@ -62,6 +62,7 @@ fn agent_tool_context_inner(
         cwd.clone(),
         None,
         loopal_backend::ResourceLimits::default(),
+        "test-session",
     );
 
     let (hub_conn, _hub_peer) = loopal_ipc::duplex_pair();

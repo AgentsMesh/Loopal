@@ -186,9 +186,14 @@ impl Backend for LocalBackend {
         command: &str,
         env: &loopal_tool_api::backend_types::EnvOverride,
     ) -> Result<ProcessHandle, ToolIoError> {
-        let data =
-            shell::exec_background(&self.cwd, self.policy.as_ref(), command, env, &self.session_id)
-                .await?;
+        let data = shell::exec_background(
+            &self.cwd,
+            self.policy.as_ref(),
+            command,
+            env,
+            &self.session_id,
+        )
+        .await?;
         Ok(ProcessHandle(Box::new(data)))
     }
 

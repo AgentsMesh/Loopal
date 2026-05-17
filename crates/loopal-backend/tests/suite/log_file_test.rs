@@ -256,10 +256,7 @@ async fn exec_command_streaming_timeout_handle_carries_log_path() {
             tokio::time::sleep(Duration::from_millis(2000)).await;
             let on_disk = match tokio::fs::read_to_string(&data.log_path).await {
                 Ok(s) => s,
-                Err(e) => panic!(
-                    "log file {} not readable: {e}",
-                    data.log_path.display()
-                ),
+                Err(e) => panic!("log file {} not readable: {e}", data.log_path.display()),
             };
             assert!(on_disk.contains("PARTIAL"));
             let mut child = data.spawned.child;

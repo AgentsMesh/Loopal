@@ -42,7 +42,7 @@ fn update_goal_description_warns_against_premature_complete() {
     let desc = make_update_goal_tool().description().to_lowercase();
     assert!(desc.contains("achieved"), "must say 'achieved'");
     assert!(
-        desc.contains("budget") && desc.contains("not"),
-        "must warn against marking complete due to budget"
+        desc.contains("stopping work") && desc.contains("not"),
+        "must warn against marking complete merely because work is stopping"
     );
 }

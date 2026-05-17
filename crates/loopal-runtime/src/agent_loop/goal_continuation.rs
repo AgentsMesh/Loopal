@@ -33,8 +33,7 @@ impl AgentLoopRunner {
             return Ok(false);
         }
         if self.barren_continuation_count >= self.max_barren_continuations {
-            self.transition_goal_to_budget_limited(session.as_ref())
-                .await;
+            self.complete_goal_on_barren(session.as_ref()).await;
             return Ok(false);
         }
         let env = build_continuation_envelope(&goal);

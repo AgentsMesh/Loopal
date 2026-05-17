@@ -26,9 +26,6 @@ impl AgentLoopRunner {
 
     async fn execute_turn_body(&mut self, turn_ctx: &mut TurnContext) -> Result<TurnOutput> {
         crate::otel_metrics::active_turns().add(1, &[]);
-        if self.params.goal_session.is_some() {
-            turn_ctx.token_baseline = Some(self.tokens.clone());
-        }
         for obs in &mut self.observers {
             obs.on_turn_start(turn_ctx);
         }
@@ -101,7 +98,6 @@ impl AgentLoopRunner {
         }
 
         self.record_turn_for_barren_tracking(&turn_ctx.metrics);
-        self.charge_goal_for_turn(turn_ctx, duration_ms).await;
 
         result
     }

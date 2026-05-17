@@ -37,19 +37,10 @@ pub struct AgentLoopRunner {
     /// (`AwaitingInput`, `Finished`, `Error`, etc.). If `emit()` fails during
     /// `transition()`, this field is rolled back so the event can be retried.
     pub status: AgentStatus,
-    /// Plan file for the current session (created lazily on first plan mode entry).
     pub plan_file: PlanFile,
-    /// Inbox message ids enqueued since the last turn began, drained as
-    /// `InboxConsumed` events when the runner transitions into `Running`.
     pub pending_consumed_ids: Vec<String>,
-    /// Number of consecutive continuation turns that produced no useful
-    /// work (no tool call and no substantive assistant text). Reset by any
-    /// productive turn. Demotes goal to BudgetLimited when threshold met.
     pub barren_continuation_count: u32,
-    /// Configurable threshold for `barren_continuation_count`.
     pub max_barren_continuations: u32,
-    /// `goal_id` of the most recent continuation envelope injected — used
-    /// by accounting and barren detection to bind a turn to its source goal.
     pub last_continuation_goal_id: Option<String>,
 }
 

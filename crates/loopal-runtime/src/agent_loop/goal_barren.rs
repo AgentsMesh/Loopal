@@ -33,16 +33,16 @@ impl AgentLoopRunner {
         self.barren_continuation_count = next;
     }
 
-    pub(super) async fn transition_goal_to_budget_limited(&self, session: &GoalRuntimeSession) {
+    pub(super) async fn complete_goal_on_barren(&self, session: &GoalRuntimeSession) {
         match session
             .transition(
-                ThreadGoalStatus::BudgetLimited,
+                ThreadGoalStatus::Complete,
                 GoalTransitionReason::BarrenContinuation,
             )
             .await
         {
-            Ok(_) => debug!("goal demoted to budget_limited after barren continuations"),
-            Err(err) => warn!(error = %err, "failed to demote barren goal"),
+            Ok(_) => debug!("goal auto-completed after barren continuations"),
+            Err(err) => warn!(error = %err, "failed to auto-complete barren goal"),
         }
     }
 }

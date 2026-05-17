@@ -15,10 +15,7 @@ use super::goal_e2e_test::{make_goal_session, wait_for_goal_reason};
 async fn goal_pause_does_not_trigger_turn() {
     let fixture = TestFixture::new();
     let (_tmp, session, _log) = make_goal_session(&fixture.test_session("kickoff-pause").id);
-    session
-        .create("active work".into(), None)
-        .await
-        .expect("create");
+    session.create("active work".into()).await.expect("create");
 
     // No mock calls provisioned — any LLM invocation would yield an empty
     // stream, but more importantly we assert the agent *never* enters
@@ -48,7 +45,7 @@ async fn goal_clear_does_not_trigger_turn() {
     let fixture = TestFixture::new();
     let (_tmp, session, _log) = make_goal_session(&fixture.test_session("kickoff-clear").id);
     session
-        .create("work to clear".into(), None)
+        .create("work to clear".into())
         .await
         .expect("create");
 
@@ -102,7 +99,6 @@ async fn goal_create_after_user_message_does_not_double_inject() {
         .control_tx
         .send(ControlCommand::GoalCreate {
             objective: "second wave".into(),
-            token_budget: None,
         })
         .await
         .unwrap();

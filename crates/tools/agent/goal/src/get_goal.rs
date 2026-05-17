@@ -19,8 +19,8 @@ impl TypedTool<GetGoalParams> for GetGoalTool {
     }
 
     fn description(&self) -> &str {
-        "Get the current goal for this thread, including status, budgets, token and elapsed-time \
-         usage, and remaining token budget. Returns null when no goal is set."
+        "Get the current goal for this thread, including objective and status. \
+         Returns null when no goal is set."
     }
 
     fn permission(&self) -> PermissionLevel {
@@ -54,13 +54,11 @@ impl TypedTool<GetGoalParams> for GetGoalTool {
 #[derive(Serialize)]
 struct GoalResponse<'a> {
     goal: Option<&'a ThreadGoal>,
-    remaining_tokens: Option<u64>,
 }
 
 pub(crate) fn render_response(goal: &Option<ThreadGoal>) -> String {
     let body = GoalResponse {
         goal: goal.as_ref(),
-        remaining_tokens: goal.as_ref().and_then(|g| g.remaining_tokens()),
     };
     serde_json::to_string_pretty(&body).unwrap_or_else(|_| "{}".to_string())
 }

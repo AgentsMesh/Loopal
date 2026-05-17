@@ -8,27 +8,8 @@ use tracing::warn;
 
 use crate::frontend::traits::EventEmitter;
 
-/// Outcome of [`GoalRuntimeSession::add_usage`]. Callers use this to react
-/// in-process (e.g. inject a budget-limit warning into the current turn)
-/// rather than waiting for the broadcast `ThreadGoalUpdated` event to round
-/// trip back through Hub → ViewState.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UsageOutcome {
-    NoOp,
-    Updated,
-    BudgetExhausted,
-}
-
-/// Maximum objective length in characters. Long objectives bloat goal.json
-/// and recur in every continuation prompt.
 pub const MAX_OBJECTIVE_CHARS: usize = 4096;
 
-/// Authoritative per-session goal owner. All mutations funnel through here so
-/// the state machine stays single-writer.
-///
-/// Mutating methods commit to disk before emitting `ThreadGoalUpdated`; emit
-/// failures are logged at WARN, never rolled back — UIs reconcile via the
-/// next `agent/state_snapshot`.
 pub struct GoalRuntimeSession {
     session_id: StdMutex<String>,
     pub(super) store: Arc<GoalStore>,
@@ -71,20 +52,13 @@ impl GoalRuntimeSession {
             .map_err(|e| GoalSessionError::Storage(e.to_string()))
     }
 
-    pub async fn create(
-        &self,
-        objective: String,
-        token_budget: Option<u64>,
-    ) -> Result<ThreadGoal, GoalSessionError> {
+    pub async fn create(&self, objective: String) -> Result<ThreadGoal, GoalSessionError> {
         let len = objective.chars().count();
         if !(1..=MAX_OBJECTIVE_CHARS).contains(&len) {
             return Err(GoalSessionError::ObjectiveTooLong {
                 max: MAX_OBJECTIVE_CHARS,
                 got: len,
             });
-        }
-        if matches!(token_budget, Some(0)) {
-            return Err(GoalSessionError::InvalidBudget);
         }
         let goal = {
             let _guard = self.write_lock.lock().await;
@@ -97,8 +71,7 @@ impl GoalRuntimeSession {
             {
                 return Err(GoalSessionError::AlreadyExists);
             }
-            let mut goal = ThreadGoal::new(id, objective);
-            goal.token_budget = token_budget;
+            let goal = ThreadGoal::new(id, objective);
             self.store
                 .save(&goal)
                 .map_err(|e| GoalSessionError::Storage(e.to_string()))?;

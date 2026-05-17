@@ -114,7 +114,6 @@ impl AgentLoopRunner {
             | ControlCommand::GoalUserPause
             | ControlCommand::GoalUserResume
             | ControlCommand::GoalUserComplete
-            | ControlCommand::GoalExtendBudget { .. }
             | ControlCommand::GoalClear) => {
                 return self.handle_goal_control(ctrl).await;
             }

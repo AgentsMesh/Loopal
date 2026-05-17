@@ -17,14 +17,13 @@ fn load_returns_none_when_no_goal_file() {
 #[test]
 fn save_then_load_roundtrip() {
     let (_tmp, store) = store();
-    let goal = ThreadGoal::new("sess-1", "Refactor X").with_token_budget(10_000);
+    let goal = ThreadGoal::new("sess-1", "Refactor X");
     store.save(&goal).unwrap();
 
     let loaded = store.load("sess-1").unwrap().unwrap();
     assert_eq!(loaded.session_id, "sess-1");
     assert_eq!(loaded.objective, "Refactor X");
     assert_eq!(loaded.status, ThreadGoalStatus::Active);
-    assert_eq!(loaded.token_budget, Some(10_000));
 }
 
 #[test]

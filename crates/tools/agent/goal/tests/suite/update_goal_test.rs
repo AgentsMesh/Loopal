@@ -7,7 +7,7 @@ use super::support::{
 
 #[tokio::test]
 async fn marks_active_goal_complete() {
-    let session = FakeGoalSession::with_active("ship", None);
+    let session = FakeGoalSession::with_active("ship");
     let ctx = ctx_with_goal_session(session.clone());
     let result = make_update_goal_tool()
         .execute(json!({"status": "complete"}), &ctx)

@@ -1,4 +1,3 @@
-//! `LocalBackend` — production `Backend` for local filesystem + OS sandbox.
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -16,35 +15,37 @@ use crate::approved::ApprovedPaths;
 use crate::limits::ResourceLimits;
 use crate::{fs, net, path, platform, search, shell, shell_stream};
 
-/// Production backend: local disk I/O with path checking, size limits,
-/// atomic writes, OS-level sandbox wrapping, and resource budgets.
 pub struct LocalBackend {
     cwd: PathBuf,
     policy: Option<ResolvedPolicy>,
     limits: ResourceLimits,
     approved: ApprovedPaths,
+    session_id: String,
 }
 
 impl LocalBackend {
-    pub fn new(cwd: PathBuf, policy: Option<ResolvedPolicy>, limits: ResourceLimits) -> Arc<Self> {
+    pub fn new(
+        cwd: PathBuf,
+        policy: Option<ResolvedPolicy>,
+        limits: ResourceLimits,
+        session_id: impl Into<String>,
+    ) -> Arc<Self> {
         let cwd = path::strip_win_prefix(cwd.canonicalize().unwrap_or(cwd));
         Arc::new(Self {
             cwd,
             policy,
             limits,
             approved: ApprovedPaths::new(),
+            session_id: session_id.into(),
         })
     }
 
-    /// Resolve with sandbox check; falls back to approved-paths on `RequiresApproval`.
     fn resolve_checked(&self, raw: &str, is_write: bool) -> Result<PathBuf, ToolIoError> {
         match path::resolve(&self.cwd, raw, is_write, self.policy.as_ref()) {
             Ok(p) => Ok(p),
             Err(ToolIoError::RequiresApproval(reason)) => {
                 let abs = path::to_absolute(&self.cwd, raw);
                 if self.approved.contains(&abs) {
-                    // Canonicalize for consistency with the Allow path
-                    // (path::resolve returns canonical form).
                     Ok(abs.canonicalize().unwrap_or(abs))
                 } else {
                     Err(ToolIoError::RequiresApproval(reason))
@@ -156,7 +157,7 @@ impl Backend for LocalBackend {
             command,
             env,
             timeout,
-            &self.limits,
+            &self.session_id,
         )
         .await
     }
@@ -174,8 +175,8 @@ impl Backend for LocalBackend {
             command,
             env,
             timeout,
-            &self.limits,
             tail,
+            &self.session_id,
         )
         .await
     }
@@ -185,7 +186,14 @@ impl Backend for LocalBackend {
         command: &str,
         env: &loopal_tool_api::backend_types::EnvOverride,
     ) -> Result<ProcessHandle, ToolIoError> {
-        let data = shell::exec_background(&self.cwd, self.policy.as_ref(), command, env).await?;
+        let data = shell::exec_background(
+            &self.cwd,
+            self.policy.as_ref(),
+            command,
+            env,
+            &self.session_id,
+        )
+        .await?;
         Ok(ProcessHandle(Box::new(data)))
     }
 

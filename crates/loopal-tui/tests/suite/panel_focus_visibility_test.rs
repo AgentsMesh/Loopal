@@ -43,8 +43,10 @@ fn setup_two_panels() -> App {
     app.view_clients["main"].inject_bg_for_test(vec![loopal_protocol::BgTaskSnapshot {
         id: "bg_1".into(),
         description: "bg".into(),
+
         status: BgTaskStatus::Running,
         exit_code: None,
+        created_at_unix_ms: 0,
     }]);
     // Both panels have a remembered selection in state.
     app.section_mut(PanelKind::Tasks).focused = Some("1".into());

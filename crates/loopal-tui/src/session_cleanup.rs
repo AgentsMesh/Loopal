@@ -47,9 +47,11 @@ pub(crate) fn merge_bg_details_from_view(
         let detail = loopal_protocol::BgTaskDetail {
             id: id.clone(),
             description: description.clone(),
+
             status: *status,
             exit_code: *exit_code,
             output: output.clone(),
+            created_at_unix_ms: 0,
         };
         if let Some(existing) = details.iter_mut().find(|d| d.id == *id) {
             *existing = detail;

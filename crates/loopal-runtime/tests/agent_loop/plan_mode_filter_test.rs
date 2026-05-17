@@ -62,6 +62,7 @@ async fn plan_mode_allows_read_with_reminder() {
         std::env::temp_dir(),
         None,
         loopal_backend::ResourceLimits::default(),
+        "test-session",
     );
 
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });

@@ -13,7 +13,10 @@ pub fn format_exec_result(output: ExecResult, command: &str) -> ToolResult {
     let cleaned = ExecResult {
         stdout: stdout_body,
         stderr: stderr_body,
+        stdout_truncated: output.stdout_truncated,
+        stderr_truncated: output.stderr_truncated,
         exit_code: output.exit_code,
+        log_path: output.log_path,
     };
 
     let stdout_size = cleaned.stdout.len();
@@ -120,6 +123,7 @@ pub fn format_converted_to_background(
     task_id: &str,
     timeout: std::time::Duration,
     partial_output: &str,
+    log_path: &std::path::Path,
 ) -> ToolResult {
     let timeout_secs = timeout.as_secs();
     let mut msg = format!(
@@ -127,6 +131,9 @@ pub fn format_converted_to_background(
          process_id: {task_id}\n\
          Use Bash with process_id to check output later."
     );
+    if !log_path.as_os_str().is_empty() {
+        msg.push_str(&format!("\nFull log: {}", log_path.display()));
+    }
     if !partial_output.is_empty() {
         let truncated = truncate_output(
             partial_output,

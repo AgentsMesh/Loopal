@@ -12,6 +12,8 @@ mod agent_setup;
 mod agent_setup_context;
 mod agent_setup_helpers;
 mod bg_task_bridge;
+mod bg_task_bridge_monitor;
+mod bg_task_bridge_sampler;
 mod cron_bridge;
 mod hub_broadcaster;
 #[doc(hidden)]

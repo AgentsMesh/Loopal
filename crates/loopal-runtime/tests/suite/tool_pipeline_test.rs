@@ -13,13 +13,18 @@ fn make_ctx() -> ToolContext {
         PathBuf::from("/tmp"),
         None,
         loopal_backend::ResourceLimits::default(),
+        "test-session",
     );
     ToolContext::new(backend, "test-session".to_string())
 }
 
 fn make_ctx_for(cwd: PathBuf) -> ToolContext {
-    let backend =
-        loopal_backend::LocalBackend::new(cwd, None, loopal_backend::ResourceLimits::default());
+    let backend = loopal_backend::LocalBackend::new(
+        cwd,
+        None,
+        loopal_backend::ResourceLimits::default(),
+        "test-session",
+    );
     ToolContext::new(backend, "test-session".to_string())
 }
 

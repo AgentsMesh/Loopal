@@ -3,7 +3,12 @@ use loopal_tool_grep::{GrepParams, GrepTool};
 use serde_json::json;
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
-    let backend = loopal_backend::LocalBackend::new(cwd.to_path_buf(), None, Default::default());
+    let backend = loopal_backend::LocalBackend::new(
+        cwd.to_path_buf(),
+        None,
+        Default::default(),
+        "test-session",
+    );
     ToolContext::new(backend, "test")
 }
 

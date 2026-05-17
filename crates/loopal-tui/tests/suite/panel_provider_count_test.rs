@@ -133,17 +133,21 @@ fn bg_tasks_count_matches_running_snapshots() {
         BgTaskDetail {
             id: "bg_1".into(),
             description: "a".into(),
+
             status: BgTaskStatus::Running,
             exit_code: None,
             output: String::new(),
+            created_at_unix_ms: 0,
         }
         .to_snapshot(),
         BgTaskDetail {
             id: "bg_2".into(),
             description: "b".into(),
+
             status: BgTaskStatus::Completed,
             exit_code: Some(0),
             output: String::new(),
+            created_at_unix_ms: 0,
         }
         .to_snapshot(),
     ]);

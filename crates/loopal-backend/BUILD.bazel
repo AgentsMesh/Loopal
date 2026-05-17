@@ -18,7 +18,12 @@ rust_library(
         "@crates//:regex",
         "@crates//:reqwest",
         "@crates//:tokio",
-    ],
+        "@crates//:tracing",
+        "@crates//:uuid",
+    ] + select({
+        "@platforms//os:windows": ["@crates//:windows-sys"],
+        "//conditions:default": ["@crates//:libc"],
+    }),
     proc_macro_deps = ["@crates//:async-trait"],
 )
 
@@ -38,8 +43,10 @@ rust_test(
         "//crates/loopal-config",
         "//crates/loopal-error",
         "//crates/loopal-tool-api",
+        "@crates//:parking_lot",
         "@crates//:tempfile",
         "@crates//:tokio",
+        "@crates//:uuid",
     ],
     proc_macro_deps = ["@crates//:async-trait"],
 )

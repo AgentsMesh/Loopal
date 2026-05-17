@@ -140,7 +140,11 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
         TurnCompleted(_) => observable::turn_completed(state),
         TasksChanged { tasks } => aggregate::tasks_changed(state, tasks),
         CronsChanged { crons } => aggregate::crons_changed(state, crons),
-        BgTaskSpawned { id, description } => bg::spawned(state, id, description),
+        BgTaskSpawned {
+            id,
+            description,
+            created_at_unix_ms,
+        } => bg::spawned(state, id, description, *created_at_unix_ms),
         BgTaskOutput { id, output_delta } => bg::output(state, id, output_delta),
         BgTaskCompleted {
             id,

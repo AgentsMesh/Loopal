@@ -31,6 +31,7 @@ pub fn render_bg_task_log(
         BgTaskStatus::Running => ("Running", Color::Yellow),
         BgTaskStatus::Completed => ("Done", Color::Green),
         BgTaskStatus::Failed => ("Failed", Color::Red),
+        BgTaskStatus::Killed => ("Killed", Color::Red),
     };
     let follow_label = if state.auto_follow { " [follow]" } else { "" };
     let title_line = Line::from(vec![

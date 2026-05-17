@@ -1,15 +1,19 @@
-//! Background-task event tests: spawn / output append / completion.
-
 use loopal_protocol::{AgentEventPayload, BgTaskDetail, BgTaskStatus};
 use loopal_view_state::{BgTaskView, ViewStateReducer};
+
+fn spawn(id: &str, description: &str) -> AgentEventPayload {
+    AgentEventPayload::BgTaskSpawned {
+        id: id.into(),
+        description: description.into(),
+
+        created_at_unix_ms: 0,
+    }
+}
 
 #[test]
 fn bg_task_spawned_inserts_running_view() {
     let mut r = ViewStateReducer::new("root");
-    r.apply(AgentEventPayload::BgTaskSpawned {
-        id: "bg_1".into(),
-        description: "long-running build".into(),
-    });
+    r.apply(spawn("bg_1", "long-running build"));
     let view = r.state().bg_tasks.get("bg_1").expect("bg_1 inserted");
     assert_eq!(view.description, "long-running build");
     assert!(matches!(view.status, BgTaskStatus::Running));
@@ -19,10 +23,7 @@ fn bg_task_spawned_inserts_running_view() {
 #[test]
 fn bg_task_output_appends_incrementally() {
     let mut r = ViewStateReducer::new("root");
-    r.apply(AgentEventPayload::BgTaskSpawned {
-        id: "bg_1".into(),
-        description: "tail".into(),
-    });
+    r.apply(spawn("bg_1", "tail"));
     r.apply(AgentEventPayload::BgTaskOutput {
         id: "bg_1".into(),
         output_delta: "line1\n".into(),
@@ -48,10 +49,7 @@ fn bg_task_output_for_unknown_id_returns_none() {
 #[test]
 fn bg_task_completed_replaces_output_and_sets_status() {
     let mut r = ViewStateReducer::new("root");
-    r.apply(AgentEventPayload::BgTaskSpawned {
-        id: "bg_1".into(),
-        description: "build".into(),
-    });
+    r.apply(spawn("bg_1", "build"));
     r.apply(AgentEventPayload::BgTaskOutput {
         id: "bg_1".into(),
         output_delta: "partial".into(),
@@ -69,7 +67,7 @@ fn bg_task_completed_replaces_output_and_sets_status() {
 }
 
 #[test]
-fn bg_task_completed_for_unknown_id_returns_none() {
+fn bg_task_completed_for_unknown_id_creates_placeholder() {
     let mut r = ViewStateReducer::new("root");
     let result = r.apply(AgentEventPayload::BgTaskCompleted {
         id: "ghost".into(),
@@ -77,8 +75,14 @@ fn bg_task_completed_for_unknown_id_returns_none() {
         exit_code: Some(1),
         output: "".into(),
     });
-    assert!(result.is_none());
-    assert_eq!(r.rev(), 0);
+    assert!(result.is_some());
+    let view = r
+        .state()
+        .bg_tasks
+        .get("ghost")
+        .expect("placeholder created");
+    assert!(matches!(view.status, BgTaskStatus::Failed));
+    assert_eq!(view.exit_code, Some(1));
 }
 
 #[test]
@@ -86,9 +90,11 @@ fn bg_view_from_detail_carries_output() {
     let detail = BgTaskDetail {
         id: "bg_x".into(),
         description: "captured run".into(),
+
         status: BgTaskStatus::Completed,
         exit_code: Some(0),
         output: "transcript text".into(),
+        created_at_unix_ms: 0,
     };
     let view = BgTaskView::from_detail(detail);
     assert_eq!(view.id, "bg_x");

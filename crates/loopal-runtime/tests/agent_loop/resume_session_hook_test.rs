@@ -231,3 +231,24 @@ async fn empty_hooks_emits_no_warning() {
         );
     }
 }
+
+#[tokio::test]
+async fn resume_rebuilds_backend_instance() {
+    // reason: regression guard for the bug where handle_resume_session only
+    // updated tool_ctx.session_id without rebuilding tool_ctx.backend.
+    // LocalBackend caches session_id + cwd as fields — if not rebuilt,
+    // bash log files would leak across sessions and sandbox path checks
+    // would use the wrong cwd.
+    let mut h = build_harness(Vec::new());
+    let old_backend_ptr = Arc::as_ptr(&h.runner.tool_ctx.backend) as *const ();
+    h.runner.handle_resume_session(&h.target_id).await.unwrap();
+    let new_backend_ptr = Arc::as_ptr(&h.runner.tool_ctx.backend) as *const ();
+    assert_ne!(
+        old_backend_ptr, new_backend_ptr,
+        "backend Arc must be replaced with a fresh instance on resume"
+    );
+    assert_eq!(
+        h.runner.tool_ctx.session_id, h.target_id,
+        "session_id must also follow"
+    );
+}

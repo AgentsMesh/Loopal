@@ -48,6 +48,7 @@ fn ctx_with_secrets(store: Arc<dyn Vault>) -> ToolContext {
         std::env::temp_dir(),
         None,
         loopal_backend::ResourceLimits::default(),
+        "test-session",
     );
     ToolContext::new(backend, "test-session").with_secrets(store)
 }
@@ -57,6 +58,7 @@ fn ctx_without_secrets() -> ToolContext {
         std::env::temp_dir(),
         None,
         loopal_backend::ResourceLimits::default(),
+        "test-session",
     );
     ToolContext::new(backend, "test-session")
 }

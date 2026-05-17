@@ -16,6 +16,8 @@ const KNOWN_KEYS: &[&str] = &[
     "telemetry",
     "fetch_refiner",
     "secrets",
+    "goals",
+    "bg_tasks",
 ];
 
 pub fn warn_unknown_keys(merged: &serde_json::Value) {

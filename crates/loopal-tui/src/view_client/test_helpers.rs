@@ -39,6 +39,7 @@ impl ViewClient {
             self.apply_event(&AgentEvent::root(AgentEventPayload::BgTaskSpawned {
                 id: item.id.clone(),
                 description: item.description.clone(),
+                created_at_unix_ms: item.created_at_unix_ms,
             }));
             if !matches!(item.status, BgTaskStatus::Running) {
                 self.apply_event(&AgentEvent::root(AgentEventPayload::BgTaskCompleted {

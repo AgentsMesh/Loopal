@@ -57,6 +57,7 @@ fn ctx_with_secret(name: &str, value: &str) -> ToolContext {
         std::env::temp_dir(),
         None,
         loopal_backend::ResourceLimits::default(),
+        "tracing-sentinel",
     );
     let mut map = std::collections::HashMap::new();
     map.insert(name.to_string(), value.to_string());

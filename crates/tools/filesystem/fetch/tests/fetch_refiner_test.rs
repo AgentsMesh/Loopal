@@ -42,6 +42,7 @@ fn make_ctx_with_resolver(resolver: Option<Arc<MockResolver>>) -> (ToolContext, 
         tmp.path().to_path_buf(),
         None,
         loopal_backend::ResourceLimits::default(),
+        "test-session",
     );
     let ctx = ToolContext::new(backend, "t");
     let ctx = match resolver {

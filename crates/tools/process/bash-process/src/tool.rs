@@ -61,10 +61,7 @@ impl TypedTool<BashProcessParams> for BashProcessTool {
         _ctx: &ToolContext,
     ) -> Result<ToolResult, LoopalError> {
         if input.stop.unwrap_or(false) {
-            return Ok(loopal_tool_background::ops::bg_stop(
-                &self.store,
-                &input.process_id,
-            ));
+            return Ok(loopal_tool_background::ops::bg_stop(&self.store, &input.process_id).await);
         }
 
         let block = input.block.unwrap_or(true);

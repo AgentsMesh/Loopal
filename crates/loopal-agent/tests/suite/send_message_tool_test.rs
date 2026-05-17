@@ -24,6 +24,7 @@ fn make_ctx_with_hub_peer(fixture: &TestFixture) -> (ToolContext, Arc<Connection
         cwd.clone(),
         None,
         loopal_backend::ResourceLimits::default(),
+        "test-session",
     );
 
     let (hub_conn, hub_peer) = loopal_ipc::duplex_pair();

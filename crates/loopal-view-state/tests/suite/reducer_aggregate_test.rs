@@ -112,6 +112,8 @@ fn session_resumed_clears_session_state_and_records_id() {
     r.apply(AgentEventPayload::BgTaskSpawned {
         id: "bg_1".into(),
         description: "doomed bg".into(),
+
+        created_at_unix_ms: 0,
     });
     r.apply(AgentEventPayload::SessionResumed {
         session_id: "session-xyz".into(),

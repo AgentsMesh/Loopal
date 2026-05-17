@@ -1,33 +1,28 @@
-//! Background task snapshot types for TUI / IPC observation.
-//!
-//! Defined in protocol so that presentation layers (TUI, ACP) can display
-//! background task status without depending on the tool-level store.
-
 use serde::{Deserialize, Serialize};
 
-/// Observable status of a background task.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BgTaskStatus {
     Running,
     Completed,
     Failed,
+    Killed,
 }
 
-/// Minimal, read-only snapshot of a background task for panel display.
-///
-/// Serializable so it can ride inside `AgentStateSnapshot` across the
-/// `agent/state_snapshot` IPC boundary (Hub cold-start ViewState rebuild).
+impl BgTaskStatus {
+    pub fn is_terminal(self) -> bool {
+        !matches!(self, BgTaskStatus::Running)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BgTaskSnapshot {
     pub id: String,
     pub description: String,
     pub status: BgTaskStatus,
     pub exit_code: Option<i32>,
+    pub created_at_unix_ms: u64,
 }
 
-/// Full detail of a background task, including captured output.
-///
-/// Transmitted via `BgTasksUpdate` events from agent process to TUI.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BgTaskDetail {
     pub id: String,
@@ -35,6 +30,7 @@ pub struct BgTaskDetail {
     pub status: BgTaskStatus,
     pub exit_code: Option<i32>,
     pub output: String,
+    pub created_at_unix_ms: u64,
 }
 
 impl BgTaskDetail {
@@ -44,6 +40,7 @@ impl BgTaskDetail {
             description: self.description.clone(),
             status: self.status,
             exit_code: self.exit_code,
+            created_at_unix_ms: self.created_at_unix_ms,
         }
     }
 }

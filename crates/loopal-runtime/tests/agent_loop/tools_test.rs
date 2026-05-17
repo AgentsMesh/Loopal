@@ -16,6 +16,7 @@ async fn test_execute_tools_bypass_mode() {
         std::env::temp_dir(),
         None,
         loopal_backend::ResourceLimits::default(),
+        "test-session",
     );
 
     let tool_uses = vec![(
@@ -107,6 +108,7 @@ async fn test_execute_tools_read_allowed_write_denied_in_supervised() {
         std::env::temp_dir(),
         None,
         loopal_backend::ResourceLimits::default(),
+        "test-session",
     );
 
     let tool_uses = vec![

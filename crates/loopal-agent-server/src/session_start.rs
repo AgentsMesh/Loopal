@@ -129,11 +129,13 @@ pub(crate) async fn start_session(
         info!(session.id = %session_id, "session started");
 
         let spawn_rx = kernel_for_bridge.bg_store().subscribe_spawns();
+        let bg_store_for_bridge = kernel_for_bridge.bg_store().clone();
         let agent_task = spawn_agent_and_bridges(
             agent_params,
             task_store_for_bridge,
             scheduler_for_bridge,
             spawn_rx,
+            bg_store_for_bridge,
             frontend_placeholder,
         );
 

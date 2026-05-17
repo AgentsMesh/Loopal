@@ -56,6 +56,7 @@ impl AgentLoopRunner {
                 self.params.store.clear();
                 self.turn_count = 0;
                 self.tokens.reset();
+                self.cleanup_session_tmp().await;
             }
             ControlCommand::Compact => {
                 self.force_compact().await?;

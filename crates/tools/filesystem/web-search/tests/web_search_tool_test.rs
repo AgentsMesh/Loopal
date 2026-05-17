@@ -7,6 +7,7 @@ fn make_ctx() -> ToolContext {
         std::path::PathBuf::from("/tmp"),
         None,
         loopal_backend::ResourceLimits::default(),
+        "test-session",
     );
     ToolContext::new(backend, "test")
 }

@@ -76,6 +76,11 @@ pub async fn run() -> anyhow::Result<()> {
         loopal_git::cleanup_stale_worktrees(&repo_root);
     }
     discovery::cleanup_stale();
+    // reason: orphan cleanup must run in every process entry, not just
+    // multiprocess parent. daemon modes (serve / hub-only / acp) own
+    // sessions too and would otherwise accumulate tmp dirs indefinitely.
+    // Cost is a single fs read_dir + HashSet compare — negligible.
+    cleanup_bash_log_orphans().await;
 
     let mut config = load_config(&cwd)?;
     cli.apply_overrides(&mut config.settings);
@@ -167,4 +172,20 @@ pub(crate) fn abbreviate_home(path: &std::path::Path) -> String {
         return format!("~/{}", rel.display());
     }
     path.display().to_string()
+}
+
+// reason: any `$TMPDIR/loopal/{id}/` dir whose id is not in
+// `~/.loopal/sessions/` is an orphan left by a previous crash. Clean it on
+// every startup so the tmp dir doesn't grow indefinitely on long-lived
+// machines. Failure is non-fatal (warn only).
+async fn cleanup_bash_log_orphans() {
+    let live_sessions: std::collections::HashSet<String> = match loopal_storage::SessionStore::new()
+    {
+        Ok(store) => store
+            .list_sessions()
+            .map(|ss| ss.into_iter().map(|s| s.id).collect())
+            .unwrap_or_default(),
+        Err(_) => std::collections::HashSet::new(),
+    };
+    loopal_backend::cleanup_orphans(&live_sessions).await;
 }

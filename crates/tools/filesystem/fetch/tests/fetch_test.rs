@@ -9,6 +9,7 @@ fn make_ctx() -> ToolContext {
         std::env::temp_dir(),
         None,
         loopal_backend::ResourceLimits::default(),
+        "test-session",
     );
     ToolContext::new(backend, "t")
 }

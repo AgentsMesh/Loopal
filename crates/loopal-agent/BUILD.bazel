@@ -66,6 +66,7 @@ rust_test(
         "//crates/loopal-scheduler",
         "//crates/loopal-test-support",
         "//crates/loopal-tool-api",
+        "//crates/tools/process/bash:loopal-tool-bash",
         "@crates//:serde_json",
         "@crates//:tempfile",
         "@crates//:tokio",

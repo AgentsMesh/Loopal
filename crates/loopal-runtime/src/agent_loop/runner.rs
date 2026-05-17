@@ -51,10 +51,10 @@ impl AgentLoopRunner {
             .as_ref()
             .map(|s| Arc::new(GoalSessionToolAdapter::new(Arc::clone(s))) as Arc<dyn GoalSession>);
         let tool_ctx = ToolContext::new(
-            params
-                .deps
-                .kernel
-                .create_backend(std::path::Path::new(&params.session.cwd)),
+            params.deps.kernel.create_backend(
+                std::path::Path::new(&params.session.cwd),
+                &params.session.id,
+            ),
             params.session.id.clone(),
         )
         .with_shared_opt(params.shared.clone())
@@ -115,6 +115,7 @@ impl AgentLoopRunner {
 
         self.fire_session_hook(loopal_config::HookEvent::SessionEnd)
             .await;
+        self.cleanup_session_tmp().await;
         self.emit_inbox_consumed().await;
 
         if let Err(ref e) = result
@@ -138,5 +139,26 @@ impl AgentLoopRunner {
     /// is a loud failure instead of a silent `turn_id=0`.
     pub async fn emit_in_turn(&self, payload: AgentEventPayload) -> Result<()> {
         self.params.deps.frontend.emit_in_turn(payload).await
+    }
+
+    /// Remove this session's tmp dir (`$TMPDIR/loopal/{id}/`).
+    /// Excludes log files of still-running background tasks.
+    pub(crate) async fn cleanup_session_tmp(&self) {
+        let exclude: Vec<std::path::PathBuf> = self
+            .params
+            .deps
+            .kernel
+            .bg_store()
+            .snapshot(loopal_tool_background::StatusFilter::Running)
+            .iter()
+            .filter_map(|s| {
+                self.params
+                    .deps
+                    .kernel
+                    .bg_store()
+                    .read_task(&s.id, |t| t.log_path().to_path_buf())
+            })
+            .collect();
+        loopal_backend::cleanup_session_tmp(&self.params.session.id, &exclude).await;
     }
 }

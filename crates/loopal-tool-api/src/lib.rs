@@ -1,12 +1,15 @@
 pub mod backend;
 pub mod backend_types;
+pub mod bg_config;
 pub mod goal_session;
+pub mod head_tail;
 pub mod input_normalize;
 pub mod memory_channel;
 pub mod output_tail;
 pub mod permission;
 pub mod provider_resolver;
 pub mod schema_normalize;
+pub mod stderr_buf;
 mod tool;
 mod tool_context;
 pub mod truncate;
@@ -20,11 +23,14 @@ pub use backend_types::{
     GlobOptions, GlobSearchResult, GrepOptions, GrepSearchResult, LsEntry, LsResult, MatchGroup,
     MatchLine, ReadResult, TimeoutSecs, WriteResult,
 };
+pub use bg_config::BgTaskConfig;
 pub use goal_session::{GoalSession, GoalSessionError};
+pub use head_tail::HeadTail;
 pub use memory_channel::MemoryChannel;
 pub use output_tail::OutputTail;
 pub use permission::{PermissionDecision, PermissionLevel, PermissionMode};
 pub use provider_resolver::{FetchRefinerPolicy, OneShotChatError, OneShotChatService};
+pub use stderr_buf::{STDERR_CAP_BYTES, StderrCappedBuffer};
 pub use tool::{Tool, ToolDefinition, ToolDispatch, ToolResult};
 pub use tool_context::ToolContext;
 pub use truncate::{

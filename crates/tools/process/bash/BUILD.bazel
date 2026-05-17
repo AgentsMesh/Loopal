@@ -12,6 +12,7 @@ rust_library(
         "//crates/loopal-sandbox:loopal-sandbox",
         "//crates/loopal-tool-api:loopal-tool-api",
         "//crates/tools/process/background:loopal-tool-background",
+        "@crates//:parking_lot",
         "@crates//:schemars",
         "@crates//:serde",
         "@crates//:serde_json",

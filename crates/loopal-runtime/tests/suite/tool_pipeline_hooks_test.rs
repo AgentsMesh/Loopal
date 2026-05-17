@@ -20,6 +20,7 @@ fn temp_file(name: &str, content: &str) -> (std::path::PathBuf, ToolContext) {
         tmp_dir.clone(),
         None,
         loopal_backend::ResourceLimits::default(),
+        "test-session",
     );
     let ctx = ToolContext::new(backend, format!("test-{name}"));
     (path, ctx)

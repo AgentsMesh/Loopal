@@ -1,5 +1,4 @@
 mod bg_convert;
-mod bg_monitor;
 mod env_inject;
 pub mod format;
 pub mod strategy;
@@ -116,10 +115,16 @@ impl TypedTool<BashParams> for BashTool {
             let desc = input.description.as_deref().unwrap_or(&input.command);
             return match ctx.backend.exec_background(&input.command, &env).await {
                 Ok(handle) => {
-                    let task_id = bg_convert::register_spawned(&self.store, handle, desc)
-                        .unwrap_or_else(|| "(unknown)".into());
+                    let (task_id, log_path) =
+                        bg_convert::register_spawned(&self.store, handle, desc)
+                            .unwrap_or_else(|| ("(unknown)".into(), std::path::PathBuf::new()));
+                    let log_line = if log_path.as_os_str().is_empty() {
+                        String::new()
+                    } else {
+                        format!("\nFull log: {}", log_path.display())
+                    };
                     Ok(ToolResult::success(format!(
-                        "Background process started.\nprocess_id: {task_id}"
+                        "Background process started.\nprocess_id: {task_id}{log_line}"
                     )))
                 }
                 Err(e) => Ok(ToolResult::error(e.to_string())),
@@ -131,7 +136,7 @@ impl TypedTool<BashParams> for BashTool {
 }
 
 async fn exec_foreground(
-    store: &BackgroundTaskStore,
+    store: &Arc<BackgroundTaskStore>,
     input: &BashParams,
     env: &loopal_tool_api::backend_types::EnvOverride,
     ctx: &ToolContext,
@@ -159,12 +164,13 @@ async fn exec_foreground(
             partial_output,
             handle,
         }) => {
-            let task_id = bg_convert::register(store, handle, &input.command)
-                .unwrap_or_else(|| "(unknown)".into());
+            let (task_id, log_path) = bg_convert::register(store, handle, &input.command)
+                .unwrap_or_else(|| ("(unknown)".into(), std::path::PathBuf::new()));
             Ok(format::format_converted_to_background(
                 &task_id,
                 timeout,
                 &partial_output,
+                &log_path,
             ))
         }
         Err(loopal_error::ToolIoError::Timeout(d)) => {

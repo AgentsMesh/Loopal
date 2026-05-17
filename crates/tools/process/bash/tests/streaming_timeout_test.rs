@@ -12,6 +12,7 @@ fn make_streaming_ctx(cwd: &std::path::Path) -> ToolContext {
         cwd.to_path_buf(),
         None,
         loopal_backend::ResourceLimits::default(),
+        "test-session",
     );
     ToolContext::new(backend, "test").with_output_tail(Arc::new(OutputTail::new(20)))
 }
@@ -47,6 +48,7 @@ async fn non_streaming_timeout_is_hard_error() {
         tmp.path().to_path_buf(),
         None,
         loopal_backend::ResourceLimits::default(),
+        "test-session",
     );
     let ctx = ToolContext::new(backend, "test");
 

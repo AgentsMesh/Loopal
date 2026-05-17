@@ -1,71 +1,58 @@
-/// Tests for SpawnNotification — subscribe_spawns() and insert() notification.
-use std::sync::Arc;
+use std::time::Duration;
 
-use loopal_tool_background::BackgroundTaskStore;
+use crate::test_support::{make_store, spawn_completed_task, spawn_raw};
 
-fn make_store() -> Arc<BackgroundTaskStore> {
-    BackgroundTaskStore::new()
-}
-
-#[test]
-fn subscribe_then_insert_sends_notification() {
+#[tokio::test]
+async fn subscribe_then_register_sends_notification() {
     let store = make_store();
     let mut rx = store.subscribe_spawns();
-    store.register_proxy("bg_1".into(), "task one".into());
-    let notif = rx.try_recv().expect("should receive notification");
-    assert_eq!(notif.task_id, "bg_1");
-    assert_eq!(notif.description, "task one");
+    let pid = spawn_raw(&store, "echo one").await;
+    let notif = rx.recv().await.expect("notification should arrive");
+    assert_eq!(notif.task_id, pid);
+    assert!(notif.description.contains("echo one"));
 }
 
-#[test]
-fn insert_without_subscriber_does_not_panic() {
+#[tokio::test]
+async fn insert_without_subscriber_does_not_panic() {
     let store = make_store();
-    store.register_proxy("bg_1".into(), "no subscriber".into());
+    let _ = spawn_completed_task(&store, "").await;
 }
 
-#[test]
-fn multiple_inserts_send_ordered_notifications() {
+#[tokio::test]
+async fn multiple_subscribers_receive_independently() {
+    let store = make_store();
+    let mut rx1 = store.subscribe_spawns();
+    let mut rx2 = store.subscribe_spawns();
+    let pid = spawn_raw(&store, "echo a").await;
+    let n1 = rx1.recv().await.unwrap();
+    let n2 = rx2.recv().await.unwrap();
+    assert_eq!(n1.task_id, pid);
+    assert_eq!(n2.task_id, pid);
+}
+
+#[tokio::test]
+async fn ordered_delivery_for_sequential_registrations() {
     let store = make_store();
     let mut rx = store.subscribe_spawns();
-    store.register_proxy("bg_a".into(), "a".into());
-    store.register_proxy("bg_b".into(), "b".into());
-    store.register_proxy("bg_c".into(), "c".into());
-    let ids: Vec<String> = (0..3).map(|_| rx.try_recv().unwrap().task_id).collect();
-    assert_eq!(ids, vec!["bg_a", "bg_b", "bg_c"]);
+    let pa = spawn_raw(&store, "echo a").await;
+    let pb = spawn_raw(&store, "echo b").await;
+    let pc = spawn_raw(&store, "echo c").await;
+    let mut ids = Vec::new();
+    for _ in 0..3 {
+        ids.push(rx.recv().await.unwrap().task_id);
+    }
+    assert_eq!(ids, vec![pa, pb, pc]);
 }
 
-#[test]
-fn notification_carries_live_arc_handles() {
-    let store = make_store();
-    let mut rx = store.subscribe_spawns();
-    let proxy = store.register_proxy("bg_1".into(), "task".into());
-    let notif = rx.try_recv().unwrap();
-
-    assert!(notif.output.lock().unwrap().is_empty());
-    proxy.complete("final output".into(), true);
-    let output = notif.output.lock().unwrap().clone();
-    assert_eq!(output, "final output");
-}
-
-#[test]
-fn subscriber_dropped_insert_still_works() {
+#[tokio::test]
+async fn dropping_receiver_does_not_block_inserts() {
     let store = make_store();
     let rx = store.subscribe_spawns();
     drop(rx);
-    store.register_proxy("bg_1".into(), "after drop".into());
-    assert!(store.with_task("bg_1", |_| true).unwrap());
-}
+    let pid = spawn_raw(&store, "echo done").await;
+    let present = store.read_task(&pid, |t| t.description().to_string());
+    assert!(present.is_some());
 
-#[test]
-fn status_watch_in_notification_receives_updates() {
-    let store = make_store();
-    let mut rx = store.subscribe_spawns();
-    let proxy = store.register_proxy("bg_1".into(), "test".into());
-    let notif = rx.try_recv().unwrap();
-
-    use loopal_tool_background::TaskStatus;
-    assert_eq!(*notif.status_watch.borrow(), TaskStatus::Running);
-    proxy.complete("done".into(), false);
-    let mut watch = notif.status_watch;
-    assert_eq!(*watch.borrow_and_update(), TaskStatus::Failed);
+    use loopal_tool_background::ops::bg_output;
+    let _ = bg_output(&store, &pid, true, Duration::from_secs(2)).await;
 }

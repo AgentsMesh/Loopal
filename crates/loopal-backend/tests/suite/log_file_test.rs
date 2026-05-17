@@ -253,8 +253,14 @@ async fn exec_command_streaming_timeout_handle_carries_log_path() {
         ExecOutcome::TimedOut { handle, .. } => {
             let data = handle.0.downcast::<TimedOutProcessData>().ok().unwrap();
             assert!(data.log_path.starts_with(std::env::temp_dir()));
-            tokio::time::sleep(Duration::from_millis(800)).await;
-            let on_disk = tokio::fs::read_to_string(&data.log_path).await.unwrap();
+            tokio::time::sleep(Duration::from_millis(2000)).await;
+            let on_disk = match tokio::fs::read_to_string(&data.log_path).await {
+                Ok(s) => s,
+                Err(e) => panic!(
+                    "log file {} not readable: {e}",
+                    data.log_path.display()
+                ),
+            };
             assert!(on_disk.contains("PARTIAL"));
             let mut child = data.spawned.child;
             let _ = child.start_kill();

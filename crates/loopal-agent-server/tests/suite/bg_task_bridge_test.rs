@@ -271,22 +271,25 @@ async fn file_sampler_emits_output_delta_for_process_task() {
     shutdown_bridge(bridge, shutdown).await;
 
     let captured = events.lock().unwrap();
-    let deltas: Vec<&str> = captured
+    let outputs: Vec<&str> = captured
         .iter()
         .filter_map(|e| match e {
             AgentEventPayload::BgTaskOutput { id, output_delta } if id == &pid => {
                 Some(output_delta.as_str())
             }
+            AgentEventPayload::BgTaskCompleted { id, output, .. } if id == &pid => {
+                Some(output.as_str())
+            }
             _ => None,
         })
         .collect();
-    let merged: String = deltas.concat();
+    let merged: String = outputs.concat();
     assert!(
         merged.contains("line_1"),
-        "expected file delta to contain line_1: {merged}"
+        "expected output to contain line_1: {merged}"
     );
     assert!(
         merged.contains("line_3"),
-        "expected file delta to contain line_3: {merged}"
+        "expected output to contain line_3: {merged}"
     );
 }

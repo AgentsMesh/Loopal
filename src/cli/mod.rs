@@ -4,7 +4,7 @@ mod parent_only;
 pub use child::ChildPassthroughArgs;
 pub use parent_only::ParentOnlyArgs;
 
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 
 #[derive(Debug)]
 pub enum ResumeIntent {
@@ -26,7 +26,14 @@ pub struct Cli {
     #[command(flatten)]
     pub parent_only: ParentOnlyArgs,
 
+    /// Prompt for the agent (everything after the flags)
     pub prompt: Vec<String>,
+}
+
+pub fn build_cli() -> clap::Command {
+    Cli::command()
+        .subcommand(loopal_vault_age::cli::vault_command())
+        .subcommand(loopal_vault_age::cli::vaults_command())
 }
 
 impl Cli {
@@ -43,21 +50,15 @@ impl Cli {
             settings.model = model.clone();
         }
         if let Some(perm) = &self.child.permission {
-            let normalized = if perm == "yolo" {
-                "bypass"
-            } else {
-                perm.as_str()
-            };
-            if let Ok(mode) = normalized.parse::<loopal_tool_api::PermissionMode>() {
-                settings.permission_mode = mode;
-            } else {
-                settings.permission_mode = loopal_tool_api::PermissionMode::AskAnyWrite;
-            }
+            let canonical = if perm == "yolo" { "bypass" } else { perm.as_str() };
+            settings.permission_mode = canonical
+                .parse::<loopal_tool_api::PermissionMode>()
+                .expect("clap PossibleValuesParser guarantees a known mode");
         }
-        if let Some(decision) = &self.child.decision
-            && let Ok(mode) = decision.parse::<loopal_decision_api::DecisionMode>()
-        {
-            settings.decision_mode = mode;
+        if let Some(decision) = &self.child.decision {
+            settings.decision_mode = decision
+                .parse::<loopal_decision_api::DecisionMode>()
+                .expect("clap PossibleValuesParser guarantees a known mode");
         }
         if self.child.no_sandbox {
             settings.sandbox.policy = loopal_config::SandboxPolicy::Disabled;
@@ -67,6 +68,8 @@ impl Cli {
 
 #[cfg(test)]
 mod apply_overrides_test;
+#[cfg(test)]
+mod build_cli_test;
 #[cfg(test)]
 mod child_args_test;
 #[cfg(test)]

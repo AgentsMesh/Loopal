@@ -1,8 +1,9 @@
-use clap::Parser;
+use clap::FromArgMatches;
 
 use loopal_config::load_config;
+use loopal_vault_api::VaultError;
 
-use crate::cli::Cli;
+use crate::cli::{Cli, build_cli};
 
 mod acp;
 mod attach_bridge;
@@ -20,6 +21,9 @@ mod token_channel;
 mod uplink_bootstrap;
 mod worktree_session;
 
+#[cfg(test)]
+mod normalize_vault_at_test;
+
 use worktree_session::{
     cleanup_session_worktree, create_session_worktree, print_detach_worktree_info,
     print_error_worktree_info, print_resume_info, resolve_resume_for_cwd,
@@ -27,40 +31,46 @@ use worktree_session::{
 
 pub(crate) use discovery::is_alive;
 
+pub(crate) fn normalize_vault_at_syntax(
+    mut args: Vec<String>,
+) -> Result<Vec<String>, VaultError> {
+    let Some(first) = args.get(1).cloned() else {
+        return Ok(args);
+    };
+    let Some(rest) = first.strip_prefix("vault@") else {
+        return Ok(args);
+    };
+    loopal_vault_age::cli::validate_vault_name(rest)?;
+    args[1] = "vault".to_string();
+    args.insert(2, "--name".to_string());
+    args.insert(3, rest.to_string());
+    Ok(args)
+}
+
 pub async fn run() -> anyhow::Result<()> {
-    let raw_args: Vec<String> = std::env::args().collect();
+    let raw_args = match normalize_vault_at_syntax(std::env::args().collect()) {
+        Ok(args) => args,
+        Err(e) => {
+            eprintln!("{e}");
+            std::process::exit(2);
+        }
+    };
     let cwd = std::env::current_dir()?;
 
-    // Peek for `loopal vault[@name] <...>` or `loopal vaults <...>` and
-    // dispatch to the independent clap parsers inside loopal-vault-age.
-    // Done before main `Cli::parse()` so it doesn't conflict with the prompt
-    // positional. To prompt the agent about vault topics, quote the string:
-    // `loopal "explain vault ..."`.
-    if let Some(first) = raw_args.get(1).map(|s| s.as_str()) {
-        if first == "vaults" {
-            let mut sub_argv = vec!["loopal vaults".to_string()];
-            sub_argv.extend(raw_args.iter().skip(2).cloned());
-            let code = loopal_vault_age::cli::dispatch_vaults(sub_argv, &cwd).await;
-            std::process::exit(code);
+    let matches = build_cli().get_matches_from(raw_args);
+
+    match matches.subcommand() {
+        Some(("vault", sub)) => {
+            std::process::exit(loopal_vault_age::cli::dispatch_vault(sub, &cwd).await);
         }
-        if first == "vault" || first.starts_with("vault@") {
-            let vault_name = if first == "vault" {
-                loopal_vault_age::cli::DEFAULT_VAULT_NAME.to_string()
-            } else {
-                first.trim_start_matches("vault@").to_string()
-            };
-            if let Err(e) = loopal_vault_age::cli::validate_vault_name(&vault_name) {
-                eprintln!("{e}");
-                std::process::exit(2);
-            }
-            let mut sub_argv = vec!["loopal vault".to_string()];
-            sub_argv.extend(raw_args.iter().skip(2).cloned());
-            let code = loopal_vault_age::cli::dispatch_vault(sub_argv, &cwd, &vault_name).await;
-            std::process::exit(code);
+        Some(("vaults", sub)) => {
+            std::process::exit(loopal_vault_age::cli::dispatch_vaults(sub, &cwd).await);
         }
+        _ => {}
     }
 
-    let cli = Cli::parse();
+    let cli = Cli::from_arg_matches(&matches)
+        .expect("matches just produced by build_cli().get_matches_from; from_arg_matches cannot fail");
 
     loopal_config::housekeeping::startup_cleanup();
     if let Some(repo_root) = loopal_git::repo_root(&cwd) {

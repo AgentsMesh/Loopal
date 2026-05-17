@@ -39,6 +39,12 @@ fn yolo_alias_is_bypass() {
 }
 
 #[test]
+fn rejects_unknown_permission_at_clap_layer() {
+    let res = Cli::try_parse_from(["loopal", "--permission", "wat"]);
+    assert!(res.is_err(), "unknown --permission must fail at clap parse");
+}
+
+#[test]
 fn threads_permission_ask_dangerous() {
     let cli = parse(&["--permission", "ask_dangerous"]);
     let mut settings = loopal_config::Settings::default();
@@ -50,8 +56,8 @@ fn threads_permission_ask_dangerous() {
 }
 
 #[test]
-fn unknown_permission_falls_back_to_ask_any_write() {
-    let cli = parse(&["--permission", "wat"]);
+fn threads_permission_ask_any_write() {
+    let cli = parse(&["--permission", "ask_any_write"]);
     let mut settings = loopal_config::Settings::default();
     cli.apply_overrides(&mut settings);
     assert!(matches!(
@@ -61,21 +67,27 @@ fn unknown_permission_falls_back_to_ask_any_write() {
 }
 
 #[test]
+fn every_clap_permission_value_maps_to_enum_without_panic() {
+    for v in ["bypass", "ask_dangerous", "ask_any_write", "yolo"] {
+        let cli = parse(&["--permission", v]);
+        let mut settings = loopal_config::Settings::default();
+        cli.apply_overrides(&mut settings);
+    }
+}
+
+#[test]
+fn every_clap_decision_value_maps_to_enum_without_panic() {
+    for v in ["manual", "classifier", "agent"] {
+        let cli = parse(&["--decision", v]);
+        let mut settings = loopal_config::Settings::default();
+        cli.apply_overrides(&mut settings);
+    }
+}
+
+#[test]
 fn rejects_legacy_decision_auto() {
-    // `auto` was the old name for Classifier; no longer accepted.
-    let cli = parse(&["--decision", "auto"]);
-    let mut settings = loopal_config::Settings {
-        decision_mode: loopal_decision_api::DecisionMode::Manual,
-        ..Default::default()
-    };
-    cli.apply_overrides(&mut settings);
-    assert!(
-        matches!(
-            settings.decision_mode,
-            loopal_decision_api::DecisionMode::Manual
-        ),
-        "legacy --decision=auto must NOT overwrite settings (parse fails silently)"
-    );
+    let res = Cli::try_parse_from(["loopal", "--decision", "auto"]);
+    assert!(res.is_err(), "legacy --decision=auto must fail at clap parse");
 }
 
 #[test]
@@ -124,20 +136,9 @@ fn threads_decision_manual() {
 }
 
 #[test]
-fn invalid_decision_leaves_settings_unchanged() {
-    let cli = parse(&["--decision", "magic"]);
-    let mut settings = loopal_config::Settings {
-        decision_mode: loopal_decision_api::DecisionMode::Classifier,
-        ..Default::default()
-    };
-    cli.apply_overrides(&mut settings);
-    assert!(
-        matches!(
-            settings.decision_mode,
-            loopal_decision_api::DecisionMode::Classifier
-        ),
-        "invalid --decision must not overwrite existing Classifier setting"
-    );
+fn rejects_invalid_decision_at_clap_layer() {
+    let res = Cli::try_parse_from(["loopal", "--decision", "magic"]);
+    assert!(res.is_err(), "invalid --decision must fail at clap parse");
 }
 
 #[test]

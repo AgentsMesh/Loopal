@@ -161,7 +161,7 @@ loopal-runtime        tool_pipeline hooks: apply_resolver + apply_redactor
 
 - `loopal-vault-api::Vault` — async trait `get / list_names / put / delete / rekey`
 - `loopal-vault-api::AuditSink` — trait the vault calls on every op; `VaultOp` enum covers Decrypted / Encrypted / Rekeyed / RecipientChanged
-- `loopal-vault-age::AgeVault` — default per-vault impl (age + yaml + SSH identity + recipients); `loopal-vault-age::cli` is the `loopal vault[@name]` + `loopal vaults` subcommands
+- `loopal-vault-age::AgeVault` — default per-vault impl (age + yaml + SSH identity + recipients); `loopal-vault-age::cli` is the `loopal vault [--name <name>]` (legacy `vault@<name>` accepted) + `loopal vaults` subcommands
 - `loopal-secret-runtime::MergedVault` — composes multiple named vaults into a single flat `Vault` view (default-first + alphabetical, conflict warn)
 - `loopal-secret-runtime::{template, resolver, redactor, hooks}` — placeholder syntax + tool argument substitution + output scrubbing
 - `loopal-secret-runtime::JsonlAuditSink` — `impl AuditSink` writing `~/.loopal/telemetry/secret_access.jsonl` with mode 0600; also records runtime `Resolved` / `Redacted` events
@@ -204,9 +204,10 @@ CLI commands:
   - `init [<name>]` — create a vault; name defaults to `default`
   - `list` — list all vaults (`*` marks the default)
   - `remove <name>` — delete a vault (forces `'rotated'` confirmation)
-- **Single-vault operations** (`loopal vault[@<name>] <op>`):
-  - `vault <op>` is shorthand for `vault@default <op>`
-  - Ops: `set <k> [<v>]` (stdin), `get <k>`, `list`, `edit`, `rekey`, `recipients {add <pubkey> | remove <label> | list}`
+- **Single-vault operations** (`loopal vault [--name <name>] <op>`):
+  - `vault <op>` (no `--name`) targets the default vault
+  - `vault@<name> <op>` (legacy syntax, normalized to `--name <name>` before clap parsing)
+  - Ops: `set <k> [--value <v>]` (stdin recommended), `get <k>`, `list`, `edit`, `rekey`, `recipients {add <pubkey> | remove <label> | list}`
 
 Settings (all optional, `.loopal/settings.json`):
 ```json
@@ -247,7 +248,7 @@ vault; vault-specific operations remain available through the CLI.
 - Compromised SSH private key (whoever has the key has the vault)
 - Plaintext lifetime in tool child process memory (Bash → `curl` → token in `curl`'s heap)
 - `ps`-visibility of `Bash.command` field when secret is substituted there (audit emits warn — prefer `env` field)
-- Removed git recipients who already cloned the repo (must rotate values at provider side after `vaults remove <name>` or `vault@<name> recipients remove`)
+- Removed git recipients who already cloned the repo (must rotate values at provider side after `vaults remove <name>` or `vault --name <name> recipients remove`)
 - LLM prompt-injection writing secrets it learns to plaintext stdout (LLM never has plaintext to inject; redactor scrubs known plaintext)
 - Memory dumps / swap files / core dumps containing plaintext during the brief window in resolver cache
 

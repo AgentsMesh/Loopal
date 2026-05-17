@@ -2,42 +2,58 @@ use clap::Args;
 
 #[derive(Args, Debug, Default)]
 pub struct ParentOnlyArgs {
-    #[arg(short, long, num_args = 0..=1, default_missing_value = "")]
+    /// Resume session by id (omit value to resume latest)
+    #[arg(
+        short,
+        long,
+        num_args = 0..=1,
+        default_missing_value = "",
+        value_name = "ID",
+    )]
     pub resume: Option<String>,
 
+    /// Speak ACP (Agent Client Protocol) over stdio for IDE integration
     #[arg(long)]
     pub acp: bool,
 
+    /// Run as agent server (TCP listener for multi-client IDE/CLI)
     #[arg(long)]
     pub server: bool,
 
     #[arg(long, hide = true)]
     pub serve: bool,
 
+    /// Run in an isolated git worktree (auto-created under .claude/worktrees/)
     #[arg(long)]
     pub worktree: bool,
 
     #[arg(long, hide = true)]
     pub test_provider: Option<String>,
 
-    #[arg(long)]
+    /// Bind address for hub-of-hubs federation (advanced)
+    #[arg(long, value_name = "ADDR")]
     pub meta_hub: Option<String>,
 
-    #[arg(long)]
+    /// TCP address of an existing hub to attach this agent to
+    #[arg(long, value_name = "ADDR")]
     pub attach_hub: Option<String>,
 
-    #[arg(long)]
+    /// Bearer token for hub authentication
+    #[arg(long, value_name = "TOKEN")]
     pub hub_token: Option<String>,
 
     #[arg(long, hide = true)]
     pub hub_only: bool,
 
+    /// List active hub processes on this machine
     #[arg(long)]
     pub list_hubs: bool,
 
+    /// Attach to a hub by its process id
     #[arg(long, value_name = "PID", value_parser = parse_pid)]
     pub attach_hub_pid: Option<u32>,
 
+    /// Kill a hub process by pid
     #[arg(long, value_name = "PID", value_parser = parse_pid)]
     pub kill_hub: Option<u32>,
 }

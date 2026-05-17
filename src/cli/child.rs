@@ -1,31 +1,49 @@
 use std::ffi::OsString;
 
 use clap::Args;
+use clap::builder::PossibleValuesParser;
 
 #[derive(Args, Debug, Default, PartialEq, Eq, Clone)]
 pub struct ChildPassthroughArgs {
-    #[arg(short, long)]
+    /// Override default LLM model id (e.g. claude-opus-4-7, gpt-5.5)
+    #[arg(short, long, value_name = "MODEL")]
     pub model: Option<String>,
 
-    #[arg(short = 'P', long)]
+    /// When to ask for permission (alias 'yolo' = bypass)
+    #[arg(
+        short = 'P',
+        long,
+        value_name = "MODE",
+        value_parser = PossibleValuesParser::new(["bypass", "ask_dangerous", "ask_any_write", "yolo"]),
+    )]
     pub permission: Option<String>,
 
-    #[arg(long)]
+    /// Who answers permission prompts when --permission is not 'bypass'
+    #[arg(
+        long,
+        value_name = "MODE",
+        value_parser = PossibleValuesParser::new(["manual", "classifier", "agent"]),
+    )]
     pub decision: Option<String>,
 
+    /// Start session in plan mode (read-only exploration first)
     #[arg(long)]
     pub plan: bool,
 
+    /// Disable OS sandbox for tool execution
     #[arg(long)]
     pub no_sandbox: bool,
 
+    /// Don't persist session to ~/.loopal/sessions/
     #[arg(long)]
     pub ephemeral: bool,
 
-    #[arg(long)]
+    /// Hub TCP address to join (e.g. 127.0.0.1:7890)
+    #[arg(long, value_name = "ADDR")]
     pub join_hub: Option<String>,
 
-    #[arg(long)]
+    /// Display name for this agent inside the hub
+    #[arg(long, value_name = "NAME")]
     pub hub_name: Option<String>,
 }
 

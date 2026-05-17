@@ -1,4 +1,5 @@
-//! `validate_vault_name` covers the path-traversal defense for `loopal vault@<name>`.
+//! `validate_vault_name` covers the path-traversal defense for `loopal vault --name <name>`
+//! (and the legacy `vault@<name>` form normalized to it).
 //! Anything not matching `^[a-z][a-z0-9_-]*$` must be rejected.
 
 use loopal_vault_age::cli::validate_vault_name;

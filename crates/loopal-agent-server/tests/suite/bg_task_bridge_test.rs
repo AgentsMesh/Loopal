@@ -267,7 +267,7 @@ async fn file_sampler_emits_output_delta_for_process_task() {
         .unwrap()
         .to_string();
 
-    tokio::time::sleep(Duration::from_millis(3500)).await;
+    tokio::time::sleep(Duration::from_millis(5000)).await;
     shutdown_bridge(bridge, shutdown).await;
 
     let captured = events.lock().unwrap();

@@ -1,10 +1,3 @@
-//! End-to-end goal lifecycle tests through the full agent loop.
-//!
-//! Drives a real `AgentLoopRunner` with a `MultiCallProvider` and a
-//! `GoalRuntimeSession` plumbed through `HarnessBuilder`. Verifies the
-//! invariants the unit tests cannot — that the runner integration points
-//! actually trigger when the loop runs end-to-end.
-
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -18,9 +11,6 @@ use loopal_test_support::{HarnessBuilder, TestFixture, chunks};
 use serde_json::json;
 use tempfile::TempDir;
 
-/// Captures `ThreadGoalUpdated` events emitted by `GoalRuntimeSession` so
-/// tests can assert on the broadcast surface independently of the frontend
-/// event channel (the test fixture wires those separately).
 #[derive(Default, Clone)]
 pub(super) struct EventLog {
     events: Arc<std::sync::Mutex<Vec<AgentEventPayload>>>,
@@ -48,10 +38,6 @@ pub(super) fn make_goal_session(session_id: &str) -> (TempDir, Arc<GoalRuntimeSe
     (tmp, Arc::new(session), log)
 }
 
-/// Poll `EventLog` until a `ThreadGoalUpdated` with the expected reason
-/// shows up, or panic on timeout. Avoids racing with the runner — once
-/// the predicate sees the event, the underlying mutation is durably
-/// persisted.
 pub(super) async fn wait_for_goal_reason(log: &EventLog, expected: GoalTransitionReason) {
     let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
     loop {
@@ -78,13 +64,10 @@ async fn happy_path_user_creates_then_model_completes() {
     let fixture = TestFixture::new();
     let (_tmp, session, log) = make_goal_session(&fixture.test_session("e2e").id);
     session
-        .create("ship the e2e".into(), None)
+        .create("ship the e2e".into())
         .await
         .expect("create goal");
 
-    // Turn 1: user-driven, text only.
-    // Idle → continuation envelope auto-injected.
-    // Turn 2: model calls update_goal(complete), Done.
     let calls = vec![
         chunks::text_turn("acknowledged"),
         chunks::tool_turn("uc1", "update_goal", json!({"status": "complete"})),
@@ -110,60 +93,14 @@ async fn happy_path_user_creates_then_model_completes() {
 }
 
 #[tokio::test]
-async fn budget_exhaustion_transitions_and_emits_event() {
-    let fixture = TestFixture::new();
-    let (_tmp, session, log) = make_goal_session(&fixture.test_session("e2e-budget").id);
-    session
-        .create("crunch the budget".into(), Some(100))
-        .await
-        .expect("create goal");
-
-    // Turn 1: user-driven; LLM text + Usage(150,30) — exceeds budget=100.
-    // Turn 2: continuation with budget_limit prompt; LLM closes out.
-    let turn1 = vec![
-        chunks::text("starting"),
-        chunks::usage(150, 30),
-        chunks::done(),
-    ];
-    let turn2 = chunks::text_turn("wrapping up");
-    let harness = HarnessBuilder::new()
-        .calls(vec![turn1, turn2])
-        .messages(vec![])
-        .goal_session(session.clone())
-        .build_spawned()
-        .await;
-
-    let mailbox_tx = harness.mailbox_tx;
-    mailbox_tx
-        .send(Envelope::new(MessageSource::Human, "main", "go"))
-        .await
-        .unwrap();
-
-    wait_for_goal_reason(&log, GoalTransitionReason::BudgetExhausted).await;
-
-    let goal = session.snapshot().await.unwrap().expect("goal persisted");
-    assert_eq!(goal.status, ThreadGoalStatus::BudgetLimited);
-    assert!(
-        goal.tokens_used >= 100,
-        "tokens_used = {}",
-        goal.tokens_used
-    );
-    drop(mailbox_tx);
-}
-
-#[tokio::test]
-async fn barren_continuations_demote_to_budget_limited() {
+async fn barren_continuations_auto_complete_goal() {
     let fixture = TestFixture::new();
     let (_tmp, session, log) = make_goal_session(&fixture.test_session("e2e-barren").id);
     session
-        .create("idle work".into(), None)
+        .create("idle work".into())
         .await
         .expect("create goal");
 
-    // Turn 1: user-driven text-only (productive=false but not continuation).
-    // Turn 2 (continuation 1): text-only → barren_count = 1.
-    // Turn 3 (continuation 2): text-only → barren_count = 2.
-    // Next idle: barren_count >= max → demote to BudgetLimited, no turn 4.
     let calls = vec![
         chunks::text_turn("hello"),
         chunks::text_turn("still working"),
@@ -185,6 +122,6 @@ async fn barren_continuations_demote_to_budget_limited() {
     wait_for_goal_reason(&log, GoalTransitionReason::BarrenContinuation).await;
 
     let goal = session.snapshot().await.unwrap().expect("goal persisted");
-    assert_eq!(goal.status, ThreadGoalStatus::BudgetLimited);
+    assert_eq!(goal.status, ThreadGoalStatus::Complete);
     drop(mailbox_tx);
 }

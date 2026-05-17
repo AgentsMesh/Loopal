@@ -13,19 +13,17 @@ async fn returns_null_goal_when_session_empty() {
     assert!(!result.is_error);
     let parsed: serde_json::Value = serde_json::from_str(&result.content).unwrap();
     assert!(parsed["goal"].is_null());
-    assert!(parsed["remaining_tokens"].is_null());
 }
 
 #[tokio::test]
-async fn returns_active_goal_with_remaining_tokens() {
-    let session = FakeGoalSession::with_active("optimize hot path", Some(10_000));
+async fn returns_active_goal() {
+    let session = FakeGoalSession::with_active("optimize hot path");
     let ctx = ctx_with_goal_session(session);
     let result = make_get_goal_tool().execute(json!({}), &ctx).await.unwrap();
     assert!(!result.is_error);
     let parsed: serde_json::Value = serde_json::from_str(&result.content).unwrap();
     assert_eq!(parsed["goal"]["objective"], "optimize hot path");
     assert_eq!(parsed["goal"]["status"], "active");
-    assert_eq!(parsed["remaining_tokens"], 10_000);
 }
 
 #[tokio::test]

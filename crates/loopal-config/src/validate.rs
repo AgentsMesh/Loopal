@@ -15,7 +15,6 @@ const KNOWN_KEYS: &[&str] = &[
     "output_style",
     "telemetry",
     "fetch_refiner",
-    "goals",
     "secrets",
 ];
 

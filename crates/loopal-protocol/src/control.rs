@@ -43,15 +43,11 @@ pub enum ControlCommand {
     /// Create a new thread goal. Fails if a goal already exists.
     GoalCreate {
         objective: String,
-        token_budget: Option<u64>,
     },
     /// User-initiated lifecycle change. The runtime validates allowed
     /// transitions; illegal targets are rejected without changing state.
     GoalUserPause,
     GoalUserResume,
     GoalUserComplete,
-    GoalExtendBudget {
-        additional_tokens: u64,
-    },
     GoalClear,
 }

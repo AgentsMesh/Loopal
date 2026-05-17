@@ -64,9 +64,6 @@ pub struct Settings {
     pub fetch_refiner: FetchRefinerConfig,
 
     #[serde(default)]
-    pub goals: GoalSettings,
-
-    #[serde(default)]
     pub secrets: super::secrets::SecretsSettings,
 }
 
@@ -89,25 +86,7 @@ impl Default for Settings {
             output_style: String::new(),
             telemetry: TelemetryConfig::default(),
             fetch_refiner: FetchRefinerConfig::default(),
-            goals: GoalSettings::default(),
             secrets: super::secrets::SecretsSettings::default(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
-pub struct GoalSettings {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub default_token_budget: Option<u64>,
-    pub barren_continuation_limit: u32,
-}
-
-impl Default for GoalSettings {
-    fn default() -> Self {
-        Self {
-            default_token_budget: None,
-            barren_continuation_limit: 2,
         }
     }
 }

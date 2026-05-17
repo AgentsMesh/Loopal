@@ -13,7 +13,7 @@ use super::goal_e2e_test::make_goal_session;
 async fn resume_via_control_resets_barren_continuation_count() {
     let fixture = TestFixture::new();
     let (_tmp, session, _log) = make_goal_session(&fixture.test_session("kickoff-resume-reset").id);
-    session.create("paused".into(), None).await.expect("create");
+    session.create("paused".into()).await.expect("create");
     session
         .transition(ThreadGoalStatus::Paused, GoalTransitionReason::UserPaused)
         .await
@@ -46,7 +46,7 @@ async fn resume_via_control_resets_barren_continuation_count() {
 async fn pause_via_control_preserves_barren_continuation_count() {
     let fixture = TestFixture::new();
     let (_tmp, session, _log) = make_goal_session(&fixture.test_session("kickoff-pause-keep").id);
-    session.create("active".into(), None).await.expect("create");
+    session.create("active".into()).await.expect("create");
 
     let inner = HarnessBuilder::new()
         .calls(vec![])

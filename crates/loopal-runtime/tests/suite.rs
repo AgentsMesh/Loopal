@@ -33,8 +33,6 @@ mod frontend_unified_permission_test;
 mod frontend_unified_test;
 #[path = "suite/goal_continuation_test.rs"]
 mod goal_continuation_test;
-#[path = "suite/goal_session_accounting_test.rs"]
-mod goal_session_accounting_test;
 #[path = "suite/goal_session_lifecycle_test.rs"]
 mod goal_session_lifecycle_test;
 #[path = "suite/goal_session_support.rs"]

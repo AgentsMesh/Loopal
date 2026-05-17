@@ -33,8 +33,8 @@ pub use sandbox::{
     SandboxPolicy,
 };
 pub use settings::{
-    FetchRefinerConfig, GoalSettings, McpServerConfig, OpenAiCompatConfig, ProviderConfig,
-    ProvidersConfig, Settings,
+    FetchRefinerConfig, McpServerConfig, OpenAiCompatConfig, ProviderConfig, ProvidersConfig,
+    Settings,
 };
 pub use skills::{Skill, format_skills_summary, scan_skills_dir};
 pub use telemetry::TelemetryConfig;

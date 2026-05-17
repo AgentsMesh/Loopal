@@ -12,8 +12,6 @@ pub struct CreateGoalTool;
 #[derive(Deserialize, JsonSchema)]
 pub struct CreateGoalParams {
     pub objective: String,
-    #[serde(default)]
-    pub token_budget: Option<u64>,
 }
 
 #[async_trait]
@@ -24,9 +22,8 @@ impl TypedTool<CreateGoalParams> for CreateGoalTool {
 
     fn description(&self) -> &str {
         "Create a goal only when explicitly requested by the user or system/developer \
-         instructions; do not infer goals from ordinary tasks. Set token_budget only when an \
-         explicit token budget is requested. Fails if a goal already exists; use update_goal \
-         only to mark an existing goal complete."
+         instructions; do not infer goals from ordinary tasks. Fails if a goal already exists; \
+         use update_goal only to mark an existing goal complete."
     }
 
     fn permission(&self) -> PermissionLevel {
@@ -53,7 +50,7 @@ impl TypedTool<CreateGoalParams> for CreateGoalTool {
         if input.objective.trim().is_empty() {
             return Ok(ToolResult::error("objective must be a non-empty string"));
         }
-        match session.create(input.objective, input.token_budget).await {
+        match session.create(input.objective).await {
             Ok(goal) => Ok(ToolResult::success(render_response(&Some(goal)))),
             Err(err) => Ok(ToolResult::error(format_session_error(err))),
         }

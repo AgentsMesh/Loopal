@@ -44,7 +44,6 @@ async fn goal_create_via_control_returns_continuation_injected() {
         .control_tx
         .send(ControlCommand::GoalCreate {
             objective: "test variant".into(),
-            token_budget: None,
         })
         .await
         .unwrap();
@@ -117,7 +116,6 @@ async fn run_loop_kickoff_path_does_not_notify_user_input_observers() {
         .control_tx
         .send(ControlCommand::GoalCreate {
             objective: "no-notify".into(),
-            token_budget: None,
         })
         .await
         .unwrap();

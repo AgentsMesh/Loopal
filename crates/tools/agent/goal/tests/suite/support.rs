@@ -108,9 +108,8 @@ impl FakeGoalSession {
         Arc::new(Self::default())
     }
 
-    pub fn with_active(objective: &str, budget: Option<u64>) -> Arc<Self> {
-        let mut g = ThreadGoal::new("test", objective);
-        g.token_budget = budget;
+    pub fn with_active(objective: &str) -> Arc<Self> {
+        let g = ThreadGoal::new("test", objective);
         Arc::new(Self {
             goal: Mutex::new(Some(g)),
         })
@@ -123,20 +122,12 @@ impl GoalSession for FakeGoalSession {
         Ok(self.goal.lock().unwrap().clone())
     }
 
-    async fn create(
-        &self,
-        objective: String,
-        token_budget: Option<u64>,
-    ) -> Result<ThreadGoal, GoalSessionError> {
+    async fn create(&self, objective: String) -> Result<ThreadGoal, GoalSessionError> {
         let mut slot = self.goal.lock().unwrap();
         if slot.is_some() {
             return Err(GoalSessionError::AlreadyExists);
         }
-        if matches!(token_budget, Some(0)) {
-            return Err(GoalSessionError::InvalidBudget);
-        }
-        let mut g = ThreadGoal::new("test", objective);
-        g.token_budget = token_budget;
+        let g = ThreadGoal::new("test", objective);
         *slot = Some(g.clone());
         Ok(g)
     }

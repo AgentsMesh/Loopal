@@ -37,10 +37,6 @@ pub(super) struct GoalScenario {
     pub session: Arc<GoalRuntimeSession>,
     pub proxy_rx: mpsc::Receiver<AgentEvent>,
     pub harness: TuiTestHarness,
-    /// Distinct goal statuses observed via `ThreadGoalUpdated` events. Lets
-    /// `wait_for_status` recognise transient states the runner sweeps past
-    /// faster than a polling loop can sample (e.g. Active→BudgetLimited
-    /// after barren-continuation demotion).
     pub status_history: Vec<ThreadGoalStatus>,
 }
 

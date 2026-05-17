@@ -6,7 +6,6 @@ pub mod diff_tracker;
 pub mod env_context;
 mod finished_guard;
 mod fork_snapshot;
-mod goal_accounting;
 mod goal_barren;
 mod goal_consistency;
 mod goal_continuation;

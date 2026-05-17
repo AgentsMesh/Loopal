@@ -27,7 +27,10 @@ fn plain_vault_returns_unchanged() {
 #[test]
 fn vault_at_name_is_rewritten_to_name_flag() {
     let out = normalize_vault_at_syntax(argv(&["loopal", "vault@production", "set", "k"])).unwrap();
-    assert_eq!(out, vec!["loopal", "vault", "--name", "production", "set", "k"]);
+    assert_eq!(
+        out,
+        vec!["loopal", "vault", "--name", "production", "set", "k"]
+    );
 }
 
 #[test]

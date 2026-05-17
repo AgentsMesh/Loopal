@@ -31,9 +31,7 @@ use worktree_session::{
 
 pub(crate) use discovery::is_alive;
 
-pub(crate) fn normalize_vault_at_syntax(
-    mut args: Vec<String>,
-) -> Result<Vec<String>, VaultError> {
+pub(crate) fn normalize_vault_at_syntax(mut args: Vec<String>) -> Result<Vec<String>, VaultError> {
     let Some(first) = args.get(1).cloned() else {
         return Ok(args);
     };
@@ -69,8 +67,9 @@ pub async fn run() -> anyhow::Result<()> {
         _ => {}
     }
 
-    let cli = Cli::from_arg_matches(&matches)
-        .expect("matches just produced by build_cli().get_matches_from; from_arg_matches cannot fail");
+    let cli = Cli::from_arg_matches(&matches).expect(
+        "matches just produced by build_cli().get_matches_from; from_arg_matches cannot fail",
+    );
 
     loopal_config::housekeeping::startup_cleanup();
     if let Some(repo_root) = loopal_git::repo_root(&cwd) {

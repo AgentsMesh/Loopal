@@ -87,7 +87,10 @@ fn every_clap_decision_value_maps_to_enum_without_panic() {
 #[test]
 fn rejects_legacy_decision_auto() {
     let res = Cli::try_parse_from(["loopal", "--decision", "auto"]);
-    assert!(res.is_err(), "legacy --decision=auto must fail at clap parse");
+    assert!(
+        res.is_err(),
+        "legacy --decision=auto must fail at clap parse"
+    );
 }
 
 #[test]

@@ -74,20 +74,21 @@ pub fn vault_command() -> Command {
                                 .required(true)
                                 .value_name("PUBKEY_PATH")
                                 .value_parser(clap::value_parser!(PathBuf))
-                                .help("Path to an SSH public key file (e.g. ~/.ssh/id_ed25519.pub)"),
+                                .help(
+                                    "Path to an SSH public key file (e.g. ~/.ssh/id_ed25519.pub)",
+                                ),
                         ),
                 )
                 .subcommand(
                     Command::new("remove")
                         .about("Remove a recipient by label/comment + force rotation confirmation")
-                        .arg(
-                            Arg::new("label")
-                                .required(true)
-                                .value_name("LABEL")
-                                .help("Recipient label/comment (suffix after the key in `recipients` file)"),
-                        ),
+                        .arg(Arg::new("label").required(true).value_name("LABEL").help(
+                            "Recipient label/comment (suffix after the key in `recipients` file)",
+                        )),
                 )
-                .subcommand(Command::new("list").about("List recipients (one per line, with labels)")),
+                .subcommand(
+                    Command::new("list").about("List recipients (one per line, with labels)"),
+                ),
         )
 }
 

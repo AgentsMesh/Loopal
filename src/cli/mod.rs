@@ -50,7 +50,11 @@ impl Cli {
             settings.model = model.clone();
         }
         if let Some(perm) = &self.child.permission {
-            let canonical = if perm == "yolo" { "bypass" } else { perm.as_str() };
+            let canonical = if perm == "yolo" {
+                "bypass"
+            } else {
+                perm.as_str()
+            };
             settings.permission_mode = canonical
                 .parse::<loopal_tool_api::PermissionMode>()
                 .expect("clap PossibleValuesParser guarantees a known mode");

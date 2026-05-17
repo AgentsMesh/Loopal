@@ -47,7 +47,11 @@ fn vault_has_name_flag_with_default() {
         .find(|a| a.get_id() == "name")
         .expect("vault must have --name arg");
     let default: Vec<_> = name_arg.get_default_values().iter().collect();
-    assert_eq!(default, vec!["default"], "default vault name must be 'default'");
+    assert_eq!(
+        default,
+        vec!["default"],
+        "default vault name must be 'default'"
+    );
 }
 
 #[test]
@@ -59,7 +63,10 @@ fn permission_accepts_yolo_alias() {
 #[test]
 fn permission_rejects_unknown_value() {
     let res = build_cli().try_get_matches_from(["loopal", "--permission", "wat"]);
-    assert!(res.is_err(), "unknown --permission must be rejected by clap");
+    assert!(
+        res.is_err(),
+        "unknown --permission must be rejected by clap"
+    );
 }
 
 #[test]
@@ -77,5 +84,8 @@ fn vault_dispatch_via_name_flag_parses() {
         .expect("parse");
     let (sub_name, sub) = m.subcommand().expect("vault subcommand chosen");
     assert_eq!(sub_name, "vault");
-    assert_eq!(sub.get_one::<String>("name").map(String::as_str), Some("personal"));
+    assert_eq!(
+        sub.get_one::<String>("name").map(String::as_str),
+        Some("personal")
+    );
 }

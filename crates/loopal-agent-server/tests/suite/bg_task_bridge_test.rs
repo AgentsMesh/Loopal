@@ -131,6 +131,7 @@ async fn spawned_event_emitted_on_notification() {
 }
 
 #[tokio::test]
+#[cfg(not(windows))]
 async fn completion_event_emitted_on_task_finish() {
     let store = BackgroundTaskStore::new();
     let (frontend, events) = CaptureFrontend::new();

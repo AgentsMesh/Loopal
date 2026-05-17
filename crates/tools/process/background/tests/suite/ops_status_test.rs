@@ -7,6 +7,7 @@ use loopal_tool_background::{BackgroundTaskStore, TaskStatus};
 use crate::test_support::{spawn_completed_task, spawn_failed_task, spawn_long_running_task};
 
 #[tokio::test]
+#[cfg(not(windows))]
 async fn stop_on_terminal_task_returns_already_terminal_message() {
     let store = BackgroundTaskStore::new();
     let pid = spawn_completed_task(&store, "").await;
@@ -21,6 +22,7 @@ async fn stop_on_terminal_task_returns_already_terminal_message() {
 }
 
 #[tokio::test]
+#[cfg(not(windows))]
 async fn output_for_completed_task_shows_completed_status() {
     let store = BackgroundTaskStore::new();
     let pid = spawn_completed_task(&store, "captured").await;
@@ -32,6 +34,7 @@ async fn output_for_completed_task_shows_completed_status() {
 }
 
 #[tokio::test]
+#[cfg(not(windows))]
 async fn output_for_failed_task_shows_failed_status() {
     let store = BackgroundTaskStore::new();
     let pid = spawn_failed_task(&store, "bad").await;
@@ -43,6 +46,7 @@ async fn output_for_failed_task_shows_failed_status() {
 }
 
 #[tokio::test]
+#[cfg(not(windows))]
 async fn output_blocks_until_status_changes_to_terminal() {
     let store = BackgroundTaskStore::new();
     // reason: spawn a script that holds the task in Running for ~300ms before

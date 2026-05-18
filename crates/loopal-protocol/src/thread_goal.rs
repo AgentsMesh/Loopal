@@ -62,7 +62,6 @@ pub enum GoalTransitionReason {
     UserPaused,
     UserResumed,
     UserCleared,
-    BarrenContinuation,
 }
 
 impl ThreadGoalStatus {
@@ -71,11 +70,8 @@ impl ThreadGoalStatus {
         use ThreadGoalStatus as S;
         matches!(
             (self, next, reason),
-            (
-                S::Active,
-                S::Complete,
-                R::ModelCompleted | R::UserCompleted | R::BarrenContinuation,
-            ) | (S::Active, S::Paused, R::UserPaused)
+            (S::Active, S::Complete, R::ModelCompleted | R::UserCompleted)
+                | (S::Active, S::Paused, R::UserPaused)
                 | (S::Paused, S::Active, R::UserResumed)
                 | (S::Paused, S::Complete, R::UserCompleted)
                 | (S::Complete, S::Active, R::ModelReopened | R::UserReopened)

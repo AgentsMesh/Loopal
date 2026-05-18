@@ -57,6 +57,8 @@ pub enum GoalTransitionReason {
     UserCreated,
     ModelCompleted,
     UserCompleted,
+    ModelReopened,
+    UserReopened,
     UserPaused,
     UserResumed,
     UserCleared,
@@ -76,6 +78,7 @@ impl ThreadGoalStatus {
             ) | (S::Active, S::Paused, R::UserPaused)
                 | (S::Paused, S::Active, R::UserResumed)
                 | (S::Paused, S::Complete, R::UserCompleted)
+                | (S::Complete, S::Active, R::ModelReopened | R::UserReopened)
         )
     }
 }

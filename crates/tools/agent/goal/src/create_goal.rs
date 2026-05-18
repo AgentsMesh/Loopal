@@ -22,8 +22,10 @@ impl TypedTool<CreateGoalParams> for CreateGoalTool {
 
     fn description(&self) -> &str {
         "Create a goal only when explicitly requested by the user or system/developer \
-         instructions; do not infer goals from ordinary tasks. Fails if a goal already exists; \
-         use update_goal only to mark an existing goal complete."
+         instructions; do not infer goals from ordinary tasks. Fails if a non-complete goal \
+         already exists. If a previous goal was mistakenly marked complete and the same \
+         objective still applies, prefer update_goal with status `active` to reopen it rather \
+         than creating a new goal with the same objective."
     }
 
     fn permission(&self) -> PermissionLevel {

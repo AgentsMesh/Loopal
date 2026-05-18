@@ -47,6 +47,7 @@ fn expected_view_effect(cmd: &ControlCommand) -> ExpectedViewEffect {
         GoalUserPause => FixtureRequired("active goal"),
         GoalUserResume => FixtureRequired("paused goal"),
         GoalUserComplete => FixtureRequired("active goal"),
+        GoalUserReopen => FixtureRequired("completed goal"),
         GoalClear => FixtureRequired("active goal"),
     }
 }
@@ -139,6 +140,7 @@ fn variant_name(cmd: &ControlCommand) -> &'static str {
         GoalUserPause => "GoalUserPause",
         GoalUserResume => "GoalUserResume",
         GoalUserComplete => "GoalUserComplete",
+        GoalUserReopen => "GoalUserReopen",
         GoalClear => "GoalClear",
     }
 }

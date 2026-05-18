@@ -29,7 +29,8 @@ async fn rejects_when_goal_already_exists() {
         .await
         .unwrap();
     assert!(result.is_error);
-    assert!(result.content.contains("already has a goal"));
+    assert!(result.content.contains("in-progress goal"));
+    assert!(result.content.contains("update_goal"));
 }
 
 #[tokio::test]

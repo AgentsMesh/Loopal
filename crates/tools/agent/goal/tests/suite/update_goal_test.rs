@@ -44,3 +44,48 @@ async fn surfaces_disabled_when_no_goal_session() {
     assert!(result.is_error);
     assert!(result.content.contains("disabled"));
 }
+
+#[tokio::test]
+async fn reopens_completed_goal_when_status_active() {
+    let session = FakeGoalSession::with_active("ship");
+    {
+        let mut slot = session.goal.lock().unwrap();
+        slot.as_mut().unwrap().status = loopal_protocol::ThreadGoalStatus::Complete;
+    }
+    let ctx = ctx_with_goal_session(session.clone());
+    let result = make_update_goal_tool()
+        .execute(json!({"status": "active"}), &ctx)
+        .await
+        .unwrap();
+    assert!(!result.is_error);
+    let parsed: serde_json::Value = serde_json::from_str(&result.content).unwrap();
+    assert_eq!(parsed["goal"]["status"], "active");
+    assert_eq!(
+        session.goal.lock().unwrap().as_ref().unwrap().status,
+        loopal_protocol::ThreadGoalStatus::Active,
+    );
+}
+
+#[tokio::test]
+async fn rejects_reopen_when_already_active() {
+    let session = FakeGoalSession::with_active("ship");
+    let ctx = ctx_with_goal_session(session);
+    let result = make_update_goal_tool()
+        .execute(json!({"status": "active"}), &ctx)
+        .await
+        .unwrap();
+    assert!(result.is_error);
+    assert!(result.content.contains("cannot apply"));
+}
+
+#[tokio::test]
+async fn rejects_reopen_when_no_goal_exists() {
+    let session = FakeGoalSession::empty();
+    let ctx = ctx_with_goal_session(session);
+    let result = make_update_goal_tool()
+        .execute(json!({"status": "active"}), &ctx)
+        .await
+        .unwrap();
+    assert!(result.is_error);
+    assert!(result.content.contains("no goal exists"));
+}

@@ -67,3 +67,43 @@ async fn goal_resume_via_control_triggers_turn() {
     wait_for_goal_reason(&log, GoalTransitionReason::ModelCompleted).await;
     drop(harness.control_tx);
 }
+
+#[tokio::test]
+async fn goal_reopen_via_control_triggers_turn() {
+    let fixture = TestFixture::new();
+    let (_tmp, session, log) = make_goal_session(&fixture.test_session("kickoff-reopen").id);
+    session.create("ship work".into()).await.expect("create");
+    session
+        .transition(
+            ThreadGoalStatus::Complete,
+            GoalTransitionReason::UserCompleted,
+        )
+        .await
+        .expect("complete");
+
+    let calls = vec![chunks::tool_turn(
+        "ureopen1",
+        "update_goal",
+        json!({"status": "complete"}),
+    )];
+    let harness = HarnessBuilder::new()
+        .calls(calls)
+        .messages(vec![])
+        .goal_session(session.clone())
+        .build_spawned()
+        .await;
+
+    harness
+        .control_tx
+        .send(ControlCommand::GoalUserReopen)
+        .await
+        .unwrap();
+
+    wait_for_goal_reason(&log, GoalTransitionReason::UserReopened).await;
+    wait_for_goal_reason(&log, GoalTransitionReason::ModelCompleted).await;
+
+    let goal = session.snapshot().await.unwrap().expect("goal persisted");
+    assert_eq!(goal.objective, "ship work");
+    assert_eq!(goal.status, ThreadGoalStatus::Complete);
+    drop(harness.control_tx);
+}

@@ -14,6 +14,10 @@ fn entry(name: &str) -> CommandEntry {
     }
 }
 
+fn synthetic_matches(count: usize) -> Vec<CommandEntry> {
+    (0..count).map(|i| entry(&format!("/cmd{i:02}"))).collect()
+}
+
 fn buffer_contains(terminal: &Terminal<TestBackend>, needle: &str) -> bool {
     let buf = terminal.backend().buffer();
     for y in 0..buf.area.height {
@@ -67,56 +71,38 @@ fn zero_visible_returns_zero_offset() {
 
 #[test]
 fn render_overflow_keeps_selected_visible() {
-    let names: Vec<&str> = vec![
-        "/plan", "/act", "/clear", "/compact", "/model", "/rewind", "/status", "/mcp", "/resume",
-        "/init", "/help", "/exit", "/agents", "/topology", "/skills",
-    ];
-    let matches: Vec<CommandEntry> = names.iter().map(|n| entry(n)).collect();
-
-    let terminal = render_menu(matches.clone(), 14);
+    let terminal = render_menu(synthetic_matches(15), 14);
     assert!(
-        buffer_contains(&terminal, "/skills"),
+        buffer_contains(&terminal, "/cmd14"),
         "selected last item must appear in buffer"
     );
     assert!(
-        !buffer_contains(&terminal, "/plan"),
+        !buffer_contains(&terminal, "/cmd00"),
         "first item must scroll out when selected is far beyond visible"
     );
 }
 
 #[test]
 fn render_first_page_shows_top_items() {
-    let names: Vec<&str> = vec![
-        "/plan", "/act", "/clear", "/compact", "/model", "/rewind", "/status", "/mcp", "/resume",
-        "/init", "/help", "/exit", "/agents", "/topology", "/skills",
-    ];
-    let matches: Vec<CommandEntry> = names.iter().map(|n| entry(n)).collect();
-
-    let terminal = render_menu(matches, 0);
-    assert!(buffer_contains(&terminal, "/plan"));
-    assert!(buffer_contains(&terminal, "/mcp"));
+    let terminal = render_menu(synthetic_matches(15), 0);
+    assert!(buffer_contains(&terminal, "/cmd00"));
+    assert!(buffer_contains(&terminal, "/cmd07"));
     assert!(
-        !buffer_contains(&terminal, "/skills"),
+        !buffer_contains(&terminal, "/cmd14"),
         "items beyond MAX_MENU_ITEMS must not appear when selected is on first page"
     );
 }
 
 #[test]
 fn render_mid_overflow_shows_window_containing_selected() {
-    let names: Vec<&str> = vec![
-        "/plan", "/act", "/clear", "/compact", "/model", "/rewind", "/status", "/mcp", "/resume",
-        "/init", "/help", "/exit", "/agents", "/topology", "/skills",
-    ];
-    let matches: Vec<CommandEntry> = names.iter().map(|n| entry(n)).collect();
-
-    let terminal = render_menu(matches, 9);
-    assert!(buffer_contains(&terminal, "/init"));
+    let terminal = render_menu(synthetic_matches(15), 9);
+    assert!(buffer_contains(&terminal, "/cmd09"));
     assert!(
-        !buffer_contains(&terminal, "/plan"),
+        !buffer_contains(&terminal, "/cmd00"),
         "first item must be scrolled out"
     );
     assert!(
-        !buffer_contains(&terminal, "/skills"),
+        !buffer_contains(&terminal, "/cmd14"),
         "last item must not be in window yet"
     );
 }

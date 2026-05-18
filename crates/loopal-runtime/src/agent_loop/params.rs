@@ -10,8 +10,8 @@ use loopal_storage::Session;
 use loopal_tool_api::{FetchRefinerPolicy, MemoryChannel, OneShotChatService, PermissionMode};
 use tokio::sync::watch;
 
-use crate::frontend::DecisionContext;
 use crate::frontend::traits::AgentFrontend;
+use crate::frontend::DecisionContext;
 use crate::mode::AgentMode;
 use crate::session::SessionManager;
 
@@ -118,6 +118,7 @@ pub struct AgentLoopParams {
     pub harness: HarnessConfig,
     pub rewake_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
     pub message_snapshot: Option<Arc<std::sync::RwLock<Vec<loopal_message::Message>>>>,
+    pub scheduler: Option<Arc<loopal_scheduler::CronScheduler>>,
     /// Hooks invoked after `handle_resume_session` swaps the active
     /// session, so per-session state (cron, task list, etc.) can follow.
     /// Default is empty — runtime callers that don't supply hooks see no

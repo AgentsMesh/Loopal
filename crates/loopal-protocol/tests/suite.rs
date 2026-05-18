@@ -35,6 +35,8 @@ mod projection_edge_test;
 mod projection_metadata_test;
 #[path = "suite/projection_test.rs"]
 mod projection_test;
+#[path = "suite/task_snapshot_test.rs"]
+mod task_snapshot_test;
 #[path = "suite/thread_goal_test.rs"]
 mod thread_goal_test;
 #[path = "suite/user_content_test.rs"]

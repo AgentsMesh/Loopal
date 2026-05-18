@@ -111,6 +111,12 @@ impl AgentLoopRunner {
             ControlCommand::McpDisconnect { server } => {
                 self.handle_mcp_disconnect(server).await?;
             }
+            ControlCommand::BgTaskKill { id } => {
+                self.handle_bg_task_kill(id).await;
+            }
+            ControlCommand::CronDelete { id } => {
+                self.handle_cron_delete(id).await;
+            }
             ctrl @ (ControlCommand::GoalCreate { .. }
             | ControlCommand::GoalUserPause
             | ControlCommand::GoalUserResume

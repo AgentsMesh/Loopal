@@ -51,6 +51,12 @@ pub enum InputAction {
     EnterAgentView,
     /// Enter the focused background task's log viewer (drill in, BgTasks panel only)
     EnterBgTaskView,
+    /// Enter the focused cron job's detail page (drill in, Crons panel only).
+    EnterCronView,
+    /// Enter the focused structured task's detail page (drill in, Tasks panel only).
+    EnterTaskView,
+    /// Stop the focused item shown in the current sub-page (bg kill or cron delete).
+    StopFocusedSubPageItem,
     /// Return to root/parent view (drill out)
     ExitAgentView,
     /// Terminate the focused agent (Agents panel only)

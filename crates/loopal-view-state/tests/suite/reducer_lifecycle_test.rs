@@ -23,6 +23,8 @@ fn from_snapshot_starts_with_rev_one() {
             active_form: None,
             status: TaskSnapshotStatus::Pending,
             blocked_by: vec![],
+            description: String::new(),
+            blocks: vec![],
         }],
         crons: vec![],
         bg_tasks: vec![],

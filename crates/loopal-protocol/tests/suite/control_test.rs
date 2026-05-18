@@ -94,6 +94,34 @@ fn test_control_command_mcp_disconnect_serde_roundtrip() {
 }
 
 #[test]
+fn test_control_command_bg_task_kill_serde_roundtrip() {
+    let cmd = ControlCommand::BgTaskKill {
+        id: "bg_42".to_string(),
+    };
+    let json = serde_json::to_string(&cmd).unwrap();
+    let deserialized: ControlCommand = serde_json::from_str(&json).unwrap();
+    if let ControlCommand::BgTaskKill { id } = deserialized {
+        assert_eq!(id, "bg_42");
+    } else {
+        panic!("expected BgTaskKill after roundtrip");
+    }
+}
+
+#[test]
+fn test_control_command_cron_delete_serde_roundtrip() {
+    let cmd = ControlCommand::CronDelete {
+        id: "abc12345".to_string(),
+    };
+    let json = serde_json::to_string(&cmd).unwrap();
+    let deserialized: ControlCommand = serde_json::from_str(&json).unwrap();
+    if let ControlCommand::CronDelete { id } = deserialized {
+        assert_eq!(id, "abc12345");
+    } else {
+        panic!("expected CronDelete after roundtrip");
+    }
+}
+
+#[test]
 fn test_all_control_commands_serde_roundtrip() {
     // Reflective: every variant must survive JSON roundtrip. Discriminant
     // equality is enough — payload fidelity for specific variants is

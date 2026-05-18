@@ -98,11 +98,12 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
 
     // AgentShared — mirrors bootstrap.rs:103-115
     let tasks_dir = fixture.path().join("tasks");
-    let (scheduler_handle, scheduled_rx) = if let Some(sched) = builder.scheduler {
-        loopal_agent::shared::SchedulerHandle::create_with_scheduler(sched)
-    } else {
-        loopal_agent::shared::SchedulerHandle::create()
-    };
+    let scheduler_for_params = builder
+        .scheduler
+        .clone()
+        .unwrap_or_else(|| Arc::new(loopal_scheduler::CronScheduler::new()));
+    let (scheduler_handle, scheduled_rx) =
+        loopal_agent::shared::SchedulerHandle::create_with_scheduler(scheduler_for_params.clone());
     // Test fixtures don't switch sessions; activate the tick loop now.
     scheduler_handle.start();
     let shared = Arc::new(AgentShared {
@@ -171,6 +172,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
     )
     .shared(shared_any)
     .scheduled_rx(scheduled_rx)
+    .scheduler(scheduler_for_params)
     .goal_session_opt(builder.goal_session)
     .build();
 

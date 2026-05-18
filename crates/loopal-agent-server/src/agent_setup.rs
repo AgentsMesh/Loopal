@@ -190,6 +190,7 @@ pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<A
             one_shot_chat: Some(one_shot_chat),
             fetch_refiner_policy: Some(fetch_refiner_policy),
             goal_session,
+            scheduler: scheduler.clone(),
         },
     );
     Ok(AgentSetupResult {

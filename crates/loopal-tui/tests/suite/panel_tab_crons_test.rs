@@ -74,6 +74,8 @@ fn tab_cycles_through_all_four_panels() {
         active_form: None,
         status: TaskSnapshotStatus::InProgress,
         blocked_by: Vec::new(),
+        description: String::new(),
+        blocks: Vec::new(),
     }]);
     app.view_clients["main"].inject_bg_for_test(vec![BgTaskSnapshot {
         id: "b1".into(),

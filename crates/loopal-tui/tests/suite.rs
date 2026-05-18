@@ -80,6 +80,14 @@ mod message_lines_test;
 mod model_picker_thinking_test;
 #[path = "suite/multi_question_test.rs"]
 mod multi_question_test;
+#[path = "suite/panel_detail_enter_test.rs"]
+mod panel_detail_enter_test;
+#[path = "suite/panel_detail_scroll_test.rs"]
+mod panel_detail_scroll_test;
+#[path = "suite/panel_detail_stop_test.rs"]
+mod panel_detail_stop_test;
+#[path = "suite/panel_detail_test.rs"]
+mod panel_detail_test;
 #[path = "suite/panel_focus_visibility_test.rs"]
 mod panel_focus_visibility_test;
 #[path = "suite/panel_header_render_test.rs"]
@@ -158,6 +166,8 @@ mod e2e_loop_test;
 mod e2e_mcp_test;
 #[path = "suite/e2e_multi_turn_test.rs"]
 mod e2e_multi_turn_test;
+#[path = "suite/e2e_panel_detail_test.rs"]
+mod e2e_panel_detail_test;
 #[path = "suite/e2e_permission_test.rs"]
 mod e2e_permission_test;
 #[path = "suite/e2e_question_test.rs"]

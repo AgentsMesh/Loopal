@@ -34,6 +34,8 @@ pub fn task_to_snapshot(task: &Task) -> TaskSnapshot {
         active_form: task.active_form.clone(),
         status,
         blocked_by: task.blocked_by.clone(),
+        description: task.description.clone(),
+        blocks: task.blocks.clone(),
     }
 }
 

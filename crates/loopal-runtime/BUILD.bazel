@@ -18,6 +18,7 @@ rust_library(
         "//crates/loopal-protocol",
         "//crates/loopal-provider",
         "//crates/loopal-provider-api",
+        "//crates/loopal-scheduler",
         "//crates/loopal-secret-runtime",
         "//crates/loopal-storage",
         "//crates/loopal-tool-api",

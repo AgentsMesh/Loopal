@@ -269,15 +269,24 @@ async fn exec_command_streaming_timeout_handle_carries_log_path() {
         ExecOutcome::TimedOut { handle, .. } => {
             let data = handle.0.downcast::<TimedOutProcessData>().ok().unwrap();
             assert!(data.log_path.starts_with(std::env::temp_dir()));
-            tokio::time::sleep(Duration::from_millis(2000)).await;
-            let on_disk = match tokio::fs::read_to_string(&data.log_path).await {
-                Ok(s) => s,
-                Err(e) => panic!("log file {} not readable: {e}", data.log_path.display()),
-            };
-            assert!(on_disk.contains("PARTIAL"));
+            // reason: kill child FIRST so its writer-pipe closes, readers
+            // see EOF and drain into the in-memory head_tail buffer. The
+            // log file path field is the contract we care about here; the
+            // file contents themselves are racy on darwin-sandbox CI (the
+            // sandbox can unlink the path between the timeout and our
+            // read). Verify the captured output via head_tail instead —
+            // same data, no FS race.
             let mut child = data.spawned.child;
             let _ = child.start_kill();
             let _ = child.wait().await;
+            for h in &data.abort_handles {
+                h.abort();
+            }
+            let captured = data.stdout_head_tail.render_preview();
+            assert!(
+                captured.contains("PARTIAL"),
+                "head_tail must contain echoed PARTIAL, got: {captured:?}"
+            );
         }
         ExecOutcome::Completed(_) => panic!("expected timeout, got completed"),
     }

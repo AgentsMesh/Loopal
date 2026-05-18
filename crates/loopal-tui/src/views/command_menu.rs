@@ -3,24 +3,19 @@ use ratatui::widgets::{Block, Borders, Clear};
 
 use crate::app::AutocompleteState;
 
-/// Maximum visible items in the autocomplete dropdown.
 const MAX_MENU_ITEMS: usize = 8;
 
-/// Render the floating command autocomplete menu above the input area.
 pub fn render_command_menu(f: &mut Frame, ac: &AutocompleteState, input_area: Rect) {
     if ac.matches.is_empty() {
         return;
     }
 
-    let item_count = ac.matches.len().min(MAX_MENU_ITEMS) as u16;
-    // +2 for border top/bottom
-    let menu_height = item_count + 2;
+    let visible = ac.matches.len().min(MAX_MENU_ITEMS);
+    let menu_height = visible as u16 + 2;
 
-    // Position just above the input area, same width
     let y = input_area.y.saturating_sub(menu_height);
     let menu_area = Rect::new(input_area.x, y, input_area.width, menu_height);
 
-    // Clear background
     f.render_widget(Clear, menu_area);
 
     let block = Block::default()
@@ -31,9 +26,17 @@ pub fn render_command_menu(f: &mut Frame, ac: &AutocompleteState, input_area: Re
     let inner = block.inner(menu_area);
     f.render_widget(block, menu_area);
 
-    // Render each command line
-    for (i, entry) in ac.matches.iter().take(item_count as usize).enumerate() {
-        let is_selected = i == ac.selected;
+    let scroll_offset = scroll_offset_for_selection(ac.selected, visible);
+
+    for (i, entry) in ac
+        .matches
+        .iter()
+        .skip(scroll_offset)
+        .take(visible)
+        .enumerate()
+    {
+        let abs_idx = scroll_offset + i;
+        let is_selected = abs_idx == ac.selected;
 
         let indicator = if is_selected { "▸" } else { " " };
 
@@ -59,5 +62,16 @@ pub fn render_command_menu(f: &mut Frame, ac: &AutocompleteState, input_area: Re
         };
 
         f.render_widget(ratatui::widgets::Paragraph::new(line).style(bg), line_area);
+    }
+}
+
+pub fn scroll_offset_for_selection(selected: usize, visible: usize) -> usize {
+    if visible == 0 {
+        return 0;
+    }
+    if selected >= visible {
+        selected + 1 - visible
+    } else {
+        0
     }
 }

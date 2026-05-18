@@ -1,14 +1,13 @@
 use std::collections::HashSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use loopal_backend::tmp_cleanup::is_valid_session_id;
 use loopal_backend::{
-    cleanup_orphans, cleanup_session_tmp, create_log_file, loopal_tmp_root, session_bash_dir,
+    cleanup_orphans_in, cleanup_session_tmp, create_log_file, loopal_tmp_root, session_bash_dir,
     session_tmp_root,
 };
+use tempfile::TempDir;
 
-// reason: each test seeds a uuid-namespaced subdir under $TMPDIR/loopal so
-// parallel tests don't stomp each other and don't leak under repeated runs.
 fn unique_session_id() -> String {
     format!("test-{}", uuid::Uuid::new_v4().simple())
 }
@@ -16,6 +15,18 @@ fn unique_session_id() -> String {
 async fn make_log_file(session_id: &str) -> PathBuf {
     let (p, _w) = create_log_file(session_id).await.expect("create log file");
     p
+}
+
+// reason: cleanup_orphans tests must NOT scan loopal_tmp_root or they will
+// delete sibling tests' session dirs created after the live snapshot.
+// Materialise an isolated root with handcrafted session subdirs and use
+// cleanup_orphans_in so the blast radius is contained to this test.
+async fn make_isolated_session(root: &Path, session_id: &str) -> PathBuf {
+    let bash = root.join(session_id).join("bash");
+    tokio::fs::create_dir_all(&bash).await.unwrap();
+    let log = bash.join(format!("{}.log", uuid::Uuid::new_v4().simple()));
+    tokio::fs::write(&log, b"").await.unwrap();
+    log
 }
 
 #[test]
@@ -93,50 +104,28 @@ async fn cleanup_session_tmp_skips_invalid_session_id() {
 
 #[tokio::test]
 async fn cleanup_orphans_removes_dirs_not_in_live_sessions() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path().to_path_buf();
+
     let orphan = unique_session_id();
     let alive = unique_session_id();
-    let _ = make_log_file(&orphan).await;
-    let _ = make_log_file(&alive).await;
+    let _ = make_isolated_session(&root, &orphan).await;
+    let _ = make_isolated_session(&root, &alive).await;
 
-    // reason: tests run in parallel against shared $TMPDIR/loopal. Snapshot
-    // every existing subdir and treat it as "live" so cleanup only ever
-    // targets our explicit orphan — protects coexisting tests' artifacts.
     let mut live: HashSet<String> = HashSet::new();
-    if let Ok(mut entries) = tokio::fs::read_dir(loopal_tmp_root()).await {
-        while let Ok(Some(entry)) = entries.next_entry().await {
-            if let Some(name) = entry.file_name().to_str() {
-                live.insert(name.to_string());
-            }
-        }
-    }
-    live.remove(&orphan);
-    assert!(live.contains(&alive));
+    live.insert(alive.clone());
 
-    cleanup_orphans(&live).await;
+    cleanup_orphans_in(&root, &live).await;
 
-    assert!(
-        !session_tmp_root(&orphan).exists(),
-        "orphan dir must be removed"
-    );
-    assert!(
-        session_tmp_root(&alive).exists(),
-        "live session dir must survive"
-    );
-
-    cleanup_session_tmp(&alive, &[]).await;
+    assert!(!root.join(&orphan).exists(), "orphan dir must be removed");
+    assert!(root.join(&alive).exists(), "live session dir must survive");
 }
 
 #[tokio::test]
 async fn cleanup_orphans_handles_missing_root() {
-    // reason: cleanup_orphans must be a no-op when $TMPDIR/loopal does not
-    // exist (cold-start), not panic. We can't easily delete the root here
-    // (other tests may have created it), so just call with empty live and
-    // confirm a freshly-named session has no leftover dir.
-    let nonexistent = unique_session_id();
+    let tmp = TempDir::new().unwrap();
+    let missing = tmp.path().join("does-not-exist");
     let live: HashSet<String> = HashSet::new();
-    // Don't actually call cleanup_orphans with empty live — that would wipe
-    // every parallel test's dir. Just verify the call itself is safe by
-    // scanning state and ensuring our session was never created.
-    let _ = live;
-    assert!(!session_tmp_root(&nonexistent).exists());
+    cleanup_orphans_in(&missing, &live).await;
+    assert!(!missing.exists());
 }

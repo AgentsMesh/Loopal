@@ -6,6 +6,7 @@ use tracing::{debug, warn};
 
 use crate::connection::{Incoming, PendingMap};
 use crate::jsonrpc::{self, IncomingMessage};
+use crate::rpc_error::RpcError;
 use crate::transport::Transport;
 
 pub(crate) fn spawn_reader_loop(
@@ -59,13 +60,17 @@ async fn dispatch_message(
 ) -> bool {
     match msg {
         IncomingMessage::Response { id, result, error } => {
-            let value = if let Some(err) = error {
-                serde_json::to_value(err).unwrap_or(Value::Null)
+            let outcome = if let Some(err) = error {
+                Err(RpcError::Remote {
+                    code: err.code,
+                    message: err.message,
+                    data: err.data,
+                })
             } else {
-                result.unwrap_or(Value::Null)
+                Ok(result.unwrap_or(Value::Null))
             };
             if let Some(sender) = pending.lock().await.remove(&id) {
-                let _ = sender.send(value);
+                let _ = sender.send(outcome);
             }
             true
         }

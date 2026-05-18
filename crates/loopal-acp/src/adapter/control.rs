@@ -33,7 +33,7 @@ impl AcpAdapter {
             Ok(_) => self.acp_out.respond(id, serde_json::json!({})).await,
             Err(e) => {
                 self.acp_out
-                    .respond_error(id, jsonrpc::INTERNAL_ERROR, &e)
+                    .respond_error(id, jsonrpc::INTERNAL_ERROR, &e.to_string())
                     .await;
             }
         }
@@ -67,7 +67,7 @@ impl AcpAdapter {
             }
             Err(e) => {
                 self.acp_out
-                    .respond_error(id, jsonrpc::INTERNAL_ERROR, &e)
+                    .respond_error(id, jsonrpc::INTERNAL_ERROR, &e.to_string())
                     .await;
             }
         }

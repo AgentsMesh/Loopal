@@ -48,7 +48,7 @@ impl AcpAdapter {
         let envelope = Envelope::new(MessageSource::Human, "main", text);
         if let Err(e) = self.client.route_envelope(&envelope).await {
             self.acp_out
-                .respond_error(id, jsonrpc::INTERNAL_ERROR, &e)
+                .respond_error(id, jsonrpc::INTERNAL_ERROR, &e.to_string())
                 .await;
             return;
         }

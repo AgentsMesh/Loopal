@@ -6,15 +6,15 @@ use std::sync::Arc;
 
 use tracing::info;
 
+use loopal_ipc::StdioTransport;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
-use loopal_ipc::{StdioTransport, jsonrpc};
 
+use crate::dispatch::{RpcErrorPayload, dispatch_simple, respond_with};
 use crate::server_init::wait_for_initialize_with_token;
 use crate::session_hub::SessionHub;
 
-/// Run the agent server over stdio (pure worker, no TCP listener).
 pub async fn run_agent_server() -> anyhow::Result<()> {
     info!("agent server starting (stdio mode)");
     let transport: Arc<dyn Transport> = Arc::new(StdioTransport::from_std());
@@ -24,7 +24,6 @@ pub async fn run_agent_server() -> anyhow::Result<()> {
     run_connection(connection, incoming_rx, &hub).await
 }
 
-/// Run the agent server with mock provider (for system tests).
 pub async fn run_agent_server_with_mock(mock_path: &str) -> anyhow::Result<()> {
     info!(mock_path, "agent server starting with mock provider");
     let provider = crate::mock_loader::load_mock_provider(mock_path)?;
@@ -43,8 +42,6 @@ async fn run_connection(
     dispatch_loop(connection, incoming_rx, hub, true).await
 }
 
-/// Permanent dispatch loop. Routes messages to the active session or
-/// handles lifecycle commands (agent/start, agent/shutdown).
 pub(crate) async fn dispatch_loop(
     connection: Arc<Connection>,
     mut incoming_rx: tokio::sync::mpsc::Receiver<Incoming>,
@@ -56,52 +53,38 @@ pub(crate) async fn dispatch_loop(
             info!("connection closed");
             break;
         };
-        match msg {
-            Incoming::Request { id, method, params } => {
-                if method == methods::AGENT_START.name {
-                    let agent_output = run_session(
-                        &connection,
-                        &mut incoming_rx,
-                        hub,
-                        is_production,
-                        id,
-                        params,
-                    )
-                    .await?;
-                    if agent_output.is_some() {
-                        // Prompt-driven session complete — send result and exit.
-                        send_agent_completed(&connection, agent_output.as_ref()).await;
-                        break;
-                    }
-                } else if method == methods::AGENT_SHUTDOWN.name {
-                    let _ = connection
-                        .respond(id, serde_json::json!({"ok": true}))
-                        .await;
-                    break;
-                } else if method == methods::AGENT_LIST.name {
-                    let ids = hub.list_session_ids().await;
-                    let sessions: Vec<_> = ids
-                        .iter()
-                        .map(|id| serde_json::json!({"session_id": id}))
-                        .collect();
-                    let _ = connection.respond(id, serde_json::json!(sessions)).await;
-                } else {
-                    let _ = connection
-                        .respond_error(id, jsonrpc::METHOD_NOT_FOUND, "expected agent/start")
-                        .await;
-                }
+        let Incoming::Request { id, method, params } = msg else {
+            continue;
+        };
+
+        if method == methods::AGENT_START.name {
+            let agent_output = run_session(
+                &connection,
+                &mut incoming_rx,
+                hub,
+                is_production,
+                id,
+                params,
+            )
+            .await?;
+            if agent_output.is_some() {
+                send_agent_completed(&connection, agent_output.as_ref()).await;
+                break;
             }
-            Incoming::Notification { .. } => {}
+            continue;
+        }
+
+        let should_break = method == methods::AGENT_SHUTDOWN.name;
+        respond_with(&connection, id, dispatch_simple(&method, hub).await).await;
+        if should_break {
+            break;
         }
     }
-    // Send completion for non-prompt sessions (prompt sessions send above).
     send_agent_completed(&connection, None).await;
     info!("server shutting down");
     Ok(())
 }
 
-/// Run one session (with possible chained restarts). Returns `Some(output)` if
-/// the session was prompt-driven (server should exit), `None` otherwise.
 async fn run_session(
     connection: &Arc<Connection>,
     incoming_rx: &mut tokio::sync::mpsc::Receiver<Incoming>,
@@ -111,21 +94,19 @@ async fn run_session(
     params: serde_json::Value,
 ) -> anyhow::Result<Option<loopal_error::AgentOutput>> {
     let mut handle =
-        crate::session_start::start_session(connection, id, params, hub, is_production).await?;
+        start_session_or_respond_error(connection, id, params, hub, is_production).await?;
     let mut forward_result =
         crate::session_forward::forward_loop(incoming_rx, connection, &mut handle).await;
     hub.remove_session(&handle.session_id).await;
 
-    // Handle chained agent/start requests.
     while let crate::session_forward::ForwardResult::NewStart {
         id: new_id,
         params: new_params,
     } = forward_result
     {
         info!("chained agent/start after session end");
-        handle =
-            crate::session_start::start_session(connection, new_id, new_params, hub, is_production)
-                .await?;
+        handle = start_session_or_respond_error(connection, new_id, new_params, hub, is_production)
+            .await?;
         forward_result =
             crate::session_forward::forward_loop(incoming_rx, connection, &mut handle).await;
         hub.remove_session(&handle.session_id).await;
@@ -145,7 +126,6 @@ async fn run_session(
     }
 }
 
-/// Send `agent/completed` with the authoritative agent output.
 async fn send_agent_completed(connection: &Connection, output: Option<&loopal_error::AgentOutput>) {
     let (reason, result) = match output {
         Some(o) => (o.terminate_reason.as_str(), serde_json::json!(o.result)),
@@ -157,4 +137,29 @@ async fn send_agent_completed(connection: &Connection, output: Option<&loopal_er
             serde_json::json!({"reason": reason, "result": result}),
         )
         .await;
+}
+
+// reason: start_session responds OK to `id` on success but `?`-early-exits
+// without responding. Without this wrapper, client.send_request hangs.
+async fn start_session_or_respond_error(
+    connection: &Arc<Connection>,
+    id: i64,
+    params: serde_json::Value,
+    hub: &SessionHub,
+    is_production: bool,
+) -> anyhow::Result<crate::session_start::SessionHandle> {
+    match crate::session_start::start_session(connection, id, params, hub, is_production).await {
+        Ok(handle) => Ok(handle),
+        Err(e) => {
+            respond_with(
+                connection,
+                id,
+                Err(RpcErrorPayload::internal(format!(
+                    "session start failed: {e}"
+                ))),
+            )
+            .await;
+            Err(e)
+        }
+    }
 }

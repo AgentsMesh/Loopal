@@ -1,7 +1,6 @@
 //! IPC client — wraps `Connection` with agent protocol methods.
 
 use serde_json::Value;
-use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::info;
@@ -11,24 +10,7 @@ use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
 use loopal_protocol::{AgentEvent, ControlCommand, Envelope};
 
-/// Parameters for `agent/start` IPC request.
-#[derive(Debug, Default)]
-pub struct StartAgentParams {
-    pub cwd: PathBuf,
-    pub model: Option<String>,
-    pub mode: Option<String>,
-    pub prompt: Option<String>,
-    pub permission_mode: Option<String>,
-    pub decision_mode: Option<String>,
-    pub no_sandbox: bool,
-    pub resume: Option<String>,
-    pub lifecycle: Option<String>,
-    pub agent_type: Option<String>,
-    /// Nesting depth (0 = root). Propagated from parent.
-    pub depth: Option<u32>,
-    /// Compressed parent conversation for fork context inheritance.
-    pub fork_context: Option<serde_json::Value>,
-}
+use crate::start_params::{StartAgentParams, encode};
 
 /// High-level agent IPC client.
 pub struct AgentClient {
@@ -92,30 +74,21 @@ impl AgentClient {
 
     /// Send `agent/start` to begin the agent loop.
     pub async fn start_agent(&self, p: &StartAgentParams) -> anyhow::Result<String> {
-        let mut params = serde_json::json!({
-            "cwd": p.cwd.to_string_lossy(),
-            "model": p.model,
-            "mode": p.mode,
-            "prompt": p.prompt,
-            "permission_mode": p.permission_mode,
-            "decision_mode": p.decision_mode,
-            "no_sandbox": p.no_sandbox,
-            "resume": p.resume,
-            "lifecycle": p.lifecycle,
-            "agent_type": p.agent_type,
-            "depth": p.depth,
-        });
-        if let Some(ref fc) = p.fork_context {
-            params["fork_context"] = fc.clone();
-        }
-        let result = self
-            .connection
-            .send_request(methods::AGENT_START.name, params)
-            .await
-            .map_err(|e| anyhow::anyhow!("agent/start failed: {e}"))?;
+        // reason: parent hub_spawn waits 30s for handshake; cap below that so
+        // user sees the real IPC error (e.g. session-not-found) instead of the
+        // generic "handshake timeout".
+        const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(25);
+        let result = tokio::time::timeout(
+            TIMEOUT,
+            self.connection
+                .send_request(methods::AGENT_START.name, encode(p)),
+        )
+        .await
+        .map_err(|_| anyhow::anyhow!("agent/start timed out after {}s", TIMEOUT.as_secs()))?
+        .map_err(|e| anyhow::anyhow!("agent/start failed: {e}"))?;
         let session_id = result["session_id"]
             .as_str()
-            .unwrap_or("unknown")
+            .ok_or_else(|| anyhow::anyhow!("agent/start response missing session_id: {result}"))?
             .to_string();
         info!(session_id = %session_id, "agent started");
         Ok(session_id)

@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use loopal_ipc::connection::Connection;
 use loopal_ipc::protocol::methods;
+use loopal_ipc::rpc_error::RpcError;
 use loopal_protocol::{ControlCommand, Envelope, MessageSource, UserContent};
 use serde_json::Value;
 use tracing::warn;
@@ -29,7 +30,7 @@ impl HubClient {
         }
     }
 
-    pub async fn route_envelope(&self, envelope: &Envelope) -> Result<Value, String> {
+    pub async fn route_envelope(&self, envelope: &Envelope) -> Result<Value, RpcError> {
         self.conn
             .send_request(
                 methods::HUB_ROUTE.name,
@@ -38,7 +39,7 @@ impl HubClient {
             .await
     }
 
-    pub async fn send_control(&self, cmd: &ControlCommand) -> Result<Value, String> {
+    pub async fn send_control(&self, cmd: &ControlCommand) -> Result<Value, RpcError> {
         self.send_control_to("main", cmd).await
     }
 
@@ -46,7 +47,7 @@ impl HubClient {
         &self,
         target: &str,
         cmd: &ControlCommand,
-    ) -> Result<Value, String> {
+    ) -> Result<Value, RpcError> {
         let params = serde_json::json!({
             "target": target,
             "command": serde_json::to_value(cmd).unwrap_or_default(),
@@ -70,7 +71,7 @@ impl HubClient {
             .await;
     }
 
-    pub async fn list_agents(&self) -> Result<Value, String> {
+    pub async fn list_agents(&self) -> Result<Value, RpcError> {
         self.conn
             .send_request(methods::HUB_LIST_AGENTS.name, serde_json::json!({}))
             .await

@@ -9,6 +9,7 @@ use loopal_agent_hub::Hub;
 use loopal_agent_hub::hub_server;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
+use loopal_ipc::rpc_error::RpcError;
 use loopal_protocol::AgentEvent;
 use serde_json::json;
 
@@ -187,11 +188,12 @@ async fn malformed_route_does_not_crash() {
     spawn_mock_agent(conn.clone(), rx);
     tokio::time::sleep(Duration::from_millis(50)).await;
 
-    // Invalid envelope JSON — should return error, not crash
+    // Invalid envelope JSON — should return Err (not crash / not transport error)
     let result = conn
         .send_request(methods::HUB_ROUTE.name, json!({"garbage": true}))
         .await;
-    assert!(result.is_ok(), "should get response (not transport error)");
+    let err = result.expect_err("malformed envelope should surface as Err");
+    assert!(matches!(err, RpcError::Remote { .. }), "got: {err:?}");
 }
 
 #[tokio::test]
@@ -201,16 +203,12 @@ async fn missing_required_field_returns_error() {
     spawn_mock_agent(conn.clone(), rx);
     tokio::time::sleep(Duration::from_millis(50)).await;
 
-    // hub/agent_info without name field → should return error
+    // hub/agent_info without name field → should return Err
     let result = conn
         .send_request(methods::HUB_AGENT_INFO.name, json!({}))
         .await;
-    assert!(
-        result.is_ok(),
-        "should get error response, not transport failure"
-    );
-    let val = result.unwrap();
-    assert!(val.get("code").is_some() || val.get("message").is_some());
+    let err = result.expect_err("missing-field should surface as Err, not transport failure");
+    assert!(matches!(err, RpcError::Remote { .. }), "got: {err:?}");
 }
 
 // ── Event propagation ───────────────────────────────────────────────

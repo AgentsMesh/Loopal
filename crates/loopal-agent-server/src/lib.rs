@@ -15,6 +15,8 @@ mod bg_task_bridge;
 mod bg_task_bridge_monitor;
 mod bg_task_bridge_sampler;
 mod cron_bridge;
+#[doc(hidden)]
+pub mod dispatch;
 mod hub_broadcaster;
 #[doc(hidden)]
 pub mod hub_frontend;

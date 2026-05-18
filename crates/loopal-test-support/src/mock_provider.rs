@@ -76,8 +76,8 @@ impl Unpin for MockStreamChunks {}
 
 /// Stream that yields nothing and never finishes — for tests that need the
 /// runner to enter Running but stay there indefinitely (e.g. asserting on
-/// transient goal states without barren-continuation demotion racing the
-/// assertion). The wake-up never fires, so the task simply parks.
+/// transient goal states without later turns racing the assertion). The
+/// wake-up never fires, so the task simply parks.
 pub struct PendingStream;
 
 impl futures::Stream for PendingStream {

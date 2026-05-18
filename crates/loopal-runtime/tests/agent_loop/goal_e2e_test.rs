@@ -93,18 +93,16 @@ async fn happy_path_user_creates_then_model_completes() {
 }
 
 #[tokio::test]
-async fn barren_continuations_auto_complete_goal() {
+async fn barren_threshold_does_not_complete_goal() {
     let fixture = TestFixture::new();
-    let (_tmp, session, log) = make_goal_session(&fixture.test_session("e2e-barren").id);
-    session
-        .create("idle work".into())
-        .await
-        .expect("create goal");
+    let (_tmp, session, log) = make_goal_session(&fixture.test_session("e2e-no-barren").id);
+    session.create("ongoing".into()).await.expect("create goal");
 
     let calls = vec![
-        chunks::text_turn("hello"),
-        chunks::text_turn("still working"),
-        chunks::text_turn("still working"),
+        chunks::text_turn("nothing"),
+        chunks::text_turn("still nothing"),
+        chunks::text_turn("still nothing"),
+        chunks::tool_turn("uc1", "update_goal", json!({"status": "complete"})),
     ];
     let harness = HarnessBuilder::new()
         .calls(calls)
@@ -115,13 +113,28 @@ async fn barren_continuations_auto_complete_goal() {
 
     let mailbox_tx = harness.mailbox_tx;
     mailbox_tx
-        .send(Envelope::new(MessageSource::Human, "main", "kick off"))
+        .send(Envelope::new(MessageSource::Human, "main", "begin"))
         .await
         .unwrap();
 
-    wait_for_goal_reason(&log, GoalTransitionReason::BarrenContinuation).await;
+    wait_for_goal_reason(&log, GoalTransitionReason::ModelCompleted).await;
 
     let goal = session.snapshot().await.unwrap().expect("goal persisted");
     assert_eq!(goal.status, ThreadGoalStatus::Complete);
+    let reasons: Vec<_> = log
+        .snapshot()
+        .into_iter()
+        .filter_map(|p| match p {
+            AgentEventPayload::ThreadGoalUpdated { reason, .. } => Some(reason),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        reasons,
+        vec![
+            GoalTransitionReason::UserCreated,
+            GoalTransitionReason::ModelCompleted,
+        ]
+    );
     drop(mailbox_tx);
 }

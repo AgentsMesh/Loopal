@@ -13,7 +13,6 @@ const NON_REOPEN_REASONS: &[GoalTransitionReason] = &[
     GoalTransitionReason::UserPaused,
     GoalTransitionReason::UserResumed,
     GoalTransitionReason::UserCleared,
-    GoalTransitionReason::BarrenContinuation,
 ];
 
 const REOPEN_REASONS: &[GoalTransitionReason] = &[
@@ -30,7 +29,6 @@ const ALL_REASONS: &[GoalTransitionReason] = &[
     GoalTransitionReason::UserPaused,
     GoalTransitionReason::UserResumed,
     GoalTransitionReason::UserCleared,
-    GoalTransitionReason::BarrenContinuation,
 ];
 
 #[test]
@@ -45,11 +43,6 @@ fn each_legal_transition_is_accepted() {
             ThreadGoalStatus::Active,
             ThreadGoalStatus::Complete,
             GoalTransitionReason::UserCompleted,
-        ),
-        (
-            ThreadGoalStatus::Active,
-            ThreadGoalStatus::Complete,
-            GoalTransitionReason::BarrenContinuation,
         ),
         (
             ThreadGoalStatus::Active,

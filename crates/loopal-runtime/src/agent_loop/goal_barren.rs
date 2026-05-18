@@ -1,7 +1,4 @@
-use loopal_protocol::{GoalTransitionReason, ThreadGoalStatus};
-use tracing::{debug, warn};
-
-use crate::goal::GoalRuntimeSession;
+use tracing::debug;
 
 use super::runner::AgentLoopRunner;
 use super::turn_metrics::TurnMetrics;
@@ -31,19 +28,6 @@ impl AgentLoopRunner {
             debug!(count = next, "barren continuation observed");
         }
         self.barren_continuation_count = next;
-    }
-
-    pub(super) async fn complete_goal_on_barren(&self, session: &GoalRuntimeSession) {
-        match session
-            .transition(
-                ThreadGoalStatus::Complete,
-                GoalTransitionReason::BarrenContinuation,
-            )
-            .await
-        {
-            Ok(_) => debug!("goal auto-completed after barren continuations"),
-            Err(err) => warn!(error = %err, "failed to auto-complete barren goal"),
-        }
     }
 }
 

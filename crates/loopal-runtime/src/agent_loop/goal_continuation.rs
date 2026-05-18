@@ -32,10 +32,6 @@ impl AgentLoopRunner {
         if !goal.status.participates_in_continuation() {
             return Ok(false);
         }
-        if self.barren_continuation_count >= self.max_barren_continuations {
-            self.complete_goal_on_barren(session.as_ref()).await;
-            return Ok(false);
-        }
         let env = build_continuation_envelope(&goal);
         self.ingest_message(&env).await;
         self.last_continuation_goal_id = Some(goal.goal_id);

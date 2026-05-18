@@ -8,6 +8,8 @@ mod bg_task_focus_test;
 mod command_dispatch_test;
 #[path = "suite/command_edge_test.rs"]
 mod command_edge_test;
+#[path = "suite/command_menu_scroll_test.rs"]
+mod command_menu_scroll_test;
 #[path = "suite/command_test.rs"]
 mod command_test;
 #[path = "suite/cron_duration_format_test.rs"]

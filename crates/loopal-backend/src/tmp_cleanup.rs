@@ -82,8 +82,11 @@ async fn prune_dir_except(dir: &Path, keep: &HashSet<&Path>) -> bool {
 }
 
 pub async fn cleanup_orphans(live_sessions: &HashSet<String>) {
-    let root = loopal_tmp_root();
-    let mut entries = match tokio::fs::read_dir(&root).await {
+    cleanup_orphans_in(&loopal_tmp_root(), live_sessions).await
+}
+
+pub async fn cleanup_orphans_in(root: &Path, live_sessions: &HashSet<String>) {
+    let mut entries = match tokio::fs::read_dir(root).await {
         Ok(e) => e,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return,
         Err(e) => {

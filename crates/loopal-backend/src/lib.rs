@@ -20,4 +20,6 @@ pub use log_writer::{
     LineSink, LogWriter, create_log_file, flush_writer, read_lines_into_sink, session_bash_dir,
 };
 pub use process_group::{KillOutcome, SpawnedChild, kill_process_group};
-pub use tmp_cleanup::{cleanup_orphans, cleanup_session_tmp, loopal_tmp_root, session_tmp_root};
+pub use tmp_cleanup::{
+    cleanup_orphans, cleanup_orphans_in, cleanup_session_tmp, loopal_tmp_root, session_tmp_root,
+};

@@ -8,6 +8,7 @@ use tracing::debug;
 
 use crate::connection_reader::spawn_reader_loop;
 use crate::jsonrpc;
+use crate::rpc_error::RpcError;
 use crate::transport::Transport;
 
 #[derive(Debug)]
@@ -23,7 +24,7 @@ pub enum Incoming {
     },
 }
 
-pub(crate) type PendingMap = Arc<Mutex<HashMap<i64, oneshot::Sender<Value>>>>;
+pub(crate) type PendingMap = Arc<Mutex<HashMap<i64, oneshot::Sender<Result<Value, RpcError>>>>>;
 
 /// Bidirectional JSON-RPC over a `Transport`. Call `start()` first,
 /// then use `send_request`, `send_notification`, `respond`, `respond_error`.
@@ -48,7 +49,7 @@ impl Connection {
 
     /// Send a JSON-RPC request and wait for the response.
     /// Cancellation-safe: dropped futures clean up via `PendingGuard`.
-    pub async fn send_request(&self, method: &str, params: Value) -> Result<Value, String> {
+    pub async fn send_request(&self, method: &str, params: Value) -> Result<Value, RpcError> {
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         debug!(id, method, "IPC send_request");
         let (tx, rx) = oneshot::channel();
@@ -57,7 +58,7 @@ impl Connection {
         let data = jsonrpc::encode_request(id, method, params);
         if let Err(e) = self.transport.send(&data).await {
             self.pending.lock().await.remove(&id);
-            return Err(format!("transport send failed: {e}"));
+            return Err(RpcError::Transport(e.to_string()));
         }
 
         let pending = self.pending.clone();
@@ -65,36 +66,36 @@ impl Connection {
             id,
             pending: Some(pending),
         };
-        let result = rx.await.map_err(|_| "response channel dropped".to_string());
+        let outcome = rx.await.map_err(|_| RpcError::ChannelDropped);
         guard.disarm();
-        result
+        outcome?
     }
 
-    pub async fn send_notification(&self, method: &str, params: Value) -> Result<(), String> {
+    pub async fn send_notification(&self, method: &str, params: Value) -> Result<(), RpcError> {
         debug!(method, "IPC send_notification");
         let data = jsonrpc::encode_notification(method, params);
         self.transport
             .send(&data)
             .await
-            .map_err(|e| format!("transport send failed: {e}"))
+            .map_err(|e| RpcError::Transport(e.to_string()))
     }
 
-    pub async fn respond(&self, id: i64, result: Value) -> Result<(), String> {
+    pub async fn respond(&self, id: i64, result: Value) -> Result<(), RpcError> {
         debug!(id, "IPC respond ok");
         let data = jsonrpc::encode_response(id, result);
         self.transport
             .send(&data)
             .await
-            .map_err(|e| format!("transport send failed: {e}"))
+            .map_err(|e| RpcError::Transport(e.to_string()))
     }
 
-    pub async fn respond_error(&self, id: i64, code: i64, message: &str) -> Result<(), String> {
+    pub async fn respond_error(&self, id: i64, code: i64, message: &str) -> Result<(), RpcError> {
         debug!(id, code, message, "IPC respond_error");
         let data = jsonrpc::encode_error(id, code, message);
         self.transport
             .send(&data)
             .await
-            .map_err(|e| format!("transport send failed: {e}"))
+            .map_err(|e| RpcError::Transport(e.to_string()))
     }
 
     pub fn is_connected(&self) -> bool {

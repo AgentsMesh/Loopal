@@ -32,7 +32,7 @@ impl AcpAdapter {
             }
             Err(e) => {
                 self.acp_out
-                    .respond_error(id, jsonrpc::INTERNAL_ERROR, &e)
+                    .respond_error(id, jsonrpc::INTERNAL_ERROR, &e.to_string())
                     .await;
             }
         }

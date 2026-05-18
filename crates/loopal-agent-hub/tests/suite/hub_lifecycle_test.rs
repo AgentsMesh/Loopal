@@ -9,6 +9,7 @@ use loopal_agent_hub::Hub;
 use loopal_agent_hub::hub_server;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
+use loopal_ipc::rpc_error::RpcError;
 use loopal_protocol::AgentEvent;
 use serde_json::json;
 
@@ -84,12 +85,8 @@ async fn tcp_invalid_token_rejected() {
         )
         .await;
 
-    assert!(result.is_ok());
-    let val = result.unwrap();
-    assert!(
-        val.get("code").is_some() || val.get("message").is_some(),
-        "should contain error: {val}"
-    );
+    let err = result.expect_err("invalid token must surface as Err");
+    assert!(matches!(err, RpcError::Remote { .. }), "got: {err:?}");
 
     tokio::time::sleep(Duration::from_millis(50)).await;
     assert!(

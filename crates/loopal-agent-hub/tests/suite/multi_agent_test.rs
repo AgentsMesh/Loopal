@@ -12,6 +12,7 @@ use loopal_agent_hub::spawn_manager::register_agent_connection;
 use loopal_agent_hub::start_event_loop;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
+use loopal_ipc::rpc_error::RpcError;
 use loopal_protocol::{AgentEvent, AgentEventPayload};
 use serde_json::json;
 
@@ -112,10 +113,8 @@ async fn route_to_disconnected_agent_returns_error() {
         "timestamp": "2026-01-01T00:00:00Z"
     });
     let result = sender.send_request(methods::HUB_ROUTE.name, envelope).await;
-    // Should get error response (ghost is gone)
-    assert!(result.is_ok());
-    let val = result.unwrap();
-    assert!(val.get("code").is_some() || val.get("message").is_some());
+    let err = result.expect_err("rpc error must surface as Err for missing target");
+    assert!(matches!(err, RpcError::Remote { .. }), "got: {err:?}");
 }
 
 // ── Two siblings communicate directly ───────────────────────────────

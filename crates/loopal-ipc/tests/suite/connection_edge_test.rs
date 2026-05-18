@@ -43,9 +43,10 @@ async fn pending_requests_cleared_on_eof() {
     .await;
 
     match result {
-        Ok(Err(msg)) => assert!(msg.contains("dropped") || msg.contains("failed")),
+        Ok(Err(loopal_ipc::RpcError::ChannelDropped)) => {}
+        Ok(Err(loopal_ipc::RpcError::Transport(_))) => {}
+        Ok(other) => panic!("expected ChannelDropped or Transport, got: {other:?}"),
         Err(_) => panic!("should not timeout — pending should be cleaned up"),
-        Ok(Ok(_)) => panic!("should not succeed with closed transport"),
     }
 }
 

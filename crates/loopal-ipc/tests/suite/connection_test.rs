@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use loopal_ipc::StdioTransport;
 use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::rpc_error::RpcError;
 
 /// Create a pair of Connections backed by in-memory duplex streams.
 fn connection_pair() -> (Arc<Connection>, Arc<Connection>) {
@@ -84,12 +85,16 @@ async fn error_response() {
         }
     });
 
-    let result = client
+    let outcome = client
         .send_request("unknown", serde_json::json!(null))
-        .await
-        .expect("should get response");
+        .await;
 
-    // Error responses are routed as-is to the pending channel
-    assert_eq!(result["code"], -32601);
-    assert_eq!(result["message"], "not found");
+    let err = outcome.expect_err("rpc error should become Err");
+    match err {
+        RpcError::Remote { code, message, .. } => {
+            assert_eq!(code, -32601);
+            assert_eq!(message, "not found");
+        }
+        _ => panic!("expected Remote, got: {err:?}"),
+    }
 }

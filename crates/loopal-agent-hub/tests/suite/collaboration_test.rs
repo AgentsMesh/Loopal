@@ -11,6 +11,7 @@ use loopal_agent_hub::hub_server;
 use loopal_agent_hub::spawn_manager::register_agent_connection;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
+use loopal_ipc::rpc_error::RpcError;
 use loopal_protocol::{AgentEvent, AgentEventPayload};
 use serde_json::json;
 
@@ -140,10 +141,8 @@ async fn agent_info_not_found() {
     let result = conn
         .send_request(methods::HUB_AGENT_INFO.name, json!({"name": "ghost"}))
         .await;
-    // Should get error response (not transport error)
-    assert!(result.is_ok());
-    let val = result.unwrap();
-    assert!(val.get("code").is_some() || val.get("message").is_some());
+    let err = result.expect_err("missing agent must surface as Err");
+    assert!(matches!(err, RpcError::Remote { .. }), "got: {err:?}");
 }
 
 /// SendMessage (hub/route) to running agent succeeds; to finished agent fails.
@@ -200,12 +199,8 @@ async fn send_message_running_vs_finished() {
     let result2 = sender
         .send_request(methods::HUB_ROUTE.name, envelope2)
         .await;
-    assert!(result2.is_ok());
-    let val = result2.unwrap();
-    assert!(
-        val.get("code").is_some() || val.get("message").is_some(),
-        "route to finished agent should return error"
-    );
+    let err = result2.expect_err("route to finished agent should return Err");
+    assert!(matches!(err, RpcError::Remote { .. }), "got: {err:?}");
 }
 
 #[tokio::test]

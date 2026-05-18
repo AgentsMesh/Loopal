@@ -13,6 +13,8 @@ mod agent_setup_context;
 mod agent_setup_helpers;
 mod bg_task_bridge;
 mod cron_bridge;
+#[doc(hidden)]
+pub mod dispatch;
 mod hub_broadcaster;
 #[doc(hidden)]
 pub mod hub_frontend;

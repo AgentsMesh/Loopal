@@ -10,6 +10,7 @@ use tokio::sync::{Mutex, mpsc};
 use loopal_agent_hub::{Hub, UiSession, start_event_loop};
 use loopal_ipc::Connection;
 use loopal_ipc::protocol::methods;
+use loopal_ipc::rpc_error::RpcError;
 use loopal_protocol::{AgentEvent, AgentEventPayload, AgentStatus, QualifiedAddress};
 use loopal_view_state::{ViewSnapshot, ViewSnapshotRequest};
 
@@ -78,22 +79,19 @@ async fn view_snapshot_unknown_agent_returns_error() {
     let req = ViewSnapshotRequest {
         agent: "ghost".into(),
     };
-    let response = ui
+    let outcome = ui
         .client
         .connection()
         .send_request(
             methods::VIEW_SNAPSHOT.name,
             serde_json::to_value(req).unwrap(),
         )
-        .await
-        .expect("transport ok");
-    let parse_attempt: Result<ViewSnapshot, _> = serde_json::from_value(response.clone());
-    assert!(
-        parse_attempt.is_err(),
-        "expected error response, got: {response:?}"
-    );
-    assert!(
-        response.get("message").is_some(),
-        "expected JSON-RPC error.message, got: {response:?}"
-    );
+        .await;
+    let err = outcome.expect_err("unknown agent must surface as Err");
+    match &err {
+        RpcError::Remote { message, .. } => {
+            assert!(message.contains("ghost"), "msg must name agent: {message}");
+        }
+        _ => panic!("expected Remote, got: {err:?}"),
+    }
 }

@@ -6,6 +6,7 @@
 pub mod bridge;
 mod client;
 mod process;
+mod start_params;
 pub(crate) mod stderr_drain;
 
 #[doc(hidden)]
@@ -14,5 +15,6 @@ pub mod test_support {
 }
 
 pub use bridge::{BridgeHandles, start_bridge};
-pub use client::{AgentClient, AgentClientEvent, StartAgentParams};
+pub use client::{AgentClient, AgentClientEvent};
 pub use process::AgentProcess;
+pub use start_params::StartAgentParams;

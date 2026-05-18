@@ -22,6 +22,8 @@ mod cron_follows_control_resume_test;
 mod cron_resume_e2e_test;
 #[path = "suite/dispatch_loop_test.rs"]
 mod dispatch_loop_test;
+#[path = "suite/dispatch_test.rs"]
+mod dispatch_test;
 #[path = "suite/hub_drain_test.rs"]
 mod hub_drain_test;
 #[path = "suite/hub_frontend_edge_test.rs"]
@@ -60,5 +62,7 @@ mod session_hub_storage_test;
 mod session_start_test;
 #[path = "suite/spawn_policy_test.rs"]
 mod spawn_policy_test;
+#[path = "suite/start_failure_responds_error_test.rs"]
+mod start_failure_responds_error_test;
 #[path = "suite/tcp_multi_client_test.rs"]
 mod tcp_multi_client_test;

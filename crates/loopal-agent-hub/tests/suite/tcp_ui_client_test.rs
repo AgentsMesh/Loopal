@@ -17,6 +17,7 @@ use loopal_agent_hub::{Hub, hub_server, start_event_loop};
 use loopal_ipc::TcpTransport;
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
+use loopal_ipc::rpc_error::RpcError;
 use loopal_ipc::transport::Transport;
 use loopal_protocol::{AgentEvent, AgentEventPayload};
 
@@ -116,12 +117,9 @@ async fn unknown_role_is_rejected() {
             methods::HUB_REGISTER.name,
             json!({"name": "weird", "token": token, "role": "snitch"}),
         )
-        .await
-        .unwrap();
-    assert!(
-        resp.get("message").is_some(),
-        "expected error, got: {resp:?}"
-    );
+        .await;
+    let err = resp.expect_err("unknown role must surface as Err");
+    assert!(matches!(err, RpcError::Remote { .. }), "got: {err:?}");
 }
 
 async fn recv_agent_event(rx: &mut mpsc::Receiver<Incoming>) -> Option<AgentEvent> {

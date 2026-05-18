@@ -1,4 +1,6 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -11,6 +13,19 @@ use loopal_tool_background::BackgroundTaskStore;
 use loopal_tool_bash::{BashParams, BashTool};
 use serde_json::json;
 use tokio::sync::oneshot;
+
+// reason: hardcoded "test-session" was racy in CI — every test in this
+// binary creates `/tmp/loopal/test-session/bash/{uuid}.log` files, and
+// the 70-task reconcile test stresses fd limits. Each test now gets a
+// pid+counter-scoped id so they no longer share the bash log dir.
+fn unique_session_id() -> String {
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    format!(
+        "test-{}-{}",
+        std::process::id(),
+        COUNTER.fetch_add(1, Ordering::Relaxed)
+    )
+}
 
 struct CaptureEmitter {
     events: Arc<Mutex<Vec<AgentEventPayload>>>,
@@ -73,7 +88,7 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
         cwd.to_path_buf(),
         None,
         loopal_backend::ResourceLimits::default(),
-        "test-session",
+        unique_session_id(),
     );
     ToolContext::new(backend, "test")
 }
@@ -244,7 +259,7 @@ async fn file_sampler_emits_output_delta_for_process_task() {
         tmp.path().to_path_buf(),
         None,
         loopal_backend::ResourceLimits::default(),
-        "test-session",
+        unique_session_id(),
     );
     let ctx = ToolContext::new(backend, "test").with_output_tail(Arc::new(OutputTail::new(20)));
     let bridge_tool: TypedBridge<BashTool, BashParams> =

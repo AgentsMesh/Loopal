@@ -5,8 +5,8 @@ use loopal_protocol::{
 };
 use loopal_session::SessionController;
 use loopal_tui::app::App;
-use ratatui::backend::TestBackend;
 use ratatui::Terminal;
+use ratatui::backend::TestBackend;
 use tokio::sync::mpsc;
 
 fn make_app() -> App {

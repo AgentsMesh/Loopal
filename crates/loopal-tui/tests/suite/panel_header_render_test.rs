@@ -7,9 +7,9 @@ use loopal_session::SessionController;
 use loopal_tui::app::{App, FocusMode, PanelKind};
 use loopal_tui::render_panel::{panel_zone_height, render_panel_zone};
 use loopal_tui::views::panel_header::render_section_header;
+use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::prelude::*;
-use ratatui::Terminal;
 
 use tokio::sync::mpsc;
 

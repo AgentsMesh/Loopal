@@ -2,9 +2,9 @@
 
 use loopal_protocol::{TaskSnapshot, TaskSnapshotStatus};
 use loopal_tui::views::tasks_panel::{render_tasks_panel, task_ids, tasks_panel_height};
+use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::prelude::*;
-use ratatui::Terminal;
 
 fn snap(id: &str, status: TaskSnapshotStatus) -> TaskSnapshot {
     TaskSnapshot {

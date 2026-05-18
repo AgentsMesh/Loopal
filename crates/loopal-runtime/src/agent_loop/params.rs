@@ -10,8 +10,8 @@ use loopal_storage::Session;
 use loopal_tool_api::{FetchRefinerPolicy, MemoryChannel, OneShotChatService, PermissionMode};
 use tokio::sync::watch;
 
-use crate::frontend::traits::AgentFrontend;
 use crate::frontend::DecisionContext;
+use crate::frontend::traits::AgentFrontend;
 use crate::mode::AgentMode;
 use crate::session::SessionManager;
 

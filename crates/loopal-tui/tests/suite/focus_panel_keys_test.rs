@@ -4,7 +4,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use loopal_protocol::{AgentEvent, AgentEventPayload, ControlCommand, UserQuestionResponse};
 use loopal_session::SessionController;
 use loopal_tui::app::{App, FocusMode, PanelKind};
-use loopal_tui::input::{handle_key, InputAction};
+use loopal_tui::input::{InputAction, handle_key};
 
 use tokio::sync::mpsc;
 

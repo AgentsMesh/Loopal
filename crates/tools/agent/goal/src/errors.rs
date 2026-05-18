@@ -3,12 +3,15 @@ use loopal_tool_api::GoalSessionError;
 pub fn format_session_error(err: GoalSessionError) -> String {
     match err {
         GoalSessionError::AlreadyExists => {
-            "this thread already has a goal; use update_goal only when the existing goal is complete"
+            "this thread already has an in-progress goal; if you intend to continue the same \
+             objective use update_goal with status `active`, otherwise wait for the user or \
+             system to clear the existing goal"
                 .to_string()
         }
         GoalSessionError::NotFound => "no goal exists for this thread".to_string(),
         GoalSessionError::ModelStatusForbidden => {
-            "update_goal can only mark the existing goal complete; pause and resume are user-controlled"
+            "update_goal cannot apply that status to the goal's current state; \
+             call get_goal to inspect the current status before retrying"
                 .to_string()
         }
         GoalSessionError::ObjectiveTooLong { max, got } => {

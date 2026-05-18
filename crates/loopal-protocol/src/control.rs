@@ -49,5 +49,6 @@ pub enum ControlCommand {
     GoalUserPause,
     GoalUserResume,
     GoalUserComplete,
+    GoalUserReopen,
     GoalClear,
 }

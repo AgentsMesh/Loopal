@@ -46,3 +46,28 @@ fn update_goal_description_warns_against_premature_complete() {
         "must warn against marking complete merely because work is stopping"
     );
 }
+
+#[test]
+fn update_goal_description_disambiguates_active_from_create() {
+    let desc = make_update_goal_tool().description().to_lowercase();
+    assert!(
+        desc.contains("same original objective"),
+        "active path must scope itself to the original objective so the LLM \
+         does not use it to silently swap goals"
+    );
+    assert!(
+        desc.contains("create_goal"),
+        "active path must point to create_goal as the alternative when the \
+         objective itself needs to change"
+    );
+}
+
+#[test]
+fn create_goal_description_routes_misclick_recovery_to_update_goal() {
+    let desc = make_create_goal_tool().description().to_lowercase();
+    assert!(
+        desc.contains("update_goal"),
+        "create_goal must point LLMs at update_goal `active` when the previous \
+         goal was mistakenly marked complete"
+    );
+}

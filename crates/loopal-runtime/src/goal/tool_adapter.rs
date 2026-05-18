@@ -34,4 +34,13 @@ impl GoalSession for GoalSessionToolAdapter {
             )
             .await
     }
+
+    async fn reopen_by_model(&self) -> Result<ThreadGoal, GoalSessionError> {
+        self.inner
+            .transition(
+                ThreadGoalStatus::Active,
+                GoalTransitionReason::ModelReopened,
+            )
+            .await
+    }
 }

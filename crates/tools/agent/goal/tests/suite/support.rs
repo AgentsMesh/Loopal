@@ -143,6 +143,18 @@ impl GoalSession for FakeGoalSession {
             None => Err(GoalSessionError::NotFound),
         }
     }
+
+    async fn reopen_by_model(&self) -> Result<ThreadGoal, GoalSessionError> {
+        let mut slot = self.goal.lock().unwrap();
+        match slot.as_mut() {
+            Some(g) if g.status == ThreadGoalStatus::Complete => {
+                g.status = ThreadGoalStatus::Active;
+                Ok(g.clone())
+            }
+            Some(_) => Err(GoalSessionError::ModelStatusForbidden),
+            None => Err(GoalSessionError::NotFound),
+        }
+    }
 }
 
 pub fn ctx_with_goal_session(session: Arc<dyn GoalSession>) -> ToolContext {

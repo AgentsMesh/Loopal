@@ -6,10 +6,27 @@ const ALL_STATUSES: &[ThreadGoalStatus] = &[
     ThreadGoalStatus::Complete,
 ];
 
+const NON_REOPEN_REASONS: &[GoalTransitionReason] = &[
+    GoalTransitionReason::UserCreated,
+    GoalTransitionReason::ModelCompleted,
+    GoalTransitionReason::UserCompleted,
+    GoalTransitionReason::UserPaused,
+    GoalTransitionReason::UserResumed,
+    GoalTransitionReason::UserCleared,
+    GoalTransitionReason::BarrenContinuation,
+];
+
+const REOPEN_REASONS: &[GoalTransitionReason] = &[
+    GoalTransitionReason::ModelReopened,
+    GoalTransitionReason::UserReopened,
+];
+
 const ALL_REASONS: &[GoalTransitionReason] = &[
     GoalTransitionReason::UserCreated,
     GoalTransitionReason::ModelCompleted,
     GoalTransitionReason::UserCompleted,
+    GoalTransitionReason::ModelReopened,
+    GoalTransitionReason::UserReopened,
     GoalTransitionReason::UserPaused,
     GoalTransitionReason::UserResumed,
     GoalTransitionReason::UserCleared,
@@ -49,6 +66,16 @@ fn each_legal_transition_is_accepted() {
             ThreadGoalStatus::Complete,
             GoalTransitionReason::UserCompleted,
         ),
+        (
+            ThreadGoalStatus::Complete,
+            ThreadGoalStatus::Active,
+            GoalTransitionReason::ModelReopened,
+        ),
+        (
+            ThreadGoalStatus::Complete,
+            ThreadGoalStatus::Active,
+            GoalTransitionReason::UserReopened,
+        ),
     ];
     for (from, to, reason) in cases {
         assert!(
@@ -59,13 +86,37 @@ fn each_legal_transition_is_accepted() {
 }
 
 #[test]
-fn complete_is_terminal_for_every_reason() {
+fn complete_only_exits_to_active_via_reopen_reasons() {
     for &to in ALL_STATUSES {
-        for &reason in ALL_REASONS {
+        for &reason in NON_REOPEN_REASONS {
             assert!(
                 !ThreadGoalStatus::Complete.can_transition_to(to, reason),
-                "Complete must not transition to {to:?} via {reason:?}"
+                "Complete must not transition to {to:?} via non-reopen {reason:?}"
             );
+        }
+    }
+    for &reason in REOPEN_REASONS {
+        assert!(
+            ThreadGoalStatus::Complete.can_transition_to(ThreadGoalStatus::Active, reason),
+            "Complete -> Active via {reason:?} must be legal"
+        );
+        assert!(
+            !ThreadGoalStatus::Complete.can_transition_to(ThreadGoalStatus::Paused, reason),
+            "Complete -> Paused via {reason:?} must be illegal"
+        );
+    }
+}
+
+#[test]
+fn reopen_reasons_only_apply_from_complete() {
+    for &reason in REOPEN_REASONS {
+        for &from in &[ThreadGoalStatus::Active, ThreadGoalStatus::Paused] {
+            for &to in ALL_STATUSES {
+                assert!(
+                    !from.can_transition_to(to, reason),
+                    "{from:?} -> {to:?} via {reason:?} must be illegal (reopen only valid from Complete)"
+                );
+            }
         }
     }
 }
@@ -102,6 +153,20 @@ fn status_string_roundtrip_through_serde() {
         assert_eq!(json, format!("\"{expected}\""));
         let back: ThreadGoalStatus = serde_json::from_str(&json).unwrap();
         assert_eq!(back, status);
+    }
+}
+
+#[test]
+fn reopen_reasons_roundtrip_through_serde() {
+    let pairs = [
+        (GoalTransitionReason::ModelReopened, "model_reopened"),
+        (GoalTransitionReason::UserReopened, "user_reopened"),
+    ];
+    for (reason, expected) in pairs {
+        let json = serde_json::to_string(&reason).unwrap();
+        assert_eq!(json, format!("\"{expected}\""));
+        let back: GoalTransitionReason = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, reason);
     }
 }
 

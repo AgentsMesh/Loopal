@@ -16,7 +16,9 @@ impl AgentLoopRunner {
         };
         let kickoff_eligible = matches!(
             &ctrl,
-            ControlCommand::GoalCreate { .. } | ControlCommand::GoalUserResume
+            ControlCommand::GoalCreate { .. }
+                | ControlCommand::GoalUserResume
+                | ControlCommand::GoalUserReopen
         );
         let is_clear = matches!(&ctrl, ControlCommand::GoalClear);
         let outcome: std::result::Result<Option<ThreadGoal>, GoalSessionError> = match ctrl {
@@ -42,6 +44,14 @@ impl AgentLoopRunner {
                     &session,
                     ThreadGoalStatus::Complete,
                     GoalTransitionReason::UserCompleted,
+                )
+                .await
+            }
+            ControlCommand::GoalUserReopen => {
+                transition(
+                    &session,
+                    ThreadGoalStatus::Active,
+                    GoalTransitionReason::UserReopened,
                 )
                 .await
             }

@@ -8,7 +8,7 @@ pub enum GoalSessionError {
     AlreadyExists,
     #[error("no goal exists for this session")]
     NotFound,
-    #[error("model can only mark goals complete; pause/resume are user-only")]
+    #[error("model attempted a forbidden goal status transition")]
     ModelStatusForbidden,
     #[error("objective must be non-empty and at most {max} characters; got {got}")]
     ObjectiveTooLong { max: usize, got: usize },
@@ -23,4 +23,6 @@ pub trait GoalSession: Send + Sync {
     async fn create(&self, objective: String) -> Result<ThreadGoal, GoalSessionError>;
 
     async fn complete_by_model(&self) -> Result<ThreadGoal, GoalSessionError>;
+
+    async fn reopen_by_model(&self) -> Result<ThreadGoal, GoalSessionError>;
 }

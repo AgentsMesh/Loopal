@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
-use loopal_tool_api::{PermissionLevel, ToolContext, ToolResult, TypedTool};
+use loopal_tool_api::{GoalSessionError, PermissionLevel, ToolContext, ToolResult, TypedTool};
 use schemars::JsonSchema;
 use serde::Deserialize;
 
@@ -12,6 +12,7 @@ pub struct UpdateGoalTool;
 #[derive(Deserialize, JsonSchema, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum GoalStatusInput {
+    Active,
     Complete,
 }
 
@@ -27,11 +28,14 @@ impl TypedTool<UpdateGoalParams> for UpdateGoalTool {
     }
 
     fn description(&self) -> &str {
-        "Update the existing goal. Use this tool only to mark the goal achieved. Set status to \
-         `complete` only when the objective has actually been achieved and no required work \
-         remains. Do not mark a goal complete merely because you are stopping work. You cannot \
-         use this tool to pause or resume a goal; those status changes are controlled by the \
-         user or system."
+        "Update the existing goal. Use `complete` only when the objective has actually been \
+         achieved and no required work remains. Use `active` only to revert a mistaken \
+         `complete` — you previously marked the goal complete and then discovered remaining \
+         work that still falls under the same original objective; reopening preserves the \
+         goal's id and objective. To pursue a different objective, use create_goal instead. \
+         Do not mark complete merely because you are stopping work, and do not toggle between \
+         `active` and `complete` to manipulate continuation. You cannot pause or resume the \
+         goal via this tool; those status changes are controlled by the user or system."
     }
 
     fn permission(&self) -> PermissionLevel {
@@ -55,8 +59,11 @@ impl TypedTool<UpdateGoalParams> for UpdateGoalTool {
                 ));
             }
         };
-        let _ = input.status;
-        match session.complete_by_model().await {
+        let outcome: Result<_, GoalSessionError> = match input.status {
+            GoalStatusInput::Complete => session.complete_by_model().await,
+            GoalStatusInput::Active => session.reopen_by_model().await,
+        };
+        match outcome {
             Ok(goal) => Ok(ToolResult::success(render_response(&Some(goal)))),
             Err(err) => Ok(ToolResult::error(format_session_error(err))),
         }

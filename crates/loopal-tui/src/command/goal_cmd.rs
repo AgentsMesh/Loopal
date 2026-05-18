@@ -4,7 +4,7 @@ use loopal_protocol::ControlCommand;
 use super::{CommandEffect, CommandHandler};
 use crate::app::App;
 
-const USAGE: &str = "/goal usage: <objective> | pause | resume | complete | clear";
+const USAGE: &str = "/goal usage: <objective> | pause | resume | complete | reopen | clear";
 
 pub struct GoalCmd;
 
@@ -15,7 +15,7 @@ impl CommandHandler for GoalCmd {
     }
 
     fn description(&self) -> &str {
-        "Manage thread goal: /goal <objective> | pause | resume | complete | clear"
+        "Manage thread goal: /goal <objective> | pause | resume | complete | reopen | clear"
     }
 
     fn has_arg(&self) -> bool {
@@ -41,6 +41,7 @@ fn ack_for(cmd: &ControlCommand) -> String {
         ControlCommand::GoalUserPause => "Goal paused.".into(),
         ControlCommand::GoalUserResume => "Goal resumed.".into(),
         ControlCommand::GoalUserComplete => "Goal marked complete.".into(),
+        ControlCommand::GoalUserReopen => "Goal reopened.".into(),
         ControlCommand::GoalClear => "Goal cleared.".into(),
         _ => "Goal command sent.".into(),
     }
@@ -55,6 +56,7 @@ pub(crate) fn parse_goal_arg(arg: &str) -> Option<ControlCommand> {
         "pause" => return Some(ControlCommand::GoalUserPause),
         "resume" => return Some(ControlCommand::GoalUserResume),
         "complete" => return Some(ControlCommand::GoalUserComplete),
+        "reopen" => return Some(ControlCommand::GoalUserReopen),
         "clear" => return Some(ControlCommand::GoalClear),
         _ => {}
     }
@@ -82,6 +84,7 @@ mod tests {
             ("pause", "GoalUserPause"),
             ("RESUME", "GoalUserResume"),
             ("Complete", "GoalUserComplete"),
+            ("reopen", "GoalUserReopen"),
             ("clear", "GoalClear"),
         ] {
             let got = dbg_variant(&parse_goal_arg(input).unwrap());
@@ -111,6 +114,7 @@ mod tests {
             ack_for(&ControlCommand::GoalUserComplete),
             "Goal marked complete."
         );
+        assert_eq!(ack_for(&ControlCommand::GoalUserReopen), "Goal reopened.");
         assert_eq!(ack_for(&ControlCommand::GoalClear), "Goal cleared.");
     }
 

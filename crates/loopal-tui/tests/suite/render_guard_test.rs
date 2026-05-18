@@ -85,6 +85,8 @@ fn render_tasks_only_no_panic() {
         active_form: Some("Building".into()),
         status: TaskSnapshotStatus::InProgress,
         blocked_by: Vec::new(),
+        description: String::new(),
+        blocks: Vec::new(),
     }]);
     let backend = TestBackend::new(80, 10);
     let mut terminal = Terminal::new(backend).unwrap();
@@ -104,6 +106,8 @@ fn render_all_three_panels_no_panic() {
         active_form: None,
         status: TaskSnapshotStatus::Pending,
         blocked_by: Vec::new(),
+        description: String::new(),
+        blocks: Vec::new(),
     }]);
     app.view_clients["main"].inject_bg_for_test(vec![BgTaskSnapshot {
         id: "bg_1".into(),

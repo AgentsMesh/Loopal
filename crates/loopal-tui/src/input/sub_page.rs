@@ -3,10 +3,12 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crate::app::{App, PickerState, SubPage};
 
 use super::bg_task_log_keys::handle_bg_task_log_key;
+use super::cron_detail_keys::handle_cron_detail_key;
 use super::mcp_page_keys::handle_mcp_page_key;
 use super::skills_page_keys::handle_skills_page_key;
 use super::status_page_keys::handle_status_page_key;
 use super::sub_page_rewind::handle_rewind_picker_key;
+use super::task_detail_keys::handle_task_detail_key;
 use super::{InputAction, SubPageResult};
 
 /// Handle keys when a sub-page (picker) is active. All keys are consumed.
@@ -33,6 +35,8 @@ pub(super) fn handle_sub_page_key(app: &mut App, key: &KeyEvent) -> InputAction 
         SubPage::McpPage(_) => handle_mcp_page_key(app, key),
         SubPage::SkillsPage(_) => handle_skills_page_key(app, key),
         SubPage::BgTaskLog(_) => handle_bg_task_log_key(app, key),
+        SubPage::CronDetail(_) => handle_cron_detail_key(app, key),
+        SubPage::TaskDetail(_) => handle_task_detail_key(app, key),
     }
 }
 

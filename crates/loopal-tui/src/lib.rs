@@ -3,7 +3,9 @@ pub mod command;
 pub mod event;
 pub mod input;
 mod key_dispatch;
+mod key_dispatch_apply;
 mod key_dispatch_ops;
+mod key_dispatch_subpage;
 pub mod markdown;
 mod panel_ops;
 pub mod panel_provider;
@@ -34,35 +36,19 @@ pub mod dispatch_ops {
 
 /// Async dispatch table for e2e tests that drive `App` via real `InputAction`s.
 /// Distinct from `dispatch_ops` (pure helpers) — this module owns side effects.
+///
+/// Single source of truth: forwards to
+/// [`apply_action`](crate::key_dispatch_apply::apply_action), the same
+/// function the production event loop uses. `DispatchOutcome::Quit` and
+/// `PasteRequested` are intentionally discarded — tests assert on
+/// observable side effects, not on the loop control signal.
 #[doc(hidden)]
 pub mod key_dispatch_for_test {
     use crate::app::App;
     use crate::input::InputAction;
+    use crate::key_dispatch_apply::apply_action;
 
     pub async fn dispatch(app: &mut App, action: InputAction) {
-        match action {
-            InputAction::None => {}
-            InputAction::QuestionConfirm => crate::question_ops::confirm(app).await,
-            InputAction::QuestionCancel => crate::question_ops::cancel(app).await,
-            InputAction::QuestionUp => crate::question_ops::cursor_up(app),
-            InputAction::QuestionDown => crate::question_ops::cursor_down(app),
-            InputAction::QuestionPrev => crate::question_ops::prev_question(app),
-            InputAction::QuestionNext => crate::question_ops::next_question(app),
-            InputAction::QuestionToggle => crate::question_ops::toggle(app),
-            InputAction::QuestionFreeTextChar(c) => crate::question_ops::free_text_char(app, c),
-            InputAction::QuestionFreeTextBackspace => crate::question_ops::free_text_backspace(app),
-            InputAction::QuestionFreeTextDelete => crate::question_ops::free_text_delete(app),
-            InputAction::QuestionFreeTextCursorLeft => {
-                crate::question_ops::free_text_cursor_left(app)
-            }
-            InputAction::QuestionFreeTextCursorRight => {
-                crate::question_ops::free_text_cursor_right(app)
-            }
-            InputAction::QuestionFreeTextHome => crate::question_ops::free_text_home(app),
-            InputAction::QuestionFreeTextEnd => crate::question_ops::free_text_end(app),
-            other => {
-                panic!("key_dispatch_for_test: unhandled action {other:?}; extend dispatch table")
-            }
-        }
+        let _ = apply_action(app, action).await;
     }
 }

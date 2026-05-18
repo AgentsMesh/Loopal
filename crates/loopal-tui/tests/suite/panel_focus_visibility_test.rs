@@ -39,6 +39,8 @@ fn setup_two_panels() -> App {
         active_form: None,
         status: TaskSnapshotStatus::InProgress,
         blocked_by: Vec::new(),
+        description: String::new(),
+        blocks: Vec::new(),
     }]);
     app.view_clients["main"].inject_bg_for_test(vec![loopal_protocol::BgTaskSnapshot {
         id: "bg_1".into(),
@@ -158,6 +160,8 @@ fn single_panel_has_no_header() {
         active_form: None,
         status: TaskSnapshotStatus::InProgress,
         blocked_by: Vec::new(),
+        description: String::new(),
+        blocks: Vec::new(),
     }]);
     let text = render_and_dump(&app, 40, 2);
     assert!(

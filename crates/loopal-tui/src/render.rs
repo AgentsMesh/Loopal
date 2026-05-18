@@ -44,7 +44,16 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     let layout = FrameLayout::compute(size, breadcrumb_h, panel_zone_h, banner_h, input_h);
 
     if let Some(ref mut sub_page) = app.sub_page {
-        render_sub_page(f, sub_page, &app.bg_task_details, layout.picker);
+        let cron_snapshots = vc.cron_snapshots();
+        let task_snapshots = vc.task_snapshots();
+        render_sub_page(
+            f,
+            sub_page,
+            &app.bg_task_details,
+            &cron_snapshots,
+            &task_snapshots,
+            layout.picker,
+        );
         views::unified_status::render_unified_status(f, app, &state, conv, layout.status);
         return;
     }
@@ -97,6 +106,8 @@ fn render_sub_page(
     f: &mut Frame,
     sub_page: &mut SubPage,
     bg_details: &[loopal_protocol::BgTaskDetail],
+    crons: &[loopal_protocol::CronJobSnapshot],
+    tasks: &[loopal_protocol::TaskSnapshot],
     area: Rect,
 ) {
     match sub_page {
@@ -108,6 +119,8 @@ fn render_sub_page(
         SubPage::McpPage(s) => views::mcp_page::render_mcp_page(f, s, area),
         SubPage::SkillsPage(s) => views::skills_page::render_skills_page(f, s, area),
         SubPage::BgTaskLog(s) => views::bg_task_log::render_bg_task_log(f, s, bg_details, area),
+        SubPage::CronDetail(s) => views::cron_detail::render_cron_detail(f, s, crons, area),
+        SubPage::TaskDetail(s) => views::task_detail::render_task_detail(f, s, tasks, area),
     }
 }
 

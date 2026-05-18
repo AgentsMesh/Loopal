@@ -2,6 +2,7 @@ mod actions;
 mod autocomplete;
 mod bg_task_log_keys;
 mod commands;
+mod cron_detail_keys;
 mod editing;
 mod mcp_page_keys;
 mod modal;
@@ -13,6 +14,7 @@ mod skills_page_keys;
 mod status_page_keys;
 mod sub_page;
 mod sub_page_rewind;
+mod task_detail_keys;
 
 pub use actions::*;
 
@@ -104,7 +106,8 @@ fn handle_panel_key(app: &mut App, key: &KeyEvent) -> InputAction {
         KeyCode::Down => InputAction::PanelDown,
         KeyCode::Enter if kind == PanelKind::Agents => InputAction::EnterAgentView,
         KeyCode::Enter if kind == PanelKind::BgTasks => InputAction::EnterBgTaskView,
-        KeyCode::Enter if kind == PanelKind::Tasks => InputAction::None,
+        KeyCode::Enter if kind == PanelKind::Crons => InputAction::EnterCronView,
+        KeyCode::Enter if kind == PanelKind::Tasks => InputAction::EnterTaskView,
         KeyCode::Delete if kind == PanelKind::Agents => InputAction::TerminateFocusedAgent,
         KeyCode::Tab => InputAction::PanelTab,
         KeyCode::Esc => InputAction::ExitPanel,

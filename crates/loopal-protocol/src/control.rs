@@ -51,4 +51,12 @@ pub enum ControlCommand {
     GoalUserComplete,
     GoalUserReopen,
     GoalClear,
+    /// Kill a running background shell task by its store ID.
+    BgTaskKill {
+        id: String,
+    },
+    /// Cancel a scheduled cron job by its scheduler-generated ID.
+    CronDelete {
+        id: String,
+    },
 }

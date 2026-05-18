@@ -13,6 +13,7 @@ mod goal_control;
 mod input;
 mod input_control;
 mod input_mcp;
+mod input_resources;
 mod llm;
 mod llm_chunk;
 mod llm_params;

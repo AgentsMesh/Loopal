@@ -13,6 +13,8 @@ fn snap(id: &str, status: TaskSnapshotStatus) -> TaskSnapshot {
         active_form: None,
         status,
         blocked_by: Vec::new(),
+        description: String::new(),
+        blocks: Vec::new(),
     }
 }
 
@@ -68,6 +70,8 @@ fn render_with_blocked_and_active_form_no_panic() {
             active_form: Some("Building".into()),
             status: TaskSnapshotStatus::InProgress,
             blocked_by: Vec::new(),
+            description: String::new(),
+            blocks: Vec::new(),
         },
         TaskSnapshot {
             id: "2".into(),
@@ -75,6 +79,8 @@ fn render_with_blocked_and_active_form_no_panic() {
             active_form: None,
             status: TaskSnapshotStatus::Pending,
             blocked_by: vec!["1".into()],
+            description: String::new(),
+            blocks: Vec::new(),
         },
     ];
     let backend = TestBackend::new(80, 2);

@@ -49,6 +49,8 @@ fn expected_view_effect(cmd: &ControlCommand) -> ExpectedViewEffect {
         GoalUserComplete => FixtureRequired("active goal"),
         GoalUserReopen => FixtureRequired("completed goal"),
         GoalClear => FixtureRequired("active goal"),
+        BgTaskKill { .. } => FixtureRequired("running bg task in store"),
+        CronDelete { .. } => FixtureRequired("scheduled cron job"),
     }
 }
 
@@ -142,5 +144,7 @@ fn variant_name(cmd: &ControlCommand) -> &'static str {
         GoalUserComplete => "GoalUserComplete",
         GoalUserReopen => "GoalUserReopen",
         GoalClear => "GoalClear",
+        BgTaskKill { .. } => "BgTaskKill",
+        CronDelete { .. } => "CronDelete",
     }
 }

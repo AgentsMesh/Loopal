@@ -34,6 +34,8 @@ fn task(id: &str, status: TaskSnapshotStatus) -> TaskSnapshot {
         active_form: None,
         status,
         blocked_by: Vec::new(),
+        description: String::new(),
+        blocks: Vec::new(),
     }
 }
 

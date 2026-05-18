@@ -157,7 +157,7 @@ fn enter_in_input_mode_with_focus_also_drills_in() {
 }
 
 #[test]
-fn enter_in_tasks_panel_returns_none() {
+fn enter_in_tasks_panel_opens_task_detail() {
     let mut app = make_app();
     app.view_clients["main"].inject_tasks_for_test(vec![loopal_protocol::TaskSnapshot {
         id: "1".into(),
@@ -165,11 +165,13 @@ fn enter_in_tasks_panel_returns_none() {
         active_form: None,
         status: loopal_protocol::TaskSnapshotStatus::InProgress,
         blocked_by: Vec::new(),
+        description: String::new(),
+        blocks: Vec::new(),
     }]);
     app.section_mut(PanelKind::Tasks).focused = Some("1".into());
     app.focus_mode = FocusMode::Panel(PanelKind::Tasks);
     let action = handle_key(&mut app, key(KeyCode::Enter));
-    assert!(matches!(action, InputAction::None));
+    assert!(matches!(action, InputAction::EnterTaskView));
 }
 
 // === Root agent guard ===

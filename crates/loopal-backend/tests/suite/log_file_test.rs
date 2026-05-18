@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use loopal_backend::shell::{SpawnedBackgroundData, exec_background, exec_command};
@@ -9,11 +10,26 @@ use loopal_tool_api::backend_types::EnvOverride;
 use loopal_tool_api::{HeadTail, OutputTail, StderrCappedBuffer};
 use parking_lot::Mutex as PlMutex;
 
+// reason: hardcoded &unique_session_id() was racy in CI — multiple tests in
+// the same binary share `/tmp/loopal/test-session/bash/`, and parallel
+// readers/log-writers can hit fd limits and stomp each other's files.
+// Each test now gets a pid+counter-scoped id (matches the convention in
+// tmp_cleanup_test.rs which already namespaces with UUIDs).
+fn unique_session_id() -> String {
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    format!(
+        "test-{}-{}",
+        std::process::id(),
+        COUNTER.fetch_add(1, Ordering::Relaxed)
+    )
+}
+
 #[tokio::test]
 async fn create_log_file_path_is_in_tmp_and_unique() {
-    let (p1, _w1) = create_log_file("test-session").await.unwrap();
-    let (p2, _w2) = create_log_file("test-session").await.unwrap();
-    assert!(p1.starts_with(std::env::temp_dir().join("loopal").join("test-session")));
+    let sid = unique_session_id();
+    let (p1, _w1) = create_log_file(&sid).await.unwrap();
+    let (p2, _w2) = create_log_file(&sid).await.unwrap();
+    assert!(p1.starts_with(std::env::temp_dir().join("loopal").join(&sid)));
     assert!(p1.extension().unwrap() == "log");
     assert_ne!(p1, p2, "uuid must produce unique paths");
     assert!(
@@ -24,7 +40,7 @@ async fn create_log_file_path_is_in_tmp_and_unique() {
 
 #[tokio::test]
 async fn read_lines_into_sink_stdout_writes_unprefixed_and_pushes_head_tail() {
-    let (path, writer) = create_log_file("test-session").await.unwrap();
+    let (path, writer) = create_log_file(&unique_session_id()).await.unwrap();
     let writer = Arc::new(writer);
     let head_tail = Arc::new(HeadTail::new(10, 10));
 
@@ -52,7 +68,7 @@ async fn read_lines_into_sink_stdout_writes_unprefixed_and_pushes_head_tail() {
 
 #[tokio::test]
 async fn read_lines_into_sink_stderr_writes_err_prefix_to_file() {
-    let (path, writer) = create_log_file("test-session").await.unwrap();
+    let (path, writer) = create_log_file(&unique_session_id()).await.unwrap();
     let writer = Arc::new(writer);
     let stderr_buf = Arc::new(PlMutex::new(StderrCappedBuffer::new()));
 
@@ -80,7 +96,7 @@ async fn read_lines_into_sink_stderr_writes_err_prefix_to_file() {
 
 #[tokio::test]
 async fn read_lines_into_sink_pushes_progress_tail_when_present() {
-    let (_path, writer) = create_log_file("test-session").await.unwrap();
+    let (_path, writer) = create_log_file(&unique_session_id()).await.unwrap();
     let writer = Arc::new(writer);
     let head_tail = Arc::new(HeadTail::new(10, 10));
     let progress = Arc::new(OutputTail::new(10));
@@ -116,7 +132,7 @@ async fn exec_command_writes_log_file_and_returns_path() {
         "echo SHORT_OUT",
         &EnvOverride::default(),
         Duration::from_secs(5),
-        "test-session",
+        &unique_session_id(),
     )
     .await
     .unwrap();
@@ -142,7 +158,7 @@ async fn exec_command_interleaves_stderr_with_err_prefix_in_file() {
         "echo OUT_LINE; echo ERR_LINE >&2",
         &EnvOverride::default(),
         Duration::from_secs(5),
-        "test-session",
+        &unique_session_id(),
     )
     .await
     .unwrap();
@@ -165,7 +181,7 @@ async fn exec_command_truncated_flags_for_long_stdout() {
         cmd,
         &EnvOverride::default(),
         Duration::from_secs(10),
-        "test-session",
+        &unique_session_id(),
     )
     .await
     .unwrap();
@@ -186,7 +202,7 @@ async fn exec_background_creates_log_path_in_spawned_data() {
         None,
         "sleep 0.5",
         &EnvOverride::default(),
-        "test-session",
+        &unique_session_id(),
     )
     .await
     .unwrap();
@@ -217,7 +233,7 @@ async fn exec_command_streaming_completed_path_returns_log_path() {
         &EnvOverride::default(),
         Duration::from_secs(5),
         tail,
-        "test-session",
+        &unique_session_id(),
     )
     .await
     .unwrap();
@@ -245,7 +261,7 @@ async fn exec_command_streaming_timeout_handle_carries_log_path() {
         &EnvOverride::default(),
         Duration::from_millis(500),
         tail,
-        "test-session",
+        &unique_session_id(),
     )
     .await
     .unwrap();
@@ -284,7 +300,7 @@ async fn exec_command_timeout_kills_process_group() {
         &cmd,
         &EnvOverride::default(),
         Duration::from_millis(400),
-        "test-session",
+        &unique_session_id(),
     )
     .await;
     assert!(matches!(result, Err(loopal_error::ToolIoError::Timeout(_))));

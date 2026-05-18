@@ -99,6 +99,10 @@ pub enum SubPage {
     SkillsPage(SkillsPageState),
     /// Background task log viewer — full output of a single bg task.
     BgTaskLog(BgTaskLogState),
+    /// Cron job detail — full prompt + schedule info with delete action.
+    CronDetail(CronDetailState),
+    /// Structured task detail — description + blocks + blocked_by.
+    TaskDetail(TaskDetailState),
 }
 
 /// State for the background task log viewer sub-page.
@@ -111,6 +115,15 @@ pub struct BgTaskLogState {
     pub auto_follow: bool,
     /// Previous line count — detects output growth for auto-follow.
     pub prev_line_count: usize,
+}
+
+pub struct CronDetailState {
+    pub cron_id: String,
+}
+
+pub struct TaskDetailState {
+    pub task_id: String,
+    pub scroll_offset: usize,
 }
 
 /// Which sub-panel within the panel zone is focused.

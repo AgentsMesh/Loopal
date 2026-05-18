@@ -13,6 +13,8 @@ fn task(id: &str, subject: &str) -> TaskSnapshot {
         active_form: None,
         status: TaskSnapshotStatus::Pending,
         blocked_by: vec![],
+        description: String::new(),
+        blocks: vec![],
     }
 }
 

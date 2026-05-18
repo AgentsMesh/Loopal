@@ -126,3 +126,54 @@ async fn snapshot_strips_newlines_from_task_subjects() {
     // avoids producing double whitespace on `\r\n` line endings.
     assert_eq!(snapshot.tasks[0].subject, "multi linesubject");
 }
+
+#[tokio::test]
+async fn snapshot_carries_description_verbatim() {
+    let fixture = TestFixture::new();
+    let (_ctx, shared) = agent_tool_context(&fixture);
+    shared
+        .task_store
+        .create("subj", "multi\nline\ndescription")
+        .await;
+
+    let snapshot = shared.snapshot_state().await;
+
+    // Description is preserved as-is — TaskDetail sub-page renders line by line,
+    // so newlines must survive the snapshot conversion.
+    assert_eq!(snapshot.tasks[0].description, "multi\nline\ndescription");
+}
+
+#[tokio::test]
+async fn snapshot_propagates_blocks_relation() {
+    let fixture = TestFixture::new();
+    let (_ctx, shared) = agent_tool_context(&fixture);
+    let blocker = shared.task_store.create("blocker", "first").await;
+    let blocked = shared.task_store.create("blocked", "second").await;
+    shared
+        .task_store
+        .update(
+            &blocker.id,
+            loopal_agent::TaskPatch {
+                add_blocks: vec![blocked.id.clone()],
+                ..loopal_agent::TaskPatch::default()
+            },
+        )
+        .await;
+    shared
+        .task_store
+        .update(
+            &blocked.id,
+            loopal_agent::TaskPatch {
+                add_blocked_by: vec![blocker.id.clone()],
+                ..loopal_agent::TaskPatch::default()
+            },
+        )
+        .await;
+
+    let snapshot = shared.snapshot_state().await;
+
+    let blocker_snap = snapshot.tasks.iter().find(|t| t.id == blocker.id).unwrap();
+    let blocked_snap = snapshot.tasks.iter().find(|t| t.id == blocked.id).unwrap();
+    assert_eq!(blocker_snap.blocks, vec![blocked.id.clone()]);
+    assert_eq!(blocked_snap.blocked_by, vec![blocker.id.clone()]);
+}

@@ -39,6 +39,7 @@ pub struct AgentLoopParamsBuilder {
     rewake_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
     message_snapshot: Option<Arc<std::sync::RwLock<Vec<Message>>>>,
     resume_hooks: Vec<Arc<dyn SessionResumeHook>>,
+    scheduler: Option<Arc<loopal_scheduler::CronScheduler>>,
 }
 
 impl AgentLoopParamsBuilder {
@@ -65,6 +66,7 @@ impl AgentLoopParamsBuilder {
             rewake_rx: None,
             message_snapshot: None,
             resume_hooks: Vec::new(),
+            scheduler: None,
         }
     }
 
@@ -119,6 +121,10 @@ impl AgentLoopParamsBuilder {
         self.resume_hooks = h;
         self
     }
+    pub fn scheduler(mut self, s: Arc<loopal_scheduler::CronScheduler>) -> Self {
+        self.scheduler = Some(s);
+        self
+    }
 
     pub fn build(self) -> AgentLoopParams {
         AgentLoopParams {
@@ -137,6 +143,7 @@ impl AgentLoopParamsBuilder {
             rewake_rx: self.rewake_rx,
             message_snapshot: self.message_snapshot,
             resume_hooks: self.resume_hooks,
+            scheduler: self.scheduler,
         }
     }
 }

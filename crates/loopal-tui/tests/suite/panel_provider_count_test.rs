@@ -101,6 +101,8 @@ fn tasks_count_matches_snapshots() {
             active_form: None,
             status: TaskSnapshotStatus::Pending,
             blocked_by: Vec::new(),
+            description: String::new(),
+            blocks: Vec::new(),
         },
         TaskSnapshot {
             id: "2".into(),
@@ -108,6 +110,8 @@ fn tasks_count_matches_snapshots() {
             active_form: None,
             status: TaskSnapshotStatus::InProgress,
             blocked_by: Vec::new(),
+            description: String::new(),
+            blocks: Vec::new(),
         },
         TaskSnapshot {
             id: "3".into(),
@@ -115,6 +119,8 @@ fn tasks_count_matches_snapshots() {
             active_form: None,
             status: TaskSnapshotStatus::Completed,
             blocked_by: Vec::new(),
+            description: String::new(),
+            blocks: Vec::new(),
         },
     ]);
     let state = app.session.lock();

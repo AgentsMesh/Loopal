@@ -59,6 +59,8 @@ fn add_task_snapshot(app: &mut App, id: &str, subject: &str) {
         active_form: None,
         status: TaskSnapshotStatus::InProgress,
         blocked_by: Vec::new(),
+        description: String::new(),
+        blocks: Vec::new(),
     }]);
 }
 

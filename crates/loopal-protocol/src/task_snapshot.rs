@@ -20,4 +20,8 @@ pub struct TaskSnapshot {
     pub active_form: Option<String>,
     pub status: TaskSnapshotStatus,
     pub blocked_by: Vec<String>,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub blocks: Vec<String>,
 }

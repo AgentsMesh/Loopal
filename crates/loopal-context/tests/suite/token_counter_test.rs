@@ -75,6 +75,7 @@ fn test_estimate_messages_tokens_includes_tool_io() {
             content: vec![ContentBlock::ToolResult {
                 tool_use_id: "call_1".into(),
                 content: "fn main() {}".into(),
+                images: Vec::new(),
                 is_error: false,
                 metadata: None,
             }],

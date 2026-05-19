@@ -21,6 +21,7 @@ fn user_with_tool_result(tool_use_id: &str) -> Message {
         content: vec![ContentBlock::ToolResult {
             tool_use_id: tool_use_id.to_string(),
             content: "ok".to_string(),
+            images: Vec::new(),
             is_error: false,
             metadata: None,
         }],

@@ -9,6 +9,7 @@ fn big_tool_result_message(size: usize) -> Message {
         content: vec![ContentBlock::ToolResult {
             tool_use_id: "t1".into(),
             content: "x".repeat(size),
+            images: Vec::new(),
             is_error: false,
             metadata: None,
         }],

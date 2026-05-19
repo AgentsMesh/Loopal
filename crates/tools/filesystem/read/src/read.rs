@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
 use loopal_tool_api::{PermissionLevel, ToolContext, ToolResult, TypedTool};
+use loopal_tool_invocation::ImageMime;
 use schemars::JsonSchema;
 use serde::Deserialize;
 
@@ -31,11 +32,10 @@ impl TypedTool<ReadParams> for ReadTool {
          - You can optionally specify a line offset and limit (especially handy for long files), \
          but it's recommended to read the whole file by not providing these parameters.\n\
          - Results are returned using cat -n format, with line numbers starting at 1.\n\
-         - This tool can read images (PNG, JPG, etc). When reading an image file the contents are presented visually.\n\
          - This tool can read Jupyter notebooks (.ipynb files) and returns all cells with their outputs.\n\
+         - For image files (PNG/JPEG/GIF/WEBP), use ReadImage instead.\n\
          - For PDF files, use the ReadPdf tool. For HTML files, use the ReadHtml tool.\n\
          - This tool can only read files, not directories. To read a directory, use Ls or an ls command via Bash.\n\
-         - If the user provides a path to a screenshot, ALWAYS use this tool to view the file at the path.\n\
          - If you read a file that exists but has empty contents you will receive a system reminder warning."
     }
 
@@ -52,6 +52,13 @@ impl TypedTool<ReadParams> for ReadTool {
         input: ReadParams,
         ctx: &ToolContext,
     ) -> Result<ToolResult, LoopalError> {
+        if let Ok(preview) = ctx.backend.peek_bytes(&input.file_path, 16).await
+            && ImageMime::from_magic(&preview).is_some()
+        {
+            return Ok(ToolResult::error(
+                "This file appears to be an image. Use ReadImage instead.",
+            ));
+        }
         let offset = input.offset.unwrap_or(1).max(1) as usize;
         let limit = input.limit.unwrap_or(2000) as usize;
 

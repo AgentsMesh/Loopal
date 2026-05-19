@@ -2,6 +2,9 @@ use std::time::Duration;
 
 use loopal_tool_api::{DEFAULT_MAX_OUTPUT_BYTES, DEFAULT_MAX_OUTPUT_LINES};
 
+pub const IMAGE_MAX_BYTES: u64 = 10 * 1024 * 1024;
+pub const IMAGE_MAX_PIXELS: u64 = 8192 * 8192;
+
 /// Resource limits applied by `LocalBackend`.
 #[derive(Debug, Clone)]
 pub struct ResourceLimits {
@@ -21,6 +24,10 @@ pub struct ResourceLimits {
     pub default_timeout: Duration,
     /// HTTP fetch timeout.
     pub fetch_timeout: Duration,
+    /// Maximum image file size in bytes.
+    pub image_max_bytes: u64,
+    /// Maximum image pixels (width × height).
+    pub image_max_pixels: u64,
 }
 
 impl Default for ResourceLimits {
@@ -34,6 +41,8 @@ impl Default for ResourceLimits {
             max_fetch_bytes: 5 * 1024 * 1024,          // 5 MB
             default_timeout: Duration::from_secs(300), // 5 min
             fetch_timeout: Duration::from_secs(30),
+            image_max_bytes: IMAGE_MAX_BYTES,
+            image_max_pixels: IMAGE_MAX_PIXELS,
         }
     }
 }

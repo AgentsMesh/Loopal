@@ -21,6 +21,7 @@ pub fn timeout_result(deadline: Duration) -> ToolResult {
         content: format!(
             "Watchdog timeout: tool did not return within {secs}s (timeout + 30s grace)",
         ),
+        images: Vec::new(),
         is_error: true,
         metadata: Some(ToolResultMetadata::stale(StaleReason::WatchdogTimeout)),
     }

@@ -48,6 +48,7 @@ fn test_build_input_tool_result_becomes_function_call_output() {
             content: vec![ContentBlock::ToolResult {
                 tool_use_id: "call_123".to_string(),
                 content: "file contents here".to_string(),
+                images: Vec::new(),
                 is_error: false,
                 metadata: None,
             }],

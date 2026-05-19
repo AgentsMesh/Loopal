@@ -56,6 +56,7 @@ fn ok_result(id: &str) -> ContentBlock {
     ContentBlock::ToolResult {
         tool_use_id: id.into(),
         content: "ok".into(),
+        images: Vec::new(),
         is_error: false,
         metadata: None,
     }
@@ -65,6 +66,7 @@ fn err_result(id: &str) -> ContentBlock {
     ContentBlock::ToolResult {
         tool_use_id: id.into(),
         content: "err".into(),
+        images: Vec::new(),
         is_error: true,
         metadata: None,
     }

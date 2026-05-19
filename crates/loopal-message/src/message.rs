@@ -1,5 +1,5 @@
 use crate::origin::MessageOrigin;
-use loopal_tool_invocation::ToolResultMetadata;
+use loopal_tool_invocation::{ToolImageBlock, ToolResultMetadata};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -76,7 +76,8 @@ impl Message {
     }
 
     /// Estimate the token count of this message across all content blocks.
-    /// Uses a rough heuristic of 1 token per 4 characters.
+    /// Uses a rough heuristic of 1 token per 4 characters; images use
+    /// raw-byte-count / 750 (approximating Anthropic's pixel-based formula).
     pub fn estimated_token_count(&self) -> u32 {
         let content_tokens: u32 = self
             .content
@@ -84,8 +85,10 @@ impl Message {
             .map(|block| match block {
                 ContentBlock::Text { text } => text.len() as u32 / 4,
                 ContentBlock::ToolUse { input, .. } => input.to_string().len() as u32 / 4,
-                ContentBlock::ToolResult { content, .. } => content.len() as u32 / 4,
-                ContentBlock::Image { .. } => 1000, // fixed estimate for images
+                ContentBlock::ToolResult {
+                    content, images, ..
+                } => content.len() as u32 / 4 + images.iter().map(image_token_cost).sum::<u32>(),
+                ContentBlock::Image { source } => estimate_image_tokens(source.data.len()),
                 ContentBlock::Thinking { thinking, .. } => thinking.len() as u32 / 4,
                 ContentBlock::ServerToolUse { input, .. } => input.to_string().len() as u32 / 4,
                 ContentBlock::ServerToolResult { content, .. } => {
@@ -96,6 +99,16 @@ impl Message {
         // +4 for role/message overhead
         content_tokens + 4
     }
+}
+
+fn estimate_image_tokens(base64_len: usize) -> u32 {
+    let raw_bytes = base64_len * 3 / 4;
+    (raw_bytes / 750).max(85) as u32
+}
+
+fn image_token_cost(img: &ToolImageBlock) -> u32 {
+    let raw_bytes = img.byte_size();
+    ((raw_bytes / 750).max(85)) as u32
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -112,6 +125,8 @@ pub enum ContentBlock {
     ToolResult {
         tool_use_id: String,
         content: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        images: Vec<ToolImageBlock>,
         is_error: bool,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         metadata: Option<ToolResultMetadata>,

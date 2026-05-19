@@ -7,7 +7,7 @@ use loopal_error::{ProcessHandle, ToolIoError};
 use loopal_protocol::{ThreadGoal, ThreadGoalStatus};
 use loopal_tool_api::backend_types::{
     EditResult, EnvOverride, ExecResult, FetchResult, FileInfo, GlobOptions, GlobSearchResult,
-    GrepOptions, GrepSearchResult, LsResult, ReadResult, WriteResult,
+    GrepOptions, GrepSearchResult, ImageResult, LsResult, ReadResult, WriteResult,
 };
 use loopal_tool_api::{
     Backend, ExecOutcome, GoalSession, GoalSessionError, Tool, ToolContext, TypedBridge,
@@ -69,6 +69,9 @@ impl Backend for PanicBackend {
         unimplemented!()
     }
     async fn read_raw(&self, _: &str) -> Result<String, ToolIoError> {
+        unimplemented!()
+    }
+    async fn read_image(&self, _: &str) -> Result<ImageResult, ToolIoError> {
         unimplemented!()
     }
     fn cwd(&self) -> &Path {

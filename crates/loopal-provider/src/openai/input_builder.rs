@@ -1,9 +1,11 @@
 use loopal_message::{ContentBlock, MessageRole};
 use loopal_provider_api::ChatParams;
 use serde_json::{Value, json};
+use tracing::error;
 
 use super::OpenAiProvider;
 use super::server_tool;
+use crate::tool_result_text::{IMAGE_ATTACHED_PLACEHOLDER, placeholder_text};
 
 impl OpenAiProvider {
     /// Convert conversation messages into Responses API `input` array items.
@@ -29,19 +31,50 @@ impl OpenAiProvider {
                         if let ContentBlock::ToolResult {
                             tool_use_id,
                             content,
+                            images,
                             is_error,
                             ..
                         } = block
                         {
+                            let base = placeholder_text(content, !images.is_empty());
+                            let output = if *is_error && base != IMAGE_ATTACHED_PLACEHOLDER {
+                                format!("[error] {content}")
+                            } else {
+                                base.to_string()
+                            };
                             input.push(json!({
                                 "type": "function_call_output",
                                 "call_id": tool_use_id,
-                                "output": if *is_error {
-                                    format!("[error] {content}")
-                                } else {
-                                    content.clone()
-                                }
+                                "output": output
                             }));
+                            if !images.is_empty() {
+                                let parts: Vec<Value> = images
+                                    .iter()
+                                    .filter_map(|img| match img.as_inline() {
+                                        Some((media_type, data)) => Some(json!({
+                                            "type": "input_image",
+                                            "image_url": format!(
+                                                "data:{};base64,{}",
+                                                media_type, data
+                                            )
+                                        })),
+                                        None => {
+                                            error!(
+                                                media_type = img.media_type(),
+                                                "SessionResource reached OpenAI provider without hydration; dropping image"
+                                            );
+                                            None
+                                        }
+                                    })
+                                    .collect();
+                                if !parts.is_empty() {
+                                    input.push(json!({
+                                        "type": "message",
+                                        "role": "user",
+                                        "content": parts
+                                    }));
+                                }
+                            }
                         }
                     }
                 }

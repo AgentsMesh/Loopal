@@ -57,6 +57,7 @@ fn project_tool_use_and_result() {
         content: vec![ContentBlock::ToolResult {
             tool_use_id: "tu-1".into(),
             content: "file contents here".into(),
+            images: Vec::new(),
             is_error: false,
 
             metadata: None,
@@ -90,6 +91,7 @@ fn project_tool_use_error() {
         content: vec![ContentBlock::ToolResult {
             tool_use_id: "tu-err".into(),
             content: "command failed".into(),
+            images: Vec::new(),
             is_error: true,
 
             metadata: None,
@@ -144,6 +146,7 @@ fn project_multi_turn_mixed() {
             content: vec![ContentBlock::ToolResult {
                 tool_use_id: "t1".into(),
                 content: "main.rs".into(),
+                images: Vec::new(),
                 is_error: false,
                 metadata: None,
             }],

@@ -1,6 +1,7 @@
 use loopal_message::{ContentBlock, MessageRole};
 use loopal_provider_api::ChatParams;
 use serde_json::{Value, json};
+use tracing::error;
 
 use super::AnthropicProvider;
 use super::server_tool;
@@ -35,14 +36,43 @@ impl AnthropicProvider {
                         ContentBlock::ToolResult {
                             tool_use_id,
                             content,
+                            images,
                             is_error,
                             ..
-                        } => json!({
-                            "type": "tool_result",
-                            "tool_use_id": tool_use_id,
-                            "content": content,
-                            "is_error": is_error
-                        }),
+                        } => {
+                            let content_value = if images.is_empty() {
+                                json!(content)
+                            } else {
+                                let mut blocks: Vec<Value> = Vec::new();
+                                if !content.is_empty() {
+                                    blocks.push(json!({"type": "text", "text": content}));
+                                }
+                                for img in images {
+                                    let Some((media_type, data)) = img.as_inline() else {
+                                        error!(
+                                            media_type = img.media_type(),
+                                            "SessionResource reached Anthropic provider without hydration; dropping image"
+                                        );
+                                        continue;
+                                    };
+                                    blocks.push(json!({
+                                        "type": "image",
+                                        "source": {
+                                            "type": "base64",
+                                            "media_type": media_type,
+                                            "data": data
+                                        }
+                                    }));
+                                }
+                                json!(blocks)
+                            };
+                            json!({
+                                "type": "tool_result",
+                                "tool_use_id": tool_use_id,
+                                "content": content_value,
+                                "is_error": is_error
+                            })
+                        }
                         ContentBlock::Image { source } => json!({
                             "type": "image",
                             "source": {

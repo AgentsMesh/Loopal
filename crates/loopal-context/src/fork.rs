@@ -85,6 +85,7 @@ fn compress_block(block: &ContentBlock) -> Option<ContentBlock> {
         ContentBlock::ToolResult {
             tool_use_id,
             content,
+            images,
             is_error,
             metadata,
         } => {
@@ -97,6 +98,7 @@ fn compress_block(block: &ContentBlock) -> Option<ContentBlock> {
             Some(ContentBlock::ToolResult {
                 tool_use_id: tool_use_id.clone(),
                 content: truncated,
+                images: images.clone(),
                 is_error: *is_error,
                 metadata: metadata.clone(),
             })

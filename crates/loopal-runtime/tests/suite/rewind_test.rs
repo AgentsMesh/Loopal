@@ -31,6 +31,7 @@ fn tool_result_only_user_msg_not_a_turn() {
         content: vec![ContentBlock::ToolResult {
             tool_use_id: "t1".into(),
             content: "result".into(),
+            images: Vec::new(),
             is_error: false,
 
             metadata: None,

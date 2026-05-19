@@ -7,6 +7,7 @@ pub(crate) mod resilient_client;
 pub mod router;
 pub mod sse;
 pub mod thinking_resolver;
+pub(crate) mod tool_result_text;
 
 pub use anthropic::AnthropicProvider;
 pub use google::GoogleProvider;

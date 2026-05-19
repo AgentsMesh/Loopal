@@ -45,6 +45,8 @@ mod goal_session_reopen_test;
 mod goal_session_support;
 #[path = "suite/goal_session_test.rs"]
 mod goal_session_test;
+#[path = "suite/hydrate_test.rs"]
+mod hydrate_test;
 #[path = "suite/loop_detector_edge_test.rs"]
 mod loop_detector_edge_test;
 #[path = "suite/loop_detector_test.rs"]
@@ -61,6 +63,8 @@ mod plan_file_test;
 mod question_parse_edge_test;
 #[path = "suite/question_parse_test.rs"]
 mod question_parse_test;
+#[path = "suite/read_image_e2e_test.rs"]
+mod read_image_e2e_test;
 #[path = "suite/rewind_test.rs"]
 mod rewind_test;
 #[path = "suite/sandbox_precheck_test.rs"]

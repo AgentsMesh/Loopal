@@ -46,6 +46,7 @@ impl AgentLoopRunner {
             ContentBlock::ToolResult {
                 tool_use_id: id.to_string(),
                 content,
+                images: Vec::new(),
                 is_error,
                 metadata: None,
             },
@@ -73,6 +74,7 @@ impl AgentLoopRunner {
             ContentBlock::ToolResult {
                 tool_use_id: id.to_string(),
                 content: err_msg,
+                images: Vec::new(),
                 is_error: true,
                 metadata: None,
             },

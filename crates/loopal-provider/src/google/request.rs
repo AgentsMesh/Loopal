@@ -1,9 +1,11 @@
 use loopal_message::{ContentBlock, MessageRole};
 use loopal_provider_api::ChatParams;
 use serde_json::{Value, json};
+use tracing::error;
 
 use super::GoogleProvider;
 use super::server_tool;
+use crate::tool_result_text::placeholder_text;
 
 impl GoogleProvider {
     pub fn build_contents(&self, params: &ChatParams) -> Vec<Value> {
@@ -21,40 +23,60 @@ impl GoogleProvider {
                 let parts: Vec<Value> = msg
                     .content
                     .iter()
-                    .map(|block| match block {
-                        ContentBlock::Text { text } => json!({"text": text}),
-                        ContentBlock::ToolUse { name, input, .. } => json!({
+                    .flat_map(|block| match block {
+                        ContentBlock::Text { text } => vec![json!({"text": text})],
+                        ContentBlock::ToolUse { name, input, .. } => vec![json!({
                             "functionCall": { "name": name, "args": input }
-                        }),
+                        })],
                         ContentBlock::ToolResult {
                             tool_use_id: _,
                             content,
+                            images,
                             ..
-                        } => json!({
-                            "functionResponse": {
-                                "name": "",
-                                "response": {"result": content}
+                        } => {
+                            let placeholder = placeholder_text(content, !images.is_empty());
+                            let mut out = vec![json!({
+                                "functionResponse": {
+                                    "name": "",
+                                    "response": {"result": placeholder}
+                                }
+                            })];
+                            for img in images {
+                                let Some((media_type, data)) = img.as_inline() else {
+                                    error!(
+                                        media_type = img.media_type(),
+                                        "SessionResource reached Google provider without hydration; dropping image"
+                                    );
+                                    continue;
+                                };
+                                out.push(json!({
+                                    "inlineData": {
+                                        "mimeType": media_type,
+                                        "data": data
+                                    }
+                                }));
                             }
-                        }),
-                        ContentBlock::Image { source } => json!({
+                            out
+                        }
+                        ContentBlock::Image { source } => vec![json!({
                             "inlineData": {
                                 "mimeType": source.media_type,
                                 "data": source.data
                             }
-                        }),
-                        ContentBlock::Thinking { thinking, .. } => json!({
+                        })],
+                        ContentBlock::Thinking { thinking, .. } => vec![json!({
                             "text": thinking,
                             "thought": true
-                        }),
+                        })],
                         // Server-side blocks from other providers preserved as text.
                         // Content is formatted for readability when crossing providers.
                         ContentBlock::ServerToolUse { name, input, .. } => {
                             let query = input.get("query").and_then(|v| v.as_str()).unwrap_or("");
-                            json!({"text": format!("[server tool: {name}({query})]")})
+                            vec![json!({"text": format!("[server tool: {name}({query})]")})]
                         }
                         ContentBlock::ServerToolResult { content, .. } => {
                             let summary = summarize_search_result(content);
-                            json!({"text": format!("[server tool result: {summary}]")})
+                            vec![json!({"text": format!("[server tool result: {summary}]")})]
                         }
                     })
                     .collect();

@@ -7,6 +7,8 @@ mod goal_store_test;
 mod messages_test;
 #[path = "suite/replay_test.rs"]
 mod replay_test;
+#[path = "suite/resources_test.rs"]
+mod resources_test;
 #[path = "suite/sessions_cwd_test.rs"]
 mod sessions_cwd_test;
 #[path = "suite/sessions_test.rs"]

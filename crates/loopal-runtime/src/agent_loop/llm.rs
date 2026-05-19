@@ -27,7 +27,15 @@ impl AgentLoopRunner {
             });
         }
 
-        let chat_params = self.prepare_chat_params_with(messages, intent)?;
+        let mut chat_params = self.prepare_chat_params_with(messages, intent)?;
+        if let Some(store) = crate::hydrate::resource_store() {
+            crate::hydrate::hydrate_images(
+                &mut chat_params.messages,
+                store.as_ref(),
+                &self.params.session.id,
+            )
+            .await?;
+        }
         let provider = self
             .params
             .deps

@@ -132,6 +132,7 @@ fn test_normalize_tool_result_before_text_after_merge() {
         content: vec![ContentBlock::ToolResult {
             tool_use_id: "toolu_abc".into(),
             content: "ok".into(),
+            images: Vec::new(),
             is_error: false,
             metadata: None,
         }],

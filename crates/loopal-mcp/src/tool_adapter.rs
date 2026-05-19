@@ -105,6 +105,7 @@ fn convert_tool_result(result: &CallToolResult) -> ToolResult {
 
     ToolResult {
         content: parts.join("\n"),
+        images: Vec::new(),
         is_error: result.is_error.unwrap_or(false),
         metadata: None,
     }

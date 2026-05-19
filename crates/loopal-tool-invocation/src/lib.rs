@@ -1,5 +1,6 @@
 mod error;
 mod id;
+mod image;
 mod invocation;
 mod outcome;
 mod progress;
@@ -8,6 +9,7 @@ mod transition;
 
 pub use error::TransitionError;
 pub use id::{InvocationId, InvocationIdError};
+pub use image::{ImageMime, ToolImageBlock};
 pub use invocation::ToolInvocation;
 pub use outcome::{CancelCause, FailureKind, Outcome, StaleReason, ToolResultMetadata};
 pub use progress::ProgressSnapshot;

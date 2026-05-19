@@ -14,6 +14,15 @@ pub struct ReadResult {
     pub total_lines: usize,
 }
 
+/// Result of an image read operation.
+#[derive(Debug, Clone)]
+pub struct ImageResult {
+    pub media_type: String,
+    pub data: String,
+    pub dimensions: (u32, u32),
+    pub byte_size: usize,
+}
+
 /// Result of a file write operation.
 #[derive(Debug, Clone)]
 pub struct WriteResult {

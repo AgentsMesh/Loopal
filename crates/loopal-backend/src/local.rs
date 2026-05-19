@@ -7,13 +7,13 @@ use loopal_config::ResolvedPolicy;
 use loopal_error::{ProcessHandle, ToolIoError};
 use loopal_tool_api::backend_types::{
     EditResult, ExecResult, FetchResult, FileInfo, GlobOptions, GlobSearchResult, GrepOptions,
-    GrepSearchResult, LsResult, ReadResult, WriteResult,
+    GrepSearchResult, ImageResult, LsResult, ReadResult, WriteResult,
 };
 use loopal_tool_api::{Backend, ExecOutcome};
 
 use crate::approved::ApprovedPaths;
 use crate::limits::ResourceLimits;
-use crate::{fs, net, path, platform, search, shell, shell_stream};
+use crate::{fs, image, net, path, platform, search, shell, shell_stream};
 
 pub struct LocalBackend {
     cwd: PathBuf,
@@ -139,6 +139,20 @@ impl Backend for LocalBackend {
 
     async fn read_raw(&self, p: &str) -> Result<String, ToolIoError> {
         fs::read_raw_file(&self.resolve_checked(p, false)?, &self.limits).await
+    }
+
+    async fn read_image(&self, p: &str) -> Result<ImageResult, ToolIoError> {
+        image::read_image(&self.cwd, p, self.policy.as_ref(), &self.limits).await
+    }
+
+    async fn peek_bytes(&self, p: &str, n: usize) -> Result<Vec<u8>, ToolIoError> {
+        use tokio::io::AsyncReadExt;
+        let resolved = self.resolve_checked(p, false)?;
+        let mut f = tokio::fs::File::open(&resolved).await?;
+        let mut buf = vec![0u8; n];
+        let read = f.read(&mut buf).await?;
+        buf.truncate(read);
+        Ok(buf)
     }
 
     fn cwd(&self) -> &Path {

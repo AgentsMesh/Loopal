@@ -47,3 +47,5 @@ mod stream_helpers;
 mod stream_openai_edge_test;
 #[path = "suite/stream_openai_test.rs"]
 mod stream_openai_test;
+#[path = "suite/tool_result_image_test.rs"]
+mod tool_result_image_test;

@@ -73,6 +73,9 @@ pub struct Settings {
     pub compaction: CompactionSettings,
 
     #[serde(default)]
+    pub images: ImageSettings,
+
+    #[serde(default)]
     pub bg_tasks: BgTaskConfig,
 }
 
@@ -98,6 +101,7 @@ impl Default for Settings {
             secrets: super::secrets::SecretsSettings::default(),
             goals: GoalSettings::default(),
             compaction: CompactionSettings::default(),
+            images: ImageSettings::default(),
             bg_tasks: BgTaskConfig::default(),
         }
     }
@@ -160,6 +164,24 @@ impl Default for CompactionSettings {
     fn default() -> Self {
         Self {
             microcompact_idle_minutes: 60,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ImageSettings {
+    pub max_bytes: u64,
+    pub max_pixels: u64,
+    pub inline_threshold_bytes: usize,
+}
+
+impl Default for ImageSettings {
+    fn default() -> Self {
+        Self {
+            max_bytes: 10 * 1024 * 1024,
+            max_pixels: 8192 * 8192,
+            inline_threshold_bytes: 256 * 1024,
         }
     }
 }

@@ -25,6 +25,7 @@ rust_library(
         "//crates/loopal-tool-invocation",
         "//crates/loopal-vault-api",
         "//crates/tools/process/background:loopal-tool-background",
+        "@crates//:base64",
         "@crates//:chrono",
         "@crates//:dirs",
         "@crates//:futures",
@@ -56,6 +57,7 @@ rust_test(
         "//crates/loopal-classifier",
         "//crates/loopal-backend",
         "//crates/loopal-test-support",
+        "@crates//:base64",
         "@crates//:chrono",
         "@crates//:futures",
         "@crates//:secrecy",
@@ -80,6 +82,7 @@ rust_test(
         "//crates/loopal-tool-invocation",
         "//crates/loopal-vault-api",
         "//crates/loopal-view-state",
+        "//crates/tools/filesystem/read-image:loopal-tool-read-image",
     ],
     proc_macro_deps = ["@crates//:async-trait"],
 )

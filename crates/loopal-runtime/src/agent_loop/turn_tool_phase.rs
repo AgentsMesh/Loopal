@@ -54,8 +54,8 @@ impl AgentLoopRunner {
             .last()
             .map(|m| m.content.as_slice())
             .unwrap_or(&[]);
-        for obs in &mut self.observers {
-            obs.on_after_tools(turn_ctx, &tool_uses, result_blocks);
+        for h in &mut self.hooks {
+            h.on_after_tools(turn_ctx, &tool_uses, result_blocks);
         }
         Ok(())
     }

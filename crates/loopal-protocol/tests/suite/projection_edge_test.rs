@@ -27,6 +27,7 @@ fn summarize_input_respects_utf8_boundary() {
             name: "TaskCreate".into(),
             input: long_chinese,
         }],
+        origin: None,
     };
     let display = project_messages(&[msg]);
     let summary = &display[0].tool_calls[0].summary;
@@ -47,6 +48,7 @@ fn summarize_input_short_input_not_truncated() {
             name: "Read".into(),
             input: short.clone(),
         }],
+        origin: None,
     };
     let display = project_messages(&[msg]);
     let summary = &display[0].tool_calls[0].summary;
@@ -84,6 +86,7 @@ fn project_multiple_images_count() {
                 },
             },
         ],
+        origin: None,
     };
     let display = project_messages(&[msg]);
     assert_eq!(display.len(), 1);

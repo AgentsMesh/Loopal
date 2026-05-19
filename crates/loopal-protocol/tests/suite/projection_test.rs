@@ -8,6 +8,7 @@ fn text_msg(role: MessageRole, text: &str) -> Message {
         content: vec![ContentBlock::Text {
             text: text.to_string(),
         }],
+        origin: None,
     }
 }
 
@@ -48,6 +49,7 @@ fn project_tool_use_and_result() {
                 input: serde_json::json!({"path": "/tmp/foo"}),
             },
         ],
+        origin: None,
     };
     let user_msg = Message {
         id: None,
@@ -59,6 +61,7 @@ fn project_tool_use_and_result() {
 
             metadata: None,
         }],
+        origin: None,
     };
     let display = project_messages(&[assistant_msg, user_msg]);
     assert_eq!(display.len(), 1);
@@ -79,6 +82,7 @@ fn project_tool_use_error() {
             name: "Bash".into(),
             input: serde_json::json!({"command": "exit 1"}),
         }],
+        origin: None,
     };
     let user_msg = Message {
         id: None,
@@ -90,6 +94,7 @@ fn project_tool_use_error() {
 
             metadata: None,
         }],
+        origin: None,
     };
     let display = project_messages(&[assistant_msg, user_msg]);
     assert!(display[0].tool_calls[0].is_error);
@@ -107,6 +112,7 @@ fn project_image_placeholder() {
                 data: "iVBOR...".into(),
             },
         }],
+        origin: None,
     };
     let display = project_messages(&[msg]);
     assert_eq!(display[0].content, "[image]");
@@ -130,6 +136,7 @@ fn project_multi_turn_mixed() {
                     input: serde_json::json!({"pattern": "*.rs"}),
                 },
             ],
+            origin: None,
         },
         Message {
             id: None,
@@ -140,6 +147,7 @@ fn project_multi_turn_mixed() {
                 is_error: false,
                 metadata: None,
             }],
+            origin: None,
         },
         text_msg(MessageRole::Assistant, "done"),
         text_msg(MessageRole::User, "q2"),
@@ -159,6 +167,7 @@ fn project_skips_empty_messages() {
         id: None,
         role: MessageRole::Assistant,
         content: vec![],
+        origin: None,
     };
     let display = project_messages(&[msg]);
     assert!(display.is_empty());

@@ -36,6 +36,7 @@ fn cap_tool_results_truncates_oversized() {
         id: None,
         role: MessageRole::User,
         content: vec![tool_result("t1", &big_content)],
+        origin: None,
     };
     // max_tokens = 1000, the big content is ~25000 tokens
     cap_tool_results(&mut msg, 1_000);
@@ -58,6 +59,7 @@ fn cap_tool_results_preserves_small() {
         id: None,
         role: MessageRole::User,
         content: vec![tool_result("t1", small_content)],
+        origin: None,
     };
     cap_tool_results(&mut msg, 1_000);
 
@@ -78,6 +80,7 @@ fn cap_tool_results_skips_errors() {
             is_error: true,
             metadata: None,
         }],
+        origin: None,
     };
     cap_tool_results(&mut msg, 1_000);
     if let ContentBlock::ToolResult { content, .. } = &msg.content[0] {
@@ -102,6 +105,7 @@ fn condense_old_server_blocks_strips_non_last() {
                     text: "Found results".into(),
                 },
             ],
+            origin: None,
         },
         Message::user("thanks"),
         Message::assistant("you're welcome"),
@@ -130,6 +134,7 @@ fn condense_preserves_last_assistant_server_blocks() {
                 text: "Results".into(),
             },
         ],
+        origin: None,
     }];
 
     condense_old_server_blocks(&mut messages);

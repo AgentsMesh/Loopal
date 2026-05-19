@@ -124,6 +124,7 @@ fn test_normalize_tool_result_before_text_after_merge() {
         content: vec![ContentBlock::Text {
             text: "[WARNING: loop detected]".into(),
         }],
+        origin: None,
     };
     let tool_results = Message {
         id: None,
@@ -134,6 +135,7 @@ fn test_normalize_tool_result_before_text_after_merge() {
             is_error: false,
             metadata: None,
         }],
+        origin: None,
     };
     let messages = vec![
         Message::assistant("thinking"),
@@ -145,6 +147,7 @@ fn test_normalize_tool_result_before_text_after_merge() {
                 name: "Read".into(),
                 input: serde_json::json!({}),
             }],
+            origin: None,
         },
         warning,
         tool_results,

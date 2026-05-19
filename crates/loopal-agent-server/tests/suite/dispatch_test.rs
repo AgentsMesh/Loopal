@@ -32,6 +32,32 @@ async fn dispatch_simple_unknown_method_returns_method_not_found() {
 }
 
 #[tokio::test]
+async fn dispatch_simple_initialize_is_idempotent() {
+    // The canonical first `initialize` is consumed by
+    // `wait_for_initialize_with_token`. A client that hits its initialize
+    // timeout will retry with a new request id, and that retry MUST land here
+    // and succeed — otherwise the connection appears broken (-32601) even
+    // though the agent is healthy. Guards against the bazel-sandbox e2e
+    // failure where slow child stdin caused legitimate retries to explode.
+    let hub = SessionHub::new();
+
+    let first = dispatch_simple(methods::INITIALIZE.name, &hub)
+        .await
+        .expect("first initialize must succeed");
+    let second = dispatch_simple(methods::INITIALIZE.name, &hub)
+        .await
+        .expect("second initialize must also succeed (idempotent)");
+
+    assert_eq!(first, second, "idempotent initialize must return same result");
+    assert_eq!(first["protocol_version"], 1);
+    assert_eq!(first["agent_info"]["name"], "loopal");
+    assert!(
+        first["agent_info"]["version"].is_string(),
+        "version must be present, got: {first}"
+    );
+}
+
+#[tokio::test]
 async fn rpc_error_payload_constructors() {
     let internal = RpcErrorPayload::internal("oops");
     assert_eq!(internal.code, loopal_ipc::jsonrpc::INTERNAL_ERROR);

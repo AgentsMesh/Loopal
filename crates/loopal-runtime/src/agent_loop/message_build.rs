@@ -1,4 +1,4 @@
-use loopal_message::{ContentBlock, ImageSource, Message, MessageRole};
+use loopal_message::{ContentBlock, ImageSource, Message, MessageOrigin, MessageRole};
 use loopal_protocol::{Envelope, MessageSource};
 
 /// Build a user Message from an Envelope, converting UserContent into ContentBlocks.
@@ -29,5 +29,6 @@ pub fn build_user_message(env: &Envelope) -> Message {
         id: None,
         role: MessageRole::User,
         content: blocks,
+        origin: Some(MessageOrigin::from(&env.source)),
     }
 }

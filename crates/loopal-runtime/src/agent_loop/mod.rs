@@ -10,6 +10,8 @@ mod goal_barren;
 mod goal_consistency;
 mod goal_continuation;
 mod goal_control;
+pub mod governance;
+mod ingest;
 mod input;
 mod input_control;
 mod input_mcp;
@@ -59,7 +61,6 @@ mod tools_resolve;
 pub mod turn_context;
 mod turn_exec;
 pub(crate) mod turn_metrics;
-pub mod turn_observer;
 mod turn_observer_dispatch;
 mod turn_response;
 mod turn_state;
@@ -80,17 +81,12 @@ use finished_guard::FinishedGuard;
 
 pub async fn agent_loop(params: AgentLoopParams) -> Result<AgentOutput> {
     let mut guard = FinishedGuard::new(params.deps.frontend.clone());
-    let h = &params.harness;
-    let observers: Vec<Box<dyn turn_observer::TurnObserver>> = vec![
-        Box::new(loop_detector::LoopDetector::with_thresholds(
-            h.loop_warn_threshold,
-            h.loop_abort_threshold,
-        )),
-        Box::new(diff_tracker::DiffTracker::new(params.deps.frontend.clone())),
-    ];
+    let governance = governance::build_governance(&params.harness);
+    let hooks = governance::build_hooks(params.deps.frontend.clone());
     let pipeline = pipeline_setup::build_context_pipeline(&params.session.cwd);
     let mut runner = AgentLoopRunner::new(params);
-    runner.observers = observers;
+    runner.governance = governance;
+    runner.hooks = hooks;
     runner.pipeline = pipeline;
     let result = runner.run().await;
     guard.disarm();

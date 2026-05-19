@@ -8,9 +8,7 @@ use tracing::debug;
 
 impl ContextStore {
     pub fn prepare_for_llm(&self) -> Vec<Message> {
-        let mut msgs = self.messages().to_vec();
-        sanitize_tool_pairs(&mut msgs);
-        msgs
+        self.messages().to_vec()
     }
 
     pub fn apply_summary(&mut self, new_messages: Vec<Message>) -> bool {

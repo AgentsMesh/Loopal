@@ -1,3 +1,4 @@
+use crate::origin::MessageOrigin;
 use loopal_tool_invocation::ToolResultMetadata;
 use serde::{Deserialize, Serialize};
 
@@ -15,6 +16,8 @@ pub struct Message {
     pub id: Option<String>,
     pub role: MessageRole,
     pub content: Vec<ContentBlock>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<MessageOrigin>,
 }
 
 impl Message {
@@ -25,6 +28,7 @@ impl Message {
             content: vec![ContentBlock::Text {
                 text: text.to_string(),
             }],
+            origin: None,
         }
     }
 
@@ -35,6 +39,7 @@ impl Message {
             content: vec![ContentBlock::Text {
                 text: text.to_string(),
             }],
+            origin: None,
         }
     }
 
@@ -45,12 +50,17 @@ impl Message {
             content: vec![ContentBlock::Text {
                 text: text.to_string(),
             }],
+            origin: None,
         }
     }
 
-    /// Return a clone with the given ID assigned.
     pub fn with_id(mut self, id: String) -> Self {
         self.id = Some(id);
+        self
+    }
+
+    pub fn with_origin(mut self, origin: MessageOrigin) -> Self {
+        self.origin = Some(origin);
         self
     }
 

@@ -1,8 +1,8 @@
-use loopal_protocol::InterruptSignal;
+use loopal_protocol::{InterruptSignal, MessageSource};
 use loopal_runtime::agent_loop::cancel::TurnCancel;
+use loopal_runtime::agent_loop::governance::{Governance, TurnHook, Verdict};
 use loopal_runtime::agent_loop::loop_detector::LoopDetector;
 use loopal_runtime::agent_loop::turn_context::TurnContext;
-use loopal_runtime::agent_loop::turn_observer::{ObserverAction, TurnObserver};
 use serde_json::json;
 use std::sync::Arc;
 
@@ -18,21 +18,32 @@ fn tool(name: &str) -> (String, String, serde_json::Value) {
     ("id".into(), name.into(), json!({"file": "/tmp/x.rs"}))
 }
 
-// --- TurnObserver trait defaults ---
+// --- Governance trait defaults ---
 
 #[test]
-fn turn_observer_defaults_are_noop() {
-    struct NoopObserver;
-    impl TurnObserver for NoopObserver {}
+fn governance_defaults_are_continue() {
+    struct NoopGovernance;
+    impl Governance for NoopGovernance {}
 
-    let mut obs = NoopObserver;
+    let mut g = NoopGovernance;
     let mut ctx = make_ctx();
-    obs.on_turn_start(&mut ctx);
-    let action = obs.on_before_tools(&mut ctx, &[tool("Read")]);
-    assert!(matches!(action, ObserverAction::Continue));
-    obs.on_after_tools(&mut ctx, &[tool("Read")], &[]);
-    obs.on_turn_end(&ctx);
-    obs.on_user_input();
+    let action = g.on_before_tools(&mut ctx, &[tool("Read")]);
+    assert!(matches!(action, Verdict::Continue));
+    g.on_envelope_received(&MessageSource::Human);
+}
+
+// --- TurnHook trait defaults ---
+
+#[test]
+fn turn_hook_defaults_are_noop() {
+    struct NoopHook;
+    impl TurnHook for NoopHook {}
+
+    let mut h = NoopHook;
+    let mut ctx = make_ctx();
+    h.on_turn_start(&mut ctx);
+    h.on_after_tools(&mut ctx, &[tool("Read")], &[]);
+    h.on_turn_end(&ctx);
 }
 
 // --- LoopDetector direct tests ---
@@ -42,7 +53,7 @@ fn loop_detector_no_repeat_returns_continue() {
     let mut det = LoopDetector::new();
     let mut ctx = make_ctx();
     let action = det.on_before_tools(&mut ctx, &[tool("Read")]);
-    assert!(matches!(action, ObserverAction::Continue));
+    assert!(matches!(action, Verdict::Continue));
 }
 
 #[test]
@@ -54,7 +65,7 @@ fn loop_detector_three_repeats_warns() {
     det.on_before_tools(&mut ctx, &calls);
     let action = det.on_before_tools(&mut ctx, &calls);
     assert!(
-        matches!(action, ObserverAction::InjectWarning(_)),
+        matches!(action, Verdict::InjectWarning(_)),
         "expected InjectWarning after 3 repeats, got {action:?}"
     );
 }
@@ -68,25 +79,71 @@ fn loop_detector_five_repeats_aborts() {
         det.on_before_tools(&mut ctx, &calls);
     }
     let action = det.on_before_tools(&mut ctx, &calls);
+    let Verdict::AbortTurn {
+        reason,
+        feedback_to_model,
+    } = action
+    else {
+        panic!("expected AbortTurn after 5 repeats, got {action:?}");
+    };
+    assert!(reason.contains("Loop detected"));
     assert!(
-        matches!(action, ObserverAction::AbortTurn(_)),
-        "expected AbortTurn after 5 repeats, got {action:?}"
+        !feedback_to_model.is_empty(),
+        "AbortTurn must carry a non-empty feedback_to_model so the model sees why"
+    );
+    assert!(
+        feedback_to_model.contains("Read"),
+        "feedback_to_model should mention the offending tool name"
     );
 }
 
 #[test]
-fn loop_detector_user_input_resets() {
+fn loop_detector_human_envelope_resets() {
     let mut det = LoopDetector::new();
     let mut ctx = make_ctx();
     let calls = [tool("Read")];
     for _ in 0..4 {
         det.on_before_tools(&mut ctx, &calls);
     }
-    det.on_user_input();
+    det.on_envelope_received(&MessageSource::Human);
     let action = det.on_before_tools(&mut ctx, &calls);
     assert!(
-        matches!(action, ObserverAction::Continue),
-        "expected Continue after reset, got {action:?}"
+        matches!(action, Verdict::Continue),
+        "expected Continue after Human envelope reset, got {action:?}"
+    );
+}
+
+#[test]
+fn loop_detector_scheduled_envelope_resets() {
+    let mut det = LoopDetector::new();
+    let mut ctx = make_ctx();
+    let calls = [tool("Read")];
+    for _ in 0..4 {
+        det.on_before_tools(&mut ctx, &calls);
+    }
+    det.on_envelope_received(&MessageSource::Scheduled);
+    let action = det.on_before_tools(&mut ctx, &calls);
+    assert!(
+        matches!(action, Verdict::Continue),
+        "expected Continue after Scheduled envelope reset, got {action:?}"
+    );
+}
+
+#[test]
+fn loop_detector_system_envelope_does_not_reset() {
+    let mut det = LoopDetector::new();
+    let mut ctx = make_ctx();
+    let calls = [tool("Read")];
+    for _ in 0..4 {
+        det.on_before_tools(&mut ctx, &calls);
+    }
+    // System-injected envelopes (continuation, hook rewake) must NOT reset —
+    // they extend the current loop rather than mark a new task boundary.
+    det.on_envelope_received(&MessageSource::System("goal_continuation".into()));
+    let action = det.on_before_tools(&mut ctx, &calls);
+    assert!(
+        matches!(action, Verdict::AbortTurn { .. }),
+        "expected AbortTurn (signatures preserved) after System envelope, got {action:?}"
     );
 }
 
@@ -100,7 +157,7 @@ fn loop_detector_different_tools_independent() {
     det.on_before_tools(&mut ctx, &[tool("Read")]);
     let action = det.on_before_tools(&mut ctx, &[tool("Write")]);
     assert!(
-        matches!(action, ObserverAction::Continue),
+        matches!(action, Verdict::Continue),
         "different tools should not trigger loop: {action:?}"
     );
 }
@@ -118,7 +175,7 @@ fn loop_detector_different_inputs_independent() {
         )];
         let action = det.on_before_tools(&mut ctx, &call);
         assert!(
-            matches!(action, ObserverAction::Continue),
+            matches!(action, Verdict::Continue),
             "different inputs should not trigger loop at iteration {i}"
         );
     }
@@ -133,5 +190,5 @@ fn loop_detector_multibyte_utf8_input_does_not_panic() {
     let cjk = "中".repeat(200); // 600 bytes
     let call = vec![("id".into(), "Write".into(), json!({"result": cjk}))];
     let action = det.on_before_tools(&mut ctx, &call);
-    assert!(matches!(action, ObserverAction::Continue));
+    assert!(matches!(action, Verdict::Continue));
 }

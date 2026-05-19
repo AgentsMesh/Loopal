@@ -11,6 +11,7 @@ fn assistant_with_tool_use(id: &str) -> Message {
             name: "read".to_string(),
             input: serde_json::json!({}),
         }],
+        origin: None,
     }
 }
 
@@ -24,6 +25,7 @@ fn user_with_tool_result(tool_use_id: &str) -> Message {
             is_error: false,
             metadata: None,
         }],
+        origin: None,
     }
 }
 
@@ -97,6 +99,7 @@ fn assistant_with_server_tool_blocks(blocks: Vec<ContentBlock>) -> Message {
         id: None,
         role: MessageRole::Assistant,
         content: blocks,
+        origin: None,
     }
 }
 

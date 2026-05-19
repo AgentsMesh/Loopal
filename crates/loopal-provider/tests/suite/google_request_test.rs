@@ -64,6 +64,7 @@ fn test_build_contents_with_function_call() {
                 name: "read_file".to_string(),
                 input: json!({"path": "main.rs"}),
             }],
+            origin: None,
         }],
         vec![],
     );
@@ -88,6 +89,7 @@ fn test_build_contents_with_function_response() {
                 is_error: false,
                 metadata: None,
             }],
+            origin: None,
         }],
         vec![],
     );
@@ -202,6 +204,7 @@ fn test_build_contents_with_image() {
                     data: "iVBOR...".to_string(),
                 },
             }],
+            origin: None,
         }],
         vec![],
     );

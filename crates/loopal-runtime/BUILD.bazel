@@ -77,6 +77,7 @@ rust_test(
         "//crates/loopal-secret-runtime",
         "//crates/loopal-storage",
         "//crates/loopal-tool-api",
+        "//crates/loopal-tool-invocation",
         "//crates/loopal-vault-api",
         "//crates/loopal-view-state",
     ],

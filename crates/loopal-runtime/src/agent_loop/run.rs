@@ -47,13 +47,8 @@ impl AgentLoopRunner {
                         LifecycleMode::Persistent => match self.wait_for_input().await? {
                             Some(WaitResult::MessageAdded) => {
                                 self.interrupt.take();
-                                self.notify_observers_user_input();
                             }
                             Some(WaitResult::ContinuationInjected) => {
-                                // Mirror the idle-phase continuation path:
-                                // skip `on_user_input` so loop-detector
-                                // signatures and other observer state are
-                                // not reset by a system-injected envelope.
                                 self.interrupt.take();
                             }
                             None => break,
@@ -164,9 +159,12 @@ impl AgentLoopRunner {
         }
     }
 
-    fn notify_observers_user_input(&mut self) {
-        for obs in &mut self.observers {
-            obs.on_user_input();
+    pub(super) fn notify_observers_envelope_received(
+        &mut self,
+        source: &loopal_protocol::MessageSource,
+    ) {
+        for g in &mut self.governance {
+            g.on_envelope_received(source);
         }
     }
 

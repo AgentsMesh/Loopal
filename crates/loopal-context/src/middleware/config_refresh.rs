@@ -2,7 +2,7 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use loopal_error::LoopalError;
-use loopal_message::{ContentBlock, Message, MessageRole};
+use loopal_message::{ContentBlock, Message, MessageOrigin, MessageRole};
 use loopal_provider_api::{Middleware, MiddlewareContext};
 use tracing::debug;
 
@@ -61,6 +61,7 @@ impl Middleware for ConfigRefreshMiddleware {
             content: vec![ContentBlock::Text {
                 text: reminder_text,
             }],
+            origin: Some(MessageOrigin::ConfigRefresh),
         });
         Ok(())
     }

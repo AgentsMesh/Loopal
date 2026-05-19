@@ -17,15 +17,28 @@ struct _InitializeParams {
 }
 
 #[derive(Serialize)]
-struct InitializeResult {
-    protocol_version: u32,
-    agent_info: AgentInfo,
+pub(crate) struct InitializeResult {
+    pub protocol_version: u32,
+    pub agent_info: AgentInfo,
 }
 
 #[derive(Serialize)]
-struct AgentInfo {
-    name: String,
-    version: String,
+pub(crate) struct AgentInfo {
+    pub name: String,
+    pub version: String,
+}
+
+/// Build the canonical `initialize` response.
+/// Centralised so the first-call path (`wait_for_initialize_with_token`) and
+/// the idempotent re-call path (`dispatch_simple`) return identical results.
+pub(crate) fn build_initialize_result() -> InitializeResult {
+    InitializeResult {
+        protocol_version: 1,
+        agent_info: AgentInfo {
+            name: "loopal".into(),
+            version: env!("CARGO_PKG_VERSION").into(),
+        },
+    }
 }
 
 pub(crate) async fn wait_for_initialize_with_token(
@@ -48,13 +61,7 @@ pub(crate) async fn wait_for_initialize_with_token(
                         anyhow::bail!("invalid token");
                     }
                 }
-                let result = InitializeResult {
-                    protocol_version: 1,
-                    agent_info: AgentInfo {
-                        name: "loopal".into(),
-                        version: env!("CARGO_PKG_VERSION").into(),
-                    },
-                };
+                let result = build_initialize_result();
                 let _ = connection.respond(id, serde_json::to_value(result)?).await;
                 info!("IPC initialized");
                 return Ok(());

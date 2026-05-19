@@ -15,7 +15,11 @@ pub fn is_valid_session_id(id: &str) -> bool {
 }
 
 pub fn session_tmp_root(session_id: &str) -> PathBuf {
-    loopal_tmp_root().join(session_id)
+    session_tmp_root_in(&loopal_tmp_root(), session_id)
+}
+
+pub fn session_tmp_root_in(root: &Path, session_id: &str) -> PathBuf {
+    root.join(session_id)
 }
 
 pub fn loopal_tmp_root() -> PathBuf {
@@ -28,21 +32,28 @@ pub fn loopal_tmp_root() -> PathBuf {
 /// `exclude` is a set of paths that must NOT be deleted (typically still-running
 /// background tasks' log files). Failure is logged but never raised.
 pub async fn cleanup_session_tmp(session_id: &str, exclude: &[PathBuf]) {
+    cleanup_session_tmp_in(&loopal_tmp_root(), session_id, exclude).await;
+}
+
+// reason: explicit `root` parameter lets tests target an isolated tempdir
+// instead of the shared `$TMPDIR/loopal/`, eliminating cross-test TOCTOU
+// races on the shared root.
+pub async fn cleanup_session_tmp_in(root: &Path, session_id: &str, exclude: &[PathBuf]) {
     if !is_valid_session_id(session_id) {
         tracing::warn!(session_id, "skip cleanup: invalid session id");
         return;
     }
-    let root = session_tmp_root(session_id);
+    let session_root = session_tmp_root_in(root, session_id);
     if exclude.is_empty() {
-        if let Err(e) = tokio::fs::remove_dir_all(&root).await
+        if let Err(e) = tokio::fs::remove_dir_all(&session_root).await
             && e.kind() != std::io::ErrorKind::NotFound
         {
-            tracing::warn!(error = %e, path = %root.display(), "cleanup_session_tmp failed");
+            tracing::warn!(error = %e, path = %session_root.display(), "cleanup_session_tmp failed");
         }
         return;
     }
     let keep: HashSet<&Path> = exclude.iter().map(|p| p.as_path()).collect();
-    selective_cleanup(&root, &keep).await;
+    selective_cleanup(&session_root, &keep).await;
 }
 
 async fn selective_cleanup(root: &Path, keep: &HashSet<&Path>) {

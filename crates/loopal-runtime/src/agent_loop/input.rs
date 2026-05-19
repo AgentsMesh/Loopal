@@ -1,29 +1,21 @@
-//! Agent input handling — wait for user input, scheduler triggers,
-//! hook rewake signals, and Hub-injected notifications.
-
 use crate::agent_input::AgentInput;
 use loopal_error::Result;
-use loopal_protocol::{Envelope, MessageSource};
-use tracing::{error, info};
+use loopal_protocol::Envelope;
+use tracing::info;
 
-use super::message_build::build_user_message;
 use super::runner::AgentLoopRunner;
 use crate::fire_hooks::fire_hooks;
 
-/// Result of waiting for user input.
 #[derive(Debug)]
 pub enum WaitResult {
-    /// A user message was added to the conversation
     MessageAdded,
-    /// A goal-kickoff continuation envelope was injected by `handle_control`.
-    /// Semantically equivalent to the idle-phase `goal_continuation_check`
-    /// path: callers must enter the running phase but must NOT treat this as
-    /// fresh user input (no `on_user_input` observer notification).
+    // reason: distinguish system-injected continuation (handle_control)
+    // from fresh user input so callers (e.g. interrupt clearing) can branch.
+    // Observers learn the envelope source directly via on_envelope_received.
     ContinuationInjected,
 }
 
 impl AgentLoopRunner {
-    /// Wait for input from any source. Returns None if all channels closed.
     pub async fn wait_for_input(&mut self) -> Result<Option<WaitResult>> {
         let stale = self.interrupt.take();
         if stale {
@@ -63,7 +55,6 @@ impl AgentLoopRunner {
         }
     }
 
-    /// Multiplex frontend, scheduler, and hook rewake channels.
     async fn select_input(&mut self) -> SelectResult {
         match (&mut self.trigger_rx, &mut self.rewake_rx) {
             (Some(sched), Some(rewake)) => tokio::select! {
@@ -95,64 +86,6 @@ impl AgentLoopRunner {
         }
     }
 
-    /// Accept a message envelope: persist (if not ephemeral) and push to store.
-    pub(super) async fn ingest_message(&mut self, env: &Envelope) -> WaitResult {
-        let mut user_msg = build_user_message(env);
-        let ephemeral = matches!(
-            env.source,
-            MessageSource::Scheduled | MessageSource::System(_)
-        );
-        if !ephemeral
-            && let Err(e) = self
-                .params
-                .deps
-                .session_manager
-                .save_message(&self.params.session.id, &mut user_msg)
-        {
-            error!(error = %e, "failed to persist message");
-        }
-        if !ephemeral && self.params.session.title.is_empty() {
-            let title = extract_title(&env.content.text);
-            if !title.is_empty() {
-                self.params.session.title = title;
-                if let Err(e) = self
-                    .params
-                    .deps
-                    .session_manager
-                    .update_session(&self.params.session)
-                {
-                    error!(error = %e, "failed to persist session title");
-                }
-            }
-        }
-        self.params.store.push_user(user_msg);
-
-        let message_id = env.id.to_string();
-        // Emit before tracking the id: a failed emit must not leave an
-        // orphan `InboxConsumed` id without its enqueued counterpart.
-        match self
-            .emit(loopal_protocol::AgentEventPayload::InboxEnqueued {
-                message_id: message_id.clone(),
-                source: env.source.clone(),
-                content: env.content.text.clone(),
-                summary: env.summary.clone(),
-            })
-            .await
-        {
-            Ok(()) => self.pending_consumed_ids.push(message_id),
-            Err(e) => tracing::warn!(
-                error = %e,
-                "InboxEnqueued emit failed; LLM will see the message but UI/observers won't"
-            ),
-        }
-
-        WaitResult::MessageAdded
-    }
-
-    /// Non-blocking drain of all pending input (frontend + scheduler + rewake).
-    ///
-    /// Returns pending message envelopes. Control commands are processed
-    /// inline (they affect agent config, not conversation history).
     pub(super) async fn drain_pending_input(&mut self) -> Vec<Envelope> {
         let all_inputs = self.params.deps.frontend.drain_pending().await;
         let mut pending = Vec::new();
@@ -184,16 +117,4 @@ enum SelectResult {
     AgentInput(Option<AgentInput>),
     Envelope(Envelope),
     ChannelClosed,
-}
-
-/// Extract first line of user text, truncated to 80 **characters**, for session title.
-fn extract_title(text: &str) -> String {
-    let line = text.lines().next().unwrap_or("").trim();
-    let char_count = line.chars().count();
-    if char_count <= 80 {
-        line.to_string()
-    } else {
-        let truncated: String = line.chars().take(80).collect();
-        format!("{truncated}…")
-    }
 }

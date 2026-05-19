@@ -48,7 +48,10 @@ async fn dispatch_simple_initialize_is_idempotent() {
         .await
         .expect("second initialize must also succeed (idempotent)");
 
-    assert_eq!(first, second, "idempotent initialize must return same result");
+    assert_eq!(
+        first, second,
+        "idempotent initialize must return same result"
+    );
     assert_eq!(first["protocol_version"], 1);
     assert_eq!(first["agent_info"]["name"], "loopal");
     assert!(

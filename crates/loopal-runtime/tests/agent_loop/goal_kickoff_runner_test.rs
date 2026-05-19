@@ -4,8 +4,8 @@
 //! human-typed message carries a Human-tagged envelope.
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
 use loopal_protocol::{ControlCommand, GoalTransitionReason, MessageSource};

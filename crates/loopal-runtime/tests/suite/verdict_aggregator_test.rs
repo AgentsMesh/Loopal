@@ -46,8 +46,10 @@ fn first_abort_short_circuits() {
         },
     ]);
     let AggregatedVerdict::Abort {
-        reason, feedback_to_model
-    } = result else {
+        reason,
+        feedback_to_model,
+    } = result
+    else {
         panic!("expected Abort, got {result:?}");
     };
     assert_eq!(reason, "first abort");

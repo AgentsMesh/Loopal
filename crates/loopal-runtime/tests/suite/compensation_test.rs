@@ -83,5 +83,8 @@ fn cancel_cause_serializes_as_governance_abort() {
         cause: CancelCause::GovernanceAbort,
     };
     let wire = serde_json::to_value(&md).unwrap();
-    assert_eq!(wire, json!({"kind": "cancelled", "cause": "governance_abort"}));
+    assert_eq!(
+        wire,
+        json!({"kind": "cancelled", "cause": "governance_abort"})
+    );
 }

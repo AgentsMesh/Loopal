@@ -7,12 +7,12 @@
 //! must produce a closed view without any post-processing.
 
 use loopal_message::{ContentBlock, MessageRole};
+use loopal_protocol::InterruptSignal;
+use loopal_runtime::agent_loop::cancel::TurnCancel;
 use loopal_runtime::agent_loop::governance::synthesize_aborted_tool_results;
+use loopal_runtime::agent_loop::governance::{Governance, Verdict};
 use loopal_runtime::agent_loop::loop_detector::LoopDetector;
 use loopal_runtime::agent_loop::turn_context::TurnContext;
-use loopal_runtime::agent_loop::governance::{Governance, Verdict};
-use loopal_runtime::agent_loop::cancel::TurnCancel;
-use loopal_protocol::InterruptSignal;
 use serde_json::json;
 use std::sync::Arc;
 

@@ -7,6 +7,7 @@ pub mod compact_progress;
 pub mod cron_detail;
 pub mod cron_duration_format;
 pub mod crons_panel;
+pub mod inline_banner;
 pub mod input_view;
 pub mod mcp_action_menu;
 pub mod mcp_page;

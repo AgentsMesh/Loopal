@@ -1,7 +1,7 @@
 //! LLM-based summarization for context compaction.
 
 use loopal_error::LoopalError;
-use loopal_message::{ContentBlock, Message, MessageRole};
+use loopal_message::{ContentBlock, Message, MessageOrigin, MessageRole};
 use loopal_provider_api::Provider;
 
 use super::smart_compact_llm::call_summarization_llm;
@@ -64,6 +64,7 @@ pub async fn summarize_old_messages(
         id: None,
         role: MessageRole::User,
         content: vec![ContentBlock::Text { text: summary_body }],
+        origin: Some(MessageOrigin::CompactionSummary),
     };
     let ack_msg = Message {
         id: None,
@@ -71,6 +72,7 @@ pub async fn summarize_old_messages(
         content: vec![ContentBlock::Text {
             text: "Understood. I'll continue from this working state.".to_string(),
         }],
+        origin: None,
     };
 
     let mut new_messages = vec![summary_msg, ack_msg];

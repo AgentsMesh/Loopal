@@ -51,6 +51,7 @@ fn test_build_messages_with_tool_use() {
                     name: "bash".to_string(),
                     input: json!({"cmd": "ls"}),
                 }],
+                origin: None,
             },
             Message {
                 id: None,
@@ -61,6 +62,7 @@ fn test_build_messages_with_tool_use() {
                     is_error: false,
                     metadata: None,
                 }],
+                origin: None,
             },
         ],
         vec![],
@@ -104,6 +106,7 @@ fn test_build_messages_with_image() {
                     data: "iVBOR...".to_string(),
                 },
             }],
+            origin: None,
         }],
         vec![],
     );

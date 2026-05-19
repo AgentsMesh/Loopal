@@ -3,8 +3,9 @@ use std::path::{Path, PathBuf};
 
 use loopal_backend::tmp_cleanup::is_valid_session_id;
 use loopal_backend::{
-    cleanup_orphans_in, cleanup_session_tmp, create_log_file, loopal_tmp_root, session_bash_dir,
-    session_tmp_root,
+    cleanup_orphans_in, cleanup_session_tmp, cleanup_session_tmp_in, create_log_file,
+    create_log_file_in, loopal_tmp_root, session_bash_dir, session_bash_dir_in, session_tmp_root,
+    session_tmp_root_in,
 };
 use tempfile::TempDir;
 
@@ -128,4 +129,44 @@ async fn cleanup_orphans_handles_missing_root() {
     let live: HashSet<String> = HashSet::new();
     cleanup_orphans_in(&missing, &live).await;
     assert!(!missing.exists());
+}
+
+#[tokio::test]
+async fn create_log_file_in_writes_to_explicit_root() {
+    let tmp = TempDir::new().unwrap();
+    let sid = unique_session_id();
+    let (p, _w) = create_log_file_in(tmp.path(), &sid).await.unwrap();
+    assert!(
+        p.starts_with(tmp.path()),
+        "log file must live under explicit root"
+    );
+    assert!(p.exists());
+}
+
+#[tokio::test]
+async fn cleanup_session_tmp_in_removes_only_inside_explicit_root() {
+    let tmp = TempDir::new().unwrap();
+    let sid = unique_session_id();
+    let (p, _w) = create_log_file_in(tmp.path(), &sid).await.unwrap();
+    assert!(p.exists());
+
+    cleanup_session_tmp_in(tmp.path(), &sid, &[]).await;
+
+    assert!(
+        !session_tmp_root_in(tmp.path(), &sid).exists(),
+        "session root inside explicit root must be gone"
+    );
+}
+
+#[test]
+fn session_path_helpers_compose_root_with_session_and_bash() {
+    let tmp = TempDir::new().unwrap();
+    assert_eq!(
+        session_tmp_root_in(tmp.path(), "sid"),
+        tmp.path().join("sid")
+    );
+    assert_eq!(
+        session_bash_dir_in(tmp.path(), "sid"),
+        tmp.path().join("sid").join("bash")
+    );
 }

@@ -24,6 +24,7 @@ fn user(text: &str) -> Message {
         id: None,
         role: MessageRole::User,
         content: vec![ContentBlock::Text { text: text.into() }],
+        origin: None,
     }
 }
 
@@ -32,6 +33,7 @@ fn assistant(text: &str) -> Message {
         id: None,
         role: MessageRole::Assistant,
         content: vec![ContentBlock::Text { text: text.into() }],
+        origin: None,
     }
 }
 

@@ -35,6 +35,7 @@ pub enum StaleReason {
 pub enum CancelCause {
     UserInterrupt,
     ParentCancelled,
+    GovernanceAbort,
 }
 
 /// Typed metadata attached to `ToolResult`.
@@ -98,6 +99,7 @@ impl std::fmt::Display for CancelCause {
         let s = match self {
             Self::UserInterrupt => "user interrupt",
             Self::ParentCancelled => "parent cancelled",
+            Self::GovernanceAbort => "governance abort",
         };
         f.write_str(s)
     }

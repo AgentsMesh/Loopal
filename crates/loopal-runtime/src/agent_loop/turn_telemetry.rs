@@ -26,12 +26,12 @@ impl AgentLoopRunner {
 
     async fn execute_turn_body(&mut self, turn_ctx: &mut TurnContext) -> Result<TurnOutput> {
         crate::otel_metrics::active_turns().add(1, &[]);
-        for obs in &mut self.observers {
-            obs.on_turn_start(turn_ctx);
+        for h in &mut self.hooks {
+            h.on_turn_start(turn_ctx);
         }
         let result = self.execute_turn_inner(turn_ctx).await;
-        for obs in &mut self.observers {
-            obs.on_turn_end(turn_ctx);
+        for h in &mut self.hooks {
+            h.on_turn_end(turn_ctx);
         }
 
         turn_ctx.metrics.warnings_injected = turn_ctx.pending_warnings.len() as u32;

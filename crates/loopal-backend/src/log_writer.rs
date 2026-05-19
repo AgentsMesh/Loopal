@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use loopal_error::ToolIoError;
@@ -10,16 +10,30 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::sync::Mutex as TokioMutex;
 use uuid::Uuid;
 
-use crate::tmp_cleanup::{is_valid_session_id, session_tmp_root};
+use crate::tmp_cleanup::{is_valid_session_id, loopal_tmp_root, session_tmp_root_in};
 
 // reason: unbuffered File so each line is visible to file tailers immediately.
 pub type LogWriter = TokioMutex<File>;
 
 pub fn session_bash_dir(session_id: &str) -> PathBuf {
-    session_tmp_root(session_id).join("bash")
+    session_bash_dir_in(&loopal_tmp_root(), session_id)
+}
+
+pub fn session_bash_dir_in(root: &Path, session_id: &str) -> PathBuf {
+    session_tmp_root_in(root, session_id).join("bash")
 }
 
 pub async fn create_log_file(session_id: &str) -> Result<(PathBuf, LogWriter), ToolIoError> {
+    create_log_file_in(&loopal_tmp_root(), session_id).await
+}
+
+// reason: explicit `root` lets tests target an isolated tempdir instead of
+// the shared `$TMPDIR/loopal/`. Mirrors `cleanup_*_in` so test fixtures can
+// build closed, race-free worlds without touching the shared root.
+pub async fn create_log_file_in(
+    root: &Path,
+    session_id: &str,
+) -> Result<(PathBuf, LogWriter), ToolIoError> {
     // reason: reject path-traversal session ids before they create files
     // outside `$TMPDIR/loopal/{id}/bash/`. Mirrors cleanup_session_tmp's
     // guard so both ends share the same trust boundary.
@@ -28,7 +42,7 @@ pub async fn create_log_file(session_id: &str) -> Result<(PathBuf, LogWriter), T
             "invalid session id for log file: {session_id:?}"
         )));
     }
-    let dir = session_bash_dir(session_id);
+    let dir = session_bash_dir_in(root, session_id);
     tokio::fs::create_dir_all(&dir)
         .await
         .map_err(|e| ToolIoError::ExecFailed(format!("create log dir {}: {e}", dir.display())))?;

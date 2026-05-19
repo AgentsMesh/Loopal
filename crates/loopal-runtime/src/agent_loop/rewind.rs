@@ -53,6 +53,7 @@ mod tests {
                     is_error: false,
                     metadata: None,
                 }],
+                origin: None,
             },
             Message::user("second turn"),
         ];

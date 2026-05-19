@@ -9,8 +9,8 @@ use std::sync::Arc;
 use loopal_message::ContentBlock;
 use loopal_protocol::AgentEventPayload;
 
+use super::governance::traits::TurnHook;
 use super::turn_context::TurnContext;
-use super::turn_observer::TurnObserver;
 use crate::frontend::traits::AgentFrontend;
 
 /// Tools that are known to modify files.
@@ -27,7 +27,7 @@ impl DiffTracker {
     }
 }
 
-impl TurnObserver for DiffTracker {
+impl TurnHook for DiffTracker {
     fn on_after_tools(
         &mut self,
         ctx: &mut TurnContext,

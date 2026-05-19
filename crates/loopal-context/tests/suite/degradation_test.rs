@@ -33,6 +33,7 @@ fn assistant_with_server_blocks() -> Message {
                 text: "Here are the results".into(),
             },
         ],
+        origin: None,
     }
 }
 
@@ -46,6 +47,7 @@ fn tool_result_msg(content_size: usize) -> Message {
             is_error: false,
             metadata: None,
         }],
+        origin: None,
     }
 }
 
@@ -103,6 +105,7 @@ fn layer0_strips_old_thinking() {
                     text: "response".into(),
                 },
             ],
+            origin: None,
         },
         Message::user("next"),
         Message {
@@ -117,6 +120,7 @@ fn layer0_strips_old_thinking() {
                     text: "response 2".into(),
                 },
             ],
+            origin: None,
         },
     ];
 

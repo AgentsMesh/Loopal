@@ -13,6 +13,7 @@ fn project_preserves_tool_result_metadata() {
                 name: "Bash".into(),
                 input: serde_json::json!({"command": "ls"}),
             }],
+            origin: None,
         },
         Message {
             id: None,
@@ -23,6 +24,7 @@ fn project_preserves_tool_result_metadata() {
                 is_error: true,
                 metadata: Some(ToolResultMetadata::stale(StaleReason::WatchdogTimeout)),
             }],
+            origin: None,
         },
     ];
     let display = project_messages(&msgs);
@@ -48,6 +50,7 @@ fn project_preserves_cancel_cause_metadata() {
                 name: "Bash".into(),
                 input: serde_json::json!({}),
             }],
+            origin: None,
         },
         Message {
             id: None,
@@ -58,6 +61,7 @@ fn project_preserves_cancel_cause_metadata() {
                 is_error: true,
                 metadata: Some(ToolResultMetadata::cancelled(CancelCause::UserInterrupt)),
             }],
+            origin: None,
         },
     ];
     let display = project_messages(&msgs);

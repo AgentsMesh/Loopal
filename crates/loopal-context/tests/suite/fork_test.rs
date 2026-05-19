@@ -20,6 +20,7 @@ fn strips_thinking_blocks() {
                 text: "hello".into(),
             },
         ],
+        origin: None,
     }];
     let result = compress_for_fork(&msgs);
     assert_eq!(result.len(), 1);
@@ -39,6 +40,7 @@ fn strips_incomplete_tail() {
                 name: "Agent".into(),
                 input: serde_json::json!({}),
             }],
+            origin: None,
         },
     ];
     let result = compress_for_fork(&msgs);
@@ -58,6 +60,7 @@ fn truncates_long_tool_result() {
             is_error: false,
             metadata: None,
         }],
+        origin: None,
     }];
     let result = compress_for_fork(&msgs);
     let ContentBlock::ToolResult { content, .. } = &result[0].content[0] else {
@@ -84,6 +87,7 @@ fn utf8_truncation_no_panic() {
             is_error: false,
             metadata: None,
         }],
+        origin: None,
     }];
     let result = compress_for_fork(&msgs);
     assert!(!result.is_empty());
@@ -97,6 +101,7 @@ fn result_starts_with_user_message() {
             id: None,
             role: MessageRole::Assistant,
             content: vec![ContentBlock::Text { text: "a1".into() }],
+            origin: None,
         },
         Message::user("q2"),
     ];
@@ -122,6 +127,7 @@ fn fork_context_json_round_trip() {
                     input: serde_json::json!({"pattern": "**/*.rs"}),
                 },
             ],
+            origin: None,
         },
         Message {
             id: None,
@@ -132,6 +138,7 @@ fn fork_context_json_round_trip() {
                 is_error: false,
                 metadata: None,
             }],
+            origin: None,
         },
         Message {
             id: None,
@@ -139,6 +146,7 @@ fn fork_context_json_round_trip() {
             content: vec![ContentBlock::Text {
                 text: "Found 2 files.".into(),
             }],
+            origin: None,
         },
     ];
     let compressed = compress_for_fork(&msgs);

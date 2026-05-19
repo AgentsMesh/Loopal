@@ -104,6 +104,7 @@ async fn test_thinking_blocks_stripped_in_context_prep() {
                 text: "answer 1".into(),
             },
         ],
+        origin: None,
     });
     runner.params.store.push_user(Message::user("q2"));
     runner.params.store.push_assistant(Message {
@@ -118,6 +119,7 @@ async fn test_thinking_blocks_stripped_in_context_prep() {
                 text: "answer 2".into(),
             },
         ],
+        origin: None,
     });
 
     let prepared = runner.params.store.prepare_for_llm();

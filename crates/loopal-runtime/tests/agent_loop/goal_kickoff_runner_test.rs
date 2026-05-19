@@ -1,29 +1,30 @@
 //! Tests for the runner-side post-conditions of the goal-kickoff control
-//! path. Distinguishes a continuation-injected wake-up from a user-input
-//! wake-up via the `WaitResult` variant *and* via observer notification —
-//! the two halves of the fix lock together against regressions.
+//! path. Verifies that a continuation-injected wake-up carries a
+//! System-tagged envelope (so observers can self-filter), and that a
+//! human-typed message carries a Human-tagged envelope.
 
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
 use loopal_protocol::{ControlCommand, GoalTransitionReason, MessageSource};
 use loopal_runtime::agent_loop::WaitResult;
-use loopal_runtime::agent_loop::turn_observer::TurnObserver;
+use loopal_runtime::agent_loop::governance::Governance;
 use loopal_test_support::{HarnessBuilder, TestFixture, chunks};
 use serde_json::json;
 
 use super::goal_e2e_test::{make_goal_session, wait_for_goal_reason};
 
-/// Records `on_user_input` calls so tests can assert run_loop's variant
-/// dispatch (MessageAdded ⇒ notify, ContinuationInjected ⇒ skip).
-struct UserInputCounter {
+struct EnvelopeRecorder {
     count: Arc<AtomicU32>,
+    last_source: Arc<Mutex<Option<MessageSource>>>,
 }
 
-impl TurnObserver for UserInputCounter {
-    fn on_user_input(&mut self) {
+impl Governance for EnvelopeRecorder {
+    fn on_envelope_received(&mut self, source: &MessageSource) {
         self.count.fetch_add(1, Ordering::Relaxed);
+        *self.last_source.lock().unwrap() = Some(source.clone());
     }
 }
 
@@ -52,7 +53,7 @@ async fn goal_create_via_control_returns_continuation_injected() {
     assert!(
         matches!(result, Some(WaitResult::ContinuationInjected)),
         "kickoff path must return ContinuationInjected (not MessageAdded) so \
-         run_loop skips on_user_input — got {result:?}",
+         the runner branch distinction stays observable — got {result:?}",
     );
     drop(inner.control_tx);
 }
@@ -89,11 +90,12 @@ async fn user_message_returns_message_added() {
 }
 
 #[tokio::test]
-async fn run_loop_kickoff_path_does_not_notify_user_input_observers() {
+async fn kickoff_envelope_carries_system_source() {
     let fixture = TestFixture::new();
-    let (_tmp, session, log) = make_goal_session(&fixture.test_session("kickoff-no-notify").id);
+    let (_tmp, session, log) = make_goal_session(&fixture.test_session("kickoff-source").id);
 
     let count = Arc::new(AtomicU32::new(0));
+    let last = Arc::new(Mutex::new(None));
     let inner = HarnessBuilder::new()
         .calls(vec![chunks::tool_turn(
             "u1",
@@ -106,8 +108,9 @@ async fn run_loop_kickoff_path_does_not_notify_user_input_observers() {
         .build()
         .await;
     let mut runner = inner.runner;
-    runner.observers.push(Box::new(UserInputCounter {
+    runner.governance.push(Box::new(EnvelopeRecorder {
         count: Arc::clone(&count),
+        last_source: Arc::clone(&last),
     }));
 
     let runner_task = tokio::spawn(async move { runner.run().await });
@@ -115,19 +118,25 @@ async fn run_loop_kickoff_path_does_not_notify_user_input_observers() {
     inner
         .control_tx
         .send(ControlCommand::GoalCreate {
-            objective: "no-notify".into(),
+            objective: "carry-source".into(),
         })
         .await
         .unwrap();
 
     wait_for_goal_reason(&log, GoalTransitionReason::ModelCompleted).await;
 
-    assert_eq!(
-        count.load(Ordering::Relaxed),
-        0,
-        "kickoff path must NOT call on_user_input — that hook is reserved \
-         for fresh user input and resets cross-turn observer state",
+    assert!(
+        count.load(Ordering::Relaxed) >= 1,
+        "kickoff path must notify observers at least once via ingest_message"
     );
+    let recorded = last.lock().unwrap().clone();
+    match recorded {
+        Some(MessageSource::System(_)) => {}
+        other => panic!(
+            "kickoff envelope must be tagged System(_) so observers can \
+             distinguish system continuation from real user input — got {other:?}"
+        ),
+    }
 
     drop(inner.control_tx);
     drop(inner.mailbox_tx);
@@ -135,11 +144,12 @@ async fn run_loop_kickoff_path_does_not_notify_user_input_observers() {
 }
 
 #[tokio::test]
-async fn run_loop_user_message_path_does_notify_user_input_observers() {
+async fn user_message_envelope_carries_human_source() {
     let fixture = TestFixture::new();
-    let (_tmp, session, _log) = make_goal_session(&fixture.test_session("user-msg-notify").id);
+    let (_tmp, session, _log) = make_goal_session(&fixture.test_session("user-msg-source").id);
 
     let count = Arc::new(AtomicU32::new(0));
+    let last = Arc::new(Mutex::new(None));
     let inner = HarnessBuilder::new()
         .calls(vec![chunks::text_turn("hi")])
         .messages(vec![])
@@ -148,8 +158,9 @@ async fn run_loop_user_message_path_does_notify_user_input_observers() {
         .build()
         .await;
     let mut runner = inner.runner;
-    runner.observers.push(Box::new(UserInputCounter {
+    runner.governance.push(Box::new(EnvelopeRecorder {
         count: Arc::clone(&count),
+        last_source: Arc::clone(&last),
     }));
 
     let runner_task = tokio::spawn(async move { runner.run().await });
@@ -166,11 +177,15 @@ async fn run_loop_user_message_path_does_notify_user_input_observers() {
 
     tokio::time::sleep(Duration::from_millis(150)).await;
 
+    let recorded = last.lock().unwrap().clone();
+    assert!(
+        matches!(recorded, Some(MessageSource::Human)),
+        "user-message path must tag envelope as Human so LoopDetector resets — got {recorded:?}"
+    );
     assert_eq!(
         count.load(Ordering::Relaxed),
         1,
-        "user-message path must call on_user_input exactly once — pairs with \
-         the kickoff-path negative test to lock both run_loop branches",
+        "user-message path must notify observers exactly once",
     );
 
     drop(inner.control_tx);

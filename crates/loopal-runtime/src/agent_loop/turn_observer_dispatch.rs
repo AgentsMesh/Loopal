@@ -1,42 +1,62 @@
-//! Stop hook and observer dispatch for the turn execution loop.
-//!
-//! Extracted from `turn_exec` — these are lifecycle extension points
-//! with independent change reasons (hook config, observer API).
-
 use loopal_error::Result;
 use loopal_protocol::AgentEventPayload;
-use tracing::warn;
+use tracing::{info, warn};
 
+use super::governance::aggregator::AggregatedVerdict;
+use super::governance::bridge::DataPlaneBridge;
+use super::governance::synthesize_aborted_tool_results;
+use super::governance::system_note::make_governance_feedback;
 use super::runner::AgentLoopRunner;
 use super::turn_context::TurnContext;
-use super::turn_observer::ObserverAction;
 
 impl AgentLoopRunner {
-    /// Run before-tools observers. Returns `true` if the turn should abort.
     pub(super) async fn run_before_tools(
         &mut self,
         turn_ctx: &mut TurnContext,
         tool_uses: &[(String, String, serde_json::Value)],
     ) -> Result<bool> {
-        for obs in &mut self.observers {
-            match obs.on_before_tools(turn_ctx, tool_uses) {
-                ObserverAction::Continue => {}
-                ObserverAction::InjectWarning(msg) => {
-                    turn_ctx.pending_warnings.push(msg);
-                }
-                ObserverAction::AbortTurn(reason) => {
-                    warn!(%reason, "observer aborted turn");
-                    self.emit_in_turn(AgentEventPayload::Error { message: reason })
-                        .await?;
-                    return Ok(true);
-                }
+        let verdicts: Vec<_> = self
+            .governance
+            .iter_mut()
+            .map(|g| g.on_before_tools(turn_ctx, tool_uses))
+            .collect();
+        match self.aggregator.aggregate(verdicts) {
+            AggregatedVerdict::Continue => Ok(false),
+            AggregatedVerdict::Warnings(warnings) => {
+                turn_ctx.pending_warnings.extend(warnings);
+                Ok(false)
+            }
+            AggregatedVerdict::Abort {
+                reason,
+                feedback_to_model,
+            } => {
+                warn!(%reason, "governance aborted turn");
+                self.emit_in_turn(AgentEventPayload::Error {
+                    message: reason.clone(),
+                })
+                .await?;
+                self.write_abort_compensation(tool_uses, &reason, &feedback_to_model);
+                Ok(true)
             }
         }
-        Ok(false)
     }
 
-    /// Run Stop lifecycle hooks. Returns feedback to inject if hooks want
-    /// the agent to continue, or `None` to let the turn end.
+    fn write_abort_compensation(
+        &mut self,
+        tool_uses: &[(String, String, serde_json::Value)],
+        reason: &str,
+        feedback_to_model: &str,
+    ) {
+        if let Some(msg) = synthesize_aborted_tool_results(tool_uses, reason) {
+            let count = tool_uses.len();
+            DataPlaneBridge::write_tool_result_stub(self, msg);
+            info!(count, "abort compensation written");
+        }
+        if let Some(note) = make_governance_feedback(feedback_to_model) {
+            DataPlaneBridge::push_system_note(self, note);
+        }
+    }
+
     pub(super) async fn run_stop_hooks(&self) -> Option<String> {
         let stop_outputs = self
             .params

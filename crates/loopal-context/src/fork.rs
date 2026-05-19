@@ -72,6 +72,7 @@ fn compress_message(msg: &Message) -> Message {
         id: msg.id.clone(),
         role: msg.role,
         content,
+        origin: msg.origin.clone(),
     }
 }
 

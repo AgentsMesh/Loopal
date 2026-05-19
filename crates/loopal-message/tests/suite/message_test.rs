@@ -35,6 +35,7 @@ fn test_text_content_ignores_non_text_blocks() {
             },
             ContentBlock::Text { text: "b".into() },
         ],
+        origin: None,
     };
     assert_eq!(msg.text_content(), "ab");
 }
@@ -45,6 +46,7 @@ fn test_text_content_empty() {
         id: None,
         role: MessageRole::User,
         content: vec![],
+        origin: None,
     };
     assert_eq!(msg.text_content(), "");
 }
@@ -65,6 +67,7 @@ fn test_estimated_token_count_tool_use() {
             name: "Read".into(),
             input: serde_json::json!({"file_path": "/tmp/test.rs"}),
         }],
+        origin: None,
     };
     // JSON serialization of input + overhead
     let expected = serde_json::json!({"file_path": "/tmp/test.rs"})
@@ -86,6 +89,7 @@ fn test_estimated_token_count_tool_result() {
             is_error: false,
             metadata: None,
         }],
+        origin: None,
     };
     // 400 / 4 = 100 + 4 overhead
     assert_eq!(msg.estimated_token_count(), 104);
@@ -103,6 +107,7 @@ fn test_estimated_token_count_image() {
                 data: "abc".into(),
             },
         }],
+        origin: None,
     };
     // 1000 fixed + 4 overhead
     assert_eq!(msg.estimated_token_count(), 1004);
@@ -123,6 +128,7 @@ fn test_estimated_token_count_mixed() {
                 input: serde_json::json!({}), // "{}" = 2 chars / 4 = 0
             },
         ],
+        origin: None,
     };
     assert_eq!(msg.estimated_token_count(), 2 + 4);
 }

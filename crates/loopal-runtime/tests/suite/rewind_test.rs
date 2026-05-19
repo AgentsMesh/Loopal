@@ -35,6 +35,7 @@ fn tool_result_only_user_msg_not_a_turn() {
 
             metadata: None,
         }],
+        origin: None,
     };
     let messages = vec![
         Message::user("turn1"),

@@ -39,6 +39,7 @@ fn thinking_becomes_reasoning_item() {
                     input: json!({"query": "rust async"}),
                 },
             ],
+            origin: None,
         }],
         "",
     );
@@ -68,6 +69,7 @@ fn thinking_without_signature_skipped() {
                     text: "Hello".to_string(),
                 },
             ],
+            origin: None,
         }],
         "",
     );
@@ -93,6 +95,7 @@ fn thinking_with_empty_signature_skipped() {
                     text: "Hello".to_string(),
                 },
             ],
+            origin: None,
         }],
         "",
     );
@@ -143,6 +146,7 @@ fn multiple_reasoning_items_paired_with_web_search_calls() {
                         text: "Here are the results.".to_string(),
                     },
                 ],
+                origin: None,
             },
         ],
         "",
@@ -184,6 +188,7 @@ fn multi_turn_reasoning_before_web_search() {
                         text: "Found it.".to_string(),
                     },
                 ],
+                origin: None,
             },
             Message::user("Tell me more"),
             Message {
@@ -192,6 +197,7 @@ fn multi_turn_reasoning_before_web_search() {
                 content: vec![ContentBlock::Text {
                     text: "Sure, here's more.".to_string(),
                 }],
+                origin: None,
             },
         ],
         "",

@@ -8,9 +8,10 @@ use tokio::sync::watch;
 use tracing::{Instrument, info, info_span};
 
 use super::AgentLoopParams;
+use super::governance::aggregator::{FirstDenyWins, VerdictAggregator};
+use super::governance::traits::{Governance, TurnHook};
 use super::model_config::ModelConfig;
 use super::token_accumulator::TokenAccumulator;
-use super::turn_observer::TurnObserver;
 use crate::goal::GoalSessionToolAdapter;
 use crate::goal::prompts::DEFAULT_MAX_BARREN_CONTINUATIONS;
 use crate::plan_file::PlanFile;
@@ -24,7 +25,13 @@ pub struct AgentLoopRunner {
     pub model_config: ModelConfig,
     pub interrupt: InterruptSignal,
     pub interrupt_tx: Arc<watch::Sender<u64>>,
-    pub observers: Vec<Box<dyn TurnObserver>>,
+    /// Decision-making governance chain (LoopDetector, future Watchdog).
+    pub governance: Vec<Box<dyn Governance>>,
+    /// Policy for combining per-governance verdicts into a final outcome.
+    /// Default is `FirstDenyWins`; tests or future configs can replace it.
+    pub aggregator: Box<dyn VerdictAggregator>,
+    /// Observation-only turn hooks (DiffTracker, future telemetry hooks).
+    pub hooks: Vec<Box<dyn TurnHook>>,
     pub pipeline: ContextPipeline,
     /// Scheduler message receiver — consumed in `wait_for_input()`.
     pub trigger_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
@@ -81,7 +88,9 @@ impl AgentLoopRunner {
             model_config,
             interrupt,
             interrupt_tx,
-            observers: Vec::new(),
+            governance: Vec::new(),
+            aggregator: Box::new(FirstDenyWins),
+            hooks: Vec::new(),
             pipeline: ContextPipeline::new(),
             trigger_rx,
             rewake_rx,

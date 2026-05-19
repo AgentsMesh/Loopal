@@ -1,4 +1,4 @@
-use loopal_message::{ContentBlock, Message, MessageRole};
+use loopal_message::{ContentBlock, Message, MessageOrigin, MessageRole};
 use tracing::error;
 
 use super::runner::AgentLoopRunner;
@@ -11,6 +11,7 @@ impl AgentLoopRunner {
             id: None,
             role: MessageRole::User,
             content: vec![ContentBlock::Text { text: feedback }],
+            origin: Some(MessageOrigin::StopFeedback),
         };
         if let Err(e) = self
             .params

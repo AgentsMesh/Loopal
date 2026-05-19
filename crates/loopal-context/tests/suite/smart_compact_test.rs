@@ -27,6 +27,7 @@ fn conversation_text_handles_tool_blocks() {
                 name: "Read".to_string(),
                 input: serde_json::json!({"path": "/src/main.rs"}),
             }],
+            origin: None,
         },
         Message {
             id: None,
@@ -37,6 +38,7 @@ fn conversation_text_handles_tool_blocks() {
                 is_error: false,
                 metadata: None,
             }],
+            origin: None,
         },
     ];
 

@@ -12,6 +12,7 @@ fn big_tool_result_message(size: usize) -> Message {
             is_error: false,
             metadata: None,
         }],
+        origin: None,
     }
 }
 

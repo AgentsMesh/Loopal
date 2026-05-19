@@ -27,6 +27,7 @@ impl AnthropicProvider {
             content: vec![ContentBlock::Text {
                 text: CONTINUATION_MARKER.to_string(),
             }],
+            origin: None,
         });
         Cow::Owned(owned)
     }

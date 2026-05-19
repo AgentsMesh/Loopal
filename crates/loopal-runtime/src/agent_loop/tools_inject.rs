@@ -52,6 +52,7 @@ impl AgentLoopRunner {
             id: None,
             role: MessageRole::User,
             content: blocks,
+            origin: None,
         };
         if let Err(e) = self
             .params

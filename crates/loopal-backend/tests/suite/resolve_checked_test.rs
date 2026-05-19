@@ -7,6 +7,10 @@ use loopal_config::{NetworkPolicy, ResolvedPolicy, SandboxPolicy};
 use loopal_error::ToolIoError;
 use loopal_tool_api::Backend;
 
+fn unique_session_id() -> String {
+    format!("test-{}", uuid::Uuid::new_v4().simple())
+}
+
 fn make_backend(cwd: &std::path::Path) -> Arc<LocalBackend> {
     let cwd_canon = cwd.canonicalize().unwrap_or_else(|_| cwd.to_path_buf());
     let policy = ResolvedPolicy {
@@ -20,7 +24,7 @@ fn make_backend(cwd: &std::path::Path) -> Arc<LocalBackend> {
         cwd.to_path_buf(),
         Some(policy),
         ResourceLimits::default(),
-        "test-session",
+        unique_session_id(),
     )
 }
 
@@ -36,7 +40,7 @@ fn make_readonly_backend(cwd: &std::path::Path) -> Arc<LocalBackend> {
         cwd.to_path_buf(),
         Some(policy),
         ResourceLimits::default(),
-        "test-session",
+        unique_session_id(),
     )
 }
 

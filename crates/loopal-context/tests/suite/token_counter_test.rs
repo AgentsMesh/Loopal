@@ -67,6 +67,7 @@ fn test_estimate_messages_tokens_includes_tool_io() {
                     input: serde_json::json!({"file_path": "/tmp/test.rs"}),
                 },
             ],
+            origin: None,
         },
         Message {
             id: None,
@@ -77,6 +78,7 @@ fn test_estimate_messages_tokens_includes_tool_io() {
                 is_error: false,
                 metadata: None,
             }],
+            origin: None,
         },
     ];
     let total = estimate_messages_tokens(&msgs);

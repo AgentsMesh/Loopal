@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use loopal_message::MessageOrigin;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -43,6 +44,18 @@ impl MessageSource {
         matches!(self, Self::Human)
     }
 
+    // Hot path predicate (called on every envelope received). Mirrors
+    // `MessageOrigin::is_task_boundary` but works directly on the protocol
+    // type to avoid the String allocations that `MessageOrigin::from(&self)`
+    // incurs for Agent/Channel variants. SSOT pinned by
+    // `tests/suite/task_boundary_test.rs`.
+    pub fn is_task_boundary(&self) -> bool {
+        matches!(
+            self,
+            Self::Human | Self::Scheduled | Self::Agent(_) | Self::Channel { .. }
+        )
+    }
+
     /// SNAT — prepend a hub name into any addressable origin field.
     /// Variants without an addressable origin (Human/Scheduled/System) are no-ops.
     pub fn prepend_hub(&mut self, self_hub: &str) {
@@ -61,6 +74,39 @@ impl MessageSource {
             Self::Agent(addr) => addr.prepend_hub_if_local(self_hub.to_string()),
             Self::Channel { from, .. } => from.prepend_hub_if_local(self_hub.to_string()),
             _ => {}
+        }
+    }
+}
+
+/// Lossy projection of `MessageSource` into the message-layer audit type.
+///
+/// Drops `QualifiedAddress` structural info (rendering it to a label string)
+/// to keep `loopal-message` free of any protocol dep. Used by `ingest_message`
+/// to stamp `Message.origin` for downstream consumers (LoopDetector,
+/// goal_continuation_check, forensic replay).
+impl From<&MessageSource> for MessageOrigin {
+    fn from(src: &MessageSource) -> Self {
+        match src {
+            MessageSource::Human => MessageOrigin::Human,
+            MessageSource::Scheduled => MessageOrigin::Scheduled,
+            MessageSource::Agent(addr) => MessageOrigin::Agent {
+                label: addr.to_string(),
+            },
+            MessageSource::Channel { channel, from } => MessageOrigin::Channel {
+                name: channel.clone(),
+                from: from.to_string(),
+            },
+            MessageSource::System(kind) => match kind.as_str() {
+                "goal_continuation" => MessageOrigin::GoalContinuation,
+                "governance_compensation" => MessageOrigin::GovernanceCompensation,
+                "governance_feedback" => MessageOrigin::GovernanceFeedback,
+                "stop_feedback" => MessageOrigin::StopFeedback,
+                "config_refresh" => MessageOrigin::ConfigRefresh,
+                "compaction_summary" => MessageOrigin::CompactionSummary,
+                other => MessageOrigin::Other {
+                    label: other.to_string(),
+                },
+            },
         }
     }
 }

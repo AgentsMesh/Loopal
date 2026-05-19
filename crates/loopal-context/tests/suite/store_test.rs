@@ -24,6 +24,7 @@ fn big_tool_result_msg(size: usize) -> Message {
             is_error: false,
             metadata: None,
         }],
+        origin: None,
     }
 }
 
@@ -46,6 +47,7 @@ fn assistant_with_server_blocks(text: &str) -> Message {
                 text: text.to_string(),
             },
         ],
+        origin: None,
     }
 }
 
@@ -102,6 +104,7 @@ fn prepare_for_llm_preserves_last_thinking() {
                 text: "first".into(),
             },
         ],
+        origin: None,
     });
     store.push_user(Message::user("next"));
     store.push_assistant(Message {
@@ -116,6 +119,7 @@ fn prepare_for_llm_preserves_last_thinking() {
                 text: "second".into(),
             },
         ],
+        origin: None,
     });
 
     let prepared = store.prepare_for_llm();

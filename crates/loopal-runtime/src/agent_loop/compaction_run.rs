@@ -12,21 +12,6 @@ use tracing::{info, warn};
 
 use super::runner::AgentLoopRunner;
 
-#[derive(Debug, Clone, Copy)]
-pub(super) enum CompactTrigger {
-    Auto,
-    Manual,
-}
-
-impl CompactTrigger {
-    fn label(self) -> &'static str {
-        match self {
-            CompactTrigger::Auto => "auto",
-            CompactTrigger::Manual => "manual",
-        }
-    }
-}
-
 #[derive(Debug)]
 pub(super) struct PersistResult {
     pub summary_msg_id: Option<String>,
@@ -39,7 +24,7 @@ impl AgentLoopRunner {
         before_count: usize,
         tokens_before: u32,
         instructions: Option<String>,
-        trigger: CompactTrigger,
+        strategy: &'static str,
         cancel: &CancellationToken,
     ) -> Result<()> {
         let compact_model = self
@@ -78,11 +63,11 @@ impl AgentLoopRunner {
             return Ok(());
         };
 
-        let apply_result = self.persist_and_apply(output, boundary_at).await?;
+        let apply_result = self.persist_and_apply(output, boundary_at, cancel).await?;
         self.post_compact(
             before_count,
             tokens_before,
-            trigger,
+            strategy,
             apply_result.summary_msg_id,
             apply_result.files_rehydrated,
         )
@@ -105,10 +90,13 @@ impl AgentLoopRunner {
     ///   in-memory and on-disk views consistent.
     /// * `compact_rehydrate` is best-effort; its failure is logged but
     ///   never bubbled up so we don't undo a successful boundary commit.
+    ///   It also honors `cancel` so a mid-rehydrate interrupt cannot leave
+    ///   an orphan `ToolUse` block in the store.
     async fn persist_and_apply(
         &mut self,
         output: CompactOutput,
         boundary_at: usize,
+        cancel: &CancellationToken,
     ) -> Result<PersistResult> {
         let CompactOutput {
             mut summary_msg,
@@ -150,7 +138,7 @@ impl AgentLoopRunner {
             })
             .await?;
         }
-        let rehydrate = self.compact_rehydrate(&touched_files).await;
+        let rehydrate = self.compact_rehydrate(&touched_files, cancel).await;
         Ok(PersistResult {
             summary_msg_id: Some(summary_id),
             files_rehydrated: rehydrate.files_succeeded,
@@ -161,14 +149,13 @@ impl AgentLoopRunner {
         &mut self,
         before: usize,
         tokens_before: u32,
-        trigger: CompactTrigger,
+        strategy: &'static str,
         summary_msg_id: Option<String>,
         files_rehydrated: usize,
     ) -> Result<()> {
         let after = self.params.store.len();
         let removed = before.saturating_sub(after);
         let tokens_after = self.params.store.current_tokens();
-        let strategy = trigger.label();
 
         self.emit(AgentEventPayload::Compacted(
             loopal_protocol::CompactionSummary {

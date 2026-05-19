@@ -3,6 +3,7 @@ use loopal_context::middleware::touched_files::TouchedFile;
 use loopal_message::{ContentBlock, MessageRole};
 use loopal_protocol::AgentEventPayload;
 use loopal_test_support::{HarnessBuilder, chunks};
+use tokio_util::sync::CancellationToken;
 
 async fn drain_events(
     rx: &mut tokio::sync::mpsc::Receiver<loopal_protocol::AgentEvent>,
@@ -46,7 +47,9 @@ async fn rehydrate_reads_files_via_real_read_tool() {
     runner.params.store.clear();
     let before = runner.params.store.len();
 
-    let stats = runner.compact_rehydrate(&touched).await;
+    let stats = runner
+        .compact_rehydrate(&touched, &CancellationToken::new())
+        .await;
 
     assert_eq!(stats.files_attempted, 2);
     assert_eq!(stats.files_succeeded, 2);
@@ -104,7 +107,9 @@ async fn rehydrate_noop_on_empty_touched() {
     runner.params.store.clear();
     let before = runner.params.store.len();
 
-    let stats = runner.compact_rehydrate(&[]).await;
+    let stats = runner
+        .compact_rehydrate(&[], &CancellationToken::new())
+        .await;
 
     assert_eq!(stats.files_attempted, 0);
     assert_eq!(stats.files_succeeded, 0);
@@ -148,7 +153,9 @@ async fn rehydrate_skips_unreadable_paths() {
     runner.params.store.clear();
     let before = runner.params.store.len();
 
-    let stats = runner.compact_rehydrate(&touched).await;
+    let stats = runner
+        .compact_rehydrate(&touched, &CancellationToken::new())
+        .await;
 
     assert_eq!(stats.files_attempted, 2);
     assert_eq!(stats.files_succeeded, 0);
@@ -197,7 +204,9 @@ async fn rehydrate_handles_partial_success() {
 
     let mut runner = h.runner;
     runner.params.store.clear();
-    let stats = runner.compact_rehydrate(&touched).await;
+    let stats = runner
+        .compact_rehydrate(&touched, &CancellationToken::new())
+        .await;
 
     assert_eq!(stats.files_attempted, 3);
     assert_eq!(stats.files_succeeded, 1);
@@ -248,7 +257,9 @@ async fn rehydrate_respects_total_bytes_budget() {
 
     let mut runner = h.runner;
     runner.params.store.clear();
-    let stats = runner.compact_rehydrate(&touched).await;
+    let stats = runner
+        .compact_rehydrate(&touched, &CancellationToken::new())
+        .await;
 
     assert!(
         stats.bytes_injected <= REHYDRATE_TOTAL_BYTES,
@@ -278,7 +289,10 @@ async fn rehydrate_emits_summary_stream_event() {
     }];
 
     h.runner.params.store.clear();
-    let stats = h.runner.compact_rehydrate(&touched).await;
+    let stats = h
+        .runner
+        .compact_rehydrate(&touched, &CancellationToken::new())
+        .await;
     assert_eq!(stats.files_succeeded, 1);
 
     let evts = drain_events(&mut h.event_rx).await;
@@ -294,5 +308,140 @@ async fn rehydrate_emits_summary_stream_event() {
     assert!(
         text.contains("bytes"),
         "stream must report byte count, got: {text:?}",
+    );
+}
+
+/// Partial-failure path: model must see an explicit note in the user
+/// message saying N files were skipped so it can re-Read them on demand
+/// rather than assuming the rehydrate was exhaustive.
+#[tokio::test]
+async fn rehydrate_partial_failure_appends_model_visible_note() {
+    let h = HarnessBuilder::new()
+        .calls(vec![chunks::text_turn("noop")])
+        .build()
+        .await;
+
+    let real = h.fixture.create_file("only.txt", "ok\n");
+    let touched = vec![
+        TouchedFile {
+            path: real.to_string_lossy().into(),
+            mutated: false,
+            last_seen_msg_idx: 0,
+        },
+        TouchedFile {
+            path: h
+                .fixture
+                .path()
+                .join("missing-1.txt")
+                .to_string_lossy()
+                .into(),
+            mutated: false,
+            last_seen_msg_idx: 1,
+        },
+        TouchedFile {
+            path: h
+                .fixture
+                .path()
+                .join("missing-2.txt")
+                .to_string_lossy()
+                .into(),
+            mutated: false,
+            last_seen_msg_idx: 2,
+        },
+    ];
+
+    let mut runner = h.runner;
+    runner.params.store.clear();
+    let stats = runner
+        .compact_rehydrate(&touched, &CancellationToken::new())
+        .await;
+
+    assert_eq!(stats.files_attempted, 3);
+    assert_eq!(stats.files_succeeded, 1);
+
+    let msgs = runner.params.store.messages();
+    let user = msgs.last().expect("user message");
+    let note = user
+        .content
+        .iter()
+        .find_map(|b| match b {
+            ContentBlock::Text { text } => Some(text.as_str()),
+            _ => None,
+        })
+        .expect("partial-failure note must be present");
+    assert!(
+        note.contains("rehydrate partial: 2 of 3"),
+        "note must spell out skipped/attempted counts, got: {note:?}",
+    );
+}
+
+/// Pre-cancelled token must short-circuit before any file read happens.
+/// Crucially, the store must be untouched — no orphan ToolUse can be
+/// persisted when rehydrate is aborted.
+#[tokio::test]
+async fn rehydrate_pre_cancelled_token_skips_persist() {
+    let h = HarnessBuilder::new()
+        .calls(vec![chunks::text_turn("noop")])
+        .build()
+        .await;
+
+    let real = h.fixture.create_file("victim.txt", "should not be read\n");
+    let touched = vec![TouchedFile {
+        path: real.to_string_lossy().into(),
+        mutated: false,
+        last_seen_msg_idx: 0,
+    }];
+
+    let mut runner = h.runner;
+    runner.params.store.clear();
+    let before = runner.params.store.len();
+
+    let cancel = CancellationToken::new();
+    cancel.cancel();
+    let stats = runner.compact_rehydrate(&touched, &cancel).await;
+
+    assert!(stats.cancelled, "stats must record the cancellation");
+    assert_eq!(stats.files_succeeded, 0);
+    assert_eq!(stats.bytes_injected, 0);
+    assert_eq!(
+        runner.params.store.len(),
+        before,
+        "no message must be persisted when rehydrate is pre-cancelled",
+    );
+}
+
+/// Even with several files queued, a cancel races the parallel reads
+/// and must produce zero persisted messages — the select! drops the
+/// in-flight Reads before any `save_message` runs.
+#[tokio::test]
+async fn rehydrate_cancel_during_reads_leaves_store_untouched() {
+    let h = HarnessBuilder::new()
+        .calls(vec![chunks::text_turn("noop")])
+        .build()
+        .await;
+
+    let mut touched = Vec::new();
+    for i in 0..5 {
+        let p = h.fixture.create_file(&format!("f{i}.txt"), "body\n");
+        touched.push(TouchedFile {
+            path: p.to_string_lossy().into(),
+            mutated: false,
+            last_seen_msg_idx: i,
+        });
+    }
+
+    let mut runner = h.runner;
+    runner.params.store.clear();
+    let before = runner.params.store.len();
+
+    let cancel = CancellationToken::new();
+    cancel.cancel();
+    let stats = runner.compact_rehydrate(&touched, &cancel).await;
+
+    assert!(stats.cancelled);
+    assert_eq!(
+        runner.params.store.len(),
+        before,
+        "store must remain pristine — no orphan ToolUse from aborted rehydrate",
     );
 }

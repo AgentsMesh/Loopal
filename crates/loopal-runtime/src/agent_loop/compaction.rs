@@ -15,7 +15,6 @@ use loopal_protocol::{AgentEventPayload, CompactPhase};
 use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, info};
 
-use super::compaction_run::CompactTrigger;
 use super::runner::AgentLoopRunner;
 
 impl AgentLoopRunner {
@@ -80,14 +79,8 @@ impl AgentLoopRunner {
             })
             .await?;
 
-            self.run_smart_compact(
-                before_count,
-                tokens_before,
-                None,
-                CompactTrigger::Auto,
-                cancel,
-            )
-            .await
+            self.run_smart_compact(before_count, tokens_before, None, "auto", cancel)
+                .await
         }
         .instrument(compact_span)
         .await
@@ -137,7 +130,7 @@ impl AgentLoopRunner {
             before_count,
             tokens_before,
             instructions,
-            CompactTrigger::Manual,
+            "manual",
             cancel.token(),
         )
         .await

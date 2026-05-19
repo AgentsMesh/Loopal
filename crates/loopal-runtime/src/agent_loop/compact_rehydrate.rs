@@ -8,6 +8,7 @@ use loopal_message::{ContentBlock, Message, MessageOrigin, MessageRole};
 use loopal_protocol::AgentEventPayload;
 use loopal_tool_api::ToolResult;
 use tokio::time::timeout;
+use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
 use super::runner::AgentLoopRunner;
@@ -17,12 +18,21 @@ pub struct RehydrateStats {
     pub files_attempted: usize,
     pub files_succeeded: usize,
     pub bytes_injected: usize,
+    pub cancelled: bool,
 }
 
 impl AgentLoopRunner {
-    pub async fn compact_rehydrate(&mut self, touched: &[TouchedFile]) -> RehydrateStats {
+    pub async fn compact_rehydrate(
+        &mut self,
+        touched: &[TouchedFile],
+        cancel: &CancellationToken,
+    ) -> RehydrateStats {
         let mut stats = RehydrateStats::default();
         if touched.is_empty() {
+            return stats;
+        }
+        if cancel.is_cancelled() {
+            stats.cancelled = true;
             return stats;
         }
         let Some(read_tool) = self.params.deps.kernel.get_tool("Read") else {
@@ -44,7 +54,20 @@ impl AgentLoopRunner {
             .await;
             (tf.path.clone(), input, outcome)
         });
-        let outcomes = futures::future::join_all(read_futs).await;
+
+        // Cancel must abort before any message is persisted. Dropping
+        // `read_futs` here cancels the in-flight Reads — they never
+        // contribute to the conversation, so no orphan ToolUse can be
+        // saved.
+        let outcomes = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => {
+                warn!("rehydrate cancelled before reads completed");
+                stats.cancelled = true;
+                return stats;
+            }
+            result = futures::future::join_all(read_futs) => result,
+        };
 
         let mut tool_uses: Vec<ContentBlock> = Vec::new();
         let mut tool_results: Vec<ContentBlock> = Vec::new();
@@ -92,12 +115,39 @@ impl AgentLoopRunner {
             return stats;
         }
 
+        // Last cancel check before the persist critical section. After the
+        // first `save_message`, the only safe option is to also save the
+        // second (no `.await` between them, so no further cancellation
+        // point — the persist block runs to completion or not at all).
+        if cancel.is_cancelled() {
+            warn!("rehydrate cancelled before persist; discarding read results");
+            stats.cancelled = true;
+            stats.files_succeeded = 0;
+            stats.bytes_injected = 0;
+            return stats;
+        }
+
         let mut assistant = Message {
             id: None,
             role: MessageRole::Assistant,
             content: tool_uses,
             origin: Some(MessageOrigin::CompactionRehydrate),
         };
+        // Partial-failure path: model only sees the ToolResults that
+        // succeeded; without an explicit note it can't tell which files
+        // dropped out. Append a text block to the same user message so
+        // the model knows to re-Read them on demand.
+        if stats.files_succeeded < stats.files_attempted {
+            let dropped = stats.files_attempted - stats.files_succeeded;
+            tool_results.push(ContentBlock::Text {
+                text: format!(
+                    "[rehydrate partial: {dropped} of {attempted} touched files were not \
+                     re-read (read error / timeout / over budget). Re-Read them on demand \
+                     before editing.]",
+                    attempted = stats.files_attempted,
+                ),
+            });
+        }
         let mut user = Message {
             id: None,
             role: MessageRole::User,

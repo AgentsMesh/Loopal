@@ -104,6 +104,7 @@ impl AgentLoopRunner {
             tool_results.push(ContentBlock::ToolResult {
                 tool_use_id: call_id,
                 content: body,
+                images: Vec::new(),
                 is_error: false,
                 metadata: None,
             });
@@ -215,6 +216,7 @@ mod tests {
     fn result(s: &str) -> ToolResult {
         ToolResult {
             content: s.to_string(),
+            images: Vec::new(),
             is_error: false,
             metadata: None,
         }

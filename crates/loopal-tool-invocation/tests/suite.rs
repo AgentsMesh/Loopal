@@ -2,6 +2,8 @@
 mod elapsed_duration_test;
 #[path = "suite/id_validation_test.rs"]
 mod id_validation_test;
+#[path = "suite/image_test.rs"]
+mod image_test;
 #[path = "suite/serialize_test.rs"]
 mod serialize_test;
 #[path = "suite/state_transition_edge_test.rs"]

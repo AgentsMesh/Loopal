@@ -18,6 +18,7 @@ const KNOWN_KEYS: &[&str] = &[
     "secrets",
     "goals",
     "compaction",
+    "images",
     "bg_tasks",
 ];
 

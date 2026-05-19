@@ -9,6 +9,8 @@ mod classifier_timeout_test;
 mod config_test;
 #[path = "suite/hook_test.rs"]
 mod hook_test;
+#[path = "suite/image_settings_test.rs"]
+mod image_settings_test;
 #[path = "suite/loader_instructions_test.rs"]
 mod loader_instructions_test;
 #[path = "suite/loader_settings_merge_test.rs"]

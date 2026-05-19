@@ -39,6 +39,7 @@ pub fn project_messages(messages: &[Message]) -> Vec<ProjectedMessage> {
                 ContentBlock::ToolResult {
                     tool_use_id,
                     content,
+                    images: _,
                     is_error,
                     metadata,
                 } => {

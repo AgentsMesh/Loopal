@@ -1,9 +1,10 @@
 use async_trait::async_trait;
-use loopal_tool_invocation::ToolResultMetadata;
+use loopal_tool_invocation::{ToolImageBlock, ToolResultMetadata};
 use serde::{Deserialize, Serialize};
 
 use loopal_error::LoopalError;
 
+use crate::backend_types::ImageResult;
 use crate::permission::PermissionLevel;
 use crate::tool_context::ToolContext;
 
@@ -51,6 +52,8 @@ pub trait Tool: Send + Sync {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolResult {
     pub content: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub images: Vec<ToolImageBlock>,
     pub is_error: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata: Option<ToolResultMetadata>,
@@ -60,6 +63,7 @@ impl ToolResult {
     pub fn success(content: impl Into<String>) -> Self {
         Self {
             content: content.into(),
+            images: Vec::new(),
             is_error: false,
             metadata: None,
         }
@@ -68,6 +72,7 @@ impl ToolResult {
     pub fn error(content: impl Into<String>) -> Self {
         Self {
             content: content.into(),
+            images: Vec::new(),
             is_error: true,
             metadata: None,
         }
@@ -75,6 +80,19 @@ impl ToolResult {
 
     pub fn with_metadata(mut self, metadata: ToolResultMetadata) -> Self {
         self.metadata = Some(metadata);
+        self
+    }
+
+    pub fn with_image(mut self, img: ImageResult) -> Self {
+        self.images.push(ToolImageBlock::Inline {
+            media_type: img.media_type,
+            data: img.data,
+        });
+        self
+    }
+
+    pub fn with_images(mut self, imgs: Vec<ToolImageBlock>) -> Self {
+        self.images.extend(imgs);
         self
     }
 }

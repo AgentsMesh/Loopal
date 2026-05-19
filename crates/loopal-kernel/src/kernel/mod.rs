@@ -151,12 +151,12 @@ impl Kernel {
         } else {
             None
         };
-        loopal_backend::LocalBackend::new(
-            cwd.to_path_buf(),
-            policy,
-            loopal_backend::ResourceLimits::default(),
-            session_id,
-        )
+        let limits = loopal_backend::ResourceLimits {
+            image_max_bytes: self.settings.images.max_bytes,
+            image_max_pixels: self.settings.images.max_pixels,
+            ..loopal_backend::ResourceLimits::default()
+        };
+        loopal_backend::LocalBackend::new(cwd.to_path_buf(), policy, limits, session_id)
     }
 
     pub fn bg_store(&self) -> &Arc<BackgroundTaskStore> {

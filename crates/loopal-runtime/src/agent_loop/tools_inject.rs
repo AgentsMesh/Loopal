@@ -17,6 +17,7 @@ pub(super) fn tool_result_block(
     ContentBlock::ToolResult {
         tool_use_id: id.to_string(),
         content: content.to_string(),
+        images: Vec::new(),
         is_error,
         metadata,
     }

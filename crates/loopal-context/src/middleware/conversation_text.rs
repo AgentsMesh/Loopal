@@ -119,6 +119,7 @@ mod tests {
             content: vec![ContentBlock::ToolResult {
                 tool_use_id: "t1".into(),
                 content: big,
+                images: Vec::new(),
                 is_error: false,
                 metadata: None,
             }],

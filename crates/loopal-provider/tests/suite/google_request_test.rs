@@ -86,6 +86,7 @@ fn test_build_contents_with_function_response() {
             content: vec![ContentBlock::ToolResult {
                 tool_use_id: "call_1".to_string(),
                 content: "file contents".to_string(),
+                images: Vec::new(),
                 is_error: false,
                 metadata: None,
             }],

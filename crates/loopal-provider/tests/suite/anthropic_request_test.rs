@@ -59,6 +59,7 @@ fn test_build_messages_with_tool_use() {
                 content: vec![ContentBlock::ToolResult {
                     tool_use_id: "tu_1".to_string(),
                     content: "file.txt".to_string(),
+                    images: Vec::new(),
                     is_error: false,
                     metadata: None,
                 }],

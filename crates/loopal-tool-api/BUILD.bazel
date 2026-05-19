@@ -27,6 +27,7 @@ rust_test(
         ":loopal-tool-api",
         "//crates/loopal-backend",
         "//crates/loopal-error",
+        "//crates/loopal-tool-invocation",
         "@crates//:schemars",
         "@crates//:serde",
         "@crates//:serde_json",

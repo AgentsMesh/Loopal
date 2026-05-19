@@ -86,6 +86,7 @@ fn test_estimated_token_count_tool_result() {
         content: vec![ContentBlock::ToolResult {
             tool_use_id: "1".into(),
             content: "a".repeat(400),
+            images: Vec::new(),
             is_error: false,
             metadata: None,
         }],
@@ -109,8 +110,8 @@ fn test_estimated_token_count_image() {
         }],
         origin: None,
     };
-    // 1000 fixed + 4 overhead
-    assert_eq!(msg.estimated_token_count(), 1004);
+    // small inline image falls back to minimum 85 tokens + 4 overhead
+    assert_eq!(msg.estimated_token_count(), 89);
 }
 
 #[test]
@@ -131,4 +132,30 @@ fn test_estimated_token_count_mixed() {
         origin: None,
     };
     assert_eq!(msg.estimated_token_count(), 2 + 4);
+}
+
+#[test]
+fn test_estimated_token_count_tool_result_with_image() {
+    use loopal_message::ToolImageBlock;
+    let big_data = "A".repeat(80_000);
+    let msg = Message {
+        id: None,
+        role: MessageRole::User,
+        content: vec![ContentBlock::ToolResult {
+            tool_use_id: "tu".into(),
+            content: String::new(),
+            images: vec![ToolImageBlock::Inline {
+                media_type: "image/png".into(),
+                data: big_data,
+            }],
+            is_error: false,
+            metadata: None,
+        }],
+        origin: None,
+    };
+    let est = msg.estimated_token_count();
+    assert!(
+        est > 4,
+        "image must contribute non-trivial tokens (got {est})"
+    );
 }

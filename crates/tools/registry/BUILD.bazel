@@ -23,6 +23,7 @@ rust_library(
         "//crates/tools/filesystem/multi-edit:loopal-tool-multi-edit",
         "//crates/tools/filesystem/read:loopal-tool-read",
         "//crates/tools/filesystem/read-html:loopal-tool-read-html",
+        "//crates/tools/filesystem/read-image:loopal-tool-read-image",
         "//crates/tools/filesystem/read-pdf:loopal-tool-read-pdf",
         "//crates/tools/filesystem/web-search:loopal-tool-web-search",
         "//crates/tools/filesystem/write:loopal-tool-write",

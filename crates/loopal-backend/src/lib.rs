@@ -1,6 +1,7 @@
 pub mod approved;
 pub mod fs;
 mod fs_write;
+pub mod image;
 pub mod limits;
 pub mod local;
 pub mod log_writer;

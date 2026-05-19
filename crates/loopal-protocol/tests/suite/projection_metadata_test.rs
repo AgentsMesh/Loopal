@@ -21,6 +21,7 @@ fn project_preserves_tool_result_metadata() {
             content: vec![ContentBlock::ToolResult {
                 tool_use_id: "tc-meta".into(),
                 content: "Watchdog timeout".into(),
+                images: Vec::new(),
                 is_error: true,
                 metadata: Some(ToolResultMetadata::stale(StaleReason::WatchdogTimeout)),
             }],
@@ -58,6 +59,7 @@ fn project_preserves_cancel_cause_metadata() {
             content: vec![ContentBlock::ToolResult {
                 tool_use_id: "tc-cancel".into(),
                 content: "Interrupted by user".into(),
+                images: Vec::new(),
                 is_error: true,
                 metadata: Some(ToolResultMetadata::cancelled(CancelCause::UserInterrupt)),
             }],

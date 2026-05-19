@@ -3,6 +3,8 @@
 mod approved_paths_test;
 #[path = "suite/fetch_headers_test.rs"]
 mod fetch_headers_test;
+#[path = "suite/image_test.rs"]
+mod image_test;
 #[path = "suite/log_file_test.rs"]
 mod log_file_test;
 #[path = "suite/path_approval_test.rs"]

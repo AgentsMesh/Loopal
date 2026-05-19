@@ -146,9 +146,22 @@ pub fn feed_tool(
                         duration_ms: Some(tool_duration.as_millis() as u64),
                         metadata: r.metadata.clone(),
                     };
+                    let mut images = r.images;
+                    if !images.is_empty()
+                        && let Some(store) = crate::hydrate::resource_store()
+                    {
+                        crate::hydrate::maybe_persist_inline_images(
+                            store.as_ref(),
+                            &tool_ctx.session_id,
+                            &mut images,
+                            kernel.settings().images.inline_threshold_bytes,
+                        )
+                        .await;
+                    }
                     let block = ContentBlock::ToolResult {
                         tool_use_id: id,
                         content: r.content,
+                        images,
                         is_error: r.is_error,
                         metadata: r.metadata,
                     };
@@ -173,6 +186,7 @@ pub fn feed_tool(
                     let block = ContentBlock::ToolResult {
                         tool_use_id: id,
                         content: err_msg,
+                        images: Vec::new(),
                         is_error: true,
                         metadata: None,
                     };

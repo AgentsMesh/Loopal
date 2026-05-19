@@ -20,8 +20,8 @@ pub mod typed_tool;
 pub use backend::{Backend, ExecOutcome};
 pub use backend_types::{
     EditResult, EnvOverride, ExecResult, FetchResult, FileInfo, FileMatchResult, GlobEntry,
-    GlobOptions, GlobSearchResult, GrepOptions, GrepSearchResult, LsEntry, LsResult, MatchGroup,
-    MatchLine, ReadResult, TimeoutSecs, WriteResult,
+    GlobOptions, GlobSearchResult, GrepOptions, GrepSearchResult, ImageResult, LsEntry, LsResult,
+    MatchGroup, MatchLine, ReadResult, TimeoutSecs, WriteResult,
 };
 pub use bg_config::BgTaskConfig;
 pub use goal_session::{GoalSession, GoalSessionError};

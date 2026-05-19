@@ -57,6 +57,7 @@ fn truncates_long_tool_result() {
         content: vec![ContentBlock::ToolResult {
             tool_use_id: "t1".into(),
             content: long_content,
+            images: Vec::new(),
             is_error: false,
             metadata: None,
         }],
@@ -84,6 +85,7 @@ fn utf8_truncation_no_panic() {
         content: vec![ContentBlock::ToolResult {
             tool_use_id: "t1".into(),
             content,
+            images: Vec::new(),
             is_error: false,
             metadata: None,
         }],
@@ -135,6 +137,7 @@ fn fork_context_json_round_trip() {
             content: vec![ContentBlock::ToolResult {
                 tool_use_id: "tu1".into(),
                 content: "src/main.rs\nsrc/lib.rs".into(),
+                images: Vec::new(),
                 is_error: false,
                 metadata: None,
             }],

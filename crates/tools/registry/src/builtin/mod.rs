@@ -21,6 +21,10 @@ pub fn register_all(registry: &ToolRegistry, bg_store: Arc<BackgroundTaskStore>)
         _,
         loopal_tool_read_html::ReadHtmlParams,
     >::new(loopal_tool_read_html::ReadHtmlTool)));
+    registry.register(Box::new(TypedBridge::<
+        _,
+        loopal_tool_read_image::ReadImageParams,
+    >::new(loopal_tool_read_image::ReadImageTool)));
     registry.register(Box::new(
         TypedBridge::<_, loopal_tool_write::WriteParams>::new(loopal_tool_write::WriteTool),
     ));

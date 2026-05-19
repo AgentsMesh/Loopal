@@ -8,6 +8,7 @@ fn tool_result(id: &str, content: &str) -> ContentBlock {
     ContentBlock::ToolResult {
         tool_use_id: id.to_string(),
         content: content.to_string(),
+        images: Vec::new(),
         is_error: false,
         metadata: None,
     }
@@ -77,6 +78,7 @@ fn cap_tool_results_skips_errors() {
         content: vec![ContentBlock::ToolResult {
             tool_use_id: "t1".into(),
             content: big_content.clone(),
+            images: Vec::new(),
             is_error: true,
             metadata: None,
         }],

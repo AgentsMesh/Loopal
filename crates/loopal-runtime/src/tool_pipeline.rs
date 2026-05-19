@@ -103,6 +103,7 @@ pub async fn execute_tool(
             &redactor_seed,
             &ctx.session_id,
         ),
+        images: result.images,
         is_error: result.is_error,
         metadata: result.metadata,
     };
@@ -117,6 +118,7 @@ pub async fn execute_tool(
         );
         ToolResult {
             content: overflow.display,
+            images: result.images,
             is_error: result.is_error,
             metadata: result.metadata,
         }

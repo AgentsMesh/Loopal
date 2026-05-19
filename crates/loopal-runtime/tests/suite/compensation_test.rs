@@ -25,6 +25,7 @@ fn single_tool_use_produces_user_message_with_one_tool_result() {
         content,
         is_error,
         metadata,
+        ..
     } = &msg.content[0]
     else {
         panic!("expected ToolResult");

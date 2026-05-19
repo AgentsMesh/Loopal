@@ -90,6 +90,7 @@ pub(super) async fn collect_results(
             ContentBlock::ToolResult {
                 tool_use_id: id.clone(),
                 content: "Interrupted by user".into(),
+                images: Vec::new(),
                 is_error: true,
                 metadata: Some(cancel_metadata),
             },

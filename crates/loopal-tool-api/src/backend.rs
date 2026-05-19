@@ -7,7 +7,7 @@ use loopal_error::{ProcessHandle, ToolIoError};
 
 use crate::backend_types::{
     EditResult, EnvOverride, ExecResult, FetchResult, FileInfo, GlobOptions, GlobSearchResult,
-    GrepOptions, GrepSearchResult, LsResult, ReadResult, WriteResult,
+    GrepOptions, GrepSearchResult, ImageResult, LsResult, ReadResult, WriteResult,
 };
 use crate::output_tail::OutputTail;
 
@@ -93,6 +93,17 @@ pub trait Backend: Send + Sync {
     /// Read raw file content with path checking, size limit, and binary detection.
     /// Unlike `read()`, does NOT add line numbers — returns the original content.
     async fn read_raw(&self, path: &str) -> Result<String, ToolIoError>;
+
+    /// Read an image file: validate MIME by magic-bytes, parse dimensions,
+    /// enforce size + pixel limits, return base64-encoded data.
+    async fn read_image(&self, path: &str) -> Result<ImageResult, ToolIoError>;
+
+    /// Read the first `n` bytes of a file for magic-byte sniffing.
+    /// Default returns empty vec, meaning the backend opts out of sniffing
+    /// (callers must handle empty result as "unknown content type").
+    async fn peek_bytes(&self, _path: &str, _n: usize) -> Result<Vec<u8>, ToolIoError> {
+        Ok(Vec::new())
+    }
 
     /// Current working directory of this backend.
     fn cwd(&self) -> &Path;

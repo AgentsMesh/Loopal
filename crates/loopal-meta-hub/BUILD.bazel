@@ -35,6 +35,10 @@ rust_test(
 )
 
 # End-to-end cluster tests (real binary, real TCP, real agent processes)
+# Forced single-threaded: each test spawns ≥1 agent subprocess + Hub + MetaHub
+# TCP listener; running them in parallel within one test binary stresses CI
+# resources (process tables, fd, port allocation) and causes initialize
+# timeouts that look like flakes but are real resource exhaustion.
 rust_test(
     name = "loopal-meta-hub_e2e",
     srcs = glob(["tests/e2e/**/*.rs"]),
@@ -42,7 +46,10 @@ rust_test(
     edition = "2024",
     local = True,
     data = ["//:loopal"],
-    env = {"LOOPAL_BINARY": "$(rootpath //:loopal)"},
+    env = {
+        "LOOPAL_BINARY": "$(rootpath //:loopal)",
+        "RUST_TEST_THREADS": "1",
+    },
     deps = [
         ":loopal-meta-hub",
         "//crates/loopal-agent-hub",
@@ -51,5 +58,6 @@ rust_test(
         "//crates/loopal-protocol",
         "@crates//:tokio",
         "@crates//:serde_json",
+        "@crates//:uuid",
     ],
 )

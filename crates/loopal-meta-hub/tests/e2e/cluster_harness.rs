@@ -159,9 +159,10 @@ impl HubHandle {
 
 fn create_mock_fixture(name: &str) -> std::path::PathBuf {
     let path = std::env::temp_dir().join(format!(
-        "loopal_cluster_mock_{}_{}.json",
+        "loopal_cluster_mock_{}_{}_{}.json",
         name,
-        std::process::id()
+        std::process::id(),
+        uuid::Uuid::new_v4().simple()
     ));
     let data = json!([
         [

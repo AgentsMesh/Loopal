@@ -54,11 +54,12 @@ fn safe_truncation_skips_server_tool_result() {
 }
 
 #[test]
-fn compact_fallback_with_no_tool_results() {
-    use loopal_context::compact_messages;
+fn sanitize_no_tool_results_simple_drain() {
+    use loopal_context::sanitize_tool_pairs;
 
     let mut messages: Vec<Message> = (0..20).map(|_| Message::user(&"y".repeat(1000))).collect();
-    compact_messages(&mut messages, 3);
+    messages.drain(0..17);
+    sanitize_tool_pairs(&mut messages);
     assert_eq!(messages.len(), 3);
 }
 

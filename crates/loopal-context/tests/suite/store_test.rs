@@ -139,22 +139,39 @@ fn prepare_for_llm_preserves_last_thinking() {
 }
 
 #[test]
-fn token_aware_keep_count_dynamic() {
+fn set_boundary_replaces_old_with_summary_pair() {
     let budget = make_budget(10_000);
     let mut store = ContextStore::new(budget);
 
-    // Push several small messages — all should fit in half budget
-    for i in 0..20 {
+    for i in 0..6 {
         if i % 2 == 0 {
-            store.push_assistant(Message::assistant(&format!("response {i}")));
+            store.push_assistant(Message::assistant(&format!("a-{i}")));
         } else {
-            store.push_user(Message::user(&format!("question {i}")));
+            store.push_user(Message::user(&format!("u-{i}")));
         }
     }
+    let summary = Message::user("[summary]");
+    let ack = Message::assistant("ok");
 
-    let keep = store.token_aware_keep_count();
-    assert!(keep >= 2, "should keep at least 2");
-    assert!(keep <= store.len(), "should not exceed total messages");
+    store.set_boundary(4, summary, ack);
+
+    assert_eq!(store.len(), 4); // 2 summary + 2 kept tail
+    assert_eq!(store.messages()[0].text_content(), "[summary]");
+    assert_eq!(store.messages()[1].text_content(), "ok");
+    assert_eq!(store.messages()[2].text_content(), "a-4");
+    assert_eq!(store.messages()[3].text_content(), "u-5");
+}
+
+#[test]
+fn set_boundary_beyond_length_keeps_only_summary_pair() {
+    let budget = make_budget(10_000);
+    let mut store = ContextStore::new(budget);
+    store.push_user(Message::user("hi"));
+
+    store.set_boundary(99, Message::user("[summary]"), Message::assistant("ok"));
+
+    assert_eq!(store.len(), 2);
+    assert_eq!(store.messages()[0].text_content(), "[summary]");
 }
 
 #[test]

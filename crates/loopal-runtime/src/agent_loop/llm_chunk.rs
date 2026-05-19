@@ -83,6 +83,9 @@ impl AgentLoopRunner {
                 self.tokens.cache_read += cache_read_input_tokens;
                 self.tokens.thinking += thinking_tokens;
                 result.thinking_tokens += thinking_tokens;
+                let full_input =
+                    input_tokens + cache_creation_input_tokens + cache_read_input_tokens;
+                self.params.store.record_actual_input_tokens(full_input);
                 self.emit_in_turn(AgentEventPayload::TokenUsage {
                     input_tokens,
                     output_tokens,

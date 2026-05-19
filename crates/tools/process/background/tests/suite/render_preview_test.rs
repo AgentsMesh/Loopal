@@ -4,7 +4,7 @@ use std::time::Duration;
 use loopal_tool_api::OutputTail;
 use loopal_tool_background::ops::bg_output;
 
-use crate::test_support::{make_store, spawn_completed_task};
+use crate::test_support::{make_store, spawn_completed_task, unique_sid};
 
 #[tokio::test]
 async fn completed_task_render_preview_includes_output_line() {
@@ -30,7 +30,7 @@ async fn process_render_preview_contains_log_path_and_stdout_section() {
         tmp.path().to_path_buf(),
         None,
         loopal_backend::ResourceLimits::default(),
-        "test-session",
+        unique_sid(),
     );
     let ctx = ToolContext::new(backend, "test").with_output_tail(Arc::new(OutputTail::new(20)));
     let bridge: TypedBridge<BashTool, BashParams> = bash;

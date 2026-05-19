@@ -1,5 +1,3 @@
-//! Edge-case compaction tests: auto-compact on large context, thinking block stripping.
-
 use loopal_context::ContextBudget;
 use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_protocol::AgentEventPayload;
@@ -24,18 +22,6 @@ fn tiny_budget() -> ContextBudget {
 }
 
 /// Drain all available events from the channel (non-blocking after brief yield).
-async fn drain_events(
-    rx: &mut tokio::sync::mpsc::Receiver<loopal_protocol::AgentEvent>,
-) -> Vec<AgentEventPayload> {
-    tokio::task::yield_now().await;
-    let mut out = Vec::new();
-    while let Ok(ev) = rx.try_recv() {
-        out.push(ev.payload);
-    }
-    out
-}
-
-/// Auto-compaction fires when messages exceed 75% of a tiny context budget.
 #[tokio::test]
 async fn test_auto_compact_on_large_context() {
     // Two LLM calls: one for smart-compact summarization, one for the
@@ -72,15 +58,19 @@ async fn test_auto_compact_on_large_context() {
         h.runner.params.store.len()
     );
 
-    let evts = drain_events(&mut h.event_rx).await;
-    let has_compacted = evts
-        .iter()
-        .any(|e| matches!(e, AgentEventPayload::Compacted(_)));
-    assert!(has_compacted, "expected Compacted event from auto-compact");
+    let evts = loopal_test_support::events::drain_pending(&mut h.event_rx).await;
+    let compacted = evts.iter().find_map(|e| match e {
+        AgentEventPayload::Compacted(s) => Some(s),
+        _ => None,
+    });
+    let summary = compacted.expect("expected Compacted event from auto-compact");
+    assert!(
+        summary.strategy.starts_with("auto"),
+        "auto-trigger must label strategy as auto, got: {:?}",
+        summary.strategy,
+    );
 }
 
-/// `store.prepare_for_llm()` strips thinking blocks from old assistant messages
-/// but preserves thinking in the last assistant message.
 #[tokio::test]
 async fn test_thinking_blocks_stripped_in_context_prep() {
     let h = HarnessBuilder::new()

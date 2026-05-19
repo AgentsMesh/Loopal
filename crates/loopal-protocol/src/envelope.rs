@@ -103,6 +103,7 @@ impl From<&MessageSource> for MessageOrigin {
                 "stop_feedback" => MessageOrigin::StopFeedback,
                 "config_refresh" => MessageOrigin::ConfigRefresh,
                 "compaction_summary" => MessageOrigin::CompactionSummary,
+                "compaction_rehydrate" => MessageOrigin::CompactionRehydrate,
                 other => MessageOrigin::Other {
                     label: other.to_string(),
                 },

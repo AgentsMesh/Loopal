@@ -78,7 +78,9 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         kernel.register_goal_tools();
     }
     loopal_agent::tools::register_all(&mut kernel);
-    kernel.register_provider(Arc::new(MultiCallProvider::new(builder.calls)) as Arc<dyn Provider>);
+    let mock_provider = MultiCallProvider::new(builder.calls);
+    let recorded_messages = mock_provider.messages_handle();
+    kernel.register_provider(Arc::new(mock_provider) as Arc<dyn Provider>);
     if let Some(setup) = builder.kernel_setup {
         setup(&mut kernel);
     }
@@ -152,6 +154,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
             tool_filter: builder.tool_filter,
             thinking_config: builder.thinking_config,
             context_tokens_cap: 200_000,
+            microcompact_idle: std::time::Duration::from_secs(60 * 60),
             plan_state: None,
         },
         loopal_runtime::AgentDeps {
@@ -183,6 +186,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         control_tx,
         session_ctrl,
         fixture,
+        recorded_messages,
     };
     (harness, AgentLoopRunner::new(params))
 }

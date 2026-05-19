@@ -4,7 +4,7 @@ mod memory;
 mod providers;
 mod secrets;
 
-pub use core::Settings;
+pub use core::{CompactionSettings, GoalSettings, Settings};
 pub use mcp::McpServerConfig;
 pub use memory::MemoryConfig;
 pub use providers::{OpenAiCompatConfig, ProviderConfig, ProvidersConfig};

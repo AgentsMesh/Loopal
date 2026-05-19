@@ -20,8 +20,18 @@ pub struct TurnSummary {
     pub modified_files: Vec<String>,
 }
 
+/// Phases of a `CompactProgress` notification. Listed in firing order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CompactPhase {
+    Microcompact,
+    Summarize,
+    Rehydrate,
+    Done,
+}
+
 /// Outcome metrics for `AgentEventPayload::Compacted`. `strategy` is one of
-/// `"smart"` (LLM summarization) / `"emergency"` (blind truncation).
+/// `"auto"` (threshold-triggered) / `"manual"` (user `/compact`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompactionSummary {
     pub kept: usize,
@@ -29,6 +39,13 @@ pub struct CompactionSummary {
     pub tokens_before: u32,
     pub tokens_after: u32,
     pub strategy: String,
+    /// Storage UUID of the persisted summary message (anchor for
+    /// `Marker::CompactBoundary` on resume).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary_msg_id: Option<String>,
+    /// How many files the post-compact rehydrate stage re-read.
+    #[serde(default)]
+    pub files_rehydrated: usize,
 }
 
 /// Metadata attached to `AgentEventPayload::SubAgentSpawned`.

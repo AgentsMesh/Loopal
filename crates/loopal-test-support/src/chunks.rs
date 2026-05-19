@@ -60,6 +60,15 @@ pub fn provider_error(msg: &str) -> Result<StreamChunk, LoopalError> {
     )))
 }
 
+/// A non-retryable provider error (HTTP 400). Triggers fallback paths
+/// (e.g. `bare_summary` in compaction) without burning the retry budget.
+pub fn non_retryable_error(msg: &str) -> Result<StreamChunk, LoopalError> {
+    Err(LoopalError::Provider(loopal_error::ProviderError::Api {
+        status: 400,
+        message: msg.to_string(),
+    }))
+}
+
 /// A rate-limit error from the provider.
 pub fn rate_limited(retry_ms: u64) -> Result<StreamChunk, LoopalError> {
     Err(LoopalError::Provider(

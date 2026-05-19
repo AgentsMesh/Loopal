@@ -116,3 +116,17 @@ pub fn extract_tool_results(events: &[AgentEventPayload]) -> Vec<(String, bool)>
         })
         .collect()
 }
+
+/// Non-blocking drain of currently-pending events. Yields once to let
+/// any in-flight emit complete, then flushes the channel via try_recv.
+/// Use this after a synchronous `runner.method().await` to inspect what
+/// events that single call produced — `collect_until_idle` waits for a
+/// terminal event which compact-internal methods don't emit.
+pub async fn drain_pending(rx: &mut mpsc::Receiver<AgentEvent>) -> Vec<AgentEventPayload> {
+    tokio::task::yield_now().await;
+    let mut out = Vec::new();
+    while let Ok(ev) = rx.try_recv() {
+        out.push(ev.payload);
+    }
+    out
+}

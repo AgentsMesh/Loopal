@@ -2,7 +2,7 @@
 //!
 //! Every line in the JSONL file is a `TaggedEntry`, discriminated by `_type`:
 //! - `message` — a conversation message
-//! - `marker`  — a control event (Clear / CompactTo / RewindTo)
+//! - `marker`  — a control event (Clear / CompactBoundary / RewindTo)
 
 use loopal_message::Message;
 use serde::{Deserialize, Serialize};
@@ -21,8 +21,13 @@ pub enum TaggedEntry {
 pub enum Marker {
     /// Discard all preceding entries during replay.
     Clear { timestamp: String },
-    /// Keep only the last `keep_last` messages during replay.
-    CompactTo { keep_last: usize, timestamp: String },
+    /// Anchor point produced by a compaction: replay drops every message
+    /// before the message whose `id == summary_msg_id`, keeping it and
+    /// everything after.
+    CompactBoundary {
+        summary_msg_id: String,
+        timestamp: String,
+    },
     /// Discard the message with `message_id` and everything after it.
     RewindTo {
         message_id: String,

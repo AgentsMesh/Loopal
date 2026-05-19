@@ -55,6 +55,7 @@ fn system_kinds_are_not_task_boundary() {
         MessageOrigin::StopFeedback,
         MessageOrigin::ConfigRefresh,
         MessageOrigin::CompactionSummary,
+        MessageOrigin::CompactionRehydrate,
         MessageOrigin::Other { label: "x".into() },
     ] {
         assert!(
@@ -99,6 +100,7 @@ fn task_boundary_classification_is_exhaustive() {
             | MessageOrigin::StopFeedback
             | MessageOrigin::ConfigRefresh
             | MessageOrigin::CompactionSummary
+            | MessageOrigin::CompactionRehydrate
             | MessageOrigin::Other { .. } => false,
         }
     }
@@ -118,6 +120,7 @@ fn task_boundary_classification_is_exhaustive() {
         MessageOrigin::StopFeedback,
         MessageOrigin::ConfigRefresh,
         MessageOrigin::CompactionSummary,
+        MessageOrigin::CompactionRehydrate,
         MessageOrigin::Other {
             label: "future".into(),
         },
@@ -130,4 +133,19 @@ fn task_boundary_classification_is_exhaustive() {
             "is_task_boundary drift for {o:?}: expected={exp}"
         );
     }
+}
+
+#[test]
+fn compaction_artifacts_classified_consistently() {
+    assert!(MessageOrigin::CompactionSummary.is_compaction_artifact());
+    assert!(MessageOrigin::CompactionRehydrate.is_compaction_artifact());
+    assert!(!MessageOrigin::Human.is_compaction_artifact());
+    assert!(!MessageOrigin::GovernanceCompensation.is_compaction_artifact());
+    assert!(!MessageOrigin::Other { label: "x".into() }.is_compaction_artifact());
+}
+
+#[test]
+fn compaction_rehydrate_serializes_to_snake_case() {
+    let r = serde_json::to_value(&MessageOrigin::CompactionRehydrate).unwrap();
+    assert_eq!(r, serde_json::json!({"kind": "compaction_rehydrate"}));
 }

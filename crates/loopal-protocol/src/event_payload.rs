@@ -4,7 +4,7 @@ use crate::address::QualifiedAddress;
 use crate::bg_task::BgTaskStatus;
 use crate::cron_snapshot::CronJobSnapshot;
 use crate::envelope::MessageSource;
-use crate::event_summary::{CompactionSummary, SubAgentSpawn, TurnSummary};
+use crate::event_summary::{CompactPhase, CompactionSummary, SubAgentSpawn, TurnSummary};
 use crate::mcp_snapshot::McpServerSnapshot;
 use crate::question::{Question, ResolveSource};
 use crate::task_snapshot::TaskSnapshot;
@@ -133,6 +133,8 @@ pub enum AgentEventPayload {
     /// `remaining_turns` is the count after truncation.
     Rewound { remaining_turns: usize },
     Compacted(CompactionSummary),
+    /// Incremental compaction phase notification.
+    CompactProgress { phase: CompactPhase, detail: Option<String> },
     /// Cancel signal or new message arrived while runner was busy.
     Interrupted,
     TurnDiffSummary { modified_files: Vec<String> },

@@ -4,7 +4,6 @@ use std::time::Duration;
 use loopal_config::ResolvedPolicy;
 use loopal_error::ToolIoError;
 use loopal_tool_api::backend_types::{EnvOverride, ExecResult};
-use tokio::task::AbortHandle;
 
 use crate::log_writer::flush_writer;
 use crate::process_group::{SpawnedChild, kill_process_group};
@@ -91,13 +90,12 @@ pub async fn exec_background(
         prepared.stderr_buf.clone(),
         None,
     );
-    let drainers: Vec<AbortHandle> = readers.into_iter().map(|h| h.abort_handle()).collect();
 
     Ok(SpawnedBackgroundData {
         spawned: prepared.spawned,
         log_path: prepared.log_path,
         head_tail: prepared.head_tail,
         stderr_buf: prepared.stderr_buf,
-        drainers,
+        drainers: readers,
     })
 }

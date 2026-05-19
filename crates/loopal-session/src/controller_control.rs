@@ -35,10 +35,10 @@ impl SessionController {
             .await;
     }
 
-    pub async fn compact(&self) {
+    pub async fn compact(&self, instructions: Option<String>) {
         let target = self.active_target();
         self.backend
-            .send_control_to_agent(&target, ControlCommand::Compact)
+            .send_control_to_agent(&target, ControlCommand::Compact { instructions })
             .await;
     }
 

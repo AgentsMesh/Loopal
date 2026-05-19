@@ -1,4 +1,3 @@
-use loopal_context::compact_messages;
 use loopal_context::compaction::sanitize_tool_pairs;
 use loopal_message::{ContentBlock, Message, MessageRole};
 
@@ -65,7 +64,7 @@ fn sanitize_preserves_valid_pairs() {
 }
 
 #[test]
-fn compact_then_sanitize_fixes_broken_pairs() {
+fn sanitize_after_manual_segment_drop_fixes_broken_pairs() {
     let mut msgs = vec![
         Message::system("sys"),
         Message::user("q1"),
@@ -77,7 +76,10 @@ fn compact_then_sanitize_fixes_broken_pairs() {
         user_with_tool_result("call_2"),
         Message::assistant("a2"),
     ];
-    compact_messages(&mut msgs, 3);
+    // Simulate a boundary that drops the front segment but leaves a dangling
+    // ToolResult, then assert sanitize_tool_pairs repairs it.
+    msgs.drain(1..6);
+    sanitize_tool_pairs(&mut msgs);
     for msg in &msgs {
         for block in &msg.content {
             if let ContentBlock::ToolResult { tool_use_id, .. } = block {

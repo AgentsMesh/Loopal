@@ -80,6 +80,7 @@ pub(super) fn compacted(
     tokens_after: u32,
     strategy: &str,
 ) -> MutationEffect {
+    state.agent.conversation.compact_banner = None;
     conversation_display::handle_compaction(
         &mut state.agent.conversation,
         kept,

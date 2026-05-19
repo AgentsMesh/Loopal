@@ -40,6 +40,7 @@ pub(super) fn error(state: &mut SessionViewState, message: &str) -> MutationEffe
     let conv = &mut state.agent.conversation;
     conv.flush_streaming();
     conv.retry_banner = None;
+    conv.compact_banner = None;
     conv.messages.push(crate::SessionMessage {
         role: "error".into(),
         content: message.into(),
@@ -85,6 +86,7 @@ fn set_idle(state: &mut SessionViewState, status: AgentStatus) {
         conv.turn_count += 1;
     }
     conv.retry_banner = None;
+    conv.compact_banner = None;
     state.agent.observable.status = status;
     if status != AgentStatus::Finished {
         state.agent.observable.turn_count = state.agent.observable.turn_count.saturating_add(1);

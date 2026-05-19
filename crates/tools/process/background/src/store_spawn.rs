@@ -7,7 +7,7 @@ use loopal_backend::SpawnedChild;
 use loopal_tool_api::{HeadTail, StderrCappedBuffer};
 use parking_lot::Mutex as PlMutex;
 use tokio::sync::{mpsc, watch};
-use tokio::task::AbortHandle;
+use tokio::task::JoinHandle;
 
 use crate::clock::unix_ms;
 use crate::control::TaskStatus;
@@ -23,7 +23,7 @@ impl BackgroundTaskStore {
         log_path: PathBuf,
         stdout_head_tail: Arc<HeadTail>,
         stderr_buf: Arc<PlMutex<StderrCappedBuffer>>,
-        output_drainers: Vec<AbortHandle>,
+        output_drainers: Vec<JoinHandle<()>>,
         desc: &str,
     ) -> String {
         let id = self.generate_task_id();
@@ -51,7 +51,9 @@ impl BackgroundTaskStore {
             drainers_grace: self.config().drainers_grace(),
             sigterm_grace: self.config().sigterm_grace(),
         };
-        let panic_safe_drainers = output_drainers.to_vec();
+        // The watchdog only needs to abort drainers if the monitor task
+        // itself panicked — it doesn't claim ownership.
+        let watchdog_aborts: Vec<_> = output_drainers.iter().map(|h| h.abort_handle()).collect();
         let monitor_handle = tokio::spawn(run_process_monitor(
             spawned.child,
             spawned.pgid,
@@ -61,7 +63,7 @@ impl BackgroundTaskStore {
             control_rx,
             timing,
         ));
-        install_panic_watchdog(monitor_handle, panic_safe_drainers, id.clone());
+        install_panic_watchdog(monitor_handle, watchdog_aborts, id.clone());
         id
     }
 }

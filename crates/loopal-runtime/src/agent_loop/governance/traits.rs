@@ -29,6 +29,14 @@ pub trait Governance: Send + Sync {
     // Self-decide whether the envelope marks a task boundary; runtime does
     // not pre-classify so each Governance can apply its own semantics.
     fn on_envelope_received(&mut self, _source: &MessageSource) {}
+
+    // Compaction just rewrote earlier history: any cross-turn state derived
+    // from the pre-compact conversation (e.g. signature counters that index
+    // tool calls now absent from the store) is stale and must reset.
+    // Called once after the boundary marker is committed and the in-memory
+    // store has advanced. Default is no-op for governances without
+    // cross-turn state.
+    fn on_compact_completed(&mut self) {}
 }
 
 // Non-decision role: CANNOT veto a turn (no Verdict return).

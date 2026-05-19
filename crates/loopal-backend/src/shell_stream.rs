@@ -8,7 +8,7 @@ use loopal_tool_api::ExecOutcome;
 use loopal_tool_api::backend_types::{EnvOverride, ExecResult};
 use loopal_tool_api::{HeadTail, OutputTail, StderrCappedBuffer};
 use parking_lot::Mutex as PlMutex;
-use tokio::task::AbortHandle;
+use tokio::task::JoinHandle;
 
 use crate::log_writer::flush_writer;
 use crate::process_group::SpawnedChild;
@@ -19,7 +19,11 @@ pub struct TimedOutProcessData {
     pub log_path: std::path::PathBuf,
     pub stdout_head_tail: Arc<HeadTail>,
     pub stderr_buf: Arc<PlMutex<StderrCappedBuffer>>,
-    pub abort_handles: Vec<AbortHandle>,
+    /// JoinHandles of the still-running reader tasks. The monitor that
+    /// adopts this `TimedOutProcessData` should `await` them after the
+    /// child's pipes close so log/preview state is complete before the
+    /// task is marked terminal. Bounded by `drainers_grace` upstream.
+    pub drainers: Vec<JoinHandle<()>>,
 }
 
 pub async fn exec_command_streaming(
@@ -40,7 +44,6 @@ pub async fn exec_command_streaming(
         prepared.stderr_buf.clone(),
         Some(tail.clone()),
     );
-    let abort_handles: Vec<AbortHandle> = readers.iter().map(|h| h.abort_handle()).collect();
 
     let SpawnedChild { mut child, pgid } = prepared.spawned;
 
@@ -73,20 +76,20 @@ pub async fn exec_command_streaming(
             Err(ToolIoError::ExecFailed(format!("wait failed: {e}")))
         }
         Err(_timeout) => {
-            // reason: detach readers (no abort) so they keep filling the log
-            // until child closes pipes. AbortHandles travel to the monitor
-            // inside TimedOutProcessData for cleanup.
-            drop(readers);
-            let partial = tail.snapshot();
+            // Flush the writer once so any data already in BufWriter / page
+            // cache lands on disk before the caller starts polling the log
+            // file. Without this a fast follow-up `read_to_string` can race
+            // the kernel's writeback and see partial / no content.
+            flush_writer(&prepared.log_writer).await;
             Ok(ExecOutcome::TimedOut {
                 timeout,
-                partial_output: partial,
+                partial_output: tail.snapshot(),
                 handle: ProcessHandle(Box::new(TimedOutProcessData {
                     spawned: SpawnedChild { child, pgid },
                     log_path: prepared.log_path,
                     stdout_head_tail: prepared.head_tail,
                     stderr_buf: prepared.stderr_buf,
-                    abort_handles,
+                    drainers: readers,
                 })),
             })
         }

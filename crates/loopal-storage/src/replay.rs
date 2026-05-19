@@ -2,17 +2,14 @@
 //!
 //! Markers alter the accumulated message list:
 //! - `Clear` discards everything before it.
-//! - `CompactTo { keep_last }` trims to the most recent N messages.
+//! - `CompactBoundary { summary_msg_id }` drops every message before the one
+//!   whose `id == summary_msg_id` (keeping it and everything after).
 //! - `RewindTo { message_id }` discards the target message and everything after it.
 
 use loopal_message::Message;
 
 use crate::entry::{Marker, TaggedEntry};
 
-/// Replay storage entries into a final message list.
-///
-/// Entries are processed in order. Markers modify the accumulated
-/// result as they are encountered.
 pub fn replay(entries: Vec<TaggedEntry>) -> Vec<Message> {
     let mut messages: Vec<Message> = Vec::new();
 
@@ -29,10 +26,12 @@ pub fn replay(entries: Vec<TaggedEntry>) -> Vec<Message> {
 fn apply_marker(messages: &mut Vec<Message>, marker: &Marker) {
     match marker {
         Marker::Clear { .. } => messages.clear(),
-        Marker::CompactTo { keep_last, .. } => {
-            if messages.len() > *keep_last {
-                let drain_end = messages.len() - keep_last;
-                messages.drain(..drain_end);
+        Marker::CompactBoundary { summary_msg_id, .. } => {
+            if let Some(pos) = messages
+                .iter()
+                .position(|m| m.id.as_deref() == Some(summary_msg_id.as_str()))
+            {
+                messages.drain(..pos);
             }
         }
         Marker::RewindTo { message_id, .. } => {

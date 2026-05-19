@@ -17,6 +17,7 @@ const KNOWN_KEYS: &[&str] = &[
     "fetch_refiner",
     "secrets",
     "goals",
+    "compaction",
     "bg_tasks",
 ];
 

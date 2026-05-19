@@ -78,7 +78,7 @@ impl MessageStore {
         Ok(entries)
     }
 
-    /// Load messages for a session, replaying any markers (Clear/CompactTo/RewindTo).
+    /// Load messages for a session, replaying any markers (Clear/CompactBoundary/RewindTo).
     pub fn load_messages(&self, session_id: &str) -> Result<Vec<Message>, StorageError> {
         let entries = self.load_entries(session_id)?;
         Ok(replay::replay(entries))

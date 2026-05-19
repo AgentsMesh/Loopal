@@ -94,7 +94,7 @@ fn snapshot_nonexistent_file_no_change() {
 
 #[test]
 fn snapshot_detects_file_creation() {
-    let dir = std::env::temp_dir().join("loopal_snap_create_v2");
+    let dir = std::env::temp_dir().join(format!("loopal_snap_create_{}", uuid::Uuid::new_v4()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let path = dir.join("mem.md");
@@ -112,7 +112,7 @@ fn snapshot_detects_file_creation() {
 
 #[test]
 fn snapshot_detects_modification() {
-    let dir = std::env::temp_dir().join("loopal_snap_modify_v2");
+    let dir = std::env::temp_dir().join(format!("loopal_snap_modify_{}", uuid::Uuid::new_v4()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let path = dir.join("mem.md");
@@ -133,7 +133,7 @@ fn snapshot_detects_modification() {
 
 #[test]
 fn snapshot_detects_deletion() {
-    let dir = std::env::temp_dir().join("loopal_snap_delete_v2");
+    let dir = std::env::temp_dir().join(format!("loopal_snap_delete_{}", uuid::Uuid::new_v4()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let path = dir.join("mem.md");
@@ -151,7 +151,7 @@ fn snapshot_detects_deletion() {
 
 #[test]
 fn snapshot_stable_returns_none() {
-    let dir = std::env::temp_dir().join("loopal_snap_stable_v2");
+    let dir = std::env::temp_dir().join(format!("loopal_snap_stable_{}", uuid::Uuid::new_v4()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let path = dir.join("mem.md");
@@ -165,7 +165,7 @@ fn snapshot_stable_returns_none() {
 
 #[test]
 fn snapshot_sequential_changes_both_detected() {
-    let dir = std::env::temp_dir().join("loopal_snap_seq_v2");
+    let dir = std::env::temp_dir().join(format!("loopal_snap_seq_{}", uuid::Uuid::new_v4()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let path = dir.join("mem.md");

@@ -49,7 +49,6 @@ fn test_set_default_does_not_affect_overrides() {
 
     router.set_default("claude-opus-4-6".into());
 
-    // Override stays, only default changes
     assert_eq!(
         router.resolve(TaskType::Summarization),
         "claude-haiku-3-5-20241022"
@@ -73,7 +72,6 @@ fn test_set_default_clears_default_override() {
 
     assert_eq!(router.resolve(TaskType::Default), "claude-opus-4-6");
 
-    // Runtime /model switch clears Default override
     router.set_default("gpt-4o".into());
 
     assert_eq!(router.resolve(TaskType::Default), "gpt-4o");

@@ -1,0 +1,37 @@
+use loopal_protocol::{AgentStatus, CompactPhase};
+
+use crate::state::SessionViewState;
+
+use super::MutationEffect;
+
+pub(super) fn progress(
+    state: &mut SessionViewState,
+    phase: CompactPhase,
+    detail: Option<&str>,
+) -> MutationEffect {
+    let conv = &mut state.agent.conversation;
+    conv.mark_active();
+    match phase {
+        CompactPhase::Done => {
+            conv.compact_banner = None;
+        }
+        phase => {
+            conv.compact_banner = Some(format_banner(phase, detail));
+            state.agent.observable.status = AgentStatus::Running;
+        }
+    }
+    MutationEffect::Mutated
+}
+
+fn format_banner(phase: CompactPhase, detail: Option<&str>) -> String {
+    let label = match phase {
+        CompactPhase::Microcompact => "⠏ microcompacting idle tool results",
+        CompactPhase::Summarize => "⠙ summarizing context",
+        CompactPhase::Rehydrate => "⠹ rehydrating files",
+        CompactPhase::Done => "✓ compact done",
+    };
+    match detail {
+        Some(d) if !d.is_empty() => format!("{label} — {d}"),
+        _ => label.to_string(),
+    }
+}

@@ -142,6 +142,15 @@ impl ConfigResolver {
         let mut settings: Settings = serde_json::from_value(merged_settings)
             .map_err(|e| ConfigError::Parse(e.to_string()))?;
 
+        // Clamp out-of-range knobs (e.g. compaction.microcompact_idle_minutes
+        // > 24h). Warnings surface via tracing so misconfigurations are
+        // visible without aborting startup.
+        let (sanitized_compaction, compact_warnings) = settings.compaction.clone().sanitize();
+        for w in &compact_warnings {
+            tracing::warn!("{w}");
+        }
+        settings.compaction = sanitized_compaction;
+
         // Sync resolved typed fields into Settings so that downstream consumers
         // (Kernel, HookRegistry) that only read Settings get the merged view.
         settings.mcp_servers = mcp_servers

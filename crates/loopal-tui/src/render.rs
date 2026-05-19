@@ -17,7 +17,8 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     let conv = vc_guard.conversation();
 
     let pw = input_view::prefix_width(app.pending_image_count());
-    let banner_h = views::retry_banner::banner_height(&conv.retry_banner);
+    let compact_banner_h = views::compact_progress::banner_height(&conv.compact_banner);
+    let retry_banner_h = views::retry_banner::banner_height(&conv.retry_banner);
     let breadcrumb_h = u16::from(state.active_view != loopal_session::ROOT_AGENT);
     let elapsed = conv.turn_elapsed();
 
@@ -41,7 +42,14 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     };
 
     let panel_zone_h = crate::render_panel::panel_zone_height(app, &state);
-    let layout = FrameLayout::compute(size, breadcrumb_h, panel_zone_h, banner_h, input_h);
+    let layout = FrameLayout::compute(
+        size,
+        breadcrumb_h,
+        panel_zone_h,
+        compact_banner_h,
+        retry_banner_h,
+        input_h,
+    );
 
     if let Some(ref mut sub_page) = app.sub_page {
         let cron_snapshots = vc.cron_snapshots();
@@ -64,6 +72,9 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     app.content_scroll.render(f, conv, layout.content);
     crate::render_panel::render_panel_zone(f, app, &state, elapsed, layout.agents);
     views::separator::render_separator(f, layout.separator);
+    if let Some(ref msg) = conv.compact_banner {
+        views::compact_progress::render_compact_banner(f, msg, layout.compact_banner);
+    }
     if let Some(ref msg) = conv.retry_banner {
         views::retry_banner::render_retry_banner(f, msg, layout.retry_banner);
     }

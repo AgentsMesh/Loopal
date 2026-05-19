@@ -14,15 +14,19 @@ pub fn make_bash(store: Arc<BackgroundTaskStore>) -> TypedBridge<BashTool, BashP
     TypedBridge::new(BashTool::new(store))
 }
 
-// reason: bash test commands (echo / true / sleep) don't touch cwd, so the
-// system temp dir is a safe shared cwd without per-test tempdir lifetime
-// concerns.
+/// Build a per-test unique session id. A literal like "test-session" would
+/// race against parallel runs (`bazel test --runs_per_test=N`) that share
+/// `$TMPDIR/loopal/`, where one process's cleanup can wipe another's log dir.
+pub fn unique_sid() -> String {
+    format!("test-{}", uuid::Uuid::new_v4().simple())
+}
+
 pub fn make_ctx() -> ToolContext {
     let backend = loopal_backend::LocalBackend::new(
         std::env::temp_dir(),
         None,
         loopal_backend::ResourceLimits::default(),
-        "test-session",
+        unique_sid(),
     );
     ToolContext::new(backend, "test")
 }

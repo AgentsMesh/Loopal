@@ -4,7 +4,9 @@ use crate::TaskType;
 
 /// Routes task types to specific model IDs.
 ///
-/// Resolution: task-specific override → default model.
+/// Resolution: task-specific override → default model. No hardcoded
+/// per-task fallbacks — the user picks the summarization model in
+/// `settings.json` (model_routing.summarization).
 #[derive(Debug, Clone)]
 pub struct ModelRouter {
     default_model: String,
@@ -19,7 +21,6 @@ impl ModelRouter {
         }
     }
 
-    /// Build from model + model_routing settings.
     pub fn from_parts(default_model: String, routing: HashMap<TaskType, String>) -> Self {
         Self {
             default_model,
@@ -27,7 +28,6 @@ impl ModelRouter {
         }
     }
 
-    /// Resolve the model for a given task type.
     pub fn resolve(&self, task: TaskType) -> &str {
         self.overrides
             .get(&task)
@@ -35,7 +35,6 @@ impl ModelRouter {
             .unwrap_or(&self.default_model)
     }
 
-    /// The default model ID.
     pub fn default_model(&self) -> &str {
         &self.default_model
     }

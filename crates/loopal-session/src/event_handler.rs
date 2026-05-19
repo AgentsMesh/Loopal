@@ -76,6 +76,7 @@ pub fn apply_event(state: &mut SessionState, event: AgentEvent) {
         | AgentEventPayload::ThreadGoalUpdated { .. }
         | AgentEventPayload::ClassifierProgress { .. }
         | AgentEventPayload::ClassifierFailed { .. }
-        | AgentEventPayload::ClassifierCompleted { .. } => {}
+        | AgentEventPayload::ClassifierCompleted { .. }
+        | AgentEventPayload::CompactProgress { .. } => {}
     }
 }

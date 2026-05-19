@@ -17,7 +17,12 @@ impl Default for BgTaskConfig {
     fn default() -> Self {
         Self {
             stop_ack_timeout_secs: 5,
-            drainers_grace_ms: 50,
+            // Drainers normally finish in milliseconds once the child exits
+            // and the kernel closes the stdout pipe. The cap is a safety
+            // net for grandchildren keeping the pipe open and for OS
+            // scheduling under stress. Raised from 50ms → 3000ms so heavily
+            // parallel CI runs don't truncate `bg_output` previews.
+            drainers_grace_ms: 3_000,
             sigterm_grace_ms: 500,
             gc_interval_secs: 60,
             terminal_retention_secs: 3600,

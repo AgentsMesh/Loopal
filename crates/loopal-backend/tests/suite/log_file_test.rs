@@ -279,7 +279,7 @@ async fn exec_command_streaming_timeout_handle_carries_log_path() {
             let mut child = data.spawned.child;
             let _ = child.start_kill();
             let _ = child.wait().await;
-            for h in &data.abort_handles {
+            for h in &data.drainers {
                 h.abort();
             }
             let captured = data.stdout_head_tail.render_preview();

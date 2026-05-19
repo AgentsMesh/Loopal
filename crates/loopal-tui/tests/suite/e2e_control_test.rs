@@ -122,7 +122,7 @@ async fn test_compact_command() {
     harness
         .inner
         .control_tx
-        .send(ControlCommand::Compact)
+        .send(ControlCommand::Compact { instructions: None })
         .await
         .unwrap();
     tokio::task::yield_now().await;

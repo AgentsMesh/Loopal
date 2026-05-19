@@ -1,6 +1,8 @@
 pub mod cancel;
 mod cold_start_emit;
+mod compact_rehydrate;
 mod compaction;
+mod compaction_run;
 mod context_pipeline;
 pub mod diff_tracker;
 pub mod env_context;

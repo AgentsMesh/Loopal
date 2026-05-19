@@ -1,8 +1,6 @@
 // Single test binary — includes all test modules
 #[path = "suite/compaction_pair_test.rs"]
 mod compaction_pair_test;
-#[path = "suite/compaction_test.rs"]
-mod compaction_test;
 #[path = "suite/config_refresh_test.rs"]
 mod config_refresh_test;
 #[path = "suite/degradation_test.rs"]
@@ -11,6 +9,8 @@ mod degradation_test;
 mod file_snapshot_test;
 #[path = "suite/fork_test.rs"]
 mod fork_test;
+#[path = "suite/image_token_cap_test.rs"]
+mod image_token_cap_test;
 #[path = "suite/ingestion_test.rs"]
 mod ingestion_test;
 #[path = "suite/pipeline_test.rs"]

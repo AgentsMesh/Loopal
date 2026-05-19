@@ -94,18 +94,27 @@ fn make_ctx(cwd: &std::path::Path) -> ToolContext {
 }
 
 async fn bash_spawn(store: &Arc<BackgroundTaskStore>, cmd: &str) -> String {
+    try_bash_spawn(store, cmd)
+        .await
+        .expect("single-spawn tests must succeed; bump fd limits if this flakes")
+}
+
+// Lenient variant for stress tests that intentionally exceed broadcast/fd
+// limits. Returns None when `exec_background` fails (e.g. transient
+// EMFILE under 70-spawn fan-out) so the caller can tolerate partial
+// failure instead of panicking inside the loop.
+async fn try_bash_spawn(store: &Arc<BackgroundTaskStore>, cmd: &str) -> Option<String> {
     let bash: TypedBridge<BashTool, BashParams> = TypedBridge::new(BashTool::new(store.clone()));
     let ctx = make_ctx(&std::env::temp_dir());
     let result = bash
         .execute(json!({"command": cmd, "run_in_background": true}), &ctx)
         .await
-        .unwrap();
+        .ok()?;
     result
         .content
         .lines()
         .find_map(|l| l.strip_prefix("process_id: "))
-        .unwrap()
-        .to_string()
+        .map(str::to_string)
 }
 
 fn spawn_bridge(
@@ -198,8 +207,18 @@ async fn reconcile_missed_re_emits_tasks_when_broadcast_lagged() {
 
     let mut pids = Vec::new();
     for _ in 0..70 {
-        pids.push(bash_spawn(&store, "true").await);
+        if let Some(pid) = try_bash_spawn(&store, "true").await {
+            pids.push(pid);
+        }
     }
+    // Need enough tasks in the store to actually exceed the broadcast cap
+    // (64); otherwise the test premise (lagged Reconcile) doesn't hold.
+    assert!(
+        pids.len() >= 65,
+        "stress test premise broken: only {} of 70 spawns succeeded; \
+         likely fd exhaustion in this test binary",
+        pids.len(),
+    );
 
     let (frontend, events) = CaptureFrontend::new();
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
@@ -224,9 +243,12 @@ async fn reconcile_missed_re_emits_tasks_when_broadcast_lagged() {
             _ => None,
         })
         .collect();
+    let min_expected = (pids.len() * 9) / 10;
     assert!(
-        spawn_ids.len() >= 60,
-        "reconcile should re-emit majority of pre-existing tasks (got {}): {:?}",
+        spawn_ids.len() >= min_expected,
+        "reconcile should re-emit majority ({} of {} pre-existing tasks) (got {}): {:?}",
+        min_expected,
+        pids.len(),
         spawn_ids.len(),
         spawn_ids
     );

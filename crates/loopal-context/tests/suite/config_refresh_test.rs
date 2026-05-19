@@ -25,7 +25,7 @@ fn make_ctx(messages: Vec<Message>) -> MiddlewareContext {
 
 #[tokio::test]
 async fn no_change_no_injection() {
-    let dir = std::env::temp_dir().join("loopal_cr_nochange_v1");
+    let dir = std::env::temp_dir().join(format!("loopal_cr_nochange_{}", uuid::Uuid::new_v4()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let path = dir.join("mem.md");
@@ -43,7 +43,7 @@ async fn no_change_no_injection() {
 
 #[tokio::test]
 async fn change_injects_reminder() {
-    let dir = std::env::temp_dir().join("loopal_cr_change_v1");
+    let dir = std::env::temp_dir().join(format!("loopal_cr_change_{}", uuid::Uuid::new_v4()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let path = dir.join("mem.md");
@@ -75,7 +75,7 @@ async fn change_injects_reminder() {
 
 #[tokio::test]
 async fn second_call_no_duplicate() {
-    let dir = std::env::temp_dir().join("loopal_cr_nodup_v1");
+    let dir = std::env::temp_dir().join(format!("loopal_cr_nodup_{}", uuid::Uuid::new_v4()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let path = dir.join("mem.md");
@@ -100,7 +100,7 @@ async fn second_call_no_duplicate() {
 
 #[tokio::test]
 async fn system_prompt_unchanged() {
-    let dir = std::env::temp_dir().join("loopal_cr_sysprompt_v1");
+    let dir = std::env::temp_dir().join(format!("loopal_cr_sysprompt_{}", uuid::Uuid::new_v4()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let path = dir.join("mem.md");
@@ -122,7 +122,7 @@ async fn system_prompt_unchanged() {
 
 #[tokio::test]
 async fn multiple_files_single_reminder() {
-    let dir = std::env::temp_dir().join("loopal_cr_multi_v1");
+    let dir = std::env::temp_dir().join(format!("loopal_cr_multi_{}", uuid::Uuid::new_v4()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let p1 = dir.join("mem.md");

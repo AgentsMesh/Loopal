@@ -67,6 +67,7 @@ rust_test(
         "@crates//:strum",
         "@crates//:tempfile",
         "@crates//:tokio",
+        "@crates//:tokio-util",
         "@crates//:wiremock",
         "@crates//:serde_json",
         "@crates//:ratatui",

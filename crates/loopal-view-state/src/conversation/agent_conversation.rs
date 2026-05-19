@@ -15,6 +15,7 @@ pub struct AgentConversation {
     pub pending_permission: Option<PendingPermission>,
     pub pending_question: Option<PendingQuestion>,
     pub retry_banner: Option<String>,
+    pub compact_banner: Option<String>,
     pub turn_count: u32,
     pub input_tokens: u32,
     pub output_tokens: u32,
@@ -102,6 +103,7 @@ impl AgentConversation {
         self.streaming_thinking.clear();
         self.thinking_active = false;
         self.retry_banner = None;
+        self.compact_banner = None;
         self.turn_count = 0;
         self.input_tokens = 0;
         self.output_tokens = 0;

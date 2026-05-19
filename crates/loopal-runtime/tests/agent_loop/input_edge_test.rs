@@ -126,15 +126,17 @@ async fn test_handle_control_compact_keeps_recent() {
     }
     assert_eq!(runner.params.store.len(), 15);
 
-    // Directly call force_compact (same path as /compact command)
-    runner.force_compact().await.unwrap();
+    runner.force_compact(None).await.unwrap();
 
-    // With budget-aware ContextStore, 15 tiny messages (~5 tokens each) are well
-    // within 50% of the 173K budget, so force_compact short-circuits with
-    // "nothing to compact" instead of actually truncating.
-    // Verify the short-circuit event was emitted.
+    // force_compact emits CompactProgress(Summarize) before attempting the
+    // LLM call. With an unknown model in this test fixture, the provider
+    // resolve fails and the runner returns Ok without doing further work,
+    // so only the progress event should arrive.
     let e1 = event_rx.recv().await.unwrap();
-    assert!(matches!(e1.payload, AgentEventPayload::Stream { .. }));
+    assert!(matches!(
+        e1.payload,
+        AgentEventPayload::CompactProgress { .. }
+    ));
 }
 
 #[tokio::test]

@@ -24,7 +24,7 @@ pub fn estimate_message_tokens(msg: &Message) -> u32 {
             ContentBlock::Text { text } => estimate_tokens(text),
             ContentBlock::ToolUse { input, .. } => estimate_tokens(&input.to_string()),
             ContentBlock::ToolResult { content, .. } => estimate_tokens(content),
-            ContentBlock::Image { .. } => 1000, // fixed estimate for images
+            ContentBlock::Image { .. } => 2000, // Claude Code 同款保守估算 (IMAGE_MAX_TOKEN_SIZE)
             ContentBlock::Thinking { thinking, .. } => estimate_tokens(thinking),
             ContentBlock::ServerToolUse { input, .. } => estimate_tokens(&input.to_string()),
             ContentBlock::ServerToolResult { content, .. } => estimate_tokens(&content.to_string()),

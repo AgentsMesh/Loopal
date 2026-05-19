@@ -84,6 +84,8 @@ fn test_compacted_wire_format_unchanged() {
         tokens_before: 1000,
         tokens_after: 500,
         strategy: "smart".into(),
+        summary_msg_id: None,
+        files_rehydrated: 0,
     }));
     let json = serde_json::to_string(&event).unwrap();
     assert!(

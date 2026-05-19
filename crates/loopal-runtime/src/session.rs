@@ -87,15 +87,20 @@ impl SessionManager {
         Ok(())
     }
 
-    /// Append a CompactTo marker to the event log.
-    /// On next load, only the last `keep_last` messages are retained.
-    pub fn compact_history(&self, session_id: &str, keep_last: usize) -> Result<()> {
-        let entry = TaggedEntry::Marker(Marker::CompactTo {
-            keep_last,
+    /// Append a CompactBoundary marker to the event log.
+    /// On next load, every message before `summary_msg_id` is dropped,
+    /// keeping the summary message and everything after it.
+    pub fn mark_compact_boundary(&self, session_id: &str, summary_msg_id: &str) -> Result<()> {
+        let entry = TaggedEntry::Marker(Marker::CompactBoundary {
+            summary_msg_id: summary_msg_id.to_string(),
             timestamp: chrono::Utc::now().to_rfc3339(),
         });
         self.message_store.append_entry(session_id, &entry)?;
-        info!(session_id = %session_id, keep_last, "compact marker written");
+        info!(
+            session_id = %session_id,
+            summary_msg_id = %summary_msg_id,
+            "compact boundary marker written"
+        );
         Ok(())
     }
 

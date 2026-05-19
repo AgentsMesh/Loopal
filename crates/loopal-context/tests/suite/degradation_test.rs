@@ -1,5 +1,5 @@
 use loopal_context::budget::ContextBudget;
-use loopal_context::degradation::{drop_oldest_group, emergency_degrade, run_sync_degradation};
+use loopal_context::degradation::run_sync_degradation;
 use loopal_message::{ContentBlock, Message, MessageRole};
 
 fn make_budget(message_budget: u32) -> ContextBudget {
@@ -62,7 +62,6 @@ fn layer0_strips_old_server_blocks() {
 
     run_sync_degradation(&mut messages, &budget);
 
-    // First assistant's server blocks should be condensed
     let first = &messages[0];
     assert!(
         !first
@@ -80,7 +79,6 @@ fn layer0_preserves_last_assistant_server_blocks() {
 
     run_sync_degradation(&mut messages, &budget);
 
-    // Only assistant = last, server blocks preserved
     assert!(
         messages[0]
             .content
@@ -90,109 +88,71 @@ fn layer0_preserves_last_assistant_server_blocks() {
 }
 
 #[test]
-fn layer0_strips_old_thinking() {
-    let budget = make_budget(100_000);
+fn layer1_truncates_oversized_old_tool_results_above_60_percent() {
+    // Use random-looking text so cl100k_base can't compress it (repeated "x"
+    // tokenizes very efficiently). budget = 10K → threshold per result =
+    // 10K/8 = 1250 tokens. Each 50K-char unique body BPE's well above that
+    // and total payload crosses 60% of the budget.
+    let budget = make_budget(10_000);
+    let bigfile_a: String = (0..50_000)
+        .map(|i| (b'a' + (i % 26) as u8) as char)
+        .collect();
+    let bigfile_b: String = (0..50_000)
+        .map(|i| (b'a' + ((i * 7) % 26) as u8) as char)
+        .collect();
+    let bigfile_c: String = (0..50_000)
+        .map(|i| (b'a' + ((i * 13) % 26) as u8) as char)
+        .collect();
     let mut messages = vec![
-        Message {
-            id: None,
-            role: MessageRole::Assistant,
-            content: vec![
-                ContentBlock::Thinking {
-                    thinking: "old thinking".into(),
-                    signature: Some("sig".into()),
-                },
-                ContentBlock::Text {
-                    text: "response".into(),
-                },
-            ],
-            origin: None,
-        },
-        Message::user("next"),
-        Message {
-            id: None,
-            role: MessageRole::Assistant,
-            content: vec![
-                ContentBlock::Thinking {
-                    thinking: "new thinking".into(),
-                    signature: Some("sig2".into()),
-                },
-                ContentBlock::Text {
-                    text: "response 2".into(),
-                },
-            ],
-            origin: None,
-        },
+        Message::assistant("a"),
+        msg_with_tool_result(&bigfile_a),
+        Message::assistant("b"),
+        msg_with_tool_result(&bigfile_b),
+        Message::assistant("c"),
+        msg_with_tool_result(&bigfile_c),
     ];
 
-    // strip_old_thinking is called in prepare_for_llm, not in run_sync_degradation
-    // But Layer 0 in degradation only handles server blocks and images
-    // Thinking is handled separately in store.prepare_for_llm()
-    // This test verifies the messages pass through without error
     run_sync_degradation(&mut messages, &budget);
-    assert_eq!(messages.len(), 3);
-}
 
-#[test]
-fn emergency_degrade_truncates_old_results() {
-    let mut messages = vec![
-        Message::assistant("first"),
-        tool_result_msg(50_000),
-        Message::assistant("second"),
-        tool_result_msg(50_000),
-    ];
-
-    emergency_degrade(&mut messages);
-
-    // Only the first tool result should be truncated (not the last 4 messages)
-    // With 4 messages, recent boundary = 0, so nothing is "old" enough
-    // Let's add more messages to have some "old" ones
-    let mut messages = vec![
-        Message::assistant("old"),
-        tool_result_msg(50_000),
-        Message::assistant("mid"),
-        tool_result_msg(50_000),
-        Message::assistant("recent"),
-        tool_result_msg(50_000),
-    ];
-
-    emergency_degrade(&mut messages);
-
-    // First two tool results (indices 1, 3) should be truncated
     if let ContentBlock::ToolResult { content, .. } = &messages[1].content[0] {
         assert!(content.len() < 50_000, "old result should be truncated");
     }
-    // Last tool result (index 5) should be preserved (within recent boundary)
     if let ContentBlock::ToolResult { content, .. } = &messages[5].content[0] {
-        assert_eq!(content.len(), 50_000, "recent result should be preserved");
+        assert_eq!(content.len(), 50_000, "recent result preserved");
+    }
+}
+
+fn msg_with_tool_result(content: &str) -> Message {
+    Message {
+        id: None,
+        role: MessageRole::User,
+        content: vec![ContentBlock::ToolResult {
+            tool_use_id: "t1".into(),
+            content: content.to_string(),
+            is_error: false,
+            metadata: None,
+        }],
+        origin: None,
     }
 }
 
 #[test]
-fn drop_oldest_group_removes_first_pair() {
+fn layer1_idle_under_60_percent() {
+    let budget = make_budget(1_000_000);
     let mut messages = vec![
-        Message::assistant("first"),
-        Message::user("result1"),
-        Message::assistant("second"),
-        Message::user("result2"),
-        Message::assistant("third"),
-        Message::user("result3"),
+        Message::assistant("a"),
+        tool_result_msg(50_000),
+        Message::assistant("b"),
+        tool_result_msg(50_000),
     ];
 
-    let removed = drop_oldest_group(&mut messages);
-    assert_eq!(removed, 2); // assistant + user
-    assert_eq!(messages.len(), 4);
-    assert_eq!(messages[0].text_content(), "second");
-}
+    run_sync_degradation(&mut messages, &budget);
 
-#[test]
-fn drop_oldest_group_preserves_minimum() {
-    let mut messages = vec![
-        Message::assistant("only"),
-        Message::user("pair"),
-        Message::assistant("last"),
-        Message::user("final"),
-    ];
-
-    let removed = drop_oldest_group(&mut messages);
-    assert_eq!(removed, 0, "should not drop when only 4 messages remain");
+    if let ContentBlock::ToolResult { content, .. } = &messages[1].content[0] {
+        assert_eq!(
+            content.len(),
+            50_000,
+            "should not truncate below 60% budget"
+        );
+    }
 }

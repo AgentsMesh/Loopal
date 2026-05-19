@@ -35,7 +35,7 @@ fn expected_view_effect(cmd: &ControlCommand) -> ExpectedViewEffect {
     match cmd {
         ModeSwitch(_) => ViewMutation,
         Clear => ViewMutation,
-        Compact => ViewMutation,
+        Compact { .. } => ViewMutation,
         ModelSwitch(_) => ViewMutation,
         Rewind { .. } => ViewMutation,
         ThinkingSwitch(_) => ViewMutation,
@@ -130,7 +130,7 @@ fn variant_name(cmd: &ControlCommand) -> &'static str {
     match cmd {
         ModeSwitch(_) => "ModeSwitch",
         Clear => "Clear",
-        Compact => "Compact",
+        Compact { .. } => "Compact",
         ModelSwitch(_) => "ModelSwitch",
         Rewind { .. } => "Rewind",
         ThinkingSwitch(_) => "ThinkingSwitch",

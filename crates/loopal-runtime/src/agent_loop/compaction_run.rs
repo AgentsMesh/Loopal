@@ -133,6 +133,13 @@ impl AgentLoopRunner {
             .store
             .set_boundary(boundary_at, summary_msg, ack_msg);
 
+        // Compaction rewrote earlier history. Notify cross-turn governance
+        // state (LoopDetector signatures, etc.) so they don't carry stale
+        // counts derived from messages no longer in the store.
+        for g in self.governance.iter_mut() {
+            g.on_compact_completed();
+        }
+
         if !touched_files.is_empty() {
             self.emit(AgentEventPayload::CompactProgress {
                 phase: CompactPhase::Rehydrate,

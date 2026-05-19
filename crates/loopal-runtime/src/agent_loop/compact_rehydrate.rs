@@ -4,7 +4,7 @@ use loopal_context::compact_config::{
     REHYDRATE_PER_FILE_BYTES, REHYDRATE_TIMEOUT, REHYDRATE_TOP_N, REHYDRATE_TOTAL_BYTES,
 };
 use loopal_context::middleware::touched_files::TouchedFile;
-use loopal_message::{ContentBlock, Message, MessageRole};
+use loopal_message::{ContentBlock, Message, MessageOrigin, MessageRole};
 use loopal_protocol::AgentEventPayload;
 use loopal_tool_api::ToolResult;
 use tokio::time::timeout;
@@ -96,13 +96,13 @@ impl AgentLoopRunner {
             id: None,
             role: MessageRole::Assistant,
             content: tool_uses,
-            origin: None,
+            origin: Some(MessageOrigin::CompactionRehydrate),
         };
         let mut user = Message {
             id: None,
             role: MessageRole::User,
             content: tool_results,
-            origin: None,
+            origin: Some(MessageOrigin::CompactionRehydrate),
         };
 
         if let Err(e) = self

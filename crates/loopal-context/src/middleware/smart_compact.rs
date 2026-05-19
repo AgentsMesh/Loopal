@@ -8,7 +8,7 @@
 //! the new conversation.
 
 use loopal_error::LoopalError;
-use loopal_message::{ContentBlock, Message, MessageRole};
+use loopal_message::{ContentBlock, Message, MessageOrigin, MessageRole};
 use loopal_provider_api::Provider;
 
 use super::bare_summary::{bare_summary, build_summary_message};
@@ -126,7 +126,7 @@ fn build_compact_output(
         content: vec![ContentBlock::Text {
             text: "Understood. I'll continue from this working state.".to_string(),
         }],
-        origin: None,
+        origin: Some(MessageOrigin::CompactionSummary),
     };
     CompactOutput {
         summary_msg,

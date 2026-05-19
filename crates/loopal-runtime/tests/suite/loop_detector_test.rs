@@ -192,3 +192,47 @@ fn loop_detector_multibyte_utf8_input_does_not_panic() {
     let action = det.on_before_tools(&mut ctx, &call);
     assert!(matches!(action, Verdict::Continue));
 }
+
+#[test]
+fn loop_detector_on_compact_completed_resets_signatures() {
+    let mut det = LoopDetector::new();
+    let mut ctx = make_ctx();
+    let calls = [tool("Read")];
+    for _ in 0..4 {
+        det.on_before_tools(&mut ctx, &calls);
+    }
+    det.on_compact_completed();
+    let action = det.on_before_tools(&mut ctx, &calls);
+    assert!(
+        matches!(action, Verdict::Continue),
+        "compact completion must reset signature counter; got {action:?}",
+    );
+}
+
+#[test]
+fn loop_detector_compact_reset_independent_from_envelope_reset() {
+    let mut det = LoopDetector::new();
+    let mut ctx = make_ctx();
+    let calls = [tool("Bash")];
+    for _ in 0..2 {
+        det.on_before_tools(&mut ctx, &calls);
+    }
+    det.on_compact_completed();
+    // After compact reset, three more calls should not yet abort
+    // (would only hit the WARN_THRESHOLD on the 3rd post-reset call).
+    let a1 = det.on_before_tools(&mut ctx, &calls);
+    let a2 = det.on_before_tools(&mut ctx, &calls);
+    let a3 = det.on_before_tools(&mut ctx, &calls);
+    assert!(
+        matches!(a1, Verdict::Continue),
+        "first post-compact call must Continue, got {a1:?}",
+    );
+    assert!(
+        matches!(a2, Verdict::Continue),
+        "second post-compact call must Continue, got {a2:?}",
+    );
+    assert!(
+        matches!(a3, Verdict::InjectWarning(_)),
+        "third post-compact call hits WARN_THRESHOLD as if starting fresh, got {a3:?}",
+    );
+}

@@ -90,6 +90,14 @@ impl Governance for LoopDetector {
             self.signatures.clear();
         }
     }
+
+    // Compaction discards earlier turns: the tool calls that fed our
+    // signature counter are no longer in the store, so the counter is
+    // measuring history that no longer exists. Reset to avoid carrying
+    // pre-compact counts into the post-compact window.
+    fn on_compact_completed(&mut self) {
+        self.signatures.clear();
+    }
 }
 
 /// Build a stable signature from tool name + full input JSON.

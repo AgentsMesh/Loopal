@@ -30,6 +30,9 @@ pub enum MessageOrigin {
     ConfigRefresh,
     /// Compaction summary produced by smart_compact middleware.
     CompactionSummary,
+    /// Post-compaction rehydrate `Read` tool_use/tool_result pair injected
+    /// by `compact_rehydrate` to restore top-N touched files.
+    CompactionRehydrate,
     /// Forward-compatible fallback for unrecognised system labels.
     Other { label: String },
 }
@@ -49,5 +52,12 @@ impl MessageOrigin {
     /// (NOT scheduled, system-injected, or relayed from another agent).
     pub fn is_human_input(&self) -> bool {
         matches!(self, Self::Human)
+    }
+
+    /// True iff this origin is a compaction artifact (summary, ack, or
+    /// rehydrate Read pair). Used by forensic replay + signature reset
+    /// hooks that treat compaction-injected messages as a single unit.
+    pub fn is_compaction_artifact(&self) -> bool {
+        matches!(self, Self::CompactionSummary | Self::CompactionRehydrate)
     }
 }

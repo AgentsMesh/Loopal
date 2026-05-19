@@ -16,6 +16,7 @@ fn all_variants() -> Vec<MessageSource> {
         MessageSource::System("stop_feedback".into()),
         MessageSource::System("config_refresh".into()),
         MessageSource::System("compaction_summary".into()),
+        MessageSource::System("compaction_rehydrate".into()),
         MessageSource::System("unrecognised_label".into()),
     ]
 }
@@ -43,6 +44,7 @@ fn system_sources_are_not_boundaries() {
         "stop_feedback",
         "config_refresh",
         "compaction_summary",
+        "compaction_rehydrate",
         "unrecognised",
     ] {
         assert!(

@@ -42,8 +42,6 @@ async fn run_force_compact_with_hook(hook: HookConfig) {
     tokio::time::sleep(Duration::from_millis(100)).await;
 }
 
-/// `/compact` must fire `PreCompact` hooks so audit / telemetry / snapshot
-/// integrators see manual compaction too — not just the auto path.
 #[tokio::test]
 async fn precompact_hook_fires_on_manual_compact() {
     let mut hook_fx = HookFixture::new();
@@ -63,8 +61,6 @@ async fn precompact_hook_fires_on_manual_compact() {
     );
 }
 
-/// Short conversations skip both compaction and the `PreCompact` hook —
-/// there is nothing to gate.
 #[tokio::test]
 async fn precompact_hook_skipped_when_nothing_to_compact() {
     let mut hook_fx = HookFixture::new();

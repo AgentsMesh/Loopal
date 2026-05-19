@@ -3,17 +3,6 @@ use loopal_message::Message;
 use loopal_protocol::AgentEventPayload;
 use loopal_test_support::{HarnessBuilder, chunks};
 
-async fn drain_events(
-    rx: &mut tokio::sync::mpsc::Receiver<loopal_protocol::AgentEvent>,
-) -> Vec<AgentEventPayload> {
-    tokio::task::yield_now().await;
-    let mut out = Vec::new();
-    while let Ok(ev) = rx.try_recv() {
-        out.push(ev.payload);
-    }
-    out
-}
-
 fn tiny_budget() -> ContextBudget {
     ContextBudget {
         context_window: 500,
@@ -30,11 +19,6 @@ fn padded_user_msg(label: &str) -> Message {
     Message::user(&format!("{label}: {}", "x".repeat(100)))
 }
 
-/// When the summarization LLM returns a non-retryable error, the runtime
-/// must still complete compaction via the `bare_summary` fallback:
-///   * Compacted event emitted
-///   * summary_msg_id populated (boundary marker was written)
-///   * message count actually reduced
 #[tokio::test]
 async fn compact_falls_back_to_bare_summary_on_llm_failure() {
     let mut h = HarnessBuilder::new()
@@ -60,7 +44,7 @@ async fn compact_falls_back_to_bare_summary_on_llm_failure() {
         h.runner.params.store.len()
     );
 
-    let evts = drain_events(&mut h.event_rx).await;
+    let evts = loopal_test_support::events::drain_pending(&mut h.event_rx).await;
     let compacted = evts.iter().find_map(|e| match e {
         AgentEventPayload::Compacted(s) => Some(s),
         _ => None,
@@ -75,9 +59,6 @@ async fn compact_falls_back_to_bare_summary_on_llm_failure() {
     assert!(summary.kept > 0, "kept count must be positive");
 }
 
-/// `bare_summary` content is deterministic — it lists touched-file outline
-/// and tool-use counts. Verify the persisted summary message body contains
-/// at least the user-turn count marker (deterministic across runs).
 #[tokio::test]
 async fn compact_bare_summary_persists_deterministic_outline() {
     let mut h = HarnessBuilder::new()

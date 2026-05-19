@@ -5,21 +5,6 @@ use loopal_protocol::AgentEventPayload;
 use loopal_test_support::{HarnessBuilder, chunks};
 use tokio_util::sync::CancellationToken;
 
-async fn drain_events(
-    rx: &mut tokio::sync::mpsc::Receiver<loopal_protocol::AgentEvent>,
-) -> Vec<AgentEventPayload> {
-    tokio::task::yield_now().await;
-    let mut out = Vec::new();
-    while let Ok(ev) = rx.try_recv() {
-        out.push(ev.payload);
-    }
-    out
-}
-
-/// Drive `compact_rehydrate` through a real `Read` tool dispatch:
-/// fixture-resident files must be read, results bundled into one
-/// Assistant ToolUse message + one User ToolResult message, and the
-/// final stats must report all attempts as succeeded.
 #[tokio::test]
 async fn rehydrate_reads_files_via_real_read_tool() {
     let h = HarnessBuilder::new()
@@ -95,7 +80,6 @@ async fn rehydrate_reads_files_via_real_read_tool() {
     );
 }
 
-/// Empty touched-file list short-circuits — no tool calls, no messages.
 #[tokio::test]
 async fn rehydrate_noop_on_empty_touched() {
     let h = HarnessBuilder::new()
@@ -116,9 +100,6 @@ async fn rehydrate_noop_on_empty_touched() {
     assert_eq!(runner.params.store.len(), before);
 }
 
-/// Non-existent files surface as failed reads — they must not produce
-/// orphan ToolUse blocks (which would break pair invariants). All-fail
-/// case is a true no-op on the store.
 #[tokio::test]
 async fn rehydrate_skips_unreadable_paths() {
     let h = HarnessBuilder::new()
@@ -167,10 +148,6 @@ async fn rehydrate_skips_unreadable_paths() {
     );
 }
 
-/// Mix of existing and missing files: succeeded count reports only the
-/// real reads, and exactly that many ToolUse/ToolResult pairs land in
-/// the store. Guards against either silent inflation (counting errors)
-/// or pair imbalance (orphan ToolUse when ToolResult is dropped).
 #[tokio::test]
 async fn rehydrate_handles_partial_success() {
     let h = HarnessBuilder::new()
@@ -234,9 +211,6 @@ async fn rehydrate_handles_partial_success() {
     );
 }
 
-/// `REHYDRATE_TOTAL_BYTES` (50K) caps cumulative injected bytes. With 6
-/// files of 12K each, the cap bites well before all 6 read in (also
-/// `REHYDRATE_TOP_N=5` limits attempts to 5).
 #[tokio::test]
 async fn rehydrate_respects_total_bytes_budget() {
     let h = HarnessBuilder::new()
@@ -272,8 +246,6 @@ async fn rehydrate_respects_total_bytes_budget() {
     );
 }
 
-/// Successful rehydrate emits a `[rehydrated N files, M bytes]` Stream
-/// event so the frontend can render an inline status line.
 #[tokio::test]
 async fn rehydrate_emits_summary_stream_event() {
     let mut h = HarnessBuilder::new()
@@ -295,7 +267,7 @@ async fn rehydrate_emits_summary_stream_event() {
         .await;
     assert_eq!(stats.files_succeeded, 1);
 
-    let evts = drain_events(&mut h.event_rx).await;
+    let evts = loopal_test_support::events::drain_pending(&mut h.event_rx).await;
     let stream_text = evts.iter().find_map(|e| match e {
         AgentEventPayload::Stream { text } if text.contains("rehydrated") => Some(text.clone()),
         _ => None,
@@ -311,9 +283,6 @@ async fn rehydrate_emits_summary_stream_event() {
     );
 }
 
-/// Partial-failure path: model must see an explicit note in the user
-/// message saying N files were skipped so it can re-Read them on demand
-/// rather than assuming the rehydrate was exhaustive.
 #[tokio::test]
 async fn rehydrate_partial_failure_appends_model_visible_note() {
     let h = HarnessBuilder::new()
@@ -375,9 +344,6 @@ async fn rehydrate_partial_failure_appends_model_visible_note() {
     );
 }
 
-/// Pre-cancelled token must short-circuit before any file read happens.
-/// Crucially, the store must be untouched — no orphan ToolUse can be
-/// persisted when rehydrate is aborted.
 #[tokio::test]
 async fn rehydrate_pre_cancelled_token_skips_persist() {
     let h = HarnessBuilder::new()
@@ -410,9 +376,6 @@ async fn rehydrate_pre_cancelled_token_skips_persist() {
     );
 }
 
-/// Even with several files queued, a cancel races the parallel reads
-/// and must produce zero persisted messages — the select! drops the
-/// in-flight Reads before any `save_message` runs.
 #[tokio::test]
 async fn rehydrate_cancel_during_reads_leaves_store_untouched() {
     let h = HarnessBuilder::new()

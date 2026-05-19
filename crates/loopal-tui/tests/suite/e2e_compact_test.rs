@@ -1,22 +1,9 @@
-//! Integration tests for compaction: manual compact, event payload, message preservation.
-
 use loopal_context::ContextBudget;
 use loopal_message::{ContentBlock, Message};
 use loopal_protocol::AgentEventPayload;
 use loopal_test_support::{HarnessBuilder, chunks};
 
 /// Drain all available events from the channel (non-blocking after brief yield).
-async fn drain_events(
-    rx: &mut tokio::sync::mpsc::Receiver<loopal_protocol::AgentEvent>,
-) -> Vec<AgentEventPayload> {
-    tokio::task::yield_now().await;
-    let mut out = Vec::new();
-    while let Ok(ev) = rx.try_recv() {
-        out.push(ev.payload);
-    }
-    out
-}
-
 /// Create a tiny budget so small messages trigger compaction.
 /// message_budget=425, half=212. Each message ~30 tokens (120 chars / 4).
 /// 15 messages × 30 tokens = 450 > 212 → token_aware_keep_count returns ~7.
@@ -37,7 +24,6 @@ fn padded_user_msg(label: &str) -> Message {
     Message::user(&format!("{label}: {}", "x".repeat(100)))
 }
 
-/// `/compact` command reduces message count and emits Compacted event.
 #[tokio::test]
 async fn test_manual_compact_reduces_messages() {
     let mut h = HarnessBuilder::new()
@@ -63,7 +49,7 @@ async fn test_manual_compact_reduces_messages() {
         h.runner.params.store.len()
     );
 
-    let evts = drain_events(&mut h.event_rx).await;
+    let evts = loopal_test_support::events::drain_pending(&mut h.event_rx).await;
     assert!(
         evts.iter()
             .any(|e| matches!(e, AgentEventPayload::Compacted(_))),
@@ -71,7 +57,6 @@ async fn test_manual_compact_reduces_messages() {
     );
 }
 
-/// Compacted event carries correct payload fields.
 #[tokio::test]
 async fn test_compact_emits_event_payload() {
     let mut h = HarnessBuilder::new()
@@ -90,7 +75,7 @@ async fn test_compact_emits_event_payload() {
 
     h.runner.force_compact(None).await.unwrap();
 
-    let evts = drain_events(&mut h.event_rx).await;
+    let evts = loopal_test_support::events::drain_pending(&mut h.event_rx).await;
     let compacted = evts.iter().find_map(|e| match e {
         AgentEventPayload::Compacted(s) => Some((&s.kept, &s.removed, s.strategy.clone())),
         _ => None,
@@ -106,7 +91,6 @@ async fn test_compact_emits_event_payload() {
     );
 }
 
-/// Compaction preserves the most recent messages.
 #[tokio::test]
 async fn test_compact_preserves_recent_messages() {
     let mut h = HarnessBuilder::new()
@@ -138,8 +122,6 @@ async fn test_compact_preserves_recent_messages() {
     assert!(h.runner.params.store.len() <= 12);
 }
 
-/// `force_compact` with ≤2 messages must short-circuit: emit the
-/// "nothing to compact" Stream marker and skip the Compacted event.
 #[tokio::test]
 async fn force_compact_short_circuits_on_tiny_history() {
     let mut h = HarnessBuilder::new()
@@ -152,7 +134,7 @@ async fn force_compact_short_circuits_on_tiny_history() {
 
     h.runner.force_compact(None).await.unwrap();
 
-    let evts = drain_events(&mut h.event_rx).await;
+    let evts = loopal_test_support::events::drain_pending(&mut h.event_rx).await;
     let saw_nothing_to_compact = evts.iter().any(
         |e| matches!(e, AgentEventPayload::Stream { text } if text.contains("nothing to compact")),
     );
@@ -170,8 +152,6 @@ async fn force_compact_short_circuits_on_tiny_history() {
     );
 }
 
-/// An empty store (boundary_at == 0) is the extreme of the short-circuit
-/// rule — the runtime must not panic and must not emit Compacted.
 #[tokio::test]
 async fn force_compact_handles_empty_store() {
     let mut h = HarnessBuilder::new()
@@ -183,7 +163,7 @@ async fn force_compact_handles_empty_store() {
 
     h.runner.force_compact(None).await.unwrap();
 
-    let evts = drain_events(&mut h.event_rx).await;
+    let evts = loopal_test_support::events::drain_pending(&mut h.event_rx).await;
     assert!(
         !evts
             .iter()

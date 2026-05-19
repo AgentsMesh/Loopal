@@ -3,17 +3,6 @@ use loopal_message::Message;
 use loopal_protocol::AgentEventPayload;
 use loopal_test_support::{HarnessBuilder, chunks};
 
-async fn drain_events(
-    rx: &mut tokio::sync::mpsc::Receiver<loopal_protocol::AgentEvent>,
-) -> Vec<AgentEventPayload> {
-    tokio::task::yield_now().await;
-    let mut out = Vec::new();
-    while let Ok(ev) = rx.try_recv() {
-        out.push(ev.payload);
-    }
-    out
-}
-
 fn tiny_budget() -> ContextBudget {
     ContextBudget {
         context_window: 500,
@@ -30,11 +19,6 @@ fn padded_user_msg(label: &str) -> Message {
     Message::user(&format!("{label}: {}", "x".repeat(100)))
 }
 
-/// End-to-end: drive `force_compact` through the full runtime, then
-/// reload the session from disk via `SessionManager::resume_session`
-/// and verify the reconstructed message list starts with the summary —
-/// not with the original first user message. This is the contract that
-/// makes the boundary marker actually useful across process restarts.
 #[tokio::test]
 async fn compact_boundary_survives_resume_via_session_manager() {
     let mut h = HarnessBuilder::new()
@@ -58,7 +42,7 @@ async fn compact_boundary_survives_resume_via_session_manager() {
 
     h.runner.force_compact(None).await.unwrap();
 
-    let evts = drain_events(&mut h.event_rx).await;
+    let evts = loopal_test_support::events::drain_pending(&mut h.event_rx).await;
     let summary_msg_id = evts
         .iter()
         .find_map(|e| match e {
@@ -87,9 +71,6 @@ async fn compact_boundary_survives_resume_via_session_manager() {
     );
 }
 
-/// When the LLM falls back to `bare_summary`, the boundary marker must
-/// still be written and survive resume. This is the failure-mode of the
-/// previous test — verifying the same contract holds on the unhappy path.
 #[tokio::test]
 async fn bare_summary_boundary_also_survives_resume() {
     let mut h = HarnessBuilder::new()
@@ -113,7 +94,7 @@ async fn bare_summary_boundary_also_survives_resume() {
 
     h.runner.force_compact(None).await.unwrap();
 
-    let evts = drain_events(&mut h.event_rx).await;
+    let evts = loopal_test_support::events::drain_pending(&mut h.event_rx).await;
     let summary_msg_id = evts
         .iter()
         .find_map(|e| match e {

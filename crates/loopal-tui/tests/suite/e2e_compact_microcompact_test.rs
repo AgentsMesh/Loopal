@@ -4,17 +4,6 @@ use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_protocol::{AgentEventPayload, CompactPhase};
 use loopal_test_support::{HarnessBuilder, chunks};
 
-async fn drain_events(
-    rx: &mut tokio::sync::mpsc::Receiver<loopal_protocol::AgentEvent>,
-) -> Vec<AgentEventPayload> {
-    tokio::task::yield_now().await;
-    let mut out = Vec::new();
-    while let Ok(ev) = rx.try_recv() {
-        out.push(ev.payload);
-    }
-    out
-}
-
 const CLEARED_MARKER: &str = "[Old tool result content cleared after idle timeout]";
 
 fn tool_use(id: &str, name: &str) -> Message {
@@ -44,11 +33,6 @@ fn tool_result(id: &str, body: &str) -> Message {
     }
 }
 
-/// Drive `check_and_microcompact` through the runtime: when the
-/// configured idle threshold has elapsed since the last assistant
-/// activity, ToolResult bodies for scrubbable tools must be replaced by
-/// the cleared marker, and a `CompactProgress { phase: Microcompact }`
-/// event must fire.
 #[tokio::test]
 async fn microcompact_scrubs_idle_tool_results_e2e() {
     let mut h = HarnessBuilder::new()
@@ -93,7 +77,7 @@ async fn microcompact_scrubs_idle_tool_results_e2e() {
         "all tool results should be scrubbed, got: {scrubbed:?}",
     );
 
-    let evts = drain_events(&mut h.event_rx).await;
+    let evts = loopal_test_support::events::drain_pending(&mut h.event_rx).await;
     let saw_microcompact = evts.iter().any(|e| {
         matches!(
             e,
@@ -109,7 +93,6 @@ async fn microcompact_scrubs_idle_tool_results_e2e() {
     );
 }
 
-/// Within the idle window: nothing scrubs, no event emits.
 #[tokio::test]
 async fn microcompact_noop_when_recent_activity_e2e() {
     let mut h = HarnessBuilder::new()
@@ -147,7 +130,7 @@ async fn microcompact_noop_when_recent_activity_e2e() {
         .collect();
     assert_eq!(preserved, vec!["stays as-is"]);
 
-    let evts = drain_events(&mut h.event_rx).await;
+    let evts = loopal_test_support::events::drain_pending(&mut h.event_rx).await;
     let saw_microcompact = evts.iter().any(|e| {
         matches!(
             e,
@@ -163,8 +146,6 @@ async fn microcompact_noop_when_recent_activity_e2e() {
     );
 }
 
-/// Non-scrubbable tools (e.g. `Plan`, `AskUser`) keep their bodies even
-/// after the idle threshold — they carry low-volume, high-value state.
 #[tokio::test]
 async fn microcompact_preserves_non_scrubbable_tools_e2e() {
     let mut h = HarnessBuilder::new()

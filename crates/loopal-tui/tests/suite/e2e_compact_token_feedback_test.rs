@@ -1,19 +1,7 @@
 use loopal_context::ContextBudget;
 use loopal_message::Message;
-use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::StreamChunk;
 use loopal_test_support::{HarnessBuilder, chunks};
-
-async fn drain_events(
-    rx: &mut tokio::sync::mpsc::Receiver<loopal_protocol::AgentEvent>,
-) -> Vec<AgentEventPayload> {
-    tokio::task::yield_now().await;
-    let mut out = Vec::new();
-    while let Ok(ev) = rx.try_recv() {
-        out.push(ev.payload);
-    }
-    out
-}
 
 fn budget_window(window: u32) -> ContextBudget {
     ContextBudget {
@@ -27,10 +15,6 @@ fn budget_window(window: u32) -> ContextBudget {
     }
 }
 
-/// Provider-reported `input_tokens` propagates into the store and
-/// `effective_tokens()` reflects the API's reading even when the local
-/// tiktoken estimate is much smaller. This is the core defense that the
-/// original 920K → 502 incident was missing.
 #[tokio::test]
 async fn usage_chunk_drives_effective_tokens_above_estimate() {
     let high_input_tokens: u32 = 800_000;
@@ -65,13 +49,9 @@ async fn usage_chunk_drives_effective_tokens_above_estimate() {
         "effective_tokens ({effective_after}) must rise to actual input ({high_input_tokens})",
     );
 
-    let _ = drain_events(&mut h.event_rx).await;
+    let _ = loopal_test_support::events::drain_pending(&mut h.event_rx).await;
 }
 
-/// With effective_tokens lifted by the API feedback, the next compaction
-/// check must trip the 80% threshold — even though tiktoken alone would
-/// still report a tiny conversation. Closes the regression loop on the
-/// "estimator-too-low never triggers auto-compact" failure mode.
 #[tokio::test]
 async fn api_token_feedback_triggers_next_auto_compact() {
     let context_window: u32 = 1_000_000;

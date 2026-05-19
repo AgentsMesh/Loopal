@@ -28,10 +28,6 @@ fn first_user_text(msgs: &[Message]) -> String {
         .unwrap_or_default()
 }
 
-/// `/compact <instructions>` must surface the user-provided instructions
-/// inside a `<custom-instructions>` block in the summarization prompt
-/// sent to the LLM. We capture the actual `messages` argument to the mock
-/// provider and inspect the prompt text.
 #[tokio::test]
 async fn force_compact_injects_custom_instructions_into_prompt() {
     let mut h = HarnessBuilder::new()
@@ -71,8 +67,6 @@ async fn force_compact_injects_custom_instructions_into_prompt() {
     );
 }
 
-/// No instructions → no `<custom-instructions>` block. Guards against
-/// the prompt accidentally always wrapping an empty block.
 #[tokio::test]
 async fn force_compact_omits_custom_instructions_when_none() {
     let mut h = HarnessBuilder::new()
@@ -101,8 +95,6 @@ async fn force_compact_omits_custom_instructions_when_none() {
     );
 }
 
-/// Whitespace-only instructions behave like `None` — the block is
-/// suppressed rather than carrying meaningless whitespace.
 #[tokio::test]
 async fn force_compact_treats_whitespace_instructions_as_absent() {
     let mut h = HarnessBuilder::new()

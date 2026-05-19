@@ -5,17 +5,6 @@ use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_protocol::{AgentEventPayload, CompactPhase};
 use loopal_test_support::{HarnessBuilder, chunks};
 
-async fn drain_events(
-    rx: &mut tokio::sync::mpsc::Receiver<loopal_protocol::AgentEvent>,
-) -> Vec<AgentEventPayload> {
-    tokio::task::yield_now().await;
-    let mut out = Vec::new();
-    while let Ok(ev) = rx.try_recv() {
-        out.push(ev.payload);
-    }
-    out
-}
-
 fn tiny_budget() -> ContextBudget {
     ContextBudget {
         context_window: 500,
@@ -59,8 +48,6 @@ fn padded_user(label: &str) -> Message {
     Message::user(&format!("{label}: {}", "x".repeat(100)))
 }
 
-/// `force_compact` with at least one touched file must emit the full
-/// `Summarize → Rehydrate → Compacted → Done` sequence in order.
 #[tokio::test]
 async fn compact_emits_full_phase_sequence_with_rehydrate() {
     let mut h = HarnessBuilder::new()
@@ -90,7 +77,7 @@ async fn compact_emits_full_phase_sequence_with_rehydrate() {
 
     h.runner.force_compact(None).await.unwrap();
 
-    let evts = drain_events(&mut h.event_rx).await;
+    let evts = loopal_test_support::events::drain_pending(&mut h.event_rx).await;
 
     let positions: Vec<(usize, &str)> = evts
         .iter()
@@ -142,8 +129,6 @@ async fn compact_emits_full_phase_sequence_with_rehydrate() {
     );
 }
 
-/// Without any touched files the `Rehydrate` phase must be skipped: the
-/// sequence collapses to `Summarize → Compacted → Done`.
 #[tokio::test]
 async fn compact_skips_rehydrate_when_no_files_touched() {
     let mut h = HarnessBuilder::new()
@@ -162,7 +147,7 @@ async fn compact_skips_rehydrate_when_no_files_touched() {
 
     h.runner.force_compact(None).await.unwrap();
 
-    let evts = drain_events(&mut h.event_rx).await;
+    let evts = loopal_test_support::events::drain_pending(&mut h.event_rx).await;
     let saw_rehydrate = evts.iter().any(|e| {
         matches!(
             e,
@@ -190,8 +175,6 @@ async fn compact_skips_rehydrate_when_no_files_touched() {
     assert!(saw_done, "Done still required: {evts:?}");
 }
 
-/// `check_and_microcompact` emits a standalone `Microcompact` phase
-/// (no other phases follow because no auto-compact threshold trips).
 #[tokio::test]
 async fn microcompact_emits_only_microcompact_phase() {
     let mut h = HarnessBuilder::new()
@@ -222,7 +205,7 @@ async fn microcompact_emits_only_microcompact_phase() {
 
     h.runner.check_and_microcompact().await.unwrap();
 
-    let evts = drain_events(&mut h.event_rx).await;
+    let evts = loopal_test_support::events::drain_pending(&mut h.event_rx).await;
     let phases: Vec<&str> = evts
         .iter()
         .filter_map(|e| match e {

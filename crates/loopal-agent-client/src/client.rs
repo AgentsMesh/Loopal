@@ -33,7 +33,10 @@ impl AgentClient {
     pub async fn initialize(&self) -> anyhow::Result<Value> {
         use std::time::Duration;
         const MAX_ATTEMPTS: u32 = 5;
-        const TIMEOUT: Duration = Duration::from_secs(2);
+        // Sandboxed child-process spawn can need ~0.8–2 s on macOS just for
+        // fork+exec + tracing init. Pair the longer per-attempt budget with
+        // the idempotent server-side `initialize` handler so retries are safe.
+        const TIMEOUT: Duration = Duration::from_secs(10);
 
         for attempt in 1..=MAX_ATTEMPTS {
             match tokio::time::timeout(

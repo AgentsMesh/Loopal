@@ -12,6 +12,8 @@ mod command_edge_test;
 mod command_menu_scroll_test;
 #[path = "suite/command_test.rs"]
 mod command_test;
+#[path = "suite/compact_banner_render_test.rs"]
+mod compact_banner_render_test;
 #[path = "suite/cron_duration_format_test.rs"]
 mod cron_duration_format_test;
 #[path = "suite/crons_panel_edge_test.rs"]
@@ -134,10 +136,28 @@ mod text_width_test;
 mod view_client_reset_test;
 
 // E2E tests
+#[path = "suite/e2e_compact_banner_test.rs"]
+mod e2e_compact_banner_test;
+#[path = "suite/e2e_compact_bare_summary_test.rs"]
+mod e2e_compact_bare_summary_test;
 #[path = "suite/e2e_compact_edge_test.rs"]
 mod e2e_compact_edge_test;
+#[path = "suite/e2e_compact_hooks_test.rs"]
+mod e2e_compact_hooks_test;
+#[path = "suite/e2e_compact_instructions_test.rs"]
+mod e2e_compact_instructions_test;
+#[path = "suite/e2e_compact_microcompact_test.rs"]
+mod e2e_compact_microcompact_test;
+#[path = "suite/e2e_compact_phases_test.rs"]
+mod e2e_compact_phases_test;
+#[path = "suite/e2e_compact_rehydrate_test.rs"]
+mod e2e_compact_rehydrate_test;
+#[path = "suite/e2e_compact_resume_test.rs"]
+mod e2e_compact_resume_test;
 #[path = "suite/e2e_compact_test.rs"]
 mod e2e_compact_test;
+#[path = "suite/e2e_compact_token_feedback_test.rs"]
+mod e2e_compact_token_feedback_test;
 #[path = "suite/e2e_control_completeness_test.rs"]
 mod e2e_control_completeness_test;
 #[path = "suite/e2e_control_lifecycle_test.rs"]

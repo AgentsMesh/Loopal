@@ -8,6 +8,7 @@ pub(crate) struct FrameLayout {
     pub content: Rect,
     pub agents: Rect,
     pub separator: Rect,
+    pub compact_banner: Rect,
     pub retry_banner: Rect,
     pub input: Rect,
     pub status: Rect,
@@ -20,7 +21,8 @@ impl FrameLayout {
         size: Rect,
         breadcrumb_h: u16,
         panel_zone_h: u16,
-        banner_h: u16,
+        compact_banner_h: u16,
+        retry_banner_h: u16,
         input_h: u16,
     ) -> Self {
         let chunks = Layout::default()
@@ -30,7 +32,8 @@ impl FrameLayout {
                 Constraint::Min(3),
                 Constraint::Length(panel_zone_h),
                 Constraint::Length(1),
-                Constraint::Length(banner_h),
+                Constraint::Length(compact_banner_h),
+                Constraint::Length(retry_banner_h),
                 Constraint::Length(input_h),
                 Constraint::Length(1),
             ])
@@ -41,11 +44,12 @@ impl FrameLayout {
             content,
             agents,
             separator,
+            compact_banner,
             retry_banner,
             input,
             status,
         ] = [
-            chunks[0], chunks[1], chunks[2], chunks[3], chunks[4], chunks[5], chunks[6],
+            chunks[0], chunks[1], chunks[2], chunks[3], chunks[4], chunks[5], chunks[6], chunks[7],
         ];
 
         let picker = Rect::new(
@@ -56,6 +60,7 @@ impl FrameLayout {
                 + content.height
                 + agents.height
                 + separator.height
+                + compact_banner.height
                 + retry_banner.height
                 + input.height,
         );
@@ -65,6 +70,7 @@ impl FrameLayout {
             content,
             agents,
             separator,
+            compact_banner,
             retry_banner,
             input,
             status,

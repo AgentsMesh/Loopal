@@ -75,7 +75,7 @@ pub mod testing {
     pub use crate::agent_setup::build_with_frontend;
     pub use crate::agent_setup_context::AgentSetupContext;
     pub use crate::agent_setup_helpers::{
-        build_initial_messages, collect_feature_tags, spawn_sub_agent_forwarder,
+        build_initial_messages, build_model_router, collect_feature_tags, spawn_sub_agent_forwarder,
     };
     pub use crate::bg_task_bridge::spawn as bg_task_bridge_spawn;
     pub use crate::cron_bridge::spawn as cron_bridge_spawn;

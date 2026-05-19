@@ -1,8 +1,8 @@
 use super::ContextStore;
-use crate::compaction::{compact_messages, sanitize_tool_pairs};
-use crate::degradation::{drop_oldest_group, run_sync_degradation};
+use crate::compaction::sanitize_tool_pairs;
+use crate::degradation::run_sync_degradation;
 use crate::ingestion::{cap_assistant_server_blocks, cap_tool_results};
-use crate::token_counter::{estimate_message_tokens, estimate_messages_tokens};
+use crate::token_counter::estimate_messages_tokens;
 use loopal_message::{Message, MessageRole};
 use tracing::debug;
 
@@ -11,26 +11,18 @@ impl ContextStore {
         self.messages().to_vec()
     }
 
-    pub fn apply_summary(&mut self, new_messages: Vec<Message>) -> bool {
-        let snapshot = self.messages().to_vec();
-        self.replace_messages(new_messages);
+    /// Replace the segment `[..boundary_at]` with a `[summary, ack]` prefix.
+    /// The caller is responsible for persisting the two messages and writing
+    /// the `Marker::CompactBoundary` anchor — this only mutates the in-memory
+    /// view used to build the next LLM request.
+    pub fn set_boundary(&mut self, boundary_at: usize, summary: Message, ack: Message) {
+        let kept = self.messages().get(boundary_at..).unwrap_or(&[]);
+        let mut new_msgs = Vec::with_capacity(kept.len() + 2);
+        new_msgs.push(summary);
+        new_msgs.push(ack);
+        new_msgs.extend_from_slice(kept);
+        self.replace_messages(new_msgs);
         self.sanitize();
-
-        if self
-            .budget()
-            .needs_emergency(estimate_messages_tokens(self.messages()))
-        {
-            self.replace_messages(snapshot);
-            return false;
-        }
-        self.enforce_budget();
-        true
-    }
-
-    pub fn emergency_compact(&mut self, keep_last: usize) {
-        let msgs = self.messages_mut();
-        compact_messages(msgs, keep_last);
-        sanitize_tool_pairs(msgs);
         self.enforce_budget();
     }
 
@@ -39,52 +31,38 @@ impl ContextStore {
     }
 
     pub fn needs_summarization(&self) -> bool {
-        self.budget()
-            .needs_compaction(estimate_messages_tokens(self.messages()))
+        self.budget().needs_compaction(self.effective_tokens())
     }
 
-    pub fn needs_emergency(&self) -> bool {
-        self.budget()
-            .needs_emergency(estimate_messages_tokens(self.messages()))
-    }
-
-    pub fn token_aware_keep_count(&self) -> usize {
-        let half = self.budget().message_budget / 2;
-        let mut tokens = 0u32;
-        let mut count = 0usize;
-        for msg in self.messages().iter().rev() {
-            let mt = estimate_message_tokens(msg);
-            if tokens + mt > half && count > 0 {
-                break;
-            }
-            tokens += mt;
-            count += 1;
-        }
-        count.max(2)
+    /// Pick the cut point at which compaction summarizes everything *before*
+    /// and preserves everything *after*. The current rule is "keep the last
+    /// two messages" (`saturating_sub(2).max(1)`) so the model continues
+    /// from the most recent turn without losing the active user request.
+    /// Living here, not in the runtime, keeps the boundary rule attached to
+    /// the data it operates on (GRASP Information Expert).
+    pub fn compact_boundary_at(&self) -> usize {
+        const KEEP_TAIL: usize = 2;
+        self.len().saturating_sub(KEEP_TAIL).max(1)
     }
 
     pub fn current_tokens(&self) -> u32 {
         estimate_messages_tokens(self.messages())
     }
 
+    /// Single source of truth for "how many tokens does the upcoming request
+    /// actually weigh." Combines the local BPE estimate with the most recent
+    /// provider-reported `input_tokens` (monotonically non-decreasing).
+    pub fn effective_tokens(&self) -> u32 {
+        let estimate = self.current_tokens();
+        match self.last_actual_input_tokens() {
+            Some(actual) => estimate.max(actual),
+            None => estimate,
+        }
+    }
+
     pub(super) fn enforce_budget(&mut self) {
         let budget = self.budget().clone();
         run_sync_degradation(self.messages_mut(), &budget);
-
-        let mut iterations = 0;
-        let mut dropped_any = false;
-        while estimate_messages_tokens(self.messages()) > budget.message_budget * 90 / 100
-            && iterations < 10
-        {
-            if drop_oldest_group(self.messages_mut()) == 0 {
-                break;
-            }
-            dropped_any = true;
-            iterations += 1;
-        }
-        if dropped_any {
-            self.sanitize();
-        }
         debug!(
             tokens = estimate_messages_tokens(self.messages()),
             budget = budget.message_budget,

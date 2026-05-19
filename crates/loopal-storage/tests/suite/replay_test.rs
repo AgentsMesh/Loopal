@@ -12,9 +12,9 @@ fn clear_marker() -> TaggedEntry {
     })
 }
 
-fn compact_marker(keep_last: usize) -> TaggedEntry {
-    TaggedEntry::Marker(Marker::CompactTo {
-        keep_last,
+fn boundary_marker(summary_msg_id: &str) -> TaggedEntry {
+    TaggedEntry::Marker(Marker::CompactBoundary {
+        summary_msg_id: summary_msg_id.into(),
         timestamp: "t".into(),
     })
 }
@@ -60,45 +60,58 @@ fn clear_at_end_yields_empty() {
 }
 
 #[test]
-fn compact_keeps_last_n() {
+fn boundary_drops_before_summary_id() {
     let entries = vec![
-        msg("1"),
-        msg("2"),
-        msg("3"),
-        msg("4"),
-        msg("5"),
-        compact_marker(2),
+        msg_with_id("m1", "a"),
+        msg_with_id("m2", "b"),
+        msg_with_id("s1", "[summary]"),
+        msg_with_id("ack", "ok"),
+        boundary_marker("s1"),
+        msg_with_id("m3", "c"),
     ];
     let result = replay(entries);
-    assert_eq!(result.len(), 2);
-    assert_eq!(result[0].text_content(), "4");
-    assert_eq!(result[1].text_content(), "5");
+    assert_eq!(result.len(), 3);
+    assert_eq!(result[0].text_content(), "[summary]");
+    assert_eq!(result[1].text_content(), "ok");
+    assert_eq!(result[2].text_content(), "c");
 }
 
 #[test]
-fn compact_with_more_keep_than_messages() {
-    let entries = vec![msg("a"), compact_marker(10)];
+fn boundary_unknown_id_is_noop() {
+    let entries = vec![
+        msg_with_id("m1", "a"),
+        msg_with_id("m2", "b"),
+        boundary_marker("missing"),
+    ];
+    let result = replay(entries);
+    assert_eq!(result.len(), 2);
+}
+
+#[test]
+fn boundary_at_head_keeps_all() {
+    let entries = vec![msg_with_id("s1", "[summary]"), boundary_marker("s1")];
     let result = replay(entries);
     assert_eq!(result.len(), 1);
-    assert_eq!(result[0].text_content(), "a");
+    assert_eq!(result[0].text_content(), "[summary]");
 }
 
 #[test]
 fn interleaved_markers() {
     let entries = vec![
-        msg("a"),
-        msg("b"),
+        msg_with_id("m1", "a"),
+        msg_with_id("m2", "b"),
         clear_marker(),
-        msg("c"),
-        msg("d"),
-        msg("e"),
-        compact_marker(1),
-        msg("f"),
+        msg_with_id("m3", "c"),
+        msg_with_id("s1", "[summary]"),
+        msg_with_id("ack", "ok"),
+        boundary_marker("s1"),
+        msg_with_id("m4", "d"),
     ];
     let result = replay(entries);
-    assert_eq!(result.len(), 2);
-    assert_eq!(result[0].text_content(), "e");
-    assert_eq!(result[1].text_content(), "f");
+    assert_eq!(result.len(), 3);
+    assert_eq!(result[0].text_content(), "[summary]");
+    assert_eq!(result[1].text_content(), "ok");
+    assert_eq!(result[2].text_content(), "d");
 }
 
 #[test]

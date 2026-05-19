@@ -69,9 +69,9 @@ async fn clear_dispatches_control() {
 #[tokio::test]
 async fn compact_dispatches_control() {
     let (ctrl, mut control_rx, _) = make_controller();
-    ctrl.compact().await;
+    ctrl.compact(None).await;
     match control_rx.recv().await {
-        Some(ControlCommand::Compact) => {}
+        Some(ControlCommand::Compact { .. }) => {}
         other => panic!("expected Compact, got {other:?}"),
     }
 }

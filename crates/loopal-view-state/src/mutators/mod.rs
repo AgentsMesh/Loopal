@@ -1,5 +1,6 @@
 mod aggregate;
 mod bg;
+mod compact;
 mod interactive;
 mod lifecycle;
 mod observable;
@@ -161,5 +162,6 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
         | TurnDiffSummary { .. }
         | SessionResumeWarnings { .. }
         | QuestionDecided { .. } => MutationEffect::NoOp,
+        CompactProgress { phase, detail } => compact::progress(state, *phase, detail.as_deref()),
     }
 }

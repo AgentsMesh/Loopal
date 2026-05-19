@@ -36,7 +36,7 @@ async fn send_control_delivers_to_server() {
     });
 
     client
-        .send_control(&loopal_protocol::ControlCommand::Compact)
+        .send_control(&loopal_protocol::ControlCommand::Compact { instructions: None })
         .await
         .unwrap();
 }

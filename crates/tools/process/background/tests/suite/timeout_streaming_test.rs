@@ -5,14 +5,14 @@ use loopal_tool_api::{OutputTail, Tool, ToolContext};
 use loopal_tool_background::ops::bg_output;
 use serde_json::json;
 
-use crate::test_support::{extract_pid, make_bash, make_store};
+use crate::test_support::{extract_pid, make_bash, make_store, unique_sid};
 
 fn make_streaming_ctx(cwd: &std::path::Path) -> ToolContext {
     let backend = loopal_backend::LocalBackend::new(
         cwd.to_path_buf(),
         None,
         loopal_backend::ResourceLimits::default(),
-        "test-session",
+        unique_sid(),
     );
     ToolContext::new(backend, "test").with_output_tail(Arc::new(OutputTail::new(20)))
 }

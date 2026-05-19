@@ -55,7 +55,7 @@ async fn test_manual_compact_reduces_messages() {
             .push_user(padded_user_msg(&format!("msg-{i}")));
     }
 
-    h.runner.force_compact().await.unwrap();
+    h.runner.force_compact(None).await.unwrap();
 
     assert!(
         h.runner.params.store.len() <= 12,
@@ -88,7 +88,7 @@ async fn test_compact_emits_event_payload() {
             .push_user(padded_user_msg(&format!("msg-{i}")));
     }
 
-    h.runner.force_compact().await.unwrap();
+    h.runner.force_compact(None).await.unwrap();
 
     let evts = drain_events(&mut h.event_rx).await;
     let compacted = evts.iter().find_map(|e| match e {
@@ -123,7 +123,7 @@ async fn test_compact_preserves_recent_messages() {
             .push_user(padded_user_msg(&format!("msg-{i}")));
     }
 
-    h.runner.force_compact().await.unwrap();
+    h.runner.force_compact(None).await.unwrap();
 
     let last_text = h.runner.params.store.messages().last().and_then(|m| {
         m.content.iter().find_map(|b| match b {
@@ -136,4 +136,58 @@ async fn test_compact_preserves_recent_messages() {
         "last message should be msg-19, got: {last_text:?}"
     );
     assert!(h.runner.params.store.len() <= 12);
+}
+
+/// `force_compact` with ≤2 messages must short-circuit: emit the
+/// "nothing to compact" Stream marker and skip the Compacted event.
+#[tokio::test]
+async fn force_compact_short_circuits_on_tiny_history() {
+    let mut h = HarnessBuilder::new()
+        .calls(vec![chunks::text_turn("noop")])
+        .build()
+        .await;
+
+    h.runner.params.store.clear();
+    h.runner.params.store.push_user(Message::user("only one"));
+
+    h.runner.force_compact(None).await.unwrap();
+
+    let evts = drain_events(&mut h.event_rx).await;
+    let saw_nothing_to_compact = evts.iter().any(
+        |e| matches!(e, AgentEventPayload::Stream { text } if text.contains("nothing to compact")),
+    );
+    let saw_compacted = evts
+        .iter()
+        .any(|e| matches!(e, AgentEventPayload::Compacted(_)));
+
+    assert!(
+        saw_nothing_to_compact,
+        "expected Stream(\"[nothing to compact...]\"), got: {evts:?}",
+    );
+    assert!(
+        !saw_compacted,
+        "Compacted event must not fire when there is nothing to compact",
+    );
+}
+
+/// An empty store (boundary_at == 0) is the extreme of the short-circuit
+/// rule — the runtime must not panic and must not emit Compacted.
+#[tokio::test]
+async fn force_compact_handles_empty_store() {
+    let mut h = HarnessBuilder::new()
+        .calls(vec![chunks::text_turn("noop")])
+        .build()
+        .await;
+
+    h.runner.params.store.clear();
+
+    h.runner.force_compact(None).await.unwrap();
+
+    let evts = drain_events(&mut h.event_rx).await;
+    assert!(
+        !evts
+            .iter()
+            .any(|e| matches!(e, AgentEventPayload::Compacted(_))),
+        "Compacted must not fire for empty store: {evts:?}",
+    );
 }

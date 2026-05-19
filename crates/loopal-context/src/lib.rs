@@ -1,4 +1,5 @@
 pub mod budget;
+pub mod compact_config;
 pub mod compaction;
 pub mod degradation;
 pub mod fork;
@@ -11,7 +12,7 @@ pub mod token_counter;
 pub mod untrusted_text;
 
 pub use budget::ContextBudget;
-pub use compaction::{compact_messages, sanitize_tool_pairs, strip_old_thinking};
+pub use compaction::{sanitize_tool_pairs, strip_old_thinking};
 pub use pipeline::ContextPipeline;
 pub use store::ContextStore;
 pub use system_prompt::build_system_prompt;

@@ -1,71 +1,125 @@
-//! LLM-based summarization for context compaction.
+//! Build a compaction summary from a conversation segment.
+//!
+//! The caller selects a `boundary_at` cut point: every message with
+//! index `< boundary_at` is summarized and discarded; everything at or
+//! after is preserved verbatim. The returned `(summary_msg, ack_msg)`
+//! pair is persisted by the runtime (so `Marker::CompactBoundary` can
+//! later anchor on the summary's message id) and pushed at the head of
+//! the new conversation.
 
 use loopal_error::LoopalError;
-use loopal_message::{ContentBlock, Message, MessageOrigin, MessageRole};
+use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_provider_api::Provider;
 
+use super::bare_summary::{bare_summary, build_summary_message};
+use super::conversation_text::build_conversation_text;
 use super::smart_compact_llm::call_summarization_llm;
+use super::summary_parse::extract_summary;
+use super::touched_files::{TouchedFile, rank_touched_files};
+use crate::compact_config::TOUCHED_FILES_HINT_LIMIT;
 
-/// Summarize old messages via LLM, returning the new compacted message list.
-///
-/// Splits `messages` at `messages.len() - keep_last`, summarizes the older portion,
-/// and returns `[summary_msg, ack_msg, ...kept_messages]`.
-///
-/// Returns `Ok(Some(new_messages))` on success, `Ok(None)` if nothing to do,
-/// `Err` if the LLM call failed.
-pub async fn summarize_old_messages(
+#[derive(Debug)]
+pub struct CompactOutput {
+    pub summary_msg: Message,
+    pub ack_msg: Message,
+    pub touched_files: Vec<TouchedFile>,
+    pub old_count: usize,
+}
+
+/// Top-level orchestrator. Three small steps, each independently testable:
+///   1. `slice_old_messages` — domain rule: what gets summarized.
+///   2. `produce_summary_text` — pure-ish dispatch: LLM or `bare_summary`.
+///   3. `build_compact_output` — sync constructor of the message pair.
+pub async fn compact_to_boundary(
     messages: &[Message],
     provider: &dyn Provider,
     model: &str,
-    keep_last: usize,
-) -> Result<Option<Vec<Message>>, LoopalError> {
-    if messages.len() <= keep_last {
+    boundary_at: usize,
+    custom_instructions: Option<&str>,
+) -> Result<Option<CompactOutput>, LoopalError> {
+    let Some(old_messages) = slice_old_messages(messages, boundary_at) else {
         return Ok(None);
-    }
-    let split_at = messages.len() - keep_last;
-    let old_messages = &messages[..split_at];
-    if old_messages.is_empty() {
-        return Ok(None);
-    }
+    };
 
-    let conversation_text = build_conversation_text(old_messages);
-    let touched_files = extract_touched_files(old_messages);
-    let summary_text = call_summarization_llm(provider, model, &conversation_text).await?;
-
-    if summary_text.is_empty() {
-        return Err(LoopalError::Provider(loopal_error::ProviderError::Api {
-            status: 0,
-            message: "empty summary response".to_string(),
-        }));
-    }
+    let touched_files = rank_touched_files(old_messages, TOUCHED_FILES_HINT_LIMIT);
+    let summary_text = produce_summary_text(
+        old_messages,
+        provider,
+        model,
+        custom_instructions,
+        &touched_files,
+    )
+    .await;
 
     tracing::info!(
         summary_len = summary_text.len(),
         old_messages = old_messages.len(),
         touched_files = touched_files.len(),
-        "generated working state summary"
+        "compaction summary produced"
     );
 
-    // Build summary with file list for rehydration
-    let mut summary_body = format!(
-        "[Working state summary of {} earlier messages]\n\n{}",
+    Ok(Some(build_compact_output(
+        summary_text,
         old_messages.len(),
-        summary_text
-    );
-    if !touched_files.is_empty() {
-        summary_body.push_str("\n\n## Recently Touched Files\n");
-        for file in &touched_files {
-            summary_body.push_str(&format!("- {file}\n"));
-        }
-        summary_body.push_str("\nThese files may have changed. Re-read before editing.");
-    }
+        touched_files,
+    )))
+}
 
-    let summary_msg = Message {
-        id: None,
-        role: MessageRole::User,
-        content: vec![ContentBlock::Text { text: summary_body }],
-        origin: Some(MessageOrigin::CompactionSummary),
-    };
+fn slice_old_messages(messages: &[Message], boundary_at: usize) -> Option<&[Message]> {
+    if boundary_at == 0 || boundary_at > messages.len() {
+        return None;
+    }
+    Some(&messages[..boundary_at])
+}
+
+/// Call the LLM with retry; on any terminal failure fall back to a
+/// deterministic outline so compaction always produces *something*.
+/// Pulling this out lets tests exercise the fallback path without a
+/// full provider stub.
+async fn produce_summary_text(
+    old_messages: &[Message],
+    provider: &dyn Provider,
+    model: &str,
+    custom_instructions: Option<&str>,
+    touched_files: &[TouchedFile],
+) -> String {
+    let conversation_text = build_conversation_text(old_messages);
+    match call_summarization_llm(provider, model, &conversation_text, custom_instructions).await {
+        Ok(raw) => {
+            let extracted = extract_summary(&raw).to_string();
+            if extracted.is_empty() {
+                tracing::warn!(
+                    fallback = "bare_summary",
+                    cause = "empty_llm_response",
+                    old_messages = old_messages.len(),
+                    touched_files = touched_files.len(),
+                    "compaction LLM returned no summary; using deterministic fallback"
+                );
+                bare_summary(old_messages, touched_files)
+            } else {
+                extracted
+            }
+        }
+        Err(e) => {
+            tracing::warn!(
+                fallback = "bare_summary",
+                cause = "llm_call_exhausted",
+                error = %e,
+                old_messages = old_messages.len(),
+                touched_files = touched_files.len(),
+                "compaction LLM exhausted retries; using deterministic fallback"
+            );
+            bare_summary(old_messages, touched_files)
+        }
+    }
+}
+
+fn build_compact_output(
+    summary_text: String,
+    old_count: usize,
+    touched_files: Vec<TouchedFile>,
+) -> CompactOutput {
+    let summary_msg = build_summary_message(&summary_text, old_count, &touched_files);
     let ack_msg = Message {
         id: None,
         role: MessageRole::Assistant,
@@ -74,110 +128,41 @@ pub async fn summarize_old_messages(
         }],
         origin: None,
     };
-
-    let mut new_messages = vec![summary_msg, ack_msg];
-    new_messages.extend_from_slice(&messages[split_at..]);
-
-    Ok(Some(new_messages))
-}
-
-/// Build a text representation of messages for the summarization prompt.
-fn build_conversation_text(messages: &[Message]) -> String {
-    let mut text = String::new();
-    for msg in messages {
-        let role = match msg.role {
-            MessageRole::User => "User",
-            MessageRole::Assistant => "Assistant",
-            MessageRole::System => "System",
-        };
-        let content = msg.text_content();
-        if !content.is_empty() {
-            text.push_str(&format!("{role}: {content}\n\n"));
-        }
-        for block in &msg.content {
-            match block {
-                ContentBlock::ToolUse { name, input, .. } => {
-                    // Include key params so LLM knows what was operated on
-                    let args = extract_tool_args(name, input);
-                    text.push_str(&format!("[Tool call: {name}({args})]\n"));
-                }
-                ContentBlock::ToolResult {
-                    content, is_error, ..
-                } => {
-                    let status = if *is_error { "error" } else { "ok" };
-                    let preview = truncate_preview(content, 200);
-                    text.push_str(&format!("[Tool result ({status}): {preview}]\n"));
-                }
-                ContentBlock::ServerToolUse { name, .. } => {
-                    text.push_str(&format!("[Server tool: {name}]\n"));
-                }
-                ContentBlock::ServerToolResult { .. } => {
-                    text.push_str("[Server tool result received]\n");
-                }
-                _ => {}
-            }
-        }
-    }
-    text
-}
-
-/// Truncate a string to `max_bytes` on a char boundary.
-fn truncate_preview(s: &str, max_bytes: usize) -> String {
-    if s.len() <= max_bytes {
-        return s.to_string();
-    }
-    let mut end = max_bytes;
-    while end > 0 && !s.is_char_boundary(end) {
-        end -= 1;
-    }
-    format!("{}...[truncated]", &s[..end])
-}
-
-/// Extract key arguments from a tool call for the summarization prompt.
-/// Preserves file paths and commands — the most important context for decisions.
-fn extract_tool_args(name: &str, input: &serde_json::Value) -> String {
-    match name {
-        "Read" | "Write" | "Edit" | "MultiEdit" => input
-            .get("file_path")
-            .or_else(|| input.get("path"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string(),
-        "Bash" => input
-            .get("command")
-            .and_then(|v| v.as_str())
-            .map(|c| truncate_preview(c, 80))
-            .unwrap_or_default(),
-        "Grep" | "Glob" => input
-            .get("pattern")
-            .and_then(|v| v.as_str())
-            .map(|p| truncate_preview(p, 60))
-            .unwrap_or_default(),
-        _ => String::new(),
+    CompactOutput {
+        summary_msg,
+        ack_msg,
+        touched_files,
+        old_count,
     }
 }
 
-/// Extract deduplicated file paths from ToolUse blocks (Read/Write/Edit/MultiEdit).
-/// Used for rehydration hints in the summary.
-fn extract_touched_files(messages: &[Message]) -> Vec<String> {
-    let mut seen = std::collections::HashSet::new();
-    let mut files = Vec::new();
-    for msg in messages {
-        for block in &msg.content {
-            if let ContentBlock::ToolUse { name, input, .. } = block
-                && matches!(name.as_str(), "Read" | "Write" | "Edit" | "MultiEdit")
-            {
-                let path = input
-                    .get("file_path")
-                    .or_else(|| input.get("path"))
-                    .and_then(|v| v.as_str());
-                if let Some(p) = path
-                    && seen.insert(p.to_string())
-                {
-                    files.push(p.to_string());
-                }
-            }
-        }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn slice_returns_none_at_zero_boundary() {
+        let m = vec![Message::user("a"), Message::user("b")];
+        assert!(slice_old_messages(&m, 0).is_none());
     }
-    files
+
+    #[test]
+    fn slice_returns_none_past_end() {
+        let m = vec![Message::user("a")];
+        assert!(slice_old_messages(&m, 5).is_none());
+    }
+
+    #[test]
+    fn slice_takes_prefix() {
+        let m = vec![Message::user("a"), Message::user("b"), Message::user("c")];
+        assert_eq!(slice_old_messages(&m, 2).unwrap().len(), 2);
+    }
+
+    #[test]
+    fn build_compact_output_returns_user_and_assistant() {
+        let out = build_compact_output("body".into(), 3, vec![]);
+        assert_eq!(out.summary_msg.role, MessageRole::User);
+        assert_eq!(out.ack_msg.role, MessageRole::Assistant);
+        assert_eq!(out.old_count, 3);
+    }
 }

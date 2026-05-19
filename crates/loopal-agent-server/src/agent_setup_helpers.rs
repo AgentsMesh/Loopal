@@ -2,12 +2,35 @@
 //! small and each helper single-purpose.
 
 use std::sync::Arc;
+use std::time::Duration;
 
-use loopal_config::ResolvedConfig;
+use loopal_config::{CompactionSettings, ResolvedConfig, Settings};
 use loopal_protocol::{AgentEvent, AgentEventPayload};
+use loopal_provider_api::{ModelRouter, TaskType};
 use loopal_runtime::frontend::traits::AgentFrontend;
 
 use crate::params::StartParams;
+
+const DEFAULT_SUMMARIZATION_MODEL: &str = "claude-haiku-4-5-20251001";
+
+pub fn build_model_router(settings: &Settings) -> ModelRouter {
+    let mut routing = settings.model_routing.clone();
+    routing
+        .entry(TaskType::Summarization)
+        .or_insert_with(|| DEFAULT_SUMMARIZATION_MODEL.to_string());
+    ModelRouter::from_parts(settings.model.clone(), routing)
+}
+
+/// Resolve the microcompact idle duration. Logs a hint when the user has
+/// disabled the feature (idle=0) so it's easy to debug "why didn't
+/// microcompact fire".
+pub fn build_microcompact_idle(settings: &CompactionSettings) -> Duration {
+    if settings.microcompact_idle_minutes == 0 {
+        tracing::info!("microcompact disabled (microcompact_idle_minutes=0)");
+        return Duration::ZERO;
+    }
+    Duration::from_secs(settings.microcompact_idle_minutes * 60)
+}
 
 /// Spawn the sub-agent lifecycle forwarder. Listens for `SubAgentSpawned`
 /// events on `event_rx` and forwards them to the root frontend so the TUI

@@ -152,6 +152,7 @@ pub struct IntegrationHarness {
     pub control_tx: mpsc::Sender<ControlCommand>,
     pub session_ctrl: SessionController,
     pub fixture: TestFixture,
+    pub recorded_messages: std::sync::Arc<std::sync::Mutex<Vec<Vec<Message>>>>,
 }
 
 impl IntegrationHarness {
@@ -163,6 +164,7 @@ impl IntegrationHarness {
             control_tx: h.control_tx,
             session_ctrl: h.session_ctrl,
             fixture: h.fixture,
+            recorded_messages: h.recorded_messages,
         }
     }
 }
@@ -174,4 +176,5 @@ pub struct SpawnedHarness {
     pub control_tx: mpsc::Sender<ControlCommand>,
     pub session_ctrl: SessionController,
     pub fixture: TestFixture,
+    pub recorded_messages: std::sync::Arc<std::sync::Mutex<Vec<Vec<Message>>>>,
 }

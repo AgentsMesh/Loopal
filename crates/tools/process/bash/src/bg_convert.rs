@@ -17,7 +17,7 @@ pub(crate) fn register(
         log_path,
         stdout_head_tail,
         stderr_buf,
-        abort_handles,
+        drainers,
     } = *data;
     let desc = format!("(auto-bg) {}", truncate_cmd_for_desc(command, 60));
     let id = store.spawn_process_task(
@@ -25,7 +25,7 @@ pub(crate) fn register(
         log_path.clone(),
         stdout_head_tail,
         stderr_buf,
-        abort_handles,
+        drainers,
         &desc,
     );
     Some((id, log_path))

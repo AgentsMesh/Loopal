@@ -5,7 +5,7 @@ use std::time::Duration;
 use loopal_backend::{KillOutcome, kill_process_group};
 use tokio::process::Child;
 use tokio::sync::{mpsc, oneshot, watch};
-use tokio::task::AbortHandle;
+use tokio::task::JoinHandle;
 
 use crate::control::{ControlSignal, StopOutcome, TaskStatus};
 
@@ -20,7 +20,7 @@ type AckSlot = Option<(oneshot::Sender<StopOutcome>, StopOutcome)>;
 pub async fn run_process_monitor(
     mut child: Child,
     pgid: Option<i32>,
-    output_drainers: Vec<AbortHandle>,
+    output_drainers: Vec<JoinHandle<()>>,
     exit_code: Arc<AtomicI32>,
     status_tx: watch::Sender<TaskStatus>,
     mut control_rx: mpsc::Receiver<ControlSignal>,
@@ -34,20 +34,34 @@ pub async fn run_process_monitor(
         res = child.wait() => natural_exit(res),
     };
 
-    tokio::time::sleep(timing.drainers_grace).await;
-    for h in output_drainers {
-        h.abort();
-    }
+    drain_or_abort(output_drainers, timing.drainers_grace).await;
+
     if let Some(c) = code {
         exit_code.store(c, Ordering::Release);
     }
 
-    // reason: status_tx.send MUST precede ack.send so observers can't see
-    // a stale Running state after a "killed" ack returns.
     let _ = status_tx.send(final_status);
 
     if let Some((ack, payload)) = ack_slot {
         let _ = ack.send(payload);
+    }
+}
+
+/// Await all reader tasks (they normally finish when the kernel closes the
+/// pipes on child exit); if any are still alive after `grace`, abort them so
+/// they cannot keep writing to the shared `head_tail` after the task has
+/// flipped to a terminal status.
+async fn drain_or_abort(drainers: Vec<JoinHandle<()>>, grace: Duration) {
+    let aborts: Vec<_> = drainers.iter().map(|h| h.abort_handle()).collect();
+    let drain = async move {
+        for h in drainers {
+            let _ = h.await;
+        }
+    };
+    if tokio::time::timeout(grace, drain).await.is_err() {
+        for h in aborts {
+            h.abort();
+        }
     }
 }
 

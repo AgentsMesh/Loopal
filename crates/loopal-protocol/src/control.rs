@@ -17,8 +17,12 @@ pub enum ControlCommand {
     ModeSwitch(AgentMode),
     /// Clear all conversation history.
     Clear,
-    /// Compact old messages, keeping only the most recent.
-    Compact,
+    /// Compact old messages via LLM summarization. Optionally include
+    /// user-provided focus hints (`/compact <instructions>`).
+    Compact {
+        #[serde(default)]
+        instructions: Option<String>,
+    },
     /// Switch to a different model at runtime.
     ModelSwitch(String),
     /// Rewind conversation to a specific turn (0-indexed from oldest).

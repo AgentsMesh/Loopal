@@ -50,6 +50,19 @@ pub async fn dispatch_simple(method: &str, hub: &SessionHub) -> Result<Value, Rp
             .collect();
         return Ok(serde_json::json!(sessions));
     }
+    if method == methods::INITIALIZE.name {
+        // Idempotent re-initialize: clients may retry the handshake when their
+        // first attempt times out before the spawned agent has finished its
+        // own bootstrap. Returning the same result on subsequent calls keeps
+        // the retry safe instead of `-32601 unexpected method`.
+        return Ok(serde_json::json!({
+            "protocol_version": 1,
+            "agent_info": {
+                "name": "loopal",
+                "version": env!("CARGO_PKG_VERSION"),
+            }
+        }));
+    }
     Err(RpcErrorPayload::method_not_found(format!(
         "unexpected method: {method}"
     )))

@@ -148,7 +148,7 @@ async fn bg_task_kill_against_missing_id_does_not_panic_runtime() {
     harness
         .inner
         .control_tx
-        .send(loopal_protocol::ControlCommand::Compact)
+        .send(loopal_protocol::ControlCommand::Compact { instructions: None })
         .await
         .expect("control channel must remain open after bg kill");
 }

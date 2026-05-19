@@ -143,8 +143,8 @@ impl AgentLoopRunner {
             }
             ErrorClass::ContextOverflow if !*context_overflow_retry => {
                 *context_overflow_retry = true;
-                info!("context overflow detected, emergency compacting and retrying");
-                self.params.store.emergency_compact(5);
+                info!("context overflow detected, force-compacting and retrying");
+                self.force_compact(None).await?;
                 self.emit(AgentEventPayload::Error {
                     message: "Context overflow — compacting and retrying...".into(),
                 })

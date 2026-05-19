@@ -31,6 +31,7 @@ pub struct AgentConfig {
     pub tool_filter: Option<HashSet<String>>,
     pub thinking_config: ThinkingConfig,
     pub context_tokens_cap: u32,
+    pub microcompact_idle: std::time::Duration,
     pub plan_state: Option<PlanModeState>,
 }
 
@@ -60,6 +61,7 @@ impl Default for AgentConfig {
             tool_filter: None,
             thinking_config: ThinkingConfig::Auto,
             context_tokens_cap: 0,
+            microcompact_idle: std::time::Duration::from_secs(60 * 60),
             plan_state: None,
         }
     }

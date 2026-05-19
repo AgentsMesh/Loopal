@@ -9,7 +9,7 @@ use loopal_tool_api::output_tail::OutputTail;
 use loopal_tool_api::{HeadTail, StderrCappedBuffer};
 use parking_lot::Mutex as PlMutex;
 use tokio::process::{ChildStderr, ChildStdout, Command};
-use tokio::task::{AbortHandle, JoinHandle};
+use tokio::task::JoinHandle;
 
 use crate::log_writer::{LineSink, LogWriter, create_log_file, read_lines_into_sink};
 use crate::process_group::{SpawnedChild, capture_pgid, configure_process_group};
@@ -22,7 +22,11 @@ pub struct SpawnedBackgroundData {
     pub log_path: std::path::PathBuf,
     pub head_tail: Arc<HeadTail>,
     pub stderr_buf: Arc<PlMutex<StderrCappedBuffer>>,
-    pub drainers: Vec<AbortHandle>,
+    /// Owns the reader tasks. The monitor awaits these on natural child
+    /// exit so `head_tail`/`log_path` are fully populated before the task
+    /// is marked terminal — fixes the race where `bg_output` could return
+    /// a half-read preview.
+    pub drainers: Vec<JoinHandle<()>>,
 }
 
 pub(crate) struct PreparedSpawn {

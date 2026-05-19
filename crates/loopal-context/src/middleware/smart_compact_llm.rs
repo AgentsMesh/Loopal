@@ -1,4 +1,8 @@
-//! LLM call for summarization — split from smart_compact.rs for 200-line limit.
+//! Drive the LLM call that produces a context-compaction summary.
+//!
+//! Tunables (max_tokens, retry schedule) live in `crate::compact_config`
+//! so the call site here is purely mechanism: build prompt → stream →
+//! retry on transient failures → propagate everything else.
 
 use loopal_error::LoopalError;
 use loopal_message::Message;
@@ -6,35 +10,56 @@ use loopal_provider_api::{ChatParams, Provider, StreamChunk};
 
 use futures::StreamExt;
 
-/// Call the LLM to generate a working state summary.
+use super::compact_prompt::{SYSTEM_PROMPT, build_prompt};
+use crate::compact_config::{COMPACT_MAX_OUTPUT_TOKENS, RETRY_BACKOFF};
+
 pub(super) async fn call_summarization_llm(
     provider: &dyn Provider,
     model: &str,
     conversation_text: &str,
+    custom_instructions: Option<&str>,
 ) -> Result<String, LoopalError> {
-    let summary_prompt = format!(
-        "You are compacting a coding agent's conversation history.\n\n\
-         Write a WORKING STATE document. The agent will continue using ONLY this \
-         document + the recent messages that follow. The original conversation will \
-         not be available.\n\n\
-         Sections:\n\
-         ## Task\nThe user's original request. Quote their exact words.\n\
-         ## Progress\nFiles created/modified, commands run, tests passed/failed.\n\
-         ## Decisions\nKey choices and rationale.\n\
-         ## Current State\nWhat the agent was working on, including partial work.\n\
-         ## Next Steps\nWhat remains, in priority order.\n\
-         ## Key References\nExact file paths, function names, error messages, URLs.\n\n\
-         Rules: be factual, use bullet points, preserve identifiers verbatim, \
-         do NOT include file contents, do NOT narrate — summarize outcomes.\n\n\
-         Conversation:\n---\n{conversation_text}\n---",
-    );
+    let prompt = build_prompt(conversation_text, custom_instructions);
 
+    let mut last_error: Option<LoopalError> = None;
+    // First attempt has no delay; subsequent attempts use the backoff schedule.
+    let no_delay = [std::time::Duration::ZERO];
+    let delays = no_delay.iter().chain(RETRY_BACKOFF.iter());
+    for (attempt, delay) in delays.enumerate() {
+        if !delay.is_zero() {
+            tokio::time::sleep(*delay).await;
+        }
+        match drive_once(provider, model, &prompt).await {
+            Ok(text) => return Ok(text),
+            Err(e) => {
+                let retryable = is_retryable(&e);
+                tracing::warn!(
+                    attempt,
+                    retryable,
+                    error = %e,
+                    "summarization LLM call failed"
+                );
+                if !retryable {
+                    return Err(e);
+                }
+                last_error = Some(e);
+            }
+        }
+    }
+    Err(last_error.expect("loop ran at least once"))
+}
+
+async fn drive_once(
+    provider: &dyn Provider,
+    model: &str,
+    prompt: &str,
+) -> Result<String, LoopalError> {
     let params = ChatParams {
         model: model.to_string(),
-        messages: vec![Message::user(&summary_prompt)],
-        system_prompt: "You produce structured working state summaries.".to_string(),
+        messages: vec![Message::user(prompt)],
+        system_prompt: SYSTEM_PROMPT.to_string(),
         tools: vec![],
-        max_tokens: 2048,
+        max_tokens: COMPACT_MAX_OUTPUT_TOKENS,
         temperature: Some(0.0),
         thinking: None,
         continuation_intent: None,
@@ -42,16 +67,20 @@ pub(super) async fn call_summarization_llm(
     };
 
     let mut stream = provider.stream_chat(&params).await?;
-    let mut summary = String::new();
+    let mut raw = String::new();
 
     while let Some(chunk) = stream.next().await {
         match chunk {
-            Ok(StreamChunk::Text { text }) => summary.push_str(&text),
+            Ok(StreamChunk::Text { text }) => raw.push_str(&text),
             Ok(StreamChunk::Done { .. }) => break,
             Err(e) => return Err(e),
             _ => {}
         }
     }
 
-    Ok(summary)
+    Ok(raw)
+}
+
+fn is_retryable(err: &LoopalError) -> bool {
+    err.is_retryable() && !err.is_context_overflow()
 }

@@ -3,6 +3,7 @@ pub mod bg_task_log;
 pub mod bg_tasks_panel;
 pub mod breadcrumb;
 pub mod command_menu;
+pub mod compact_progress;
 pub mod cron_detail;
 pub mod cron_duration_format;
 pub mod crons_panel;

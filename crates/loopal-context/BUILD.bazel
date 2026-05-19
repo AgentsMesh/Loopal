@@ -41,6 +41,7 @@ rust_test(
         "@crates//:regex",
         "@crates//:serde_json",
         "@crates//:tokio",
+        "@crates//:uuid",
         "//crates/loopal-error",
         "//crates/loopal-message",
         "//crates/loopal-provider",

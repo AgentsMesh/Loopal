@@ -1,6 +1,8 @@
 // Single test binary — includes all test modules
 #[path = "suite/classifier_status_mutator_test.rs"]
 mod classifier_status_mutator_test;
+#[path = "suite/compact_banner_mutator_test.rs"]
+mod compact_banner_mutator_test;
 #[path = "suite/conversation_serde_test.rs"]
 mod conversation_serde_test;
 #[path = "suite/decided_mutators_test.rs"]

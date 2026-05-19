@@ -73,10 +73,16 @@ async fn test_auto_compact_on_large_context() {
     );
 
     let evts = drain_events(&mut h.event_rx).await;
-    let has_compacted = evts
-        .iter()
-        .any(|e| matches!(e, AgentEventPayload::Compacted(_)));
-    assert!(has_compacted, "expected Compacted event from auto-compact");
+    let compacted = evts.iter().find_map(|e| match e {
+        AgentEventPayload::Compacted(s) => Some(s),
+        _ => None,
+    });
+    let summary = compacted.expect("expected Compacted event from auto-compact");
+    assert!(
+        summary.strategy.starts_with("auto"),
+        "auto-trigger must label strategy as auto, got: {:?}",
+        summary.strategy,
+    );
 }
 
 /// `store.prepare_for_llm()` strips thinking blocks from old assistant messages

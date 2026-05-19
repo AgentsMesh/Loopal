@@ -90,4 +90,18 @@ pub(super) static ANTHROPIC_MODELS: &[ModelEntry] = &[
         supports_vision: true,
         supports_prefill: true,
     },
+    ModelEntry {
+        id: "claude-haiku-4-5-20251001",
+        provider: "anthropic",
+        display_name: "Claude Haiku 4.5",
+        context_window: 200_000,
+        max_output_tokens: 16_384,
+        thinking: ThinkingCapability::None,
+        speed: SpeedTier::Fast,
+        cost: CostTier::Low,
+        quality: QualityTier::Standard,
+        supports_tools: true,
+        supports_vision: true,
+        supports_prefill: true,
+    },
 ];

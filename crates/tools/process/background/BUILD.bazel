@@ -30,6 +30,7 @@ rust_test(
         "@crates//:tempfile",
         "@crates//:serde_json",
         "@crates//:tokio",
+        "@crates//:uuid",
         "//crates/loopal-tool-api",
     ],
 )

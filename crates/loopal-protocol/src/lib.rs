@@ -30,7 +30,7 @@ pub use cron_snapshot::CronJobSnapshot;
 pub use envelope::{Envelope, MessageSource};
 pub use event::AgentEvent;
 pub use event_payload::AgentEventPayload;
-pub use event_summary::{CompactionSummary, SubAgentSpawn, TurnSummary};
+pub use event_summary::{CompactPhase, CompactionSummary, SubAgentSpawn, TurnSummary};
 pub use interrupt::InterruptSignal;
 pub use mcp_snapshot::McpServerSnapshot;
 pub use projected::{ProjectedMessage, ProjectedToolCall};

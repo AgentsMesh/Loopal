@@ -15,8 +15,20 @@ fn test_control_command_clear() {
 
 #[test]
 fn test_control_command_compact() {
-    let cmd = ControlCommand::Compact;
-    assert!(matches!(cmd, ControlCommand::Compact));
+    let cmd = ControlCommand::Compact { instructions: None };
+    assert!(matches!(cmd, ControlCommand::Compact { .. }));
+}
+
+#[test]
+fn test_control_command_compact_carries_instructions() {
+    let cmd = ControlCommand::Compact {
+        instructions: Some("preserve repro steps".into()),
+    };
+    if let ControlCommand::Compact { instructions } = cmd {
+        assert_eq!(instructions.as_deref(), Some("preserve repro steps"));
+    } else {
+        panic!("expected Compact variant");
+    }
 }
 
 #[test]

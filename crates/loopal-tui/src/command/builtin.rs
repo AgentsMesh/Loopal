@@ -44,13 +44,17 @@ impl CommandHandler for CompactCmd {
         "/compact"
     }
     fn description(&self) -> &str {
-        "Compact old messages"
+        "Compact old messages (optional focus hint: /compact <instructions>)"
     }
     fn has_arg(&self) -> bool {
-        false
+        true
     }
-    async fn execute(&self, app: &mut App, _arg: Option<&str>) -> CommandEffect {
-        app.session.compact().await;
+    async fn execute(&self, app: &mut App, arg: Option<&str>) -> CommandEffect {
+        let instructions = arg
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string);
+        app.session.compact(instructions).await;
         CommandEffect::Done
     }
 }

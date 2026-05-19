@@ -58,8 +58,8 @@ impl AgentLoopRunner {
                 self.tokens.reset();
                 self.cleanup_session_tmp().await;
             }
-            ControlCommand::Compact => {
-                self.force_compact().await?;
+            ControlCommand::Compact { instructions } => {
+                self.force_compact(instructions).await?;
             }
             ControlCommand::ModelSwitch(new_model) => {
                 info!(from = %self.params.config.model(), to = %new_model, "switching model");

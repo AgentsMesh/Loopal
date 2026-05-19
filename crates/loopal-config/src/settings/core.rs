@@ -70,6 +70,9 @@ pub struct Settings {
     pub goals: GoalSettings,
 
     #[serde(default)]
+    pub compaction: CompactionSettings,
+
+    #[serde(default)]
     pub bg_tasks: BgTaskConfig,
 }
 
@@ -94,6 +97,7 @@ impl Default for Settings {
             fetch_refiner: FetchRefinerConfig::default(),
             secrets: super::secrets::SecretsSettings::default(),
             goals: GoalSettings::default(),
+            compaction: CompactionSettings::default(),
             bg_tasks: BgTaskConfig::default(),
         }
     }
@@ -112,6 +116,50 @@ impl Default for GoalSettings {
         Self {
             default_token_budget: None,
             barren_continuation_limit: 2,
+        }
+    }
+}
+
+/// Tunable knobs for the compaction subsystem. See
+/// `crates/loopal-context/src/middleware/microcompact.rs` and `smart_compact.rs`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct CompactionSettings {
+    /// Minutes of inactivity after which microcompaction scrubs old
+    /// tool_result bodies. Set to 0 to disable. Capped at 1440 (24h) —
+    /// anything larger is almost certainly a misconfiguration.
+    pub microcompact_idle_minutes: u64,
+}
+
+impl CompactionSettings {
+    pub const MAX_MICROCOMPACT_IDLE_MINUTES: u64 = 1440;
+
+    /// Clamp out-of-range values. Returns the sanitized copy together with
+    /// a list of human-readable warnings so the caller can surface them.
+    pub fn sanitize(self) -> (Self, Vec<String>) {
+        let mut warnings = Vec::new();
+        let mut microcompact_idle_minutes = self.microcompact_idle_minutes;
+        if microcompact_idle_minutes > Self::MAX_MICROCOMPACT_IDLE_MINUTES {
+            warnings.push(format!(
+                "compaction.microcompact_idle_minutes={} exceeds max {}; clamped",
+                microcompact_idle_minutes,
+                Self::MAX_MICROCOMPACT_IDLE_MINUTES
+            ));
+            microcompact_idle_minutes = Self::MAX_MICROCOMPACT_IDLE_MINUTES;
+        }
+        (
+            Self {
+                microcompact_idle_minutes,
+            },
+            warnings,
+        )
+    }
+}
+
+impl Default for CompactionSettings {
+    fn default() -> Self {
+        Self {
+            microcompact_idle_minutes: 60,
         }
     }
 }

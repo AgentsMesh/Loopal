@@ -64,5 +64,7 @@ mod session_start_test;
 mod spawn_policy_test;
 #[path = "suite/start_failure_responds_error_test.rs"]
 mod start_failure_responds_error_test;
+#[path = "suite/summarization_default_test.rs"]
+mod summarization_default_test;
 #[path = "suite/tcp_multi_client_test.rs"]
 mod tcp_multi_client_test;

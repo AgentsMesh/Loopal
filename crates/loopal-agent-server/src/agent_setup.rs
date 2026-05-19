@@ -1,7 +1,8 @@
 //! Internal agent loop setup — builds `AgentLoopParams` from resolved config.
 use crate::agent_setup_context::AgentSetupContext;
 use crate::agent_setup_helpers::{
-    build_initial_messages, collect_feature_tags, spawn_sub_agent_forwarder,
+    build_initial_messages, build_microcompact_idle, build_model_router, collect_feature_tags,
+    spawn_sub_agent_forwarder,
 };
 use crate::params::AgentSetupResult;
 use loopal_agent::shared::{AgentShared, SchedulerHandle};
@@ -24,10 +25,7 @@ pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<A
         hub,
         decision_context,
     } = ctx;
-    let router = loopal_provider_api::ModelRouter::from_parts(
-        config.settings.model.clone(),
-        config.settings.model_routing.clone(),
-    );
+    let router = build_model_router(&config.settings);
     let model = router
         .resolve(loopal_provider_api::TaskType::Default)
         .to_string();
@@ -168,6 +166,7 @@ pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<A
                 tool_filter,
                 thinking_config,
                 context_tokens_cap: config.settings.max_context_tokens,
+                microcompact_idle: build_microcompact_idle(&config.settings.compaction),
                 plan_state: None,
             },
             deps: loopal_runtime::AgentDeps {

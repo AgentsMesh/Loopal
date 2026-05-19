@@ -1,24 +1,51 @@
-//! Persistent compaction — LLM summarization + emergency truncation.
+//! Per-turn compaction triggers.
 //!
-//! The ContextStore handles sync degradation (strip, truncate) automatically.
-//! This module handles the async Layer 2 (LLM summarization) that the store
-//! cannot do on its own (requires Provider access).
+//! Three entry points, all narrow:
+//!   * `check_and_microcompact` — free idle-time scrub of old tool results
+//!   * `check_and_compact` — auto-trigger when input crosses the budget
+//!   * `force_compact` — user-initiated `/compact`
+//!
+//! Execution detail (LLM call, persistence, event emission) lives in
+//! `compaction_run.rs` so this file stays a thin dispatch layer.
+
+use std::time::{Duration, SystemTime};
 
 use loopal_error::Result;
-use loopal_protocol::AgentEventPayload;
-use tracing::{Instrument, info, warn};
+use loopal_protocol::{AgentEventPayload, CompactPhase};
+use tracing::{Instrument, info};
 
+use super::compaction_run::CompactTrigger;
 use super::runner::AgentLoopRunner;
 
-/// Minimum messages to keep during emergency compaction.
-const EMERGENCY_KEEP_LAST: usize = 5;
-
 impl AgentLoopRunner {
-    /// Check if LLM summarization is needed and apply it.
-    ///
-    /// The ContextStore's sync degradation (layers 0, 1, 3) already runs on
-    /// every push. This method handles Layer 2: async LLM summarization
-    /// when messages exceed 75% of budget.
+    pub async fn check_and_microcompact(&mut self) -> Result<()> {
+        let idle = self.params.config.microcompact_idle;
+        if idle == Duration::ZERO {
+            return Ok(());
+        }
+        let last = self.params.store.last_assistant_activity_at();
+        let now = SystemTime::now();
+        let stats = match self.params.store.apply_microcompact(last, now, idle) {
+            Some(s) if s.results_cleared > 0 => s,
+            _ => return Ok(()),
+        };
+        info!(
+            cleared = stats.results_cleared,
+            idle_seconds = idle.as_secs(),
+            "microcompact scrubbed old tool results"
+        );
+        self.params.store.record_assistant_activity(now);
+        self.emit(AgentEventPayload::CompactProgress {
+            phase: CompactPhase::Microcompact,
+            detail: Some(format!(
+                "scrubbed {} stale tool results",
+                stats.results_cleared
+            )),
+        })
+        .await?;
+        Ok(())
+    }
+
     pub async fn check_and_compact(&mut self) -> Result<()> {
         let compact_span = tracing::info_span!("context_compact");
         async {
@@ -26,7 +53,6 @@ impl AgentLoopRunner {
                 return Ok(());
             }
 
-            // PreCompact hook: notify before compaction.
             crate::fire_hooks::fire_hooks(
                 &self.params.deps.kernel,
                 loopal_config::HookEvent::PreCompact,
@@ -37,152 +63,69 @@ impl AgentLoopRunner {
             )
             .await;
 
-            let msg_tokens = self.params.store.current_tokens();
-            let budget = self.params.store.budget().clone();
+            let tokens_before = self.params.store.effective_tokens();
+            let before_count = self.params.store.len();
 
             info!(
-                msg_tokens,
-                message_budget = budget.message_budget,
-                messages = self.params.store.len(),
-                "compaction triggered"
+                tokens_before,
+                context_window = self.params.store.budget().context_window,
+                messages = before_count,
+                "auto compaction triggered"
             );
 
-            self.emit(AgentEventPayload::Stream {
-                text: "[compacting context...]\n".to_string(),
+            self.emit(AgentEventPayload::CompactProgress {
+                phase: CompactPhase::Summarize,
+                detail: Some(format!("{tokens_before} tokens before")),
             })
             .await?;
 
-            let before = self.params.store.len();
-            let tokens_before = msg_tokens;
-
-            // Try LLM summarization first, fall back to emergency truncation
-            if !budget.needs_emergency(msg_tokens) {
-                if self.try_smart_compact().await {
-                    self.post_compact(before, tokens_before, "smart").await?;
-                    return Ok(());
-                }
-                warn!("smart compact failed, falling back to emergency truncation");
-            }
-
-            self.params.store.emergency_compact(EMERGENCY_KEEP_LAST);
-            self.post_compact(before, tokens_before, "emergency")
-                .await?;
-            Ok(())
+            self.run_smart_compact(before_count, tokens_before, None, CompactTrigger::Auto)
+                .await
         }
         .instrument(compact_span)
         .await
     }
 
-    /// Attempt LLM-based summarization. Returns true if successful.
-    async fn try_smart_compact(&mut self) -> bool {
-        let compact_model = self
-            .params
-            .config
-            .router
-            .resolve(loopal_provider_api::TaskType::Summarization);
-        let Ok(provider) = self.params.deps.kernel.resolve_provider(compact_model) else {
-            warn!("no summarization provider available");
-            return false;
-        };
-
-        let keep_last = self.params.store.token_aware_keep_count();
-        let result = loopal_context::middleware::smart_compact::summarize_old_messages(
-            self.params.store.messages(), // &[Message] — read only
-            &*provider,
-            compact_model,
-            keep_last,
-        )
-        .await;
-
-        match result {
-            Ok(Some(new_messages)) => {
-                // apply_summary validates tokens, reverts if inflated
-                if self.params.store.apply_summary(new_messages) {
-                    true
-                } else {
-                    warn!("summary inflated tokens, reverted");
-                    false
-                }
-            }
-            Ok(None) => false,
-            Err(e) => {
-                warn!(error = %e, "summarization failed");
-                false
-            }
-        }
-    }
-
-    /// Force compaction unconditionally (user-triggered `/compact`).
-    pub async fn force_compact(&mut self) -> Result<()> {
-        let before = self.params.store.len();
-        let keep_last = self.params.store.token_aware_keep_count();
-        if before <= keep_last {
+    pub async fn force_compact(&mut self, instructions: Option<String>) -> Result<()> {
+        let before_count = self.params.store.len();
+        if before_count <= 2 {
             self.emit(AgentEventPayload::Stream {
                 text: "[nothing to compact — conversation is short]\n".to_string(),
             })
             .await?;
             return Ok(());
         }
-        let tokens_before = self.params.store.current_tokens();
 
-        self.emit(AgentEventPayload::Stream {
-            text: "[compacting context...]\n".to_string(),
-        })
-        .await?;
+        crate::fire_hooks::fire_hooks(
+            &self.params.deps.kernel,
+            loopal_config::HookEvent::PreCompact,
+            &loopal_hooks::HookContext {
+                session_id: Some(&self.params.session.id),
+                ..Default::default()
+            },
+        )
+        .await;
+
+        let tokens_before = self.params.store.effective_tokens();
 
         info!(
             tokens_before,
-            messages = before,
+            messages = before_count,
             "manual compaction triggered"
         );
 
-        if self.try_smart_compact().await {
-            self.post_compact(before, tokens_before, "manual-smart")
-                .await?;
-        } else {
-            warn!("smart compact failed for manual /compact, falling back");
-            self.params.store.emergency_compact(keep_last);
-            self.post_compact(before, tokens_before, "manual-emergency")
-                .await?;
-        }
-        Ok(())
-    }
-
-    /// Post-compaction: write marker, emit event with metrics.
-    async fn post_compact(
-        &mut self,
-        before: usize,
-        tokens_before: u32,
-        strategy: &str,
-    ) -> Result<()> {
-        let after = self.params.store.len();
-        let removed = before.saturating_sub(after);
-        let tokens_after = self.params.store.current_tokens();
-
-        if let Err(e) = self
-            .params
-            .deps
-            .session_manager
-            .compact_history(&self.params.session.id, after)
-        {
-            warn!(error = %e, "failed to write compact marker");
-        }
-
-        self.emit(AgentEventPayload::Compacted(
-            loopal_protocol::CompactionSummary {
-                kept: after,
-                removed,
-                tokens_before,
-                tokens_after,
-                strategy: strategy.to_string(),
-            },
-        ))
+        self.emit(AgentEventPayload::CompactProgress {
+            phase: CompactPhase::Summarize,
+            detail: Some(format!("{tokens_before} tokens before")),
+        })
         .await?;
 
-        info!(
-            before,
-            after, removed, tokens_before, tokens_after, strategy, "compaction complete"
-        );
-        Ok(())
+        self.run_smart_compact(
+            before_count,
+            tokens_before,
+            instructions,
+            CompactTrigger::Manual,
+        )
+        .await
     }
 }

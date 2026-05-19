@@ -79,6 +79,7 @@ impl AgentLoopRunner {
             self.params.store.last_role(),
             turn_ctx.pending_continuation.is_some()
         );
+        self.check_and_microcompact().await?;
         self.check_and_compact().await?;
         let mut working = self.params.store.prepare_for_llm();
         self.run_context_pipeline(&mut working).await;

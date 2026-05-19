@@ -25,23 +25,35 @@ fn clear_history_marker_persisted() {
 }
 
 #[test]
-fn compact_history_marker_persisted() {
+fn compact_boundary_marker_persisted() {
     let tmp = TempDir::new().unwrap();
     let mgr = SessionManager::with_base_dir(tmp.path().to_path_buf());
     let session = mgr
         .create_session(std::path::Path::new("/tmp"), "test-model")
         .unwrap();
 
-    for i in 0..10 {
-        mgr.save_message(&session.id, &mut Message::user(&format!("msg-{i}")))
+    let mut summary = Message::user("[summary]");
+    summary.id = Some("summary-1".to_string());
+    let mut ack = Message::assistant("ok");
+    ack.id = Some("ack-1".to_string());
+
+    for i in 0..5 {
+        mgr.save_message(&session.id, &mut Message::user(&format!("old-{i}")))
             .unwrap();
     }
-    mgr.compact_history(&session.id, 3).unwrap();
+    mgr.save_message(&session.id, &mut summary).unwrap();
+    mgr.save_message(&session.id, &mut ack).unwrap();
+    for i in 0..3 {
+        mgr.save_message(&session.id, &mut Message::user(&format!("new-{i}")))
+            .unwrap();
+    }
+    mgr.mark_compact_boundary(&session.id, "summary-1").unwrap();
 
     let (_, messages) = mgr.resume_session(&session.id).unwrap();
-    assert_eq!(messages.len(), 3);
-    assert_eq!(messages[0].text_content(), "msg-7");
-    assert_eq!(messages[2].text_content(), "msg-9");
+    assert_eq!(messages.len(), 5);
+    assert_eq!(messages[0].text_content(), "[summary]");
+    assert_eq!(messages[1].text_content(), "ok");
+    assert_eq!(messages[4].text_content(), "new-2");
 }
 
 #[test]

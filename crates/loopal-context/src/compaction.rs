@@ -2,29 +2,6 @@ use std::collections::HashSet;
 
 use loopal_message::{ContentBlock, Message, MessageRole};
 
-/// Remove oldest messages, keeping the system message and the last `keep_last` messages.
-/// Post-processes with `sanitize_tool_pairs` to fix any broken tool_use/tool_result references.
-pub fn compact_messages(messages: &mut Vec<Message>, keep_last: usize) {
-    if messages.len() <= keep_last + 1 {
-        return;
-    }
-
-    let system_count = messages
-        .iter()
-        .take_while(|m| m.role == MessageRole::System)
-        .count();
-
-    let non_system_len = messages.len() - system_count;
-    if non_system_len <= keep_last {
-        return;
-    }
-
-    let remove_count = non_system_len - keep_last;
-    messages.drain(system_count..system_count + remove_count);
-
-    sanitize_tool_pairs(messages);
-}
-
 /// Remove orphaned tool_use/tool_result blocks after compaction.
 ///
 /// Ensures every ToolResult references an existing ToolUse (and vice versa).

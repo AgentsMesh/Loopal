@@ -34,25 +34,35 @@ fn clear_marker_roundtrip() {
 }
 
 #[test]
-fn compact_to_marker_roundtrip() {
-    let entry = TaggedEntry::Marker(Marker::CompactTo {
-        keep_last: 5,
+fn compact_boundary_marker_roundtrip() {
+    let entry = TaggedEntry::Marker(Marker::CompactBoundary {
+        summary_msg_id: "summary-msg-001".into(),
         timestamp: "2025-06-15T12:00:00Z".into(),
     });
     let json = serde_json::to_string(&entry).unwrap();
-    assert!(json.contains("\"compact_to\""));
+    assert!(json.contains("\"compact_boundary\""));
+    assert!(json.contains("\"summary-msg-001\""));
 
     let decoded: TaggedEntry = serde_json::from_str(&json).unwrap();
     match decoded {
-        TaggedEntry::Marker(Marker::CompactTo {
-            keep_last,
+        TaggedEntry::Marker(Marker::CompactBoundary {
+            summary_msg_id,
             timestamp,
         }) => {
-            assert_eq!(keep_last, 5);
+            assert_eq!(summary_msg_id, "summary-msg-001");
             assert_eq!(timestamp, "2025-06-15T12:00:00Z");
         }
-        other => panic!("expected CompactTo marker, got {other:?}"),
+        other => panic!("expected CompactBoundary marker, got {other:?}"),
     }
+}
+
+#[test]
+fn old_compact_to_marker_fails_to_decode() {
+    let json = r#"{"_type":"marker","kind":"compact_to","keep_last":5,"timestamp":"x"}"#;
+    assert!(
+        serde_json::from_str::<TaggedEntry>(json).is_err(),
+        "legacy compact_to marker must be rejected after removal"
+    );
 }
 
 #[test]

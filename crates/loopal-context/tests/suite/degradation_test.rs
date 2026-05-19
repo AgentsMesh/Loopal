@@ -130,6 +130,7 @@ fn msg_with_tool_result(content: &str) -> Message {
         content: vec![ContentBlock::ToolResult {
             tool_use_id: "t1".into(),
             content: content.to_string(),
+            images: Vec::new(),
             is_error: false,
             metadata: None,
         }],

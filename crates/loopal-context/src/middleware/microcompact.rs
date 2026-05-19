@@ -105,6 +105,7 @@ mod tests {
             content: vec![ContentBlock::ToolResult {
                 tool_use_id: id.into(),
                 content: body.into(),
+                images: Vec::new(),
                 is_error: false,
                 metadata: None,
             }],

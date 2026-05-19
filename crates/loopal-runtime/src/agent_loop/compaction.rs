@@ -12,6 +12,7 @@ use std::time::{Duration, SystemTime};
 
 use loopal_error::Result;
 use loopal_protocol::{AgentEventPayload, CompactPhase};
+use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, info};
 
 use super::compaction_run::CompactTrigger;
@@ -46,7 +47,7 @@ impl AgentLoopRunner {
         Ok(())
     }
 
-    pub async fn check_and_compact(&mut self) -> Result<()> {
+    pub async fn check_and_compact(&mut self, cancel: &CancellationToken) -> Result<()> {
         let compact_span = tracing::info_span!("context_compact");
         async {
             if !self.params.store.needs_summarization() {
@@ -79,8 +80,14 @@ impl AgentLoopRunner {
             })
             .await?;
 
-            self.run_smart_compact(before_count, tokens_before, None, CompactTrigger::Auto)
-                .await
+            self.run_smart_compact(
+                before_count,
+                tokens_before,
+                None,
+                CompactTrigger::Auto,
+                cancel,
+            )
+            .await
         }
         .instrument(compact_span)
         .await
@@ -120,11 +127,18 @@ impl AgentLoopRunner {
         })
         .await?;
 
+        // Bridge the cross-boundary `InterruptSignal` into a fresh
+        // `CancellationToken`. `/compact` (and the `force_compact` retry
+        // path triggered by ContextOverflow recovery) runs outside any
+        // active turn, so there is no `TurnCancel` to borrow.
+        let cancel =
+            super::cancel::TurnCancel::new(self.interrupt.clone(), self.interrupt_tx.clone());
         self.run_smart_compact(
             before_count,
             tokens_before,
             instructions,
             CompactTrigger::Manual,
+            cancel.token(),
         )
         .await
     }

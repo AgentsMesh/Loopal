@@ -96,4 +96,11 @@ impl TurnCancel {
             }
         }
     }
+
+    /// Borrow the underlying token. Lets callers in other crates (e.g.
+    /// `loopal-context`) wire `select!` directly against the same
+    /// cancellation source without re-bridging InterruptSignal.
+    pub fn token(&self) -> &CancellationToken {
+        &self.token
+    }
 }

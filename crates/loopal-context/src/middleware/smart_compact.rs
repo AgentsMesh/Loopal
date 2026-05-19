@@ -10,6 +10,7 @@
 use loopal_error::LoopalError;
 use loopal_message::{ContentBlock, Message, MessageOrigin, MessageRole};
 use loopal_provider_api::Provider;
+use tokio_util::sync::CancellationToken;
 
 use super::bare_summary::{bare_summary, build_summary_message};
 use super::conversation_text::build_conversation_text;
@@ -36,6 +37,7 @@ pub async fn compact_to_boundary(
     model: &str,
     boundary_at: usize,
     custom_instructions: Option<&str>,
+    cancel: &CancellationToken,
 ) -> Result<Option<CompactOutput>, LoopalError> {
     let Some(old_messages) = slice_old_messages(messages, boundary_at) else {
         return Ok(None);
@@ -48,6 +50,7 @@ pub async fn compact_to_boundary(
         model,
         custom_instructions,
         &touched_files,
+        cancel,
     )
     .await;
 
@@ -82,9 +85,18 @@ async fn produce_summary_text(
     model: &str,
     custom_instructions: Option<&str>,
     touched_files: &[TouchedFile],
+    cancel: &CancellationToken,
 ) -> String {
     let conversation_text = build_conversation_text(old_messages);
-    match call_summarization_llm(provider, model, &conversation_text, custom_instructions).await {
+    match call_summarization_llm(
+        provider,
+        model,
+        &conversation_text,
+        custom_instructions,
+        cancel,
+    )
+    .await
+    {
         Ok(raw) => {
             let extracted = extract_summary(&raw).to_string();
             if extracted.is_empty() {

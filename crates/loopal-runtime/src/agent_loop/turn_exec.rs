@@ -80,7 +80,7 @@ impl AgentLoopRunner {
             turn_ctx.pending_continuation.is_some()
         );
         self.check_and_microcompact().await?;
-        self.check_and_compact().await?;
+        self.check_and_compact(turn_ctx.cancel.token()).await?;
         let mut working = self.params.store.prepare_for_llm();
         self.run_context_pipeline(&mut working).await;
         turn_ctx.metrics.llm_calls += 1;

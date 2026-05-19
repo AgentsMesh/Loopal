@@ -7,6 +7,7 @@
 use loopal_context::middleware::smart_compact::{CompactOutput, compact_to_boundary};
 use loopal_error::Result;
 use loopal_protocol::{AgentEventPayload, CompactPhase};
+use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
 use super::runner::AgentLoopRunner;
@@ -39,6 +40,7 @@ impl AgentLoopRunner {
         tokens_before: u32,
         instructions: Option<String>,
         trigger: CompactTrigger,
+        cancel: &CancellationToken,
     ) -> Result<()> {
         let compact_model = self
             .params
@@ -62,6 +64,7 @@ impl AgentLoopRunner {
             &compact_model,
             boundary_at,
             instructions.as_deref(),
+            cancel,
         )
         .await;
 

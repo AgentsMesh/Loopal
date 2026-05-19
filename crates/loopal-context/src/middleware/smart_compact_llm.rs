@@ -9,6 +9,7 @@ use loopal_message::Message;
 use loopal_provider_api::{ChatParams, Provider, StreamChunk};
 
 use futures::StreamExt;
+use tokio_util::sync::CancellationToken;
 
 use super::compact_prompt::{SYSTEM_PROMPT, build_prompt};
 use crate::compact_config::{COMPACT_MAX_OUTPUT_TOKENS, RETRY_BACKOFF};
@@ -18,18 +19,24 @@ pub(super) async fn call_summarization_llm(
     model: &str,
     conversation_text: &str,
     custom_instructions: Option<&str>,
+    cancel: &CancellationToken,
 ) -> Result<String, LoopalError> {
     let prompt = build_prompt(conversation_text, custom_instructions);
 
     let mut last_error: Option<LoopalError> = None;
-    // First attempt has no delay; subsequent attempts use the backoff schedule.
     let no_delay = [std::time::Duration::ZERO];
     let delays = no_delay.iter().chain(RETRY_BACKOFF.iter());
     for (attempt, delay) in delays.enumerate() {
         if !delay.is_zero() {
-            tokio::time::sleep(*delay).await;
+            tokio::select! {
+                biased;
+                _ = cancel.cancelled() => {
+                    return Err(LoopalError::Other("compact cancelled by interrupt".into()));
+                }
+                _ = tokio::time::sleep(*delay) => {}
+            }
         }
-        match drive_once(provider, model, &prompt).await {
+        match drive_once(provider, model, &prompt, cancel).await {
             Ok(text) => return Ok(text),
             Err(e) => {
                 let retryable = is_retryable(&e);
@@ -53,6 +60,7 @@ async fn drive_once(
     provider: &dyn Provider,
     model: &str,
     prompt: &str,
+    cancel: &CancellationToken,
 ) -> Result<String, LoopalError> {
     let params = ChatParams {
         model: model.to_string(),
@@ -69,12 +77,19 @@ async fn drive_once(
     let mut stream = provider.stream_chat(&params).await?;
     let mut raw = String::new();
 
-    while let Some(chunk) = stream.next().await {
-        match chunk {
-            Ok(StreamChunk::Text { text }) => raw.push_str(&text),
-            Ok(StreamChunk::Done { .. }) => break,
-            Err(e) => return Err(e),
-            _ => {}
+    loop {
+        tokio::select! {
+            biased;
+            _ = cancel.cancelled() => {
+                return Err(LoopalError::Other("compact cancelled by interrupt".into()));
+            }
+            chunk = stream.next() => match chunk {
+                Some(Ok(StreamChunk::Text { text })) => raw.push_str(&text),
+                Some(Ok(StreamChunk::Done { .. })) => break,
+                Some(Err(e)) => return Err(e),
+                Some(_) => {}
+                None => break,
+            }
         }
     }
 

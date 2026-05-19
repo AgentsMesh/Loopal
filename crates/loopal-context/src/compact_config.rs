@@ -1,11 +1,3 @@
-//! Single source of truth for compaction tuning constants.
-//!
-//! Mechanism (LLM call, file IO, marker write) lives in its own modules
-//! and reads from this file. User-facing knobs that should be
-//! runtime-configurable live in `loopal_config::CompactionSettings`
-//! instead — pull the value across at the bootstrap boundary so the
-//! compact subsystem itself stays free of settings lookups.
-
 use std::time::Duration;
 
 /// Why 80 (not 95): tokenizer drift between local cl100k_base and the

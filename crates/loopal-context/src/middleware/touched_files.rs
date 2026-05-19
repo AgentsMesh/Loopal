@@ -1,14 +1,3 @@
-//! Rank file paths touched during a compacted conversation segment.
-//!
-//! The post-compact rehydrate step re-reads the top-ranked files so the
-//! continuing LLM sees fresh content rather than a stale path list inside
-//! the summary. Ranking criteria (in priority order):
-//!   1. Write / Edit / MultiEdit are more important than Read
-//!      (writes mutate state; reads are easier to redo)
-//!   2. Later mentions outrank earlier ones (recency proxy — we don't
-//!      persist mtime, so position in the message list is the signal)
-//!   3. Stable de-dup by absolute path
-
 use loopal_message::{ContentBlock, Message};
 
 /// Tools whose `file_path` (or `path`) argument we consider a touched file.

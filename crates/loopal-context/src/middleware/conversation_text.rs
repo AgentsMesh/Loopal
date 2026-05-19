@@ -1,8 +1,3 @@
-//! Render a slice of messages into the plain-text form that the
-//! summarization LLM consumes. Pulled out of `smart_compact.rs` to keep
-//! each file single-purpose: this file decides *what is summarizable*,
-//! while `smart_compact.rs` decides *how* to drive the summary.
-
 use loopal_message::{ContentBlock, Message, MessageRole};
 
 const TOOL_RESULT_PREVIEW_BYTES: usize = 200;

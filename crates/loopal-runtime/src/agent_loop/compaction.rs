@@ -1,13 +1,3 @@
-//! Per-turn compaction triggers.
-//!
-//! Three entry points, all narrow:
-//!   * `check_and_microcompact` — free idle-time scrub of old tool results
-//!   * `check_and_compact` — auto-trigger when input crosses the budget
-//!   * `force_compact` — user-initiated `/compact`
-//!
-//! Execution detail (LLM call, persistence, event emission) lives in
-//! `compaction_run.rs` so this file stays a thin dispatch layer.
-
 use std::time::{Duration, SystemTime};
 
 use loopal_error::Result;

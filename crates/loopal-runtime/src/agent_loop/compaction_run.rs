@@ -1,9 +1,3 @@
-//! Compaction execution: invoke summarizer, persist atomically, emit
-//! lifecycle events. Split from `compaction.rs` so the public entry
-//! points there (auto-trigger, force-trigger, microcompact) stay short
-//! and the failure-semantics commentary lives next to the code it
-//! describes.
-
 use loopal_context::middleware::smart_compact::{CompactOutput, compact_to_boundary};
 use loopal_error::Result;
 use loopal_protocol::{AgentEventPayload, CompactPhase};

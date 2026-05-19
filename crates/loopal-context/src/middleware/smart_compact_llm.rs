@@ -1,9 +1,3 @@
-//! Drive the LLM call that produces a context-compaction summary.
-//!
-//! Tunables (max_tokens, retry schedule) live in `crate::compact_config`
-//! so the call site here is purely mechanism: build prompt → stream →
-//! retry on transient failures → propagate everything else.
-
 use loopal_error::LoopalError;
 use loopal_message::Message;
 use loopal_provider_api::{ChatParams, Provider, StreamChunk};
@@ -13,6 +7,8 @@ use tokio_util::sync::CancellationToken;
 
 use super::compact_prompt::{SYSTEM_PROMPT, build_prompt};
 use crate::compact_config::{COMPACT_MAX_OUTPUT_TOKENS, RETRY_BACKOFF};
+
+const CANCELLED_MSG: &str = "compact cancelled by interrupt";
 
 pub(super) async fn call_summarization_llm(
     provider: &dyn Provider,
@@ -31,7 +27,7 @@ pub(super) async fn call_summarization_llm(
             tokio::select! {
                 biased;
                 _ = cancel.cancelled() => {
-                    return Err(LoopalError::Other("compact cancelled by interrupt".into()));
+                    return Err(LoopalError::Other(CANCELLED_MSG.into()));
                 }
                 _ = tokio::time::sleep(*delay) => {}
             }
@@ -81,7 +77,7 @@ async fn drive_once(
         tokio::select! {
             biased;
             _ = cancel.cancelled() => {
-                return Err(LoopalError::Other("compact cancelled by interrupt".into()));
+                return Err(LoopalError::Other(CANCELLED_MSG.into()));
             }
             chunk = stream.next() => match chunk {
                 Some(Ok(StreamChunk::Text { text })) => raw.push_str(&text),

@@ -1,13 +1,3 @@
-//! Deterministic, LLM-free summary used when the summarization model is
-//! unavailable. Lives next to (but not inside) `smart_compact.rs` so the
-//! main orchestrator stays focused on the happy path.
-//!
-//! Output is intentionally low-fidelity: it lists touched files and tool
-//! call counts so the next turn can re-derive context cheaply, but it
-//! does NOT try to reconstruct prose. Anything richer than that would
-//! invite the failure mode it exists to guard against (looping on a
-//! 502).
-
 use loopal_message::{ContentBlock, Message, MessageOrigin, MessageRole};
 
 use super::touched_files::TouchedFile;

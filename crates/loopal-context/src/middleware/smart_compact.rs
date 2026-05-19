@@ -1,12 +1,3 @@
-//! Build a compaction summary from a conversation segment.
-//!
-//! The caller selects a `boundary_at` cut point: every message with
-//! index `< boundary_at` is summarized and discarded; everything at or
-//! after is preserved verbatim. The returned `(summary_msg, ack_msg)`
-//! pair is persisted by the runtime (so `Marker::CompactBoundary` can
-//! later anchor on the summary's message id) and pushed at the head of
-//! the new conversation.
-
 use loopal_error::LoopalError;
 use loopal_message::{ContentBlock, Message, MessageOrigin, MessageRole};
 use loopal_provider_api::Provider;

@@ -1,13 +1,3 @@
-//! Extract the final summary text from an LLM compaction response.
-//!
-//! The compaction prompt asks the model to emit two regions:
-//!   `<analysis>...</analysis>`  — scratchpad / drafting work, discardable.
-//!   `<summary>...</summary>`    — the structured summary, the only part
-//!                                  that should survive into context.
-//!
-//! If the model forgets the tags we fall back to the full response so a
-//! degraded summary is still better than no summary at all.
-
 /// Return the body of the first `<summary>...</summary>` block, trimmed.
 /// Falls back to the full response (trimmed) when no tag is present.
 pub fn extract_summary(raw: &str) -> &str {

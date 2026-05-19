@@ -1,10 +1,3 @@
-//! Prompt template for context compaction.
-//!
-//! Designed to be passed to a small fast model (Haiku-class). The 9-section
-//! structure mirrors what production coding agents (Claude Code) use; the
-//! `<analysis>` / `<summary>` tags keep the model's drafting work out of
-//! the persistent summary.
-
 pub const NO_TOOLS_PREAMBLE: &str = "\
 You MUST NOT call any tools.\n\
 You MUST NOT request follow-up actions.\n\

@@ -1,13 +1,3 @@
-//! Idle-time micro-compaction: scrub stale tool_result content in place.
-//!
-//! When a conversation goes idle longer than `idle_threshold`, any cached
-//! prompt prefix the provider was holding is already gone (5–60 min server
-//! cache TTL depending on plan). Keeping the verbatim tool output around
-//! after that point pays for tokens without buying cache hits, so we
-//! replace the bodies of file/shell/network tool results with a short
-//! marker. The ToolUse parents stay intact, so pair-matching invariants
-//! hold and the model still sees that the call happened.
-
 use std::time::{Duration, SystemTime};
 
 use loopal_message::{ContentBlock, Message};

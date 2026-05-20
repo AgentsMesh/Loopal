@@ -65,7 +65,7 @@ fn key(code: KeyCode) -> KeyEvent {
 }
 
 #[tokio::test]
-async fn askuser_silent_enter_without_interaction_does_not_submit() {
+async fn askuser_enter_without_interaction_submits_default_first_option() {
     let calls = vec![
         chunks::tool_turn(
             "tc-q",
@@ -82,27 +82,18 @@ async fn askuser_silent_enter_without_interaction_does_not_submit() {
     ];
     let inner = HarnessBuilder::new().calls(calls).build_spawned().await;
     let mut harness = build_tui(inner);
-    let _ = collect_until_question(&mut harness).await;
+    let mut events = collect_until_question(&mut harness).await;
 
-    // 用户没动 cursor 直接 Enter — 应该被防御不提交
+    // 用户没动 cursor 直接 Enter — 应直接提交默认第一项 "Yes"
     let action = handle_key(&mut harness.app, key(KeyCode::Enter));
     key_dispatch_for_test::dispatch(&mut harness.app, action).await;
 
-    // pending_question 应仍存在
-    let still_pending = harness
-        .app
-        .with_active_conversation(|conv| conv.pending_question.is_some());
-    assert!(
-        still_pending,
-        "silent Enter must NOT submit when user has not interacted"
-    );
+    let rest = harness.collect_until_idle().await;
+    events.extend(rest);
 
-    // transient_status 应有提示
-    let status = harness.app.current_transient_status().map(String::from);
-    assert!(
-        status.as_deref().is_some_and(|s| s.contains("Press")),
-        "transient_status should hint to press arrow keys, got: {status:?}"
-    );
+    let result =
+        assertions::find_tool_result(&events, "AskUser").expect("AskUser ToolResult event missing");
+    assert_q_prefix_and_answer(&result, 1, "Yes");
 }
 
 #[tokio::test]
@@ -125,12 +116,9 @@ async fn askuser_single_select_via_key_dispatch_passes_label_to_llm() {
     let mut harness = build_tui(inner);
     let mut events = collect_until_question(&mut harness).await;
 
-    // simulate user interaction: arrow down + up to acknowledge before Enter
+    // 方向键移到第二项后 Enter,提交 "No"
     let action = handle_key(&mut harness.app, key(KeyCode::Down));
     key_dispatch_for_test::dispatch(&mut harness.app, action).await;
-    let action = handle_key(&mut harness.app, key(KeyCode::Up));
-    key_dispatch_for_test::dispatch(&mut harness.app, action).await;
-
     let action = handle_key(&mut harness.app, key(KeyCode::Enter));
     key_dispatch_for_test::dispatch(&mut harness.app, action).await;
 
@@ -139,7 +127,7 @@ async fn askuser_single_select_via_key_dispatch_passes_label_to_llm() {
 
     let result =
         assertions::find_tool_result(&events, "AskUser").expect("AskUser ToolResult event missing");
-    assert_q_prefix_and_answer(&result, 1, "Yes");
+    assert_q_prefix_and_answer(&result, 1, "No");
 }
 
 #[tokio::test]

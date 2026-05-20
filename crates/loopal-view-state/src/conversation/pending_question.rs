@@ -85,14 +85,10 @@ impl PendingQuestion {
         self.current().map(|(_, s)| s.selection()).unwrap_or(&[])
     }
 
-    pub fn interacted(&self) -> bool {
-        self.current().map(|(_, s)| s.interacted()).unwrap_or(false)
-    }
-
     pub fn cursor_up(&mut self) {
         if let Some(s) = self.current_mut() {
             let next = s.cursor().saturating_sub(1);
-            s.user_set_cursor_clamped(next, usize::MAX);
+            s.set_cursor_clamped(next, usize::MAX);
         }
     }
 
@@ -100,7 +96,7 @@ impl PendingQuestion {
         let max = self.other_index();
         if let Some(s) = self.current_mut() {
             let next = s.cursor().saturating_add(1);
-            s.user_set_cursor_clamped(next, max);
+            s.set_cursor_clamped(next, max);
         }
     }
 

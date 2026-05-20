@@ -28,7 +28,6 @@ fn answers(q: &PendingQuestion) -> Vec<String> {
 fn set_cursor(q: &mut PendingQuestion, c: usize) {
     if let Some(s) = q.states.get_mut(q.current_question) {
         s.cursor = c;
-        s.interacted = true;
     }
 }
 

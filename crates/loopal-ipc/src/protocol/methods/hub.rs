@@ -90,3 +90,23 @@ pub const HUB_INTERRUPT: Method = Method {
 
 /// Query Hub status (uplink, agent count, etc).
 pub const HUB_STATUS: Method = Method { name: "hub/status" };
+
+/// Sub-agent → Hub: list all MCP tools available on the root agent.
+/// Response: `Vec<(server_name, ToolDefinition)>`. Used at sub-agent
+/// setup to populate ToolRegistry from the root's settled MCP servers.
+pub const HUB_MCP_LIST_TOOLS: Method = Method {
+    name: "hub/mcp/list_tools",
+};
+
+/// Sub-agent → Hub: invoke an MCP tool on the root agent.
+/// Params: `{ server: String, tool: String, args: Value }`.
+/// Response: `CallToolResult`.
+pub const HUB_MCP_CALL_TOOL: Method = Method {
+    name: "hub/mcp/call_tool",
+};
+
+/// Sub-agent → Hub: snapshot of all MCP server statuses (for display).
+/// Response: `Vec<McpServerSnapshot>`.
+pub const HUB_MCP_SNAPSHOT: Method = Method {
+    name: "hub/mcp/snapshot",
+};

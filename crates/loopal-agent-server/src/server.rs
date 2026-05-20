@@ -75,7 +75,7 @@ pub(crate) async fn dispatch_loop(
         }
 
         let should_break = method == methods::AGENT_SHUTDOWN.name;
-        respond_with(&connection, id, dispatch_simple(&method, hub).await).await;
+        respond_with(&connection, id, dispatch_simple(&method, params, hub).await).await;
         if should_break {
             break;
         }

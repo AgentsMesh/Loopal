@@ -92,3 +92,21 @@ pub const AGENT_QUESTION: Method = Method {
 
 pub const AGENT_JOIN: Method = Method { name: "agent/join" };
 pub const AGENT_LIST: Method = Method { name: "agent/list" };
+
+// ── MCP forwarding (Hub → root Agent) ───────────────────────────
+
+/// Hub → root Agent: list MCP tools owned by this agent.
+/// Sub-agents call `hub/mcp/list_tools` which Hub forwards here.
+pub const AGENT_MCP_LIST_TOOLS: Method = Method {
+    name: "agent/mcp/list_tools",
+};
+
+/// Hub → root Agent: invoke an MCP tool on this agent's behalf.
+pub const AGENT_MCP_CALL_TOOL: Method = Method {
+    name: "agent/mcp/call_tool",
+};
+
+/// Hub → root Agent: snapshot of this agent's MCP server statuses.
+pub const AGENT_MCP_SNAPSHOT: Method = Method {
+    name: "agent/mcp/snapshot",
+};

@@ -62,6 +62,7 @@ mod inbox_event_test;
 mod input_edge_test;
 mod input_emit_fail_edge_test;
 mod input_image_test;
+mod input_mcp_test;
 mod input_resources_test;
 mod input_scheduled_test;
 mod input_test;

@@ -62,7 +62,7 @@ async fn consume_events(
                     .agent_name
                     .as_ref()
                     .map(|q| q.agent.clone())
-                    .unwrap_or_else(|| "main".to_string());
+                    .unwrap_or_else(|| loopal_protocol::ROOT_AGENT_NAME.to_string());
                 match event.payload {
                     AgentEventPayload::Stream { text } => {
                         eprint!("{text}");

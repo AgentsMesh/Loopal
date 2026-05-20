@@ -173,6 +173,11 @@ impl McpManager {
     }
 
     /// Collect a snapshot of all managed connections for status display.
+    /// reason: stderr from the server process carries the most actionable
+    /// diagnostics (e.g. "browser is already running for chrome-profile").
+    /// Merge those tail lines into `errors` when the connection is in a
+    /// non-Connected state so the `/mcp` page surfaces them instead of just
+    /// a generic "did not complete handshake" wrapper.
     pub fn collect_snapshots(&self) -> Vec<McpConnectionSnapshot> {
         self.connections
             .iter()
@@ -181,6 +186,14 @@ impl McpManager {
                     McpServerConfig::Stdio { .. } => "stdio",
                     McpServerConfig::StreamableHttp { .. } => "streamable-http",
                 };
+                let mut errors = conn.errors.clone();
+                if !conn.status.is_connected()
+                    && let Ok(tail) = conn.stderr_tail.try_lock()
+                {
+                    for line in tail.iter() {
+                        errors.push(format!("stderr: {line}"));
+                    }
+                }
                 McpConnectionSnapshot {
                     name: name.clone(),
                     transport: transport.to_string(),
@@ -188,7 +201,7 @@ impl McpManager {
                     tool_count: conn.cached_tools.len(),
                     resource_count: conn.cached_resources.len(),
                     prompt_count: conn.cached_prompts.len(),
-                    errors: conn.errors.clone(),
+                    errors,
                 }
             })
             .collect()

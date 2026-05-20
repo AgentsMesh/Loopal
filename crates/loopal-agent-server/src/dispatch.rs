@@ -28,7 +28,11 @@ impl RpcErrorPayload {
     }
 }
 
-pub async fn dispatch_simple(method: &str, hub: &SessionHub) -> Result<Value, RpcErrorPayload> {
+pub async fn dispatch_simple(
+    method: &str,
+    params: Value,
+    hub: &SessionHub,
+) -> Result<Value, RpcErrorPayload> {
     // Idempotent re-handshake: clients may retry `initialize` after a transient
     // timeout (e.g. slow child stdin under sandboxed test runners). The canonical
     // first call is consumed by `wait_for_initialize_with_token`; any subsequent
@@ -49,6 +53,15 @@ pub async fn dispatch_simple(method: &str, hub: &SessionHub) -> Result<Value, Rp
             .map(|id| serde_json::json!({"session_id": id}))
             .collect();
         return Ok(serde_json::json!(sessions));
+    }
+    if method == methods::AGENT_MCP_LIST_TOOLS.name {
+        return crate::mcp_dispatch::handle_list_tools(hub).await;
+    }
+    if method == methods::AGENT_MCP_CALL_TOOL.name {
+        return crate::mcp_dispatch::handle_call_tool(hub, params).await;
+    }
+    if method == methods::AGENT_MCP_SNAPSHOT.name {
+        return crate::mcp_dispatch::handle_snapshot(hub).await;
     }
     if method == methods::INITIALIZE.name {
         // Idempotent re-initialize: clients may retry the handshake when their

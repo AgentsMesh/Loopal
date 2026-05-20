@@ -77,10 +77,9 @@ impl AgentClient {
 
     /// Send `agent/start` to begin the agent loop.
     pub async fn start_agent(&self, p: &StartAgentParams) -> anyhow::Result<String> {
-        // reason: parent hub_spawn waits 30s for handshake; cap below that so
-        // user sees the real IPC error (e.g. session-not-found) instead of the
-        // generic "handshake timeout".
-        const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(25);
+        // reason: agent/start no longer blocks on MCP spawn (LOOPAL_MCP_STARTUP_WAIT_SECS
+        // bounded wait, default 5s). 30s covers setup overhead + bounded wait + margin.
+        const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
         let result = tokio::time::timeout(
             TIMEOUT,
             self.connection

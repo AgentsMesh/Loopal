@@ -72,11 +72,11 @@ pub async fn register_agent_connection(
         let h = hub.lock().await;
         // Routed to the parent agent so the parent's ViewStateReducer
         // appends `name` to its `children` field. Parent defaults to
-        // root "main" when unspecified (top-level spawn).
+        // root agent when unspecified (top-level spawn).
         let parent_agent = parent_addr
             .as_ref()
             .map(|p| p.agent.clone())
-            .unwrap_or_else(|| "main".to_string());
+            .unwrap_or_else(|| loopal_protocol::ROOT_AGENT_NAME.to_string());
         let event = AgentEvent::named(
             QualifiedAddress::local(parent_agent),
             AgentEventPayload::SubAgentSpawned(loopal_protocol::SubAgentSpawn {

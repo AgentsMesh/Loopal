@@ -104,6 +104,20 @@ TUI Process ──stdio IPC──→ Agent Server Process ←──TCP──→ 
 - **New middleware**: Implement `Middleware` trait → add to pipeline in `bootstrap.rs`
 - **MCP tools**: Configure `mcp_servers` in settings.json → auto-discovered at startup
 
+## MCP startup model
+
+MCP server spawn does not block `agent/start`. The Kernel holds a `Arc<dyn McpProvider>` strategy with two implementations:
+
+- **`LocalMcpProvider`** (root agent): owns `Arc<RwLock<McpManager>>`. `spawn_background(configs)` fires the `start_all` future on a background `tokio::spawn` and returns immediately. `wait_until_settled(timeout)` races the background task against a deadline.
+- **`McpProxyClient`** (sub-agent, depth > 0): forwards `list_tools` / `call_tool` / `snapshot` to root via `hub/mcp/*` IPC. Hub forwards those to `"main"` agent's `agent/mcp/*` handler, which calls the root's `LocalMcpProvider`. **Sub-agents do not spawn MCP processes** — they share root's connections.
+
+`build_kernel_from_config` orchestrates:
+1. `kernel.spawn_mcp()` — fire-and-forget (no-op for proxy)
+2. `kernel.finalize_mcp_tools(LOOPAL_MCP_STARTUP_WAIT_SECS)` — bounded wait (default 5s), then register `McpToolAdapter` for every `(server, tool)` pair the provider reports
+3. Slow servers settle in the background; subsequent reconnects register their tools via `kernel.register_mcp_tools_for_server(name)`
+
+`McpConnection::connect` is wrapped in `tokio::time::timeout(config.timeout_ms)` defensively — bottoms out at the configured per-server limit even if the underlying rmcp transport ignores it.
+
 ## Vault + Secret runtime
 
 Zero-trust secret management. LLM never sees plaintext. Architecture is split

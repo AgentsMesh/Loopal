@@ -5,7 +5,7 @@ use loopal_ipc::protocol::methods;
 #[tokio::test]
 async fn dispatch_simple_lists_sessions() {
     let hub = SessionHub::new();
-    let outcome = dispatch_simple(methods::AGENT_LIST.name, &hub).await;
+    let outcome = dispatch_simple(methods::AGENT_LIST.name, serde_json::Value::Null, &hub).await;
     let value = outcome.expect("list ok");
     assert!(value.is_array(), "got: {value}");
 }
@@ -13,7 +13,7 @@ async fn dispatch_simple_lists_sessions() {
 #[tokio::test]
 async fn dispatch_simple_shutdown_is_ok() {
     let hub = SessionHub::new();
-    let outcome = dispatch_simple(methods::AGENT_SHUTDOWN.name, &hub).await;
+    let outcome = dispatch_simple(methods::AGENT_SHUTDOWN.name, serde_json::Value::Null, &hub).await;
     let value = outcome.expect("shutdown ok");
     assert_eq!(value["ok"], true);
 }
@@ -21,7 +21,7 @@ async fn dispatch_simple_shutdown_is_ok() {
 #[tokio::test]
 async fn dispatch_simple_unknown_method_returns_method_not_found() {
     let hub = SessionHub::new();
-    let outcome = dispatch_simple("agent/totally_made_up", &hub).await;
+    let outcome = dispatch_simple("agent/totally_made_up", serde_json::Value::Null, &hub).await;
     let err = outcome.expect_err("unknown method should error");
     assert_eq!(err.code, loopal_ipc::jsonrpc::METHOD_NOT_FOUND);
     assert!(
@@ -41,10 +41,10 @@ async fn dispatch_simple_initialize_is_idempotent() {
     // failure where slow child stdin caused legitimate retries to explode.
     let hub = SessionHub::new();
 
-    let first = dispatch_simple(methods::INITIALIZE.name, &hub)
+    let first = dispatch_simple(methods::INITIALIZE.name, serde_json::Value::Null, &hub)
         .await
         .expect("first initialize must succeed");
-    let second = dispatch_simple(methods::INITIALIZE.name, &hub)
+    let second = dispatch_simple(methods::INITIALIZE.name, serde_json::Value::Null, &hub)
         .await
         .expect("second initialize must also succeed (idempotent)");
 

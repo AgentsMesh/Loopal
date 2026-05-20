@@ -34,8 +34,14 @@ rust_test(
     edition = "2024",
     deps = [
         ":loopal-kernel",
-        "@crates//:tokio",
         "//crates/loopal-config",
+        "//crates/loopal-error",
+        "//crates/loopal-mcp",
         "//crates/loopal-provider",
+        "//crates/loopal-tool-api",
+        "@crates//:rmcp",
+        "@crates//:serde_json",
+        "@crates//:tokio",
     ],
+    proc_macro_deps = ["@crates//:async-trait"],
 )

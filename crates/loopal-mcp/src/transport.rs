@@ -2,13 +2,14 @@
 ///
 /// Creates transport and connects to MCP server in one step.
 /// HTTP connections automatically fall back to OAuth if auth is required.
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::process::Stdio;
 use std::sync::Arc;
 use std::time::Duration;
 
 use loopal_error::McpError;
 use rmcp::transport::child_process::TokioChildProcess;
+use tokio::sync::Mutex;
 use tracing::{info, warn};
 
 use crate::client::McpClient;
@@ -21,6 +22,7 @@ pub async fn connect_stdio(
     env: &HashMap<String, String>,
     timeout: Duration,
     sampling: Option<Arc<dyn SamplingCallback>>,
+    stderr_tail: Option<Arc<Mutex<VecDeque<String>>>>,
 ) -> Result<McpClient, McpError> {
     info!(command, ?args, "spawning MCP stdio server");
 
@@ -35,11 +37,13 @@ pub async fn connect_stdio(
         .spawn()
         .map_err(|e| McpError::ConnectionFailed(format!("{command}: {e}")))?;
 
-    // Drain child stderr to tracing so MCP server errors are visible in logs.
+    // Drain child stderr to tracing so MCP server errors are visible in logs,
+    // AND retain the tail in a per-connection buffer so the user can see
+    // server diagnostics in the /mcp page when a connection fails.
     if let Some(stderr) = stderr {
         let cmd_name = command.to_string();
         tokio::spawn(async move {
-            drain_stderr(stderr, &cmd_name).await;
+            drain_stderr(stderr, &cmd_name, stderr_tail).await;
         });
     }
 
@@ -106,8 +110,13 @@ fn build_http_client(headers: &HashMap<String, String>) -> Result<reqwest::Clien
         .map_err(|e| McpError::ConnectionFailed(format!("HTTP client: {e}")))
 }
 
-/// Forward child process stderr lines to tracing as warnings.
-async fn drain_stderr(stderr: tokio::process::ChildStderr, server: &str) {
+/// Forward child process stderr lines to tracing as warnings, AND retain
+/// the tail in `stderr_tail` for `/mcp` page diagnostics.
+async fn drain_stderr(
+    stderr: tokio::process::ChildStderr,
+    server: &str,
+    stderr_tail: Option<Arc<Mutex<VecDeque<String>>>>,
+) {
     use tokio::io::{AsyncBufReadExt, BufReader};
     let mut reader = BufReader::new(stderr);
     let mut line = String::new();
@@ -119,6 +128,13 @@ async fn drain_stderr(stderr: tokio::process::ChildStderr, server: &str) {
                 let trimmed = line.trim();
                 if !trimmed.is_empty() {
                     warn!(server, "MCP stderr: {trimmed}");
+                    if let Some(tail) = stderr_tail.as_ref() {
+                        let mut t = tail.lock().await;
+                        if t.len() == t.capacity().max(16) {
+                            t.pop_front();
+                        }
+                        t.push_back(trimmed.to_string());
+                    }
                 }
             }
         }

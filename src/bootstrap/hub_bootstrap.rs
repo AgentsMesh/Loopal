@@ -97,8 +97,13 @@ pub async fn bootstrap_hub_and_agent(
         .await?;
 
     let (root_conn, incoming_rx) = client.into_parts();
-    loopal_agent_hub::agent_io::start_agent_io(hub.clone(), "main", root_conn, incoming_rx);
-    info!("root agent registered as 'main' in Hub");
+    loopal_agent_hub::agent_io::start_agent_io(
+        hub.clone(),
+        loopal_protocol::ROOT_AGENT_NAME,
+        root_conn,
+        incoming_rx,
+    );
+    info!(name = loopal_protocol::ROOT_AGENT_NAME, "root agent registered");
 
     Ok(BootstrapContext {
         hub,

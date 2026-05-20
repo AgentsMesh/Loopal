@@ -7,13 +7,13 @@ use loopal_config::Settings;
 use loopal_error::Result;
 use loopal_hooks::{HookRegistry, HookService};
 use loopal_mcp::types::{McpPrompt, McpResource};
-use loopal_mcp::{McpManager, McpToolAdapter};
+use loopal_mcp::{LocalMcpProvider, McpManager, McpProvider, SamplingCallback};
 use loopal_provider::ProviderRegistry;
 use loopal_tool_api::ToolDefinition;
 use loopal_tools::ToolRegistry;
 use loopal_vault_api::Vault;
 use tokio::sync::RwLock;
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::hook_factory::DefaultExecutorFactory;
 use crate::provider_registry;
@@ -22,15 +22,38 @@ use loopal_tool_background::BackgroundTaskStore;
 
 use crate::bg_gc::spawn_bg_gc_tick;
 
+/// Where MCP capability comes from for this kernel.
+/// `Local` owns connections (root agent); `Proxy` forwards over IPC (sub-agent).
+pub(super) enum McpBackend {
+    Local(Arc<LocalMcpProvider>),
+    Proxy(Arc<dyn McpProvider>),
+}
+
+impl McpBackend {
+    pub(super) fn provider(&self) -> Arc<dyn McpProvider> {
+        match self {
+            Self::Local(local) => local.clone(),
+            Self::Proxy(proxy) => proxy.clone(),
+        }
+    }
+
+    pub(super) fn local(&self) -> Option<&Arc<LocalMcpProvider>> {
+        match self {
+            Self::Local(local) => Some(local),
+            Self::Proxy(_) => None,
+        }
+    }
+}
+
 pub struct Kernel {
     pub(super) tool_registry: ToolRegistry,
     provider_registry: ProviderRegistry,
     hook_service: HookService,
-    pub(super) mcp_manager: Arc<RwLock<McpManager>>,
+    pub(super) mcp: McpBackend,
     pub(super) mcp_instructions: Vec<(String, String)>,
     pub(super) mcp_resources: Vec<(String, McpResource)>,
     pub(super) mcp_prompts: Vec<(String, McpPrompt)>,
-    settings: Settings,
+    pub(super) settings: Settings,
     bg_store: Arc<BackgroundTaskStore>,
     secrets: Option<Arc<dyn Vault>>,
 }
@@ -48,7 +71,7 @@ impl Kernel {
         let hook_registry = HookRegistry::new(settings.hooks.clone());
         let factory = Arc::new(DefaultExecutorFactory::new(None));
         let hook_service = HookService::new(hook_registry, factory);
-        let mcp_manager = Arc::new(RwLock::new(McpManager::new()));
+        let local = Arc::new(LocalMcpProvider::new(Arc::new(RwLock::new(McpManager::new()))));
 
         spawn_bg_gc_tick(bg_store.clone(), bg_config);
 
@@ -58,7 +81,7 @@ impl Kernel {
             tool_registry,
             provider_registry,
             hook_service,
-            mcp_manager,
+            mcp: McpBackend::Local(local),
             mcp_instructions: Vec::new(),
             mcp_resources: Vec::new(),
             mcp_prompts: Vec::new(),
@@ -68,76 +91,33 @@ impl Kernel {
         })
     }
 
-    /// Inject the resolved secret store. Subsequent operations that need
-    /// secret access (MCP spawn, runtime tool args, prompt translation) use it.
     pub fn set_secrets(&mut self, store: Arc<dyn Vault>) {
         self.secrets = Some(store);
     }
 
-    /// The currently-configured secret store, if any.
     pub fn secrets(&self) -> Option<&Arc<dyn Vault>> {
         self.secrets.as_ref()
     }
 
-    /// Register an additional tool (thread-safe, can be called after Arc wrapping).
     pub fn register_tool(&self, tool: Box<dyn loopal_tool_api::Tool>) {
         self.tool_registry.register(tool);
     }
 
-    /// Register thread-goal tools — only valid for the root agent that
-    /// owns a `goal_session`. Sub-agents must not call this.
     pub fn register_goal_tools(&self) {
         loopal_tools::builtin::register_goal_tools(&self.tool_registry);
     }
 
-    /// Register an additional provider (useful for testing with mock providers).
     pub fn register_provider(&mut self, provider: Arc<dyn loopal_provider_api::Provider>) {
         self.provider_registry.register(provider);
     }
 
-    /// Start all configured MCP servers and register their tools.
-    pub async fn start_mcp(&mut self) -> Result<()> {
-        if !self.settings.mcp_servers.is_empty() {
-            let mut mgr = self.mcp_manager.write().await;
-            if let Some(ref store) = self.secrets {
-                mgr.set_secrets(store.clone());
-            }
-            mgr.start_all(&self.settings.mcp_servers).await?;
-            info!(
-                count = self.settings.mcp_servers.len(),
-                "MCP servers started"
-            );
-
-            let tools_with_server = mgr.get_tools_with_server();
-            self.mcp_instructions = mgr.get_server_instructions();
-            self.mcp_resources = mgr.get_resources();
-            self.mcp_prompts = mgr.get_prompts();
-            drop(mgr);
-
-            let mut skipped_tools = Vec::new();
-            for (server_name, tool_def) in tools_with_server {
-                if self.tool_registry.get(&tool_def.name).is_some() {
-                    warn!(
-                        tool = %tool_def.name, server = %server_name,
-                        "MCP tool name conflicts with existing tool, skipping"
-                    );
-                    skipped_tools.push(tool_def.name.clone());
-                    continue;
-                }
-                info!(tool = %tool_def.name, server = %server_name, "registering MCP tool");
-                let adapter =
-                    McpToolAdapter::new(tool_def, server_name, Arc::clone(&self.mcp_manager));
-                self.tool_registry.register(Box::new(adapter));
-            }
-
-            if !skipped_tools.is_empty() {
-                let mut mgr = self.mcp_manager.write().await;
-                for name in &skipped_tools {
-                    mgr.remove_tool_mapping(name);
-                }
-            }
+    /// Install a sampling callback so MCP servers can issue LLM calls
+    /// (e.g. the in-process Claude provider). No-op for sub-agent kernels
+    /// whose backend is a remote proxy.
+    pub async fn set_mcp_sampling(&self, callback: Arc<dyn SamplingCallback>) {
+        if let Some(local) = self.mcp.local() {
+            local.manager().write().await.set_sampling(callback);
         }
-        Ok(())
     }
 
     pub fn create_backend(
@@ -197,7 +177,15 @@ impl Kernel {
         &self.hook_service
     }
 
-    pub fn mcp_manager(&self) -> &Arc<RwLock<McpManager>> {
-        &self.mcp_manager
+    /// Local MCP manager (root agent only — None for sub-agents whose
+    /// backend is a remote proxy).
+    pub fn mcp_manager(&self) -> Option<Arc<RwLock<McpManager>>> {
+        self.mcp.local().map(|l| l.manager())
+    }
+
+    /// Cloned reference to the local MCP provider. Used by late-registration
+    /// listeners that must outlive `build_kernel_from_config`'s bounded wait.
+    pub fn local_mcp_provider(&self) -> Option<Arc<LocalMcpProvider>> {
+        self.mcp.local().cloned()
     }
 }

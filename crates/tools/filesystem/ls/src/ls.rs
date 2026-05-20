@@ -47,21 +47,22 @@ impl TypedTool<LsParams> for LsTool {
             Err(e) => return Ok(ToolResult::error(e.to_string())),
         };
 
-        let info = match ctx.backend.file_info(target.to_str().unwrap_or(".")).await {
+        let info = match ctx.backend.file_info(&target).await {
             Ok(i) => i,
             Err(e) => return Ok(ToolResult::error(e.to_string())),
         };
 
         if !info.is_dir {
             return Ok(ToolResult::success(ls_format::format_stat_from_info(
-                &target, &info,
+                target.as_path(),
+                &info,
             )));
         }
 
         let long = input.long.unwrap_or(false);
         let show_all = input.all.unwrap_or(false);
 
-        let ls_result = match ctx.backend.ls(target.to_str().unwrap_or(".")).await {
+        let ls_result = match ctx.backend.ls(&target).await {
             Ok(r) => r,
             Err(e) => return Ok(ToolResult::error(e.to_string())),
         };

@@ -4,6 +4,8 @@ use loopal_tool_api::{PermissionLevel, ToolContext, ToolResult, TypedTool};
 use schemars::JsonSchema;
 use serde::Deserialize;
 
+use crate::dst_resolve::{ensure_parent_dir, resolve_dst};
+
 pub struct MoveFileTool;
 
 #[derive(Deserialize, JsonSchema)]
@@ -35,45 +37,38 @@ impl TypedTool<MoveFileParams> for MoveFileTool {
         input: MoveFileParams,
         ctx: &ToolContext,
     ) -> Result<ToolResult, LoopalError> {
-        if let Err(e) = ctx.backend.file_info(&input.src).await {
+        let src = match ctx.backend.resolve_path(&input.src, true) {
+            Ok(p) => p,
+            Err(e) => return Ok(ToolResult::error(e.to_string())),
+        };
+        if let Err(e) = ctx.backend.file_info(&src).await {
             return Ok(ToolResult::error(e.to_string()));
         }
 
-        let final_dst = match ctx.backend.file_info(&input.dst).await {
-            Ok(info) if info.is_dir => {
-                let src_path = std::path::Path::new(&input.src);
-                let name = src_path.file_name().ok_or_else(|| {
-                    LoopalError::Tool(loopal_error::ToolError::InvalidInput(
-                        "source has no file name".into(),
-                    ))
-                })?;
-                let dst_path = std::path::Path::new(&input.dst).join(name);
-                dst_path.to_string_lossy().into_owned()
-            }
-            _ => input.dst.clone(),
+        let dst = match resolve_dst(ctx.backend.as_ref(), &input.src, &input.dst).await {
+            Ok(d) => d,
+            Err(e) => return Ok(ToolResult::error(e.to_string())),
         };
 
-        if let Some(parent) = std::path::Path::new(&final_dst).parent()
-            && let Err(e) = ctx.backend.create_dir_all(&parent.to_string_lossy()).await
-        {
+        if let Err(e) = ensure_parent_dir(ctx.backend.as_ref(), &dst.resolved).await {
             return Ok(ToolResult::error(e.to_string()));
         }
 
-        match ctx.backend.rename(&input.src, &final_dst).await {
+        match ctx.backend.rename(&src, &dst.resolved).await {
             Ok(()) => {}
             Err(_) => {
-                if let Err(e) = ctx.backend.copy(&input.src, &final_dst).await {
+                if let Err(e) = ctx.backend.copy(&src, &dst.resolved).await {
                     return Ok(ToolResult::error(e.to_string()));
                 }
-                if let Err(e) = ctx.backend.remove(&input.src).await {
+                if let Err(e) = ctx.backend.remove(&src).await {
                     return Ok(ToolResult::error(e.to_string()));
                 }
             }
         }
 
         Ok(ToolResult::success(format!(
-            "Moved {} → {final_dst}",
-            input.src
+            "Moved {} → {}",
+            input.src, dst.display
         )))
     }
 }

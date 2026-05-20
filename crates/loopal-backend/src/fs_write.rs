@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use loopal_error::ToolIoError;
-use loopal_tool_api::backend_types::{EditResult, WriteResult};
+use loopal_tool_api::backend_types::WriteResult;
 
 pub async fn write_file(path: &Path, content: &str) -> Result<WriteResult, ToolIoError> {
     if let Some(parent) = path.parent() {
@@ -36,40 +36,4 @@ pub async fn write_file(path: &Path, content: &str) -> Result<WriteResult, ToolI
     Ok(WriteResult {
         bytes_written: content.len(),
     })
-}
-
-pub async fn edit_file(
-    path: &Path,
-    old: &str,
-    new: &str,
-    replace_all: bool,
-) -> Result<EditResult, ToolIoError> {
-    let content = tokio::fs::read_to_string(path).await.map_err(|e| {
-        if e.kind() == std::io::ErrorKind::NotFound {
-            ToolIoError::NotFound(format!("{}", path.display()))
-        } else {
-            ToolIoError::Io(e)
-        }
-    })?;
-
-    use loopal_edit_core::search_replace::{SearchReplaceResult, search_replace};
-    match search_replace(&content, old, new, replace_all) {
-        SearchReplaceResult::Ok(new_content) => {
-            let count = if replace_all {
-                content.matches(old).count()
-            } else {
-                1
-            };
-            write_file(path, &new_content).await?;
-            Ok(EditResult {
-                replacements: count,
-            })
-        }
-        SearchReplaceResult::NotFound => {
-            Err(ToolIoError::Other("old_string not found in file".into()))
-        }
-        SearchReplaceResult::MultipleMatches(n) => Err(ToolIoError::Other(format!(
-            "old_string found {n} times — use replace_all or provide more context"
-        ))),
-    }
 }

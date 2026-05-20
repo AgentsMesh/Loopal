@@ -1,14 +1,18 @@
 use async_trait::async_trait;
+use loopal_edit_core::multi_edit::{MultiEditError, MultiEditItem, apply_multi_edits};
+use loopal_edit_core::omission_detector::detect_omissions;
+use loopal_edit_core::omission_message::format_omission_error;
 use loopal_error::LoopalError;
 use loopal_secret_runtime::{SECRET_REJECTION_MESSAGE, WIRE_REF_MARKER};
 use loopal_tool_api::{PermissionLevel, ToolContext, ToolResult, TypedTool};
 use schemars::JsonSchema;
 use serde::Deserialize;
 
-use loopal_edit_core::omission_detector::detect_omissions;
-
 pub struct MultiEditTool;
 
+/// JSON-schema-bound input type from LLM tool calls. Converted to
+/// `loopal_edit_core::multi_edit::MultiEditItem` (same shape, no
+/// `Deserialize`/`JsonSchema`) for the pure algorithm in edit-core.
 #[derive(Deserialize, JsonSchema)]
 pub struct EditItem {
     pub old_string: String,
@@ -61,42 +65,53 @@ impl TypedTool<MultiEditParams> for MultiEditTool {
             return Ok(ToolResult::error("edits array must not be empty"));
         }
 
-        let content = match ctx.backend.read_raw(&input.file_path).await {
+        let path = match ctx.backend.resolve_path(&input.file_path, true) {
+            Ok(p) => p,
+            Err(e) => return Ok(ToolResult::error(e.to_string())),
+        };
+
+        let content = match ctx.backend.read_raw(&path).await {
             Ok(c) => c,
             Err(e) => return Ok(ToolResult::error(e.to_string())),
         };
 
-        let mut current = content;
         for (i, edit) in input.edits.iter().enumerate() {
             let omissions = detect_omissions(&edit.new_string);
             if !omissions.is_empty() {
-                return Ok(ToolResult::error(format!(
-                    "Edit {i}: omission detected in new_string: {}",
-                    omissions.join(", ")
+                return Ok(ToolResult::error(format_omission_error(
+                    &format!("edit {i} new_string"),
+                    &omissions,
                 )));
-            }
-
-            let count = current.matches(&edit.old_string).count();
-            match count {
-                0 => {
-                    return Ok(ToolResult::error(format!(
-                        "Edit {i}: old_string not found in current content"
-                    )));
-                }
-                1 => current = current.replacen(&edit.old_string, &edit.new_string, 1),
-                n => {
-                    return Ok(ToolResult::error(format!(
-                        "Edit {i}: old_string found {n} times; must be unique"
-                    )));
-                }
             }
         }
 
-        match ctx.backend.write(&input.file_path, &current).await {
+        let items: Vec<MultiEditItem> = input
+            .edits
+            .iter()
+            .map(|e| MultiEditItem {
+                old_string: e.old_string.clone(),
+                new_string: e.new_string.clone(),
+            })
+            .collect();
+
+        let outcome = match apply_multi_edits(&content, &items) {
+            Ok(o) => o,
+            Err(MultiEditError::NotFound { index }) => {
+                return Ok(ToolResult::error(format!(
+                    "Edit {index}: old_string not found in current content"
+                )));
+            }
+            Err(MultiEditError::MultipleMatches { index, count }) => {
+                return Ok(ToolResult::error(format!(
+                    "Edit {index}: old_string found {count} times; must be unique"
+                )));
+            }
+        };
+
+        match ctx.backend.write(&path, &outcome.content).await {
             Ok(_) => Ok(ToolResult::success(format!(
                 "Applied {} edit(s) to {}",
-                input.edits.len(),
-                input.file_path
+                outcome.applied, input.file_path
             ))),
             Err(e) => Ok(ToolResult::error(e.to_string())),
         }

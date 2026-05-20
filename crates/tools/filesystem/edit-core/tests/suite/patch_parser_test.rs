@@ -175,3 +175,14 @@ fn parse_add_with_blank_plus_line() {
         _ => panic!("expected Add"),
     }
 }
+
+#[test]
+fn parse_add_rejects_unprefixed_non_empty_line() {
+    let patch = "*** Add File: a.txt\n+line_a\nmissing_plus\n+line_b\n";
+    let e = parse_patch(patch).unwrap_err();
+    assert!(
+        e.message.contains("unexpected line in add body"),
+        "got: {}",
+        e.message
+    );
+}

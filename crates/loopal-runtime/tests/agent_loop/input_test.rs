@@ -21,7 +21,7 @@ fn test_tool_ctx_matches_session() {
     let expected_cwd = std::path::Path::new(&runner.params.session.cwd)
         .canonicalize()
         .unwrap_or_else(|_| runner.params.session.cwd.clone().into());
-    assert_eq!(runner.tool_ctx.backend.cwd(), expected_cwd);
+    assert_eq!(runner.tool_ctx.backend.cwd().as_path(), expected_cwd);
     assert_eq!(runner.tool_ctx.session_id, runner.params.session.id);
 }
 

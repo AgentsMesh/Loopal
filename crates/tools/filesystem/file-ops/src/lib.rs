@@ -1,5 +1,6 @@
 pub mod copy;
 pub mod delete;
+mod dst_resolve;
 pub mod move_file;
 
 pub use copy::{CopyFileParams, CopyFileTool};

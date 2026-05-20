@@ -90,3 +90,24 @@ async fn test_write_missing_content_returns_error() {
 
     assert!(result.is_err());
 }
+
+#[test]
+fn test_write_precheck_rejects_secret_marker_in_content() {
+    let tool = make_tool();
+    let rejection =
+        tool.precheck(&json!({"file_path": "a.txt", "content": "token=<secret_ref:api_key>"}));
+    assert!(
+        rejection.is_some(),
+        "content carrying <secret_ref:...> must be rejected"
+    );
+}
+
+#[test]
+fn test_write_precheck_rejects_secret_marker_in_file_path() {
+    let tool = make_tool();
+    let rejection = tool.precheck(&json!({"file_path": "<secret_ref:path>", "content": "data"}));
+    assert!(
+        rejection.is_some(),
+        "file_path carrying <secret_ref:...> must be rejected"
+    );
+}

@@ -5,7 +5,7 @@ use std::sync::Arc;
 use loopal_backend::{LocalBackend, ResourceLimits};
 use loopal_config::{NetworkPolicy, ResolvedPolicy, SandboxPolicy};
 use loopal_error::ToolIoError;
-use loopal_tool_api::Backend;
+use loopal_tool_api::{Backend, ResolvedPath};
 
 fn unique_session_id() -> String {
     format!("test-{}", uuid::Uuid::new_v4().simple())
@@ -42,6 +42,16 @@ fn make_readonly_backend(cwd: &std::path::Path) -> Arc<LocalBackend> {
         ResourceLimits::default(),
         unique_session_id(),
     )
+}
+
+async fn write_via(
+    backend: &Arc<LocalBackend>,
+    raw: &str,
+    content: &str,
+) -> Result<(), ToolIoError> {
+    let p = backend.resolve_path(raw, true)?;
+    backend.write(&p, content).await?;
+    Ok(())
 }
 
 // ── check_sandbox_path ───────────────────────────────────────────
@@ -90,7 +100,7 @@ fn check_sandbox_path_returns_none_after_approve() {
     let dir = tempfile::tempdir().unwrap();
     let backend = make_backend(dir.path());
     let evil = outside_cwd_path();
-    let path = std::path::PathBuf::from(evil);
+    let path = ResolvedPath::from_backend_resolved(std::path::PathBuf::from(evil));
 
     // Before approval: needs approval
     assert!(backend.check_sandbox_path(evil, true).is_some());
@@ -107,7 +117,7 @@ async fn write_to_allowed_path_succeeds() {
     let dir = tempfile::tempdir().unwrap();
     let backend = make_backend(dir.path());
     let target = dir.path().join("test.txt");
-    let result = backend.write(target.to_str().unwrap(), "hello").await;
+    let result = write_via(&backend, target.to_str().unwrap(), "hello").await;
     assert!(result.is_ok());
 }
 
@@ -115,7 +125,7 @@ async fn write_to_allowed_path_succeeds() {
 async fn write_outside_cwd_returns_requires_approval() {
     let dir = tempfile::tempdir().unwrap();
     let backend = make_backend(dir.path());
-    let result = backend.write(outside_cwd_path(), "bad").await;
+    let result = write_via(&backend, outside_cwd_path(), "bad").await;
     assert!(matches!(result, Err(ToolIoError::RequiresApproval(_))));
 }
 
@@ -124,7 +134,7 @@ async fn write_to_deny_glob_returns_requires_approval() {
     let dir = tempfile::tempdir().unwrap();
     let backend = make_backend(dir.path());
     let env_path = dir.path().join(".env");
-    let result = backend.write(env_path.to_str().unwrap(), "SECRET=x").await;
+    let result = write_via(&backend, env_path.to_str().unwrap(), "SECRET=x").await;
     assert!(matches!(result, Err(ToolIoError::RequiresApproval(_))));
 }
 
@@ -133,21 +143,21 @@ async fn write_outside_cwd_succeeds_after_approval() {
     let dir = tempfile::tempdir().unwrap();
     let backend = make_backend(dir.path());
 
-    // Create a writable target directory for the test
     let target_dir = tempfile::tempdir().unwrap();
     let target = target_dir.path().join("approved.txt");
 
     // Before approval: fails
     assert!(matches!(
-        backend.write(target.to_str().unwrap(), "data").await,
+        write_via(&backend, target.to_str().unwrap(), "data").await,
         Err(ToolIoError::RequiresApproval(_))
     ));
 
-    // Approve the path (use to_absolute logic: absolute path as-is)
-    backend.approve_path(&target);
+    // Approve the path
+    let target_resolved = ResolvedPath::from_backend_resolved(target.clone());
+    backend.approve_path(&target_resolved);
 
     // After approval: succeeds
-    let result = backend.write(target.to_str().unwrap(), "data").await;
+    let result = write_via(&backend, target.to_str().unwrap(), "data").await;
     assert!(
         result.is_ok(),
         "expected success after approval, got: {result:?}"
@@ -160,8 +170,7 @@ async fn readonly_mode_hard_denies_writes() {
     let dir = tempfile::tempdir().unwrap();
     let backend = make_readonly_backend(dir.path());
     let target = dir.path().join("test.txt");
-    let result = backend.write(target.to_str().unwrap(), "data").await;
-    // ReadOnly returns PermissionDenied (hard), not RequiresApproval (soft)
+    let result = write_via(&backend, target.to_str().unwrap(), "data").await;
     assert!(matches!(result, Err(ToolIoError::PermissionDenied(_))));
 }
 
@@ -172,14 +181,13 @@ async fn approval_is_session_scoped_across_calls() {
     let target_dir = tempfile::tempdir().unwrap();
     let target = target_dir.path().join("reuse.txt");
 
-    backend.approve_path(&target);
+    let target_resolved = ResolvedPath::from_backend_resolved(target.clone());
+    backend.approve_path(&target_resolved);
 
-    // First write
-    let r1 = backend.write(target.to_str().unwrap(), "first").await;
+    let r1 = write_via(&backend, target.to_str().unwrap(), "first").await;
     assert!(r1.is_ok());
 
-    // Second write to same path — no re-approval needed
-    let r2 = backend.write(target.to_str().unwrap(), "second").await;
+    let r2 = write_via(&backend, target.to_str().unwrap(), "second").await;
     assert!(r2.is_ok());
     assert_eq!(std::fs::read_to_string(&target).unwrap(), "second");
 }

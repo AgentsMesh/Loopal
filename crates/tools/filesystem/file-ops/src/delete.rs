@@ -34,14 +34,19 @@ impl TypedTool<DeleteParams> for DeleteTool {
         input: DeleteParams,
         ctx: &ToolContext,
     ) -> Result<ToolResult, LoopalError> {
-        let info = match ctx.backend.file_info(&input.path).await {
+        let path = match ctx.backend.resolve_path(&input.path, true) {
+            Ok(p) => p,
+            Err(e) => return Ok(ToolResult::error(e.to_string())),
+        };
+
+        let info = match ctx.backend.file_info(&path).await {
             Ok(i) => i,
             Err(e) => return Ok(ToolResult::error(e.to_string())),
         };
 
         let kind = if info.is_dir { "directory" } else { "file" };
 
-        match ctx.backend.remove(&input.path).await {
+        match ctx.backend.remove(&path).await {
             Ok(()) => Ok(ToolResult::success(format!(
                 "Deleted {} ({kind})",
                 input.path

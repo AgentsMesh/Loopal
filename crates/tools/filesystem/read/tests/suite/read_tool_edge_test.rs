@@ -116,3 +116,64 @@ async fn test_read_empty_string_optional_fields_ignored() {
     assert!(!result.is_error);
     assert!(result.content.contains("content here"));
 }
+
+#[tokio::test]
+async fn test_read_binary_file_rejected_with_actionable_error() {
+    let tmp = tempfile::tempdir().unwrap();
+    let file = tmp.path().join("data.bin");
+    let mut payload = vec![0xFFu8, 0xFE, 0x00, 0x42, 0x00, 0x99];
+    payload.extend(std::iter::repeat_n(0x88, 32));
+    std::fs::write(&file, payload).unwrap();
+
+    let tool = TypedBridge::<ReadTool, ReadParams>::new(ReadTool);
+    let backend = loopal_backend::LocalBackend::new(
+        tmp.path().to_path_buf(),
+        None,
+        loopal_backend::ResourceLimits::default(),
+        "test-session",
+    );
+    let ctx = ToolContext::new(backend, "test");
+
+    let r = tool
+        .execute(json!({"file_path": "data.bin"}), &ctx)
+        .await
+        .unwrap();
+    assert!(r.is_error, "binary file must be rejected: {}", r.content);
+    assert!(
+        r.content.contains("binary"),
+        "error should mention 'binary' for LLM context, got: {}",
+        r.content
+    );
+}
+
+#[tokio::test]
+async fn test_read_over_size_limit_hints_to_use_offset_limit() {
+    let tmp = tempfile::tempdir().unwrap();
+    let file = tmp.path().join("big.txt");
+    std::fs::write(&file, "x".repeat(500)).unwrap();
+
+    let limits = loopal_backend::ResourceLimits {
+        max_file_read_bytes: 100,
+        ..loopal_backend::ResourceLimits::default()
+    };
+    let backend =
+        loopal_backend::LocalBackend::new(tmp.path().to_path_buf(), None, limits, "test-session");
+    let ctx = ToolContext::new(backend, "test");
+    let tool = TypedBridge::<ReadTool, ReadParams>::new(ReadTool);
+
+    let r = tool
+        .execute(json!({"file_path": "big.txt"}), &ctx)
+        .await
+        .unwrap();
+    assert!(r.is_error);
+    assert!(
+        r.content.contains("too large"),
+        "expected size-limit phrase, got: {}",
+        r.content
+    );
+    assert!(
+        r.content.contains("offset") && r.content.contains("limit"),
+        "TooLarge error must hint at offset/limit pagination for LLM, got: {}",
+        r.content
+    );
+}

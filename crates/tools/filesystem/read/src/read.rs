@@ -52,7 +52,11 @@ impl TypedTool<ReadParams> for ReadTool {
         input: ReadParams,
         ctx: &ToolContext,
     ) -> Result<ToolResult, LoopalError> {
-        if let Ok(preview) = ctx.backend.peek_bytes(&input.file_path, 16).await
+        let path = match ctx.backend.resolve_path(&input.file_path, false) {
+            Ok(p) => p,
+            Err(e) => return Ok(ToolResult::error(e.to_string())),
+        };
+        if let Ok(preview) = ctx.backend.peek_bytes(&path, 16).await
             && ImageMime::from_magic(&preview).is_some()
         {
             return Ok(ToolResult::error(
@@ -62,9 +66,16 @@ impl TypedTool<ReadParams> for ReadTool {
         let offset = input.offset.unwrap_or(1).max(1) as usize;
         let limit = input.limit.unwrap_or(2000) as usize;
 
-        match ctx.backend.read(&input.file_path, offset - 1, limit).await {
+        match ctx.backend.read(&path, offset - 1, limit).await {
             Ok(result) => Ok(ToolResult::success(result.content)),
-            Err(e) => Ok(ToolResult::error(e.to_string())),
+            Err(e) => {
+                let msg = if matches!(e, loopal_error::ToolIoError::TooLarge { .. }) {
+                    format!("{e}. Use the `offset` and `limit` parameters to read in chunks.")
+                } else {
+                    e.to_string()
+                };
+                Ok(ToolResult::error(msg))
+            }
         }
     }
 }

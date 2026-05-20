@@ -62,9 +62,10 @@ pub fn approve_all(backend: &dyn Backend, needs: &[ApprovalNeeded]) {
         let abs = if p.is_absolute() {
             p.to_path_buf()
         } else {
-            backend.cwd().join(p)
+            backend.cwd().as_path().join(p)
         };
-        backend.approve_path(&abs);
+        let resolved = loopal_tool_api::ResolvedPath::from_backend_resolved(abs);
+        backend.approve_path(&resolved);
     }
 }
 

@@ -104,3 +104,20 @@ fn test_read_html_schema() {
     assert!(required.contains(&json!("file_path")));
     assert!(schema["properties"]["pages"].is_null());
 }
+
+#[tokio::test]
+async fn test_read_html_rejects_path_traversal() {
+    let dir = tempfile::tempdir().unwrap();
+    let ctx = make_ctx(dir.path());
+    let tool = make_tool();
+    let r = tool
+        .execute(json!({"file_path": "../escape.html"}), &ctx)
+        .await
+        .unwrap();
+    assert!(r.is_error, "traversal must be rejected");
+    assert!(
+        r.content.contains("escapes") || r.content.contains("outside"),
+        "expected path-escape diagnostic, got: {}",
+        r.content
+    );
+}

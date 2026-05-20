@@ -5,6 +5,8 @@
 
 use std::time::Duration;
 
+use crate::path::ResolvedPath;
+
 /// Result of a file read operation.
 #[derive(Debug, Clone)]
 pub struct ReadResult {
@@ -27,13 +29,6 @@ pub struct ImageResult {
 #[derive(Debug, Clone)]
 pub struct WriteResult {
     pub bytes_written: usize,
-}
-
-/// Result of a search-and-replace edit operation.
-#[derive(Debug, Clone)]
-pub struct EditResult {
-    /// Number of replacements made.
-    pub replacements: usize,
 }
 
 /// Result of a shell command execution.
@@ -98,7 +93,7 @@ pub struct LsEntry {
 #[derive(Debug, Clone)]
 pub struct GlobOptions {
     pub pattern: String,
-    pub path: Option<String>,
+    pub path: Option<ResolvedPath>,
     pub type_filter: Option<String>,
     pub max_results: usize,
 }
@@ -126,7 +121,7 @@ pub struct GlobEntry {
 #[derive(Debug, Clone)]
 pub struct GrepOptions {
     pub pattern: String,
-    pub path: Option<String>,
+    pub path: Option<ResolvedPath>,
     pub glob_filter: Option<String>,
     pub case_insensitive: bool,
     pub multiline: bool,

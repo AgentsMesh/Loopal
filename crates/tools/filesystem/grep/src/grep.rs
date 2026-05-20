@@ -108,15 +108,9 @@ fn parse_params(
         .unwrap_or(0);
 
     let search_path = match input.path.as_deref() {
-        Some(p) => Some(
-            ctx.backend
-                .resolve_path(p, false)
-                .map_err(|e| {
-                    LoopalError::Tool(loopal_error::ToolError::ExecutionFailed(e.to_string()))
-                })?
-                .to_string_lossy()
-                .into_owned(),
-        ),
+        Some(p) => Some(ctx.backend.resolve_path(p, false).map_err(|e| {
+            LoopalError::Tool(loopal_error::ToolError::ExecutionFailed(e.to_string()))
+        })?),
         None => None,
     };
 

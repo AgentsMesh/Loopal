@@ -38,7 +38,7 @@ pub fn grep_search(
     let search_path = opts
         .path
         .as_ref()
-        .map(|p| cwd.join(p))
+        .map(|p| p.as_path().to_path_buf())
         .unwrap_or_else(|| cwd.to_path_buf());
 
     if search_path.is_file() {

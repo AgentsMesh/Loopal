@@ -66,6 +66,25 @@ async fn copy_dst_is_directory() {
 }
 
 #[tokio::test]
+async fn copy_overwrites_existing_dst_file() {
+    let tmp = tempfile::tempdir().unwrap();
+    std::fs::write(tmp.path().join("src.txt"), "new").unwrap();
+    std::fs::write(tmp.path().join("dst.txt"), "old").unwrap();
+    let tool = make_tool();
+    let ctx = make_ctx(tmp.path());
+    let r = tool
+        .execute(json!({"src": "src.txt", "dst": "dst.txt"}), &ctx)
+        .await
+        .unwrap();
+    assert!(!r.is_error, "expected overwrite to succeed: {}", r.content);
+    assert_eq!(
+        std::fs::read_to_string(tmp.path().join("dst.txt")).unwrap(),
+        "new",
+        "dst should be overwritten with src content"
+    );
+}
+
+#[tokio::test]
 async fn copy_creates_parent_dirs() {
     let tmp = tempfile::tempdir().unwrap();
     std::fs::write(tmp.path().join("a.txt"), "data").unwrap();

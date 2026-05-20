@@ -110,24 +110,38 @@ pub(crate) async fn save_to_tmp(
     body: &str,
     ext: &str,
 ) -> Result<String, LoopalError> {
-    let tmp_dir = ctx.backend.cwd().join(".loopal_fetch");
+    let tmp_dir = ctx.backend.cwd().as_path().join(".loopal_fetch");
     cleanup::cleanup_old_files_once(&tmp_dir);
     let uuid = simple_uuid();
     let file_path = tmp_dir.join(format!("fetch_{uuid}.{ext}"));
-    if let Err(e) = ctx
+    let tmp_dir_resolved = match ctx
         .backend
-        .create_dir_all(tmp_dir.to_str().unwrap_or("."))
-        .await
+        .resolve_path(tmp_dir.to_str().unwrap_or("."), true)
     {
+        Ok(p) => p,
+        Err(e) => {
+            return Err(LoopalError::Other(format!(
+                "Failed to resolve temp dir: {e}"
+            )));
+        }
+    };
+    if let Err(e) = ctx.backend.create_dir_all(&tmp_dir_resolved).await {
         return Err(LoopalError::Other(format!(
             "Failed to create temp dir: {e}"
         )));
     }
-    if let Err(e) = ctx
+    let file_path_resolved = match ctx
         .backend
-        .write(file_path.to_str().unwrap_or("."), body)
-        .await
+        .resolve_path(file_path.to_str().unwrap_or("."), true)
     {
+        Ok(p) => p,
+        Err(e) => {
+            return Err(LoopalError::Other(format!(
+                "Failed to resolve temp file: {e}"
+            )));
+        }
+    };
+    if let Err(e) = ctx.backend.write(&file_path_resolved, body).await {
         return Err(LoopalError::Other(format!(
             "Failed to write temp file: {e}"
         )));

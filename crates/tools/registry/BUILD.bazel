@@ -14,7 +14,6 @@ rust_library(
         "//crates/tools/agent/plan-mode:loopal-tool-plan-mode",
         "//crates/tools/filesystem/apply-patch:loopal-tool-apply-patch",
         "//crates/tools/filesystem/edit:loopal-tool-edit",
-        "//crates/tools/filesystem/edit-core:loopal-edit-core",
         "//crates/tools/filesystem/fetch:loopal-tool-fetch",
         "//crates/tools/filesystem/file-ops:loopal-tool-file-ops",
         "//crates/tools/filesystem/glob:loopal-tool-glob",

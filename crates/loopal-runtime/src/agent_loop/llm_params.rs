@@ -13,8 +13,10 @@ impl AgentLoopRunner {
         messages: &[Message],
         continuation_intent: Option<ContinuationIntent>,
     ) -> Result<ChatParams> {
-        let env_section =
-            super::env_context::build_env_section(self.tool_ctx.backend.cwd(), self.turn_count);
+        let env_section = super::env_context::build_env_section(
+            self.tool_ctx.backend.cwd().as_path(),
+            self.turn_count,
+        );
         let full_system_prompt = format!(
             "{}{}{}",
             self.params.config.system_prompt,

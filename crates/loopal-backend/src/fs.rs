@@ -76,7 +76,7 @@ pub async fn read_raw_file(path: &Path, limits: &ResourceLimits) -> Result<Strin
     Ok(String::from_utf8_lossy(&bytes).into_owned())
 }
 
-pub use crate::fs_write::{edit_file, write_file};
+pub use crate::fs_write::write_file;
 
 pub async fn get_file_info(path: &Path) -> Result<FileInfo, ToolIoError> {
     let meta = tokio::fs::metadata(path).await.map_err(|e| {
@@ -117,4 +117,23 @@ pub async fn get_file_info(path: &Path) -> Result<FileInfo, ToolIoError> {
 fn is_binary(data: &[u8]) -> bool {
     let check_len = data.len().min(8192);
     data[..check_len].contains(&0)
+}
+
+pub async fn remove_path(path: &Path) -> Result<(), ToolIoError> {
+    let meta = tokio::fs::metadata(path).await?;
+    if meta.is_dir() {
+        tokio::fs::remove_dir_all(path).await?;
+    } else {
+        tokio::fs::remove_file(path).await?;
+    }
+    Ok(())
+}
+
+pub async fn peek_bytes(path: &Path, n: usize) -> Result<Vec<u8>, ToolIoError> {
+    use tokio::io::AsyncReadExt;
+    let mut f = tokio::fs::File::open(path).await?;
+    let mut buf = vec![0u8; n];
+    let read = f.read(&mut buf).await?;
+    buf.truncate(read);
+    Ok(buf)
 }

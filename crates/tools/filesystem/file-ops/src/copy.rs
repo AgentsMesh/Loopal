@@ -4,6 +4,8 @@ use loopal_tool_api::{PermissionLevel, ToolContext, ToolResult, TypedTool};
 use schemars::JsonSchema;
 use serde::Deserialize;
 
+use crate::dst_resolve::{ensure_parent_dir, resolve_dst};
+
 pub struct CopyFileTool;
 
 #[derive(Deserialize, JsonSchema)]
@@ -35,7 +37,11 @@ impl TypedTool<CopyFileParams> for CopyFileTool {
         input: CopyFileParams,
         ctx: &ToolContext,
     ) -> Result<ToolResult, LoopalError> {
-        let src_info = match ctx.backend.file_info(&input.src).await {
+        let src = match ctx.backend.resolve_path(&input.src, false) {
+            Ok(p) => p,
+            Err(e) => return Ok(ToolResult::error(e.to_string())),
+        };
+        let src_info = match ctx.backend.file_info(&src).await {
             Ok(i) => i,
             Err(e) => return Ok(ToolResult::error(e.to_string())),
         };
@@ -45,30 +51,19 @@ impl TypedTool<CopyFileParams> for CopyFileTool {
             ));
         }
 
-        let final_dst = match ctx.backend.file_info(&input.dst).await {
-            Ok(info) if info.is_dir => {
-                let src_path = std::path::Path::new(&input.src);
-                let name = src_path.file_name().ok_or_else(|| {
-                    LoopalError::Tool(loopal_error::ToolError::InvalidInput(
-                        "source has no file name".into(),
-                    ))
-                })?;
-                let dst_path = std::path::Path::new(&input.dst).join(name);
-                dst_path.to_string_lossy().into_owned()
-            }
-            _ => input.dst.clone(),
+        let dst = match resolve_dst(ctx.backend.as_ref(), &input.src, &input.dst).await {
+            Ok(d) => d,
+            Err(e) => return Ok(ToolResult::error(e.to_string())),
         };
 
-        if let Some(parent) = std::path::Path::new(&final_dst).parent()
-            && let Err(e) = ctx.backend.create_dir_all(&parent.to_string_lossy()).await
-        {
+        if let Err(e) = ensure_parent_dir(ctx.backend.as_ref(), &dst.resolved).await {
             return Ok(ToolResult::error(e.to_string()));
         }
 
-        match ctx.backend.copy(&input.src, &final_dst).await {
+        match ctx.backend.copy(&src, &dst.resolved).await {
             Ok(()) => Ok(ToolResult::success(format!(
-                "Copied {} → {final_dst}",
-                input.src
+                "Copied {} → {}",
+                input.src, dst.display
             ))),
             Err(e) => Ok(ToolResult::error(e.to_string())),
         }

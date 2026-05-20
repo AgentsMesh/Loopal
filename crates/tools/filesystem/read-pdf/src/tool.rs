@@ -54,14 +54,18 @@ impl TypedTool<ReadPdfParams> for ReadPdfTool {
             Err(e) => return Ok(ToolResult::error(e.to_string())),
         };
 
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+        let ext = path
+            .as_path()
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("");
         if !ext.eq_ignore_ascii_case("pdf") {
             return Ok(ToolResult::error(
                 "ReadPdf only supports .pdf files. Use Read for other file types.",
             ));
         }
 
-        match extract_pdf_text(&path, pages.as_deref()) {
+        match extract_pdf_text(path.as_path(), pages.as_deref()) {
             Ok(text) => Ok(ToolResult::success(text)),
             Err(e) => Ok(ToolResult::error(e)),
         }

@@ -23,7 +23,7 @@ pub fn parse_patch(input: &str) -> Result<Vec<FileOp>, PatchParseError> {
     while i < lines.len() {
         let line = lines[i];
         if let Some(path) = line.strip_prefix("*** Add File: ") {
-            let (content, next) = parse_add_body(&lines, i + 1);
+            let (content, next) = parse_add_body(&lines, i + 1)?;
             ops.push(FileOp::Add {
                 path: PathBuf::from(path.trim()),
                 content,
@@ -59,15 +59,23 @@ pub fn parse_patch(input: &str) -> Result<Vec<FileOp>, PatchParseError> {
     Ok(ops)
 }
 
-fn parse_add_body(lines: &[&str], start: usize) -> (String, usize) {
+fn parse_add_body(lines: &[&str], start: usize) -> Result<(String, usize), PatchParseError> {
     let mut content_lines = Vec::new();
     let mut i = start;
     while i < lines.len() {
-        if lines[i].starts_with("*** ") {
+        let line = lines[i];
+        if line.starts_with("*** ") {
             break;
         }
-        if let Some(rest) = lines[i].strip_prefix('+') {
+        if let Some(rest) = line.strip_prefix('+') {
             content_lines.push(rest);
+        } else if !line.is_empty() {
+            return Err(PatchParseError {
+                line: i + 1,
+                message: format!(
+                    "unexpected line in add body (expected '+' prefix or empty): {line}"
+                ),
+            });
         }
         i += 1;
     }
@@ -75,7 +83,7 @@ fn parse_add_body(lines: &[&str], start: usize) -> (String, usize) {
     if !content_lines.is_empty() {
         content.push('\n');
     }
-    (content, i)
+    Ok((content, i))
 }
 
 fn parse_update_body(lines: &[&str], start: usize) -> Result<(Vec<Hunk>, usize), PatchParseError> {

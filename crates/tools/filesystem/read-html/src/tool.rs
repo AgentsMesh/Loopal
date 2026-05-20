@@ -45,21 +45,20 @@ impl TypedTool<ReadHtmlParams> for ReadHtmlTool {
             Err(e) => return Ok(ToolResult::error(e.to_string())),
         };
 
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+        let ext = path
+            .as_path()
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("");
         if !ext.eq_ignore_ascii_case("html") && !ext.eq_ignore_ascii_case("htm") {
             return Ok(ToolResult::error(
                 "ReadHtml only supports .html/.htm files. Use Read for other file types.",
             ));
         }
 
-        let raw = match std::fs::read_to_string(&path) {
+        let raw = match ctx.backend.read_raw(&path).await {
             Ok(s) => s,
-            Err(e) => {
-                return Ok(ToolResult::error(format!(
-                    "Failed to read {}: {e}",
-                    path.display()
-                )));
-            }
+            Err(e) => return Ok(ToolResult::error(e.to_string())),
         };
 
         let converted = html2text::from_read(raw.as_bytes(), 120);

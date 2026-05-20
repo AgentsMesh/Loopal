@@ -1,4 +1,3 @@
-use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -6,21 +5,15 @@ use async_trait::async_trait;
 use loopal_error::{ProcessHandle, ToolIoError};
 
 use crate::backend_types::{
-    EditResult, EnvOverride, ExecResult, FetchResult, FileInfo, GlobOptions, GlobSearchResult,
-    GrepOptions, GrepSearchResult, ImageResult, LsResult, ReadResult, WriteResult,
+    EnvOverride, ExecResult, FetchResult, FileInfo, GlobOptions, GlobSearchResult, GrepOptions,
+    GrepSearchResult, ImageResult, LsResult, ReadResult, WriteResult,
 };
+use crate::batch::{BatchOp, BatchOutcome};
 use crate::output_tail::OutputTail;
+use crate::path::ResolvedPath;
 
-/// Outcome of a streaming command execution.
-///
-/// Unlike a plain `Result<ExecResult>`, this explicitly models the timeout
-/// path as a valid outcome rather than an error.
 pub enum ExecOutcome {
-    /// Command completed (successfully or not) within the timeout.
     Completed(ExecResult),
-    /// Command exceeded its timeout; the process is still running.
-    /// The `handle` carries the child so the caller can register it as a
-    /// background task.
     TimedOut {
         timeout: Duration,
         partial_output: String,
@@ -28,92 +21,49 @@ pub enum ExecOutcome {
     },
 }
 
-/// Capability-based I/O abstraction injected into tools via `ToolContext`.
-///
-/// Tool crates call `ctx.backend().<method>()` instead of doing raw
-/// `tokio::fs` / `tokio::process` / `reqwest` I/O.  Because tool crates
-/// never list those runtime crates in their `Cargo.toml`, the Cargo resolver
-/// guarantees at *compile time* that tools cannot bypass this interface.
-///
-/// The default production implementation is `LocalBackend` (in `loopal-backend`),
-/// which adds path checking, size limits, atomic writes, OS-level sandbox
-/// wrapping, and resource budgets.
 #[async_trait]
 pub trait Backend: Send + Sync {
     // --- Filesystem ---
 
-    /// Read file content with offset/limit pagination.
     async fn read(
         &self,
-        path: &str,
+        path: &ResolvedPath,
         offset: usize,
         limit: usize,
     ) -> Result<ReadResult, ToolIoError>;
 
-    /// Write content to a file (atomic: write-tmp → fsync → rename).
-    async fn write(&self, path: &str, content: &str) -> Result<WriteResult, ToolIoError>;
+    async fn write(&self, path: &ResolvedPath, content: &str) -> Result<WriteResult, ToolIoError>;
 
-    /// Search-and-replace edit on an existing file.
-    async fn edit(
-        &self,
-        path: &str,
-        old: &str,
-        new: &str,
-        replace_all: bool,
-    ) -> Result<EditResult, ToolIoError>;
+    async fn remove(&self, path: &ResolvedPath) -> Result<(), ToolIoError>;
 
-    /// Remove a file or directory.
-    async fn remove(&self, path: &str) -> Result<(), ToolIoError>;
+    async fn create_dir_all(&self, path: &ResolvedPath) -> Result<(), ToolIoError>;
 
-    /// Create directory tree (like `mkdir -p`).
-    async fn create_dir_all(&self, path: &str) -> Result<(), ToolIoError>;
+    async fn copy(&self, from: &ResolvedPath, to: &ResolvedPath) -> Result<(), ToolIoError>;
 
-    /// Copy a file or directory.
-    async fn copy(&self, from: &str, to: &str) -> Result<(), ToolIoError>;
+    async fn rename(&self, from: &ResolvedPath, to: &ResolvedPath) -> Result<(), ToolIoError>;
 
-    /// Rename / move a file or directory.
-    async fn rename(&self, from: &str, to: &str) -> Result<(), ToolIoError>;
+    async fn file_info(&self, path: &ResolvedPath) -> Result<FileInfo, ToolIoError>;
 
-    /// Query file metadata.
-    async fn file_info(&self, path: &str) -> Result<FileInfo, ToolIoError>;
+    async fn ls(&self, path: &ResolvedPath) -> Result<LsResult, ToolIoError>;
 
-    /// List directory contents.
-    async fn ls(&self, path: &str) -> Result<LsResult, ToolIoError>;
-
-    /// Glob pattern search from an optional base directory.
     async fn glob(&self, opts: &GlobOptions) -> Result<GlobSearchResult, ToolIoError>;
 
-    /// Regex search over file contents with context, multiline, and type filtering.
     async fn grep(&self, opts: &GrepOptions) -> Result<GrepSearchResult, ToolIoError>;
 
-    /// Resolve a user-supplied path to a canonical absolute path.
-    /// `is_write` triggers write-permission checks when a sandbox policy is active.
-    fn resolve_path(&self, raw: &str, is_write: bool) -> Result<PathBuf, ToolIoError>;
+    fn resolve_path(&self, raw: &str, is_write: bool) -> Result<ResolvedPath, ToolIoError>;
 
-    /// Read raw file content with path checking, size limit, and binary detection.
-    /// Unlike `read()`, does NOT add line numbers — returns the original content.
-    async fn read_raw(&self, path: &str) -> Result<String, ToolIoError>;
+    async fn read_raw(&self, path: &ResolvedPath) -> Result<String, ToolIoError>;
 
-    /// Read an image file: validate MIME by magic-bytes, parse dimensions,
-    /// enforce size + pixel limits, return base64-encoded data.
-    async fn read_image(&self, path: &str) -> Result<ImageResult, ToolIoError>;
+    async fn read_image(&self, path: &ResolvedPath) -> Result<ImageResult, ToolIoError>;
 
-    /// Read the first `n` bytes of a file for magic-byte sniffing.
-    /// Default returns empty vec, meaning the backend opts out of sniffing
-    /// (callers must handle empty result as "unknown content type").
-    async fn peek_bytes(&self, _path: &str, _n: usize) -> Result<Vec<u8>, ToolIoError> {
+    async fn peek_bytes(&self, _path: &ResolvedPath, _n: usize) -> Result<Vec<u8>, ToolIoError> {
         Ok(Vec::new())
     }
 
-    /// Current working directory of this backend.
-    fn cwd(&self) -> &Path;
+    fn cwd(&self) -> &ResolvedPath;
 
     // --- Command execution ---
 
-    /// Execute a shell command synchronously (with timeout).
-    ///
-    /// `env` overrides are applied AFTER sandbox env_clear, so secret values
-    /// reliably reach the child process without being stripped.
     async fn exec(
         &self,
         command: &str,
@@ -121,14 +71,6 @@ pub trait Backend: Send + Sync {
         env: &EnvOverride,
     ) -> Result<ExecResult, ToolIoError>;
 
-    /// Execute a shell command with streaming output capture.
-    ///
-    /// Like `exec`, but feeds stdout/stderr lines into `tail` in real time.
-    /// Returns [`ExecOutcome::Completed`] on normal exit, or
-    /// [`ExecOutcome::TimedOut`] when the timeout is exceeded (the process
-    /// is **not** killed — it can be registered as a background task).
-    ///
-    /// Default implementation ignores `tail` and delegates to `exec`.
     async fn exec_streaming(
         &self,
         command: &str,
@@ -141,11 +83,6 @@ pub trait Backend: Send + Sync {
             .map(ExecOutcome::Completed)
     }
 
-    /// Spawn a command in the background.
-    ///
-    /// Returns a [`ProcessHandle`](loopal_error::ProcessHandle) carrying the
-    /// child process.  The caller is responsible for registering it in the
-    /// background task store and monitoring it.
     async fn exec_background(
         &self,
         command: &str,
@@ -154,21 +91,18 @@ pub trait Backend: Send + Sync {
 
     // --- Network ---
 
-    /// Fetch content from a URL.
     async fn fetch(&self, url: &str) -> Result<FetchResult, ToolIoError>;
+
+    // --- Batch ---
+
+    async fn apply_batch(&self, ops: Vec<BatchOp>) -> Result<BatchOutcome, ToolIoError>;
 
     // --- Sandbox approval ---
 
     /// Record a path as approved for this session (sandbox RequiresApproval flow).
-    /// Once approved, subsequent operations on this path skip the approval check.
-    /// Default: no-op (for test backends that don't enforce sandbox).
-    fn approve_path(&self, _path: &Path) {}
+    fn approve_path(&self, _path: &ResolvedPath) {}
 
-    /// Pre-check whether a path operation would require sandbox approval.
-    /// Returns `Some(reason)` if approval is needed, `None` if the path is
-    /// allowed (either by policy or by prior approval).
-    /// Called by the runtime BEFORE tool execution to route through the
-    /// permission system.
+    /// Pre-check whether a raw path would require sandbox approval (pre-resolve).
     fn check_sandbox_path(&self, _raw: &str, _is_write: bool) -> Option<String> {
         None
     }

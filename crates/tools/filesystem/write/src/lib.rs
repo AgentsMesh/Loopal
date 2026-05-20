@@ -1,12 +1,12 @@
 use async_trait::async_trait;
+use loopal_edit_core::omission_detector::detect_omissions;
+use loopal_edit_core::omission_message::format_omission_error;
 use loopal_error::LoopalError;
 use loopal_secret_runtime::{SECRET_REJECTION_MESSAGE, WIRE_REF_MARKER};
 use loopal_tool_api::{PermissionLevel, ToolContext, ToolResult, TypedTool};
 use loopal_tool_invocation::ToolResultMetadata;
 use schemars::JsonSchema;
 use serde::Deserialize;
-
-use loopal_edit_core::omission_detector::detect_omissions;
 
 pub struct WriteTool;
 
@@ -55,20 +55,22 @@ impl TypedTool<WriteParams> for WriteTool {
 
         let omissions = detect_omissions(content);
         if !omissions.is_empty() {
-            return Ok(ToolResult::error(format!(
-                "Omission detected in content. The following patterns suggest code was skipped: {}. Please provide the complete file content.",
-                omissions.join(", ")
+            return Ok(ToolResult::error(format_omission_error(
+                "content", &omissions,
             )));
         }
 
-        match ctx.backend.write(file_path, content).await {
-            Ok(result) => Ok(ToolResult::success(format!(
-                "Successfully wrote {} bytes to {}",
-                result.bytes_written, file_path
-            ))
-            .with_metadata(ToolResultMetadata::bytes_written(
-                result.bytes_written as u64,
-            ))),
+        match ctx.backend.resolve_path(file_path, true) {
+            Ok(path) => match ctx.backend.write(&path, content).await {
+                Ok(result) => Ok(ToolResult::success(format!(
+                    "Successfully wrote {} bytes to {}",
+                    result.bytes_written, file_path
+                ))
+                .with_metadata(ToolResultMetadata::bytes_written(
+                    result.bytes_written as u64,
+                ))),
+                Err(e) => Ok(ToolResult::error(e.to_string())),
+            },
             Err(e) => Ok(ToolResult::error(e.to_string())),
         }
     }

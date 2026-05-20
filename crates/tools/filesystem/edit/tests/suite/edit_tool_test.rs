@@ -92,6 +92,11 @@ async fn test_edit_old_string_not_found_returns_error() {
 
     assert!(result.is_error);
     assert!(result.content.contains("not found"));
+    assert!(
+        result.content.contains("test.txt"),
+        "error must include file path for LLM actionability, got: {}",
+        result.content
+    );
 }
 
 #[tokio::test]
@@ -118,6 +123,11 @@ async fn test_edit_multiple_matches_without_replace_all_returns_error() {
     assert!(result.is_error);
     assert!(result.content.contains("3 times"));
     assert!(result.content.contains("replace_all"));
+    assert!(
+        result.content.contains("test.txt"),
+        "error must include file path for LLM actionability, got: {}",
+        result.content
+    );
 }
 
 #[tokio::test]

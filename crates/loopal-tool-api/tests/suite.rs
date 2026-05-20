@@ -3,6 +3,8 @@
 mod head_tail_test;
 #[path = "suite/input_normalize_test.rs"]
 mod input_normalize_test;
+#[path = "suite/path_test.rs"]
+mod path_test;
 #[path = "suite/permission_test.rs"]
 mod permission_test;
 #[path = "suite/schema_normalize_test.rs"]

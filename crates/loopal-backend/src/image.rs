@@ -5,7 +5,6 @@ use loopal_tool_api::backend_types::ImageResult;
 use loopal_tool_invocation::ImageMime;
 
 use crate::limits::ResourceLimits;
-use crate::path;
 
 fn parse_dimensions(bytes: &[u8], mime: ImageMime) -> Option<(u32, u32)> {
     match mime {
@@ -98,29 +97,27 @@ fn parse_webp(bytes: &[u8]) -> Option<(u32, u32)> {
     }
 }
 
-pub async fn read_image(
-    cwd: &std::path::Path,
-    raw_path: &str,
-    policy: Option<&loopal_config::ResolvedPolicy>,
+pub async fn read_image_resolved(
+    path: &std::path::Path,
     limits: &ResourceLimits,
 ) -> Result<ImageResult, ToolIoError> {
-    let resolved = path::resolve(cwd, raw_path, false, policy)?;
-    let bytes = tokio::fs::read(&resolved).await?;
+    let bytes = tokio::fs::read(path).await?;
     let size = bytes.len() as u64;
+    let display = path.display().to_string();
     if size > limits.image_max_bytes {
         return Err(ToolIoError::TooLarge {
-            path: raw_path.to_string(),
+            path: display,
             size,
             limit: limits.image_max_bytes,
         });
     }
     let mime = ImageMime::from_magic(&bytes).ok_or_else(|| {
         ToolIoError::Other(format!(
-            "unsupported image format (expected PNG/JPEG/GIF/WEBP): {raw_path}"
+            "unsupported image format (expected PNG/JPEG/GIF/WEBP): {display}"
         ))
     })?;
     let (w, h) = parse_dimensions(&bytes, mime)
-        .ok_or_else(|| ToolIoError::Other(format!("malformed image dimensions: {raw_path}")))?;
+        .ok_or_else(|| ToolIoError::Other(format!("malformed image dimensions: {display}")))?;
     let pixels = w as u64 * h as u64;
     if pixels > limits.image_max_pixels {
         return Err(ToolIoError::Other(format!(

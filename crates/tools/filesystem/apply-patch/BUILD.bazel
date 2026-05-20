@@ -24,6 +24,7 @@ rust_test(
     deps = [
         ":loopal-tool-apply-patch",
         "//crates/loopal-backend:loopal-backend",
+        "//crates/loopal-config:loopal-config",
         "@crates//:tempfile",
         "@crates//:tokio",
         "@crates//:serde_json",

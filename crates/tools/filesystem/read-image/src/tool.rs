@@ -38,7 +38,11 @@ impl TypedTool<ReadImageParams> for ReadImageTool {
         input: ReadImageParams,
         ctx: &ToolContext,
     ) -> Result<ToolResult, LoopalError> {
-        match ctx.backend.read_image(&input.file_path).await {
+        let path = match ctx.backend.resolve_path(&input.file_path, false) {
+            Ok(p) => p,
+            Err(e) => return Ok(ToolResult::error(e.to_string())),
+        };
+        match ctx.backend.read_image(&path).await {
             Ok(img) => {
                 let summary = format!(
                     "Loaded {} ({}×{}, {} bytes).",

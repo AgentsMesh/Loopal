@@ -1,11 +1,12 @@
 use async_trait::async_trait;
+use loopal_edit_core::omission_detector::detect_omissions;
+use loopal_edit_core::omission_message::format_omission_error;
+use loopal_edit_core::search_replace::{SearchReplaceResult, search_replace};
 use loopal_error::LoopalError;
 use loopal_secret_runtime::{SECRET_REJECTION_MESSAGE, WIRE_REF_MARKER};
 use loopal_tool_api::{PermissionLevel, ToolContext, ToolResult, TypedTool};
 use schemars::JsonSchema;
 use serde::Deserialize;
-
-use loopal_edit_core::omission_detector::detect_omissions;
 
 pub struct EditTool;
 
@@ -60,26 +61,38 @@ impl TypedTool<EditParams> for EditTool {
 
         let omissions = detect_omissions(&input.new_string);
         if !omissions.is_empty() {
-            return Ok(ToolResult::error(format!(
-                "Omission detected in new_string. The following patterns suggest code was skipped: {}. Please provide the complete replacement text.",
-                omissions.join(", ")
+            return Ok(ToolResult::error(format_omission_error(
+                "new_string",
+                &omissions,
             )));
         }
 
-        match ctx
-            .backend
-            .edit(
-                &input.file_path,
-                &input.old_string,
-                &input.new_string,
-                replace_all,
-            )
-            .await
-        {
-            Ok(_result) => Ok(ToolResult::success(format!(
-                "Successfully edited {}",
-                input.file_path
-            ))),
+        match ctx.backend.resolve_path(&input.file_path, true) {
+            Ok(path) => {
+                let content = match ctx.backend.read_raw(&path).await {
+                    Ok(c) => c,
+                    Err(e) => return Ok(ToolResult::error(e.to_string())),
+                };
+                match search_replace(&content, &input.old_string, &input.new_string, replace_all) {
+                    SearchReplaceResult::Ok(new_content) => {
+                        match ctx.backend.write(&path, &new_content).await {
+                            Ok(_) => Ok(ToolResult::success(format!(
+                                "Successfully edited {}",
+                                input.file_path
+                            ))),
+                            Err(e) => Ok(ToolResult::error(e.to_string())),
+                        }
+                    }
+                    SearchReplaceResult::NotFound => Ok(ToolResult::error(format!(
+                        "old_string not found in {}",
+                        input.file_path
+                    ))),
+                    SearchReplaceResult::MultipleMatches(n) => Ok(ToolResult::error(format!(
+                        "old_string found {n} times in {}; use replace_all=true or provide more context",
+                        input.file_path
+                    ))),
+                }
+            }
             Err(e) => Ok(ToolResult::error(e.to_string())),
         }
     }

@@ -10,6 +10,14 @@ fn unique_session_id() -> String {
     format!("test-{}", uuid::Uuid::new_v4().simple())
 }
 
+async fn read_image_via(
+    backend: &Arc<LocalBackend>,
+    raw: &str,
+) -> Result<loopal_tool_api::backend_types::ImageResult, ToolIoError> {
+    let p = backend.resolve_path(raw, false)?;
+    backend.read_image(&p).await
+}
+
 fn make_backend(cwd: &std::path::Path) -> Arc<LocalBackend> {
     LocalBackend::new(
         cwd.to_path_buf(),
@@ -75,8 +83,7 @@ async fn read_image_png_round_trip() {
     let path = dir.path().join("a.png");
     fs::write(&path, minimal_png(64, 48)).await.unwrap();
     let backend = make_backend(dir.path());
-    let img = backend
-        .read_image(path.to_str().unwrap())
+    let img = read_image_via(&backend, path.to_str().unwrap())
         .await
         .expect("must read png");
     assert_eq!(img.media_type, "image/png");
@@ -91,7 +98,9 @@ async fn read_image_jpeg_round_trip() {
     let path = dir.path().join("a.jpg");
     fs::write(&path, minimal_jpeg(100, 200)).await.unwrap();
     let backend = make_backend(dir.path());
-    let img = backend.read_image(path.to_str().unwrap()).await.unwrap();
+    let img = read_image_via(&backend, path.to_str().unwrap())
+        .await
+        .unwrap();
     assert_eq!(img.media_type, "image/jpeg");
     assert_eq!(img.dimensions, (100, 200));
 }
@@ -102,7 +111,9 @@ async fn read_image_gif_round_trip() {
     let path = dir.path().join("a.gif");
     fs::write(&path, minimal_gif(16, 32)).await.unwrap();
     let backend = make_backend(dir.path());
-    let img = backend.read_image(path.to_str().unwrap()).await.unwrap();
+    let img = read_image_via(&backend, path.to_str().unwrap())
+        .await
+        .unwrap();
     assert_eq!(img.media_type, "image/gif");
     assert_eq!(img.dimensions, (16, 32));
 }
@@ -113,7 +124,9 @@ async fn read_image_webp_vp8l_round_trip() {
     let path = dir.path().join("a.webp");
     fs::write(&path, minimal_webp_vp8l(5, 10)).await.unwrap();
     let backend = make_backend(dir.path());
-    let img = backend.read_image(path.to_str().unwrap()).await.unwrap();
+    let img = read_image_via(&backend, path.to_str().unwrap())
+        .await
+        .unwrap();
     assert_eq!(img.media_type, "image/webp");
     assert_eq!(img.dimensions, (5, 10));
 }
@@ -126,8 +139,7 @@ async fn read_image_rejects_oversized_file() {
     payload.resize(11 * 1024 * 1024, 0);
     fs::write(&path, payload).await.unwrap();
     let backend = make_backend(dir.path());
-    let err = backend
-        .read_image(path.to_str().unwrap())
+    let err = read_image_via(&backend, path.to_str().unwrap())
         .await
         .unwrap_err();
     assert!(matches!(err, ToolIoError::TooLarge { .. }), "got {err:?}");
@@ -139,8 +151,7 @@ async fn read_image_rejects_oversized_pixels() {
     let path = dir.path().join("huge.png");
     fs::write(&path, minimal_png(8193, 8193)).await.unwrap();
     let backend = make_backend(dir.path());
-    let err = backend
-        .read_image(path.to_str().unwrap())
+    let err = read_image_via(&backend, path.to_str().unwrap())
         .await
         .unwrap_err();
     match err {
@@ -155,7 +166,9 @@ async fn read_image_sniffs_by_magic_not_extension() {
     let path = dir.path().join("fake.png");
     fs::write(&path, minimal_jpeg(7, 9)).await.unwrap();
     let backend = make_backend(dir.path());
-    let img = backend.read_image(path.to_str().unwrap()).await.unwrap();
+    let img = read_image_via(&backend, path.to_str().unwrap())
+        .await
+        .unwrap();
     assert_eq!(img.media_type, "image/jpeg");
     assert_eq!(img.dimensions, (7, 9));
 }
@@ -168,8 +181,7 @@ async fn read_image_rejects_unknown_format() {
         .await
         .unwrap();
     let backend = make_backend(dir.path());
-    let err = backend
-        .read_image(path.to_str().unwrap())
+    let err = read_image_via(&backend, path.to_str().unwrap())
         .await
         .unwrap_err();
     match err {
@@ -184,8 +196,7 @@ async fn read_image_rejects_truncated_data() {
     let path = dir.path().join("trunc.png");
     fs::write(&path, b"\x89PNG\r\n\x1a\n").await.unwrap();
     let backend = make_backend(dir.path());
-    let err = backend
-        .read_image(path.to_str().unwrap())
+    let err = read_image_via(&backend, path.to_str().unwrap())
         .await
         .unwrap_err();
     match err {
@@ -198,8 +209,7 @@ async fn read_image_rejects_truncated_data() {
 async fn read_image_rejects_missing_file() {
     let dir = tempdir().unwrap();
     let backend = make_backend(dir.path());
-    let err = backend
-        .read_image(dir.path().join("nope.png").to_str().unwrap())
+    let err = read_image_via(&backend, dir.path().join("nope.png").to_str().unwrap())
         .await
         .unwrap_err();
     assert!(

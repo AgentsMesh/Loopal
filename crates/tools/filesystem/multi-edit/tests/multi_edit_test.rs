@@ -2,6 +2,11 @@ use loopal_tool_api::{PermissionLevel, Tool, ToolContext, TypedBridge};
 use loopal_tool_multi_edit::{MultiEditParams, MultiEditTool};
 use serde_json::json;
 
+#[path = "multi_edit_edge_test.rs"]
+mod multi_edit_edge_test;
+#[path = "multi_edit_secret_precheck_test.rs"]
+mod multi_edit_secret_precheck_test;
+
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
     let backend = loopal_backend::LocalBackend::new(
         cwd.to_path_buf(),
@@ -125,7 +130,7 @@ async fn test_multi_edit_omission_detection() {
         .unwrap();
 
     assert!(result.is_error);
-    assert!(result.content.contains("omission"));
+    assert!(result.content.contains("Omission"));
 }
 
 #[tokio::test]

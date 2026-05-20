@@ -158,3 +158,33 @@ async fn test_edit_with_relative_path() {
     let content = std::fs::read_to_string(&file).unwrap();
     assert_eq!(content, "new content");
 }
+
+#[tokio::test]
+async fn test_edit_file_over_read_limit_returns_error() {
+    let tmp = tempfile::tempdir().unwrap();
+    let file = tmp.path().join("big.txt");
+    std::fs::write(&file, "x".repeat(200) + "\ntarget\n").unwrap();
+
+    let limits = loopal_backend::ResourceLimits {
+        max_file_read_bytes: 100,
+        ..loopal_backend::ResourceLimits::default()
+    };
+    let backend =
+        loopal_backend::LocalBackend::new(tmp.path().to_path_buf(), None, limits, "test-session");
+    let ctx = ToolContext::new(backend, "test");
+    let tool = make_tool();
+
+    let r = tool
+        .execute(
+            json!({"file_path": "big.txt", "old_string": "target", "new_string": "replaced"}),
+            &ctx,
+        )
+        .await
+        .unwrap();
+    assert!(r.is_error, "edit on oversized file must fail at read_raw");
+    assert!(
+        r.content.contains("too large") || r.content.contains("TooLarge"),
+        "expected size-limit error, got: {}",
+        r.content
+    );
+}

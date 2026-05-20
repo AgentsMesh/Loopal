@@ -1,9 +1,11 @@
 pub mod approved;
+pub mod batch;
 pub mod fs;
 mod fs_write;
 pub mod image;
 pub mod limits;
 pub mod local;
+mod local_backend_impl;
 pub mod log_writer;
 pub mod net;
 pub mod path;

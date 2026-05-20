@@ -82,7 +82,7 @@ async fn test_delete_file() {
 }
 
 #[tokio::test]
-async fn test_multi_file_atomic() {
+async fn test_multi_file_batch() {
     let tmp = tempfile::tempdir().unwrap();
     let existing = tmp.path().join("a.rs");
     std::fs::write(&existing, "old\n").unwrap();

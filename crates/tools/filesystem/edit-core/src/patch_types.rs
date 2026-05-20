@@ -30,10 +30,3 @@ pub enum HunkLine {
     Remove(String),
     Add(String),
 }
-
-/// Instruction to write (or delete) a file after applying a patch.
-pub struct FileWrite {
-    pub path: PathBuf,
-    /// `None` means delete the file.
-    pub content: Option<String>,
-}

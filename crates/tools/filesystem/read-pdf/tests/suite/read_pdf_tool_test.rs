@@ -101,3 +101,20 @@ fn test_read_pdf_schema_has_pages() {
     let schema = tool.parameters_schema();
     assert!(schema["properties"]["pages"].is_object());
 }
+
+#[tokio::test]
+async fn test_read_pdf_rejects_path_traversal() {
+    let dir = tempfile::tempdir().unwrap();
+    let ctx = make_ctx(dir.path());
+    let tool = make_tool();
+    let r = tool
+        .execute(json!({"file_path": "../escape.pdf"}), &ctx)
+        .await
+        .unwrap();
+    assert!(r.is_error, "traversal must be rejected");
+    assert!(
+        r.content.contains("escapes") || r.content.contains("outside"),
+        "expected path-escape diagnostic, got: {}",
+        r.content
+    );
+}

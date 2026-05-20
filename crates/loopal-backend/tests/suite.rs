@@ -1,6 +1,8 @@
 // Single test binary for loopal-backend
 #[path = "suite/approved_paths_test.rs"]
 mod approved_paths_test;
+#[path = "suite/batch_test.rs"]
+mod batch_test;
 #[path = "suite/fetch_headers_test.rs"]
 mod fetch_headers_test;
 #[path = "suite/image_test.rs"]

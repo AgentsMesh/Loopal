@@ -1,4 +1,3 @@
-use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -6,11 +5,12 @@ use async_trait::async_trait;
 use loopal_error::{ProcessHandle, ToolIoError};
 use loopal_protocol::{ThreadGoal, ThreadGoalStatus};
 use loopal_tool_api::backend_types::{
-    EditResult, EnvOverride, ExecResult, FetchResult, FileInfo, GlobOptions, GlobSearchResult,
-    GrepOptions, GrepSearchResult, ImageResult, LsResult, ReadResult, WriteResult,
+    EnvOverride, ExecResult, FetchResult, FileInfo, GlobOptions, GlobSearchResult, GrepOptions,
+    GrepSearchResult, ImageResult, LsResult, ReadResult, WriteResult,
 };
 use loopal_tool_api::{
-    Backend, ExecOutcome, GoalSession, GoalSessionError, Tool, ToolContext, TypedBridge,
+    Backend, BatchOp, BatchOutcome, ExecOutcome, GoalSession, GoalSessionError, ResolvedPath, Tool,
+    ToolContext, TypedBridge,
 };
 use loopal_tool_goal::{
     CreateGoalParams, CreateGoalTool, GetGoalParams, GetGoalTool, UpdateGoalParams, UpdateGoalTool,
@@ -28,35 +28,54 @@ pub fn make_update_goal_tool() -> impl Tool {
     TypedBridge::<UpdateGoalTool, UpdateGoalParams>::new(UpdateGoalTool)
 }
 
-pub struct PanicBackend;
+/// Test mock that panics on any filesystem operation. Goal-tool tests do not
+/// touch the filesystem; this backend exists to satisfy the `Backend` trait
+/// while making accidental I/O attempts obvious.
+///
+/// Exception: `cwd()` returns a real value (`/tmp` by default) because
+/// `ToolContext` construction reads it. All other methods `unimplemented!()`.
+pub struct PanicBackend {
+    cwd: ResolvedPath,
+}
+
+impl PanicBackend {
+    pub fn new() -> Self {
+        Self {
+            cwd: ResolvedPath::from_backend_resolved(std::path::PathBuf::from("/tmp")),
+        }
+    }
+}
+
+impl Default for PanicBackend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[async_trait]
 impl Backend for PanicBackend {
-    async fn read(&self, _: &str, _: usize, _: usize) -> Result<ReadResult, ToolIoError> {
+    async fn read(&self, _: &ResolvedPath, _: usize, _: usize) -> Result<ReadResult, ToolIoError> {
         unimplemented!("backend not used in goal tool tests")
     }
-    async fn write(&self, _: &str, _: &str) -> Result<WriteResult, ToolIoError> {
+    async fn write(&self, _: &ResolvedPath, _: &str) -> Result<WriteResult, ToolIoError> {
         unimplemented!()
     }
-    async fn edit(&self, _: &str, _: &str, _: &str, _: bool) -> Result<EditResult, ToolIoError> {
+    async fn remove(&self, _: &ResolvedPath) -> Result<(), ToolIoError> {
         unimplemented!()
     }
-    async fn remove(&self, _: &str) -> Result<(), ToolIoError> {
+    async fn create_dir_all(&self, _: &ResolvedPath) -> Result<(), ToolIoError> {
         unimplemented!()
     }
-    async fn create_dir_all(&self, _: &str) -> Result<(), ToolIoError> {
+    async fn copy(&self, _: &ResolvedPath, _: &ResolvedPath) -> Result<(), ToolIoError> {
         unimplemented!()
     }
-    async fn copy(&self, _: &str, _: &str) -> Result<(), ToolIoError> {
+    async fn rename(&self, _: &ResolvedPath, _: &ResolvedPath) -> Result<(), ToolIoError> {
         unimplemented!()
     }
-    async fn rename(&self, _: &str, _: &str) -> Result<(), ToolIoError> {
+    async fn file_info(&self, _: &ResolvedPath) -> Result<FileInfo, ToolIoError> {
         unimplemented!()
     }
-    async fn file_info(&self, _: &str) -> Result<FileInfo, ToolIoError> {
-        unimplemented!()
-    }
-    async fn ls(&self, _: &str) -> Result<LsResult, ToolIoError> {
+    async fn ls(&self, _: &ResolvedPath) -> Result<LsResult, ToolIoError> {
         unimplemented!()
     }
     async fn glob(&self, _: &GlobOptions) -> Result<GlobSearchResult, ToolIoError> {
@@ -65,17 +84,20 @@ impl Backend for PanicBackend {
     async fn grep(&self, _: &GrepOptions) -> Result<GrepSearchResult, ToolIoError> {
         unimplemented!()
     }
-    fn resolve_path(&self, _: &str, _: bool) -> Result<PathBuf, ToolIoError> {
+    fn resolve_path(&self, _: &str, _: bool) -> Result<ResolvedPath, ToolIoError> {
         unimplemented!()
     }
-    async fn read_raw(&self, _: &str) -> Result<String, ToolIoError> {
+    async fn apply_batch(&self, _: Vec<BatchOp>) -> Result<BatchOutcome, ToolIoError> {
         unimplemented!()
     }
-    async fn read_image(&self, _: &str) -> Result<ImageResult, ToolIoError> {
+    async fn read_raw(&self, _: &ResolvedPath) -> Result<String, ToolIoError> {
         unimplemented!()
     }
-    fn cwd(&self) -> &Path {
-        Path::new("/tmp")
+    async fn read_image(&self, _: &ResolvedPath) -> Result<ImageResult, ToolIoError> {
+        unimplemented!()
+    }
+    fn cwd(&self) -> &ResolvedPath {
+        &self.cwd
     }
     async fn exec(&self, _: &str, _: Duration, _: &EnvOverride) -> Result<ExecResult, ToolIoError> {
         unimplemented!()
@@ -161,9 +183,9 @@ impl GoalSession for FakeGoalSession {
 }
 
 pub fn ctx_with_goal_session(session: Arc<dyn GoalSession>) -> ToolContext {
-    ToolContext::new(Arc::new(PanicBackend), "test").with_goal_session(session)
+    ToolContext::new(Arc::new(PanicBackend::new()), "test").with_goal_session(session)
 }
 
 pub fn ctx_without_goal_session() -> ToolContext {
-    ToolContext::new(Arc::new(PanicBackend), "test")
+    ToolContext::new(Arc::new(PanicBackend::new()), "test")
 }

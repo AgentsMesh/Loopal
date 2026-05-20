@@ -230,10 +230,7 @@ async fn list_tools_ipc_returns_empty_on_malformed_payload() {
 
 #[tokio::test]
 async fn snapshot_ipc_returns_empty_on_malformed_payload() {
-    let mock = MockHubClient::new(vec![(
-        "hub/mcp/snapshot",
-        json!({"servers": 42}),
-    )]);
+    let mock = MockHubClient::new(vec![("hub/mcp/snapshot", json!({"servers": 42}))]);
     let proxy = McpProxyClient::new(mock);
     assert!(proxy.snapshot().await.is_empty());
 }

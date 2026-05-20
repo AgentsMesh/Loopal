@@ -13,7 +13,8 @@ async fn dispatch_simple_lists_sessions() {
 #[tokio::test]
 async fn dispatch_simple_shutdown_is_ok() {
     let hub = SessionHub::new();
-    let outcome = dispatch_simple(methods::AGENT_SHUTDOWN.name, serde_json::Value::Null, &hub).await;
+    let outcome =
+        dispatch_simple(methods::AGENT_SHUTDOWN.name, serde_json::Value::Null, &hub).await;
     let value = outcome.expect("shutdown ok");
     assert_eq!(value["ok"], true);
 }

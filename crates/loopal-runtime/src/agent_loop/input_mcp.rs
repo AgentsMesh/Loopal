@@ -42,11 +42,14 @@ impl AgentLoopRunner {
         drop(local);
         tokio::spawn(async move {
             while rx.changed().await.is_ok() {
-                let Some(k) = weak_kernel.upgrade() else { break };
-                let Some(f) = weak_frontend.upgrade() else { break };
+                let Some(k) = weak_kernel.upgrade() else {
+                    break;
+                };
+                let Some(f) = weak_frontend.upgrade() else {
+                    break;
+                };
                 let snapshots = collect_mcp_snapshots_via_provider(&k, &cwd).await;
-                if f
-                    .emit(AgentEventPayload::McpStatusReport { servers: snapshots })
+                if f.emit(AgentEventPayload::McpStatusReport { servers: snapshots })
                     .await
                     .is_err()
                 {

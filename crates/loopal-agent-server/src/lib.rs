@@ -25,9 +25,9 @@ mod hub_input_receiver;
 #[doc(hidden)]
 pub mod interrupt_filter;
 mod ipc_handlers;
+mod mcp_dispatch;
 mod memory_adapter;
 mod memory_consolidation;
-mod mcp_dispatch;
 mod mock_loader;
 #[doc(hidden)]
 pub mod params;

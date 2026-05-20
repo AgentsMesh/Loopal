@@ -60,7 +60,9 @@ async fn wait_until_settled_times_out_for_slow_server() {
     provider.spawn_background(configs);
 
     let start = std::time::Instant::now();
-    let settled = provider.wait_until_settled(Duration::from_millis(300)).await;
+    let settled = provider
+        .wait_until_settled(Duration::from_millis(300))
+        .await;
     let elapsed = start.elapsed();
     assert!(!settled, "should time out, not settle");
     assert!(
@@ -133,7 +135,9 @@ async fn wait_until_settled_honors_all_overlapping_spawns() {
     tokio::time::sleep(Duration::from_millis(20)).await;
     provider.spawn_background(fast);
 
-    let settled_short = provider.wait_until_settled(Duration::from_millis(100)).await;
+    let settled_short = provider
+        .wait_until_settled(Duration::from_millis(100))
+        .await;
     assert!(
         !settled_short,
         "must NOT report settled while the slow spawn is still in-flight, \

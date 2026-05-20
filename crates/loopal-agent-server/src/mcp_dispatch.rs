@@ -41,10 +41,7 @@ pub async fn handle_list_tools(hub: &SessionHub) -> Result<Value, RpcErrorPayloa
     ok(McpListToolsResponse { tools })
 }
 
-pub async fn handle_call_tool(
-    hub: &SessionHub,
-    params: Value,
-) -> Result<Value, RpcErrorPayload> {
+pub async fn handle_call_tool(hub: &SessionHub, params: Value) -> Result<Value, RpcErrorPayload> {
     let req: McpCallToolRequest = serde_json::from_value(params)
         .map_err(|e| RpcErrorPayload::internal(format!("invalid call_tool params: {e}")))?;
 
@@ -99,4 +96,3 @@ pub async fn handle_snapshot(hub: &SessionHub) -> Result<Value, RpcErrorPayload>
 fn ok<T: serde::Serialize>(value: T) -> Result<Value, RpcErrorPayload> {
     serde_json::to_value(value).map_err(|e| RpcErrorPayload::internal(format!("encode: {e}")))
 }
-

@@ -238,7 +238,11 @@ async fn build_kernel_late_registers_failed_server_snapshot() {
     tokio::time::sleep(Duration::from_secs(2)).await;
 
     let snaps = kernel.mcp_provider().snapshot().await;
-    assert_eq!(snaps.len(), 1, "late-arrived server must reach manager snapshot");
+    assert_eq!(
+        snaps.len(),
+        1,
+        "late-arrived server must reach manager snapshot"
+    );
     assert!(
         snaps[0].status.starts_with("failed"),
         "expected failed status, got {:?}",
@@ -334,4 +338,3 @@ async fn late_listener_picks_up_server_that_settles_after_finalize_bounded_wait(
         "sleep server fails handshake; status must show that"
     );
 }
-

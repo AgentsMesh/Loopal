@@ -88,4 +88,3 @@ fn warn_if_placeholders_unresolved(config: &McpServerConfig) {
         );
     }
 }
-

@@ -48,8 +48,7 @@ async fn install_mock_root(
 #[tokio::test]
 async fn mcp_list_tools_without_root_returns_error() {
     let hub = make_hub();
-    let result =
-        dispatch_hub_request(&hub, "hub/mcp/list_tools", json!({}), "sub-1".into()).await;
+    let result = dispatch_hub_request(&hub, "hub/mcp/list_tools", json!({}), "sub-1".into()).await;
     let err = result.unwrap_err();
     assert!(
         err.contains("main") && err.contains("not registered"),
@@ -74,8 +73,7 @@ async fn mcp_call_tool_without_root_returns_error() {
 #[tokio::test]
 async fn mcp_snapshot_without_root_returns_error() {
     let hub = make_hub();
-    let result =
-        dispatch_hub_request(&hub, "hub/mcp/snapshot", json!({}), "sub-1".into()).await;
+    let result = dispatch_hub_request(&hub, "hub/mcp/snapshot", json!({}), "sub-1".into()).await;
     let err = result.unwrap_err();
     assert!(err.contains("main"));
 }
@@ -203,8 +201,7 @@ async fn mcp_forward_times_out_when_root_agent_hangs() {
     // SAFETY: env mutation is process-global; this test runs single-threaded.
     unsafe { std::env::set_var("LOOPAL_HUB_MCP_FORWARD_TIMEOUT_SECS", "1") };
     let start = std::time::Instant::now();
-    let result =
-        dispatch_hub_request(&hub, "hub/mcp/list_tools", json!({}), "sub-x".into()).await;
+    let result = dispatch_hub_request(&hub, "hub/mcp/list_tools", json!({}), "sub-x".into()).await;
     let elapsed = start.elapsed();
     unsafe { std::env::remove_var("LOOPAL_HUB_MCP_FORWARD_TIMEOUT_SECS") };
 

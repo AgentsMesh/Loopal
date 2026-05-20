@@ -226,10 +226,7 @@ async fn snapshot_surfaces_stderr_tail_for_failed_stdio_server() {
         "diag".to_string(),
         McpServerConfig::Stdio {
             command: "sh".to_string(),
-            args: vec![
-                "-c".to_string(),
-                format!("echo '{MARKER}' >&2; sleep 0.5"),
-            ],
+            args: vec!["-c".to_string(), format!("echo '{MARKER}' >&2; sleep 0.5")],
             env: Default::default(),
             enabled: true,
             timeout_ms: 800,

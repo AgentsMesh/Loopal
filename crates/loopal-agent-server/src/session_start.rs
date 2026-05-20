@@ -37,9 +37,9 @@ pub(crate) async fn start_session(
         crate::params::apply_start_overrides(&mut config.settings, &start);
         let depth = start.depth.unwrap_or(0);
         let hub_client: Option<Arc<dyn loopal_mcp::HubMcpClient>> = if depth > 0 {
-            Some(Arc::new(crate::connection_mcp_client::ConnectionMcpClient::new(
-                connection.clone(),
-            )))
+            Some(Arc::new(
+                crate::connection_mcp_client::ConnectionMcpClient::new(connection.clone()),
+            ))
         } else {
             None
         };
@@ -48,7 +48,9 @@ pub(crate) async fn start_session(
         } else {
             match hub.get_test_provider().await {
                 Some(provider) => crate::params::build_kernel_with_provider(provider)?,
-                None => crate::params::build_kernel_from_config(&config, false, depth, None).await?,
+                None => {
+                    crate::params::build_kernel_from_config(&config, false, depth, None).await?
+                }
             }
         };
 

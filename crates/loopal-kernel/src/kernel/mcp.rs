@@ -133,7 +133,9 @@ impl Kernel {
     /// `snapshot_local_mcp_metadata` — never block finalize past the bounded
     /// wait. For Proxy mode (sub-agents), we always go through the trait so
     /// IPC fetches the remote tool list.
-    async fn snapshot_tools_for_registration(&self) -> Vec<(String, loopal_tool_api::ToolDefinition)> {
+    async fn snapshot_tools_for_registration(
+        &self,
+    ) -> Vec<(String, loopal_tool_api::ToolDefinition)> {
         if let Some(local) = self.mcp.local() {
             let arc_mgr = local.manager();
             return match arc_mgr.try_read() {

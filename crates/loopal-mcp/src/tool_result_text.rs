@@ -5,11 +5,7 @@ use rmcp::model::{CallToolResult, RawContent, ResourceContents};
 /// so hub forwarding preserves every content block (text, image, audio,
 /// resource) across the protocol boundary.
 pub fn call_result_to_response(result: &CallToolResult) -> McpCallToolResponse {
-    let content = result
-        .content
-        .iter()
-        .filter_map(content_to_block)
-        .collect();
+    let content = result.content.iter().filter_map(content_to_block).collect();
     McpCallToolResponse {
         content,
         is_error: result.is_error.unwrap_or(false),

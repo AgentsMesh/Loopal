@@ -90,10 +90,7 @@ impl McpManager {
 
     /// Insert already-connected (or already-failed) `McpConnection` objects
     /// into manager state. Errors only when EVERY server failed to connect.
-    pub fn absorb_connections(
-        &mut self,
-        results: Vec<McpConnection>,
-    ) -> Result<(), McpError> {
+    pub fn absorb_connections(&mut self, results: Vec<McpConnection>) -> Result<(), McpError> {
         let total = results.len();
         let mut failure_count = 0;
         for conn in results {

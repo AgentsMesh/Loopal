@@ -28,10 +28,8 @@ pub async fn append_runtime_sections(prompt: &mut String, kernel: &Kernel) {
     let configured: Vec<_> = kernel.settings().mcp_servers.keys().cloned().collect();
     if !configured.is_empty() {
         let snapshots = kernel.mcp_provider().snapshot().await;
-        let mut by_name: std::collections::HashMap<String, String> = snapshots
-            .into_iter()
-            .map(|s| (s.name, s.status))
-            .collect();
+        let mut by_name: std::collections::HashMap<String, String> =
+            snapshots.into_iter().map(|s| (s.name, s.status)).collect();
         prompt.push_str("\n\n# MCP Server Status\n");
         prompt.push_str(
             "Configured at session start. A server may still be initializing \
@@ -67,4 +65,3 @@ pub async fn append_runtime_sections(prompt: &mut String, kernel: &Kernel) {
         }
     }
 }
-

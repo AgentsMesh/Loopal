@@ -41,8 +41,11 @@ impl McpProxyClient {
     }
 
     async fn rpc(&self, method: &str, params: Value) -> Result<Value, String> {
-        match tokio::time::timeout(proxy_rpc_timeout(), self.client.send_request(method, params))
-            .await
+        match tokio::time::timeout(
+            proxy_rpc_timeout(),
+            self.client.send_request(method, params),
+        )
+        .await
         {
             Ok(inner) => inner,
             Err(_) => Err(format!(
@@ -57,7 +60,10 @@ impl McpProxyClient {
 impl McpProvider for McpProxyClient {
     async fn list_tools(&self) -> Vec<(String, ToolDefinition)> {
         let resp = match self
-            .rpc(methods::HUB_MCP_LIST_TOOLS.name, Value::Object(Default::default()))
+            .rpc(
+                methods::HUB_MCP_LIST_TOOLS.name,
+                Value::Object(Default::default()),
+            )
             .await
         {
             Ok(v) => v,
@@ -123,7 +129,10 @@ impl McpProvider for McpProxyClient {
 
     async fn snapshot(&self) -> Vec<McpConnectionSnapshot> {
         let resp = match self
-            .rpc(methods::HUB_MCP_SNAPSHOT.name, Value::Object(Default::default()))
+            .rpc(
+                methods::HUB_MCP_SNAPSHOT.name,
+                Value::Object(Default::default()),
+            )
             .await
         {
             Ok(v) => v,

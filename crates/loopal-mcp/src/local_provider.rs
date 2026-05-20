@@ -167,7 +167,12 @@ impl McpProvider for LocalMcpProvider {
         tool: &str,
         args: &Value,
     ) -> Result<CallToolResult, McpError> {
-        let first = self.manager.read().await.call_tool(server, tool, args).await;
+        let first = self
+            .manager
+            .read()
+            .await
+            .call_tool(server, tool, args)
+            .await;
         match first {
             Err(McpError::TransportClosed(_)) => {
                 tracing::warn!(server, tool, "MCP transport closed, attempting reconnect");
@@ -175,7 +180,11 @@ impl McpProvider for LocalMcpProvider {
                 if !reconnected {
                     return first;
                 }
-                self.manager.read().await.call_tool(server, tool, args).await
+                self.manager
+                    .read()
+                    .await
+                    .call_tool(server, tool, args)
+                    .await
             }
             other => other,
         }
@@ -185,5 +194,3 @@ impl McpProvider for LocalMcpProvider {
         self.manager.read().await.collect_snapshots()
     }
 }
-
-

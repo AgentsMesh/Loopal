@@ -103,7 +103,10 @@ pub async fn bootstrap_hub_and_agent(
         root_conn,
         incoming_rx,
     );
-    info!(name = loopal_protocol::ROOT_AGENT_NAME, "root agent registered");
+    info!(
+        name = loopal_protocol::ROOT_AGENT_NAME,
+        "root agent registered"
+    );
 
     Ok(BootstrapContext {
         hub,

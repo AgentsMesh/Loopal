@@ -11,8 +11,7 @@ fn root_agent_under_budget_returns_none() {
 
 #[test]
 fn sub_agent_below_budget_forbids_ask_user_only() {
-    let filter =
-        build_depth_tool_filter(1, 2).expect("sub-agent should always impose a filter");
+    let filter = build_depth_tool_filter(1, 2).expect("sub-agent should always impose a filter");
     assert!(
         filter.contains("AskUser"),
         "AskUser must be in the forbidden set for sub-agents"
@@ -30,8 +29,8 @@ fn sub_agent_below_budget_forbids_ask_user_only() {
 #[test]
 fn root_at_zero_budget_forbids_spawn_tools_only() {
     // depth=0 → root (is_sub_agent=false), max_depth=0 → exhausted (0 >= 0)
-    let filter = build_depth_tool_filter(0, 0)
-        .expect("root at exhausted budget should impose filter");
+    let filter =
+        build_depth_tool_filter(0, 0).expect("root at exhausted budget should impose filter");
     for spawn_tool in &["Agent", "SendMessage", "ListHubs"] {
         assert!(
             filter.contains(*spawn_tool),
@@ -47,8 +46,8 @@ fn root_at_zero_budget_forbids_spawn_tools_only() {
 #[test]
 fn sub_agent_at_max_depth_forbids_both_ask_user_and_spawn() {
     // depth=2, max=2 → both is_sub_agent (2>0) AND exhausted (2>=2)
-    let filter = build_depth_tool_filter(2, 2)
-        .expect("sub-agent at max depth should impose filter");
+    let filter =
+        build_depth_tool_filter(2, 2).expect("sub-agent at max depth should impose filter");
     assert!(
         filter.contains("AskUser"),
         "sub-agent must have AskUser forbidden"
@@ -74,8 +73,7 @@ fn sub_agent_at_max_depth_forbids_both_ask_user_and_spawn() {
 
 #[test]
 fn sub_agent_above_max_depth_forbids_all_dangerous() {
-    let filter =
-        build_depth_tool_filter(5, 2).expect("filter required when both flags trigger");
+    let filter = build_depth_tool_filter(5, 2).expect("filter required when both flags trigger");
     assert!(filter.contains("AskUser"));
     assert!(filter.contains("Agent"));
     assert!(!filter.contains("Read"));

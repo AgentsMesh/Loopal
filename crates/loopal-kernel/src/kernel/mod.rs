@@ -71,7 +71,9 @@ impl Kernel {
         let hook_registry = HookRegistry::new(settings.hooks.clone());
         let factory = Arc::new(DefaultExecutorFactory::new(None));
         let hook_service = HookService::new(hook_registry, factory);
-        let local = Arc::new(LocalMcpProvider::new(Arc::new(RwLock::new(McpManager::new()))));
+        let local = Arc::new(LocalMcpProvider::new(Arc::new(RwLock::new(
+            McpManager::new(),
+        ))));
 
         spawn_bg_gc_tick(bg_store.clone(), bg_config);
 

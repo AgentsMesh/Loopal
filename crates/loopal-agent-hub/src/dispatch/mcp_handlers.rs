@@ -52,4 +52,3 @@ async fn forward_to_root(
         )),
     }
 }
-

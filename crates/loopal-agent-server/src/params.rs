@@ -72,9 +72,7 @@ pub async fn build_kernel_from_config(
     loopal_agent::tools::register_all(&mut kernel);
     let kernel = Arc::new(kernel);
 
-    if production
-        && let Some(local) = kernel.local_mcp_provider()
-    {
+    if production && let Some(local) = kernel.local_mcp_provider() {
         spawn_late_mcp_registration(Arc::downgrade(&kernel), local);
     }
 

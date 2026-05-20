@@ -67,9 +67,7 @@ async fn set_mcp_provider_then_finalize_registers_proxy_tools() {
     });
     kernel.set_mcp_provider(provider);
 
-    let settled = kernel
-        .finalize_mcp_tools(Duration::from_millis(50))
-        .await;
+    let settled = kernel.finalize_mcp_tools(Duration::from_millis(50)).await;
     assert!(
         settled,
         "proxy backend skips wait_until_settled (no local spawn) — finalize must return true"
@@ -123,9 +121,7 @@ async fn register_mcp_tools_for_server_picks_up_late_connected_tools() {
     use loopal_mcp::{ConnectionStatus, McpConnection};
     let kernel = Kernel::new(Settings::default()).unwrap();
 
-    let manager = kernel
-        .mcp_manager()
-        .expect("root kernel has local manager");
+    let manager = kernel.mcp_manager().expect("root kernel has local manager");
     {
         let mut mgr = manager.write().await;
         let mut conn = McpConnection::new(
@@ -154,9 +150,7 @@ async fn register_mcp_tools_for_server_picks_up_late_connected_tools() {
         "tool should NOT be in ToolRegistry yet — only after register_mcp_tools_for_server"
     );
 
-    kernel
-        .register_mcp_tools_for_server("fake-server")
-        .await;
+    kernel.register_mcp_tools_for_server("fake-server").await;
 
     assert!(
         kernel.get_tool("late_arrival_tool").is_some(),
@@ -203,4 +197,3 @@ async fn register_all_settled_mcp_tools_is_idempotent_on_reentry() {
     kernel.register_all_settled_mcp_tools().await;
     assert!(kernel.get_tool("shared_tool").is_some());
 }
-

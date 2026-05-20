@@ -36,11 +36,13 @@ impl McpProvider for RootProvider {
         _args: &Value,
     ) -> Result<CallToolResult, McpError> {
         if server == "fail" {
-            return Err(McpError::ServerNotFound(format!("no such server: {server}")));
+            return Err(McpError::ServerNotFound(format!(
+                "no such server: {server}"
+            )));
         }
-        Ok(CallToolResult::success(vec![
-            Content::text(format!("called {server}/{tool}")),
-        ]))
+        Ok(CallToolResult::success(vec![Content::text(format!(
+            "called {server}/{tool}"
+        ))]))
     }
     async fn snapshot(&self) -> Vec<McpConnectionSnapshot> {
         vec![McpConnectionSnapshot {
@@ -171,10 +173,7 @@ async fn e2e_call_tool_when_hub_has_no_provider_returns_error() {
     let bridge: Arc<dyn HubMcpClient> = Arc::new(SessionHubBridge { hub });
     let proxy = McpProxyClient::new(bridge);
 
-    let err = proxy
-        .call_tool("s", "t", &Value::Null)
-        .await
-        .unwrap_err();
+    let err = proxy.call_tool("s", "t", &Value::Null).await.unwrap_err();
     let msg = format!("{err}");
     assert!(
         msg.contains("no MCP provider"),

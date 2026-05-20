@@ -36,9 +36,6 @@ fn compute_answer_for(q: &PendingQuestion, idx: usize) -> String {
         return parts.join(", ");
     }
 
-    if !state.interacted() && !question.options.is_empty() {
-        return String::new();
-    }
     question
         .options
         .get(state.cursor())
@@ -140,24 +137,6 @@ pub(crate) async fn cancel(app: &mut App) {
 }
 
 pub(crate) async fn confirm(app: &mut App) {
-    // 防止 silent confirmation：当前题未交互且有选项 且 cursor 不在 Other 行时，
-    // 不提交答案，提示用户先用方向键选择或在 Other 行输入。
-    let needs_interaction = app.with_active_conversation(|conv| {
-        conv.pending_question
-            .as_ref()
-            .and_then(|q| {
-                let cur = q.questions.get(q.current_question)?;
-                let s = q.states.get(q.current_question)?;
-                let cursor_on_other = s.cursor() == cur.options.len();
-                Some(!s.interacted() && !cur.options.is_empty() && !cursor_on_other)
-            })
-            .unwrap_or(false)
-    });
-    if needs_interaction {
-        app.set_transient_status("Press ↑/↓ to choose, or type into Other.");
-        return;
-    }
-
     let advanced = app.with_active_conversation_mut(|conv| {
         conv.pending_question
             .as_mut()

@@ -102,13 +102,13 @@ fn answered_response_protocol_mismatch_is_warned() {
 }
 
 #[test]
-fn untouched_single_select_returns_empty_in_compute() {
+fn untouched_single_select_returns_first_option_label() {
     let q = PendingQuestion::new("id".into(), vec![make_q(&["A", "B"], false)]);
     let answers = compute_question_answers(&q);
     assert_eq!(
         answers,
-        vec![String::new()],
-        "untouched cursor must return empty answer to avoid silent confirmation"
+        vec!["A".to_string()],
+        "untouched cursor on single-select must return default (first) option label"
     );
 }
 

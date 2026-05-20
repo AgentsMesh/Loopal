@@ -81,12 +81,10 @@ fn single_select_invariant_selection_stays_empty() {
     let mut q = PendingQuestion::new("id".into(), vec![make_q(&["A", "B", "C"], false)]);
     if let Some(s) = q.states.get_mut(q.current_question) {
         s.cursor = 1;
-        s.interacted = true;
     }
     q.toggle();
     if let Some(s) = q.states.get_mut(q.current_question) {
         s.cursor = 2;
-        s.interacted = true;
     }
     q.toggle();
     assert!(
@@ -103,7 +101,6 @@ fn multi_question_independent_state() {
     );
     if let Some(s) = q.states.get_mut(q.current_question) {
         s.cursor = 1;
-        s.interacted = true;
     }
     q.toggle();
     "first".chars().for_each(|c| q.free_text_insert_char(c));
@@ -111,7 +108,6 @@ fn multi_question_independent_state() {
     q.next_question();
     if let Some(s) = q.states.get_mut(q.current_question) {
         s.cursor = 2;
-        s.interacted = true;
     }
 
     let answers: Vec<String> = compute_question_answers(&q);
@@ -145,7 +141,6 @@ fn options_window_around_cursor_in_narrow_area() {
     let mut q = PendingQuestion::new("id".into(), vec![make_q(&["A", "B", "C", "D", "E"], false)]);
     if let Some(s) = q.states.get_mut(q.current_question) {
         s.cursor = 4;
-        s.interacted = true;
     }
     let s = render_to_buffer(60, 5, |f, area| question_inline::render(f, &q, area, None));
     assert!(s.contains("E"), "cursor option must be visible:\n{s}");

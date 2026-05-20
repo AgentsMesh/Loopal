@@ -117,6 +117,7 @@ impl AgentLoopRunner {
         self.emit(AgentEventPayload::Started).await?;
         self.emit_cold_start_observables().await?;
         self.emit_initial_mcp_status().await;
+        self.spawn_mcp_settle_emitter();
         self.fire_session_hook(loopal_config::HookEvent::SessionStart)
             .await;
 

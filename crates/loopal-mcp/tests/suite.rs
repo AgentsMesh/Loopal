@@ -15,3 +15,9 @@ mod callback_test;
 
 #[path = "suite/snapshot_test.rs"]
 mod snapshot_test;
+
+#[path = "suite/proxy_client_test.rs"]
+mod proxy_client_test;
+
+#[path = "suite/local_provider_test.rs"]
+mod local_provider_test;

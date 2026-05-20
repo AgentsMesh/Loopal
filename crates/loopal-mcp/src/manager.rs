@@ -59,30 +59,38 @@ impl McpManager {
         &mut self,
         configs: &IndexMap<String, McpServerConfig>,
     ) -> Result<(), McpError> {
-        // Phase 0: expand secret placeholders in configs.
-        let mut expanded: IndexMap<String, McpServerConfig> = IndexMap::new();
+        let prepared = self.prepare_connections(configs).await;
+        let results = connect_all(prepared).await;
+        self.absorb_connections(results)
+    }
+
+    /// Snapshot sampling/secrets and expand placeholders without holding any
+    /// caller's lock. Returns unconnected `McpConnection` objects ready for
+    /// `connect_all`. Lets background spawn release the manager write lock
+    /// during the slow `connect()` phase.
+    pub async fn prepare_connections(
+        &self,
+        configs: &IndexMap<String, McpServerConfig>,
+    ) -> Vec<McpConnection> {
+        let mut prepared = Vec::new();
         for (name, cfg) in configs {
             let resolved = expand_mcp_config(cfg.clone(), self.secrets.as_ref()).await;
-            expanded.insert(name.clone(), resolved);
-        }
-
-        // Phase 1: connect all enabled servers concurrently.
-        let mut futures = Vec::new();
-        for (name, config) in &expanded {
-            if !config.enabled() {
+            if !resolved.enabled() {
                 info!(server = %name, "MCP server disabled, skipping");
                 continue;
             }
-            let mut conn = McpConnection::new(name.clone(), config.clone(), self.sampling.clone());
-            futures.push(async move {
-                conn.connect().await;
-                conn
-            });
+            prepared.push(McpConnection::new(
+                name.clone(),
+                resolved,
+                self.sampling.clone(),
+            ));
         }
+        prepared
+    }
 
-        let results = futures::future::join_all(futures).await;
-
-        // Phase 2: collect results (sequential, cheap — just HashMap inserts).
+    /// Insert already-connected (or already-failed) `McpConnection` objects
+    /// into manager state. Errors only when EVERY server failed to connect.
+    pub fn absorb_connections(&mut self, results: Vec<McpConnection>) -> Result<(), McpError> {
         let total = results.len();
         let mut failure_count = 0;
         for conn in results {
@@ -102,8 +110,6 @@ impl McpManager {
             } else {
                 warn!(server = %conn.name, errors = ?conn.errors, "failed to start MCP server");
                 failure_count += 1;
-                // Keep failed connections so /mcp page can display them and
-                // the user can attempt a manual reconnect.
                 self.connections.insert(conn.name.clone(), conn);
             }
         }
@@ -176,6 +182,18 @@ impl McpManager {
     pub fn remove_tool_mapping(&mut self, tool_name: &str) {
         self.tool_map.remove(tool_name);
     }
+}
+
+/// Lock-free concurrent connect — caller passes prepared `McpConnection`
+/// objects (see `prepare_connections`); this drives all `connect()` futures
+/// in parallel without any shared state, so a slow server cannot block
+/// other readers of the originating manager.
+pub async fn connect_all(prepared: Vec<McpConnection>) -> Vec<McpConnection> {
+    futures::future::join_all(prepared.into_iter().map(|mut conn| async move {
+        conn.connect().await;
+        conn
+    }))
+    .await
 }
 
 impl Default for McpManager {

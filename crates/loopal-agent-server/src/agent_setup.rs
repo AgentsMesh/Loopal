@@ -136,7 +136,7 @@ pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<A
         features,
         start.depth.unwrap_or(0),
     );
-    crate::prompt_post::append_runtime_sections(&mut system_prompt, &kernel);
+    crate::prompt_post::append_runtime_sections(&mut system_prompt, &kernel).await;
 
     let messages = build_initial_messages(resume_messages, start);
 
@@ -150,7 +150,6 @@ pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<A
     let lifecycle = start.lifecycle;
     let depth = start.depth.unwrap_or(0);
     let tool_filter = crate::spawn_policy::build_depth_tool_filter(
-        &kernel,
         depth,
         config.settings.harness.agent_max_depth,
     );

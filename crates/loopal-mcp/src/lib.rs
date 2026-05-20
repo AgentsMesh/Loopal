@@ -1,19 +1,27 @@
 pub mod client;
 pub mod connection;
 pub mod handler;
+pub mod local_provider;
 pub mod manager;
 mod manager_query;
 pub mod oauth;
+pub mod provider;
+pub mod proxy_client;
 pub mod reconnect;
 pub mod secret_expand;
 pub mod tool_adapter;
+pub mod tool_result_text;
 pub mod transport;
 pub mod types;
 
 pub use client::McpClient;
 pub use connection::McpConnection;
 pub use handler::SamplingCallback;
+pub use local_provider::LocalMcpProvider;
 pub use manager::McpManager;
 pub use manager_query::McpConnectionSnapshot;
+pub use provider::McpProvider;
+pub use proxy_client::{HubMcpClient, McpProxyClient};
 pub use tool_adapter::McpToolAdapter;
+pub use tool_result_text::call_result_to_response;
 pub use types::ConnectionStatus;

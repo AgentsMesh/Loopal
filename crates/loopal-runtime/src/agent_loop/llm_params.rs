@@ -23,8 +23,11 @@ impl AgentLoopRunner {
         );
         let mut tool_defs = self.params.deps.kernel.tool_definitions();
 
-        if let Some(ref filter) = self.params.config.tool_filter {
-            tool_defs.retain(|t| filter.contains(&t.name));
+        // reason: tool_filter is now a deny-list (sub-agent / depth-exhausted
+        // restrictions). Allow-list semantics would silently strip
+        // late-registered MCP tools from sub-agents — see spawn_policy.rs.
+        if let Some(ref forbidden) = self.params.config.tool_filter {
+            tool_defs.retain(|t| !forbidden.contains(&t.name));
         }
         if self.params.config.mode == AgentMode::Plan
             && let Some(plan_filter) = self.plan_tool_filter()

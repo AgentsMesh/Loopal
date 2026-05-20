@@ -53,12 +53,16 @@ fn test_get_tool_returns_some_for_builtin() {
 }
 
 #[tokio::test]
-async fn test_start_mcp_no_servers() {
+async fn test_finalize_mcp_tools_no_servers() {
     let mut kernel = make_kernel();
-    kernel
-        .start_mcp()
-        .await
-        .expect("start_mcp with no servers should succeed");
+    kernel.spawn_mcp().await;
+    let settled = kernel
+        .finalize_mcp_tools(std::time::Duration::from_millis(100))
+        .await;
+    assert!(
+        settled,
+        "finalize_mcp_tools with no servers should settle immediately"
+    );
 }
 
 #[test]

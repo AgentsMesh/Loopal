@@ -57,6 +57,10 @@ pub struct SessionHub {
     /// root — silent root mismatch would let two agent setups share
     /// storage they think is independent.
     pub(crate) storage_root: Mutex<Option<std::path::PathBuf>>,
+    /// MCP provider owned by the root agent's kernel. Set by `session_start`
+    /// after `build_kernel_from_config`. Used by sub-agents (via Hub forwarding)
+    /// to share root's MCP server connections without re-spawning.
+    pub(crate) mcp_provider: Mutex<Option<Arc<dyn loopal_mcp::McpProvider>>>,
 }
 
 impl SessionHub {
@@ -68,7 +72,16 @@ impl SessionHub {
             cron_storage: Mutex::new(None),
             task_storage: Mutex::new(None),
             storage_root: Mutex::new(None),
+            mcp_provider: Mutex::new(None),
         }
+    }
+
+    pub async fn set_mcp_provider(&self, provider: Arc<dyn loopal_mcp::McpProvider>) {
+        *self.mcp_provider.lock().await = Some(provider);
+    }
+
+    pub async fn mcp_provider(&self) -> Option<Arc<dyn loopal_mcp::McpProvider>> {
+        self.mcp_provider.lock().await.clone()
     }
 
     /// Set a mock provider for testing (consumed on next session creation).

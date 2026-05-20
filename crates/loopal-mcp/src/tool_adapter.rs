@@ -1,41 +1,31 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use loopal_error::{LoopalError, McpError};
+use loopal_error::LoopalError;
 use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolDefinition, ToolResult};
 use rmcp::model::CallToolResult;
 use serde_json::Value;
-use tokio::sync::RwLock;
-use tracing::{Instrument, warn};
+use tracing::Instrument;
 
-use crate::manager::McpManager;
-use crate::reconnect::ReconnectPolicy;
+use crate::provider::McpProvider;
 
-/// Wraps an MCP tool as a local Tool trait implementation.
 pub struct McpToolAdapter {
     definition: ToolDefinition,
     server_name: String,
-    manager: Arc<RwLock<McpManager>>,
+    provider: Arc<dyn McpProvider>,
 }
 
 impl McpToolAdapter {
     pub fn new(
         definition: ToolDefinition,
         server_name: String,
-        manager: Arc<RwLock<McpManager>>,
+        provider: Arc<dyn McpProvider>,
     ) -> Self {
         Self {
             definition,
             server_name,
-            manager,
+            provider,
         }
-    }
-
-    async fn is_reconnectable(&self) -> bool {
-        let mgr = self.manager.read().await;
-        mgr.connections
-            .get(&self.server_name)
-            .is_some_and(|c| ReconnectPolicy::is_reconnectable(&c.config))
     }
 }
 
@@ -65,28 +55,11 @@ impl Tool for McpToolAdapter {
         let mcp_span =
             tracing::info_span!("mcp_tool_call", mcp.tool = self.definition.name.as_str());
         async {
-            // Fast path: read lock for normal tool calls (allows concurrency).
-            let result = {
-                let mgr = self.manager.read().await;
-                mgr.call_tool(&self.server_name, &self.definition.name, &input)
-                    .await
-            };
-
-            let result = match result {
-                Ok(val) => val,
-                Err(McpError::TransportClosed(_)) if self.is_reconnectable().await => {
-                    warn!(server = %self.server_name, tool = %self.definition.name, "transport closed, reconnecting");
-                    {
-                        let mut mgr = self.manager.write().await;
-                        let _ = mgr.restart_connection(&self.server_name).await;
-                    }
-                    let mgr = self.manager.read().await;
-                    mgr.call_tool(&self.server_name, &self.definition.name, &input)
-                        .await
-                        .map_err(LoopalError::Mcp)?
-                }
-                Err(e) => return Err(LoopalError::Mcp(e)),
-            };
+            let result = self
+                .provider
+                .call_tool(&self.server_name, &self.definition.name, &input)
+                .await
+                .map_err(LoopalError::Mcp)?;
 
             Ok(convert_tool_result(&result))
         }
@@ -95,11 +68,6 @@ impl Tool for McpToolAdapter {
     }
 }
 
-/// Convert rmcp `CallToolResult` to Loopal `ToolResult` without serialization.
-///
-/// Extracts text from all content blocks. Non-text content (images, resources)
-/// is represented as descriptive placeholders since Loopal's ToolResult is
-/// text-only.
 fn convert_tool_result(result: &CallToolResult) -> ToolResult {
     let parts: Vec<String> = result.content.iter().filter_map(content_to_text).collect();
 
@@ -136,6 +104,9 @@ fn content_to_text(content: &rmcp::model::Content) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::local_provider::LocalMcpProvider;
+    use crate::manager::McpManager;
+    use tokio::sync::RwLock;
 
     fn make_adapter() -> McpToolAdapter {
         let definition = ToolDefinition {
@@ -149,7 +120,8 @@ mod tests {
             }),
         };
         let manager = Arc::new(RwLock::new(McpManager::default()));
-        McpToolAdapter::new(definition, "test_server".to_string(), manager)
+        let provider: Arc<dyn McpProvider> = Arc::new(LocalMcpProvider::new(manager));
+        McpToolAdapter::new(definition, "test_server".to_string(), provider)
     }
 
     #[test]
@@ -192,7 +164,8 @@ mod tests {
             input_schema: serde_json::json!({}),
         };
         let manager = Arc::new(RwLock::new(McpManager::default()));
-        let adapter = McpToolAdapter::new(definition, "srv".to_string(), manager);
+        let provider: Arc<dyn McpProvider> = Arc::new(LocalMcpProvider::new(manager));
+        let adapter = McpToolAdapter::new(definition, "srv".to_string(), provider);
         assert_eq!(adapter.name(), "minimal");
         assert_eq!(adapter.description(), "");
         assert_eq!(adapter.parameters_schema(), serde_json::json!({}));

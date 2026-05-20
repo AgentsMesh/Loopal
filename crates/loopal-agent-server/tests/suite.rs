@@ -10,6 +10,8 @@ mod bridge_basic_test;
 mod bridge_edge_test;
 #[path = "suite/bridge_helpers.rs"]
 mod bridge_helpers;
+#[path = "suite/build_kernel_depth_test.rs"]
+mod build_kernel_depth_test;
 #[path = "suite/cron_bridge_edge_test.rs"]
 mod cron_bridge_edge_test;
 #[path = "suite/cron_bridge_helpers.rs"]
@@ -38,6 +40,8 @@ mod hub_interaction_edge_test;
 mod hub_interaction_test;
 #[path = "suite/interrupt_filter_test.rs"]
 mod interrupt_filter_test;
+#[path = "suite/mcp_e2e_test.rs"]
+mod mcp_e2e_test;
 #[path = "suite/observer_join_edge_test.rs"]
 mod observer_join_edge_test;
 #[path = "suite/observer_join_test.rs"]
@@ -46,6 +50,8 @@ mod observer_join_test;
 mod params_test;
 #[path = "suite/permission_mode_e2e_test.rs"]
 mod permission_mode_e2e_test;
+#[path = "suite/prompt_post_test.rs"]
+mod prompt_post_test;
 #[path = "suite/resolve_sessions_root_test.rs"]
 mod resolve_sessions_root_test;
 #[path = "suite/resume_e2e_helpers.rs"]

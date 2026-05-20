@@ -12,7 +12,9 @@ pub mod event_payload;
 mod event_snat;
 pub mod event_summary;
 pub mod interrupt;
+pub mod mcp_ipc;
 pub mod mcp_snapshot;
+pub mod naming;
 pub mod projected;
 pub mod projection;
 pub mod question;
@@ -32,7 +34,12 @@ pub use event::AgentEvent;
 pub use event_payload::AgentEventPayload;
 pub use event_summary::{CompactPhase, CompactionSummary, SubAgentSpawn, TurnSummary};
 pub use interrupt::InterruptSignal;
+pub use mcp_ipc::{
+    McpCallToolRequest, McpCallToolResponse, McpContentBlock, McpListToolsResponse,
+    McpSnapshotResponse, McpToolEntry,
+};
 pub use mcp_snapshot::McpServerSnapshot;
+pub use naming::ROOT_AGENT_NAME;
 pub use projected::{ProjectedMessage, ProjectedToolCall};
 pub use projection::project_messages;
 pub use question::{Question, QuestionOption, ResolveSource, UserQuestionResponse};

@@ -21,6 +21,8 @@ mod hub_integration_test;
 mod hub_lifecycle_test;
 #[path = "suite/hub_shutdown_test.rs"]
 mod hub_shutdown_test;
+#[path = "suite/mcp_handlers_test.rs"]
+mod mcp_handlers_test;
 #[path = "suite/multi_agent_test.rs"]
 mod multi_agent_test;
 #[path = "suite/multi_ui_attach_test.rs"]

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use loopal_ipc::connection::Connection;
 use loopal_ipc::protocol::methods;
 use loopal_ipc::rpc_error::RpcError;
-use loopal_protocol::{ControlCommand, Envelope, MessageSource, UserContent};
+use loopal_protocol::{ControlCommand, Envelope, MessageSource, ROOT_AGENT_NAME, UserContent};
 use serde_json::Value;
 use tracing::warn;
 
@@ -17,7 +17,7 @@ impl HubClient {
     }
 
     pub async fn send_message(&self, content: UserContent) {
-        self.send_message_to("main", content).await;
+        self.send_message_to(ROOT_AGENT_NAME, content).await;
     }
 
     pub async fn send_message_to(&self, target: &str, content: UserContent) {
@@ -40,7 +40,7 @@ impl HubClient {
     }
 
     pub async fn send_control(&self, cmd: &ControlCommand) -> Result<Value, RpcError> {
-        self.send_control_to("main", cmd).await
+        self.send_control_to(ROOT_AGENT_NAME, cmd).await
     }
 
     pub async fn send_control_to(
@@ -58,7 +58,7 @@ impl HubClient {
     }
 
     pub async fn interrupt(&self) {
-        self.interrupt_target("main").await;
+        self.interrupt_target(ROOT_AGENT_NAME).await;
     }
 
     pub async fn interrupt_target(&self, target: &str) {
@@ -82,7 +82,7 @@ impl HubClient {
             .conn
             .send_request(
                 methods::HUB_SHUTDOWN_AGENT.name,
-                serde_json::json!({"target": "main"}),
+                serde_json::json!({"target": ROOT_AGENT_NAME}),
             )
             .await
         {

@@ -1,18 +1,26 @@
 /// Single MCP server connection lifecycle.
 ///
 /// Wraps `McpClient` with status tracking, config, and capability-guarded discovery.
+use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 
 use loopal_config::McpServerConfig;
 use loopal_tool_api::ToolDefinition;
 use serde_json::Value;
+use tokio::sync::Mutex;
 use tracing::{info, warn};
 
 use crate::client::McpClient;
 use crate::handler::SamplingCallback;
 use crate::transport;
 use crate::types::{CapabilitySummary, ConnectionStatus, McpPrompt, McpResource};
+
+/// How many stderr lines to retain per stdio server for diagnostics.
+/// Surfaced to `/mcp` page when the connection is in Failed state so the
+/// user sees the server's own error messages instead of a generic
+/// "did not complete handshake" wrapper.
+const STDERR_RETENTION: usize = 16;
 
 /// A managed connection to a single MCP server.
 pub struct McpConnection {
@@ -25,6 +33,10 @@ pub struct McpConnection {
     /// Server instructions from the initialize handshake.
     pub instructions: Option<String>,
     pub errors: Vec<String>,
+    /// Most recent stderr lines (stdio servers only). Tail-capped at
+    /// `STDERR_RETENTION` to bound memory. Read by `manager_query::collect_snapshots`
+    /// when surfacing failure diagnostics to the user.
+    pub stderr_tail: Arc<Mutex<VecDeque<String>>>,
     client: Option<McpClient>,
     sampling: Option<Arc<dyn SamplingCallback>>,
 }
@@ -44,6 +56,7 @@ impl McpConnection {
             cached_prompts: Vec::new(),
             instructions: None,
             errors: Vec::new(),
+            stderr_tail: Arc::new(Mutex::new(VecDeque::with_capacity(STDERR_RETENTION))),
             client: None,
             sampling,
         }
@@ -60,7 +73,13 @@ impl McpConnection {
 
         let timeout = Duration::from_millis(self.config.timeout_ms());
 
-        let result = self.create_client(timeout).await;
+        let result = match tokio::time::timeout(timeout, self.create_client(timeout)).await {
+            Ok(inner) => inner,
+            Err(_) => Err(loopal_error::McpError::ConnectionFailed(format!(
+                "'{}' did not complete handshake within {:?}",
+                self.name, timeout
+            ))),
+        };
         match result {
             Ok(client) => {
                 // Extract server instructions from handshake.
@@ -107,7 +126,17 @@ impl McpConnection {
         match &self.config {
             McpServerConfig::Stdio {
                 command, args, env, ..
-            } => transport::connect_stdio(command, args, env, timeout, sampling).await,
+            } => {
+                transport::connect_stdio(
+                    command,
+                    args,
+                    env,
+                    timeout,
+                    sampling,
+                    Some(self.stderr_tail.clone()),
+                )
+                .await
+            }
             McpServerConfig::StreamableHttp { url, headers, .. } => {
                 transport::connect_http(url, headers, timeout, sampling).await
             }

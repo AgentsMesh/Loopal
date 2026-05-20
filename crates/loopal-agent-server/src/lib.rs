@@ -14,6 +14,7 @@ mod agent_setup_helpers;
 mod bg_task_bridge;
 mod bg_task_bridge_monitor;
 mod bg_task_bridge_sampler;
+mod connection_mcp_client;
 mod cron_bridge;
 #[doc(hidden)]
 pub mod dispatch;
@@ -24,11 +25,14 @@ mod hub_input_receiver;
 #[doc(hidden)]
 pub mod interrupt_filter;
 mod ipc_handlers;
+mod mcp_dispatch;
 mod memory_adapter;
 mod memory_consolidation;
 mod mock_loader;
-mod params;
-mod prompt_post;
+#[doc(hidden)]
+pub mod params;
+#[doc(hidden)]
+pub mod prompt_post;
 mod server;
 pub mod server_info;
 mod server_init;

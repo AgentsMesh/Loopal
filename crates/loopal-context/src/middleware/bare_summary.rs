@@ -54,6 +54,7 @@ pub(super) fn build_summary_message(
         role: MessageRole::User,
         content: vec![ContentBlock::Text { text: body }],
         origin: Some(MessageOrigin::CompactionSummary),
+        ephemeral_in_history: false,
     }
 }
 
@@ -95,6 +96,7 @@ mod tests {
                 },
             ],
             origin: None,
+            ephemeral_in_history: false,
         }];
         let out = bare_summary(&m, &[]);
         assert!(out.contains("Read: 2"));

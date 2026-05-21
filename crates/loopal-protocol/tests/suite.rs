@@ -9,6 +9,8 @@ mod command_test;
 mod control_test;
 #[path = "suite/cron_snapshot_test.rs"]
 mod cron_snapshot_test;
+#[path = "suite/degeneration_event_test.rs"]
+mod degeneration_event_test;
 #[path = "suite/envelope_test.rs"]
 mod envelope_test;
 #[path = "suite/event_edge_test.rs"]

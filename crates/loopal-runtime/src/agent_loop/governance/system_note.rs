@@ -16,6 +16,7 @@ pub fn make_governance_feedback(feedback: &str) -> Option<Message> {
             text: feedback.to_string(),
         }],
         origin: Some(MessageOrigin::GovernanceFeedback),
+        ephemeral_in_history: false,
     })
 }
 

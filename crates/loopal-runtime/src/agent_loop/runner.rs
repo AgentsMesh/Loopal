@@ -8,12 +8,13 @@ use tokio::sync::watch;
 use tracing::{Instrument, info, info_span};
 
 use super::AgentLoopParams;
+use super::continuation_gate::ContinuationGate;
 use super::governance::aggregator::{FirstDenyWins, VerdictAggregator};
 use super::governance::traits::{Governance, TurnHook};
 use super::model_config::ModelConfig;
 use super::token_accumulator::TokenAccumulator;
+use super::turn_history::TurnHistory;
 use crate::goal::GoalSessionToolAdapter;
-use crate::goal::prompts::DEFAULT_MAX_BARREN_CONTINUATIONS;
 use crate::plan_file::PlanFile;
 
 /// Encapsulates the agent loop state and behavior.
@@ -46,8 +47,8 @@ pub struct AgentLoopRunner {
     pub status: AgentStatus,
     pub plan_file: PlanFile,
     pub pending_consumed_ids: Vec<String>,
-    pub barren_continuation_count: u32,
-    pub max_barren_continuations: u32,
+    pub continuation_gate: ContinuationGate,
+    pub turn_history: TurnHistory,
     pub last_continuation_goal_id: Option<String>,
 }
 
@@ -97,8 +98,8 @@ impl AgentLoopRunner {
             status: AgentStatus::Starting,
             plan_file,
             pending_consumed_ids: Vec::new(),
-            barren_continuation_count: 0,
-            max_barren_continuations: DEFAULT_MAX_BARREN_CONTINUATIONS,
+            continuation_gate: ContinuationGate::new(),
+            turn_history: TurnHistory::new(),
             last_continuation_goal_id: None,
         }
     }

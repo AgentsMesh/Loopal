@@ -53,6 +53,7 @@ impl AgentLoopRunner {
                 role: MessageRole::Assistant,
                 content: assistant_content,
                 origin: None,
+                ephemeral_in_history: false,
             };
             if let Err(e) = self
                 .params

@@ -20,6 +20,7 @@ impl AgentLoopRunner {
             role: MessageRole::User,
             content: blocks,
             origin: None,
+            ephemeral_in_history: false,
         };
         if let Err(e) = self
             .params

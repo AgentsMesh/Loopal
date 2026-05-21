@@ -14,6 +14,7 @@ fn big_tool_result_message(size: usize) -> Message {
             metadata: None,
         }],
         origin: None,
+        ephemeral_in_history: false,
     }
 }
 

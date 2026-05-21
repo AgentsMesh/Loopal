@@ -19,6 +19,7 @@ impl AgentLoopRunner {
                 "EnterPlanMode" => intercepted.push(self.handle_enter_plan(idx, id).await?),
                 "ExitPlanMode" => intercepted.push(self.handle_exit_plan(idx, id).await?),
                 "AskUser" => intercepted.push(self.handle_ask_user(idx, id, name, input).await?),
+                "request_idle" => intercepted.push(self.handle_request_idle(idx, id, input).await?),
                 _ => remaining.push((id.clone(), name.clone(), input.clone())),
             }
         }

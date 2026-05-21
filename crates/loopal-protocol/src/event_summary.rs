@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::address::QualifiedAddress;
+use chrono::{DateTime, Utc};
 
 /// Aggregated per-turn metrics. Extracted from `AgentEventPayload::TurnCompleted`
 /// so the enum body stays readable.
@@ -60,4 +61,40 @@ pub struct SubAgentSpawn {
     pub model: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DegenerationSignal {
+    BarrenStreak,
+    RepeatedText,
+}
+
+/// Payload of `AgentEventPayload::DegenerationDetected`. `wake_deadline` is
+/// the deadline the runtime committed to before the gate auto-reopens.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DegenerationSummary {
+    pub signal: DegenerationSignal,
+    pub count: u32,
+    pub wake_deadline: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GateCloseReason {
+    ModelRequested,
+    Degeneration,
+    UserSuspend,
+    IdleTimeout,
+}
+
+/// Payload of `AgentEventPayload::ContinuationGateChanged`. `wake_deadline`
+/// is `None` for `UserSuspend` (no auto-reopen) or when the gate is open.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContinuationGateSummary {
+    pub open: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub closed_reason: Option<GateCloseReason>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wake_deadline: Option<DateTime<Utc>>,
 }

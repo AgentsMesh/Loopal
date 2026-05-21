@@ -7,6 +7,7 @@ pub enum AgentStatus {
     Starting,
     Running,
     WaitingForInput,
+    Suspended,
     Finished,
     Error,
 }

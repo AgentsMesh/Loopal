@@ -33,7 +33,10 @@ pub use cron_snapshot::CronJobSnapshot;
 pub use envelope::{Envelope, MessageSource};
 pub use event::AgentEvent;
 pub use event_payload::AgentEventPayload;
-pub use event_summary::{CompactPhase, CompactionSummary, SubAgentSpawn, TurnSummary};
+pub use event_summary::{
+    CompactPhase, CompactionSummary, ContinuationGateSummary, DegenerationSignal,
+    DegenerationSummary, GateCloseReason, SubAgentSpawn, TurnSummary,
+};
 pub use interrupt::InterruptSignal;
 pub use mcp_ipc::{
     McpCallToolRequest, McpCallToolResponse, McpContentBlock, McpListToolsResponse,

@@ -36,6 +36,7 @@ fn test_text_content_ignores_non_text_blocks() {
             ContentBlock::Text { text: "b".into() },
         ],
         origin: None,
+        ephemeral_in_history: false,
     };
     assert_eq!(msg.text_content(), "ab");
 }
@@ -47,6 +48,7 @@ fn test_text_content_empty() {
         role: MessageRole::User,
         content: vec![],
         origin: None,
+        ephemeral_in_history: false,
     };
     assert_eq!(msg.text_content(), "");
 }
@@ -68,6 +70,7 @@ fn test_estimated_token_count_tool_use() {
             input: serde_json::json!({"file_path": "/tmp/test.rs"}),
         }],
         origin: None,
+        ephemeral_in_history: false,
     };
     // JSON serialization of input + overhead
     let expected = serde_json::json!({"file_path": "/tmp/test.rs"})
@@ -91,6 +94,7 @@ fn test_estimated_token_count_tool_result() {
             metadata: None,
         }],
         origin: None,
+        ephemeral_in_history: false,
     };
     // 400 / 4 = 100 + 4 overhead
     assert_eq!(msg.estimated_token_count(), 104);
@@ -109,6 +113,7 @@ fn test_estimated_token_count_image() {
             },
         }],
         origin: None,
+        ephemeral_in_history: false,
     };
     // small inline image falls back to minimum 85 tokens + 4 overhead
     assert_eq!(msg.estimated_token_count(), 89);
@@ -130,6 +135,7 @@ fn test_estimated_token_count_mixed() {
             },
         ],
         origin: None,
+        ephemeral_in_history: false,
     };
     assert_eq!(msg.estimated_token_count(), 2 + 4);
 }
@@ -152,6 +158,7 @@ fn test_estimated_token_count_tool_result_with_image() {
             metadata: None,
         }],
         origin: None,
+        ephemeral_in_history: false,
     };
     let est = msg.estimated_token_count();
     assert!(

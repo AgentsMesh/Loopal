@@ -28,6 +28,7 @@ fn summarize_input_respects_utf8_boundary() {
             input: long_chinese,
         }],
         origin: None,
+        ephemeral_in_history: false,
     };
     let display = project_messages(&[msg]);
     let summary = &display[0].tool_calls[0].summary;
@@ -49,6 +50,7 @@ fn summarize_input_short_input_not_truncated() {
             input: short.clone(),
         }],
         origin: None,
+        ephemeral_in_history: false,
     };
     let display = project_messages(&[msg]);
     let summary = &display[0].tool_calls[0].summary;
@@ -87,6 +89,7 @@ fn project_multiple_images_count() {
             },
         ],
         origin: None,
+        ephemeral_in_history: false,
     };
     let display = project_messages(&[msg]);
     assert_eq!(display.len(), 1);

@@ -101,6 +101,7 @@ async fn small_image_full_pipeline_stays_inline() {
         role: MessageRole::User,
         content: vec![block],
         origin: None,
+        ephemeral_in_history: false,
     }];
     hydrate_images(&mut messages, store.as_ref(), "e2e-session")
         .await
@@ -144,6 +145,7 @@ async fn large_image_persists_to_resource_and_hydrates_back() {
         role: MessageRole::User,
         content: vec![tool_result_block("tu_1", images)],
         origin: None,
+        ephemeral_in_history: false,
     }];
 
     // Simulate session reload + hydrate before next LLM call.
@@ -180,6 +182,7 @@ async fn jsonl_round_trip_preserves_session_resource() {
         role: MessageRole::User,
         content: vec![tool_result_block("tu_1", images)],
         origin: None,
+        ephemeral_in_history: false,
     };
 
     // Serialize → deserialize: simulates session JSONL persistence.

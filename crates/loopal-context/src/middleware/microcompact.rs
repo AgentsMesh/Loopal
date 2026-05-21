@@ -95,6 +95,7 @@ mod tests {
                 input: serde_json::json!({}),
             }],
             origin: None,
+            ephemeral_in_history: false,
         }
     }
 
@@ -110,6 +111,7 @@ mod tests {
                 metadata: None,
             }],
             origin: None,
+            ephemeral_in_history: false,
         }
     }
 

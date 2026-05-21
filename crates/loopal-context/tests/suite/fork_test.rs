@@ -21,6 +21,7 @@ fn strips_thinking_blocks() {
             },
         ],
         origin: None,
+        ephemeral_in_history: false,
     }];
     let result = compress_for_fork(&msgs);
     assert_eq!(result.len(), 1);
@@ -41,6 +42,7 @@ fn strips_incomplete_tail() {
                 input: serde_json::json!({}),
             }],
             origin: None,
+            ephemeral_in_history: false,
         },
     ];
     let result = compress_for_fork(&msgs);
@@ -62,6 +64,7 @@ fn truncates_long_tool_result() {
             metadata: None,
         }],
         origin: None,
+        ephemeral_in_history: false,
     }];
     let result = compress_for_fork(&msgs);
     let ContentBlock::ToolResult { content, .. } = &result[0].content[0] else {
@@ -90,6 +93,7 @@ fn utf8_truncation_no_panic() {
             metadata: None,
         }],
         origin: None,
+        ephemeral_in_history: false,
     }];
     let result = compress_for_fork(&msgs);
     assert!(!result.is_empty());
@@ -104,6 +108,7 @@ fn result_starts_with_user_message() {
             role: MessageRole::Assistant,
             content: vec![ContentBlock::Text { text: "a1".into() }],
             origin: None,
+            ephemeral_in_history: false,
         },
         Message::user("q2"),
     ];
@@ -130,6 +135,7 @@ fn fork_context_json_round_trip() {
                 },
             ],
             origin: None,
+            ephemeral_in_history: false,
         },
         Message {
             id: None,
@@ -142,6 +148,7 @@ fn fork_context_json_round_trip() {
                 metadata: None,
             }],
             origin: None,
+            ephemeral_in_history: false,
         },
         Message {
             id: None,
@@ -150,6 +157,7 @@ fn fork_context_json_round_trip() {
                 text: "Found 2 files.".into(),
             }],
             origin: None,
+            ephemeral_in_history: false,
         },
     ];
     let compressed = compress_for_fork(&msgs);

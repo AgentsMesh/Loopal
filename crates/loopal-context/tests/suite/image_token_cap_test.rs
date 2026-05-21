@@ -20,6 +20,7 @@ fn user_msg(content: Vec<ContentBlock>) -> Message {
         role: MessageRole::User,
         content,
         origin: None,
+        ephemeral_in_history: false,
     }
 }
 

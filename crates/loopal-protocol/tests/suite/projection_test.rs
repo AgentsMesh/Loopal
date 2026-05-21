@@ -9,6 +9,7 @@ fn text_msg(role: MessageRole, text: &str) -> Message {
             text: text.to_string(),
         }],
         origin: None,
+        ephemeral_in_history: false,
     }
 }
 
@@ -50,6 +51,7 @@ fn project_tool_use_and_result() {
             },
         ],
         origin: None,
+        ephemeral_in_history: false,
     };
     let user_msg = Message {
         id: None,
@@ -63,6 +65,7 @@ fn project_tool_use_and_result() {
             metadata: None,
         }],
         origin: None,
+        ephemeral_in_history: false,
     };
     let display = project_messages(&[assistant_msg, user_msg]);
     assert_eq!(display.len(), 1);
@@ -84,6 +87,7 @@ fn project_tool_use_error() {
             input: serde_json::json!({"command": "exit 1"}),
         }],
         origin: None,
+        ephemeral_in_history: false,
     };
     let user_msg = Message {
         id: None,
@@ -97,6 +101,7 @@ fn project_tool_use_error() {
             metadata: None,
         }],
         origin: None,
+        ephemeral_in_history: false,
     };
     let display = project_messages(&[assistant_msg, user_msg]);
     assert!(display[0].tool_calls[0].is_error);
@@ -115,6 +120,7 @@ fn project_image_placeholder() {
             },
         }],
         origin: None,
+        ephemeral_in_history: false,
     };
     let display = project_messages(&[msg]);
     assert_eq!(display[0].content, "[image]");
@@ -139,6 +145,7 @@ fn project_multi_turn_mixed() {
                 },
             ],
             origin: None,
+            ephemeral_in_history: false,
         },
         Message {
             id: None,
@@ -151,6 +158,7 @@ fn project_multi_turn_mixed() {
                 metadata: None,
             }],
             origin: None,
+            ephemeral_in_history: false,
         },
         text_msg(MessageRole::Assistant, "done"),
         text_msg(MessageRole::User, "q2"),
@@ -171,6 +179,7 @@ fn project_skips_empty_messages() {
         role: MessageRole::Assistant,
         content: vec![],
         origin: None,
+        ephemeral_in_history: false,
     };
     let display = project_messages(&[msg]);
     assert!(display.is_empty());

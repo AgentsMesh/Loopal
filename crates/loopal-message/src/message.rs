@@ -18,6 +18,21 @@ pub struct Message {
     pub content: Vec<ContentBlock>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<MessageOrigin>,
+    /// True when the message is part of the LLM context but should not be
+    /// surfaced as user-visible history (e.g. system-injected
+    /// `goal_continuation`, scheduled cron prompt).
+    ///
+    /// **Snapshot semantics**: this is a frozen image of the write-time
+    /// `MessageSource` classification, not a live attribute. It is derived
+    /// from `env.source` at ingest time and persisted alongside the message
+    /// so forensic replays reproduce *what the LLM actually saw* even if
+    /// the classification rule changes later. Do not mutate after write.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub ephemeral_in_history: bool,
+}
+
+fn is_false(b: &bool) -> bool {
+    !*b
 }
 
 impl Message {
@@ -29,6 +44,7 @@ impl Message {
                 text: text.to_string(),
             }],
             origin: None,
+            ephemeral_in_history: false,
         }
     }
 
@@ -40,6 +56,7 @@ impl Message {
                 text: text.to_string(),
             }],
             origin: None,
+            ephemeral_in_history: false,
         }
     }
 
@@ -51,6 +68,7 @@ impl Message {
                 text: text.to_string(),
             }],
             origin: None,
+            ephemeral_in_history: false,
         }
     }
 
@@ -61,6 +79,11 @@ impl Message {
 
     pub fn with_origin(mut self, origin: MessageOrigin) -> Self {
         self.origin = Some(origin);
+        self
+    }
+
+    pub fn with_ephemeral_in_history(mut self, ephemeral: bool) -> Self {
+        self.ephemeral_in_history = ephemeral;
         self
     }
 

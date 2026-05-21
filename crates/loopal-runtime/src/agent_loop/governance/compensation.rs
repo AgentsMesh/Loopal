@@ -29,5 +29,6 @@ pub fn synthesize_aborted_tool_results(
         role: MessageRole::User,
         content: blocks,
         origin: Some(MessageOrigin::GovernanceCompensation),
+        ephemeral_in_history: false,
     })
 }

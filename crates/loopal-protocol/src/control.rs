@@ -55,6 +55,13 @@ pub enum ControlCommand {
     GoalUserComplete,
     GoalUserReopen,
     GoalClear,
+    /// Session-level suspend: gate closes (no deadline), `select_input`
+    /// stops consuming cron/rewake; only human input resumes.
+    Suspend,
+    /// Counterpart to `Suspend`. Reopens the continuation gate and resumes
+    /// cron/rewake consumption. Named `Unsuspend` (not `Resume`) to avoid
+    /// collision with `ResumeSession` (session swap — a different concept).
+    Unsuspend,
     /// Kill a running background shell task by its store ID.
     BgTaskKill {
         id: String,

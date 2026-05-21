@@ -105,6 +105,7 @@ mod tests {
                 input: serde_json::json!({"file_path": "/x.rs"}),
             }],
             origin: None,
+            ephemeral_in_history: false,
         };
         let out = build_conversation_text(&[m]);
         assert!(out.contains("[Tool call: Read(/x.rs)]"));
@@ -124,6 +125,7 @@ mod tests {
                 metadata: None,
             }],
             origin: None,
+            ephemeral_in_history: false,
         };
         let out = build_conversation_text(&[m]);
         assert!(out.contains("[truncated]"));

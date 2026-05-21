@@ -25,6 +25,7 @@ rust_library(
         "//crates/loopal-tool-api",
         "//crates/loopal-tool-invocation",
         "//crates/loopal-vault-api",
+        "//crates/tools/agent/idle:loopal-tool-idle",
         "//crates/tools/process/background:loopal-tool-background",
         "@crates//:base64",
         "@crates//:chrono",

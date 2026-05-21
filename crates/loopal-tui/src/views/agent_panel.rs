@@ -186,6 +186,11 @@ fn status_display(
             "Idle".to_string(),
             Style::default().fg(Color::DarkGray),
         ),
+        AgentStatus::Suspended => (
+            "⏸",
+            "Suspended".to_string(),
+            Style::default().fg(Color::Magenta),
+        ),
         AgentStatus::Finished => ("✓", "Done".to_string(), Style::default().fg(Color::Green)),
         AgentStatus::Error => ("✗", "Error".to_string(), Style::default().fg(Color::Red)),
     }

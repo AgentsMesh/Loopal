@@ -35,6 +35,7 @@ pub struct HarnessBuilder {
     pub(crate) kernel_setup: Option<Box<dyn FnOnce(&mut Kernel)>>,
     pub(crate) scheduler: Option<Arc<loopal_scheduler::CronScheduler>>,
     pub(crate) goal_session: Option<Arc<GoalRuntimeSession>>,
+    pub(crate) llm_chunk_delay: Option<std::time::Duration>,
 }
 
 impl Default for HarnessBuilder {
@@ -61,6 +62,7 @@ impl HarnessBuilder {
             kernel_setup: None,
             scheduler: None,
             goal_session: None,
+            llm_chunk_delay: None,
         }
     }
 
@@ -124,6 +126,15 @@ impl HarnessBuilder {
         self.lifecycle = l;
         self
     }
+    /// Insert a per-chunk sleep into the mock LLM stream so that the turn
+    /// stays in-flight long enough for a test to inject a control / signal
+    /// an interrupt while the runner is streaming. Pair this with
+    /// `wait_for_stream_event` (event-driven sync) rather than
+    /// `tokio::time::sleep` for race-free test pacing.
+    pub fn llm_chunk_delay(mut self, d: std::time::Duration) -> Self {
+        self.llm_chunk_delay = Some(d);
+        self
+    }
 
     pub async fn build(self) -> IntegrationHarness {
         let (harness, runner) = self.into_wired().await;
@@ -150,6 +161,7 @@ pub struct IntegrationHarness {
     pub event_rx: mpsc::Receiver<AgentEvent>,
     pub mailbox_tx: mpsc::Sender<Envelope>,
     pub control_tx: mpsc::Sender<ControlCommand>,
+    pub interrupt: loopal_protocol::InterruptSignal,
     pub session_ctrl: SessionController,
     pub fixture: TestFixture,
     pub recorded_messages: std::sync::Arc<std::sync::Mutex<Vec<Vec<Message>>>>,
@@ -162,6 +174,7 @@ impl IntegrationHarness {
             event_rx: h.event_rx,
             mailbox_tx: h.mailbox_tx,
             control_tx: h.control_tx,
+            interrupt: h.interrupt,
             session_ctrl: h.session_ctrl,
             fixture: h.fixture,
             recorded_messages: h.recorded_messages,
@@ -174,6 +187,7 @@ pub struct SpawnedHarness {
     pub event_rx: mpsc::Receiver<AgentEvent>,
     pub mailbox_tx: mpsc::Sender<Envelope>,
     pub control_tx: mpsc::Sender<ControlCommand>,
+    pub interrupt: loopal_protocol::InterruptSignal,
     pub session_ctrl: SessionController,
     pub fixture: TestFixture,
     pub recorded_messages: std::sync::Arc<std::sync::Mutex<Vec<Vec<Message>>>>,

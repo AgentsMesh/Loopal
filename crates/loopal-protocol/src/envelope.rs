@@ -44,6 +44,22 @@ impl MessageSource {
         matches!(self, Self::Human)
     }
 
+    /// True for sources that should lift `AgentStatus::Suspended` on ingest.
+    /// Only `Human` input wakes the session; cron / system / agent / channel
+    /// envelopes do not (they are exactly what `/suspend` is meant to silence).
+    /// Centralised here so adding a new source forces a deliberate decision.
+    pub fn wakes_suspended_session(&self) -> bool {
+        matches!(self, Self::Human)
+    }
+
+    /// True for sources whose messages feed the LLM context but should not
+    /// appear in user-visible session history (e.g. `goal_continuation` /
+    /// scheduled cron prompts). Used at ingest time to set the persisted
+    /// `Message.ephemeral_in_history` flag.
+    pub fn is_ephemeral_in_history(&self) -> bool {
+        matches!(self, Self::Scheduled | Self::System(_))
+    }
+
     // Hot path predicate (called on every envelope received). Mirrors
     // `MessageOrigin::is_task_boundary` but works directly on the protocol
     // type to avoid the String allocations that `MessageOrigin::from(&self)`

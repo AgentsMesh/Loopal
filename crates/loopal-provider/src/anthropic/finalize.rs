@@ -28,6 +28,7 @@ impl AnthropicProvider {
                 text: CONTINUATION_MARKER.to_string(),
             }],
             origin: None,
+            ephemeral_in_history: false,
         });
         Cow::Owned(owned)
     }

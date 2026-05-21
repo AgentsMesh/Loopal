@@ -31,6 +31,7 @@ rust_test(
         ":loopal-protocol",
         "//crates/loopal-message",
         "//crates/loopal-tool-invocation",
+        "@crates//:chrono",
         "@crates//:serde_json",
         "@crates//:strum",
         "@crates//:tokio",

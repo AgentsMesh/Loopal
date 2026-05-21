@@ -40,6 +40,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
     let (permission_tx, permission_rx) = mpsc::channel::<bool>(16);
     let (question_tx, question_rx) = mpsc::channel::<UserQuestionResponse>(16);
     let interrupt = loopal_runtime::InterruptHandle::new();
+    let interrupt_signal_for_test = interrupt.signal.clone();
 
     // Bypass policy never returns Ask, so the handler is unreachable —
     // use DenyAllHandler as a no-op that flags misconfig if it is ever called.
@@ -79,6 +80,11 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
     }
     loopal_agent::tools::register_all(&mut kernel);
     let mock_provider = MultiCallProvider::new(builder.calls);
+    let mock_provider = if let Some(d) = builder.llm_chunk_delay {
+        mock_provider.with_delay(d)
+    } else {
+        mock_provider
+    };
     let recorded_messages = mock_provider.messages_handle();
     kernel.register_provider(Arc::new(mock_provider) as Arc<dyn Provider>);
     if let Some(setup) = builder.kernel_setup {
@@ -184,9 +190,17 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         event_rx,
         mailbox_tx,
         control_tx,
+        interrupt: interrupt_signal_for_test,
         session_ctrl,
         fixture,
         recorded_messages,
     };
-    (harness, AgentLoopRunner::new(params))
+    let mut runner = AgentLoopRunner::new(params);
+    // reason: production `agent_loop()` sets `runner.governance` after
+    // construction; the test harness used to omit this, silently disabling
+    // every Governance (LoopDetector / DegenerationDetector / ...) in tests.
+    // Mirror the production wiring so test coverage matches reality.
+    let harness_cfg = loopal_config::HarnessConfig::default();
+    runner.governance = loopal_runtime::agent_loop::governance::build_governance(&harness_cfg);
+    (harness, runner)
 }

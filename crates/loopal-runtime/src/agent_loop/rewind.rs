@@ -55,6 +55,7 @@ mod tests {
                     metadata: None,
                 }],
                 origin: None,
+                ephemeral_in_history: false,
             },
             Message::user("second turn"),
         ];

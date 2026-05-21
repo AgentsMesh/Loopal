@@ -16,6 +16,7 @@ fn tool_use(id: &str, name: &str) -> Message {
             input: serde_json::json!({}),
         }],
         origin: None,
+        ephemeral_in_history: false,
     }
 }
 
@@ -31,6 +32,7 @@ fn tool_result(id: &str, body: &str) -> Message {
             metadata: None,
         }],
         origin: None,
+        ephemeral_in_history: false,
     }
 }
 

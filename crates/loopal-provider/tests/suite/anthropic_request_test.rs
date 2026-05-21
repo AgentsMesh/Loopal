@@ -52,6 +52,7 @@ fn test_build_messages_with_tool_use() {
                     input: json!({"cmd": "ls"}),
                 }],
                 origin: None,
+                ephemeral_in_history: false,
             },
             Message {
                 id: None,
@@ -64,6 +65,7 @@ fn test_build_messages_with_tool_use() {
                     metadata: None,
                 }],
                 origin: None,
+                ephemeral_in_history: false,
             },
         ],
         vec![],
@@ -108,6 +110,7 @@ fn test_build_messages_with_image() {
                 },
             }],
             origin: None,
+            ephemeral_in_history: false,
         }],
         vec![],
     );

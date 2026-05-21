@@ -1,7 +1,8 @@
 use loopal_message::ContentBlock;
-use loopal_protocol::MessageSource;
+use loopal_protocol::{DegenerationSummary, MessageSource};
 
 use super::super::turn_context::TurnContext;
+use super::super::turn_history::{TurnHistory, TurnRecord};
 
 #[derive(Debug)]
 pub enum Verdict {
@@ -11,6 +12,21 @@ pub enum Verdict {
     // conversation so the model reads it next turn and changes strategy.
     AbortTurn {
         reason: String,
+        feedback_to_model: String,
+    },
+}
+
+/// Side-effect a `Governance` requests after a completed turn. The runtime
+/// reads it and applies the action; the trait stays decoupled from runner
+/// internals (it cannot mutate `ContinuationGate` directly).
+#[derive(Debug, Clone)]
+pub enum PostTurnAction {
+    None,
+    /// Close the `ContinuationGate` with a deadline + emit
+    /// `DegenerationDetected` for observers + inject an in-band warning
+    /// the model sees on its next prompt.
+    Degeneration {
+        summary: DegenerationSummary,
         feedback_to_model: String,
     },
 }
@@ -37,6 +53,13 @@ pub trait Governance: Send + Sync {
     // store has advanced. Default is no-op for governances without
     // cross-turn state.
     fn on_compact_completed(&mut self) {}
+
+    /// Inspect the completed turn alongside trailing history; default
+    /// returns `PostTurnAction::None`. Cross-turn safety nets (degeneration
+    /// detector, repetition guard) override this.
+    fn on_after_turn(&mut self, _record: &TurnRecord, _history: &TurnHistory) -> PostTurnAction {
+        PostTurnAction::None
+    }
 }
 
 // Non-decision role: CANNOT veto a turn (no Verdict return).

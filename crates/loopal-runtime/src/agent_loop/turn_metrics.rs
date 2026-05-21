@@ -31,6 +31,12 @@ pub struct TurnMetrics {
     pub tokens_in: u32,
     /// Output tokens produced during this turn.
     pub tokens_out: u32,
+    /// Length in bytes of the assistant's final text output.
+    pub text_output_len: u32,
+    /// Stable hash of the assistant's final text output; feeds repetition detection.
+    pub text_hash: Option<u64>,
+    /// Count of `thinking` blocks recorded in this turn.
+    pub thinking_block_count: u32,
 }
 
 /// Summary returned by `execute_tools` for metrics aggregation.

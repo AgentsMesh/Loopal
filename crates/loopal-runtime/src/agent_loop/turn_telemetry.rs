@@ -6,8 +6,13 @@ use opentelemetry::KeyValue;
 use tracing::{Instrument, info, info_span};
 
 use super::TurnOutput;
+use super::continuation_gate::GateClose;
+use super::governance::bridge::DataPlaneBridge;
+use super::governance::system_note::make_governance_feedback;
+use super::governance::traits::PostTurnAction;
 use super::runner::AgentLoopRunner;
 use super::turn_context::TurnContext;
+use super::turn_history::TurnRecord;
 
 impl AgentLoopRunner {
     pub(super) async fn execute_turn(&mut self, turn_ctx: &mut TurnContext) -> Result<TurnOutput> {
@@ -97,8 +102,56 @@ impl AgentLoopRunner {
             );
         }
 
-        self.record_turn_for_barren_tracking(&turn_ctx.metrics);
+        self.record_turn_completion(turn_ctx).await;
 
         result
+    }
+
+    async fn record_turn_completion(&mut self, turn_ctx: &TurnContext) {
+        let record = TurnRecord {
+            metrics: turn_ctx.metrics.clone(),
+            text_hash: turn_ctx.metrics.text_hash,
+        };
+        self.turn_history.push(record.clone());
+        let actions: Vec<PostTurnAction> = {
+            let history = &self.turn_history;
+            self.governance
+                .iter_mut()
+                .map(|g| g.on_after_turn(&record, history))
+                .collect()
+        };
+        for action in actions {
+            self.apply_post_turn_action(action).await;
+        }
+    }
+
+    async fn apply_post_turn_action(&mut self, action: PostTurnAction) {
+        match action {
+            PostTurnAction::None => {}
+            PostTurnAction::Degeneration {
+                summary,
+                feedback_to_model,
+            } => {
+                self.continuation_gate.close(GateClose::Degeneration {
+                    wake_at: summary.wake_deadline,
+                });
+                if let Err(err) = self
+                    .emit(AgentEventPayload::DegenerationDetected(summary))
+                    .await
+                {
+                    tracing::error!(error = %err, "DegenerationDetected emit failed");
+                }
+                let gate = self.continuation_gate.summary();
+                if let Err(err) = self
+                    .emit(AgentEventPayload::ContinuationGateChanged(gate))
+                    .await
+                {
+                    tracing::error!(error = %err, "ContinuationGateChanged emit failed");
+                }
+                if let Some(msg) = make_governance_feedback(&feedback_to_model) {
+                    self.push_system_note(msg);
+                }
+            }
+        }
     }
 }

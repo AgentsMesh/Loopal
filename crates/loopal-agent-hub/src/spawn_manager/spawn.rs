@@ -75,7 +75,7 @@ pub async fn spawn_and_register(
 
     let (conn, incoming_rx) = client.into_parts();
     match register_agent_connection(
-        hub,
+        hub.clone(),
         &name,
         conn,
         incoming_rx,
@@ -86,6 +86,18 @@ pub async fn spawn_and_register(
     .await
     {
         Ok(agent_id) => {
+            let (spawn_registry, mcp_service) = {
+                let h = hub.lock().await;
+                (h.spawn_registry.clone(), h.mcp_service.clone())
+            };
+            let parent_name = parent
+                .as_ref()
+                .map(|p| loopal_protocol::QualifiedAddress::parse(p).agent.clone());
+            let cwd_path = std::path::PathBuf::from(&cwd);
+            spawn_registry.register(name.clone(), cwd_path.clone(), parent_name.clone());
+            mcp_service
+                .on_agent_attach(name.clone(), cwd_path, parent_name)
+                .await;
             tokio::spawn(async move {
                 let _ = agent_proc.wait().await;
             });

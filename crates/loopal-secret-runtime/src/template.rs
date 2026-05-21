@@ -1,14 +1,8 @@
 use std::collections::HashSet;
 
-use loopal_vault_api::Vault;
-use once_cell::sync::Lazy;
-use regex::Regex;
-
-pub(crate) static AUTHOR_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\{\{secret:([a-z][a-z0-9_]*)\}\}").expect("author regex"));
-
-pub(crate) static WIRE_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"<secret_ref:([a-z][a-z0-9_]*)>").expect("wire regex"));
+use loopal_secret_client::SecretClient;
+use loopal_secret_client::SecretError;
+use loopal_secret_client::placeholder::{AUTHOR_RE, WIRE_RE};
 
 #[derive(Debug, Clone, Default)]
 pub struct TranslationView {
@@ -72,13 +66,13 @@ pub fn collect_wire_names(input: &str) -> Vec<String> {
         .collect()
 }
 
-/// Async-expand `{{secret:NAME}}` placeholders to plaintext via the given vault.
+/// Async-expand `{{secret:NAME}}` placeholders to plaintext via the given client.
 ///
 /// Unlike `translate_outbound` (which converts author syntax to wire syntax
 /// for LLM-bound text), this resolves directly to plaintext. Use for fields
 /// that must contain real secret values at point of use, e.g. provider
 /// `api_key` / `base_url` and MCP server `env` / `headers` / `url`.
-pub async fn expand_to_plaintext(input: &str, vault: &dyn Vault) -> String {
+pub async fn expand_to_plaintext(input: &str, client: &dyn SecretClient) -> String {
     let names: Vec<String> = AUTHOR_RE
         .captures_iter(input)
         .map(|c| c[1].to_string())
@@ -89,8 +83,19 @@ pub async fn expand_to_plaintext(input: &str, vault: &dyn Vault) -> String {
     let mut resolved: std::collections::HashMap<String, secrecy::SecretString> =
         std::collections::HashMap::new();
     for n in &names {
-        if let Some(v) = vault.get(n).await {
-            resolved.insert(n.clone(), v);
+        match client.get(n).await {
+            Ok(v) => {
+                resolved.insert(n.clone(), v);
+            }
+            Err(SecretError::SecretNotFound(_)) => {}
+            Err(e) => {
+                tracing::warn!(
+                    name = %n,
+                    error = %e,
+                    "expand_to_plaintext: secret fetch failed (non-NotFound); \
+                     leaving as <missing-secret:NAME> placeholder"
+                );
+            }
         }
     }
     AUTHOR_RE

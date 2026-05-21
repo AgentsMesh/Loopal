@@ -26,6 +26,7 @@ rust_binary(
         "//crates/loopal-config",
         "//crates/loopal-decision-api",
         "//crates/loopal-git",
+        "//crates/loopal-hub-vault",
         "//crates/loopal-ipc",
         "//crates/loopal-meta-hub",
         "//crates/loopal-protocol",

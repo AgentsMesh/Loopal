@@ -24,7 +24,7 @@ pub async fn finish_and_deliver(
 
     crate::pending_relay::cleanup_pending_for_agent(hub, name).await;
 
-    let (pending, uplink, parent_addr) = {
+    let (pending, uplink, parent_addr, spawn_registry, mcp_service) = {
         let mut h = hub.lock().await;
         let parent = h
             .registry
@@ -32,8 +32,18 @@ pub async fn finish_and_deliver(
             .and_then(|info| info.parent.clone());
         let pending = h.registry.emit_agent_finished(name, output);
         h.registry.unregister_connection(name);
-        (pending, h.uplink.clone(), parent)
+        (
+            pending,
+            h.uplink.clone(),
+            parent,
+            h.spawn_registry.clone(),
+            h.mcp_service.clone(),
+        )
     };
+
+    let was_root = spawn_registry.is_root(name);
+    mcp_service.on_agent_detach(name, was_root).await;
+    spawn_registry.unregister(name);
 
     if let Some((tx, envelope)) = pending {
         if tx.send(envelope).await.is_err() {

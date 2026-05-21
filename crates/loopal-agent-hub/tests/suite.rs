@@ -13,6 +13,12 @@ mod completion_output_test;
 mod dispatch_test;
 #[path = "suite/e2e_bootstrap_test.rs"]
 mod e2e_bootstrap_test;
+#[path = "suite/e2e_real_vault_test.rs"]
+mod e2e_real_vault_test;
+#[path = "suite/e2e_secret_access_boundary_test.rs"]
+mod e2e_secret_access_boundary_test;
+#[path = "suite/e2e_secret_ipc_test.rs"]
+mod e2e_secret_ipc_test;
 #[path = "suite/event_router_test.rs"]
 mod event_router_test;
 #[path = "suite/hub_integration_test.rs"]
@@ -21,8 +27,6 @@ mod hub_integration_test;
 mod hub_lifecycle_test;
 #[path = "suite/hub_shutdown_test.rs"]
 mod hub_shutdown_test;
-#[path = "suite/mcp_handlers_test.rs"]
-mod mcp_handlers_test;
 #[path = "suite/multi_agent_test.rs"]
 mod multi_agent_test;
 #[path = "suite/multi_ui_attach_test.rs"]
@@ -39,10 +43,14 @@ mod permission_race_test;
 mod race_condition_test;
 #[path = "suite/relay_test.rs"]
 mod relay_test;
+#[path = "suite/secret_test_helpers.rs"]
+mod secret_test_helpers;
 #[path = "suite/spawn_lifecycle_test.rs"]
 mod spawn_lifecycle_test;
 #[path = "suite/spawn_prepare_test.rs"]
 mod spawn_prepare_test;
+#[path = "suite/spawn_registry_test.rs"]
+mod spawn_registry_test;
 #[path = "suite/spawn_remote_test.rs"]
 mod spawn_remote_test;
 #[path = "suite/tcp_ui_cleanup_test.rs"]

@@ -12,6 +12,8 @@ fn mcp_config(command: &str) -> McpServerConfig {
         env: HashMap::new(),
         enabled: true,
         timeout_ms: 30_000,
+        sharing: Default::default(),
+        cwd_isolation: None,
     }
 }
 
@@ -107,6 +109,8 @@ fn test_resolve_mcp_disabled_removes() {
         env: HashMap::new(),
         enabled: false,
         timeout_ms: 30_000,
+        sharing: Default::default(),
+        cwd_isolation: None,
     };
     let mut layer2 = ConfigLayer {
         source: LayerSource::Project,

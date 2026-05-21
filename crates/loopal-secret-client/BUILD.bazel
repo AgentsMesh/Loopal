@@ -1,0 +1,27 @@
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+rust_library(
+    name = "loopal-secret-client",
+    srcs = glob(["src/**/*.rs"]),
+    edition = "2024",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//crates/loopal-ipc",
+        "//crates/loopal-protocol",
+        "@crates//:once_cell",
+        "@crates//:regex",
+        "@crates//:secrecy",
+        "@crates//:serde_json",
+        "@crates//:thiserror",
+        "@crates//:tokio",
+    ],
+    proc_macro_deps = [
+        "@crates//:async-trait",
+    ],
+)
+
+rust_test(
+    name = "loopal-secret-client-unit-test",
+    crate = ":loopal-secret-client",
+    edition = "2024",
+)

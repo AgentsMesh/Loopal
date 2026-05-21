@@ -36,32 +36,42 @@ pub(crate) async fn start_session(
         let mut config = load_config(&cwd)?;
         crate::params::apply_start_overrides(&mut config.settings, &start);
         let depth = start.depth.unwrap_or(0);
-        let hub_client: Option<Arc<dyn loopal_mcp::HubMcpClient>> = if depth > 0 {
-            Some(Arc::new(
-                crate::connection_mcp_client::ConnectionMcpClient::new(connection.clone()),
-            ))
+        let hub_client: Option<Arc<dyn loopal_mcp::HubMcpClient>> = Some(Arc::new(
+            crate::connection_mcp_client::ConnectionMcpClient::new(connection.clone()),
+        ));
+        let agent_name = if depth == 0 {
+            loopal_protocol::ROOT_AGENT_NAME.to_string()
         } else {
-            None
+            "sub".to_string()
         };
         let kernel = if is_production {
-            crate::params::build_kernel_from_config(&config, true, depth, hub_client).await?
+            crate::params::build_kernel_from_config(
+                &config,
+                true,
+                depth,
+                hub_client,
+                Some(connection.clone()),
+                cwd.clone(),
+                agent_name,
+            )
+            .await?
         } else {
             match hub.get_test_provider().await {
                 Some(provider) => crate::params::build_kernel_with_provider(provider)?,
                 None => {
-                    crate::params::build_kernel_from_config(&config, false, depth, None).await?
+                    crate::params::build_kernel_from_config(
+                        &config,
+                        false,
+                        depth,
+                        None,
+                        None,
+                        cwd.clone(),
+                        "test".to_string(),
+                    )
+                    .await?
                 }
             }
         };
-
-        if depth == 0 {
-            // reason: must publish AFTER build_kernel_from_config (which runs
-            // spawn_mcp + finalize_mcp_tools). Earlier publish would expose a
-            // half-initialized provider to hub/mcp/* forwarders. Sub-agents
-            // are only spawned from inside the root agent loop, so by the time
-            // they call hub/mcp/* this set has already completed.
-            hub.set_mcp_provider(kernel.mcp_provider()).await;
-        }
 
         let (input_tx, input_rx) = tokio::sync::mpsc::channel::<AgentInput>(16);
         let interrupt = InterruptSignal::new();

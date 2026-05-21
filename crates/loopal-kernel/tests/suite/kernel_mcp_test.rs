@@ -132,6 +132,8 @@ async fn register_mcp_tools_for_server_picks_up_late_connected_tools() {
                 env: Default::default(),
                 enabled: true,
                 timeout_ms: 1000,
+                sharing: Default::default(),
+                cwd_isolation: None,
             },
             None,
         );
@@ -178,6 +180,8 @@ async fn register_all_settled_mcp_tools_is_idempotent_on_reentry() {
                 env: Default::default(),
                 enabled: true,
                 timeout_ms: 1000,
+                sharing: Default::default(),
+                cwd_isolation: None,
             },
             None,
         );

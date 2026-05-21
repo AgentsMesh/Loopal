@@ -31,6 +31,8 @@ async fn spawn_background_does_not_block_on_slow_server() {
             env: Default::default(),
             enabled: true,
             timeout_ms: 1000,
+            sharing: Default::default(),
+            cwd_isolation: None,
         },
     );
 
@@ -55,6 +57,8 @@ async fn wait_until_settled_times_out_for_slow_server() {
             env: Default::default(),
             enabled: true,
             timeout_ms: 60_000,
+            sharing: Default::default(),
+            cwd_isolation: None,
         },
     );
     provider.spawn_background(configs);
@@ -87,6 +91,8 @@ async fn wait_until_settled_returns_true_after_failed_server_settles() {
             env: Default::default(),
             enabled: true,
             timeout_ms: 500,
+            sharing: Default::default(),
+            cwd_isolation: None,
         },
     );
     provider.spawn_background(configs);
@@ -117,6 +123,8 @@ async fn wait_until_settled_honors_all_overlapping_spawns() {
             env: Default::default(),
             enabled: true,
             timeout_ms: 200,
+            sharing: Default::default(),
+            cwd_isolation: None,
         },
     );
     let mut fast = IndexMap::new();
@@ -128,6 +136,8 @@ async fn wait_until_settled_honors_all_overlapping_spawns() {
             env: Default::default(),
             enabled: true,
             timeout_ms: 100,
+            sharing: Default::default(),
+            cwd_isolation: None,
         },
     );
 
@@ -160,6 +170,8 @@ async fn call_tool_retries_after_transport_closed() {
             env: Default::default(),
             enabled: true,
             timeout_ms: 300,
+            sharing: Default::default(),
+            cwd_isolation: None,
         },
     );
     provider.spawn_background(configs);
@@ -206,6 +218,8 @@ async fn await_all_settled_unblocks_after_background_spawn_finishes() {
             env: Default::default(),
             enabled: true,
             timeout_ms: 200,
+            sharing: Default::default(),
+            cwd_isolation: None,
         },
     );
     provider.spawn_background(configs);
@@ -239,6 +253,8 @@ async fn await_all_settled_waits_through_multiple_overlapping_spawns() {
             env: Default::default(),
             enabled: true,
             timeout_ms: 100,
+            sharing: Default::default(),
+            cwd_isolation: None,
         },
     );
     let mut spawn_b = IndexMap::new();
@@ -250,6 +266,8 @@ async fn await_all_settled_waits_through_multiple_overlapping_spawns() {
             env: Default::default(),
             enabled: true,
             timeout_ms: 200,
+            sharing: Default::default(),
+            cwd_isolation: None,
         },
     );
     provider.spawn_background(spawn_a);

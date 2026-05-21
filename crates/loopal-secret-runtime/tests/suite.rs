@@ -2,6 +2,8 @@
 mod argv_exposure_test;
 #[path = "suite/audit_test.rs"]
 mod audit_test;
+#[path = "suite/expand_to_plaintext_test.rs"]
+mod expand_to_plaintext_test;
 #[path = "suite/guard_test.rs"]
 mod guard_test;
 #[path = "suite/merged_test.rs"]

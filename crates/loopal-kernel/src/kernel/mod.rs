@@ -9,9 +9,9 @@ use loopal_hooks::{HookRegistry, HookService};
 use loopal_mcp::types::{McpPrompt, McpResource};
 use loopal_mcp::{LocalMcpProvider, McpManager, McpProvider, SamplingCallback};
 use loopal_provider::ProviderRegistry;
+use loopal_secret_client::SecretClient;
 use loopal_tool_api::ToolDefinition;
 use loopal_tools::ToolRegistry;
-use loopal_vault_api::Vault;
 use tokio::sync::RwLock;
 use tracing::info;
 
@@ -55,7 +55,7 @@ pub struct Kernel {
     pub(super) mcp_prompts: Vec<(String, McpPrompt)>,
     pub(super) settings: Settings,
     bg_store: Arc<BackgroundTaskStore>,
-    secrets: Option<Arc<dyn Vault>>,
+    secret_client: Option<Arc<dyn SecretClient>>,
 }
 
 impl Kernel {
@@ -89,16 +89,16 @@ impl Kernel {
             mcp_prompts: Vec::new(),
             settings,
             bg_store,
-            secrets: None,
+            secret_client: None,
         })
     }
 
-    pub fn set_secrets(&mut self, store: Arc<dyn Vault>) {
-        self.secrets = Some(store);
+    pub fn set_secret_client(&mut self, client: Arc<dyn SecretClient>) {
+        self.secret_client = Some(client);
     }
 
-    pub fn secrets(&self) -> Option<&Arc<dyn Vault>> {
-        self.secrets.as_ref()
+    pub fn secret_client(&self) -> Option<&Arc<dyn SecretClient>> {
+        self.secret_client.as_ref()
     }
 
     pub fn register_tool(&self, tool: Box<dyn loopal_tool_api::Tool>) {

@@ -110,3 +110,23 @@ pub const HUB_MCP_CALL_TOOL: Method = Method {
 pub const HUB_MCP_SNAPSHOT: Method = Method {
     name: "hub/mcp/snapshot",
 };
+
+/// Agent → Hub: fetch one plaintext secret by name from the cwd-resolved vault.
+/// Params: `{ cwd: String, name: String, caller: { agent_name, depth, tool_name? } }`.
+/// Response: `{ plaintext: String }`. Caller wraps in `Zeroizing<String>`.
+pub const HUB_SECRET_GET: Method = Method {
+    name: "hub/secret/get",
+};
+
+/// Agent → Hub: list secret names in the cwd-resolved vault.
+/// Params: `{ cwd: String }`. Response: `{ names: Vec<String> }`.
+/// Does not expose plaintext.
+pub const HUB_SECRET_LIST_NAMES: Method = Method {
+    name: "hub/secret/list_names",
+};
+
+/// Agent / UI → Hub: vault subsystem health for status display.
+/// Params: `{ cwd: String }`. Response: `{ vault_count, default_vault, last_op_ts }`.
+pub const HUB_SECRET_HEALTH: Method = Method {
+    name: "hub/secret/health",
+};

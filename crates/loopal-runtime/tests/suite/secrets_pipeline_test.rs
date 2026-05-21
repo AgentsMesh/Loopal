@@ -2,10 +2,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use loopal_secret_client::{SecretClient, SecretError, SecretResult};
 use loopal_secret_runtime::{apply_redactor, apply_resolver};
 use loopal_tool_api::ToolContext;
-use loopal_vault_api::{SecretString, Vault, VaultResult};
-use secrecy::ExposeSecret;
+use secrecy::{ExposeSecret, SecretString};
 use serde_json::json;
 
 #[derive(Default)]
@@ -25,48 +25,42 @@ impl MockVault {
 }
 
 #[async_trait]
-impl Vault for MockVault {
-    async fn get(&self, name: &str) -> Option<SecretString> {
-        self.map.get(name).map(|v| SecretString::from(v.clone()))
+impl SecretClient for MockVault {
+    async fn get(&self, name: &str) -> SecretResult<SecretString> {
+        match self.map.get(name) {
+            Some(v) => Ok(SecretString::from(v.clone())),
+            None => Err(SecretError::SecretNotFound(name.to_string())),
+        }
     }
-    async fn list_names(&self) -> Vec<String> {
-        self.map.keys().cloned().collect()
+    async fn list_names(&self) -> SecretResult<Vec<String>> {
+        Ok(self.map.keys().cloned().collect())
     }
-    async fn put(&self, _: &str, _: SecretString) -> VaultResult<()> {
-        Ok(())
+    async fn expand_author(&self, template: &str) -> SecretResult<SecretString> {
+        Ok(SecretString::from(template.to_string()))
     }
-    async fn delete(&self, _: &str) -> VaultResult<()> {
-        Ok(())
-    }
-    async fn rekey(&self) -> VaultResult<()> {
-        Ok(())
+    async fn expand_wire(&self, template: &str) -> SecretResult<SecretString> {
+        Ok(SecretString::from(template.to_string()))
     }
 }
 
-fn ctx_with_secrets(store: Arc<dyn Vault>) -> ToolContext {
+fn ctx_with(store: Option<Arc<dyn SecretClient>>) -> ToolContext {
     let backend = loopal_backend::LocalBackend::new(
         std::env::temp_dir(),
         None,
         loopal_backend::ResourceLimits::default(),
         "test-session",
     );
-    ToolContext::new(backend, "test-session").with_secrets(store)
-}
-
-fn ctx_without_secrets() -> ToolContext {
-    let backend = loopal_backend::LocalBackend::new(
-        std::env::temp_dir(),
-        None,
-        loopal_backend::ResourceLimits::default(),
-        "test-session",
-    );
-    ToolContext::new(backend, "test-session")
+    let ctx = ToolContext::new(backend, "test-session");
+    match store {
+        Some(s) => ctx.with_secret_client(s),
+        None => ctx,
+    }
 }
 
 #[tokio::test]
 async fn resolver_substitutes_whitelisted_field_only() {
     let store = Arc::new(MockVault::new(&[("openai_key", "sk-abc12345")]));
-    let ctx = ctx_with_secrets(store);
+    let ctx = ctx_with(Some(store));
     let mut input = json!({
         "command": "curl -H 'Bearer <secret_ref:openai_key>'",
         "description": "ignore <secret_ref:openai_key>"
@@ -75,7 +69,7 @@ async fn resolver_substitutes_whitelisted_field_only() {
         "Bash",
         &mut input,
         &["command"],
-        ctx.secrets.as_ref(),
+        ctx.secret_client.as_ref(),
         &ctx.session_id,
     )
     .await;
@@ -92,13 +86,13 @@ async fn resolver_substitutes_whitelisted_field_only() {
 
 #[tokio::test]
 async fn resolver_no_op_when_no_store() {
-    let ctx = ctx_without_secrets();
+    let ctx = ctx_with(None);
     let mut input = json!({ "command": "echo <secret_ref:foo>" });
     let seed = apply_resolver(
         "Bash",
         &mut input,
         &["command"],
-        ctx.secrets.as_ref(),
+        ctx.secret_client.as_ref(),
         &ctx.session_id,
     )
     .await;
@@ -109,13 +103,13 @@ async fn resolver_no_op_when_no_store() {
 #[tokio::test]
 async fn resolver_no_op_when_whitelist_empty() {
     let store = Arc::new(MockVault::new(&[("k", "12345678")]));
-    let ctx = ctx_with_secrets(store);
+    let ctx = ctx_with(Some(store));
     let mut input = json!({ "command": "<secret_ref:k>" });
     let seed = apply_resolver(
         "Write",
         &mut input,
         &[],
-        ctx.secrets.as_ref(),
+        ctx.secret_client.as_ref(),
         &ctx.session_id,
     )
     .await;
@@ -126,13 +120,13 @@ async fn resolver_no_op_when_whitelist_empty() {
 #[tokio::test]
 async fn resolver_missing_secret_becomes_placeholder() {
     let store = Arc::new(MockVault::new(&[]));
-    let ctx = ctx_with_secrets(store);
+    let ctx = ctx_with(Some(store));
     let mut input = json!({ "command": "<secret_ref:ghost>" });
     let seed = apply_resolver(
         "Bash",
         &mut input,
         &["command"],
-        ctx.secrets.as_ref(),
+        ctx.secret_client.as_ref(),
         &ctx.session_id,
     )
     .await;
@@ -184,7 +178,7 @@ fn redactor_handles_multiple_secrets() {
 #[tokio::test]
 async fn end_to_end_resolve_execute_redact_chain() {
     let store = Arc::new(MockVault::new(&[("api_key", "sk-tokenvalue")]));
-    let ctx = ctx_with_secrets(store);
+    let ctx = ctx_with(Some(store));
 
     let mut tool_args = json!({
         "command": "echo Bearer <secret_ref:api_key>"
@@ -193,7 +187,7 @@ async fn end_to_end_resolve_execute_redact_chain() {
         "Bash",
         &mut tool_args,
         &["command"],
-        ctx.secrets.as_ref(),
+        ctx.secret_client.as_ref(),
         &ctx.session_id,
     )
     .await;

@@ -1,7 +1,7 @@
 use std::fmt;
 use std::sync::Arc;
 
-use loopal_vault_api::Vault;
+use loopal_secret_client::SecretClient;
 
 use crate::backend::Backend;
 use crate::goal_session::GoalSession;
@@ -19,7 +19,7 @@ pub struct ToolContext {
     pub one_shot_chat: Option<Arc<dyn OneShotChatService>>,
     pub fetch_refiner_policy: Option<Arc<dyn FetchRefinerPolicy>>,
     pub goal_session: Option<Arc<dyn GoalSession>>,
-    pub secrets: Option<Arc<dyn Vault>>,
+    pub secret_client: Option<Arc<dyn SecretClient>>,
 }
 
 impl ToolContext {
@@ -33,7 +33,7 @@ impl ToolContext {
             one_shot_chat: None,
             fetch_refiner_policy: None,
             goal_session: None,
-            secrets: None,
+            secret_client: None,
         }
     }
 
@@ -92,13 +92,13 @@ impl ToolContext {
         self
     }
 
-    pub fn with_secrets(mut self, s: Arc<dyn Vault>) -> Self {
-        self.secrets = Some(s);
+    pub fn with_secret_client(mut self, c: Arc<dyn SecretClient>) -> Self {
+        self.secret_client = Some(c);
         self
     }
 
-    pub fn with_secrets_opt(mut self, s: Option<Arc<dyn Vault>>) -> Self {
-        self.secrets = s;
+    pub fn with_secret_client_opt(mut self, c: Option<Arc<dyn SecretClient>>) -> Self {
+        self.secret_client = c;
         self
     }
 }
@@ -114,7 +114,7 @@ impl Clone for ToolContext {
             one_shot_chat: self.one_shot_chat.clone(),
             fetch_refiner_policy: self.fetch_refiner_policy.clone(),
             goal_session: self.goal_session.clone(),
-            secrets: self.secrets.clone(),
+            secret_client: self.secret_client.clone(),
         }
     }
 }

@@ -36,32 +36,39 @@ pub async fn build_kernel_from_config(
     production: bool,
     depth: u32,
     hub_client: Option<Arc<dyn loopal_mcp::HubMcpClient>>,
+    hub_connection: Option<Arc<loopal_ipc::connection::Connection>>,
+    cwd: std::path::PathBuf,
+    agent_name: String,
 ) -> anyhow::Result<Arc<Kernel>> {
     let mut settings = config.settings.clone();
-    if let Some(store) = config.secrets.as_ref() {
-        expand_provider_secrets(&mut settings, store.as_ref()).await;
+    let secret_client: Option<Arc<dyn loopal_secret_client::SecretClient>> =
+        hub_connection.map(|conn| {
+            Arc::new(loopal_secret_client::HubSecretClient::new(
+                conn, cwd, agent_name, depth,
+            )) as Arc<dyn loopal_secret_client::SecretClient>
+        });
+    if let Some(client) = secret_client.as_ref() {
+        expand_provider_secrets(&mut settings, client.as_ref()).await;
     }
     let mut kernel = Kernel::new(settings)?;
-    if let Some(store) = config.secrets.as_ref() {
-        kernel.set_secrets(store.clone());
+    if let Some(client) = secret_client {
+        kernel.set_secret_client(client);
     }
     if depth == 0 {
         kernel.register_goal_tools();
     }
     if production {
-        if depth > 0
-            && let Some(client) = hub_client
-        {
+        if let Some(client) = hub_client {
             let proxy = loopal_mcp::McpProxyClient::new(client);
             kernel.set_mcp_provider(Arc::new(proxy));
-        } else if let Ok(provider) = kernel.resolve_provider(&config.settings.model) {
-            let adapter =
-                loopal_kernel::McpSamplingAdapter::new(provider, config.settings.model.clone());
-            kernel.set_mcp_sampling(Arc::new(adapter)).await;
         }
-        kernel.spawn_mcp().await;
         let wait = mcp_startup_wait();
-        let settled = kernel.finalize_mcp_tools(wait).await;
+        let settled = tokio::time::timeout(
+            wait + std::time::Duration::from_secs(1),
+            kernel.finalize_mcp_tools(wait),
+        )
+        .await
+        .unwrap_or(false);
         if !settled {
             tracing::warn!(
                 wait_secs = wait.as_secs(),
@@ -72,36 +79,48 @@ pub async fn build_kernel_from_config(
     loopal_agent::tools::register_all(&mut kernel);
     let kernel = Arc::new(kernel);
 
-    if production && let Some(local) = kernel.local_mcp_provider() {
-        spawn_late_mcp_registration(Arc::downgrade(&kernel), local);
+    if production {
+        spawn_proxy_mcp_settle_poll(Arc::downgrade(&kernel));
     }
 
     Ok(kernel)
 }
 
-/// reason: when `finalize_mcp_tools` returns `settled=false`, the bounded
-/// wait expired but background `connect()` futures may still complete
-/// successfully (e.g. chrome-devtools-mcp's slow Chrome bootstrap). Without
-/// this listener those late-arriving tools would never reach ToolRegistry —
-/// `kernel.tool_definitions()` would forever miss them. The listener uses a
-/// `Weak` so it cannot keep the kernel alive past its natural lifetime.
-///
-/// We spawn the listener unconditionally for local backends: the previous
-/// `settled_immediately` optimization had a race — when the background task
-/// was in its `connect_all` phase (holding NO lock), a `try_read` probe
-/// passed, the listener was skipped, and tools that arrived later (e.g. a
-/// 30s server finally connecting) never made it into ToolRegistry.
-/// `await_all_settled` is cheap when already settled (immediate return);
-/// `register_all_settled_mcp_tools` is idempotent.
-fn spawn_late_mcp_registration(
-    kernel: std::sync::Weak<Kernel>,
-    local: Arc<loopal_mcp::LocalMcpProvider>,
-) {
+/// reason: agent uses `McpProxyClient` and cannot subscribe to Hub-side
+/// `LocalMcpProvider` settle events directly. Poll the Hub at low cadence
+/// while tools are still arriving; back off and terminate once the tool
+/// surface is stable so we don't tick forever for the kernel's lifetime.
+/// `register_all_settled_mcp_tools` returns the number of newly registered
+/// adapters, so a streak of zeros means "settled".
+fn spawn_proxy_mcp_settle_poll(kernel: std::sync::Weak<Kernel>) {
+    let poll = mcp_settle_poll_interval();
+    let quiet_streak_to_settle: u32 = std::env::var("LOOPAL_MCP_POLL_QUIET_STREAK")
+        .ok()
+        .and_then(|s| s.parse::<u32>().ok())
+        .filter(|s| *s > 0)
+        .unwrap_or(4);
     tokio::spawn(async move {
-        local.await_all_settled().await;
-        if let Some(k) = kernel.upgrade() {
-            k.register_all_settled_mcp_tools().await;
-            tracing::info!("late-registered MCP tools after settle");
+        let mut interval = tokio::time::interval(poll);
+        interval.tick().await;
+        let mut quiet_streak: u32 = 0;
+        loop {
+            interval.tick().await;
+            let Some(k) = kernel.upgrade() else {
+                return;
+            };
+            let added = k.register_all_settled_mcp_tools().await;
+            if added == 0 {
+                quiet_streak = quiet_streak.saturating_add(1);
+                if quiet_streak >= quiet_streak_to_settle {
+                    tracing::debug!(
+                        quiet_streak,
+                        "proxy MCP settle-poll: tool surface stable, terminating"
+                    );
+                    return;
+                }
+            } else {
+                quiet_streak = 0;
+            }
         }
     });
 }
@@ -111,6 +130,15 @@ fn mcp_startup_wait() -> std::time::Duration {
         .ok()
         .and_then(|s| s.parse::<u64>().ok())
         .unwrap_or(5);
+    std::time::Duration::from_secs(secs)
+}
+
+fn mcp_settle_poll_interval() -> std::time::Duration {
+    let secs = std::env::var("LOOPAL_MCP_POLL_SECS")
+        .ok()
+        .and_then(|s| s.parse::<u64>().ok())
+        .filter(|s| *s > 0)
+        .unwrap_or(3);
     std::time::Duration::from_secs(secs)
 }
 
@@ -149,7 +177,7 @@ pub fn apply_start_overrides(settings: &mut loopal_config::Settings, start: &Sta
 
 async fn expand_provider_secrets(
     settings: &mut loopal_config::Settings,
-    store: &dyn loopal_vault_api::Vault,
+    client: &dyn loopal_secret_client::SecretClient,
 ) {
     for slot in [
         &mut settings.providers.anthropic,
@@ -158,17 +186,17 @@ async fn expand_provider_secrets(
     ] {
         if let Some(cfg) = slot.as_mut() {
             if let Some(k) = cfg.api_key.as_mut() {
-                *k = loopal_secret_runtime::expand_to_plaintext(k, store).await;
+                *k = loopal_secret_runtime::expand_to_plaintext(k, client).await;
             }
             if let Some(u) = cfg.base_url.as_mut() {
-                *u = loopal_secret_runtime::expand_to_plaintext(u, store).await;
+                *u = loopal_secret_runtime::expand_to_plaintext(u, client).await;
             }
         }
     }
     for cfg in settings.providers.openai_compat.iter_mut() {
-        cfg.base_url = loopal_secret_runtime::expand_to_plaintext(&cfg.base_url, store).await;
+        cfg.base_url = loopal_secret_runtime::expand_to_plaintext(&cfg.base_url, client).await;
         if let Some(k) = cfg.api_key.as_mut() {
-            *k = loopal_secret_runtime::expand_to_plaintext(k, store).await;
+            *k = loopal_secret_runtime::expand_to_plaintext(k, client).await;
         }
     }
 }

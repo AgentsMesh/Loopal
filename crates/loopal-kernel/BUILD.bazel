@@ -15,6 +15,7 @@ rust_library(
         "//crates/loopal-provider",
         "//crates/loopal-provider-api",
         "//crates/loopal-sandbox",
+        "//crates/loopal-secret-client",
         "//crates/loopal-tool-api",
         "//crates/loopal-vault-api",
         "//crates/tools/process/background:loopal-tool-background",

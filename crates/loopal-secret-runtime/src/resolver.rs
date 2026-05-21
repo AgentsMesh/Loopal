@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use secrecy::{ExposeSecret, SecretString};
 use serde_json::Value;
 
-use crate::template::WIRE_RE;
+use loopal_secret_client::placeholder::WIRE_RE;
 
 #[derive(Debug, Default)]
 pub struct ResolverReport {

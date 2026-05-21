@@ -1,15 +1,11 @@
-/// Manages multiple MCP server connections.
-///
-/// Core lifecycle (start) and tool dispatch. Reconnect, restart, and query
-/// methods are in `manager_query.rs`.
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use indexmap::IndexMap;
 use loopal_config::McpServerConfig;
 use loopal_error::McpError;
+use loopal_secret_client::SecretClient;
 use loopal_tool_api::ToolDefinition;
-use loopal_vault_api::Vault;
 use rmcp::model::CallToolResult;
 use serde_json::Value;
 use tracing::{debug, info, warn};
@@ -18,16 +14,11 @@ use crate::connection::McpConnection;
 use crate::handler::SamplingCallback;
 use crate::secret_expand::expand_mcp_config;
 
-/// Manages multiple MCP server connections and tool routing.
 pub struct McpManager {
     pub(crate) connections: IndexMap<String, McpConnection>,
-    /// tool_name → server_name for fast dispatch.
     pub(crate) tool_map: HashMap<String, String>,
-    /// Shared sampling callback for all connections.
     sampling: Option<Arc<dyn SamplingCallback>>,
-    /// Optional secret store for resolving `{{secret:X}}` placeholders in
-    /// env / headers / url at spawn time.
-    secrets: Option<Arc<dyn Vault>>,
+    secret_client: Option<Arc<dyn SecretClient>>,
 }
 
 impl McpManager {
@@ -36,19 +27,16 @@ impl McpManager {
             connections: IndexMap::new(),
             tool_map: HashMap::new(),
             sampling: None,
-            secrets: None,
+            secret_client: None,
         }
     }
 
-    /// Set the sampling callback for MCP server-initiated LLM calls.
     pub fn set_sampling(&mut self, callback: Arc<dyn SamplingCallback>) {
         self.sampling = Some(callback);
     }
 
-    /// Configure the secret store used to expand `{{secret:X}}` placeholders
-    /// in MCP server configs before spawn.
-    pub fn set_secrets(&mut self, store: Arc<dyn Vault>) {
-        self.secrets = Some(store);
+    pub fn set_secret_client(&mut self, client: Arc<dyn SecretClient>) {
+        self.secret_client = Some(client);
     }
 
     /// Start all configured MCP servers.
@@ -74,7 +62,7 @@ impl McpManager {
     ) -> Vec<McpConnection> {
         let mut prepared = Vec::new();
         for (name, cfg) in configs {
-            let resolved = expand_mcp_config(cfg.clone(), self.secrets.as_ref()).await;
+            let resolved = expand_mcp_config(cfg.clone(), self.secret_client.as_ref()).await;
             if !resolved.enabled() {
                 info!(server = %name, "MCP server disabled, skipping");
                 continue;

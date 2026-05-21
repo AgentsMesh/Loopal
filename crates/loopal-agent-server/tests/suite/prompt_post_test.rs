@@ -21,6 +21,8 @@ fn stdio_server(command: &str, args: Vec<&str>, timeout_ms: u64) -> McpServerCon
         env: Default::default(),
         enabled: true,
         timeout_ms,
+        sharing: Default::default(),
+        cwd_isolation: None,
     }
 }
 
@@ -42,9 +44,17 @@ async fn append_runtime_sections_lists_configured_servers_even_when_not_yet_read
 
     unsafe { std::env::set_var("LOOPAL_MCP_STARTUP_WAIT_SECS", "0") };
     let start = Instant::now();
-    let kernel = build_kernel_from_config(&config, true, 0, None)
-        .await
-        .expect("build");
+    let kernel = build_kernel_from_config(
+        &config,
+        true,
+        0,
+        None,
+        None,
+        std::path::PathBuf::from("."),
+        "test".to_string(),
+    )
+    .await
+    .expect("build");
     let elapsed = start.elapsed();
     unsafe { std::env::remove_var("LOOPAL_MCP_STARTUP_WAIT_SECS") };
 
@@ -73,9 +83,17 @@ async fn append_runtime_sections_lists_configured_servers_even_when_not_yet_read
 #[tokio::test]
 async fn append_runtime_sections_omits_status_when_no_servers_configured() {
     let config = empty_config();
-    let kernel = build_kernel_from_config(&config, true, 0, None)
-        .await
-        .expect("build");
+    let kernel = build_kernel_from_config(
+        &config,
+        true,
+        0,
+        None,
+        None,
+        std::path::PathBuf::from("."),
+        "test".to_string(),
+    )
+    .await
+    .expect("build");
     let mut prompt = String::new();
     loopal_agent_server::prompt_post::append_runtime_sections(&mut prompt, &kernel).await;
     assert!(
@@ -85,6 +103,7 @@ async fn append_runtime_sections_omits_status_when_no_servers_configured() {
 }
 
 #[tokio::test]
+#[ignore = "obsolete after Stage 2: MCP now lives in Hub, not root agent"]
 async fn append_runtime_sections_shows_failed_status_for_dead_binary() {
     let mut servers = IndexMap::new();
     servers.insert(
@@ -93,9 +112,17 @@ async fn append_runtime_sections_shows_failed_status_for_dead_binary() {
     );
     let config = config_with_mcp_servers(servers);
 
-    let kernel = build_kernel_from_config(&config, true, 0, None)
-        .await
-        .expect("build");
+    let kernel = build_kernel_from_config(
+        &config,
+        true,
+        0,
+        None,
+        None,
+        std::path::PathBuf::from("."),
+        "test".to_string(),
+    )
+    .await
+    .expect("build");
     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
     let mut prompt = String::new();

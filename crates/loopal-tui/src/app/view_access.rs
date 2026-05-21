@@ -51,6 +51,12 @@ impl App {
             .and_then(|vc| vc.state().state().thread_goal.clone())
     }
 
+    pub fn hub_degraded_since_for(&self, agent: &str) -> Option<u64> {
+        self.view_clients
+            .get(agent)
+            .and_then(|vc| vc.state().state().hub_degraded_since_ms)
+    }
+
     pub fn is_agent_live(&self, agent: &str) -> bool {
         let status = self.observable_for(agent).status;
         !matches!(status, AgentStatus::Finished | AgentStatus::Error)

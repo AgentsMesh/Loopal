@@ -2,10 +2,10 @@ use std::io::Write;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
+use loopal_secret_client::{SecretClient, SecretError, SecretResult};
 use loopal_secret_runtime::{apply_redactor, apply_resolver};
 use loopal_tool_api::ToolContext;
-use loopal_vault_api::{SecretString, Vault, VaultResult};
-use secrecy::ExposeSecret;
+use secrecy::{ExposeSecret, SecretString};
 use serde_json::json;
 
 #[derive(Default)]
@@ -14,21 +14,21 @@ struct MockVault {
 }
 
 #[async_trait]
-impl Vault for MockVault {
-    async fn get(&self, name: &str) -> Option<SecretString> {
-        self.map.get(name).map(|v| SecretString::from(v.clone()))
+impl SecretClient for MockVault {
+    async fn get(&self, name: &str) -> SecretResult<SecretString> {
+        match self.map.get(name) {
+            Some(v) => Ok(SecretString::from(v.clone())),
+            None => Err(SecretError::SecretNotFound(name.to_string())),
+        }
     }
-    async fn list_names(&self) -> Vec<String> {
-        self.map.keys().cloned().collect()
+    async fn list_names(&self) -> SecretResult<Vec<String>> {
+        Ok(self.map.keys().cloned().collect())
     }
-    async fn put(&self, _: &str, _: SecretString) -> VaultResult<()> {
-        Ok(())
+    async fn expand_author(&self, template: &str) -> SecretResult<SecretString> {
+        Ok(SecretString::from(template.to_string()))
     }
-    async fn delete(&self, _: &str) -> VaultResult<()> {
-        Ok(())
-    }
-    async fn rekey(&self) -> VaultResult<()> {
-        Ok(())
+    async fn expand_wire(&self, template: &str) -> SecretResult<SecretString> {
+        Ok(SecretString::from(template.to_string()))
     }
 }
 
@@ -61,8 +61,8 @@ fn ctx_with_secret(name: &str, value: &str) -> ToolContext {
     );
     let mut map = std::collections::HashMap::new();
     map.insert(name.to_string(), value.to_string());
-    let store: Arc<dyn Vault> = Arc::new(MockVault { map });
-    ToolContext::new(backend, "tracing-sentinel").with_secrets(store)
+    let store: Arc<dyn SecretClient> = Arc::new(MockVault { map });
+    ToolContext::new(backend, "tracing-sentinel").with_secret_client(store)
 }
 
 const SECRET_VALUE: &str = "sk-CANARY-1234567890-VERY-DISTINCT";
@@ -91,7 +91,7 @@ async fn tracing_never_contains_plaintext_after_full_pipeline() {
         "Bash",
         &mut input,
         &["command", "env"],
-        ctx.secrets.as_ref(),
+        ctx.secret_client.as_ref(),
         &ctx.session_id,
     )
     .await;

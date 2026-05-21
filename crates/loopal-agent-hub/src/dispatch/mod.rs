@@ -12,6 +12,7 @@ mod cross_hub_forward;
 mod dispatch_handlers;
 mod mcp_handlers;
 mod relay_response_handlers;
+mod secret_handlers;
 mod shutdown_handler;
 #[doc(hidden)]
 pub mod spawn_prepare;
@@ -30,6 +31,7 @@ pub async fn dispatch_hub_request(
     use dispatch_handlers::*;
     use mcp_handlers::{handle_mcp_call_tool, handle_mcp_list_tools, handle_mcp_snapshot};
     use relay_response_handlers::{handle_permission_response, handle_question_response};
+    use secret_handlers::{handle_secret_get, handle_secret_health, handle_secret_list_names};
     use shutdown_handler::handle_hub_shutdown;
     use spawn_routing::{handle_spawn_agent, handle_spawn_remote_agent};
     use status_handler::handle_status;
@@ -59,9 +61,16 @@ pub async fn dispatch_hub_request(
         m if m == methods::HUB_AGENT_INFO.name => handle_agent_info(hub, params).await,
         m if m == methods::HUB_TOPOLOGY.name => handle_topology(hub).await,
         m if m == methods::HUB_STATUS.name => handle_status(hub).await,
-        m if m == methods::HUB_MCP_LIST_TOOLS.name => handle_mcp_list_tools(hub).await,
-        m if m == methods::HUB_MCP_CALL_TOOL.name => handle_mcp_call_tool(hub, params).await,
-        m if m == methods::HUB_MCP_SNAPSHOT.name => handle_mcp_snapshot(hub).await,
+        m if m == methods::HUB_MCP_LIST_TOOLS.name => handle_mcp_list_tools(hub, &from_agent).await,
+        m if m == methods::HUB_MCP_CALL_TOOL.name => {
+            handle_mcp_call_tool(hub, params, &from_agent).await
+        }
+        m if m == methods::HUB_MCP_SNAPSHOT.name => handle_mcp_snapshot(hub, &from_agent).await,
+        m if m == methods::HUB_SECRET_GET.name => handle_secret_get(hub, params, &from_agent).await,
+        m if m == methods::HUB_SECRET_LIST_NAMES.name => {
+            handle_secret_list_names(hub, params, &from_agent).await
+        }
+        m if m == methods::HUB_SECRET_HEALTH.name => handle_secret_health(hub, params).await,
         // Forward meta/* methods to MetaHub via uplink
         m if m.starts_with("meta/") => {
             let uplink = hub.lock().await.uplink.clone();

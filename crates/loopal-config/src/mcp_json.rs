@@ -86,6 +86,8 @@ fn convert_entry(name: &str, entry: McpJsonEntry) -> Option<McpServerConfig> {
                 env: entry.env,
                 enabled,
                 timeout_ms,
+                sharing: crate::settings::McpSharing::default(),
+                cwd_isolation: None,
             })
         }
         "streamable-http" => {
@@ -98,6 +100,7 @@ fn convert_entry(name: &str, entry: McpJsonEntry) -> Option<McpServerConfig> {
                 headers: entry.headers,
                 enabled,
                 timeout_ms,
+                sharing: crate::settings::McpSharing::default(),
             })
         }
         other => {

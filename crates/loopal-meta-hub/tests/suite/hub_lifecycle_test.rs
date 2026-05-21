@@ -12,8 +12,7 @@ use loopal_meta_hub::MetaHub;
 async fn hub_disconnect_cleans_up_registry() {
     let meta_hub = Arc::new(Mutex::new(MetaHub::new()));
     let (_, meta_transport) = loopal_ipc::duplex_pair();
-    let meta_conn = Arc::new(Connection::new(meta_transport));
-    let _rx = meta_conn.start();
+    let (meta_conn, _rx) = Connection::new(meta_transport).into_listening();
     {
         let mut mh = meta_hub.lock().await;
         mh.registry

@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use loopal_ipc::StdioTransport;
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_protocol::AgentEventPayload;
 
@@ -12,7 +12,7 @@ const TIMEOUT: Duration = Duration::from_secs(5);
 
 fn ipc_pair() -> (
     Arc<dyn loopal_ipc::transport::Transport>,
-    Arc<Connection>,
+    Arc<Connection<Listening>>,
     tokio::sync::mpsc::Receiver<Incoming>,
 ) {
     let (a_tx, a_rx) = tokio::io::duplex(16384);
@@ -25,8 +25,7 @@ fn ipc_pair() -> (
         Box::new(tokio::io::BufReader::new(a_rx)),
         Box::new(b_tx),
     ));
-    let server_conn = Arc::new(Connection::new(server_t));
-    let server_rx = server_conn.start();
+    let (server_conn, server_rx) = Connection::new(server_t).into_listening();
     (client_t, server_conn, server_rx)
 }
 

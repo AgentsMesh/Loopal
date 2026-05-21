@@ -5,15 +5,14 @@ use anyhow::Context as _;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt as _, BufReader};
 use tokio::process::{Child, Command};
 
+use loopal_ipc::HandshakeLine;
+
 use crate::cli::Cli;
 
-const HANDSHAKE_PREFIX: &str = "LOOPAL_HUB ";
-const HANDSHAKE_ERROR_PREFIX: &str = "LOOPAL_HUB_ERROR ";
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(30);
 const HANDSHAKE_MAX_LINES: usize = 64;
-// Cap on stdout bytes consumed before giving up. Real handshakes are
-// ~150 bytes; runaway child output (broken shim, log spam) must not
-// drag the parent into unbounded buffering.
+// reason: real handshakes are ~150 bytes; runaway child output (broken shim,
+// log spam) must not drag the parent into unbounded buffering.
 const HANDSHAKE_MAX_BYTES: u64 = 64 * 1024;
 
 pub struct HubHandshake {
@@ -21,10 +20,7 @@ pub struct HubHandshake {
     pub token: String,
     pub root_session_id: String,
     /// Hub child process handle. `kill_on_drop(false)` is set, so dropping
-    /// without `wait()` leaves the child running (the detach case). For
-    /// `/exit` and `/kill-hub`, the caller awaits this handle to ensure the
-    /// child fully exits before any worktree cleanup, avoiding the race
-    /// where parent removes files while agent is still flushing them.
+    /// without `wait()` leaves the child running (the detach case).
     pub child: Child,
 }
 
@@ -85,7 +81,10 @@ async fn read_handshake<R>(mut reader: BufReader<R>) -> anyhow::Result<(String, 
 where
     R: tokio::io::AsyncRead + Unpin,
 {
+    let mut alive: Option<(String, String)> = None;
+    let mut ready_session: Option<String> = None;
     let mut skipped = Vec::new();
+
     for _ in 0..HANDSHAKE_MAX_LINES {
         let mut line = String::new();
         let n = reader
@@ -96,33 +95,36 @@ where
             let context = format_skipped_lines(&skipped);
             anyhow::bail!("hub child closed stdout before sending handshake{context}");
         }
-        let trimmed = line.trim_end_matches(['\r', '\n']);
-        if let Some(rest) = trimmed.strip_prefix(HANDSHAKE_ERROR_PREFIX) {
-            anyhow::bail!("hub child failed to start: {rest}");
+        match HandshakeLine::parse(&line) {
+            Some(HandshakeLine::Error(rest)) => anyhow::bail!("hub child failed to start: {rest}"),
+            Some(HandshakeLine::Alive { addr, token }) => {
+                alive = Some((addr, token));
+            }
+            Some(HandshakeLine::Ready { session_id }) => {
+                ready_session = Some(session_id);
+                if let Some((addr, token)) = alive.clone() {
+                    return Ok((addr, token, ready_session.unwrap()));
+                }
+            }
+            Some(HandshakeLine::Legacy {
+                addr,
+                token,
+                session_id,
+            }) => {
+                return Ok((addr, token, session_id));
+            }
+            None => skipped.push(line.trim_end().to_string()),
         }
-        if let Some(rest) = trimmed.strip_prefix(HANDSHAKE_PREFIX) {
-            return parse_handshake_fields(rest);
+        if let Some((addr, token)) = &alive
+            && let Some(session_id) = &ready_session
+        {
+            return Ok((addr.clone(), token.clone(), session_id.clone()));
         }
-        skipped.push(trimmed.to_string());
     }
     anyhow::bail!(
         "hub child wrote {HANDSHAKE_MAX_LINES} lines without recognised handshake prefix; \
          likely stdout pollution"
     );
-}
-
-fn parse_handshake_fields(rest: &str) -> anyhow::Result<(String, String, String)> {
-    let mut parts = rest.splitn(3, ' ');
-    let addr = parts
-        .next()
-        .ok_or_else(|| anyhow::anyhow!("malformed hub handshake (no addr): {rest:?}"))?;
-    let token = parts
-        .next()
-        .ok_or_else(|| anyhow::anyhow!("malformed hub handshake (no token): {rest:?}"))?;
-    let session_id = parts
-        .next()
-        .ok_or_else(|| anyhow::anyhow!("malformed hub handshake (no session_id): {rest:?}"))?;
-    Ok((addr.to_string(), token.to_string(), session_id.to_string()))
 }
 
 fn format_skipped_lines(skipped: &[String]) -> String {

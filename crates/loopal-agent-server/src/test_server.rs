@@ -17,8 +17,8 @@ pub async fn run_server_for_test(
     _cwd: std::path::PathBuf,
     session_dir: std::path::PathBuf,
 ) -> anyhow::Result<()> {
-    let connection = Arc::new(Connection::new(transport));
-    let mut incoming_rx = connection.start();
+    let (connection, mut incoming_rx) = Connection::new(transport).into_listening();
+
     let hub = SessionHub::new();
     hub.set_test_provider(provider).await;
     hub.set_session_dir_override(session_dir).await;
@@ -44,8 +44,8 @@ pub async fn run_test_connection(
     transport: Arc<dyn Transport>,
     hub: Arc<SessionHub>,
 ) -> anyhow::Result<()> {
-    let connection = Arc::new(Connection::new(transport));
-    let mut incoming_rx = connection.start();
+    let (connection, mut incoming_rx) = Connection::new(transport).into_listening();
+
     wait_for_initialize(&connection, &mut incoming_rx).await?;
     dispatch_loop(connection, incoming_rx, &hub, false).await
 }

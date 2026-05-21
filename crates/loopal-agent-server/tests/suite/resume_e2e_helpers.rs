@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::Utc;
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
 use loopal_protocol::{AgentEvent, AgentEventPayload};
@@ -21,7 +21,7 @@ use super::bridge_helpers::make_duplex_pair;
 pub const RESUME_E2E_TIMEOUT: Duration = Duration::from_secs(10);
 
 pub struct ResumeServer {
-    pub conn: Arc<Connection>,
+    pub conn: Arc<Connection<Listening>>,
     pub rx: tokio::sync::mpsc::Receiver<Incoming>,
     pub handle: tokio::task::JoinHandle<()>,
 }
@@ -38,13 +38,12 @@ pub async fn spawn_resume_server(
         let _ =
             loopal_agent_server::run_server_for_test(server_t, provider, cwd, session_dir).await;
     });
-    let conn = Arc::new(Connection::new(client_t));
-    let rx = conn.start();
+    let (conn, rx) = Connection::new(client_t).into_listening();
     ResumeServer { conn, rx, handle }
 }
 
 pub async fn initialize_and_start(
-    conn: &Connection,
+    conn: &Connection<Listening>,
     fixture: &TestFixture,
     extra: serde_json::Value,
 ) -> String {

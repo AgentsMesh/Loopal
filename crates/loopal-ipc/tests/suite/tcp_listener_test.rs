@@ -35,8 +35,7 @@ async fn tcp_connection_jsonrpc_roundtrip() {
 
     let server_task = tokio::spawn(async move {
         let (transport, _) = listener.accept().await.unwrap();
-        let conn = Arc::new(Connection::new(Arc::new(transport)));
-        let mut rx = conn.start();
+        let (conn, mut rx) = Connection::new(Arc::new(transport)).into_listening();
 
         // Receive request from client
         let incoming = rx.recv().await.expect("should receive");
@@ -54,8 +53,7 @@ async fn tcp_connection_jsonrpc_roundtrip() {
     let stream = tokio::net::TcpStream::connect(format!("127.0.0.1:{port}"))
         .await
         .unwrap();
-    let client_conn = Arc::new(Connection::new(Arc::new(TcpTransport::new(stream))));
-    let _rx = client_conn.start();
+    let (client_conn, _rx) = Connection::new(Arc::new(TcpTransport::new(stream))).into_listening();
 
     let result = client_conn
         .send_request("test/hello", serde_json::json!({"name": "loopal"}))

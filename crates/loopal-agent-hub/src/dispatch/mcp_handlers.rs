@@ -64,7 +64,12 @@ pub async fn handle_mcp_call_tool(
         })?;
     expand_secret_refs_in_args(hub, &cwd, from_agent, &req.tool, &mut req.args).await;
     let result = provider
-        .call_tool(&req.server, &req.tool, &req.args)
+        .call_tool(
+            &req.server,
+            &req.tool,
+            &req.args,
+            loopal_mcp::HUB_RPC_BUDGET,
+        )
         .await
         .map_err(|e| format!("call_tool: {e}"))?;
     Ok(json!(loopal_mcp::call_result_to_response(&result)))
@@ -73,7 +78,7 @@ pub async fn handle_mcp_call_tool(
 pub async fn handle_mcp_snapshot(hub: &Arc<Mutex<Hub>>, from_agent: &str) -> Result<Value, String> {
     let (provider, _cwd) = resolve_provider(hub, from_agent).await?;
     let servers = provider
-        .snapshot()
+        .snapshot(loopal_mcp::HUB_RPC_BUDGET)
         .await
         .into_iter()
         .map(|s| loopal_protocol::McpServerSnapshot {

@@ -3,10 +3,19 @@
 use std::sync::Arc;
 
 use loopal_ipc::StdioTransport;
-use loopal_ipc::connection::Connection;
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
+use tokio::sync::mpsc;
 
-fn make_pair() -> (Arc<Connection>, Arc<Connection>) {
+struct ConnPair {
+    agent_conn: Arc<Connection<Listening>>,
+    #[allow(dead_code)]
+    agent_rx: mpsc::Receiver<Incoming>,
+    tui_conn: Arc<Connection<Listening>>,
+    tui_incoming: mpsc::Receiver<Incoming>,
+}
+
+fn make_pair() -> ConnPair {
     let (a_tx, a_rx) = tokio::io::duplex(8192);
     let (b_tx, b_rx) = tokio::io::duplex(8192);
     let ta: Arc<dyn loopal_ipc::transport::Transport> = Arc::new(StdioTransport::new(
@@ -17,14 +26,24 @@ fn make_pair() -> (Arc<Connection>, Arc<Connection>) {
         Box::new(tokio::io::BufReader::new(a_rx)),
         Box::new(b_tx),
     ));
-    (Arc::new(Connection::new(ta)), Arc::new(Connection::new(tb)))
+    let (agent_conn, agent_rx) = Connection::new(ta).into_listening();
+    let (tui_conn, tui_incoming) = Connection::new(tb).into_listening();
+    ConnPair {
+        agent_conn,
+        agent_rx,
+        tui_conn,
+        tui_incoming,
+    }
 }
 
 #[tokio::test]
 async fn bridge_forwards_agent_events_to_channel() {
-    let (agent_conn, tui_conn) = make_pair();
-    let tui_incoming = tui_conn.start();
-    let _agent_rx = agent_conn.start();
+    let ConnPair {
+        agent_conn,
+        tui_conn,
+        tui_incoming,
+        ..
+    } = make_pair();
 
     // Start bridge with the TUI-side connection
     let handles = loopal_agent_client::start_bridge(tui_conn, tui_incoming);
@@ -58,9 +77,12 @@ async fn bridge_forwards_agent_events_to_channel() {
 
 #[tokio::test]
 async fn bridge_forwards_control_commands_to_ipc() {
-    let (agent_conn, tui_conn) = make_pair();
-    let tui_incoming = tui_conn.start();
-    let mut agent_rx = agent_conn.start();
+    let ConnPair {
+        mut agent_rx,
+        tui_conn,
+        tui_incoming,
+        ..
+    } = make_pair();
 
     let handles = loopal_agent_client::start_bridge(tui_conn, tui_incoming);
 
@@ -86,9 +108,12 @@ async fn bridge_forwards_control_commands_to_ipc() {
 
 #[tokio::test]
 async fn bridge_forwards_mailbox_messages_to_ipc() {
-    let (agent_conn, tui_conn) = make_pair();
-    let tui_incoming = tui_conn.start();
-    let mut agent_rx = agent_conn.start();
+    let ConnPair {
+        mut agent_rx,
+        tui_conn,
+        tui_incoming,
+        ..
+    } = make_pair();
 
     let handles = loopal_agent_client::start_bridge(tui_conn, tui_incoming);
 

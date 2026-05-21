@@ -42,14 +42,19 @@ async fn handle_meta_route(
     }
 
     let mut mh = meta_hub.lock().await;
-    let candidates: Vec<(String, Arc<loopal_ipc::connection::Connection>)> = mh
+    let candidates: Vec<(
+        String,
+        Arc<loopal_ipc::connection::Connection<loopal_ipc::connection::Listening>>,
+    )> = mh
         .registry
         .alive_hubs()
         .into_iter()
         .map(|(name, conn)| (name.to_string(), conn.clone()))
         .collect();
-    let refs: Vec<(&str, &Arc<loopal_ipc::connection::Connection>)> =
-        candidates.iter().map(|(n, c)| (n.as_str(), c)).collect();
+    let refs: Vec<(
+        &str,
+        &Arc<loopal_ipc::connection::Connection<loopal_ipc::connection::Listening>>,
+    )> = candidates.iter().map(|(n, c)| (n.as_str(), c)).collect();
 
     mh.router.route(&envelope, &refs).await?;
     Ok(json!({"ok": true}))

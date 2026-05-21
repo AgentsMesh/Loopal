@@ -36,7 +36,9 @@ pub async fn build_kernel_from_config(
     production: bool,
     depth: u32,
     hub_client: Option<Arc<dyn loopal_mcp::HubMcpClient>>,
-    hub_connection: Option<Arc<loopal_ipc::connection::Connection>>,
+    hub_connection: Option<
+        Arc<loopal_ipc::connection::Connection<loopal_ipc::connection::Listening>>,
+    >,
     cwd: std::path::PathBuf,
     agent_name: String,
 ) -> anyhow::Result<Arc<Kernel>> {
@@ -179,6 +181,11 @@ async fn expand_provider_secrets(
     settings: &mut loopal_config::Settings,
     client: &dyn loopal_secret_client::SecretClient,
 ) {
+    // reason: critical path (agent/start) but reverse-IPC dispatcher is
+    // already Listening by P2-A's happens-before; default 8s budget bounds
+    // any stuck hub call so we surface "timed out" rather than the layered
+    // 30s handshake timeout further up.
+    let budget = loopal_ipc::HUB_RPC_BUDGET;
     for slot in [
         &mut settings.providers.anthropic,
         &mut settings.providers.openai,
@@ -186,17 +193,18 @@ async fn expand_provider_secrets(
     ] {
         if let Some(cfg) = slot.as_mut() {
             if let Some(k) = cfg.api_key.as_mut() {
-                *k = loopal_secret_runtime::expand_to_plaintext(k, client).await;
+                *k = loopal_secret_runtime::expand_to_plaintext(k, client, budget).await;
             }
             if let Some(u) = cfg.base_url.as_mut() {
-                *u = loopal_secret_runtime::expand_to_plaintext(u, client).await;
+                *u = loopal_secret_runtime::expand_to_plaintext(u, client, budget).await;
             }
         }
     }
     for cfg in settings.providers.openai_compat.iter_mut() {
-        cfg.base_url = loopal_secret_runtime::expand_to_plaintext(&cfg.base_url, client).await;
+        cfg.base_url =
+            loopal_secret_runtime::expand_to_plaintext(&cfg.base_url, client, budget).await;
         if let Some(k) = cfg.api_key.as_mut() {
-            *k = loopal_secret_runtime::expand_to_plaintext(k, client).await;
+            *k = loopal_secret_runtime::expand_to_plaintext(k, client, budget).await;
         }
     }
 }

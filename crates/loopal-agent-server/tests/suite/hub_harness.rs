@@ -10,7 +10,7 @@ use tokio::sync::{Mutex, mpsc, watch};
 
 use loopal_error::AgentOutput;
 use loopal_ipc::StdioTransport;
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
 use loopal_protocol::{AgentEvent, AgentEventPayload, Envelope, InterruptSignal, MessageSource};
@@ -29,7 +29,7 @@ pub struct HubTestHarness {
     pub interrupt: InterruptSignal,
     pub interrupt_tx: Arc<watch::Sender<u64>>,
     pub client_rx: mpsc::Receiver<Incoming>,
-    pub client_conn: Arc<Connection>,
+    pub client_conn: Arc<Connection<Listening>>,
     #[allow(dead_code)]
     pub agent_task: tokio::task::JoinHandle<loopal_error::Result<AgentOutput>>,
     #[allow(dead_code)]
@@ -69,7 +69,11 @@ impl HubTestHarness {
     }
 }
 
-fn conn_pair() -> (Arc<Connection>, Arc<Connection>, mpsc::Receiver<Incoming>) {
+fn conn_pair() -> (
+    Arc<Connection<Listening>>,
+    Arc<Connection<Listening>>,
+    mpsc::Receiver<Incoming>,
+) {
     let (a_tx, a_rx) = tokio::io::duplex(8192);
     let (b_tx, b_rx) = tokio::io::duplex(8192);
     let server_t: Arc<dyn Transport> = Arc::new(StdioTransport::new(
@@ -80,10 +84,8 @@ fn conn_pair() -> (Arc<Connection>, Arc<Connection>, mpsc::Receiver<Incoming>) {
         Box::new(tokio::io::BufReader::new(b_rx)),
         Box::new(a_tx),
     ));
-    let server_conn = Arc::new(Connection::new(server_t));
-    let _server_rx = server_conn.start();
-    let client_conn = Arc::new(Connection::new(client_t));
-    let client_rx = client_conn.start();
+    let (server_conn, _server_rx) = Connection::new(server_t).into_listening();
+    let (client_conn, client_rx) = Connection::new(client_t).into_listening();
     (server_conn, client_conn, client_rx)
 }
 
@@ -137,7 +139,7 @@ pub async fn build_hub_harness_with(
         fork_context: None,
     };
     let (hub_conn, _hub_peer) = loopal_ipc::duplex_pair();
-    let hub_connection = std::sync::Arc::new(loopal_ipc::Connection::new(hub_conn));
+    let (hub_connection, _hub_rx) = loopal_ipc::Connection::new(hub_conn).into_listening();
 
     let hub = loopal_agent_server::testing::SessionHub::default();
     let setup = loopal_agent_server::testing::build_with_frontend(

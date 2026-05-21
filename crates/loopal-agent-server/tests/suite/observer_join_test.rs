@@ -4,7 +4,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_protocol::{AgentEvent, AgentEventPayload, Envelope, MessageSource};
 use loopal_test_support::TestFixture;
@@ -63,7 +63,7 @@ async fn collect_events(rx: &mut tokio::sync::mpsc::Receiver<Incoming>) -> Vec<A
 }
 
 /// Helper: initialize a client connection.
-pub(crate) async fn init_client(conn: &Connection) {
+pub(crate) async fn init_client(conn: &Connection<Listening>) {
     tokio::time::timeout(
         T,
         conn.send_request("initialize", serde_json::json!({"protocol_version": 1})),
@@ -97,8 +97,8 @@ async fn observer_joins_session_receives_events() {
     });
 
     // Primary: init + start interactive (no prompt -> AwaitingInput)
-    let primary = Arc::new(Connection::new(primary_client_t));
-    let mut primary_rx = primary.start();
+    let (primary, mut primary_rx) = Connection::new(primary_client_t).into_listening();
+
     init_client(&primary).await;
     let start_resp = tokio::time::timeout(
         T,
@@ -114,8 +114,8 @@ async fn observer_joins_session_receives_events() {
     drain_until_terminal(&mut primary_rx).await;
 
     // Observer: init + join
-    let observer = Arc::new(Connection::new(observer_client_t));
-    let mut observer_rx = observer.start();
+    let (observer, mut observer_rx) = Connection::new(observer_client_t).into_listening();
+
     init_client(&observer).await;
     let join_resp = tokio::time::timeout(
         T,

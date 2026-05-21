@@ -4,8 +4,8 @@ use loopal_agent::shared::{AgentShared, SchedulerHandle};
 use loopal_agent::task_store::TaskStore;
 use loopal_agent::tools::collaboration::send_message::SendMessageTool;
 use loopal_config::Settings;
-use loopal_ipc::Connection;
 use loopal_ipc::connection::Incoming;
+use loopal_ipc::{Connection, Listening};
 use loopal_kernel::Kernel;
 use loopal_protocol::Envelope;
 use loopal_scheduler::CronScheduler;
@@ -14,7 +14,13 @@ use loopal_tool_api::{Tool, ToolContext};
 use serde_json::json;
 use tokio_util::sync::CancellationToken;
 
-fn make_ctx_with_hub_peer(fixture: &TestFixture) -> (ToolContext, Arc<Connection>) {
+fn make_ctx_with_hub_peer(
+    fixture: &TestFixture,
+) -> (
+    ToolContext,
+    Arc<Connection<Listening>>,
+    tokio::sync::mpsc::Receiver<Incoming>,
+) {
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
     let cwd = fixture
         .path()
@@ -28,10 +34,10 @@ fn make_ctx_with_hub_peer(fixture: &TestFixture) -> (ToolContext, Arc<Connection
     );
 
     let (hub_conn, hub_peer) = loopal_ipc::duplex_pair();
-    let hub_connection = Arc::new(Connection::new(hub_conn));
-    let mut hub_conn_rx = hub_connection.start();
+    let (hub_connection, mut hub_conn_rx) = Connection::new(hub_conn).into_listening();
+
     tokio::spawn(async move { while hub_conn_rx.recv().await.is_some() {} });
-    let hub_peer = Arc::new(Connection::new(hub_peer));
+    let (hub_peer, rx) = Connection::new(hub_peer).into_listening();
 
     let scheduler_handle =
         SchedulerHandle::new(Arc::new(CronScheduler::new()), CancellationToken::new());
@@ -52,11 +58,14 @@ fn make_ctx_with_hub_peer(fixture: &TestFixture) -> (ToolContext, Arc<Connection
     (
         ToolContext::new(backend, "test-session").with_shared(shared_any),
         hub_peer,
+        rx,
     )
 }
 
-async fn intercept_routed_envelope(hub_peer: Arc<Connection>) -> Envelope {
-    let mut rx = hub_peer.start();
+async fn intercept_routed_envelope(
+    hub_peer: Arc<Connection<Listening>>,
+    mut rx: tokio::sync::mpsc::Receiver<Incoming>,
+) -> Envelope {
     while let Some(msg) = rx.recv().await {
         if let Incoming::Request { id, method, params } = msg {
             assert_eq!(method, "hub/route");
@@ -71,7 +80,7 @@ async fn intercept_routed_envelope(hub_peer: Arc<Connection>) -> Envelope {
 #[tokio::test]
 async fn test_send_message_without_summary_omits_field() {
     let fixture = TestFixture::new();
-    let (ctx, hub_peer) = make_ctx_with_hub_peer(&fixture);
+    let (ctx, hub_peer, rx) = make_ctx_with_hub_peer(&fixture);
 
     let tool_call = tokio::spawn(async move {
         SendMessageTool
@@ -79,7 +88,7 @@ async fn test_send_message_without_summary_omits_field() {
             .await
             .unwrap()
     });
-    let env = intercept_routed_envelope(hub_peer).await;
+    let env = intercept_routed_envelope(hub_peer, rx).await;
     let result = tool_call.await.unwrap();
 
     assert!(!result.is_error);
@@ -90,7 +99,7 @@ async fn test_send_message_without_summary_omits_field() {
 #[tokio::test]
 async fn test_send_message_with_summary_propagates_to_envelope() {
     let fixture = TestFixture::new();
-    let (ctx, hub_peer) = make_ctx_with_hub_peer(&fixture);
+    let (ctx, hub_peer, rx) = make_ctx_with_hub_peer(&fixture);
 
     let tool_call = tokio::spawn(async move {
         SendMessageTool
@@ -101,7 +110,7 @@ async fn test_send_message_with_summary_propagates_to_envelope() {
             .await
             .unwrap()
     });
-    let env = intercept_routed_envelope(hub_peer).await;
+    let env = intercept_routed_envelope(hub_peer, rx).await;
     let result = tool_call.await.unwrap();
 
     assert!(!result.is_error);
@@ -112,7 +121,7 @@ async fn test_send_message_with_summary_propagates_to_envelope() {
 #[tokio::test]
 async fn test_send_message_empty_summary_is_treated_as_none() {
     let fixture = TestFixture::new();
-    let (ctx, hub_peer) = make_ctx_with_hub_peer(&fixture);
+    let (ctx, hub_peer, rx) = make_ctx_with_hub_peer(&fixture);
 
     let tool_call = tokio::spawn(async move {
         SendMessageTool
@@ -120,7 +129,7 @@ async fn test_send_message_empty_summary_is_treated_as_none() {
             .await
             .unwrap()
     });
-    let env = intercept_routed_envelope(hub_peer).await;
+    let env = intercept_routed_envelope(hub_peer, rx).await;
     let _ = tool_call.await.unwrap();
 
     assert!(env.summary.is_none());
@@ -129,7 +138,7 @@ async fn test_send_message_empty_summary_is_treated_as_none() {
 #[tokio::test]
 async fn test_send_message_whitespace_only_summary_is_treated_as_none() {
     let fixture = TestFixture::new();
-    let (ctx, hub_peer) = make_ctx_with_hub_peer(&fixture);
+    let (ctx, hub_peer, rx) = make_ctx_with_hub_peer(&fixture);
 
     let tool_call = tokio::spawn(async move {
         SendMessageTool
@@ -140,7 +149,7 @@ async fn test_send_message_whitespace_only_summary_is_treated_as_none() {
             .await
             .unwrap()
     });
-    let env = intercept_routed_envelope(hub_peer).await;
+    let env = intercept_routed_envelope(hub_peer, rx).await;
     let _ = tool_call.await.unwrap();
 
     assert!(
@@ -152,7 +161,7 @@ async fn test_send_message_whitespace_only_summary_is_treated_as_none() {
 #[tokio::test]
 async fn test_send_message_missing_target_returns_invalid_input_error() {
     let fixture = TestFixture::new();
-    let (ctx, _hub_peer) = make_ctx_with_hub_peer(&fixture);
+    let (ctx, _hub_peer, _rx) = make_ctx_with_hub_peer(&fixture);
     let result = SendMessageTool
         .execute(json!({"message": "no target"}), &ctx)
         .await;

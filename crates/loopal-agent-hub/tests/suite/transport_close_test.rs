@@ -31,11 +31,8 @@ async fn transport_closed_after_agent_completes() {
     let (agent_transport, hub_transport) = loopal_ipc::duplex_pair();
     let hub_transport_ref = hub_transport.clone();
 
-    let agent_conn = Arc::new(Connection::new(agent_transport));
-    let server_conn = Arc::new(Connection::new(hub_transport));
-
-    let _agent_rx = agent_conn.start();
-    let server_rx = server_conn.start();
+    let (agent_conn, _agent_rx) = Connection::new(agent_transport).into_listening();
+    let (server_conn, server_rx) = Connection::new(hub_transport).into_listening();
 
     let _ = register_agent_connection(
         hub.clone(),
@@ -76,11 +73,8 @@ async fn agent_receives_eof_after_hub_closes_transport() {
     let (agent_transport, hub_transport) = loopal_ipc::duplex_pair();
     let agent_transport_ref = agent_transport.clone();
 
-    let agent_conn = Arc::new(Connection::new(agent_transport));
-    let server_conn = Arc::new(Connection::new(hub_transport));
-
-    let _agent_rx = agent_conn.start();
-    let server_rx = server_conn.start();
+    let (agent_conn, _agent_rx) = Connection::new(agent_transport).into_listening();
+    let (server_conn, server_rx) = Connection::new(hub_transport).into_listening();
 
     let _ = register_agent_connection(
         hub.clone(),
@@ -125,11 +119,8 @@ async fn result_delivered_before_transport_close() {
     let (hub, _event_rx) = make_hub();
 
     let (agent_transport, hub_transport) = loopal_ipc::duplex_pair();
-    let agent_conn = Arc::new(Connection::new(agent_transport));
-    let server_conn = Arc::new(Connection::new(hub_transport));
-
-    let _agent_rx = agent_conn.start();
-    let server_rx = server_conn.start();
+    let (agent_conn, _agent_rx) = Connection::new(agent_transport).into_listening();
+    let (server_conn, server_rx) = Connection::new(hub_transport).into_listening();
 
     let _ = register_agent_connection(
         hub.clone(),
@@ -178,11 +169,8 @@ async fn child_crash_triggers_transport_close() {
     let (agent_transport, hub_transport) = loopal_ipc::duplex_pair();
     let hub_transport_ref = hub_transport.clone();
 
-    let agent_conn = Arc::new(Connection::new(agent_transport));
-    let server_conn = Arc::new(Connection::new(hub_transport));
-
-    let _agent_rx = agent_conn.start();
-    let server_rx = server_conn.start();
+    let (agent_conn, _agent_rx) = Connection::new(agent_transport).into_listening();
+    let (server_conn, server_rx) = Connection::new(hub_transport).into_listening();
 
     let _ = register_agent_connection(
         hub.clone(),
@@ -226,11 +214,8 @@ async fn agent_unregistered_after_completion() {
     let (hub, _event_rx) = make_hub();
 
     let (agent_transport, hub_transport) = loopal_ipc::duplex_pair();
-    let agent_conn = Arc::new(Connection::new(agent_transport));
-    let server_conn = Arc::new(Connection::new(hub_transport));
-
-    let _agent_rx = agent_conn.start();
-    let server_rx = server_conn.start();
+    let (agent_conn, _agent_rx) = Connection::new(agent_transport).into_listening();
+    let (server_conn, server_rx) = Connection::new(hub_transport).into_listening();
 
     let _ = register_agent_connection(
         hub.clone(),

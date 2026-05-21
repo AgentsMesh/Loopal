@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-use loopal_ipc::connection::Connection;
+use loopal_ipc::connection::{Connection, Listening};
 
 use crate::hub_info::{HubInfo, HubStatus};
 use crate::managed_hub::ManagedHub;
@@ -39,7 +39,7 @@ impl HubRegistry {
     pub fn register(
         &mut self,
         name: &str,
-        conn: Arc<Connection>,
+        conn: Arc<Connection<Listening>>,
         capabilities: Vec<String>,
     ) -> Result<(), String> {
         if self.hubs.contains_key(name) {
@@ -67,7 +67,7 @@ impl HubRegistry {
     }
 
     /// Get the connection to a sub-hub by name.
-    pub fn connection(&self, name: &str) -> Option<Arc<Connection>> {
+    pub fn connection(&self, name: &str) -> Option<Arc<Connection<Listening>>> {
         self.hubs.get(name).map(|h| Arc::clone(&h.conn))
     }
 
@@ -87,7 +87,7 @@ impl HubRegistry {
     }
 
     /// List all alive (Connected or Degraded) hubs with their connections.
-    pub fn alive_hubs(&self) -> Vec<(&str, &Arc<Connection>)> {
+    pub fn alive_hubs(&self) -> Vec<(&str, &Arc<Connection<Listening>>)> {
         self.hubs
             .iter()
             .filter(|(_, h)| h.info().is_alive())

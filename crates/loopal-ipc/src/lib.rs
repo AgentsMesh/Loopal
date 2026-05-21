@@ -3,10 +3,13 @@
 //! Provides a platform-abstracted transport layer (Mojo-like) and JSON-RPC 2.0
 //! protocol for communication between consumer, agent, and sub-agent processes.
 
+pub mod budget;
 pub mod connection;
 mod connection_reader;
 pub mod cross_hub;
+pub mod dispatcher;
 pub mod duplex;
+pub mod handshake_protocol;
 pub mod jsonrpc;
 pub mod protocol;
 pub mod rpc_error;
@@ -15,8 +18,11 @@ pub mod tcp;
 pub mod tcp_listener;
 pub mod transport;
 
-pub use connection::Connection;
+pub use budget::{HUB_RPC_BUDGET, IpcBudget};
+pub use connection::{Connection, Inactive, Listening};
+pub use dispatcher::{Dispatcher, DispatcherBuilder, HandlerCtx, RequestHandler};
 pub use duplex::duplex_pair;
+pub use handshake_protocol::HandshakeLine;
 pub use jsonrpc::{IncomingMessage, JsonRpcError, read_message};
 pub use protocol::{Method, methods};
 pub use rpc_error::RpcError;

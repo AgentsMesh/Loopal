@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use loopal_config::Settings;
 use loopal_error::McpError;
 use loopal_kernel::Kernel;
-use loopal_mcp::{McpConnectionSnapshot, McpProvider};
+use loopal_mcp::{IpcBudget, McpConnectionSnapshot, McpProvider};
 use loopal_tool_api::ToolDefinition;
 use rmcp::model::CallToolResult;
 use serde_json::Value;
@@ -16,7 +16,7 @@ struct StaticProvider {
 
 #[async_trait]
 impl McpProvider for StaticProvider {
-    async fn list_tools(&self) -> Vec<(String, ToolDefinition)> {
+    async fn list_tools(&self, _budget: IpcBudget) -> Vec<(String, ToolDefinition)> {
         self.tools.clone()
     }
     async fn call_tool(
@@ -24,12 +24,13 @@ impl McpProvider for StaticProvider {
         _server: &str,
         _tool: &str,
         _args: &Value,
+        _budget: IpcBudget,
     ) -> Result<CallToolResult, McpError> {
         Ok(CallToolResult::success(vec![rmcp::model::Content::text(
             "ok",
         )]))
     }
-    async fn snapshot(&self) -> Vec<McpConnectionSnapshot> {
+    async fn snapshot(&self, _budget: IpcBudget) -> Vec<McpConnectionSnapshot> {
         Vec::new()
     }
 }

@@ -1,10 +1,12 @@
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use secrecy::SecretString;
 
-use loopal_ipc::connection::Connection;
+use loopal_ipc::IpcBudget;
+use loopal_ipc::connection::{Connection, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_protocol::{
     SecretCaller, SecretGetRequest, SecretGetResponse, SecretListNamesRequest,
@@ -19,7 +21,7 @@ use crate::placeholder::{AUTHOR_RE, WIRE_RE};
 use crate::retry::{RetryPolicy, classify_rpc, retry_transient};
 
 pub struct HubSecretClient {
-    connection: Arc<Connection>,
+    connection: Arc<Connection<Listening>>,
     cwd: PathBuf,
     agent_name: String,
     depth: u32,
@@ -28,7 +30,12 @@ pub struct HubSecretClient {
 }
 
 impl HubSecretClient {
-    pub fn new(connection: Arc<Connection>, cwd: PathBuf, agent_name: String, depth: u32) -> Self {
+    pub fn new(
+        connection: Arc<Connection<Listening>>,
+        cwd: PathBuf,
+        agent_name: String,
+        depth: u32,
+    ) -> Self {
         Self {
             connection,
             cwd,
@@ -55,12 +62,22 @@ impl HubSecretClient {
             tool_name,
         }
     }
+
+    fn check_budget(budget: IpcBudget, op: &str) -> Result<Duration, SecretError> {
+        match budget {
+            IpcBudget::Forbidden => Err(SecretError::Ipc(format!(
+                "{op} rejected: IpcBudget::Forbidden on critical path"
+            ))),
+            IpcBudget::Allowed(d) => Ok(d),
+        }
+    }
 }
 
 #[async_trait]
 impl SecretClient for HubSecretClient {
-    async fn get(&self, name: &str) -> SecretResult<SecretString> {
-        let result = retry_transient(self.retry_policy, || async {
+    async fn get(&self, name: &str, budget: IpcBudget) -> SecretResult<SecretString> {
+        let timeout = Self::check_budget(budget, "secret/get")?;
+        let inner = retry_transient(self.retry_policy, || async {
             let req = SecretGetRequest {
                 cwd: self.cwd.to_string_lossy().into_owned(),
                 name: name.to_string(),
@@ -76,14 +93,20 @@ impl SecretClient for HubSecretClient {
             let payload: SecretGetResponse = serde_json::from_value(resp)
                 .map_err(|e| SecretError::Ipc(format!("decode: {e}")))?;
             Ok(SecretString::from(payload.plaintext))
-        })
-        .await;
+        });
+        let result = match tokio::time::timeout(timeout, inner).await {
+            Ok(r) => r,
+            Err(_) => Err(SecretError::Ipc(format!(
+                "secret/get timed out after {timeout:?}"
+            ))),
+        };
         self.health.record_outcome(&result);
         result
     }
 
-    async fn list_names(&self) -> SecretResult<Vec<String>> {
-        let result = retry_transient(self.retry_policy, || async {
+    async fn list_names(&self, budget: IpcBudget) -> SecretResult<Vec<String>> {
+        let timeout = Self::check_budget(budget, "secret/list_names")?;
+        let inner = retry_transient(self.retry_policy, || async {
             let req = SecretListNamesRequest {
                 cwd: self.cwd.to_string_lossy().into_owned(),
             };
@@ -97,18 +120,31 @@ impl SecretClient for HubSecretClient {
             let payload: SecretListNamesResponse = serde_json::from_value(resp)
                 .map_err(|e| SecretError::Ipc(format!("decode: {e}")))?;
             Ok(payload.names)
-        })
-        .await;
+        });
+        let result = match tokio::time::timeout(timeout, inner).await {
+            Ok(r) => r,
+            Err(_) => Err(SecretError::Ipc(format!(
+                "secret/list_names timed out after {timeout:?}"
+            ))),
+        };
         self.health.record_outcome(&result);
         result
     }
 
-    async fn expand_author(&self, template: &str) -> SecretResult<SecretString> {
-        expand_template(&AUTHOR_RE, template, |n| async move { self.get(&n).await }).await
+    async fn expand_author(&self, template: &str, budget: IpcBudget) -> SecretResult<SecretString> {
+        expand_template(&AUTHOR_RE, template, |n| async move {
+            self.get(&n, budget).await
+        })
+        .await
     }
 
-    async fn expand_wire(&self, template: &str) -> SecretResult<SecretString> {
-        expand_template(&WIRE_RE, template, |n| async move { self.get(&n).await }).await
+    async fn expand_wire(&self, template: &str, budget: IpcBudget) -> SecretResult<SecretString> {
+        expand_template(
+            &WIRE_RE,
+            template,
+            |n| async move { self.get(&n, budget).await },
+        )
+        .await
     }
 
     fn health(&self) -> Option<Arc<HubHealth>> {

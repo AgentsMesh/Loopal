@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use loopal_ipc::StdioTransport;
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
 use loopal_test_support::TestFixture;
@@ -14,7 +14,7 @@ use loopal_test_support::mock_provider::MultiCallProvider;
 async fn start_test_server(
     calls: Vec<Vec<Result<loopal_provider_api::StreamChunk, loopal_error::LoopalError>>>,
 ) -> (
-    Arc<Connection>,
+    Arc<Connection<Listening>>,
     tokio::sync::mpsc::Receiver<Incoming>,
     TestFixture,
 ) {
@@ -42,8 +42,7 @@ async fn start_test_server(
                 .await;
     });
 
-    let client = Arc::new(Connection::new(client_transport));
-    let rx = client.start();
+    let (client, rx) = Connection::new(client_transport).into_listening();
     (client, rx, fixture)
 }
 

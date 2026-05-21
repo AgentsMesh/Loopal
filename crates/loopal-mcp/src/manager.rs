@@ -62,7 +62,12 @@ impl McpManager {
     ) -> Vec<McpConnection> {
         let mut prepared = Vec::new();
         for (name, cfg) in configs {
-            let resolved = expand_mcp_config(cfg.clone(), self.secret_client.as_ref()).await;
+            let resolved = expand_mcp_config(
+                cfg.clone(),
+                self.secret_client.as_ref(),
+                loopal_ipc::HUB_RPC_BUDGET,
+            )
+            .await;
             if !resolved.enabled() {
                 info!(server = %name, "MCP server disabled, skipping");
                 continue;

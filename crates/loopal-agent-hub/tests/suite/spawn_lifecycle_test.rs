@@ -29,11 +29,8 @@ async fn register_agent_connection_makes_agent_routable() {
 
     // Create mock agent connection (duplex pair)
     let (agent_client, agent_server) = loopal_ipc::duplex_pair();
-    let agent_conn = Arc::new(Connection::new(agent_client));
-    let server_conn = Arc::new(Connection::new(agent_server));
-
-    let agent_rx = agent_conn.start();
-    let server_rx = server_conn.start();
+    let (agent_conn, agent_rx) = Connection::new(agent_client).into_listening();
+    let (server_conn, server_rx) = Connection::new(agent_server).into_listening();
 
     // Register via testable API
     let agent_id = register_agent_connection(
@@ -115,11 +112,8 @@ async fn wait_agent_returns_when_agent_disconnects() {
 
     // Create mock agent
     let (agent_client, agent_server) = loopal_ipc::duplex_pair();
-    let agent_conn = Arc::new(Connection::new(agent_client));
-    let server_conn = Arc::new(Connection::new(agent_server));
-
-    let _agent_rx = agent_conn.start();
-    let server_rx = server_conn.start();
+    let (_agent_conn, _agent_rx) = Connection::new(agent_client).into_listening();
+    let (server_conn, server_rx) = Connection::new(agent_server).into_listening();
 
     let _ = register_agent_connection(
         hub.clone(),
@@ -184,11 +178,9 @@ async fn spawned_agent_routes_message_to_parent() {
 
     // Mock child agent (registered as if spawned by Hub)
     let (child_client, child_server) = loopal_ipc::duplex_pair();
-    let child_conn = Arc::new(Connection::new(child_client));
-    let server_conn = Arc::new(Connection::new(child_server));
+    let (child_conn, _child_rx) = Connection::new(child_client).into_listening();
+    let (server_conn, server_rx) = Connection::new(child_server).into_listening();
 
-    let _child_rx = child_conn.start();
-    let server_rx = server_conn.start();
     let _ = register_agent_connection(
         hub.clone(),
         "child",

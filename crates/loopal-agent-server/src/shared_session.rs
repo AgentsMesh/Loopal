@@ -11,14 +11,14 @@ use std::sync::{Arc, Weak};
 use tokio::sync::Mutex;
 
 use loopal_agent::AgentShared;
-use loopal_ipc::connection::Connection;
+use loopal_ipc::connection::{Connection, Listening};
 use loopal_protocol::InterruptSignal;
 use loopal_runtime::agent_input::AgentInput;
 
 /// A connected client handle within a shared session.
 pub struct ClientHandle {
     pub id: String,
-    pub connection: Arc<Connection>,
+    pub connection: Arc<Connection<Listening>>,
     /// True if this is the primary client (handles permissions/questions).
     pub is_primary: bool,
 }
@@ -75,7 +75,7 @@ impl SharedSession {
     }
 
     /// Add a client to this session. First client becomes primary.
-    pub async fn add_client(&self, id: String, connection: Arc<Connection>) {
+    pub async fn add_client(&self, id: String, connection: Arc<Connection<Listening>>) {
         let mut clients = self.clients.lock().await;
         let is_primary = clients.is_empty();
         clients.push(ClientHandle {
@@ -100,7 +100,7 @@ impl SharedSession {
     }
 
     /// Get the primary client's connection (for permission/question routing).
-    pub async fn primary_connection(&self) -> Option<Arc<Connection>> {
+    pub async fn primary_connection(&self) -> Option<Arc<Connection<Listening>>> {
         self.clients
             .lock()
             .await
@@ -110,7 +110,7 @@ impl SharedSession {
     }
 
     /// Get all client connections (for event broadcast).
-    pub async fn all_connections(&self) -> Vec<Arc<Connection>> {
+    pub async fn all_connections(&self) -> Vec<Arc<Connection<Listening>>> {
         self.clients
             .lock()
             .await

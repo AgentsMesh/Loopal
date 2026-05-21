@@ -8,7 +8,7 @@ use tokio::sync::mpsc;
 
 use loopal_agent_hub::{Hub, hub_server, start_event_loop};
 use loopal_ipc::TcpTransport;
-use loopal_ipc::connection::Connection;
+use loopal_ipc::connection::{Connection, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
 
@@ -25,13 +25,12 @@ async fn make_hub_with_tcp() -> (Arc<Mutex<Hub>>, u16, String) {
     (hub, port, token)
 }
 
-async fn connect_and_register(port: u16, token: &str, name: &str) -> Arc<Connection> {
+async fn connect_and_register(port: u16, token: &str, name: &str) -> Arc<Connection<Listening>> {
     let stream = TcpStream::connect(format!("127.0.0.1:{port}"))
         .await
         .unwrap();
     let transport: Arc<dyn Transport> = Arc::new(TcpTransport::new(stream));
-    let conn = Arc::new(Connection::new(transport));
-    let _rx = conn.start();
+    let (conn, _rx) = Connection::new(transport).into_listening();
     let resp = conn
         .send_request(
             methods::HUB_REGISTER.name,

@@ -23,8 +23,8 @@ async fn tcp_valid_token_accepted() {
         let token = token.clone();
         async move {
             let (transport, _) = listener.accept().await.unwrap();
-            let conn = Arc::new(Connection::new(Arc::new(transport) as Arc<dyn Transport>));
-            let mut rx = conn.start();
+            let (conn, mut rx) =
+                Connection::new(Arc::new(transport) as Arc<dyn Transport>).into_listening();
             // Read initialize request
             let msg = rx.recv().await.unwrap();
             if let loopal_ipc::connection::Incoming::Request { id, params, .. } = msg {
@@ -41,10 +41,8 @@ async fn tcp_valid_token_accepted() {
     let stream = tokio::net::TcpStream::connect(format!("127.0.0.1:{port}"))
         .await
         .unwrap();
-    let client = Arc::new(Connection::new(
-        Arc::new(TcpTransport::new(stream)) as Arc<dyn Transport>
-    ));
-    let _rx = client.start();
+    let (client, _rx) =
+        Connection::new(Arc::new(TcpTransport::new(stream)) as Arc<dyn Transport>).into_listening();
     let resp = tokio::time::timeout(
         T,
         client.send_request(
@@ -70,8 +68,8 @@ async fn tcp_wrong_token_rejected() {
 
     let server = tokio::spawn(async move {
         let (transport, _) = listener.accept().await.unwrap();
-        let conn = Arc::new(Connection::new(Arc::new(transport) as Arc<dyn Transport>));
-        let mut rx = conn.start();
+        let (conn, mut rx) =
+            Connection::new(Arc::new(transport) as Arc<dyn Transport>).into_listening();
         let msg = rx.recv().await.unwrap();
         if let loopal_ipc::connection::Incoming::Request { id, params, .. } = msg {
             let client_token = params["token"].as_str().unwrap_or("");
@@ -85,10 +83,8 @@ async fn tcp_wrong_token_rejected() {
     let stream = tokio::net::TcpStream::connect(format!("127.0.0.1:{port}"))
         .await
         .unwrap();
-    let client = Arc::new(Connection::new(
-        Arc::new(TcpTransport::new(stream)) as Arc<dyn Transport>
-    ));
-    let _rx = client.start();
+    let (client, _rx) =
+        Connection::new(Arc::new(TcpTransport::new(stream)) as Arc<dyn Transport>).into_listening();
     // send_request with wrong token — server responds with JSON-RPC error
     let result = tokio::time::timeout(
         T,
@@ -127,8 +123,8 @@ async fn tcp_multiple_clients_sequential() {
     let server = tokio::spawn(async move {
         for i in 0..3 {
             let (transport, _) = listener.accept().await.unwrap();
-            let conn = Arc::new(Connection::new(Arc::new(transport) as Arc<dyn Transport>));
-            let mut rx = conn.start();
+            let (conn, mut rx) =
+                Connection::new(Arc::new(transport) as Arc<dyn Transport>).into_listening();
             let msg = rx.recv().await.unwrap();
             if let loopal_ipc::connection::Incoming::Request { id, params, .. } = msg {
                 let client_id = params["client_id"].as_i64().unwrap();
@@ -144,10 +140,9 @@ async fn tcp_multiple_clients_sequential() {
         let stream = tokio::net::TcpStream::connect(format!("127.0.0.1:{port}"))
             .await
             .unwrap();
-        let client = Arc::new(Connection::new(
-            Arc::new(TcpTransport::new(stream)) as Arc<dyn Transport>
-        ));
-        let _rx = client.start();
+        let (client, _rx) =
+            Connection::new(Arc::new(TcpTransport::new(stream)) as Arc<dyn Transport>)
+                .into_listening();
         let resp = tokio::time::timeout(
             T,
             client.send_request("hello", serde_json::json!({"client_id": i})),

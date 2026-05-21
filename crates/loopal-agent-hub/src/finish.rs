@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 
-use loopal_ipc::connection::Connection;
+use loopal_ipc::connection::{Connection, Listening};
 use loopal_protocol::{Envelope, MessageSource, QualifiedAddress};
 
 use crate::hub::Hub;
@@ -18,7 +18,7 @@ pub async fn finish_and_deliver(
     hub: &Arc<Mutex<Hub>>,
     name: &str,
     output: Option<String>,
-    conn: &Arc<Connection>,
+    conn: &Arc<Connection<Listening>>,
 ) {
     let output_text = output.as_deref().unwrap_or("(no output)").to_string();
 

@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use loopal_agent_hub::Hub;
 use loopal_agent_hub::dispatch::dispatch_hub_request;
-use loopal_ipc::Connection;
 use loopal_ipc::connection::Incoming;
+use loopal_ipc::{Connection, Listening};
 use tokio::sync::Mutex;
 
 pub const ED25519_UNENCRYPTED: &str = "-----BEGIN OPENSSH PRIVATE KEY-----
@@ -34,10 +34,10 @@ pub fn write_key_0600(path: &std::path::Path, content: &str) {
 
 pub fn spawn_hub_dispatch_loop(
     hub: Arc<Mutex<Hub>>,
-    hub_conn: Arc<Connection>,
+    hub_conn: Arc<Connection<Listening>>,
+    mut rx: tokio::sync::mpsc::Receiver<Incoming>,
     from_agent: String,
 ) {
-    let mut rx = hub_conn.start();
     let conn = hub_conn.clone();
     tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {

@@ -3,12 +3,17 @@
 use std::sync::Arc;
 
 use loopal_ipc::StdioTransport;
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
+use tokio::sync::mpsc;
 
 use loopal_agent_client::AgentClient;
 
-fn make_pair() -> (Arc<dyn loopal_ipc::transport::Transport>, Arc<Connection>) {
+fn make_pair() -> (
+    Arc<dyn loopal_ipc::transport::Transport>,
+    Arc<Connection<Listening>>,
+    mpsc::Receiver<Incoming>,
+) {
     let (a_tx, a_rx) = tokio::io::duplex(8192);
     let (b_tx, b_rx) = tokio::io::duplex(8192);
     let client_transport: Arc<dyn loopal_ipc::transport::Transport> = Arc::new(
@@ -17,15 +22,13 @@ fn make_pair() -> (Arc<dyn loopal_ipc::transport::Transport>, Arc<Connection>) {
     let server_transport: Arc<dyn loopal_ipc::transport::Transport> = Arc::new(
         StdioTransport::new(Box::new(tokio::io::BufReader::new(a_rx)), Box::new(b_tx)),
     );
-    let server_conn = Arc::new(Connection::new(server_transport));
-    (client_transport, server_conn)
+    let (server_conn, server_rx) = Connection::new(server_transport).into_listening();
+    (client_transport, server_conn, server_rx)
 }
 
 #[tokio::test]
 async fn initialize_sends_correct_request() {
-    let (transport, server) = make_pair();
-    let mut server_rx = server.start();
-
+    let (transport, server, mut server_rx) = make_pair();
     let client = AgentClient::new(transport);
 
     let server_clone = server.clone();
@@ -44,8 +47,7 @@ async fn initialize_sends_correct_request() {
 
 #[tokio::test]
 async fn recv_delivers_agent_events() {
-    let (transport, server) = make_pair();
-    let _server_rx = server.start();
+    let (transport, server, _server_rx) = make_pair();
     let mut client = AgentClient::new(transport);
 
     // Server sends event notification
@@ -77,8 +79,7 @@ async fn recv_delivers_agent_events() {
 
 #[tokio::test]
 async fn into_parts_transfers_connection() {
-    let (transport, server) = make_pair();
-    let _server_rx = server.start();
+    let (transport, server, _server_rx) = make_pair();
     let client = AgentClient::new(transport);
 
     let (conn, mut rx) = client.into_parts();

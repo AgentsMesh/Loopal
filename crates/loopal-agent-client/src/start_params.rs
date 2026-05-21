@@ -18,7 +18,7 @@ pub struct StartAgentParams {
     pub fork_context: Option<Value>,
 }
 
-pub(crate) fn encode(p: &StartAgentParams) -> Value {
+pub fn encode(p: &StartAgentParams) -> Value {
     let mut params = serde_json::json!({
         "cwd": p.cwd.to_string_lossy(),
         "model": p.model,

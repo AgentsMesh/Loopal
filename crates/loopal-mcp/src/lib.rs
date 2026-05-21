@@ -18,6 +18,7 @@ pub use client::McpClient;
 pub use connection::McpConnection;
 pub use handler::SamplingCallback;
 pub use local_provider::LocalMcpProvider;
+pub use loopal_ipc::{HUB_RPC_BUDGET, IpcBudget};
 pub use manager::McpManager;
 pub use manager_query::McpConnectionSnapshot;
 pub use provider::McpProvider;

@@ -3,9 +3,18 @@
 use std::sync::Arc;
 
 use loopal_ipc::StdioTransport;
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
+use tokio::sync::mpsc;
 
-fn connection_pair() -> (Arc<Connection>, Arc<Connection>) {
+struct ConnPair {
+    client: Arc<Connection<Listening>>,
+    #[allow(dead_code)]
+    client_rx: mpsc::Receiver<Incoming>,
+    server: Arc<Connection<Listening>>,
+    server_rx: mpsc::Receiver<Incoming>,
+}
+
+fn connection_pair() -> ConnPair {
     let (a_tx, a_rx) = tokio::io::duplex(4096);
     let (b_tx, b_rx) = tokio::io::duplex(4096);
     let ta: Arc<dyn loopal_ipc::transport::Transport> = Arc::new(StdioTransport::new(
@@ -16,7 +25,14 @@ fn connection_pair() -> (Arc<Connection>, Arc<Connection>) {
         Box::new(tokio::io::BufReader::new(a_rx)),
         Box::new(b_tx),
     ));
-    (Arc::new(Connection::new(ta)), Arc::new(Connection::new(tb)))
+    let (client, client_rx) = Connection::new(ta).into_listening();
+    let (server, server_rx) = Connection::new(tb).into_listening();
+    ConnPair {
+        client,
+        client_rx,
+        server,
+        server_rx,
+    }
 }
 
 #[tokio::test]
@@ -28,8 +44,7 @@ async fn pending_requests_cleared_on_eof() {
         Box::new(tokio::io::BufReader::new(b_rx)),
         Box::new(a_tx),
     ));
-    let client = Arc::new(Connection::new(ta));
-    let _client_rx = client.start();
+    let (client, _client_rx) = Connection::new(ta).into_listening();
 
     // Drop the other end to cause EOF
     drop(b_tx);
@@ -52,9 +67,12 @@ async fn pending_requests_cleared_on_eof() {
 
 #[tokio::test]
 async fn concurrent_requests_each_get_correct_response() {
-    let (client, server) = connection_pair();
-    let mut server_rx = server.start();
-    let _client_rx = client.start();
+    let ConnPair {
+        client,
+        server,
+        mut server_rx,
+        ..
+    } = connection_pair();
 
     // Server echoes back with the request ID embedded
     let server_clone = server.clone();
@@ -96,8 +114,7 @@ async fn incoming_channel_returns_none_on_eof() {
         Box::new(tokio::io::BufReader::new(b_rx)),
         Box::new(a_tx),
     ));
-    let conn = Arc::new(Connection::new(t));
-    let mut rx = conn.start();
+    let (_conn, mut rx) = Connection::new(t).into_listening();
 
     // Drop sender side → EOF
     drop(_b_tx);

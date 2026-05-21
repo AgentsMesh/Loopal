@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 
-use loopal_ipc::connection::Connection;
+use loopal_ipc::connection::{Connection, Listening};
 use loopal_protocol::Envelope;
 use loopal_view_state::ViewStateReducer;
 use tokio::sync::Mutex;
@@ -28,7 +28,7 @@ impl AgentRegistry {
             .count()
     }
 
-    pub fn get_agent_connection(&self, name: &str) -> Option<Arc<Connection>> {
+    pub fn get_agent_connection(&self, name: &str) -> Option<Arc<Connection<Listening>>> {
         self.agents.get(name).and_then(|a| a.state.connection())
     }
 
@@ -38,7 +38,7 @@ impl AgentRegistry {
         self.agents.get(name).map(|a| a.view.clone())
     }
 
-    pub fn all_agent_connections(&self) -> Vec<(String, Arc<Connection>)> {
+    pub fn all_agent_connections(&self) -> Vec<(String, Arc<Connection<Listening>>)> {
         self.agents
             .iter()
             .filter_map(|(n, a)| a.state.connection().map(|c| (n.clone(), c)))

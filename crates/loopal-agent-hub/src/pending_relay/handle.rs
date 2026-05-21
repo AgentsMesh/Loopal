@@ -4,7 +4,7 @@ use tokio::sync::Mutex;
 use tracing::warn;
 use uuid::Uuid;
 
-use loopal_ipc::connection::Connection;
+use loopal_ipc::connection::{Connection, Listening};
 use loopal_protocol::{AgentEvent, AgentEventPayload, QualifiedAddress, Question};
 
 use super::types::{FastPath, PendingPermissionInfo, PendingQuestionInfo};
@@ -12,7 +12,7 @@ use crate::hub::Hub;
 
 pub async fn handle_agent_permission(
     hub: &Arc<Mutex<Hub>>,
-    agent_conn: Arc<Connection>,
+    agent_conn: Arc<Connection<Listening>>,
     agent_ipc_id: i64,
     params: serde_json::Value,
     agent_name: &str,
@@ -88,7 +88,7 @@ pub async fn handle_agent_permission(
 
 pub async fn handle_agent_question(
     hub: &Arc<Mutex<Hub>>,
-    agent_conn: Arc<Connection>,
+    agent_conn: Arc<Connection<Listening>>,
     agent_ipc_id: i64,
     params: serde_json::Value,
     agent_name: &str,

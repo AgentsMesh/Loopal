@@ -18,8 +18,7 @@ async fn join_fails_when_no_active_session() {
         let _ = loopal_agent_server::run_test_connection(server_t, h).await;
     });
 
-    let client = Arc::new(Connection::new(client_t));
-    let _rx = client.start();
+    let (client, _rx) = Connection::new(client_t).into_listening();
     init_client(&client).await;
 
     let t = std::time::Duration::from_secs(10);

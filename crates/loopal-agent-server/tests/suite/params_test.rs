@@ -4,14 +4,15 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use loopal_ipc::StdioTransport;
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 
-fn ipc_pair() -> (
-    Arc<Connection>,
+type ConnAndRx = (
+    Arc<Connection<Listening>>,
     tokio::sync::mpsc::Receiver<Incoming>,
-    Arc<Connection>,
-) {
+);
+
+fn ipc_pair() -> (ConnAndRx, ConnAndRx) {
     let (a_tx, a_rx) = tokio::io::duplex(8192);
     let (b_tx, b_rx) = tokio::io::duplex(8192);
     let ta: Arc<dyn loopal_ipc::transport::Transport> = Arc::new(StdioTransport::new(
@@ -22,10 +23,9 @@ fn ipc_pair() -> (
         Box::new(tokio::io::BufReader::new(a_rx)),
         Box::new(b_tx),
     ));
-    let sa = Arc::new(Connection::new(ta));
-    let sb = Arc::new(Connection::new(tb));
-    let ra = sa.start();
-    (sa, ra, sb)
+    let (sa, ra) = Connection::new(ta).into_listening();
+    let (sb, rb) = Connection::new(tb).into_listening();
+    ((sa, ra), (sb, rb))
 }
 
 /// Verify model override from start_agent reaches the agent config.
@@ -48,8 +48,7 @@ async fn model_override_propagated_via_ipc() {
 /// Event forwarder: events sent to parent_event_tx arrive via IPC.
 #[tokio::test]
 async fn event_forwarder_delivers_sub_agent_events() {
-    let (server_conn, _server_rx, client_conn) = ipc_pair();
-    let mut client_rx = client_conn.start();
+    let ((server_conn, _server_rx), (_client_conn, mut client_rx)) = ipc_pair();
 
     // Simulate what params.rs does: create event channel + forwarder task
     let (event_tx, mut event_rx) = tokio::sync::mpsc::channel::<loopal_protocol::AgentEvent>(256);

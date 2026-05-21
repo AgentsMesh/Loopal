@@ -113,7 +113,13 @@ impl AgentLoopRunner {
 
     async fn collect_mcp_snapshots(&self) -> Vec<McpServerSnapshot> {
         let source_map = self.load_mcp_source_map();
-        let snapshots = self.params.deps.kernel.mcp_provider().snapshot().await;
+        let snapshots = self
+            .params
+            .deps
+            .kernel
+            .mcp_provider()
+            .snapshot(loopal_mcp::HUB_RPC_BUDGET)
+            .await;
         snapshots
             .into_iter()
             .map(|s| McpServerSnapshot {
@@ -160,7 +166,7 @@ async fn collect_mcp_snapshots_via_provider(
     };
     kernel
         .mcp_provider()
-        .snapshot()
+        .snapshot(loopal_mcp::HUB_RPC_BUDGET)
         .await
         .into_iter()
         .map(|s| McpServerSnapshot {

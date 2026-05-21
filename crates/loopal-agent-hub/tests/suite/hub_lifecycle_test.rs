@@ -7,7 +7,7 @@ use tokio::sync::{Mutex, mpsc};
 
 use loopal_agent_hub::Hub;
 use loopal_agent_hub::hub_server;
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::rpc_error::RpcError;
 use loopal_protocol::AgentEvent;
@@ -18,7 +18,7 @@ fn make_hub() -> (Arc<Mutex<Hub>>, mpsc::Receiver<AgentEvent>) {
     (Arc::new(Mutex::new(Hub::new(tx))), rx)
 }
 
-fn spawn_mock_agent(conn: Arc<Connection>, mut rx: mpsc::Receiver<Incoming>) {
+fn spawn_mock_agent(conn: Arc<Connection<Listening>>, mut rx: mpsc::Receiver<Incoming>) {
     tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
             if let Incoming::Request { id, .. } = msg {
@@ -75,8 +75,7 @@ async fn tcp_invalid_token_rejected() {
         .await
         .unwrap();
     let transport: Arc<dyn loopal_ipc::Transport> = Arc::new(loopal_ipc::TcpTransport::new(stream));
-    let conn = Arc::new(loopal_ipc::Connection::new(transport));
-    let _rx = conn.start();
+    let (conn, _rx) = loopal_ipc::Connection::new(transport).into_listening();
 
     let result = conn
         .send_request(

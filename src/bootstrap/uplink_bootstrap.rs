@@ -31,8 +31,7 @@ pub async fn connect_to_meta_hub(
 
     let stream = TcpStream::connect(meta_addr).await?;
     let transport: Arc<dyn loopal_ipc::transport::Transport> = Arc::new(TcpTransport::new(stream));
-    let conn = Arc::new(Connection::new(transport));
-    let rx = conn.start();
+    let (conn, rx) = Connection::new(transport).into_listening();
 
     let resp = conn
         .send_request(

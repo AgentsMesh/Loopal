@@ -10,7 +10,7 @@ use tokio::sync::{Mutex, mpsc};
 
 use loopal_agent_hub::Hub;
 use loopal_agent_hub::agent_io::agent_io_loop;
-use loopal_ipc::connection::Connection;
+use loopal_ipc::connection::{Connection, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_protocol::AgentEvent;
 use serde_json::json;
@@ -19,17 +19,19 @@ type IoHandle = tokio::task::JoinHandle<Option<String>>;
 
 /// Set up a Hub + duplex connection + spawn agent_io_loop. Returns the
 /// client-side connection (to send notifications) and the io_loop join handle.
-async fn setup_agent(name: &str) -> (Arc<Connection>, IoHandle) {
+async fn setup_agent(name: &str) -> (Arc<Connection<Listening>>, IoHandle) {
     let (tx, _rx) = mpsc::channel::<AgentEvent>(64);
     let hub = Arc::new(Mutex::new(Hub::new(tx)));
     let (agent_side, hub_side) = loopal_ipc::duplex_pair();
-    let agent_conn = Arc::new(Connection::new(agent_side));
-    let hub_conn = Arc::new(Connection::new(hub_side));
-    let _agent_rx = agent_conn.start();
-    let hub_rx = hub_conn.start();
+    let (agent_conn, _agent_rx) = Connection::new(agent_side).into_listening();
+    let (hub_conn, hub_rx) = Connection::new(hub_side).into_listening();
+
     let hc = hub_conn.clone();
     let n = name.to_string();
-    let handle = tokio::spawn(async move { agent_io_loop(hub, hc, hub_rx, n).await });
+    let dispatcher = Arc::new(loopal_agent_hub::dispatch::build_hub_dispatcher(
+        hub.clone(),
+    ));
+    let handle = tokio::spawn(async move { agent_io_loop(hub, dispatcher, hc, hub_rx, n).await });
     (agent_conn, handle)
 }
 

@@ -6,7 +6,7 @@ use tokio::sync::{Mutex, mpsc};
 
 use loopal_agent_hub::Hub;
 use loopal_agent_hub::spawn_manager::register_agent_connection;
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_protocol::AgentEvent;
 use serde_json::json;
 
@@ -22,12 +22,10 @@ pub async fn wire_hub_to_meta(
     hub_name: &str,
     hub: &Arc<Mutex<Hub>>,
     meta_hub: &Arc<Mutex<MetaHub>>,
-) -> Arc<Connection> {
+) -> Arc<Connection<Listening>> {
     let (hub_transport, meta_transport) = loopal_ipc::duplex_pair();
-    let hub_conn = Arc::new(Connection::new(hub_transport));
-    let meta_conn = Arc::new(Connection::new(meta_transport));
-    let hub_rx = hub_conn.start();
-    let meta_rx = meta_conn.start();
+    let (hub_conn, hub_rx) = Connection::new(hub_transport).into_listening();
+    let (meta_conn, meta_rx) = Connection::new(meta_transport).into_listening();
 
     {
         let mut mh = meta_hub.lock().await;
@@ -64,12 +62,10 @@ pub async fn register_mock_agent(
     hub: &Arc<Mutex<Hub>>,
     name: &str,
     parent: Option<&str>,
-) -> (Arc<Connection>, mpsc::Receiver<Incoming>) {
+) -> (Arc<Connection<Listening>>, mpsc::Receiver<Incoming>) {
     let (client_transport, server_transport) = loopal_ipc::duplex_pair();
-    let server_conn = Arc::new(Connection::new(server_transport));
-    let client_conn = Arc::new(Connection::new(client_transport));
-    let server_rx = server_conn.start();
-    let client_rx = client_conn.start();
+    let (server_conn, server_rx) = Connection::new(server_transport).into_listening();
+    let (client_conn, client_rx) = Connection::new(client_transport).into_listening();
 
     let _ = register_agent_connection(
         hub.clone(),

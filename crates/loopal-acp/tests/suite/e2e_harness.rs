@@ -81,8 +81,7 @@ pub async fn build_acp_harness(
     let ui_session = UiSession::connect(hub.clone(), "acp").await;
 
     // 5. Connect to agent, initialize + start it
-    let agent_conn = Arc::new(Connection::new(agent_transport));
-    let agent_incoming = agent_conn.start();
+    let (agent_conn, agent_incoming) = Connection::new(agent_transport).into_listening();
     let _ = agent_conn
         .send_request("initialize", serde_json::json!({"protocol_version": 1}))
         .await;
@@ -95,7 +94,16 @@ pub async fn build_acp_harness(
         let mut h = hub.lock().await;
         let _ = h.registry.register_connection("main", agent_conn.clone());
     }
-    loopal_agent_hub::agent_io::spawn_io_loop(hub.clone(), "main", agent_conn, agent_incoming);
+    let dispatcher = Arc::new(loopal_agent_hub::dispatch::build_hub_dispatcher(
+        hub.clone(),
+    ));
+    loopal_agent_hub::agent_io::spawn_io_loop(
+        hub.clone(),
+        dispatcher,
+        "main",
+        agent_conn,
+        agent_incoming,
+    );
 
     // 7. Spawn ACP adapter using UiSession
     let acp_out = Arc::new(JsonRpcTransport::with_writer(Box::new(acp_write)));

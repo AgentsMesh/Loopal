@@ -9,11 +9,11 @@ use std::sync::Arc;
 
 use tokio::sync::broadcast;
 
-use loopal_ipc::connection::Connection;
+use loopal_ipc::connection::{Connection, Listening};
 use loopal_protocol::AgentEvent;
 
 pub struct UiDispatcher {
-    pub(crate) clients: HashMap<String, Arc<Connection>>,
+    pub(crate) clients: HashMap<String, Arc<Connection<Listening>>>,
     pub(crate) event_broadcast: broadcast::Sender<AgentEvent>,
 }
 
@@ -32,7 +32,7 @@ impl UiDispatcher {
         }
     }
 
-    pub fn register_client(&mut self, name: &str, conn: Arc<Connection>) {
+    pub fn register_client(&mut self, name: &str, conn: Arc<Connection<Listening>>) {
         self.clients.insert(name.to_string(), conn);
         tracing::info!(client = %name, "registered UI client");
     }

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use loopal_ipc::connection::Connection;
+use loopal_ipc::connection::{Connection, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::rpc_error::RpcError;
 use loopal_protocol::{ControlCommand, Envelope, MessageSource, ROOT_AGENT_NAME, UserContent};
@@ -8,11 +8,11 @@ use serde_json::Value;
 use tracing::warn;
 
 pub struct HubClient {
-    conn: Arc<Connection>,
+    conn: Arc<Connection<Listening>>,
 }
 
 impl HubClient {
-    pub fn new(conn: Arc<Connection>) -> Self {
+    pub fn new(conn: Arc<Connection<Listening>>) -> Self {
         Self { conn }
     }
 
@@ -100,7 +100,7 @@ impl HubClient {
         }
     }
 
-    pub fn connection(&self) -> &Arc<Connection> {
+    pub fn connection(&self) -> &Arc<Connection<Listening>> {
         &self.conn
     }
 }

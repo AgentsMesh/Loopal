@@ -27,7 +27,17 @@ pub async fn append_runtime_sections(prompt: &mut String, kernel: &Kernel) {
     // when those tools haven't arrived yet.
     let configured: Vec<_> = kernel.settings().mcp_servers.keys().cloned().collect();
     if !configured.is_empty() {
-        let snapshots = kernel.mcp_provider().snapshot().await;
+        // reason: snapshot() on McpProxyClient is reverse IPC back to the
+        // hub. We are on the synchronous `agent/start` response path; if the
+        // reverse channel is not yet draining (bootstrap regression), this
+        // would block. IpcBudget::forbidden() forces the proxy to reject
+        // immediately without any wire I/O — LocalMcpProvider ignores the
+        // budget and returns the in-process snapshot normally. Either way,
+        // MCP status is only a hint for the LLM, not load-bearing data.
+        let snapshots = kernel
+            .mcp_provider()
+            .snapshot(loopal_mcp::IpcBudget::Forbidden)
+            .await;
         let mut by_name: std::collections::HashMap<String, String> =
             snapshots.into_iter().map(|s| (s.name, s.status)).collect();
         prompt.push_str("\n\n# MCP Server Status\n");

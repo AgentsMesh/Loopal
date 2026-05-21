@@ -14,11 +14,11 @@ use tokio::sync::Mutex;
 use tokio::sync::mpsc;
 
 use loopal_agent_hub::{Hub, hub_server, start_event_loop};
-use loopal_ipc::Connection;
 use loopal_ipc::TcpTransport;
 use loopal_ipc::connection::Incoming;
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
+use loopal_ipc::{Connection, Listening};
 use loopal_protocol::{AgentEvent, AgentEventPayload, QualifiedAddress};
 
 async fn make_hub() -> (Arc<Mutex<Hub>>, mpsc::Sender<AgentEvent>, u16, String) {
@@ -36,8 +36,7 @@ async fn make_hub() -> (Arc<Mutex<Hub>>, mpsc::Sender<AgentEvent>, u16, String) 
 
 async fn register_test_agent(hub: &Arc<Mutex<Hub>>, name: &str) {
     let (_t1, t2) = loopal_ipc::duplex_pair();
-    let conn = Arc::new(Connection::new(t2));
-    let _rx = conn.start();
+    let (conn, _rx) = Connection::new(t2).into_listening();
     hub.lock()
         .await
         .registry
@@ -49,13 +48,12 @@ async fn connect_ui(
     port: u16,
     token: &str,
     name: &str,
-) -> (Arc<Connection>, mpsc::Receiver<Incoming>) {
+) -> (Arc<Connection<Listening>>, mpsc::Receiver<Incoming>) {
     let stream = TcpStream::connect(format!("127.0.0.1:{port}"))
         .await
         .unwrap();
     let transport: Arc<dyn Transport> = Arc::new(TcpTransport::new(stream));
-    let conn = Arc::new(Connection::new(transport));
-    let rx = conn.start();
+    let (conn, rx) = Connection::new(transport).into_listening();
     let resp = conn
         .send_request(
             methods::HUB_REGISTER.name,

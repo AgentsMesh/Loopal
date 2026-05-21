@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::info;
 
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
 use loopal_protocol::{AgentEvent, ControlCommand, Envelope};
@@ -14,14 +14,13 @@ use crate::start_params::{StartAgentParams, encode};
 
 /// High-level agent IPC client.
 pub struct AgentClient {
-    connection: Arc<Connection>,
+    connection: Arc<Connection<Listening>>,
     incoming_rx: mpsc::Receiver<Incoming>,
 }
 
 impl AgentClient {
     pub fn new(transport: Arc<dyn Transport>) -> Self {
-        let connection = Arc::new(Connection::new(transport));
-        let incoming_rx = connection.start();
+        let (connection, incoming_rx) = Connection::new(transport).into_listening();
         Self {
             connection,
             incoming_rx,
@@ -75,18 +74,33 @@ impl AgentClient {
         unreachable!()
     }
 
-    /// Send `agent/start` to begin the agent loop.
+    /// Send `agent/start` to begin the agent loop using the client's own
+    /// connection and a 30s default timeout. Callers needing a different
+    /// budget or a hand-owned `Connection` (e.g. after `into_parts`) should
+    /// use [`AgentClient::start_agent_on`].
     pub async fn start_agent(&self, p: &StartAgentParams) -> anyhow::Result<String> {
-        // reason: agent/start no longer blocks on MCP spawn (LOOPAL_MCP_STARTUP_WAIT_SECS
-        // bounded wait, default 5s). 30s covers setup overhead + bounded wait + margin.
-        const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+        // reason: 30s covers process spawn + initialize + bounded MCP wait +
+        // margin. Hub bootstrap shortens this via start_agent_on to keep
+        // proxy(8s) < start_agent(20s) < HANDSHAKE(30s) layering intact.
+        const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+        Self::start_agent_on(&self.connection, p, DEFAULT_TIMEOUT).await
+    }
+
+    /// Send `agent/start` over a caller-supplied `Connection` with a
+    /// caller-supplied deadline. Stays in `AgentClient` so the RPC wire
+    /// shape (`agent/start` + `encode(p)` + `session_id` extraction) lives
+    /// in exactly one place.
+    pub async fn start_agent_on(
+        connection: &Connection<Listening>,
+        p: &StartAgentParams,
+        timeout: std::time::Duration,
+    ) -> anyhow::Result<String> {
         let result = tokio::time::timeout(
-            TIMEOUT,
-            self.connection
-                .send_request(methods::AGENT_START.name, encode(p)),
+            timeout,
+            connection.send_request(methods::AGENT_START.name, encode(p)),
         )
         .await
-        .map_err(|_| anyhow::anyhow!("agent/start timed out after {}s", TIMEOUT.as_secs()))?
+        .map_err(|_| anyhow::anyhow!("agent/start timed out after {}s", timeout.as_secs()))?
         .map_err(|e| anyhow::anyhow!("agent/start failed: {e}"))?;
         let session_id = result["session_id"]
             .as_str()
@@ -163,7 +177,7 @@ impl AgentClient {
     }
 
     /// Decompose into Connection + incoming receiver for bridge handoff.
-    pub fn into_parts(self) -> (Arc<Connection>, mpsc::Receiver<Incoming>) {
+    pub fn into_parts(self) -> (Arc<Connection<Listening>>, mpsc::Receiver<Incoming>) {
         (self.connection, self.incoming_rx)
     }
 }

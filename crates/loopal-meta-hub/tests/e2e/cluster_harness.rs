@@ -8,7 +8,7 @@ use tokio::sync::{Mutex, mpsc};
 
 use loopal_agent_client::AgentProcess;
 use loopal_agent_hub::{Hub, HubUplink};
-use loopal_ipc::connection::Connection;
+use loopal_ipc::connection::{Connection, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::tcp::TcpTransport;
 use loopal_protocol::AgentEvent;
@@ -53,7 +53,7 @@ pub struct HubHandle {
     pub hub: Arc<Mutex<Hub>>,
     pub event_rx: mpsc::Receiver<AgentEvent>,
     pub agent_proc: AgentProcess,
-    pub root_conn: Arc<Connection>,
+    pub root_conn: Arc<Connection<Listening>>,
 }
 
 impl HubHandle {
@@ -69,8 +69,7 @@ impl HubHandle {
             .expect("TCP connect to MetaHub");
         let transport: Arc<dyn loopal_ipc::transport::Transport> =
             Arc::new(TcpTransport::new(stream));
-        let conn = Arc::new(Connection::new(transport));
-        let rx = conn.start();
+        let (conn, rx) = Connection::new(transport).into_listening();
 
         // meta/register handshake
         let resp = conn
@@ -117,11 +116,16 @@ impl HubHandle {
 
         // Register in Hub
         let (root_conn, incoming_rx) = client.into_parts();
+        let dispatcher = std::sync::Arc::new(loopal_agent_hub::dispatch::build_hub_dispatcher(
+            hub.clone(),
+        ));
         loopal_agent_hub::agent_io::start_agent_io(
             hub.clone(),
+            dispatcher,
             "main",
             root_conn.clone(),
             incoming_rx,
+            None,
         );
 
         // Start event loop

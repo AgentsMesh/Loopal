@@ -14,6 +14,7 @@ rust_library(
         "//crates/loopal-git",
         "//crates/loopal-hooks",
         "//crates/loopal-kernel",
+        "//crates/loopal-mcp",
         "//crates/loopal-message",
         "//crates/loopal-protocol",
         "//crates/loopal-provider",

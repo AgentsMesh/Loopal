@@ -47,7 +47,7 @@ async fn hub_only_handshake_writes_discovery_and_socket() {
     let pid = child.id().expect("child pid");
     let stdout = child.stdout.take().expect("captured stdout");
 
-    let line = timeout(SPAWN_DEADLINE, read_first_line(stdout))
+    let line = timeout(SPAWN_DEADLINE, find_handshake_line(stdout))
         .await
         .expect("handshake timeout")
         .expect("read line");
@@ -87,11 +87,28 @@ async fn hub_only_handshake_writes_discovery_and_socket() {
     drop(child);
 }
 
-async fn read_first_line(stdout: tokio::process::ChildStdout) -> std::io::Result<String> {
+async fn find_handshake_line(stdout: tokio::process::ChildStdout) -> std::io::Result<String> {
+    // hub-only emits LOOPAL_HUB_ALIVE first, then LOOPAL_HUB_READY, then
+    // the legacy LOOPAL_HUB line — read until we find the legacy form
+    // (which carries all three fields in one line for back-compat).
     let mut reader = BufReader::new(stdout);
-    let mut line = String::new();
-    reader.read_line(&mut line).await?;
-    Ok(line.trim_end().to_string())
+    for _ in 0..64 {
+        let mut line = String::new();
+        let n = reader.read_line(&mut line).await?;
+        if n == 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "stdout closed before LOOPAL_HUB line",
+            ));
+        }
+        let trimmed = line.trim_end().to_string();
+        if trimmed.starts_with("LOOPAL_HUB ") {
+            return Ok(trimmed);
+        }
+    }
+    Err(std::io::Error::other(
+        "no LOOPAL_HUB line within 64 stdout lines",
+    ))
 }
 
 fn assert_record_owner_only(path: &std::path::Path) {

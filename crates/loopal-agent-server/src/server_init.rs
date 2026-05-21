@@ -5,7 +5,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::jsonrpc;
 use loopal_ipc::protocol::methods;
 
@@ -42,7 +42,7 @@ pub(crate) fn build_initialize_result() -> InitializeResult {
 }
 
 pub(crate) async fn wait_for_initialize_with_token(
-    connection: &Arc<Connection>,
+    connection: &Arc<Connection<Listening>>,
     rx: &mut tokio::sync::mpsc::Receiver<Incoming>,
     expected_token: Option<&str>,
 ) -> anyhow::Result<()> {
@@ -74,7 +74,7 @@ pub(crate) async fn wait_for_initialize_with_token(
 }
 
 pub(crate) async fn wait_for_initialize(
-    connection: &Arc<Connection>,
+    connection: &Arc<Connection<Listening>>,
     rx: &mut tokio::sync::mpsc::Receiver<Incoming>,
 ) -> anyhow::Result<()> {
     wait_for_initialize_with_token(connection, rx, None).await

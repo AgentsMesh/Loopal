@@ -4,7 +4,6 @@
 //! Companion file to `shadow_lifecycle_test.rs` (split for the 200-line
 //! file limit).
 
-use std::sync::Arc;
 use std::time::Duration;
 
 use loopal_agent_hub::spawn_manager::register_agent_connection;
@@ -23,10 +22,9 @@ async fn orphan_cascade_skips_shadows() {
     let (_p_conn, _) = register_mock_agent(&hub, "parent", None).await;
 
     let (real_client, real_server) = loopal_ipc::duplex_pair();
-    let real_conn = Arc::new(Connection::new(real_server));
-    let _real_client_conn = Arc::new(Connection::new(real_client));
-    let real_rx = real_conn.start();
-    let _real_client_rx = _real_client_conn.start();
+    let (real_conn, real_rx) = Connection::new(real_server).into_listening();
+    let (_real_client_conn, _real_client_rx) = Connection::new(real_client).into_listening();
+
     let _ = register_agent_connection(
         hub.clone(),
         "real-child",

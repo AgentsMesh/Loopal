@@ -18,6 +18,7 @@ mod multiprocess;
 mod server_mode;
 mod sub_agent_resume;
 mod token_channel;
+pub(crate) mod typestate;
 mod uplink_bootstrap;
 mod worktree_session;
 

@@ -116,6 +116,47 @@ rust_test(
     ],
 )
 
+# Hub-only deadlock regression — spawns `--hub-only` with a project settings
+# file that configures an unresponsive stdio MCP server. Detects the
+# reverse-IPC deadlock where hub_bootstrap awaits agent/start while
+# session_start's synchronous path tries to call hub/mcp/snapshot back.
+# `#[ignore]` until Phase 1 lands (run with `--ignored` to verify on main).
+rust_test(
+    name = "hub_only_mcp_deadlock_test",
+    srcs = ["tests/hub_only_mcp_deadlock_test.rs"],
+    edition = "2024",
+    data = [":loopal"],
+    env = {
+        "LOOPAL_BINARY": "$(rootpath :loopal)",
+    },
+    local = True,
+    deps = [
+        "@crates//:tokio",
+        "@crates//:tempfile",
+        "@crates//:serde_json",
+    ],
+)
+
+# Bootstrap typestate e2e — spawns `--hub-only` and asserts ALIVE/READY
+# emit within the layered handshake budget (proxy 8s < start_agent 20s <
+# handshake 30s). Skipping any state in the chain (bind_listener →
+# register_handlers → spawn_agent_process → start_root_agent) breaks the
+# guarantee and is caught here.
+rust_test(
+    name = "bootstrap_typestate_e2e_test",
+    srcs = ["tests/bootstrap_typestate_e2e_test.rs"],
+    edition = "2024",
+    data = [":loopal"],
+    env = {
+        "LOOPAL_BINARY": "$(rootpath :loopal)",
+    },
+    local = True,
+    deps = [
+        "@crates//:tokio",
+        "@crates//:tempfile",
+    ],
+)
+
 # Unit tests for #[cfg(test)] modules in src/ — currently covers the
 # CLI passthrough invariants (ChildPassthroughArgs::to_args completeness,
 # round-trip, parent-only-flag isolation, resume_intent, apply_overrides).

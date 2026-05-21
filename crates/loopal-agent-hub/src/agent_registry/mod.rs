@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use tokio::sync::{mpsc, watch};
 
-use loopal_ipc::connection::Connection;
+use loopal_ipc::connection::{Connection, Listening};
 use loopal_protocol::{AgentEvent, Envelope, QualifiedAddress};
 
 use crate::topology::AgentInfo;
@@ -53,14 +53,18 @@ impl AgentRegistry {
         );
     }
 
-    pub fn register_connection(&mut self, name: &str, conn: Arc<Connection>) -> Result<(), String> {
+    pub fn register_connection(
+        &mut self,
+        name: &str,
+        conn: Arc<Connection<Listening>>,
+    ) -> Result<(), String> {
         self.register_connection_with_parent(name, conn, None, None, None)
     }
 
     pub fn register_connection_with_parent(
         &mut self,
         name: &str,
-        conn: Arc<Connection>,
+        conn: Arc<Connection<Listening>>,
         parent: Option<QualifiedAddress>,
         model: Option<&str>,
         completion_tx: Option<mpsc::Sender<Envelope>>,

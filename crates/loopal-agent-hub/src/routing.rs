@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use loopal_ipc::connection::Connection;
+use loopal_ipc::connection::{Connection, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_protocol::{AgentEvent, AgentEventPayload, Envelope, MessageSource, QualifiedAddress};
 use tokio::sync::mpsc;
@@ -17,7 +17,7 @@ use tokio::sync::mpsc;
 /// On successful delivery a `MessageRouted` audit event is emitted
 /// after the response returns.
 pub async fn route_to_agent(
-    conn: &Arc<Connection>,
+    conn: &Arc<Connection<Listening>>,
     envelope: &Envelope,
     observation_tx: &mpsc::Sender<AgentEvent>,
 ) -> Result<(), String> {

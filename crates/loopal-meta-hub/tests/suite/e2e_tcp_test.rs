@@ -9,7 +9,7 @@ use tokio::sync::{Mutex, mpsc};
 
 use loopal_agent_hub::spawn_manager::register_agent_connection;
 use loopal_agent_hub::{Hub, HubUplink};
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::tcp::TcpTransport;
 use loopal_protocol::AgentEvent;
@@ -45,11 +45,10 @@ async fn join_hub_tcp(
     meta_addr: &str,
     token: &str,
     hub_name: &str,
-) -> Arc<Connection> {
+) -> Arc<Connection<Listening>> {
     let stream = TcpStream::connect(meta_addr).await.expect("TCP connect");
     let transport: Arc<dyn loopal_ipc::transport::Transport> = Arc::new(TcpTransport::new(stream));
-    let conn = Arc::new(Connection::new(transport));
-    let rx = conn.start();
+    let (conn, rx) = Connection::new(transport).into_listening();
 
     // meta/register
     let resp = conn
@@ -85,12 +84,10 @@ async fn join_hub_tcp(
 async fn register_mock(
     hub: &Arc<Mutex<Hub>>,
     name: &str,
-) -> (Arc<Connection>, mpsc::Receiver<Incoming>) {
+) -> (Arc<Connection<Listening>>, mpsc::Receiver<Incoming>) {
     let (client_t, server_t) = loopal_ipc::duplex_pair();
-    let server = Arc::new(Connection::new(server_t));
-    let client = Arc::new(Connection::new(client_t));
-    let server_rx = server.start();
-    let client_rx = client.start();
+    let (server, server_rx) = Connection::new(server_t).into_listening();
+    let (client, client_rx) = Connection::new(client_t).into_listening();
 
     let _ = register_agent_connection(hub.clone(), name, server, server_rx, None, None, None)
         .await

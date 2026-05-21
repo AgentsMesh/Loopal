@@ -5,9 +5,8 @@ use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use tracing::info;
 
-use loopal_ipc::Connection;
 use loopal_ipc::TcpTransport;
-use loopal_ipc::connection::Incoming;
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
 use loopal_protocol::{AgentEvent, AgentEventPayload};
@@ -15,11 +14,10 @@ use loopal_protocol::{AgentEvent, AgentEventPayload};
 pub async fn connect_and_register(
     addr: &str,
     token: &str,
-) -> anyhow::Result<(Arc<Connection>, mpsc::Receiver<Incoming>)> {
+) -> anyhow::Result<(Arc<Connection<Listening>>, mpsc::Receiver<Incoming>)> {
     let stream = TcpStream::connect(addr).await?;
     let transport: Arc<dyn Transport> = Arc::new(TcpTransport::new(stream));
-    let conn = Arc::new(Connection::new(transport));
-    let incoming_rx = conn.start();
+    let (conn, incoming_rx) = Connection::new(transport).into_listening();
     let client_name = format!("tui-{}", &uuid::Uuid::new_v4().to_string()[..8]);
     let response = conn
         .send_request(

@@ -12,7 +12,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_protocol::{AgentEvent, ControlCommand, Envelope};
 
@@ -25,7 +25,7 @@ pub struct BridgeHandles {
 
 /// Start the IPC bridge using an existing Connection (from `AgentClient::into_parts()`).
 pub fn start_bridge(
-    connection: Arc<Connection>,
+    connection: Arc<Connection<Listening>>,
     incoming_rx: mpsc::Receiver<Incoming>,
 ) -> BridgeHandles {
     let (agent_event_tx, agent_event_rx) = mpsc::channel::<AgentEvent>(256);
@@ -77,7 +77,7 @@ pub fn start_bridge(
 
 async fn bridge_incoming(
     mut incoming_rx: mpsc::Receiver<Incoming>,
-    connection: Arc<Connection>,
+    connection: Arc<Connection<Listening>>,
     event_tx: mpsc::Sender<AgentEvent>,
 ) {
     loop {

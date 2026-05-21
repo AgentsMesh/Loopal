@@ -9,14 +9,8 @@ use loopal_session::SessionController;
 use super::attach_bridge::{bridge_events, connect_and_register};
 use crate::cli::Cli;
 
-/// Outcome of a TUI attach session — used by `multiprocess` to decide
-/// whether to print resume instructions on exit.
 pub struct AttachOutcome {
-    /// `Some(id)` if SessionController has a known root session;
-    /// `None` only for pure `--attach-hub` runs that never owned the root.
     pub session_id: Option<String>,
-    /// `true` when the user exited via `/detach-hub` (Hub stays alive,
-    /// re-attach instructions were already printed).
     pub detached: bool,
 }
 
@@ -54,8 +48,7 @@ pub async fn run_with_addr(
         addr: hub_addr.to_string(),
         token: hub_token.to_string(),
     });
-    let connection_lost = app.hub_connection_lost.clone();
-    let (event_rx, resync_rx) = bridge_events(incoming_rx, connection_lost);
+    let (event_rx, resync_rx) = bridge_events(incoming_rx, app.hub_connection_lost.clone());
 
     let session_ctrl = app.session.clone();
     if let Some(sid) = root_session_id {
@@ -91,10 +84,6 @@ fn print_post_exit_message(exit: &loopal_tui::ExitInfo) {
             );
         }
     } else if exit.connection_lost && !exit.shutdown_initiated {
-        // Only warn about an unexpected disconnect when the user did
-        // NOT just ask Hub to shut down (`/exit` / `/kill-hub`). A
-        // post-shutdown TCP close is the expected behaviour, not a
-        // crash worth alarming the user about.
         eprintln!();
         eprintln!("Hub connection lost. The Hub process may have exited or crashed.");
     }

@@ -44,7 +44,7 @@ impl HubMcpService {
             std::collections::HashSet::new();
 
         if let Some(p) = self.per_agent.read().await.get(agent_name) {
-            for (server, def) in p.list_tools().await {
+            for (server, def) in p.list_tools(loopal_mcp::HUB_RPC_BUDGET).await {
                 claimed_servers.insert(server.clone());
                 out.push((server, def));
             }
@@ -52,7 +52,7 @@ impl HubMcpService {
         if let Some(r) = self.root_of(agent_name)
             && let Some(p) = self.spawn_tree.read().await.get(&r)
         {
-            for (server, def) in p.list_tools().await {
+            for (server, def) in p.list_tools(loopal_mcp::HUB_RPC_BUDGET).await {
                 if claimed_servers.insert(server.clone()) {
                     out.push((server, def));
                 }
@@ -60,7 +60,7 @@ impl HubMcpService {
         }
         let canonical = canonical_or_self(cwd);
         if let Some(p) = self.hub_singleton.read().await.get(&canonical) {
-            for (server, def) in p.list_tools().await {
+            for (server, def) in p.list_tools(loopal_mcp::HUB_RPC_BUDGET).await {
                 if claimed_servers.insert(server.clone()) {
                     out.push((server, def));
                 }

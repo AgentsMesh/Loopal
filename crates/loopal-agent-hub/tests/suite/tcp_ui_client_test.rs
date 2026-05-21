@@ -15,7 +15,7 @@ use tokio::sync::mpsc;
 
 use loopal_agent_hub::{Hub, hub_server, start_event_loop};
 use loopal_ipc::TcpTransport;
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::rpc_error::RpcError;
 use loopal_ipc::transport::Transport;
@@ -38,13 +38,12 @@ async fn connect_ui_client(
     port: u16,
     token: &str,
     name: &str,
-) -> (Arc<Connection>, mpsc::Receiver<Incoming>) {
+) -> (Arc<Connection<Listening>>, mpsc::Receiver<Incoming>) {
     let stream = TcpStream::connect(format!("127.0.0.1:{port}"))
         .await
         .expect("tcp connect");
     let transport: Arc<dyn Transport> = Arc::new(TcpTransport::new(stream));
-    let conn = Arc::new(Connection::new(transport));
-    let rx = conn.start();
+    let (conn, rx) = Connection::new(transport).into_listening();
     let resp = conn
         .send_request(
             methods::HUB_REGISTER.name,
@@ -110,8 +109,7 @@ async fn unknown_role_is_rejected() {
         .await
         .unwrap();
     let transport: Arc<dyn Transport> = Arc::new(TcpTransport::new(stream));
-    let conn = Arc::new(Connection::new(transport));
-    let _rx = conn.start();
+    let (conn, _rx) = Connection::new(transport).into_listening();
     let resp = conn
         .send_request(
             methods::HUB_REGISTER.name,

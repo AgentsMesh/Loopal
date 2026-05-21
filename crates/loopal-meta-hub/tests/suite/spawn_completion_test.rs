@@ -85,10 +85,9 @@ async fn completion_delivery_to_remote_parent() {
     }
 
     let (child_client, child_server) = loopal_ipc::duplex_pair();
-    let child_server_conn = Arc::new(Connection::new(child_server));
-    let child_client_conn = Arc::new(Connection::new(child_client));
-    let child_server_rx = child_server_conn.start();
-    let _child_client_rx = child_client_conn.start();
+    let (child_server_conn, child_server_rx) = Connection::new(child_server).into_listening();
+    let (child_client_conn, _child_client_rx) = Connection::new(child_client).into_listening();
+
     let _ = register_agent_connection(
         hub_b.clone(),
         "child-worker",

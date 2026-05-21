@@ -19,8 +19,7 @@ async fn local_ui_responds_with_uplink_present() {
 
     {
         let (t, _) = loopal_ipc::duplex_pair();
-        let c = Arc::new(Connection::new(t));
-        let _rx = c.start();
+        let (c, _rx) = Connection::new(t).into_listening();
         let ul = Arc::new(loopal_agent_hub::HubUplink::new(c, "hub-x".into()));
         hub.lock().await.uplink = Some(ul);
     }

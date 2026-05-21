@@ -171,7 +171,7 @@ impl LocalMcpProvider {
 
 #[async_trait]
 impl McpProvider for LocalMcpProvider {
-    async fn list_tools(&self) -> Vec<(String, ToolDefinition)> {
+    async fn list_tools(&self, _budget: loopal_ipc::IpcBudget) -> Vec<(String, ToolDefinition)> {
         self.manager.read().await.get_tools_with_server()
     }
 
@@ -180,6 +180,7 @@ impl McpProvider for LocalMcpProvider {
         server: &str,
         tool: &str,
         args: &Value,
+        _budget: loopal_ipc::IpcBudget,
     ) -> Result<CallToolResult, McpError> {
         let first = self
             .manager
@@ -204,7 +205,7 @@ impl McpProvider for LocalMcpProvider {
         }
     }
 
-    async fn snapshot(&self) -> Vec<McpConnectionSnapshot> {
+    async fn snapshot(&self, _budget: loopal_ipc::IpcBudget) -> Vec<McpConnectionSnapshot> {
         self.manager.read().await.collect_snapshots()
     }
 }

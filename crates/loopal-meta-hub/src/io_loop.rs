@@ -16,7 +16,7 @@ use crate::meta_hub::MetaHub;
 /// Runs until the Sub-Hub disconnects.
 pub async fn meta_hub_io_loop(
     meta_hub: Arc<Mutex<MetaHub>>,
-    conn: Arc<loopal_ipc::connection::Connection>,
+    conn: Arc<loopal_ipc::connection::Connection<loopal_ipc::connection::Listening>>,
     mut rx: tokio::sync::mpsc::Receiver<Incoming>,
     hub_name: String,
 ) {

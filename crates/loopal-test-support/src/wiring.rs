@@ -102,7 +102,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
 
     // Mock hub connection (in-memory duplex — hub side is dropped).
     let (hub_conn, _hub_peer) = loopal_ipc::duplex_pair();
-    let hub_connection = Arc::new(loopal_ipc::Connection::new(hub_conn));
+    let (hub_connection, _hub_rx) = loopal_ipc::Connection::new(hub_conn).into_listening();
 
     // AgentShared — mirrors bootstrap.rs:103-115
     let tasks_dir = fixture.path().join("tasks");

@@ -25,8 +25,7 @@ async fn completion_output_passed_through_wait() {
 
     // Register agent (keep both sides alive)
     let (_ca, ct) = loopal_ipc::duplex_pair();
-    let conn = Arc::new(Connection::new(ct));
-    let rx = conn.start();
+    let (conn, rx) = Connection::new(ct).into_listening();
     let _ = register_agent_connection(hub.clone(), "worker", conn, rx, None, None, None)
         .await
         .unwrap();
@@ -69,8 +68,7 @@ async fn completion_no_output_fallback() {
     let (hub, _) = make_hub();
 
     let (_ca, ct) = loopal_ipc::duplex_pair();
-    let conn = Arc::new(Connection::new(ct));
-    let rx = conn.start();
+    let (conn, rx) = Connection::new(ct).into_listening();
     let _ = register_agent_connection(hub.clone(), "worker2", conn, rx, None, None, None)
         .await
         .unwrap();
@@ -107,8 +105,7 @@ async fn topology_tracks_parent_child() {
 
     // Register parent (keep both sides of duplex alive!)
     let (_pa, pt) = loopal_ipc::duplex_pair();
-    let parent_conn = Arc::new(Connection::new(pt));
-    let parent_rx = parent_conn.start();
+    let (parent_conn, parent_rx) = Connection::new(pt).into_listening();
     let _ = register_agent_connection(
         hub.clone(),
         "parent",
@@ -123,8 +120,7 @@ async fn topology_tracks_parent_child() {
 
     // Register child with parent relationship
     let (_ca, ct) = loopal_ipc::duplex_pair();
-    let child_conn = Arc::new(Connection::new(ct));
-    let child_rx = child_conn.start();
+    let (child_conn, child_rx) = Connection::new(ct).into_listening();
     let _ = register_agent_connection(
         hub.clone(),
         "child-1",

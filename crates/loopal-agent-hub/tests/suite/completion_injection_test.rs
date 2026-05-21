@@ -8,7 +8,7 @@ use tokio::sync::{Mutex, mpsc};
 
 use loopal_agent_hub::Hub;
 use loopal_agent_hub::spawn_manager::register_agent_connection;
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_protocol::{AgentEvent, Envelope, MessageSource};
 use serde_json::json;
@@ -23,12 +23,11 @@ async fn register_agent(
     hub: &Arc<Mutex<Hub>>,
     name: &str,
     parent: Option<&str>,
-) -> (Arc<Connection>, mpsc::Receiver<Incoming>) {
+) -> (Arc<Connection<Listening>>, mpsc::Receiver<Incoming>) {
     let (client_transport, server_transport) = loopal_ipc::duplex_pair();
-    let client_conn = Arc::new(Connection::new(client_transport));
-    let server_conn = Arc::new(Connection::new(server_transport));
-    let client_rx = client_conn.start();
-    let server_rx = server_conn.start();
+    let (client_conn, client_rx) = Connection::new(client_transport).into_listening();
+    let (server_conn, server_rx) = Connection::new(server_transport).into_listening();
+
     let _ = register_agent_connection(
         hub.clone(),
         name,

@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use tokio::sync::{Mutex, mpsc};
 
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_protocol::Envelope;
 use serde_json::{Value, json};
@@ -23,7 +23,7 @@ use serde_json::{Value, json};
 /// consulted when local handling fails.
 pub struct HubUplink {
     /// TCP connection to the MetaHub.
-    conn: Arc<Connection>,
+    conn: Arc<Connection<Listening>>,
     /// This Hub's registered name on the MetaHub.
     hub_name: String,
 }
@@ -33,7 +33,7 @@ impl HubUplink {
     ///
     /// The caller is responsible for TCP connect + `meta/register` handshake.
     /// This constructor just wraps the authenticated connection.
-    pub fn new(conn: Arc<Connection>, hub_name: String) -> Self {
+    pub fn new(conn: Arc<Connection<Listening>>, hub_name: String) -> Self {
         Self { conn, hub_name }
     }
 
@@ -43,7 +43,7 @@ impl HubUplink {
     }
 
     /// The underlying connection (for advanced use / event subscription).
-    pub fn connection(&self) -> &Arc<Connection> {
+    pub fn connection(&self) -> &Arc<Connection<Listening>> {
         &self.conn
     }
 
@@ -101,11 +101,12 @@ impl HubUplink {
 /// Runs until the connection closes.
 pub async fn handle_reverse_requests(
     hub: Arc<Mutex<crate::hub::Hub>>,
-    conn: Arc<Connection>,
+    conn: Arc<Connection<Listening>>,
     mut rx: mpsc::Receiver<Incoming>,
     hub_name: String,
 ) {
     tracing::info!(hub = %hub_name, "MetaHub reverse handler started");
+    let dispatcher = Arc::new(crate::dispatch::build_hub_dispatcher(hub.clone()));
     while let Some(msg) = rx.recv().await {
         match msg {
             Incoming::Request { id, method, params } => {
@@ -133,8 +134,8 @@ pub async fn handle_reverse_requests(
                     };
                     let _ = conn.respond(id, json!({"ok": ok})).await;
                 } else {
-                    match crate::dispatch::dispatch_hub_request(
-                        &hub,
+                    match crate::dispatch::dispatch_hub_request_with(
+                        &dispatcher,
                         &method,
                         params,
                         format!("meta:{hub_name}"),

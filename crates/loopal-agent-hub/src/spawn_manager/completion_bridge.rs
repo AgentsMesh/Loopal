@@ -1,14 +1,14 @@
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
-use loopal_ipc::connection::Connection;
+use loopal_ipc::connection::{Connection, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_protocol::Envelope;
 
 /// Bridge: reads from Hub-internal channel, forwards to agent via IPC notification.
 pub fn spawn_completion_bridge(
     name: &str,
-    conn: Arc<Connection>,
+    conn: Arc<Connection<Listening>>,
     mut rx: mpsc::Receiver<Envelope>,
 ) {
     let n = name.to_string();

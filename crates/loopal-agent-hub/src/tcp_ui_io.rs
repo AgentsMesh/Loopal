@@ -16,12 +16,13 @@ use std::sync::Arc;
 use tokio::sync::{Mutex, broadcast::error::RecvError, mpsc};
 use tracing::{debug, info, warn};
 
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_protocol::AgentEvent;
 
-use crate::dispatch::dispatch_hub_request;
+use crate::dispatch::build_hub_dispatcher;
 use crate::hub::Hub;
+use crate::ui_request_loop::ui_client_io_loop;
 
 /// Spawn the per-TCP-UI-client tasks.
 ///
@@ -31,12 +32,13 @@ use crate::hub::Hub;
 pub fn start_tcp_ui_io(
     hub: Arc<Mutex<Hub>>,
     name: &str,
-    conn: Arc<Connection>,
+    conn: Arc<Connection<Listening>>,
     rx: mpsc::Receiver<Incoming>,
 ) {
     let n = name.to_string();
     let hub_for_io = hub.clone();
     let conn_for_forward = conn.clone();
+    let dispatcher = Arc::new(build_hub_dispatcher(hub.clone()));
     tokio::spawn(async move {
         let event_rx = {
             let mut h = hub.lock().await;
@@ -48,7 +50,7 @@ pub fn start_tcp_ui_io(
         let n_io = n.clone();
 
         let forward = tokio::spawn(forward_events(n.clone(), event_rx, conn_for_forward));
-        tcp_ui_io_loop(hub_io, conn_io, rx, n_io).await;
+        ui_client_io_loop(hub_io, dispatcher, conn_io, rx, n_io).await;
         forward.abort();
         hub.lock().await.ui.unregister_client(&n);
         info!(client = %n, "TCP UI client disconnected");
@@ -58,7 +60,7 @@ pub fn start_tcp_ui_io(
 async fn forward_events(
     client: String,
     mut event_rx: tokio::sync::broadcast::Receiver<AgentEvent>,
-    conn: Arc<Connection>,
+    conn: Arc<Connection<Listening>>,
 ) {
     loop {
         match event_rx.recv().await {
@@ -84,40 +86,4 @@ async fn forward_events(
             Err(RecvError::Closed) => return,
         }
     }
-}
-
-async fn tcp_ui_io_loop(
-    hub: Arc<Mutex<Hub>>,
-    conn: Arc<Connection>,
-    mut rx: mpsc::Receiver<Incoming>,
-    name: String,
-) {
-    info!(client = %name, "TCP UI client IO loop started");
-    while let Some(msg) = rx.recv().await {
-        match msg {
-            Incoming::Request { id, method, params } => {
-                let result = if method == methods::VIEW_SNAPSHOT.name {
-                    crate::view_router::handle_snapshot(&hub, params).await
-                } else if method.starts_with("hub/") {
-                    dispatch_hub_request(&hub, &method, params, name.clone()).await
-                } else {
-                    Err(format!(
-                        "UI clients only support hub/* and view/snapshot, got: {method}"
-                    ))
-                };
-                match result {
-                    Ok(value) => {
-                        let _ = conn.respond(id, value).await;
-                    }
-                    Err(e) => {
-                        let _ = conn
-                            .respond_error(id, loopal_ipc::jsonrpc::INVALID_REQUEST, &e)
-                            .await;
-                    }
-                }
-            }
-            Incoming::Notification { .. } => {}
-        }
-    }
-    info!(client = %name, "TCP UI client IO loop ended");
 }

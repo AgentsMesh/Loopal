@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::jsonrpc::INVALID_REQUEST;
 use loopal_ipc::protocol::methods;
 use loopal_ipc::tcp::TcpTransport;
@@ -39,8 +39,7 @@ pub async fn meta_accept_loop(listener: TcpListener, meta_hub: Arc<Mutex<MetaHub
 
         tokio::spawn(async move {
             let transport = Arc::new(TcpTransport::new(stream));
-            let conn = Arc::new(Connection::new(transport));
-            let mut rx = conn.start();
+            let (conn, mut rx) = Connection::new(transport).into_listening();
 
             match wait_for_meta_register(&conn, &mut rx, &token).await {
                 Ok((name, capabilities)) => {
@@ -67,7 +66,7 @@ pub async fn meta_accept_loop(listener: TcpListener, meta_hub: Arc<Mutex<MetaHub
 
 /// Wait for `meta/register` request, validate token, extract hub name.
 async fn wait_for_meta_register(
-    conn: &Arc<Connection>,
+    conn: &Arc<Connection<Listening>>,
     rx: &mut tokio::sync::mpsc::Receiver<Incoming>,
     expected_token: &str,
 ) -> anyhow::Result<(String, Vec<String>)> {

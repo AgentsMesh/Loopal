@@ -55,9 +55,12 @@ impl Tool for McpToolAdapter {
         let mcp_span =
             tracing::info_span!("mcp_tool_call", mcp.tool = self.definition.name.as_str());
         async {
+            // reason: tool execution runs after the agent loop is up and
+            // the reverse channel is draining — default IPC budget is fine.
+            let budget = loopal_ipc::HUB_RPC_BUDGET;
             let result = self
                 .provider
-                .call_tool(&self.server_name, &self.definition.name, &input)
+                .call_tool(&self.server_name, &self.definition.name, &input, budget)
                 .await
                 .map_err(LoopalError::Mcp)?;
 

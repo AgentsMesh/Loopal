@@ -6,7 +6,7 @@
 use std::time::Duration;
 
 use loopal_error::AgentOutput;
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::jsonrpc;
 use loopal_ipc::protocol::methods;
 use loopal_protocol::{ControlCommand, Envelope};
@@ -25,7 +25,7 @@ pub(crate) enum ForwardResult {
 /// Forward messages from the connection to the active session.
 pub(crate) async fn forward_loop(
     incoming_rx: &mut tokio::sync::mpsc::Receiver<Incoming>,
-    connection: &Connection,
+    connection: &Connection<Listening>,
     handle: &mut SessionHandle,
 ) -> ForwardResult {
     let session = &handle.session;
@@ -93,7 +93,7 @@ async fn route_request(
     method: &str,
     params: serde_json::Value,
     session: &crate::session_hub::SharedSession,
-    connection: &Connection,
+    connection: &Connection<Listening>,
 ) {
     match method {
         m if m == methods::AGENT_MESSAGE.name => match serde_json::from_value::<Envelope>(params) {
@@ -165,7 +165,7 @@ async fn route_request(
 #[allow(dead_code)]
 pub(crate) async fn observer_loop(
     incoming_rx: &mut tokio::sync::mpsc::Receiver<Incoming>,
-    connection: &Connection,
+    connection: &Connection<Listening>,
     session: &crate::session_hub::SharedSession,
     client_id: &str,
 ) {

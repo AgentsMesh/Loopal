@@ -12,22 +12,22 @@ fn shared_with_policy(fixture: &TestFixture, policy: SandboxPolicy) -> Arc<Agent
     shared
 }
 
-#[test]
-fn no_sandbox_true_when_policy_disabled() {
+#[tokio::test(flavor = "current_thread")]
+async fn no_sandbox_true_when_policy_disabled() {
     let fixture = TestFixture::new();
     let shared = shared_with_policy(&fixture, SandboxPolicy::Disabled);
     assert!(shared.no_sandbox());
 }
 
-#[test]
-fn no_sandbox_false_when_policy_default_write() {
+#[tokio::test(flavor = "current_thread")]
+async fn no_sandbox_false_when_policy_default_write() {
     let fixture = TestFixture::new();
     let shared = shared_with_policy(&fixture, SandboxPolicy::DefaultWrite);
     assert!(!shared.no_sandbox());
 }
 
-#[test]
-fn no_sandbox_false_when_policy_read_only() {
+#[tokio::test(flavor = "current_thread")]
+async fn no_sandbox_false_when_policy_read_only() {
     let fixture = TestFixture::new();
     let shared = shared_with_policy(&fixture, SandboxPolicy::ReadOnly);
     assert!(!shared.no_sandbox());

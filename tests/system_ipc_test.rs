@@ -56,8 +56,7 @@ async fn system_spawn_and_initialize() {
     let transport: std::sync::Arc<dyn loopal_ipc::transport::Transport> = std::sync::Arc::new(
         StdioTransport::new(Box::new(tokio::io::BufReader::new(stdout)), Box::new(stdin)),
     );
-    let conn = std::sync::Arc::new(Connection::new(transport));
-    let mut rx = conn.start();
+    let (conn, mut rx) = Connection::new(transport).into_listening();
 
     // Initialize
     let resp = tokio::time::timeout(

@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use loopal_ipc::connection::Connection;
+use loopal_ipc::connection::{Connection, Listening};
 use loopal_protocol::Envelope;
 
 /// Cross-hub message router.
@@ -26,7 +26,7 @@ impl GlobalRouter {
     pub async fn route(
         &mut self,
         envelope: &Envelope,
-        candidates: &[(&str, &Arc<Connection>)],
+        candidates: &[(&str, &Arc<Connection<Listening>>)],
     ) -> Result<(), String> {
         let next_hop = envelope.target.next_hop().ok_or_else(|| {
             format!(

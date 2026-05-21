@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use loopal_ipc::StdioTransport;
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
 use loopal_test_support::TestFixture;
@@ -13,7 +13,7 @@ use loopal_test_support::mock_provider::MultiCallProvider;
 async fn start_test_server_with_calls(
     calls: Vec<Vec<Result<loopal_provider_api::StreamChunk, loopal_error::LoopalError>>>,
 ) -> (
-    Arc<Connection>,
+    Arc<Connection<Listening>>,
     tokio::sync::mpsc::Receiver<Incoming>,
     TestFixture,
 ) {
@@ -37,8 +37,7 @@ async fn start_test_server_with_calls(
         let _ =
             loopal_agent_server::run_server_for_test(server_t, provider, cwd, session_dir).await;
     });
-    let client = Arc::new(Connection::new(client_t));
-    let rx = client.start();
+    let (client, rx) = Connection::new(client_t).into_listening();
     (client, rx, fixture)
 }
 
@@ -46,7 +45,7 @@ const T: Duration = Duration::from_secs(10);
 
 /// Helper: initialize + start agent with optional prompt, return session_id.
 async fn init_and_start(
-    conn: &Connection,
+    conn: &Connection<Listening>,
     _rx: &mut tokio::sync::mpsc::Receiver<Incoming>,
     prompt: Option<&str>,
 ) -> String {
@@ -70,7 +69,7 @@ async fn init_and_start(
 }
 
 /// Helper: start agent (already initialized), return session_id.
-async fn start_only(conn: &Connection, prompt: Option<&str>) -> String {
+async fn start_only(conn: &Connection<Listening>, prompt: Option<&str>) -> String {
     let mut params = serde_json::json!({});
     if let Some(p) = prompt {
         params["prompt"] = serde_json::Value::String(p.into());

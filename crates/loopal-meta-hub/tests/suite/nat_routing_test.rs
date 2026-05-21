@@ -268,10 +268,11 @@ async fn cross_hub_completion_carries_origin_hub_in_source() {
     // Register a child on hub-B whose parent is *remote* (lives on hub-A).
     // No completion_tx — finish_and_deliver will fall through to uplink.
     let (client_t, server_t) = loopal_ipc::duplex_pair();
-    let child_conn = Arc::new(loopal_ipc::connection::Connection::new(server_t));
-    let _client_conn = Arc::new(loopal_ipc::connection::Connection::new(client_t));
-    let _server_rx = child_conn.start();
-    let _client_rx = _client_conn.start();
+    let (child_conn, _server_rx) =
+        loopal_ipc::connection::Connection::new(server_t).into_listening();
+    let (_client_conn, _client_rx) =
+        loopal_ipc::connection::Connection::new(client_t).into_listening();
+
     {
         let mut h = hub_b.lock().await;
         h.registry
@@ -330,10 +331,8 @@ async fn cross_hub_spawn_carries_qualified_parent_through_event_and_registry() {
     // (the form produced by `dispatch_handlers::handle_spawn_agent` on the
     // originating hub when target_hub is set).
     let (client_t, server_t) = loopal_ipc::duplex_pair();
-    let server_conn = Arc::new(Connection::new(server_t));
-    let _client_conn = Arc::new(Connection::new(client_t));
-    let server_rx = server_conn.start();
-    let _client_rx = _client_conn.start();
+    let (server_conn, server_rx) = Connection::new(server_t).into_listening();
+    let (_client_conn, _client_rx) = Connection::new(client_t).into_listening();
 
     let _ = register_agent_connection(
         hub_b.clone(),

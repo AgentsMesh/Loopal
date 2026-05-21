@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use loopal_ipc::StdioTransport;
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
 use loopal_protocol::{AgentEvent, AgentEventPayload};
@@ -18,7 +18,7 @@ use loopal_test_support::mock_provider::MultiCallProvider;
 async fn start_test_server(
     calls: Vec<Vec<Result<loopal_provider_api::StreamChunk, loopal_error::LoopalError>>>,
 ) -> (
-    Arc<Connection>,
+    Arc<Connection<Listening>>,
     tokio::sync::mpsc::Receiver<Incoming>,
     TestFixture,
 ) {
@@ -46,13 +46,12 @@ async fn start_test_server(
                 .await;
     });
 
-    let client = Arc::new(Connection::new(client_transport));
-    let rx = client.start();
+    let (client, rx) = Connection::new(client_transport).into_listening();
     (client, rx, fixture)
 }
 
 async fn init_and_start(
-    client: &Arc<Connection>,
+    client: &Arc<Connection<Listening>>,
     extra_params: serde_json::Value,
 ) -> serde_json::Value {
     let _ = tokio::time::timeout(
@@ -81,7 +80,7 @@ async fn init_and_start(
 
 async fn collect_events_until_terminal(
     rx: &mut tokio::sync::mpsc::Receiver<Incoming>,
-    conn: &Arc<Connection>,
+    conn: &Arc<Connection<Listening>>,
 ) -> Vec<AgentEventPayload> {
     let mut events = Vec::new();
     let deadline = tokio::time::Instant::now() + Duration::from_secs(15);

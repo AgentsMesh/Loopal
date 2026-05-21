@@ -7,7 +7,7 @@ use std::sync::Arc;
 use tracing::info;
 
 use loopal_ipc::StdioTransport;
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
 
@@ -18,8 +18,7 @@ use crate::session_hub::SessionHub;
 pub async fn run_agent_server() -> anyhow::Result<()> {
     info!("agent server starting (stdio mode)");
     let transport: Arc<dyn Transport> = Arc::new(StdioTransport::from_std());
-    let connection = Arc::new(Connection::new(transport));
-    let incoming_rx = connection.start();
+    let (connection, incoming_rx) = Connection::new(transport).into_listening();
     let hub = Arc::new(SessionHub::new());
     run_connection(connection, incoming_rx, &hub).await
 }
@@ -34,7 +33,7 @@ pub async fn run_agent_server_with_mock(mock_path: &str) -> anyhow::Result<()> {
 }
 
 async fn run_connection(
-    connection: Arc<Connection>,
+    connection: Arc<Connection<Listening>>,
     mut incoming_rx: tokio::sync::mpsc::Receiver<Incoming>,
     hub: &SessionHub,
 ) -> anyhow::Result<()> {
@@ -43,7 +42,7 @@ async fn run_connection(
 }
 
 pub(crate) async fn dispatch_loop(
-    connection: Arc<Connection>,
+    connection: Arc<Connection<Listening>>,
     mut incoming_rx: tokio::sync::mpsc::Receiver<Incoming>,
     hub: &SessionHub,
     is_production: bool,
@@ -86,7 +85,7 @@ pub(crate) async fn dispatch_loop(
 }
 
 async fn run_session(
-    connection: &Arc<Connection>,
+    connection: &Arc<Connection<Listening>>,
     incoming_rx: &mut tokio::sync::mpsc::Receiver<Incoming>,
     hub: &SessionHub,
     is_production: bool,
@@ -126,7 +125,10 @@ async fn run_session(
     }
 }
 
-async fn send_agent_completed(connection: &Connection, output: Option<&loopal_error::AgentOutput>) {
+async fn send_agent_completed(
+    connection: &Connection<Listening>,
+    output: Option<&loopal_error::AgentOutput>,
+) {
     let (reason, result) = match output {
         Some(o) => (o.terminate_reason.as_str(), serde_json::json!(o.result)),
         None => ("shutdown", serde_json::Value::Null),
@@ -142,7 +144,7 @@ async fn send_agent_completed(connection: &Connection, output: Option<&loopal_er
 // reason: start_session responds OK to `id` on success but `?`-early-exits
 // without responding. Without this wrapper, client.send_request hangs.
 async fn start_session_or_respond_error(
-    connection: &Arc<Connection>,
+    connection: &Arc<Connection<Listening>>,
     id: i64,
     params: serde_json::Value,
     hub: &SessionHub,

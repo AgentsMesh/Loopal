@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use loopal_secret_client::{SecretClient, SecretError};
+use loopal_secret_client::{HUB_RPC_BUDGET, SecretClient, SecretError};
 use secrecy::{ExposeSecret, SecretString};
 use serde_json::Value;
 use tracing::warn;
@@ -9,10 +9,6 @@ use crate::audit::{JsonlAuditSink, RuntimeOp, default_telemetry_dir};
 use crate::redactor::Redactor;
 use crate::resolver::{collect_wire_refs, resolve_in_value};
 
-/// Resolve `<secret_ref:NAME>` placeholders in tool args.
-///
-/// Returns the seed list `(name, plaintext)` used by [`apply_redactor`]
-/// after execute to scrub the output. Empty when no secrets were resolved.
 pub async fn apply_resolver(
     tool_name: &str,
     effective_input: &mut Value,
@@ -34,7 +30,7 @@ pub async fn apply_resolver(
         std::collections::HashMap::new();
     let mut seed: Vec<(String, SecretString)> = Vec::new();
     for n in &names {
-        match client.get(n).await {
+        match client.get(n, HUB_RPC_BUDGET).await {
             Ok(v) => {
                 resolved.insert(n.clone(), v.clone());
                 seed.push((n.clone(), v));

@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use loopal_ipc::StdioTransport;
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::jsonrpc;
 use loopal_ipc::protocol::methods;
 use loopal_ipc::rpc_error::RpcError;
@@ -13,7 +13,10 @@ use loopal_test_support::mock_provider::MultiCallProvider;
 fn pair_with_server(
     cwd: std::path::PathBuf,
     session_dir: std::path::PathBuf,
-) -> (Arc<Connection>, tokio::sync::mpsc::Receiver<Incoming>) {
+) -> (
+    Arc<Connection<Listening>>,
+    tokio::sync::mpsc::Receiver<Incoming>,
+) {
     let provider =
         Arc::new(MultiCallProvider::new(Vec::new())) as Arc<dyn loopal_provider_api::Provider>;
     let (a_tx, a_rx) = tokio::io::duplex(8192);
@@ -31,8 +34,7 @@ fn pair_with_server(
             loopal_agent_server::run_server_for_test(server_transport, provider, cwd, session_dir)
                 .await;
     });
-    let client = Arc::new(Connection::new(client_transport));
-    let rx = client.start();
+    let (client, rx) = Connection::new(client_transport).into_listening();
     (client, rx)
 }
 

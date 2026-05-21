@@ -2,7 +2,7 @@ use std::sync::Arc;
 use tokio::sync::{Mutex, mpsc};
 use tracing::{info, warn};
 
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_protocol::{AgentEvent, AgentEventPayload, Envelope, QualifiedAddress};
 
 use crate::hub::Hub;
@@ -14,7 +14,7 @@ use super::completion_bridge::spawn_completion_bridge;
 pub async fn register_agent_connection(
     hub: Arc<Mutex<Hub>>,
     name: &str,
-    conn: Arc<Connection>,
+    conn: Arc<Connection<Listening>>,
     incoming_rx: mpsc::Receiver<Incoming>,
     parent: Option<&str>,
     model: Option<&str>,
@@ -66,7 +66,8 @@ pub async fn register_agent_connection(
     info!(agent = %name, "agent registered in Hub");
 
     spawn_completion_bridge(name, conn.clone(), completion_rx);
-    crate::agent_io::spawn_io_loop(hub.clone(), name, conn, incoming_rx);
+    let dispatcher = std::sync::Arc::new(crate::dispatch::build_hub_dispatcher(hub.clone()));
+    crate::agent_io::spawn_io_loop(hub.clone(), dispatcher, name, conn, incoming_rx);
 
     {
         let h = hub.lock().await;

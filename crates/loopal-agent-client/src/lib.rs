@@ -17,4 +17,4 @@ pub mod test_support {
 pub use bridge::{BridgeHandles, start_bridge};
 pub use client::{AgentClient, AgentClientEvent};
 pub use process::AgentProcess;
-pub use start_params::StartAgentParams;
+pub use start_params::{StartAgentParams, encode};

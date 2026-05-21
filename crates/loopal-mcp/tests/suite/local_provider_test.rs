@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use indexmap::IndexMap;
 use loopal_config::McpServerConfig;
-use loopal_mcp::{LocalMcpProvider, McpManager, McpProvider};
+use loopal_mcp::{HUB_RPC_BUDGET, LocalMcpProvider, McpManager, McpProvider};
 use tokio::sync::RwLock;
 
 fn make_provider() -> LocalMcpProvider {
@@ -98,7 +98,7 @@ async fn wait_until_settled_returns_true_after_failed_server_settles() {
     provider.spawn_background(configs);
     let settled = provider.wait_until_settled(Duration::from_secs(3)).await;
     assert!(settled, "failed server should still mark settled");
-    let snaps = provider.snapshot().await;
+    let snaps = provider.snapshot(HUB_RPC_BUDGET).await;
     assert_eq!(snaps.len(), 1);
     assert!(snaps[0].status.starts_with("failed"));
 }
@@ -177,12 +177,12 @@ async fn call_tool_retries_after_transport_closed() {
     provider.spawn_background(configs);
     assert!(provider.wait_until_settled(Duration::from_secs(3)).await);
 
-    let snaps = provider.snapshot().await;
+    let snaps = provider.snapshot(HUB_RPC_BUDGET).await;
     assert_eq!(snaps.len(), 1, "failed server still kept in connections");
     assert!(snaps[0].status.starts_with("failed"));
 
     let result = provider
-        .call_tool("ghost", "anything", &serde_json::json!({}))
+        .call_tool("ghost", "anything", &serde_json::json!({}), HUB_RPC_BUDGET)
         .await;
     assert!(
         matches!(
@@ -198,7 +198,12 @@ async fn call_tool_retries_after_transport_closed() {
 async fn call_tool_on_unknown_server_returns_server_not_found() {
     let provider = make_provider();
     let result = provider
-        .call_tool("never-registered", "t", &serde_json::json!({}))
+        .call_tool(
+            "never-registered",
+            "t",
+            &serde_json::json!({}),
+            HUB_RPC_BUDGET,
+        )
         .await;
     assert!(matches!(
         result,
@@ -280,6 +285,6 @@ async fn await_all_settled_waits_through_multiple_overlapping_spawns() {
         elapsed < Duration::from_secs(2),
         "must release only after BOTH spawns finish, took {elapsed:?}"
     );
-    let snaps = provider.snapshot().await;
+    let snaps = provider.snapshot(HUB_RPC_BUDGET).await;
     assert_eq!(snaps.len(), 2, "both servers should be persisted as failed");
 }

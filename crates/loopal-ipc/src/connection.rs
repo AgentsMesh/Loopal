@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::marker::PhantomData;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 
@@ -26,29 +27,44 @@ pub enum Incoming {
 
 pub(crate) type PendingMap = Arc<Mutex<HashMap<i64, oneshot::Sender<Result<Value, RpcError>>>>>;
 
-/// Bidirectional JSON-RPC over a `Transport`. Call `start()` first,
-/// then use `send_request`, `send_notification`, `respond`, `respond_error`.
-pub struct Connection {
+pub struct Inactive;
+pub struct Listening;
+
+pub struct Connection<S = Inactive> {
     transport: Arc<dyn Transport>,
     pending: PendingMap,
     next_id: AtomicI64,
+    _state: PhantomData<S>,
 }
 
-impl Connection {
+impl Connection<Inactive> {
     pub fn new(transport: Arc<dyn Transport>) -> Self {
         Self {
             transport,
             pending: Arc::new(Mutex::new(HashMap::new())),
             next_id: AtomicI64::new(1),
+            _state: PhantomData,
         }
     }
 
-    pub fn start(&self) -> mpsc::Receiver<Incoming> {
-        spawn_reader_loop(self.transport.clone(), self.pending.clone())
+    /// Start the reader loop and transition to `Listening`. Returns the raw
+    /// `Incoming` receiver so callers (`agent_io_loop`, hub_server, etc.) can
+    /// drive their own routing.
+    pub fn into_listening(self) -> (Arc<Connection<Listening>>, mpsc::Receiver<Incoming>) {
+        let rx = spawn_reader_loop(self.transport.clone(), self.pending.clone());
+        (
+            Arc::new(Connection {
+                transport: self.transport,
+                pending: self.pending,
+                next_id: self.next_id,
+                _state: PhantomData,
+            }),
+            rx,
+        )
     }
+}
 
-    /// Send a JSON-RPC request and wait for the response.
-    /// Cancellation-safe: dropped futures clean up via `PendingGuard`.
+impl Connection<Listening> {
     pub async fn send_request(&self, method: &str, params: Value) -> Result<Value, RpcError> {
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         debug!(id, method, "IPC send_request");
@@ -61,10 +77,9 @@ impl Connection {
             return Err(RpcError::Transport(e.to_string()));
         }
 
-        let pending = self.pending.clone();
         let guard = PendingGuard {
             id,
-            pending: Some(pending),
+            pending: Some(self.pending.clone()),
         };
         let outcome = rx.await.map_err(|_| RpcError::ChannelDropped);
         guard.disarm();
@@ -102,16 +117,11 @@ impl Connection {
         self.transport.is_connected()
     }
 
-    /// Close the write side of the underlying transport.
-    /// The remote end will see EOF; pending responses are cleaned up by the reader loop.
     pub async fn close(&self) {
         self.transport.close().await;
     }
 }
 
-/// Removes a pending request entry on drop (cancellation safety).
-/// Call `disarm()` on success to skip cleanup. Uses `try_lock` in Drop
-/// to avoid spawning async tasks (unsafe during runtime shutdown).
 struct PendingGuard {
     id: i64,
     pending: Option<PendingMap>,
@@ -130,6 +140,5 @@ impl Drop for PendingGuard {
         {
             map.remove(&self.id);
         }
-        // reason: if lock is held, entry leaks — reader loop cleanup reclaims it.
     }
 }

@@ -66,7 +66,7 @@ fn agent_tool_context_inner(
     );
 
     let (hub_conn, _hub_peer) = loopal_ipc::duplex_pair();
-    let hub_connection = Arc::new(loopal_ipc::Connection::new(hub_conn));
+    let (hub_connection, _hub_rx) = loopal_ipc::Connection::new(hub_conn).into_listening();
 
     let tasks_dir = fixture.path().join("tasks");
     let cancel = CancellationToken::new();

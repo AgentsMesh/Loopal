@@ -73,8 +73,7 @@ async fn local_parent_completion_unaffected_by_uplink() {
 
     {
         let (t, _) = loopal_ipc::duplex_pair();
-        let c = Arc::new(Connection::new(t));
-        let _rx = c.start();
+        let (c, _rx) = Connection::new(t).into_listening();
         let ul = Arc::new(loopal_agent_hub::HubUplink::new(c, "my-hub".into()));
         hub.lock().await.uplink = Some(ul);
     }
@@ -82,10 +81,9 @@ async fn local_parent_completion_unaffected_by_uplink() {
     let (_parent_conn, _parent_rx) = register_mock_agent(&hub, "parent", None).await;
 
     let (child_client, child_server) = loopal_ipc::duplex_pair();
-    let child_server_conn = Arc::new(Connection::new(child_server));
-    let child_client_conn = Arc::new(Connection::new(child_client));
-    let child_server_rx = child_server_conn.start();
-    let _child_client_rx = child_client_conn.start();
+    let (child_server_conn, child_server_rx) = Connection::new(child_server).into_listening();
+    let (child_client_conn, _child_client_rx) = Connection::new(child_client).into_listening();
+
     let _ = register_agent_connection(
         hub.clone(),
         "child",

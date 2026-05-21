@@ -23,8 +23,7 @@ fn make_hub() -> (
 
 async fn register_test_agent(hub: &Arc<Mutex<Hub>>, name: &str) {
     let (_t1, t2) = loopal_ipc::duplex_pair();
-    let conn = Arc::new(Connection::new(t2));
-    let _rx = conn.start();
+    let (conn, _rx) = Connection::new(t2).into_listening();
     hub.lock()
         .await
         .registry

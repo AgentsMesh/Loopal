@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use loopal_secret_client::{SecretClient, SecretError, SecretResult};
+use loopal_secret_client::{IpcBudget, SecretClient, SecretError, SecretResult};
 use loopal_secret_runtime::{apply_redactor, apply_resolver};
 use loopal_tool_api::ToolContext;
 use secrecy::{ExposeSecret, SecretString};
@@ -26,19 +26,23 @@ impl MockVault {
 
 #[async_trait]
 impl SecretClient for MockVault {
-    async fn get(&self, name: &str) -> SecretResult<SecretString> {
+    async fn get(&self, name: &str, _budget: IpcBudget) -> SecretResult<SecretString> {
         match self.map.get(name) {
             Some(v) => Ok(SecretString::from(v.clone())),
             None => Err(SecretError::SecretNotFound(name.to_string())),
         }
     }
-    async fn list_names(&self) -> SecretResult<Vec<String>> {
+    async fn list_names(&self, _budget: IpcBudget) -> SecretResult<Vec<String>> {
         Ok(self.map.keys().cloned().collect())
     }
-    async fn expand_author(&self, template: &str) -> SecretResult<SecretString> {
+    async fn expand_author(
+        &self,
+        template: &str,
+        _budget: IpcBudget,
+    ) -> SecretResult<SecretString> {
         Ok(SecretString::from(template.to_string()))
     }
-    async fn expand_wire(&self, template: &str) -> SecretResult<SecretString> {
+    async fn expand_wire(&self, template: &str, _budget: IpcBudget) -> SecretResult<SecretString> {
         Ok(SecretString::from(template.to_string()))
     }
 }

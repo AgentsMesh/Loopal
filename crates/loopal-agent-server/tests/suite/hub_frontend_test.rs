@@ -7,7 +7,7 @@ use std::time::Duration;
 use tokio::sync::Mutex;
 
 use loopal_ipc::StdioTransport;
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
 use loopal_protocol::{AgentEventPayload, InterruptSignal};
@@ -19,8 +19,8 @@ use loopal_runtime::agent_input::AgentInput;
 /// Create a bidirectional Connection pair (like a network socket pair).
 /// Returns (server_conn, client_conn, client_rx).
 fn conn_pair() -> (
-    Arc<Connection>,
-    Arc<Connection>,
+    Arc<Connection<Listening>>,
+    Arc<Connection<Listening>>,
     tokio::sync::mpsc::Receiver<Incoming>,
 ) {
     let (a_tx, a_rx) = tokio::io::duplex(8192);
@@ -33,10 +33,8 @@ fn conn_pair() -> (
         Box::new(tokio::io::BufReader::new(b_rx)),
         Box::new(a_tx),
     ));
-    let server_conn = Arc::new(Connection::new(server_t));
-    let _server_rx = server_conn.start(); // Must start reader loop
-    let client_conn = Arc::new(Connection::new(client_t));
-    let client_rx = client_conn.start();
+    let (server_conn, _server_rx) = Connection::new(server_t).into_listening(); // Must start reader loop
+    let (client_conn, client_rx) = Connection::new(client_t).into_listening();
     (server_conn, client_conn, client_rx)
 }
 

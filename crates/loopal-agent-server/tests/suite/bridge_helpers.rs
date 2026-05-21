@@ -3,7 +3,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_protocol::{AgentEvent, AgentEventPayload};
 use loopal_test_support::TestFixture;
@@ -17,7 +17,7 @@ pub const T: Duration = Duration::from_secs(10);
 pub async fn start_child_server(
     calls: Vec<Vec<Result<loopal_provider_api::StreamChunk, loopal_error::LoopalError>>>,
 ) -> (
-    Arc<Connection>,
+    Arc<Connection<Listening>>,
     tokio::sync::mpsc::Receiver<Incoming>,
     TestFixture,
     tokio::task::JoinHandle<()>,
@@ -32,19 +32,22 @@ pub async fn start_child_server(
         let _ =
             loopal_agent_server::run_server_for_test(server_t, provider, cwd, session_dir).await;
     });
-    let conn = Arc::new(Connection::new(client_t));
-    let rx = conn.start();
+    let (conn, rx) = Connection::new(client_t).into_listening();
     (conn, rx, fixture, join)
 }
 
 /// Initialize + start agent with prompt, return session_id.
-pub async fn init_and_start(conn: &Connection, fixture: &TestFixture, prompt: &str) -> String {
+pub async fn init_and_start(
+    conn: &Connection<Listening>,
+    fixture: &TestFixture,
+    prompt: &str,
+) -> String {
     init_and_start_with(conn, fixture, prompt, serde_json::json!({})).await
 }
 
 /// Initialize + start agent with prompt and extra params, return session_id.
 pub async fn init_and_start_with(
-    conn: &Connection,
+    conn: &Connection<Listening>,
     fixture: &TestFixture,
     prompt: &str,
     extra: serde_json::Value,

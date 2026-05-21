@@ -21,3 +21,6 @@ mod proxy_client_test;
 
 #[path = "suite/local_provider_test.rs"]
 mod local_provider_test;
+
+#[path = "suite/ipc_budget_test.rs"]
+mod ipc_budget_test;

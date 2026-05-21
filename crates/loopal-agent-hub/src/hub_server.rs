@@ -16,7 +16,7 @@ use tokio::sync::Mutex;
 use tracing::{info, warn};
 
 use loopal_ipc::TcpTransport;
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
 
@@ -50,13 +50,15 @@ pub async fn start_hub_listener(
 pub fn connect_local(
     hub: Arc<Mutex<Hub>>,
     name: &str,
-) -> (Arc<Connection>, tokio::sync::mpsc::Receiver<Incoming>) {
+) -> (
+    Arc<Connection<Listening>>,
+    tokio::sync::mpsc::Receiver<Incoming>,
+) {
     let (client_transport, server_transport) = loopal_ipc::duplex_pair();
-    let client_conn = Arc::new(Connection::new(client_transport));
-    let server_conn = Arc::new(Connection::new(server_transport));
-    let client_rx = client_conn.start();
-    let server_rx = server_conn.start();
-    crate::agent_io::start_agent_io(hub, name, server_conn, server_rx);
+    let (client_conn, client_rx) = Connection::new(client_transport).into_listening();
+    let (server_conn, server_rx) = Connection::new(server_transport).into_listening();
+    let dispatcher = Arc::new(crate::dispatch::build_hub_dispatcher(hub.clone()));
+    crate::agent_io::start_agent_io(hub, dispatcher, name, server_conn, server_rx, None);
     (client_conn, client_rx)
 }
 
@@ -75,8 +77,8 @@ pub async fn accept_loop(listener: TcpListener, hub: Arc<Mutex<Hub>>, token: Str
         let token = token.clone();
         tokio::spawn(async move {
             let transport: Arc<dyn Transport> = Arc::new(TcpTransport::new(stream));
-            let conn = Arc::new(Connection::new(transport));
-            let mut rx = conn.start();
+            let (conn, mut rx) = Connection::new(transport).into_listening();
+
             match wait_for_register(&conn, &mut rx, &token).await {
                 Ok(result) => {
                     info!(client = %result.name, role = ?result.role,
@@ -91,7 +93,16 @@ pub async fn accept_loop(listener: TcpListener, hub: Arc<Mutex<Hub>>, token: Str
                     });
                     match result.role {
                         ClientRole::Agent => {
-                            crate::agent_io::start_agent_io(hub, &result.name, conn, owned_rx);
+                            let dispatcher =
+                                Arc::new(crate::dispatch::build_hub_dispatcher(hub.clone()));
+                            crate::agent_io::start_agent_io(
+                                hub,
+                                dispatcher,
+                                &result.name,
+                                conn,
+                                owned_rx,
+                                None,
+                            );
                         }
                         ClientRole::UiClient => {
                             crate::tcp_ui_io::start_tcp_ui_io(hub, &result.name, conn, owned_rx);
@@ -108,7 +119,7 @@ pub async fn accept_loop(listener: TcpListener, hub: Arc<Mutex<Hub>>, token: Str
 
 /// Wait for `hub/register` with valid token. Returns agent name + role.
 async fn wait_for_register(
-    conn: &Arc<Connection>,
+    conn: &Arc<Connection<Listening>>,
     rx: &mut tokio::sync::mpsc::Receiver<Incoming>,
     expected_token: &str,
 ) -> anyhow::Result<RegisterResult> {

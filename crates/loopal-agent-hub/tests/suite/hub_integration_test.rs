@@ -7,7 +7,7 @@ use tokio::sync::{Mutex, mpsc};
 
 use loopal_agent_hub::Hub;
 use loopal_agent_hub::hub_server;
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::rpc_error::RpcError;
 use loopal_protocol::AgentEvent;
@@ -19,7 +19,7 @@ fn make_hub() -> (Arc<Mutex<Hub>>, mpsc::Receiver<AgentEvent>) {
 }
 
 /// Spawn a mock agent that auto-responds to all requests with {"ok": true}.
-fn spawn_mock_agent(conn: Arc<Connection>, mut rx: mpsc::Receiver<Incoming>) {
+fn spawn_mock_agent(conn: Arc<Connection<Listening>>, mut rx: mpsc::Receiver<Incoming>) {
     tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
             if let Incoming::Request { id, .. } = msg {

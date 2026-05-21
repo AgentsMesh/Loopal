@@ -24,8 +24,7 @@ async fn wait_agent_after_finish_returns_cached_output() {
     let (hub, _) = make_hub();
 
     let (_ca, ct) = loopal_ipc::duplex_pair();
-    let conn = Arc::new(Connection::new(ct));
-    let rx = conn.start();
+    let (conn, rx) = Connection::new(ct).into_listening();
     let _ = register_agent_connection(hub.clone(), "fast-agent", conn, rx, None, None, None)
         .await
         .unwrap();
@@ -62,8 +61,7 @@ async fn emit_before_unregister_delivers_output() {
     let (hub, _) = make_hub();
 
     let (_ca, ct) = loopal_ipc::duplex_pair();
-    let conn = Arc::new(Connection::new(ct));
-    let rx = conn.start();
+    let (conn, rx) = Connection::new(ct).into_listening();
     let _ = register_agent_connection(hub.clone(), "normal", conn, rx, None, None, None)
         .await
         .unwrap();

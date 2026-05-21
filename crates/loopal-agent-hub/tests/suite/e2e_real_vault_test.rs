@@ -5,7 +5,9 @@ use loopal_agent_hub::Hub;
 use loopal_hub_vault::HubVaultService;
 use loopal_ipc::Connection;
 use loopal_ipc::duplex_pair;
-use loopal_secret_client::{ExposeSecret, HubSecretClient, SecretClient, SecretError};
+use loopal_secret_client::{
+    ExposeSecret, HUB_RPC_BUDGET, HubSecretClient, SecretClient, SecretError,
+};
 use loopal_vault_age::{AgeVault, DiscoveredIdentity, Recipients};
 use loopal_vault_api::Vault;
 use tokio::sync::Mutex;
@@ -57,9 +59,8 @@ async fn make_real_vault_client(
     request_cwd: std::path::PathBuf,
 ) -> (HubSecretClient, Arc<Mutex<Hub>>) {
     let (client_t, hub_t) = duplex_pair();
-    let client_conn = Arc::new(Connection::new(client_t));
-    let hub_conn = Arc::new(Connection::new(hub_t));
-    let _client_rx = client_conn.start();
+    let (client_conn, _client_rx) = Connection::new(client_t).into_listening();
+    let (hub_conn, hub_rx) = Connection::new(hub_t).into_listening();
 
     let (event_tx, _event_rx) = mpsc::channel(64);
     let hub = Arc::new(Mutex::new(Hub::new(event_tx)));
@@ -72,7 +73,7 @@ async fn make_real_vault_client(
         .await
         .spawn_registry
         .register(agent_name.into(), fixture.cwd.clone(), None);
-    spawn_hub_dispatch_loop(hub.clone(), hub_conn, agent_name.into());
+    spawn_hub_dispatch_loop(hub.clone(), hub_conn, hub_rx, agent_name.into());
 
     let client = HubSecretClient::new(client_conn, request_cwd, agent_name.into(), 0);
     (client, hub)
@@ -82,10 +83,13 @@ async fn make_real_vault_client(
 async fn real_vault_get_roundtrip_returns_exact_plaintext() {
     let fx = setup_real_vault(&[("api_key", "sk-real-plaintext-value-12345")]).await;
     let (client, _hub) = make_real_vault_client(&fx, "test-agent", fx.cwd.clone()).await;
-    let plaintext = tokio::time::timeout(Duration::from_secs(5), client.get("api_key"))
-        .await
-        .expect("IPC must not hang")
-        .expect("real vault get must succeed");
+    let plaintext = tokio::time::timeout(
+        Duration::from_secs(5),
+        client.get("api_key", HUB_RPC_BUDGET),
+    )
+    .await
+    .expect("IPC must not hang")
+    .expect("real vault get must succeed");
     assert_eq!(
         plaintext.expose_secret(),
         "sk-real-plaintext-value-12345",
@@ -97,7 +101,7 @@ async fn real_vault_get_roundtrip_returns_exact_plaintext() {
 async fn real_vault_list_names_returns_all_keys() {
     let fx = setup_real_vault(&[("k1", "v1"), ("k2", "v2"), ("openai_api", "sk-x")]).await;
     let (client, _hub) = make_real_vault_client(&fx, "test-agent", fx.cwd.clone()).await;
-    let mut names = tokio::time::timeout(Duration::from_secs(5), client.list_names())
+    let mut names = tokio::time::timeout(Duration::from_secs(5), client.list_names(HUB_RPC_BUDGET))
         .await
         .expect("IPC must not hang")
         .expect("real vault list_names must succeed");
@@ -112,7 +116,7 @@ async fn real_vault_list_names_returns_all_keys() {
 async fn real_vault_missing_secret_returns_structured_not_found() {
     let fx = setup_real_vault(&[("present", "x")]).await;
     let (client, _hub) = make_real_vault_client(&fx, "test-agent", fx.cwd.clone()).await;
-    let err = tokio::time::timeout(Duration::from_secs(5), client.get("absent"))
+    let err = tokio::time::timeout(Duration::from_secs(5), client.get("absent", HUB_RPC_BUDGET))
         .await
         .expect("IPC must not hang")
         .unwrap_err();
@@ -129,10 +133,13 @@ async fn cross_cwd_request_denied_with_structured_permission_denied() {
     let fx_a = setup_real_vault(&[("api_key", "sk-A")]).await;
     let fx_b = setup_real_vault(&[("api_key", "sk-B")]).await;
     let (client, _hub) = make_real_vault_client(&fx_a, "test-agent", fx_b.cwd.clone()).await;
-    let err = tokio::time::timeout(Duration::from_secs(5), client.get("api_key"))
-        .await
-        .expect("IPC must not hang")
-        .unwrap_err();
+    let err = tokio::time::timeout(
+        Duration::from_secs(5),
+        client.get("api_key", HUB_RPC_BUDGET),
+    )
+    .await
+    .expect("IPC must not hang")
+    .unwrap_err();
     assert!(
         matches!(err, SecretError::PermissionDenied),
         "cross-cwd MUST yield typed PermissionDenied; got: {err:?}"

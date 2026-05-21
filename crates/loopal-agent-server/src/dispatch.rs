@@ -1,4 +1,4 @@
-use loopal_ipc::connection::Connection;
+use loopal_ipc::connection::{Connection, Listening};
 use loopal_ipc::jsonrpc;
 use loopal_ipc::protocol::methods;
 use serde_json::Value;
@@ -60,7 +60,7 @@ pub async fn dispatch_simple(
 }
 
 pub async fn respond_with(
-    connection: &Connection,
+    connection: &Connection<Listening>,
     id: i64,
     outcome: Result<Value, RpcErrorPayload>,
 ) {

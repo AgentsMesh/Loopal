@@ -4,7 +4,7 @@ use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-use loopal_ipc::connection::Connection;
+use loopal_ipc::connection::{Connection, Listening};
 use loopal_kernel::Kernel;
 use loopal_message::Message;
 use loopal_protocol::{AgentEvent, AgentStateSnapshot, Envelope, MessageSource};
@@ -107,7 +107,7 @@ pub struct AgentShared {
     pub kernel: Arc<Kernel>,
     pub task_store: Arc<TaskStore>,
     /// Connection to Hub for `hub/*` IPC requests (route, broadcast, channels).
-    pub hub_connection: Arc<Connection>,
+    pub hub_connection: Arc<Connection<Listening>>,
     /// Initial working directory. Immutable after construction.
     pub cwd: PathBuf,
     /// Current nesting depth (0 = root agent). Propagated via IPC so agents

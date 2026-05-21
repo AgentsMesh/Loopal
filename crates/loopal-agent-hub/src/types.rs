@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use tokio::sync::{Mutex, mpsc};
 
-use loopal_ipc::connection::Connection;
+use loopal_ipc::connection::{Connection, Listening};
 use loopal_protocol::{ControlCommand, Envelope, InterruptSignal, UserQuestionResponse};
 use loopal_view_state::ViewStateReducer;
 
@@ -18,7 +18,7 @@ pub(crate) enum AgentConnectionState {
     /// In-process channels (for unit tests — no real Hub).
     Local(LocalChannels),
     /// Hub-mode: uniform IPC connection (agents via stdio, clients via TCP).
-    Connected(Arc<Connection>),
+    Connected(Arc<Connection<Listening>>),
     /// Shadow entry for a remote agent spawned on another Hub via MetaHub.
     /// No real connection — only a placeholder so wait_agent and completion work.
     Shadow,
@@ -26,7 +26,7 @@ pub(crate) enum AgentConnectionState {
 
 impl AgentConnectionState {
     /// Extract the IPC Connection if available.
-    pub(crate) fn connection(&self) -> Option<Arc<Connection>> {
+    pub(crate) fn connection(&self) -> Option<Arc<Connection<Listening>>> {
         match self {
             Self::Connected(conn) => Some(Arc::clone(conn)),
             Self::Local(_) | Self::Shadow => None,

@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use loopal_secret_client::IpcBudget;
 use loopal_secret_client::SecretClient;
 use loopal_secret_client::SecretError;
 use loopal_secret_client::placeholder::{AUTHOR_RE, WIRE_RE};
@@ -66,13 +67,11 @@ pub fn collect_wire_names(input: &str) -> Vec<String> {
         .collect()
 }
 
-/// Async-expand `{{secret:NAME}}` placeholders to plaintext via the given client.
-///
-/// Unlike `translate_outbound` (which converts author syntax to wire syntax
-/// for LLM-bound text), this resolves directly to plaintext. Use for fields
-/// that must contain real secret values at point of use, e.g. provider
-/// `api_key` / `base_url` and MCP server `env` / `headers` / `url`.
-pub async fn expand_to_plaintext(input: &str, client: &dyn SecretClient) -> String {
+pub async fn expand_to_plaintext(
+    input: &str,
+    client: &dyn SecretClient,
+    budget: IpcBudget,
+) -> String {
     let names: Vec<String> = AUTHOR_RE
         .captures_iter(input)
         .map(|c| c[1].to_string())
@@ -83,7 +82,7 @@ pub async fn expand_to_plaintext(input: &str, client: &dyn SecretClient) -> Stri
     let mut resolved: std::collections::HashMap<String, secrecy::SecretString> =
         std::collections::HashMap::new();
     for n in &names {
-        match client.get(n).await {
+        match client.get(n, budget).await {
             Ok(v) => {
                 resolved.insert(n.clone(), v);
             }

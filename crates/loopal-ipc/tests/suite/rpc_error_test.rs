@@ -16,8 +16,7 @@ async fn rpc_error_preserves_data_field() {
         Box::new(tokio::io::BufReader::new(server_to_client_rx)),
         Box::new(client_to_server_tx),
     ));
-    let client = Arc::new(Connection::new(client_transport));
-    let _rx = client.start();
+    let (client, _rx) = Connection::new(client_transport).into_listening();
 
     let mut server_writer = server_to_client_tx;
     let response_with_data = json!({

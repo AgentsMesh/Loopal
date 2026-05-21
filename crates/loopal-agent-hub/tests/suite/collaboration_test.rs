@@ -36,8 +36,7 @@ async fn spawn_and_result_full_chain() {
 
     // Register mock child (simulates hub/spawn_agent result)
     let (_ca, ct) = loopal_ipc::duplex_pair();
-    let child = Arc::new(Connection::new(ct));
-    let child_rx = child.start();
+    let (child, child_rx) = Connection::new(ct).into_listening();
     let _ = register_agent_connection(
         hub.clone(),
         "worker",
@@ -87,8 +86,7 @@ async fn agent_info_running_and_finished() {
 
     // Register child
     let (_ca, ct) = loopal_ipc::duplex_pair();
-    let child = Arc::new(Connection::new(ct));
-    let child_rx = child.start();
+    let (child, child_rx) = Connection::new(ct).into_listening();
     let _ = register_agent_connection(
         hub.clone(),
         "child-a",
@@ -255,8 +253,7 @@ async fn cascade_shutdown_interrupts_children() {
 
     // Register parent
     let (_pa, pt) = loopal_ipc::duplex_pair();
-    let parent = Arc::new(Connection::new(pt));
-    let parent_rx = parent.start();
+    let (parent, parent_rx) = Connection::new(pt).into_listening();
     let _ = register_agent_connection(hub.clone(), "parent", parent, parent_rx, None, None, None)
         .await
         .unwrap();
@@ -264,10 +261,9 @@ async fn cascade_shutdown_interrupts_children() {
 
     // Register child with interrupt capture
     let (child_client, child_server) = loopal_ipc::duplex_pair();
-    let child_conn = Arc::new(Connection::new(child_client));
-    let server_conn = Arc::new(Connection::new(child_server));
-    let client_rx = child_conn.start();
-    let server_rx = server_conn.start();
+    let (child_conn, client_rx) = Connection::new(child_client).into_listening();
+    let (server_conn, server_rx) = Connection::new(child_server).into_listening();
+
     let _ = register_agent_connection(
         hub.clone(),
         "child",

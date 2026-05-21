@@ -31,8 +31,7 @@ async fn hub_status_shows_uplink() {
 
     {
         let (t, _) = loopal_ipc::duplex_pair();
-        let c = Arc::new(Connection::new(t));
-        let _rx = c.start();
+        let (c, _rx) = Connection::new(t).into_listening();
         hub.lock().await.uplink = Some(Arc::new(loopal_agent_hub::HubUplink::new(
             c,
             "my-hub".into(),
@@ -85,8 +84,7 @@ async fn heartbeat_updates_agent_count() {
 async fn heartbeat_timeout_degrades_and_disconnects() {
     let meta_hub = Arc::new(Mutex::new(MetaHub::new()));
     let (_, meta_transport) = loopal_ipc::duplex_pair();
-    let meta_conn = Arc::new(Connection::new(meta_transport));
-    let _rx = meta_conn.start();
+    let (meta_conn, _rx) = Connection::new(meta_transport).into_listening();
 
     // Register with a hub_info that has an old heartbeat
     {

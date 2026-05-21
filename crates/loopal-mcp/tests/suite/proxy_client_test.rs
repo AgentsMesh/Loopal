@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
-use loopal_mcp::{HubMcpClient, McpProvider, McpProxyClient};
+use loopal_mcp::{HUB_RPC_BUDGET, HubMcpClient, IpcBudget, McpProvider, McpProxyClient};
 use serde_json::{Value, json};
 
 struct MockHubClient {
@@ -52,7 +52,7 @@ async fn list_tools_parses_server_and_tool_definitions() {
         }),
     )]);
     let proxy = McpProxyClient::new(mock);
-    let tools = proxy.list_tools().await;
+    let tools = proxy.list_tools(HUB_RPC_BUDGET).await;
     assert_eq!(tools.len(), 2);
     assert_eq!(tools[0].0, "s1");
     assert_eq!(tools[0].1.name, "t1");
@@ -64,14 +64,14 @@ async fn list_tools_parses_server_and_tool_definitions() {
 async fn list_tools_empty_response_returns_empty_vec() {
     let mock = MockHubClient::new(vec![("hub/mcp/list_tools", json!({"tools": []}))]);
     let proxy = McpProxyClient::new(mock);
-    assert!(proxy.list_tools().await.is_empty());
+    assert!(proxy.list_tools(HUB_RPC_BUDGET).await.is_empty());
 }
 
 #[tokio::test]
 async fn list_tools_ipc_error_returns_empty_vec() {
     let mock = MockHubClient::new(vec![]);
     let proxy = McpProxyClient::new(mock);
-    assert!(proxy.list_tools().await.is_empty());
+    assert!(proxy.list_tools(HUB_RPC_BUDGET).await.is_empty());
 }
 
 #[tokio::test]
@@ -82,7 +82,7 @@ async fn call_tool_forwards_server_tool_and_args() {
     )]);
     let proxy = McpProxyClient::new(mock.clone());
     let result = proxy
-        .call_tool("srv", "the_tool", &json!({"k": "v"}))
+        .call_tool("srv", "the_tool", &json!({"k": "v"}), HUB_RPC_BUDGET)
         .await
         .expect("call_tool ok");
     assert_eq!(result.is_error, Some(false));
@@ -103,7 +103,7 @@ async fn call_tool_is_error_true_is_preserved() {
     )]);
     let proxy = McpProxyClient::new(mock);
     let result = proxy
-        .call_tool("s", "t", &json!({}))
+        .call_tool("s", "t", &json!({}), HUB_RPC_BUDGET)
         .await
         .expect("call_tool ok");
     assert_eq!(result.is_error, Some(true));
@@ -113,7 +113,10 @@ async fn call_tool_is_error_true_is_preserved() {
 async fn call_tool_transport_error_returns_mcp_error() {
     let mock = MockHubClient::new(vec![]);
     let proxy = McpProxyClient::new(mock);
-    let err = proxy.call_tool("s", "t", &json!({})).await.unwrap_err();
+    let err = proxy
+        .call_tool("s", "t", &json!({}), HUB_RPC_BUDGET)
+        .await
+        .unwrap_err();
     let msg = format!("{err}");
     assert!(msg.contains("hub/mcp/call_tool"));
 }
@@ -138,7 +141,7 @@ async fn snapshot_parses_server_records() {
         }),
     )]);
     let proxy = McpProxyClient::new(mock);
-    let snaps = proxy.snapshot().await;
+    let snaps = proxy.snapshot(HUB_RPC_BUDGET).await;
     assert_eq!(snaps.len(), 1);
     assert_eq!(snaps[0].name, "s1");
     assert_eq!(snaps[0].transport, "stdio");
@@ -155,17 +158,13 @@ async fn call_tool_times_out_when_hub_hangs() {
             std::future::pending::<Result<Value, String>>().await
         }
     }
-    // SAFETY: env override is process-global; this test is single-threaded.
-    unsafe {
-        std::env::set_var("LOOPAL_MCP_PROXY_RPC_TIMEOUT_SECS", "1");
-    }
     let proxy = McpProxyClient::new(Arc::new(HangingHub));
     let start = std::time::Instant::now();
-    let err = proxy.call_tool("s", "t", &json!({})).await.unwrap_err();
+    let err = proxy
+        .call_tool("s", "t", &json!({}), IpcBudget::allow_secs(1))
+        .await
+        .unwrap_err();
     let elapsed = start.elapsed();
-    unsafe {
-        std::env::remove_var("LOOPAL_MCP_PROXY_RPC_TIMEOUT_SECS");
-    }
     assert!(
         elapsed < std::time::Duration::from_secs(3),
         "proxy must surface timeout, got {elapsed:?}"
@@ -190,7 +189,7 @@ async fn call_tool_round_trips_non_text_content_blocks() {
     )]);
     let proxy = McpProxyClient::new(mock);
     let result = proxy
-        .call_tool("s", "t", &json!({}))
+        .call_tool("s", "t", &json!({}), HUB_RPC_BUDGET)
         .await
         .expect("call_tool ok");
 
@@ -225,12 +224,12 @@ async fn list_tools_ipc_returns_empty_on_malformed_payload() {
         json!({"tools": "not-an-array"}),
     )]);
     let proxy = McpProxyClient::new(mock);
-    assert!(proxy.list_tools().await.is_empty());
+    assert!(proxy.list_tools(HUB_RPC_BUDGET).await.is_empty());
 }
 
 #[tokio::test]
 async fn snapshot_ipc_returns_empty_on_malformed_payload() {
     let mock = MockHubClient::new(vec![("hub/mcp/snapshot", json!({"servers": 42}))]);
     let proxy = McpProxyClient::new(mock);
-    assert!(proxy.snapshot().await.is_empty());
+    assert!(proxy.snapshot(HUB_RPC_BUDGET).await.is_empty());
 }

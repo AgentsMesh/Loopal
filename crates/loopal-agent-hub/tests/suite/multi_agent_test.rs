@@ -10,7 +10,7 @@ use loopal_agent_hub::Hub;
 use loopal_agent_hub::hub_server;
 use loopal_agent_hub::spawn_manager::register_agent_connection;
 use loopal_agent_hub::start_event_loop;
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::rpc_error::RpcError;
 use loopal_protocol::{AgentEvent, AgentEventPayload};
@@ -21,7 +21,7 @@ fn make_hub() -> (Arc<Mutex<Hub>>, mpsc::Receiver<AgentEvent>) {
     (Arc::new(Mutex::new(Hub::new(tx))), rx)
 }
 
-fn spawn_mock(conn: Arc<Connection>, rx: mpsc::Receiver<Incoming>) {
+fn spawn_mock(conn: Arc<Connection<Listening>>, rx: mpsc::Receiver<Incoming>) {
     tokio::spawn(async move {
         let mut rx = rx;
         while let Some(msg) = rx.recv().await {
@@ -94,8 +94,7 @@ async fn route_to_disconnected_agent_returns_error() {
     // Register then immediately unregister (simulate disconnect)
     {
         let (_t1, t2) = loopal_ipc::duplex_pair();
-        let conn = Arc::new(Connection::new(t2));
-        let _rx = conn.start();
+        let (conn, _rx) = Connection::new(t2).into_listening();
         let mut h = hub.lock().await;
         let _ = h.registry.register_connection("ghost", conn);
         h.registry.unregister_connection("ghost");
@@ -163,8 +162,7 @@ async fn wait_already_finished_agent_returns_immediately() {
 
     // Register and immediately finish
     let (_t1, t2) = loopal_ipc::duplex_pair();
-    let conn = Arc::new(Connection::new(t2));
-    let rx = conn.start();
+    let (conn, rx) = Connection::new(t2).into_listening();
     let _ = register_agent_connection(hub.clone(), "done-agent", conn, rx, None, None, None)
         .await
         .unwrap();
@@ -205,8 +203,7 @@ async fn multiple_waiters_on_same_agent() {
     let (hub, _) = make_hub();
 
     let (_t1, t2) = loopal_ipc::duplex_pair();
-    let conn = Arc::new(Connection::new(t2));
-    let rx = conn.start();
+    let (conn, rx) = Connection::new(t2).into_listening();
     let _ = register_agent_connection(hub.clone(), "shared-target", conn, rx, None, None, None)
         .await
         .unwrap();
@@ -256,11 +253,20 @@ async fn root_agent_event_gets_main_agent_name() {
 
     // Register as root (no is_root parameter — all agents are treated equally)
     let (t1, t2) = loopal_ipc::duplex_pair();
-    let agent_conn = Arc::new(Connection::new(t1));
-    let server_conn = Arc::new(Connection::new(t2));
-    let _agent_rx = agent_conn.start();
-    let server_rx = server_conn.start();
-    loopal_agent_hub::agent_io::start_agent_io(hub.clone(), "main", server_conn, server_rx);
+    let (agent_conn, _agent_rx) = Connection::new(t1).into_listening();
+    let (server_conn, server_rx) = Connection::new(t2).into_listening();
+
+    let dispatcher = std::sync::Arc::new(loopal_agent_hub::dispatch::build_hub_dispatcher(
+        hub.clone(),
+    ));
+    loopal_agent_hub::agent_io::start_agent_io(
+        hub.clone(),
+        dispatcher,
+        "main",
+        server_conn,
+        server_rx,
+        None,
+    );
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Root agent sends event with agent_name=None — IO loop fills in "main"

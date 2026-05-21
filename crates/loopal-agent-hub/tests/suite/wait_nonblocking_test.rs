@@ -12,7 +12,7 @@ use tokio::sync::{Mutex, mpsc};
 use loopal_agent_hub::Hub;
 use loopal_agent_hub::hub_server;
 use loopal_agent_hub::spawn_manager::register_agent_connection;
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_protocol::AgentEvent;
 use serde_json::json;
@@ -164,12 +164,15 @@ async fn spawn_after_wait_not_blocked() {
     assert!(agents["agents"].is_array());
 }
 
-fn mock_agent() -> (Arc<Connection>, Arc<Connection>, mpsc::Receiver<Incoming>) {
+fn mock_agent() -> (
+    Arc<Connection<Listening>>,
+    Arc<Connection<Listening>>,
+    mpsc::Receiver<Incoming>,
+) {
     let (client_transport, server_transport) = loopal_ipc::duplex_pair();
-    let client_conn = Arc::new(Connection::new(client_transport));
-    let server_conn = Arc::new(Connection::new(server_transport));
-    let _client_rx = client_conn.start();
-    let server_rx = server_conn.start();
+    let (client_conn, _client_rx) = Connection::new(client_transport).into_listening();
+    let (server_conn, server_rx) = Connection::new(server_transport).into_listening();
+
     // Wrap server_rx in a channel so register_agent_connection can consume it
     let (tx, rx) = mpsc::channel(256);
     tokio::spawn(async move {

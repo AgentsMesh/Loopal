@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use serde_json::Value;
 use tracing::{debug, info, warn};
 
-use loopal_ipc::connection::Connection;
+use loopal_ipc::connection::{Connection, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_protocol::{Question, UserQuestionResponse};
 use loopal_runtime::frontend::permission_handler::{PermissionHandler, PermissionOutcome};
@@ -14,7 +14,7 @@ use crate::session_hub::SharedSession;
 
 pub type SessionRef = Arc<tokio::sync::RwLock<Arc<SharedSession>>>;
 
-async fn primary_connection(session: &SessionRef) -> Option<Arc<Connection>> {
+async fn primary_connection(session: &SessionRef) -> Option<Arc<Connection<Listening>>> {
     let snap = session.read().await.clone();
     snap.primary_connection().await
 }

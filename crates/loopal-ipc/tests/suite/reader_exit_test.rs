@@ -4,7 +4,6 @@
 //! the background reader task breaks on the next `tx.send()` failure rather than
 //! silently continuing to read from the transport.
 
-use std::sync::Arc;
 use std::time::Duration;
 
 use loopal_ipc::connection::Connection;
@@ -21,11 +20,8 @@ async fn reader_exits_after_incoming_channel_dropped() {
     let (client_transport, server_transport) = loopal_ipc::duplex_pair();
     let server_transport_ref = server_transport.clone();
 
-    let client = Arc::new(Connection::new(client_transport));
-    let server = Arc::new(Connection::new(server_transport));
-
-    let server_rx = server.start();
-    let _client_rx = client.start();
+    let (client, _client_rx) = Connection::new(client_transport).into_listening();
+    let (_server, server_rx) = Connection::new(server_transport).into_listening();
 
     // Drop the server's incoming receiver
     drop(server_rx);

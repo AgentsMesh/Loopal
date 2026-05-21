@@ -3,12 +3,17 @@
 use std::sync::Arc;
 
 use loopal_ipc::StdioTransport;
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
+use tokio::sync::mpsc;
 
 use loopal_agent_client::AgentClient;
 
-fn make_pair() -> (Arc<dyn loopal_ipc::transport::Transport>, Arc<Connection>) {
+fn make_pair() -> (
+    Arc<dyn loopal_ipc::transport::Transport>,
+    Arc<Connection<Listening>>,
+    mpsc::Receiver<Incoming>,
+) {
     let (a_tx, a_rx) = tokio::io::duplex(8192);
     let (b_tx, b_rx) = tokio::io::duplex(8192);
     let ct: Arc<dyn loopal_ipc::transport::Transport> = Arc::new(StdioTransport::new(
@@ -19,13 +24,13 @@ fn make_pair() -> (Arc<dyn loopal_ipc::transport::Transport>, Arc<Connection>) {
         Box::new(tokio::io::BufReader::new(a_rx)),
         Box::new(b_tx),
     ));
-    (ct, Arc::new(Connection::new(st)))
+    let (server, server_rx) = Connection::new(st).into_listening();
+    (ct, server, server_rx)
 }
 
 #[tokio::test]
 async fn send_control_delivers_to_server() {
-    let (transport, server) = make_pair();
-    let mut server_rx = server.start();
+    let (transport, server, mut server_rx) = make_pair();
     let client = AgentClient::new(transport);
 
     let sc = server.clone();
@@ -43,8 +48,7 @@ async fn send_control_delivers_to_server() {
 
 #[tokio::test]
 async fn send_interrupt_delivers_notification() {
-    let (transport, server) = make_pair();
-    let mut server_rx = server.start();
+    let (transport, _server, mut server_rx) = make_pair();
     let client = AgentClient::new(transport);
 
     client.send_interrupt().await.unwrap();
@@ -61,8 +65,7 @@ async fn send_interrupt_delivers_notification() {
 
 #[tokio::test]
 async fn send_message_delivers_envelope() {
-    let (transport, server) = make_pair();
-    let mut server_rx = server.start();
+    let (transport, server, mut server_rx) = make_pair();
     let client = AgentClient::new(transport);
 
     let sc = server.clone();

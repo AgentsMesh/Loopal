@@ -11,11 +11,11 @@ use tokio::sync::Mutex;
 use tokio::sync::mpsc;
 
 use loopal_agent_hub::{Hub, agent_io, hub_server, start_event_loop};
-use loopal_ipc::Connection;
 use loopal_ipc::TcpTransport;
 use loopal_ipc::connection::Incoming;
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
+use loopal_ipc::{Connection, Listening};
 use loopal_protocol::{
     AgentEvent, AgentEventPayload, Envelope, MessageSource, QualifiedAddress, UserContent,
 };
@@ -37,13 +37,12 @@ async fn connect_ui(
     port: u16,
     token: &str,
     name: &str,
-) -> (Arc<Connection>, mpsc::Receiver<Incoming>) {
+) -> (Arc<Connection<Listening>>, mpsc::Receiver<Incoming>) {
     let stream = TcpStream::connect(format!("127.0.0.1:{port}"))
         .await
         .unwrap();
     let transport: Arc<dyn Transport> = Arc::new(TcpTransport::new(stream));
-    let conn = Arc::new(Connection::new(transport));
-    let rx = conn.start();
+    let (conn, rx) = Connection::new(transport).into_listening();
     conn.send_request(
         methods::HUB_REGISTER.name,
         json!({"name": name, "token": token, "role": "ui_client"}),
@@ -59,10 +58,9 @@ async fn connect_ui(
 /// resolves promptly.
 async fn register_auto_responding_agent(hub: &Arc<Mutex<Hub>>, name: &str) {
     let (t1, t2) = loopal_ipc::duplex_pair();
-    let hub_side = Arc::new(Connection::new(t1));
-    let _hub_rx = hub_side.start();
-    let agent_side = Arc::new(Connection::new(t2));
-    let mut agent_rx = agent_side.start();
+    let (hub_side, _hub_rx) = Connection::new(t1).into_listening();
+    let (agent_side, mut agent_rx) = Connection::new(t2).into_listening();
+
     hub.lock()
         .await
         .registry
@@ -149,7 +147,7 @@ async fn user_input_from_one_ui_lands_in_both_ui_streams() {
 /// `ToolPermissionRequest` event arrives on `rx` (parsed from
 /// `agent/event` notifications).
 fn approve_first_permission_via_events(
-    conn: Arc<Connection>,
+    conn: Arc<Connection<Listening>>,
     mut rx: mpsc::Receiver<Incoming>,
     allow: bool,
 ) {
@@ -187,10 +185,8 @@ async fn permission_resolved_event_reaches_non_winning_ui() {
     let (hub, port, token) = make_hub().await;
 
     let (t1, t2) = loopal_ipc::duplex_pair();
-    let hub_side = Arc::new(Connection::new(t1));
-    let hub_rx = hub_side.start();
-    let agent_side = Arc::new(Connection::new(t2));
-    let _agent_rx = agent_side.start();
+    let (hub_side, hub_rx) = Connection::new(t1).into_listening();
+    let (agent_side, _agent_rx) = Connection::new(t2).into_listening();
     hub.lock()
         .await
         .registry
@@ -198,7 +194,10 @@ async fn permission_resolved_event_reaches_non_winning_ui() {
         .unwrap();
     // Hub-side IO loop: dispatch agent/permission via pending_relay
     // (writes pending + emits ToolPermissionRequest event).
-    agent_io::spawn_io_loop(hub.clone(), "main", hub_side, hub_rx);
+    let dispatcher = std::sync::Arc::new(loopal_agent_hub::dispatch::build_hub_dispatcher(
+        hub.clone(),
+    ));
+    agent_io::spawn_io_loop(hub.clone(), dispatcher, "main", hub_side, hub_rx);
 
     let (ui_a, rx_a) = connect_ui(port, &token, "tui-A").await;
     let (_ui_b, mut rx_b) = connect_ui(port, &token, "tui-B").await;

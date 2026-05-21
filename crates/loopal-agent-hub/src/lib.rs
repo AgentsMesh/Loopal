@@ -24,6 +24,7 @@ mod tcp_ui_io;
 pub mod topology;
 mod types;
 mod ui_dispatcher;
+mod ui_request_loop;
 pub mod ui_session;
 pub mod uplink;
 pub mod view_router;

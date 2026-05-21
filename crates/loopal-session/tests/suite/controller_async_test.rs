@@ -87,8 +87,7 @@ async fn hub_respond_permission_sends_request() {
             Box::new(tokio::io::BufReader::new(client_side)),
             Box::new(server_side),
         ));
-    let conn = Arc::new(loopal_ipc::connection::Connection::new(client_transport));
-    let _rx = conn.start();
+    let (conn, _rx) = loopal_ipc::connection::Connection::new(client_transport).into_listening();
     let hub_client = Arc::new(HubClient::new(conn));
     let ctrl = SessionController::with_hub(hub_client);
     let _handle = tokio::spawn(async move {
@@ -119,8 +118,7 @@ async fn shutdown_hub_with_hub_backend_sends_request() {
             Box::new(tokio::io::BufReader::new(client_reader)),
             Box::new(client_writer),
         ));
-    let conn = Arc::new(loopal_ipc::connection::Connection::new(client_transport));
-    let _rx = conn.start();
+    let (conn, _rx) = loopal_ipc::connection::Connection::new(client_transport).into_listening();
     let hub_client = Arc::new(HubClient::new(conn));
     let ctrl = SessionController::with_hub(hub_client);
 

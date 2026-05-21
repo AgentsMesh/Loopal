@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use loopal_ipc::connection::Connection;
+use loopal_ipc::connection::{Connection, Listening};
 
 use crate::hub_info::HubInfo;
 
@@ -12,19 +12,19 @@ use crate::hub_info::HubInfo;
 /// Analogous to `ManagedAgent` in `loopal-agent-hub`.
 pub struct ManagedHub {
     /// IPC connection to the sub-hub (TCP).
-    pub(crate) conn: Arc<Connection>,
+    pub(crate) conn: Arc<Connection<Listening>>,
     /// Metadata snapshot (name, status, capabilities, etc.).
     pub(crate) info: HubInfo,
 }
 
 impl ManagedHub {
     /// Create a new managed hub entry.
-    pub fn new(conn: Arc<Connection>, info: HubInfo) -> Self {
+    pub fn new(conn: Arc<Connection<Listening>>, info: HubInfo) -> Self {
         Self { conn, info }
     }
 
     /// Get the connection to this sub-hub.
-    pub fn connection(&self) -> &Arc<Connection> {
+    pub fn connection(&self) -> &Arc<Connection<Listening>> {
         &self.conn
     }
 

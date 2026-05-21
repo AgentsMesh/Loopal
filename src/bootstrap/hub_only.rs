@@ -1,6 +1,9 @@
 use chrono::Utc;
 use tokio::io::AsyncWriteExt as _;
+use tokio::sync::oneshot;
 use tracing::{error, info};
+
+use loopal_ipc::HandshakeLine;
 
 use crate::cli::Cli;
 
@@ -14,10 +17,31 @@ pub async fn run(
 ) -> anyhow::Result<()> {
     info!("starting in hub-only mode");
 
-    let ctx = match super::hub_bootstrap::bootstrap_hub_and_agent(cli, cwd, config, resume).await {
-        Ok(ctx) => ctx,
+    let (alive_tx, alive_rx) = oneshot::channel();
+    let bootstrap = super::hub_bootstrap::bootstrap_hub_and_agent_with_alive(
+        cli,
+        cwd,
+        config,
+        resume,
+        Some(alive_tx),
+    );
+    let alive_task = tokio::spawn(async move {
+        if let Ok(info) = alive_rx.await {
+            write_line(&HandshakeLine::Alive {
+                addr: info.addr,
+                token: info.token,
+            })
+            .await;
+        }
+    });
+    let ctx = match bootstrap.await {
+        Ok(ctx) => {
+            let _ = alive_task.await;
+            ctx
+        }
         Err(e) => {
-            write_handshake_error(&e.to_string()).await;
+            let _ = alive_task.await;
+            write_line(&HandshakeLine::Error(e.to_string())).await;
             return Err(e);
         }
     };
@@ -26,7 +50,7 @@ pub async fn run(
         Some(p) => p,
         None => {
             let msg = "hub listener has no port";
-            write_handshake_error(msg).await;
+            write_line(&HandshakeLine::Error(msg.into())).await;
             return Err(anyhow::anyhow!(msg));
         }
     };
@@ -34,39 +58,20 @@ pub async fn run(
     let addr = format!("127.0.0.1:{port}");
     let pid = std::process::id();
 
-    // Bind the per-pid token channel FIRST. If it fails the discovery
-    // record is intentionally NOT written so `--list-hubs` does not
-    // advertise an unreachable Hub. Users can still attach via the
-    // explicit `--attach-hub <addr> --hub-token <t>` path printed on
-    // stdout.
-    let channel_result = token_channel::bind_token_channel(pid, token.clone());
-    let _channel = match channel_result {
-        Ok(handle) => {
-            let record = discovery::HubDiscoveryRecord {
-                pid,
-                tcp_addr: addr.clone(),
-                cwd: cwd.display().to_string(),
-                started_at: Utc::now().to_rfc3339(),
-                root_session_id: ctx.root_session_id.clone(),
-            };
-            if let Err(e) = discovery::write_record(&record) {
-                error!(error = %e, "failed to write hub discovery record");
-            }
-            Some(handle)
-        }
-        Err(e) => {
-            error!(error = %e, "failed to bind hub token channel; \
-                                  --list-hubs / --attach-hub-pid unavailable");
-            None
-        }
-    };
+    let _channel = register_with_token_channel(pid, &token, &addr, cwd, &ctx.root_session_id);
 
-    write_handshake_line(&addr, &token, &ctx.root_session_id).await?;
+    write_line(&HandshakeLine::Ready {
+        session_id: ctx.root_session_id.clone(),
+    })
+    .await;
+    write_line(&HandshakeLine::Legacy {
+        addr: addr.clone(),
+        token: token.clone(),
+        session_id: ctx.root_session_id.clone(),
+    })
+    .await;
     info!(%addr, pid, "hub-only listening; awaiting hub/shutdown");
 
-    // Subscribe to events BEFORE starting the broadcast forwarder, so
-    // the persist watcher does not miss any SubAgentSpawned that could
-    // race with the loop's first iteration.
     let persist_subscriber = ctx.hub.lock().await.ui.subscribe_events();
     let persist_root = ctx.root_session_id.clone();
     tokio::spawn(async move {
@@ -85,27 +90,40 @@ pub async fn run(
     Ok(())
 }
 
-async fn write_handshake_line(addr: &str, token: &str, session_id: &str) -> anyhow::Result<()> {
-    // Use tokio's async stdout: writing the handshake on the runtime's
-    // sync std::io::stdout would block the reactor if the parent's pipe
-    // buffer were full (would deadlock the spawn handshake itself).
-    let mut out = tokio::io::stdout();
-    let line = format!("LOOPAL_HUB {addr} {token} {session_id}\n");
-    out.write_all(line.as_bytes()).await.map_err(|e| {
-        error!(error = %e, "failed to write hub handshake to stdout");
-        anyhow::anyhow!("hub handshake write failed: {e}")
-    })?;
-    let _ = out.flush().await;
-    Ok(())
+fn register_with_token_channel(
+    pid: u32,
+    token: &str,
+    addr: &str,
+    cwd: &std::path::Path,
+    session_id: &str,
+) -> Option<tokio::task::JoinHandle<()>> {
+    // reason: bind the per-pid token channel FIRST. If it fails the discovery
+    // record is intentionally NOT written so `--list-hubs` does not advertise
+    // an unreachable Hub.
+    let handle = match token_channel::bind_token_channel(pid, token.to_string()) {
+        Ok(h) => h,
+        Err(e) => {
+            error!(error = %e, "failed to bind hub token channel; --list-hubs / --attach-hub-pid unavailable");
+            return None;
+        }
+    };
+    let record = discovery::HubDiscoveryRecord {
+        pid,
+        tcp_addr: addr.to_string(),
+        cwd: cwd.display().to_string(),
+        started_at: Utc::now().to_rfc3339(),
+        root_session_id: session_id.to_string(),
+    };
+    if let Err(e) = discovery::write_record(&record) {
+        error!(error = %e, "failed to write hub discovery record");
+    }
+    Some(handle)
 }
 
-async fn write_handshake_error(msg: &str) {
-    let sanitized: String = msg
-        .chars()
-        .map(|c| if c == '\n' { ' ' } else { c })
-        .collect();
+async fn write_line(line: &HandshakeLine) {
     let mut out = tokio::io::stdout();
-    let line = format!("LOOPAL_HUB_ERROR {sanitized}\n");
-    let _ = out.write_all(line.as_bytes()).await;
+    if let Err(e) = out.write_all(line.encode().as_bytes()).await {
+        error!(error = %e, "failed to write handshake line");
+    }
     let _ = out.flush().await;
 }

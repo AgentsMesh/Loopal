@@ -1,8 +1,8 @@
 use std::sync::Arc;
-use std::time::Duration;
 
 use async_trait::async_trait;
 use loopal_error::McpError;
+use loopal_ipc::IpcBudget;
 use loopal_ipc::protocol::methods;
 use loopal_protocol::{
     McpCallToolRequest, McpCallToolResponse, McpListToolsResponse, McpSnapshotResponse,
@@ -14,17 +14,6 @@ use serde_json::Value;
 use crate::manager_query::McpConnectionSnapshot;
 use crate::provider::McpProvider;
 use crate::tool_result_text::block_to_text;
-
-/// Per-request IPC deadline. Defends against root agent dying mid-call
-/// or a hub that accepts the request but never forwards it. Overridable
-/// via `LOOPAL_MCP_PROXY_RPC_TIMEOUT_SECS` for slow MCP servers.
-fn proxy_rpc_timeout() -> Duration {
-    let secs = std::env::var("LOOPAL_MCP_PROXY_RPC_TIMEOUT_SECS")
-        .ok()
-        .and_then(|s| s.parse::<u64>().ok())
-        .unwrap_or(30);
-    Duration::from_secs(secs)
-}
 
 #[async_trait]
 pub trait HubMcpClient: Send + Sync {
@@ -40,29 +29,30 @@ impl McpProxyClient {
         Self { client }
     }
 
-    async fn rpc(&self, method: &str, params: Value) -> Result<Value, String> {
-        match tokio::time::timeout(
-            proxy_rpc_timeout(),
-            self.client.send_request(method, params),
-        )
-        .await
-        {
+    async fn rpc(&self, method: &str, params: Value, budget: IpcBudget) -> Result<Value, String> {
+        let timeout = match budget {
+            IpcBudget::Forbidden => {
+                return Err(format!(
+                    "{method} rejected: IpcBudget::Forbidden on critical path"
+                ));
+            }
+            IpcBudget::Allowed(d) => d,
+        };
+        match tokio::time::timeout(timeout, self.client.send_request(method, params)).await {
             Ok(inner) => inner,
-            Err(_) => Err(format!(
-                "{method} timed out after {:?}",
-                proxy_rpc_timeout()
-            )),
+            Err(_) => Err(format!("{method} timed out after {timeout:?}")),
         }
     }
 }
 
 #[async_trait]
 impl McpProvider for McpProxyClient {
-    async fn list_tools(&self) -> Vec<(String, ToolDefinition)> {
+    async fn list_tools(&self, budget: IpcBudget) -> Vec<(String, ToolDefinition)> {
         let resp = match self
             .rpc(
                 methods::HUB_MCP_LIST_TOOLS.name,
                 Value::Object(Default::default()),
+                budget,
             )
             .await
         {
@@ -100,6 +90,7 @@ impl McpProvider for McpProxyClient {
         server: &str,
         tool: &str,
         args: &Value,
+        budget: IpcBudget,
     ) -> Result<CallToolResult, McpError> {
         let req = McpCallToolRequest {
             server: server.to_string(),
@@ -109,7 +100,7 @@ impl McpProvider for McpProxyClient {
         let params = serde_json::to_value(&req)
             .map_err(|e| McpError::Protocol(format!("encode call_tool: {e}")))?;
         let resp = self
-            .rpc(methods::HUB_MCP_CALL_TOOL.name, params)
+            .rpc(methods::HUB_MCP_CALL_TOOL.name, params, budget)
             .await
             .map_err(|e| McpError::TransportClosed(format!("hub/mcp/call_tool: {e}")))?;
         let parsed: McpCallToolResponse = serde_json::from_value(resp)
@@ -127,11 +118,12 @@ impl McpProvider for McpProxyClient {
         })
     }
 
-    async fn snapshot(&self) -> Vec<McpConnectionSnapshot> {
+    async fn snapshot(&self, budget: IpcBudget) -> Vec<McpConnectionSnapshot> {
         let resp = match self
             .rpc(
                 methods::HUB_MCP_SNAPSHOT.name,
                 Value::Object(Default::default()),
+                budget,
             )
             .await
         {

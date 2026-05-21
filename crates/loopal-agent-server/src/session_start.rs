@@ -5,7 +5,7 @@ use tracing::{Instrument, info};
 
 use loopal_config::load_config;
 use loopal_error::AgentOutput;
-use loopal_ipc::connection::Connection;
+use loopal_ipc::connection::{Connection, Listening};
 use loopal_protocol::InterruptSignal;
 use loopal_runtime::agent_input::AgentInput;
 
@@ -23,7 +23,7 @@ pub(crate) struct SessionHandle {
 }
 
 pub(crate) async fn start_session(
-    connection: &Arc<Connection>,
+    connection: &Arc<Connection<Listening>>,
     request_id: i64,
     params: serde_json::Value,
     hub: &SessionHub,

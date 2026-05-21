@@ -130,20 +130,18 @@ async fn recursive_agent_nesting_grandchild_routes_to_root() {
 
     // Child A (registered as sub-agent of root)
     let (t1, t2) = loopal_ipc::duplex_pair();
-    let child_a = Arc::new(Connection::new(t1));
-    let server_a = Arc::new(Connection::new(t2));
-    let _ra = child_a.start();
-    let sra = server_a.start();
+    let (_child_a, _ra) = Connection::new(t1).into_listening();
+    let (server_a, sra) = Connection::new(t2).into_listening();
+
     let _ = register_agent_connection(hub.clone(), "child-a", server_a, sra, None, None, None)
         .await
         .unwrap();
 
     // Grandchild B (registered as sub-agent of child-a, same Hub)
     let (t3, t4) = loopal_ipc::duplex_pair();
-    let grandchild_b = Arc::new(Connection::new(t3));
-    let server_b = Arc::new(Connection::new(t4));
-    let _rb = grandchild_b.start();
-    let srb = server_b.start();
+    let (grandchild_b, _rb) = Connection::new(t3).into_listening();
+    let (server_b, srb) = Connection::new(t4).into_listening();
+
     let _ = register_agent_connection(hub.clone(), "grandchild-b", server_b, srb, None, None, None)
         .await
         .unwrap();
@@ -172,12 +170,21 @@ async fn concurrent_events_all_reach_hub() {
     for i in 0..3 {
         let name = format!("evt-agent-{i}");
         let (t1, t2) = loopal_ipc::duplex_pair();
-        let agent = Arc::new(Connection::new(t1));
-        let server = Arc::new(Connection::new(t2));
-        let _rx = agent.start();
-        let srx = server.start();
+        let (agent, _rx) = Connection::new(t1).into_listening();
+        let (server, srx) = Connection::new(t2).into_listening();
+
         // Register as sub-agent so agent_name gets tagged
-        loopal_agent_hub::agent_io::start_agent_io(hub.clone(), &name, server, srx);
+        let dispatcher = std::sync::Arc::new(loopal_agent_hub::dispatch::build_hub_dispatcher(
+            hub.clone(),
+        ));
+        loopal_agent_hub::agent_io::start_agent_io(
+            hub.clone(),
+            dispatcher,
+            &name,
+            server,
+            srx,
+            None,
+        );
         agent_conns.push((name, agent));
     }
     tokio::time::sleep(Duration::from_millis(50)).await;

@@ -151,7 +151,10 @@ impl Kernel {
                 Err(_) => Vec::new(),
             };
         }
-        self.mcp.provider().list_tools().await
+        self.mcp
+            .provider()
+            .list_tools(loopal_mcp::HUB_RPC_BUDGET)
+            .await
     }
 
     /// Register tools from a (re)connected MCP server. Used by reconnect path.

@@ -99,8 +99,7 @@ pub async fn run_kill_hub(pid: u32) -> Result<()> {
         .await
         .with_context(|| format!("connect {addr}"))?;
     let transport: Arc<dyn Transport> = Arc::new(TcpTransport::new(stream));
-    let conn = Arc::new(Connection::new(transport));
-    let _rx = conn.start();
+    let (conn, _rx) = Connection::new(transport).into_listening();
     let client_name = format!("kill-{}", &uuid::Uuid::new_v4().to_string()[..8]);
     let response = conn
         .send_request(

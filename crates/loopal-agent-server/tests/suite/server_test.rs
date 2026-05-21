@@ -6,10 +6,19 @@
 use std::sync::Arc;
 
 use loopal_ipc::StdioTransport;
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
+use tokio::sync::mpsc;
 
-fn pipe_connection_pair() -> (Arc<Connection>, Arc<Connection>) {
+struct ConnPair {
+    client: Arc<Connection<Listening>>,
+    #[allow(dead_code)]
+    client_rx: mpsc::Receiver<Incoming>,
+    server: Arc<Connection<Listening>>,
+    server_rx: mpsc::Receiver<Incoming>,
+}
+
+fn pipe_connection_pair() -> ConnPair {
     let (a_tx, a_rx) = tokio::io::duplex(8192);
     let (b_tx, b_rx) = tokio::io::duplex(8192);
     let ta: Arc<dyn loopal_ipc::transport::Transport> = Arc::new(StdioTransport::new(
@@ -20,14 +29,24 @@ fn pipe_connection_pair() -> (Arc<Connection>, Arc<Connection>) {
         Box::new(tokio::io::BufReader::new(a_rx)),
         Box::new(b_tx),
     ));
-    (Arc::new(Connection::new(ta)), Arc::new(Connection::new(tb)))
+    let (client, client_rx) = Connection::new(ta).into_listening();
+    let (server, server_rx) = Connection::new(tb).into_listening();
+    ConnPair {
+        client,
+        client_rx,
+        server,
+        server_rx,
+    }
 }
 
 #[tokio::test]
 async fn initialize_returns_agent_info() {
-    let (client, server) = pipe_connection_pair();
-    let mut server_rx = server.start();
-    let _client_rx = client.start();
+    let ConnPair {
+        client,
+        server,
+        mut server_rx,
+        ..
+    } = pipe_connection_pair();
 
     // Simulate server handling initialize
     let client_clone = client.clone();
@@ -61,9 +80,12 @@ async fn initialize_returns_agent_info() {
 
 #[tokio::test]
 async fn shutdown_before_start_is_graceful() {
-    let (client, server) = pipe_connection_pair();
-    let mut server_rx = server.start();
-    let _client_rx = client.start();
+    let ConnPair {
+        client,
+        server,
+        mut server_rx,
+        ..
+    } = pipe_connection_pair();
 
     let client_clone = client.clone();
     let handle = tokio::spawn(async move {
@@ -83,9 +105,11 @@ async fn shutdown_before_start_is_graceful() {
 
 #[tokio::test]
 async fn agent_event_notification_delivered() {
-    let (client, server) = pipe_connection_pair();
-    let mut client_rx = client.start();
-    let _server_rx = server.start();
+    let ConnPair {
+        mut client_rx,
+        server,
+        ..
+    } = pipe_connection_pair();
 
     // Server sends an agent/event notification
     server
@@ -115,9 +139,12 @@ async fn agent_event_notification_delivered() {
 
 #[tokio::test]
 async fn interrupt_notification_delivered() {
-    let (client, server) = pipe_connection_pair();
-    let mut server_rx = server.start();
-    let _client_rx = client.start();
+    let ConnPair {
+        client,
+        server: _,
+        mut server_rx,
+        ..
+    } = pipe_connection_pair();
 
     // Client sends interrupt notification
     client

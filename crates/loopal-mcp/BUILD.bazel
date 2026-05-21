@@ -10,6 +10,7 @@ rust_library(
         "//crates/loopal-error",
         "//crates/loopal-ipc",
         "//crates/loopal-protocol",
+        "//crates/loopal-secret-client",
         "//crates/loopal-secret-runtime",
         "//crates/loopal-tool-api",
         "//crates/loopal-vault-api",

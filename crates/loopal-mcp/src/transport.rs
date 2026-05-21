@@ -31,6 +31,11 @@ pub async fn connect_stdio(
     for (k, v) in env {
         cmd.env(k, v);
     }
+    // reason: ensure MCP child is reaped when its parent (Hub or root agent)
+    // exits. Without this, killing Hub leaves chrome-devtools-mcp / chrome
+    // grandchildren running indefinitely. Set kill_on_drop so the Tokio child
+    // handle's Drop sends SIGKILL.
+    cmd.kill_on_drop(true);
 
     let (transport, stderr) = TokioChildProcess::builder(cmd)
         .stderr(Stdio::piped())

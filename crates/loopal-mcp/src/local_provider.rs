@@ -153,6 +153,20 @@ impl LocalMcpProvider {
         }
         true
     }
+
+    /// O(1) check whether `server` has any settled tools. Semantically
+    /// equivalent to `list_tools().iter().any(|(s, _)| s == server)` but
+    /// without iterating the full tool list — `provider_for_call` dispatches
+    /// on every tool invocation, so the cheap-path matters.
+    pub async fn has_server(&self, server: &str) -> bool {
+        self.manager
+            .read()
+            .await
+            .connections
+            .get(server)
+            .map(|conn| !conn.cached_tools.is_empty())
+            .unwrap_or(false)
+    }
 }
 
 #[async_trait]

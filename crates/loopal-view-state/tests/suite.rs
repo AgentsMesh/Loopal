@@ -7,6 +7,8 @@ mod compact_banner_mutator_test;
 mod conversation_serde_test;
 #[path = "suite/decided_mutators_test.rs"]
 mod decided_mutators_test;
+#[path = "suite/e2e_hub_health_chain_test.rs"]
+mod e2e_hub_health_chain_test;
 #[path = "suite/e2e_resolve_source_propagation_test.rs"]
 mod e2e_resolve_source_propagation_test;
 #[path = "suite/free_text_test.rs"]

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use loopal_vault_api::Vault;
+use loopal_secret_client::{SecretClient, SecretError};
 use secrecy::{ExposeSecret, SecretString};
 use serde_json::Value;
 use tracing::warn;
@@ -17,10 +17,10 @@ pub async fn apply_resolver(
     tool_name: &str,
     effective_input: &mut Value,
     whitelist: &[&str],
-    vault: Option<&Arc<dyn Vault>>,
+    client: Option<&Arc<dyn SecretClient>>,
     session_id: &str,
 ) -> Vec<(String, SecretString)> {
-    let Some(vault) = vault else {
+    let Some(client) = client else {
         return Vec::new();
     };
     if whitelist.is_empty() {
@@ -34,9 +34,21 @@ pub async fn apply_resolver(
         std::collections::HashMap::new();
     let mut seed: Vec<(String, SecretString)> = Vec::new();
     for n in &names {
-        if let Some(v) = vault.get(n).await {
-            resolved.insert(n.clone(), v.clone());
-            seed.push((n.clone(), v));
+        match client.get(n).await {
+            Ok(v) => {
+                resolved.insert(n.clone(), v.clone());
+                seed.push((n.clone(), v));
+            }
+            Err(SecretError::SecretNotFound(_)) => {}
+            Err(e) => {
+                warn!(
+                    tool = tool_name,
+                    name = %n,
+                    error = %e,
+                    "secret_ref resolve failed (non-NotFound); \
+                     falling back to placeholder — tool may receive literal `<secret_ref:NAME>`"
+                );
+            }
         }
     }
     let report = resolve_in_value(effective_input, &resolved, whitelist);

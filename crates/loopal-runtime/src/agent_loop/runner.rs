@@ -69,7 +69,7 @@ impl AgentLoopRunner {
         .with_one_shot_chat_opt(params.one_shot_chat.clone())
         .with_fetch_refiner_policy_opt(params.fetch_refiner_policy.clone())
         .with_goal_session_opt(goal_adapter)
-        .with_secrets_opt(params.deps.kernel.secrets().cloned());
+        .with_secret_client_opt(params.deps.kernel.secret_client().cloned());
         let model_config = ModelConfig::from_model(
             params.config.model(),
             params.config.thinking_config.clone(),
@@ -118,6 +118,7 @@ impl AgentLoopRunner {
         self.emit_cold_start_observables().await?;
         self.emit_initial_mcp_status().await;
         self.spawn_mcp_settle_emitter();
+        self.spawn_hub_health_poller();
         self.fire_session_hook(loopal_config::HookEvent::SessionStart)
             .await;
 

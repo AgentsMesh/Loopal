@@ -18,6 +18,7 @@ pub mod naming;
 pub mod projected;
 pub mod projection;
 pub mod question;
+pub mod secret_ipc;
 pub mod task_snapshot;
 pub mod thread_goal;
 pub mod user_content;
@@ -43,6 +44,10 @@ pub use naming::ROOT_AGENT_NAME;
 pub use projected::{ProjectedMessage, ProjectedToolCall};
 pub use projection::project_messages;
 pub use question::{Question, QuestionOption, ResolveSource, UserQuestionResponse};
+pub use secret_ipc::{
+    SecretCaller, SecretGetRequest, SecretGetResponse, SecretHealthRequest,
+    SecretHealthResponse, SecretIpcError, SecretListNamesRequest, SecretListNamesResponse,
+};
 pub use task_snapshot::{TaskSnapshot, TaskSnapshotStatus};
 pub use thread_goal::{GoalTransitionReason, ThreadGoal, ThreadGoalStatus};
 pub use user_content::{ImageAttachment, SkillInvocation, UserContent};

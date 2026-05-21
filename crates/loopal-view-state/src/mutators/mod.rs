@@ -157,6 +157,8 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
         SubAgentSpawned(s) => aggregate::sub_agent_spawned(state, &s.name),
         SessionResumed { session_id, .. } => aggregate::session_resumed(state, session_id),
         ThreadGoalUpdated { goal, .. } => aggregate::thread_goal_updated(state, goal),
+        HubDegraded { since_unix_ms } => aggregate::hub_degraded(state, *since_unix_ms),
+        HubRecovered { .. } => aggregate::hub_recovered(state),
         MessageRouted { .. }
         | InboxConsumed { .. }
         | TurnDiffSummary { .. }

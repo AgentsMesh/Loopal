@@ -22,6 +22,10 @@ pub struct SessionViewState {
     /// `AgentStateSnapshot.thread_goal` on cold start / reconnect.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thread_goal: Option<ThreadGoal>,
+    /// Hub IPC health. `None` = healthy; `Some(unix_ms)` = degraded since
+    /// that timestamp. Updated by `HubDegraded` / `HubRecovered` events.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hub_degraded_since_ms: Option<u64>,
 }
 
 impl SessionViewState {
@@ -33,6 +37,7 @@ impl SessionViewState {
             bg_tasks: IndexMap::new(),
             mcp_status: None,
             thread_goal: None,
+            hub_degraded_since_ms: None,
         }
     }
 
@@ -49,6 +54,7 @@ impl SessionViewState {
             bg_tasks,
             mcp_status: None,
             thread_goal: snapshot.thread_goal,
+            hub_degraded_since_ms: None,
         }
     }
 }

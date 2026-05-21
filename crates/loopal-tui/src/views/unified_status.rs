@@ -76,6 +76,14 @@ pub fn render_unified_status(
         append_goal_indicator(&mut spans, &goal);
     }
 
+    if let Some(since_ms) = app.hub_degraded_since_for(&state.active_view) {
+        spans.push(Span::raw("  "));
+        spans.push(Span::styled(
+            format!("⚠ Hub degraded {}", format_degraded_age(since_ms)),
+            Style::default().fg(Color::Yellow).bold(),
+        ));
+    }
+
     let bg = if is_plan {
         Style::default().bg(Color::Rgb(50, 20, 50))
     } else {
@@ -169,4 +177,13 @@ pub fn format_duration(d: std::time::Duration) -> String {
     } else {
         format!("{}h{:02}m", secs / 3600, (secs % 3600) / 60)
     }
+}
+
+fn format_degraded_age(since_unix_ms: u64) -> String {
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(since_unix_ms);
+    let age_secs = now_ms.saturating_sub(since_unix_ms) / 1000;
+    format_duration(Duration::from_secs(age_secs))
 }

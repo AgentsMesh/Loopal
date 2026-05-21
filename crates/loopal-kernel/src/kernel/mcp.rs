@@ -40,8 +40,12 @@ impl Kernel {
         if self.settings.mcp_servers.is_empty() {
             return;
         }
-        if let Some(store) = self.secrets() {
-            local.manager().write().await.set_secrets(store.clone());
+        if let Some(client) = self.secret_client() {
+            local
+                .manager()
+                .write()
+                .await
+                .set_secret_client(client.clone());
         }
         local.spawn_background(self.settings.mcp_servers.clone());
     }
@@ -94,15 +98,17 @@ impl Kernel {
 
     /// Public re-entry point for the late-registration listener spawned in
     /// `build_kernel_from_config`. Idempotent — already-registered tools are
-    /// skipped by the inner ToolRegistry conflict check.
-    pub async fn register_all_settled_mcp_tools(&self) {
-        self.register_mcp_tool_adapters().await;
+    /// skipped by the inner ToolRegistry conflict check. Returns the number
+    /// of newly registered adapters so callers can detect a settled state.
+    pub async fn register_all_settled_mcp_tools(&self) -> usize {
+        self.register_mcp_tool_adapters().await
     }
 
-    async fn register_mcp_tool_adapters(&self) {
+    async fn register_mcp_tool_adapters(&self) -> usize {
         let provider = self.mcp.provider();
         let tools = self.snapshot_tools_for_registration().await;
         let mut skipped = Vec::new();
+        let mut registered = 0usize;
         for (server_name, tool_def) in tools {
             if self.tool_registry.get(&tool_def.name).is_some() {
                 warn!(
@@ -115,17 +121,19 @@ impl Kernel {
             info!(tool = %tool_def.name, server = %server_name, "registering MCP tool");
             let adapter = McpToolAdapter::new(tool_def, server_name, provider.clone());
             self.tool_registry.register(Box::new(adapter));
+            registered += 1;
         }
         let (Some(local), false) = (self.mcp.local(), skipped.is_empty()) else {
-            return;
+            return registered;
         };
         let arc_mgr = local.manager();
         let Ok(mut mgr) = arc_mgr.try_write() else {
-            return;
+            return registered;
         };
         for name in &skipped {
             mgr.remove_tool_mapping(name);
         }
+        registered
     }
 
     /// Non-blocking variant of `mcp_provider().list_tools()` for the local

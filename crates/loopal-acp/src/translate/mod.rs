@@ -166,7 +166,9 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
         | AgentEventPayload::ClassifierProgress { .. }
         | AgentEventPayload::ClassifierFailed { .. }
         | AgentEventPayload::ClassifierCompleted { .. }
-        | AgentEventPayload::CompactProgress { .. } => None,
+        | AgentEventPayload::CompactProgress { .. }
+        | AgentEventPayload::HubDegraded { .. }
+        | AgentEventPayload::HubRecovered { .. } => None,
         AgentEventPayload::ToolPermissionResolved { id } => Some(AcpNotification::Extension {
             method: "_loopal/permission_resolved".into(),
             params: serde_json::json!({

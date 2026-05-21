@@ -7,17 +7,31 @@ rust_library(
     visibility = ["//visibility:public"],
     deps = [
         "//crates/loopal-agent-client",
+        "//crates/loopal-config",
+        "//crates/loopal-hub-vault",
         "//crates/loopal-ipc",
+        "//crates/loopal-mcp",
         "//crates/loopal-protocol",
+        "//crates/loopal-secret-client",
+        "//crates/loopal-tool-api",
         "//crates/loopal-view-state",
         "@crates//:anyhow",
         "@crates//:chrono",
+        "@crates//:dirs",
+        "@crates//:indexmap",
         "@crates//:serde",
         "@crates//:serde_json",
+        "@crates//:tempfile",
         "@crates//:tokio",
         "@crates//:tracing",
         "@crates//:uuid",
     ],
+)
+
+rust_test(
+    name = "loopal-agent-hub-unit-test",
+    crate = ":loopal-agent-hub",
+    edition = "2024",
 )
 
 rust_test(
@@ -30,13 +44,19 @@ rust_test(
     env = {"LOOPAL_BINARY": "$(rootpath //:loopal)"},
     deps = [
         ":loopal-agent-hub",
+        "@crates//:secrecy",
+        "@crates//:tempfile",
         "@crates//:tokio",
         "@crates//:serde_json",
         "@crates//:uuid",
         "//crates/loopal-agent",
         "//crates/loopal-agent-client",
+        "//crates/loopal-hub-vault",
         "//crates/loopal-ipc",
         "//crates/loopal-protocol",
+        "//crates/loopal-secret-client",
+        "//crates/loopal-vault-age",
+        "//crates/loopal-vault-api",
         "//crates/loopal-view-state",
     ],
 )

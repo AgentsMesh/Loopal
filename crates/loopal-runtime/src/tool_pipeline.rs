@@ -68,7 +68,7 @@ pub async fn execute_tool(
         name,
         &mut effective_input,
         tool.secret_eligible_params(),
-        ctx.secrets.as_ref(),
+        ctx.secret_client.as_ref(),
         &ctx.session_id,
     )
     .await;

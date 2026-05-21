@@ -36,6 +36,16 @@ pub async fn bootstrap_hub_and_agent(
     let hub = Arc::new(Mutex::new(Hub::with_cwd(event_tx, cwd.to_path_buf())));
     hub.lock().await.max_total_agents = config.settings.harness.agent_max_total;
 
+    match loopal_hub_vault::HubVaultService::with_noop_audit() {
+        Ok(vault) => {
+            hub.lock().await.set_vault_service(Arc::new(vault));
+            info!("Hub vault service initialized");
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "Hub vault service unavailable; hub/secret/* will fail");
+        }
+    }
+
     let (listener, port, hub_token) = hub_server::start_hub_listener(hub.clone()).await?;
     {
         let mut h = hub.lock().await;

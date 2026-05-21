@@ -6,6 +6,7 @@ rust_library(
     edition = "2024",
     visibility = ["//visibility:public"],
     deps = [
+        "//crates/loopal-secret-client",
         "//crates/loopal-vault-api",
         "@crates//:aho-corasick",
         "@crates//:chrono",
@@ -30,6 +31,7 @@ rust_test(
     edition = "2024",
     deps = [
         ":loopal-secret-runtime",
+        "//crates/loopal-secret-client",
         "//crates/loopal-vault-api",
         "@crates//:secrecy",
         "@crates//:serde_json",

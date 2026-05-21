@@ -192,8 +192,7 @@ pub enum AgentEventPayload {
     /// Emitted by the periodic bridge.
     CronsChanged { crons: Vec<CronJobSnapshot> },
     /// `goal: None` means the goal was cleared.
-    ThreadGoalUpdated {
-        goal: Option<ThreadGoal>,
-        reason: GoalTransitionReason,
-    },
+    ThreadGoalUpdated { goal: Option<ThreadGoal>, reason: GoalTransitionReason },
+    HubDegraded { since_unix_ms: u64 },
+    HubRecovered { duration_ms: u64 },
 }

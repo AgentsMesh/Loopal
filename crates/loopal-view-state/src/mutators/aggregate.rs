@@ -43,6 +43,8 @@ pub(super) fn session_resumed(state: &mut SessionViewState, session_id: &str) ->
     state.crons.clear();
     state.bg_tasks.clear();
     state.thread_goal = None;
+    // Clear stale Hub-health snapshot; the next poller tick will re-sync.
+    state.hub_degraded_since_ms = None;
     MutationEffect::Mutated
 }
 
@@ -54,5 +56,21 @@ pub(super) fn thread_goal_updated(
         return MutationEffect::NoOp;
     }
     state.thread_goal = goal.clone();
+    MutationEffect::Mutated
+}
+
+pub(super) fn hub_degraded(state: &mut SessionViewState, since_unix_ms: u64) -> MutationEffect {
+    if state.hub_degraded_since_ms == Some(since_unix_ms) {
+        return MutationEffect::NoOp;
+    }
+    state.hub_degraded_since_ms = Some(since_unix_ms);
+    MutationEffect::Mutated
+}
+
+pub(super) fn hub_recovered(state: &mut SessionViewState) -> MutationEffect {
+    if state.hub_degraded_since_ms.is_none() {
+        return MutationEffect::NoOp;
+    }
+    state.hub_degraded_since_ms = None;
     MutationEffect::Mutated
 }

@@ -9,6 +9,8 @@ fn fake_connected_conn(name: &str, tool_names: &[&str]) -> McpConnection {
         env: Default::default(),
         enabled: true,
         timeout_ms: 1000,
+            sharing: Default::default(),
+        cwd_isolation: None,
     };
     let mut conn = McpConnection::new(name.to_string(), config, None);
     conn.status = ConnectionStatus::Connected;
@@ -77,6 +79,8 @@ async fn test_start_all_with_failed_server_keeps_connection() {
             env: Default::default(),
             enabled: true,
             timeout_ms: 2000,
+            sharing: Default::default(),
+            cwd_isolation: None,
         },
     );
     let result = manager.start_all(&configs).await;
@@ -106,6 +110,8 @@ async fn test_get_tools_for_server_failed_returns_empty() {
             env: Default::default(),
             enabled: true,
             timeout_ms: 2000,
+            sharing: Default::default(),
+            cwd_isolation: None,
         },
     );
     let _ = manager.start_all(&configs).await;
@@ -128,6 +134,8 @@ async fn test_restart_connection_on_failed_server() {
             env: Default::default(),
             enabled: true,
             timeout_ms: 2000,
+            sharing: Default::default(),
+            cwd_isolation: None,
         },
     );
     let _ = manager.start_all(&configs).await;
@@ -156,6 +164,8 @@ async fn test_start_all_disabled_server_skipped() {
             env: Default::default(),
             enabled: false,
             timeout_ms: 2000,
+            sharing: Default::default(),
+            cwd_isolation: None,
         },
     );
     let result = manager.start_all(&configs).await;
@@ -230,6 +240,8 @@ async fn snapshot_surfaces_stderr_tail_for_failed_stdio_server() {
             env: Default::default(),
             enabled: true,
             timeout_ms: 800,
+            sharing: Default::default(),
+            cwd_isolation: None,
         },
     );
 

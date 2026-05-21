@@ -13,6 +13,7 @@ mod goal_consistency;
 mod goal_continuation;
 mod goal_control;
 pub mod governance;
+mod hub_health;
 mod ingest;
 mod input;
 mod input_control;

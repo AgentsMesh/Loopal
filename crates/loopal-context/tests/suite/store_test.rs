@@ -26,6 +26,7 @@ fn big_tool_result_msg(size: usize) -> Message {
             metadata: None,
         }],
         origin: None,
+        ephemeral_in_history: false,
     }
 }
 
@@ -49,6 +50,7 @@ fn assistant_with_server_blocks(text: &str) -> Message {
             },
         ],
         origin: None,
+        ephemeral_in_history: false,
     }
 }
 
@@ -106,6 +108,7 @@ fn prepare_for_llm_preserves_last_thinking() {
             },
         ],
         origin: None,
+        ephemeral_in_history: false,
     });
     store.push_user(Message::user("next"));
     store.push_assistant(Message {
@@ -121,6 +124,7 @@ fn prepare_for_llm_preserves_last_thinking() {
             },
         ],
         origin: None,
+        ephemeral_in_history: false,
     });
 
     let prepared = store.prepare_for_llm();

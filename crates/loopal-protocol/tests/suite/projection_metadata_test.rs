@@ -14,6 +14,7 @@ fn project_preserves_tool_result_metadata() {
                 input: serde_json::json!({"command": "ls"}),
             }],
             origin: None,
+            ephemeral_in_history: false,
         },
         Message {
             id: None,
@@ -26,6 +27,7 @@ fn project_preserves_tool_result_metadata() {
                 metadata: Some(ToolResultMetadata::stale(StaleReason::WatchdogTimeout)),
             }],
             origin: None,
+            ephemeral_in_history: false,
         },
     ];
     let display = project_messages(&msgs);
@@ -52,6 +54,7 @@ fn project_preserves_cancel_cause_metadata() {
                 input: serde_json::json!({}),
             }],
             origin: None,
+            ephemeral_in_history: false,
         },
         Message {
             id: None,
@@ -64,6 +67,7 @@ fn project_preserves_cancel_cause_metadata() {
                 metadata: Some(ToolResultMetadata::cancelled(CancelCause::UserInterrupt)),
             }],
             origin: None,
+            ephemeral_in_history: false,
         },
     ];
     let display = project_messages(&msgs);

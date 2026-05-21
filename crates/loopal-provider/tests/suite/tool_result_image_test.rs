@@ -32,6 +32,7 @@ fn tool_result_with_image(tool_use_id: &str, content: &str, data: &str) -> Messa
             metadata: None,
         }],
         origin: None,
+        ephemeral_in_history: false,
     }
 }
 
@@ -70,6 +71,7 @@ fn anthropic_tool_result_text_only_stays_string() {
             metadata: None,
         }],
         origin: None,
+        ephemeral_in_history: false,
     }]);
     let msgs = provider.build_messages(&params);
     assert_eq!(msgs[0]["content"][0]["content"], "ok");
@@ -138,6 +140,7 @@ fn tool_result_with_session_resource(tool_use_id: &str, content: &str) -> Messag
             metadata: None,
         }],
         origin: None,
+        ephemeral_in_history: false,
     }
 }
 

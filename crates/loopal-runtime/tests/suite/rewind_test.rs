@@ -37,6 +37,7 @@ fn tool_result_only_user_msg_not_a_turn() {
             metadata: None,
         }],
         origin: None,
+        ephemeral_in_history: false,
     };
     let messages = vec![
         Message::user("turn1"),

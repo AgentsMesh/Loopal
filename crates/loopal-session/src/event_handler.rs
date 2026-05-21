@@ -79,6 +79,8 @@ pub fn apply_event(state: &mut SessionState, event: AgentEvent) {
         | AgentEventPayload::ClassifierCompleted { .. }
         | AgentEventPayload::CompactProgress { .. }
         | AgentEventPayload::HubDegraded { .. }
-        | AgentEventPayload::HubRecovered { .. } => {}
+        | AgentEventPayload::HubRecovered { .. }
+        | AgentEventPayload::DegenerationDetected(_)
+        | AgentEventPayload::ContinuationGateChanged(_) => {}
     }
 }

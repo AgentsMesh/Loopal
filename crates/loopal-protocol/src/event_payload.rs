@@ -4,7 +4,10 @@ use crate::address::QualifiedAddress;
 use crate::bg_task::BgTaskStatus;
 use crate::cron_snapshot::CronJobSnapshot;
 use crate::envelope::MessageSource;
-use crate::event_summary::{CompactPhase, CompactionSummary, SubAgentSpawn, TurnSummary};
+use crate::event_summary::{
+    CompactPhase, CompactionSummary, ContinuationGateSummary, DegenerationSummary, SubAgentSpawn,
+    TurnSummary,
+};
 use crate::mcp_snapshot::McpServerSnapshot;
 use crate::question::{Question, ResolveSource};
 use crate::task_snapshot::TaskSnapshot;
@@ -166,15 +169,9 @@ pub enum AgentEventPayload {
         #[serde(default)]
         source: ResolveSource,
     },
-    SessionResumed {
-        session_id: String,
-        message_count: usize,
-    },
+    SessionResumed { session_id: String, message_count: usize },
     /// `SessionResumeHook` adapter failed during swap. Resume completed; cron/task state may be stale.
-    SessionResumeWarnings {
-        session_id: String,
-        warnings: Vec<String>,
-    },
+    SessionResumeWarnings { session_id: String, warnings: Vec<String> },
     BgTaskSpawned { id: String, description: String, created_at_unix_ms: u64 },
     BgTaskOutput { id: String, output_delta: String },
     /// Authoritative final state.
@@ -195,4 +192,8 @@ pub enum AgentEventPayload {
     ThreadGoalUpdated { goal: Option<ThreadGoal>, reason: GoalTransitionReason },
     HubDegraded { since_unix_ms: u64 },
     HubRecovered { duration_ms: u64 },
+    /// Runtime detected a degenerate streak. Carries the auto-reopen deadline.
+    DegenerationDetected(DegenerationSummary),
+    /// Continuation gate opened or closed. Drives UI status indicators.
+    ContinuationGateChanged(ContinuationGateSummary),
 }

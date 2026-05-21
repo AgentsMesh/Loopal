@@ -131,6 +131,7 @@ impl AgentLoopRunner {
             role: MessageRole::Assistant,
             content: tool_uses,
             origin: Some(MessageOrigin::CompactionRehydrate),
+            ephemeral_in_history: false,
         };
         // Partial-failure path: model only sees the ToolResults that
         // succeeded; without an explicit note it can't tell which files
@@ -152,6 +153,7 @@ impl AgentLoopRunner {
             role: MessageRole::User,
             content: tool_results,
             origin: Some(MessageOrigin::CompactionRehydrate),
+            ephemeral_in_history: false,
         };
 
         if let Err(e) = self

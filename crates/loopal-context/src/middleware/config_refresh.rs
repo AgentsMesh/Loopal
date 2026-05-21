@@ -62,6 +62,7 @@ impl Middleware for ConfigRefreshMiddleware {
                 text: reminder_text,
             }],
             origin: Some(MessageOrigin::ConfigRefresh),
+            ephemeral_in_history: false,
         });
         Ok(())
     }

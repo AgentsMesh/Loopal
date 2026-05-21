@@ -12,6 +12,7 @@ impl AgentLoopRunner {
             role: MessageRole::User,
             content: vec![ContentBlock::Text { text: feedback }],
             origin: Some(MessageOrigin::StopFeedback),
+            ephemeral_in_history: false,
         };
         if let Err(e) = self
             .params

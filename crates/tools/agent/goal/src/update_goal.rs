@@ -14,6 +14,7 @@ pub struct UpdateGoalTool;
 pub enum GoalStatusInput {
     Active,
     Complete,
+    Infeasible,
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -28,14 +29,16 @@ impl TypedTool<UpdateGoalParams> for UpdateGoalTool {
     }
 
     fn description(&self) -> &str {
-        "Update the existing goal. Use `complete` only when the objective has actually been \
-         achieved and no required work remains. Use `active` only to revert a mistaken \
-         `complete` — you previously marked the goal complete and then discovered remaining \
-         work that still falls under the same original objective; reopening preserves the \
-         goal's id and objective. To pursue a different objective, use create_goal instead. \
+        "Update the existing goal's status. Use `complete` when the objective has actually been \
+         achieved and no required work remains. Use `infeasible` when the objective is \
+         structurally unreachable given current constraints (e.g. external blocker, missing \
+         capability) — this surfaces the verdict to the user instead of forcing a false \
+         `complete`. Use `active` only to revert a mistaken terminal status — you previously \
+         marked the goal terminal and then discovered remaining work that still falls under \
+         the same original objective. To pursue a different objective, use create_goal instead. \
          Do not mark complete merely because you are stopping work, and do not toggle between \
-         `active` and `complete` to manipulate continuation. You cannot pause or resume the \
-         goal via this tool; those status changes are controlled by the user or system."
+         statuses to manipulate continuation. You cannot pause or resume the goal via this \
+         tool; those status changes are controlled by the user or system."
     }
 
     fn permission(&self) -> PermissionLevel {
@@ -62,6 +65,7 @@ impl TypedTool<UpdateGoalParams> for UpdateGoalTool {
         let outcome: Result<_, GoalSessionError> = match input.status {
             GoalStatusInput::Complete => session.complete_by_model().await,
             GoalStatusInput::Active => session.reopen_by_model().await,
+            GoalStatusInput::Infeasible => session.mark_infeasible_by_model().await,
         };
         match outcome {
             Ok(goal) => Ok(ToolResult::success(render_response(&Some(goal)))),

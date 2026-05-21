@@ -65,6 +65,7 @@ fn test_build_contents_with_function_call() {
                 input: json!({"path": "main.rs"}),
             }],
             origin: None,
+            ephemeral_in_history: false,
         }],
         vec![],
     );
@@ -91,6 +92,7 @@ fn test_build_contents_with_function_response() {
                 metadata: None,
             }],
             origin: None,
+            ephemeral_in_history: false,
         }],
         vec![],
     );
@@ -206,6 +208,7 @@ fn test_build_contents_with_image() {
                 },
             }],
             origin: None,
+            ephemeral_in_history: false,
         }],
         vec![],
     );

@@ -10,4 +10,4 @@ pub use bridge::DataPlaneBridge;
 pub use compensation::synthesize_aborted_tool_results;
 pub use config::{build_governance, build_hooks};
 pub use system_note::make_governance_feedback;
-pub use traits::{Governance, TurnHook, Verdict};
+pub use traits::{Governance, PostTurnAction, TurnHook, Verdict};

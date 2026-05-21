@@ -51,6 +51,12 @@ fn expected_view_effect(cmd: &ControlCommand) -> ExpectedViewEffect {
         GoalClear => FixtureRequired("active goal"),
         BgTaskKill { .. } => FixtureRequired("running bg task in store"),
         CronDelete { .. } => FixtureRequired("scheduled cron job"),
+        Suspend => {
+            FixtureRequired("session-level gating; e2e test added in Step 3 (control plane gating)")
+        }
+        Unsuspend => {
+            FixtureRequired("session-level gating; e2e test added in Step 3 (control plane gating)")
+        }
     }
 }
 
@@ -146,5 +152,7 @@ fn variant_name(cmd: &ControlCommand) -> &'static str {
         GoalClear => "GoalClear",
         BgTaskKill { .. } => "BgTaskKill",
         CronDelete { .. } => "CronDelete",
+        Suspend => "Suspend",
+        Unsuspend => "Unsuspend",
     }
 }

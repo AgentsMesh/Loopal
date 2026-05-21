@@ -34,6 +34,7 @@ fn assistant_with_server_blocks() -> Message {
             },
         ],
         origin: None,
+        ephemeral_in_history: false,
     }
 }
 
@@ -49,6 +50,7 @@ fn tool_result_msg(content_size: usize) -> Message {
             metadata: None,
         }],
         origin: None,
+        ephemeral_in_history: false,
     }
 }
 
@@ -135,6 +137,7 @@ fn msg_with_tool_result(content: &str) -> Message {
             metadata: None,
         }],
         origin: None,
+        ephemeral_in_history: false,
     }
 }
 

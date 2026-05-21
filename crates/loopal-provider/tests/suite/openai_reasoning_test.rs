@@ -40,6 +40,7 @@ fn thinking_becomes_reasoning_item() {
                 },
             ],
             origin: None,
+            ephemeral_in_history: false,
         }],
         "",
     );
@@ -70,6 +71,7 @@ fn thinking_without_signature_skipped() {
                 },
             ],
             origin: None,
+            ephemeral_in_history: false,
         }],
         "",
     );
@@ -96,6 +98,7 @@ fn thinking_with_empty_signature_skipped() {
                 },
             ],
             origin: None,
+            ephemeral_in_history: false,
         }],
         "",
     );
@@ -147,6 +150,7 @@ fn multiple_reasoning_items_paired_with_web_search_calls() {
                     },
                 ],
                 origin: None,
+                ephemeral_in_history: false,
             },
         ],
         "",
@@ -189,6 +193,7 @@ fn multi_turn_reasoning_before_web_search() {
                     },
                 ],
                 origin: None,
+                ephemeral_in_history: false,
             },
             Message::user("Tell me more"),
             Message {
@@ -198,6 +203,7 @@ fn multi_turn_reasoning_before_web_search() {
                     text: "Sure, here's more.".to_string(),
                 }],
                 origin: None,
+                ephemeral_in_history: false,
             },
         ],
         "",

@@ -1,4 +1,4 @@
-use loopal_protocol::{Envelope, MessageSource};
+use loopal_protocol::{AgentStatus, Envelope};
 use tracing::error;
 
 use super::input::WaitResult;
@@ -7,17 +7,33 @@ use super::runner::AgentLoopRunner;
 
 impl AgentLoopRunner {
     pub(super) async fn ingest_message(&mut self, env: &Envelope) -> WaitResult {
+        if matches!(self.status, AgentStatus::Suspended)
+            && env.source.wakes_suspended_session()
+            && let Err(err) = self.transition(AgentStatus::Running).await
+        {
+            tracing::warn!(error = %err, "transition out of Suspended on human input failed");
+        }
+        let was_closed = !self.continuation_gate.is_open();
+        self.continuation_gate.open_for_envelope();
+        if was_closed {
+            let summary = self.continuation_gate.summary();
+            if let Err(err) = self
+                .emit(loopal_protocol::AgentEventPayload::ContinuationGateChanged(
+                    summary,
+                ))
+                .await
+            {
+                tracing::warn!(error = %err, "ContinuationGateChanged emit failed on ingest");
+            }
+        }
         let mut user_msg = build_user_message(env);
-        let ephemeral = matches!(
-            env.source,
-            MessageSource::Scheduled | MessageSource::System(_)
-        );
-        if !ephemeral
-            && let Err(e) = self
-                .params
-                .deps
-                .session_manager
-                .save_message(&self.params.session.id, &mut user_msg)
+        let ephemeral = env.source.is_ephemeral_in_history();
+        user_msg.ephemeral_in_history = ephemeral;
+        if let Err(e) = self
+            .params
+            .deps
+            .session_manager
+            .save_message(&self.params.session.id, &mut user_msg)
         {
             error!(error = %e, "failed to persist message");
         }

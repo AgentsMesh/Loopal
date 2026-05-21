@@ -40,7 +40,8 @@ impl AgentLoopRunner {
         self.turn_count = 0;
         self.tokens.reset();
         self.pending_consumed_ids.clear();
-        self.barren_continuation_count = 0;
+        self.turn_history.clear();
+        self.continuation_gate = super::continuation_gate::ContinuationGate::new();
         self.last_continuation_goal_id = None;
         if let Some(goal_session) = self.params.goal_session.as_ref()
             && let Err(err) = goal_session

@@ -185,6 +185,7 @@ fn status_icon(node: &TopologyNode) -> (&'static str, Color) {
         AgentStatus::Starting => (spinner_frame(node.elapsed), Color::DarkGray),
         AgentStatus::Running => (spinner_frame(node.elapsed), Color::Green),
         AgentStatus::WaitingForInput => ("●", Color::DarkGray),
+        AgentStatus::Suspended => ("⏸", Color::Magenta),
         AgentStatus::Finished => ("✓", Color::Green),
         AgentStatus::Error => ("✗", Color::Red),
     }

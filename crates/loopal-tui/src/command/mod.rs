@@ -16,6 +16,7 @@ mod skill;
 mod skills_cmd;
 mod status_cmd;
 mod status_config;
+mod suspend_cmd;
 mod topology_cmd;
 
 use async_trait::async_trait;

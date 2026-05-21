@@ -43,4 +43,13 @@ impl GoalSession for GoalSessionToolAdapter {
             )
             .await
     }
+
+    async fn mark_infeasible_by_model(&self) -> Result<ThreadGoal, GoalSessionError> {
+        self.inner
+            .transition(
+                ThreadGoalStatus::Infeasible,
+                GoalTransitionReason::ModelInfeasible,
+            )
+            .await
+    }
 }

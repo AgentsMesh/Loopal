@@ -163,7 +163,9 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
         | InboxConsumed { .. }
         | TurnDiffSummary { .. }
         | SessionResumeWarnings { .. }
-        | QuestionDecided { .. } => MutationEffect::NoOp,
+        | QuestionDecided { .. }
+        | DegenerationDetected(_)
+        | ContinuationGateChanged(_) => MutationEffect::NoOp,
         CompactProgress { phase, detail } => compact::progress(state, *phase, detail.as_deref()),
     }
 }

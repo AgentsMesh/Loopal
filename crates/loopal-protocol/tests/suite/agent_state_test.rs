@@ -11,6 +11,7 @@ fn test_agent_status_all_variants_debug() {
         AgentStatus::Starting,
         AgentStatus::Running,
         AgentStatus::WaitingForInput,
+        AgentStatus::Suspended,
         AgentStatus::Finished,
         AgentStatus::Error,
     ];
@@ -26,6 +27,7 @@ fn test_agent_status_serde_roundtrip() {
         AgentStatus::Starting,
         AgentStatus::Running,
         AgentStatus::WaitingForInput,
+        AgentStatus::Suspended,
         AgentStatus::Finished,
         AgentStatus::Error,
     ] {

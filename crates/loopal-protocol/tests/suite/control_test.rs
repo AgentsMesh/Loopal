@@ -134,6 +134,18 @@ fn test_control_command_cron_delete_serde_roundtrip() {
 }
 
 #[test]
+fn suspend_and_resume_roundtrip_through_json() {
+    for cmd in [ControlCommand::Suspend, ControlCommand::Unsuspend] {
+        let json = serde_json::to_string(&cmd).unwrap();
+        let restored: ControlCommand = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            std::mem::discriminant(&restored),
+            std::mem::discriminant(&cmd)
+        );
+    }
+}
+
+#[test]
 fn test_all_control_commands_serde_roundtrip() {
     // Reflective: every variant must survive JSON roundtrip. Discriminant
     // equality is enough — payload fidelity for specific variants is

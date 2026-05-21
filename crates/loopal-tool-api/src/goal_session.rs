@@ -25,4 +25,6 @@ pub trait GoalSession: Send + Sync {
     async fn complete_by_model(&self) -> Result<ThreadGoal, GoalSessionError>;
 
     async fn reopen_by_model(&self) -> Result<ThreadGoal, GoalSessionError>;
+
+    async fn mark_infeasible_by_model(&self) -> Result<ThreadGoal, GoalSessionError>;
 }

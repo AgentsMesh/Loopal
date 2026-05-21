@@ -7,6 +7,7 @@ pub(super) fn append_goal_indicator(spans: &mut Vec<Span<'static>>, goal: &Threa
         ThreadGoalStatus::Active => ("active", Color::Cyan),
         ThreadGoalStatus::Paused => ("paused", Color::Yellow),
         ThreadGoalStatus::Complete => ("done", Color::Green),
+        ThreadGoalStatus::Infeasible => ("infeasible", Color::Red),
     };
     spans.push(Span::styled("◆ ", Style::default().fg(color).bold()));
     spans.push(Span::styled(

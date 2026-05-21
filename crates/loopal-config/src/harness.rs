@@ -28,6 +28,17 @@ pub struct HarnessConfig {
     pub agent_max_total: u32,
     /// Auto classifier LLM call timeout in seconds (default: 180).
     pub classifier_timeout_secs: u64,
+    /// DegenerationDetector: trigger BarrenStreak after this many consecutive
+    /// turns with zero approved tool calls (default: 50). Generous — long
+    /// goals legitimately spend many turns observing or thinking. This is a
+    /// last-resort safety net, not a productivity tracker.
+    pub degeneration_barren_threshold: u32,
+    /// DegenerationDetector: trigger RepeatedText after this many consecutive
+    /// turns with identical assistant text output (default: 5).
+    pub degeneration_duplicate_text_threshold: u32,
+    /// DegenerationDetector: auto-reopen the ContinuationGate this many
+    /// seconds after Degeneration close (default: 3600 = 1h).
+    pub degeneration_wake_after_secs: u32,
 }
 
 impl Default for HarnessConfig {
@@ -42,6 +53,9 @@ impl Default for HarnessConfig {
             agent_max_depth: 2,
             agent_max_total: 16,
             classifier_timeout_secs: 180,
+            degeneration_barren_threshold: 50,
+            degeneration_duplicate_text_threshold: 5,
+            degeneration_wake_after_secs: 3600,
         }
     }
 }

@@ -2,7 +2,6 @@ use loopal_context::wrap_untrusted;
 use loopal_protocol::{Envelope, MessageSource, ThreadGoal, UserContent};
 
 pub const GOAL_CONTINUATION_SOURCE: &str = "goal_continuation";
-pub const DEFAULT_MAX_BARREN_CONTINUATIONS: u32 = 2;
 
 pub fn build_continuation_envelope(goal: &ThreadGoal) -> Envelope {
     Envelope::new(

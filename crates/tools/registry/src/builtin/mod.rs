@@ -91,6 +91,10 @@ pub fn register_all(registry: &ToolRegistry, bg_store: Arc<BackgroundTaskStore>)
         _,
         loopal_tool_file_ops::CopyFileParams,
     >::new(loopal_tool_file_ops::CopyFileTool)));
+    registry.register(Box::new(TypedBridge::<
+        _,
+        loopal_tool_idle::RequestIdleParams,
+    >::new(loopal_tool_idle::RequestIdleTool)));
 }
 
 pub fn register_goal_tools(registry: &ToolRegistry) {

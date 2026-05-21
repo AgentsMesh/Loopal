@@ -27,6 +27,7 @@ fn read_tool_use(path: &str, id: &str) -> Message {
             input: serde_json::json!({ "file_path": path }),
         }],
         origin: None,
+        ephemeral_in_history: false,
     }
 }
 
@@ -42,6 +43,7 @@ fn tool_result(id: &str, body: &str) -> Message {
             metadata: None,
         }],
         origin: None,
+        ephemeral_in_history: false,
     }
 }
 
@@ -195,6 +197,7 @@ async fn microcompact_emits_only_microcompact_phase() {
             input: serde_json::json!({}),
         }],
         origin: None,
+        ephemeral_in_history: false,
     });
     h.runner
         .params

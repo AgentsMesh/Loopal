@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use crate::mode::AgentMode;
 use loopal_error::Result;
-use loopal_protocol::{AgentEventPayload, ControlCommand};
+use loopal_protocol::{AgentEventPayload, AgentStatus, ControlCommand};
 use tracing::{error, info};
 
 use super::rewind::detect_turn_boundaries;
@@ -124,6 +124,23 @@ impl AgentLoopRunner {
             | ControlCommand::GoalUserReopen
             | ControlCommand::GoalClear) => {
                 return self.handle_goal_control(ctrl).await;
+            }
+            ControlCommand::Suspend => {
+                info!("session suspend requested");
+                self.continuation_gate
+                    .close(super::continuation_gate::GateClose::UserSuspend);
+                let gate = self.continuation_gate.summary();
+                self.emit(AgentEventPayload::ContinuationGateChanged(gate))
+                    .await?;
+                self.transition(AgentStatus::Suspended).await?;
+            }
+            ControlCommand::Unsuspend => {
+                info!("session unsuspend requested");
+                self.continuation_gate.open_for_envelope();
+                let gate = self.continuation_gate.summary();
+                self.emit(AgentEventPayload::ContinuationGateChanged(gate))
+                    .await?;
+                self.transition(AgentStatus::Running).await?;
             }
         }
         Ok(false)

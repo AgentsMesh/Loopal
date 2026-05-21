@@ -91,6 +91,7 @@ async fn hydrate_converts_session_resource_back_to_inline() {
             metadata: None,
         }],
         origin: None,
+        ephemeral_in_history: false,
     }];
 
     hydrate_images(&mut messages, store.as_ref(), "sess")
@@ -122,6 +123,7 @@ async fn hydrate_leaves_inline_untouched() {
             metadata: None,
         }],
         origin: None,
+        ephemeral_in_history: false,
     }];
 
     hydrate_images(&mut messages, store.as_ref(), "sess")
@@ -158,6 +160,7 @@ async fn persist_then_hydrate_round_trip() {
             metadata: None,
         }],
         origin: None,
+        ephemeral_in_history: false,
     }];
 
     hydrate_images(&mut messages, store.as_ref(), "sess")
@@ -228,6 +231,7 @@ async fn hydrate_propagates_store_read_error() {
             metadata: None,
         }],
         origin: None,
+        ephemeral_in_history: false,
     }];
 
     let store = ReadFailingStore;

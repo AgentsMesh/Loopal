@@ -7,6 +7,7 @@ pub enum ThreadGoalStatus {
     Active,
     Paused,
     Complete,
+    Infeasible,
 }
 
 impl ThreadGoalStatus {
@@ -15,11 +16,12 @@ impl ThreadGoalStatus {
             Self::Active => "active",
             Self::Paused => "paused",
             Self::Complete => "complete",
+            Self::Infeasible => "infeasible",
         }
     }
 
     pub fn is_terminal(self) -> bool {
-        matches!(self, Self::Complete)
+        matches!(self, Self::Complete | Self::Infeasible)
     }
 
     pub fn participates_in_continuation(self) -> bool {
@@ -62,6 +64,8 @@ pub enum GoalTransitionReason {
     UserPaused,
     UserResumed,
     UserCleared,
+    ModelInfeasible,
+    UserInfeasible,
 }
 
 impl ThreadGoalStatus {
@@ -72,9 +76,16 @@ impl ThreadGoalStatus {
             (self, next, reason),
             (S::Active, S::Complete, R::ModelCompleted | R::UserCompleted)
                 | (S::Active, S::Paused, R::UserPaused)
+                | (
+                    S::Active,
+                    S::Infeasible,
+                    R::ModelInfeasible | R::UserInfeasible
+                )
                 | (S::Paused, S::Active, R::UserResumed)
                 | (S::Paused, S::Complete, R::UserCompleted)
+                | (S::Paused, S::Infeasible, R::UserInfeasible)
                 | (S::Complete, S::Active, R::ModelReopened | R::UserReopened)
+                | (S::Infeasible, S::Active, R::ModelReopened | R::UserReopened)
         )
     }
 }

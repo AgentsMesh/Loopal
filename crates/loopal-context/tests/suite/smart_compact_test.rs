@@ -20,6 +20,7 @@ fn tool_use(name: &str, path: &str) -> Message {
             input: serde_json::json!({ "file_path": path }),
         }],
         origin: None,
+        ephemeral_in_history: false,
     }
 }
 

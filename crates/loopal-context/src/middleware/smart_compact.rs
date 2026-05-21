@@ -130,6 +130,7 @@ fn build_compact_output(
             text: "Understood. I'll continue from this working state.".to_string(),
         }],
         origin: Some(MessageOrigin::CompactionSummary),
+        ephemeral_in_history: false,
     };
     CompactOutput {
         summary_msg,

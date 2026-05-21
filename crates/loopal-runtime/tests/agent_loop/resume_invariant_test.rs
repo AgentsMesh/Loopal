@@ -50,6 +50,7 @@ fn assistant(text: &str) -> Message {
         role: MessageRole::Assistant,
         content: vec![ContentBlock::Text { text: text.into() }],
         origin: None,
+        ephemeral_in_history: false,
     }
 }
 
@@ -59,6 +60,7 @@ fn user(text: &str) -> Message {
         role: MessageRole::User,
         content: vec![ContentBlock::Text { text: text.into() }],
         origin: None,
+        ephemeral_in_history: false,
     }
 }
 

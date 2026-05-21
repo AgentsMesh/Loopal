@@ -34,6 +34,7 @@ impl AgentLoopRunner {
             AgentStatus::Starting => Ok(()),
             AgentStatus::Running => self.emit(AgentEventPayload::Running).await,
             AgentStatus::WaitingForInput => self.emit(AgentEventPayload::AwaitingInput).await,
+            AgentStatus::Suspended => self.emit(AgentEventPayload::AwaitingInput).await,
             AgentStatus::Finished => self.emit(AgentEventPayload::Finished).await,
             AgentStatus::Error => Ok(()), // Error event carries a message; use transition_error().
         };

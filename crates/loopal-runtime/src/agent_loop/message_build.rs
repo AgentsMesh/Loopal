@@ -30,5 +30,6 @@ pub fn build_user_message(env: &Envelope) -> Message {
         role: MessageRole::User,
         content: blocks,
         origin: Some(MessageOrigin::from(&env.source)),
+        ephemeral_in_history: false,
     }
 }

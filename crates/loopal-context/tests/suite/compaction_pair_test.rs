@@ -11,6 +11,7 @@ fn assistant_with_tool_use(id: &str) -> Message {
             input: serde_json::json!({}),
         }],
         origin: None,
+        ephemeral_in_history: false,
     }
 }
 
@@ -26,6 +27,7 @@ fn user_with_tool_result(tool_use_id: &str) -> Message {
             metadata: None,
         }],
         origin: None,
+        ephemeral_in_history: false,
     }
 }
 
@@ -103,6 +105,7 @@ fn assistant_with_server_tool_blocks(blocks: Vec<ContentBlock>) -> Message {
         role: MessageRole::Assistant,
         content: blocks,
         origin: None,
+        ephemeral_in_history: false,
     }
 }
 

@@ -68,6 +68,7 @@ fn test_estimate_messages_tokens_includes_tool_io() {
                 },
             ],
             origin: None,
+            ephemeral_in_history: false,
         },
         Message {
             id: None,
@@ -80,6 +81,7 @@ fn test_estimate_messages_tokens_includes_tool_io() {
                 metadata: None,
             }],
             origin: None,
+            ephemeral_in_history: false,
         },
     ];
     let total = estimate_messages_tokens(&msgs);

@@ -56,6 +56,9 @@ impl AgentLoopRunner {
     }
 
     async fn select_input(&mut self) -> SelectResult {
+        if matches!(self.status, loopal_protocol::AgentStatus::Suspended) {
+            return SelectResult::AgentInput(self.params.deps.frontend.recv_input().await);
+        }
         match (&mut self.trigger_rx, &mut self.rewake_rx) {
             (Some(sched), Some(rewake)) => tokio::select! {
                 input = self.params.deps.frontend.recv_input() => SelectResult::AgentInput(input),

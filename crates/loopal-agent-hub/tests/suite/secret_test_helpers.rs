@@ -42,8 +42,7 @@ pub fn spawn_hub_dispatch_loop(
     tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
             if let Incoming::Request { id, method, params } = msg {
-                let outcome =
-                    dispatch_hub_request(&hub, &method, params, from_agent.clone()).await;
+                let outcome = dispatch_hub_request(&hub, &method, params, from_agent.clone()).await;
                 match outcome {
                     Ok(v) => {
                         let _ = conn.respond(id, v).await;

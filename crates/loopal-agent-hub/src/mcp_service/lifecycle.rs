@@ -58,11 +58,7 @@ impl HubMcpService {
             .insert(agent_name.to_string(), Arc::new(local));
     }
 
-    async fn provision_spawn_tree_if_root_owner(
-        &self,
-        agent_name: &str,
-        cwd: &std::path::Path,
-    ) {
+    async fn provision_spawn_tree_if_root_owner(&self, agent_name: &str, cwd: &std::path::Path) {
         let Some(root_name) = self.root_of(agent_name) else {
             return;
         };

@@ -61,8 +61,11 @@ mod tests {
 
     fn make_fetch(
         map: std::collections::HashMap<&'static str, &'static str>,
-    ) -> impl Fn(String) -> std::pin::Pin<Box<dyn std::future::Future<Output = SecretResult<SecretString>> + Send>>
-    {
+    ) -> impl Fn(
+        String,
+    ) -> std::pin::Pin<
+        Box<dyn std::future::Future<Output = SecretResult<SecretString>> + Send>,
+    > {
         move |name: String| {
             let map = map.clone();
             Box::pin(async move {
@@ -128,7 +131,10 @@ mod tests {
             Box::pin(async move {
                 c.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 Ok(SecretString::from(format!("V({name})")))
-            }) as std::pin::Pin<Box<dyn std::future::Future<Output = SecretResult<SecretString>> + Send>>
+            })
+                as std::pin::Pin<
+                    Box<dyn std::future::Future<Output = SecretResult<SecretString>> + Send>,
+                >
         };
         let out = expand_template(&WIRE_RE, "<secret_ref:k><secret_ref:k>", fetch)
             .await

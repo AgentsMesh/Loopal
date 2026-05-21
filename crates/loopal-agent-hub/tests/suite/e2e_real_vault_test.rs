@@ -11,7 +11,9 @@ use loopal_vault_api::Vault;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc;
 
-use super::secret_test_helpers::{ED25519_UNENCRYPTED, PUBKEY_ALICE, spawn_hub_dispatch_loop, write_key_0600};
+use super::secret_test_helpers::{
+    ED25519_UNENCRYPTED, PUBKEY_ALICE, spawn_hub_dispatch_loop, write_key_0600,
+};
 
 struct VaultFixture {
     _tmp: tempfile::TempDir,
@@ -100,7 +102,10 @@ async fn real_vault_list_names_returns_all_keys() {
         .expect("IPC must not hang")
         .expect("real vault list_names must succeed");
     names.sort();
-    assert_eq!(names, vec!["k1".to_string(), "k2".into(), "openai_api".into()]);
+    assert_eq!(
+        names,
+        vec!["k1".to_string(), "k2".into(), "openai_api".into()]
+    );
 }
 
 #[tokio::test]

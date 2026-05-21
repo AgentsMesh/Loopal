@@ -45,8 +45,8 @@ pub use projected::{ProjectedMessage, ProjectedToolCall};
 pub use projection::project_messages;
 pub use question::{Question, QuestionOption, ResolveSource, UserQuestionResponse};
 pub use secret_ipc::{
-    SecretCaller, SecretGetRequest, SecretGetResponse, SecretHealthRequest,
-    SecretHealthResponse, SecretIpcError, SecretListNamesRequest, SecretListNamesResponse,
+    SecretCaller, SecretGetRequest, SecretGetResponse, SecretHealthRequest, SecretHealthResponse,
+    SecretIpcError, SecretListNamesRequest, SecretListNamesResponse,
 };
 pub use task_snapshot::{TaskSnapshot, TaskSnapshotStatus};
 pub use thread_goal::{GoalTransitionReason, ThreadGoal, ThreadGoalStatus};

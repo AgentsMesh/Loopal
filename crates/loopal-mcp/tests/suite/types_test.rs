@@ -69,7 +69,7 @@ fn test_is_reconnectable_stdio() {
         env: Default::default(),
         enabled: true,
         timeout_ms: 5000,
-            sharing: Default::default(),
+        sharing: Default::default(),
         cwd_isolation: None,
     };
     assert!(!ReconnectPolicy::is_reconnectable(&config));
@@ -82,7 +82,7 @@ fn test_is_reconnectable_http() {
         headers: Default::default(),
         enabled: true,
         timeout_ms: 5000,
-            sharing: Default::default(),
+        sharing: Default::default(),
     };
     assert!(ReconnectPolicy::is_reconnectable(&config));
 }

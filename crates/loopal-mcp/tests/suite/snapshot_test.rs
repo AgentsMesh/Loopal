@@ -9,7 +9,7 @@ fn fake_connected_conn(name: &str, tool_names: &[&str]) -> McpConnection {
         env: Default::default(),
         enabled: true,
         timeout_ms: 1000,
-            sharing: Default::default(),
+        sharing: Default::default(),
         cwd_isolation: None,
     };
     let mut conn = McpConnection::new(name.to_string(), config, None);

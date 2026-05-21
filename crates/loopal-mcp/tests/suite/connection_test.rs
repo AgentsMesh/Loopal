@@ -17,7 +17,7 @@ fn stdio_config() -> McpServerConfig {
         env: Default::default(),
         enabled: true,
         timeout_ms: 5000,
-            sharing: Default::default(),
+        sharing: Default::default(),
         cwd_isolation: None,
     }
 }

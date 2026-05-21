@@ -27,8 +27,8 @@ pub struct HubVaultService {
 
 impl HubVaultService {
     pub fn new(audit: Arc<dyn AuditSink>) -> SecretResult<Self> {
-        let identity = discover()
-            .map_err(|e| SecretError::DecryptFailed(format!("SSH identity: {e}")))?;
+        let identity =
+            discover().map_err(|e| SecretError::DecryptFailed(format!("SSH identity: {e}")))?;
         Ok(Self::with_identity(Arc::new(identity), audit))
     }
 
@@ -39,10 +39,7 @@ impl HubVaultService {
     /// Caller-supplied identity. Production uses `new()` to auto-discover
     /// from `~/.ssh/`; tests inject a known key, and non-`~/.ssh` deployments
     /// (e.g. secret manager) plug in here too.
-    pub fn with_identity(
-        identity: Arc<DiscoveredIdentity>,
-        audit: Arc<dyn AuditSink>,
-    ) -> Self {
+    pub fn with_identity(identity: Arc<DiscoveredIdentity>, audit: Arc<dyn AuditSink>) -> Self {
         Self {
             vaults: RwLock::new(HashMap::new()),
             audit,

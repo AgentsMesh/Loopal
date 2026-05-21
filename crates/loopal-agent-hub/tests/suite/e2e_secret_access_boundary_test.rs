@@ -62,11 +62,10 @@ async fn agent_requesting_own_cwd_is_allowed_through_verify_caller() {
     let vault = HubVaultService::with_noop_audit().expect("noop vault");
 
     let dir = tempfile::tempdir().unwrap();
-    hub.lock().await.spawn_registry.register(
-        "self-agent".into(),
-        dir.path().to_path_buf(),
-        None,
-    );
+    hub.lock()
+        .await
+        .spawn_registry
+        .register("self-agent".into(), dir.path().to_path_buf(), None);
     hub.lock().await.set_vault_service(Arc::new(vault));
 
     spawn_hub_dispatch_loop(hub.clone(), hub_conn, "self-agent".into());

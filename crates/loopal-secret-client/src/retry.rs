@@ -34,10 +34,7 @@ impl Default for RetryPolicy {
 /// Retry on `Ipc(_)` errors with exponential backoff. Permanent errors
 /// propagate immediately — retrying them wastes time and hides the
 /// real failure.
-pub(crate) async fn retry_transient<F, Fut, T>(
-    policy: RetryPolicy,
-    mut op: F,
-) -> SecretResult<T>
+pub(crate) async fn retry_transient<F, Fut, T>(policy: RetryPolicy, mut op: F) -> SecretResult<T>
 where
     F: FnMut() -> Fut,
     Fut: std::future::Future<Output = SecretResult<T>>,

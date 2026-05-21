@@ -145,7 +145,11 @@ fn parent_of_returns_immediate_parent() {
     let r = SpawnRegistry::new();
     let dir = tmp();
     r.register("root".into(), dir.path().to_path_buf(), None);
-    r.register("child".into(), dir.path().to_path_buf(), Some("root".into()));
+    r.register(
+        "child".into(),
+        dir.path().to_path_buf(),
+        Some("root".into()),
+    );
     assert_eq!(r.parent_of("child").as_deref(), Some("root"));
     assert_eq!(r.parent_of("root"), None);
 }

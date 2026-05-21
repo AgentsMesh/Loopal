@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use loopal_secret_client::SecretClient;
-use loopal_secret_client::placeholder::{AUTHOR_RE, WIRE_RE};
 use loopal_secret_client::SecretError;
+use loopal_secret_client::placeholder::{AUTHOR_RE, WIRE_RE};
 
 #[derive(Debug, Clone, Default)]
 pub struct TranslationView {

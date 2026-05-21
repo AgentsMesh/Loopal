@@ -7,8 +7,8 @@ use tokio::sync::Mutex;
 
 use loopal_hub_vault::{AuditContext, HubVaultService};
 use loopal_protocol::{
-    SecretCaller, SecretGetRequest, SecretGetResponse, SecretHealthRequest,
-    SecretHealthResponse, SecretIpcError, SecretListNamesRequest, SecretListNamesResponse,
+    SecretCaller, SecretGetRequest, SecretGetResponse, SecretHealthRequest, SecretHealthResponse,
+    SecretIpcError, SecretListNamesRequest, SecretListNamesResponse,
 };
 use loopal_secret_client::{ExposeSecret, SecretError};
 
@@ -20,11 +20,10 @@ pub async fn handle_secret_get(
     params: Value,
     from_agent: &str,
 ) -> Result<Value, String> {
-    let req: SecretGetRequest = serde_json::from_value(params)
-        .map_err(|e| format!("invalid secret_get params: {e}"))?;
+    let req: SecretGetRequest =
+        serde_json::from_value(params).map_err(|e| format!("invalid secret_get params: {e}"))?;
     let (vault, spawn_registry) = resolve_deps(hub).await?;
-    verify_caller(&spawn_registry, from_agent, &req.cwd, Some(&req.caller))
-        .map_err(map_err)?;
+    verify_caller(&spawn_registry, from_agent, &req.cwd, Some(&req.caller)).map_err(map_err)?;
     let cwd = PathBuf::from(&req.cwd);
     let plain = vault
         .get(&cwd, &req.name, audit_ctx(&req.caller))
@@ -49,16 +48,12 @@ pub async fn handle_secret_list_names(
         .list_names(&PathBuf::from(&req.cwd))
         .await
         .map_err(map_err)?;
-    serde_json::to_value(SecretListNamesResponse { names })
-        .map_err(|e| e.to_string())
+    serde_json::to_value(SecretListNamesResponse { names }).map_err(|e| e.to_string())
 }
 
-pub async fn handle_secret_health(
-    hub: &Arc<Mutex<Hub>>,
-    params: Value,
-) -> Result<Value, String> {
-    let req: SecretHealthRequest = serde_json::from_value(params)
-        .map_err(|e| format!("invalid secret_health params: {e}"))?;
+pub async fn handle_secret_health(hub: &Arc<Mutex<Hub>>, params: Value) -> Result<Value, String> {
+    let req: SecretHealthRequest =
+        serde_json::from_value(params).map_err(|e| format!("invalid secret_health params: {e}"))?;
     let (vault, _) = resolve_deps(hub).await?;
     let names = vault
         .list_names(&PathBuf::from(&req.cwd))

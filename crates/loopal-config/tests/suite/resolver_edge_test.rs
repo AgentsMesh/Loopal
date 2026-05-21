@@ -11,7 +11,7 @@ fn mcp_config(command: &str) -> McpServerConfig {
         env: HashMap::new(),
         enabled: true,
         timeout_ms: 30_000,
-            sharing: Default::default(),
+        sharing: Default::default(),
         cwd_isolation: None,
     }
 }

@@ -56,10 +56,7 @@ async fn expand_vec(items: Vec<String>, v: &dyn SecretClient) -> Vec<String> {
     out
 }
 
-async fn expand_map(
-    map: HashMap<String, String>,
-    v: &dyn SecretClient,
-) -> HashMap<String, String> {
+async fn expand_map(map: HashMap<String, String>, v: &dyn SecretClient) -> HashMap<String, String> {
     let mut out = HashMap::with_capacity(map.len());
     for (k, val) in map {
         out.insert(k, expand_to_plaintext(&val, v).await);

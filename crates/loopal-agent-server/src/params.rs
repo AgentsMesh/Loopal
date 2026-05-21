@@ -44,10 +44,7 @@ pub async fn build_kernel_from_config(
     let secret_client: Option<Arc<dyn loopal_secret_client::SecretClient>> =
         hub_connection.map(|conn| {
             Arc::new(loopal_secret_client::HubSecretClient::new(
-                conn,
-                cwd,
-                agent_name,
-                depth,
+                conn, cwd, agent_name, depth,
             )) as Arc<dyn loopal_secret_client::SecretClient>
         });
     if let Some(client) = secret_client.as_ref() {

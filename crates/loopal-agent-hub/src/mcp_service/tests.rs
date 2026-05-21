@@ -191,9 +191,16 @@ async fn cwd_isolation_config_flows_from_settings_to_injected_args() {
     }
 
     let servers_a = load_servers_by_sharing(&canonical_a, McpSharing::HubSingleton);
-    assert_eq!(servers_a.len(), 1, "config must yield one hub-singleton server");
+    assert_eq!(
+        servers_a.len(),
+        1,
+        "config must yield one hub-singleton server"
+    );
     let (name_a, cfg_a) = servers_a.into_iter().next().unwrap();
-    assert!(cfg_a.cwd_isolation().is_some(), "cwd_isolation must deserialize");
+    assert!(
+        cfg_a.cwd_isolation().is_some(),
+        "cwd_isolation must deserialize"
+    );
 
     let injected_a = inject(&name_a, cfg_a, &canonical_a);
     let injected_b = inject(
@@ -230,4 +237,3 @@ async fn cwd_isolation_config_flows_from_settings_to_injected_args() {
     assert!(arg_a.contains("chrome-isolated"));
     assert!(arg_b.contains("chrome-isolated"));
 }
-

@@ -70,10 +70,7 @@ pub async fn handle_mcp_call_tool(
     Ok(json!(loopal_mcp::call_result_to_response(&result)))
 }
 
-pub async fn handle_mcp_snapshot(
-    hub: &Arc<Mutex<Hub>>,
-    from_agent: &str,
-) -> Result<Value, String> {
+pub async fn handle_mcp_snapshot(hub: &Arc<Mutex<Hub>>, from_agent: &str) -> Result<Value, String> {
     let (provider, _cwd) = resolve_provider(hub, from_agent).await?;
     let servers = provider
         .snapshot()

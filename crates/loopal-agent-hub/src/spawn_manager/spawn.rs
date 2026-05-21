@@ -90,9 +90,9 @@ pub async fn spawn_and_register(
                 let h = hub.lock().await;
                 (h.spawn_registry.clone(), h.mcp_service.clone())
             };
-            let parent_name = parent.as_ref().map(|p| {
-                loopal_protocol::QualifiedAddress::parse(p).agent.clone()
-            });
+            let parent_name = parent
+                .as_ref()
+                .map(|p| loopal_protocol::QualifiedAddress::parse(p).agent.clone());
             let cwd_path = std::path::PathBuf::from(&cwd);
             spawn_registry.register(name.clone(), cwd_path.clone(), parent_name.clone());
             mcp_service

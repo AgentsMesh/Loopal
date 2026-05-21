@@ -56,4 +56,3 @@ pub enum SecretIpcError {
     TemplateParse { detail: String },
     Ipc { detail: String },
 }
-

@@ -28,12 +28,7 @@ pub struct HubSecretClient {
 }
 
 impl HubSecretClient {
-    pub fn new(
-        connection: Arc<Connection>,
-        cwd: PathBuf,
-        agent_name: String,
-        depth: u32,
-    ) -> Self {
+    pub fn new(connection: Arc<Connection>, cwd: PathBuf, agent_name: String, depth: u32) -> Self {
         Self {
             connection,
             cwd,
@@ -71,8 +66,8 @@ impl SecretClient for HubSecretClient {
                 name: name.to_string(),
                 caller: self.caller(None),
             };
-            let params = serde_json::to_value(&req)
-                .map_err(|e| SecretError::Ipc(format!("encode: {e}")))?;
+            let params =
+                serde_json::to_value(&req).map_err(|e| SecretError::Ipc(format!("encode: {e}")))?;
             let resp = self
                 .connection
                 .send_request(methods::HUB_SECRET_GET.name, params)
@@ -92,8 +87,8 @@ impl SecretClient for HubSecretClient {
             let req = SecretListNamesRequest {
                 cwd: self.cwd.to_string_lossy().into_owned(),
             };
-            let params = serde_json::to_value(&req)
-                .map_err(|e| SecretError::Ipc(format!("encode: {e}")))?;
+            let params =
+                serde_json::to_value(&req).map_err(|e| SecretError::Ipc(format!("encode: {e}")))?;
             let resp = self
                 .connection
                 .send_request(methods::HUB_SECRET_LIST_NAMES.name, params)

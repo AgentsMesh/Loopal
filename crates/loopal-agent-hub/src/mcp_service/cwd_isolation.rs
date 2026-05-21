@@ -2,11 +2,7 @@ use std::path::{Path, PathBuf};
 
 use loopal_config::McpServerConfig;
 
-pub(super) fn inject(
-    server_name: &str,
-    cfg: McpServerConfig,
-    cwd: &Path,
-) -> McpServerConfig {
+pub(super) fn inject(server_name: &str, cfg: McpServerConfig, cwd: &Path) -> McpServerConfig {
     let Some(iso) = cfg.cwd_isolation().cloned() else {
         return cfg;
     };

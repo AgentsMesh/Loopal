@@ -9,7 +9,13 @@ use loopal_secret_client::{HubSecretClient, SecretClient, SecretError};
 use tokio::sync::Mutex;
 use tokio::sync::mpsc;
 
-use super::secret_test_helpers::spawn_hub_dispatch_loop;
+use super::secret_test_helpers::{ED25519_UNENCRYPTED, spawn_hub_dispatch_loop, write_key_0600};
+
+fn test_identity_in(dir: &std::path::Path) -> Arc<loopal_vault_age::DiscoveredIdentity> {
+    let key_path = dir.join("id_ed25519");
+    write_key_0600(&key_path, ED25519_UNENCRYPTED);
+    Arc::new(loopal_vault_age::load(&key_path).unwrap())
+}
 
 #[tokio::test]
 async fn sub_agent_requesting_cwd_outside_spawn_tree_is_denied() {
@@ -20,10 +26,12 @@ async fn sub_agent_requesting_cwd_outside_spawn_tree_is_denied() {
 
     let (event_tx, _event_rx) = mpsc::channel(64);
     let hub = Arc::new(Mutex::new(Hub::new(event_tx)));
-    let vault = HubVaultService::with_noop_audit().expect("noop vault construct");
 
     let dir_a = tempfile::tempdir().unwrap();
     let dir_b = tempfile::tempdir().unwrap();
+    let identity = test_identity_in(dir_a.path());
+    let vault = HubVaultService::with_identity(identity, Arc::new(loopal_vault_api::NoopAuditSink));
+
     hub.lock()
         .await
         .spawn_registry
@@ -59,9 +67,11 @@ async fn agent_requesting_own_cwd_is_allowed_through_verify_caller() {
 
     let (event_tx, _event_rx) = mpsc::channel(64);
     let hub = Arc::new(Mutex::new(Hub::new(event_tx)));
-    let vault = HubVaultService::with_noop_audit().expect("noop vault");
 
     let dir = tempfile::tempdir().unwrap();
+    let identity = test_identity_in(dir.path());
+    let vault = HubVaultService::with_identity(identity, Arc::new(loopal_vault_api::NoopAuditSink));
+
     hub.lock()
         .await
         .spawn_registry

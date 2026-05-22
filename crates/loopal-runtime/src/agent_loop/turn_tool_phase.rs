@@ -41,6 +41,9 @@ impl AgentLoopRunner {
         turn_ctx.metrics.tool_calls_approved += stats.approved;
         turn_ctx.metrics.tool_calls_denied += stats.denied;
         turn_ctx.metrics.tool_errors += stats.errors;
+        if stats.turn_end_signal {
+            turn_ctx.signal_turn_end_after_tools();
+        }
         info!("tool exec complete");
 
         let warnings = std::mem::take(&mut turn_ctx.pending_warnings);

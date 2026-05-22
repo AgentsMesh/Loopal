@@ -14,12 +14,20 @@ impl AgentLoopRunner {
         &mut self,
         idx: usize,
         id: &str,
-    ) -> loopal_error::Result<(usize, ContentBlock)> {
+    ) -> loopal_error::Result<(usize, ContentBlock, bool)> {
         debug!(tool = ENTER_PLAN_NAME, "intercepted");
 
         if self.params.config.mode == AgentMode::Plan {
             return self
-                .complete_intercepted_tool(idx, id, ENTER_PLAN_NAME, "Already in plan mode.", true, None)
+                .complete_intercepted_tool(
+                    idx,
+                    id,
+                    ENTER_PLAN_NAME,
+                    "Already in plan mode.",
+                    true,
+                    None,
+                    false,
+                )
                 .await;
         }
         if self.params.config.lifecycle == super::LifecycleMode::Ephemeral {
@@ -31,6 +39,7 @@ impl AgentLoopRunner {
                     "EnterPlanMode cannot be used in agent contexts",
                     true,
                     None,
+                    false,
                 )
                 .await;
         }
@@ -51,6 +60,7 @@ impl AgentLoopRunner {
                     "User declined to enter plan mode. Continue without planning.",
                     false,
                     None,
+                    false,
                 )
                 .await;
         }
@@ -86,9 +96,10 @@ impl AgentLoopRunner {
                     idx,
                     id,
                     ENTER_PLAN_NAME,
-                    &format!("Cannot create plans directory: {e}. Plan mode was not entered."),
+                    format!("Cannot create plans directory: {e}. Plan mode was not entered."),
                     true,
                     None,
+                    false,
                 )
                 .await;
         }
@@ -110,7 +121,7 @@ impl AgentLoopRunner {
             idx,
             id,
             ENTER_PLAN_NAME,
-            &format!(
+            format!(
                 "Entered plan mode.\n\n\
              ## Plan File Info:\n{file_info}\n\
              This is the ONLY file you may edit. All other tools are read-only.\n\
@@ -118,6 +129,7 @@ impl AgentLoopRunner {
             ),
             false,
             None,
+            false,
         )
         .await
     }

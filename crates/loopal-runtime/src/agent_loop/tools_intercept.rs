@@ -12,25 +12,29 @@ impl AgentLoopRunner {
     pub(super) async fn intercept_special_tools(
         &mut self,
         tool_uses: &[(String, String, serde_json::Value)],
-    ) -> Result<(Intercepted, Remaining)> {
+    ) -> Result<(Intercepted, Remaining, bool)> {
         let mut intercepted = Vec::new();
         let mut remaining = Vec::new();
+        let mut turn_end_signal = false;
 
         for (idx, (id, name, input)) in tool_uses.iter().enumerate() {
-            match name.as_str() {
-                n if n == ENTER_PLAN_NAME => {
-                    intercepted.push(self.handle_enter_plan(idx, id).await?)
-                }
-                n if n == EXIT_PLAN_NAME => {
-                    intercepted.push(self.handle_exit_plan(idx, id).await?)
-                }
-                "AskUser" => intercepted.push(self.handle_ask_user(idx, id, name, input).await?),
+            let outcome = match name.as_str() {
+                n if n == ENTER_PLAN_NAME => Some(self.handle_enter_plan(idx, id).await?),
+                n if n == EXIT_PLAN_NAME => Some(self.handle_exit_plan(idx, id).await?),
+                "AskUser" => Some(self.handle_ask_user(idx, id, name, input).await?),
                 n if n == REQUEST_IDLE_NAME => {
-                    intercepted.push(self.handle_request_idle(idx, id, input).await?)
+                    Some(self.handle_request_idle(idx, id, input).await?)
                 }
-                _ => remaining.push((id.clone(), name.clone(), input.clone())),
+                _ => {
+                    remaining.push((id.clone(), name.clone(), input.clone()));
+                    None
+                }
+            };
+            if let Some((i, block, signal)) = outcome {
+                intercepted.push((i, block));
+                turn_end_signal |= signal;
             }
         }
-        Ok((intercepted, remaining))
+        Ok((intercepted, remaining, turn_end_signal))
     }
 }

@@ -108,9 +108,6 @@ impl AgentLoopRunner {
             }
             server_block_retry = false;
             context_overflow_retry = false;
-            // reason: 错误路径 (handle_request_idle set 后 emit 失败/execute_tool_phase
-            // 失败) 会让信号未被消费就退 turn；turn 边界显式 take 防污染下一 turn。
-            self.take_turn_end_signal();
         }
 
         Ok(AgentOutput {

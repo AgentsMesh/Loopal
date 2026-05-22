@@ -60,7 +60,7 @@ impl AgentLoopRunner {
                     TurnState::ReadyToCall
                 }
                 TurnState::ToolResultsWritten => {
-                    if self.take_turn_end_signal() {
+                    if turn_ctx.take_turn_end_signal() {
                         TurnState::Complete
                     } else {
                         c.continuation_count = 0;

@@ -6,7 +6,6 @@ use super::cancel::TurnCancel;
 use super::runner::AgentLoopRunner;
 use super::sandbox_precheck;
 use super::tools_check_one::CheckOne;
-use super::tools_inject::tool_result_block;
 
 pub(super) struct CheckResult {
     pub approved: Vec<(String, String, serde_json::Value)>,
@@ -72,17 +71,16 @@ impl AgentLoopRunner {
                 .iter()
                 .position(|(tid, _, _)| tid == id)
                 .unwrap_or(0);
-            denied.push((
-                orig_idx,
-                tool_result_block(
+            let block = self
+                .emit_and_block(
                     id,
+                    name,
                     "Interrupted by user",
                     true,
                     Some(ToolResultMetadata::cancelled(CancelCause::UserInterrupt)),
-                ),
-            ));
-            self.emit_tool_cancelled(id, name, "Interrupted by user")
+                )
                 .await?;
+            denied.push((orig_idx, block));
         }
 
         Ok(CheckResult { approved, denied })

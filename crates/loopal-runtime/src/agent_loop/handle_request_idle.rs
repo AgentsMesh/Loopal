@@ -23,7 +23,7 @@ impl AgentLoopRunner {
         idx: usize,
         id: &str,
         input: &serde_json::Value,
-    ) -> loopal_error::Result<(usize, ContentBlock)> {
+    ) -> loopal_error::Result<(usize, ContentBlock, bool)> {
         debug!(tool = NAME, "intercepted");
         let parsed: ParsedIdle = match serde_json::from_value(input.clone()) {
             Ok(p) => p,
@@ -33,29 +33,26 @@ impl AgentLoopRunner {
                         idx,
                         id,
                         NAME,
-                        &format!(
+                        format!(
                             "request_idle: invalid arguments ({e}). Required: \
                              max_idle_duration_secs (u64, {MIN_IDLE_DURATION_SECS}..={MAX_IDLE_DURATION_SECS}), \
                              reason (string). Optional: expected_wake_signal (string)."
                         ),
                         true,
                         None,
+                        false,
                     )
                     .await;
             }
         };
         if let Err(msg) = validate_duration(parsed.max_idle_duration_secs) {
             return self
-                .complete_intercepted_tool(idx, id, NAME, &msg, true, None)
+                .complete_intercepted_tool(idx, id, NAME, msg, true, None, false)
                 .await;
         }
         let wake_at = Utc::now() + Duration::seconds(parsed.max_idle_duration_secs as i64);
         self.continuation_gate
             .close(GateClose::ModelRequested { wake_at });
-        // reason: request_idle 后 LLM 已经表达 "I'm done waiting"；turn state machine 在
-        // ToolResultsWritten 分支会读取这个 signal，跳过原本会消耗 tool_result 的下次 LLM call。
-        // 详见 plan Part B2 + runner.rs::tool_signaled_turn_end 不变量说明。
-        self.signal_turn_end_after_tools();
         let gate = self.continuation_gate.summary();
         if let Err(err) = self
             .emit(AgentEventPayload::ContinuationGateChanged(gate))
@@ -74,7 +71,10 @@ impl AgentLoopRunner {
             wake_at = wake_at.to_rfc3339(),
             reason = parsed.reason,
         );
-        self.complete_intercepted_tool(idx, id, NAME, &message, false, None)
+        // reason: turn_end_signal=true -> dispatcher 聚合后通过 ToolExecStats 冒泡到
+        // execute_tool_phase, set 到 turn_ctx; turn_exec::ToolResultsWritten 分支 take
+        // 后 turn 直接 Complete (跳过消耗 tool_result 的下次 LLM call). 详见 plan Part B2.
+        self.complete_intercepted_tool(idx, id, NAME, message, false, None, true)
             .await
     }
 }

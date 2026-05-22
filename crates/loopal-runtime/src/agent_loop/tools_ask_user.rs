@@ -11,7 +11,7 @@ impl AgentLoopRunner {
         id: &str,
         name: &str,
         input: &serde_json::Value,
-    ) -> loopal_error::Result<(usize, ContentBlock)> {
+    ) -> loopal_error::Result<(usize, ContentBlock, bool)> {
         match parse_questions(input) {
             Ok(questions) => self.handle_ask_user_ok(idx, id, name, questions).await,
             Err(err_msg) => {
@@ -27,11 +27,11 @@ impl AgentLoopRunner {
         id: &str,
         name: &str,
         questions: Vec<loopal_protocol::Question>,
-    ) -> loopal_error::Result<(usize, ContentBlock)> {
+    ) -> loopal_error::Result<(usize, ContentBlock, bool)> {
         self.refresh_decision_context().await;
         let response = self.params.deps.frontend.ask_user(questions.clone()).await;
         let (content, is_error) = format_response(&response, &questions);
-        self.complete_intercepted_tool(idx, id, name, &content, is_error, None)
+        self.complete_intercepted_tool(idx, id, name, content, is_error, None, false)
             .await
     }
 
@@ -41,8 +41,8 @@ impl AgentLoopRunner {
         id: &str,
         name: &str,
         err_msg: String,
-    ) -> loopal_error::Result<(usize, ContentBlock)> {
-        self.complete_intercepted_tool(idx, id, name, &err_msg, true, None)
+    ) -> loopal_error::Result<(usize, ContentBlock, bool)> {
+        self.complete_intercepted_tool(idx, id, name, err_msg, true, None, false)
             .await
     }
 }

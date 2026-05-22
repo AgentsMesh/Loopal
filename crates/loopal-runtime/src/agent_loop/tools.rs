@@ -23,7 +23,8 @@ impl AgentLoopRunner {
             return Ok(ToolExecStats::default());
         }
 
-        let (intercepted, remaining) = self.intercept_special_tools(&tool_uses).await?;
+        let (intercepted, remaining, turn_end_signal) =
+            self.intercept_special_tools(&tool_uses).await?;
         let intercepted_indices: HashSet<usize> = intercepted.iter().map(|(idx, _)| *idx).collect();
 
         let early_ids = early_handle.early_started_ids().clone();
@@ -48,6 +49,7 @@ impl AgentLoopRunner {
             approved: check.approved.len() as u32 + early_ids.len() as u32,
             denied: check.denied.len() as u32,
             errors: 0,
+            turn_end_signal,
         };
 
         let mut indexed_results: Vec<(usize, ContentBlock)> = Vec::new();

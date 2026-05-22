@@ -25,22 +25,18 @@ pub(super) fn tool_result_block(
 }
 
 impl AgentLoopRunner {
-    // reason: 所有 intercept handler 都必须既 emit ToolResult（让 view-state 知道工具完成、
-    // 不被 turn-end reconcile 误标 Stale），又返回 ContentBlock（让 LLM 在后续 turn 看到 result）。
-    // 历史上 4 个 handler 里 3 个漏 emit（request_idle / EnterPlanMode / ExitPlanMode），
-    // 集中到这一个 helper 让契约不可漏。详见 plans/breezy-tickling-cerf.md Part B1。
-    //
-    // content 取所有权: emit 需 clone 一次给 event, ContentBlock 直接 move; 比之前
-    // &str 接口少一次 to_string() 分配 (每个 intercept tool 完成省 1 次 String alloc)。
-    pub(super) async fn complete_intercepted_tool(
+    // reason: emit ToolResult event + 构造 ContentBlock 是同一动作的两面 —— event 给
+    // view-state, block 喂回 LLM。历史上 emit_tool_error / emit_tool_cancelled +
+    // tool_result_block 分两步调用，4 个 intercept handler 里有 3 个漏 emit。此 helper
+    // 统一两面入口, 任何 "工具结果回写" 路径走它即可保证两边一致。
+    pub(super) async fn emit_and_block(
         &self,
-        idx: usize,
         id: &str,
         name: &str,
         content: impl Into<String>,
         is_error: bool,
         metadata: Option<ToolResultMetadata>,
-    ) -> Result<(usize, ContentBlock)> {
+    ) -> Result<ContentBlock> {
         let content = content.into();
         self.emit_in_turn(AgentEventPayload::ToolResult {
             id: id.to_string(),
@@ -51,16 +47,31 @@ impl AgentLoopRunner {
             metadata: metadata.clone(),
         })
         .await?;
-        Ok((
-            idx,
-            ContentBlock::ToolResult {
-                tool_use_id: id.to_string(),
-                content,
-                images: Vec::new(),
-                is_error,
-                metadata,
-            },
-        ))
+        Ok(ContentBlock::ToolResult {
+            tool_use_id: id.to_string(),
+            content,
+            images: Vec::new(),
+            is_error,
+            metadata,
+        })
+    }
+
+    // reason: intercept handler 的薄包装 —— 在 emit_and_block 之上加 idx + turn_end_signal
+    // 适配 intercept_special_tools 的聚合签名。详见 plans/breezy-tickling-cerf.md Part B1.
+    pub(super) async fn complete_intercepted_tool(
+        &self,
+        idx: usize,
+        id: &str,
+        name: &str,
+        content: impl Into<String>,
+        is_error: bool,
+        metadata: Option<ToolResultMetadata>,
+        turn_end_signal: bool,
+    ) -> Result<(usize, ContentBlock, bool)> {
+        let block = self
+            .emit_and_block(id, name, content, is_error, metadata)
+            .await?;
+        Ok((idx, block, turn_end_signal))
     }
 
     /// Emit interrupted results for all tools (early cancel path).

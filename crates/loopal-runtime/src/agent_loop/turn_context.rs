@@ -14,6 +14,11 @@ pub struct TurnContext {
     pub pending_warnings: Vec<String>,
     pub pending_continuation: Option<ContinuationIntent>,
     pub metrics: TurnMetrics,
+    // reason: intercept handler 在工具阶段 set，turn_exec::ToolResultsWritten 分支 take
+    // 后 turn 直接 Complete（跳过原本消耗 tool_result 的下次 LLM call）。当前唯一设置者
+    // handle_request_idle —— LLM 已表达 idle。turn-scoped 字段随 TurnContext 销毁
+    // 自然 reset，无需跨 turn 防御性 clear。
+    tool_signaled_turn_end: bool,
 }
 
 impl TurnContext {
@@ -26,6 +31,15 @@ impl TurnContext {
             pending_warnings: Vec::new(),
             pending_continuation: None,
             metrics: TurnMetrics::default(),
+            tool_signaled_turn_end: false,
         }
+    }
+
+    pub(super) fn signal_turn_end_after_tools(&mut self) {
+        self.tool_signaled_turn_end = true;
+    }
+
+    pub(super) fn take_turn_end_signal(&mut self) -> bool {
+        std::mem::take(&mut self.tool_signaled_turn_end)
     }
 }

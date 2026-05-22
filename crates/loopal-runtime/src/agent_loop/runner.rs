@@ -50,6 +50,15 @@ pub struct AgentLoopRunner {
     pub continuation_gate: ContinuationGate,
     pub turn_history: TurnHistory,
     pub last_continuation_goal_id: Option<String>,
+    // reason: turn-scoped flag — intercept handler 在工具执行阶段 set，turn_exec 的
+    // ToolResultsWritten 分支 consume 后 turn 直接 Complete (跳过原本消耗 tool_result
+    // 的下次 LLM call)。当前唯一设置者是 handle_request_idle —— LLM 已表达 idle 意图，
+    // 再发起 LLM call 既浪费 tokens 又无产出。
+    //
+    // 不变量：每 turn 末尾必须 reset (正常路径由 take_turn_end_signal 消费；错误路径
+    // 由 run_loop 在 retry-flag reset 同处显式 take 清残留)。pub(super) 配合 setter/
+    // taker method 保证 single-writer 契约不被绕过。
+    pub(super) tool_signaled_turn_end: bool,
 }
 
 impl AgentLoopRunner {
@@ -101,6 +110,7 @@ impl AgentLoopRunner {
             continuation_gate: ContinuationGate::new(),
             turn_history: TurnHistory::new(),
             last_continuation_goal_id: None,
+            tool_signaled_turn_end: false,
         }
     }
 
@@ -151,6 +161,20 @@ impl AgentLoopRunner {
     /// is a loud failure instead of a silent `turn_id=0`.
     pub async fn emit_in_turn(&self, payload: AgentEventPayload) -> Result<()> {
         self.params.deps.frontend.emit_in_turn(payload).await
+    }
+
+    // reason: intercept handler 向 turn state machine 发出"工具阶段后立即终止 turn"
+    // 信号。当前唯一调用者是 handle_request_idle。命名表达 intent (signal)，不暴露
+    // 字段实现，保证 single-writer 契约: 调用方只能 set，无法 read/clear。
+    pub(super) fn signal_turn_end_after_tools(&mut self) {
+        self.tool_signaled_turn_end = true;
+    }
+
+    // reason: turn state machine (turn_exec::ToolResultsWritten) 消费信号。同时
+    // 也被 run_loop 在每轮 turn 末尾调用以清残留 (错误路径如果 set 后 turn fail，
+    // 信号会泄漏到下一 turn)。take 语义 (读取并清空) 保证幂等。
+    pub(super) fn take_turn_end_signal(&mut self) -> bool {
+        std::mem::take(&mut self.tool_signaled_turn_end)
     }
 
     /// Remove this session's tmp dir (`$TMPDIR/loopal/{id}/`).

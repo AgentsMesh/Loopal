@@ -22,7 +22,9 @@ impl AgentLoopRunner {
         );
         let is_clear = matches!(&ctrl, ControlCommand::GoalClear);
         let outcome: std::result::Result<Option<ThreadGoal>, GoalSessionError> = match ctrl {
-            ControlCommand::GoalCreate { objective } => session.create(objective).await.map(Some),
+            ControlCommand::GoalCreate { objective } => {
+                session.create_or_replace(objective).await.map(Some)
+            }
             ControlCommand::GoalUserPause => {
                 transition(
                     &session,

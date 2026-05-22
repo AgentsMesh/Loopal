@@ -1,4 +1,5 @@
-//! Helpers for tool interrupt handling, pending message injection, and result blocks.
+//! Helpers for intercept handler completion, tool interrupt handling, pending
+//! message injection, and result blocks.
 
 use loopal_error::Result;
 use loopal_message::{ContentBlock, Message, MessageRole};
@@ -24,6 +25,31 @@ pub(super) fn tool_result_block(
 }
 
 impl AgentLoopRunner {
+    // reason: 所有 intercept handler 都必须既 emit ToolResult（让 view-state 知道工具完成、
+    // 不被 turn-end reconcile 误标 Stale），又返回 ContentBlock（让 LLM 在后续 turn 看到 result）。
+    // 历史上 4 个 handler 里 3 个漏 emit（request_idle / EnterPlanMode / ExitPlanMode），
+    // 集中到这一个 helper 让契约不可漏。详见 plans/breezy-tickling-cerf.md Part B1。
+    pub(super) async fn complete_intercepted_tool(
+        &self,
+        idx: usize,
+        id: &str,
+        name: &str,
+        content: &str,
+        is_error: bool,
+        metadata: Option<ToolResultMetadata>,
+    ) -> Result<(usize, ContentBlock)> {
+        self.emit_in_turn(AgentEventPayload::ToolResult {
+            id: id.to_string(),
+            name: name.to_string(),
+            result: content.to_string(),
+            is_error,
+            duration_ms: None,
+            metadata: metadata.clone(),
+        })
+        .await?;
+        Ok((idx, tool_result_block(id, content, is_error, metadata)))
+    }
+
     /// Emit interrupted results for all tools (early cancel path).
     pub(super) async fn emit_all_interrupted(
         &mut self,

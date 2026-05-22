@@ -182,6 +182,12 @@ mod e2e_goal_edge_test;
 mod e2e_goal_support;
 #[path = "suite/e2e_goal_test.rs"]
 mod e2e_goal_test;
+#[path = "suite/e2e_goal_replace_test.rs"]
+mod e2e_goal_replace_test;
+#[path = "suite/e2e_request_idle_terminates_turn_test.rs"]
+mod e2e_request_idle_terminates_turn_test;
+#[path = "suite/e2e_intercept_emit_test.rs"]
+mod e2e_intercept_emit_test;
 #[path = "suite/e2e_harness.rs"]
 mod e2e_harness;
 #[path = "suite/e2e_hooks_test.rs"]

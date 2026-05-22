@@ -108,6 +108,12 @@ impl AgentLoopRunner {
             }
             server_block_retry = false;
             context_overflow_retry = false;
+            // reason: 正常路径 turn_exec::ToolResultsWritten 已经 take 信号；错误路径
+            // (handle_request_idle 设置后 emit_in_turn 失败传播 Err、execute_tool_phase
+            // 失败等) 会让信号未被消费就退出 turn。在 turn 边界显式 take 清残留，避免
+            // 污染下一 turn (cron 触发或新 user input 后被错误跳过 LLM call)。
+            // 与 retry-flag reset 同模式：每轮 turn 末尾归零所有 per-turn 状态。
+            self.take_turn_end_signal();
         }
 
         Ok(AgentOutput {

@@ -61,7 +61,13 @@ impl AgentLoopRunner {
         let cancel_md = ToolResultMetadata::cancelled(CancelCause::UserInterrupt);
         for (id, name, _) in tool_uses {
             let block = self
-                .emit_and_block(id, name, "Interrupted by user", true, Some(cancel_md.clone()))
+                .emit_and_block(
+                    id,
+                    name,
+                    "Interrupted by user",
+                    true,
+                    Some(cancel_md.clone()),
+                )
                 .await?;
             blocks.push(block);
         }

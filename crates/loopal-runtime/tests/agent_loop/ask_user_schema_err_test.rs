@@ -1,6 +1,6 @@
 use loopal_message::ContentBlock;
 
-use super::{in_turn, make_turn_ctx, make_runner};
+use super::{in_turn, make_runner, make_turn_ctx};
 
 async fn run_ask_user_with_input(
     runner: &mut loopal_runtime::agent_loop::AgentLoopRunner,
@@ -8,7 +8,11 @@ async fn run_ask_user_with_input(
 ) -> ContentBlock {
     let tool_uses = vec![("tc-bad".to_string(), "AskUser".to_string(), input)];
     let mut turn_ctx = make_turn_ctx();
-    in_turn(runner.execute_tools(&mut turn_ctx, tool_uses, loopal_runtime::agent_loop::StreamingToolHandle::empty()))
+    in_turn(runner.execute_tools(
+        &mut turn_ctx,
+        tool_uses,
+        loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+    ))
     .await
     .unwrap();
     runner.params.store.messages()[0].content[0].clone()

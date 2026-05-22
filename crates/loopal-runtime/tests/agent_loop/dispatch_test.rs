@@ -5,7 +5,7 @@ use std::collections::HashSet;
 
 use loopal_message::ContentBlock;
 
-use super::{in_turn, make_turn_ctx, make_runner};
+use super::{in_turn, make_runner, make_turn_ctx};
 
 /// AskUser is intercepted: produces exactly one ToolResult with the frontend
 /// answer, NOT the fallback "(intercepted by runner)" from Tool::execute().
@@ -27,7 +27,11 @@ async fn ask_user_intercepted_no_fallback_leak() {
         }),
     )];
     let mut turn_ctx = make_turn_ctx();
-    in_turn(runner.execute_tools(&mut turn_ctx, tool_uses, loopal_runtime::agent_loop::StreamingToolHandle::empty()))
+    in_turn(runner.execute_tools(
+        &mut turn_ctx,
+        tool_uses,
+        loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+    ))
     .await
     .unwrap();
 
@@ -93,7 +97,11 @@ async fn ask_user_plus_read_no_duplicate_tool_result() {
     ];
 
     let mut turn_ctx = make_turn_ctx();
-    in_turn(runner.execute_tools(&mut turn_ctx, tool_uses, loopal_runtime::agent_loop::StreamingToolHandle::empty()))
+    in_turn(runner.execute_tools(
+        &mut turn_ctx,
+        tool_uses,
+        loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+    ))
     .await
     .unwrap();
 

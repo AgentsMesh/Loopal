@@ -63,6 +63,9 @@ impl AgentLoopRunner {
             wake_at = wake_at.to_rfc3339(),
             reason = parsed.reason,
         );
-        Ok((idx, self.emit_and_block(id, NAME, message, false, None).await?))
+        Ok((
+            idx,
+            self.emit_and_block(id, NAME, message, false, None).await?,
+        ))
     }
 }

@@ -87,11 +87,11 @@ impl AgentLoopRunner {
             {
                 tracing::error!(error = %emit_err, "ModeChanged rollback emit failed");
             }
-            let msg =
-                format!("Cannot create plans directory: {e}. Plan mode was not entered.");
+            let msg = format!("Cannot create plans directory: {e}. Plan mode was not entered.");
             return Ok((
                 idx,
-                self.emit_and_block(id, ENTER_PLAN_NAME, msg, true, None).await?,
+                self.emit_and_block(id, ENTER_PLAN_NAME, msg, true, None)
+                    .await?,
             ));
         }
 
@@ -116,7 +116,8 @@ impl AgentLoopRunner {
         );
         Ok((
             idx,
-            self.emit_and_block(id, ENTER_PLAN_NAME, msg, false, None).await?,
+            self.emit_and_block(id, ENTER_PLAN_NAME, msg, false, None)
+                .await?,
         ))
     }
 

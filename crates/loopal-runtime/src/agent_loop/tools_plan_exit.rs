@@ -39,7 +39,11 @@ impl AgentLoopRunner {
                     "No plan file at {}. Write your plan before calling ExitPlanMode.",
                     self.plan_file.path().display()
                 );
-                return Ok((idx, self.emit_and_block(id, EXIT_PLAN_NAME, msg, true, None).await?));
+                return Ok((
+                    idx,
+                    self.emit_and_block(id, EXIT_PLAN_NAME, msg, true, None)
+                        .await?,
+                ));
             }
         };
 
@@ -119,6 +123,10 @@ impl AgentLoopRunner {
              Refer back to it during implementation.{team_hint}\n\n\
              ## Approved Plan:\n{plan}"
         );
-        Ok((idx, self.emit_and_block(id, EXIT_PLAN_NAME, content, false, None).await?))
+        Ok((
+            idx,
+            self.emit_and_block(id, EXIT_PLAN_NAME, content, false, None)
+                .await?,
+        ))
     }
 }

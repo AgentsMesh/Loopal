@@ -33,7 +33,11 @@ impl AgentLoopRunner {
         self.refresh_decision_context().await;
         let response = self.params.deps.frontend.ask_user(questions.clone()).await;
         let (content, is_error) = format_response(&response, &questions);
-        Ok((idx, self.emit_and_block(id, name, content, is_error, None).await?))
+        Ok((
+            idx,
+            self.emit_and_block(id, name, content, is_error, None)
+                .await?,
+        ))
     }
 
     async fn handle_ask_user_schema_err(
@@ -43,6 +47,9 @@ impl AgentLoopRunner {
         name: &str,
         err_msg: String,
     ) -> loopal_error::Result<(usize, ContentBlock)> {
-        Ok((idx, self.emit_and_block(id, name, err_msg, true, None).await?))
+        Ok((
+            idx,
+            self.emit_and_block(id, name, err_msg, true, None).await?,
+        ))
     }
 }

@@ -23,8 +23,7 @@ impl AgentLoopRunner {
             return Ok(ToolExecStats::default());
         }
 
-        let (intercepted, remaining) =
-            self.intercept_special_tools(turn_ctx, &tool_uses).await?;
+        let (intercepted, remaining) = self.intercept_special_tools(turn_ctx, &tool_uses).await?;
         let intercepted_indices: HashSet<usize> = intercepted.iter().map(|(idx, _)| *idx).collect();
 
         let early_ids = early_handle.early_started_ids().clone();

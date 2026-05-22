@@ -2,7 +2,7 @@ use loopal_message::{ContentBlock, MessageRole};
 use loopal_protocol::AgentEventPayload;
 use loopal_tool_api::PermissionMode;
 
-use super::{in_turn, make_turn_ctx, make_runner_with_channels};
+use super::{in_turn, make_runner_with_channels, make_turn_ctx};
 
 #[tokio::test]
 async fn test_execute_tools_bypass_mode() {
@@ -26,7 +26,11 @@ async fn test_execute_tools_bypass_mode() {
     )];
 
     let mut turn_ctx = make_turn_ctx();
-    in_turn(runner.execute_tools(&mut turn_ctx, tool_uses, loopal_runtime::agent_loop::StreamingToolHandle::empty()))
+    in_turn(runner.execute_tools(
+        &mut turn_ctx,
+        tool_uses,
+        loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+    ))
     .await
     .unwrap();
 
@@ -66,7 +70,11 @@ async fn test_execute_tools_supervised_denies_without_approval() {
     )];
 
     let mut turn_ctx = make_turn_ctx();
-    in_turn(runner.execute_tools(&mut turn_ctx, tool_uses, loopal_runtime::agent_loop::StreamingToolHandle::empty()))
+    in_turn(runner.execute_tools(
+        &mut turn_ctx,
+        tool_uses,
+        loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+    ))
     .await
     .unwrap();
 
@@ -119,7 +127,11 @@ async fn test_execute_tools_read_allowed_write_denied_in_supervised() {
     ];
 
     let mut turn_ctx = make_turn_ctx();
-    in_turn(runner.execute_tools(&mut turn_ctx, tool_uses, loopal_runtime::agent_loop::StreamingToolHandle::empty()))
+    in_turn(runner.execute_tools(
+        &mut turn_ctx,
+        tool_uses,
+        loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+    ))
     .await
     .unwrap();
 

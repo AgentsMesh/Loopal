@@ -40,8 +40,8 @@ async fn run_intercept_emit_scenario(
 #[tokio::test]
 async fn enter_plan_in_ephemeral_emits_tool_result_error() {
     let events = run_intercept_emit_scenario(AgentMode::Act, "tc-enter-plan").await;
-    let (is_error, result) = find_tool_result_full(&events, "EnterPlanMode")
-        .expect("EnterPlanMode ToolResult required");
+    let (is_error, result) =
+        find_tool_result_full(&events, "EnterPlanMode").expect("EnterPlanMode ToolResult required");
     assert!(is_error, "agent-context 拒绝时 is_error 应为 true");
     assert!(
         result.contains("cannot be used in agent contexts"),
@@ -52,8 +52,8 @@ async fn enter_plan_in_ephemeral_emits_tool_result_error() {
 #[tokio::test]
 async fn enter_plan_when_already_in_plan_mode_emits_tool_result_error() {
     let events = run_intercept_emit_scenario(AgentMode::Plan, "tc-enter-plan-2").await;
-    let (is_error, result) = find_tool_result_full(&events, "EnterPlanMode")
-        .expect("EnterPlanMode ToolResult required");
+    let (is_error, result) =
+        find_tool_result_full(&events, "EnterPlanMode").expect("EnterPlanMode ToolResult required");
     assert!(is_error);
     assert!(result.contains("Already in plan mode"), "got: {result}");
 }

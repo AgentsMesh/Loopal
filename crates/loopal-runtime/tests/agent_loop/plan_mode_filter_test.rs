@@ -6,7 +6,7 @@ use loopal_runtime::agent_loop::PlanModeState;
 use loopal_runtime::plan_file::build_plan_mode_filter;
 use loopal_tool_api::PermissionMode;
 
-use super::{in_turn, make_cancel, make_runner_with_channels};
+use super::{in_turn, make_runner_with_channels, make_turn_ctx};
 
 /// Helper: set up a runner in plan mode with proper PlanModeState.
 fn setup_plan_state(runner: &mut loopal_runtime::agent_loop::AgentLoopRunner) {
@@ -30,9 +30,10 @@ async fn plan_mode_blocks_bash() {
         "Bash".to_string(),
         serde_json::json!({"command": "echo hello"}),
     )];
+    let mut turn_ctx = make_turn_ctx();
     in_turn(runner.execute_tools(
+        &mut turn_ctx,
         tool_uses,
-        &make_cancel(),
         loopal_runtime::agent_loop::StreamingToolHandle::empty(),
     ))
     .await
@@ -72,9 +73,10 @@ async fn plan_mode_allows_read_with_reminder() {
         "Read".to_string(),
         serde_json::json!({"file_path": tmp.to_str().unwrap()}),
     )];
+    let mut turn_ctx = make_turn_ctx();
     in_turn(runner.execute_tools(
+        &mut turn_ctx,
         tool_uses,
-        &make_cancel(),
         loopal_runtime::agent_loop::StreamingToolHandle::empty(),
     ))
     .await
@@ -107,9 +109,10 @@ async fn plan_mode_write_blocks_non_plan_path() {
         "Write".to_string(),
         serde_json::json!({"file_path": "/tmp/not-a-plan.txt", "content": "hack"}),
     )];
+    let mut turn_ctx = make_turn_ctx();
     in_turn(runner.execute_tools(
+        &mut turn_ctx,
         tool_uses,
-        &make_cancel(),
         loopal_runtime::agent_loop::StreamingToolHandle::empty(),
     ))
     .await

@@ -114,10 +114,20 @@ pub fn assert_has_mode_changed(events: &[AgentEventPayload], expected_mode: &str
 }
 
 pub fn find_tool_result(events: &[AgentEventPayload], tool_name: &str) -> Option<String> {
+    find_tool_result_full(events, tool_name).map(|(_, c)| c)
+}
+
+pub fn find_tool_result_full(
+    events: &[AgentEventPayload],
+    tool_name: &str,
+) -> Option<(bool, String)> {
     events.iter().find_map(|e| match e {
-        AgentEventPayload::ToolResult { name, result, .. } if name == tool_name => {
-            Some(result.clone())
-        }
+        AgentEventPayload::ToolResult {
+            name,
+            is_error,
+            result,
+            ..
+        } if name == tool_name => Some((*is_error, result.clone())),
         _ => None,
     })
 }

@@ -6,6 +6,7 @@ use serde::Deserialize;
 
 pub const MIN_IDLE_DURATION_SECS: u64 = 60;
 pub const MAX_IDLE_DURATION_SECS: u64 = 86_400;
+pub const NAME: &str = "request_idle";
 
 pub struct RequestIdleTool;
 

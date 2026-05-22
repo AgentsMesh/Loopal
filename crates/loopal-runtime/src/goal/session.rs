@@ -53,6 +53,24 @@ impl GoalRuntimeSession {
     }
 
     pub async fn create(&self, objective: String) -> Result<ThreadGoal, GoalSessionError> {
+        self.create_internal(objective, false).await
+    }
+
+    // reason: TUI `/goal <obj>` 表达"换目标"的显式用户意图，与 LLM `create_goal` 工具的
+    // "建议性创建" 语义不同。LLM 工具应继续 fail-on-exists 让模型选 update_goal；
+    // 用户输入应直接替换。详见 plans/breezy-tickling-cerf.md Part A。
+    pub async fn create_or_replace(
+        &self,
+        objective: String,
+    ) -> Result<ThreadGoal, GoalSessionError> {
+        self.create_internal(objective, true).await
+    }
+
+    async fn create_internal(
+        &self,
+        objective: String,
+        replace_existing: bool,
+    ) -> Result<ThreadGoal, GoalSessionError> {
         let len = objective.chars().count();
         if !(1..=MAX_OBJECTIVE_CHARS).contains(&len) {
             return Err(GoalSessionError::ObjectiveTooLong {
@@ -63,10 +81,11 @@ impl GoalRuntimeSession {
         let goal = {
             let _guard = self.write_lock.lock().await;
             let id = self.current_session_id();
-            if let Some(existing) = self
-                .store
-                .load(&id)
-                .map_err(|e| GoalSessionError::Storage(e.to_string()))?
+            if !replace_existing
+                && let Some(existing) = self
+                    .store
+                    .load(&id)
+                    .map_err(|e| GoalSessionError::Storage(e.to_string()))?
                 && existing.status != ThreadGoalStatus::Complete
             {
                 return Err(GoalSessionError::AlreadyExists);

@@ -1,13 +1,14 @@
 use loopal_message::ContentBlock;
-use loopal_protocol::AgentEventPayload;
 
 use super::question_format::format_response;
 use super::question_parse::parse_questions;
 use super::runner::AgentLoopRunner;
+use super::turn_context::TurnContext;
 
 impl AgentLoopRunner {
     pub(super) async fn handle_ask_user(
         &mut self,
+        _turn_ctx: &mut TurnContext,
         idx: usize,
         id: &str,
         name: &str,
@@ -32,24 +33,10 @@ impl AgentLoopRunner {
         self.refresh_decision_context().await;
         let response = self.params.deps.frontend.ask_user(questions.clone()).await;
         let (content, is_error) = format_response(&response, &questions);
-        self.emit_in_turn(AgentEventPayload::ToolResult {
-            id: id.to_string(),
-            name: name.to_string(),
-            result: content.clone(),
-            is_error,
-            duration_ms: None,
-            metadata: None,
-        })
-        .await?;
         Ok((
             idx,
-            ContentBlock::ToolResult {
-                tool_use_id: id.to_string(),
-                content,
-                images: Vec::new(),
-                is_error,
-                metadata: None,
-            },
+            self.emit_and_block(id, name, content, is_error, None)
+                .await?,
         ))
     }
 
@@ -60,24 +47,9 @@ impl AgentLoopRunner {
         name: &str,
         err_msg: String,
     ) -> loopal_error::Result<(usize, ContentBlock)> {
-        self.emit_in_turn(AgentEventPayload::ToolResult {
-            id: id.to_string(),
-            name: name.to_string(),
-            result: err_msg.clone(),
-            is_error: true,
-            duration_ms: None,
-            metadata: None,
-        })
-        .await?;
         Ok((
             idx,
-            ContentBlock::ToolResult {
-                tool_use_id: id.to_string(),
-                content: err_msg,
-                images: Vec::new(),
-                is_error: true,
-                metadata: None,
-            },
+            self.emit_and_block(id, name, err_msg, true, None).await?,
         ))
     }
 }

@@ -14,6 +14,8 @@ pub struct TurnContext {
     pub pending_warnings: Vec<String>,
     pub pending_continuation: Option<ContinuationIntent>,
     pub metrics: TurnMetrics,
+    // 唯一 setter: handle_request_idle (turn_exec::ToolResultsWritten 分支 take).
+    tool_signaled_turn_end: bool,
 }
 
 impl TurnContext {
@@ -26,6 +28,15 @@ impl TurnContext {
             pending_warnings: Vec::new(),
             pending_continuation: None,
             metrics: TurnMetrics::default(),
+            tool_signaled_turn_end: false,
         }
+    }
+
+    pub(super) fn signal_turn_end_after_tools(&mut self) {
+        self.tool_signaled_turn_end = true;
+    }
+
+    pub(super) fn take_turn_end_signal(&mut self) -> bool {
+        std::mem::take(&mut self.tool_signaled_turn_end)
     }
 }

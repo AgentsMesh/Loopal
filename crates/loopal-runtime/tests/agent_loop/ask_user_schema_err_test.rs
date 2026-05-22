@@ -1,15 +1,16 @@
 use loopal_message::ContentBlock;
 
-use super::{in_turn, make_cancel, make_runner};
+use super::{in_turn, make_runner, make_turn_ctx};
 
 async fn run_ask_user_with_input(
     runner: &mut loopal_runtime::agent_loop::AgentLoopRunner,
     input: serde_json::Value,
 ) -> ContentBlock {
     let tool_uses = vec![("tc-bad".to_string(), "AskUser".to_string(), input)];
+    let mut turn_ctx = make_turn_ctx();
     in_turn(runner.execute_tools(
+        &mut turn_ctx,
         tool_uses,
-        &make_cancel(),
         loopal_runtime::agent_loop::StreamingToolHandle::empty(),
     ))
     .await

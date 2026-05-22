@@ -178,6 +178,8 @@ mod e2e_fetch_test;
 mod e2e_git_test;
 #[path = "suite/e2e_goal_edge_test.rs"]
 mod e2e_goal_edge_test;
+#[path = "suite/e2e_goal_replace_test.rs"]
+mod e2e_goal_replace_test;
 #[path = "suite/e2e_goal_support.rs"]
 mod e2e_goal_support;
 #[path = "suite/e2e_goal_test.rs"]
@@ -186,6 +188,8 @@ mod e2e_goal_test;
 mod e2e_harness;
 #[path = "suite/e2e_hooks_test.rs"]
 mod e2e_hooks_test;
+#[path = "suite/e2e_intercept_emit_test.rs"]
+mod e2e_intercept_emit_test;
 #[path = "suite/e2e_loop_test.rs"]
 mod e2e_loop_test;
 #[path = "suite/e2e_mcp_test.rs"]
@@ -198,6 +202,8 @@ mod e2e_panel_detail_test;
 mod e2e_permission_test;
 #[path = "suite/e2e_question_test.rs"]
 mod e2e_question_test;
+#[path = "suite/e2e_request_idle_terminates_turn_test.rs"]
+mod e2e_request_idle_terminates_turn_test;
 #[path = "suite/e2e_scroll_test.rs"]
 mod e2e_scroll_test;
 #[path = "suite/e2e_session_test.rs"]

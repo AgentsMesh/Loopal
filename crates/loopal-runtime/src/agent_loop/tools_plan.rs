@@ -1,37 +1,42 @@
 use loopal_message::ContentBlock;
 use loopal_protocol::AgentEventPayload;
 use loopal_tool_api::PermissionDecision;
+use loopal_tool_plan_mode::ENTER_PLAN_NAME;
 use tracing::{debug, info, warn};
 
 use super::PlanModeState;
 use super::runner::AgentLoopRunner;
-use super::tools_inject::tool_result_block;
+use super::turn_context::TurnContext;
 use crate::mode::AgentMode;
 use crate::plan_file::build_plan_mode_filter;
 
 impl AgentLoopRunner {
     pub(super) async fn handle_enter_plan(
         &mut self,
+        _turn_ctx: &mut TurnContext,
         idx: usize,
         id: &str,
     ) -> loopal_error::Result<(usize, ContentBlock)> {
-        debug!(tool = "EnterPlanMode", "intercepted");
+        debug!(tool = ENTER_PLAN_NAME, "intercepted");
 
         if self.params.config.mode == AgentMode::Plan {
             return Ok((
                 idx,
-                tool_result_block(id, "Already in plan mode.", true, None),
+                self.emit_and_block(id, ENTER_PLAN_NAME, "Already in plan mode.", true, None)
+                    .await?,
             ));
         }
         if self.params.config.lifecycle == super::LifecycleMode::Ephemeral {
             return Ok((
                 idx,
-                tool_result_block(
+                self.emit_and_block(
                     id,
+                    ENTER_PLAN_NAME,
                     "EnterPlanMode cannot be used in agent contexts",
                     true,
                     None,
-                ),
+                )
+                .await?,
             ));
         }
 
@@ -40,17 +45,19 @@ impl AgentLoopRunner {
             .params
             .deps
             .frontend
-            .request_permission(id, "EnterPlanMode", &serde_json::json!({}))
+            .request_permission(id, ENTER_PLAN_NAME, &serde_json::json!({}))
             .await;
         if decision != PermissionDecision::Allow {
             return Ok((
                 idx,
-                tool_result_block(
+                self.emit_and_block(
                     id,
+                    ENTER_PLAN_NAME,
                     "User declined to enter plan mode. Continue without planning.",
                     false,
                     None,
-                ),
+                )
+                .await?,
             ));
         }
 
@@ -80,14 +87,11 @@ impl AgentLoopRunner {
             {
                 tracing::error!(error = %emit_err, "ModeChanged rollback emit failed");
             }
+            let msg = format!("Cannot create plans directory: {e}. Plan mode was not entered.");
             return Ok((
                 idx,
-                tool_result_block(
-                    id,
-                    &format!("Cannot create plans directory: {e}. Plan mode was not entered."),
-                    true,
-                    None,
-                ),
+                self.emit_and_block(id, ENTER_PLAN_NAME, msg, true, None)
+                    .await?,
             ));
         }
 
@@ -104,19 +108,16 @@ impl AgentLoopRunner {
             format!("No plan file yet. Create your plan at {plan_path} using the Write tool.")
         };
         info!(plan_file = %plan_path, "entered plan mode");
-        Ok((
-            idx,
-            tool_result_block(
-                id,
-                &format!(
-                    "Entered plan mode.\n\n\
+        let msg = format!(
+            "Entered plan mode.\n\n\
              ## Plan File Info:\n{file_info}\n\
              This is the ONLY file you may edit. All other tools are read-only.\n\
              Detailed workflow instructions will follow."
-                ),
-                false,
-                None,
-            ),
+        );
+        Ok((
+            idx,
+            self.emit_and_block(id, ENTER_PLAN_NAME, msg, false, None)
+                .await?,
         ))
     }
 

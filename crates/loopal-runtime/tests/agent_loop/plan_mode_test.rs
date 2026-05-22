@@ -3,7 +3,7 @@ use loopal_runtime::AgentMode;
 use loopal_runtime::agent_loop::LifecycleMode;
 use loopal_tool_api::PermissionMode;
 
-use super::{in_turn, make_cancel, make_runner};
+use super::{in_turn, make_runner, make_turn_ctx};
 
 #[tokio::test]
 async fn enter_plan_mode_denied_by_default_frontend() {
@@ -15,9 +15,10 @@ async fn enter_plan_mode_denied_by_default_frontend() {
         "EnterPlanMode".to_string(),
         serde_json::json!({}),
     )];
+    let mut turn_ctx = make_turn_ctx();
     in_turn(runner.execute_tools(
+        &mut turn_ctx,
         tool_uses,
-        &make_cancel(),
         loopal_runtime::agent_loop::StreamingToolHandle::empty(),
     ))
     .await
@@ -37,9 +38,10 @@ async fn enter_plan_when_already_in_plan_returns_error() {
         "EnterPlanMode".to_string(),
         serde_json::json!({}),
     )];
+    let mut turn_ctx = make_turn_ctx();
     in_turn(runner.execute_tools(
+        &mut turn_ctx,
         tool_uses,
-        &make_cancel(),
         loopal_runtime::agent_loop::StreamingToolHandle::empty(),
     ))
     .await
@@ -67,9 +69,10 @@ async fn enter_plan_blocked_for_task_lifecycle() {
         "EnterPlanMode".to_string(),
         serde_json::json!({}),
     )];
+    let mut turn_ctx = make_turn_ctx();
     in_turn(runner.execute_tools(
+        &mut turn_ctx,
         tool_uses,
-        &make_cancel(),
         loopal_runtime::agent_loop::StreamingToolHandle::empty(),
     ))
     .await
@@ -97,9 +100,10 @@ async fn exit_plan_when_not_in_plan_returns_error() {
         "ExitPlanMode".to_string(),
         serde_json::json!({}),
     )];
+    let mut turn_ctx = make_turn_ctx();
     in_turn(runner.execute_tools(
+        &mut turn_ctx,
         tool_uses,
-        &make_cancel(),
         loopal_runtime::agent_loop::StreamingToolHandle::empty(),
     ))
     .await
@@ -127,9 +131,10 @@ async fn exit_plan_without_plan_file_returns_error() {
         "ExitPlanMode".to_string(),
         serde_json::json!({}),
     )];
+    let mut turn_ctx = make_turn_ctx();
     in_turn(runner.execute_tools(
+        &mut turn_ctx,
         tool_uses,
-        &make_cancel(),
         loopal_runtime::agent_loop::StreamingToolHandle::empty(),
     ))
     .await
@@ -169,9 +174,10 @@ async fn exit_plan_with_plan_file_approves_and_restores_mode() {
         "ExitPlanMode".to_string(),
         serde_json::json!({}),
     )];
+    let mut turn_ctx = make_turn_ctx();
     in_turn(runner.execute_tools(
+        &mut turn_ctx,
         tool_uses,
-        &make_cancel(),
         loopal_runtime::agent_loop::StreamingToolHandle::empty(),
     ))
     .await

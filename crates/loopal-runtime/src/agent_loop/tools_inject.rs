@@ -1,5 +1,3 @@
-//! Helpers for tool interrupt handling, pending message injection, and result blocks.
-
 use loopal_error::Result;
 use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_protocol::AgentEventPayload;
@@ -24,6 +22,35 @@ pub(super) fn tool_result_block(
 }
 
 impl AgentLoopRunner {
+    // reason: 单点写回 tool_result event + ContentBlock，保证 view-state 与 LLM 同源
+    // (历史上分两步调用导致 4 个 intercept handler 里 3 个漏 emit)。
+    pub(super) async fn emit_and_block(
+        &self,
+        id: &str,
+        name: &str,
+        content: impl Into<String>,
+        is_error: bool,
+        metadata: Option<ToolResultMetadata>,
+    ) -> Result<ContentBlock> {
+        let content = content.into();
+        self.emit_in_turn(AgentEventPayload::ToolResult {
+            id: id.to_string(),
+            name: name.to_string(),
+            result: content.clone(),
+            is_error,
+            duration_ms: None,
+            metadata: metadata.clone(),
+        })
+        .await?;
+        Ok(ContentBlock::ToolResult {
+            tool_use_id: id.to_string(),
+            content,
+            images: Vec::new(),
+            is_error,
+            metadata,
+        })
+    }
+
     /// Emit interrupted results for all tools (early cancel path).
     pub(super) async fn emit_all_interrupted(
         &mut self,
@@ -33,21 +60,16 @@ impl AgentLoopRunner {
         let mut blocks = Vec::with_capacity(tool_uses.len());
         let cancel_md = ToolResultMetadata::cancelled(CancelCause::UserInterrupt);
         for (id, name, _) in tool_uses {
-            self.emit_in_turn(AgentEventPayload::ToolResult {
-                id: id.clone(),
-                name: name.clone(),
-                result: "Interrupted by user".into(),
-                is_error: true,
-                duration_ms: None,
-                metadata: Some(cancel_md.clone()),
-            })
-            .await?;
-            blocks.push(tool_result_block(
-                id,
-                "Interrupted by user",
-                true,
-                Some(cancel_md.clone()),
-            ));
+            let block = self
+                .emit_and_block(
+                    id,
+                    name,
+                    "Interrupted by user",
+                    true,
+                    Some(cancel_md.clone()),
+                )
+                .await?;
+            blocks.push(block);
         }
         let mut msg = Message {
             id: None,

@@ -4,26 +4,26 @@ use loopal_error::Result;
 use loopal_message::ContentBlock;
 use tracing::info;
 
-use super::cancel::TurnCancel;
 use super::runner::AgentLoopRunner;
 use super::streaming_tool_exec::StreamingToolHandle;
 use super::tools_phase::count_errors;
+use super::turn_context::TurnContext;
 use super::turn_metrics::ToolExecStats;
 
 impl AgentLoopRunner {
     pub async fn execute_tools(
         &mut self,
+        turn_ctx: &mut TurnContext,
         tool_uses: Vec<(String, String, serde_json::Value)>,
-        cancel: &TurnCancel,
         early_handle: StreamingToolHandle,
     ) -> Result<ToolExecStats> {
-        if cancel.is_cancelled() {
+        if turn_ctx.cancel.is_cancelled() {
             early_handle.discard();
             self.emit_all_interrupted(&tool_uses).await?;
             return Ok(ToolExecStats::default());
         }
 
-        let (intercepted, remaining) = self.intercept_special_tools(&tool_uses).await?;
+        let (intercepted, remaining) = self.intercept_special_tools(turn_ctx, &tool_uses).await?;
         let intercepted_indices: HashSet<usize> = intercepted.iter().map(|(idx, _)| *idx).collect();
 
         let early_ids = early_handle.early_started_ids().clone();
@@ -37,7 +37,9 @@ impl AgentLoopRunner {
             early = early_ids.len(),
             "check_tools start"
         );
-        let check = self.check_tools(&non_early, &tool_uses, cancel).await?;
+        let check = self
+            .check_tools(&non_early, &tool_uses, &turn_ctx.cancel)
+            .await?;
         info!(
             approved = check.approved.len(),
             denied = check.denied.len(),
@@ -55,7 +57,7 @@ impl AgentLoopRunner {
         indexed_results.extend(check.denied);
 
         let parallel = self
-            .run_approved_batch(check.approved, &tool_uses, cancel)
+            .run_approved_batch(check.approved, &tool_uses, &turn_ctx.cancel)
             .await?;
         indexed_results.extend(parallel);
 

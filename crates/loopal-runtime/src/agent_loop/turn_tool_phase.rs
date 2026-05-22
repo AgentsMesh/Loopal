@@ -33,10 +33,9 @@ impl AgentLoopRunner {
 
         let tool_names: Vec<&str> = tool_uses.iter().map(|(_, n, _)| n.as_str()).collect();
         info!(tool_count = tool_uses.len(), ?tool_names, "tool exec start");
-        let cancel = &turn_ctx.cancel;
         turn_ctx.metrics.tool_calls_requested += tool_uses.len() as u32;
         let stats = self
-            .execute_tools(tool_uses.clone(), cancel, early_handle)
+            .execute_tools(turn_ctx, tool_uses.clone(), early_handle)
             .await?;
         turn_ctx.metrics.tool_calls_approved += stats.approved;
         turn_ctx.metrics.tool_calls_denied += stats.denied;

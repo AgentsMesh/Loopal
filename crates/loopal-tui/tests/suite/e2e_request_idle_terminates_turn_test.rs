@@ -1,7 +1,4 @@
-//! request_idle 工具的 turn 终止 + ToolResult emit 守门:
-//!   - emit ToolResult (修复前漏 emit, TUI 误显示 "Stale (turn ended after N)")
-//!   - turn 立即 Complete, 不再发起消耗 tool_result 的下次 LLM call
-//!   - 信号 turn-scoped, 不跨 turn 泄漏 (signal_does_not_leak_to_next_turn)
+//! request_idle: emit ToolResult, terminate turn without next LLM call, signal turn-scoped.
 
 use std::time::Duration;
 

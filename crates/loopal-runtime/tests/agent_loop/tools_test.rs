@@ -2,7 +2,7 @@ use loopal_message::{ContentBlock, MessageRole};
 use loopal_protocol::AgentEventPayload;
 use loopal_tool_api::PermissionMode;
 
-use super::{in_turn, make_cancel, make_runner_with_channels};
+use super::{in_turn, make_cancel, make_turn_ctx, make_runner_with_channels};
 
 #[tokio::test]
 async fn test_execute_tools_bypass_mode() {
@@ -25,11 +25,8 @@ async fn test_execute_tools_bypass_mode() {
         serde_json::json!({"file_path": tmp.to_str().unwrap()}),
     )];
 
-    in_turn(runner.execute_tools(
-        tool_uses,
-        &make_cancel(),
-        loopal_runtime::agent_loop::StreamingToolHandle::empty(),
-    ))
+    let mut turn_ctx = make_turn_ctx();
+    in_turn(runner.execute_tools(&mut turn_ctx, tool_uses, loopal_runtime::agent_loop::StreamingToolHandle::empty()))
     .await
     .unwrap();
 
@@ -68,11 +65,8 @@ async fn test_execute_tools_supervised_denies_without_approval() {
         serde_json::json!({"file_path": "/tmp/nope.txt", "content": "x"}),
     )];
 
-    in_turn(runner.execute_tools(
-        tool_uses,
-        &make_cancel(),
-        loopal_runtime::agent_loop::StreamingToolHandle::empty(),
-    ))
+    let mut turn_ctx = make_turn_ctx();
+    in_turn(runner.execute_tools(&mut turn_ctx, tool_uses, loopal_runtime::agent_loop::StreamingToolHandle::empty()))
     .await
     .unwrap();
 
@@ -124,11 +118,8 @@ async fn test_execute_tools_read_allowed_write_denied_in_supervised() {
         ),
     ];
 
-    in_turn(runner.execute_tools(
-        tool_uses,
-        &make_cancel(),
-        loopal_runtime::agent_loop::StreamingToolHandle::empty(),
-    ))
+    let mut turn_ctx = make_turn_ctx();
+    in_turn(runner.execute_tools(&mut turn_ctx, tool_uses, loopal_runtime::agent_loop::StreamingToolHandle::empty()))
     .await
     .unwrap();
 

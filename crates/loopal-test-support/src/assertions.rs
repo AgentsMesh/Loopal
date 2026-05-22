@@ -121,3 +121,18 @@ pub fn find_tool_result(events: &[AgentEventPayload], tool_name: &str) -> Option
         _ => None,
     })
 }
+
+pub fn find_tool_result_full(
+    events: &[AgentEventPayload],
+    tool_name: &str,
+) -> Option<(bool, String)> {
+    events.iter().find_map(|e| match e {
+        AgentEventPayload::ToolResult {
+            name,
+            is_error,
+            result,
+            ..
+        } if name == tool_name => Some((*is_error, result.clone())),
+        _ => None,
+    })
+}

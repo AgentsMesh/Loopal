@@ -1,9 +1,11 @@
 use loopal_error::Result;
 use loopal_message::ContentBlock;
+use loopal_tool_ask_user::NAME as ASK_USER_NAME;
 use loopal_tool_idle::NAME as REQUEST_IDLE_NAME;
 use loopal_tool_plan_mode::{ENTER_PLAN_NAME, EXIT_PLAN_NAME};
 
 use super::runner::AgentLoopRunner;
+use super::turn_context::TurnContext;
 
 pub(super) type Intercepted = Vec<(usize, ContentBlock)>;
 pub(super) type Remaining = Vec<(String, String, serde_json::Value)>;
@@ -11,30 +13,29 @@ pub(super) type Remaining = Vec<(String, String, serde_json::Value)>;
 impl AgentLoopRunner {
     pub(super) async fn intercept_special_tools(
         &mut self,
+        turn_ctx: &mut TurnContext,
         tool_uses: &[(String, String, serde_json::Value)],
-    ) -> Result<(Intercepted, Remaining, bool)> {
+    ) -> Result<(Intercepted, Remaining)> {
         let mut intercepted = Vec::new();
         let mut remaining = Vec::new();
-        let mut turn_end_signal = false;
 
         for (idx, (id, name, input)) in tool_uses.iter().enumerate() {
-            let outcome = match name.as_str() {
-                n if n == ENTER_PLAN_NAME => Some(self.handle_enter_plan(idx, id).await?),
-                n if n == EXIT_PLAN_NAME => Some(self.handle_exit_plan(idx, id).await?),
-                "AskUser" => Some(self.handle_ask_user(idx, id, name, input).await?),
+            let entry = match name.as_str() {
+                n if n == ENTER_PLAN_NAME => self.handle_enter_plan(turn_ctx, idx, id).await?,
+                n if n == EXIT_PLAN_NAME => self.handle_exit_plan(turn_ctx, idx, id).await?,
+                n if n == ASK_USER_NAME => {
+                    self.handle_ask_user(turn_ctx, idx, id, name, input).await?
+                }
                 n if n == REQUEST_IDLE_NAME => {
-                    Some(self.handle_request_idle(idx, id, input).await?)
+                    self.handle_request_idle(turn_ctx, idx, id, input).await?
                 }
                 _ => {
                     remaining.push((id.clone(), name.clone(), input.clone()));
-                    None
+                    continue;
                 }
             };
-            if let Some((i, block, signal)) = outcome {
-                intercepted.push((i, block));
-                turn_end_signal |= signal;
-            }
+            intercepted.push(entry);
         }
-        Ok((intercepted, remaining, turn_end_signal))
+        Ok((intercepted, remaining))
     }
 }

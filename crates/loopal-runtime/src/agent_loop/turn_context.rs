@@ -14,10 +14,8 @@ pub struct TurnContext {
     pub pending_warnings: Vec<String>,
     pub pending_continuation: Option<ContinuationIntent>,
     pub metrics: TurnMetrics,
-    // reason: intercept handler 在工具阶段 set，turn_exec::ToolResultsWritten 分支 take
-    // 后 turn 直接 Complete（跳过原本消耗 tool_result 的下次 LLM call）。当前唯一设置者
-    // handle_request_idle —— LLM 已表达 idle。turn-scoped 字段随 TurnContext 销毁
-    // 自然 reset，无需跨 turn 防御性 clear。
+    // reason: intercept handler set → ToolResultsWritten take → turn 直接 Complete
+    // (跳过消耗 tool_result 的下次 LLM call)。唯一 setter 是 handle_request_idle。
     tool_signaled_turn_end: bool,
 }
 

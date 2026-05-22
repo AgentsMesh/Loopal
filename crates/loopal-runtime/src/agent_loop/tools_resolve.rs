@@ -29,9 +29,6 @@ impl AgentLoopRunner {
             } else {
                 info!(tool = name.as_str(), decision = "deny", "permission");
                 let msg = format!("Permission denied: tool '{name}' not allowed");
-                // reason: 旧实现 view-state event 用 "Permission denied" 简短版、block 用具体
-                // msg，统一到具体 msg —— LLM 与 view-state 看到相同信息，TUI 显示完整工具名
-                // 更利诊断。
                 let block = self.emit_and_block(&id, &name, msg, true, None).await?;
                 denied.push((orig_idx, block));
             }

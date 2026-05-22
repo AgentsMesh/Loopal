@@ -4,15 +4,17 @@ use loopal_tool_plan_mode::EXIT_PLAN_NAME;
 use tracing::{debug, info, warn};
 
 use super::runner::AgentLoopRunner;
+use super::turn_context::TurnContext;
 use crate::frontend::traits::PlanApproval;
 use crate::mode::AgentMode;
 
 impl AgentLoopRunner {
     pub(super) async fn handle_exit_plan(
         &mut self,
+        _turn_ctx: &mut TurnContext,
         idx: usize,
         id: &str,
-    ) -> loopal_error::Result<(usize, ContentBlock, bool)> {
+    ) -> loopal_error::Result<(usize, ContentBlock)> {
         debug!(tool = EXIT_PLAN_NAME, "intercepted");
 
         if self.params.config.mode != AgentMode::Plan {
@@ -25,7 +27,6 @@ impl AgentLoopRunner {
                      continue with implementation.",
                     true,
                     None,
-                    false,
                 )
                 .await;
         }
@@ -44,7 +45,6 @@ impl AgentLoopRunner {
                         ),
                         true,
                         None,
-                        false,
                     )
                     .await;
             }
@@ -78,7 +78,6 @@ impl AgentLoopRunner {
                     "User rejected the plan. Revise and call ExitPlanMode again.",
                     false,
                     None,
-                    false,
                 )
                 .await
             }
@@ -113,7 +112,7 @@ impl AgentLoopRunner {
         idx: usize,
         id: &str,
         plan: &str,
-    ) -> loopal_error::Result<(usize, ContentBlock, bool)> {
+    ) -> loopal_error::Result<(usize, ContentBlock)> {
         let team_hint = if self.params.deps.kernel.get_tool("Agent").is_some() {
             "\n\nIf this plan can be broken into independent tasks, \
              consider using the Agent tool to parallelize."
@@ -127,7 +126,7 @@ impl AgentLoopRunner {
              Refer back to it during implementation.{team_hint}\n\n\
              ## Approved Plan:\n{plan}"
         );
-        self.complete_intercepted_tool(idx, id, EXIT_PLAN_NAME, content, false, None, false)
+        self.complete_intercepted_tool(idx, id, EXIT_PLAN_NAME, content, false, None)
             .await
     }
 }

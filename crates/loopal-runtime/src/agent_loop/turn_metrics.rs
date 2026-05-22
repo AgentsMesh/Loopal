@@ -45,7 +45,4 @@ pub struct ToolExecStats {
     pub approved: u32,
     pub denied: u32,
     pub errors: u32,
-    // reason: intercept handler 通过返回值冒泡 "turn 直接 Complete" 信号，避免
-    // handler 持有 turn_ctx 引用。caller 在 execute_tool_phase 处把它喂给 TurnContext。
-    pub turn_end_signal: bool,
 }

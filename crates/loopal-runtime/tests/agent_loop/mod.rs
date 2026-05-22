@@ -25,6 +25,12 @@ pub fn make_cancel() -> TurnCancel {
     )
 }
 
+/// Create a fresh TurnContext (turn_id=0) for tests that drive
+/// `execute_tools` / `intercept_special_tools` directly.
+pub fn make_turn_ctx() -> loopal_runtime::agent_loop::TurnContext {
+    loopal_runtime::agent_loop::TurnContext::new(0, make_cancel())
+}
+
 /// Wrap an async block in `scope_turn(1, ...)` so in-turn emit sites
 /// (`emit_in_turn`) can run inside the capability scope without panicking.
 /// Use whenever a test directly calls runner methods that internally use

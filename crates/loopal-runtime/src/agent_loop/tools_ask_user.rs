@@ -3,15 +3,17 @@ use loopal_message::ContentBlock;
 use super::question_format::format_response;
 use super::question_parse::parse_questions;
 use super::runner::AgentLoopRunner;
+use super::turn_context::TurnContext;
 
 impl AgentLoopRunner {
     pub(super) async fn handle_ask_user(
         &mut self,
+        _turn_ctx: &mut TurnContext,
         idx: usize,
         id: &str,
         name: &str,
         input: &serde_json::Value,
-    ) -> loopal_error::Result<(usize, ContentBlock, bool)> {
+    ) -> loopal_error::Result<(usize, ContentBlock)> {
         match parse_questions(input) {
             Ok(questions) => self.handle_ask_user_ok(idx, id, name, questions).await,
             Err(err_msg) => {
@@ -27,11 +29,11 @@ impl AgentLoopRunner {
         id: &str,
         name: &str,
         questions: Vec<loopal_protocol::Question>,
-    ) -> loopal_error::Result<(usize, ContentBlock, bool)> {
+    ) -> loopal_error::Result<(usize, ContentBlock)> {
         self.refresh_decision_context().await;
         let response = self.params.deps.frontend.ask_user(questions.clone()).await;
         let (content, is_error) = format_response(&response, &questions);
-        self.complete_intercepted_tool(idx, id, name, content, is_error, None, false)
+        self.complete_intercepted_tool(idx, id, name, content, is_error, None)
             .await
     }
 
@@ -41,8 +43,8 @@ impl AgentLoopRunner {
         id: &str,
         name: &str,
         err_msg: String,
-    ) -> loopal_error::Result<(usize, ContentBlock, bool)> {
-        self.complete_intercepted_tool(idx, id, name, err_msg, true, None, false)
+    ) -> loopal_error::Result<(usize, ContentBlock)> {
+        self.complete_intercepted_tool(idx, id, name, err_msg, true, None)
             .await
     }
 }

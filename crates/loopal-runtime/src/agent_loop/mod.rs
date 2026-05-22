@@ -82,6 +82,7 @@ pub use params::{
 pub use params_builder::AgentLoopParamsBuilder;
 pub use runner::AgentLoopRunner;
 pub use streaming_tool_exec::StreamingToolHandle;
+pub use turn_context::TurnContext;
 
 use finished_guard::FinishedGuard;
 

@@ -1,6 +1,3 @@
-//! Helpers for intercept handler completion, tool interrupt handling, pending
-//! message injection, and result blocks.
-
 use loopal_error::Result;
 use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_protocol::AgentEventPayload;
@@ -25,10 +22,10 @@ pub(super) fn tool_result_block(
 }
 
 impl AgentLoopRunner {
-    // reason: emit ToolResult event + 构造 ContentBlock 是同一动作的两面 —— event 给
-    // view-state, block 喂回 LLM。历史上 emit_tool_error / emit_tool_cancelled +
-    // tool_result_block 分两步调用，4 个 intercept handler 里有 3 个漏 emit。此 helper
-    // 统一两面入口, 任何 "工具结果回写" 路径走它即可保证两边一致。
+    // reason: 历史上 emit_tool_error/cancelled + tool_result_block 分两步调用导致 4 个
+    // intercept handler 里 3 个漏 emit (request_idle / EnterPlanMode / ExitPlanMode)。
+    // 此 helper 统一两面，任何 "tool result 回写" 走它即保证 view-state event 与 LLM
+    // ContentBlock 同源。
     pub(super) async fn emit_and_block(
         &self,
         id: &str,
@@ -56,8 +53,8 @@ impl AgentLoopRunner {
         })
     }
 
-    // reason: intercept handler 的薄包装 —— 在 emit_and_block 之上加 idx + turn_end_signal
-    // 适配 intercept_special_tools 的聚合签名。详见 plans/breezy-tickling-cerf.md Part B1.
+    // reason: intercept handler 的薄包装 —— 在 emit_and_block 之上加 idx 适配
+    // intercept_special_tools 的聚合签名。
     pub(super) async fn complete_intercepted_tool(
         &self,
         idx: usize,
@@ -66,12 +63,11 @@ impl AgentLoopRunner {
         content: impl Into<String>,
         is_error: bool,
         metadata: Option<ToolResultMetadata>,
-        turn_end_signal: bool,
-    ) -> Result<(usize, ContentBlock, bool)> {
+    ) -> Result<(usize, ContentBlock)> {
         let block = self
             .emit_and_block(id, name, content, is_error, metadata)
             .await?;
-        Ok((idx, block, turn_end_signal))
+        Ok((idx, block))
     }
 
     /// Emit interrupted results for all tools (early cancel path).
@@ -83,21 +79,10 @@ impl AgentLoopRunner {
         let mut blocks = Vec::with_capacity(tool_uses.len());
         let cancel_md = ToolResultMetadata::cancelled(CancelCause::UserInterrupt);
         for (id, name, _) in tool_uses {
-            self.emit_in_turn(AgentEventPayload::ToolResult {
-                id: id.clone(),
-                name: name.clone(),
-                result: "Interrupted by user".into(),
-                is_error: true,
-                duration_ms: None,
-                metadata: Some(cancel_md.clone()),
-            })
-            .await?;
-            blocks.push(tool_result_block(
-                id,
-                "Interrupted by user",
-                true,
-                Some(cancel_md.clone()),
-            ));
+            let block = self
+                .emit_and_block(id, name, "Interrupted by user", true, Some(cancel_md.clone()))
+                .await?;
+            blocks.push(block);
         }
         let mut msg = Message {
             id: None,

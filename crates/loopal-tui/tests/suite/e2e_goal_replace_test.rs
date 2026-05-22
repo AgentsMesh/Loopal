@@ -1,5 +1,4 @@
-//! `/goal <new>` 替换语义: user-initiated path 走 create_or_replace (允许覆盖
-//! active goal), LLM tool path 仍 fail-on-exists.
+//! `/goal <new>` user-initiated path replaces active goal; LLM tool path still fails.
 
 use std::time::Duration;
 

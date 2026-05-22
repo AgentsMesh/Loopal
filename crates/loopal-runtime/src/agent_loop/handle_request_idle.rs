@@ -7,6 +7,7 @@ use tracing::debug;
 
 use super::continuation_gate::GateClose;
 use super::runner::AgentLoopRunner;
+use super::turn_context::TurnContext;
 
 #[derive(Deserialize)]
 struct ParsedIdle {
@@ -20,10 +21,11 @@ struct ParsedIdle {
 impl AgentLoopRunner {
     pub(super) async fn handle_request_idle(
         &mut self,
+        turn_ctx: &mut TurnContext,
         idx: usize,
         id: &str,
         input: &serde_json::Value,
-    ) -> loopal_error::Result<(usize, ContentBlock, bool)> {
+    ) -> loopal_error::Result<(usize, ContentBlock)> {
         debug!(tool = NAME, "intercepted");
         let parsed: ParsedIdle = match serde_json::from_value(input.clone()) {
             Ok(p) => p,
@@ -40,19 +42,19 @@ impl AgentLoopRunner {
                         ),
                         true,
                         None,
-                        false,
                     )
                     .await;
             }
         };
         if let Err(msg) = validate_duration(parsed.max_idle_duration_secs) {
             return self
-                .complete_intercepted_tool(idx, id, NAME, msg, true, None, false)
+                .complete_intercepted_tool(idx, id, NAME, msg, true, None)
                 .await;
         }
         let wake_at = Utc::now() + Duration::seconds(parsed.max_idle_duration_secs as i64);
         self.continuation_gate
             .close(GateClose::ModelRequested { wake_at });
+        turn_ctx.signal_turn_end_after_tools();
         let gate = self.continuation_gate.summary();
         if let Err(err) = self
             .emit(AgentEventPayload::ContinuationGateChanged(gate))
@@ -71,10 +73,7 @@ impl AgentLoopRunner {
             wake_at = wake_at.to_rfc3339(),
             reason = parsed.reason,
         );
-        // reason: turn_end_signal=true -> dispatcher 聚合后通过 ToolExecStats 冒泡到
-        // execute_tool_phase, set 到 turn_ctx; turn_exec::ToolResultsWritten 分支 take
-        // 后 turn 直接 Complete (跳过消耗 tool_result 的下次 LLM call). 详见 plan Part B2.
-        self.complete_intercepted_tool(idx, id, NAME, message, false, None, true)
+        self.complete_intercepted_tool(idx, id, NAME, message, false, None)
             .await
     }
 }

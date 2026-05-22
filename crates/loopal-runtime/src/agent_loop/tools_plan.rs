@@ -6,15 +6,17 @@ use tracing::{debug, info, warn};
 
 use super::PlanModeState;
 use super::runner::AgentLoopRunner;
+use super::turn_context::TurnContext;
 use crate::mode::AgentMode;
 use crate::plan_file::build_plan_mode_filter;
 
 impl AgentLoopRunner {
     pub(super) async fn handle_enter_plan(
         &mut self,
+        _turn_ctx: &mut TurnContext,
         idx: usize,
         id: &str,
-    ) -> loopal_error::Result<(usize, ContentBlock, bool)> {
+    ) -> loopal_error::Result<(usize, ContentBlock)> {
         debug!(tool = ENTER_PLAN_NAME, "intercepted");
 
         if self.params.config.mode == AgentMode::Plan {
@@ -26,7 +28,6 @@ impl AgentLoopRunner {
                     "Already in plan mode.",
                     true,
                     None,
-                    false,
                 )
                 .await;
         }
@@ -39,7 +40,6 @@ impl AgentLoopRunner {
                     "EnterPlanMode cannot be used in agent contexts",
                     true,
                     None,
-                    false,
                 )
                 .await;
         }
@@ -60,7 +60,6 @@ impl AgentLoopRunner {
                     "User declined to enter plan mode. Continue without planning.",
                     false,
                     None,
-                    false,
                 )
                 .await;
         }
@@ -99,7 +98,6 @@ impl AgentLoopRunner {
                     format!("Cannot create plans directory: {e}. Plan mode was not entered."),
                     true,
                     None,
-                    false,
                 )
                 .await;
         }
@@ -129,7 +127,6 @@ impl AgentLoopRunner {
             ),
             false,
             None,
-            false,
         )
         .await
     }

@@ -4,6 +4,8 @@ use loopal_tool_api::{PermissionLevel, ToolContext, ToolDispatch, ToolResult, Ty
 use schemars::JsonSchema;
 use serde::Deserialize;
 
+pub const NAME: &str = "AskUser";
+
 pub struct AskUserTool;
 
 #[derive(Deserialize, JsonSchema)]
@@ -31,7 +33,7 @@ pub struct AskUserParams {
 #[async_trait]
 impl TypedTool<AskUserParams> for AskUserTool {
     fn name(&self) -> &str {
-        "AskUser"
+        NAME
     }
 
     fn description(&self) -> &str {

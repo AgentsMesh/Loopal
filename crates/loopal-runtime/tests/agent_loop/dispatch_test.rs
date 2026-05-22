@@ -5,7 +5,7 @@ use std::collections::HashSet;
 
 use loopal_message::ContentBlock;
 
-use super::{in_turn, make_cancel, make_turn_ctx, make_runner};
+use super::{in_turn, make_turn_ctx, make_runner};
 
 /// AskUser is intercepted: produces exactly one ToolResult with the frontend
 /// answer, NOT the fallback "(intercepted by runner)" from Tool::execute().

@@ -1,6 +1,6 @@
 use loopal_message::ContentBlock;
 
-use super::{in_turn, make_cancel, make_turn_ctx, make_runner};
+use super::{in_turn, make_turn_ctx, make_runner};
 
 async fn run_ask_user_with_input(
     runner: &mut loopal_runtime::agent_loop::AgentLoopRunner,

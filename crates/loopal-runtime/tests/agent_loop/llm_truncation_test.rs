@@ -5,7 +5,7 @@
 
 use loopal_provider_api::{StopReason, StreamChunk};
 
-use super::{in_turn, make_cancel, make_turn_ctx, make_runner_with_mock_provider};
+use super::{in_turn, make_cancel, make_runner_with_mock_provider};
 
 /// EOF after text chunks but no Done → stream_error=true (silent truncation).
 #[tokio::test]

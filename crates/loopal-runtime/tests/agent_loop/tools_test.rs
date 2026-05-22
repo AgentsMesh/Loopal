@@ -2,7 +2,7 @@ use loopal_message::{ContentBlock, MessageRole};
 use loopal_protocol::AgentEventPayload;
 use loopal_tool_api::PermissionMode;
 
-use super::{in_turn, make_cancel, make_turn_ctx, make_runner_with_channels};
+use super::{in_turn, make_turn_ctx, make_runner_with_channels};
 
 #[tokio::test]
 async fn test_execute_tools_bypass_mode() {

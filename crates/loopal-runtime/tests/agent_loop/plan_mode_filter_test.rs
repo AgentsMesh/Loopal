@@ -6,7 +6,7 @@ use loopal_runtime::agent_loop::PlanModeState;
 use loopal_runtime::plan_file::build_plan_mode_filter;
 use loopal_tool_api::PermissionMode;
 
-use super::{in_turn, make_cancel, make_turn_ctx, make_runner_with_channels};
+use super::{in_turn, make_turn_ctx, make_runner_with_channels};
 
 /// Helper: set up a runner in plan mode with proper PlanModeState.
 fn setup_plan_state(runner: &mut loopal_runtime::agent_loop::AgentLoopRunner) {

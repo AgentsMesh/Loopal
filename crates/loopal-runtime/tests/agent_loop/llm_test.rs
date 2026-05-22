@@ -4,7 +4,7 @@ use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::{StopReason, StreamChunk};
 use loopal_runtime::AgentMode;
 
-use super::{in_turn, make_cancel, make_turn_ctx, make_runner, make_runner_with_mock_provider};
+use super::{in_turn, make_cancel, make_runner, make_runner_with_mock_provider};
 
 #[test]
 fn test_prepare_chat_params_act_mode() {

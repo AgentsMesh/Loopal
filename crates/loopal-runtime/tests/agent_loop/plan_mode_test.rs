@@ -3,7 +3,7 @@ use loopal_runtime::AgentMode;
 use loopal_runtime::agent_loop::LifecycleMode;
 use loopal_tool_api::PermissionMode;
 
-use super::{in_turn, make_cancel, make_turn_ctx, make_runner};
+use super::{in_turn, make_turn_ctx, make_runner};
 
 #[tokio::test]
 async fn enter_plan_mode_denied_by_default_frontend() {

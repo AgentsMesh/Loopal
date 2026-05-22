@@ -20,28 +20,24 @@ impl AgentLoopRunner {
         debug!(tool = ENTER_PLAN_NAME, "intercepted");
 
         if self.params.config.mode == AgentMode::Plan {
-            return self
-                .complete_intercepted_tool(
-                    idx,
-                    id,
-                    ENTER_PLAN_NAME,
-                    "Already in plan mode.",
-                    true,
-                    None,
-                )
-                .await;
+            return Ok((
+                idx,
+                self.emit_and_block(id, ENTER_PLAN_NAME, "Already in plan mode.", true, None)
+                    .await?,
+            ));
         }
         if self.params.config.lifecycle == super::LifecycleMode::Ephemeral {
-            return self
-                .complete_intercepted_tool(
-                    idx,
+            return Ok((
+                idx,
+                self.emit_and_block(
                     id,
                     ENTER_PLAN_NAME,
                     "EnterPlanMode cannot be used in agent contexts",
                     true,
                     None,
                 )
-                .await;
+                .await?,
+            ));
         }
 
         self.refresh_decision_context().await;
@@ -52,16 +48,17 @@ impl AgentLoopRunner {
             .request_permission(id, ENTER_PLAN_NAME, &serde_json::json!({}))
             .await;
         if decision != PermissionDecision::Allow {
-            return self
-                .complete_intercepted_tool(
-                    idx,
+            return Ok((
+                idx,
+                self.emit_and_block(
                     id,
                     ENTER_PLAN_NAME,
                     "User declined to enter plan mode. Continue without planning.",
                     false,
                     None,
                 )
-                .await;
+                .await?,
+            ));
         }
 
         self.params.config.plan_state = Some(PlanModeState {
@@ -90,16 +87,12 @@ impl AgentLoopRunner {
             {
                 tracing::error!(error = %emit_err, "ModeChanged rollback emit failed");
             }
-            return self
-                .complete_intercepted_tool(
-                    idx,
-                    id,
-                    ENTER_PLAN_NAME,
-                    format!("Cannot create plans directory: {e}. Plan mode was not entered."),
-                    true,
-                    None,
-                )
-                .await;
+            let msg =
+                format!("Cannot create plans directory: {e}. Plan mode was not entered.");
+            return Ok((
+                idx,
+                self.emit_and_block(id, ENTER_PLAN_NAME, msg, true, None).await?,
+            ));
         }
 
         if let Some(plans_dir) = self.plan_file.path().parent()
@@ -115,20 +108,16 @@ impl AgentLoopRunner {
             format!("No plan file yet. Create your plan at {plan_path} using the Write tool.")
         };
         info!(plan_file = %plan_path, "entered plan mode");
-        self.complete_intercepted_tool(
-            idx,
-            id,
-            ENTER_PLAN_NAME,
-            format!(
-                "Entered plan mode.\n\n\
+        let msg = format!(
+            "Entered plan mode.\n\n\
              ## Plan File Info:\n{file_info}\n\
              This is the ONLY file you may edit. All other tools are read-only.\n\
              Detailed workflow instructions will follow."
-            ),
-            false,
-            None,
-        )
-        .await
+        );
+        Ok((
+            idx,
+            self.emit_and_block(id, ENTER_PLAN_NAME, msg, false, None).await?,
+        ))
     }
 
     pub(super) fn plan_tool_filter(&self) -> Option<&std::collections::HashSet<String>> {

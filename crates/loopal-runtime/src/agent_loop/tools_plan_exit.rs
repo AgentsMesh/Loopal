@@ -18,9 +18,9 @@ impl AgentLoopRunner {
         debug!(tool = EXIT_PLAN_NAME, "intercepted");
 
         if self.params.config.mode != AgentMode::Plan {
-            return self
-                .complete_intercepted_tool(
-                    idx,
+            return Ok((
+                idx,
+                self.emit_and_block(
                     id,
                     EXIT_PLAN_NAME,
                     "You are not in plan mode. If your plan was already approved, \
@@ -28,25 +28,18 @@ impl AgentLoopRunner {
                     true,
                     None,
                 )
-                .await;
+                .await?,
+            ));
         }
 
         let plan_content = match self.plan_file.read() {
             Some(c) => c,
             None => {
-                return self
-                    .complete_intercepted_tool(
-                        idx,
-                        id,
-                        EXIT_PLAN_NAME,
-                        format!(
-                            "No plan file at {}. Write your plan before calling ExitPlanMode.",
-                            self.plan_file.path().display()
-                        ),
-                        true,
-                        None,
-                    )
-                    .await;
+                let msg = format!(
+                    "No plan file at {}. Write your plan before calling ExitPlanMode.",
+                    self.plan_file.path().display()
+                );
+                return Ok((idx, self.emit_and_block(id, EXIT_PLAN_NAME, msg, true, None).await?));
             }
         };
 
@@ -70,17 +63,17 @@ impl AgentLoopRunner {
                 self.restore_pre_plan_state().await?;
                 self.emit_approved_result(idx, id, &edited).await
             }
-            PlanApproval::Reject => {
-                self.complete_intercepted_tool(
-                    idx,
+            PlanApproval::Reject => Ok((
+                idx,
+                self.emit_and_block(
                     id,
                     EXIT_PLAN_NAME,
                     "User rejected the plan. Revise and call ExitPlanMode again.",
                     false,
                     None,
                 )
-                .await
-            }
+                .await?,
+            )),
         }
     }
 
@@ -126,7 +119,6 @@ impl AgentLoopRunner {
              Refer back to it during implementation.{team_hint}\n\n\
              ## Approved Plan:\n{plan}"
         );
-        self.complete_intercepted_tool(idx, id, EXIT_PLAN_NAME, content, false, None)
-            .await
+        Ok((idx, self.emit_and_block(id, EXIT_PLAN_NAME, content, false, None).await?))
     }
 }

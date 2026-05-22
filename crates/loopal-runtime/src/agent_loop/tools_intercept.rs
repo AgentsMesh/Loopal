@@ -7,15 +7,15 @@ use loopal_tool_plan_mode::{ENTER_PLAN_NAME, EXIT_PLAN_NAME};
 use super::runner::AgentLoopRunner;
 use super::turn_context::TurnContext;
 
-pub(super) type Intercepted = Vec<(usize, ContentBlock)>;
-pub(super) type Remaining = Vec<(String, String, serde_json::Value)>;
-
 impl AgentLoopRunner {
     pub(super) async fn intercept_special_tools(
         &mut self,
         turn_ctx: &mut TurnContext,
         tool_uses: &[(String, String, serde_json::Value)],
-    ) -> Result<(Intercepted, Remaining)> {
+    ) -> Result<(
+        Vec<(usize, ContentBlock)>,
+        Vec<(String, String, serde_json::Value)>,
+    )> {
         let mut intercepted = Vec::new();
         let mut remaining = Vec::new();
 

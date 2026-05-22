@@ -30,26 +30,16 @@ impl AgentLoopRunner {
         let parsed: ParsedIdle = match serde_json::from_value(input.clone()) {
             Ok(p) => p,
             Err(e) => {
-                return self
-                    .complete_intercepted_tool(
-                        idx,
-                        id,
-                        NAME,
-                        format!(
-                            "request_idle: invalid arguments ({e}). Required: \
-                             max_idle_duration_secs (u64, {MIN_IDLE_DURATION_SECS}..={MAX_IDLE_DURATION_SECS}), \
-                             reason (string). Optional: expected_wake_signal (string)."
-                        ),
-                        true,
-                        None,
-                    )
-                    .await;
+                let msg = format!(
+                    "request_idle: invalid arguments ({e}). Required: \
+                     max_idle_duration_secs (u64, {MIN_IDLE_DURATION_SECS}..={MAX_IDLE_DURATION_SECS}), \
+                     reason (string). Optional: expected_wake_signal (string)."
+                );
+                return Ok((idx, self.emit_and_block(id, NAME, msg, true, None).await?));
             }
         };
         if let Err(msg) = validate_duration(parsed.max_idle_duration_secs) {
-            return self
-                .complete_intercepted_tool(idx, id, NAME, msg, true, None)
-                .await;
+            return Ok((idx, self.emit_and_block(id, NAME, msg, true, None).await?));
         }
         let wake_at = Utc::now() + Duration::seconds(parsed.max_idle_duration_secs as i64);
         self.continuation_gate
@@ -73,7 +63,6 @@ impl AgentLoopRunner {
             wake_at = wake_at.to_rfc3339(),
             reason = parsed.reason,
         );
-        self.complete_intercepted_tool(idx, id, NAME, message, false, None)
-            .await
+        Ok((idx, self.emit_and_block(id, NAME, message, false, None).await?))
     }
 }

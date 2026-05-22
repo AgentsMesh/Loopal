@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use loopal_message::Message;
 use loopal_protocol::{Envelope, MessageSource};
+use loopal_session::ROOT_AGENT;
 use loopal_test_support::events::{collect_until_idle, extract_tool_results};
 use loopal_test_support::{HarnessBuilder, chunks};
 
@@ -98,7 +99,7 @@ async fn signal_does_not_leak_to_next_turn() {
         "turn 1 (request_idle) 应只调一次 LLM"
     );
 
-    let env = Envelope::new(MessageSource::Human, "main", "turn 2: continue please");
+    let env = Envelope::new(MessageSource::Human, ROOT_AGENT, "turn 2: continue please");
     mailbox_tx
         .send(env)
         .await

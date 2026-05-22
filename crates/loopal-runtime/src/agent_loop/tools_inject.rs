@@ -22,10 +22,8 @@ pub(super) fn tool_result_block(
 }
 
 impl AgentLoopRunner {
-    // reason: 历史上 emit_tool_error/cancelled + tool_result_block 分两步调用导致 4 个
-    // intercept handler 里 3 个漏 emit (request_idle / EnterPlanMode / ExitPlanMode)。
-    // 此 helper 统一两面，任何 "tool result 回写" 走它即保证 view-state event 与 LLM
-    // ContentBlock 同源。
+    // reason: 单点写回 tool_result event + ContentBlock，保证 view-state 与 LLM 同源
+    // (历史上分两步调用导致 4 个 intercept handler 里 3 个漏 emit)。
     pub(super) async fn emit_and_block(
         &self,
         id: &str,
@@ -51,23 +49,6 @@ impl AgentLoopRunner {
             is_error,
             metadata,
         })
-    }
-
-    // reason: intercept handler 的薄包装 —— 在 emit_and_block 之上加 idx 适配
-    // intercept_special_tools 的聚合签名。
-    pub(super) async fn complete_intercepted_tool(
-        &self,
-        idx: usize,
-        id: &str,
-        name: &str,
-        content: impl Into<String>,
-        is_error: bool,
-        metadata: Option<ToolResultMetadata>,
-    ) -> Result<(usize, ContentBlock)> {
-        let block = self
-            .emit_and_block(id, name, content, is_error, metadata)
-            .await?;
-        Ok((idx, block))
     }
 
     /// Emit interrupted results for all tools (early cancel path).

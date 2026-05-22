@@ -1,6 +1,7 @@
 use loopal_message::ContentBlock;
 use loopal_protocol::AgentEventPayload;
 use loopal_tool_api::PermissionDecision;
+use loopal_tool_plan_mode::ENTER_PLAN_NAME;
 use tracing::{debug, info, warn};
 
 use super::PlanModeState;
@@ -8,19 +9,17 @@ use super::runner::AgentLoopRunner;
 use crate::mode::AgentMode;
 use crate::plan_file::build_plan_mode_filter;
 
-const TOOL_NAME: &str = "EnterPlanMode";
-
 impl AgentLoopRunner {
     pub(super) async fn handle_enter_plan(
         &mut self,
         idx: usize,
         id: &str,
     ) -> loopal_error::Result<(usize, ContentBlock)> {
-        debug!(tool = TOOL_NAME, "intercepted");
+        debug!(tool = ENTER_PLAN_NAME, "intercepted");
 
         if self.params.config.mode == AgentMode::Plan {
             return self
-                .complete_intercepted_tool(idx, id, TOOL_NAME, "Already in plan mode.", true, None)
+                .complete_intercepted_tool(idx, id, ENTER_PLAN_NAME, "Already in plan mode.", true, None)
                 .await;
         }
         if self.params.config.lifecycle == super::LifecycleMode::Ephemeral {
@@ -28,7 +27,7 @@ impl AgentLoopRunner {
                 .complete_intercepted_tool(
                     idx,
                     id,
-                    TOOL_NAME,
+                    ENTER_PLAN_NAME,
                     "EnterPlanMode cannot be used in agent contexts",
                     true,
                     None,
@@ -41,14 +40,14 @@ impl AgentLoopRunner {
             .params
             .deps
             .frontend
-            .request_permission(id, TOOL_NAME, &serde_json::json!({}))
+            .request_permission(id, ENTER_PLAN_NAME, &serde_json::json!({}))
             .await;
         if decision != PermissionDecision::Allow {
             return self
                 .complete_intercepted_tool(
                     idx,
                     id,
-                    TOOL_NAME,
+                    ENTER_PLAN_NAME,
                     "User declined to enter plan mode. Continue without planning.",
                     false,
                     None,
@@ -86,7 +85,7 @@ impl AgentLoopRunner {
                 .complete_intercepted_tool(
                     idx,
                     id,
-                    TOOL_NAME,
+                    ENTER_PLAN_NAME,
                     &format!("Cannot create plans directory: {e}. Plan mode was not entered."),
                     true,
                     None,
@@ -110,7 +109,7 @@ impl AgentLoopRunner {
         self.complete_intercepted_tool(
             idx,
             id,
-            TOOL_NAME,
+            ENTER_PLAN_NAME,
             &format!(
                 "Entered plan mode.\n\n\
              ## Plan File Info:\n{file_info}\n\

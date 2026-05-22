@@ -50,14 +50,10 @@ pub struct AgentLoopRunner {
     pub continuation_gate: ContinuationGate,
     pub turn_history: TurnHistory,
     pub last_continuation_goal_id: Option<String>,
-    // reason: turn-scoped flag — intercept handler 在工具执行阶段 set，turn_exec 的
-    // ToolResultsWritten 分支 consume 后 turn 直接 Complete (跳过原本消耗 tool_result
-    // 的下次 LLM call)。当前唯一设置者是 handle_request_idle —— LLM 已表达 idle 意图，
-    // 再发起 LLM call 既浪费 tokens 又无产出。
-    //
-    // 不变量：每 turn 末尾必须 reset (正常路径由 take_turn_end_signal 消费；错误路径
-    // 由 run_loop 在 retry-flag reset 同处显式 take 清残留)。pub(super) 配合 setter/
-    // taker method 保证 single-writer 契约不被绕过。
+    // reason: turn-scoped flag —— intercept handler 在工具执行阶段 set，
+    // turn_exec::ToolResultsWritten 分支 take 后 turn 直接 Complete (跳过原本消耗
+    // tool_result 的下次 LLM call)。当前唯一设置者 handle_request_idle。每 turn 末尾
+    // run_loop 显式 take 防错误路径泄漏到下一 turn。
     pub(super) tool_signaled_turn_end: bool,
 }
 

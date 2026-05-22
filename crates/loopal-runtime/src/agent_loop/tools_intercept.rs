@@ -1,5 +1,7 @@
 use loopal_error::Result;
 use loopal_message::ContentBlock;
+use loopal_tool_idle::NAME as REQUEST_IDLE_NAME;
+use loopal_tool_plan_mode::{ENTER_PLAN_NAME, EXIT_PLAN_NAME};
 
 use super::runner::AgentLoopRunner;
 
@@ -16,10 +18,16 @@ impl AgentLoopRunner {
 
         for (idx, (id, name, input)) in tool_uses.iter().enumerate() {
             match name.as_str() {
-                "EnterPlanMode" => intercepted.push(self.handle_enter_plan(idx, id).await?),
-                "ExitPlanMode" => intercepted.push(self.handle_exit_plan(idx, id).await?),
+                n if n == ENTER_PLAN_NAME => {
+                    intercepted.push(self.handle_enter_plan(idx, id).await?)
+                }
+                n if n == EXIT_PLAN_NAME => {
+                    intercepted.push(self.handle_exit_plan(idx, id).await?)
+                }
                 "AskUser" => intercepted.push(self.handle_ask_user(idx, id, name, input).await?),
-                "request_idle" => intercepted.push(self.handle_request_idle(idx, id, input).await?),
+                n if n == REQUEST_IDLE_NAME => {
+                    intercepted.push(self.handle_request_idle(idx, id, input).await?)
+                }
                 _ => remaining.push((id.clone(), name.clone(), input.clone())),
             }
         }

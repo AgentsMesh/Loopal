@@ -29,25 +29,38 @@ impl AgentLoopRunner {
     // 不被 turn-end reconcile 误标 Stale），又返回 ContentBlock（让 LLM 在后续 turn 看到 result）。
     // 历史上 4 个 handler 里 3 个漏 emit（request_idle / EnterPlanMode / ExitPlanMode），
     // 集中到这一个 helper 让契约不可漏。详见 plans/breezy-tickling-cerf.md Part B1。
+    //
+    // content 取所有权: emit 需 clone 一次给 event, ContentBlock 直接 move; 比之前
+    // &str 接口少一次 to_string() 分配 (每个 intercept tool 完成省 1 次 String alloc)。
     pub(super) async fn complete_intercepted_tool(
         &self,
         idx: usize,
         id: &str,
         name: &str,
-        content: &str,
+        content: impl Into<String>,
         is_error: bool,
         metadata: Option<ToolResultMetadata>,
     ) -> Result<(usize, ContentBlock)> {
+        let content = content.into();
         self.emit_in_turn(AgentEventPayload::ToolResult {
             id: id.to_string(),
             name: name.to_string(),
-            result: content.to_string(),
+            result: content.clone(),
             is_error,
             duration_ms: None,
             metadata: metadata.clone(),
         })
         .await?;
-        Ok((idx, tool_result_block(id, content, is_error, metadata)))
+        Ok((
+            idx,
+            ContentBlock::ToolResult {
+                tool_use_id: id.to_string(),
+                content,
+                images: Vec::new(),
+                is_error,
+                metadata,
+            },
+        ))
     }
 
     /// Emit interrupted results for all tools (early cancel path).

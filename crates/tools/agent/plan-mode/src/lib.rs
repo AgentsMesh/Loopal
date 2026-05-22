@@ -4,6 +4,9 @@ use loopal_tool_api::{PermissionLevel, ToolContext, ToolDispatch, ToolResult, Ty
 use schemars::JsonSchema;
 use serde::Deserialize;
 
+pub const ENTER_PLAN_NAME: &str = "EnterPlanMode";
+pub const EXIT_PLAN_NAME: &str = "ExitPlanMode";
+
 pub struct EnterPlanModeTool;
 
 #[derive(Deserialize, JsonSchema)]
@@ -12,7 +15,7 @@ pub struct EnterPlanModeParams {}
 #[async_trait]
 impl TypedTool<EnterPlanModeParams> for EnterPlanModeTool {
     fn name(&self) -> &str {
-        "EnterPlanMode"
+        ENTER_PLAN_NAME
     }
 
     fn description(&self) -> &str {
@@ -54,7 +57,7 @@ pub struct ExitPlanModeParams {}
 #[async_trait]
 impl TypedTool<ExitPlanModeParams> for ExitPlanModeTool {
     fn name(&self) -> &str {
-        "ExitPlanMode"
+        EXIT_PLAN_NAME
     }
 
     fn description(&self) -> &str {

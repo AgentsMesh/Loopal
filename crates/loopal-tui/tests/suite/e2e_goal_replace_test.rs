@@ -1,17 +1,9 @@
-//! `/goal <new>` 在已有 active goal 上的 replace 语义测试。
-//!
-//! 修复前：TUI ControlCommand::GoalCreate 在已有 active goal 时被 session.create 拒绝
-//! (GoalSessionError::AlreadyExists)，仅 WARN 日志、不反馈给 TUI，goal 不变。
-//! 修复后：user-initiated 路径走 session.create_or_replace，直接替换 objective。
-//! LLM 工具路径 (CreateGoalTool) 继续走 session.create，保持 fail-on-exists 语义。
-//!
-//! 测试聚焦 session 层语义。control pipeline 在 `e2e_goal_test.rs` 已有覆盖
-//! (`create_command_drives_runtime_and_renders_status_bar`)；本文件直接驱动
-//! `GoalRuntimeSession`，避免 HangingProvider mock 卡住 turn 时 control 队列饿死。
+//! `/goal <new>` 替换语义: user-initiated path 走 create_or_replace (允许覆盖
+//! active goal), LLM tool path 仍 fail-on-exists.
 
 use std::time::Duration;
 
-use loopal_protocol::{ThreadGoalStatus};
+use loopal_protocol::ThreadGoalStatus;
 use loopal_tool_api::GoalSessionError;
 
 use super::e2e_goal_support::{drain_proxy, run_goal, setup, wait_for_status};

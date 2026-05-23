@@ -69,7 +69,7 @@ impl AgentLoopRunner {
         // an orphan InboxConsumed without its enqueued counterpart.
         match self
             .emit(loopal_protocol::AgentEventPayload::InboxEnqueued {
-                message_id: message_id.clone(),
+                envelope_id: message_id.clone(),
                 source: env.source.clone(),
                 content: env.content.text.clone(),
                 summary: env.summary.clone(),

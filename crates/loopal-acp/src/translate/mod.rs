@@ -110,7 +110,7 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
             Some(AcpNotification::Extension { method, params })
         }
         AgentEventPayload::InboxEnqueued {
-            message_id,
+            envelope_id,
             source,
             content,
             summary,
@@ -119,11 +119,11 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
                 return None;
             }
             let (method, params) =
-                ext::inbox_enqueued(session_id, message_id, source, content, summary.as_deref());
+                ext::inbox_enqueued(session_id, envelope_id, source, content, summary.as_deref());
             Some(AcpNotification::Extension { method, params })
         }
-        AgentEventPayload::InboxConsumed { message_id } => {
-            let (method, params) = ext::inbox_consumed(session_id, message_id);
+        AgentEventPayload::InboxConsumed { envelope_id } => {
+            let (method, params) = ext::inbox_consumed(session_id, envelope_id);
             Some(AcpNotification::Extension { method, params })
         }
         AgentEventPayload::Cleared { context_window } => {

@@ -25,7 +25,7 @@ pub async fn route_to_agent(
         let queued = AgentEvent::named(
             QualifiedAddress::local(envelope.target.agent.clone()),
             AgentEventPayload::UserMessageQueued {
-                message_id: envelope.id.to_string(),
+                envelope_id: envelope.id.to_string(),
                 content: envelope.content.text.clone(),
                 image_count: envelope.content.images.len(),
             },

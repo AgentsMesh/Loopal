@@ -27,7 +27,7 @@ async fn test_inbox_enqueued_emitted_for_human_message() {
     let payload = send_and_drain_event(mbox_tx, &mut runner, &mut event_rx, env).await;
 
     let AgentEventPayload::InboxEnqueued {
-        message_id,
+        envelope_id,
         source,
         content,
         summary,
@@ -35,7 +35,7 @@ async fn test_inbox_enqueued_emitted_for_human_message() {
     else {
         panic!("expected InboxEnqueued");
     };
-    assert_eq!(message_id, env_id);
+    assert_eq!(envelope_id, env_id);
     assert_eq!(source, MessageSource::Human);
     assert_eq!(content, "hi from user");
     assert!(summary.is_none());
@@ -193,8 +193,8 @@ async fn test_emit_inbox_consumed_drains_all_pending_ids() {
 
     let mut consumed: Vec<String> = Vec::new();
     while let Ok(event) = event_rx.try_recv() {
-        if let AgentEventPayload::InboxConsumed { message_id } = event.payload {
-            consumed.push(message_id);
+        if let AgentEventPayload::InboxConsumed { envelope_id } = event.payload {
+            consumed.push(envelope_id);
         }
     }
     assert_eq!(consumed, vec![id_a, id_b]);
@@ -221,10 +221,10 @@ async fn test_inbox_enqueued_precedes_inbox_consumed_in_production_sequence() {
     let mut idx = 0;
     while let Ok(event) = event_rx.try_recv() {
         match &event.payload {
-            AgentEventPayload::InboxEnqueued { message_id, .. } if message_id == &env_id => {
+            AgentEventPayload::InboxEnqueued { envelope_id, .. } if envelope_id == &env_id => {
                 enq_idx = Some(idx);
             }
-            AgentEventPayload::InboxConsumed { message_id } if message_id == &env_id => {
+            AgentEventPayload::InboxConsumed { envelope_id } if envelope_id == &env_id => {
                 consumed_idx = Some(idx);
             }
             _ => {}

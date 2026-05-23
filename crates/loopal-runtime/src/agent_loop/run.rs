@@ -179,7 +179,7 @@ impl AgentLoopRunner {
         for message_id in ids {
             if let Err(e) = self
                 .emit(AgentEventPayload::InboxConsumed {
-                    message_id: message_id.clone(),
+                    envelope_id: message_id.clone(),
                 })
                 .await
             {

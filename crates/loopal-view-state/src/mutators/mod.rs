@@ -76,10 +76,10 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
             question::classifier_completed(state, id, answers)
         }
         UserMessageQueued {
-            message_id,
+            envelope_id,
             content,
             image_count,
-        } => interactive::user_message_queued(state, message_id, content, *image_count),
+        } => interactive::user_message_queued(state, envelope_id, content, *image_count),
         Stream { text } => stream::stream(state, text),
         ThinkingStream { text } => stream::thinking_stream(state, text),
         ThinkingComplete { token_count } => stream::thinking_complete(state, *token_count),
@@ -123,11 +123,11 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
             content,
         } => tool::server_tool_result(state, tool_use_id, content),
         InboxEnqueued {
-            message_id,
+            envelope_id,
             source,
             content,
             summary,
-        } => interactive::inbox_enqueued(state, message_id, source, content, summary.as_deref()),
+        } => interactive::inbox_enqueued(state, envelope_id, source, content, summary.as_deref()),
         PermissionDecided {
             tool_name,
             decision,

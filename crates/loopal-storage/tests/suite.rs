@@ -17,3 +17,5 @@ mod sessions_test;
 mod sessions_update_test;
 #[path = "suite/sub_agent_ref_test.rs"]
 mod sub_agent_ref_test;
+#[path = "suite/turn_event_store_test.rs"]
+mod turn_event_store_test;

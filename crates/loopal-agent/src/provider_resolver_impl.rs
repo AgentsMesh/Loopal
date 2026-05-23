@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use futures::StreamExt;
-use loopal_message::Message;
+use loopal_provider_api::Message;
 use loopal_provider_api::{ChatParams, StreamChunk, TaskType};
 use loopal_tool_api::{FetchRefinerPolicy, OneShotChatError, OneShotChatService};
 

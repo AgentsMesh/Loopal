@@ -1,4 +1,5 @@
-use loopal_message::{ContentBlock, Message, MessageOrigin, MessageRole};
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
+use loopal_turn::MessageOrigin;
 use loopal_turn::{
     AssistantOutput, CompactionRecord, InjectedMessage, InjectionKind, OrderedToolBatch,
     ServerToolPair, TextBlock, ThinkingBlock, ToolBatchItem, ToolCall, ToolExecState, ToolResult,

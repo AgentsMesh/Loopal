@@ -1,9 +1,9 @@
 use loopal_error::{LoopalError, ProviderError};
-use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_provider::AnthropicProvider;
 use loopal_provider_api::{
     ChatParams, ContinuationIntent, ContinuationReason, ErrorClass, Provider,
 };
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 
 fn make_params(model: &str, messages: Vec<Message>) -> ChatParams {
     ChatParams {

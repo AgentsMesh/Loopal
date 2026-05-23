@@ -1,6 +1,7 @@
 use loopal_error::LoopalError;
-use loopal_message::{ContentBlock, Message, MessageOrigin, MessageRole};
 use loopal_provider_api::Provider;
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
+use loopal_turn::MessageOrigin;
 use tokio_util::sync::CancellationToken;
 
 use super::bare_summary::{bare_summary, build_summary_message};

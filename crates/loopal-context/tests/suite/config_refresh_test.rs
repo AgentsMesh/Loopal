@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use loopal_context::middleware::config_refresh::ConfigRefreshMiddleware;
 use loopal_context::middleware::file_snapshot::FileSnapshot;
-use loopal_message::{Message, MessageRole};
+use loopal_provider_api::{Message, MessageRole};
 use loopal_provider_api::{Middleware, MiddlewareContext};
 
 fn wait_for_mtime() {

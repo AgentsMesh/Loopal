@@ -3,7 +3,7 @@
 use std::sync::{Arc, Mutex};
 
 use loopal_error::LoopalError;
-use loopal_message::Message;
+use loopal_provider_api::Message;
 use loopal_provider_api::{ChatParams, ChatStream, Provider};
 
 /// Snapshot of a single `stream_chat` invocation.

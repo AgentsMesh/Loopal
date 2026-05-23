@@ -71,7 +71,7 @@ impl AnthropicProvider {
         } else {
             // Legacy path for callers (smart_compact_llm one-shot, tests) that
             // still build message-shaped ChatParams.
-            let normalized = loopal_message::normalize_messages(&params.messages);
+            let normalized = loopal_provider_api::normalize_messages(&params.messages);
             let normalized_params = ChatParams {
                 messages: normalized,
                 ..params.clone()

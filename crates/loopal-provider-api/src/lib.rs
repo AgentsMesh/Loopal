@@ -4,6 +4,7 @@ pub mod model;
 pub mod model_router;
 pub mod resolver;
 pub mod thinking;
+pub mod wire;
 
 use std::borrow::Cow;
 
@@ -11,7 +12,6 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use loopal_error::LoopalError;
-use loopal_message::Message;
 
 pub use chat::{ChatParams, ChatStream, StopReason, StreamChunk};
 pub use middleware::{Middleware, MiddlewareContext};
@@ -19,6 +19,7 @@ pub use model::*;
 pub use model_router::ModelRouter;
 pub use resolver::ProviderResolver;
 pub use thinking::*;
+pub use wire::{ContentBlock, ImageSource, Message, MessageRole, normalize_messages};
 
 // ---------------------------------------------------------------------------
 // Continuation intent (Runtime → Provider)

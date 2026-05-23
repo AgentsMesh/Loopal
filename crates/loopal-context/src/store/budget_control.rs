@@ -3,7 +3,7 @@ use crate::compaction::sanitize_tool_pairs;
 use crate::degradation::run_sync_degradation;
 use crate::ingestion::{cap_assistant_server_blocks, cap_tool_results};
 use crate::token_counter::estimate_messages_tokens;
-use loopal_message::{Message, MessageRole};
+use loopal_provider_api::{Message, MessageRole};
 use tracing::debug;
 
 impl ContextStore {

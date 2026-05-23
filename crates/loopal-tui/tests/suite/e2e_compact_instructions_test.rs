@@ -1,5 +1,5 @@
 use loopal_context::ContextBudget;
-use loopal_message::{ContentBlock, Message};
+use loopal_provider_api::{ContentBlock, Message};
 use loopal_test_support::{HarnessBuilder, chunks};
 
 fn tiny_budget() -> ContextBudget {

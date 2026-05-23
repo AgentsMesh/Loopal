@@ -1,4 +1,4 @@
-use loopal_message::Message;
+use loopal_provider_api::Message;
 use loopal_provider_api::MiddlewareContext;
 use tracing::warn;
 

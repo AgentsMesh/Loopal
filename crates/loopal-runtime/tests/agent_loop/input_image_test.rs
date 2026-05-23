@@ -1,7 +1,7 @@
 //! Tests for build_user_message image handling via wait_for_input.
 
-use loopal_message::ContentBlock;
 use loopal_protocol::{Envelope, ImageAttachment, MessageSource, UserContent};
+use loopal_provider_api::ContentBlock;
 
 use super::make_runner_with_channels;
 

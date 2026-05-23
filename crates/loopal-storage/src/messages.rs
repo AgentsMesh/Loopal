@@ -2,7 +2,7 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use loopal_error::StorageError;
-use loopal_message::Message;
+use loopal_provider_api::Message;
 
 use crate::entry::TaggedEntry;
 use crate::replay;

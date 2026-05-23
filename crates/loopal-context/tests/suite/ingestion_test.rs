@@ -1,7 +1,7 @@
 use loopal_context::ingestion::{
     cap_tool_results, condense_old_server_blocks, safe_truncate_tool_result,
 };
-use loopal_message::{ContentBlock, Message, MessageRole};
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 
 /// Helper: create a ToolResult block with given content size.
 fn tool_result(id: &str, content: &str) -> ContentBlock {

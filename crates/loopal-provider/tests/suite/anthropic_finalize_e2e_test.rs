@@ -1,6 +1,6 @@
-use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_provider::AnthropicProvider;
 use loopal_provider_api::{ChatParams, ContinuationIntent, ContinuationReason, Provider};
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 

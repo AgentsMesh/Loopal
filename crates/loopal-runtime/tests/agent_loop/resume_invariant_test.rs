@@ -2,9 +2,9 @@ use loopal_config::Settings;
 use loopal_context::ContextStore;
 use loopal_error::LoopalError;
 use loopal_kernel::Kernel;
-use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_protocol::{AgentEvent, ControlCommand, Envelope};
 use loopal_provider_api::{ChatParams, ChatStream, Provider, StopReason, StreamChunk};
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 use loopal_runtime::agent_loop::AgentLoopRunner;
 use loopal_runtime::frontend::{DenyAllHandler, UnsupportedQuestionHandler};
 use loopal_runtime::{

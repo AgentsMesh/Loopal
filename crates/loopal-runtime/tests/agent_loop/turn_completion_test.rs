@@ -98,7 +98,7 @@ pub(crate) fn make_multi_runner(
         },
         fixture.test_session("test-multi"),
         ContextStore::from_messages(
-            vec![loopal_message::Message::user("go")],
+            vec![loopal_provider_api::Message::user("go")],
             make_test_budget(),
         ),
         InterruptHandle::new(),

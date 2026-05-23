@@ -1,7 +1,7 @@
 use std::time::Instant;
 
-use loopal_message::Message;
 use loopal_protocol::Question;
+use loopal_provider_api::Message;
 use loopal_provider_api::{ChatParams, Provider, StreamChunk};
 use tracing::{info, warn};
 

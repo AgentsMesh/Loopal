@@ -1,4 +1,4 @@
-use loopal_message::{ContentBlock, Message, MessageRole};
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 use loopal_turn::{
     AssistantOutput, LlmRequestSnapshot, ServerToolCall, ServerToolPair, ServerToolResult,
     StopReason as TurnStopReason, TextBlock, ThinkingBlock, ToolCall, ToolCallId, TurnStep,

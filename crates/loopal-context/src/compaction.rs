@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use loopal_message::{ContentBlock, Message, MessageRole};
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 
 /// Remove orphaned tool_use/tool_result blocks after compaction.
 ///

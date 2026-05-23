@@ -1,12 +1,13 @@
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use loopal_backend::{LocalBackend, ResourceLimits};
-use loopal_message::{ContentBlock, Message, MessageRole, ToolImageBlock};
 use loopal_provider::AnthropicProvider;
 use loopal_provider_api::ChatParams;
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 use loopal_runtime::hydrate::{hydrate_images, maybe_persist_inline_images};
 use loopal_storage::FileResourceStore;
 use loopal_tool_api::{Tool, ToolContext, ToolDefinition, TypedBridge};
+use loopal_tool_invocation::ToolImageBlock;
 use loopal_tool_read_image::{ReadImageParams, ReadImageTool};
 use serde_json::json;
 use std::sync::Arc;

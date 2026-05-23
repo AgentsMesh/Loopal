@@ -1,6 +1,6 @@
 use loopal_context::ContextBudget;
-use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_protocol::AgentEventPayload;
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 use loopal_test_support::{HarnessBuilder, chunks};
 
 /// Build a large user message (~`n` estimated tokens via 4-bytes-per-token).

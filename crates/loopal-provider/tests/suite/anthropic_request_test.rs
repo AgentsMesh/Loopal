@@ -1,6 +1,6 @@
-use loopal_message::{ContentBlock, ImageSource, Message, MessageRole};
 use loopal_provider::AnthropicProvider;
 use loopal_provider_api::ChatParams;
+use loopal_provider_api::{ContentBlock, ImageSource, Message, MessageRole};
 use loopal_tool_api::ToolDefinition;
 use serde_json::json;
 

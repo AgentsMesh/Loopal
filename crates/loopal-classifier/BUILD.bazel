@@ -7,9 +7,8 @@ rust_library(
     visibility = ["//visibility:public"],
     deps = [
         "//crates/loopal-error",
-        "//crates/loopal-message",
-        "//crates/loopal-protocol",
         "//crates/loopal-provider-api",
+        "//crates/loopal-protocol",
         "//crates/loopal-tool-api",
         "@crates//:futures",
         "@crates//:serde_json",

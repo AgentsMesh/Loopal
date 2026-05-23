@@ -4,8 +4,8 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 
 use loopal_context::ContextBudget;
-use loopal_message::Message;
 use loopal_protocol::AgentEventPayload;
+use loopal_provider_api::Message;
 use loopal_test_support::{HarnessBuilder, chunks};
 
 fn tiny_budget() -> ContextBudget {

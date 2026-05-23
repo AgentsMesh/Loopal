@@ -1,6 +1,6 @@
 use loopal_error::{AgentOutput, LoopalError, Result, TerminateReason};
-use loopal_message::MessageRole;
 use loopal_protocol::{AgentEventPayload, AgentStatus};
+use loopal_provider_api::MessageRole;
 use loopal_provider_api::{
     ContinuationIntent, ContinuationReason, ErrorClass, default_classify_error,
 };

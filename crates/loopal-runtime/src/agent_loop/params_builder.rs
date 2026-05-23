@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 use loopal_config::HarnessConfig;
 use loopal_context::ContextStore;
-use loopal_message::Message;
+use loopal_provider_api::Message;
 use loopal_storage::Session;
 use loopal_tool_api::{FetchRefinerPolicy, MemoryChannel, OneShotChatService};
 

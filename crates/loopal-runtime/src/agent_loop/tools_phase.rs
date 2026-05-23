@@ -2,8 +2,8 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use loopal_error::Result;
-use loopal_message::ContentBlock;
 use loopal_protocol::AgentEventPayload;
+use loopal_provider_api::ContentBlock;
 
 use super::cancel::TurnCancel;
 use super::runner::AgentLoopRunner;

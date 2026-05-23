@@ -7,7 +7,7 @@
 use std::collections::HashSet;
 
 use crate::token_counter::estimate_tokens;
-use loopal_message::{ContentBlock, Message, MessageRole};
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 
 /// Max lines kept when truncating a single ToolResult.
 const CAP_MAX_LINES: usize = 500;

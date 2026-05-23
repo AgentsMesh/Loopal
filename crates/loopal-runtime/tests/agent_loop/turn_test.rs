@@ -160,10 +160,10 @@ async fn ask_user_plus_read_no_duplicate_via_run() {
         .messages()
         .iter()
         .find(|m| {
-            m.role == loopal_message::MessageRole::User
+            m.role == loopal_provider_api::MessageRole::User
                 && m.content
                     .iter()
-                    .any(|b| matches!(b, loopal_message::ContentBlock::ToolResult { .. }))
+                    .any(|b| matches!(b, loopal_provider_api::ContentBlock::ToolResult { .. }))
         })
         .expect("expected a User message with ToolResult blocks");
 
@@ -171,7 +171,7 @@ async fn ask_user_plus_read_no_duplicate_via_run() {
         .content
         .iter()
         .filter_map(|b| match b {
-            loopal_message::ContentBlock::ToolResult { tool_use_id, .. } => {
+            loopal_provider_api::ContentBlock::ToolResult { tool_use_id, .. } => {
                 Some(tool_use_id.as_str())
             }
             _ => None,
@@ -189,7 +189,7 @@ async fn ask_user_plus_read_no_duplicate_via_run() {
 
     // Verify AskUser result doesn't contain the fallback execute() text.
     for block in &tool_result_msg.content {
-        if let loopal_message::ContentBlock::ToolResult {
+        if let loopal_provider_api::ContentBlock::ToolResult {
             tool_use_id,
             content,
             ..

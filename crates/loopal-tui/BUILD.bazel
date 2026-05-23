@@ -59,7 +59,6 @@ rust_test(
         "//crates/loopal-context",
         "//crates/loopal-error",
         "//crates/loopal-git",
-        "//crates/loopal-message",
         "//crates/loopal-provider-api",
         "//crates/loopal-scheduler",
         "//crates/loopal-test-support",

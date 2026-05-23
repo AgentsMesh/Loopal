@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use loopal_error::LoopalError;
-use loopal_message::Message;
+use loopal_provider_api::Message;
 use loopal_provider_api::{ChatParams, ChatStream, ContinuationIntent, Provider, StreamChunk};
 use tokio::time::Sleep;
 

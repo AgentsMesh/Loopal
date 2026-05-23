@@ -1,5 +1,6 @@
-use loopal_message::{ContentBlock, Message, MessageOrigin, MessageRole};
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 use loopal_tool_invocation::{CancelCause, ToolResultMetadata};
+use loopal_turn::MessageOrigin;
 
 use super::super::tools_inject::tool_result_block;
 

@@ -1,5 +1,5 @@
-use loopal_message::{ContentBlock, MessageRole};
 use loopal_protocol::AgentEventPayload;
+use loopal_provider_api::{ContentBlock, MessageRole};
 use loopal_tool_api::PermissionMode;
 
 use super::{in_turn, make_runner_with_channels, make_turn_ctx};

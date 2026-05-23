@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use futures::StreamExt;
 use loopal_error::LoopalError;
-use loopal_message::Message;
+use loopal_provider_api::Message;
 use loopal_provider_api::{ChatParams, Provider, StreamChunk};
 
 use crate::prompt;

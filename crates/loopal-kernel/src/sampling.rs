@@ -25,11 +25,11 @@ impl SamplingCallback for McpSamplingAdapter {
         messages: Vec<(String, String)>,
         max_tokens: Option<u32>,
     ) -> Result<(String, String), String> {
-        let llm_messages: Vec<loopal_message::Message> = messages
+        let llm_messages: Vec<loopal_provider_api::Message> = messages
             .into_iter()
             .map(|(role, text)| match role.as_str() {
-                "user" => loopal_message::Message::user(&text),
-                _ => loopal_message::Message::assistant(&text),
+                "user" => loopal_provider_api::Message::user(&text),
+                _ => loopal_provider_api::Message::assistant(&text),
             })
             .collect();
 

@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use loopal_context::middleware::smart_compact::compact_to_boundary;
 use loopal_context::middleware::touched_files::rank_touched_files;
 use loopal_error::{LoopalError, ProviderError};
-use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_provider_api::{ChatParams, ChatStream, Provider};
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 use std::time::{Duration, Instant};
 use tokio_util::sync::CancellationToken;
 

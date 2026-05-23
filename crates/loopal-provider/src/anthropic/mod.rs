@@ -15,7 +15,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use loopal_error::{LoopalError, ProviderError};
-use loopal_message::Message;
+use loopal_provider_api::Message;
 use loopal_provider_api::{ChatParams, ChatStream, ErrorClass, Provider};
 use tokio::sync::Semaphore;
 

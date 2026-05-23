@@ -1,7 +1,7 @@
 use std::time::{Duration, SystemTime};
 
-use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_protocol::{AgentEventPayload, CompactPhase};
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 use loopal_test_support::{HarnessBuilder, chunks};
 
 const CLEARED_MARKER: &str = "[Old tool result content cleared after idle timeout]";

@@ -61,15 +61,15 @@ pub fn spawn_sub_agent_forwarder(
 /// and finally appends the user prompt wrapped with fork boilerplate if
 /// fork was applied.
 pub fn build_initial_messages(
-    resume_messages: Vec<loopal_message::Message>,
+    resume_messages: Vec<loopal_provider_api::Message>,
     start: &StartParams,
-) -> Vec<loopal_message::Message> {
+) -> Vec<loopal_provider_api::Message> {
     let mut messages = resume_messages;
     let mut has_fork = false;
     if let Some(ref fc_value) = start.fork_context
         && start.resume.is_none()
     {
-        match serde_json::from_value::<Vec<loopal_message::Message>>(fc_value.clone()) {
+        match serde_json::from_value::<Vec<loopal_provider_api::Message>>(fc_value.clone()) {
             Ok(fork_msgs) => {
                 messages.extend(fork_msgs);
                 has_fork = true;
@@ -83,7 +83,7 @@ pub fn build_initial_messages(
         } else {
             prompt.to_string()
         };
-        messages.push(loopal_message::Message::user(&text));
+        messages.push(loopal_provider_api::Message::user(&text));
     }
     messages
 }

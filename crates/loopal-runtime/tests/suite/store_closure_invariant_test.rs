@@ -6,8 +6,8 @@
 //! `prepare_for_llm` no longer runs `sanitize_tool_pairs` — so the store
 //! must produce a closed view without any post-processing.
 
-use loopal_message::{ContentBlock, MessageRole};
 use loopal_protocol::InterruptSignal;
+use loopal_provider_api::{ContentBlock, MessageRole};
 use loopal_runtime::agent_loop::cancel::TurnCancel;
 use loopal_runtime::agent_loop::governance::synthesize_aborted_tool_results;
 use loopal_runtime::agent_loop::governance::{Governance, Verdict};

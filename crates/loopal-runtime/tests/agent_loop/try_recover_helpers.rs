@@ -140,7 +140,7 @@ pub fn make_runner_with_intents(
         },
         fixture.test_session("rt-test"),
         loopal_context::ContextStore::from_messages(
-            vec![loopal_message::Message::user("go")],
+            vec![loopal_provider_api::Message::user("go")],
             make_test_budget(),
         ),
         InterruptHandle::new(),

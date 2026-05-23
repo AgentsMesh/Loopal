@@ -1,4 +1,4 @@
-use loopal_message::{ContentBlock, MessageRole};
+use loopal_provider_api::{ContentBlock, MessageRole};
 use loopal_tool_invocation::{CancelCause, ToolResultMetadata};
 use serde_json::json;
 

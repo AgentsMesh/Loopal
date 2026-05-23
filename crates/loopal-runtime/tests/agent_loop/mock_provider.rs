@@ -28,7 +28,7 @@ fn build_params(
     kernel: Arc<Kernel>,
     frontend: Arc<dyn loopal_runtime::AgentFrontend>,
     fixture: &TestFixture,
-    messages: Vec<loopal_message::Message>,
+    messages: Vec<loopal_provider_api::Message>,
     permission_mode: PermissionMode,
 ) -> AgentLoopParams {
     build_params_with_config(
@@ -48,7 +48,7 @@ fn build_params_with_config(
     kernel: Arc<Kernel>,
     frontend: Arc<dyn loopal_runtime::AgentFrontend>,
     fixture: &TestFixture,
-    messages: Vec<loopal_message::Message>,
+    messages: Vec<loopal_provider_api::Message>,
     config: AgentConfig,
 ) -> AgentLoopParams {
     AgentLoopParamsBuilder::new(
@@ -105,7 +105,7 @@ pub fn make_runner_with_mock_provider(
         Arc::new(kernel),
         frontend,
         &fixture,
-        vec![loopal_message::Message::user("hello")],
+        vec![loopal_provider_api::Message::user("hello")],
         PermissionMode::Bypass,
     );
     (AgentLoopRunner::new(params), event_rx, mbox_tx, ctrl_tx)
@@ -145,7 +145,7 @@ pub fn make_multi_runner_with_intents(
         Arc::new(kernel),
         frontend,
         &fixture,
-        vec![loopal_message::Message::user("go")],
+        vec![loopal_provider_api::Message::user("go")],
         AgentConfig::default(),
     );
     (AgentLoopRunner::new(params), event_rx, intents)

@@ -2,7 +2,7 @@
 
 use futures::StreamExt;
 use loopal_error::LoopalError;
-use loopal_message::Message;
+use loopal_provider_api::Message;
 use loopal_provider_api::{ChatParams, StreamChunk};
 
 pub fn test_chat_params() -> ChatParams {

@@ -1,5 +1,5 @@
-use loopal_message::{ContentBlock, MessageRole};
 use loopal_provider_api::ChatParams;
+use loopal_provider_api::{ContentBlock, MessageRole};
 use serde_json::{Value, json};
 use tracing::error;
 

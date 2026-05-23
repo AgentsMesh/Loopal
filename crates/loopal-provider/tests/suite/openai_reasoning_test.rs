@@ -1,6 +1,6 @@
-use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_provider::OpenAiProvider;
 use loopal_provider_api::ChatParams;
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 use serde_json::json;
 
 fn make_provider() -> OpenAiProvider {

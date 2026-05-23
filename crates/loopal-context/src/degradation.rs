@@ -18,7 +18,7 @@ use crate::compact_config::{
 };
 use crate::ingestion::{condense_old_server_blocks, safe_truncate_tool_result};
 use crate::token_counter::estimate_messages_tokens;
-use loopal_message::{ContentBlock, Message, MessageRole};
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 
 pub fn run_sync_degradation(messages: &mut Vec<Message>, budget: &ContextBudget) {
     strip_ephemeral_blocks(messages);

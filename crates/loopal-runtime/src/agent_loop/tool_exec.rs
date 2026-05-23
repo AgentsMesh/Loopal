@@ -2,8 +2,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use loopal_kernel::Kernel;
-use loopal_message::ContentBlock;
 use loopal_protocol::AgentEventPayload;
+use loopal_provider_api::ContentBlock;
 use loopal_tool_api::{OutputTail, ToolContext};
 use tracing::{Instrument, info};
 

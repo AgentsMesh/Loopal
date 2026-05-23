@@ -1,7 +1,7 @@
 use loopal_context::compact_config::REHYDRATE_TOTAL_BYTES;
 use loopal_context::middleware::touched_files::TouchedFile;
-use loopal_message::{ContentBlock, MessageRole};
 use loopal_protocol::AgentEventPayload;
+use loopal_provider_api::{ContentBlock, MessageRole};
 use loopal_test_support::{HarnessBuilder, chunks};
 use tokio_util::sync::CancellationToken;
 

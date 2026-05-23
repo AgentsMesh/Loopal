@@ -1,6 +1,6 @@
 use loopal_error::LoopalError;
-use loopal_message::MessageRole;
 use loopal_protocol::AgentEventPayload;
+use loopal_provider_api::MessageRole;
 use loopal_provider_api::{StopReason, StreamChunk};
 use loopal_runtime::AgentMode;
 
@@ -47,7 +47,7 @@ fn test_prepare_chat_params_plan_mode_passes_through() {
 
 #[test]
 fn test_prepare_chat_params_with_messages() {
-    use loopal_message::Message;
+    use loopal_provider_api::Message;
 
     let (mut runner, _rx) = make_runner();
     runner.params.store.push_user(Message::user("Hello"));

@@ -19,7 +19,7 @@ pub(super) fn worktree_allowed(target_hub: &Option<String>, isolation: Option<&s
 pub(super) fn build_spawn_target(
     target_hub: Option<String>,
     cwd_override: Option<PathBuf>,
-    fork_context: Option<Vec<loopal_message::Message>>,
+    fork_context: Option<Vec<loopal_provider_api::Message>>,
 ) -> SpawnTarget {
     match target_hub {
         Some(hub_id) => SpawnTarget::CrossHub { hub_id },

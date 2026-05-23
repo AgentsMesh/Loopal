@@ -1,6 +1,6 @@
 use loopal_context::ContextBudget;
-use loopal_message::Message;
 use loopal_protocol::AgentEventPayload;
+use loopal_provider_api::Message;
 use loopal_test_support::{HarnessBuilder, chunks};
 
 fn tiny_budget() -> ContextBudget {
@@ -87,7 +87,7 @@ async fn compact_bare_summary_persists_deterministic_outline() {
         .first()
         .and_then(|m| {
             m.content.iter().find_map(|b| match b {
-                loopal_message::ContentBlock::Text { text } => Some(text.clone()),
+                loopal_provider_api::ContentBlock::Text { text } => Some(text.clone()),
                 _ => None,
             })
         })
@@ -135,7 +135,7 @@ async fn compact_falls_back_to_bare_summary_on_empty_llm_response() {
         .first()
         .and_then(|m| {
             m.content.iter().find_map(|b| match b {
-                loopal_message::ContentBlock::Text { text } => Some(text.clone()),
+                loopal_provider_api::ContentBlock::Text { text } => Some(text.clone()),
                 _ => None,
             })
         })
@@ -191,7 +191,7 @@ async fn compact_extracts_tagged_summary_from_llm_response() {
         .first()
         .and_then(|m| {
             m.content.iter().find_map(|b| match b {
-                loopal_message::ContentBlock::Text { text } => Some(text.clone()),
+                loopal_provider_api::ContentBlock::Text { text } => Some(text.clone()),
                 _ => None,
             })
         })

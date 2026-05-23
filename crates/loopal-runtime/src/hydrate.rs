@@ -3,8 +3,9 @@ use std::sync::{Arc, OnceLock};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use loopal_error::StorageError;
-use loopal_message::{ContentBlock, Message, ToolImageBlock};
+use loopal_provider_api::{ContentBlock, Message};
 use loopal_storage::{FileResourceStore, ResourceStore};
+use loopal_tool_invocation::ToolImageBlock;
 use tracing::warn;
 
 static RESOURCE_STORE: OnceLock<Option<Arc<dyn ResourceStore>>> = OnceLock::new();

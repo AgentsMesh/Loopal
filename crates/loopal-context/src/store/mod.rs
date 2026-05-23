@@ -5,7 +5,7 @@ use std::time::SystemTime;
 use crate::budget::ContextBudget;
 use crate::degradation::run_sync_degradation;
 use crate::ingestion::{cap_assistant_server_blocks, cap_tool_results};
-use loopal_message::{Message, MessageRole};
+use loopal_provider_api::{Message, MessageRole};
 
 pub struct ContextStore {
     messages: Vec<Message>,
@@ -72,7 +72,7 @@ impl ContextStore {
             debug_assert!(msg.role == MessageRole::User);
             for w in warnings {
                 msg.content
-                    .push(loopal_message::ContentBlock::Text { text: w });
+                    .push(loopal_provider_api::ContentBlock::Text { text: w });
             }
         }
     }

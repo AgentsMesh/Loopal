@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use loopal_error::Result;
-use loopal_message::ContentBlock;
+use loopal_provider_api::ContentBlock;
 use tracing::info;
 
 use super::runner::AgentLoopRunner;

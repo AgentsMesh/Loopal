@@ -1,6 +1,6 @@
 use loopal_error::Result;
-use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_protocol::AgentEventPayload;
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 use loopal_tool_invocation::{CancelCause, ToolResultMetadata};
 use loopal_turn::{
     CancelCause as TurnCancelCause, OrderedToolBatch, ToolBatchItem, ToolCall, ToolCallId,

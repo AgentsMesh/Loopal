@@ -1,4 +1,4 @@
-use loopal_message::ContentBlock;
+use loopal_provider_api::ContentBlock;
 use loopal_tool_invocation::{CancelCause, ToolResultMetadata};
 use tracing::Instrument;
 

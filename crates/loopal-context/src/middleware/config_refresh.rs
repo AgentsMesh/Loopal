@@ -1,8 +1,9 @@
+use loopal_turn::MessageOrigin;
 use std::sync::Mutex;
 
 use async_trait::async_trait;
 use loopal_error::LoopalError;
-use loopal_message::{ContentBlock, Message, MessageOrigin, MessageRole};
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 use loopal_provider_api::{Middleware, MiddlewareContext};
 use tracing::debug;
 

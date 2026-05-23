@@ -4,7 +4,7 @@
 //! - `message` — a conversation message
 //! - `marker`  — a control event (Clear / CompactBoundary / RewindTo)
 
-use loopal_message::Message;
+use loopal_provider_api::Message;
 use serde::{Deserialize, Serialize};
 
 /// A single line in the JSONL event log.

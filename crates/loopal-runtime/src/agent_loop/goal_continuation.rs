@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use loopal_error::Result;
-use loopal_message::MessageRole;
 use loopal_protocol::AgentEventPayload;
+use loopal_provider_api::MessageRole;
 use tracing::warn;
 
 use crate::goal::prompts::build_continuation_envelope;

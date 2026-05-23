@@ -1,6 +1,6 @@
 use chrono::{Duration, Utc};
-use loopal_message::ContentBlock;
 use loopal_protocol::AgentEventPayload;
+use loopal_provider_api::ContentBlock;
 use loopal_tool_idle::{MAX_IDLE_DURATION_SECS, MIN_IDLE_DURATION_SECS, NAME, validate_duration};
 use serde::Deserialize;
 use tracing::debug;

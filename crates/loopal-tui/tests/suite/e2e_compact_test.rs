@@ -1,6 +1,6 @@
 use loopal_context::ContextBudget;
-use loopal_message::{ContentBlock, Message};
 use loopal_protocol::AgentEventPayload;
+use loopal_provider_api::{ContentBlock, Message};
 use loopal_test_support::{HarnessBuilder, chunks};
 
 /// Drain all available events from the channel (non-blocking after brief yield).

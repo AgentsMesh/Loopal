@@ -1,6 +1,6 @@
 use loopal_context::budget::ContextBudget;
 use loopal_context::store::ContextStore;
-use loopal_message::{ContentBlock, Message, MessageRole};
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 
 fn make_budget(message_budget: u32) -> ContextBudget {
     ContextBudget {

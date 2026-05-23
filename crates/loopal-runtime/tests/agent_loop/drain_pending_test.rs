@@ -132,7 +132,7 @@ async fn test_subagent_drains_pending_before_exit() {
         },
         fixture.test_session("drain-test"),
         ContextStore::from_messages(
-            vec![loopal_message::Message::user("run task")],
+            vec![loopal_provider_api::Message::user("run task")],
             make_test_budget(),
         ),
         InterruptHandle::new(),

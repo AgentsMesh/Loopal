@@ -1,5 +1,5 @@
 use loopal_context::fork::{FORK_BOILERPLATE, compress_for_fork};
-use loopal_message::{ContentBlock, Message, MessageRole};
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 
 #[test]
 fn empty_input() {

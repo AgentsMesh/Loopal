@@ -8,8 +8,8 @@
 
 use std::time::Duration;
 
-use loopal_message::Message;
 use loopal_protocol::ControlCommand;
+use loopal_provider_api::Message;
 
 use super::make_runner_with_channels;
 

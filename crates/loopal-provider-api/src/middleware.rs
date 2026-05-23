@@ -3,9 +3,9 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use loopal_error::LoopalError;
-use loopal_message::Message;
 
 use crate::Provider;
+use crate::wire::Message;
 
 pub struct MiddlewareContext {
     pub messages: Vec<Message>,

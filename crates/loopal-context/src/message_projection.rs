@@ -1,5 +1,5 @@
-use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_protocol::projected::{ProjectedMessage, ProjectedToolCall};
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 
 use std::collections::HashMap;
 

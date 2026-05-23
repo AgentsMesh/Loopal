@@ -6,7 +6,7 @@
 //!   whose `id == summary_msg_id` (keeping it and everything after).
 //! - `RewindTo { message_id }` discards the target message and everything after it.
 
-use loopal_message::Message;
+use loopal_provider_api::Message;
 
 use crate::entry::{Marker, TaggedEntry};
 

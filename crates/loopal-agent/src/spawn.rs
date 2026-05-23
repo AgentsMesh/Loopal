@@ -24,7 +24,7 @@ pub enum SpawnTarget {
         /// Override the working directory (e.g. for worktree isolation).
         cwd_override: Option<PathBuf>,
         /// Compressed parent conversation injected as initial child context.
-        fork_context: Option<Vec<loopal_message::Message>>,
+        fork_context: Option<Vec<loopal_provider_api::Message>>,
     },
     CrossHub {
         /// Target hub identifier (e.g. "hub-b") registered on MetaHub.

@@ -1,4 +1,4 @@
-use loopal_message::{ContentBlock, Message, MessageRole};
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 
 const TOOL_RESULT_PREVIEW_BYTES: usize = 200;
 const BASH_COMMAND_PREVIEW_BYTES: usize = 80;
@@ -80,7 +80,7 @@ fn extract_tool_args(name: &str, input: &serde_json::Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use loopal_message::Message;
+    use loopal_provider_api::Message;
 
     #[test]
     fn empty_messages_render_empty() {

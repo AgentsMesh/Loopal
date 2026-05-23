@@ -94,7 +94,7 @@ async fn wait_for_event_variant(
 }
 
 pub(crate) async fn wait_for_tool_error(
-    handle: &Arc<std::sync::Mutex<Vec<Vec<loopal_message::Message>>>>,
+    handle: &Arc<std::sync::Mutex<Vec<Vec<loopal_provider_api::Message>>>>,
 ) -> String {
     let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
     loop {
@@ -102,7 +102,7 @@ pub(crate) async fn wait_for_tool_error(
         for batch in snapshot.iter().rev() {
             for m in batch.iter().rev() {
                 for block in &m.content {
-                    if let loopal_message::ContentBlock::ToolResult {
+                    if let loopal_provider_api::ContentBlock::ToolResult {
                         content, is_error, ..
                     } = block
                         && *is_error
@@ -120,7 +120,7 @@ pub(crate) async fn wait_for_tool_error(
 }
 
 pub(crate) async fn wait_for_call_count(
-    handle: &Arc<std::sync::Mutex<Vec<Vec<loopal_message::Message>>>>,
+    handle: &Arc<std::sync::Mutex<Vec<Vec<loopal_provider_api::Message>>>>,
     target: usize,
     timeout: Duration,
 ) {
@@ -147,7 +147,7 @@ pub(crate) async fn wait_for_call_count(
 }
 
 pub(crate) async fn wait_for_recorded_text(
-    handle: &Arc<std::sync::Mutex<Vec<Vec<loopal_message::Message>>>>,
+    handle: &Arc<std::sync::Mutex<Vec<Vec<loopal_provider_api::Message>>>>,
     needle: &str,
     timeout: Duration,
 ) {

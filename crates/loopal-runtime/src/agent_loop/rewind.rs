@@ -3,7 +3,7 @@
 //! A "turn" starts at a User message that contains at least one `ContentBlock::Text`.
 //! Pure `ToolResult`-only User messages are continuations, not turn starts.
 
-use loopal_message::{ContentBlock, Message, MessageRole};
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 
 /// Detect turn boundaries in the message list.
 ///

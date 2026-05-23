@@ -1,6 +1,6 @@
 use loopal_error::Result;
-use loopal_message::MessageRole;
 use loopal_provider_api::ContinuationIntent;
+use loopal_provider_api::MessageRole;
 use tracing::{info, warn};
 
 use super::TurnOutput;

@@ -114,7 +114,7 @@ async fn test_continuation_marker_never_persisted_to_store() {
     let has_marker = messages.iter().any(|m| {
         m.content.iter().any(|b| matches!(
             b,
-            loopal_message::ContentBlock::Text { text } if text.contains("[Continue from where you left off]")
+            loopal_provider_api::ContentBlock::Text { text } if text.contains("[Continue from where you left off]")
         ))
     });
     assert!(

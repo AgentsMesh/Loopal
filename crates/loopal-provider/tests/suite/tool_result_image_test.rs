@@ -1,7 +1,8 @@
-use loopal_message::{ContentBlock, Message, MessageRole, ToolImageBlock};
 use loopal_provider::{AnthropicProvider, GoogleProvider, OpenAiCompatProvider, OpenAiProvider};
 use loopal_provider_api::ChatParams;
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 use loopal_tool_api::ToolDefinition;
+use loopal_tool_invocation::ToolImageBlock;
 
 fn params_with(messages: Vec<Message>) -> ChatParams {
     ChatParams {

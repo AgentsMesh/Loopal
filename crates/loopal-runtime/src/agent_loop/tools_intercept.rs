@@ -1,5 +1,5 @@
 use loopal_error::Result;
-use loopal_message::ContentBlock;
+use loopal_provider_api::ContentBlock;
 use loopal_tool_ask_user::NAME as ASK_USER_NAME;
 use loopal_tool_idle::NAME as REQUEST_IDLE_NAME;
 use loopal_tool_plan_mode::{ENTER_PLAN_NAME, EXIT_PLAN_NAME};

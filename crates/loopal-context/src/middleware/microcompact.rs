@@ -1,6 +1,6 @@
 use std::time::{Duration, SystemTime};
 
-use loopal_message::{ContentBlock, Message};
+use loopal_provider_api::{ContentBlock, Message};
 
 pub const DEFAULT_IDLE_MINUTES: u64 = 60;
 const CLEARED_MARKER: &str = "[Old tool result content cleared after idle timeout]";
@@ -83,7 +83,7 @@ fn collect_scrubbable_tool_use_ids(messages: &[Message]) -> std::collections::Ha
 #[cfg(test)]
 mod tests {
     use super::*;
-    use loopal_message::MessageRole;
+    use loopal_provider_api::MessageRole;
 
     fn tool_use(id: &str, name: &str) -> Message {
         Message {

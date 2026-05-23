@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use loopal_config::{HookConfig, HookEvent};
 use loopal_context::ContextBudget;
-use loopal_message::Message;
+use loopal_provider_api::Message;
 use loopal_test_support::{HarnessBuilder, HookFixture, chunks};
 
 fn tiny_budget() -> ContextBudget {

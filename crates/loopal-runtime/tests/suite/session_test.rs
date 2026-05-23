@@ -1,4 +1,4 @@
-use loopal_message::Message;
+use loopal_provider_api::Message;
 use loopal_runtime::SessionManager;
 use std::path::Path;
 use tempfile::TempDir;

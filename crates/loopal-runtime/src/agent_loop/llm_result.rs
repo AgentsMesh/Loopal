@@ -1,4 +1,4 @@
-use loopal_message::ContentBlock;
+use loopal_provider_api::ContentBlock;
 use loopal_provider_api::StopReason;
 
 /// Structured result from `stream_llm_with()`, replacing the previous 4-element tuple.

@@ -1,4 +1,4 @@
-use loopal_message::{ContentBlock, Message};
+use loopal_provider_api::{ContentBlock, Message};
 
 /// Tools whose `file_path` (or `path`) argument we consider a touched file.
 const FILE_TOOLS: &[&str] = &["Read", "Write", "Edit", "MultiEdit"];
@@ -53,7 +53,7 @@ pub fn rank_touched_files(messages: &[Message], top_n: usize) -> Vec<TouchedFile
 #[cfg(test)]
 mod tests {
     use super::*;
-    use loopal_message::{ContentBlock, MessageRole};
+    use loopal_provider_api::{ContentBlock, MessageRole};
 
     fn tool_use(name: &str, path: &str) -> Message {
         Message {

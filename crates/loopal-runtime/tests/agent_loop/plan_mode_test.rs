@@ -1,4 +1,4 @@
-use loopal_message::ContentBlock;
+use loopal_provider_api::ContentBlock;
 use loopal_runtime::AgentMode;
 use loopal_runtime::agent_loop::LifecycleMode;
 use loopal_tool_api::PermissionMode;

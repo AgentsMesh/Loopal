@@ -2,7 +2,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use loopal_error::Result;
-use loopal_message::Message;
+use loopal_provider_api::Message;
 use loopal_storage::entry::{Marker, TaggedEntry};
 use loopal_storage::{GoalStore, MessageStore, Session, SessionStore, SubAgentRef, TurnEventStore};
 use loopal_turn::TurnEvent;

@@ -1,7 +1,7 @@
 //! Fork context compression — prepare parent messages for child agents.
 
 use crate::token_counter::estimate_messages_tokens;
-use loopal_message::{ContentBlock, Message, MessageRole};
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 
 const FORK_MAX_TOKENS: u32 = 50_000;
 const TOOL_RESULT_CAP: usize = 200;

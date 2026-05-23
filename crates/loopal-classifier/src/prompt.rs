@@ -73,25 +73,25 @@ pub(crate) fn truncate(s: &str, max_chars: usize) -> &str {
     &s[..end]
 }
 
-pub fn build_recent_context(messages: &[loopal_message::Message]) -> String {
+pub fn build_recent_context(messages: &[loopal_provider_api::Message]) -> String {
     let start = messages.len().saturating_sub(6);
     let mut context = String::new();
     for msg in &messages[start..] {
         let role = match msg.role {
-            loopal_message::MessageRole::User => "User",
-            loopal_message::MessageRole::Assistant => "Assistant",
-            loopal_message::MessageRole::System => "System",
+            loopal_provider_api::MessageRole::User => "User",
+            loopal_provider_api::MessageRole::Assistant => "Assistant",
+            loopal_provider_api::MessageRole::System => "System",
         };
         for block in &msg.content {
             match block {
-                loopal_message::ContentBlock::Text { text } => {
+                loopal_provider_api::ContentBlock::Text { text } => {
                     let preview = truncate(text, 200);
                     context.push_str(&format!("{role}: {preview}\n"));
                 }
-                loopal_message::ContentBlock::ToolUse { name, .. } => {
+                loopal_provider_api::ContentBlock::ToolUse { name, .. } => {
                     context.push_str(&format!("{role}: [tool_call: {name}]\n"));
                 }
-                loopal_message::ContentBlock::ToolResult {
+                loopal_provider_api::ContentBlock::ToolResult {
                     content, is_error, ..
                 } => {
                     let label = if *is_error { "error" } else { "result" };

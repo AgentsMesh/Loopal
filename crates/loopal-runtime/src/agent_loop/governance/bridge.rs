@@ -1,4 +1,4 @@
-use loopal_message::Message;
+use loopal_provider_api::Message;
 
 // Invariant: implementations must persist (save_message) and push to store
 // atomically — on persist failure, skip the in-memory push so JSONL and

@@ -5,8 +5,8 @@
 use std::sync::Arc;
 
 use loopal_context::ContextStore;
-use loopal_message::Message;
 use loopal_protocol::{Envelope, InterruptSignal};
+use loopal_provider_api::Message;
 use loopal_runtime::{
     AgentConfig, AgentDeps, AgentLoopParams, AgentLoopParamsBuilder, GoalRuntimeSession,
     InterruptHandle, SessionResumeHook,

@@ -4,12 +4,12 @@ use std::pin::Pin;
 use serde::{Deserialize, Serialize};
 
 use loopal_error::LoopalError;
-use loopal_message::Message;
 use loopal_tool_api::ToolDefinition;
 use loopal_turn::Turn;
 
 use crate::ContinuationIntent;
 use crate::thinking::ThinkingConfig;
+use crate::wire::Message;
 
 pub type ChatStream = Pin<
     Box<dyn futures::Stream<Item = std::result::Result<StreamChunk, LoopalError>> + Send + Unpin>,

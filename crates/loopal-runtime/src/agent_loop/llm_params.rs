@@ -1,7 +1,7 @@
 use loopal_context::{estimate_messages_tokens, estimate_tokens};
 use loopal_error::Result;
-use loopal_message::Message;
 use loopal_provider::{get_thinking_capability, resolve_thinking_config};
+use loopal_provider_api::Message;
 use loopal_provider_api::{ChatParams, ContinuationIntent};
 
 use super::runner::AgentLoopRunner;

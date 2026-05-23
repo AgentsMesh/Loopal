@@ -1,4 +1,4 @@
-use crate::message::{ContentBlock, Message, MessageRole};
+use super::message::{ContentBlock, Message, MessageRole};
 
 /// Normalize messages to ensure they alternate between user and assistant roles.
 /// Consecutive messages with the same role are merged by concatenating their content blocks.

@@ -29,7 +29,7 @@ impl HookExecutor for PromptExecutor {
 
         let params = ChatParams {
             model: self.model.clone(),
-            messages: vec![loopal_message::Message::user(&user_msg)],
+            messages: vec![loopal_provider_api::Message::user(&user_msg)],
             turns: vec![],
             system_prompt: self.system_prompt.clone(),
             tools: vec![],

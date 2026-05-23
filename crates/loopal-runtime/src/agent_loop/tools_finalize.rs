@@ -1,5 +1,5 @@
 use loopal_error::Result;
-use loopal_message::{ContentBlock, Message, MessageRole};
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 use loopal_turn::{
     OrderedToolBatch, ToolBatchItem, ToolCall, ToolCallId, ToolExecState, ToolResult, TurnStep,
 };

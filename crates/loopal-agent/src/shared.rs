@@ -6,8 +6,8 @@ use tokio_util::sync::CancellationToken;
 
 use loopal_ipc::connection::{Connection, Listening};
 use loopal_kernel::Kernel;
-use loopal_message::Message;
 use loopal_protocol::{AgentEvent, AgentStateSnapshot, Envelope, MessageSource};
+use loopal_provider_api::Message;
 use loopal_runtime::GoalRuntimeSession;
 use loopal_scheduler::{CronScheduler, ScheduledTrigger};
 

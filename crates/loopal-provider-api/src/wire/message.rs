@@ -1,5 +1,5 @@
-use crate::origin::MessageOrigin;
 use loopal_tool_invocation::{ToolImageBlock, ToolResultMetadata};
+use loopal_turn::MessageOrigin;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

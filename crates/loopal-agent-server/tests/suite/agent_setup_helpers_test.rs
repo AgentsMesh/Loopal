@@ -86,7 +86,7 @@ fn blank_start() -> StartParams {
 
 #[test]
 fn build_initial_messages_returns_resume_only_when_no_prompt_or_fork() {
-    let resume = vec![loopal_message::Message::user("resumed A")];
+    let resume = vec![loopal_provider_api::Message::user("resumed A")];
     let out = build_initial_messages(resume.clone(), &blank_start());
     assert_eq!(out.len(), 1);
 }
@@ -102,7 +102,7 @@ fn build_initial_messages_appends_prompt_without_fork() {
 #[test]
 fn build_initial_messages_fork_added_when_no_resume() {
     let mut start = blank_start();
-    let fork_msgs = vec![loopal_message::Message::user("fork msg 1")];
+    let fork_msgs = vec![loopal_provider_api::Message::user("fork msg 1")];
     start.fork_context = Some(serde_json::to_value(&fork_msgs).unwrap());
     start.prompt = Some("continue".into());
     let out = build_initial_messages(Vec::new(), &start);
@@ -113,9 +113,9 @@ fn build_initial_messages_fork_added_when_no_resume() {
 fn build_initial_messages_fork_ignored_when_resuming() {
     let mut start = blank_start();
     start.resume = Some("sid".into());
-    let fork_msgs = vec![loopal_message::Message::user("fork msg")];
+    let fork_msgs = vec![loopal_provider_api::Message::user("fork msg")];
     start.fork_context = Some(serde_json::to_value(&fork_msgs).unwrap());
-    let resume = vec![loopal_message::Message::user("resumed")];
+    let resume = vec![loopal_provider_api::Message::user("resumed")];
     let out = build_initial_messages(resume, &start);
     assert_eq!(out.len(), 1, "fork ignored during resume");
 }

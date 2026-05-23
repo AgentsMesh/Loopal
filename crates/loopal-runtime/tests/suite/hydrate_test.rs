@@ -2,9 +2,10 @@ use async_trait::async_trait;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use loopal_error::StorageError;
-use loopal_message::{ContentBlock, Message, MessageRole, ToolImageBlock};
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 use loopal_runtime::hydrate::{hydrate_images, maybe_persist_inline_images};
 use loopal_storage::{FileResourceStore, ResourceStore};
+use loopal_tool_invocation::ToolImageBlock;
 use tempfile::tempdir;
 
 fn b64(data: &[u8]) -> String {

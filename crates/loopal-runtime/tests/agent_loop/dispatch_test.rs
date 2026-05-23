@@ -3,7 +3,7 @@
 
 use std::collections::HashSet;
 
-use loopal_message::ContentBlock;
+use loopal_provider_api::ContentBlock;
 
 use super::{in_turn, make_runner, make_turn_ctx};
 

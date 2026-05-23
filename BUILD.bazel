@@ -24,6 +24,7 @@ rust_binary(
         "//crates/loopal-agent-server",
         "//crates/loopal-backend",
         "//crates/loopal-config",
+        "//crates/loopal-context",
         "//crates/loopal-decision-api",
         "//crates/loopal-git",
         "//crates/loopal-hub-vault",

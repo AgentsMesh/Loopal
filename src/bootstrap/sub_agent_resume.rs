@@ -7,7 +7,8 @@
 //! the Hub's event broadcast and writes a `SubAgentRef` to disk every
 //! time a sub-agent is spawned.
 
-use loopal_protocol::{AgentEventPayload, project_messages};
+use loopal_context::project_messages;
+use loopal_protocol::AgentEventPayload;
 use loopal_session::ROOT_AGENT;
 use loopal_storage::SubAgentRef;
 use tokio::sync::broadcast;

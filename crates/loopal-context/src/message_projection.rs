@@ -1,15 +1,8 @@
-//! Projection: convert `Vec<Message>` → `Vec<ProjectedMessage>`.
-//!
-//! Used when restoring a session so consumers can render historical messages
-//! without replaying the full agent event stream.
+use loopal_message::{ContentBlock, Message, MessageRole};
+use loopal_protocol::projected::{ProjectedMessage, ProjectedToolCall};
 
 use std::collections::HashMap;
 
-use loopal_message::{ContentBlock, Message, MessageRole};
-
-use crate::projected::{ProjectedMessage, ProjectedToolCall};
-
-/// Project a slice of Messages into ProjectedMessages.
 pub fn project_messages(messages: &[Message]) -> Vec<ProjectedMessage> {
     let mut output: Vec<ProjectedMessage> = Vec::new();
     let mut tool_index: HashMap<String, (usize, usize, String)> = HashMap::new();
@@ -151,7 +144,6 @@ fn role_str(role: &MessageRole) -> String {
     }
 }
 
-/// Format server tool content for projection (simplified from session layer).
 fn format_server_tool_content(content: &serde_json::Value) -> String {
     if let Some(text) = content.get("text").and_then(|v| v.as_str()) {
         return text.to_string();

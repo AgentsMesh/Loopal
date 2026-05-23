@@ -1,5 +1,4 @@
 use chrono::{DateTime, Utc};
-use loopal_message::MessageOrigin;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -94,39 +93,9 @@ impl MessageSource {
     }
 }
 
-/// Lossy projection of `MessageSource` into the message-layer audit type.
-///
-/// Drops `QualifiedAddress` structural info (rendering it to a label string)
-/// to keep `loopal-message` free of any protocol dep. Used by `ingest_message`
-/// to stamp `Message.origin` for downstream consumers (LoopDetector,
-/// goal_continuation_check, forensic replay).
-impl From<&MessageSource> for MessageOrigin {
-    fn from(src: &MessageSource) -> Self {
-        match src {
-            MessageSource::Human => MessageOrigin::Human,
-            MessageSource::Scheduled => MessageOrigin::Scheduled,
-            MessageSource::Agent(addr) => MessageOrigin::Agent {
-                label: addr.to_string(),
-            },
-            MessageSource::Channel { channel, from } => MessageOrigin::Channel {
-                name: channel.clone(),
-                from: from.to_string(),
-            },
-            MessageSource::System(kind) => match kind.as_str() {
-                "goal_continuation" => MessageOrigin::GoalContinuation,
-                "governance_compensation" => MessageOrigin::GovernanceCompensation,
-                "governance_feedback" => MessageOrigin::GovernanceFeedback,
-                "stop_feedback" => MessageOrigin::StopFeedback,
-                "config_refresh" => MessageOrigin::ConfigRefresh,
-                "compaction_summary" => MessageOrigin::CompactionSummary,
-                "compaction_rehydrate" => MessageOrigin::CompactionRehydrate,
-                other => MessageOrigin::Other {
-                    label: other.to_string(),
-                },
-            },
-        }
-    }
-}
+// MessageOrigin projection (previously implemented as `From<&MessageSource>`
+// here) moved to `loopal-runtime::agent_loop::message_build` so this crate no
+// longer pulls in `loopal-message`. See `envelope_to_message_origin` there.
 
 /// A routable message envelope.
 ///

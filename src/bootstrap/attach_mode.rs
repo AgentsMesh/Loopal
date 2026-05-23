@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tracing::info;
 
 use loopal_agent_hub::HubClient;
-use loopal_protocol::project_messages;
+use loopal_context::project_messages;
 use loopal_session::SessionController;
 
 use super::attach_bridge::{bridge_events, connect_and_register};

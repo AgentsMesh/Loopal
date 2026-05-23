@@ -4,6 +4,7 @@ pub mod compaction;
 pub mod degradation;
 pub mod fork;
 pub mod ingestion;
+pub mod message_projection;
 pub mod middleware;
 pub mod pipeline;
 pub mod store;
@@ -15,6 +16,7 @@ pub mod untrusted_text;
 
 pub use budget::ContextBudget;
 pub use compaction::{sanitize_tool_pairs, strip_old_thinking};
+pub use message_projection::project_messages;
 pub use pipeline::ContextPipeline;
 pub use store::ContextStore;
 pub use system_prompt::build_system_prompt;

@@ -6,7 +6,6 @@ rust_library(
     edition = "2024",
     visibility = ["//visibility:public"],
     deps = [
-        "//crates/loopal-message",
         "//crates/loopal-tool-invocation",
         "@crates//:chrono",
         "@crates//:serde",
@@ -29,7 +28,6 @@ rust_test(
     edition = "2024",
     deps = [
         ":loopal-protocol",
-        "//crates/loopal-message",
         "//crates/loopal-tool-invocation",
         "@crates//:chrono",
         "@crates//:serde_json",

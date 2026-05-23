@@ -9,7 +9,7 @@ pub(crate) fn load_resumed_display(app: &mut App, session_id: &str) {
     let Ok((session, messages)) = sm.resume_session(session_id) else {
         return;
     };
-    let projected = loopal_protocol::project_messages(&messages);
+    let projected = loopal_context::project_messages(&messages);
     app.load_display_history(projected);
 
     for sub in &session.sub_agents {
@@ -24,7 +24,7 @@ pub(crate) fn load_resumed_display(app: &mut App, session_id: &str) {
             &sub.session_id,
             sub.parent.as_deref(),
             sub.model.as_deref(),
-            loopal_protocol::project_messages(&sub_msgs),
+            loopal_context::project_messages(&sub_msgs),
         );
     }
 }

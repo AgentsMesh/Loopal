@@ -9,6 +9,7 @@ rust_library(
         "//crates/loopal-agent",
         "//crates/loopal-agent-hub",
         "//crates/loopal-config",
+        "//crates/loopal-context",
         "//crates/loopal-ipc",
         "//crates/loopal-protocol",
         "//crates/loopal-provider",

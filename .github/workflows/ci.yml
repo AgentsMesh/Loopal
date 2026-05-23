@@ -55,3 +55,40 @@ jobs:
 
       - name: Rustfmt check
         run: bazel build //... --config=rustfmt
+
+  boundary:
+    name: Architectural boundary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Protocol crate must not depend on loopal-message
+        run: |
+          set -e
+          if grep -n 'loopal-message\b' crates/loopal-protocol/BUILD.bazel; then
+            echo "PR-5b boundary violated: loopal-protocol/BUILD.bazel must not depend on loopal-message"
+            exit 1
+          fi
+          if grep -rn '\buse loopal_message\b' crates/loopal-protocol/src; then
+            echo "PR-5b boundary violated: loopal-protocol/src imports loopal_message"
+            exit 1
+          fi
+          # MessageRole / ContentBlock are wire-format names; only McpContentBlock is allowed.
+          if grep -rn '\bMessageRole\b\|\bContentBlock\b' crates/loopal-protocol/src | grep -v 'McpContentBlock' | grep -q .; then
+            echo "PR-5b boundary violated: protocol src uses wire-format type names"
+            exit 1
+          fi
+          echo "OK: loopal-protocol boundary clean."
+
+      - name: Event payload field naming uses envelope_id (not message_id)
+        run: |
+          set -e
+          # `message_id` MUST NOT appear within the InboxEnqueued / InboxConsumed /
+          # UserMessageQueued variants (it would re-introduce the wire-format leak).
+          if grep -A 5 'InboxEnqueued\s*{\|InboxConsumed\s*{\|UserMessageQueued\s*{' \
+              crates/loopal-protocol/src/event_payload.rs \
+            | grep -q 'message_id'; then
+            echo "PR-5b boundary violated: event_payload reintroduced message_id field"
+            exit 1
+          fi
+          echo "OK: event_payload uses envelope_id."

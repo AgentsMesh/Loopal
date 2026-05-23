@@ -48,16 +48,37 @@ impl SessionManager {
         Ok(session)
     }
 
-    /// Resume an existing session by loading it and its messages.
+    /// Resume an existing session.
+    ///
+    /// Reads turns.jsonl first (new SSOT — PR-3+). If the turn event log is
+    /// present, the recovered `Vec<Turn>` is projected to `Vec<Message>` for
+    /// callers that still expect message shape. Falls back to messages.jsonl
+    /// for legacy sessions written before turns were dual-written.
     pub fn resume_session(&self, session_id: &str) -> Result<(Session, Vec<Message>)> {
         let session = self.session_store.load_session(session_id)?;
-        let messages = self.message_store.load_messages(session_id)?;
-        info!(session_id = %session_id, message_count = messages.len(), "session resumed");
+        let turns = self.turn_event_store.load_turns(session_id)?;
+        let messages = if turns.is_empty() {
+            // Legacy session — no turn events written. Use messages.jsonl.
+            self.message_store.load_messages(session_id)?
+        } else {
+            loopal_context::project_turns_to_messages(&turns)
+        };
+        info!(
+            session_id = %session_id,
+            message_count = messages.len(),
+            from_turns = !turns.is_empty(),
+            "session resumed"
+        );
         Ok((session, messages))
     }
 
     /// Load messages for a sub-agent session (by session_id).
+    /// Same fallback semantics as `resume_session`.
     pub fn load_messages(&self, session_id: &str) -> Result<Vec<Message>> {
+        let turns = self.turn_event_store.load_turns(session_id)?;
+        if !turns.is_empty() {
+            return Ok(loopal_context::project_turns_to_messages(&turns));
+        }
         let messages = self.message_store.load_messages(session_id)?;
         Ok(messages)
     }

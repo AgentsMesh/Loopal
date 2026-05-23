@@ -12,6 +12,7 @@ fn make_params(messages: Vec<Message>, tools: Vec<ToolDefinition>) -> ChatParams
     ChatParams {
         model: "gemini-2.0-flash".to_string(),
         messages,
+        turns: vec![],
         system_prompt: String::new(),
         tools,
         max_tokens: 4096,

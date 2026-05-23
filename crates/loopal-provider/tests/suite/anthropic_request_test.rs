@@ -12,6 +12,7 @@ fn make_params(messages: Vec<Message>, tools: Vec<ToolDefinition>) -> ChatParams
     ChatParams {
         model: "claude-sonnet-4-20250514".to_string(),
         messages,
+        turns: vec![],
         system_prompt: String::new(),
         tools,
         max_tokens: 4096,

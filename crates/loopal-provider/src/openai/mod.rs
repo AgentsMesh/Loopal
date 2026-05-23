@@ -42,7 +42,21 @@ impl Provider for OpenAiProvider {
     }
 
     async fn stream_chat(&self, params: &ChatParams) -> Result<ChatStream, LoopalError> {
-        let finalized = self.finalize_messages(params).into_owned();
+        // reason: OpenAI build_input still consumes Message[]. When caller
+        // provides Turns (new SSOT), project them back to Messages here so
+        // the rest of the build path is unchanged. PR-6 will replace this
+        // with a direct Turn→Responses-API input fold inside OpenAI adapter.
+        let params = if params.turns.is_empty() {
+            params.clone()
+        } else {
+            let messages = loopal_context::project_turns_to_messages(&params.turns);
+            ChatParams {
+                messages,
+                turns: vec![],
+                ..params.clone()
+            }
+        };
+        let finalized = self.finalize_messages(&params).into_owned();
         let final_params = ChatParams {
             messages: finalized,
             ..params.clone()

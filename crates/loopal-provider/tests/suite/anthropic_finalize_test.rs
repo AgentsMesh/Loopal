@@ -9,6 +9,7 @@ fn make_params(model: &str, messages: Vec<Message>) -> ChatParams {
     ChatParams {
         model: model.into(),
         messages,
+        turns: vec![],
         system_prompt: String::new(),
         tools: vec![],
         max_tokens: 4096,

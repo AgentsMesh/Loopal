@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use loopal_error::LoopalError;
 use loopal_message::Message;
 use loopal_tool_api::ToolDefinition;
+use loopal_turn::Turn;
 
 use crate::ContinuationIntent;
 use crate::thinking::ThinkingConfig;
@@ -18,6 +19,11 @@ pub type ChatStream = Pin<
 pub struct ChatParams {
     pub model: String,
     pub messages: Vec<Message>,
+    /// Domain-shaped conversation history (new SSOT). When non-empty,
+    /// providers should fold this directly into wire-format JSON; the
+    /// `messages` field is kept as fallback during the dual-write
+    /// transition (PR-5a) and will be removed in PR-6.
+    pub turns: Vec<Turn>,
     pub system_prompt: String,
     pub tools: Vec<ToolDefinition>,
     pub max_tokens: u32,
@@ -36,6 +42,7 @@ impl ChatParams {
         Self {
             model,
             messages,
+            turns: Vec::new(),
             system_prompt,
             tools: vec![],
             max_tokens: 16_384,

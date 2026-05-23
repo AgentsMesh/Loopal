@@ -6,7 +6,7 @@ use super::runner::AgentLoopRunner;
 
 impl AgentLoopRunner {
     pub(super) fn start_turn_record(&mut self, trigger: TurnTrigger) -> TurnId {
-        let id = TurnId::new();
+        let id = self.turn_store.start_turn(trigger.clone());
         self.current_turn_id = Some(id.clone());
         self.current_step_index = 0;
         let event = TurnEvent::TurnStarted {
@@ -29,6 +29,9 @@ impl AgentLoopRunner {
         let turn_id = self.current_turn_id.as_ref()?.clone();
         let step_index = self.current_step_index;
         self.current_step_index += 1;
+        if let Err(e) = self.turn_store.append_step(step.clone()) {
+            warn!(error = %e, "turn_store append_step failed");
+        }
         let event = TurnEvent::StepAppended {
             turn_id,
             step_index,
@@ -49,6 +52,9 @@ impl AgentLoopRunner {
         let Some(turn_id) = self.current_turn_id.take() else {
             return;
         };
+        if let Err(e) = self.turn_store.end_current_turn(outcome.clone()) {
+            warn!(error = %e, "turn_store end_current_turn failed");
+        }
         let event = TurnEvent::TurnEnded { turn_id, outcome };
         if let Err(e) = self
             .params

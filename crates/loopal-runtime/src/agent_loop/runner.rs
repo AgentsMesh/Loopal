@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use loopal_context::ContextPipeline;
+use loopal_context::{ContextPipeline, TurnStore};
 use loopal_error::{AgentOutput, Result};
 use loopal_protocol::{AgentEventPayload, AgentStatus, InterruptSignal};
 use loopal_tool_api::{GoalSession, ToolContext};
@@ -57,6 +57,10 @@ pub struct AgentLoopRunner {
     /// emit via `StepAppended` events.
     pub current_turn_id: Option<TurnId>,
     pub current_step_index: u32,
+    /// In-memory `Vec<Turn>` mirror — populated by `turn_record` helpers
+    /// alongside `params.store` (message-shaped). Will become SSOT in PR-6;
+    /// for now both views stay in sync via dual-write.
+    pub turn_store: TurnStore,
 }
 
 impl AgentLoopRunner {
@@ -88,6 +92,7 @@ impl AgentLoopRunner {
         let trigger_rx = params.scheduled_rx.take();
         let rewake_rx = params.rewake_rx.take();
         let plan_file = PlanFile::new(std::path::Path::new(&params.session.cwd));
+        let turn_store_budget = params.store.budget().clone();
         Self {
             params,
             tool_ctx,
@@ -110,6 +115,7 @@ impl AgentLoopRunner {
             last_continuation_goal_id: None,
             current_turn_id: None,
             current_step_index: 0,
+            turn_store: TurnStore::new(turn_store_budget),
         }
     }
 

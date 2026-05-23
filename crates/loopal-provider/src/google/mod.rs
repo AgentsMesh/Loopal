@@ -42,6 +42,19 @@ impl Provider for GoogleProvider {
     }
 
     async fn stream_chat(&self, params: &ChatParams) -> Result<ChatStream, LoopalError> {
+        // reason: Google build_contents still consumes Message[]. When caller
+        // provides Turns (new SSOT), project them back to Messages here. PR-6
+        // will replace this with a direct Turn→Google-API contents fold.
+        let params = if params.turns.is_empty() {
+            params.clone()
+        } else {
+            let messages = loopal_context::project_turns_to_messages(&params.turns);
+            ChatParams {
+                messages,
+                turns: vec![],
+                ..params.clone()
+            }
+        };
         let normalized = loopal_message::normalize_messages(&params.messages);
         let normalized_params = ChatParams {
             messages: normalized,

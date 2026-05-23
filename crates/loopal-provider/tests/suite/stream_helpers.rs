@@ -9,6 +9,7 @@ pub fn test_chat_params() -> ChatParams {
     ChatParams {
         model: "test-model".to_string(),
         messages: vec![Message::user("Hello")],
+        turns: vec![],
         system_prompt: "You are helpful.".to_string(),
         tools: vec![],
         max_tokens: 100,

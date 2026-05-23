@@ -11,6 +11,7 @@ fn make_params(messages: Vec<Message>, system_prompt: &str) -> ChatParams {
     ChatParams {
         model: "gpt-5.5".to_string(),
         messages,
+        turns: vec![],
         system_prompt: system_prompt.to_string(),
         tools: vec![],
         max_tokens: 4096,

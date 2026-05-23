@@ -26,6 +26,7 @@ impl OneShotChatService for AgentShared {
         let params = ChatParams {
             model: model.to_string(),
             messages: vec![Message::user(user_prompt)],
+            turns: vec![],
             system_prompt: system_prompt.to_string(),
             tools: vec![],
             max_tokens,

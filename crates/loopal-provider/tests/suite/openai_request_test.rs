@@ -16,6 +16,7 @@ fn make_params(
     ChatParams {
         model: "gpt-4o".to_string(),
         messages,
+        turns: vec![],
         system_prompt: system_prompt.to_string(),
         tools,
         max_tokens: 4096,

@@ -61,6 +61,7 @@ async fn drive_once(
     let params = ChatParams {
         model: model.to_string(),
         messages: vec![Message::user(prompt)],
+        turns: vec![],
         system_prompt: SYSTEM_PROMPT.to_string(),
         tools: vec![],
         max_tokens: COMPACT_MAX_OUTPUT_TOKENS,

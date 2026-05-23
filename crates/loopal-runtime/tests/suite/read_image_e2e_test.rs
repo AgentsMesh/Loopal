@@ -46,6 +46,7 @@ fn anthropic_params(messages: Vec<Message>) -> ChatParams {
     ChatParams {
         model: "claude-test".to_string(),
         messages,
+        turns: vec![],
         system_prompt: String::new(),
         tools: Vec::<ToolDefinition>::new(),
         max_tokens: 4096,

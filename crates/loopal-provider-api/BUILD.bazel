@@ -9,6 +9,7 @@ rust_library(
         "//crates/loopal-error",
         "//crates/loopal-message",
         "//crates/loopal-tool-api",
+        "//crates/loopal-turn",
         "@crates//:futures",
         "@crates//:serde",
         "@crates//:serde_json",

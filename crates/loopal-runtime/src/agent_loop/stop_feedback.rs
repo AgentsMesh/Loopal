@@ -1,4 +1,5 @@
 use loopal_message::{ContentBlock, Message, MessageOrigin, MessageRole};
+use loopal_turn::{InjectedMessage, InjectionKind, TurnStep};
 use tracing::error;
 
 use super::runner::AgentLoopRunner;
@@ -10,7 +11,9 @@ impl AgentLoopRunner {
         let mut msg = Message {
             id: None,
             role: MessageRole::User,
-            content: vec![ContentBlock::Text { text: feedback }],
+            content: vec![ContentBlock::Text {
+                text: feedback.clone(),
+            }],
             origin: Some(MessageOrigin::StopFeedback),
             ephemeral_in_history: false,
         };
@@ -22,6 +25,10 @@ impl AgentLoopRunner {
         {
             error!(error = %e, "failed to persist stop-feedback message");
         }
+        self.append_step_record(TurnStep::Injection(InjectedMessage {
+            kind: InjectionKind::StopFeedback,
+            text: feedback,
+        }));
         self.params.store.push_user(msg);
     }
 }

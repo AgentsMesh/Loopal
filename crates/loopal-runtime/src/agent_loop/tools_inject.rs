@@ -2,6 +2,10 @@ use loopal_error::Result;
 use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_protocol::AgentEventPayload;
 use loopal_tool_invocation::{CancelCause, ToolResultMetadata};
+use loopal_turn::{
+    CancelCause as TurnCancelCause, OrderedToolBatch, ToolBatchItem, ToolCall, ToolCallId,
+    ToolExecState, TurnStep,
+};
 use tracing::{error, info};
 
 use super::runner::AgentLoopRunner;
@@ -85,6 +89,21 @@ impl AgentLoopRunner {
             .save_message(&self.params.session.id, &mut msg)
         {
             error!(error = %e, "failed to persist message");
+        }
+        // Domain mirror: emit ToolBatch with all items in Cancelled state.
+        let items: Vec<ToolBatchItem> = tool_uses
+            .iter()
+            .map(|(id, name, input)| ToolBatchItem {
+                call: ToolCall {
+                    id: ToolCallId::new(id),
+                    name: name.clone(),
+                    input: input.clone(),
+                },
+                state: ToolExecState::Cancelled(TurnCancelCause::UserInterrupt),
+            })
+            .collect();
+        if !items.is_empty() {
+            self.append_step_record(TurnStep::ToolBatch(OrderedToolBatch { items }));
         }
         self.params.store.push_tool_results(msg);
         Ok(())

@@ -4,13 +4,15 @@ use std::sync::Arc;
 use loopal_error::Result;
 use loopal_message::Message;
 use loopal_storage::entry::{Marker, TaggedEntry};
-use loopal_storage::{GoalStore, MessageStore, Session, SessionStore, SubAgentRef};
+use loopal_storage::{GoalStore, MessageStore, Session, SessionStore, SubAgentRef, TurnEventStore};
+use loopal_turn::TurnEvent;
 use tracing::info;
 
 /// Manages session creation, resumption, and message persistence.
 pub struct SessionManager {
     session_store: SessionStore,
     message_store: MessageStore,
+    turn_event_store: TurnEventStore,
     goal_store: Arc<GoalStore>,
 }
 
@@ -19,6 +21,7 @@ impl SessionManager {
         Ok(Self {
             session_store: SessionStore::new()?,
             message_store: MessageStore::new()?,
+            turn_event_store: TurnEventStore::new()?,
             goal_store: Arc::new(GoalStore::from_default_dir()?),
         })
     }
@@ -29,6 +32,7 @@ impl SessionManager {
         Self {
             session_store: SessionStore::with_base_dir(base_dir.clone()),
             message_store: MessageStore::with_base_dir(base_dir.clone()),
+            turn_event_store: TurnEventStore::with_base_dir(base_dir.clone()),
             goal_store: Arc::new(GoalStore::with_base_dir(base_dir)),
         }
     }
@@ -73,6 +77,16 @@ impl SessionManager {
             message.id = Some(uuid::Uuid::new_v4().to_string());
         }
         self.message_store.append_message(session_id, message)?;
+        Ok(())
+    }
+
+    /// Persist a Turn-domain event to the session's turn event log.
+    /// turns.jsonl is the new SSOT under construction; messages.jsonl
+    /// remains as the active read path until PR-6.
+    pub fn record_turn_event(&self, session_id: &str, event: &TurnEvent) -> Result<()> {
+        self.turn_event_store
+            .append_event(session_id, event)
+            .map_err(loopal_error::LoopalError::from)?;
         Ok(())
     }
 

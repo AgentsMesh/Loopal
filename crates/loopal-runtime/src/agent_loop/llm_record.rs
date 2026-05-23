@@ -1,4 +1,8 @@
 use loopal_message::{ContentBlock, Message, MessageRole};
+use loopal_turn::{
+    AssistantOutput, LlmRequestSnapshot, ServerToolCall, ServerToolPair, ServerToolResult,
+    StopReason as TurnStopReason, TextBlock, ThinkingBlock, ToolCall, ToolCallId, TurnStep,
+};
 use tracing::error;
 
 use super::runner::AgentLoopRunner;
@@ -30,7 +34,7 @@ impl AgentLoopRunner {
         }
 
         // Server-side tool blocks (e.g. web_search) in stream order.
-        for block in server_blocks {
+        for block in server_blocks.clone() {
             assistant_content.push(block);
         }
 
@@ -63,7 +67,105 @@ impl AgentLoopRunner {
             {
                 error!(error = %e, "failed to persist message");
             }
+            // Domain-layer mirror: record LlmCall step (parallel to message store).
+            let step = build_llm_call_step(
+                self.params.config.model(),
+                assistant_text,
+                tool_uses,
+                thinking_text,
+                thinking_signature,
+                &server_blocks,
+            );
+            self.append_step_record(step);
             self.params.store.push_assistant(assistant_msg);
         }
     }
+}
+
+fn build_llm_call_step(
+    model: &str,
+    assistant_text: &str,
+    tool_uses: &[(String, String, serde_json::Value)],
+    thinking_text: &str,
+    thinking_signature: Option<&str>,
+    server_blocks: &[ContentBlock],
+) -> TurnStep {
+    let thinking = if thinking_signature.is_some() && !thinking_text.is_empty() {
+        Some(ThinkingBlock {
+            thinking: thinking_text.to_string(),
+            signature: thinking_signature.map(String::from),
+        })
+    } else {
+        None
+    };
+    let text_blocks = if assistant_text.is_empty() {
+        vec![]
+    } else {
+        vec![TextBlock {
+            text: assistant_text.to_string(),
+        }]
+    };
+    let tool_calls: Vec<ToolCall> = tool_uses
+        .iter()
+        .map(|(id, name, input)| ToolCall {
+            id: ToolCallId::new(id),
+            name: name.clone(),
+            input: input.clone(),
+        })
+        .collect();
+    let server_pairs = pair_server_blocks(server_blocks);
+    let tool_count = tool_calls.len() as u32;
+    let stop_reason = if tool_uses.is_empty() {
+        TurnStopReason::EndTurn
+    } else {
+        TurnStopReason::ToolUse
+    };
+    TurnStep::LlmCall {
+        request_snapshot: LlmRequestSnapshot {
+            model: model.to_string(),
+            max_tokens: 0,
+            tool_count,
+            message_count: 0,
+        },
+        response: AssistantOutput {
+            thinking,
+            text_blocks,
+            tool_calls,
+            server_blocks: server_pairs,
+            stop_reason,
+        },
+    }
+}
+
+fn pair_server_blocks(blocks: &[ContentBlock]) -> Vec<ServerToolPair> {
+    let mut uses: std::collections::HashMap<String, (String, serde_json::Value)> =
+        Default::default();
+    let mut pairs = Vec::new();
+    for b in blocks {
+        if let ContentBlock::ServerToolUse { id, name, input } = b {
+            uses.insert(id.clone(), (name.clone(), input.clone()));
+        }
+    }
+    for b in blocks {
+        if let ContentBlock::ServerToolResult {
+            block_type,
+            tool_use_id,
+            content,
+        } = b
+            && let Some((name, input)) = uses.remove(tool_use_id)
+        {
+            pairs.push(ServerToolPair {
+                call: ServerToolCall {
+                    id: tool_use_id.clone(),
+                    name,
+                    input,
+                },
+                result: ServerToolResult {
+                    block_type: block_type.clone(),
+                    content: content.clone(),
+                },
+            });
+        }
+    }
+    pairs
 }

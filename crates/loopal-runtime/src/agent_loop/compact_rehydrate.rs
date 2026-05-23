@@ -5,6 +5,7 @@ use loopal_context::middleware::touched_files::TouchedFile;
 use loopal_message::{ContentBlock, Message, MessageOrigin, MessageRole};
 use loopal_protocol::AgentEventPayload;
 use loopal_tool_api::ToolResult;
+use loopal_turn::{CompactionRecord, RehydratedFile, ToolCallId, TurnStep};
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
@@ -175,6 +176,19 @@ impl AgentLoopRunner {
             return stats;
         }
 
+        // Domain mirror: emit a Compaction step carrying only the rehydrated files.
+        let rehydrated_files: Vec<RehydratedFile> =
+            collect_rehydrated_files(&assistant.content, &user.content);
+        if !rehydrated_files.is_empty() {
+            self.append_step_record(TurnStep::Compaction(CompactionRecord {
+                summary_text: String::new(),
+                ack_text: String::new(),
+                rehydrated: rehydrated_files,
+                kept_turn_count: 0,
+                removed_turn_count: 0,
+            }));
+        }
+
         self.params.store.push_assistant(assistant);
         self.params.store.push_tool_results(user);
 
@@ -194,6 +208,41 @@ impl AgentLoopRunner {
             .await;
         stats
     }
+}
+
+fn collect_rehydrated_files(
+    use_blocks: &[ContentBlock],
+    result_blocks: &[ContentBlock],
+) -> Vec<RehydratedFile> {
+    let mut results: std::collections::HashMap<&str, &str> = std::collections::HashMap::new();
+    for b in result_blocks {
+        if let ContentBlock::ToolResult {
+            tool_use_id,
+            content,
+            ..
+        } = b
+        {
+            results.insert(tool_use_id.as_str(), content.as_str());
+        }
+    }
+    use_blocks
+        .iter()
+        .filter_map(|b| match b {
+            ContentBlock::ToolUse { id, input, .. } => {
+                let body = results.get(id.as_str())?;
+                let path = input
+                    .get("file_path")
+                    .or_else(|| input.get("path"))
+                    .and_then(|v| v.as_str())?;
+                Some(RehydratedFile {
+                    path: path.to_string(),
+                    tool_call_id: ToolCallId::new(id),
+                    content: body.to_string(),
+                })
+            }
+            _ => None,
+        })
+        .collect()
 }
 
 fn trim_body(r: ToolResult, max_bytes: usize) -> String {

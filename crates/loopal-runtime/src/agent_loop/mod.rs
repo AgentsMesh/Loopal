@@ -68,10 +68,12 @@ mod turn_exec;
 pub mod turn_history;
 pub(crate) mod turn_metrics;
 mod turn_observer_dispatch;
+mod turn_record;
 mod turn_response;
 mod turn_state;
 mod turn_telemetry;
 mod turn_tool_phase;
+mod turn_trigger_map;
 
 use loopal_error::{AgentOutput, Result};
 

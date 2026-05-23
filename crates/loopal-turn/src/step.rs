@@ -1,0 +1,107 @@
+use serde::{Deserialize, Serialize};
+
+use crate::content::{ServerToolPair, TextBlock, ThinkingBlock, ToolCall, ToolCallId, ToolResult};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TurnStep {
+    LlmCall {
+        request_snapshot: LlmRequestSnapshot,
+        response: AssistantOutput,
+    },
+    ToolBatch(OrderedToolBatch),
+    Compaction(CompactionRecord),
+    Injection(InjectedMessage),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LlmRequestSnapshot {
+    pub model: String,
+    pub max_tokens: u32,
+    pub tool_count: u32,
+    pub message_count: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AssistantOutput {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thinking: Option<ThinkingBlock>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub text_blocks: Vec<TextBlock>,
+    // reason: Vec 顺序 = LLM stream emission 顺序; ToolBatchItem 通过 id 匹配回此处的
+    // tool_calls. I4 invariant (parallel ordering) 在此处的 Vec ordering 上锁定。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tool_calls: Vec<ToolCall>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub server_blocks: Vec<ServerToolPair>,
+    pub stop_reason: StopReason,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum StopReason {
+    EndTurn,
+    MaxTokens,
+    StopSequence,
+    ToolUse,
+    Refusal,
+    Other(String),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrderedToolBatch {
+    // reason: Vec 顺序必须匹配 prev LlmCall.response.tool_calls 顺序; ToolBatchItem 把
+    // call (含 id) 和 state 绑成一体，编译期不可能产生孤立 result.
+    pub items: Vec<ToolBatchItem>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolBatchItem {
+    pub call: ToolCall,
+    pub state: ToolExecState,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ToolExecState {
+    Pending,
+    Running,
+    Done(ToolResult),
+    Cancelled(CancelCause),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum CancelCause {
+    UserInterrupt,
+    GovernanceAbort,
+    CrashRecovery,
+    Timeout,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompactionRecord {
+    pub summary_text: String,
+    pub ack_text: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rehydrated: Vec<RehydratedFile>,
+    pub kept_turn_count: u32,
+    pub removed_turn_count: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RehydratedFile {
+    pub path: String,
+    pub tool_call_id: ToolCallId,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InjectedMessage {
+    pub kind: InjectionKind,
+    pub text: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum InjectionKind {
+    Governance,
+    StopFeedback,
+    ConfigRefresh,
+    SystemNote,
+}

@@ -1,5 +1,6 @@
 mod content;
 mod event;
+mod repo;
 mod step;
 mod turn;
 
@@ -8,6 +9,7 @@ pub use content::{
     ToolCallId, ToolResult,
 };
 pub use event::TurnEvent;
+pub use repo::{InMemoryTurnRepo, TurnRepo, TurnRepoError, TurnRepoResult};
 pub use step::{
     AssistantOutput, CancelCause, CompactionRecord, InjectedMessage, InjectionKind,
     LlmRequestSnapshot, OrderedToolBatch, RehydratedFile, StopReason, ToolBatchItem, ToolExecState,

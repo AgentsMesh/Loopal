@@ -9,6 +9,7 @@ rust_library(
         "@crates//:chrono",
         "@crates//:serde",
         "@crates//:serde_json",
+        "@crates//:thiserror",
         "@crates//:uuid",
     ],
 )

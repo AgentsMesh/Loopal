@@ -13,6 +13,7 @@ rust_library(
         "//crates/loopal-prompt-system",
         "//crates/loopal-provider-api",
         "//crates/loopal-tool-api",
+        "//crates/loopal-turn",
         "@crates//:chrono",
         "@crates//:futures",
         "@crates//:serde",
@@ -49,6 +50,7 @@ rust_test(
         "//crates/loopal-provider",
         "//crates/loopal-provider-api",
         "//crates/loopal-tool-api",
+        "//crates/loopal-turn",
     ],
     proc_macro_deps = ["@crates//:async-trait"],
 )

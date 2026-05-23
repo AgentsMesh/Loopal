@@ -9,6 +9,7 @@ pub mod pipeline;
 pub mod store;
 pub mod system_prompt;
 pub mod token_counter;
+pub mod turn_store;
 pub mod untrusted_text;
 
 pub use budget::ContextBudget;
@@ -17,4 +18,5 @@ pub use pipeline::ContextPipeline;
 pub use store::ContextStore;
 pub use system_prompt::build_system_prompt;
 pub use token_counter::{estimate_message_tokens, estimate_messages_tokens, estimate_tokens};
+pub use turn_store::{TurnStore, TurnStoreError, TurnStoreResult};
 pub use untrusted_text::{escape_xml_text, wrap_untrusted};

@@ -1,10 +1,11 @@
-use loopal_provider_api::{ContentBlock, Message, MessageRole};
 use loopal_turn::MessageOrigin;
 use loopal_turn::{
     AssistantOutput, CompactionRecord, InjectedMessage, InjectionKind, OrderedToolBatch,
     ServerToolPair, TextBlock, ThinkingBlock, ToolBatchItem, ToolCall, ToolExecState, ToolResult,
     Turn, TurnStep, TurnTrigger,
 };
+
+use super::message::{ContentBlock, Message, MessageRole};
 
 pub fn project_turns_to_messages(turns: &[Turn]) -> Vec<Message> {
     turns.iter().flat_map(project_turn_to_messages).collect()

@@ -25,6 +25,7 @@ rust_test(
     deps = [
         ":loopal-provider-api",
         "//crates/loopal-provider",
+        "//crates/loopal-turn",
         "@crates//:serde_json",
     ],
 )

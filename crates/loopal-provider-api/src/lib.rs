@@ -19,7 +19,10 @@ pub use model::*;
 pub use model_router::ModelRouter;
 pub use resolver::ProviderResolver;
 pub use thinking::*;
-pub use wire::{ContentBlock, ImageSource, Message, MessageRole, normalize_messages};
+pub use wire::{
+    ContentBlock, ImageSource, Message, MessageRole, normalize_messages, project_turn_to_messages,
+    project_turns_to_messages,
+};
 
 // ---------------------------------------------------------------------------
 // Continuation intent (Runtime → Provider)

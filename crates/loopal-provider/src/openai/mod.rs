@@ -49,7 +49,7 @@ impl Provider for OpenAiProvider {
         let params = if params.turns.is_empty() {
             params.clone()
         } else {
-            let messages = loopal_context::project_turns_to_messages(&params.turns);
+            let messages = loopal_provider_api::project_turns_to_messages(&params.turns);
             ChatParams {
                 messages,
                 turns: vec![],

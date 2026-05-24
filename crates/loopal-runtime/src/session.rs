@@ -61,7 +61,7 @@ impl SessionManager {
             // Legacy session — no turn events written. Use messages.jsonl.
             self.message_store.load_messages(session_id)?
         } else {
-            loopal_context::project_turns_to_messages(&turns)
+            loopal_provider_api::project_turns_to_messages(&turns)
         };
         info!(
             session_id = %session_id,
@@ -77,7 +77,7 @@ impl SessionManager {
     pub fn load_messages(&self, session_id: &str) -> Result<Vec<Message>> {
         let turns = self.turn_event_store.load_turns(session_id)?;
         if !turns.is_empty() {
-            return Ok(loopal_context::project_turns_to_messages(&turns));
+            return Ok(loopal_provider_api::project_turns_to_messages(&turns));
         }
         let messages = self.message_store.load_messages(session_id)?;
         Ok(messages)

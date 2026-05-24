@@ -25,7 +25,5 @@ mod system_prompt_agent_test;
 mod system_prompt_test;
 #[path = "suite/token_counter_test.rs"]
 mod token_counter_test;
-#[path = "suite/turn_projection_test.rs"]
-mod turn_projection_test;
 #[path = "suite/turn_store_test.rs"]
 mod turn_store_test;

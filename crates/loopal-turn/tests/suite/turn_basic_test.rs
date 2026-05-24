@@ -43,7 +43,7 @@ fn ordered_tool_batch_preserves_call_order() {
         },
     ];
     t.body.steps.push(TurnStep::LlmCall {
-        request_snapshot: snapshot(),
+        model: snapshot(),
         response: AssistantOutput {
             thinking: None,
             text_blocks: vec![],
@@ -85,7 +85,7 @@ fn turn_json_round_trip() {
 fn turn_with_steps_round_trip() {
     let mut t = make_user_turn();
     t.body.steps.push(TurnStep::LlmCall {
-        request_snapshot: snapshot(),
+        model: snapshot(),
         response: AssistantOutput {
             thinking: None,
             text_blocks: vec![],
@@ -99,13 +99,8 @@ fn turn_with_steps_round_trip() {
     assert_eq!(back.body.steps.len(), 1);
 }
 
-fn snapshot() -> loopal_turn::LlmRequestSnapshot {
-    loopal_turn::LlmRequestSnapshot {
-        model: "claude-opus-4-7".into(),
-        max_tokens: 128_000,
-        tool_count: 0,
-        message_count: 0,
-    }
+fn snapshot() -> String {
+    "claude-opus-4-7".into()
 }
 
 fn ok(text: &str) -> ToolResult {

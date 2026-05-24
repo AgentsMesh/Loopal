@@ -1,7 +1,5 @@
 use loopal_context::{ContextBudget, TurnStore, TurnStoreError};
-use loopal_turn::{
-    AssistantOutput, LlmRequestSnapshot, StopReason, TurnOutcome, TurnStep, TurnTrigger,
-};
+use loopal_turn::{AssistantOutput, StopReason, TurnOutcome, TurnStep, TurnTrigger};
 
 fn budget() -> ContextBudget {
     ContextBudget {
@@ -25,12 +23,7 @@ fn user_trigger() -> TurnTrigger {
 
 fn llm_step() -> TurnStep {
     TurnStep::LlmCall {
-        request_snapshot: LlmRequestSnapshot {
-            model: "claude-opus-4-7".into(),
-            max_tokens: 64_000,
-            tool_count: 0,
-            message_count: 1,
-        },
+        model: "claude-opus-4-7".into(),
         response: AssistantOutput {
             thinking: None,
             text_blocks: vec![],

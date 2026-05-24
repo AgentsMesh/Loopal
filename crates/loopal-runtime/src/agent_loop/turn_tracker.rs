@@ -11,29 +11,30 @@ pub trait TurnEventLogger {
     fn persist(&self, event: &TurnEvent) -> bool;
 }
 
-/// Domain-layer turn tracking state — owned exclusively by `AgentLoopRunner`.
-/// All mutating methods are inherent on this type so the single-writer
-/// contract is enforced by visibility (fields are crate-private).
+/// Fail-closed persistence adapter around `TurnStore`. Each mutator method
+/// applies the in-memory change, then persists the matching `TurnEvent`; on
+/// persist failure it rolls back via the store's `rollback_*` API so the
+/// in-memory view and `turns.jsonl` stay in lockstep.
+///
+/// State is intentionally delegated: `current_turn_id` / step index come from
+/// `TurnStore`. The only tracker-owned field is `current_tool_batch_step`,
+/// which is transient (in-flight tool-batch marker, never persisted).
 pub struct TurnTracker {
-    current_turn_id: Option<TurnId>,
-    current_step_index: u32,
-    current_tool_batch_step: Option<u32>,
     store: TurnStore,
+    current_tool_batch_step: Option<u32>,
 }
 
 impl TurnTracker {
     pub fn new(store: TurnStore) -> Self {
         Self {
-            current_turn_id: None,
-            current_step_index: 0,
-            current_tool_batch_step: None,
             store,
+            current_tool_batch_step: None,
         }
     }
 
     // ── Read-only accessors ────────────────────────────────────────────────
     pub fn current_turn_id(&self) -> Option<&TurnId> {
-        self.current_turn_id.as_ref()
+        self.store.current_turn_id()
     }
     pub fn current_tool_batch_step(&self) -> Option<u32> {
         self.current_tool_batch_step
@@ -45,19 +46,13 @@ impl TurnTracker {
         &mut self.store
     }
 
-    /// Replace the inner `TurnStore` (e.g. on session resume) and reset the
-    /// tracker's in-flight pointers to match. Tool-batch and step indices
-    /// derive from the new store: `current_turn_id` mirrors the store's last
-    /// InProgress turn (if any); step/tool counters reset to 0/None.
+    /// Replace the inner `TurnStore` (e.g. on session resume). The new store's
+    /// `current_turn_id` (derived from its last InProgress turn) becomes the
+    /// authoritative pointer; the transient `current_tool_batch_step` resets
+    /// — in-flight tool batches never survive across a resume.
     pub fn replace_store(&mut self, store: TurnStore) {
-        self.current_turn_id = store.current_turn_id().cloned();
-        let step_count = store
-            .current_turn()
-            .map(|t| t.body.steps.len() as u32)
-            .unwrap_or(0);
-        self.current_step_index = step_count;
-        self.current_tool_batch_step = None;
         self.store = store;
+        self.current_tool_batch_step = None;
     }
 
     // ── Mutators (fail-closed: persist before in-memory commit) ────────────
@@ -76,12 +71,9 @@ impl TurnTracker {
             trigger,
         };
         if logger.persist(&event) {
-            self.current_turn_id = Some(id.clone());
-            self.current_step_index = 0;
-            self.current_tool_batch_step = None;
             Some(id)
         } else {
-            self.store.turns_mut().pop();
+            self.store.rollback_last_turn();
             None
         }
     }
@@ -89,24 +81,23 @@ impl TurnTracker {
     /// Append a step to the current turn. Returns the assigned `step_index` on
     /// success; rolls back the in-memory push on persist failure.
     pub fn try_append_step(&mut self, step: TurnStep, logger: &dyn TurnEventLogger) -> Option<u32> {
-        let turn_id = self.current_turn_id.as_ref()?.clone();
-        let step_index = self.current_step_index;
-        if let Err(e) = self.store.append_step(step.clone()) {
-            warn!(error = %e, "turn_store append_step failed; skipping event persist");
-            return None;
-        }
+        let turn_id = self.store.current_turn_id()?.clone();
+        let step_index = match self.store.append_step(step.clone()) {
+            Ok(idx) => idx,
+            Err(e) => {
+                warn!(error = %e, "turn_store append_step failed; skipping event persist");
+                return None;
+            }
+        };
         let event = TurnEvent::StepAppended {
-            turn_id: turn_id.clone(),
+            turn_id,
             step_index,
             step,
         };
         if logger.persist(&event) {
-            self.current_step_index += 1;
             Some(step_index)
         } else {
-            if let Some(turn) = self.store.turns_mut().iter_mut().find(|t| t.id == turn_id) {
-                turn.body.steps.pop();
-            }
+            self.store.rollback_last_step();
             None
         }
     }
@@ -129,7 +120,7 @@ impl TurnTracker {
         new_state: loopal_turn::ToolExecState,
         logger: &dyn TurnEventLogger,
     ) {
-        let Some(turn_id) = self.current_turn_id.clone() else {
+        let Some(turn_id) = self.store.current_turn_id().cloned() else {
             return;
         };
         let Some(step_index) = self.current_tool_batch_step else {
@@ -169,7 +160,7 @@ impl TurnTracker {
     /// missing `TurnEnded` and apply `CrashRecovery` Cancelled semantics, so
     /// both views converge.
     pub fn try_end_turn(&mut self, outcome: TurnOutcome, logger: &dyn TurnEventLogger) {
-        let Some(turn_id) = self.current_turn_id.clone() else {
+        let Some(turn_id) = self.store.current_turn_id().cloned() else {
             return;
         };
         if let Err(e) = self.store.end_current_turn(outcome.clone()) {
@@ -186,8 +177,6 @@ impl TurnTracker {
                 "TurnEnded event persist failed; in-memory ended, jsonl missing"
             );
         }
-        self.current_turn_id = None;
-        self.current_step_index = 0;
         self.current_tool_batch_step = None;
     }
 }

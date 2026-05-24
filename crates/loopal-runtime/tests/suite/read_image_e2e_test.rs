@@ -71,12 +71,7 @@ fn turn_with_tool_images(tool_use_id: &str, images: Vec<ToolImageBlock>) -> Turn
     turn.body = TurnBody {
         steps: vec![
             TurnStep::LlmCall {
-                request_snapshot: loopal_turn::LlmRequestSnapshot {
-                    model: "claude-test".into(),
-                    max_tokens: 0,
-                    tool_count: 1,
-                    message_count: 0,
-                },
+                model: "claude-test".into(),
                 response: AssistantOutput {
                     thinking: None,
                     text_blocks: vec![],

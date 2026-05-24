@@ -1,6 +1,6 @@
 use loopal_provider_api::{ContentBlock, Message, MessageRole};
 use loopal_turn::{
-    AssistantOutput, LlmRequestSnapshot, ServerToolCall, ServerToolPair, ServerToolResult,
+    AssistantOutput, ServerToolCall, ServerToolPair, ServerToolResult,
     StopReason as TurnStopReason, TextBlock, ThinkingBlock, ToolCall, ToolCallId, TurnStep,
 };
 use tracing::error;
@@ -115,19 +115,13 @@ fn build_llm_call_step(
         })
         .collect();
     let server_pairs = pair_server_blocks(server_blocks);
-    let tool_count = tool_calls.len() as u32;
     let stop_reason = if tool_uses.is_empty() {
         TurnStopReason::EndTurn
     } else {
         TurnStopReason::ToolUse
     };
     TurnStep::LlmCall {
-        request_snapshot: LlmRequestSnapshot {
-            model: model.to_string(),
-            max_tokens: 0,
-            tool_count,
-            message_count: 0,
-        },
+        model: model.to_string(),
         response: AssistantOutput {
             thinking,
             text_blocks,

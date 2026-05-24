@@ -1,9 +1,9 @@
 use chrono::Utc;
 use loopal_storage::{TurnEventStore, fold_events};
 use loopal_turn::{
-    AssistantOutput, CancelCause, CancelledCause, LlmRequestSnapshot, OrderedToolBatch, StopReason,
-    ToolBatchItem, ToolCall, ToolCallId, ToolExecState, ToolResult, TurnEvent, TurnId, TurnOutcome,
-    TurnStep, TurnTrigger,
+    AssistantOutput, CancelCause, CancelledCause, OrderedToolBatch, StopReason, ToolBatchItem,
+    ToolCall, ToolCallId, ToolExecState, ToolResult, TurnEvent, TurnId, TurnOutcome, TurnStep,
+    TurnTrigger,
 };
 use tempfile::TempDir;
 
@@ -21,12 +21,7 @@ fn user_trigger() -> TurnTrigger {
 
 fn empty_llm_step() -> TurnStep {
     TurnStep::LlmCall {
-        request_snapshot: LlmRequestSnapshot {
-            model: "m".into(),
-            max_tokens: 1,
-            tool_count: 0,
-            message_count: 0,
-        },
+        model: "m".into(),
         response: AssistantOutput {
             thinking: None,
             text_blocks: vec![],

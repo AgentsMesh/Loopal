@@ -5,7 +5,7 @@ use crate::content::{ServerToolPair, TextBlock, ThinkingBlock, ToolCall, ToolCal
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TurnStep {
     LlmCall {
-        request_snapshot: LlmRequestSnapshot,
+        model: String,
         response: AssistantOutput,
     },
     ToolBatch(OrderedToolBatch),
@@ -23,14 +23,6 @@ pub enum TurnStep {
         kind: InjectionKind,
         text: String,
     },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LlmRequestSnapshot {
-    pub model: String,
-    pub max_tokens: u32,
-    pub tool_count: u32,
-    pub message_count: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

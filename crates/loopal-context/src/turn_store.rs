@@ -141,6 +141,26 @@ impl TurnStore {
         Ok(())
     }
 
+    /// Undo the most recent `start_turn`: pops the trailing turn and clears
+    /// `current_turn_id`. Used by fail-closed persistence wrappers when the
+    /// event log write fails.
+    pub fn rollback_last_turn(&mut self) {
+        self.turns.pop();
+        self.current_turn_id = None;
+    }
+
+    /// Undo the most recent `append_step` on the current turn. No-op if the
+    /// current turn has no steps. Used by fail-closed persistence wrappers
+    /// when the `StepAppended` event log write fails.
+    pub fn rollback_last_step(&mut self) {
+        let Some(id) = self.current_turn_id.clone() else {
+            return;
+        };
+        if let Some(turn) = self.turns.iter_mut().find(|t| t.id == id) {
+            turn.body.steps.pop();
+        }
+    }
+
     pub fn turns(&self) -> &[Turn] {
         &self.turns
     }

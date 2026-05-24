@@ -1,16 +1,11 @@
 use loopal_turn::{
-    AssistantOutput, InMemoryTurnRepo, LlmRequestSnapshot, OrderedToolBatch, StopReason,
-    ToolBatchItem, ToolCall, ToolCallId, ToolExecState, ToolResult, TurnEvent, TurnOutcome,
-    TurnRepo, TurnRepoError, TurnStep, TurnTrigger,
+    AssistantOutput, InMemoryTurnRepo, OrderedToolBatch, StopReason, ToolBatchItem, ToolCall,
+    ToolCallId, ToolExecState, ToolResult, TurnEvent, TurnOutcome, TurnRepo, TurnRepoError,
+    TurnStep, TurnTrigger,
 };
 
-fn snapshot() -> LlmRequestSnapshot {
-    LlmRequestSnapshot {
-        model: "claude-opus-4-7".into(),
-        max_tokens: 64_000,
-        tool_count: 1,
-        message_count: 1,
-    }
+fn snapshot() -> String {
+    "claude-opus-4-7".into()
 }
 
 fn user_trigger() -> TurnTrigger {
@@ -40,7 +35,7 @@ fn append_step_emits_event_and_grows_body() {
         .append_step(
             &id,
             TurnStep::LlmCall {
-                request_snapshot: snapshot(),
+                model: snapshot(),
                 response: AssistantOutput {
                     thinking: None,
                     text_blocks: vec![],
@@ -106,7 +101,7 @@ fn cannot_append_after_end() {
         .append_step(
             &id,
             TurnStep::LlmCall {
-                request_snapshot: snapshot(),
+                model: snapshot(),
                 response: AssistantOutput {
                     thinking: None,
                     text_blocks: vec![],
@@ -127,7 +122,7 @@ fn update_state_rejects_non_tool_batch_step() {
     repo.append_step(
         &id,
         TurnStep::LlmCall {
-            request_snapshot: snapshot(),
+            model: snapshot(),
             response: AssistantOutput {
                 thinking: None,
                 text_blocks: vec![],

@@ -24,12 +24,7 @@ fn user_trigger(content: &str) -> TurnTrigger {
 
 fn llm_step(text: &str, calls: Vec<ToolCall>) -> TurnStep {
     TurnStep::LlmCall {
-        request_snapshot: loopal_turn::LlmRequestSnapshot {
-            model: "m".into(),
-            max_tokens: 1,
-            tool_count: calls.len() as u32,
-            message_count: 0,
-        },
+        model: "m".into(),
         response: AssistantOutput {
             thinking: None,
             text_blocks: if text.is_empty() {
@@ -236,12 +231,7 @@ fn server_tool_pair_emits_use_and_result() {
     let t = turn_with(
         user_trigger("q"),
         vec![TurnStep::LlmCall {
-            request_snapshot: loopal_turn::LlmRequestSnapshot {
-                model: "m".into(),
-                max_tokens: 1,
-                tool_count: 0,
-                message_count: 0,
-            },
+            model: "m".into(),
             response: AssistantOutput {
                 thinking: None,
                 text_blocks: vec![],

@@ -27,16 +27,29 @@ impl AgentLoopRunner {
                 tracing::warn!(error = %err, "ContinuationGateChanged emit failed on ingest");
             }
         }
-        // reason: domain-layer turn boundary opens before the wire-format
-        // message lands. If a previous turn is still open (resume after
-        // crash without TurnEnded), close it as Cancelled so the new
-        // TurnStarted is the only InProgress turn at any time.
         if self.turns.current_turn_id().is_some() {
             self.end_turn_record(loopal_turn::TurnOutcome::Cancelled {
                 cause: loopal_turn::CancelledCause::ParentTurnAborted,
             });
         }
-        self.start_turn_record(envelope_to_trigger(env));
+        let Some(_turn_id) = self.start_turn_record(envelope_to_trigger(env)) else {
+            error!(
+                envelope_id = %env.id,
+                "TurnStarted persist failed; dropping envelope to avoid orphan message on disk"
+            );
+            if let Err(emit_err) = self
+                .emit(loopal_protocol::AgentEventPayload::Error {
+                    message: format!(
+                        "Failed to start turn for envelope {}: persist log unavailable",
+                        env.id
+                    ),
+                })
+                .await
+            {
+                tracing::warn!(error = %emit_err, "Error event emit failed after ingest abort");
+            }
+            return WaitResult::MessageAdded;
+        };
         let mut user_msg = build_user_message(env);
         let ephemeral = env.source.is_ephemeral_in_history();
         user_msg.ephemeral_in_history = ephemeral;

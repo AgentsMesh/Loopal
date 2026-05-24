@@ -17,9 +17,7 @@ impl AnthropicProvider {
         for turn in &params.turns {
             push_turn(&mut out, turn);
         }
-        // reason: Anthropic 要求 last message 是 user，前提是 model 不支持
-        // prefill 或 caller 显式设了 continuation_intent。原 finalize_messages
-        // 在 message 路径处理；现在 turn-only 后直接在 wire build 内 fold。
+        merge_adjacent_same_role(&mut out);
         let supports_prefill = get_model_info(&params.model)
             .map(|m| m.supports_prefill)
             .unwrap_or(true);
@@ -30,7 +28,6 @@ impl AnthropicProvider {
                 "content": [{"type": "text", "text": CONTINUATION_MARKER}],
             }));
         }
-        // Cache breakpoint on last user message for multi-turn prompt caching.
         if let Some(last_user) = out.iter_mut().rev().find(|m| m["role"] == "user")
             && let Some(arr) = last_user["content"].as_array_mut()
             && let Some(last_block) = arr.last_mut()
@@ -39,6 +36,30 @@ impl AnthropicProvider {
         }
         out
     }
+}
+
+// Merge consecutive messages that share the same role into a single message
+// with concatenated content. Anthropic's API requires strict user/assistant
+// alternation; a cancelled tool batch ending in a User msg followed by a new
+// UserInput turn would otherwise produce adjacent Users.
+fn merge_adjacent_same_role(out: &mut Vec<Value>) {
+    let mut write = 0usize;
+    for read in 0..out.len() {
+        if write > 0 && out[write - 1]["role"] == out[read]["role"] {
+            let extra = std::mem::take(&mut out[read]["content"]);
+            if let (Some(dst), Some(src)) =
+                (out[write - 1]["content"].as_array_mut(), extra.as_array())
+            {
+                dst.extend(src.iter().cloned());
+            }
+            continue;
+        }
+        if write != read {
+            out.swap(write, read);
+        }
+        write += 1;
+    }
+    out.truncate(write);
 }
 
 fn push_turn(out: &mut Vec<Value>, turn: &Turn) {
@@ -242,4 +263,54 @@ fn server_pair_to_json(p: &ServerToolPair) -> Vec<Value> {
             "content": p.result.content,
         }),
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn user(text: &str) -> Value {
+        json!({"role": "user", "content": [{"type": "text", "text": text}]})
+    }
+    fn assistant(text: &str) -> Value {
+        json!({"role": "assistant", "content": [{"type": "text", "text": text}]})
+    }
+
+    #[test]
+    fn merge_collapses_adjacent_user_msgs() {
+        let mut v = vec![user("a"), user("b"), assistant("c"), user("d")];
+        merge_adjacent_same_role(&mut v);
+        assert_eq!(v.len(), 3);
+        assert_eq!(v[0]["role"], "user");
+        assert_eq!(v[0]["content"].as_array().unwrap().len(), 2);
+        assert_eq!(v[1]["role"], "assistant");
+        assert_eq!(v[2]["role"], "user");
+    }
+
+    #[test]
+    fn merge_collapses_adjacent_assistant_msgs() {
+        let mut v = vec![user("a"), assistant("b"), assistant("c"), user("d")];
+        merge_adjacent_same_role(&mut v);
+        assert_eq!(v.len(), 3);
+        assert_eq!(v[1]["content"].as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn merge_noop_on_alternating() {
+        let mut v = vec![user("a"), assistant("b"), user("c"), assistant("d")];
+        let before = v.clone();
+        merge_adjacent_same_role(&mut v);
+        assert_eq!(v, before);
+    }
+
+    #[test]
+    fn merge_handles_empty_and_single() {
+        let mut empty: Vec<Value> = vec![];
+        merge_adjacent_same_role(&mut empty);
+        assert!(empty.is_empty());
+
+        let mut one = vec![user("a")];
+        merge_adjacent_same_role(&mut one);
+        assert_eq!(one.len(), 1);
+    }
 }

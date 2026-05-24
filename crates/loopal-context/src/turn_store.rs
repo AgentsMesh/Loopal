@@ -130,14 +130,16 @@ impl TurnStore {
     pub fn end_current_turn(&mut self, outcome: TurnOutcome) -> TurnStoreResult<()> {
         let id = self
             .current_turn_id
-            .take()
-            .ok_or(TurnStoreError::NoCurrentTurn)?;
+            .as_ref()
+            .ok_or(TurnStoreError::NoCurrentTurn)?
+            .clone();
         let turn = self
             .turns
             .iter_mut()
             .find(|t| t.id == id)
             .ok_or_else(|| TurnStoreError::TurnNotFound(id.as_str().to_string()))?;
         turn.outcome = outcome;
+        self.current_turn_id = None;
         Ok(())
     }
 

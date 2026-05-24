@@ -8,11 +8,6 @@ use crate::ingestion::{cap_assistant_server_blocks, cap_tool_results};
 use loopal_provider_api::{Message, MessageRole, project_turns_to_messages};
 use loopal_turn::Turn;
 
-// reason: ContextStore is being migrated to a derived view of TurnStore.
-// `refresh_view(turns)` is the projection target — callers invoke it after
-// writing to TurnStore. Dual-write `push_*` calls remain as the current SSOT
-// until the migration completes (compaction boundary id anchors and image-
-// carrying user messages still require ContextStore for now).
 pub struct ContextStore {
     messages: Vec<Message>,
     budget: ContextBudget,
@@ -47,13 +42,13 @@ impl ContextStore {
         self.enforce_budget();
     }
 
-    /// Recompute the messages view from the authoritative turn list. Callers
-    /// invoke this after writing to `TurnStore` so reads (token estimate,
-    /// classifier context, microcompact scrub) observe the latest projection.
     pub fn refresh_view(&mut self, turns: &[Turn]) {
         self.messages = project_turns_to_messages(turns);
         self.apply_ingestion_caps();
         self.enforce_budget();
+        if let Some(at) = latest_llm_call_started_at(turns) {
+            self.last_assistant_activity_at = Some(datetime_to_system_time(at));
+        }
     }
 
     pub fn push_user(&mut self, msg: Message) {
@@ -167,4 +162,22 @@ impl ContextStore {
     pub(super) fn replace_messages(&mut self, new: Vec<Message>) {
         self.messages = new;
     }
+}
+
+fn latest_llm_call_started_at(turns: &[Turn]) -> Option<chrono::DateTime<chrono::Utc>> {
+    turns
+        .iter()
+        .rev()
+        .find(|t| {
+            t.body
+                .steps
+                .iter()
+                .any(|s| matches!(s, loopal_turn::TurnStep::LlmCall { .. }))
+        })
+        .map(|t| t.started_at)
+}
+
+fn datetime_to_system_time(at: chrono::DateTime<chrono::Utc>) -> SystemTime {
+    let secs = at.timestamp().max(0) as u64;
+    SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(secs)
 }

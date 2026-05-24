@@ -135,14 +135,14 @@ impl TurnTracker {
             .ok_or(TurnTrackerError::NoCurrentTurn)?;
         let step_index = self.store.append_step(step.clone())?;
         let event = TurnEvent::StepAppended {
-            turn_id,
+            turn_id: turn_id.clone(),
             step_index,
             step,
         };
         if logger.persist(&event) {
             Ok(step_index)
         } else {
-            self.store.rollback_last_step();
+            self.store.rollback_last_step(&turn_id);
             Err(TurnTrackerError::PersistFailed)
         }
     }

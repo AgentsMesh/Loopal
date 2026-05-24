@@ -34,10 +34,14 @@ impl AgentLoopRunner {
         }
         // Domain mirror: patch each item state on the in-flight ToolBatch step
         // (started in execute_tools); ToolCall.name/input remain authoritative.
-        for (item_index, new_state) in item_updates {
-            self.update_tool_batch_item_state(item_index, new_state);
+        // Same precondition as emit_all_interrupted: skip the loop if the
+        // batch failed to open, so each update doesn't log NoToolBatchOpen.
+        if self.turns.current_tool_batch_step().is_some() {
+            for (item_index, new_state) in item_updates {
+                self.update_tool_batch_item_state(item_index, new_state);
+            }
+            self.close_tool_batch_record();
         }
-        self.close_tool_batch_record();
         // reason: dual-write transitional — see ContextStore::refresh_view doc.
         self.params.store.push_tool_results(msg);
         Ok(())

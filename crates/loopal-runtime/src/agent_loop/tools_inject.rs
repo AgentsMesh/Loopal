@@ -88,15 +88,19 @@ impl AgentLoopRunner {
             error!(error = %e, "failed to persist message");
         }
         // Domain mirror: patch in-flight ToolBatch items to Cancelled.
-        // (execute_tools opened the batch with full ToolCall info; here we
-        // just update each item's state.)
-        for (item_index, _) in tool_uses.iter().enumerate() {
-            self.update_tool_batch_item_state(
-                item_index as u32,
-                ToolExecState::Cancelled(TurnCancelCause::UserInterrupt),
-            );
+        // (execute_tools normally opened the batch with full ToolCall info;
+        // skip the update loop if the batch failed to open — each
+        // update_tool_batch_item_state would otherwise log a NoToolBatchOpen
+        // warning per item without persisting anything useful.)
+        if self.turns.current_tool_batch_step().is_some() {
+            for (item_index, _) in tool_uses.iter().enumerate() {
+                self.update_tool_batch_item_state(
+                    item_index as u32,
+                    ToolExecState::Cancelled(TurnCancelCause::UserInterrupt),
+                );
+            }
+            self.close_tool_batch_record();
         }
-        self.close_tool_batch_record();
         // reason: dual-write transitional — see ContextStore::refresh_view doc.
         self.params.store.push_tool_results(msg);
         Ok(())

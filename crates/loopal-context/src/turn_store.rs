@@ -159,16 +159,23 @@ impl TurnStore {
         self.current_turn_id = None;
     }
 
-    /// Undo the most recent `append_step` on the current turn. No-op if the
-    /// current turn has no steps. Used by fail-closed persistence wrappers
-    /// when the `StepAppended` event log write fails.
-    pub fn rollback_last_step(&mut self) {
-        let Some(id) = self.current_turn_id.clone() else {
-            return;
-        };
-        if let Some(turn) = self.turns.iter_mut().find(|t| t.id == id) {
-            turn.body.steps.pop();
-        }
+    /// Undo the most recent `append_step` on the current turn. Symmetric to
+    /// `rollback_last_turn`: panics if the precondition (current turn exists
+    /// and matches `expected_turn_id`) is violated, so a wrong-state caller
+    /// fails fast rather than silently leaving the in-memory step in place
+    /// while the event log thinks the rollback happened.
+    pub fn rollback_last_step(&mut self, expected_turn_id: &TurnId) {
+        assert!(
+            self.current_turn_id.as_ref() == Some(expected_turn_id),
+            "rollback_last_step: current_turn_id mismatch (expected {expected_turn_id:?}, got {:?})",
+            self.current_turn_id
+        );
+        let turn = self
+            .turns
+            .iter_mut()
+            .find(|t| &t.id == expected_turn_id)
+            .expect("rollback_last_step: turn referenced by current_turn_id is missing from store");
+        turn.body.steps.pop();
     }
 
     pub fn turns(&self) -> &[Turn] {

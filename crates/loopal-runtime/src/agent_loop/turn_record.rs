@@ -84,8 +84,12 @@ impl AgentLoopRunner {
             sm: &self.params.deps.session_manager,
             session_id: &self.params.session.id,
         };
-        self.turns
-            .try_update_tool_state(item_index, new_state, &logger);
+        if let Err(e) = self
+            .turns
+            .try_update_tool_state(item_index, new_state, &logger)
+        {
+            warn!(error = %e, item_index, "update_tool_batch_item_state failed; turn step left at prior state");
+        }
     }
 
     pub(super) fn close_tool_batch_record(&mut self) {

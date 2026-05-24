@@ -1,5 +1,5 @@
 use chrono::Utc;
-use loopal_context::TurnStore;
+use loopal_context::{TurnStore, TurnStoreError};
 use loopal_turn::{TurnEvent, TurnId, TurnOutcome, TurnStep, TurnTrigger};
 use tracing::warn;
 
@@ -9,6 +9,46 @@ use tracing::warn;
 /// views stay in lockstep (fail-closed atomicity).
 pub trait TurnEventLogger {
     fn persist(&self, event: &TurnEvent) -> bool;
+}
+
+/// Errors observable from `TurnTracker` mutators. Lets callers react to
+/// failures (programmer error, store invariant, persist failure) uniformly
+/// instead of swallowing them.
+#[derive(Debug)]
+pub enum TurnTrackerError {
+    NoCurrentTurn,
+    NoToolBatchOpen,
+    Store(TurnStoreError),
+    /// Persist failure surfaced through the same Result channel so callers
+    /// can react uniformly. The in-memory mutation has already been rolled
+    /// back when this is returned.
+    PersistFailed,
+}
+
+impl std::fmt::Display for TurnTrackerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NoCurrentTurn => write!(f, "no turn in progress"),
+            Self::NoToolBatchOpen => {
+                write!(
+                    f,
+                    "no in-flight ToolBatch step (call mark_tool_batch_open first)"
+                )
+            }
+            Self::Store(e) => write!(f, "turn store error: {e}"),
+            Self::PersistFailed => {
+                write!(f, "event log persist failed; in-memory rolled back")
+            }
+        }
+    }
+}
+
+impl std::error::Error for TurnTrackerError {}
+
+impl From<TurnStoreError> for TurnTrackerError {
+    fn from(e: TurnStoreError) -> Self {
+        Self::Store(e)
+    }
 }
 
 /// Fail-closed persistence adapter around `TurnStore`. Each mutator method
@@ -73,7 +113,7 @@ impl TurnTracker {
         if logger.persist(&event) {
             Some(id)
         } else {
-            self.store.rollback_last_turn();
+            self.store.rollback_last_turn(&id);
             None
         }
     }
@@ -113,20 +153,27 @@ impl TurnTracker {
     }
 
     /// Patch an in-flight ToolBatch item's state. Snapshots the prior state so
-    /// a persist failure can roll back in-memory.
+    /// a persist failure can roll back in-memory. Returns:
+    /// - `Ok(())` on success.
+    /// - `Err(NoCurrentTurn / NoToolBatchOpen)` when caller precondition failed
+    ///   (programmer error: turn never started or batch never marked open).
+    /// - `Err(Store(_))` if the underlying store mutation failed (bad indices).
+    /// - `Err(PersistFailed)` if event persist failed; in-memory has been
+    ///   rolled back to the prior state.
     pub fn try_update_tool_state(
         &mut self,
         item_index: u32,
         new_state: loopal_turn::ToolExecState,
         logger: &dyn TurnEventLogger,
-    ) {
-        let Some(turn_id) = self.store.current_turn_id().cloned() else {
-            return;
-        };
-        let Some(step_index) = self.current_tool_batch_step else {
-            warn!("try_update_tool_state called without in-flight ToolBatch step");
-            return;
-        };
+    ) -> Result<(), TurnTrackerError> {
+        let turn_id = self
+            .store
+            .current_turn_id()
+            .cloned()
+            .ok_or(TurnTrackerError::NoCurrentTurn)?;
+        let step_index = self
+            .current_tool_batch_step
+            .ok_or(TurnTrackerError::NoToolBatchOpen)?;
         let old_state = self
             .store
             .current_turn()
@@ -135,24 +182,21 @@ impl TurnTracker {
                 TurnStep::ToolBatch(b) => b.items.get(item_index as usize).map(|i| i.state.clone()),
                 _ => None,
             });
-        if let Err(e) = self
-            .store
-            .update_tool_state(step_index, item_index, new_state.clone())
-        {
-            warn!(error = %e, "turn_store update_tool_state failed; skipping event persist");
-            return;
-        }
+        self.store
+            .update_tool_state(step_index, item_index, new_state.clone())?;
         let event = TurnEvent::StepUpdated {
             turn_id,
             step_index,
             item_index,
             new_state,
         };
-        if !logger.persist(&event)
-            && let Some(prev) = old_state
-        {
-            let _ = self.store.update_tool_state(step_index, item_index, prev);
+        if !logger.persist(&event) {
+            if let Some(prev) = old_state {
+                let _ = self.store.update_tool_state(step_index, item_index, prev);
+            }
+            return Err(TurnTrackerError::PersistFailed);
         }
+        Ok(())
     }
 
     /// Close the current turn. Persists `TurnEnded`; if the persist fails, the

@@ -142,9 +142,19 @@ impl TurnStore {
     }
 
     /// Undo the most recent `start_turn`: pops the trailing turn and clears
-    /// `current_turn_id`. Used by fail-closed persistence wrappers when the
-    /// event log write fails.
-    pub fn rollback_last_turn(&mut self) {
+    /// `current_turn_id`. The caller passes the id returned by the original
+    /// `start_turn` call so a mismatched current state panics rather than
+    /// silently dropping an unrelated turn.
+    pub fn rollback_last_turn(&mut self, expected_id: &TurnId) {
+        assert!(
+            self.current_turn_id.as_ref() == Some(expected_id),
+            "rollback_last_turn: current_turn_id mismatch (expected {expected_id:?}, got {:?})",
+            self.current_turn_id
+        );
+        assert!(
+            self.turns.last().map(|t| &t.id) == Some(expected_id),
+            "rollback_last_turn: last turn in vec is not the expected one"
+        );
         self.turns.pop();
         self.current_turn_id = None;
     }

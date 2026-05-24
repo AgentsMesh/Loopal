@@ -34,12 +34,24 @@ fn push_turn(out: &mut Vec<Value>, turn: &Turn) {
 }
 
 fn trigger_user(trigger: &TurnTrigger) -> Option<Value> {
+    // reason: 保持与 turn_projection (provider-api/src/wire/turn_projection.rs)
+    // 的前缀语义一致 —— LLM 上下文里 cron/agent/channel/hook 都该见到 originating
+    // context 的前缀。
     match trigger {
         TurnTrigger::UserInput { content, .. } => Some(text_user(content)),
-        TurnTrigger::Cron { prompt, .. } => Some(text_user(prompt)),
-        TurnTrigger::GoalContinuation { .. }
-        | TurnTrigger::BackgroundHook { .. }
-        | TurnTrigger::Resume => None,
+        TurnTrigger::Cron { content, .. } => Some(text_user(&format!("[scheduled] {content}"))),
+        TurnTrigger::Agent { from, content, .. } => {
+            Some(text_user(&format!("[from: {from}] {content}")))
+        }
+        TurnTrigger::Channel {
+            channel,
+            from,
+            content,
+            ..
+        } => Some(text_user(&format!("[from: #{channel}/{from}] {content}"))),
+        TurnTrigger::GoalContinuation { content, .. } => Some(text_user(content)),
+        TurnTrigger::BackgroundHook { content, .. } => Some(text_user(content)),
+        TurnTrigger::Resume => None,
     }
 }
 

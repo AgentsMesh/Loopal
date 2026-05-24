@@ -23,13 +23,45 @@ pub fn project_turn_to_messages(turn: &Turn) -> Vec<Message> {
 }
 
 fn project_trigger(trigger: &TurnTrigger) -> Option<Message> {
+    // reason: 与 runtime/message_build::build_user_message 的前缀规则保持一致 —
+    // 投影出的 user message 在 LLM 上下文中和 ingest 时直接写入的版本等价。
     match trigger {
         TurnTrigger::UserInput { content, .. } => {
             Some(text_user(content, Some(MessageOrigin::Human)))
         }
-        TurnTrigger::Cron { prompt, .. } => Some(text_user(prompt, Some(MessageOrigin::Scheduled))),
-        TurnTrigger::GoalContinuation { .. } => None,
-        TurnTrigger::BackgroundHook { .. } => None,
+        TurnTrigger::Cron { content, .. } => Some(text_user(
+            &format!("[scheduled] {content}"),
+            Some(MessageOrigin::Scheduled),
+        )),
+        TurnTrigger::Agent { from, content, .. } => Some(text_user(
+            &format!("[from: {from}] {content}"),
+            Some(MessageOrigin::Agent {
+                label: from.clone(),
+            }),
+        )),
+        TurnTrigger::Channel {
+            channel,
+            from,
+            content,
+            ..
+        } => Some(text_user(
+            &format!("[from: #{channel}/{from}] {content}"),
+            Some(MessageOrigin::Channel {
+                name: channel.clone(),
+                from: from.clone(),
+            }),
+        )),
+        TurnTrigger::GoalContinuation { content, .. } => {
+            Some(text_user(content, Some(MessageOrigin::GoalContinuation)))
+        }
+        TurnTrigger::BackgroundHook {
+            hook_kind, content, ..
+        } => Some(text_user(
+            content,
+            Some(MessageOrigin::Other {
+                label: hook_kind.clone(),
+            }),
+        )),
         TurnTrigger::Resume => None,
     }
 }

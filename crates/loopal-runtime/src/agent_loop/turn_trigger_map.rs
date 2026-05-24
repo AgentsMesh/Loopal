@@ -10,27 +10,34 @@ pub fn envelope_to_trigger(env: &Envelope) -> TurnTrigger {
             content,
         },
         MessageSource::Scheduled => TurnTrigger::Cron {
-            task_id: envelope_id,
-            prompt: content,
-        },
-        MessageSource::Agent(_) | MessageSource::Channel { .. } => TurnTrigger::UserInput {
             envelope_id,
             content,
         },
+        MessageSource::Agent(addr) => TurnTrigger::Agent {
+            envelope_id,
+            from: addr.to_string(),
+            content,
+        },
+        MessageSource::Channel { channel, from } => TurnTrigger::Channel {
+            envelope_id,
+            channel: channel.clone(),
+            from: from.to_string(),
+            content,
+        },
         MessageSource::System(kind) => {
-            // reason: System(...) 覆盖 goal_continuation / background hook / governance
-            // 各种触发；用 kind 字符串走分支让命名稳定，不依赖 protocol crate 内部演化。
-            match kind.as_str() {
-                "goal_continuation" => TurnTrigger::GoalContinuation {
-                    goal_id: envelope_id,
-                },
-                other => TurnTrigger::BackgroundHook {
-                    hook_id: other.to_string(),
-                    payload: serde_json::json!({
-                        "envelope_id": envelope_id,
-                        "content": content,
-                    }),
-                },
+            // reason: System(...) 覆盖 goal_continuation 与各种 background hook；
+            // goal_continuation 是已知的特例，其他 kind 都归入 BackgroundHook。
+            if kind == "goal_continuation" {
+                TurnTrigger::GoalContinuation {
+                    envelope_id,
+                    content,
+                }
+            } else {
+                TurnTrigger::BackgroundHook {
+                    envelope_id,
+                    hook_kind: kind.clone(),
+                    content,
+                }
             }
         }
     }

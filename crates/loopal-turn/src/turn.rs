@@ -55,21 +55,43 @@ pub struct TurnBody {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TurnTrigger {
+    /// Real human typing into the prompt.
     UserInput {
         envelope_id: String,
         content: String,
     },
+    /// Scheduled cron / timer envelope.
     Cron {
-        task_id: String,
-        prompt: String,
+        envelope_id: String,
+        content: String,
     },
+    /// Routed from another agent. `from` is the address rendered as audit label
+    /// (loses structural info but provider/projection just need to show it).
+    Agent {
+        envelope_id: String,
+        from: String,
+        content: String,
+    },
+    /// Routed via a named channel.
+    Channel {
+        envelope_id: String,
+        channel: String,
+        from: String,
+        content: String,
+    },
+    /// `goal_continuation_check` injected continuation prompt.
     GoalContinuation {
-        goal_id: String,
+        envelope_id: String,
+        content: String,
     },
+    /// Async background hook fired and queued an envelope. `hook_kind` is the
+    /// system kind string (matches `MessageSource::System(kind)`).
     BackgroundHook {
-        hook_id: String,
-        payload: serde_json::Value,
+        envelope_id: String,
+        hook_kind: String,
+        content: String,
     },
+    /// Synthetic trigger when resuming a session from disk — no real envelope.
     Resume,
 }
 

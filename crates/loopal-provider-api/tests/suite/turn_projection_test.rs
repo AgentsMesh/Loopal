@@ -79,6 +79,93 @@ fn user_trigger_emits_human_user_message() {
 }
 
 #[test]
+fn cron_trigger_prefixed_with_scheduled() {
+    let t = turn_with(
+        TurnTrigger::Cron {
+            envelope_id: "env-2".into(),
+            content: "tick body".into(),
+        },
+        vec![],
+    );
+    let msgs = project_turn_to_messages(&t);
+    assert_eq!(msgs.len(), 1);
+    assert!(msgs[0].text_content().starts_with("[scheduled] tick body"));
+    assert!(matches!(msgs[0].origin, Some(MessageOrigin::Scheduled)));
+}
+
+#[test]
+fn agent_trigger_prefixed_with_from_address() {
+    let t = turn_with(
+        TurnTrigger::Agent {
+            envelope_id: "env-3".into(),
+            from: "hub-a/worker".into(),
+            content: "hi".into(),
+        },
+        vec![],
+    );
+    let msgs = project_turn_to_messages(&t);
+    assert_eq!(msgs[0].text_content(), "[from: hub-a/worker] hi");
+    assert!(matches!(
+        &msgs[0].origin,
+        Some(MessageOrigin::Agent { label }) if label == "hub-a/worker"
+    ));
+}
+
+#[test]
+fn channel_trigger_prefixed_with_channel_and_from() {
+    let t = turn_with(
+        TurnTrigger::Channel {
+            envelope_id: "env-4".into(),
+            channel: "general".into(),
+            from: "alice".into(),
+            content: "hello team".into(),
+        },
+        vec![],
+    );
+    let msgs = project_turn_to_messages(&t);
+    assert_eq!(msgs[0].text_content(), "[from: #general/alice] hello team");
+}
+
+#[test]
+fn goal_continuation_emits_visible_user_message() {
+    // regression: previously this trigger was projected to None, dropping the
+    // injected continuation prompt entirely from LLM context.
+    let t = turn_with(
+        TurnTrigger::GoalContinuation {
+            envelope_id: "env-5".into(),
+            content: "continue goal X".into(),
+        },
+        vec![],
+    );
+    let msgs = project_turn_to_messages(&t);
+    assert_eq!(msgs.len(), 1);
+    assert_eq!(msgs[0].text_content(), "continue goal X");
+    assert!(matches!(
+        msgs[0].origin,
+        Some(MessageOrigin::GoalContinuation)
+    ));
+}
+
+#[test]
+fn background_hook_emits_visible_user_message_with_kind_origin() {
+    let t = turn_with(
+        TurnTrigger::BackgroundHook {
+            envelope_id: "env-6".into(),
+            hook_kind: "stop_feedback".into(),
+            content: "user requested stop".into(),
+        },
+        vec![],
+    );
+    let msgs = project_turn_to_messages(&t);
+    assert_eq!(msgs.len(), 1);
+    assert_eq!(msgs[0].text_content(), "user requested stop");
+    assert!(matches!(
+        &msgs[0].origin,
+        Some(MessageOrigin::Other { label }) if label == "stop_feedback"
+    ));
+}
+
+#[test]
 fn llm_text_only_emits_assistant_message() {
     let t = turn_with(user_trigger("hi"), vec![llm_step("hello back", vec![])]);
     let msgs = project_turn_to_messages(&t);

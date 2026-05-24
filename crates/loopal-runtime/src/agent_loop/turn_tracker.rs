@@ -119,26 +119,31 @@ impl TurnTracker {
     }
 
     /// Append a step to the current turn. Returns the assigned `step_index` on
-    /// success; rolls back the in-memory push on persist failure.
-    pub fn try_append_step(&mut self, step: TurnStep, logger: &dyn TurnEventLogger) -> Option<u32> {
-        let turn_id = self.store.current_turn_id()?.clone();
-        let step_index = match self.store.append_step(step.clone()) {
-            Ok(idx) => idx,
-            Err(e) => {
-                warn!(error = %e, "turn_store append_step failed; skipping event persist");
-                return None;
-            }
-        };
+    /// success; rolls back the in-memory push on persist failure. Errors:
+    /// - `NoCurrentTurn`: caller never opened a turn (programmer error).
+    /// - `Store(_)`: underlying store rejected (e.g. turn already ended).
+    /// - `PersistFailed`: event log write failed; in-memory rolled back.
+    pub fn try_append_step(
+        &mut self,
+        step: TurnStep,
+        logger: &dyn TurnEventLogger,
+    ) -> Result<u32, TurnTrackerError> {
+        let turn_id = self
+            .store
+            .current_turn_id()
+            .cloned()
+            .ok_or(TurnTrackerError::NoCurrentTurn)?;
+        let step_index = self.store.append_step(step.clone())?;
         let event = TurnEvent::StepAppended {
             turn_id,
             step_index,
             step,
         };
         if logger.persist(&event) {
-            Some(step_index)
+            Ok(step_index)
         } else {
             self.store.rollback_last_step();
-            None
+            Err(TurnTrackerError::PersistFailed)
         }
     }
 

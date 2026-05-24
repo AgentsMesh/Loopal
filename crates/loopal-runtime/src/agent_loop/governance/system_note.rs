@@ -52,8 +52,10 @@ impl AgentLoopRunner {
                 Some(MessageOrigin::Other { .. }) => Some(InjectionKind::SystemNote),
                 _ => None,
             };
-            if let Some(kind) = kind {
-                self.append_step_record(TurnStep::Injection { kind, text });
+            if let Some(kind) = kind
+                && let Err(e) = self.append_step_record(TurnStep::Injection { kind, text })
+            {
+                tracing::warn!(error = %e, "append_step(Injection) failed in governance bridge");
             }
         }
         push(&mut self.params.store, msg);

@@ -40,7 +40,10 @@ impl AgentLoopRunner {
         self.turns.try_start_turn(trigger, &logger)
     }
 
-    pub(super) fn append_step_record(&mut self, step: TurnStep) -> Option<u32> {
+    pub(super) fn append_step_record(
+        &mut self,
+        step: TurnStep,
+    ) -> Result<u32, super::turn_tracker::TurnTrackerError> {
         let logger = JsonlLogger {
             sm: &self.params.deps.session_manager,
             session_id: &self.params.session.id,
@@ -49,14 +52,15 @@ impl AgentLoopRunner {
     }
 
     /// Open a ToolBatch step in Pending state, carrying the full ToolCall info
-    /// (name + input). Returns the step_index used by subsequent
-    /// `update_tool_batch_item_state` calls.
+    /// (name + input). Returns `Ok(Some(step_index))` on success, `Ok(None)`
+    /// when `tool_uses` is empty (no-op), or `Err` when TurnStore write or
+    /// event persist fails.
     pub(super) fn start_tool_batch_record(
         &mut self,
         tool_uses: &[(String, String, serde_json::Value)],
-    ) -> Option<u32> {
+    ) -> Result<Option<u32>, super::turn_tracker::TurnTrackerError> {
         if tool_uses.is_empty() {
-            return None;
+            return Ok(None);
         }
         let items: Vec<ToolBatchItem> = tool_uses
             .iter()
@@ -72,7 +76,7 @@ impl AgentLoopRunner {
         let step_index =
             self.append_step_record(TurnStep::ToolBatch(OrderedToolBatch { items }))?;
         self.turns.mark_tool_batch_open(step_index);
-        Some(step_index)
+        Ok(Some(step_index))
     }
 
     pub(super) fn update_tool_batch_item_state(

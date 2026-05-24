@@ -26,10 +26,12 @@ impl AgentLoopRunner {
         {
             error!(error = %e, "failed to persist stop-feedback message");
         }
-        self.append_step_record(TurnStep::Injection {
+        if let Err(e) = self.append_step_record(TurnStep::Injection {
             kind: InjectionKind::StopFeedback,
             text: feedback,
-        });
+        }) {
+            error!(error = %e, "append_step(Injection::StopFeedback) failed");
+        }
         // reason: dual-write transitional — see ContextStore::refresh_view doc.
         self.params.store.push_user(msg);
     }

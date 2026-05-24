@@ -67,7 +67,12 @@ impl AgentLoopRunner {
             {
                 error!(error = %e, "failed to persist message");
             }
-            // Domain-layer mirror: record LlmCall step.
+            // Domain-layer mirror: record LlmCall step. The append failure
+            // path keeps the dual-write going because ContextStore is still
+            // SSOT for the compaction boundary anchor (Message.id) — skipping
+            // the push would diverge from messages.jsonl and break resume.
+            // When CompactionSummary carries the persisted summary id, this
+            // can change to abort.
             let step = build_llm_call_step(
                 self.params.config.model(),
                 assistant_text,
@@ -76,7 +81,9 @@ impl AgentLoopRunner {
                 thinking_signature,
                 &server_blocks,
             );
-            self.append_step_record(step);
+            if let Err(e) = self.append_step_record(step) {
+                error!(error = %e, "append_step(LlmCall) failed; turn log diverges from ContextStore");
+            }
             // reason: dual-write transitional — see ContextStore::refresh_view doc.
             self.params.store.push_assistant(assistant_msg);
         }

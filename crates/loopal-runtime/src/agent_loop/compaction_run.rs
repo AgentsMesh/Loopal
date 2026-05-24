@@ -110,13 +110,20 @@ impl AgentLoopRunner {
             .save_message(&self.params.session.id, &mut ack_msg)?;
 
         // Domain mirror: record summary step (LLM-generated working state + ack).
+        // Compaction's set_boundary path still depends on Message.id anchors in
+        // ContextStore, so a failed step write is logged but does not abort
+        // the compaction — the in-memory boundary still flips below via
+        // `store.set_boundary`. Resume from turns.jsonl will miss the summary
+        // step in this rare path.
         let removed_count = boundary_at as u32;
-        self.append_step_record(TurnStep::CompactionSummary(CompactionSummary {
+        if let Err(e) = self.append_step_record(TurnStep::CompactionSummary(CompactionSummary {
             summary_text: summary_msg.text_content(),
             ack_text: ack_msg.text_content(),
             kept_turn_count: 0,
             removed_turn_count: removed_count,
-        }));
+        })) {
+            warn!(error = %e, "append_step(CompactionSummary) failed; turns.jsonl will be missing this entry");
+        }
 
         let summary_id = summary_msg.id.clone().expect("save_message assigns a UUID");
         self.params

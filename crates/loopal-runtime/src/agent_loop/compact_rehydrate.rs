@@ -180,13 +180,21 @@ impl AgentLoopRunner {
         // Domain mirror: emit a CompactionRehydrate step carrying the rehydrated files.
         let rehydrated_files: Vec<RehydratedFile> =
             collect_rehydrated_files(&assistant.content, &user.content);
-        if !rehydrated_files.is_empty() {
-            self.append_step_record(TurnStep::CompactionRehydrate(CompactionRehydrate {
-                files: rehydrated_files,
-            }));
+        if !rehydrated_files.is_empty()
+            && let Err(e) =
+                self.append_step_record(TurnStep::CompactionRehydrate(CompactionRehydrate {
+                    files: rehydrated_files,
+                }))
+        {
+            warn!(error = %e, "append_step(CompactionRehydrate) failed");
         }
 
-        // reason: dual-write transitional — see ContextStore::refresh_view doc.
+        // reason: compact still dual-writes — the boundary message-id anchor
+        // tracked by SessionManager::mark_compact_boundary references the
+        // ContextStore message, and TurnStep::CompactionRehydrate's projection
+        // emits id-less synthetic messages. Removing this would lose the
+        // resume-boundary correlation. Migration path: extend TurnStep to
+        // carry persisted message ids.
         self.params.store.push_assistant(assistant);
         self.params.store.push_tool_results(user);
 

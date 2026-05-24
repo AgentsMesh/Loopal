@@ -156,8 +156,6 @@ mod e2e_compact_partial_save_test;
 mod e2e_compact_phases_test;
 #[path = "suite/e2e_compact_rehydrate_test.rs"]
 mod e2e_compact_rehydrate_test;
-#[path = "suite/e2e_compact_resume_test.rs"]
-mod e2e_compact_resume_test;
 #[path = "suite/e2e_compact_test.rs"]
 mod e2e_compact_test;
 #[path = "suite/e2e_compact_token_feedback_test.rs"]

@@ -1,4 +1,3 @@
-use loopal_provider_api::Message;
 use loopal_runtime::SessionManager;
 use std::path::Path;
 use tempfile::TempDir;
@@ -43,28 +42,6 @@ fn test_resume_session() {
     assert_eq!(resumed.id, session_id);
     assert_eq!(resumed.model, "test-model");
     assert!(messages.is_empty(), "fresh session should have no messages");
-}
-
-#[test]
-fn test_save_message_and_resume() {
-    let tmp = TempDir::new().unwrap();
-    let mgr = make_manager(&tmp);
-
-    let cwd = Path::new("/tmp/test_project");
-    let session = mgr.create_session(cwd, "test-model").unwrap();
-    let session_id = session.id.clone();
-
-    // Save a few messages
-    let mut msg1 = Message::user("hello");
-    let mut msg2 = Message::assistant("hi there");
-    mgr.save_message(&session_id, &mut msg1).unwrap();
-    mgr.save_message(&session_id, &mut msg2).unwrap();
-
-    // Resume and verify messages
-    let (_resumed, _turns, messages) = mgr.resume_session(&session_id).unwrap();
-    assert_eq!(messages.len(), 2);
-    assert_eq!(messages[0].text_content(), "hello");
-    assert_eq!(messages[1].text_content(), "hi there");
 }
 
 #[test]

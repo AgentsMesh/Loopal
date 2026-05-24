@@ -313,4 +313,24 @@ mod tests {
         merge_adjacent_same_role(&mut one);
         assert_eq!(one.len(), 1);
     }
+
+    #[test]
+    fn merge_handles_multiple_pairs_across_role_transitions() {
+        let mut v = vec![
+            user("a"),
+            user("b"),
+            assistant("c"),
+            user("d"),
+            user("e"),
+            assistant("f"),
+        ];
+        merge_adjacent_same_role(&mut v);
+        assert_eq!(v.len(), 4);
+        assert_eq!(v[0]["role"], "user");
+        assert_eq!(v[0]["content"].as_array().unwrap().len(), 2);
+        assert_eq!(v[1]["role"], "assistant");
+        assert_eq!(v[2]["role"], "user");
+        assert_eq!(v[2]["content"].as_array().unwrap().len(), 2);
+        assert_eq!(v[3]["role"], "assistant");
+    }
 }

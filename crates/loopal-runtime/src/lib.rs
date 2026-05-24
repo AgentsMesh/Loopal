@@ -4,7 +4,6 @@ pub mod fire_hooks;
 pub mod frontend;
 pub mod goal;
 pub mod hydrate;
-mod legacy_message_to_turn;
 pub mod mode;
 pub mod otel_metrics;
 pub mod permission;

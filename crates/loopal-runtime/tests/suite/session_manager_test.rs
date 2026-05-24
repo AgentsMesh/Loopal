@@ -1,118 +1,19 @@
-use loopal_provider_api::Message;
 use loopal_runtime::SessionManager;
 use loopal_storage::SubAgentRef;
 use tempfile::TempDir;
 
 #[test]
-fn clear_history_marker_persisted() {
-    let tmp = TempDir::new().unwrap();
-    let mgr = SessionManager::with_base_dir(tmp.path().to_path_buf());
-    let session = mgr
-        .create_session(std::path::Path::new("/tmp"), "test-model")
-        .unwrap();
-
-    mgr.save_message(&session.id, &mut Message::user("msg1"))
-        .unwrap();
-    mgr.save_message(&session.id, &mut Message::user("msg2"))
-        .unwrap();
-    mgr.clear_history(&session.id).unwrap();
-    mgr.save_message(&session.id, &mut Message::user("msg3"))
-        .unwrap();
-
-    let (_, _turns, messages) = mgr.resume_session(&session.id).unwrap();
-    assert_eq!(messages.len(), 1);
-    assert_eq!(messages[0].text_content(), "msg3");
-}
-
-#[test]
-fn compact_boundary_marker_persisted() {
-    let tmp = TempDir::new().unwrap();
-    let mgr = SessionManager::with_base_dir(tmp.path().to_path_buf());
-    let session = mgr
-        .create_session(std::path::Path::new("/tmp"), "test-model")
-        .unwrap();
-
-    let mut summary = Message::user("[summary]");
-    summary.id = Some("summary-1".to_string());
-    let mut ack = Message::assistant("ok");
-    ack.id = Some("ack-1".to_string());
-
-    for i in 0..5 {
-        mgr.save_message(&session.id, &mut Message::user(&format!("old-{i}")))
-            .unwrap();
-    }
-    mgr.save_message(&session.id, &mut summary).unwrap();
-    mgr.save_message(&session.id, &mut ack).unwrap();
-    for i in 0..3 {
-        mgr.save_message(&session.id, &mut Message::user(&format!("new-{i}")))
-            .unwrap();
-    }
-    mgr.mark_compact_boundary(&session.id, "summary-1").unwrap();
-
-    let (_, _turns, messages) = mgr.resume_session(&session.id).unwrap();
-    assert_eq!(messages.len(), 5);
-    assert_eq!(messages[0].text_content(), "[summary]");
-    assert_eq!(messages[1].text_content(), "ok");
-    assert_eq!(messages[4].text_content(), "new-2");
-}
-
-#[test]
-fn save_message_assigns_uuid() {
-    let tmp = TempDir::new().unwrap();
-    let mgr = SessionManager::with_base_dir(tmp.path().to_path_buf());
-    let session = mgr
-        .create_session(std::path::Path::new("/tmp"), "test-model")
-        .unwrap();
-
-    let mut msg = Message::user("hello");
-    assert!(msg.id.is_none());
-    mgr.save_message(&session.id, &mut msg).unwrap();
-
-    // In-memory message should now have the UUID
-    assert!(msg.id.is_some());
-    assert!(!msg.id.as_ref().unwrap().is_empty());
-
-    // Storage should match
-    let (_, _turns, messages) = mgr.resume_session(&session.id).unwrap();
-    assert_eq!(messages.len(), 1);
-    assert_eq!(messages[0].id, msg.id);
-}
-
-#[test]
-fn save_message_preserves_existing_id() {
-    let tmp = TempDir::new().unwrap();
-    let mgr = SessionManager::with_base_dir(tmp.path().to_path_buf());
-    let session = mgr
-        .create_session(std::path::Path::new("/tmp"), "test-model")
-        .unwrap();
-
-    let mut msg = Message::user("hello").with_id("custom-id".into());
-    mgr.save_message(&session.id, &mut msg).unwrap();
-
-    let (_, _turns, messages) = mgr.resume_session(&session.id).unwrap();
-    assert_eq!(messages[0].id.as_deref(), Some("custom-id"));
-}
-
-#[test]
-fn add_sub_agent_and_load_messages() {
+fn add_sub_agent_persists_ref() {
     let tmp = TempDir::new().unwrap();
     let mgr = SessionManager::with_base_dir(tmp.path().to_path_buf());
 
-    // Create root session
     let root = mgr
         .create_session(std::path::Path::new("/work"), "root-model")
         .unwrap();
-
-    // Create sub-agent session with messages
     let sub = mgr
         .create_session(std::path::Path::new("/work"), "sub-model")
         .unwrap();
-    mgr.save_message(&sub.id, &mut Message::user("do analysis"))
-        .unwrap();
-    mgr.save_message(&sub.id, &mut Message::assistant("done"))
-        .unwrap();
 
-    // Record sub-agent in root session
     mgr.add_sub_agent(
         &root.id,
         SubAgentRef {
@@ -124,17 +25,10 @@ fn add_sub_agent_and_load_messages() {
     )
     .unwrap();
 
-    // On resume, root session has sub-agent refs
     let (resumed, _turns, _) = mgr.resume_session(&root.id).unwrap();
     assert_eq!(resumed.sub_agents.len(), 1);
     assert_eq!(resumed.sub_agents[0].name, "researcher");
     assert_eq!(resumed.sub_agents[0].session_id, sub.id);
-
-    // Can load sub-agent messages
-    let sub_msgs = mgr.load_messages(&sub.id).unwrap();
-    assert_eq!(sub_msgs.len(), 2);
-    assert_eq!(sub_msgs[0].text_content(), "do analysis");
-    assert_eq!(sub_msgs[1].text_content(), "done");
 }
 
 // ---------------------------------------------------------------------------

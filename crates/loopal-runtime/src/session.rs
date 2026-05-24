@@ -8,8 +8,6 @@ use loopal_storage::{GoalStore, MessageStore, Session, SessionStore, SubAgentRef
 use loopal_turn::TurnEvent;
 use tracing::info;
 
-use crate::legacy_message_to_turn::legacy_messages_to_turns;
-
 /// Manages session creation, resumption, and message persistence.
 pub struct SessionManager {
     session_store: SessionStore,
@@ -55,17 +53,10 @@ impl SessionManager {
         session_id: &str,
     ) -> Result<(Session, Vec<loopal_turn::Turn>, Vec<Message>)> {
         let session = self.session_store.load_session(session_id)?;
-        let turns_from_log = self.turn_event_store.load_turns(session_id)?;
-        let (turns, messages) = if turns_from_log.is_empty() {
-            let legacy = self.message_store.load_messages(session_id)?;
-            (legacy_messages_to_turns(legacy.clone()), legacy)
-        } else {
-            let projected = loopal_provider_api::project_turns_to_messages(&turns_from_log);
-            (turns_from_log, projected)
-        };
+        let turns = self.turn_event_store.load_turns(session_id)?;
+        let messages = loopal_provider_api::project_turns_to_messages(&turns);
         info!(
             session_id = %session_id,
-            message_count = messages.len(),
             turn_count = turns.len(),
             "session resumed"
         );
@@ -73,14 +64,9 @@ impl SessionManager {
     }
 
     /// Load messages for a sub-agent session (by session_id).
-    /// Same fallback semantics as `resume_session`.
     pub fn load_messages(&self, session_id: &str) -> Result<Vec<Message>> {
         let turns = self.turn_event_store.load_turns(session_id)?;
-        if !turns.is_empty() {
-            return Ok(loopal_provider_api::project_turns_to_messages(&turns));
-        }
-        let messages = self.message_store.load_messages(session_id)?;
-        Ok(messages)
+        Ok(loopal_provider_api::project_turns_to_messages(&turns))
     }
 
     /// Record a sub-agent reference in the parent session.

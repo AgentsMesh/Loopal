@@ -183,13 +183,14 @@ fn server_tool_pair_emits_use_and_result() {
 fn compaction_emits_user_summary_then_assistant_ack() {
     let t = turn_with(
         TurnTrigger::Resume,
-        vec![TurnStep::Compaction(loopal_turn::CompactionRecord {
-            summary_text: "SUM".into(),
-            ack_text: "OK".into(),
-            rehydrated: vec![],
-            kept_turn_count: 0,
-            removed_turn_count: 1,
-        })],
+        vec![TurnStep::CompactionSummary(
+            loopal_turn::CompactionSummary {
+                summary_text: "SUM".into(),
+                ack_text: "OK".into(),
+                kept_turn_count: 0,
+                removed_turn_count: 1,
+            },
+        )],
     );
     let msgs = project_turn_to_messages(&t);
     assert_eq!(msgs.len(), 2);

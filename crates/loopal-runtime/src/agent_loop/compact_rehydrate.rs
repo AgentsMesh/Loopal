@@ -6,7 +6,7 @@ use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::{ContentBlock, Message, MessageRole};
 use loopal_tool_api::ToolResult;
 use loopal_turn::MessageOrigin;
-use loopal_turn::{CompactionRecord, RehydratedFile, ToolCallId, TurnStep};
+use loopal_turn::{CompactionRehydrate, RehydratedFile, ToolCallId, TurnStep};
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
@@ -177,16 +177,12 @@ impl AgentLoopRunner {
             return stats;
         }
 
-        // Domain mirror: emit a Compaction step carrying only the rehydrated files.
+        // Domain mirror: emit a CompactionRehydrate step carrying the rehydrated files.
         let rehydrated_files: Vec<RehydratedFile> =
             collect_rehydrated_files(&assistant.content, &user.content);
         if !rehydrated_files.is_empty() {
-            self.append_step_record(TurnStep::Compaction(CompactionRecord {
-                summary_text: String::new(),
-                ack_text: String::new(),
-                rehydrated: rehydrated_files,
-                kept_turn_count: 0,
-                removed_turn_count: 0,
+            self.append_step_record(TurnStep::CompactionRehydrate(CompactionRehydrate {
+                files: rehydrated_files,
             }));
         }
 

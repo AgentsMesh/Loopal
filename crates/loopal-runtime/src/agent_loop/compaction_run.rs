@@ -1,7 +1,7 @@
 use loopal_context::middleware::smart_compact::{CompactOutput, compact_to_boundary};
 use loopal_error::Result;
 use loopal_protocol::{AgentEventPayload, CompactPhase};
-use loopal_turn::{CompactionRecord, TurnStep};
+use loopal_turn::{CompactionSummary, TurnStep};
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
@@ -109,12 +109,11 @@ impl AgentLoopRunner {
             .session_manager
             .save_message(&self.params.session.id, &mut ack_msg)?;
 
-        // Domain mirror: record one Compaction step with both summary + ack texts.
+        // Domain mirror: record summary step (LLM-generated working state + ack).
         let removed_count = boundary_at as u32;
-        self.append_step_record(TurnStep::Compaction(CompactionRecord {
+        self.append_step_record(TurnStep::CompactionSummary(CompactionSummary {
             summary_text: summary_msg.text_content(),
             ack_text: ack_msg.text_content(),
-            rehydrated: vec![],
             kept_turn_count: 0,
             removed_turn_count: removed_count,
         }));

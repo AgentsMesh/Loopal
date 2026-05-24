@@ -13,8 +13,8 @@ pub use event::TurnEvent;
 pub use origin::MessageOrigin;
 pub use repo::{InMemoryTurnRepo, TurnRepo, TurnRepoError, TurnRepoResult};
 pub use step::{
-    AssistantOutput, CancelCause, CompactionRecord, InjectedMessage, InjectionKind,
-    LlmRequestSnapshot, OrderedToolBatch, RehydratedFile, StopReason, ToolBatchItem, ToolExecState,
-    TurnStep,
+    AssistantOutput, CancelCause, CompactionRehydrate, CompactionSummary, InjectedMessage,
+    InjectionKind, LlmRequestSnapshot, OrderedToolBatch, RehydratedFile, StopReason, ToolBatchItem,
+    ToolExecState, TurnStep,
 };
 pub use turn::{CancelledCause, Turn, TurnBody, TurnId, TurnOutcome, TurnTrigger};

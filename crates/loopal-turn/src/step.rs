@@ -9,7 +9,13 @@ pub enum TurnStep {
         response: AssistantOutput,
     },
     ToolBatch(OrderedToolBatch),
-    Compaction(CompactionRecord),
+    /// Compaction summary + ack pair produced by smart_compact middleware.
+    /// One per compaction event; carries the LLM-generated working-state.
+    CompactionSummary(CompactionSummary),
+    /// Post-compaction file rehydration: a tool_use/result Read pair per file
+    /// injected so the model can continue without re-reading. Always follows a
+    /// CompactionSummary step in the same turn (best-effort; not enforced).
+    CompactionRehydrate(CompactionRehydrate),
     Injection(InjectedMessage),
 }
 
@@ -76,13 +82,16 @@ pub enum CancelCause {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CompactionRecord {
+pub struct CompactionSummary {
     pub summary_text: String,
     pub ack_text: String,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub rehydrated: Vec<RehydratedFile>,
     pub kept_turn_count: u32,
     pub removed_turn_count: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompactionRehydrate {
+    pub files: Vec<RehydratedFile>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

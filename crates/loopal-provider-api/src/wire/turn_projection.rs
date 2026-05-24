@@ -1,8 +1,8 @@
 use loopal_turn::MessageOrigin;
 use loopal_turn::{
-    AssistantOutput, CompactionRecord, InjectedMessage, InjectionKind, OrderedToolBatch,
-    ServerToolPair, TextBlock, ThinkingBlock, ToolBatchItem, ToolCall, ToolExecState, ToolResult,
-    Turn, TurnStep, TurnTrigger,
+    AssistantOutput, CompactionRehydrate, CompactionSummary, InjectedMessage, InjectionKind,
+    OrderedToolBatch, ServerToolPair, TextBlock, ThinkingBlock, ToolBatchItem, ToolCall,
+    ToolExecState, ToolResult, Turn, TurnStep, TurnTrigger,
 };
 
 use super::message::{ContentBlock, Message, MessageRole};
@@ -38,7 +38,8 @@ fn project_step(step: &TurnStep) -> Vec<Message> {
     match step {
         TurnStep::LlmCall { response, .. } => vec![project_assistant(response)],
         TurnStep::ToolBatch(batch) => project_tool_batch(batch).into_iter().collect(),
-        TurnStep::Compaction(rec) => project_compaction(rec),
+        TurnStep::CompactionSummary(s) => project_compaction_summary(s),
+        TurnStep::CompactionRehydrate(r) => project_compaction_rehydrate(r),
         TurnStep::Injection(inj) => vec![project_injection(inj)],
     }
 }
@@ -104,12 +105,12 @@ fn tool_batch_item_to_block(item: &ToolBatchItem) -> ContentBlock {
     }
 }
 
-fn project_compaction(rec: &CompactionRecord) -> Vec<Message> {
+fn project_compaction_summary(s: &CompactionSummary) -> Vec<Message> {
     let summary = Message {
         id: None,
         role: MessageRole::User,
         content: vec![ContentBlock::Text {
-            text: rec.summary_text.clone(),
+            text: s.summary_text.clone(),
         }],
         origin: Some(MessageOrigin::CompactionSummary),
         ephemeral_in_history: false,
@@ -118,12 +119,46 @@ fn project_compaction(rec: &CompactionRecord) -> Vec<Message> {
         id: None,
         role: MessageRole::Assistant,
         content: vec![ContentBlock::Text {
-            text: rec.ack_text.clone(),
+            text: s.ack_text.clone(),
         }],
         origin: Some(MessageOrigin::CompactionSummary),
         ephemeral_in_history: false,
     };
     vec![summary, ack]
+}
+
+fn project_compaction_rehydrate(r: &CompactionRehydrate) -> Vec<Message> {
+    // reason: per file emit assistant tool_use(Read) + user tool_result(content)
+    // pair, matching the original compact_rehydrate.rs serialization that the
+    // LLM expects to see in conversation history.
+    let mut out = Vec::with_capacity(r.files.len() * 2);
+    for f in &r.files {
+        out.push(Message {
+            id: None,
+            role: MessageRole::Assistant,
+            content: vec![ContentBlock::ToolUse {
+                id: f.tool_call_id.as_str().to_string(),
+                name: "Read".to_string(),
+                input: serde_json::json!({ "file_path": f.path }),
+            }],
+            origin: Some(MessageOrigin::CompactionRehydrate),
+            ephemeral_in_history: false,
+        });
+        out.push(Message {
+            id: None,
+            role: MessageRole::User,
+            content: vec![ContentBlock::ToolResult {
+                tool_use_id: f.tool_call_id.as_str().to_string(),
+                content: f.content.clone(),
+                images: Vec::new(),
+                is_error: false,
+                metadata: None,
+            }],
+            origin: Some(MessageOrigin::CompactionRehydrate),
+            ephemeral_in_history: false,
+        });
+    }
+    out
 }
 
 fn project_injection(inj: &InjectedMessage) -> Message {

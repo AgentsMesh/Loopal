@@ -1,7 +1,8 @@
 use loopal_provider_api::ChatParams;
 use loopal_turn::{
-    AssistantOutput, CancelCause, OrderedToolBatch, ServerToolPair, TextBlock, ThinkingBlock,
-    ToolBatchItem, ToolCall, ToolExecState, ToolResult, Turn, TurnStep, TurnTrigger,
+    AssistantOutput, CancelCause, CompactionRehydrate, CompactionSummary, OrderedToolBatch,
+    ServerToolPair, TextBlock, ThinkingBlock, ToolBatchItem, ToolCall, ToolExecState, ToolResult,
+    Turn, TurnStep, TurnTrigger,
 };
 use serde_json::{Value, json};
 
@@ -49,37 +50,41 @@ fn push_step(out: &mut Vec<Value>, step: &TurnStep) {
             out.push(build_user_from_batch(batch));
         }
         TurnStep::ToolBatch(_) => {}
-        TurnStep::Compaction(rec) => {
-            if !rec.summary_text.is_empty() {
-                out.push(text_user(&rec.summary_text));
-            }
-            if !rec.ack_text.is_empty() {
-                out.push(
-                    json!({"role": "assistant", "content": [{"type":"text","text": rec.ack_text}]}),
-                );
-            }
-            for r in &rec.rehydrated {
-                out.push(json!({
-                    "role": "assistant",
-                    "content": [{
-                        "type": "tool_use",
-                        "id": r.tool_call_id.as_str(),
-                        "name": "Read",
-                        "input": {"file_path": r.path}
-                    }]
-                }));
-                out.push(json!({
-                    "role": "user",
-                    "content": [{
-                        "type": "tool_result",
-                        "tool_use_id": r.tool_call_id.as_str(),
-                        "content": r.content,
-                        "is_error": false
-                    }]
-                }));
-            }
-        }
+        TurnStep::CompactionSummary(s) => push_compaction_summary(out, s),
+        TurnStep::CompactionRehydrate(r) => push_compaction_rehydrate(out, r),
         TurnStep::Injection(inj) => out.push(text_user(&inj.text)),
+    }
+}
+
+fn push_compaction_summary(out: &mut Vec<Value>, s: &CompactionSummary) {
+    if !s.summary_text.is_empty() {
+        out.push(text_user(&s.summary_text));
+    }
+    if !s.ack_text.is_empty() {
+        out.push(json!({"role": "assistant", "content": [{"type":"text","text": s.ack_text}]}));
+    }
+}
+
+fn push_compaction_rehydrate(out: &mut Vec<Value>, r: &CompactionRehydrate) {
+    for f in &r.files {
+        out.push(json!({
+            "role": "assistant",
+            "content": [{
+                "type": "tool_use",
+                "id": f.tool_call_id.as_str(),
+                "name": "Read",
+                "input": {"file_path": f.path}
+            }]
+        }));
+        out.push(json!({
+            "role": "user",
+            "content": [{
+                "type": "tool_result",
+                "tool_use_id": f.tool_call_id.as_str(),
+                "content": f.content,
+                "is_error": false
+            }]
+        }));
     }
 }
 

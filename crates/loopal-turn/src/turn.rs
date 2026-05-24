@@ -54,6 +54,7 @@ impl Turn {
         Self::new(TurnTrigger::UserInput {
             envelope_id: String::new(),
             content: prompt.into(),
+            images: Vec::new(),
         })
     }
 }
@@ -66,10 +67,14 @@ pub struct TurnBody {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TurnTrigger {
-    /// Real human typing into the prompt.
+    /// Real human typing into the prompt. `images` carries any base64
+    /// attachments — empty for text-only input (serde default keeps old
+    /// turns.jsonl readable).
     UserInput {
         envelope_id: String,
         content: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        images: Vec<loopal_tool_invocation::ToolImageBlock>,
     },
     /// Scheduled cron / timer envelope.
     Cron {

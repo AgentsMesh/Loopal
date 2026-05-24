@@ -19,6 +19,7 @@ fn user_trigger() -> TurnTrigger {
     TurnTrigger::UserInput {
         envelope_id: "env-1".into(),
         content: "hi".into(),
+        images: Vec::new(),
     }
 }
 

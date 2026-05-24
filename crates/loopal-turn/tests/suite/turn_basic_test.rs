@@ -7,6 +7,7 @@ fn make_user_turn() -> Turn {
     Turn::new(TurnTrigger::UserInput {
         envelope_id: "env-1".into(),
         content: "test".into(),
+        images: Vec::new(),
     })
 }
 

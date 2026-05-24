@@ -66,6 +66,7 @@ fn turn_with_tool_images(tool_use_id: &str, images: Vec<ToolImageBlock>) -> Turn
     let mut turn = Turn::new(TurnTrigger::UserInput {
         envelope_id: "env".into(),
         content: "show me the image".into(),
+        images: Vec::new(),
     });
     turn.body = TurnBody {
         steps: vec![

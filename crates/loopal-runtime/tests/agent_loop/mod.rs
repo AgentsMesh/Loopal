@@ -107,9 +107,6 @@ mod turn_completion_test;
 mod turn_test;
 
 /// Minimal runner with no provider — for testing pure AgentLoopRunner methods.
-/// Opens a Resume turn so subsequent `append_step_record` calls succeed.
-/// `TurnTrigger::Resume` does not project to a user message, so ContextStore
-/// starts empty just as before — but a turn is open for tests to record steps.
 pub fn make_runner() -> (AgentLoopRunner, mpsc::Receiver<AgentEvent>) {
     let fixture = TestFixture::new();
     let (event_tx, event_rx) = mpsc::channel(16);
@@ -138,12 +135,7 @@ pub fn make_runner() -> (AgentLoopRunner, mpsc::Receiver<AgentEvent>) {
         InterruptHandle::new(),
     )
     .build();
-    let mut runner = AgentLoopRunner::new(params);
-    runner
-        .turns
-        .store_mut()
-        .start_turn(loopal_turn::TurnTrigger::Resume);
-    (runner, event_rx)
+    (AgentLoopRunner::new(params), event_rx)
 }
 
 /// Runner with all channels exposed — for testing permission and input flows.
@@ -185,10 +177,11 @@ pub fn make_runner_with_channels() -> (
         InterruptHandle::new(),
     )
     .build();
-    let mut runner = AgentLoopRunner::new(params);
-    runner
-        .turns
-        .store_mut()
-        .start_turn(loopal_turn::TurnTrigger::Resume);
-    (runner, event_rx, mbox_tx, ctrl_tx, perm_tx)
+    (
+        AgentLoopRunner::new(params),
+        event_rx,
+        mbox_tx,
+        ctrl_tx,
+        perm_tx,
+    )
 }

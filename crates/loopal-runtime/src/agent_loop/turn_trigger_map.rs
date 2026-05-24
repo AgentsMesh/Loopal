@@ -1,4 +1,5 @@
 use loopal_protocol::{Envelope, MessageSource};
+use loopal_tool_invocation::ToolImageBlock;
 use loopal_turn::TurnTrigger;
 
 pub fn envelope_to_trigger(env: &Envelope) -> TurnTrigger {
@@ -8,6 +9,15 @@ pub fn envelope_to_trigger(env: &Envelope) -> TurnTrigger {
         MessageSource::Human => TurnTrigger::UserInput {
             envelope_id,
             content,
+            images: env
+                .content
+                .images
+                .iter()
+                .map(|img| ToolImageBlock::Inline {
+                    media_type: img.media_type.clone(),
+                    data: img.data.clone(),
+                })
+                .collect(),
         },
         MessageSource::Scheduled => TurnTrigger::Cron {
             envelope_id,

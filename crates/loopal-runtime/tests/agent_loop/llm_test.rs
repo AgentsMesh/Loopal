@@ -18,10 +18,7 @@ fn test_prepare_chat_params_act_mode() {
     );
     // With empty messages and 200K window, max_tokens should be preserved (headroom is large).
     assert_eq!(params.max_tokens, runner.model_config.max_output_tokens);
-    // make_runner seeds one synthetic Resume turn (zero-projection); the
-    // request body sees a single turn with no steps.
-    assert_eq!(params.turns.len(), 1);
-    assert!(params.turns[0].body.steps.is_empty());
+    assert!(params.turns.is_empty());
     // Builtin tools should be present
     assert!(!params.tools.is_empty());
 }
@@ -51,19 +48,18 @@ fn test_prepare_chat_params_with_turns() {
     runner.turns.store_mut().start_turn(TurnTrigger::UserInput {
         envelope_id: "env-1".into(),
         content: "Hello".into(),
+        images: Vec::new(),
     });
     // pre-existing turn in store (no need to actively use start_turn_record
     // here; we just exercise the prepare_chat_params projection).
 
     let params = runner.prepare_chat_params(None).expect("should succeed");
-    // make_runner seeds a synthetic Resume turn; this test adds a second
-    // UserInput turn — verify it lands at index 1.
-    assert_eq!(params.turns.len(), 2);
+    assert_eq!(params.turns.len(), 1);
     assert!(matches!(
-        params.turns[1].trigger,
+        params.turns[0].trigger,
         TurnTrigger::UserInput { ref content, .. } if content == "Hello"
     ));
-    let _: &Turn = &params.turns[1];
+    let _: &Turn = &params.turns[0];
 }
 
 #[tokio::test]

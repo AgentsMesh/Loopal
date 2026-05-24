@@ -8,11 +8,11 @@ use crate::ingestion::{cap_assistant_server_blocks, cap_tool_results};
 use loopal_provider_api::{Message, MessageRole, project_turns_to_messages};
 use loopal_turn::Turn;
 
-// reason: ContextStore is being migrated to a derived view of TurnStore. The
-// `push_*` mutators below are the current SSOT for in-memory message state
-// (runtime dual-writes them after TurnStore mutations); `refresh_view` is the
-// projection target — future PRs flip the SSOT direction by removing push_*
-// callers once resume + test fixtures seed TurnStore.
+// reason: ContextStore is being migrated to a derived view of TurnStore.
+// `refresh_view(turns)` is the projection target — callers invoke it after
+// writing to TurnStore. Dual-write `push_*` calls remain as the current SSOT
+// until the migration completes (compaction boundary id anchors and image-
+// carrying user messages still require ContextStore for now).
 pub struct ContextStore {
     messages: Vec<Message>,
     budget: ContextBudget,
@@ -47,13 +47,9 @@ impl ContextStore {
         self.enforce_budget();
     }
 
-    /// Recompute the messages view from the authoritative turn list. This is
-    /// the migration target: once TurnStore is seeded on session resume and
-    /// test fixtures, runtime call sites will drop the dual `push_*` writes
-    /// and rely on this projection alone.
-    ///
-    /// `enforce_budget()` is invoked so the projected view obeys the same
-    /// degradation rules as direct writes.
+    /// Recompute the messages view from the authoritative turn list. Callers
+    /// invoke this after writing to `TurnStore` so reads (token estimate,
+    /// classifier context, microcompact scrub) observe the latest projection.
     pub fn refresh_view(&mut self, turns: &[Turn]) {
         self.messages = project_turns_to_messages(turns);
         self.apply_ingestion_caps();

@@ -12,6 +12,7 @@ fn turn_started_event_round_trip() {
         trigger: TurnTrigger::UserInput {
             envelope_id: "env-1".into(),
             content: "hi".into(),
+            images: Vec::new(),
         },
     };
     let json = serde_json::to_string(&event).unwrap();

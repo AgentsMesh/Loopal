@@ -29,7 +29,7 @@ impl TurnEventLogger for JsonlLogger<'_> {
 }
 
 impl AgentLoopRunner {
-    pub(super) fn start_turn_record(&mut self, trigger: TurnTrigger) -> Option<TurnId> {
+    pub fn start_turn_record(&mut self, trigger: TurnTrigger) -> Option<TurnId> {
         // reason: split borrow — JsonlLogger captures &self.params.* (immutable)
         // while try_start_turn takes &mut self.turns. Rust resolves disjoint
         // struct-field borrows automatically; can't go through a `&self`-method.

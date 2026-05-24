@@ -23,20 +23,6 @@ use tokio::sync::mpsc;
 
 pub use loopal_test_support::mock_provider::{MockProvider, MockStreamChunks, MultiCallProvider};
 
-/// Open a synthetic UserInput turn on the runner so subsequent
-/// `record_assistant_message` / `execute_tools` calls have a turn to append to.
-/// Mirrors the production flow: `ingest_message` is what opens turns in real
-/// code, but tests that bypass ingest need this explicit seed.
-fn seed_initial_user_turn(runner: &mut AgentLoopRunner, content: &str) {
-    runner
-        .turns
-        .store_mut()
-        .start_turn(loopal_turn::TurnTrigger::UserInput {
-            envelope_id: format!("test-seed-{content}"),
-            content: content.to_string(),
-        });
-}
-
 /// Build AgentLoopParams using sub-structs — eliminates the 18-field ceremony.
 fn build_params(
     kernel: Arc<Kernel>,
@@ -122,9 +108,7 @@ pub fn make_runner_with_mock_provider(
         vec![loopal_provider_api::Message::user("hello")],
         PermissionMode::Bypass,
     );
-    let mut runner = AgentLoopRunner::new(params);
-    seed_initial_user_turn(&mut runner, "hello");
-    (runner, event_rx, mbox_tx, ctrl_tx)
+    (AgentLoopRunner::new(params), event_rx, mbox_tx, ctrl_tx)
 }
 
 pub fn make_multi_runner(
@@ -164,9 +148,7 @@ pub fn make_multi_runner_with_intents(
         vec![loopal_provider_api::Message::user("go")],
         AgentConfig::default(),
     );
-    let mut runner = AgentLoopRunner::new(params);
-    seed_initial_user_turn(&mut runner, "go");
-    (runner, event_rx, intents)
+    (AgentLoopRunner::new(params), event_rx, intents)
 }
 
 pub fn make_interactive_multi_runner(
@@ -201,10 +183,5 @@ pub fn make_interactive_multi_runner(
         vec![],
         PermissionMode::Bypass,
     );
-    let mut runner = AgentLoopRunner::new(params);
-    runner
-        .turns
-        .store_mut()
-        .start_turn(loopal_turn::TurnTrigger::Resume);
-    (runner, event_rx, mbox_tx, ctrl_tx)
+    (AgentLoopRunner::new(params), event_rx, mbox_tx, ctrl_tx)
 }

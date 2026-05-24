@@ -26,9 +26,13 @@ fn project_trigger(trigger: &TurnTrigger) -> Option<Message> {
     // reason: 与 runtime/message_build::build_user_message 的前缀规则保持一致 —
     // 投影出的 user message 在 LLM 上下文中和 ingest 时直接写入的版本等价。
     match trigger {
-        TurnTrigger::UserInput { content, .. } => {
-            Some(text_user(content, Some(MessageOrigin::Human)))
-        }
+        TurnTrigger::UserInput {
+            content, images, ..
+        } => Some(text_user_with_images(
+            content,
+            images,
+            Some(MessageOrigin::Human),
+        )),
         TurnTrigger::Cron { content, .. } => Some(text_user(
             &format!("[scheduled] {content}"),
             Some(MessageOrigin::Scheduled),
@@ -160,37 +164,50 @@ fn project_compaction_summary(s: &CompactionSummary) -> Vec<Message> {
 }
 
 fn project_compaction_rehydrate(r: &CompactionRehydrate) -> Vec<Message> {
-    // reason: per file emit assistant tool_use(Read) + user tool_result(content)
-    // pair, matching the original compact_rehydrate.rs serialization that the
-    // LLM expects to see in conversation history.
-    let mut out = Vec::with_capacity(r.files.len() * 2);
-    for f in &r.files {
-        out.push(Message {
+    // reason: bundle all files into a single assistant message carrying every
+    // tool_use, followed by a single user message carrying every tool_result.
+    // Matches the runtime's pre-refactor shape (compact_rehydrate built one
+    // pair regardless of file count) and keeps the I4 ordering invariant —
+    // tool_use[i] in assistant pairs with tool_result[i] in user.
+    if r.files.is_empty() {
+        return Vec::new();
+    }
+    let assistant_blocks: Vec<ContentBlock> = r
+        .files
+        .iter()
+        .map(|f| ContentBlock::ToolUse {
+            id: f.tool_call_id.as_str().to_string(),
+            name: "Read".to_string(),
+            input: serde_json::json!({ "file_path": f.path }),
+        })
+        .collect();
+    let user_blocks: Vec<ContentBlock> = r
+        .files
+        .iter()
+        .map(|f| ContentBlock::ToolResult {
+            tool_use_id: f.tool_call_id.as_str().to_string(),
+            content: f.content.clone(),
+            images: Vec::new(),
+            is_error: false,
+            metadata: None,
+        })
+        .collect();
+    vec![
+        Message {
             id: None,
             role: MessageRole::Assistant,
-            content: vec![ContentBlock::ToolUse {
-                id: f.tool_call_id.as_str().to_string(),
-                name: "Read".to_string(),
-                input: serde_json::json!({ "file_path": f.path }),
-            }],
+            content: assistant_blocks,
             origin: Some(MessageOrigin::CompactionRehydrate),
             ephemeral_in_history: false,
-        });
-        out.push(Message {
+        },
+        Message {
             id: None,
             role: MessageRole::User,
-            content: vec![ContentBlock::ToolResult {
-                tool_use_id: f.tool_call_id.as_str().to_string(),
-                content: f.content.clone(),
-                images: Vec::new(),
-                is_error: false,
-                metadata: None,
-            }],
+            content: user_blocks,
             origin: Some(MessageOrigin::CompactionRehydrate),
             ephemeral_in_history: false,
-        });
-    }
-    out
+        },
+    ]
 }
 
 fn project_injection(kind: &InjectionKind, text: &str) -> Message {
@@ -212,6 +229,43 @@ fn text_user(text: &str, origin: Option<MessageOrigin>) -> Message {
         content: vec![ContentBlock::Text {
             text: text.to_string(),
         }],
+        origin,
+        ephemeral_in_history: false,
+    }
+}
+
+fn text_user_with_images(
+    text: &str,
+    images: &[loopal_tool_invocation::ToolImageBlock],
+    origin: Option<MessageOrigin>,
+) -> Message {
+    use super::message::ImageSource;
+    let mut content: Vec<ContentBlock> = Vec::new();
+    if !text.is_empty() {
+        content.push(ContentBlock::Text {
+            text: text.to_string(),
+        });
+    }
+    for img in images {
+        match img {
+            loopal_tool_invocation::ToolImageBlock::Inline { media_type, data } => {
+                content.push(ContentBlock::Image {
+                    source: ImageSource {
+                        source_type: "base64".to_string(),
+                        media_type: media_type.clone(),
+                        data: data.clone(),
+                    },
+                });
+            }
+            // reason: SessionResource references on-disk image; projection layer
+            // must not block resolution. Provider adapter resolves at send time.
+            loopal_tool_invocation::ToolImageBlock::SessionResource { .. } => {}
+        }
+    }
+    Message {
+        id: None,
+        role: MessageRole::User,
+        content,
         origin,
         ephemeral_in_history: false,
     }

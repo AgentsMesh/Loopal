@@ -1,9 +1,9 @@
 use loopal_error::Result;
 use loopal_protocol::AgentEventPayload;
-use loopal_provider_api::{ContentBlock, Message, MessageRole};
+use loopal_provider_api::ContentBlock;
 use loopal_tool_invocation::{CancelCause, ToolResultMetadata};
 use loopal_turn::{CancelCause as TurnCancelCause, ToolExecState};
-use tracing::{error, info};
+use tracing::info;
 
 use super::runner::AgentLoopRunner;
 
@@ -58,40 +58,17 @@ impl AgentLoopRunner {
         tool_uses: &[(String, String, serde_json::Value)],
     ) -> Result<()> {
         info!("cancelled, skipping tool execution");
-        let mut blocks = Vec::with_capacity(tool_uses.len());
         let cancel_md = ToolResultMetadata::cancelled(CancelCause::UserInterrupt);
         for (id, name, _) in tool_uses {
-            let block = self
-                .emit_and_block(
-                    id,
-                    name,
-                    "Interrupted by user",
-                    true,
-                    Some(cancel_md.clone()),
-                )
-                .await?;
-            blocks.push(block);
+            self.emit_and_block(
+                id,
+                name,
+                "Interrupted by user",
+                true,
+                Some(cancel_md.clone()),
+            )
+            .await?;
         }
-        let mut msg = Message {
-            id: None,
-            role: MessageRole::User,
-            content: blocks,
-            origin: None,
-            ephemeral_in_history: false,
-        };
-        if let Err(e) = self
-            .params
-            .deps
-            .session_manager
-            .save_message(&self.params.session.id, &mut msg)
-        {
-            error!(error = %e, "failed to persist message");
-        }
-        // Domain mirror: patch in-flight ToolBatch items to Cancelled.
-        // (execute_tools normally opened the batch with full ToolCall info;
-        // skip the update loop if the batch failed to open — each
-        // update_tool_batch_item_state would otherwise log a NoToolBatchOpen
-        // warning per item without persisting anything useful.)
         if self.turns.current_tool_batch_step().is_some() {
             for (item_index, _) in tool_uses.iter().enumerate() {
                 self.update_tool_batch_item_state(
@@ -101,8 +78,6 @@ impl AgentLoopRunner {
             }
             self.close_tool_batch_record();
         }
-        // reason: dual-write transitional — see ContextStore::refresh_view doc.
-        self.params.store.push_tool_results(msg);
         Ok(())
     }
 

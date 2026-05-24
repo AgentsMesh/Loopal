@@ -108,7 +108,13 @@ pub fn make_runner_with_mock_provider(
         vec![loopal_provider_api::Message::user("hello")],
         PermissionMode::Bypass,
     );
-    (AgentLoopRunner::new(params), event_rx, mbox_tx, ctrl_tx)
+    let mut runner = AgentLoopRunner::new(params);
+    runner.start_turn_record(loopal_turn::TurnTrigger::UserInput {
+        envelope_id: "test-seed-hello".into(),
+        content: "hello".into(),
+        images: Vec::new(),
+    });
+    (runner, event_rx, mbox_tx, ctrl_tx)
 }
 
 pub fn make_multi_runner(
@@ -148,7 +154,13 @@ pub fn make_multi_runner_with_intents(
         vec![loopal_provider_api::Message::user("go")],
         AgentConfig::default(),
     );
-    (AgentLoopRunner::new(params), event_rx, intents)
+    let mut runner = AgentLoopRunner::new(params);
+    runner.start_turn_record(loopal_turn::TurnTrigger::UserInput {
+        envelope_id: "test-seed-go".into(),
+        content: "go".into(),
+        images: Vec::new(),
+    });
+    (runner, event_rx, intents)
 }
 
 pub fn make_interactive_multi_runner(
@@ -183,5 +195,7 @@ pub fn make_interactive_multi_runner(
         vec![],
         PermissionMode::Bypass,
     );
-    (AgentLoopRunner::new(params), event_rx, mbox_tx, ctrl_tx)
+    let mut runner = AgentLoopRunner::new(params);
+    runner.start_turn_record(loopal_turn::TurnTrigger::Resume);
+    (runner, event_rx, mbox_tx, ctrl_tx)
 }

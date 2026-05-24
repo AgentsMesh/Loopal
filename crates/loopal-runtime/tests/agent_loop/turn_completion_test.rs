@@ -104,7 +104,13 @@ pub(crate) fn make_multi_runner(
         InterruptHandle::new(),
     )
     .build();
-    (AgentLoopRunner::new(params), event_rx)
+    let mut runner = AgentLoopRunner::new(params);
+    runner.start_turn_record(loopal_turn::TurnTrigger::UserInput {
+        envelope_id: "test-multi-seed".into(),
+        content: "go".into(),
+        images: Vec::new(),
+    });
+    (runner, event_rx)
 }
 
 /// LLM returns text-only response -> turn exits with Goal.

@@ -30,14 +30,15 @@ impl TurnEventLogger for JsonlLogger<'_> {
 
 impl AgentLoopRunner {
     pub fn start_turn_record(&mut self, trigger: TurnTrigger) -> Option<TurnId> {
-        // reason: split borrow — JsonlLogger captures &self.params.* (immutable)
-        // while try_start_turn takes &mut self.turns. Rust resolves disjoint
-        // struct-field borrows automatically; can't go through a `&self`-method.
         let logger = JsonlLogger {
             sm: &self.params.deps.session_manager,
             session_id: &self.params.session.id,
         };
-        self.turns.try_start_turn(trigger, &logger)
+        let id = self.turns.try_start_turn(trigger, &logger);
+        if id.is_some() {
+            self.refresh_context_view();
+        }
+        id
     }
 
     pub(super) fn append_step_record(
@@ -48,7 +49,9 @@ impl AgentLoopRunner {
             sm: &self.params.deps.session_manager,
             session_id: &self.params.session.id,
         };
-        self.turns.try_append_step(step, &logger)
+        let idx = self.turns.try_append_step(step, &logger)?;
+        self.refresh_context_view();
+        Ok(idx)
     }
 
     /// Open a ToolBatch step in Pending state, carrying the full ToolCall info
@@ -93,7 +96,9 @@ impl AgentLoopRunner {
             .try_update_tool_state(item_index, new_state, &logger)
         {
             warn!(error = %e, item_index, "update_tool_batch_item_state failed; turn step left at prior state");
+            return;
         }
+        self.refresh_context_view();
     }
 
     pub(super) fn close_tool_batch_record(&mut self) {
@@ -106,5 +111,11 @@ impl AgentLoopRunner {
             session_id: &self.params.session.id,
         };
         self.turns.try_end_turn(outcome, &logger);
+        self.refresh_context_view();
+    }
+
+    fn refresh_context_view(&mut self) {
+        let turns = self.turns.store().turns();
+        self.params.store.refresh_view(turns);
     }
 }

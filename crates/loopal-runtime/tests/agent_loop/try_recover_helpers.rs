@@ -146,7 +146,13 @@ pub fn make_runner_with_intents(
         InterruptHandle::new(),
     )
     .build();
-    (AgentLoopRunner::new(params), call_count, intents, event_rx)
+    let mut runner = AgentLoopRunner::new(params);
+    runner.start_turn_record(loopal_turn::TurnTrigger::UserInput {
+        envelope_id: "rt-seed".into(),
+        content: "go".into(),
+        images: Vec::new(),
+    });
+    (runner, call_count, intents, event_rx)
 }
 
 pub fn ok_done() -> Vec<Result<StreamChunk, LoopalError>> {

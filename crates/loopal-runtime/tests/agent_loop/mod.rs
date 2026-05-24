@@ -135,7 +135,9 @@ pub fn make_runner() -> (AgentLoopRunner, mpsc::Receiver<AgentEvent>) {
         InterruptHandle::new(),
     )
     .build();
-    (AgentLoopRunner::new(params), event_rx)
+    let mut runner = AgentLoopRunner::new(params);
+    runner.start_turn_record(loopal_turn::TurnTrigger::Resume);
+    (runner, event_rx)
 }
 
 /// Runner with all channels exposed — for testing permission and input flows.
@@ -177,11 +179,7 @@ pub fn make_runner_with_channels() -> (
         InterruptHandle::new(),
     )
     .build();
-    (
-        AgentLoopRunner::new(params),
-        event_rx,
-        mbox_tx,
-        ctrl_tx,
-        perm_tx,
-    )
+    let mut runner = AgentLoopRunner::new(params);
+    runner.start_turn_record(loopal_turn::TurnTrigger::Resume);
+    (runner, event_rx, mbox_tx, ctrl_tx, perm_tx)
 }

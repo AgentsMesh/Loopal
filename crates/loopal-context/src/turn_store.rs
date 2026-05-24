@@ -218,6 +218,17 @@ impl TurnStore {
         self.current_turn_id = None;
     }
 
+    /// Truncate to the first `keep` turns. Drops any current_turn_id that
+    /// pointed at a removed turn. Used by `ControlCommand::Rewind`.
+    pub fn truncate_turns(&mut self, keep: usize) {
+        self.turns.truncate(keep);
+        if let Some(id) = &self.current_turn_id
+            && !self.turns.iter().any(|t| &t.id == id)
+        {
+            self.current_turn_id = None;
+        }
+    }
+
     pub fn record_actual_input_tokens(&mut self, tokens: u32) {
         self.last_actual_input_tokens = Some(tokens);
     }

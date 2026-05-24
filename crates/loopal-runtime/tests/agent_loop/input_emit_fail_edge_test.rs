@@ -9,7 +9,6 @@
 use std::time::Duration;
 
 use loopal_protocol::ControlCommand;
-use loopal_provider_api::Message;
 
 use super::make_runner_with_channels;
 
@@ -22,8 +21,6 @@ async fn test_clear_bails_out_when_event_emit_fails() {
     let (mut runner, event_rx, _mbox_tx, ctrl_tx, _perm_tx) = make_runner_with_channels();
     drop(event_rx);
 
-    runner.params.store.push_user(Message::user("msg1"));
-    runner.params.store.push_user(Message::user("msg2"));
     runner.turn_count = 3;
     runner.tokens.input = 800;
 
@@ -37,7 +34,6 @@ async fn test_clear_bails_out_when_event_emit_fails() {
     );
 
     // State must be untouched — the emit failed before any mutation ran.
-    assert_eq!(runner.params.store.len(), 2);
     assert_eq!(runner.turn_count, 3);
     assert_eq!(runner.tokens.input, 800);
 }

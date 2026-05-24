@@ -33,6 +33,7 @@ use crate::mock_provider::MultiCallProvider;
 /// Async because `MessageRouter::register()` requires it.
 pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopRunner) {
     let fixture = TestFixture::new();
+    let seed_messages = builder.messages.clone();
 
     let (event_tx, event_rx) = mpsc::channel::<AgentEvent>(256);
     let (mailbox_tx, mailbox_rx) = mpsc::channel::<Envelope>(16);
@@ -176,7 +177,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         } else {
             fixture.test_session("integration-test")
         },
-        ContextStore::from_messages(builder.messages, budget),
+        ContextStore::from_messages(seed_messages.clone(), budget),
         interrupt,
     )
     .shared(shared_any)
@@ -196,11 +197,18 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         recorded_messages,
     };
     let mut runner = AgentLoopRunner::new(params);
-    // reason: production `agent_loop()` sets `runner.governance` after
-    // construction; the test harness used to omit this, silently disabling
-    // every Governance (LoopDetector / DegenerationDetector / ...) in tests.
-    // Mirror the production wiring so test coverage matches reality.
     let harness_cfg = loopal_config::HarnessConfig::default();
     runner.governance = loopal_runtime::agent_loop::governance::build_governance(&harness_cfg);
+    let seed_trigger = match seed_messages.as_slice() {
+        [msg] if matches!(msg.role, loopal_provider_api::MessageRole::User) => {
+            loopal_turn::TurnTrigger::UserInput {
+                envelope_id: "harness-seed".into(),
+                content: msg.text_content(),
+                images: Vec::new(),
+            }
+        }
+        _ => loopal_turn::TurnTrigger::Resume,
+    };
+    runner.start_turn_record(seed_trigger);
     (harness, runner)
 }

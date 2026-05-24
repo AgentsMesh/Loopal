@@ -3,15 +3,13 @@ use std::sync::Arc;
 
 use loopal_error::Result;
 use loopal_provider_api::Message;
-use loopal_storage::entry::{Marker, TaggedEntry};
-use loopal_storage::{GoalStore, MessageStore, Session, SessionStore, SubAgentRef, TurnEventStore};
+use loopal_storage::{GoalStore, Session, SessionStore, SubAgentRef, TurnEventStore};
 use loopal_turn::TurnEvent;
 use tracing::info;
 
 /// Manages session creation, resumption, and message persistence.
 pub struct SessionManager {
     session_store: SessionStore,
-    message_store: MessageStore,
     turn_event_store: TurnEventStore,
     goal_store: Arc<GoalStore>,
 }
@@ -20,7 +18,6 @@ impl SessionManager {
     pub fn new() -> Result<Self> {
         Ok(Self {
             session_store: SessionStore::new()?,
-            message_store: MessageStore::new()?,
             turn_event_store: TurnEventStore::new()?,
             goal_store: Arc::new(GoalStore::from_default_dir()?),
         })
@@ -31,7 +28,6 @@ impl SessionManager {
     pub fn with_base_dir(base_dir: std::path::PathBuf) -> Self {
         Self {
             session_store: SessionStore::with_base_dir(base_dir.clone()),
-            message_store: MessageStore::with_base_dir(base_dir.clone()),
             turn_event_store: TurnEventStore::with_base_dir(base_dir.clone()),
             goal_store: Arc::new(GoalStore::with_base_dir(base_dir)),
         }
@@ -76,64 +72,11 @@ impl SessionManager {
         Ok(())
     }
 
-    /// Persist a message to the session's message store.
-    /// Automatically assigns a UUID in-place if the message has no id,
-    /// so the caller's copy stays in sync with storage.
-    pub fn save_message(&self, session_id: &str, message: &mut Message) -> Result<()> {
-        if message.id.is_none() {
-            message.id = Some(uuid::Uuid::new_v4().to_string());
-        }
-        self.message_store.append_message(session_id, message)?;
-        Ok(())
-    }
-
     /// Persist a Turn-domain event to the session's turn event log.
-    /// turns.jsonl is the new SSOT under construction; messages.jsonl
-    /// remains as the active read path until PR-6.
     pub fn record_turn_event(&self, session_id: &str, event: &TurnEvent) -> Result<()> {
         self.turn_event_store
             .append_event(session_id, event)
             .map_err(loopal_error::LoopalError::from)?;
-        Ok(())
-    }
-
-    /// Append a Clear marker to the event log.
-    /// On next load, all messages before this marker are discarded.
-    pub fn clear_history(&self, session_id: &str) -> Result<()> {
-        let entry = TaggedEntry::Marker(Marker::Clear {
-            timestamp: chrono::Utc::now().to_rfc3339(),
-        });
-        self.message_store.append_entry(session_id, &entry)?;
-        info!(session_id = %session_id, "clear marker written");
-        Ok(())
-    }
-
-    /// Append a CompactBoundary marker to the event log.
-    /// On next load, every message before `summary_msg_id` is dropped,
-    /// keeping the summary message and everything after it.
-    pub fn mark_compact_boundary(&self, session_id: &str, summary_msg_id: &str) -> Result<()> {
-        let entry = TaggedEntry::Marker(Marker::CompactBoundary {
-            summary_msg_id: summary_msg_id.to_string(),
-            timestamp: chrono::Utc::now().to_rfc3339(),
-        });
-        self.message_store.append_entry(session_id, &entry)?;
-        info!(
-            session_id = %session_id,
-            summary_msg_id = %summary_msg_id,
-            "compact boundary marker written"
-        );
-        Ok(())
-    }
-
-    /// Append a RewindTo marker to the event log.
-    /// On next load, the message with `message_id` and everything after it are discarded.
-    pub fn rewind_to(&self, session_id: &str, message_id: &str) -> Result<()> {
-        let entry = TaggedEntry::Marker(Marker::RewindTo {
-            message_id: message_id.to_string(),
-            timestamp: chrono::Utc::now().to_rfc3339(),
-        });
-        self.message_store.append_entry(session_id, &entry)?;
-        info!(session_id = %session_id, message_id = %message_id, "rewind marker written");
         Ok(())
     }
 

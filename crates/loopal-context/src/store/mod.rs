@@ -4,7 +4,6 @@ use std::time::SystemTime;
 
 use crate::budget::ContextBudget;
 use crate::degradation::run_sync_degradation;
-use crate::ingestion::{cap_assistant_server_blocks, cap_tool_results};
 use loopal_provider_api::{Message, MessageRole, project_turns_to_messages};
 use loopal_turn::Turn;
 
@@ -49,29 +48,6 @@ impl ContextStore {
         if let Some(at) = latest_llm_call_started_at(turns) {
             self.last_assistant_activity_at = Some(datetime_to_system_time(at));
         }
-    }
-
-    pub fn push_user(&mut self, msg: Message) {
-        debug_assert!(msg.role == MessageRole::User);
-        self.messages.push(msg);
-        self.enforce_budget();
-    }
-
-    pub fn push_assistant(&mut self, mut msg: Message) {
-        debug_assert!(msg.role == MessageRole::Assistant);
-        let max_server_tokens = self.budget.message_budget / 4;
-        cap_assistant_server_blocks(&mut msg, max_server_tokens);
-        self.messages.push(msg);
-        self.last_assistant_activity_at = Some(SystemTime::now());
-        self.enforce_budget();
-    }
-
-    pub fn push_tool_results(&mut self, mut msg: Message) {
-        debug_assert!(msg.role == MessageRole::User);
-        let max_per_result = self.budget.message_budget / 8;
-        cap_tool_results(&mut msg, max_per_result);
-        self.messages.push(msg);
-        self.enforce_budget();
     }
 
     pub fn append_warnings_to_last_user(&mut self, warnings: Vec<String>) {
@@ -157,10 +133,6 @@ impl ContextStore {
 
     pub(super) fn messages_mut(&mut self) -> &mut Vec<Message> {
         &mut self.messages
-    }
-
-    pub(super) fn replace_messages(&mut self, new: Vec<Message>) {
-        self.messages = new;
     }
 }
 

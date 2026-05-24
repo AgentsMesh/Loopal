@@ -29,7 +29,6 @@ mod llm_record;
 pub(crate) mod llm_result;
 mod llm_retry;
 pub mod loop_detector;
-pub(crate) mod message_build;
 pub(crate) mod model_config;
 mod params;
 mod params_builder;

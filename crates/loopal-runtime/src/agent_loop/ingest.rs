@@ -2,7 +2,6 @@ use loopal_protocol::{AgentStatus, Envelope};
 use tracing::error;
 
 use super::input::WaitResult;
-use super::message_build::build_user_message;
 use super::runner::AgentLoopRunner;
 use super::turn_trigger_map::envelope_to_trigger;
 
@@ -50,17 +49,7 @@ impl AgentLoopRunner {
             }
             return WaitResult::MessageAdded;
         };
-        let mut user_msg = build_user_message(env);
         let ephemeral = env.source.is_ephemeral_in_history();
-        user_msg.ephemeral_in_history = ephemeral;
-        if let Err(e) = self
-            .params
-            .deps
-            .session_manager
-            .save_message(&self.params.session.id, &mut user_msg)
-        {
-            error!(error = %e, "failed to persist message");
-        }
         if !ephemeral && self.params.session.title.is_empty() {
             let title = extract_title(&env.content.text);
             if !title.is_empty() {
@@ -75,10 +64,6 @@ impl AgentLoopRunner {
                 }
             }
         }
-        // reason: dual-write transitional. TurnStore is authoritative; ContextStore
-        // is migrated via `refresh_view` but full retirement awaits removal of
-        // compaction's set_boundary id-anchor dependency on `Message.id`.
-        self.params.store.push_user(user_msg);
 
         let message_id = env.id.to_string();
         // reason: emit before tracking the id — a failed emit must not leave

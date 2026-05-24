@@ -11,15 +11,15 @@ fn test_prepare_chat_params_act_mode() {
     let params = runner.prepare_chat_params(None).expect("should succeed");
 
     assert_eq!(params.model, "claude-sonnet-4-20250514");
-    // Default system_prompt is empty; only env section is appended
     assert!(
         !params.system_prompt.is_empty(),
         "env section should be present"
     );
-    // With empty messages and 200K window, max_tokens should be preserved (headroom is large).
     assert_eq!(params.max_tokens, runner.model_config.max_output_tokens);
-    assert!(params.turns.is_empty());
-    // Builtin tools should be present
+    // make_runner seeds a synthetic Resume turn (zero-projection); the
+    // request body sees a single empty turn.
+    assert_eq!(params.turns.len(), 1);
+    assert!(params.turns[0].body.steps.is_empty());
     assert!(!params.tools.is_empty());
 }
 
@@ -54,12 +54,14 @@ fn test_prepare_chat_params_with_turns() {
     // here; we just exercise the prepare_chat_params projection).
 
     let params = runner.prepare_chat_params(None).expect("should succeed");
-    assert_eq!(params.turns.len(), 1);
+    // make_runner seeds a Resume turn at index 0; this test adds a second
+    // UserInput turn at index 1.
+    assert_eq!(params.turns.len(), 2);
     assert!(matches!(
-        params.turns[0].trigger,
+        params.turns[1].trigger,
         TurnTrigger::UserInput { ref content, .. } if content == "Hello"
     ));
-    let _: &Turn = &params.turns[0];
+    let _: &Turn = &params.turns[1];
 }
 
 #[tokio::test]

@@ -128,7 +128,7 @@ impl AgentLoopRunner {
             return stats;
         }
 
-        let mut assistant = Message {
+        let assistant = Message {
             id: None,
             role: MessageRole::Assistant,
             content: tool_uses,
@@ -150,7 +150,7 @@ impl AgentLoopRunner {
                 ),
             });
         }
-        let mut user = Message {
+        let user = Message {
             id: None,
             role: MessageRole::User,
             content: tool_results,
@@ -158,26 +158,6 @@ impl AgentLoopRunner {
             ephemeral_in_history: false,
         };
 
-        if let Err(e) = self
-            .params
-            .deps
-            .session_manager
-            .save_message(&self.params.session.id, &mut assistant)
-        {
-            warn!(error = %e, "rehydrate assistant persist failed");
-            return stats;
-        }
-        if let Err(e) = self
-            .params
-            .deps
-            .session_manager
-            .save_message(&self.params.session.id, &mut user)
-        {
-            warn!(error = %e, "rehydrate tool_result persist failed");
-            return stats;
-        }
-
-        // Domain mirror: emit a CompactionRehydrate step carrying the rehydrated files.
         let rehydrated_files: Vec<RehydratedFile> =
             collect_rehydrated_files(&assistant.content, &user.content);
         if !rehydrated_files.is_empty()
@@ -188,15 +168,6 @@ impl AgentLoopRunner {
         {
             warn!(error = %e, "append_step(CompactionRehydrate) failed");
         }
-
-        // reason: compact still dual-writes — the boundary message-id anchor
-        // tracked by SessionManager::mark_compact_boundary references the
-        // ContextStore message, and TurnStep::CompactionRehydrate's projection
-        // emits id-less synthetic messages. Removing this would lose the
-        // resume-boundary correlation. Migration path: extend TurnStep to
-        // carry persisted message ids.
-        self.params.store.push_assistant(assistant);
-        self.params.store.push_tool_results(user);
 
         info!(
             files_attempted = stats.files_attempted,

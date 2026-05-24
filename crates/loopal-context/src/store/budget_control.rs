@@ -1,29 +1,12 @@
 use super::ContextStore;
-use crate::compaction::sanitize_tool_pairs;
 use crate::degradation::run_sync_degradation;
-use crate::ingestion::{cap_assistant_server_blocks, cap_tool_results};
 use crate::token_counter::estimate_messages_tokens;
-use loopal_provider_api::{Message, MessageRole};
+use loopal_provider_api::Message;
 use tracing::debug;
 
 impl ContextStore {
     pub fn prepare_for_llm(&self) -> Vec<Message> {
         self.messages().to_vec()
-    }
-
-    /// Replace the segment `[..boundary_at]` with a `[summary, ack]` prefix.
-    /// The caller is responsible for persisting the two messages and writing
-    /// the `Marker::CompactBoundary` anchor — this only mutates the in-memory
-    /// view used to build the next LLM request.
-    pub fn set_boundary(&mut self, boundary_at: usize, summary: Message, ack: Message) {
-        let kept = self.messages().get(boundary_at..).unwrap_or(&[]);
-        let mut new_msgs = Vec::with_capacity(kept.len() + 2);
-        new_msgs.push(summary);
-        new_msgs.push(ack);
-        new_msgs.extend_from_slice(kept);
-        self.replace_messages(new_msgs);
-        self.sanitize();
-        self.enforce_budget();
     }
 
     pub fn condense_server_blocks(&mut self) {
@@ -38,8 +21,6 @@ impl ContextStore {
     /// and preserves everything *after*. The current rule is "keep the last
     /// two messages" (`saturating_sub(2).max(1)`) so the model continues
     /// from the most recent turn without losing the active user request.
-    /// Living here, not in the runtime, keeps the boundary rule attached to
-    /// the data it operates on (GRASP Information Expert).
     pub fn compact_boundary_at(&self) -> usize {
         const KEEP_TAIL: usize = 2;
         self.len().saturating_sub(KEEP_TAIL).max(1)
@@ -72,6 +53,8 @@ impl ContextStore {
     }
 
     pub(super) fn apply_ingestion_caps(&mut self) {
+        use crate::ingestion::{cap_assistant_server_blocks, cap_tool_results};
+        use loopal_provider_api::MessageRole;
         let max_server = self.budget().message_budget / 4;
         let max_result = self.budget().message_budget / 8;
         for msg in self.messages_mut() {
@@ -81,9 +64,5 @@ impl ContextStore {
                 cap_tool_results(msg, max_result);
             }
         }
-    }
-
-    fn sanitize(&mut self) {
-        sanitize_tool_pairs(self.messages_mut());
     }
 }

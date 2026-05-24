@@ -17,8 +17,6 @@ mod ingestion_test;
 mod pipeline_test;
 #[path = "suite/smart_compact_test.rs"]
 mod smart_compact_test;
-#[path = "suite/store_test.rs"]
-mod store_test;
 #[path = "suite/system_prompt_agent_test.rs"]
 mod system_prompt_agent_test;
 #[path = "suite/system_prompt_test.rs"]

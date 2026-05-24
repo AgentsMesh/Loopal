@@ -1,4 +1,4 @@
-use loopal_provider_api::{ContentBlock, Message, MessageRole};
+use loopal_provider_api::ContentBlock;
 use loopal_turn::{
     AssistantOutput, ServerToolCall, ServerToolPair, ServerToolResult,
     StopReason as TurnStopReason, TextBlock, ThinkingBlock, ToolCall, ToolCallId, TurnStep,
@@ -8,9 +8,7 @@ use tracing::error;
 use super::runner::AgentLoopRunner;
 
 impl AgentLoopRunner {
-    /// Record the assistant response as a message in the conversation history.
-    /// Writes to both persistent storage and in-memory store.
-    /// Block order: thinking → server blocks → text → client tool_uses.
+    /// Record the assistant response as an LlmCall step on the current turn.
     pub fn record_assistant_message(
         &mut self,
         assistant_text: &str,
@@ -19,73 +17,24 @@ impl AgentLoopRunner {
         thinking_signature: Option<&str>,
         server_blocks: Vec<ContentBlock>,
     ) {
-        let mut assistant_content: Vec<ContentBlock> = Vec::new();
-
-        // Thinking block goes first (Anthropic API requires this order).
-        // Skip if signature is missing — an unsigned thinking block (e.g. from
-        // an interrupted stream) fails API validation on the next multi-turn call.
-        // For OpenAI, signature stores the reasoning item ID — save even if text is empty.
-        if thinking_signature.is_some() && (!thinking_text.is_empty() || !server_blocks.is_empty())
-        {
-            assistant_content.push(ContentBlock::Thinking {
-                thinking: thinking_text.to_string(),
-                signature: thinking_signature.map(String::from),
-            });
+        let has_thinking = thinking_signature.is_some()
+            && (!thinking_text.is_empty() || !server_blocks.is_empty());
+        let has_text = !assistant_text.is_empty();
+        let has_tools = !tool_uses.is_empty();
+        let has_server = !server_blocks.is_empty();
+        if !has_thinking && !has_text && !has_tools && !has_server {
+            return;
         }
-
-        // Server-side tool blocks (e.g. web_search) in stream order.
-        for block in server_blocks.clone() {
-            assistant_content.push(block);
-        }
-
-        if !assistant_text.is_empty() {
-            assistant_content.push(ContentBlock::Text {
-                text: assistant_text.to_string(),
-            });
-        }
-        for (id, name, input) in tool_uses {
-            assistant_content.push(ContentBlock::ToolUse {
-                id: id.clone(),
-                name: name.clone(),
-                input: input.clone(),
-            });
-        }
-
-        if !assistant_content.is_empty() {
-            let mut assistant_msg = Message {
-                id: None,
-                role: MessageRole::Assistant,
-                content: assistant_content,
-                origin: None,
-                ephemeral_in_history: false,
-            };
-            if let Err(e) = self
-                .params
-                .deps
-                .session_manager
-                .save_message(&self.params.session.id, &mut assistant_msg)
-            {
-                error!(error = %e, "failed to persist message");
-            }
-            // Domain-layer mirror: record LlmCall step. The append failure
-            // path keeps the dual-write going because ContextStore is still
-            // SSOT for the compaction boundary anchor (Message.id) — skipping
-            // the push would diverge from messages.jsonl and break resume.
-            // When CompactionSummary carries the persisted summary id, this
-            // can change to abort.
-            let step = build_llm_call_step(
-                self.params.config.model(),
-                assistant_text,
-                tool_uses,
-                thinking_text,
-                thinking_signature,
-                &server_blocks,
-            );
-            if let Err(e) = self.append_step_record(step) {
-                error!(error = %e, "append_step(LlmCall) failed; turn log diverges from ContextStore");
-            }
-            // reason: dual-write transitional — see ContextStore::refresh_view doc.
-            self.params.store.push_assistant(assistant_msg);
+        let step = build_llm_call_step(
+            self.params.config.model(),
+            assistant_text,
+            tool_uses,
+            thinking_text,
+            thinking_signature,
+            &server_blocks,
+        );
+        if let Err(e) = self.append_step_record(step) {
+            error!(error = %e, "append_step(LlmCall) failed");
         }
     }
 }

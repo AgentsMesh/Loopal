@@ -23,8 +23,6 @@ pub fn project_turn_to_messages(turn: &Turn) -> Vec<Message> {
 }
 
 fn project_trigger(trigger: &TurnTrigger) -> Option<Message> {
-    // reason: 与 runtime/message_build::build_user_message 的前缀规则保持一致 —
-    // 投影出的 user message 在 LLM 上下文中和 ingest 时直接写入的版本等价。
     match trigger {
         TurnTrigger::UserInput {
             content, images, ..

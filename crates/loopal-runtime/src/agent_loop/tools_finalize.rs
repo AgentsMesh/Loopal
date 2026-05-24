@@ -1,7 +1,6 @@
 use loopal_error::Result;
-use loopal_provider_api::{ContentBlock, Message, MessageRole};
+use loopal_provider_api::ContentBlock;
 use loopal_turn::{ToolExecState, ToolResult};
-use tracing::error;
 
 use super::runner::AgentLoopRunner;
 
@@ -17,33 +16,12 @@ impl AgentLoopRunner {
         let blocks: Vec<ContentBlock> = indexed_results.into_iter().map(|(_, b)| b).collect();
         let item_updates = collect_item_updates(&blocks, self.current_tool_batch_item_ids());
 
-        let mut msg = Message {
-            id: None,
-            role: MessageRole::User,
-            content: blocks,
-            origin: None,
-            ephemeral_in_history: false,
-        };
-        if let Err(e) = self
-            .params
-            .deps
-            .session_manager
-            .save_message(&self.params.session.id, &mut msg)
-        {
-            error!(error = %e, "failed to persist message");
-        }
-        // Domain mirror: patch each item state on the in-flight ToolBatch step
-        // (started in execute_tools); ToolCall.name/input remain authoritative.
-        // Same precondition as emit_all_interrupted: skip the loop if the
-        // batch failed to open, so each update doesn't log NoToolBatchOpen.
         if self.turns.current_tool_batch_step().is_some() {
             for (item_index, new_state) in item_updates {
                 self.update_tool_batch_item_state(item_index, new_state);
             }
             self.close_tool_batch_record();
         }
-        // reason: dual-write transitional — see ContextStore::refresh_view doc.
-        self.params.store.push_tool_results(msg);
         Ok(())
     }
 

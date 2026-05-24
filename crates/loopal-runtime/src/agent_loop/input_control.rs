@@ -7,7 +7,6 @@ use loopal_error::Result;
 use loopal_protocol::{AgentEventPayload, AgentStatus, ControlCommand};
 use tracing::{error, info};
 
-use super::rewind::detect_turn_boundaries;
 use super::runner::AgentLoopRunner;
 
 fn persist_local_setting(cwd: &str, key: &str, value: serde_json::Value) {
@@ -40,19 +39,7 @@ impl AgentLoopRunner {
                 // is still coherent rather than `agent: empty, view: full`.
                 self.emit(AgentEventPayload::Cleared { context_window })
                     .await?;
-                if let Err(e) = self
-                    .params
-                    .deps
-                    .session_manager
-                    .clear_history(&self.params.session.id)
-                {
-                    // Best-effort persist: a failure here leaves the on-disk
-                    // marker missing while view + in-memory store are wiped.
-                    // The agent will reload pre-clear history on next restart
-                    // — acceptable because the alternative (abort the clear,
-                    // leave view confused) is worse UX.
-                    error!(error = %e, "failed to persist clear marker");
-                }
+                self.turns.store_mut().clear();
                 self.params.store.clear();
                 self.turn_count = 0;
                 self.tokens.reset();
@@ -147,42 +134,18 @@ impl AgentLoopRunner {
     }
 
     pub(super) async fn handle_rewind(&mut self, turn_index: usize) -> Result<()> {
-        let boundaries = detect_turn_boundaries(self.params.store.messages());
-        if turn_index >= boundaries.len() {
-            error!(turn_index, total = boundaries.len(), "invalid turn index");
+        let total = self.turns.store().turns().len();
+        if turn_index >= total {
+            error!(turn_index, total, "invalid turn index");
             return Ok(());
         }
-        let truncate_at = boundaries[turn_index];
-        info!(turn_index, truncate_at, "rewinding conversation");
-        if truncate_at == 0 {
-            if let Err(e) = self
-                .params
-                .deps
-                .session_manager
-                .clear_history(&self.params.session.id)
-            {
-                error!(error = %e, "failed to persist clear marker for rewind");
-            }
-        } else if let Some(ref id) = self.params.store.messages()[truncate_at].id {
-            if let Err(e) = self
-                .params
-                .deps
-                .session_manager
-                .rewind_to(&self.params.session.id, id)
-            {
-                error!(error = %e, "failed to persist rewind marker");
-            }
-        } else {
-            error!(
-                truncate_at,
-                "message at truncate point has no id, skipping marker"
-            );
-        }
-        self.params.store.truncate(truncate_at);
+        info!(turn_index, "rewinding conversation");
+        self.turns.store_mut().truncate_turns(turn_index);
+        let turns = self.turns.store().turns().to_vec();
+        self.params.store.refresh_view(&turns);
         self.turn_count = self.turn_count.min(turn_index as u32);
-        let remaining = detect_turn_boundaries(self.params.store.messages()).len();
         self.emit(AgentEventPayload::Rewound {
-            remaining_turns: remaining,
+            remaining_turns: turn_index,
         })
         .await?;
         Ok(())

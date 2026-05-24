@@ -69,24 +69,6 @@ impl AgentLoopRunner {
         .await
     }
 
-    /// Persist the summary/ack pair and anchor the boundary marker.
-    ///
-    /// Failure semantics (read this before touching the order):
-    /// * `save_message(summary)` fails — caller propagates; nothing else
-    ///   has run, no on-disk state, store untouched. Caller will retry on
-    ///   the next compact tick.
-    /// * `save_message(ack)` fails after summary saved — propagated; the
-    ///   summary message lives on disk without a boundary marker. Replay
-    ///   falls back to the safe path (keep full history) because the
-    ///   marker is the anchor; the orphan summary message is harmless.
-    /// * `mark_compact_boundary` fails — propagated; same safe fallback.
-    /// * `store.set_boundary` is the last step and is infallible; it only
-    ///   runs after every persistence step has succeeded, which keeps
-    ///   in-memory and on-disk views consistent.
-    /// * `compact_rehydrate` is best-effort; its failure is logged but
-    ///   never bubbled up so we don't undo a successful boundary commit.
-    ///   It also honors `cancel` so a mid-rehydrate interrupt cannot leave
-    ///   an orphan `ToolUse` block in the store.
     async fn persist_and_apply(
         &mut self,
         output: CompactOutput,
@@ -94,27 +76,12 @@ impl AgentLoopRunner {
         cancel: &CancellationToken,
     ) -> Result<PersistResult> {
         let CompactOutput {
-            mut summary_msg,
-            mut ack_msg,
+            summary_msg,
+            ack_msg,
             touched_files,
             ..
         } = output;
 
-        self.params
-            .deps
-            .session_manager
-            .save_message(&self.params.session.id, &mut summary_msg)?;
-        self.params
-            .deps
-            .session_manager
-            .save_message(&self.params.session.id, &mut ack_msg)?;
-
-        // Domain mirror: record summary step (LLM-generated working state + ack).
-        // Compaction's set_boundary path still depends on Message.id anchors in
-        // ContextStore, so a failed step write is logged but does not abort
-        // the compaction — the in-memory boundary still flips below via
-        // `store.set_boundary`. Resume from turns.jsonl will miss the summary
-        // step in this rare path.
         let removed_count = boundary_at as u32;
         if let Err(e) = self.append_step_record(TurnStep::CompactionSummary(CompactionSummary {
             summary_text: summary_msg.text_content(),
@@ -122,18 +89,8 @@ impl AgentLoopRunner {
             kept_turn_count: 0,
             removed_turn_count: removed_count,
         })) {
-            warn!(error = %e, "append_step(CompactionSummary) failed; turns.jsonl will be missing this entry");
+            warn!(error = %e, "append_step(CompactionSummary) failed");
         }
-
-        let summary_id = summary_msg.id.clone().expect("save_message assigns a UUID");
-        self.params
-            .deps
-            .session_manager
-            .mark_compact_boundary(&self.params.session.id, &summary_id)?;
-
-        self.params
-            .store
-            .set_boundary(boundary_at, summary_msg, ack_msg);
 
         // Compaction rewrote earlier history. Notify cross-turn governance
         // state (LoopDetector signatures, etc.) so they don't carry stale
@@ -151,7 +108,7 @@ impl AgentLoopRunner {
         }
         let rehydrate = self.compact_rehydrate(&touched_files, cancel).await;
         Ok(PersistResult {
-            summary_msg_id: Some(summary_id),
+            summary_msg_id: None,
             files_rehydrated: rehydrate.files_succeeded,
         })
     }

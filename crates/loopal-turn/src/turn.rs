@@ -96,7 +96,8 @@ pub enum TurnTrigger {
         content: String,
     },
     /// Async background hook fired and queued an envelope. `hook_kind` is the
-    /// system kind string (matches `MessageSource::System(kind)`).
+    /// short label that identifies which hook ran (e.g. `stop_feedback`,
+    /// `goal_continuation`).
     BackgroundHook {
         envelope_id: String,
         hook_kind: String,

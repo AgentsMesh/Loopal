@@ -31,7 +31,7 @@ impl AgentLoopRunner {
         // message lands. If a previous turn is still open (resume after
         // crash without TurnEnded), close it as Cancelled so the new
         // TurnStarted is the only InProgress turn at any time.
-        if self.turns.current_turn_id.is_some() {
+        if self.turns.current_turn_id().is_some() {
             self.end_turn_record(loopal_turn::TurnOutcome::Cancelled {
                 cause: loopal_turn::CancelledCause::ParentTurnAborted,
             });

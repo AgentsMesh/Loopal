@@ -81,7 +81,7 @@ fn push_step(out: &mut Vec<Value>, step: &TurnStep) {
         TurnStep::ToolBatch(_) => {}
         TurnStep::CompactionSummary(s) => push_compaction_summary(out, s),
         TurnStep::CompactionRehydrate(r) => push_compaction_rehydrate(out, r),
-        TurnStep::Injection(inj) => out.push(text_user(&inj.text)),
+        TurnStep::Injection { text, .. } => out.push(text_user(text)),
     }
 }
 

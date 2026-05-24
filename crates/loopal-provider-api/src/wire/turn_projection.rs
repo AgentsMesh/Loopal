@@ -1,7 +1,7 @@
 use loopal_turn::{
-    AssistantOutput, CompactionRehydrate, CompactionSummary, InjectedMessage, InjectionKind,
-    OrderedToolBatch, ServerToolPair, TextBlock, ThinkingBlock, ToolBatchItem, ToolCall,
-    ToolExecState, ToolResult, Turn, TurnStep, TurnTrigger,
+    AssistantOutput, CompactionRehydrate, CompactionSummary, InjectionKind, OrderedToolBatch,
+    ServerToolPair, TextBlock, ThinkingBlock, ToolBatchItem, ToolCall, ToolExecState, ToolResult,
+    Turn, TurnStep, TurnTrigger,
 };
 
 use super::message::{ContentBlock, Message, MessageRole};
@@ -72,7 +72,7 @@ fn project_step(step: &TurnStep) -> Vec<Message> {
         TurnStep::ToolBatch(batch) => project_tool_batch(batch).into_iter().collect(),
         TurnStep::CompactionSummary(s) => project_compaction_summary(s),
         TurnStep::CompactionRehydrate(r) => project_compaction_rehydrate(r),
-        TurnStep::Injection(inj) => vec![project_injection(inj)],
+        TurnStep::Injection { kind, text } => vec![project_injection(kind, text)],
     }
 }
 
@@ -193,8 +193,8 @@ fn project_compaction_rehydrate(r: &CompactionRehydrate) -> Vec<Message> {
     out
 }
 
-fn project_injection(inj: &InjectedMessage) -> Message {
-    let origin = match inj.kind {
+fn project_injection(kind: &InjectionKind, text: &str) -> Message {
+    let origin = match kind {
         InjectionKind::Governance => MessageOrigin::GovernanceFeedback,
         InjectionKind::StopFeedback => MessageOrigin::StopFeedback,
         InjectionKind::ConfigRefresh => MessageOrigin::ConfigRefresh,
@@ -202,7 +202,7 @@ fn project_injection(inj: &InjectedMessage) -> Message {
             label: "system_note".into(),
         },
     };
-    text_user(&inj.text, Some(origin))
+    text_user(text, Some(origin))
 }
 
 fn text_user(text: &str, origin: Option<MessageOrigin>) -> Message {

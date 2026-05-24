@@ -46,12 +46,12 @@ impl AgentLoopRunner {
         // currently in-progress Turn. Errors close it with an Error outcome.
         match new_status {
             AgentStatus::WaitingForInput => {
-                if self.turns.current_turn_id.is_some() {
+                if self.turns.current_turn_id().is_some() {
                     self.end_turn_record(loopal_turn::TurnOutcome::Complete);
                 }
             }
             AgentStatus::Finished => {
-                if self.turns.current_turn_id.is_some() {
+                if self.turns.current_turn_id().is_some() {
                     self.end_turn_record(loopal_turn::TurnOutcome::Complete);
                 }
             }
@@ -68,7 +68,7 @@ impl AgentLoopRunner {
                 message: message.clone(),
             })
             .await;
-        if self.turns.current_turn_id.is_some() {
+        if self.turns.current_turn_id().is_some() {
             self.end_turn_record(loopal_turn::TurnOutcome::Error { message });
         }
         result

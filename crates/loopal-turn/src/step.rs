@@ -16,7 +16,13 @@ pub enum TurnStep {
     /// injected so the model can continue without re-reading. Always follows a
     /// CompactionSummary step in the same turn (best-effort; not enforced).
     CompactionRehydrate(CompactionRehydrate),
-    Injection(InjectedMessage),
+    /// Synthetic content injected into the conversation by runtime governance,
+    /// stop-feedback hooks, or config-refresh middleware. `kind` discriminates
+    /// origin so downstream views (replay, audit) can label it accordingly.
+    Injection {
+        kind: InjectionKind,
+        text: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -99,12 +105,6 @@ pub struct RehydratedFile {
     pub path: String,
     pub tool_call_id: ToolCallId,
     pub content: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InjectedMessage {
-    pub kind: InjectionKind,
-    pub text: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

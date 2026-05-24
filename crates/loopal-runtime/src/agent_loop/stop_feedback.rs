@@ -1,6 +1,6 @@
 use loopal_provider_api::MessageOrigin;
 use loopal_provider_api::{ContentBlock, Message, MessageRole};
-use loopal_turn::{InjectedMessage, InjectionKind, TurnStep};
+use loopal_turn::{InjectionKind, TurnStep};
 use tracing::error;
 
 use super::runner::AgentLoopRunner;
@@ -26,10 +26,10 @@ impl AgentLoopRunner {
         {
             error!(error = %e, "failed to persist stop-feedback message");
         }
-        self.append_step_record(TurnStep::Injection(InjectedMessage {
+        self.append_step_record(TurnStep::Injection {
             kind: InjectionKind::StopFeedback,
             text: feedback,
-        }));
+        });
         self.params.store.push_user(msg);
     }
 }

@@ -1,7 +1,7 @@
 use loopal_context::ContextStore;
 use loopal_provider_api::MessageOrigin;
 use loopal_provider_api::{ContentBlock, Message, MessageRole};
-use loopal_turn::{InjectedMessage, InjectionKind, TurnStep};
+use loopal_turn::{InjectionKind, TurnStep};
 use tracing::error;
 
 use super::super::runner::AgentLoopRunner;
@@ -53,7 +53,7 @@ impl AgentLoopRunner {
                 _ => None,
             };
             if let Some(kind) = kind {
-                self.append_step_record(TurnStep::Injection(InjectedMessage { kind, text }));
+                self.append_step_record(TurnStep::Injection { kind, text });
             }
         }
         push(&mut self.params.store, msg);

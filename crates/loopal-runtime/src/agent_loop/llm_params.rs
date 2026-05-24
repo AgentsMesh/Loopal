@@ -55,7 +55,7 @@ impl AgentLoopRunner {
             resolve_thinking_config(&self.model_config.thinking, capability, safe_max_tokens);
         Ok(ChatParams {
             model: self.params.config.model().to_string(),
-            turns: self.turns.store.turns().to_vec(),
+            turns: self.turns.store().turns().to_vec(),
             system_prompt: full_system_prompt,
             tools: tool_defs,
             max_tokens: safe_max_tokens,

@@ -291,10 +291,10 @@ fn compaction_emits_user_summary_then_assistant_ack() {
 fn injection_governance_maps_to_governance_feedback_origin() {
     let t = turn_with(
         TurnTrigger::Resume,
-        vec![TurnStep::Injection(loopal_turn::InjectedMessage {
+        vec![TurnStep::Injection {
             kind: loopal_turn::InjectionKind::Governance,
             text: "abort".into(),
-        })],
+        }],
     );
     let msgs = project_turn_to_messages(&t);
     assert_eq!(msgs.len(), 1);

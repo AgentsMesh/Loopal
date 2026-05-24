@@ -45,10 +45,13 @@ fn test_prepare_chat_params_with_turns() {
     use loopal_turn::{Turn, TurnTrigger};
 
     let (mut runner, _rx) = make_runner();
-    runner.turns.store.start_turn(TurnTrigger::UserInput {
-        envelope_id: "env-1".into(),
-        content: "Hello".into(),
-    });
+    runner
+        .turns
+        .store_mut()
+        .start_turn(TurnTrigger::UserInput {
+            envelope_id: "env-1".into(),
+            content: "Hello".into(),
+        });
     // pre-existing turn in store (no need to actively use start_turn_record
     // here; we just exercise the prepare_chat_params projection).
 

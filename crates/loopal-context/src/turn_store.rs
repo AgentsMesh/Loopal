@@ -1,6 +1,6 @@
 use std::time::SystemTime;
 
-use loopal_turn::{Turn, TurnId, TurnOutcome, TurnStep, TurnTrigger};
+use loopal_turn::{ToolExecState, Turn, TurnId, TurnOutcome, TurnStep, TurnTrigger};
 
 use crate::budget::ContextBudget;
 
@@ -12,6 +12,12 @@ pub enum TurnStoreError {
     CurrentTurnFinished,
     #[error("turn not found: {0}")]
     TurnNotFound(String),
+    #[error("step index out of range: {step_index}")]
+    StepIndexOutOfRange { step_index: u32 },
+    #[error("step at index {step_index} is not a ToolBatch")]
+    StepNotToolBatch { step_index: u32 },
+    #[error("tool item index out of range: {item_index} (batch len {batch_len})")]
+    ItemIndexOutOfRange { item_index: u32, batch_len: u32 },
 }
 
 pub type TurnStoreResult<T> = Result<T, TurnStoreError>;
@@ -80,6 +86,45 @@ impl TurnStore {
         let idx = turn.body.steps.len() as u32;
         turn.body.steps.push(step);
         Ok(idx)
+    }
+
+    /// Patch a single `ToolBatchItem.state` inside an existing `ToolBatch` step
+    /// of the current turn. Mirrors the `TurnEvent::StepUpdated` event-sourcing
+    /// path for in-memory state.
+    pub fn update_tool_state(
+        &mut self,
+        step_index: u32,
+        item_index: u32,
+        new_state: ToolExecState,
+    ) -> TurnStoreResult<()> {
+        let id = self
+            .current_turn_id
+            .as_ref()
+            .ok_or(TurnStoreError::NoCurrentTurn)?
+            .clone();
+        let turn = self
+            .turns
+            .iter_mut()
+            .find(|t| t.id == id)
+            .ok_or_else(|| TurnStoreError::TurnNotFound(id.as_str().to_string()))?;
+        let step = turn
+            .body
+            .steps
+            .get_mut(step_index as usize)
+            .ok_or(TurnStoreError::StepIndexOutOfRange { step_index })?;
+        let batch = match step {
+            TurnStep::ToolBatch(b) => b,
+            _ => return Err(TurnStoreError::StepNotToolBatch { step_index }),
+        };
+        let batch_len = batch.items.len() as u32;
+        let item = batch.items.get_mut(item_index as usize).ok_or(
+            TurnStoreError::ItemIndexOutOfRange {
+                item_index,
+                batch_len,
+            },
+        )?;
+        item.state = new_state;
+        Ok(())
     }
 
     pub fn end_current_turn(&mut self, outcome: TurnOutcome) -> TurnStoreResult<()> {

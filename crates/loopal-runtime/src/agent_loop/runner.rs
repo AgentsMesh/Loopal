@@ -57,6 +57,11 @@ pub struct AgentLoopRunner {
     /// emit via `StepAppended` events.
     pub current_turn_id: Option<TurnId>,
     pub current_step_index: u32,
+    /// Index of the in-flight `TurnStep::ToolBatch` step (set by
+    /// `start_tool_batch_record`; consumed by `complete_tool_batch_item`).
+    /// Allows tools_finalize to patch item state via `StepUpdated` instead of
+    /// appending a new batch step with placeholder call fields.
+    pub current_tool_batch_step: Option<u32>,
     /// In-memory `Vec<Turn>` mirror — populated by `turn_record` helpers
     /// alongside `params.store` (message-shaped). Will become SSOT in PR-6;
     /// for now both views stay in sync via dual-write.
@@ -115,6 +120,7 @@ impl AgentLoopRunner {
             last_continuation_goal_id: None,
             current_turn_id: None,
             current_step_index: 0,
+            current_tool_batch_step: None,
             turn_store: TurnStore::new(turn_store_budget),
         }
     }

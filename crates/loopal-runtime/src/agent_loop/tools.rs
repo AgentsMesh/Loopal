@@ -17,6 +17,11 @@ impl AgentLoopRunner {
         tool_uses: Vec<(String, String, serde_json::Value)>,
         early_handle: StreamingToolHandle,
     ) -> Result<ToolExecStats> {
+        // reason: open the ToolBatch step up-front with full ToolCall info so
+        // subsequent finalize/intercept paths only need to patch item state via
+        // StepUpdated — no placeholder fields, no second batch step.
+        self.start_tool_batch_record(&tool_uses);
+
         if turn_ctx.cancel.is_cancelled() {
             early_handle.discard();
             self.emit_all_interrupted(&tool_uses).await?;

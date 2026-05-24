@@ -2,10 +2,7 @@ use loopal_error::Result;
 use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::{ContentBlock, Message, MessageRole};
 use loopal_tool_invocation::{CancelCause, ToolResultMetadata};
-use loopal_turn::{
-    CancelCause as TurnCancelCause, OrderedToolBatch, ToolBatchItem, ToolCall, ToolCallId,
-    ToolExecState, TurnStep,
-};
+use loopal_turn::{CancelCause as TurnCancelCause, ToolExecState};
 use tracing::{error, info};
 
 use super::runner::AgentLoopRunner;
@@ -90,21 +87,16 @@ impl AgentLoopRunner {
         {
             error!(error = %e, "failed to persist message");
         }
-        // Domain mirror: emit ToolBatch with all items in Cancelled state.
-        let items: Vec<ToolBatchItem> = tool_uses
-            .iter()
-            .map(|(id, name, input)| ToolBatchItem {
-                call: ToolCall {
-                    id: ToolCallId::new(id),
-                    name: name.clone(),
-                    input: input.clone(),
-                },
-                state: ToolExecState::Cancelled(TurnCancelCause::UserInterrupt),
-            })
-            .collect();
-        if !items.is_empty() {
-            self.append_step_record(TurnStep::ToolBatch(OrderedToolBatch { items }));
+        // Domain mirror: patch in-flight ToolBatch items to Cancelled.
+        // (execute_tools opened the batch with full ToolCall info; here we
+        // just update each item's state.)
+        for (item_index, _) in tool_uses.iter().enumerate() {
+            self.update_tool_batch_item_state(
+                item_index as u32,
+                ToolExecState::Cancelled(TurnCancelCause::UserInterrupt),
+            );
         }
+        self.close_tool_batch_record();
         self.params.store.push_tool_results(msg);
         Ok(())
     }

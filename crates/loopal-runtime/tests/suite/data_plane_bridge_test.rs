@@ -2,11 +2,11 @@
 //! can satisfy the trait, which is the whole point of having a trait
 //! instead of inlined calls on `AgentLoopRunner`.
 
+use loopal_provider_api::MessageOrigin;
 use loopal_provider_api::{ContentBlock, Message, MessageRole};
 use loopal_runtime::agent_loop::governance::{
     DataPlaneBridge, make_governance_feedback, synthesize_aborted_tool_results,
 };
-use loopal_turn::MessageOrigin;
 
 #[derive(Default)]
 struct CapturingBridge {

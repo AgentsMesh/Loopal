@@ -1,4 +1,4 @@
-use loopal_turn::MessageOrigin;
+use loopal_provider_api::MessageOrigin;
 use std::sync::Mutex;
 
 use async_trait::async_trait;

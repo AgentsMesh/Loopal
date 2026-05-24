@@ -3,9 +3,9 @@ use loopal_context::compact_config::{
 };
 use loopal_context::middleware::touched_files::TouchedFile;
 use loopal_protocol::AgentEventPayload;
+use loopal_provider_api::MessageOrigin;
 use loopal_provider_api::{ContentBlock, Message, MessageRole};
 use loopal_tool_api::ToolResult;
-use loopal_turn::MessageOrigin;
 use loopal_turn::{CompactionRehydrate, RehydratedFile, ToolCallId, TurnStep};
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;

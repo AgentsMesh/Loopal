@@ -1,7 +1,7 @@
+use loopal_provider_api::MessageOrigin;
 use loopal_provider_api::{
     ContentBlock, MessageRole, project_turn_to_messages, project_turns_to_messages,
 };
-use loopal_turn::MessageOrigin;
 use loopal_turn::{
     AssistantOutput, OrderedToolBatch, ServerToolCall, ServerToolPair, ServerToolResult,
     StopReason, TextBlock, ToolBatchItem, ToolCall, ToolCallId, ToolExecState, ToolResult, Turn,

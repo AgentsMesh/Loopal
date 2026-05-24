@@ -1,6 +1,7 @@
 use loopal_tool_invocation::{ToolImageBlock, ToolResultMetadata};
-use loopal_turn::MessageOrigin;
 use serde::{Deserialize, Serialize};
+
+use super::origin::MessageOrigin;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]

@@ -1,6 +1,5 @@
 mod content;
 mod event;
-mod origin;
 mod repo;
 mod step;
 mod turn;
@@ -10,7 +9,6 @@ pub use content::{
     ToolCallId, ToolResult,
 };
 pub use event::TurnEvent;
-pub use origin::MessageOrigin;
 pub use repo::{InMemoryTurnRepo, TurnRepo, TurnRepoError, TurnRepoResult};
 pub use step::{
     AssistantOutput, CancelCause, CompactionRehydrate, CompactionSummary, InjectedMessage,

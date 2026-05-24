@@ -1,12 +1,10 @@
 use serde::{Deserialize, Serialize};
 
-/// Origin of a `Message` — audit metadata indicating how the message
-/// entered the conversation.
-///
-/// This is a lossy projection of the protocol-level `MessageSource`
-/// (which lives in `loopal-protocol` and carries `QualifiedAddress`).
-/// Keeping the projection here avoids a circular dep
-/// (`loopal-message` would otherwise depend on `loopal-protocol`).
+// reason: Audit metadata for a wire-format Message — describes how the
+// message entered the conversation. Lossy projection of the protocol-level
+// `MessageSource` (which carries `QualifiedAddress`); kept here in the wire
+// schema crate so neither domain (loopal-turn) nor protocol need to know
+// about it. Consumed by middleware / UI / forensic replay.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum MessageOrigin {

@@ -1,5 +1,5 @@
+use loopal_provider_api::MessageOrigin;
 use loopal_provider_api::{ContentBlock, Message, MessageRole};
-use loopal_turn::MessageOrigin;
 use loopal_turn::{InjectedMessage, InjectionKind, TurnStep};
 use tracing::error;
 

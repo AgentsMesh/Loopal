@@ -28,7 +28,7 @@ impl AgentLoopRunner {
     }
 
     pub(super) fn start_turn_record(&mut self, trigger: TurnTrigger) -> Option<TurnId> {
-        let id = self.turn_store.start_turn(trigger.clone());
+        let id = self.turns.store.start_turn(trigger.clone());
         let event = TurnEvent::TurnStarted {
             turn_id: id.clone(),
             started_at: Utc::now(),
@@ -36,23 +36,23 @@ impl AgentLoopRunner {
         };
         if !self.persist_event(&event) {
             // Roll back: pop the just-pushed turn so turn_store stays in lockstep.
-            self.turn_store.turns_mut().pop();
+            self.turns.store.turns_mut().pop();
             return None;
         }
-        self.current_turn_id = Some(id.clone());
-        self.current_step_index = 0;
-        self.current_tool_batch_step = None;
+        self.turns.current_turn_id = Some(id.clone());
+        self.turns.current_step_index = 0;
+        self.turns.current_tool_batch_step = None;
         Some(id)
     }
 
     pub(super) fn append_step_record(&mut self, step: TurnStep) -> Option<u32> {
-        let turn_id = self.current_turn_id.as_ref()?.clone();
-        let step_index = self.current_step_index;
+        let turn_id = self.turns.current_turn_id.as_ref()?.clone();
+        let step_index = self.turns.current_step_index;
         // In-memory first so the event we persist matches what fold() would
         // reproduce. Failure here means the in-memory state machine is broken
         // (no current turn); skip the persist to avoid emitting an event that
         // can't be replayed.
-        if let Err(e) = self.turn_store.append_step(step.clone()) {
+        if let Err(e) = self.turns.store.append_step(step.clone()) {
             warn!(error = %e, "turn_store append_step failed; skipping event persist");
             return None;
         }
@@ -64,7 +64,8 @@ impl AgentLoopRunner {
         if !self.persist_event(&event) {
             // Roll back the in-memory push so the two views stay aligned.
             if let Some(turn) = self
-                .turn_store
+                .turns
+                .store
                 .turns_mut()
                 .iter_mut()
                 .find(|t| t.id == turn_id)
@@ -73,7 +74,7 @@ impl AgentLoopRunner {
             }
             return None;
         }
-        self.current_step_index += 1;
+        self.turns.current_step_index += 1;
         Some(step_index)
     }
 
@@ -101,7 +102,7 @@ impl AgentLoopRunner {
             .collect();
         let step_index =
             self.append_step_record(TurnStep::ToolBatch(OrderedToolBatch { items }))?;
-        self.current_tool_batch_step = Some(step_index);
+        self.turns.current_tool_batch_step = Some(step_index);
         Some(step_index)
     }
 
@@ -113,25 +114,27 @@ impl AgentLoopRunner {
         item_index: u32,
         new_state: ToolExecState,
     ) {
-        let Some(turn_id) = self.current_turn_id.clone() else {
+        let Some(turn_id) = self.turns.current_turn_id.clone() else {
             return;
         };
-        let Some(step_index) = self.current_tool_batch_step else {
+        let Some(step_index) = self.turns.current_tool_batch_step else {
             warn!("update_tool_batch_item_state called without in-flight ToolBatch step");
             return;
         };
         // Snapshot the old state so we can roll back if event persist fails.
         let old_state = self
-            .turn_store
+            .turns
+            .store
             .current_turn()
             .and_then(|t| t.body.steps.get(step_index as usize))
             .and_then(|s| match s {
                 TurnStep::ToolBatch(b) => b.items.get(item_index as usize).map(|i| i.state.clone()),
                 _ => None,
             });
-        if let Err(e) = self
-            .turn_store
-            .update_tool_state(step_index, item_index, new_state.clone())
+        if let Err(e) =
+            self.turns
+                .store
+                .update_tool_state(step_index, item_index, new_state.clone())
         {
             warn!(error = %e, "turn_store update_tool_state failed; skipping event persist");
             return;
@@ -148,20 +151,21 @@ impl AgentLoopRunner {
             // Best-effort rollback to the prior state so in-memory matches
             // what fold(jsonl) will reproduce.
             let _ = self
-                .turn_store
+                .turns
+                .store
                 .update_tool_state(step_index, item_index, prev);
         }
     }
 
     pub(super) fn close_tool_batch_record(&mut self) {
-        self.current_tool_batch_step = None;
+        self.turns.current_tool_batch_step = None;
     }
 
     pub(super) fn end_turn_record(&mut self, outcome: TurnOutcome) {
-        let Some(turn_id) = self.current_turn_id.clone() else {
+        let Some(turn_id) = self.turns.current_turn_id.clone() else {
             return;
         };
-        if let Err(e) = self.turn_store.end_current_turn(outcome.clone()) {
+        if let Err(e) = self.turns.store.end_current_turn(outcome.clone()) {
             warn!(error = %e, "turn_store end_current_turn failed");
             return;
         }
@@ -179,8 +183,8 @@ impl AgentLoopRunner {
                 "TurnEnded event persist failed; in-memory ended, jsonl missing"
             );
         }
-        self.current_turn_id = None;
-        self.current_step_index = 0;
-        self.current_tool_batch_step = None;
+        self.turns.current_turn_id = None;
+        self.turns.current_step_index = 0;
+        self.turns.current_tool_batch_step = None;
     }
 }

@@ -45,10 +45,10 @@ impl AgentLoopRunner {
     /// Snapshot of (tool_use_id → item_index) for the in-flight ToolBatch step.
     /// Used to map ToolResult blocks back to the correct item position.
     pub(super) fn current_tool_batch_item_ids(&self) -> Vec<String> {
-        let Some(step_index) = self.current_tool_batch_step else {
+        let Some(step_index) = self.turns.current_tool_batch_step else {
             return Vec::new();
         };
-        let Some(turn) = self.turn_store.current_turn() else {
+        let Some(turn) = self.turns.store.current_turn() else {
             return Vec::new();
         };
         let Some(loopal_turn::TurnStep::ToolBatch(batch)) =

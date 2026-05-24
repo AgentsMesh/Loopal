@@ -73,6 +73,7 @@ mod turn_response;
 mod turn_state;
 mod turn_telemetry;
 mod turn_tool_phase;
+mod turn_tracker;
 mod turn_trigger_map;
 
 use loopal_error::{AgentOutput, Result};

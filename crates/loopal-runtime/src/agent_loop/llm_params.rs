@@ -55,7 +55,7 @@ impl AgentLoopRunner {
         Ok(ChatParams {
             model: self.params.config.model().to_string(),
             messages: messages.to_vec(),
-            turns: self.turn_store.turns().to_vec(),
+            turns: self.turns.store.turns().to_vec(),
             system_prompt: full_system_prompt,
             tools: tool_defs,
             max_tokens: safe_max_tokens,

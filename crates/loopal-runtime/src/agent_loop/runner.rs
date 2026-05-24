@@ -4,7 +4,6 @@ use loopal_context::{ContextPipeline, TurnStore};
 use loopal_error::{AgentOutput, Result};
 use loopal_protocol::{AgentEventPayload, AgentStatus, InterruptSignal};
 use loopal_tool_api::{GoalSession, ToolContext};
-use loopal_turn::TurnId;
 use tokio::sync::watch;
 use tracing::{Instrument, info, info_span};
 
@@ -15,6 +14,7 @@ use super::governance::traits::{Governance, TurnHook};
 use super::model_config::ModelConfig;
 use super::token_accumulator::TokenAccumulator;
 use super::turn_history::TurnHistory;
+use super::turn_tracker::TurnTracker;
 use crate::goal::GoalSessionToolAdapter;
 use crate::plan_file::PlanFile;
 
@@ -51,21 +51,10 @@ pub struct AgentLoopRunner {
     pub continuation_gate: ContinuationGate,
     pub turn_history: TurnHistory,
     pub last_continuation_goal_id: Option<String>,
-    /// Domain-layer turn tracking (parallel to message-layer save_message).
-    /// `current_turn_id == Some` between `start_turn_record` and
-    /// `end_turn_record`; `current_step_index` is the next step index to
-    /// emit via `StepAppended` events.
-    pub current_turn_id: Option<TurnId>,
-    pub current_step_index: u32,
-    /// Index of the in-flight `TurnStep::ToolBatch` step (set by
-    /// `start_tool_batch_record`; consumed by `complete_tool_batch_item`).
-    /// Allows tools_finalize to patch item state via `StepUpdated` instead of
-    /// appending a new batch step with placeholder call fields.
-    pub current_tool_batch_step: Option<u32>,
-    /// In-memory `Vec<Turn>` mirror — populated by `turn_record` helpers
-    /// alongside `params.store` (message-shaped). Will become SSOT in PR-6;
-    /// for now both views stay in sync via dual-write.
-    pub turn_store: TurnStore,
+    /// Domain-layer turn tracking — current turn id, step index, in-flight
+    /// ToolBatch step index, and in-memory `Vec<Turn>` mirror. Mutated only
+    /// by `turn_record` helpers under fail-closed atomicity with turns.jsonl.
+    pub turns: TurnTracker,
 }
 
 impl AgentLoopRunner {
@@ -118,10 +107,7 @@ impl AgentLoopRunner {
             continuation_gate: ContinuationGate::new(),
             turn_history: TurnHistory::new(),
             last_continuation_goal_id: None,
-            current_turn_id: None,
-            current_step_index: 0,
-            current_tool_batch_step: None,
-            turn_store: TurnStore::new(turn_store_budget),
+            turns: TurnTracker::new(TurnStore::new(turn_store_budget)),
         }
     }
 

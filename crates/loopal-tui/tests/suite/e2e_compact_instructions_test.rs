@@ -1,6 +1,7 @@
 use loopal_context::ContextBudget;
-use loopal_provider_api::{ContentBlock, Message};
+use loopal_provider_api::Message;
 use loopal_test_support::{HarnessBuilder, chunks};
+use loopal_turn::{Turn, TurnTrigger};
 
 fn tiny_budget() -> ContextBudget {
     ContextBudget {
@@ -18,11 +19,13 @@ fn padded_user(label: &str) -> Message {
     Message::user(&format!("{label}: {}", "x".repeat(100)))
 }
 
-fn first_user_text(msgs: &[Message]) -> String {
-    msgs.iter()
-        .flat_map(|m| m.content.iter())
-        .find_map(|b| match b {
-            ContentBlock::Text { text } => Some(text.clone()),
+fn first_user_text(turns: &[Turn]) -> String {
+    // reason: smart_compact_llm builds a single-turn ChatParams; the user
+    // prompt lives in the trigger content.
+    turns
+        .iter()
+        .find_map(|t| match &t.trigger {
+            TurnTrigger::UserInput { content, .. } => Some(content.clone()),
             _ => None,
         })
         .unwrap_or_default()

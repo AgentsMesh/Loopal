@@ -10,6 +10,7 @@ rust_library(
         "//crates/loopal-error",
         "//crates/loopal-provider-api",
         "//crates/loopal-protocol",
+        "//crates/loopal-turn",
         "@crates//:futures",
         "@crates//:reqwest",
         "@crates//:serde",

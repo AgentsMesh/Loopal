@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use futures::StreamExt;
-use loopal_provider_api::Message;
 use loopal_provider_api::{ChatParams, StreamChunk, TaskType};
 use loopal_tool_api::{FetchRefinerPolicy, OneShotChatError, OneShotChatService};
 
@@ -25,8 +24,7 @@ impl OneShotChatService for AgentShared {
             .map_err(|_| OneShotChatError::ProviderUnresolvable)?;
         let params = ChatParams {
             model: model.to_string(),
-            messages: vec![Message::user(user_prompt)],
-            turns: vec![],
+            turns: vec![loopal_turn::Turn::single_user_prompt(user_prompt)],
             system_prompt: system_prompt.to_string(),
             tools: vec![],
             max_tokens,

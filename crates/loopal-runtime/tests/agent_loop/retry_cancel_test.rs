@@ -87,9 +87,7 @@ async fn test_cancel_during_retry_sleep() {
     // Drain events in background
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 
-    let params = runner
-        .prepare_chat_params_with(runner.params.store.messages(), None)
-        .unwrap();
+    let params = runner.prepare_chat_params(None).unwrap();
     let provider = runner
         .params
         .deps
@@ -141,9 +139,7 @@ async fn test_cancel_before_stream_chat_attempt() {
 
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 
-    let params = runner
-        .prepare_chat_params_with(runner.params.store.messages(), None)
-        .unwrap();
+    let params = runner.prepare_chat_params(None).unwrap();
     let provider = runner
         .params
         .deps

@@ -4,11 +4,15 @@ use loopal_backend::{LocalBackend, ResourceLimits};
 use loopal_provider::AnthropicProvider;
 use loopal_provider_api::ChatParams;
 use loopal_provider_api::{ContentBlock, Message, MessageRole};
-use loopal_runtime::hydrate::{hydrate_images, maybe_persist_inline_images};
+use loopal_runtime::hydrate::{hydrate_images, hydrate_turn_images, maybe_persist_inline_images};
 use loopal_storage::FileResourceStore;
 use loopal_tool_api::{Tool, ToolContext, ToolDefinition, TypedBridge};
 use loopal_tool_invocation::ToolImageBlock;
 use loopal_tool_read_image::{ReadImageParams, ReadImageTool};
+use loopal_turn::{
+    AssistantOutput, OrderedToolBatch, StopReason, ToolBatchItem, ToolCall, ToolCallId,
+    ToolExecState, ToolResult as TurnToolResult, Turn, TurnBody, TurnStep, TurnTrigger,
+};
 use serde_json::json;
 use std::sync::Arc;
 use tempfile::tempdir;
@@ -43,11 +47,10 @@ fn tool() -> TypedBridge<ReadImageTool, ReadImageParams> {
     TypedBridge::new(ReadImageTool)
 }
 
-fn anthropic_params(messages: Vec<Message>) -> ChatParams {
+fn anthropic_params(turns: Vec<Turn>) -> ChatParams {
     ChatParams {
         model: "claude-test".to_string(),
-        messages,
-        turns: vec![],
+        turns,
         system_prompt: String::new(),
         tools: Vec::<ToolDefinition>::new(),
         max_tokens: 4096,
@@ -58,14 +61,50 @@ fn anthropic_params(messages: Vec<Message>) -> ChatParams {
     }
 }
 
-fn tool_result_block(tool_use_id: &str, images: Vec<ToolImageBlock>) -> ContentBlock {
-    ContentBlock::ToolResult {
-        tool_use_id: tool_use_id.into(),
-        content: String::new(),
-        images,
-        is_error: false,
-        metadata: None,
-    }
+/// Build a single turn whose ToolBatch carries the supplied images on item 0.
+fn turn_with_tool_images(tool_use_id: &str, images: Vec<ToolImageBlock>) -> Turn {
+    let mut turn = Turn::new(TurnTrigger::UserInput {
+        envelope_id: "env".into(),
+        content: "show me the image".into(),
+    });
+    turn.body = TurnBody {
+        steps: vec![
+            TurnStep::LlmCall {
+                request_snapshot: loopal_turn::LlmRequestSnapshot {
+                    model: "claude-test".into(),
+                    max_tokens: 0,
+                    tool_count: 1,
+                    message_count: 0,
+                },
+                response: AssistantOutput {
+                    thinking: None,
+                    text_blocks: vec![],
+                    tool_calls: vec![ToolCall {
+                        id: ToolCallId::new(tool_use_id),
+                        name: "Read".into(),
+                        input: json!({}),
+                    }],
+                    server_blocks: vec![],
+                    stop_reason: StopReason::ToolUse,
+                },
+            },
+            TurnStep::ToolBatch(OrderedToolBatch {
+                items: vec![ToolBatchItem {
+                    call: ToolCall {
+                        id: ToolCallId::new(tool_use_id),
+                        name: "Read".into(),
+                        input: json!({}),
+                    },
+                    state: ToolExecState::Done(TurnToolResult {
+                        content: String::new(),
+                        is_error: false,
+                        images,
+                    }),
+                }],
+            }),
+        ],
+    };
+    turn
 }
 
 #[tokio::test]
@@ -89,27 +128,18 @@ async fn small_image_full_pipeline_stays_inline() {
     let store = FileResourceStore::with_base_dir(store_dir.path().to_path_buf());
     let mut images = result.images;
     maybe_persist_inline_images(store.as_ref(), "e2e-session", &mut images, 256 * 1024).await;
-    let block = tool_result_block("tu_1", images);
-
-    let ContentBlock::ToolResult { images, .. } = &block else {
-        panic!();
-    };
     assert!(matches!(images[0], ToolImageBlock::Inline { .. }));
 
-    // Step 3: provider serializes Inline directly
+    // Step 3: build turn-shaped wire JSON via provider.build_messages_json_from_turns
     let provider = AnthropicProvider::new("k".into());
-    let mut messages = vec![Message {
-        id: None,
-        role: MessageRole::User,
-        content: vec![block],
-        origin: None,
-        ephemeral_in_history: false,
-    }];
-    hydrate_images(&mut messages, store.as_ref(), "e2e-session")
+    let mut turns = vec![turn_with_tool_images("tu_1", images)];
+    hydrate_turn_images(&mut turns, store.as_ref(), "e2e-session")
         .await
         .unwrap();
-    let msgs = provider.build_messages(&anthropic_params(messages));
-    let arr = msgs[0]["content"][0]["content"].as_array().unwrap();
+    let msgs = provider.build_messages_json_from_turns(&anthropic_params(turns));
+    // assistant LlmCall + user ToolBatch are the last two entries.
+    let user_msg = msgs.iter().rev().find(|m| m["role"] == "user").unwrap();
+    let arr = user_msg["content"][0]["content"].as_array().unwrap();
     let image_block = arr.iter().find(|b| b["type"] == "image").unwrap();
     assert_eq!(image_block["source"]["media_type"], "image/png");
 }
@@ -142,27 +172,25 @@ async fn large_image_persists_to_resource_and_hydrates_back() {
     assert!(stored.exists(), "resource file must exist on disk");
     assert_eq!(*byte_size, png.len());
 
-    let mut messages = vec![Message {
-        id: None,
-        role: MessageRole::User,
-        content: vec![tool_result_block("tu_1", images)],
-        origin: None,
-        ephemeral_in_history: false,
-    }];
-
-    // Simulate session reload + hydrate before next LLM call.
-    hydrate_images(&mut messages, store.as_ref(), "e2e-session")
+    let mut turns = vec![turn_with_tool_images("tu_1", images)];
+    hydrate_turn_images(&mut turns, store.as_ref(), "e2e-session")
         .await
         .unwrap();
-    let ContentBlock::ToolResult { images, .. } = &messages[0].content[0] else {
+    let TurnStep::ToolBatch(batch) = &turns[0].body.steps[1] else {
         panic!();
     };
-    let ToolImageBlock::Inline { data, .. } = &images[0] else {
+    let ToolExecState::Done(r) = &batch.items[0].state else {
+        panic!();
+    };
+    let ToolImageBlock::Inline { data, .. } = &r.images[0] else {
         panic!("hydrate must convert SessionResource back to Inline");
     };
     assert_eq!(STANDARD.decode(data.as_bytes()).unwrap(), png);
 }
 
+/// JSON round-trip preservation of SessionResource is tested at the Message
+/// level (legacy storage path), not Turn — the storage layer still emits
+/// messages.jsonl alongside turns.jsonl during the migration window.
 #[tokio::test]
 async fn jsonl_round_trip_preserves_session_resource() {
     let workdir = tempdir().unwrap();
@@ -182,12 +210,17 @@ async fn jsonl_round_trip_preserves_session_resource() {
     let message = Message {
         id: None,
         role: MessageRole::User,
-        content: vec![tool_result_block("tu_1", images)],
+        content: vec![ContentBlock::ToolResult {
+            tool_use_id: "tu_1".into(),
+            content: String::new(),
+            images,
+            is_error: false,
+            metadata: None,
+        }],
         origin: None,
         ephemeral_in_history: false,
     };
 
-    // Serialize → deserialize: simulates session JSONL persistence.
     let line = serde_json::to_string(&message).unwrap();
     assert!(line.contains("\"type\":\"session_resource\""));
     let restored: Message = serde_json::from_str(&line).unwrap();

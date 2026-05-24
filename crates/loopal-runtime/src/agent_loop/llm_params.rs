@@ -1,16 +1,14 @@
 use loopal_context::{estimate_messages_tokens, estimate_tokens};
 use loopal_error::Result;
 use loopal_provider::{get_thinking_capability, resolve_thinking_config};
-use loopal_provider_api::Message;
 use loopal_provider_api::{ChatParams, ContinuationIntent};
 
 use super::runner::AgentLoopRunner;
 use crate::mode::AgentMode;
 
 impl AgentLoopRunner {
-    pub fn prepare_chat_params_with(
+    pub fn prepare_chat_params(
         &self,
-        messages: &[Message],
         continuation_intent: Option<ContinuationIntent>,
     ) -> Result<ChatParams> {
         let env_section = super::env_context::build_env_section(
@@ -39,10 +37,13 @@ impl AgentLoopRunner {
 
         // Pre-flight: estimate input tokens and clamp max_tokens to avoid
         // the API's `input + max_tokens > context_window` hard rejection.
+        // The token estimate uses messages-shaped projection so the heuristic
+        // matches what the provider actually sends on the wire.
+        let messages_view = self.params.store.messages();
         let tool_token_count = loopal_context::ContextBudget::estimate_tool_tokens(&tool_defs);
         let estimated_input = estimate_tokens(&full_system_prompt)
             + tool_token_count
-            + estimate_messages_tokens(messages);
+            + estimate_messages_tokens(messages_view);
         let safe_max_tokens = self
             .params
             .store
@@ -54,7 +55,6 @@ impl AgentLoopRunner {
             resolve_thinking_config(&self.model_config.thinking, capability, safe_max_tokens);
         Ok(ChatParams {
             model: self.params.config.model().to_string(),
-            messages: messages.to_vec(),
             turns: self.turns.store.turns().to_vec(),
             system_prompt: full_system_prompt,
             tools: tool_defs,

@@ -42,65 +42,47 @@ impl Provider for GoogleProvider {
     }
 
     async fn stream_chat(&self, params: &ChatParams) -> Result<ChatStream, LoopalError> {
-        // reason: Google build_contents still consumes Message[]. When caller
-        // provides Turns (new SSOT), project them back to Messages here. PR-6
-        // will replace this with a direct Turn→Google-API contents fold.
-        let params = if params.turns.is_empty() {
-            params.clone()
-        } else {
-            let messages = loopal_provider_api::project_turns_to_messages(&params.turns);
-            ChatParams {
-                messages,
-                turns: vec![],
-                ..params.clone()
-            }
-        };
-        let normalized = loopal_provider_api::normalize_messages(&params.messages);
-        let normalized_params = ChatParams {
-            messages: normalized,
-            ..params.clone()
-        };
-        let finalized = self.finalize_messages(&normalized_params).into_owned();
-        let final_params = ChatParams {
-            messages: finalized,
-            ..normalized_params
-        };
-        let contents = self.build_contents(&final_params);
-        let tools = self.build_tools(&final_params);
+        // reason: build_contents still consumes Vec<Message>; project turns →
+        // messages locally then normalize (Google requires alternating roles
+        // like Anthropic). One projection + one normalize, no ChatParams clone.
+        let projected = loopal_provider_api::project_turns_to_messages(&params.turns);
+        let messages = loopal_provider_api::normalize_messages(&projected);
+        let contents = self.build_contents_from_messages(&messages, params);
+        let tools = self.build_tools(params);
 
         let mut body = json!({
             "contents": contents,
             "generationConfig": {
-                "maxOutputTokens": final_params.max_tokens,
+                "maxOutputTokens": params.max_tokens,
             },
         });
 
-        if !final_params.system_prompt.is_empty() {
+        if !params.system_prompt.is_empty() {
             body["systemInstruction"] = json!({
-                "parts": [{"text": final_params.system_prompt}]
+                "parts": [{"text": params.system_prompt}]
             });
         }
         if !tools.is_empty() {
             body["tools"] = json!(tools);
         }
-        if let Some(temp) = final_params.temperature {
+        if let Some(temp) = params.temperature {
             body["generationConfig"]["temperature"] = json!(temp);
         }
-        if let Some(ref thinking_config) = final_params.thinking {
+        if let Some(ref thinking_config) = params.thinking {
             body["generationConfig"]["thinkingConfig"] =
                 thinking::to_google_thinking(thinking_config);
         }
 
         let url = format!(
             "{}/models/{}:streamGenerateContent?alt=sse&key={}",
-            self.base_url, final_params.model, self.api_key
+            self.base_url, params.model, self.api_key
         );
 
         tracing::info!(
-            model = %final_params.model,
-            messages = final_params.messages.len(),
-            tools = final_params.tools.len(),
-            max_tokens = final_params.max_tokens,
+            model = %params.model,
+            messages = messages.len(),
+            tools = params.tools.len(),
+            max_tokens = params.max_tokens,
             "API request"
         );
 

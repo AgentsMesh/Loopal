@@ -7,6 +7,9 @@ use loopal_turn::{
 use serde_json::{Value, json};
 
 use super::AnthropicProvider;
+use crate::model_info::get_model_info;
+
+const CONTINUATION_MARKER: &str = "[Continue from where you left off]";
 
 impl AnthropicProvider {
     pub fn build_messages_json_from_turns(&self, params: &ChatParams) -> Vec<Value> {
@@ -14,6 +17,20 @@ impl AnthropicProvider {
         for turn in &params.turns {
             push_turn(&mut out, turn);
         }
+        // reason: Anthropic 要求 last message 是 user，前提是 model 不支持
+        // prefill 或 caller 显式设了 continuation_intent。原 finalize_messages
+        // 在 message 路径处理；现在 turn-only 后直接在 wire build 内 fold。
+        let supports_prefill = get_model_info(&params.model)
+            .map(|m| m.supports_prefill)
+            .unwrap_or(true);
+        let needs_user_tail = !supports_prefill || params.continuation_intent.is_some();
+        if needs_user_tail && !out.last().is_some_and(|m| m["role"] == "user") {
+            out.push(json!({
+                "role": "user",
+                "content": [{"type": "text", "text": CONTINUATION_MARKER}],
+            }));
+        }
+        // Cache breakpoint on last user message for multi-turn prompt caching.
         if let Some(last_user) = out.iter_mut().rev().find(|m| m["role"] == "user")
             && let Some(arr) = last_user["content"].as_array_mut()
             && let Some(last_block) = arr.last_mut()
@@ -178,10 +195,35 @@ fn tool_call_to_json(c: &ToolCall) -> Value {
 }
 
 fn tool_result_to_json(tool_use_id: &str, r: &ToolResult) -> Value {
+    // reason: when images attach, content must become an array of blocks
+    // [text?, image*] per Anthropic API. SessionResource is unexpected here
+    // (hydrate should have converted it to Inline already).
+    let content_value = if r.images.is_empty() {
+        json!(r.content)
+    } else {
+        let mut blocks: Vec<Value> = Vec::new();
+        if !r.content.is_empty() {
+            blocks.push(json!({"type": "text", "text": r.content}));
+        }
+        for img in &r.images {
+            let Some((media_type, data)) = img.as_inline() else {
+                continue;
+            };
+            blocks.push(json!({
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": media_type,
+                    "data": data,
+                }
+            }));
+        }
+        json!(blocks)
+    };
     json!({
         "type": "tool_result",
         "tool_use_id": tool_use_id,
-        "content": r.content,
+        "content": content_value,
         "is_error": r.is_error,
     })
 }

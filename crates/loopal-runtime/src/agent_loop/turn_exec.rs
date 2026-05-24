@@ -85,13 +85,16 @@ impl AgentLoopRunner {
         );
         self.check_and_microcompact().await?;
         self.check_and_compact(turn_ctx.cancel.token()).await?;
+        // reason: middleware still operates on Vec<Message> projection of the
+        // ContextStore; it runs against `working` but the resulting messages
+        // are not sent directly — the provider builds its wire request from
+        // self.turns.store. Middleware mutations to `working` are temporarily
+        // not propagated (see Issue/middleware migration TODO).
         let mut working = self.params.store.prepare_for_llm();
         self.run_context_pipeline(&mut working).await;
         turn_ctx.metrics.llm_calls += 1;
         let intent = turn_ctx.pending_continuation.take();
-        let result = self
-            .stream_llm_with(&working, intent, &turn_ctx.cancel)
-            .await?;
+        let result = self.stream_llm_with(intent, &turn_ctx.cancel).await?;
         Ok(TurnState::ResponseRecorded { result })
     }
 }

@@ -22,6 +22,7 @@ rust_library(
         "//crates/loopal-session",
         "//crates/loopal-storage",
         "//crates/loopal-tool-api",
+        "//crates/loopal-turn",
         "@crates//:chrono",
         "@crates//:futures",
         "@crates//:rmcp",

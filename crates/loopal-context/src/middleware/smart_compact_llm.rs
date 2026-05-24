@@ -1,5 +1,4 @@
 use loopal_error::LoopalError;
-use loopal_provider_api::Message;
 use loopal_provider_api::{ChatParams, Provider, StreamChunk};
 
 use futures::StreamExt;
@@ -60,8 +59,7 @@ async fn drive_once(
 ) -> Result<String, LoopalError> {
     let params = ChatParams {
         model: model.to_string(),
-        messages: vec![Message::user(prompt)],
-        turns: vec![],
+        turns: vec![loopal_turn::Turn::single_user_prompt(prompt)],
         system_prompt: SYSTEM_PROMPT.to_string(),
         tools: vec![],
         max_tokens: COMPACT_MAX_OUTPUT_TOKENS,

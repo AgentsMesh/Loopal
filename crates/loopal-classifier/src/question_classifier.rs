@@ -1,7 +1,6 @@
 use std::time::Instant;
 
 use loopal_protocol::Question;
-use loopal_provider_api::Message;
 use loopal_provider_api::{ChatParams, Provider, StreamChunk};
 use tracing::{info, warn};
 
@@ -54,8 +53,7 @@ impl ClassifierEngine {
             question_prompt::user_prompt(questions, self.instructions(), recent_context, cwd);
         let params = ChatParams {
             model: model.to_string(),
-            messages: vec![Message::user(&user_prompt)],
-            turns: vec![],
+            turns: vec![loopal_turn::Turn::single_user_prompt(&user_prompt)],
             system_prompt: self.question_system_prompt().to_string(),
             tools: vec![],
             max_tokens: 512,

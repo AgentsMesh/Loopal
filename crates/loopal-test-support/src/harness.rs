@@ -164,7 +164,7 @@ pub struct IntegrationHarness {
     pub interrupt: loopal_protocol::InterruptSignal,
     pub session_ctrl: SessionController,
     pub fixture: TestFixture,
-    pub recorded_messages: std::sync::Arc<std::sync::Mutex<Vec<Vec<Message>>>>,
+    pub recorded_messages: std::sync::Arc<std::sync::Mutex<Vec<Vec<loopal_turn::Turn>>>>,
 }
 
 impl IntegrationHarness {
@@ -190,5 +190,5 @@ pub struct SpawnedHarness {
     pub interrupt: loopal_protocol::InterruptSignal,
     pub session_ctrl: SessionController,
     pub fixture: TestFixture,
-    pub recorded_messages: std::sync::Arc<std::sync::Mutex<Vec<Vec<Message>>>>,
+    pub recorded_messages: std::sync::Arc<std::sync::Mutex<Vec<Vec<loopal_turn::Turn>>>>,
 }

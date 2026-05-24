@@ -40,6 +40,7 @@ rust_test(
         "//crates/loopal-provider-api",
         "//crates/loopal-tool-api",
         "//crates/loopal-tool-invocation",
+        "//crates/loopal-turn",
         "@crates//:futures",
         "@crates//:tokio",
         "@crates//:wiremock",

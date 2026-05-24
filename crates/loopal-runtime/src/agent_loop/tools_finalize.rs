@@ -74,6 +74,7 @@ fn collect_item_updates(
             tool_use_id,
             content,
             is_error,
+            images,
             ..
         } = block
         else {
@@ -87,7 +88,7 @@ fn collect_item_updates(
             ToolExecState::Done(ToolResult {
                 content: content.clone(),
                 is_error: *is_error,
-                images: vec![],
+                images: images.clone(),
             }),
         ));
     }

@@ -9,7 +9,6 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use loopal_error::LoopalError;
-use loopal_provider_api::Message;
 use loopal_provider_api::{ChatParams, ChatStream, ContinuationIntent, Provider, StreamChunk};
 use tokio::time::Sleep;
 
@@ -142,7 +141,7 @@ pub struct MultiCallProvider {
     recorded_intents: Arc<Mutex<Vec<Option<ContinuationIntent>>>>,
     /// Per-call snapshot of the messages slice. Tests use this to assert
     /// that `pending_warnings` (e.g. budget_limit prompts) reach the LLM.
-    recorded_messages: Arc<Mutex<Vec<Vec<Message>>>>,
+    recorded_messages: Arc<Mutex<Vec<Vec<loopal_turn::Turn>>>>,
 }
 
 impl MultiCallProvider {
@@ -168,7 +167,7 @@ impl MultiCallProvider {
     }
 
     /// Shared handle to the per-call messages snapshots.
-    pub fn messages_handle(&self) -> Arc<Mutex<Vec<Vec<Message>>>> {
+    pub fn messages_handle(&self) -> Arc<Mutex<Vec<Vec<loopal_turn::Turn>>>> {
         Arc::clone(&self.recorded_messages)
     }
 }
@@ -186,7 +185,7 @@ impl Provider for MultiCallProvider {
         self.recorded_messages
             .lock()
             .unwrap()
-            .push(p.messages.to_vec());
+            .push(p.turns.to_vec());
         let chunks = self.calls.lock().unwrap().pop_front().unwrap_or_default();
         let mut stream = MockStreamChunks::new(VecDeque::from(chunks));
         if let Some(d) = self.delay {

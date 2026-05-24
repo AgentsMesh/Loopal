@@ -1,6 +1,5 @@
 use loopal_error::LoopalError;
 use loopal_protocol::AgentEventPayload;
-use loopal_provider_api::MessageRole;
 use loopal_provider_api::{StopReason, StreamChunk};
 use loopal_runtime::AgentMode;
 
@@ -9,9 +8,7 @@ use super::{in_turn, make_cancel, make_runner, make_runner_with_mock_provider};
 #[test]
 fn test_prepare_chat_params_act_mode() {
     let (runner, _rx) = make_runner();
-    let params = runner
-        .prepare_chat_params_with(runner.params.store.messages(), None)
-        .expect("should succeed");
+    let params = runner.prepare_chat_params(None).expect("should succeed");
 
     assert_eq!(params.model, "claude-sonnet-4-20250514");
     // Default system_prompt is empty; only env section is appended
@@ -21,7 +18,7 @@ fn test_prepare_chat_params_act_mode() {
     );
     // With empty messages and 200K window, max_tokens should be preserved (headroom is large).
     assert_eq!(params.max_tokens, runner.model_config.max_output_tokens);
-    assert!(params.messages.is_empty());
+    assert!(params.turns.is_empty());
     // Builtin tools should be present
     assert!(!params.tools.is_empty());
 }
@@ -33,9 +30,7 @@ fn test_prepare_chat_params_plan_mode_passes_through() {
     // (env section is appended dynamically per-turn).
     let (mut runner, _rx) = make_runner();
     runner.params.config.mode = AgentMode::Plan;
-    let params = runner
-        .prepare_chat_params_with(runner.params.store.messages(), None)
-        .expect("should succeed");
+    let params = runner.prepare_chat_params(None).expect("should succeed");
 
     assert!(
         params
@@ -46,22 +41,24 @@ fn test_prepare_chat_params_plan_mode_passes_through() {
 }
 
 #[test]
-fn test_prepare_chat_params_with_messages() {
-    use loopal_provider_api::Message;
+fn test_prepare_chat_params_with_turns() {
+    use loopal_turn::{Turn, TurnTrigger};
 
     let (mut runner, _rx) = make_runner();
-    runner.params.store.push_user(Message::user("Hello"));
-    runner
-        .params
-        .store
-        .push_assistant(Message::assistant("Hi there!"));
+    runner.turns.store.start_turn(TurnTrigger::UserInput {
+        envelope_id: "env-1".into(),
+        content: "Hello".into(),
+    });
+    // pre-existing turn in store (no need to actively use start_turn_record
+    // here; we just exercise the prepare_chat_params projection).
 
-    let params = runner
-        .prepare_chat_params_with(runner.params.store.messages(), None)
-        .expect("should succeed");
-    assert_eq!(params.messages.len(), 2);
-    assert_eq!(params.messages[0].role, MessageRole::User);
-    assert_eq!(params.messages[1].role, MessageRole::Assistant);
+    let params = runner.prepare_chat_params(None).expect("should succeed");
+    assert_eq!(params.turns.len(), 1);
+    assert!(matches!(
+        params.turns[0].trigger,
+        TurnTrigger::UserInput { ref content, .. } if content == "Hello"
+    ));
+    let _: &Turn = &params.turns[0];
 }
 
 #[tokio::test]
@@ -86,9 +83,8 @@ async fn test_stream_llm_text_response() {
     ];
     let (mut runner, mut event_rx, _input_tx, _ctrl_tx) = make_runner_with_mock_provider(chunks);
 
-    let msgs = runner.params.store.messages().to_vec();
     let cancel = make_cancel();
-    let result = in_turn(runner.stream_llm_with(&msgs, None, &cancel))
+    let result = in_turn(runner.stream_llm_with(None, &cancel))
         .await
         .unwrap();
     let text = result.assistant_text;
@@ -142,9 +138,8 @@ async fn test_stream_llm_tool_use_response() {
     ];
     let (mut runner, _event_rx, _input_tx, _ctrl_tx) = make_runner_with_mock_provider(chunks);
 
-    let msgs = runner.params.store.messages().to_vec();
     let cancel = make_cancel();
-    let result = in_turn(runner.stream_llm_with(&msgs, None, &cancel))
+    let result = in_turn(runner.stream_llm_with(None, &cancel))
         .await
         .unwrap();
     let text = result.assistant_text;
@@ -169,9 +164,8 @@ async fn test_stream_llm_error_in_stream() {
     ];
     let (mut runner, _event_rx, _input_tx, _ctrl_tx) = make_runner_with_mock_provider(chunks);
 
-    let msgs = runner.params.store.messages().to_vec();
     let cancel = make_cancel();
-    let result = in_turn(runner.stream_llm_with(&msgs, None, &cancel))
+    let result = in_turn(runner.stream_llm_with(None, &cancel))
         .await
         .unwrap();
     let text = result.assistant_text;
@@ -188,9 +182,8 @@ async fn test_stream_llm_empty_stream() {
     let chunks = vec![];
     let (mut runner, _event_rx, _input_tx, _ctrl_tx) = make_runner_with_mock_provider(chunks);
 
-    let msgs = runner.params.store.messages().to_vec();
     let cancel = make_cancel();
-    let result = in_turn(runner.stream_llm_with(&msgs, None, &cancel))
+    let result = in_turn(runner.stream_llm_with(None, &cancel))
         .await
         .unwrap();
     let text = result.assistant_text;
@@ -222,9 +215,7 @@ fn report_real_system_prompt_tokens() {
         0,
     );
     runner.params.config.system_prompt = real_prompt.clone();
-    let params = runner
-        .prepare_chat_params_with(runner.params.store.messages(), None)
-        .unwrap();
+    let params = runner.prepare_chat_params(None).unwrap();
 
     let tokens = loopal_context::estimate_tokens(&params.system_prompt);
 

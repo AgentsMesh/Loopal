@@ -6,8 +6,6 @@ pub mod resolver;
 pub mod thinking;
 pub mod wire;
 
-use std::borrow::Cow;
-
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
@@ -87,13 +85,6 @@ pub trait Provider: Send + Sync {
         &self,
         params: &ChatParams,
     ) -> std::result::Result<ChatStream, LoopalError>;
-
-    /// Protocol-level message finalization. Called by `stream_chat` to enforce
-    /// per-provider invariants (e.g. Anthropic requires User tail when
-    /// `supports_prefill==false` or `continuation_intent.is_some()`). Default: passthrough.
-    fn finalize_messages<'a>(&self, params: &'a ChatParams) -> Cow<'a, [Message]> {
-        Cow::Borrowed(&params.messages)
-    }
 
     /// Map a provider error to a recovery class. Default uses
     /// `default_classify_error` (variant-only, no protocol strings).

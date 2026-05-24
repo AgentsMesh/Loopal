@@ -9,7 +9,6 @@ use loopal_turn::Turn;
 
 use crate::ContinuationIntent;
 use crate::thinking::ThinkingConfig;
-use crate::wire::Message;
 
 pub type ChatStream = Pin<
     Box<dyn futures::Stream<Item = std::result::Result<StreamChunk, LoopalError>> + Send + Unpin>,
@@ -18,11 +17,8 @@ pub type ChatStream = Pin<
 #[derive(Debug, Clone)]
 pub struct ChatParams {
     pub model: String,
-    pub messages: Vec<Message>,
-    /// Domain-shaped conversation history (new SSOT). When non-empty,
-    /// providers should fold this directly into wire-format JSON; the
-    /// `messages` field is kept as fallback during the dual-write
-    /// transition (PR-5a) and will be removed in PR-6.
+    /// Conversation history as domain-shaped turns. Single source of truth;
+    /// providers fold this into wire-format JSON internally.
     pub turns: Vec<Turn>,
     pub system_prompt: String,
     pub tools: Vec<ToolDefinition>,
@@ -38,11 +34,10 @@ pub struct ChatParams {
 }
 
 impl ChatParams {
-    pub fn new(model: String, messages: Vec<Message>, system_prompt: String) -> Self {
+    pub fn new(model: String, turns: Vec<Turn>, system_prompt: String) -> Self {
         Self {
             model,
-            messages,
-            turns: Vec::new(),
+            turns,
             system_prompt,
             tools: vec![],
             max_tokens: 16_384,

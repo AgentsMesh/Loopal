@@ -40,34 +40,34 @@ impl Provider for OpenAiCompatProvider {
     }
 
     async fn stream_chat(&self, params: &ChatParams) -> Result<ChatStream, LoopalError> {
-        let finalized = self.finalize_messages(params).into_owned();
-        let final_params = ChatParams {
-            messages: finalized,
-            ..params.clone()
-        };
-        let messages = self.build_messages(&final_params);
-        let tools = self.build_tools(&final_params);
+        // reason: build_messages still consumes Vec<Message>; project turns →
+        // messages locally. OpenAI Chat Completions API tolerates assistant-tail
+        // so no continuation user-tail needed.
+        let projected = loopal_provider_api::project_turns_to_messages(&params.turns);
+        let normalized = loopal_provider_api::normalize_messages(&projected);
+        let messages = self.build_messages_from_messages(&normalized, params);
+        let tools = self.build_tools(params);
 
         let mut body = json!({
-            "model": final_params.model,
+            "model": params.model,
             "stream": true,
             "messages": messages,
-            "max_completion_tokens": final_params.max_tokens,
+            "max_completion_tokens": params.max_tokens,
         });
 
         if !tools.is_empty() {
             body["tools"] = json!(tools);
         }
-        if let Some(temp) = final_params.temperature {
+        if let Some(temp) = params.temperature {
             body["temperature"] = json!(temp);
         }
         body["stream_options"] = json!({"include_usage": true});
 
         tracing::info!(
-            model = %final_params.model,
+            model = %params.model,
             url = %format!("{}/v1/chat/completions", self.base_url),
-            messages = final_params.messages.len(),
-            tools = final_params.tools.len(),
+            messages = normalized.len(),
+            tools = params.tools.len(),
             "API request"
         );
 

@@ -63,6 +63,7 @@ rust_test(
         "//crates/loopal-scheduler",
         "//crates/loopal-test-support",
         "//crates/loopal-tool-api",
+        "//crates/loopal-turn",
         "@crates//:chrono",
         "@crates//:strum",
         "@crates//:tempfile",

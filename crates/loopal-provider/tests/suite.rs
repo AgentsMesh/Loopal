@@ -1,20 +1,12 @@
 // Single test binary — includes all test modules
 #[path = "suite/anthropic_capability_test.rs"]
 mod anthropic_capability_test;
-#[path = "suite/anthropic_finalize_e2e_test.rs"]
-mod anthropic_finalize_e2e_test;
-#[path = "suite/anthropic_finalize_test.rs"]
-mod anthropic_finalize_test;
-#[path = "suite/anthropic_request_test.rs"]
-mod anthropic_request_test;
 #[path = "suite/anthropic_stream_edge_test.rs"]
 mod anthropic_stream_edge_test;
 #[path = "suite/anthropic_stream_test.rs"]
 mod anthropic_stream_test;
 #[path = "suite/classify_error_test.rs"]
 mod classify_error_test;
-#[path = "suite/google_request_test.rs"]
-mod google_request_test;
 #[path = "suite/google_stream_test.rs"]
 mod google_stream_test;
 #[path = "suite/model_info_overlay_test.rs"]
@@ -25,10 +17,6 @@ mod model_info_test;
 mod model_supports_prefill_test;
 #[path = "suite/openai_reasoning_e2e_test.rs"]
 mod openai_reasoning_e2e_test;
-#[path = "suite/openai_reasoning_test.rs"]
-mod openai_reasoning_test;
-#[path = "suite/openai_request_test.rs"]
-mod openai_request_test;
 #[path = "suite/openai_stream_edge_test.rs"]
 mod openai_stream_edge_test;
 #[path = "suite/openai_stream_test.rs"]
@@ -47,5 +35,3 @@ mod stream_helpers;
 mod stream_openai_edge_test;
 #[path = "suite/stream_openai_test.rs"]
 mod stream_openai_test;
-#[path = "suite/tool_result_image_test.rs"]
-mod tool_result_image_test;

@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 
 use loopal_error::{LoopalError, ProviderError};
-use loopal_provider_api::{ChatParams, ChatStream, Provider};
+use loopal_provider_api::{ChatParams, ChatStream};
 use serde_json::json;
 use tracing::Instrument;
 
@@ -21,7 +21,7 @@ impl AnthropicProvider {
         let body = self.build_request_body(params);
         tracing::info!(
             model = %params.model, url = %format!("{}/v1/messages", self.base_url),
-            messages = params.messages.len(), tools = params.tools.len(),
+            messages = params.turns.len(), tools = params.tools.len(),
             max_tokens = params.max_tokens,
             body_bytes = body.to_string().len(),
             "API request"
@@ -62,27 +62,11 @@ impl AnthropicProvider {
     }
 
     fn build_request_body(&self, params: &ChatParams) -> serde_json::Value {
-        let messages = if !params.turns.is_empty() {
-            // reason: domain SSOT — fold Turns directly into wire JSON.
-            // 5 invariants (alternation / id pairing / tool_result-before-text /
-            // parallel ordering / server pairing) are statically encoded in the
-            // Turn shape, so no normalize / sanitize pass is needed.
-            self.build_messages_json_from_turns(params)
-        } else {
-            // Legacy path for callers (smart_compact_llm one-shot, tests) that
-            // still build message-shaped ChatParams.
-            let normalized = loopal_provider_api::normalize_messages(&params.messages);
-            let normalized_params = ChatParams {
-                messages: normalized,
-                ..params.clone()
-            };
-            let finalized = self.finalize_messages(&normalized_params).into_owned();
-            let final_params = ChatParams {
-                messages: finalized,
-                ..normalized_params
-            };
-            self.build_messages(&final_params)
-        };
+        // reason: domain SSOT — fold Turns directly into wire JSON.
+        // 5 invariants (alternation / id pairing / tool_result-before-text /
+        // parallel ordering / server pairing) are statically encoded in the
+        // Turn shape, so no normalize / sanitize pass is needed.
+        let messages = self.build_messages_json_from_turns(params);
         let tools = self.build_tools(params);
 
         let mut body = json!({

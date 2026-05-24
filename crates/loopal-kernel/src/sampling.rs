@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use loopal_mcp::SamplingCallback;
 use loopal_provider_api::{ChatParams, Provider, StreamChunk};
+use loopal_turn::Turn;
 use tokio_stream::StreamExt;
 
 /// Implements MCP sampling by calling a Loopal LLM provider.
@@ -25,17 +26,21 @@ impl SamplingCallback for McpSamplingAdapter {
         messages: Vec<(String, String)>,
         max_tokens: Option<u32>,
     ) -> Result<(String, String), String> {
-        let llm_messages: Vec<loopal_provider_api::Message> = messages
-            .into_iter()
-            .map(|(role, text)| match role.as_str() {
-                "user" => loopal_provider_api::Message::user(&text),
-                _ => loopal_provider_api::Message::assistant(&text),
-            })
-            .collect();
-
+        // reason: MCP sampling delivers a flat role+text history. Loopal's
+        // provider takes Turns — concatenate the history into a single user
+        // prompt as the trigger (assistant-side text becomes part of the
+        // prompt with a marker prefix). MCP sampling rarely needs deep
+        // history; if it does, this can be promoted to per-role Turns later.
+        let mut combined = String::new();
+        for (role, text) in messages {
+            if !combined.is_empty() {
+                combined.push_str("\n\n");
+            }
+            combined.push_str(&format!("[{role}] {text}"));
+        }
         let mut params = ChatParams::new(
             self.model.clone(),
-            llm_messages,
+            vec![Turn::single_user_prompt(combined)],
             system_prompt
                 .unwrap_or("You are a helpful assistant.")
                 .to_string(),

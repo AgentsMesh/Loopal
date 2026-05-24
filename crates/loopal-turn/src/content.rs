@@ -1,3 +1,4 @@
+use loopal_tool_invocation::ToolImageBlock;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
@@ -35,8 +36,12 @@ pub struct ToolCall {
 pub struct ToolResult {
     pub content: String,
     pub is_error: bool,
+    /// Image attachments produced by the tool (e.g. Read on PNG/JPEG, screenshot
+    /// tools). `Inline { media_type, data }` carries base64-encoded bytes;
+    /// `SessionResource { id, media_type, byte_size }` references storage by
+    /// id (hydrate to Inline before sending to LLM).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub images: Vec<String>,
+    pub images: Vec<ToolImageBlock>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

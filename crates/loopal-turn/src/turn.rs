@@ -45,6 +45,17 @@ impl Turn {
             outcome: TurnOutcome::InProgress,
         }
     }
+
+    /// Construct a single-turn for one-shot LLM callers (classifier, hooks,
+    /// compaction LLM): wraps a user prompt as the trigger with no steps.
+    /// Provider builds it directly via turn_projection / Anthropic
+    /// build_messages_json_from_turns.
+    pub fn single_user_prompt(prompt: impl Into<String>) -> Self {
+        Self::new(TurnTrigger::UserInput {
+            envelope_id: String::new(),
+            content: prompt.into(),
+        })
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

@@ -242,7 +242,7 @@ fn tool_result_block(tool_use_id: &str, r: &ToolResult) -> ContentBlock {
     ContentBlock::ToolResult {
         tool_use_id: tool_use_id.to_string(),
         content: r.content.clone(),
-        images: Vec::new(),
+        images: r.images.clone(),
         is_error: r.is_error,
         metadata: None,
     }

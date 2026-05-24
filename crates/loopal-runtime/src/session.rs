@@ -8,6 +8,8 @@ use loopal_storage::{GoalStore, MessageStore, Session, SessionStore, SubAgentRef
 use loopal_turn::TurnEvent;
 use tracing::info;
 
+use crate::legacy_message_to_turn::legacy_messages_to_turns;
+
 /// Manages session creation, resumption, and message persistence.
 pub struct SessionManager {
     session_store: SessionStore,
@@ -48,35 +50,23 @@ impl SessionManager {
         Ok(session)
     }
 
-    /// Resume an existing session.
-    ///
-    /// Returns both `turns` (the new authoritative log) and `messages` because
-    /// they are NOT always equivalent: for legacy sessions written before the
-    /// turn-event dual-write, `turns.jsonl` is empty and the conversation
-    /// lives in `messages.jsonl`. Callers that need to seed a `TurnStore`
-    /// use `turns`; callers that need wire-shape messages use `messages`.
-    ///
-    /// When `turns` is non-empty, `messages` is `project_turns_to_messages(&turns)`
-    /// — caller may reuse the projection or recompute.
     pub fn resume_session(
         &self,
         session_id: &str,
     ) -> Result<(Session, Vec<loopal_turn::Turn>, Vec<Message>)> {
         let session = self.session_store.load_session(session_id)?;
-        let turns = self.turn_event_store.load_turns(session_id)?;
-        let messages = if turns.is_empty() {
-            // Legacy session: no turn events on disk, conversation lives in
-            // messages.jsonl. `turns` stays empty; callers seed only
-            // ContextStore from `messages` until next ingest writes a turn.
-            self.message_store.load_messages(session_id)?
+        let turns_from_log = self.turn_event_store.load_turns(session_id)?;
+        let (turns, messages) = if turns_from_log.is_empty() {
+            let legacy = self.message_store.load_messages(session_id)?;
+            (legacy_messages_to_turns(legacy.clone()), legacy)
         } else {
-            loopal_provider_api::project_turns_to_messages(&turns)
+            let projected = loopal_provider_api::project_turns_to_messages(&turns_from_log);
+            (turns_from_log, projected)
         };
         info!(
             session_id = %session_id,
             message_count = messages.len(),
             turn_count = turns.len(),
-            from_turns = !turns.is_empty(),
             "session resumed"
         );
         Ok((session, turns, messages))

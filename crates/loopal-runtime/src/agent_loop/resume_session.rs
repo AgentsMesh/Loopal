@@ -25,7 +25,7 @@ impl AgentLoopRunner {
     /// `ControlCommand::ResumeSession`.
     pub async fn handle_resume_session(&mut self, session_id: &str) -> Result<()> {
         info!(session_id, "resuming session");
-        let (session, messages) = self
+        let (session, turns, messages) = self
             .params
             .deps
             .session_manager
@@ -35,6 +35,12 @@ impl AgentLoopRunner {
         self.params.session = session;
         self.params.store =
             ContextStore::from_messages(messages, self.params.store.budget().clone());
+        // reason: TurnStore is authoritative for LLM input. Seed it from the
+        // recovered turn log so the next LLM call carries history; without
+        // this, the resumed session would issue an empty request.
+        let turn_budget = self.params.store.budget().clone();
+        self.turns
+            .replace_store(loopal_context::TurnStore::from_turns(turns, turn_budget));
 
         // Reset per-session counters
         self.turn_count = 0;

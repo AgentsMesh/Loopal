@@ -38,7 +38,7 @@ fn test_resume_session() {
     let session_id = session.id.clone();
 
     // Resume the session
-    let (resumed, messages) = mgr.resume_session(&session_id).unwrap();
+    let (resumed, _turns, messages) = mgr.resume_session(&session_id).unwrap();
 
     assert_eq!(resumed.id, session_id);
     assert_eq!(resumed.model, "test-model");
@@ -61,7 +61,7 @@ fn test_save_message_and_resume() {
     mgr.save_message(&session_id, &mut msg2).unwrap();
 
     // Resume and verify messages
-    let (_resumed, messages) = mgr.resume_session(&session_id).unwrap();
+    let (_resumed, _turns, messages) = mgr.resume_session(&session_id).unwrap();
     assert_eq!(messages.len(), 2);
     assert_eq!(messages[0].text_content(), "hello");
     assert_eq!(messages[1].text_content(), "hi there");
@@ -111,6 +111,6 @@ fn test_update_session() {
     mgr.update_session(&session).unwrap();
 
     // Resume and verify
-    let (resumed, _messages) = mgr.resume_session(&session_id).unwrap();
+    let (resumed, _turns, _messages) = mgr.resume_session(&session_id).unwrap();
     assert_eq!(resumed.title, "My Updated Title");
 }

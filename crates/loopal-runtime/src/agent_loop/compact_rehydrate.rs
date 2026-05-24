@@ -186,6 +186,7 @@ impl AgentLoopRunner {
             }));
         }
 
+        // reason: dual-write transitional — see ContextStore::refresh_view doc.
         self.params.store.push_assistant(assistant);
         self.params.store.push_tool_results(user);
 

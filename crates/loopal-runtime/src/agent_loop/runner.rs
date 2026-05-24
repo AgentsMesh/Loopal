@@ -87,6 +87,12 @@ impl AgentLoopRunner {
         let rewake_rx = params.rewake_rx.take();
         let plan_file = PlanFile::new(std::path::Path::new(&params.session.cwd));
         let turn_store_budget = params.store.budget().clone();
+        let initial_turns = std::mem::take(&mut params.initial_turns);
+        let turn_store = if initial_turns.is_empty() {
+            TurnStore::new(turn_store_budget)
+        } else {
+            TurnStore::from_turns(initial_turns, turn_store_budget)
+        };
         Self {
             params,
             tool_ctx,
@@ -107,7 +113,7 @@ impl AgentLoopRunner {
             continuation_gate: ContinuationGate::new(),
             turn_history: TurnHistory::new(),
             last_continuation_goal_id: None,
-            turns: TurnTracker::new(TurnStore::new(turn_store_budget)),
+            turns: TurnTracker::new(turn_store),
         }
     }
 

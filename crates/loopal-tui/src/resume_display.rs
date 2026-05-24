@@ -6,7 +6,7 @@ pub(crate) fn load_resumed_display(app: &mut App, session_id: &str) {
     let Ok(sm) = loopal_runtime::SessionManager::new() else {
         return;
     };
-    let Ok((session, messages)) = sm.resume_session(session_id) else {
+    let Ok((session, _turns, messages)) = sm.resume_session(session_id) else {
         return;
     };
     let projected = loopal_context::project_messages_to_display(&messages);

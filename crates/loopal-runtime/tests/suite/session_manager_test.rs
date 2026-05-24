@@ -19,7 +19,7 @@ fn clear_history_marker_persisted() {
     mgr.save_message(&session.id, &mut Message::user("msg3"))
         .unwrap();
 
-    let (_, messages) = mgr.resume_session(&session.id).unwrap();
+    let (_, _turns, messages) = mgr.resume_session(&session.id).unwrap();
     assert_eq!(messages.len(), 1);
     assert_eq!(messages[0].text_content(), "msg3");
 }
@@ -49,7 +49,7 @@ fn compact_boundary_marker_persisted() {
     }
     mgr.mark_compact_boundary(&session.id, "summary-1").unwrap();
 
-    let (_, messages) = mgr.resume_session(&session.id).unwrap();
+    let (_, _turns, messages) = mgr.resume_session(&session.id).unwrap();
     assert_eq!(messages.len(), 5);
     assert_eq!(messages[0].text_content(), "[summary]");
     assert_eq!(messages[1].text_content(), "ok");
@@ -73,7 +73,7 @@ fn save_message_assigns_uuid() {
     assert!(!msg.id.as_ref().unwrap().is_empty());
 
     // Storage should match
-    let (_, messages) = mgr.resume_session(&session.id).unwrap();
+    let (_, _turns, messages) = mgr.resume_session(&session.id).unwrap();
     assert_eq!(messages.len(), 1);
     assert_eq!(messages[0].id, msg.id);
 }
@@ -89,7 +89,7 @@ fn save_message_preserves_existing_id() {
     let mut msg = Message::user("hello").with_id("custom-id".into());
     mgr.save_message(&session.id, &mut msg).unwrap();
 
-    let (_, messages) = mgr.resume_session(&session.id).unwrap();
+    let (_, _turns, messages) = mgr.resume_session(&session.id).unwrap();
     assert_eq!(messages[0].id.as_deref(), Some("custom-id"));
 }
 
@@ -125,7 +125,7 @@ fn add_sub_agent_and_load_messages() {
     .unwrap();
 
     // On resume, root session has sub-agent refs
-    let (resumed, _) = mgr.resume_session(&root.id).unwrap();
+    let (resumed, _turns, _) = mgr.resume_session(&root.id).unwrap();
     assert_eq!(resumed.sub_agents.len(), 1);
     assert_eq!(resumed.sub_agents[0].name, "researcher");
     assert_eq!(resumed.sub_agents[0].session_id, sub.id);

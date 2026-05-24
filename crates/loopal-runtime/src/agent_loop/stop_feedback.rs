@@ -30,6 +30,7 @@ impl AgentLoopRunner {
             kind: InjectionKind::StopFeedback,
             text: feedback,
         });
+        // reason: dual-write transitional — see ContextStore::refresh_view doc.
         self.params.store.push_user(msg);
     }
 }

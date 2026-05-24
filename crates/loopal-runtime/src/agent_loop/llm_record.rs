@@ -67,7 +67,8 @@ impl AgentLoopRunner {
             {
                 error!(error = %e, "failed to persist message");
             }
-            // Domain-layer mirror: record LlmCall step (parallel to message store).
+            // Domain-layer mirror: record LlmCall step. push_assistant is the
+            // transitional dual-write — see ContextStore::refresh_view doc.
             let step = build_llm_call_step(
                 self.params.config.model(),
                 assistant_text,

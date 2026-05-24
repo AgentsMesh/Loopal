@@ -24,6 +24,7 @@ rust_library(
         "//crates/loopal-secret-runtime",
         "//crates/loopal-storage",
         "//crates/loopal-tool-api",
+        "//crates/loopal-turn",
         "//crates/loopal-vault-api",
         "//crates/tools/process/background:loopal-tool-background",
         "@crates//:anyhow",

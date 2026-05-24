@@ -45,6 +45,21 @@ impl TurnTracker {
         &mut self.store
     }
 
+    /// Replace the inner `TurnStore` (e.g. on session resume) and reset the
+    /// tracker's in-flight pointers to match. Tool-batch and step indices
+    /// derive from the new store: `current_turn_id` mirrors the store's last
+    /// InProgress turn (if any); step/tool counters reset to 0/None.
+    pub fn replace_store(&mut self, store: TurnStore) {
+        self.current_turn_id = store.current_turn_id().cloned();
+        let step_count = store
+            .current_turn()
+            .map(|t| t.body.steps.len() as u32)
+            .unwrap_or(0);
+        self.current_step_index = step_count;
+        self.current_tool_batch_step = None;
+        self.store = store;
+    }
+
     // ── Mutators (fail-closed: persist before in-memory commit) ────────────
 
     /// Open a new turn. Persists `TurnStarted` to the log; on persist failure

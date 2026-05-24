@@ -111,6 +111,10 @@ pub struct AgentLoopParams {
     pub session: Session,
     pub store: ContextStore,
     pub interrupt: InterruptHandle,
+    /// Turns recovered from `turns.jsonl` on session resume. Empty for new
+    /// sessions. `AgentLoopRunner::new` uses this to seed `TurnStore` so the
+    /// next LLM call carries resumed history.
+    pub initial_turns: Vec<loopal_turn::Turn>,
     pub shared: Option<Arc<dyn std::any::Any + Send + Sync>>,
     pub memory_channel: Option<Arc<dyn MemoryChannel>>,
     pub one_shot_chat: Option<Arc<dyn OneShotChatService>>,

@@ -18,6 +18,7 @@ use loopal_context::ContextStore;
 use loopal_provider_api::Message;
 use loopal_storage::Session;
 use loopal_tool_api::{FetchRefinerPolicy, MemoryChannel, OneShotChatService};
+use loopal_turn::Turn;
 
 use super::params::{AgentConfig, AgentDeps, AgentLoopParams, InterruptHandle};
 use crate::goal::GoalRuntimeSession;
@@ -29,6 +30,7 @@ pub struct AgentLoopParamsBuilder {
     session: Session,
     store: ContextStore,
     interrupt: InterruptHandle,
+    initial_turns: Vec<Turn>,
     shared: Option<Arc<dyn std::any::Any + Send + Sync>>,
     memory_channel: Option<Arc<dyn MemoryChannel>>,
     one_shot_chat: Option<Arc<dyn OneShotChatService>>,
@@ -56,6 +58,7 @@ impl AgentLoopParamsBuilder {
             session,
             store,
             interrupt,
+            initial_turns: Vec::new(),
             shared: None,
             memory_channel: None,
             one_shot_chat: None,
@@ -68,6 +71,14 @@ impl AgentLoopParamsBuilder {
             resume_hooks: Vec::new(),
             scheduler: None,
         }
+    }
+
+    /// Seed `TurnStore` from a recovered turn log (e.g. session resume).
+    /// Default is empty; production callers pass the turns returned by
+    /// `SessionManager::resume_session`.
+    pub fn initial_turns(mut self, turns: Vec<Turn>) -> Self {
+        self.initial_turns = turns;
+        self
     }
 
     pub fn shared(mut self, s: Arc<dyn std::any::Any + Send + Sync>) -> Self {
@@ -133,6 +144,7 @@ impl AgentLoopParamsBuilder {
             session: self.session,
             store: self.store,
             interrupt: self.interrupt,
+            initial_turns: self.initial_turns,
             shared: self.shared,
             memory_channel: self.memory_channel,
             one_shot_chat: self.one_shot_chat,

@@ -62,6 +62,9 @@ impl AgentLoopRunner {
                 }
             }
         }
+        // reason: dual-write transitional. TurnStore is authoritative; ContextStore
+        // is being migrated to a derived view via `refresh_view`. Until resume +
+        // legacy test paths seed TurnStore, the explicit push keeps reads coherent.
         self.params.store.push_user(user_msg);
 
         let message_id = env.id.to_string();

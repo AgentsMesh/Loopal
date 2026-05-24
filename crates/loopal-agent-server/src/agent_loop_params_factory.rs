@@ -13,6 +13,7 @@ use loopal_runtime::{
 };
 use loopal_storage::Session;
 use loopal_tool_api::{FetchRefinerPolicy, MemoryChannel, OneShotChatService};
+use loopal_turn::Turn;
 
 /// Aggregate inputs for [`assemble_agent_loop_params`] — collapses what
 /// would otherwise be a 14-argument helper into a single value so the
@@ -21,6 +22,10 @@ pub(crate) struct AgentLoopAssembly {
     pub config: AgentConfig,
     pub deps: AgentDeps,
     pub session: Session,
+    /// Resume payload — `initial_turns` is the authoritative log replay,
+    /// `messages` is its message-shape projection kept for the transitional
+    /// `ContextStore` view.
+    pub initial_turns: Vec<Turn>,
     pub messages: Vec<Message>,
     pub budget: loopal_context::ContextBudget,
     pub interrupt: InterruptSignal,
@@ -48,6 +53,7 @@ pub(crate) fn assemble_agent_loop_params(a: AgentLoopAssembly) -> AgentLoopParam
             tx: a.interrupt_tx,
         },
     )
+    .initial_turns(a.initial_turns)
     .shared(a.shared)
     .scheduled_rx(a.scheduled_rx)
     .harness(a.harness)

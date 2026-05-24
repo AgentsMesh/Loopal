@@ -34,10 +34,12 @@ impl AgentLoopRunner {
         }
         // Domain mirror: patch each item state on the in-flight ToolBatch step
         // (started in execute_tools); ToolCall.name/input remain authoritative.
+        // Each update_tool_batch_item_state refreshes the projected view.
         for (item_index, new_state) in item_updates {
             self.update_tool_batch_item_state(item_index, new_state);
         }
         self.close_tool_batch_record();
+        // reason: dual-write transitional — see ContextStore::refresh_view doc.
         self.params.store.push_tool_results(msg);
         Ok(())
     }

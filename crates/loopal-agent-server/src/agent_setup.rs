@@ -41,11 +41,15 @@ pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<A
     } else {
         loopal_runtime::SessionManager::new()?
     };
-    let (session, resume_messages) = if let Some(ref sid) = start.resume {
-        let (s, msgs) = session_manager.resume_session(sid)?;
-        (s, msgs)
+    let (session, resume_turns, resume_messages) = if let Some(ref sid) = start.resume {
+        let (s, turns, msgs) = session_manager.resume_session(sid)?;
+        (s, turns, msgs)
     } else {
-        (session_manager.create_session(cwd, &model)?, Vec::new())
+        (
+            session_manager.create_session(cwd, &model)?,
+            Vec::new(),
+            Vec::new(),
+        )
     };
 
     let event_tx = spawn_sub_agent_forwarder(frontend.clone());
@@ -175,6 +179,7 @@ pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<A
                 decision_context,
             },
             session,
+            initial_turns: resume_turns,
             messages,
             budget,
             interrupt,

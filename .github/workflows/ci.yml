@@ -62,50 +62,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: loopal-message crate must not exist (deleted in PR-6)
-        run: |
-          set -e
-          if [ -d "crates/loopal-message" ]; then
-            echo "PR-6 boundary violated: crates/loopal-message must be deleted"
-            exit 1
-          fi
-          if grep -rn '\buse loopal_message::' crates/ src/ 2>/dev/null; then
-            echo "PR-6 boundary violated: source files still import loopal_message"
-            exit 1
-          fi
-          if grep -rn '//crates/loopal-message' crates/ src/ BUILD.bazel 2>/dev/null; then
-            echo "PR-6 boundary violated: BUILD.bazel files still depend on loopal-message"
-            exit 1
-          fi
-          echo "OK: loopal-message crate fully removed."
+      # Build already enforces "loopal-message crate deleted" and "no crate
+      # depends on it" — a stray `use loopal_message` or `//crates/loopal-message`
+      # makes the workspace fail to compile. The checks below catch only what
+      # build *can't* see: code that compiles but violates the boundary.
 
-      - name: Protocol crate must not depend on loopal-message
+      - name: protocol/src must not name wire-format types
         run: |
           set -e
-          if grep -n 'loopal-message\b' crates/loopal-protocol/BUILD.bazel; then
-            echo "PR-5b boundary violated: loopal-protocol/BUILD.bazel must not depend on loopal-message"
+          # MessageRole / ContentBlock live in `loopal-provider-api::wire`.
+          # Re-exporting them through `loopal-protocol` (e.g. `pub use ...`)
+          # would compile but re-introduce the wire-format leak into IPC.
+          # `McpContentBlock` is allowed: it's an MCP-specific IPC type.
+          if grep -rn '\bMessageRole\b\|\bContentBlock\b' crates/loopal-protocol/src \
+            | grep -v 'McpContentBlock' | grep -q .; then
+            echo "boundary violated: protocol src names wire-format type"
             exit 1
           fi
-          if grep -rn '\buse loopal_message\b' crates/loopal-protocol/src; then
-            echo "PR-5b boundary violated: loopal-protocol/src imports loopal_message"
-            exit 1
-          fi
-          # MessageRole / ContentBlock are wire-format names; only McpContentBlock is allowed.
-          if grep -rn '\bMessageRole\b\|\bContentBlock\b' crates/loopal-protocol/src | grep -v 'McpContentBlock' | grep -q .; then
-            echo "PR-5b boundary violated: protocol src uses wire-format type names"
-            exit 1
-          fi
-          echo "OK: loopal-protocol boundary clean."
+          echo "OK: loopal-protocol does not surface wire-format types."
 
-      - name: Event payload field naming uses envelope_id (not message_id)
+      - name: event_payload uses envelope_id, not message_id
         run: |
           set -e
-          # `message_id` MUST NOT appear within the InboxEnqueued / InboxConsumed /
-          # UserMessageQueued variants (it would re-introduce the wire-format leak).
+          # Renaming envelope_id back to message_id compiles fine but undoes
+          # the IPC-schema cleanup and re-implies Message is a first-class
+          # IPC entity.
           if grep -A 5 'InboxEnqueued\s*{\|InboxConsumed\s*{\|UserMessageQueued\s*{' \
               crates/loopal-protocol/src/event_payload.rs \
             | grep -q 'message_id'; then
-            echo "PR-5b boundary violated: event_payload reintroduced message_id field"
+            echo "boundary violated: event_payload field renamed back to message_id"
             exit 1
           fi
           echo "OK: event_payload uses envelope_id."

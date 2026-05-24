@@ -3,7 +3,7 @@ use loopal_provider_api::{ContentBlock, Message, MessageRole};
 
 use std::collections::HashMap;
 
-pub fn project_messages(messages: &[Message]) -> Vec<ProjectedMessage> {
+pub fn project_messages_to_display(messages: &[Message]) -> Vec<ProjectedMessage> {
     let mut output: Vec<ProjectedMessage> = Vec::new();
     let mut tool_index: HashMap<String, (usize, usize, String)> = HashMap::new();
 

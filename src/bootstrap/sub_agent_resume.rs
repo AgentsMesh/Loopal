@@ -7,7 +7,7 @@
 //! the Hub's event broadcast and writes a `SubAgentRef` to disk every
 //! time a sub-agent is spawned.
 
-use loopal_context::project_messages;
+use loopal_context::project_messages_to_display;
 use loopal_protocol::AgentEventPayload;
 use loopal_session::ROOT_AGENT;
 use loopal_storage::SubAgentRef;
@@ -41,7 +41,7 @@ pub fn load_sub_agent_histories(
             &sub_ref.session_id,
             sub_ref.parent.as_deref(),
             sub_ref.model.as_deref(),
-            project_messages(&messages),
+            project_messages_to_display(&messages),
         );
     }
 }

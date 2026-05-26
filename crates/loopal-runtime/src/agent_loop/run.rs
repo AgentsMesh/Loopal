@@ -1,10 +1,12 @@
 use loopal_error::{AgentOutput, LoopalError, Result, TerminateReason};
-use loopal_message::MessageRole;
 use loopal_protocol::{AgentEventPayload, AgentStatus};
+use loopal_provider_api::MessageRole;
 use loopal_provider_api::{
     ContinuationIntent, ContinuationReason, ErrorClass, default_classify_error,
 };
-use tracing::{error, info};
+use tracing::{error, info, warn};
+
+pub const CONTEXT_OVERFLOW_BANNER: &str = "Context overflow — compacting and retrying...";
 
 use super::LifecycleMode;
 use super::cancel::TurnCancel;
@@ -17,12 +19,10 @@ impl AgentLoopRunner {
         let mut last_output = String::new();
         let mut server_block_retry = false;
         let mut context_overflow_retry = false;
-        // Need user input whenever the last message is not a User message.
-        // Covers: empty store, resume-with-trailing-Assistant (crash recovery),
-        // and any unexpected non-User tail. ReadyToCall's invariant assumes a
-        // User tail (or pending continuation), so going straight to the running
-        // phase without a User tail would panic the debug_assert.
-        let mut needs_input = !matches!(self.params.store.last_role(), Some(MessageRole::User));
+        // Need user input whenever the last message isn't User — covers empty
+        // store, resume-with-Assistant-tail (crash recovery), or any non-User
+        // tail. ReadyToCall's invariant would panic the debug_assert otherwise.
+        let mut needs_input = !matches!(self.turns.view().last_role(), Some(MessageRole::User));
 
         loop {
             // ── Idle phase ──────────────────────────────────────────
@@ -61,7 +61,7 @@ impl AgentLoopRunner {
             // ── Running phase ───────────────────────────────────────
             info!(
                 turn = self.turn_count,
-                messages = self.params.store.len(),
+                messages = self.turns.view().len(),
                 "turn start"
             );
             self.transition(AgentStatus::Running).await?;
@@ -69,11 +69,9 @@ impl AgentLoopRunner {
 
             let cancel = TurnCancel::new(self.interrupt.clone(), self.interrupt_tx.clone());
             let mut turn_ctx = TurnContext::new(self.turn_count, cancel);
-            // After try_recover, store may end with an Assistant message but
-            // turn_ctx is fresh (per-turn lifetime). Re-prime intent so
-            // ReadyToCall's invariant holds and Provider::finalize_messages
-            // receives the continuation context.
-            if !matches!(self.params.store.last_role(), Some(MessageRole::User)) {
+            // After try_recover, store may end with Assistant. turn_ctx is
+            // fresh per-turn, so re-prime intent for ReadyToCall + finalize.
+            if !matches!(self.turns.view().last_role(), Some(MessageRole::User)) {
                 turn_ctx.pending_continuation = Some(ContinuationIntent::AutoContinue {
                     reason: ContinuationReason::RecoveryRetry,
                 });
@@ -138,23 +136,29 @@ impl AgentLoopRunner {
             ErrorClass::ServerBlockError if !*server_block_retry => {
                 *server_block_retry = true;
                 info!("condensing server blocks after API rejection, retrying");
-                self.params.store.condense_server_blocks();
+                self.turns
+                    .with_wire_mut(loopal_context::condense_server_blocks);
                 Ok(true)
             }
             ErrorClass::ContextOverflow if !*context_overflow_retry => {
                 *context_overflow_retry = true;
                 info!("context overflow detected, force-compacting and retrying");
-                self.force_compact(None).await?;
-                self.emit(AgentEventPayload::Error {
-                    message: "Context overflow — compacting and retrying...".into(),
+                // Emit banner ONLY after compact succeeded — pre-fix showed
+                // "retrying" then errored when force_compact silently bailed.
+                let compacted = self.force_compact(None).await?;
+                if !compacted {
+                    warn!("force_compact declined; ContextOverflow propagates");
+                    return Ok(false);
+                }
+                self.emit_cosmetic(AgentEventPayload::Error {
+                    message: CONTEXT_OVERFLOW_BANNER.into(),
                 })
-                .await?;
+                .await;
                 Ok(true)
             }
-            // PrefillRejected: provider's finalize_messages should have prevented
-            // this. If it leaks here, the model catalog is misconfigured (model
-            // marked supports_prefill=true when it isn't). Failing fast surfaces
-            // the bug instead of silently retrying without state change.
+            // PrefillRejected here means provider's finalize_messages let it
+            // through — the model catalog has supports_prefill=true wrongly.
+            // Fail fast: silent retry would loop without state change.
             _ => Ok(false),
         }
     }
@@ -179,7 +183,7 @@ impl AgentLoopRunner {
         for message_id in ids {
             if let Err(e) = self
                 .emit(AgentEventPayload::InboxConsumed {
-                    message_id: message_id.clone(),
+                    envelope_id: message_id.clone(),
                 })
                 .await
             {

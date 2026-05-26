@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 
 use loopal_error::{LoopalError, ProviderError};
-use loopal_provider_api::{ChatParams, ChatStream, Provider};
+use loopal_provider_api::{ChatParams, ChatStream};
 use serde_json::json;
 use tracing::Instrument;
 
@@ -21,7 +21,7 @@ impl AnthropicProvider {
         let body = self.build_request_body(params);
         tracing::info!(
             model = %params.model, url = %format!("{}/v1/messages", self.base_url),
-            messages = params.messages.len(), tools = params.tools.len(),
+            messages = params.turns.len(), tools = params.tools.len(),
             max_tokens = params.max_tokens,
             body_bytes = body.to_string().len(),
             "API request"
@@ -62,48 +62,41 @@ impl AnthropicProvider {
     }
 
     fn build_request_body(&self, params: &ChatParams) -> serde_json::Value {
-        let normalized = loopal_message::normalize_messages(&params.messages);
-        let normalized_params = ChatParams {
-            messages: normalized,
-            ..params.clone()
-        };
-        let finalized = self.finalize_messages(&normalized_params).into_owned();
-        let final_params = ChatParams {
-            messages: finalized,
-            ..normalized_params
-        };
-        let messages = self.build_messages(&final_params);
-        let tools = self.build_tools(&final_params);
+        // reason: domain SSOT — fold Turns directly into wire JSON.
+        // 5 invariants (alternation / id pairing / tool_result-before-text /
+        // parallel ordering / server pairing) are statically encoded in the
+        // Turn shape, so no normalize / sanitize pass is needed.
+        let messages = self.build_messages_json_from_turns(params);
+        let tools = self.build_tools(params);
 
         let mut body = json!({
-            "model": final_params.model,
-            "max_tokens": final_params.max_tokens,
+            "model": params.model,
+            "max_tokens": params.max_tokens,
             "stream": true,
             "messages": messages,
         });
-        if !final_params.system_prompt.is_empty() {
+        if !params.system_prompt.is_empty() {
             body["system"] = json!([{
                 "type": "text",
-                "text": final_params.system_prompt,
+                "text": params.system_prompt,
                 "cache_control": {"type": "ephemeral"}
             }]);
         }
         if !tools.is_empty() {
             body["tools"] = json!(tools);
         }
-        if let Some(temp) = final_params.temperature
-            && capability::supports_temperature(&final_params.model)
+        if let Some(temp) = params.temperature
+            && capability::supports_temperature(&params.model)
         {
             body["temperature"] = json!(temp);
-        } else if final_params.temperature.is_some() {
+        } else if params.temperature.is_some() {
             tracing::debug!(
-                model = %final_params.model,
+                model = %params.model,
                 "dropping temperature for model not on Anthropic temperature allowlist"
             );
         }
-        if let Some(ref thinking_config) = final_params.thinking {
-            body["thinking"] =
-                thinking::to_anthropic_thinking(thinking_config, final_params.max_tokens);
+        if let Some(ref thinking_config) = params.thinking {
+            body["thinking"] = thinking::to_anthropic_thinking(thinking_config, params.max_tokens);
             if let Some(output_config) = thinking::to_anthropic_output_config(thinking_config) {
                 body["output_config"] = output_config;
             }

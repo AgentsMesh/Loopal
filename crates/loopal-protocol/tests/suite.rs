@@ -31,14 +31,6 @@ mod event_test;
 mod file_size_cap_test;
 #[path = "suite/mcp_snapshot_test.rs"]
 mod mcp_snapshot_test;
-#[path = "suite/projection_edge_test.rs"]
-mod projection_edge_test;
-#[path = "suite/projection_metadata_test.rs"]
-mod projection_metadata_test;
-#[path = "suite/projection_test.rs"]
-mod projection_test;
-#[path = "suite/task_boundary_test.rs"]
-mod task_boundary_test;
 #[path = "suite/task_snapshot_test.rs"]
 mod task_snapshot_test;
 #[path = "suite/thread_goal_test.rs"]

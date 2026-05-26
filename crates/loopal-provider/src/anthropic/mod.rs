@@ -1,20 +1,18 @@
 mod accumulator;
 pub mod capability;
 mod error_classify;
-mod finalize;
 mod request;
+mod request_turns;
 mod send;
 pub(crate) mod server_tool;
 mod stream;
 mod stream_parser;
 mod thinking;
 
-use std::borrow::Cow;
 use std::time::Duration;
 
 use async_trait::async_trait;
 use loopal_error::{LoopalError, ProviderError};
-use loopal_message::Message;
 use loopal_provider_api::{ChatParams, ChatStream, ErrorClass, Provider};
 use tokio::sync::Semaphore;
 
@@ -60,10 +58,6 @@ impl Provider for AnthropicProvider {
             .await
             .map_err(|_| ProviderError::Http("request semaphore closed".into()))?;
         self.do_stream_chat(params).await
-    }
-
-    fn finalize_messages<'a>(&self, params: &'a ChatParams) -> Cow<'a, [Message]> {
-        self.finalize_messages_impl(params)
     }
 
     fn classify_error(&self, err: &LoopalError) -> ErrorClass {

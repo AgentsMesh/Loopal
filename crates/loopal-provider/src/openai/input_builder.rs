@@ -1,5 +1,4 @@
-use loopal_message::{ContentBlock, MessageRole};
-use loopal_provider_api::ChatParams;
+use loopal_provider_api::{ChatParams, ContentBlock, Message, MessageRole};
 use serde_json::{Value, json};
 use tracing::error;
 
@@ -9,10 +8,14 @@ use crate::tool_result_text::{IMAGE_ATTACHED_PLACEHOLDER, placeholder_text};
 
 impl OpenAiProvider {
     /// Convert conversation messages into Responses API `input` array items.
-    pub fn build_input(&self, params: &ChatParams) -> Vec<Value> {
+    pub fn build_input_from_messages(
+        &self,
+        messages: &[Message],
+        _params: &ChatParams,
+    ) -> Vec<Value> {
         let mut input = Vec::new();
 
-        for msg in &params.messages {
+        for msg in messages {
             match msg.role {
                 MessageRole::System => {
                     // System messages go to `instructions`, skip here

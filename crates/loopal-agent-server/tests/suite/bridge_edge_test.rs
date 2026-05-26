@@ -44,10 +44,7 @@ async fn child_permission_request_denied() {
                 if method == methods::AGENT_EVENT.name
                     && let Ok(ev) = serde_json::from_value::<AgentEvent>(params)
                 {
-                    let terminal = matches!(
-                        ev.payload,
-                        AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
-                    );
+                    let terminal = matches!(ev.payload, AgentEventPayload::Finished);
                     events.push(ev.payload);
                     if terminal {
                         break;
@@ -111,10 +108,7 @@ async fn child_provider_error_handled() {
                 if method == methods::AGENT_EVENT.name
                     && let Ok(ev) = serde_json::from_value::<AgentEvent>(params)
                 {
-                    let terminal = matches!(
-                        ev.payload,
-                        AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
-                    );
+                    let terminal = matches!(ev.payload, AgentEventPayload::Finished);
                     events.push(ev.payload);
                     if terminal {
                         break;

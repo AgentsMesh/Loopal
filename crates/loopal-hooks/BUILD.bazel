@@ -8,9 +8,9 @@ rust_library(
     deps = [
         "//crates/loopal-config",
         "//crates/loopal-error",
-        "//crates/loopal-message",
-        "//crates/loopal-protocol",
         "//crates/loopal-provider-api",
+        "//crates/loopal-protocol",
+        "//crates/loopal-turn",
         "@crates//:futures",
         "@crates//:reqwest",
         "@crates//:serde",

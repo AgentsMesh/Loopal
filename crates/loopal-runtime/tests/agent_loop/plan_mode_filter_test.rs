@@ -1,6 +1,6 @@
 //! Integration tests for Plan mode tool filtering and system-reminder wrapping.
 
-use loopal_message::ContentBlock;
+use loopal_provider_api::ContentBlock;
 use loopal_runtime::AgentMode;
 use loopal_runtime::agent_loop::PlanModeState;
 use loopal_runtime::plan_file::build_plan_mode_filter;
@@ -39,7 +39,7 @@ async fn plan_mode_blocks_bash() {
     .await
     .unwrap();
 
-    let msg = &runner.params.store.messages()[0];
+    let msg = &runner.turns.view().messages()[0];
     match &msg.content[0] {
         ContentBlock::ToolResult {
             content, is_error, ..
@@ -82,7 +82,7 @@ async fn plan_mode_allows_read_with_reminder() {
     .await
     .unwrap();
 
-    let msg = &runner.params.store.messages()[0];
+    let msg = &runner.turns.view().messages()[0];
     match &msg.content[0] {
         ContentBlock::ToolResult {
             content, is_error, ..
@@ -118,7 +118,7 @@ async fn plan_mode_write_blocks_non_plan_path() {
     .await
     .unwrap();
 
-    let msg = &runner.params.store.messages()[0];
+    let msg = &runner.turns.view().messages()[0];
     match &msg.content[0] {
         ContentBlock::ToolResult {
             content, is_error, ..

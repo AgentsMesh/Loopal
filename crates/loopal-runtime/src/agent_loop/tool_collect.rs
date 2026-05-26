@@ -3,8 +3,8 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use loopal_message::ContentBlock;
 use loopal_protocol::AgentEventPayload;
+use loopal_provider_api::ContentBlock;
 use tracing::{error, info};
 
 use crate::frontend::traits::AgentFrontend;

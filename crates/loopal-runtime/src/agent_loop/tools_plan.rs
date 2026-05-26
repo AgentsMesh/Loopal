@@ -1,5 +1,5 @@
-use loopal_message::ContentBlock;
 use loopal_protocol::AgentEventPayload;
+use loopal_provider_api::ContentBlock;
 use loopal_tool_api::PermissionDecision;
 use loopal_tool_plan_mode::ENTER_PLAN_NAME;
 use tracing::{debug, info, warn};

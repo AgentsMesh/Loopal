@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use loopal_config::Settings;
-use loopal_context::{ContextBudget, ContextStore};
+use loopal_context::ContextBudget;
 use loopal_kernel::Kernel;
 use loopal_protocol::AgentEventPayload;
 use loopal_protocol::ControlCommand;
@@ -57,7 +57,7 @@ async fn test_agent_loop_immediate_channel_close() {
             decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
         },
         fixture.test_session("test-loop"),
-        ContextStore::new(make_test_budget()),
+        make_test_budget(),
         InterruptHandle::new(),
     )
     .build();
@@ -117,7 +117,7 @@ async fn test_full_run_text_only_then_input_close() {
 
     let result = runner.run().await;
     assert!(result.is_ok());
-    assert!(runner.params.store.len() >= 2);
+    assert!(runner.turns.view().len() >= 2);
 }
 
 #[tokio::test]
@@ -160,7 +160,7 @@ async fn test_full_run_with_tool_execution() {
     let result = runner.run().await;
     assert!(result.is_ok());
     // user + assistant(tool_use) + user(tool_result) + assistant(text)
-    assert!(runner.params.store.len() >= 3);
+    assert!(runner.turns.view().len() >= 3);
 
     let _ = std::fs::remove_file(&tmp_file);
 }

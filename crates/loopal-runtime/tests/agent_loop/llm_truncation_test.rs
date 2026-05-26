@@ -17,10 +17,9 @@ async fn test_eof_with_text_no_done_sets_stream_error() {
         // Stream ends — no Done chunk
     ];
     let (mut runner, _rx, _mbox, _ctrl) = make_runner_with_mock_provider(chunks);
-    let msgs = runner.params.store.messages().to_vec();
     let cancel = make_cancel();
 
-    let result = in_turn(runner.stream_llm_with(&msgs, None, &cancel))
+    let result = in_turn(runner.stream_llm_with(None, &cancel))
         .await
         .unwrap();
 
@@ -50,10 +49,9 @@ async fn test_eof_with_text_and_tool_no_done_sets_stream_error() {
         // No Done — stream truncated after tool_use
     ];
     let (mut runner, _rx, _mbox, _ctrl) = make_runner_with_mock_provider(chunks);
-    let msgs = runner.params.store.messages().to_vec();
     let cancel = make_cancel();
 
-    let result = in_turn(runner.stream_llm_with(&msgs, None, &cancel))
+    let result = in_turn(runner.stream_llm_with(None, &cancel))
         .await
         .unwrap();
 
@@ -77,10 +75,9 @@ async fn test_normal_response_with_done_no_stream_error() {
         }),
     ];
     let (mut runner, _rx, _mbox, _ctrl) = make_runner_with_mock_provider(chunks);
-    let msgs = runner.params.store.messages().to_vec();
     let cancel = make_cancel();
 
-    let result = in_turn(runner.stream_llm_with(&msgs, None, &cancel))
+    let result = in_turn(runner.stream_llm_with(None, &cancel))
         .await
         .unwrap();
 
@@ -102,10 +99,9 @@ async fn test_err_chunk_with_text_sets_stream_error() {
         )),
     ];
     let (mut runner, _rx, _mbox, _ctrl) = make_runner_with_mock_provider(chunks);
-    let msgs = runner.params.store.messages().to_vec();
     let cancel = make_cancel();
 
-    let result = in_turn(runner.stream_llm_with(&msgs, None, &cancel))
+    let result = in_turn(runner.stream_llm_with(None, &cancel))
         .await
         .unwrap();
 
@@ -127,10 +123,9 @@ async fn test_max_tokens_done_not_confused_with_truncation() {
         }),
     ];
     let (mut runner, _rx, _mbox, _ctrl) = make_runner_with_mock_provider(chunks);
-    let msgs = runner.params.store.messages().to_vec();
     let cancel = make_cancel();
 
-    let result = in_turn(runner.stream_llm_with(&msgs, None, &cancel))
+    let result = in_turn(runner.stream_llm_with(None, &cancel))
         .await
         .unwrap();
 

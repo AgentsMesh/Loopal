@@ -1,6 +1,6 @@
 use loopal_error::Result;
-use loopal_message::MessageRole;
 use loopal_provider_api::ContinuationIntent;
+use loopal_provider_api::MessageRole;
 use tracing::{info, warn};
 
 use super::TurnOutput;
@@ -77,21 +77,18 @@ impl AgentLoopRunner {
             return Ok(TurnState::Cancelled);
         }
         debug_assert!(
-            self.params.store.last_role() == Some(MessageRole::User)
+            self.turns.view().last_role() == Some(MessageRole::User)
                 || turn_ctx.pending_continuation.is_some(),
             "ReadyToCall invariant violated: last_role={:?}, pending_continuation={}",
-            self.params.store.last_role(),
+            self.turns.view().last_role(),
             turn_ctx.pending_continuation.is_some()
         );
         self.check_and_microcompact().await?;
         self.check_and_compact(turn_ctx.cancel.token()).await?;
-        let mut working = self.params.store.prepare_for_llm();
-        self.run_context_pipeline(&mut working).await;
+        self.check_and_inject_config_refresh().await?;
         turn_ctx.metrics.llm_calls += 1;
         let intent = turn_ctx.pending_continuation.take();
-        let result = self
-            .stream_llm_with(&working, intent, &turn_ctx.cancel)
-            .await?;
+        let result = self.stream_llm_with(intent, &turn_ctx.cancel).await?;
         Ok(TurnState::ResponseRecorded { result })
     }
 }

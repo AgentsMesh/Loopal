@@ -138,28 +138,8 @@ mod view_client_reset_test;
 // E2E tests
 #[path = "suite/e2e_compact_banner_test.rs"]
 mod e2e_compact_banner_test;
-#[path = "suite/e2e_compact_bare_summary_test.rs"]
-mod e2e_compact_bare_summary_test;
 #[path = "suite/e2e_compact_control_serialization_test.rs"]
 mod e2e_compact_control_serialization_test;
-#[path = "suite/e2e_compact_edge_test.rs"]
-mod e2e_compact_edge_test;
-#[path = "suite/e2e_compact_hooks_test.rs"]
-mod e2e_compact_hooks_test;
-#[path = "suite/e2e_compact_instructions_test.rs"]
-mod e2e_compact_instructions_test;
-#[path = "suite/e2e_compact_microcompact_test.rs"]
-mod e2e_compact_microcompact_test;
-#[path = "suite/e2e_compact_partial_save_test.rs"]
-mod e2e_compact_partial_save_test;
-#[path = "suite/e2e_compact_phases_test.rs"]
-mod e2e_compact_phases_test;
-#[path = "suite/e2e_compact_rehydrate_test.rs"]
-mod e2e_compact_rehydrate_test;
-#[path = "suite/e2e_compact_resume_test.rs"]
-mod e2e_compact_resume_test;
-#[path = "suite/e2e_compact_test.rs"]
-mod e2e_compact_test;
 #[path = "suite/e2e_compact_token_feedback_test.rs"]
 mod e2e_compact_token_feedback_test;
 #[path = "suite/e2e_control_completeness_test.rs"]

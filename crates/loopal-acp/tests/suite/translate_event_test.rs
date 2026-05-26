@@ -91,7 +91,7 @@ fn none_events_return_none() {
 fn inbox_enqueued_human_returns_none_to_avoid_echoing_input_back() {
     let r = translate_event(
         &AgentEventPayload::InboxEnqueued {
-            message_id: "m".into(),
+            envelope_id: "m".into(),
             source: loopal_protocol::MessageSource::Human,
             content: "hi".into(),
             summary: None,
@@ -105,7 +105,7 @@ fn inbox_enqueued_human_returns_none_to_avoid_echoing_input_back() {
 fn inbox_enqueued_agent_returns_extension() {
     let r = translate_event(
         &AgentEventPayload::InboxEnqueued {
-            message_id: "m".into(),
+            envelope_id: "m".into(),
             source: loopal_protocol::MessageSource::Agent(
                 loopal_protocol::QualifiedAddress::local("worker"),
             ),
@@ -127,7 +127,7 @@ fn inbox_enqueued_agent_returns_extension() {
 fn inbox_consumed_returns_extension() {
     let r = translate_event(
         &AgentEventPayload::InboxConsumed {
-            message_id: "m-7".into(),
+            envelope_id: "m-7".into(),
         },
         "s",
     );

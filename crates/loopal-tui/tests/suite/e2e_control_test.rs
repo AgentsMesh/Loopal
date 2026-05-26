@@ -2,7 +2,7 @@
 //! AutoContinuation, Rewind).
 
 use loopal_protocol::{AgentEventPayload, ControlCommand, Envelope, MessageSource};
-use loopal_test_support::{HarnessBuilder, assertions, events, scenarios};
+use loopal_test_support::{HarnessBuilder, assertions, chunks, events, scenarios};
 use loopal_tui::app::App;
 
 use ratatui::Terminal;
@@ -101,7 +101,12 @@ async fn test_clear_command() {
 
 #[tokio::test]
 async fn test_compact_command() {
-    let calls = scenarios::two_turn("First.", "After compact.");
+    // 3 LLM calls: turn 1 → /compact summary → turn 2 (after compact).
+    let calls = vec![
+        chunks::text_turn("First."),
+        chunks::text_turn("<summary>compacted</summary>"),
+        chunks::text_turn("After compact."),
+    ];
     let inner = HarnessBuilder::new()
         .calls(calls)
         .messages(vec![])

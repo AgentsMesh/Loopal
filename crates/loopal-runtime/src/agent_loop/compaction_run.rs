@@ -1,6 +1,7 @@
 use loopal_context::middleware::smart_compact::{CompactOutput, compact_to_boundary};
 use loopal_error::Result;
 use loopal_protocol::{AgentEventPayload, CompactPhase};
+use loopal_turn::{CompactionSummary, TurnStep};
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
@@ -13,6 +14,9 @@ pub(super) struct PersistResult {
 }
 
 impl AgentLoopRunner {
+    /// Run a smart compaction pass. Returns `true` iff a `CompactionSummary`
+    /// step was actually appended; `false` for guarded silent fall-throughs
+    /// (provider unresolved, compact LLM Err, compact_to_boundary Ok(None)).
     pub(super) async fn run_smart_compact(
         &mut self,
         before_count: usize,
@@ -20,7 +24,7 @@ impl AgentLoopRunner {
         instructions: Option<String>,
         strategy: &'static str,
         cancel: &CancellationToken,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         let compact_model = self
             .params
             .config
@@ -31,17 +35,17 @@ impl AgentLoopRunner {
             Ok(p) => p,
             Err(e) => {
                 warn!(error = %e, model = %compact_model, "summarization provider unavailable");
-                return Ok(());
+                return Ok(false);
             }
         };
 
-        let boundary_at = self.params.store.compact_boundary_at();
+        let boundary_turn_at = self.turns.store().compact_boundary_turn_index();
 
         let result = compact_to_boundary(
-            self.params.store.messages(),
+            self.turns.store().turns(),
             &*provider,
             &compact_model,
-            boundary_at,
+            boundary_turn_at,
             instructions.as_deref(),
             cancel,
         )
@@ -51,13 +55,19 @@ impl AgentLoopRunner {
             Ok(opt) => opt,
             Err(e) => {
                 warn!(error = %e, "compaction LLM call failed");
-                return Ok(());
+                return Ok(false);
             }
         }) else {
-            return Ok(());
+            return Ok(false);
         };
 
-        let apply_result = self.persist_and_apply(output, boundary_at, cancel).await?;
+        let apply_result = match self.persist_and_apply(output, cancel).await {
+            Ok(r) => r,
+            Err(e) => {
+                warn!(error = %e, "persist_and_apply failed; reporting compact as no-op");
+                return Ok(false);
+            }
+        };
         self.post_compact(
             before_count,
             tokens_before,
@@ -65,58 +75,35 @@ impl AgentLoopRunner {
             apply_result.summary_msg_id,
             apply_result.files_rehydrated,
         )
-        .await
+        .await?;
+        Ok(true)
     }
 
-    /// Persist the summary/ack pair and anchor the boundary marker.
-    ///
-    /// Failure semantics (read this before touching the order):
-    /// * `save_message(summary)` fails — caller propagates; nothing else
-    ///   has run, no on-disk state, store untouched. Caller will retry on
-    ///   the next compact tick.
-    /// * `save_message(ack)` fails after summary saved — propagated; the
-    ///   summary message lives on disk without a boundary marker. Replay
-    ///   falls back to the safe path (keep full history) because the
-    ///   marker is the anchor; the orphan summary message is harmless.
-    /// * `mark_compact_boundary` fails — propagated; same safe fallback.
-    /// * `store.set_boundary` is the last step and is infallible; it only
-    ///   runs after every persistence step has succeeded, which keeps
-    ///   in-memory and on-disk views consistent.
-    /// * `compact_rehydrate` is best-effort; its failure is logged but
-    ///   never bubbled up so we don't undo a successful boundary commit.
-    ///   It also honors `cancel` so a mid-rehydrate interrupt cannot leave
-    ///   an orphan `ToolUse` block in the store.
     async fn persist_and_apply(
         &mut self,
         output: CompactOutput,
-        boundary_at: usize,
         cancel: &CancellationToken,
     ) -> Result<PersistResult> {
         let CompactOutput {
-            mut summary_msg,
-            mut ack_msg,
+            summary_msg,
+            ack_msg,
             touched_files,
+            removed_turn_count,
+            kept_turn_count,
             ..
         } = output;
 
-        self.params
-            .deps
-            .session_manager
-            .save_message(&self.params.session.id, &mut summary_msg)?;
-        self.params
-            .deps
-            .session_manager
-            .save_message(&self.params.session.id, &mut ack_msg)?;
-
-        let summary_id = summary_msg.id.clone().expect("save_message assigns a UUID");
-        self.params
-            .deps
-            .session_manager
-            .mark_compact_boundary(&self.params.session.id, &summary_id)?;
-
-        self.params
-            .store
-            .set_boundary(boundary_at, summary_msg, ack_msg);
+        if let Err(e) = self.append_step_record(TurnStep::CompactionSummary(CompactionSummary {
+            summary_text: summary_msg.text_content(),
+            ack_text: ack_msg.text_content(),
+            kept_turn_count,
+            removed_turn_count,
+        })) {
+            warn!(error = %e, "append_step(CompactionSummary) failed");
+            return Err(loopal_error::LoopalError::Other(format!(
+                "compaction summary append failed: {e}"
+            )));
+        }
 
         // Compaction rewrote earlier history. Notify cross-turn governance
         // state (LoopDetector signatures, etc.) so they don't carry stale
@@ -134,7 +121,7 @@ impl AgentLoopRunner {
         }
         let rehydrate = self.compact_rehydrate(&touched_files, cancel).await;
         Ok(PersistResult {
-            summary_msg_id: Some(summary_id),
+            summary_msg_id: None,
             files_rehydrated: rehydrate.files_succeeded,
         })
     }
@@ -147,9 +134,9 @@ impl AgentLoopRunner {
         summary_msg_id: Option<String>,
         files_rehydrated: usize,
     ) -> Result<()> {
-        let after = self.params.store.len();
+        let after = self.turns.view().len();
         let removed = before.saturating_sub(after);
-        let tokens_after = self.params.store.current_tokens();
+        let tokens_after = self.turns.view().current_tokens();
 
         self.emit(AgentEventPayload::Compacted(
             loopal_protocol::CompactionSummary {

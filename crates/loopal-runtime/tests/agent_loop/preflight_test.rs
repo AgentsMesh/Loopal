@@ -1,6 +1,6 @@
 use loopal_context::ingestion::safe_truncate_tool_result;
 use loopal_context::token_counter::estimate_messages_tokens;
-use loopal_message::{ContentBlock, Message, MessageRole};
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 
 fn big_tool_result_message(size: usize) -> Message {
     Message {

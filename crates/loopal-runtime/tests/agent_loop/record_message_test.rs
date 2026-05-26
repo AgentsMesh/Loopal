@@ -1,16 +1,16 @@
-use loopal_message::{ContentBlock, MessageRole};
+use loopal_provider_api::{ContentBlock, MessageRole};
 
 use super::make_runner;
 
 #[test]
 fn test_record_assistant_message_text_only() {
     let (mut runner, _rx) = make_runner();
-    assert!(runner.params.store.is_empty());
+    assert!(runner.turns.view().is_empty());
 
     runner.record_assistant_message("Hello, world!", &[], "", None, vec![]);
 
-    assert_eq!(runner.params.store.len(), 1);
-    let msg = &runner.params.store.messages()[0];
+    assert_eq!(runner.turns.view().len(), 1);
+    let msg = &runner.turns.view().messages()[0];
     assert_eq!(msg.role, MessageRole::Assistant);
     assert_eq!(msg.content.len(), 1);
     match &msg.content[0] {
@@ -38,8 +38,8 @@ fn test_record_assistant_message_with_tool_uses() {
 
     runner.record_assistant_message("Let me check that.", &tool_uses, "", None, vec![]);
 
-    assert_eq!(runner.params.store.len(), 1);
-    let msg = &runner.params.store.messages()[0];
+    assert_eq!(runner.turns.view().len(), 1);
+    let msg = &runner.turns.view().messages()[0];
     assert_eq!(msg.role, MessageRole::Assistant);
     assert_eq!(msg.content.len(), 3);
 
@@ -69,7 +69,7 @@ fn test_record_assistant_message_empty_adds_nothing() {
     runner.record_assistant_message("", &[], "", None, vec![]);
 
     assert!(
-        runner.params.store.is_empty(),
+        runner.turns.view().is_empty(),
         "empty content should not produce a message"
     );
 }
@@ -86,8 +86,8 @@ fn test_record_assistant_message_tool_uses_only_no_text() {
 
     runner.record_assistant_message("", &tool_uses, "", None, vec![]);
 
-    assert_eq!(runner.params.store.len(), 1);
-    let msg = &runner.params.store.messages()[0];
+    assert_eq!(runner.turns.view().len(), 1);
+    let msg = &runner.turns.view().messages()[0];
     assert_eq!(msg.content.len(), 1);
     match &msg.content[0] {
         ContentBlock::ToolUse { id, name, .. } => {
@@ -102,9 +102,9 @@ fn test_record_assistant_message_tool_uses_only_no_text() {
 async fn test_record_assistant_message_saves_to_session() {
     let (mut runner, _rx) = make_runner();
     runner.record_assistant_message("test message", &[], "", None, vec![]);
-    assert_eq!(runner.params.store.len(), 1);
+    assert_eq!(runner.turns.view().len(), 1);
     assert_eq!(
-        runner.params.store.messages()[0].text_content(),
+        runner.turns.view().messages()[0].text_content(),
         "test message"
     );
 }

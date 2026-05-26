@@ -1,4 +1,5 @@
-use loopal_message::{ContentBlock, Message, MessageOrigin, MessageRole};
+use loopal_provider_api::MessageOrigin;
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 
 use super::touched_files::TouchedFile;
 

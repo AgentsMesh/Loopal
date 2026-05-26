@@ -17,7 +17,7 @@ fn target_hub_some_yields_crosshub_dropping_cwd_and_fork_context() {
     let target = build_spawn_target(
         Some("hub-b".into()),
         Some(PathBuf::from("/local/wt")),
-        Some(vec![loopal_message::Message::user("would-be ctx")]),
+        Some(vec![loopal_provider_api::Message::user("would-be ctx")]),
     );
     match target {
         SpawnTarget::CrossHub { hub_id } => assert_eq!(hub_id, "hub-b"),
@@ -30,7 +30,7 @@ fn target_hub_none_yields_inhub_carrying_cwd_and_fork_context() {
     let target = build_spawn_target(
         None,
         Some(PathBuf::from("/local/wt")),
-        Some(vec![loopal_message::Message::user("ctx")]),
+        Some(vec![loopal_provider_api::Message::user("ctx")]),
     );
     match target {
         SpawnTarget::InHub {

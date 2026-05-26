@@ -1,23 +1,11 @@
-//! Builder for [`AgentLoopParams`] — keeps test/setup call sites
-//! resilient to new fields.
-//!
-//! Without a builder, every new optional field on `AgentLoopParams`
-//! forces every callsite (12+ test fixtures + production setup) to add
-//! `field: default_value`. The builder centralizes the defaults, so
-//! adding a field is a one-line change here, not a sweep across the
-//! codebase.
-//!
-//! Required arguments (`config`, `deps`, `session`, `store`,
-//! `interrupt`) are passed to `new()`; everything else has a sensible
-//! default and is overridden via fluent setters.
-
 use std::sync::Arc;
 
 use loopal_config::HarnessConfig;
-use loopal_context::ContextStore;
-use loopal_message::Message;
+use loopal_context::ContextBudget;
+use loopal_provider_api::Message;
 use loopal_storage::Session;
 use loopal_tool_api::{FetchRefinerPolicy, MemoryChannel, OneShotChatService};
+use loopal_turn::Turn;
 
 use super::params::{AgentConfig, AgentDeps, AgentLoopParams, InterruptHandle};
 use crate::goal::GoalRuntimeSession;
@@ -27,8 +15,9 @@ pub struct AgentLoopParamsBuilder {
     config: AgentConfig,
     deps: AgentDeps,
     session: Session,
-    store: ContextStore,
+    budget: ContextBudget,
     interrupt: InterruptHandle,
+    initial_turns: Vec<Turn>,
     shared: Option<Arc<dyn std::any::Any + Send + Sync>>,
     memory_channel: Option<Arc<dyn MemoryChannel>>,
     one_shot_chat: Option<Arc<dyn OneShotChatService>>,
@@ -47,15 +36,16 @@ impl AgentLoopParamsBuilder {
         config: AgentConfig,
         deps: AgentDeps,
         session: Session,
-        store: ContextStore,
+        budget: ContextBudget,
         interrupt: InterruptHandle,
     ) -> Self {
         Self {
             config,
             deps,
             session,
-            store,
+            budget,
             interrupt,
+            initial_turns: Vec::new(),
             shared: None,
             memory_channel: None,
             one_shot_chat: None,
@@ -68,6 +58,11 @@ impl AgentLoopParamsBuilder {
             resume_hooks: Vec::new(),
             scheduler: None,
         }
+    }
+
+    pub fn initial_turns(mut self, turns: Vec<Turn>) -> Self {
+        self.initial_turns = turns;
+        self
     }
 
     pub fn shared(mut self, s: Arc<dyn std::any::Any + Send + Sync>) -> Self {
@@ -131,7 +126,8 @@ impl AgentLoopParamsBuilder {
             config: self.config,
             deps: self.deps,
             session: self.session,
-            store: self.store,
+            budget: self.budget,
+            initial_turns: self.initial_turns,
             interrupt: self.interrupt,
             shared: self.shared,
             memory_channel: self.memory_channel,

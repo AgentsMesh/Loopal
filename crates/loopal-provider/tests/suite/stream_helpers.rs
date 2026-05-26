@@ -2,13 +2,12 @@
 
 use futures::StreamExt;
 use loopal_error::LoopalError;
-use loopal_message::Message;
 use loopal_provider_api::{ChatParams, StreamChunk};
 
 pub fn test_chat_params() -> ChatParams {
     ChatParams {
         model: "test-model".to_string(),
-        messages: vec![Message::user("Hello")],
+        turns: vec![loopal_turn::Turn::single_user_prompt("Hello")],
         system_prompt: "You are helpful.".to_string(),
         tools: vec![],
         max_tokens: 100,

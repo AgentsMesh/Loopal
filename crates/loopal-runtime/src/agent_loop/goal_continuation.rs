@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use loopal_error::Result;
-use loopal_message::MessageRole;
 use loopal_protocol::AgentEventPayload;
+use loopal_provider_api::MessageRole;
 use tracing::warn;
 
 use crate::goal::prompts::build_continuation_envelope;
@@ -33,7 +33,7 @@ impl AgentLoopRunner {
         if matches!(self.params.config.mode, AgentMode::Plan) {
             return Ok(false);
         }
-        if matches!(self.params.store.last_role(), Some(MessageRole::User)) {
+        if matches!(self.turns.view().last_role(), Some(MessageRole::User)) {
             return Ok(false);
         }
         let goal = match session.snapshot().await {

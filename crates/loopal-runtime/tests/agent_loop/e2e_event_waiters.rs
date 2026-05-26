@@ -94,20 +94,23 @@ async fn wait_for_event_variant(
 }
 
 pub(crate) async fn wait_for_tool_error(
-    handle: &Arc<std::sync::Mutex<Vec<Vec<loopal_message::Message>>>>,
+    handle: &Arc<std::sync::Mutex<Vec<Vec<loopal_turn::Turn>>>>,
 ) -> String {
     let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
     loop {
         let snapshot = handle.lock().unwrap().clone();
         for batch in snapshot.iter().rev() {
-            for m in batch.iter().rev() {
-                for block in &m.content {
-                    if let loopal_message::ContentBlock::ToolResult {
-                        content, is_error, ..
-                    } = block
-                        && *is_error
-                    {
-                        return content.clone();
+            for turn in batch.iter().rev() {
+                for step in turn.body.steps.iter().rev() {
+                    let loopal_turn::TurnStep::ToolBatch(b) = step else {
+                        continue;
+                    };
+                    for item in &b.items {
+                        if let loopal_turn::ToolExecState::Done(r) = &item.state
+                            && r.is_error
+                        {
+                            return r.content.clone();
+                        }
                     }
                 }
             }
@@ -120,7 +123,7 @@ pub(crate) async fn wait_for_tool_error(
 }
 
 pub(crate) async fn wait_for_call_count(
-    handle: &Arc<std::sync::Mutex<Vec<Vec<loopal_message::Message>>>>,
+    handle: &Arc<std::sync::Mutex<Vec<Vec<loopal_turn::Turn>>>>,
     target: usize,
     timeout: Duration,
 ) {
@@ -135,7 +138,7 @@ pub(crate) async fn wait_for_call_count(
                 .lock()
                 .unwrap()
                 .iter()
-                .filter_map(|batch| batch.last().map(|m| m.text_content()))
+                .filter_map(|batch| batch.last().map(turn_text_summary))
                 .map(|t| t.chars().take(40).collect::<String>())
                 .collect();
             panic!(
@@ -147,7 +150,7 @@ pub(crate) async fn wait_for_call_count(
 }
 
 pub(crate) async fn wait_for_recorded_text(
-    handle: &Arc<std::sync::Mutex<Vec<Vec<loopal_message::Message>>>>,
+    handle: &Arc<std::sync::Mutex<Vec<Vec<loopal_turn::Turn>>>>,
     needle: &str,
     timeout: Duration,
 ) {
@@ -155,15 +158,42 @@ pub(crate) async fn wait_for_recorded_text(
     loop {
         let snapshot = handle.lock().unwrap().clone();
         for batch in snapshot.iter().rev() {
-            for m in batch.iter().rev() {
-                if m.text_content().contains(needle) {
+            for t in batch.iter().rev() {
+                if turn_text_summary(t).contains(needle) {
                     return;
                 }
             }
         }
         if tokio::time::Instant::now() >= deadline {
-            panic!("timed out waiting for text {needle:?} in recorded messages");
+            panic!("timed out waiting for text {needle:?} in recorded turns");
         }
         tokio::time::sleep(Duration::from_millis(20)).await;
     }
+}
+
+/// reason: tests use this to inspect the trigger content and any assistant
+/// text-block output of a Turn. Mirrors the old `Message::text_content` flat
+/// view but adapted to Turn's split trigger/steps shape.
+fn turn_text_summary(turn: &loopal_turn::Turn) -> String {
+    use loopal_turn::{TurnStep, TurnTrigger};
+    let mut out = match &turn.trigger {
+        TurnTrigger::UserInput { content, .. }
+        | TurnTrigger::Cron { content, .. }
+        | TurnTrigger::Agent { content, .. }
+        | TurnTrigger::Channel { content, .. }
+        | TurnTrigger::GoalContinuation { content, .. }
+        | TurnTrigger::BackgroundHook { content, .. } => content.clone(),
+        TurnTrigger::Resume => String::new(),
+    };
+    for step in &turn.body.steps {
+        if let TurnStep::LlmCall { response, .. } = step {
+            for tb in &response.text_blocks {
+                if !out.is_empty() {
+                    out.push('\n');
+                }
+                out.push_str(&tb.text);
+            }
+        }
+    }
+    out
 }

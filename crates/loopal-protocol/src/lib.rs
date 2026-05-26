@@ -16,7 +16,6 @@ pub mod mcp_ipc;
 pub mod mcp_snapshot;
 pub mod naming;
 pub mod projected;
-pub mod projection;
 pub mod question;
 pub mod secret_ipc;
 pub mod task_snapshot;
@@ -45,7 +44,6 @@ pub use mcp_ipc::{
 pub use mcp_snapshot::McpServerSnapshot;
 pub use naming::ROOT_AGENT_NAME;
 pub use projected::{ProjectedMessage, ProjectedToolCall};
-pub use projection::project_messages;
 pub use question::{Question, QuestionOption, ResolveSource, UserQuestionResponse};
 pub use secret_ipc::{
     SecretCaller, SecretGetRequest, SecretGetResponse, SecretHealthRequest, SecretHealthResponse,

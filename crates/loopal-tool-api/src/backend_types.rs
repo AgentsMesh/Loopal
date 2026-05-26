@@ -1,22 +1,13 @@
-//! Value types returned by [`Backend`](super::Backend) methods.
-//!
-//! These are deliberately simple structs so that tool crates only depend
-//! on `loopal-tool-api` (a leaf crate) for their I/O interface.
-
 use std::time::Duration;
 
 use crate::path::ResolvedPath;
 
-/// Result of a file read operation.
 #[derive(Debug, Clone)]
 pub struct ReadResult {
-    /// File content (with line-numbered formatting if applicable).
     pub content: String,
-    /// Total number of lines in the original file.
     pub total_lines: usize,
 }
 
-/// Result of an image read operation.
 #[derive(Debug, Clone)]
 pub struct ImageResult {
     pub media_type: String,
@@ -25,19 +16,15 @@ pub struct ImageResult {
     pub byte_size: usize,
 }
 
-/// Result of a file write operation.
 #[derive(Debug, Clone)]
 pub struct WriteResult {
     pub bytes_written: usize,
 }
 
-/// Result of a shell command execution.
-///
-/// reason: `stdout` is the HeadTail preview (short → full content; long →
-/// head + tail with elision marker). `stderr` is a capped in-memory buffer
-/// (≤ 8 KB; longer content is trimmed front-first). `log_path` always points
-/// to the merged tmp file holding the full interleaved output (stderr lines
-/// prefixed with `[err] `), so callers needing complete output can `Read` it.
+// stdout = HeadTail preview (short → full; long → head + tail + elision marker).
+// stderr = ≤8 KB capped buffer (front-first trim). log_path is the merged tmp
+// file with full interleaved output (stderr lines prefixed `[err] `) — Read
+// it if complete output is needed.
 #[derive(Debug, Clone)]
 pub struct ExecResult {
     pub stdout: String,
@@ -48,20 +35,17 @@ pub struct ExecResult {
     pub log_path: std::path::PathBuf,
 }
 
-/// Result of an HTTP fetch operation.
 #[derive(Debug, Clone)]
 pub struct FetchResult {
     pub body: String,
     pub content_type: Option<String>,
     pub status: u16,
-    /// Path to an overflow file when body exceeded fetch size limit.
     pub overflow_path: Option<String>,
-    /// Final URL after redirects, populated only when the host differs from
-    /// the requested URL so the caller can decide whether to follow.
+    // Populated only when redirect host differs from the requested URL —
+    // signals to caller that following is a cross-origin decision.
     pub final_url: Option<String>,
 }
 
-/// Metadata about a single file or directory.
 #[derive(Debug, Clone)]
 pub struct FileInfo {
     pub size: u64,
@@ -70,13 +54,11 @@ pub struct FileInfo {
     pub modified: Option<u64>,
 }
 
-/// Result of a directory listing.
 #[derive(Debug, Clone)]
 pub struct LsResult {
     pub entries: Vec<LsEntry>,
 }
 
-/// Single entry in a directory listing.
 #[derive(Debug, Clone)]
 pub struct LsEntry {
     pub name: String,
@@ -87,9 +69,6 @@ pub struct LsEntry {
     pub permissions: Option<u32>,
 }
 
-// --- Glob search types ---
-
-/// Options for a glob file search.
 #[derive(Debug, Clone)]
 pub struct GlobOptions {
     pub pattern: String,
@@ -98,26 +77,19 @@ pub struct GlobOptions {
     pub max_results: usize,
 }
 
-/// Result of a glob search.
 #[derive(Debug, Clone)]
 pub struct GlobSearchResult {
     pub entries: Vec<GlobEntry>,
-    /// `true` when results were capped at the configured limit.
     pub truncated: bool,
-    /// Path to an overflow file containing all results (set when truncated).
     pub overflow_path: Option<String>,
 }
 
-/// Single entry in a glob search result.
 #[derive(Debug, Clone)]
 pub struct GlobEntry {
     pub path: String,
     pub modified_secs: Option<u64>,
 }
 
-// --- Grep search types ---
-
-/// Options for a regex content search.
 #[derive(Debug, Clone)]
 pub struct GrepOptions {
     pub pattern: String,
@@ -132,29 +104,24 @@ pub struct GrepOptions {
     pub max_matches: usize,
 }
 
-/// Result of a grep content search.
 #[derive(Debug, Clone)]
 pub struct GrepSearchResult {
     pub file_matches: Vec<FileMatchResult>,
     pub total_match_count: usize,
-    /// Path to an overflow file containing all results (set when truncated).
     pub overflow_path: Option<String>,
 }
 
-/// All matches within a single file.
 #[derive(Debug, Clone)]
 pub struct FileMatchResult {
     pub path: String,
     pub groups: Vec<MatchGroup>,
 }
 
-/// A group of contiguous lines (matches + surrounding context).
 #[derive(Debug, Clone)]
 pub struct MatchGroup {
     pub lines: Vec<MatchLine>,
 }
 
-/// A single line in a match group — either a match or a context line.
 #[derive(Debug, Clone)]
 pub struct MatchLine {
     pub line_num: usize,
@@ -162,12 +129,6 @@ pub struct MatchLine {
     pub is_match: bool,
 }
 
-// --- Timeout ---
-
-/// Timeout in seconds, parsed from LLM tool input.
-///
-/// Centralizes the "seconds → milliseconds" conversion so that consumers
-/// never need to guess the unit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TimeoutSecs(u64);
 
@@ -176,7 +137,6 @@ impl TimeoutSecs {
         Self(secs)
     }
 
-    /// Parse `input["timeout"]` (seconds). Falls back to `default_secs`.
     pub fn from_tool_input(input: &serde_json::Value, default_secs: u64) -> Self {
         Self(input["timeout"].as_u64().unwrap_or(default_secs))
     }
@@ -185,12 +145,10 @@ impl TimeoutSecs {
         self.0
     }
 
-    /// Convert to a `Duration`.
     pub const fn to_duration(&self) -> Duration {
         Duration::from_secs(self.0)
     }
 
-    /// Convert to a `Duration`, clamped to `max`.
     pub fn to_duration_clamped(&self, max: Duration) -> Duration {
         let d = Duration::from_secs(self.0);
         if d > max { max } else { d }

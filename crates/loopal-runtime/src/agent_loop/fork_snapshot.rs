@@ -15,10 +15,10 @@ impl AgentLoopRunner {
         }
         if let Some(ref snapshot) = self.params.message_snapshot {
             match snapshot.write() {
-                Ok(mut guard) => *guard = self.params.store.messages().to_vec(),
+                Ok(mut guard) => *guard = self.turns.view().messages().to_vec(),
                 Err(e) => {
                     tracing::warn!("fork snapshot write lock poisoned, recovering: {e}");
-                    *e.into_inner() = self.params.store.messages().to_vec();
+                    *e.into_inner() = self.turns.view().messages().to_vec();
                 }
             }
         }

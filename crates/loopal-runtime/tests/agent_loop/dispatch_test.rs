@@ -3,7 +3,7 @@
 
 use std::collections::HashSet;
 
-use loopal_message::ContentBlock;
+use loopal_provider_api::ContentBlock;
 
 use super::{in_turn, make_runner, make_turn_ctx};
 
@@ -35,8 +35,8 @@ async fn ask_user_intercepted_no_fallback_leak() {
     .await
     .unwrap();
 
-    assert_eq!(runner.params.store.len(), 1);
-    let msg = &runner.params.store.messages()[0];
+    assert_eq!(runner.turns.view().len(), 1);
+    let msg = &runner.turns.view().messages()[0];
     assert_eq!(msg.content.len(), 1, "expected exactly one ToolResult");
 
     match &msg.content[0] {
@@ -105,7 +105,7 @@ async fn ask_user_plus_read_no_duplicate_tool_result() {
     .await
     .unwrap();
 
-    let msg = &runner.params.store.messages()[0];
+    let msg = &runner.turns.view().messages()[0];
     assert_eq!(msg.content.len(), 2, "expected exactly 2 ToolResult blocks");
 
     // Collect tool_use_ids — must be unique.

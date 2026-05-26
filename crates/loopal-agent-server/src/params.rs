@@ -8,6 +8,8 @@ use loopal_kernel::Kernel;
 use loopal_runtime::AgentLoopParams;
 use loopal_scheduler::CronScheduler;
 
+use crate::mcp_settle::{mcp_startup_wait, spawn_proxy_mcp_settle_poll};
+
 pub struct AgentSetupResult {
     pub params: AgentLoopParams,
     pub task_store: Arc<TaskStore>,
@@ -88,62 +90,6 @@ pub async fn build_kernel_from_config(
     Ok(kernel)
 }
 
-/// reason: agent uses `McpProxyClient` and cannot subscribe to Hub-side
-/// `LocalMcpProvider` settle events directly. Poll the Hub at low cadence
-/// while tools are still arriving; back off and terminate once the tool
-/// surface is stable so we don't tick forever for the kernel's lifetime.
-/// `register_all_settled_mcp_tools` returns the number of newly registered
-/// adapters, so a streak of zeros means "settled".
-fn spawn_proxy_mcp_settle_poll(kernel: std::sync::Weak<Kernel>) {
-    let poll = mcp_settle_poll_interval();
-    let quiet_streak_to_settle: u32 = std::env::var("LOOPAL_MCP_POLL_QUIET_STREAK")
-        .ok()
-        .and_then(|s| s.parse::<u32>().ok())
-        .filter(|s| *s > 0)
-        .unwrap_or(4);
-    tokio::spawn(async move {
-        let mut interval = tokio::time::interval(poll);
-        interval.tick().await;
-        let mut quiet_streak: u32 = 0;
-        loop {
-            interval.tick().await;
-            let Some(k) = kernel.upgrade() else {
-                return;
-            };
-            let added = k.register_all_settled_mcp_tools().await;
-            if added == 0 {
-                quiet_streak = quiet_streak.saturating_add(1);
-                if quiet_streak >= quiet_streak_to_settle {
-                    tracing::debug!(
-                        quiet_streak,
-                        "proxy MCP settle-poll: tool surface stable, terminating"
-                    );
-                    return;
-                }
-            } else {
-                quiet_streak = 0;
-            }
-        }
-    });
-}
-
-fn mcp_startup_wait() -> std::time::Duration {
-    let secs = std::env::var("LOOPAL_MCP_STARTUP_WAIT_SECS")
-        .ok()
-        .and_then(|s| s.parse::<u64>().ok())
-        .unwrap_or(5);
-    std::time::Duration::from_secs(secs)
-}
-
-fn mcp_settle_poll_interval() -> std::time::Duration {
-    let secs = std::env::var("LOOPAL_MCP_POLL_SECS")
-        .ok()
-        .and_then(|s| s.parse::<u64>().ok())
-        .filter(|s| *s > 0)
-        .unwrap_or(3);
-    std::time::Duration::from_secs(secs)
-}
-
 pub fn build_kernel_with_provider(
     provider: Arc<dyn loopal_provider_api::Provider>,
 ) -> anyhow::Result<Arc<Kernel>> {
@@ -181,10 +127,9 @@ async fn expand_provider_secrets(
     settings: &mut loopal_config::Settings,
     client: &dyn loopal_secret_client::SecretClient,
 ) {
-    // reason: critical path (agent/start) but reverse-IPC dispatcher is
-    // already Listening by P2-A's happens-before; default 8s budget bounds
-    // any stuck hub call so we surface "timed out" rather than the layered
-    // 30s handshake timeout further up.
+    // Critical-path (agent/start) but reverse-IPC dispatcher is already
+    // Listening per P2-A's happens-before; 8s budget bounds any stuck hub
+    // call so we surface "timed out" rather than the 30s handshake timeout.
     let budget = loopal_ipc::HUB_RPC_BUDGET;
     for slot in [
         &mut settings.providers.anthropic,

@@ -3,8 +3,10 @@ use std::sync::{Arc, OnceLock};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use loopal_error::StorageError;
-use loopal_message::{ContentBlock, Message, ToolImageBlock};
+use loopal_provider_api::{ContentBlock, Message};
 use loopal_storage::{FileResourceStore, ResourceStore};
+use loopal_tool_invocation::ToolImageBlock;
+use loopal_turn::{ToolExecState, Turn, TurnStep};
 use tracing::warn;
 
 static RESOURCE_STORE: OnceLock<Option<Arc<dyn ResourceStore>>> = OnceLock::new();
@@ -68,19 +70,50 @@ pub async fn hydrate_images(
             let ContentBlock::ToolResult { images, .. } = block else {
                 continue;
             };
-            for img in images.iter_mut() {
-                let resource = match img {
-                    ToolImageBlock::SessionResource { id, media_type, .. } => {
-                        Some((id.clone(), media_type.clone()))
-                    }
-                    ToolImageBlock::Inline { .. } => None,
-                };
-                if let Some((id, media_type)) = resource {
-                    let bytes = store.read(session_id, &id).await?;
-                    let data = STANDARD.encode(&bytes);
-                    *img = ToolImageBlock::Inline { media_type, data };
+            hydrate_image_blocks(images, store, session_id).await?;
+        }
+    }
+    Ok(())
+}
+
+/// Walk every turn's ToolBatch step and inline-hydrate any SessionResource
+/// image attachments. Called before sending turns to the provider.
+pub async fn hydrate_turn_images(
+    turns: &mut [Turn],
+    store: &dyn ResourceStore,
+    session_id: &str,
+) -> Result<(), StorageError> {
+    for turn in turns.iter_mut() {
+        for step in turn.body.steps.iter_mut() {
+            let TurnStep::ToolBatch(batch) = step else {
+                continue;
+            };
+            for item in batch.items.iter_mut() {
+                if let ToolExecState::Done(ref mut r) = item.state {
+                    hydrate_image_blocks(&mut r.images, store, session_id).await?;
                 }
             }
+        }
+    }
+    Ok(())
+}
+
+async fn hydrate_image_blocks(
+    images: &mut [ToolImageBlock],
+    store: &dyn ResourceStore,
+    session_id: &str,
+) -> Result<(), StorageError> {
+    for img in images.iter_mut() {
+        let resource = match img {
+            ToolImageBlock::SessionResource { id, media_type, .. } => {
+                Some((id.clone(), media_type.clone()))
+            }
+            ToolImageBlock::Inline { .. } => None,
+        };
+        if let Some((id, media_type)) = resource {
+            let bytes = store.read(session_id, &id).await?;
+            let data = STANDARD.encode(&bytes);
+            *img = ToolImageBlock::Inline { media_type, data };
         }
     }
     Ok(())

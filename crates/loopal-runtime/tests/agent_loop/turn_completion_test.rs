@@ -5,7 +5,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use futures::stream::Stream as FutStream;
 use loopal_config::Settings;
-use loopal_context::{ContextBudget, ContextStore};
+use loopal_context::ContextBudget;
 use loopal_error::LoopalError;
 use loopal_kernel::Kernel;
 use loopal_protocol::ControlCommand;
@@ -97,14 +97,17 @@ pub(crate) fn make_multi_runner(
             decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
         },
         fixture.test_session("test-multi"),
-        ContextStore::from_messages(
-            vec![loopal_message::Message::user("go")],
-            make_test_budget(),
-        ),
+        make_test_budget(),
         InterruptHandle::new(),
     )
     .build();
-    (AgentLoopRunner::new(params), event_rx)
+    let mut runner = AgentLoopRunner::new(params);
+    runner.start_turn_record(loopal_turn::TurnTrigger::UserInput {
+        envelope_id: "test-multi-seed".into(),
+        content: "go".into(),
+        images: Vec::new(),
+    });
+    (runner, event_rx)
 }
 
 /// LLM returns text-only response -> turn exits with Goal.

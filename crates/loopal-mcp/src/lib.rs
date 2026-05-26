@@ -9,6 +9,7 @@ pub mod provider;
 pub mod proxy_client;
 pub mod reconnect;
 pub mod secret_expand;
+mod settle_signal;
 pub mod tool_adapter;
 pub mod tool_result_text;
 pub mod transport;

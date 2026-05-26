@@ -6,7 +6,7 @@
 use std::sync::Arc;
 
 use loopal_config::Settings;
-use loopal_context::{ContextBudget, ContextStore};
+use loopal_context::ContextBudget;
 use loopal_error::LoopalError;
 use loopal_kernel::Kernel;
 use loopal_protocol::{AgentEvent, ControlCommand, Envelope};
@@ -28,7 +28,7 @@ fn build_params(
     kernel: Arc<Kernel>,
     frontend: Arc<dyn loopal_runtime::AgentFrontend>,
     fixture: &TestFixture,
-    messages: Vec<loopal_message::Message>,
+    messages: Vec<loopal_provider_api::Message>,
     permission_mode: PermissionMode,
 ) -> AgentLoopParams {
     build_params_with_config(
@@ -48,7 +48,7 @@ fn build_params_with_config(
     kernel: Arc<Kernel>,
     frontend: Arc<dyn loopal_runtime::AgentFrontend>,
     fixture: &TestFixture,
-    messages: Vec<loopal_message::Message>,
+    _messages: Vec<loopal_provider_api::Message>,
     config: AgentConfig,
 ) -> AgentLoopParams {
     AgentLoopParamsBuilder::new(
@@ -60,7 +60,7 @@ fn build_params_with_config(
             decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
         },
         fixture.test_session("rt-test"),
-        ContextStore::from_messages(messages, make_test_budget()),
+        make_test_budget(),
         InterruptHandle::new(),
     )
     .build()
@@ -105,10 +105,16 @@ pub fn make_runner_with_mock_provider(
         Arc::new(kernel),
         frontend,
         &fixture,
-        vec![loopal_message::Message::user("hello")],
+        vec![loopal_provider_api::Message::user("hello")],
         PermissionMode::Bypass,
     );
-    (AgentLoopRunner::new(params), event_rx, mbox_tx, ctrl_tx)
+    let mut runner = AgentLoopRunner::new(params);
+    runner.start_turn_record(loopal_turn::TurnTrigger::UserInput {
+        envelope_id: "test-seed-hello".into(),
+        content: "hello".into(),
+        images: Vec::new(),
+    });
+    (runner, event_rx, mbox_tx, ctrl_tx)
 }
 
 pub fn make_multi_runner(
@@ -145,10 +151,16 @@ pub fn make_multi_runner_with_intents(
         Arc::new(kernel),
         frontend,
         &fixture,
-        vec![loopal_message::Message::user("go")],
+        vec![loopal_provider_api::Message::user("go")],
         AgentConfig::default(),
     );
-    (AgentLoopRunner::new(params), event_rx, intents)
+    let mut runner = AgentLoopRunner::new(params);
+    runner.start_turn_record(loopal_turn::TurnTrigger::UserInput {
+        envelope_id: "test-seed-go".into(),
+        content: "go".into(),
+        images: Vec::new(),
+    });
+    (runner, event_rx, intents)
 }
 
 pub fn make_interactive_multi_runner(
@@ -183,5 +195,7 @@ pub fn make_interactive_multi_runner(
         vec![],
         PermissionMode::Bypass,
     );
-    (AgentLoopRunner::new(params), event_rx, mbox_tx, ctrl_tx)
+    let mut runner = AgentLoopRunner::new(params);
+    runner.start_turn_record(loopal_turn::TurnTrigger::Resume);
+    (runner, event_rx, mbox_tx, ctrl_tx)
 }

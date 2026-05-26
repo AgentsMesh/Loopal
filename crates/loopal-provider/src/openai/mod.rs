@@ -42,40 +42,39 @@ impl Provider for OpenAiProvider {
     }
 
     async fn stream_chat(&self, params: &ChatParams) -> Result<ChatStream, LoopalError> {
-        let finalized = self.finalize_messages(params).into_owned();
-        let final_params = ChatParams {
-            messages: finalized,
-            ..params.clone()
-        };
-        let input = self.build_input(&final_params);
-        let tools = self.build_tools(&final_params);
+        // reason: build_input still consumes Vec<Message>; project turns →
+        // messages locally so existing build path is unchanged. Responses API
+        // tolerates assistant-tail so no continuation user-tail needed here.
+        let messages = loopal_provider_api::project_turns_to_messages(&params.turns);
+        let input = self.build_input_from_messages(&messages, params);
+        let tools = self.build_tools(params);
 
         let mut body = json!({
-            "model": final_params.model,
+            "model": params.model,
             "stream": true,
             "input": input,
-            "max_output_tokens": final_params.max_tokens,
+            "max_output_tokens": params.max_tokens,
         });
 
-        if !final_params.system_prompt.is_empty() {
-            body["instructions"] = json!(final_params.system_prompt);
+        if !params.system_prompt.is_empty() {
+            body["instructions"] = json!(params.system_prompt);
         }
         if !tools.is_empty() {
             body["tools"] = json!(tools);
             body["tool_choice"] = json!("auto");
         }
-        if let Some(ref thinking_config) = final_params.thinking {
+        if let Some(ref thinking_config) = params.thinking {
             body["reasoning"] = thinking::to_openai_reasoning(thinking_config);
-        } else if let Some(temp) = final_params.temperature {
+        } else if let Some(temp) = params.temperature {
             body["temperature"] = json!(temp);
         }
 
         tracing::info!(
-            model = %final_params.model,
+            model = %params.model,
             url = %format!("{}/v1/responses", self.base_url),
-            messages = final_params.messages.len(),
+            messages = messages.len(),
             tools = tools.len(),
-            max_tokens = final_params.max_tokens,
+            max_tokens = params.max_tokens,
             "API request"
         );
 

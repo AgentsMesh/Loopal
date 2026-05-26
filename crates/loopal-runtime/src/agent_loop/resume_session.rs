@@ -1,11 +1,10 @@
 //! Session resume — hot-swap agent context to a different persisted session.
 
-use loopal_context::ContextStore;
 use loopal_error::Result;
 use loopal_protocol::AgentEventPayload;
 use tracing::info;
 
-use super::pipeline_setup::build_context_pipeline;
+use super::pipeline_setup::build_config_snapshots;
 use super::runner::AgentLoopRunner;
 use crate::plan_file::PlanFile;
 
@@ -25,16 +24,15 @@ impl AgentLoopRunner {
     /// `ControlCommand::ResumeSession`.
     pub async fn handle_resume_session(&mut self, session_id: &str) -> Result<()> {
         info!(session_id, "resuming session");
-        let (session, messages) = self
+        let (session, turns) = self
             .params
             .deps
             .session_manager
             .resume_session(session_id)?;
 
-        // Replace session identity + conversation context
         self.params.session = session;
-        self.params.store =
-            ContextStore::from_messages(messages, self.params.store.budget().clone());
+        self.turns
+            .replace_store(loopal_context::TurnStore::from_turns(turns));
 
         // Reset per-session counters
         self.turn_count = 0;
@@ -62,10 +60,10 @@ impl AgentLoopRunner {
         // reason: PlanFile caches cwd, so plan-mode writes would land in
         // the old cwd's `.loopal/plans/`.
         self.plan_file = PlanFile::new(std::path::Path::new(&self.params.session.cwd));
-        // reason: ConfigRefreshMiddleware holds FileSnapshot entries with
-        // cwd-resolved paths; without rebuild the new session inherits the
-        // old project's MEMORY.md / instructions / settings.
-        self.pipeline = build_context_pipeline(&self.params.session.cwd);
+        // reason: ConfigRefresh snapshots cache cwd-resolved paths; without
+        // rebuild the new session inherits the old project's MEMORY.md /
+        // instructions / settings.
+        self.config_snapshots = build_config_snapshots(&self.params.session.cwd);
 
         // Clear the shared message snapshot — the previous session's
         // entries must not leak into a sub-agent fork that happens
@@ -98,7 +96,7 @@ impl AgentLoopRunner {
         }
 
         // Notify frontend
-        let message_count = self.params.store.len();
+        let message_count = self.turns.view().len();
         self.emit(AgentEventPayload::SessionResumed {
             session_id: self.params.session.id.clone(),
             message_count,
@@ -109,7 +107,7 @@ impl AgentLoopRunner {
         self.emit(AgentEventPayload::TokenUsage {
             input_tokens: 0,
             output_tokens: 0,
-            context_window: self.params.store.budget().context_window,
+            context_window: self.turns.view().budget().context_window,
             cache_creation_input_tokens: 0,
             cache_read_input_tokens: 0,
             thinking_tokens: 0,

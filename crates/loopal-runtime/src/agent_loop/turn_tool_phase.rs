@@ -1,5 +1,6 @@
 use loopal_error::Result;
-use tracing::info;
+use loopal_turn::{InjectionKind, TurnStep};
+use tracing::{info, warn};
 
 use super::runner::AgentLoopRunner;
 use super::streaming_tool_exec::{self, StreamingToolHandle, ToolUseArrived};
@@ -42,19 +43,37 @@ impl AgentLoopRunner {
         turn_ctx.metrics.tool_errors += stats.errors;
         info!("tool exec complete");
 
-        let warnings = std::mem::take(&mut turn_ctx.pending_warnings);
-        self.params.store.append_warnings_to_last_user(warnings);
-
-        self.inject_pending_messages().await;
-        let result_blocks = self
-            .params
-            .store
+        // reason: capture result_blocks BEFORE BOTH the governance Injection
+        // step append AND inject_pending_messages. Either would shift
+        // `view.messages().last()` away from the tool batch's user message
+        // — Injection projects to a User text message (the warning), and
+        // inject_pending_messages may end the current turn entirely. If
+        // we captured later, DiffTracker would see Text instead of
+        // ToolResult and miss every Write/Edit/Apply/MultiEdit.
+        let result_blocks: Vec<_> = self
+            .turns
+            .view()
             .messages()
             .last()
-            .map(|m| m.content.as_slice())
-            .unwrap_or(&[]);
+            .map(|m| m.content.clone())
+            .unwrap_or_default();
+
+        let warnings = std::mem::take(&mut turn_ctx.pending_warnings);
+        let warning_count = warnings.len();
+        turn_ctx.metrics.warnings_injected = warning_count as u32;
+        if !warnings.is_empty() {
+            let text = warnings.join("\n");
+            if let Err(e) = self.append_step_record(TurnStep::Injection {
+                kind: InjectionKind::SystemNote,
+                text,
+            }) {
+                warn!(error = %e, "append_step(Injection) failed for governance warnings");
+            }
+        }
+
+        self.inject_pending_messages().await;
         for h in &mut self.hooks {
-            h.on_after_tools(turn_ctx, &tool_uses, result_blocks);
+            h.on_after_tools(turn_ctx, &tool_uses, &result_blocks);
         }
         Ok(())
     }

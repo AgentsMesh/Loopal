@@ -1,5 +1,5 @@
 use loopal_context::token_counter::estimate_message_tokens;
-use loopal_message::{ContentBlock, ImageSource, Message, MessageRole};
+use loopal_provider_api::{ContentBlock, ImageSource, Message, MessageRole};
 
 const IMAGE_CAP: u32 = 2000;
 const FRAMING_OVERHEAD: u32 = 4;

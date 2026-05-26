@@ -1,18 +1,14 @@
-//! Helper that wires up [`AgentLoopParams`] from the various pieces
-//! `agent_setup` already prepared. Split out so `agent_setup.rs` stays
-//! within the project's 200-LOC file budget.
-
 use std::sync::Arc;
 
-use loopal_context::ContextStore;
-use loopal_message::Message;
 use loopal_protocol::{Envelope, InterruptSignal};
+use loopal_provider_api::Message;
 use loopal_runtime::{
     AgentConfig, AgentDeps, AgentLoopParams, AgentLoopParamsBuilder, GoalRuntimeSession,
     InterruptHandle, SessionResumeHook,
 };
 use loopal_storage::Session;
 use loopal_tool_api::{FetchRefinerPolicy, MemoryChannel, OneShotChatService};
+use loopal_turn::Turn;
 
 /// Aggregate inputs for [`assemble_agent_loop_params`] — collapses what
 /// would otherwise be a 14-argument helper into a single value so the
@@ -21,7 +17,7 @@ pub(crate) struct AgentLoopAssembly {
     pub config: AgentConfig,
     pub deps: AgentDeps,
     pub session: Session,
-    pub messages: Vec<Message>,
+    pub initial_turns: Vec<Turn>,
     pub budget: loopal_context::ContextBudget,
     pub interrupt: InterruptSignal,
     pub interrupt_tx: Arc<tokio::sync::watch::Sender<u64>>,
@@ -42,12 +38,13 @@ pub(crate) fn assemble_agent_loop_params(a: AgentLoopAssembly) -> AgentLoopParam
         a.config,
         a.deps,
         a.session,
-        ContextStore::from_messages(a.messages, a.budget),
+        a.budget,
         InterruptHandle {
             signal: a.interrupt,
             tx: a.interrupt_tx,
         },
     )
+    .initial_turns(a.initial_turns)
     .shared(a.shared)
     .scheduled_rx(a.scheduled_rx)
     .harness(a.harness)

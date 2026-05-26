@@ -3,7 +3,6 @@ use super::llm_result::LlmStreamResult;
 use super::runner::AgentLoopRunner;
 use futures::StreamExt;
 use loopal_error::Result;
-use loopal_message::Message;
 use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::ContinuationIntent;
 use opentelemetry::KeyValue;
@@ -16,7 +15,6 @@ impl AgentLoopRunner {
     /// synthetic User tail for non-prefill models).
     pub async fn stream_llm_with(
         &mut self,
-        messages: &[Message],
         intent: Option<ContinuationIntent>,
         cancel: &TurnCancel,
     ) -> Result<LlmStreamResult> {
@@ -27,10 +25,10 @@ impl AgentLoopRunner {
             });
         }
 
-        let mut chat_params = self.prepare_chat_params_with(messages, intent)?;
+        let mut chat_params = self.prepare_chat_params(intent)?;
         if let Some(store) = crate::hydrate::resource_store() {
-            crate::hydrate::hydrate_images(
-                &mut chat_params.messages,
+            crate::hydrate::hydrate_turn_images(
+                &mut chat_params.turns,
                 store.as_ref(),
                 &self.params.session.id,
             )
@@ -55,7 +53,7 @@ impl AgentLoopRunner {
 
         let llm_start = Instant::now();
         info!(
-            model = %self.params.config.model(), messages = messages.len(),
+            model = %self.params.config.model(), turns = chat_params.turns.len(),
             tools = chat_params.tools.len(), max_tokens = chat_params.max_tokens,
             thinking = ?chat_params.thinking, "LLM request"
         );

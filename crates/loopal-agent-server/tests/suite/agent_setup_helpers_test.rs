@@ -6,7 +6,7 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 use indexmap::IndexMap;
 use loopal_agent_server::testing::{
-    StartParams, build_initial_messages, collect_feature_tags, spawn_sub_agent_forwarder,
+    StartParams, build_fork_synthetic_turn, collect_feature_tags, spawn_sub_agent_forwarder,
 };
 use loopal_config::{ResolvedConfig, Settings};
 use loopal_error::Result;
@@ -85,49 +85,41 @@ fn blank_start() -> StartParams {
 }
 
 #[test]
-fn build_initial_messages_returns_resume_only_when_no_prompt_or_fork() {
-    let resume = vec![loopal_message::Message::user("resumed A")];
-    let out = build_initial_messages(resume.clone(), &blank_start());
-    assert_eq!(out.len(), 1);
+fn fork_synthetic_turn_none_when_no_fork() {
+    let turn = build_fork_synthetic_turn(&blank_start());
+    assert!(turn.is_none());
 }
 
 #[test]
-fn build_initial_messages_appends_prompt_without_fork() {
+fn fork_synthetic_turn_built_from_fork_messages() {
     let mut start = blank_start();
-    start.prompt = Some("do the thing".into());
-    let out = build_initial_messages(Vec::new(), &start);
-    assert_eq!(out.len(), 1);
-}
-
-#[test]
-fn build_initial_messages_fork_added_when_no_resume() {
-    let mut start = blank_start();
-    let fork_msgs = vec![loopal_message::Message::user("fork msg 1")];
+    let fork_msgs = vec![loopal_provider_api::Message::user("fork msg 1")];
     start.fork_context = Some(serde_json::to_value(&fork_msgs).unwrap());
-    start.prompt = Some("continue".into());
-    let out = build_initial_messages(Vec::new(), &start);
-    assert_eq!(out.len(), 2, "fork msgs + prompt");
+    let turn = build_fork_synthetic_turn(&start).expect("should produce turn");
+    assert_eq!(turn.body.steps.len(), 1);
+    match &turn.body.steps[0] {
+        loopal_turn::TurnStep::Injection { kind, text } => {
+            assert!(matches!(kind, loopal_turn::InjectionKind::SystemNote));
+            assert!(text.contains("fork msg 1"));
+        }
+        _ => panic!("expected Injection step"),
+    }
 }
 
 #[test]
-fn build_initial_messages_fork_ignored_when_resuming() {
+fn fork_synthetic_turn_ignored_when_resuming() {
     let mut start = blank_start();
     start.resume = Some("sid".into());
-    let fork_msgs = vec![loopal_message::Message::user("fork msg")];
+    let fork_msgs = vec![loopal_provider_api::Message::user("fork msg")];
     start.fork_context = Some(serde_json::to_value(&fork_msgs).unwrap());
-    let resume = vec![loopal_message::Message::user("resumed")];
-    let out = build_initial_messages(resume, &start);
-    assert_eq!(out.len(), 1, "fork ignored during resume");
+    assert!(build_fork_synthetic_turn(&start).is_none());
 }
 
 #[test]
-fn build_initial_messages_fork_json_fail_is_skipped() {
+fn fork_synthetic_turn_none_on_bad_json() {
     let mut start = blank_start();
     start.fork_context = Some(serde_json::json!({"not_a_message_array": true}));
-    start.prompt = Some("ok".into());
-    let out = build_initial_messages(Vec::new(), &start);
-    // Bad fork JSON is logged and skipped; prompt still appended.
-    assert_eq!(out.len(), 1);
+    assert!(build_fork_synthetic_turn(&start).is_none());
 }
 
 #[test]

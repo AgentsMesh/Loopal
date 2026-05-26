@@ -1,5 +1,5 @@
-use loopal_message::ContentBlock;
 use loopal_protocol::{AgentEvent, ControlCommand, Envelope, InterruptSignal};
+use loopal_provider_api::ContentBlock;
 use loopal_runtime::UnifiedFrontend;
 use loopal_runtime::agent_loop::cancel::TurnCancel;
 use loopal_runtime::agent_loop::diff_tracker::DiffTracker;

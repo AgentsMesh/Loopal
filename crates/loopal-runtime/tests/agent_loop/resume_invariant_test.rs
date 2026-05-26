@@ -1,10 +1,9 @@
 use loopal_config::Settings;
-use loopal_context::ContextStore;
 use loopal_error::LoopalError;
 use loopal_kernel::Kernel;
-use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_protocol::{AgentEvent, ControlCommand, Envelope};
 use loopal_provider_api::{ChatParams, ChatStream, Provider, StopReason, StreamChunk};
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 use loopal_runtime::agent_loop::AgentLoopRunner;
 use loopal_runtime::frontend::{DenyAllHandler, UnsupportedQuestionHandler};
 use loopal_runtime::{
@@ -102,11 +101,14 @@ fn make_runner_with_history(
             decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
         },
         fixture.test_session("rt-test"),
-        ContextStore::from_messages(history, make_test_budget()),
+        make_test_budget(),
         InterruptHandle::new(),
     )
     .build();
-    (AgentLoopRunner::new(params), call_count, event_rx)
+    let mut runner = AgentLoopRunner::new(params);
+    let turns = loopal_test_support::seed_history::reverse_project_messages_to_turns(history);
+    runner.seed_test_turns(turns);
+    (runner, call_count, event_rx)
 }
 
 #[tokio::test]

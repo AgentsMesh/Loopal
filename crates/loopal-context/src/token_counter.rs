@@ -1,4 +1,4 @@
-use loopal_message::{ContentBlock, Message};
+use loopal_provider_api::{ContentBlock, Message};
 use std::sync::LazyLock;
 use tiktoken_rs::CoreBPE;
 

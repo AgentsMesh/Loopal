@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use loopal_config::Settings;
-use loopal_context::{ContextBudget, ContextStore};
+use loopal_context::ContextBudget;
 use loopal_kernel::Kernel;
 use loopal_protocol::AgentEvent;
 use loopal_protocol::ControlCommand;
@@ -57,6 +57,7 @@ pub fn make_test_budget() -> ContextBudget {
 mod ask_user_schema_err_test;
 mod auto_continue_edge_test;
 mod auto_continue_test;
+mod compaction_run_e2e_test;
 mod cron_e2e_test;
 mod degeneration_e2e_test;
 mod drain_pending_test;
@@ -131,11 +132,13 @@ pub fn make_runner() -> (AgentLoopRunner, mpsc::Receiver<AgentEvent>) {
             decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
         },
         fixture.test_session("test-minimal"),
-        ContextStore::new(make_test_budget()),
+        make_test_budget(),
         InterruptHandle::new(),
     )
     .build();
-    (AgentLoopRunner::new(params), event_rx)
+    let mut runner = AgentLoopRunner::new(params);
+    runner.start_turn_record(loopal_turn::TurnTrigger::Resume);
+    (runner, event_rx)
 }
 
 /// Runner with all channels exposed — for testing permission and input flows.
@@ -173,15 +176,11 @@ pub fn make_runner_with_channels() -> (
             decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
         },
         fixture.test_session("test-channels"),
-        ContextStore::new(make_test_budget()),
+        make_test_budget(),
         InterruptHandle::new(),
     )
     .build();
-    (
-        AgentLoopRunner::new(params),
-        event_rx,
-        mbox_tx,
-        ctrl_tx,
-        perm_tx,
-    )
+    let mut runner = AgentLoopRunner::new(params);
+    runner.start_turn_record(loopal_turn::TurnTrigger::Resume);
+    (runner, event_rx, mbox_tx, ctrl_tx, perm_tx)
 }

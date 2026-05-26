@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use loopal_error::Result;
-use loopal_message::ContentBlock;
+use loopal_provider_api::ContentBlock;
 use tracing::info;
 
 use super::runner::AgentLoopRunner;
@@ -17,6 +17,17 @@ impl AgentLoopRunner {
         tool_uses: Vec<(String, String, serde_json::Value)>,
         early_handle: StreamingToolHandle,
     ) -> Result<ToolExecStats> {
+        // reason: open the ToolBatch step up-front with full ToolCall info so
+        // subsequent finalize/intercept paths only need to patch item state via
+        // StepUpdated — no placeholder fields, no second batch step. Failure
+        // here (e.g. no current turn) is logged but execution continues so
+        // tests that bypass ingest_message still drive the tool pipeline;
+        // the result is that turns.jsonl misses the ToolBatch step while
+        // messages.jsonl still records the tool_result.
+        if let Err(e) = self.start_tool_batch_record(&tool_uses) {
+            tracing::warn!(error = %e, "start_tool_batch_record failed; turn log will miss this batch");
+        }
+
         if turn_ctx.cancel.is_cancelled() {
             early_handle.discard();
             self.emit_all_interrupted(&tool_uses).await?;

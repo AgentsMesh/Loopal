@@ -3,13 +3,13 @@
 use std::sync::{Arc, Mutex};
 
 use loopal_error::LoopalError;
-use loopal_message::Message;
 use loopal_provider_api::{ChatParams, ChatStream, Provider};
+use loopal_turn::Turn;
 
 /// Snapshot of a single `stream_chat` invocation.
 #[derive(Debug, Clone)]
 pub struct CapturedRequest {
-    pub messages: Vec<Message>,
+    pub turns: Vec<Turn>,
     pub system_prompt: String,
     pub model: String,
 }
@@ -47,7 +47,7 @@ impl Provider for CapturedProvider {
 
     async fn stream_chat(&self, params: &ChatParams) -> Result<ChatStream, LoopalError> {
         self.requests.lock().unwrap().push(CapturedRequest {
-            messages: params.messages.clone(),
+            turns: params.turns.clone(),
             system_prompt: params.system_prompt.clone(),
             model: params.model.clone(),
         });

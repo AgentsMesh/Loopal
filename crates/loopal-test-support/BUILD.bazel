@@ -1,4 +1,4 @@
-load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 
 rust_library(
     name = "loopal-test-support",
@@ -15,14 +15,14 @@ rust_library(
         "//crates/loopal-error",
         "//crates/loopal-ipc",
         "//crates/loopal-kernel",
-        "//crates/loopal-message",
-        "//crates/loopal-protocol",
         "//crates/loopal-provider-api",
+        "//crates/loopal-protocol",
         "//crates/loopal-runtime",
         "//crates/loopal-scheduler",
         "//crates/loopal-session",
         "//crates/loopal-storage",
         "//crates/loopal-tool-api",
+        "//crates/loopal-turn",
         "@crates//:chrono",
         "@crates//:futures",
         "@crates//:rmcp",
@@ -32,4 +32,10 @@ rust_library(
         "@crates//:tokio-util",
     ],
     proc_macro_deps = ["@crates//:async-trait"],
+)
+
+rust_test(
+    name = "loopal-test-support-unit-test",
+    crate = ":loopal-test-support",
+    edition = "2024",
 )

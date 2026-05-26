@@ -93,16 +93,16 @@ pub enum AgentEventPayload {
     },
     /// Fires on the receiving runtime once the message is enqueued, for any source.
     InboxEnqueued {
-        message_id: String,
+        envelope_id: String,
         source: MessageSource,
         content: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         summary: Option<String>,
     },
     /// Pairs with `InboxEnqueued` by id.
-    InboxConsumed { message_id: String },
+    InboxConsumed { envelope_id: String },
     UserMessageQueued {
-        message_id: String,
+        envelope_id: String,
         content: String,
         image_count: usize,
     },

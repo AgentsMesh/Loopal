@@ -1,5 +1,5 @@
-use loopal_message::ContentBlock;
 use loopal_protocol::{DegenerationSummary, MessageSource};
+use loopal_provider_api::ContentBlock;
 
 use super::super::turn_context::TurnContext;
 use super::super::turn_history::{TurnHistory, TurnRecord};

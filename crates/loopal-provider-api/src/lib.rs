@@ -1,24 +1,24 @@
 pub mod chat;
-pub mod middleware;
 pub mod model;
 pub mod model_router;
 pub mod resolver;
 pub mod thinking;
-
-use std::borrow::Cow;
+pub mod wire;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use loopal_error::LoopalError;
-use loopal_message::Message;
 
 pub use chat::{ChatParams, ChatStream, StopReason, StreamChunk};
-pub use middleware::{Middleware, MiddlewareContext};
 pub use model::*;
 pub use model_router::ModelRouter;
 pub use resolver::ProviderResolver;
 pub use thinking::*;
+pub use wire::{
+    ContentBlock, ImageSource, Message, MessageOrigin, MessageRole, normalize_messages,
+    project_turn_to_messages, project_turns_to_messages,
+};
 
 // ---------------------------------------------------------------------------
 // Continuation intent (Runtime → Provider)
@@ -83,13 +83,6 @@ pub trait Provider: Send + Sync {
         &self,
         params: &ChatParams,
     ) -> std::result::Result<ChatStream, LoopalError>;
-
-    /// Protocol-level message finalization. Called by `stream_chat` to enforce
-    /// per-provider invariants (e.g. Anthropic requires User tail when
-    /// `supports_prefill==false` or `continuation_intent.is_some()`). Default: passthrough.
-    fn finalize_messages<'a>(&self, params: &'a ChatParams) -> Cow<'a, [Message]> {
-        Cow::Borrowed(&params.messages)
-    }
 
     /// Map a provider error to a recovery class. Default uses
     /// `default_classify_error` (variant-only, no protocol strings).

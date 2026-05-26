@@ -75,7 +75,12 @@ pub async fn init_and_start_with(
     resp["session_id"].as_str().unwrap().to_string()
 }
 
-/// Collect agent/event notifications until Finished or AwaitingInput.
+/// Collect agent/event notifications until `Finished` or a long quiescence.
+///
+/// `AwaitingInput` alone is NOT treated as terminal: in headless mode the
+/// agent may emit `AwaitingInput` transiently before draining a queued
+/// envelope, and tests need to observe the subsequent `Stream` / `Finished`
+/// events that come from processing the prompt.
 pub async fn collect_agent_events(
     rx: &mut tokio::sync::mpsc::Receiver<Incoming>,
 ) -> Vec<AgentEventPayload> {
@@ -87,10 +92,7 @@ pub async fn collect_agent_events(
                 if method == methods::AGENT_EVENT.name
                     && let Ok(ev) = serde_json::from_value::<AgentEvent>(params)
                 {
-                    let terminal = matches!(
-                        ev.payload,
-                        AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
-                    );
+                    let terminal = matches!(ev.payload, AgentEventPayload::Finished);
                     events.push(ev.payload);
                     if terminal {
                         break;

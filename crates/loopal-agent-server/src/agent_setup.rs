@@ -1,7 +1,6 @@
-//! Internal agent loop setup — builds `AgentLoopParams` from resolved config.
 use crate::agent_setup_context::AgentSetupContext;
 use crate::agent_setup_helpers::{
-    build_initial_messages, build_microcompact_idle, build_model_router, collect_feature_tags,
+    build_fork_synthetic_turn, build_microcompact_idle, build_model_router, collect_feature_tags,
     spawn_sub_agent_forwarder,
 };
 use crate::params::AgentSetupResult;
@@ -10,7 +9,6 @@ use loopal_context::ContextBudget;
 use loopal_context::system_prompt::build_system_prompt;
 use std::sync::Arc;
 
-/// Build `AgentLoopParams` with a pre-constructed frontend.
 pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<AgentSetupResult> {
     let AgentSetupContext {
         cwd,
@@ -41,19 +39,24 @@ pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<A
     } else {
         loopal_runtime::SessionManager::new()?
     };
-    let (session, resume_messages) = if let Some(ref sid) = start.resume {
-        let (s, msgs) = session_manager.resume_session(sid)?;
-        (s, msgs)
+    let (session, resume_turns) = if let Some(ref sid) = start.resume {
+        session_manager.resume_session(sid)?
     } else {
         (session_manager.create_session(cwd, &model)?, Vec::new())
     };
+    // fork-context arrives as wire-format Vec<Message> from the parent;
+    // convert to a synthetic Turn (SystemNote Injection) so the sub-agent's
+    // first LLM call sees the parent history. TurnStore is wire-build SSOT —
+    // stuffing fork messages only into the projected view leaves wire empty.
+    let mut initial_turns = resume_turns;
+    if let Some(fork_turn) = build_fork_synthetic_turn(start) {
+        initial_turns.insert(0, fork_turn);
+    }
 
     let event_tx = spawn_sub_agent_forwarder(frontend.clone());
 
-    // Build task store + scheduler + resume hooks. Scheduler's async
-    // bind to the session id runs in `session_start::run` after this
-    // synchronous builder returns (covers both fresh and resumed
-    // sessions through one path).
+    // Scheduler's async bind to the session id runs in session_start::run
+    // after this synchronous builder returns (one path for fresh + resumed).
     let depth = start.depth.unwrap_or(0);
     let crate::session_resources::SessionScopedResources {
         task_store,
@@ -111,9 +114,9 @@ pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<A
 
     let features = collect_feature_tags(config, memory_channel.is_some());
 
-    // Outbound secret translation: replace `{{secret:X}}` author placeholders
-    // in instructions + memory with `<secret_ref:X>` wire-form placeholders
-    // BEFORE they enter the prompt. Plaintext is never materialized here.
+    // Outbound secret translation: replace {{secret:X}} author placeholders
+    // with <secret_ref:X> wire-form BEFORE entering the prompt. Plaintext is
+    // never materialized here.
     let translation_view = if let Some(store) = config.secrets.as_ref() {
         let names = store.list_names().await;
         Some(loopal_secret_runtime::TranslationView::from_names(names))
@@ -138,8 +141,6 @@ pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<A
     );
     crate::prompt_post::append_runtime_sections(&mut system_prompt, &kernel).await;
 
-    let messages = build_initial_messages(resume_messages, start);
-
     let tool_tokens = ContextBudget::estimate_tool_tokens(&tool_defs);
     let budget = loopal_runtime::build_initial_budget(
         &model,
@@ -148,7 +149,6 @@ pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<A
         tool_tokens,
     );
     let lifecycle = start.lifecycle;
-    let depth = start.depth.unwrap_or(0);
     let tool_filter = crate::spawn_policy::build_depth_tool_filter(
         depth,
         config.settings.harness.agent_max_depth,
@@ -175,7 +175,7 @@ pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<A
                 decision_context,
             },
             session,
-            messages,
+            initial_turns,
             budget,
             interrupt,
             interrupt_tx,

@@ -4,8 +4,8 @@ use std::pin::Pin;
 use serde::{Deserialize, Serialize};
 
 use loopal_error::LoopalError;
-use loopal_message::Message;
 use loopal_tool_api::ToolDefinition;
+use loopal_turn::Turn;
 
 use crate::ContinuationIntent;
 use crate::thinking::ThinkingConfig;
@@ -17,7 +17,9 @@ pub type ChatStream = Pin<
 #[derive(Debug, Clone)]
 pub struct ChatParams {
     pub model: String,
-    pub messages: Vec<Message>,
+    /// Conversation history as domain-shaped turns. Single source of truth;
+    /// providers fold this into wire-format JSON internally.
+    pub turns: Vec<Turn>,
     pub system_prompt: String,
     pub tools: Vec<ToolDefinition>,
     pub max_tokens: u32,
@@ -32,10 +34,10 @@ pub struct ChatParams {
 }
 
 impl ChatParams {
-    pub fn new(model: String, messages: Vec<Message>, system_prompt: String) -> Self {
+    pub fn new(model: String, turns: Vec<Turn>, system_prompt: String) -> Self {
         Self {
             model,
-            messages,
+            turns,
             system_prompt,
             tools: vec![],
             max_tokens: 16_384,

@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use futures::StreamExt;
 use loopal_error::LoopalError;
-use loopal_message::Message;
 use loopal_provider_api::{ChatParams, Provider, StreamChunk};
 
 use crate::prompt;
@@ -31,7 +30,7 @@ async fn call_classifier_inner(
 ) -> Result<String, LoopalError> {
     let params = ChatParams {
         model: model.to_string(),
-        messages: vec![Message::user(user_prompt)],
+        turns: vec![loopal_turn::Turn::single_user_prompt(user_prompt)],
         system_prompt: prompt::system_prompt().to_string(),
         tools: vec![],
         max_tokens: 256,

@@ -7,8 +7,8 @@ use tokio::sync::mpsc;
 use loopal_config::HookConfig;
 use loopal_error::LoopalError;
 use loopal_kernel::Kernel;
-use loopal_message::Message;
 use loopal_protocol::{AgentEvent, ControlCommand, Envelope};
+use loopal_provider_api::Message;
 use loopal_provider_api::{StreamChunk, ThinkingConfig};
 use loopal_runtime::AgentMode;
 use loopal_runtime::agent_loop::AgentLoopRunner;
@@ -164,7 +164,7 @@ pub struct IntegrationHarness {
     pub interrupt: loopal_protocol::InterruptSignal,
     pub session_ctrl: SessionController,
     pub fixture: TestFixture,
-    pub recorded_messages: std::sync::Arc<std::sync::Mutex<Vec<Vec<Message>>>>,
+    pub recorded_messages: std::sync::Arc<std::sync::Mutex<Vec<Vec<loopal_turn::Turn>>>>,
 }
 
 impl IntegrationHarness {
@@ -190,5 +190,5 @@ pub struct SpawnedHarness {
     pub interrupt: loopal_protocol::InterruptSignal,
     pub session_ctrl: SessionController,
     pub fixture: TestFixture,
-    pub recorded_messages: std::sync::Arc<std::sync::Mutex<Vec<Vec<Message>>>>,
+    pub recorded_messages: std::sync::Arc<std::sync::Mutex<Vec<Vec<loopal_turn::Turn>>>>,
 }

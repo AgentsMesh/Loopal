@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -9,79 +8,19 @@ use loopal_error::McpError;
 use loopal_tool_api::ToolDefinition;
 use rmcp::model::CallToolResult;
 use serde_json::Value;
-use tokio::sync::{Notify, RwLock};
-use tokio::time::Instant;
+use tokio::sync::RwLock;
 
 use crate::manager::McpManager;
 use crate::manager_query::McpConnectionSnapshot;
 use crate::provider::McpProvider;
-
-/// Running-task counter: `wait()` returns true exactly when every spawn that
-/// was outstanding at any point during the wait has completed. Fast tasks
-/// cannot prematurely declare "settled" on behalf of still-running peers.
-struct SettleSignal {
-    running: AtomicU64,
-    notify: Notify,
-}
-
-impl SettleSignal {
-    fn new() -> Self {
-        Self {
-            running: AtomicU64::new(0),
-            notify: Notify::new(),
-        }
-    }
-
-    fn mark_running(&self) {
-        self.running.fetch_add(1, Ordering::AcqRel);
-    }
-
-    fn mark_settled(&self) {
-        if self.running.fetch_sub(1, Ordering::AcqRel) == 1 {
-            self.notify.notify_waiters();
-        }
-    }
-
-    async fn wait(&self, timeout: Duration) -> bool {
-        if self.running.load(Ordering::Acquire) == 0 {
-            return true;
-        }
-        let deadline = Instant::now() + timeout;
-        loop {
-            if self.running.load(Ordering::Acquire) == 0 {
-                return true;
-            }
-            let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
-                return false;
-            };
-            if tokio::time::timeout(remaining, self.notify.notified())
-                .await
-                .is_err()
-            {
-                return false;
-            }
-        }
-    }
-
-    /// Block (no timeout) until every outstanding spawn finishes. Used by
-    /// late-registration listeners that must react to MCP servers coming
-    /// online *after* the bounded-wait budget elapsed.
-    async fn wait_forever(&self) {
-        loop {
-            if self.running.load(Ordering::Acquire) == 0 {
-                return;
-            }
-            self.notify.notified().await;
-        }
-    }
-}
+use crate::settle_signal::SettleSignal;
 
 pub struct LocalMcpProvider {
     manager: Arc<RwLock<McpManager>>,
     signal: Arc<SettleSignal>,
-    /// Bumped each time a background spawn finishes. Lets the runtime
-    /// subscribe and push an updated `McpStatusReport` to the TUI so users
-    /// see "connecting → connected" transitions without polling.
+    // Bumped each time a background spawn finishes; runtime subscribes and
+    // pushes an updated McpStatusReport so users see connecting → connected
+    // transitions without polling.
     settle_revision: tokio::sync::watch::Sender<u64>,
 }
 
@@ -112,12 +51,11 @@ impl LocalMcpProvider {
         let revision = self.settle_revision.clone();
         signal.mark_running();
         tokio::spawn(async move {
-            // reason: connect() can take 30s+ for slow stdio servers. If we
-            // held manager.write() across this await, every reader (snapshot,
-            // list_tools, finalize_mcp_tools' metadata pull) would block,
-            // defeating the entire bounded-wait design. So: snapshot
-            // sampling/secrets behind a read lock (instant), connect with
-            // NO lock held, then take a brief write lock to commit results.
+            // connect() can take 30s+ for slow stdio servers. Holding
+            // manager.write() across the await would block every reader
+            // (snapshot, list_tools, finalize_mcp_tools). Snapshot inputs
+            // under read lock (instant), connect with NO lock, then take
+            // a brief write lock to commit.
             let prepared = {
                 let mgr = manager.read().await;
                 mgr.prepare_connections(&configs).await
@@ -138,9 +76,9 @@ impl LocalMcpProvider {
         self.signal.wait(timeout).await
     }
 
-    /// Block until every background spawn has finished. Listener tasks use
-    /// this to register tools that only became available after the bounded
-    /// `wait_until_settled` budget elapsed.
+    // Blocks until every background spawn has finished. Listener tasks use
+    // this to register tools that became available after the bounded
+    // `wait_until_settled` budget elapsed.
     pub async fn await_all_settled(&self) {
         self.signal.wait_forever().await;
     }
@@ -154,10 +92,9 @@ impl LocalMcpProvider {
         true
     }
 
-    /// O(1) check whether `server` has any settled tools. Semantically
-    /// equivalent to `list_tools().iter().any(|(s, _)| s == server)` but
-    /// without iterating the full tool list — `provider_for_call` dispatches
-    /// on every tool invocation, so the cheap-path matters.
+    // O(1) check whether `server` has settled tools — equivalent to
+    // `list_tools().iter().any(...)` but without iterating the full list.
+    // provider_for_call dispatches on every tool invocation, so cheap matters.
     pub async fn has_server(&self, server: &str) -> bool {
         self.manager
             .read()

@@ -1,10 +1,11 @@
-use loopal_message::Message;
+use loopal_provider_api::Message;
 
-// Invariant: implementations must persist (save_message) and push to store
-// atomically — on persist failure, skip the in-memory push so JSONL and
-// store stay consistent. Half-writes break the closure guarantee that
-// every `tool_use` has a visible `tool_result` next turn.
+/// Text-only injection bridge used by governance to surface `GovernanceFeedback`
+/// / `StopFeedback` / `SystemNote` messages back to the LLM. The implementation
+/// extracts `msg.text_content()` and writes a `TurnStep::Injection` with the
+/// appropriate kind — only Text content is preserved. Pair-of-blocks payloads
+/// (e.g. abort compensation `ToolResult`s) need to go through a different
+/// path (`start_tool_batch_record` + `update_tool_batch_item_state`).
 pub trait DataPlaneBridge {
-    fn write_tool_result_stub(&mut self, msg: Message);
     fn push_system_note(&mut self, msg: Message);
 }

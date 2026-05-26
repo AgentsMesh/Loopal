@@ -1,25 +1,35 @@
-use loopal_message::Message;
-use loopal_provider_api::MiddlewareContext;
+use loopal_error::Result;
+use loopal_turn::{InjectionKind, TurnStep};
 use tracing::warn;
 
 use super::runner::AgentLoopRunner;
 
 impl AgentLoopRunner {
-    /// Run the context middleware pipeline on a working copy of messages.
-    /// Non-fatal: pipeline errors are logged and swallowed so the LLM call proceeds.
-    pub async fn run_context_pipeline(&self, messages: &mut Vec<Message>) {
-        let mut ctx = MiddlewareContext {
-            messages: std::mem::take(messages),
-            system_prompt: self.params.config.system_prompt.clone(),
-            model: self.params.config.model().to_string(),
-            total_input_tokens: self.tokens.input,
-            total_output_tokens: self.tokens.output,
-            max_context_tokens: self.params.store.budget().context_window,
-            summarization_provider: None,
-        };
-        if let Err(e) = self.pipeline.execute(&mut ctx).await {
-            warn!(error = %e, "context pipeline failed, proceeding without refresh");
+    /// Check tracked config files for changes; on first detection, append an
+    /// `Injection { kind: ConfigRefresh, text: <reminder> }` step to the current
+    /// turn so the LLM sees the updated context on its next call. Idempotent —
+    /// `FileSnapshot::check_and_refresh` returns `None` when the file is
+    /// unchanged.
+    pub async fn check_and_inject_config_refresh(&mut self) -> Result<()> {
+        let mut reminders = Vec::new();
+        for snap in &mut self.config_snapshots {
+            if let Some(r) = snap.check_and_refresh() {
+                reminders.push(r);
+            }
         }
-        *messages = ctx.messages;
+        if reminders.is_empty() {
+            return Ok(());
+        }
+        let text = format!(
+            "<system-reminder>\n{}\n</system-reminder>",
+            reminders.join("\n\n")
+        );
+        if let Err(e) = self.append_step_record(TurnStep::Injection {
+            kind: InjectionKind::ConfigRefresh,
+            text,
+        }) {
+            warn!(error = %e, "append_step(ConfigRefresh) failed");
+        }
+        Ok(())
     }
 }

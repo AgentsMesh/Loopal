@@ -35,25 +35,35 @@ async fn server_block_error_not_retried_twice() {
 }
 
 #[tokio::test]
-async fn context_overflow_triggers_one_retry() {
-    let (mut runner, calls, mut rx) = make_runner(vec![
-        Outcome::Err(context_overflow_err()),
-        Outcome::Stream(ok_done()),
-    ]);
+async fn context_overflow_with_no_compactable_history_propagates() {
+    // F: when only the in-progress turn exists (compactable_turns < 1),
+    // force_compact returns false. try_recover MUST NOT report success
+    // — silently retrying against unchanged state was the pre-fix bug.
+    let (mut runner, calls, mut rx) = make_runner(vec![Outcome::Err(context_overflow_err())]);
     tokio::spawn(async move { while rx.recv().await.is_some() {} });
     let _ = runner.run().await.unwrap();
-    assert_eq!(calls.load(Ordering::SeqCst), 2);
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        1,
+        "no history to compact ⇒ overflow propagates immediately, no retry"
+    );
 }
 
 #[tokio::test]
 async fn context_overflow_not_retried_twice() {
-    let (mut runner, calls, mut rx) = make_runner(vec![
-        Outcome::Err(context_overflow_err()),
-        Outcome::Err(context_overflow_err()),
-    ]);
+    // No-history path: post-fix this errors on the first attempt
+    // (because try_recover returns false). Single outcome — if the
+    // runtime regresses to silent retry, SequencedProvider's
+    // panic-on-underflow guard fires loudly instead of consuming a
+    // bystander outcome.
+    let (mut runner, calls, mut rx) = make_runner(vec![Outcome::Err(context_overflow_err())]);
     tokio::spawn(async move { while rx.recv().await.is_some() {} });
     let _ = runner.run().await.unwrap();
-    assert_eq!(calls.load(Ordering::SeqCst), 2);
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        1,
+        "context overflow without history: first error propagates, no second attempt"
+    );
 }
 
 #[tokio::test]

@@ -1,5 +1,4 @@
-use loopal_message::{ContentBlock, MessageRole};
-use loopal_provider_api::ChatParams;
+use loopal_provider_api::{ChatParams, ContentBlock, Message, MessageRole};
 use serde_json::{Value, json};
 use tracing::error;
 
@@ -7,7 +6,11 @@ use super::OpenAiCompatProvider;
 use crate::tool_result_text::placeholder_text;
 
 impl OpenAiCompatProvider {
-    pub fn build_messages(&self, params: &ChatParams) -> Vec<Value> {
+    pub fn build_messages_from_messages(
+        &self,
+        messages_in: &[Message],
+        params: &ChatParams,
+    ) -> Vec<Value> {
         let mut messages = Vec::new();
 
         if !params.system_prompt.is_empty() {
@@ -17,7 +20,7 @@ impl OpenAiCompatProvider {
             }));
         }
 
-        for msg in &params.messages {
+        for msg in messages_in {
             match msg.role {
                 MessageRole::System => {
                     messages.push(json!({

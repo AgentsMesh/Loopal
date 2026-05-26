@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tracing::info;
 
 use loopal_agent_hub::HubClient;
-use loopal_protocol::project_messages;
+use loopal_context::project_messages_to_display;
 use loopal_session::SessionController;
 
 use super::attach_bridge::{bridge_events, connect_and_register};
@@ -99,8 +99,9 @@ fn seed_resume_or_welcome(
         match loopal_runtime::SessionManager::new()
             .and_then(|sm| sm.resume_session(sid).map(|p| (sm, p)))
         {
-            Ok((session_manager, (session, messages))) => {
-                app.load_display_history(project_messages(&messages));
+            Ok((session_manager, (session, turns))) => {
+                let messages = loopal_provider_api::project_turns_to_messages(&turns);
+                app.load_display_history(project_messages_to_display(&messages));
                 super::sub_agent_resume::load_sub_agent_histories(app, &session, &session_manager);
             }
             Err(e) => {

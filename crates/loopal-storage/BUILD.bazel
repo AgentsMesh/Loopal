@@ -8,9 +8,10 @@ rust_library(
     deps = [
         "//crates/loopal-config",
         "//crates/loopal-error",
-        "//crates/loopal-message",
+        "//crates/loopal-provider-api",
         "//crates/loopal-protocol",
         "//crates/loopal-tool-invocation",
+        "//crates/loopal-turn",
         "@crates//:chrono",
         "@crates//:serde",
         "@crates//:serde_json",
@@ -23,6 +24,12 @@ rust_library(
 )
 
 rust_test(
+    name = "loopal-storage-unit-test",
+    crate = ":loopal-storage",
+    edition = "2024",
+)
+
+rust_test(
     name = "loopal-storage_test",
     srcs = glob(["tests/**/*.rs"]),
     crate_root = "tests/suite.rs",
@@ -30,8 +37,9 @@ rust_test(
     deps = [
         ":loopal-storage",
         "//crates/loopal-error",
-        "//crates/loopal-message",
         "//crates/loopal-protocol",
+        "//crates/loopal-provider-api",
+        "//crates/loopal-turn",
         "@crates//:chrono",
         "@crates//:serde_json",
         "@crates//:tempfile",

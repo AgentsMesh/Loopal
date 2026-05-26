@@ -1,5 +1,4 @@
-use loopal_message::{ContentBlock, MessageRole};
-use loopal_provider_api::ChatParams;
+use loopal_provider_api::{ChatParams, ContentBlock, Message, MessageRole};
 use serde_json::{Value, json};
 use tracing::error;
 
@@ -8,9 +7,12 @@ use super::server_tool;
 use crate::tool_result_text::placeholder_text;
 
 impl GoogleProvider {
-    pub fn build_contents(&self, params: &ChatParams) -> Vec<Value> {
-        params
-            .messages
+    pub fn build_contents_from_messages(
+        &self,
+        messages: &[Message],
+        _params: &ChatParams,
+    ) -> Vec<Value> {
+        messages
             .iter()
             .filter(|m| m.role != MessageRole::System)
             .map(|msg| {

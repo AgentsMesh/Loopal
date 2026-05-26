@@ -1,4 +1,4 @@
-use loopal_message::ContentBlock;
+use loopal_provider_api::ContentBlock;
 
 use super::question_format::format_response;
 use super::question_parse::parse_questions;

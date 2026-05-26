@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use loopal_config::Settings;
-use loopal_context::ContextStore;
 use loopal_kernel::Kernel;
 use loopal_protocol::{AgentEvent, ControlCommand, Envelope};
 use loopal_provider_api::{ModelRouter, TaskType};
@@ -51,7 +50,7 @@ fn make_runner_with_routing(
             decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
         },
         fixture.test_session("test-routing"),
-        ContextStore::new(make_test_budget()),
+        make_test_budget(),
         InterruptHandle::new(),
     )
     .build();
@@ -133,7 +132,7 @@ fn test_model_routing_default_override_via_config_model() {
             decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
         },
         fixture.test_session("test-default-override"),
-        ContextStore::new(make_test_budget()),
+        make_test_budget(),
         InterruptHandle::new(),
     )
     .build();

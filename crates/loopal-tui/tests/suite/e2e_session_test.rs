@@ -113,7 +113,7 @@ async fn test_empty_user_input() {
     let calls = vec![chunks::text_turn("Response to empty")];
     let inner = HarnessBuilder::new()
         .calls(calls)
-        .messages(vec![loopal_message::Message::user("")])
+        .messages(vec![loopal_provider_api::Message::user("")])
         .build_spawned()
         .await;
     let mut harness = wrap_tui(inner);

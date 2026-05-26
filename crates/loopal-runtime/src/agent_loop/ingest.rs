@@ -2,8 +2,8 @@ use loopal_protocol::{AgentStatus, Envelope};
 use tracing::error;
 
 use super::input::WaitResult;
-use super::message_build::build_user_message;
 use super::runner::AgentLoopRunner;
+use super::turn_trigger_map::envelope_to_trigger;
 
 impl AgentLoopRunner {
     pub(super) async fn ingest_message(&mut self, env: &Envelope) -> WaitResult {
@@ -26,17 +26,30 @@ impl AgentLoopRunner {
                 tracing::warn!(error = %err, "ContinuationGateChanged emit failed on ingest");
             }
         }
-        let mut user_msg = build_user_message(env);
-        let ephemeral = env.source.is_ephemeral_in_history();
-        user_msg.ephemeral_in_history = ephemeral;
-        if let Err(e) = self
-            .params
-            .deps
-            .session_manager
-            .save_message(&self.params.session.id, &mut user_msg)
-        {
-            error!(error = %e, "failed to persist message");
+        if self.turns.current_turn_id().is_some() {
+            self.end_turn_record(loopal_turn::TurnOutcome::Cancelled {
+                cause: loopal_turn::CancelledCause::ParentTurnAborted,
+            });
         }
+        let Some(_turn_id) = self.start_turn_record(envelope_to_trigger(env)) else {
+            error!(
+                envelope_id = %env.id,
+                "TurnStarted persist failed; dropping envelope to avoid orphan message on disk"
+            );
+            if let Err(emit_err) = self
+                .emit(loopal_protocol::AgentEventPayload::Error {
+                    message: format!(
+                        "Failed to start turn for envelope {}: persist log unavailable",
+                        env.id
+                    ),
+                })
+                .await
+            {
+                tracing::warn!(error = %emit_err, "Error event emit failed after ingest abort");
+            }
+            return WaitResult::MessageAdded;
+        };
+        let ephemeral = env.source.is_ephemeral_in_history();
         if !ephemeral && self.params.session.title.is_empty() {
             let title = extract_title(&env.content.text);
             if !title.is_empty() {
@@ -51,14 +64,13 @@ impl AgentLoopRunner {
                 }
             }
         }
-        self.params.store.push_user(user_msg);
 
         let message_id = env.id.to_string();
         // reason: emit before tracking the id — a failed emit must not leave
         // an orphan InboxConsumed without its enqueued counterpart.
         match self
             .emit(loopal_protocol::AgentEventPayload::InboxEnqueued {
-                message_id: message_id.clone(),
+                envelope_id: message_id.clone(),
                 source: env.source.clone(),
                 content: env.content.text.clone(),
                 summary: env.summary.clone(),

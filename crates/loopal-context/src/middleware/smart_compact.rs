@@ -1,6 +1,8 @@
 use loopal_error::LoopalError;
-use loopal_message::{ContentBlock, Message, MessageOrigin, MessageRole};
+use loopal_provider_api::MessageOrigin;
 use loopal_provider_api::Provider;
+use loopal_provider_api::{ContentBlock, Message, MessageRole, project_turns_to_messages};
+use loopal_turn::Turn;
 use tokio_util::sync::CancellationToken;
 
 use super::bare_summary::{bare_summary, build_summary_message};
@@ -16,27 +18,31 @@ pub struct CompactOutput {
     pub ack_msg: Message,
     pub touched_files: Vec<TouchedFile>,
     pub old_count: usize,
+    /// Number of turns summarized away (== boundary_turn_at).
+    pub removed_turn_count: u32,
+    /// Number of turns kept after compaction (== input turns.len() - boundary_turn_at).
+    pub kept_turn_count: u32,
 }
 
-/// Top-level orchestrator. Three small steps, each independently testable:
-///   1. `slice_old_messages` — domain rule: what gets summarized.
-///   2. `produce_summary_text` — pure-ish dispatch: LLM or `bare_summary`.
-///   3. `build_compact_output` — sync constructor of the message pair.
+/// Summarize `turns[..boundary_turn_at]` and return a message pair
+/// (summary + ack) representing the compacted prefix. Returns `None` when
+/// `boundary_turn_at == 0` or out of range (nothing to compact).
 pub async fn compact_to_boundary(
-    messages: &[Message],
+    turns: &[Turn],
     provider: &dyn Provider,
     model: &str,
-    boundary_at: usize,
+    boundary_turn_at: usize,
     custom_instructions: Option<&str>,
     cancel: &CancellationToken,
 ) -> Result<Option<CompactOutput>, LoopalError> {
-    let Some(old_messages) = slice_old_messages(messages, boundary_at) else {
+    let Some(old_turns) = slice_old_turns(turns, boundary_turn_at) else {
         return Ok(None);
     };
 
-    let touched_files = rank_touched_files(old_messages, TOUCHED_FILES_HINT_LIMIT);
+    let old_messages = project_turns_to_messages(old_turns);
+    let touched_files = rank_touched_files(&old_messages, TOUCHED_FILES_HINT_LIMIT);
     let summary_text = produce_summary_text(
-        old_messages,
+        &old_messages,
         provider,
         model,
         custom_instructions,
@@ -47,23 +53,28 @@ pub async fn compact_to_boundary(
 
     tracing::info!(
         summary_len = summary_text.len(),
+        old_turns = old_turns.len(),
         old_messages = old_messages.len(),
         touched_files = touched_files.len(),
         "compaction summary produced"
     );
 
+    let removed_turn_count = boundary_turn_at as u32;
+    let kept_turn_count = turns.len().saturating_sub(boundary_turn_at) as u32;
     Ok(Some(build_compact_output(
         summary_text,
         old_messages.len(),
         touched_files,
+        removed_turn_count,
+        kept_turn_count,
     )))
 }
 
-fn slice_old_messages(messages: &[Message], boundary_at: usize) -> Option<&[Message]> {
-    if boundary_at == 0 || boundary_at > messages.len() {
+fn slice_old_turns(turns: &[Turn], boundary_turn_at: usize) -> Option<&[Turn]> {
+    if boundary_turn_at == 0 || boundary_turn_at > turns.len() {
         return None;
     }
-    Some(&messages[..boundary_at])
+    Some(&turns[..boundary_turn_at])
 }
 
 /// Call the LLM with retry; on any terminal failure fall back to a
@@ -121,6 +132,8 @@ fn build_compact_output(
     summary_text: String,
     old_count: usize,
     touched_files: Vec<TouchedFile>,
+    removed_turn_count: u32,
+    kept_turn_count: u32,
 ) -> CompactOutput {
     let summary_msg = build_summary_message(&summary_text, old_count, &touched_files);
     let ack_msg = Message {
@@ -137,36 +150,49 @@ fn build_compact_output(
         ack_msg,
         touched_files,
         old_count,
+        removed_turn_count,
+        kept_turn_count,
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use loopal_turn::TurnTrigger;
+
+    fn user_turn(text: &str) -> Turn {
+        Turn::new(TurnTrigger::UserInput {
+            envelope_id: text.into(),
+            content: text.into(),
+            images: Vec::new(),
+        })
+    }
 
     #[test]
     fn slice_returns_none_at_zero_boundary() {
-        let m = vec![Message::user("a"), Message::user("b")];
-        assert!(slice_old_messages(&m, 0).is_none());
+        let t = vec![user_turn("a"), user_turn("b")];
+        assert!(slice_old_turns(&t, 0).is_none());
     }
 
     #[test]
     fn slice_returns_none_past_end() {
-        let m = vec![Message::user("a")];
-        assert!(slice_old_messages(&m, 5).is_none());
+        let t = vec![user_turn("a")];
+        assert!(slice_old_turns(&t, 5).is_none());
     }
 
     #[test]
     fn slice_takes_prefix() {
-        let m = vec![Message::user("a"), Message::user("b"), Message::user("c")];
-        assert_eq!(slice_old_messages(&m, 2).unwrap().len(), 2);
+        let t = vec![user_turn("a"), user_turn("b"), user_turn("c")];
+        assert_eq!(slice_old_turns(&t, 2).unwrap().len(), 2);
     }
 
     #[test]
     fn build_compact_output_returns_user_and_assistant() {
-        let out = build_compact_output("body".into(), 3, vec![]);
+        let out = build_compact_output("body".into(), 3, vec![], 2, 1);
         assert_eq!(out.summary_msg.role, MessageRole::User);
         assert_eq!(out.ack_msg.role, MessageRole::Assistant);
         assert_eq!(out.old_count, 3);
+        assert_eq!(out.removed_turn_count, 2);
+        assert_eq!(out.kept_turn_count, 1);
     }
 }

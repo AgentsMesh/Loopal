@@ -25,6 +25,7 @@ mod hub_input_receiver;
 #[doc(hidden)]
 pub mod interrupt_filter;
 mod ipc_handlers;
+mod mcp_settle;
 mod memory_adapter;
 mod memory_consolidation;
 mod mock_loader;
@@ -43,6 +44,7 @@ mod session_hub_storage;
 mod session_resources;
 mod session_spawn;
 mod session_start;
+mod session_start_prompt;
 mod shared_session;
 mod spawn_policy;
 mod task_bridge;
@@ -78,7 +80,8 @@ pub mod testing {
     pub use crate::agent_setup::build_with_frontend;
     pub use crate::agent_setup_context::AgentSetupContext;
     pub use crate::agent_setup_helpers::{
-        build_initial_messages, build_model_router, collect_feature_tags, spawn_sub_agent_forwarder,
+        build_fork_synthetic_turn, build_model_router, collect_feature_tags,
+        spawn_sub_agent_forwarder,
     };
     pub use crate::bg_task_bridge::spawn as bg_task_bridge_spawn;
     pub use crate::cron_bridge::spawn as cron_bridge_spawn;

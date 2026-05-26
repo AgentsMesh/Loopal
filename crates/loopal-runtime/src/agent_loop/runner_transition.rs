@@ -40,6 +40,22 @@ impl AgentLoopRunner {
         };
         if result.is_err() {
             self.status = old;
+            return result;
+        }
+        // Domain mirror: a transition to WaitingForInput/Finished closes the
+        // currently in-progress Turn. Errors close it with an Error outcome.
+        match new_status {
+            AgentStatus::WaitingForInput => {
+                if self.turns.current_turn_id().is_some() {
+                    self.end_turn_record(loopal_turn::TurnOutcome::Complete);
+                }
+            }
+            AgentStatus::Finished => {
+                if self.turns.current_turn_id().is_some() {
+                    self.end_turn_record(loopal_turn::TurnOutcome::Complete);
+                }
+            }
+            _ => {}
         }
         result
     }
@@ -47,7 +63,15 @@ impl AgentLoopRunner {
     /// Transition to Error status with a message.
     pub(super) async fn transition_error(&mut self, message: String) -> Result<()> {
         self.status = AgentStatus::Error;
-        self.emit(AgentEventPayload::Error { message }).await
+        let result = self
+            .emit(AgentEventPayload::Error {
+                message: message.clone(),
+            })
+            .await;
+        if self.turns.current_turn_id().is_some() {
+            self.end_turn_record(loopal_turn::TurnOutcome::Error { message });
+        }
+        result
     }
 
     /// Recalculate context budget from current model config.
@@ -58,6 +82,6 @@ impl AgentLoopRunner {
         let budget = self
             .model_config
             .build_budget(&self.params.config.system_prompt, tool_tokens);
-        self.params.store.update_budget(budget);
+        self.turns.update_budget(budget);
     }
 }

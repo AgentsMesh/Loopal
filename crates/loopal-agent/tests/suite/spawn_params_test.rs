@@ -45,7 +45,7 @@ fn inhub_uses_cwd_override_when_provided() {
 #[test]
 fn inhub_serializes_fork_context() {
     let parent_cwd = PathBuf::from("/parent/dir");
-    let messages = vec![loopal_message::Message::user("earlier")];
+    let messages = vec![loopal_provider_api::Message::user("earlier")];
     let params = base_params(SpawnTarget::InHub {
         cwd_override: None,
         fork_context: Some(messages),

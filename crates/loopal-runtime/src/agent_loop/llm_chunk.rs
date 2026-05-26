@@ -1,6 +1,6 @@
 use loopal_error::Result;
-use loopal_message::ContentBlock;
 use loopal_protocol::AgentEventPayload;
+use loopal_provider_api::ContentBlock;
 use loopal_provider_api::StreamChunk;
 use tracing::error;
 
@@ -85,11 +85,11 @@ impl AgentLoopRunner {
                 result.thinking_tokens += thinking_tokens;
                 let full_input =
                     input_tokens + cache_creation_input_tokens + cache_read_input_tokens;
-                self.params.store.record_actual_input_tokens(full_input);
+                self.turns.record_actual_input_tokens(full_input);
                 self.emit_in_turn(AgentEventPayload::TokenUsage {
                     input_tokens,
                     output_tokens,
-                    context_window: self.params.store.budget().context_window,
+                    context_window: self.turns.view().budget().context_window,
                     cache_creation_input_tokens,
                     cache_read_input_tokens,
                     thinking_tokens,

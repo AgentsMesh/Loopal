@@ -67,7 +67,7 @@ async fn test_turn_tool_then_text_non_interactive() {
 
     let output = runner.run().await.unwrap();
     // Tool executed, non-interactive agent exits after first turn
-    assert!(runner.params.store.len() >= 3);
+    assert!(runner.turns.view().len() >= 3);
     // Result may be empty since LLM text was empty (only tool use in the stream)
     assert_eq!(output.terminate_reason, TerminateReason::Goal);
 
@@ -155,15 +155,15 @@ async fn ask_user_plus_read_no_duplicate_via_run() {
 
     // Find the User message that contains tool results.
     let tool_result_msg = runner
-        .params
-        .store
+        .turns
+        .view()
         .messages()
         .iter()
         .find(|m| {
-            m.role == loopal_message::MessageRole::User
+            m.role == loopal_provider_api::MessageRole::User
                 && m.content
                     .iter()
-                    .any(|b| matches!(b, loopal_message::ContentBlock::ToolResult { .. }))
+                    .any(|b| matches!(b, loopal_provider_api::ContentBlock::ToolResult { .. }))
         })
         .expect("expected a User message with ToolResult blocks");
 
@@ -171,7 +171,7 @@ async fn ask_user_plus_read_no_duplicate_via_run() {
         .content
         .iter()
         .filter_map(|b| match b {
-            loopal_message::ContentBlock::ToolResult { tool_use_id, .. } => {
+            loopal_provider_api::ContentBlock::ToolResult { tool_use_id, .. } => {
                 Some(tool_use_id.as_str())
             }
             _ => None,
@@ -189,7 +189,7 @@ async fn ask_user_plus_read_no_duplicate_via_run() {
 
     // Verify AskUser result doesn't contain the fallback execute() text.
     for block in &tool_result_msg.content {
-        if let loopal_message::ContentBlock::ToolResult {
+        if let loopal_provider_api::ContentBlock::ToolResult {
             tool_use_id,
             content,
             ..

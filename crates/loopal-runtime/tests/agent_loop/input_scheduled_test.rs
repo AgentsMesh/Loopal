@@ -20,7 +20,7 @@ async fn test_wait_for_input_scheduled_message_has_prefix() {
     let result = runner.wait_for_input().await.unwrap();
     assert!(result.is_some());
     assert_eq!(
-        runner.params.store.messages()[0].text_content(),
+        runner.turns.view().messages()[0].text_content(),
         "[scheduled] check deploys"
     );
 }
@@ -44,7 +44,7 @@ async fn test_trigger_rx_delivers_scheduled_message() {
     let result = runner.wait_for_input().await.unwrap();
     assert!(result.is_some());
     assert_eq!(
-        runner.params.store.messages()[0].text_content(),
+        runner.turns.view().messages()[0].text_content(),
         "[scheduled] run health check"
     );
 }

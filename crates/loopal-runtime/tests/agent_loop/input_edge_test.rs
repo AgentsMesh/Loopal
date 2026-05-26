@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use loopal_message::Message;
 use loopal_protocol::AgentEventPayload;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::Envelope;
@@ -51,7 +50,7 @@ fn test_model_info_defaults_for_unknown_model() {
             decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
         },
         fixture.test_session("test"),
-        loopal_context::ContextStore::new(super::make_test_budget()),
+        super::make_test_budget(),
         InterruptHandle::new(),
     )
     .build();
@@ -88,56 +87,6 @@ async fn test_emit_multiple_events() {
 }
 
 // --- handle_control behavior tests ---
-
-#[tokio::test]
-async fn test_handle_control_clear_resets_state() {
-    let (mut runner, mut event_rx, _mbox_tx, ctrl_tx, _perm_tx) = make_runner_with_channels();
-
-    runner.params.store.push_user(Message::user("msg1"));
-    runner.params.store.push_user(Message::user("msg2"));
-    runner.turn_count = 5;
-    runner.tokens.input = 1000;
-    runner.tokens.output = 500;
-
-    ctrl_tx.send(ControlCommand::Clear).await.unwrap();
-    drop(ctrl_tx);
-
-    // wait_for_input processes Clear then blocks on the open mailbox; timeout exits.
-    let _ = tokio::time::timeout(Duration::from_millis(100), runner.wait_for_input()).await;
-
-    assert!(runner.params.store.is_empty());
-    assert_eq!(runner.turn_count, 0);
-    assert_eq!(runner.tokens.input, 0);
-    assert_eq!(runner.tokens.output, 0);
-
-    let e1 = event_rx.recv().await.unwrap();
-    assert!(matches!(e1.payload, AgentEventPayload::Cleared { .. }));
-}
-
-#[tokio::test]
-async fn test_handle_control_compact_keeps_recent() {
-    let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx, _perm_tx) = make_runner_with_channels();
-
-    for i in 0..15 {
-        runner
-            .params
-            .store
-            .push_user(Message::user(&format!("msg{i}")));
-    }
-    assert_eq!(runner.params.store.len(), 15);
-
-    runner.force_compact(None).await.unwrap();
-
-    // force_compact emits CompactProgress(Summarize) before attempting the
-    // LLM call. With an unknown model in this test fixture, the provider
-    // resolve fails and the runner returns Ok without doing further work,
-    // so only the progress event should arrive.
-    let e1 = event_rx.recv().await.unwrap();
-    assert!(matches!(
-        e1.payload,
-        AgentEventPayload::CompactProgress { .. }
-    ));
-}
 
 #[tokio::test]
 async fn test_handle_control_model_switch_updates_model() {

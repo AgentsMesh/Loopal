@@ -2,8 +2,8 @@
 
 use std::time::Duration;
 
-use loopal_message::Message;
 use loopal_protocol::AgentEventPayload;
+use loopal_provider_api::Message;
 use loopal_runtime::{AgentMode, LifecycleMode};
 use loopal_test_support::assertions::find_tool_result_full;
 use loopal_test_support::events::collect_until_idle;

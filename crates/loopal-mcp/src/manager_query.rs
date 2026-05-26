@@ -1,7 +1,3 @@
-/// Query and lifecycle methods for McpManager.
-///
-/// Split from `manager.rs` to stay within the 200-line file limit.
-/// Contains: resource/prompt/instruction queries, reconnect, restart, snapshot.
 use loopal_config::McpServerConfig;
 use loopal_error::McpError;
 use tracing::warn;
@@ -10,7 +6,6 @@ use crate::manager::McpManager;
 use crate::reconnect::{self, ReconnectPolicy};
 use crate::types::{McpPrompt, McpResource};
 
-/// Lightweight snapshot of a single MCP connection for status display.
 pub struct McpConnectionSnapshot {
     pub name: String,
     pub transport: String,
@@ -22,7 +17,6 @@ pub struct McpConnectionSnapshot {
 }
 
 impl McpManager {
-    /// Collect server instructions from all connected MCP servers.
     pub fn get_server_instructions(&self) -> Vec<(String, String)> {
         self.connections
             .iter()
@@ -34,7 +28,6 @@ impl McpManager {
             .collect()
     }
 
-    /// Return (server_name, resource) for all connected servers.
     pub fn get_resources(&self) -> Vec<(String, McpResource)> {
         self.connections
             .iter()
@@ -46,7 +39,6 @@ impl McpManager {
             .collect()
     }
 
-    /// Return (server_name, prompt) for all connected servers.
     pub fn get_prompts(&self) -> Vec<(String, McpPrompt)> {
         self.connections
             .iter()
@@ -58,7 +50,6 @@ impl McpManager {
             .collect()
     }
 
-    /// Read a specific resource by server name and URI.
     pub async fn read_resource(&self, server: &str, uri: &str) -> Result<String, McpError> {
         use rmcp::model::ResourceContents;
 
@@ -83,10 +74,8 @@ impl McpManager {
         Ok(text)
     }
 
-    /// Reconnect an HTTP connection with exponential backoff, then rebuild tool_map.
-    ///
-    /// Not used in the hot path (tool_adapter uses restart_connection for single
-    /// attempt). Reserved for future background health-check tasks.
+    // Not used in the hot path (tool_adapter uses restart_connection for single
+    // attempt). Reserved for future background health-check tasks.
     #[allow(dead_code)]
     pub(crate) async fn reconnect(&mut self, name: &str) -> Result<(), McpError> {
         let conn = self
@@ -103,7 +92,6 @@ impl McpManager {
         Ok(())
     }
 
-    /// Disconnect a specific connection by name. Returns removed tool names.
     pub async fn disconnect_connection(&mut self, name: &str) -> Result<Vec<String>, McpError> {
         let conn = self
             .connections
@@ -120,10 +108,8 @@ impl McpManager {
         Ok(removed)
     }
 
-    /// Restart a specific connection by name (manual restart, no backoff).
-    ///
-    /// Skips if the connection is already connected (guards against concurrent
-    /// reconnect attempts from multiple tool adapters).
+    // Skips if already connected — guards against concurrent reconnect
+    // attempts from multiple tool adapters.
     pub async fn restart_connection(&mut self, name: &str) -> Result<(), McpError> {
         let conn = self
             .connections
@@ -163,7 +149,6 @@ impl McpManager {
         }
     }
 
-    /// Return tool definitions for a single connected server (empty if not connected).
     pub fn get_tools_for_server(&self, server: &str) -> Vec<loopal_tool_api::ToolDefinition> {
         self.connections
             .get(server)
@@ -172,12 +157,9 @@ impl McpManager {
             .unwrap_or_default()
     }
 
-    /// Collect a snapshot of all managed connections for status display.
-    /// reason: stderr from the server process carries the most actionable
-    /// diagnostics (e.g. "browser is already running for chrome-profile").
-    /// Merge those tail lines into `errors` when the connection is in a
-    /// non-Connected state so the `/mcp` page surfaces them instead of just
-    /// a generic "did not complete handshake" wrapper.
+    // For non-Connected servers, merge stderr_tail lines into `errors` so the
+    // /mcp page shows actionable diagnostics from the server process instead
+    // of just our generic "did not complete handshake" wrapper.
     pub fn collect_snapshots(&self) -> Vec<McpConnectionSnapshot> {
         self.connections
             .iter()

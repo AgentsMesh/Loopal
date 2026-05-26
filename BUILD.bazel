@@ -24,12 +24,14 @@ rust_binary(
         "//crates/loopal-agent-server",
         "//crates/loopal-backend",
         "//crates/loopal-config",
+        "//crates/loopal-context",
         "//crates/loopal-decision-api",
         "//crates/loopal-git",
         "//crates/loopal-hub-vault",
         "//crates/loopal-ipc",
         "//crates/loopal-meta-hub",
         "//crates/loopal-protocol",
+        "//crates/loopal-provider-api",
         "//crates/loopal-runtime",
         "//crates/loopal-secret-runtime",
         "//crates/loopal-session",
@@ -164,4 +166,19 @@ rust_test(
     name = "loopal-unit-test",
     crate = ":loopal",
     edition = "2024",
+)
+
+# Architectural boundary enforcement — fails build if wire-format types
+# leak outside the provider / context / display layer, or if
+# compile-time-killed APIs (ContextStore::from_messages, TurnStore::turns_mut,
+# loopal-message) try to come back.
+rust_test(
+    name = "architecture_boundary_test",
+    srcs = ["tests/architecture_boundary_test.rs"],
+    edition = "2024",
+    local = True,
+    deps = [
+        "@crates//:regex",
+        "@crates//:walkdir",
+    ],
 )

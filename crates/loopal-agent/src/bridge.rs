@@ -25,8 +25,7 @@ pub async fn bridge_child_events(
                         AgentEventPayload::Stream { text } => {
                             stream_text.push_str(text);
                         }
-                        AgentEventPayload::AwaitingInput
-                        | AgentEventPayload::Finished => {
+                        AgentEventPayload::Finished => {
                             break;
                         }
                         _ => {}

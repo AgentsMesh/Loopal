@@ -1,4 +1,4 @@
-use loopal_message::{ContentBlock, Message, MessageRole};
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
 use loopal_runtime::agent_loop::rewind::{detect_turn_boundaries, turn_preview};
 
 #[test]

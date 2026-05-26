@@ -8,7 +8,7 @@ impl AgentLoopRunner {
     /// it sees up-to-date conversation history. Manual handlers ignore the
     /// cell, so this is harmless when running in non-Auto mode.
     pub(super) async fn refresh_decision_context(&self) {
-        let recent = loopal_classifier::prompt::build_recent_context(self.params.store.messages());
+        let recent = loopal_classifier::prompt::build_recent_context(self.turns.view().messages());
         self.params.deps.decision_context.set_recent(recent).await;
     }
 

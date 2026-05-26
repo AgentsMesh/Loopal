@@ -2,10 +2,19 @@ use async_trait::async_trait;
 use loopal_context::middleware::smart_compact::compact_to_boundary;
 use loopal_context::middleware::touched_files::rank_touched_files;
 use loopal_error::{LoopalError, ProviderError};
-use loopal_message::{ContentBlock, Message, MessageRole};
 use loopal_provider_api::{ChatParams, ChatStream, Provider};
+use loopal_provider_api::{ContentBlock, Message, MessageRole};
+use loopal_turn::{Turn, TurnTrigger};
 use std::time::{Duration, Instant};
 use tokio_util::sync::CancellationToken;
+
+fn user_turn(content: &str) -> Turn {
+    Turn::new(TurnTrigger::UserInput {
+        envelope_id: content.into(),
+        content: content.into(),
+        images: Vec::new(),
+    })
+}
 
 // `compact_to_boundary` requires a live Provider, so its happy-path is exercised
 // in runtime integration tests. Here we cover the deterministic helpers it uses.
@@ -69,12 +78,12 @@ impl Provider for AlwaysRetryableErrProvider {
 #[tokio::test]
 async fn cancel_token_wakes_compact_retry_sleep_promptly() {
     let provider = AlwaysRetryableErrProvider;
-    let messages = vec![Message::user("hello"), Message::user("world")];
+    let turns = vec![user_turn("hello"), user_turn("world")];
     let cancel = CancellationToken::new();
     cancel.cancel();
 
     let start = Instant::now();
-    let result = compact_to_boundary(&messages, &provider, "claude-haiku-4-5", 2, None, &cancel)
+    let result = compact_to_boundary(&turns, &provider, "claude-haiku-4-5", 2, None, &cancel)
         .await
         .expect("compact_to_boundary always falls back to bare_summary on LLM failure");
     let elapsed = start.elapsed();
@@ -97,7 +106,7 @@ async fn cancel_token_wakes_compact_retry_sleep_promptly() {
 #[tokio::test]
 async fn cancel_after_first_retry_still_short_circuits() {
     let provider = AlwaysRetryableErrProvider;
-    let messages = vec![Message::user("a"), Message::user("b")];
+    let turns = vec![user_turn("a"), user_turn("b")];
     let cancel = CancellationToken::new();
 
     let cancel_clone = cancel.clone();
@@ -107,7 +116,7 @@ async fn cancel_after_first_retry_still_short_circuits() {
     });
 
     let start = Instant::now();
-    let result = compact_to_boundary(&messages, &provider, "claude-haiku-4-5", 2, None, &cancel)
+    let result = compact_to_boundary(&turns, &provider, "claude-haiku-4-5", 2, None, &cancel)
         .await
         .expect("bare_summary fallback");
     let elapsed = start.elapsed();

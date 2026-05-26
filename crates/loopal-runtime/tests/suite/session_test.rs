@@ -37,11 +37,11 @@ fn test_resume_session() {
     let session_id = session.id.clone();
 
     // Resume the session
-    let (resumed, _turns, messages) = mgr.resume_session(&session_id).unwrap();
+    let (resumed, turns) = mgr.resume_session(&session_id).unwrap();
 
     assert_eq!(resumed.id, session_id);
     assert_eq!(resumed.model, "test-model");
-    assert!(messages.is_empty(), "fresh session should have no messages");
+    assert!(turns.is_empty(), "fresh session should have no turns");
 }
 
 #[test]
@@ -88,6 +88,6 @@ fn test_update_session() {
     mgr.update_session(&session).unwrap();
 
     // Resume and verify
-    let (resumed, _turns, _messages) = mgr.resume_session(&session_id).unwrap();
+    let (resumed, _turns) = mgr.resume_session(&session_id).unwrap();
     assert_eq!(resumed.title, "My Updated Title");
 }

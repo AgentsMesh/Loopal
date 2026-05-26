@@ -5,7 +5,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use futures::stream::Stream as FutStream;
 use loopal_config::Settings;
-use loopal_context::{ContextBudget, ContextStore};
+use loopal_context::ContextBudget;
 use loopal_error::LoopalError;
 use loopal_kernel::Kernel;
 use loopal_protocol::ControlCommand;
@@ -97,10 +97,7 @@ pub(crate) fn make_multi_runner(
             decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
         },
         fixture.test_session("test-multi"),
-        ContextStore::from_messages(
-            vec![loopal_provider_api::Message::user("go")],
-            make_test_budget(),
-        ),
+        make_test_budget(),
         InterruptHandle::new(),
     )
     .build();

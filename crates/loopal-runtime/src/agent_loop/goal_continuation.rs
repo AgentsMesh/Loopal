@@ -33,7 +33,7 @@ impl AgentLoopRunner {
         if matches!(self.params.config.mode, AgentMode::Plan) {
             return Ok(false);
         }
-        if matches!(self.params.store.last_role(), Some(MessageRole::User)) {
+        if matches!(self.turns.view().last_role(), Some(MessageRole::User)) {
             return Ok(false);
         }
         let goal = match session.snapshot().await {

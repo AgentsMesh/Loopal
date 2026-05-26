@@ -46,92 +46,6 @@ fn write_settings(dir: &std::path::Path, sharing_kind: &str) {
 }
 
 #[tokio::test]
-async fn spawn_tree_owned_by_root_shared_with_sub_agents() {
-    let dir = tempfile::tempdir().unwrap();
-    let canonical = dir.path().canonicalize().unwrap();
-    write_settings(&canonical, "spawn-tree");
-
-    let registry = Arc::new(SpawnRegistry::new());
-    registry.register("root".into(), canonical.clone(), None);
-    registry.register("child".into(), canonical.clone(), Some("root".into()));
-
-    let svc = HubMcpService::new().with_spawn_registry(registry);
-
-    svc.on_agent_attach("root".into(), canonical.clone(), None)
-        .await;
-    assert!(
-        svc.spawn_tree.read().await.contains_key("root"),
-        "root attach must provision spawn-tree owner entry"
-    );
-    let after_root = svc.spawn_tree.read().await.len();
-
-    svc.on_agent_attach("child".into(), canonical.clone(), Some("root".into()))
-        .await;
-    assert_eq!(
-        svc.spawn_tree.read().await.len(),
-        after_root,
-        "sub-agent attach must NOT create a second spawn-tree entry"
-    );
-    assert!(
-        svc.spawn_tree.read().await.contains_key("root"),
-        "spawn-tree entry remains keyed by root, not child"
-    );
-}
-
-#[tokio::test]
-async fn spawn_tree_dropped_only_when_root_detaches() {
-    let dir = tempfile::tempdir().unwrap();
-    let canonical = dir.path().canonicalize().unwrap();
-    write_settings(&canonical, "spawn-tree");
-
-    let registry = Arc::new(SpawnRegistry::new());
-    registry.register("root".into(), canonical.clone(), None);
-    registry.register("child".into(), canonical.clone(), Some("root".into()));
-
-    let svc = HubMcpService::new().with_spawn_registry(registry);
-    svc.on_agent_attach("root".into(), canonical.clone(), None)
-        .await;
-    svc.on_agent_attach("child".into(), canonical.clone(), Some("root".into()))
-        .await;
-    assert!(svc.spawn_tree.read().await.contains_key("root"));
-
-    svc.on_agent_detach("child", false).await;
-    assert!(
-        svc.spawn_tree.read().await.contains_key("root"),
-        "sub-agent detach must not drop the root's spawn-tree instance"
-    );
-
-    svc.on_agent_detach("root", true).await;
-    assert!(
-        !svc.spawn_tree.read().await.contains_key("root"),
-        "root detach must release the spawn-tree instance"
-    );
-}
-
-#[tokio::test]
-async fn was_root_false_must_not_drop_spawn_tree_even_for_root_agent() {
-    // Reason: was_root is the authoritative signal — even if agent_name
-    // matches the root, was_root=false must NOT drop. Prevents detach-order
-    // races from taking down spawn-tree while sub-agents are still alive.
-    let dir = tempfile::tempdir().unwrap();
-    let canonical = dir.path().canonicalize().unwrap();
-    write_settings(&canonical, "spawn-tree");
-
-    let registry = Arc::new(SpawnRegistry::new());
-    registry.register("root".into(), canonical.clone(), None);
-    let svc = HubMcpService::new().with_spawn_registry(registry);
-    svc.on_agent_attach("root".into(), canonical.clone(), None)
-        .await;
-    assert!(svc.spawn_tree.read().await.contains_key("root"));
-
-    svc.on_agent_detach("root", false).await;
-    assert!(
-        svc.spawn_tree.read().await.contains_key("root"),
-        "was_root=false must prevent drop, regardless of agent_name"
-    );
-}
-
-#[tokio::test]
 async fn per_agent_provider_isolated_per_agent() {
     let dir = tempfile::tempdir().unwrap();
     let canonical = dir.path().canonicalize().unwrap();
@@ -150,13 +64,10 @@ async fn per_agent_provider_isolated_per_agent() {
     let per_agent = svc.per_agent.read().await;
     assert!(per_agent.contains_key("agent-a"));
     assert!(per_agent.contains_key("agent-b"));
-    assert!(
-        !Arc::ptr_eq(
-            per_agent.get("agent-a").unwrap(),
-            per_agent.get("agent-b").unwrap(),
-        ),
-        "per-agent providers must be distinct instances per agent"
-    );
+    assert!(!Arc::ptr_eq(
+        per_agent.get("agent-a").unwrap(),
+        per_agent.get("agent-b").unwrap(),
+    ));
 }
 
 #[tokio::test]
@@ -191,16 +102,9 @@ async fn cwd_isolation_config_flows_from_settings_to_injected_args() {
     }
 
     let servers_a = load_servers_by_sharing(&canonical_a, McpSharing::HubSingleton);
-    assert_eq!(
-        servers_a.len(),
-        1,
-        "config must yield one hub-singleton server"
-    );
+    assert_eq!(servers_a.len(), 1);
     let (name_a, cfg_a) = servers_a.into_iter().next().unwrap();
-    assert!(
-        cfg_a.cwd_isolation().is_some(),
-        "cwd_isolation must deserialize"
-    );
+    assert!(cfg_a.cwd_isolation().is_some());
 
     let injected_a = inject(&name_a, cfg_a, &canonical_a);
     let injected_b = inject(
@@ -230,10 +134,7 @@ async fn cwd_isolation_config_flows_from_settings_to_injected_args() {
         .iter()
         .find(|s| s.starts_with("--user-data-dir="))
         .expect("injected --user-data-dir for cwd B");
-    assert_ne!(
-        arg_a, arg_b,
-        "two different cwds must get different --user-data-dir paths"
-    );
+    assert_ne!(arg_a, arg_b);
     assert!(arg_a.contains("chrome-isolated"));
     assert!(arg_b.contains("chrome-isolated"));
 }

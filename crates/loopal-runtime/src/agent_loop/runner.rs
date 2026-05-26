@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
-use loopal_context::{ContextPipeline, TurnStore};
+use loopal_context::middleware::file_snapshot::FileSnapshot;
+use loopal_context::{TurnStore, TurnTracker};
 use loopal_error::{AgentOutput, Result};
 use loopal_protocol::{AgentEventPayload, AgentStatus, InterruptSignal};
 use loopal_tool_api::{GoalSession, ToolContext};
@@ -14,7 +15,6 @@ use super::governance::traits::{Governance, TurnHook};
 use super::model_config::ModelConfig;
 use super::token_accumulator::TokenAccumulator;
 use super::turn_history::TurnHistory;
-use super::turn_tracker::TurnTracker;
 use crate::goal::GoalSessionToolAdapter;
 use crate::plan_file::PlanFile;
 
@@ -34,7 +34,7 @@ pub struct AgentLoopRunner {
     pub aggregator: Box<dyn VerdictAggregator>,
     /// Observation-only turn hooks (DiffTracker, future telemetry hooks).
     pub hooks: Vec<Box<dyn TurnHook>>,
-    pub pipeline: ContextPipeline,
+    pub config_snapshots: Vec<FileSnapshot>,
     /// Scheduler message receiver — consumed in `wait_for_input()`.
     pub trigger_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
     /// Async hook rewake channel — background hooks send Envelopes here.
@@ -86,13 +86,13 @@ impl AgentLoopRunner {
         let trigger_rx = params.scheduled_rx.take();
         let rewake_rx = params.rewake_rx.take();
         let plan_file = PlanFile::new(std::path::Path::new(&params.session.cwd));
-        let turn_store_budget = params.store.budget().clone();
         let initial_turns = std::mem::take(&mut params.initial_turns);
         let turn_store = if initial_turns.is_empty() {
-            TurnStore::new(turn_store_budget)
+            TurnStore::new()
         } else {
-            TurnStore::from_turns(initial_turns, turn_store_budget)
+            TurnStore::from_turns(initial_turns)
         };
+        let turns = TurnTracker::new(turn_store, params.budget.clone());
         Self {
             params,
             tool_ctx,
@@ -104,7 +104,7 @@ impl AgentLoopRunner {
             governance: Vec::new(),
             aggregator: Box::new(FirstDenyWins),
             hooks: Vec::new(),
-            pipeline: ContextPipeline::new(),
+            config_snapshots: Vec::new(),
             trigger_rx,
             rewake_rx,
             status: AgentStatus::Starting,
@@ -113,7 +113,7 @@ impl AgentLoopRunner {
             continuation_gate: ContinuationGate::new(),
             turn_history: TurnHistory::new(),
             last_continuation_goal_id: None,
-            turns: TurnTracker::new(turn_store),
+            turns,
         }
     }
 
@@ -157,6 +157,17 @@ impl AgentLoopRunner {
     /// Send an event payload via the frontend.
     pub async fn emit(&self, payload: AgentEventPayload) -> Result<()> {
         self.params.deps.frontend.emit(payload).await
+    }
+
+    /// Best-effort emit — log warn if the channel rejects but never
+    /// propagate. Use for cosmetic / progress events where a dropped
+    /// banner must not crash the agent loop (e.g. `/compact` progress,
+    /// recovery retry notice). Reserve `emit(...)?` for events whose
+    /// loss breaks an invariant (status transitions, InboxConsumed).
+    pub async fn emit_cosmetic(&self, payload: AgentEventPayload) {
+        if let Err(e) = self.params.deps.frontend.emit(payload).await {
+            tracing::warn!(error = %e, "cosmetic emit dropped; continuing");
+        }
     }
 
     /// Capability-checked emit — panics if called outside `scope_turn`.

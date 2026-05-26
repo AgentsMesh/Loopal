@@ -1,5 +1,4 @@
 pub mod chat;
-pub mod middleware;
 pub mod model;
 pub mod model_router;
 pub mod resolver;
@@ -12,7 +11,6 @@ use serde::{Deserialize, Serialize};
 use loopal_error::LoopalError;
 
 pub use chat::{ChatParams, ChatStream, StopReason, StreamChunk};
-pub use middleware::{Middleware, MiddlewareContext};
 pub use model::*;
 pub use model_router::ModelRouter;
 pub use resolver::ProviderResolver;

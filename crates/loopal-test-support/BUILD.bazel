@@ -1,4 +1,4 @@
-load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 
 rust_library(
     name = "loopal-test-support",
@@ -32,4 +32,10 @@ rust_library(
         "@crates//:tokio-util",
     ],
     proc_macro_deps = ["@crates//:async-trait"],
+)
+
+rust_test(
+    name = "loopal-test-support-unit-test",
+    crate = ":loopal-test-support",
+    edition = "2024",
 )

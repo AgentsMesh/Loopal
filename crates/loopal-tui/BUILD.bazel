@@ -13,6 +13,7 @@ rust_library(
         "//crates/loopal-ipc",
         "//crates/loopal-protocol",
         "//crates/loopal-provider",
+        "//crates/loopal-provider-api",
         "//crates/loopal-runtime",
         "//crates/loopal-session",
         "//crates/loopal-tool-api",

@@ -1,20 +1,7 @@
-//! Streaming tool executor — overlaps ReadOnly tool execution with LLM streaming.
-//!
-//! # Architecture
-//!
-//! `StreamingToolExec` is a standalone consumer that receives ToolUse notifications
-//! via a channel. It determines whether a tool is safe to execute early (ReadOnly,
-//! no side effects) and spawns execution immediately.
-//!
-//! The orchestration lives in `turn_exec`: it spawns both the LLM stream and this
-//! executor in parallel, then merges their results. This keeps LLM streaming
-//! (`llm.rs`) and tool execution (`tool_exec.rs`) as independent concerns.
-//!
-//! # Safety invariant
-//!
-//! Only `PermissionLevel::ReadOnly` tools are started early. These have no side
-//! effects, so even if the stream is later truncated (MaxTokens) and the results
-//! are discarded, no state is corrupted.
+// StreamingToolExec receives ToolUse notifications via a channel and spawns
+// PermissionLevel::ReadOnly tools early (no side effects, safe to discard if
+// the stream truncates). turn_exec orchestrates this in parallel with LLM
+// streaming and merges results.
 
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -31,7 +18,6 @@ use crate::frontend::traits::EventEmitter;
 use crate::mode::AgentMode;
 use crate::tool_pipeline::execute_tool;
 
-/// Notification describing a ToolUse that arrived from the LLM stream.
 #[derive(Debug, Clone)]
 pub struct ToolUseArrived {
     pub index: usize,
@@ -40,10 +26,8 @@ pub struct ToolUseArrived {
     pub input: serde_json::Value,
 }
 
-/// Handle returned to the orchestrator (turn_exec).
-///
-/// Drop or call `discard()` to cancel all early executions.
-/// Call `take_results()` to await completion and collect results.
+// Drop or call discard() to cancel all early executions;
+// call take_results() to await completion and collect results.
 pub struct StreamingToolHandle {
     join_set: JoinSet<(usize, ContentBlock)>,
     early_ids: HashSet<String>,

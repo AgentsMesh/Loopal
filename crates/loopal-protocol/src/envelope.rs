@@ -93,10 +93,6 @@ impl MessageSource {
     }
 }
 
-// MessageOrigin projection (previously implemented as `From<&MessageSource>`
-// here) moved to `loopal-runtime::agent_loop::message_build` so this crate no
-// longer pulls in `loopal-message`. See `envelope_to_message_origin` there.
-
 /// A routable message envelope.
 ///
 /// `target` is a [`QualifiedAddress`]; routing layers consume hub segments

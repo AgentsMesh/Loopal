@@ -87,6 +87,7 @@ impl TurnRepo for InMemoryTurnRepo {
             turn_id: turn_id.clone(),
             step_index: idx,
             step,
+            appended_at: Some(chrono::Utc::now()),
         });
         Ok(idx)
     }
@@ -124,6 +125,7 @@ impl TurnRepo for InMemoryTurnRepo {
             step_index,
             item_index,
             new_state,
+            updated_at: Some(chrono::Utc::now()),
         });
         Ok(())
     }

@@ -33,20 +33,16 @@ impl AgentLoopRunner {
             }
             ControlCommand::Clear => {
                 info!("clearing conversation history");
-                let context_window = self.params.store.budget().context_window;
-                // Emit before mutating local state: if the receiver is gone
-                // the runner stays in a state where the next view/snapshot
-                // is still coherent rather than `agent: empty, view: full`.
+                let context_window = self.turns.view().budget().context_window;
                 self.emit(AgentEventPayload::Cleared { context_window })
                     .await?;
-                self.turns.store_mut().clear();
-                self.params.store.clear();
+                self.clear_turns_record();
                 self.turn_count = 0;
                 self.tokens.reset();
                 self.cleanup_session_tmp().await;
             }
             ControlCommand::Compact { instructions } => {
-                self.force_compact(instructions).await?;
+                let _ = self.force_compact(instructions).await?;
             }
             ControlCommand::ModelSwitch(new_model) => {
                 info!(from = %self.params.config.model(), to = %new_model, "switching model");
@@ -134,18 +130,30 @@ impl AgentLoopRunner {
     }
 
     pub(super) async fn handle_rewind(&mut self, turn_index: usize) -> Result<()> {
-        let total = self.turns.store().turns().len();
-        if turn_index >= total {
-            error!(turn_index, total, "invalid turn index");
-            return Ok(());
-        }
-        info!(turn_index, "rewinding conversation");
-        self.turns.store_mut().truncate_turns(turn_index);
-        let turns = self.turns.store().turns().to_vec();
-        self.params.store.refresh_view(&turns);
-        self.turn_count = self.turn_count.min(turn_index as u32);
+        // reason: TUI picker counts user messages in display projection;
+        // TurnStore may contain interleaved synthetic Resume turns (from
+        // `/compact while idle`) whose indices don't line up. Map the
+        // picker ordinal to a real TurnStore index by indexing UserInput
+        // triggers only.
+        let real_index = match self.turns.store().user_input_turn_index(turn_index) {
+            Some(idx) => idx,
+            None => {
+                error!(
+                    user_ordinal = turn_index,
+                    total = self.turns.store().turns().len(),
+                    "invalid user-turn ordinal for rewind"
+                );
+                return Ok(());
+            }
+        };
+        info!(
+            user_ordinal = turn_index,
+            real_index, "rewinding conversation"
+        );
+        self.rewind_turns_record(real_index);
+        self.turn_count = self.turn_count.min(real_index as u32);
         self.emit(AgentEventPayload::Rewound {
-            remaining_turns: turn_index,
+            remaining_turns: real_index,
         })
         .await?;
         Ok(())

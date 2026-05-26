@@ -50,7 +50,7 @@ fn test_model_info_defaults_for_unknown_model() {
             decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
         },
         fixture.test_session("test"),
-        loopal_context::ContextStore::new(super::make_test_budget()),
+        super::make_test_budget(),
         InterruptHandle::new(),
     )
     .build();

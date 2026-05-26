@@ -1,10 +1,8 @@
 use std::path::Path;
 
-use loopal_context::ContextPipeline;
-use loopal_context::middleware::config_refresh::ConfigRefreshMiddleware;
 use loopal_context::middleware::file_snapshot::FileSnapshot;
 
-pub(super) fn build_context_pipeline(cwd: &str) -> ContextPipeline {
+pub(super) fn build_config_snapshots(cwd: &str) -> Vec<FileSnapshot> {
     let cwd = Path::new(cwd);
     let mut snapshots = Vec::new();
 
@@ -45,7 +43,5 @@ pub(super) fn build_context_pipeline(cwd: &str) -> ContextPipeline {
         "Local Settings",
     ));
 
-    let mut pipeline = ContextPipeline::new();
-    pipeline.add(Box::new(ConfigRefreshMiddleware::new(snapshots)));
-    pipeline
+    snapshots
 }

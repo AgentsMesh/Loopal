@@ -279,6 +279,88 @@ fn compaction_emits_user_summary_then_assistant_ack() {
 }
 
 #[test]
+fn compaction_summary_projects_before_trigger_on_userinput_turn() {
+    // Regression: ContextOverflow retry / auto-compact at ReadyToCall append
+    // CompactionSummary to a UserInput turn. Without the projection fix,
+    // wire order would be [user X, summary, ack] — placing the summary AFTER
+    // the user query. Correct order is [summary, ack, user X].
+    let t = turn_with(
+        TurnTrigger::UserInput {
+            envelope_id: "env-1".into(),
+            content: "analyze foo.txt".into(),
+            images: Vec::new(),
+        },
+        vec![TurnStep::CompactionSummary(
+            loopal_turn::CompactionSummary {
+                summary_text: "PRIOR-HISTORY-SUMMARY".into(),
+                ack_text: "ACK".into(),
+                kept_turn_count: 1,
+                removed_turn_count: 4,
+            },
+        )],
+    );
+    let msgs = project_turn_to_messages(&t);
+    assert_eq!(msgs.len(), 3);
+    // 0: summary (user role)
+    assert_eq!(msgs[0].role, MessageRole::User);
+    assert!(
+        msgs[0].text_content().contains("PRIOR-HISTORY-SUMMARY"),
+        "expected summary first; got: {}",
+        msgs[0].text_content()
+    );
+    // 1: ack (assistant role)
+    assert_eq!(msgs[1].role, MessageRole::Assistant);
+    assert!(msgs[1].text_content().contains("ACK"));
+    // 2: user X (the trigger)
+    assert_eq!(msgs[2].role, MessageRole::User);
+    assert!(
+        msgs[2].text_content().contains("analyze foo.txt"),
+        "trigger must appear AFTER compaction summary on UserInput turn"
+    );
+}
+
+#[test]
+fn compaction_summary_projects_before_other_steps() {
+    // CompactionSummary must appear before non-summary steps in the same turn,
+    // even when they were appended later (auto-compact mid-turn then LLM step).
+    use loopal_turn::{AssistantOutput, StopReason, TextBlock};
+    let t = turn_with(
+        TurnTrigger::UserInput {
+            envelope_id: "env-1".into(),
+            content: "hi".into(),
+            images: Vec::new(),
+        },
+        vec![
+            TurnStep::CompactionSummary(loopal_turn::CompactionSummary {
+                summary_text: "S".into(),
+                ack_text: "A".into(),
+                kept_turn_count: 1,
+                removed_turn_count: 3,
+            }),
+            TurnStep::LlmCall {
+                model: "claude-haiku-4-5".into(),
+                response: AssistantOutput {
+                    thinking: None,
+                    text_blocks: vec![TextBlock {
+                        text: "RESP".into(),
+                    }],
+                    tool_calls: vec![],
+                    server_blocks: vec![],
+                    stop_reason: StopReason::EndTurn,
+                },
+            },
+        ],
+    );
+    let msgs = project_turn_to_messages(&t);
+    // Expected order: summary (user), ack (assistant), trigger (user), llm response (assistant)
+    assert_eq!(msgs.len(), 4);
+    assert!(msgs[0].text_content().contains("S"));
+    assert!(msgs[1].text_content().contains("A"));
+    assert!(msgs[2].text_content().contains("hi"));
+    assert!(msgs[3].text_content().contains("RESP"));
+}
+
+#[test]
 fn injection_governance_maps_to_governance_feedback_origin() {
     let t = turn_with(
         TurnTrigger::Resume,

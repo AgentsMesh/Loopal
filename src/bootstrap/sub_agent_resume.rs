@@ -23,8 +23,8 @@ pub fn load_sub_agent_histories(
     session_manager: &loopal_runtime::SessionManager,
 ) {
     for sub_ref in &session.sub_agents {
-        let messages = match session_manager.load_messages(&sub_ref.session_id) {
-            Ok(msgs) => msgs,
+        let turns = match session_manager.load_turns(&sub_ref.session_id) {
+            Ok(t) => t,
             Err(e) => {
                 warn!(
                     agent = %sub_ref.name, sid = %sub_ref.session_id,
@@ -33,6 +33,7 @@ pub fn load_sub_agent_histories(
                 continue;
             }
         };
+        let messages = loopal_provider_api::project_turns_to_messages(&turns);
         if messages.is_empty() {
             continue;
         }

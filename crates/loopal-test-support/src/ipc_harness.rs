@@ -76,16 +76,14 @@ pub async fn build_ipc_harness(
 /// Default timeout for acceptance tests.
 pub const IPC_TEST_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// Collect events until AwaitingInput or Finished, with timeout.
+/// Collect events until `Finished`, with timeout. `AwaitingInput` is NOT
+/// terminal — see [`crate::events::collect_until_idle`] for rationale.
 pub async fn collect_ipc_events(rx: &mut mpsc::Receiver<AgentEvent>) -> Vec<AgentEventPayload> {
     let mut events = Vec::new();
     loop {
         match tokio::time::timeout(IPC_TEST_TIMEOUT, rx.recv()).await {
             Ok(Some(event)) => {
-                let is_terminal = matches!(
-                    &event.payload,
-                    AgentEventPayload::AwaitingInput | AgentEventPayload::Finished
-                );
+                let is_terminal = matches!(&event.payload, AgentEventPayload::Finished);
                 events.push(event.payload);
                 if is_terminal {
                     break;

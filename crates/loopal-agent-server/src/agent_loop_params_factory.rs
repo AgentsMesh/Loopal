@@ -1,10 +1,5 @@
-//! Helper that wires up [`AgentLoopParams`] from the various pieces
-//! `agent_setup` already prepared. Split out so `agent_setup.rs` stays
-//! within the project's 200-LOC file budget.
-
 use std::sync::Arc;
 
-use loopal_context::ContextStore;
 use loopal_protocol::{Envelope, InterruptSignal};
 use loopal_provider_api::Message;
 use loopal_runtime::{
@@ -22,11 +17,7 @@ pub(crate) struct AgentLoopAssembly {
     pub config: AgentConfig,
     pub deps: AgentDeps,
     pub session: Session,
-    /// Resume payload — `initial_turns` is the authoritative log replay,
-    /// `messages` is its message-shape projection kept for the transitional
-    /// `ContextStore` view.
     pub initial_turns: Vec<Turn>,
-    pub messages: Vec<Message>,
     pub budget: loopal_context::ContextBudget,
     pub interrupt: InterruptSignal,
     pub interrupt_tx: Arc<tokio::sync::watch::Sender<u64>>,
@@ -47,7 +38,7 @@ pub(crate) fn assemble_agent_loop_params(a: AgentLoopAssembly) -> AgentLoopParam
         a.config,
         a.deps,
         a.session,
-        ContextStore::from_messages(a.messages, a.budget),
+        a.budget,
         InterruptHandle {
             signal: a.interrupt,
             tx: a.interrupt_tx,

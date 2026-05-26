@@ -45,17 +45,19 @@ fn test_prepare_chat_params_with_turns() {
     use loopal_turn::{Turn, TurnTrigger};
 
     let (mut runner, _rx) = make_runner();
-    runner.turns.store_mut().start_turn(TurnTrigger::UserInput {
+    // make_runner auto-opens a Resume turn (wiring path for empty-seed
+    // sessions). End it before opening a second turn — try_start_turn
+    // refuses to overwrite an in-progress turn (F7 invariant).
+    runner.end_turn_record(loopal_turn::TurnOutcome::Complete);
+    runner.start_turn_record(TurnTrigger::UserInput {
         envelope_id: "env-1".into(),
         content: "Hello".into(),
         images: Vec::new(),
     });
-    // pre-existing turn in store (no need to actively use start_turn_record
-    // here; we just exercise the prepare_chat_params projection).
 
     let params = runner.prepare_chat_params(None).expect("should succeed");
-    // make_runner seeds a Resume turn at index 0; this test adds a second
-    // UserInput turn at index 1.
+    // make_runner seeds a Resume turn at index 0 (now complete); the test
+    // adds a second UserInput turn at index 1.
     assert_eq!(params.turns.len(), 2);
     assert!(matches!(
         params.turns[1].trigger,

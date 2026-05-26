@@ -110,7 +110,7 @@ async fn test_continuation_marker_never_persisted_to_store() {
 
     let _ = runner.run().await.unwrap();
 
-    let messages = runner.params.store.messages();
+    let messages = runner.turns.view().messages();
     let has_marker = messages.iter().any(|m| {
         m.content.iter().any(|b| matches!(
             b,

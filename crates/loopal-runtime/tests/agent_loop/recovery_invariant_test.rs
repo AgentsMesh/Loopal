@@ -3,18 +3,20 @@ use std::sync::atomic::Ordering;
 use loopal_provider_api::{ContinuationIntent, ContinuationReason, StopReason, StreamChunk};
 
 use super::try_recover_helpers::{
-    Outcome, context_overflow_err, make_runner, make_runner_with_intents, ok_done, server_block_err,
+    Outcome, context_overflow_err, make_runner, make_runner_with_intents, ok_done,
+    seed_prior_completed_turn, server_block_err,
 };
 
 #[tokio::test]
 async fn retry_after_continuation_failure_does_not_violate_invariant() {
-    // Sequence:
+    // Sequence (with prior history seeded so force_compact actually compacts):
     //   1) MaxTokens-with-tools → record assistant (no tools because truncated),
     //      set pending_continuation
-    //   2) ContextOverflow during continuation → try_recover compacts and retries
-    //      → next turn enters ReadyToCall with Assistant tail and no intent
-    //      (turn_ctx is per-turn so pending_continuation reset to None)
-    //   3) Final success
+    //   2) ContextOverflow during continuation → try_recover invokes
+    //      force_compact, which calls the summarization LLM once
+    //   3) compact succeeds → loop retries → next turn enters ReadyToCall with
+    //      Assistant tail and RecoveryRetry intent
+    //   4) Final success
     let truncated_with_tools = vec![
         Ok(StreamChunk::Text {
             text: "partial ".into(),
@@ -32,15 +34,17 @@ async fn retry_after_continuation_failure_does_not_violate_invariant() {
         Outcome::Stream(truncated_with_tools),
         Outcome::Err(context_overflow_err()),
         Outcome::Stream(ok_done()),
+        Outcome::Stream(ok_done()),
     ]);
+    seed_prior_completed_turn(&mut runner);
     tokio::spawn(async move { while rx.recv().await.is_some() {} });
 
     let _ = runner.run().await.unwrap();
 
     assert_eq!(
         calls.load(Ordering::SeqCst),
-        3,
-        "expected 3 LLM calls: truncated + overflow + recovered success; got {}",
+        4,
+        "expected 4 LLM calls: truncated + overflow + compact-summary + retry-success; got {}",
         calls.load(Ordering::SeqCst)
     );
 }
@@ -68,13 +72,15 @@ async fn recovery_retry_call_carries_recovery_retry_intent() {
         Outcome::Stream(truncated_with_tools),
         Outcome::Err(context_overflow_err()),
         Outcome::Stream(ok_done()),
+        Outcome::Stream(ok_done()),
     ]);
+    seed_prior_completed_turn(&mut runner);
     tokio::spawn(async move { while rx.recv().await.is_some() {} });
 
     let _ = runner.run().await.unwrap();
 
     let snapshot = intents.lock().unwrap().clone();
-    assert_eq!(snapshot.len(), 3);
+    assert_eq!(snapshot.len(), 4);
     assert!(snapshot[0].is_none(), "first call has no intent");
     assert!(
         matches!(
@@ -87,20 +93,26 @@ async fn recovery_retry_call_carries_recovery_retry_intent() {
         snapshot[1]
     );
     assert!(
+        snapshot[2].is_none(),
+        "third call (compact summarization) has no intent, got {:?}",
+        snapshot[2]
+    );
+    assert!(
         matches!(
-            snapshot[2],
+            snapshot[3],
             Some(ContinuationIntent::AutoContinue {
                 reason: ContinuationReason::RecoveryRetry
             })
         ),
-        "third call (post-recovery retry) must carry RecoveryRetry intent, got {:?}",
-        snapshot[2]
+        "fourth call (post-recovery retry) must carry RecoveryRetry intent, got {:?}",
+        snapshot[3]
     );
 }
 
 #[tokio::test]
 async fn server_block_recovery_also_re_primes_intent() {
-    // Same invariant also applies to ServerBlockError recovery path.
+    // Same invariant for ServerBlockError. server_block_err recovery uses
+    // condense_server_blocks (no LLM call), so call count stays at 3.
     let truncated_with_tools = vec![
         Ok(StreamChunk::Text {
             text: "partial".into(),
@@ -134,5 +146,59 @@ async fn server_block_recovery_also_re_primes_intent() {
         ),
         "post-server-block-recovery call must carry RecoveryRetry, got {:?}",
         snapshot[2]
+    );
+}
+
+#[tokio::test]
+async fn context_overflow_recovery_emits_compacting_banner() {
+    use loopal_protocol::{AgentEvent, AgentEventPayload};
+    let truncated_with_tools = vec![
+        Ok(StreamChunk::Text {
+            text: "partial".into(),
+        }),
+        Ok(StreamChunk::ToolUse {
+            id: "tc-1".into(),
+            name: "Read".into(),
+            input: serde_json::json!({"file_path": "/tmp/x"}),
+        }),
+        Ok(StreamChunk::Done {
+            stop_reason: StopReason::MaxTokens,
+        }),
+    ];
+    let (mut runner, _calls, mut rx) = make_runner(vec![
+        Outcome::Stream(truncated_with_tools),
+        Outcome::Err(context_overflow_err()),
+        Outcome::Stream(ok_done()),
+        Outcome::Stream(ok_done()),
+    ]);
+    seed_prior_completed_turn(&mut runner);
+
+    let collected: std::sync::Arc<std::sync::Mutex<Vec<AgentEvent>>> = Default::default();
+    let collector = collected.clone();
+    let collector_handle = tokio::spawn(async move {
+        while let Some(ev) = rx.recv().await {
+            collector.lock().unwrap().push(ev);
+        }
+    });
+
+    let _ = runner.run().await.unwrap();
+
+    // Drop runner so its frontend Sender is closed; the collector's
+    // rx.recv() then returns None and the spawned task exits. Awaiting
+    // its JoinHandle guarantees all events are drained before assertion.
+    drop(runner);
+    collector_handle.await.expect("collector task panicked");
+
+    let events = collected.lock().unwrap().clone();
+    let saw_banner = events.iter().any(|ev| {
+        matches!(
+            &ev.payload,
+            AgentEventPayload::Error { message }
+                if message == loopal_runtime::agent_loop::CONTEXT_OVERFLOW_BANNER
+        )
+    });
+    assert!(
+        saw_banner,
+        "ContextOverflow recovery must emit exact CONTEXT_OVERFLOW_BANNER; got events: {events:?}"
     );
 }

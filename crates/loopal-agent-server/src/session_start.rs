@@ -14,6 +14,7 @@ use crate::hub_frontend::HubFrontend;
 use crate::session_handlers_factory::build_session_handlers;
 use crate::session_hub::{SessionHub, SharedSession};
 use crate::session_spawn::{parse_start_params, spawn_agent_and_bridges};
+use crate::session_start_prompt::push_prompt_envelope;
 
 pub(crate) struct SessionHandle {
     pub session_id: String,
@@ -130,9 +131,8 @@ pub(crate) async fn start_session(
         {
             tracing::warn!(error = %e, "failed to bind scheduler to session");
         }
-        // Tick loop activates after switch_session so the first survey
-        // sees the loaded task set, not an empty in-memory state.
-        // Disk sync is fire-and-forget — failures retry via dirty flag.
+        // Tick loop activates after switch_session so the first survey sees
+        // the loaded task set, not empty in-memory state.
         agent_shared_for_session.scheduler_handle.start();
 
         let session_id = agent_params.session().id.clone();
@@ -158,6 +158,14 @@ pub(crate) async fn start_session(
 
         let spawn_rx = kernel_for_bridge.bg_store().subscribe_spawns();
         let bg_store_for_bridge = kernel_for_bridge.bg_store().clone();
+
+        // Enqueue --prompt BEFORE spawning agent task — pushing after races
+        // the ephemeral lifecycle's drain_pending_input, which exits when
+        // the queue is empty.
+        if let Some(prompt) = &start.prompt {
+            push_prompt_envelope(&session, prompt, start.fork_context.is_some()).await;
+        }
+
         let agent_task = spawn_agent_and_bridges(
             agent_params,
             task_store_for_bridge,

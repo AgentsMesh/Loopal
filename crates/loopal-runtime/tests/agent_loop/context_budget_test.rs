@@ -54,7 +54,7 @@ fn test_build_budget_uses_effective_window() {
 async fn test_model_switch_updates_budget() {
     let (mut runner, _event_rx, _mbox_tx, ctrl_tx, _perm_tx) = super::make_runner_with_channels();
 
-    let original_window = runner.params.store.budget().context_window;
+    let original_window = runner.turns.view().budget().context_window;
 
     ctrl_tx
         .send(ControlCommand::ModelSwitch("claude-sonnet-4-6".into()))
@@ -64,7 +64,7 @@ async fn test_model_switch_updates_budget() {
 
     let _ = tokio::time::timeout(Duration::from_millis(100), runner.wait_for_input()).await;
 
-    let new_window = runner.params.store.budget().context_window;
+    let new_window = runner.turns.view().budget().context_window;
     // Sonnet 4.6 has 1M window; budget should reflect that
     assert!(
         new_window > original_window,
@@ -90,6 +90,6 @@ async fn test_model_switch_preserves_cap() {
     // Cap should be preserved across model switch
     assert_eq!(runner.model_config.context_tokens_cap, 300_000);
     // Budget should use capped value (300K), not model's 1M
-    let window = runner.params.store.budget().context_window;
+    let window = runner.turns.view().budget().context_window;
     assert_eq!(window, 300_000);
 }

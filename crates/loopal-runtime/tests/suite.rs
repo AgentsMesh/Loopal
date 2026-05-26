@@ -13,10 +13,6 @@ mod classifier_question_handler_edge_test;
 mod classifier_question_handler_support;
 #[path = "suite/classifier_question_handler_test.rs"]
 mod classifier_question_handler_test;
-#[path = "suite/compensation_test.rs"]
-mod compensation_test;
-#[path = "suite/data_plane_bridge_test.rs"]
-mod data_plane_bridge_test;
 #[path = "suite/diff_tracker_test.rs"]
 mod diff_tracker_test;
 #[path = "suite/dispatch_test.rs"]
@@ -75,8 +71,6 @@ mod secrets_pipeline_test;
 mod session_manager_test;
 #[path = "suite/session_test.rs"]
 mod session_test;
-#[path = "suite/store_closure_invariant_test.rs"]
-mod store_closure_invariant_test;
 #[path = "suite/tool_pipeline_hooks_test.rs"]
 mod tool_pipeline_hooks_test;
 #[path = "suite/tool_pipeline_test.rs"]

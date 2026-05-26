@@ -6,16 +6,18 @@ pub(crate) fn load_resumed_display(app: &mut App, session_id: &str) {
     let Ok(sm) = loopal_runtime::SessionManager::new() else {
         return;
     };
-    let Ok((session, _turns, messages)) = sm.resume_session(session_id) else {
+    let Ok((session, turns)) = sm.resume_session(session_id) else {
         return;
     };
+    let messages = loopal_provider_api::project_turns_to_messages(&turns);
     let projected = loopal_context::project_messages_to_display(&messages);
     app.load_display_history(projected);
 
     for sub in &session.sub_agents {
-        let Ok(sub_msgs) = sm.load_messages(&sub.session_id) else {
+        let Ok(sub_turns) = sm.load_turns(&sub.session_id) else {
             continue;
         };
+        let sub_msgs = loopal_provider_api::project_turns_to_messages(&sub_turns);
         if sub_msgs.is_empty() {
             continue;
         }

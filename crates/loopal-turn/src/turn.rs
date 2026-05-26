@@ -33,6 +33,11 @@ pub struct Turn {
     pub trigger: TurnTrigger,
     pub body: TurnBody,
     pub outcome: TurnOutcome,
+    /// Wall-clock time of the most recent `append_step`. Ephemeral —
+    /// not serialized. Microcompact uses this (falling back to
+    /// `started_at` after replay) to gauge real idle duration.
+    #[serde(skip, default)]
+    pub last_step_at: Option<DateTime<Utc>>,
 }
 
 impl Turn {
@@ -43,6 +48,7 @@ impl Turn {
             trigger,
             body: TurnBody::default(),
             outcome: TurnOutcome::InProgress,
+            last_step_at: None,
         }
     }
 

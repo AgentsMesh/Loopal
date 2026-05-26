@@ -1,20 +1,7 @@
-//! Builder for [`AgentLoopParams`] — keeps test/setup call sites
-//! resilient to new fields.
-//!
-//! Without a builder, every new optional field on `AgentLoopParams`
-//! forces every callsite (12+ test fixtures + production setup) to add
-//! `field: default_value`. The builder centralizes the defaults, so
-//! adding a field is a one-line change here, not a sweep across the
-//! codebase.
-//!
-//! Required arguments (`config`, `deps`, `session`, `store`,
-//! `interrupt`) are passed to `new()`; everything else has a sensible
-//! default and is overridden via fluent setters.
-
 use std::sync::Arc;
 
 use loopal_config::HarnessConfig;
-use loopal_context::ContextStore;
+use loopal_context::ContextBudget;
 use loopal_provider_api::Message;
 use loopal_storage::Session;
 use loopal_tool_api::{FetchRefinerPolicy, MemoryChannel, OneShotChatService};
@@ -28,7 +15,7 @@ pub struct AgentLoopParamsBuilder {
     config: AgentConfig,
     deps: AgentDeps,
     session: Session,
-    store: ContextStore,
+    budget: ContextBudget,
     interrupt: InterruptHandle,
     initial_turns: Vec<Turn>,
     shared: Option<Arc<dyn std::any::Any + Send + Sync>>,
@@ -49,14 +36,14 @@ impl AgentLoopParamsBuilder {
         config: AgentConfig,
         deps: AgentDeps,
         session: Session,
-        store: ContextStore,
+        budget: ContextBudget,
         interrupt: InterruptHandle,
     ) -> Self {
         Self {
             config,
             deps,
             session,
-            store,
+            budget,
             interrupt,
             initial_turns: Vec::new(),
             shared: None,
@@ -73,9 +60,6 @@ impl AgentLoopParamsBuilder {
         }
     }
 
-    /// Seed `TurnStore` from a recovered turn log (e.g. session resume).
-    /// Default is empty; production callers pass the turns returned by
-    /// `SessionManager::resume_session`.
     pub fn initial_turns(mut self, turns: Vec<Turn>) -> Self {
         self.initial_turns = turns;
         self
@@ -142,9 +126,9 @@ impl AgentLoopParamsBuilder {
             config: self.config,
             deps: self.deps,
             session: self.session,
-            store: self.store,
-            interrupt: self.interrupt,
+            budget: self.budget,
             initial_turns: self.initial_turns,
+            interrupt: self.interrupt,
             shared: self.shared,
             memory_channel: self.memory_channel,
             one_shot_chat: self.one_shot_chat,

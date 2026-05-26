@@ -2,7 +2,6 @@ use std::path::Path;
 use std::sync::Arc;
 
 use loopal_error::Result;
-use loopal_provider_api::Message;
 use loopal_storage::{GoalStore, Session, SessionStore, SubAgentRef, TurnEventStore};
 use loopal_turn::TurnEvent;
 use tracing::info;
@@ -44,25 +43,21 @@ impl SessionManager {
         Ok(session)
     }
 
-    pub fn resume_session(
-        &self,
-        session_id: &str,
-    ) -> Result<(Session, Vec<loopal_turn::Turn>, Vec<Message>)> {
+    pub fn resume_session(&self, session_id: &str) -> Result<(Session, Vec<loopal_turn::Turn>)> {
         let session = self.session_store.load_session(session_id)?;
         let turns = self.turn_event_store.load_turns(session_id)?;
-        let messages = loopal_provider_api::project_turns_to_messages(&turns);
         info!(
             session_id = %session_id,
             turn_count = turns.len(),
             "session resumed"
         );
-        Ok((session, turns, messages))
+        Ok((session, turns))
     }
 
-    /// Load messages for a sub-agent session (by session_id).
-    pub fn load_messages(&self, session_id: &str) -> Result<Vec<Message>> {
-        let turns = self.turn_event_store.load_turns(session_id)?;
-        Ok(loopal_provider_api::project_turns_to_messages(&turns))
+    /// Load sub-agent turns. Caller projects to wire messages on demand
+    /// via `loopal_provider_api::project_turns_to_messages`.
+    pub fn load_turns(&self, session_id: &str) -> Result<Vec<loopal_turn::Turn>> {
+        Ok(self.turn_event_store.load_turns(session_id)?)
     }
 
     /// Record a sub-agent reference in the parent session.

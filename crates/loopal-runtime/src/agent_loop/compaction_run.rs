@@ -14,6 +14,9 @@ pub(super) struct PersistResult {
 }
 
 impl AgentLoopRunner {
+    /// Run a smart compaction pass. Returns `true` iff a `CompactionSummary`
+    /// step was actually appended; `false` for guarded silent fall-throughs
+    /// (provider unresolved, compact LLM Err, compact_to_boundary Ok(None)).
     pub(super) async fn run_smart_compact(
         &mut self,
         before_count: usize,
@@ -21,7 +24,7 @@ impl AgentLoopRunner {
         instructions: Option<String>,
         strategy: &'static str,
         cancel: &CancellationToken,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         let compact_model = self
             .params
             .config
@@ -32,17 +35,17 @@ impl AgentLoopRunner {
             Ok(p) => p,
             Err(e) => {
                 warn!(error = %e, model = %compact_model, "summarization provider unavailable");
-                return Ok(());
+                return Ok(false);
             }
         };
 
-        let boundary_at = self.params.store.compact_boundary_at();
+        let boundary_turn_at = self.turns.store().compact_boundary_turn_index();
 
         let result = compact_to_boundary(
-            self.params.store.messages(),
+            self.turns.store().turns(),
             &*provider,
             &compact_model,
-            boundary_at,
+            boundary_turn_at,
             instructions.as_deref(),
             cancel,
         )
@@ -52,13 +55,19 @@ impl AgentLoopRunner {
             Ok(opt) => opt,
             Err(e) => {
                 warn!(error = %e, "compaction LLM call failed");
-                return Ok(());
+                return Ok(false);
             }
         }) else {
-            return Ok(());
+            return Ok(false);
         };
 
-        let apply_result = self.persist_and_apply(output, boundary_at, cancel).await?;
+        let apply_result = match self.persist_and_apply(output, cancel).await {
+            Ok(r) => r,
+            Err(e) => {
+                warn!(error = %e, "persist_and_apply failed; reporting compact as no-op");
+                return Ok(false);
+            }
+        };
         self.post_compact(
             before_count,
             tokens_before,
@@ -66,30 +75,34 @@ impl AgentLoopRunner {
             apply_result.summary_msg_id,
             apply_result.files_rehydrated,
         )
-        .await
+        .await?;
+        Ok(true)
     }
 
     async fn persist_and_apply(
         &mut self,
         output: CompactOutput,
-        boundary_at: usize,
         cancel: &CancellationToken,
     ) -> Result<PersistResult> {
         let CompactOutput {
             summary_msg,
             ack_msg,
             touched_files,
+            removed_turn_count,
+            kept_turn_count,
             ..
         } = output;
 
-        let removed_count = boundary_at as u32;
         if let Err(e) = self.append_step_record(TurnStep::CompactionSummary(CompactionSummary {
             summary_text: summary_msg.text_content(),
             ack_text: ack_msg.text_content(),
-            kept_turn_count: 0,
-            removed_turn_count: removed_count,
+            kept_turn_count,
+            removed_turn_count,
         })) {
             warn!(error = %e, "append_step(CompactionSummary) failed");
+            return Err(loopal_error::LoopalError::Other(format!(
+                "compaction summary append failed: {e}"
+            )));
         }
 
         // Compaction rewrote earlier history. Notify cross-turn governance
@@ -121,9 +134,9 @@ impl AgentLoopRunner {
         summary_msg_id: Option<String>,
         files_rehydrated: usize,
     ) -> Result<()> {
-        let after = self.params.store.len();
+        let after = self.turns.view().len();
         let removed = before.saturating_sub(after);
-        let tokens_after = self.params.store.current_tokens();
+        let tokens_after = self.turns.view().current_tokens();
 
         self.emit(AgentEventPayload::Compacted(
             loopal_protocol::CompactionSummary {

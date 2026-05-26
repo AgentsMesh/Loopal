@@ -47,7 +47,13 @@ fn build_llm_call_step(
     thinking_signature: Option<&str>,
     server_blocks: &[ContentBlock],
 ) -> TurnStep {
-    let thinking = if thinking_signature.is_some() && !thinking_text.is_empty() {
+    // reason: signature 在 OpenAI 路径上承载 reasoning_item_id；只要 signature
+    // 在场且 text 或 server_blocks 之一非空，就必须保留 ThinkingBlock。否则
+    // multi-turn web_search 跨 turn 配对（OpenAI server tool）会丢失 reasoning
+    // item id，下一次 wire projection 缺少必要锚点 → API 拒绝。
+    let thinking = if thinking_signature.is_some()
+        && (!thinking_text.is_empty() || !server_blocks.is_empty())
+    {
         Some(ThinkingBlock {
             thinking: thinking_text.to_string(),
             signature: thinking_signature.map(String::from),

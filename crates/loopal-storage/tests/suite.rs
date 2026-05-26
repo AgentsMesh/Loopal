@@ -1,4 +1,6 @@
 // Single test binary — includes all test modules
+#[path = "suite/fold_events_test.rs"]
+mod fold_events_test;
 #[path = "suite/goal_store_test.rs"]
 mod goal_store_test;
 #[path = "suite/resources_test.rs"]
@@ -13,3 +15,5 @@ mod sessions_update_test;
 mod sub_agent_ref_test;
 #[path = "suite/turn_event_store_test.rs"]
 mod turn_event_store_test;
+#[path = "suite/turn_synthesize_test.rs"]
+mod turn_synthesize_test;

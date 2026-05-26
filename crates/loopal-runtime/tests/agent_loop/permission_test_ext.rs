@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use loopal_config::Settings;
-use loopal_context::{ContextBudget, ContextStore};
+use loopal_context::ContextBudget;
 use loopal_kernel::Kernel;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::Envelope;
@@ -131,7 +131,7 @@ async fn test_check_permission_channel_closed_denies() {
             decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
         },
         fixture.test_session("test-perm-closed"),
-        ContextStore::new(make_test_budget()),
+        make_test_budget(),
         InterruptHandle::new(),
     )
     .build();

@@ -30,12 +30,9 @@ async fn usage_chunk_drives_effective_tokens_above_estimate() {
         .build()
         .await;
 
-    h.runner
-        .params
-        .store
-        .update_budget(budget_window(1_000_000));
+    h.runner.turns.update_budget(budget_window(1_000_000));
 
-    let estimate_before = h.runner.params.store.current_tokens();
+    let estimate_before = h.runner.turns.view().current_tokens();
     assert!(
         estimate_before < high_input_tokens,
         "local estimate ({estimate_before}) must be the underestimate in this test",
@@ -43,7 +40,7 @@ async fn usage_chunk_drives_effective_tokens_above_estimate() {
 
     let _ = h.runner.run().await;
 
-    let effective_after = h.runner.params.store.effective_tokens();
+    let effective_after = h.runner.turns.view().effective_tokens();
     assert!(
         effective_after >= high_input_tokens,
         "effective_tokens ({effective_after}) must rise to actual input ({high_input_tokens})",
@@ -71,20 +68,17 @@ async fn api_token_feedback_triggers_next_auto_compact() {
         .build()
         .await;
 
-    h.runner
-        .params
-        .store
-        .update_budget(budget_window(context_window));
+    h.runner.turns.update_budget(budget_window(context_window));
 
     assert!(
-        !h.runner.params.store.needs_summarization(),
+        !h.runner.turns.view().needs_summarization(),
         "tiny conversation should not yet need compaction",
     );
 
     let _ = h.runner.run().await;
 
     assert!(
-        h.runner.params.store.needs_summarization(),
+        h.runner.turns.view().needs_summarization(),
         "after Usage chunk reports {actual_input} tokens (85% of {context_window}), \
          needs_summarization must trip on the next check",
     );

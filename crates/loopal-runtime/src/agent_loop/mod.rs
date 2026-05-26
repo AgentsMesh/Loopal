@@ -39,6 +39,7 @@ pub mod question_parse;
 mod resume_session;
 pub mod rewind;
 mod run;
+pub use run::CONTEXT_OVERFLOW_BANNER;
 mod runner;
 mod runner_transition;
 /// Sandbox path pre-check utilities for the tools_check phase.
@@ -72,7 +73,6 @@ mod turn_response;
 mod turn_state;
 mod turn_telemetry;
 mod turn_tool_phase;
-mod turn_tracker;
 mod turn_trigger_map;
 
 use loopal_error::{AgentOutput, Result};
@@ -92,11 +92,11 @@ pub async fn agent_loop(params: AgentLoopParams) -> Result<AgentOutput> {
     let mut guard = FinishedGuard::new(params.deps.frontend.clone());
     let governance = governance::build_governance(&params.harness);
     let hooks = governance::build_hooks(params.deps.frontend.clone());
-    let pipeline = pipeline_setup::build_context_pipeline(&params.session.cwd);
+    let config_snapshots = pipeline_setup::build_config_snapshots(&params.session.cwd);
     let mut runner = AgentLoopRunner::new(params);
     runner.governance = governance;
     runner.hooks = hooks;
-    runner.pipeline = pipeline;
+    runner.config_snapshots = config_snapshots;
     let result = runner.run().await;
     guard.disarm();
     result

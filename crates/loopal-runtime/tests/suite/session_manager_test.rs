@@ -25,7 +25,7 @@ fn add_sub_agent_persists_ref() {
     )
     .unwrap();
 
-    let (resumed, _turns, _) = mgr.resume_session(&root.id).unwrap();
+    let (resumed, _turns) = mgr.resume_session(&root.id).unwrap();
     assert_eq!(resumed.sub_agents.len(), 1);
     assert_eq!(resumed.sub_agents[0].name, "researcher");
     assert_eq!(resumed.sub_agents[0].session_id, sub.id);

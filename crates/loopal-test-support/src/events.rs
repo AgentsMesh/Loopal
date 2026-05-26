@@ -11,6 +11,12 @@ pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Collect events until `AwaitingInput` or `Finished`, with timeout.
 ///
+/// `AwaitingInput` IS terminal here — used for Persistent-lifecycle tests
+/// where the agent goes idle between turns. Ephemeral-lifecycle tests with
+/// headless prompts should use [`collect_until_finished`] instead, since
+/// they emit a transient `AwaitingInput` before draining the queued
+/// envelope.
+///
 /// Calls `observer` for each event before storing it (e.g., to feed a
 /// `SessionController`). Panics on timeout.
 pub async fn collect_until_idle(
@@ -36,6 +42,34 @@ pub async fn collect_until_idle(
             Ok(None) => break, // channel closed
             Err(_) => panic!(
                 "collect_until_idle timed out after {timeout:?} — collected {} events",
+                collected.len()
+            ),
+        }
+    }
+    collected
+}
+
+/// Collect events until `Finished`. Use for Ephemeral-lifecycle agents
+/// whose `AwaitingInput` may be transient (emitted by the idle phase
+/// before draining a queued envelope, e.g. headless `--prompt`).
+pub async fn collect_until_finished(
+    rx: &mut mpsc::Receiver<AgentEvent>,
+    timeout: Duration,
+) -> Vec<AgentEventPayload> {
+    let mut collected = Vec::new();
+    let deadline = tokio::time::Instant::now() + timeout;
+    loop {
+        match tokio::time::timeout_at(deadline, rx.recv()).await {
+            Ok(Some(event)) => {
+                let is_finished = matches!(&event.payload, AgentEventPayload::Finished);
+                collected.push(event.payload);
+                if is_finished {
+                    break;
+                }
+            }
+            Ok(None) => break,
+            Err(_) => panic!(
+                "collect_until_finished timed out after {timeout:?} — collected {} events",
                 collected.len()
             ),
         }

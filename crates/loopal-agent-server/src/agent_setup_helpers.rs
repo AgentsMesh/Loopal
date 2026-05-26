@@ -6,8 +6,9 @@ use std::time::Duration;
 
 use loopal_config::{CompactionSettings, ResolvedConfig, Settings};
 use loopal_protocol::{AgentEvent, AgentEventPayload};
-use loopal_provider_api::{ModelRouter, TaskType};
+use loopal_provider_api::{ContentBlock, Message, MessageRole, ModelRouter, TaskType};
 use loopal_runtime::frontend::traits::AgentFrontend;
+use loopal_turn::{InjectionKind, Turn, TurnOutcome, TurnStep, TurnTrigger};
 
 use crate::params::StartParams;
 
@@ -54,38 +55,67 @@ pub fn spawn_sub_agent_forwarder(
     event_tx
 }
 
-/// Compose the initial message list for the agent loop.
+/// Convert a parent agent's wire-format fork context (`Vec<Message>`) into
+/// a synthetic `Turn` carrying an `Injection { SystemNote }` step. This
+/// lands in the sub-agent's `TurnStore` so the LLM sees the parent's
+/// history on its first call (wire-build reads from `TurnStore`, never
+/// from the projected `ContextStore` view).
 ///
-/// Starts from any resumed messages, appends a deserialized fork context
-/// (when the start params request it and there is no resume in progress),
-/// and finally appends the user prompt wrapped with fork boilerplate if
-/// fork was applied.
-pub fn build_initial_messages(
-    resume_messages: Vec<loopal_provider_api::Message>,
-    start: &StartParams,
-) -> Vec<loopal_provider_api::Message> {
-    let mut messages = resume_messages;
-    let mut has_fork = false;
-    if let Some(ref fc_value) = start.fork_context
-        && start.resume.is_none()
-    {
-        match serde_json::from_value::<Vec<loopal_provider_api::Message>>(fc_value.clone()) {
-            Ok(fork_msgs) => {
-                messages.extend(fork_msgs);
-                has_fork = true;
-            }
-            Err(e) => tracing::warn!("fork context deserialization failed, skipping: {e}"),
-        }
+/// Returns `None` when fork is absent / empty / unparseable, OR when the
+/// session is resuming (resume takes precedence over fork).
+pub fn build_fork_synthetic_turn(start: &StartParams) -> Option<Turn> {
+    if start.resume.is_some() {
+        return None;
     }
-    if let Some(prompt) = &start.prompt {
-        let text = if has_fork {
-            format!("{}\n\n{prompt}", loopal_context::fork::FORK_BOILERPLATE)
-        } else {
-            prompt.to_string()
+    let fork_value = start.fork_context.as_ref()?;
+    let messages: Vec<Message> = serde_json::from_value(fork_value.clone())
+        .map_err(|e| tracing::warn!("fork context deserialization failed, skipping: {e}"))
+        .ok()?;
+    if messages.is_empty() {
+        return None;
+    }
+    let text = render_fork_as_text(&messages);
+    let mut turn = Turn::new(TurnTrigger::Resume);
+    turn.body.steps.push(TurnStep::Injection {
+        kind: InjectionKind::SystemNote,
+        text,
+    });
+    turn.outcome = TurnOutcome::Complete;
+    Some(turn)
+}
+
+fn render_fork_as_text(messages: &[Message]) -> String {
+    let mut buf = String::from("[Parent agent conversation context]\n\n");
+    for msg in messages {
+        let role_label = match msg.role {
+            MessageRole::User => "USER",
+            MessageRole::Assistant => "ASSISTANT",
+            MessageRole::System => "SYSTEM",
         };
-        messages.push(loopal_provider_api::Message::user(&text));
+        buf.push_str(role_label);
+        buf.push_str(": ");
+        for block in &msg.content {
+            match block {
+                ContentBlock::Text { text } => buf.push_str(text),
+                ContentBlock::ToolUse { name, input, .. } => {
+                    buf.push_str(&format!("[calls {name}({input})]"));
+                }
+                ContentBlock::ToolResult {
+                    content, is_error, ..
+                } => {
+                    let prefix = if *is_error {
+                        "tool error"
+                    } else {
+                        "tool result"
+                    };
+                    buf.push_str(&format!("[{prefix}: {content}]"));
+                }
+                _ => {}
+            }
+        }
+        buf.push('\n');
     }
-    messages
+    buf
 }
 
 /// Collect runtime feature tags for the system prompt preamble.

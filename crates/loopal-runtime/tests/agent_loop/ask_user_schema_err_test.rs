@@ -15,7 +15,7 @@ async fn run_ask_user_with_input(
     ))
     .await
     .unwrap();
-    runner.params.store.messages()[0].content[0].clone()
+    runner.turns.view().messages()[0].content[0].clone()
 }
 
 fn assert_schema_err(block: &ContentBlock) {

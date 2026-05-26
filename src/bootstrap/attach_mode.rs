@@ -99,7 +99,8 @@ fn seed_resume_or_welcome(
         match loopal_runtime::SessionManager::new()
             .and_then(|sm| sm.resume_session(sid).map(|p| (sm, p)))
         {
-            Ok((session_manager, (session, _turns, messages))) => {
+            Ok((session_manager, (session, turns))) => {
+                let messages = loopal_provider_api::project_turns_to_messages(&turns);
                 app.load_display_history(project_messages_to_display(&messages));
                 super::sub_agent_resume::load_sub_agent_histories(app, &session, &session_manager);
             }

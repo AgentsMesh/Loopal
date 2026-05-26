@@ -82,6 +82,6 @@ impl AgentLoopRunner {
         let budget = self
             .model_config
             .build_budget(&self.params.config.system_prompt, tool_tokens);
-        self.params.store.update_budget(budget);
+        self.turns.update_budget(budget);
     }
 }

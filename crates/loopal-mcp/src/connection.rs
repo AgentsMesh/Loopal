@@ -1,6 +1,3 @@
-/// Single MCP server connection lifecycle.
-///
-/// Wraps `McpClient` with status tracking, config, and capability-guarded discovery.
 use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
@@ -16,13 +13,10 @@ use crate::handler::SamplingCallback;
 use crate::transport;
 use crate::types::{CapabilitySummary, ConnectionStatus, McpPrompt, McpResource};
 
-/// How many stderr lines to retain per stdio server for diagnostics.
-/// Surfaced to `/mcp` page when the connection is in Failed state so the
-/// user sees the server's own error messages instead of a generic
-/// "did not complete handshake" wrapper.
+// Surfaced to `/mcp` page when a stdio server enters Failed state so the
+// user sees the server's own error output, not just our wrapper message.
 const STDERR_RETENTION: usize = 16;
 
-/// A managed connection to a single MCP server.
 pub struct McpConnection {
     pub name: String,
     pub status: ConnectionStatus,
@@ -30,12 +24,10 @@ pub struct McpConnection {
     pub cached_tools: Vec<ToolDefinition>,
     pub cached_resources: Vec<McpResource>,
     pub cached_prompts: Vec<McpPrompt>,
-    /// Server instructions from the initialize handshake.
     pub instructions: Option<String>,
     pub errors: Vec<String>,
-    /// Most recent stderr lines (stdio servers only). Tail-capped at
-    /// `STDERR_RETENTION` to bound memory. Read by `manager_query::collect_snapshots`
-    /// when surfacing failure diagnostics to the user.
+    // Tail-capped at STDERR_RETENTION for bounded memory; consumed by
+    // manager_query::collect_snapshots for failure diagnostics.
     pub stderr_tail: Arc<Mutex<VecDeque<String>>>,
     client: Option<McpClient>,
     sampling: Option<Arc<dyn SamplingCallback>>,
@@ -62,7 +54,6 @@ impl McpConnection {
         }
     }
 
-    /// Establish connection and discover capabilities.
     pub async fn connect(&mut self) {
         self.status = ConnectionStatus::Connecting;
         self.errors.clear();
@@ -70,9 +61,7 @@ impl McpConnection {
         self.cached_resources.clear();
         self.cached_prompts.clear();
         self.instructions = None;
-
         let timeout = Duration::from_millis(self.config.timeout_ms());
-
         let result = match tokio::time::timeout(timeout, self.create_client(timeout)).await {
             Ok(inner) => inner,
             Err(_) => Err(loopal_error::McpError::ConnectionFailed(format!(
@@ -82,14 +71,13 @@ impl McpConnection {
         };
         match result {
             Ok(client) => {
-                // Extract server instructions from handshake.
                 if let Some(info) = client.peer_info() {
                     self.instructions = info.instructions.clone();
                 }
                 self.client = Some(client);
                 self.discover_capabilities().await;
-                // Status is Connected even with discovery errors — the transport
-                // works but some capabilities may be missing. Check `errors` for details.
+                // Connected even with discovery errors — transport works
+                // but capabilities may be partial; check `errors` for details.
                 self.status = ConnectionStatus::Connected;
                 if self.errors.is_empty() {
                     info!(server = %self.name, tools = self.cached_tools.len(), "connected");
@@ -105,7 +93,6 @@ impl McpConnection {
         }
     }
 
-    /// Disconnect and release the client.
     pub async fn disconnect(&mut self) {
         self.client = None;
         self.status = ConnectionStatus::Disconnected;
@@ -115,12 +102,10 @@ impl McpConnection {
         self.instructions = None;
     }
 
-    /// Get the underlying client (if connected).
     pub fn client(&self) -> Option<&McpClient> {
         self.client.as_ref()
     }
 
-    /// Create client by selecting the right transport for our config.
     async fn create_client(&self, timeout: Duration) -> Result<McpClient, loopal_error::McpError> {
         let sampling = self.sampling.clone();
         match &self.config {
@@ -143,7 +128,6 @@ impl McpConnection {
         }
     }
 
-    /// Discover tools/resources/prompts based on server capabilities.
     async fn discover_capabilities(&mut self) {
         let Some(client) = &self.client else { return };
         let caps = extract_capabilities(client);
@@ -168,7 +152,6 @@ impl McpConnection {
                 Err(e) => self.errors.push(format!("tools/list: {e}")),
             }
         }
-
         if caps.resources {
             match client.list_resources().await {
                 Ok(result) => {

@@ -1,66 +1,34 @@
 mod budget_control;
 
-use std::time::SystemTime;
-
 use crate::budget::ContextBudget;
-use crate::degradation::run_sync_degradation;
 use loopal_provider_api::{Message, MessageRole, project_turns_to_messages};
 use loopal_turn::Turn;
 
-pub struct ContextStore {
+/// Derived projection of `TurnStore.turns` into message-shape, plus budget
+/// metadata. Cached so repeated reads in a single turn don't re-project.
+/// Refreshed automatically by `TurnTracker` after every mutator.
+pub struct ProjectedView {
     messages: Vec<Message>,
     budget: ContextBudget,
     last_actual_input_tokens: Option<u32>,
-    last_assistant_activity_at: Option<SystemTime>,
 }
 
-impl ContextStore {
+impl ProjectedView {
     pub fn new(budget: ContextBudget) -> Self {
         Self {
             messages: Vec::new(),
             budget,
             last_actual_input_tokens: None,
-            last_assistant_activity_at: None,
         }
-    }
-
-    pub fn from_messages(messages: Vec<Message>, budget: ContextBudget) -> Self {
-        let mut store = Self {
-            messages,
-            budget,
-            last_actual_input_tokens: None,
-            last_assistant_activity_at: None,
-        };
-        store.apply_ingestion_caps();
-        run_sync_degradation(&mut store.messages, &store.budget);
-        store
     }
 
     pub fn update_budget(&mut self, budget: ContextBudget) {
         self.budget = budget;
-        self.enforce_budget();
     }
 
-    pub fn refresh_view(&mut self, turns: &[Turn]) {
+    pub(crate) fn refresh_view(&mut self, turns: &[Turn]) {
         self.messages = project_turns_to_messages(turns);
         self.apply_ingestion_caps();
-        self.enforce_budget();
-        if let Some(at) = latest_llm_call_started_at(turns) {
-            self.last_assistant_activity_at = Some(datetime_to_system_time(at));
-        }
-    }
-
-    pub fn append_warnings_to_last_user(&mut self, warnings: Vec<String>) {
-        if warnings.is_empty() {
-            return;
-        }
-        if let Some(msg) = self.messages.last_mut() {
-            debug_assert!(msg.role == MessageRole::User);
-            for w in warnings {
-                msg.content
-                    .push(loopal_provider_api::ContentBlock::Text { text: w });
-            }
-        }
     }
 
     pub fn messages(&self) -> &[Message] {
@@ -83,35 +51,9 @@ impl ContextStore {
         self.messages.last().map(|m| m.role)
     }
 
-    pub fn clear(&mut self) {
-        self.messages.clear();
-    }
-
-    pub fn truncate(&mut self, at: usize) {
-        self.messages.truncate(at);
-    }
-
-    /// Apply microcompaction in place. The store hands the message list to
-    /// the middleware so the scrub logic stays out of the runtime; the
-    /// runtime still owns the clock + idle threshold and passes them in.
-    pub fn apply_microcompact(
-        &mut self,
-        last_activity: Option<std::time::SystemTime>,
-        now: std::time::SystemTime,
-        idle_threshold: std::time::Duration,
-    ) -> Option<crate::middleware::microcompact::MicroCompactStats> {
-        crate::middleware::microcompact::maybe_microcompact(
-            &mut self.messages,
-            last_activity,
-            now,
-            idle_threshold,
-        )
-    }
-
     /// Record the prompt_tokens value returned by the provider for the most
     /// recent LLM call. Used to ground `effective_tokens()` in real numbers
-    /// instead of the BPE estimate, which can drift up to ~30% on Anthropic
-    /// payloads (cl100k_base ≠ Anthropic tokenizer).
+    /// instead of the BPE estimate.
     pub fn record_actual_input_tokens(&mut self, tokens: u32) {
         self.last_actual_input_tokens = Some(tokens);
     }
@@ -120,36 +62,7 @@ impl ContextStore {
         self.last_actual_input_tokens
     }
 
-    /// Refresh the "last assistant activity" timestamp. Microcompact uses this
-    /// to detect long-idle conversations whose old tool results no longer
-    /// share a server-side cache and can be safely scrubbed.
-    pub fn record_assistant_activity(&mut self, at: SystemTime) {
-        self.last_assistant_activity_at = Some(at);
-    }
-
-    pub fn last_assistant_activity_at(&self) -> Option<SystemTime> {
-        self.last_assistant_activity_at
-    }
-
     pub(super) fn messages_mut(&mut self) -> &mut Vec<Message> {
         &mut self.messages
     }
-}
-
-fn latest_llm_call_started_at(turns: &[Turn]) -> Option<chrono::DateTime<chrono::Utc>> {
-    turns
-        .iter()
-        .rev()
-        .find(|t| {
-            t.body
-                .steps
-                .iter()
-                .any(|s| matches!(s, loopal_turn::TurnStep::LlmCall { .. }))
-        })
-        .map(|t| t.started_at)
-}
-
-fn datetime_to_system_time(at: chrono::DateTime<chrono::Utc>) -> SystemTime {
-    let secs = at.timestamp().max(0) as u64;
-    SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(secs)
 }

@@ -1,13 +1,3 @@
-/// Agent status panel — per-agent observability with focus selection.
-///
-/// Dynamic height: 0 when no live agents, 1 line per agent otherwise.
-/// Tab cycles focus; focused agent highlighted with `▸`.
-///
-/// ```text
-///  ▸ researcher   ⠹ Working   12s  Read(src/foo.rs)
-///    coder        ● Idle        0s
-///    tester       ⠧ Working     5s  Bash(npm test)
-/// ```
 use std::time::Duration;
 
 use ratatui::prelude::*;
@@ -17,11 +7,9 @@ use loopal_protocol::AgentStatus;
 
 use super::unified_status::{format_duration, spinner_frame};
 
-/// Maximum visible agent rows before showing overflow.
-/// NOTE: must match `key_dispatch_ops::MAX_VISIBLE` (scroll calculation).
+// Must match key_dispatch_ops::MAX_VISIBLE — scroll calculations assume parity.
 pub const MAX_VISIBLE: usize = 5;
 
-/// Per-agent display data lifted out of `ViewClient` once per render.
 #[derive(Clone)]
 pub struct AgentDisplayInfo {
     pub status: AgentStatus,
@@ -30,8 +18,7 @@ pub struct AgentDisplayInfo {
     pub elapsed: Duration,
 }
 
-/// Compute the height needed for the agent panel.
-/// Excludes the currently viewed agent — it's the active conversation, not a switchable target.
+// Excludes active_view — that's the current conversation, not a switchable target.
 pub fn panel_height(
     agents: &[(String, AgentDisplayInfo)],
     active_view: &str,
@@ -52,8 +39,6 @@ pub fn panel_height(
     visible as u16 + indicators
 }
 
-/// Render the agent panel with a scrolling viewport.
-/// `active_view` is excluded from the list (it's the current conversation).
 pub fn render_agent_panel(
     f: &mut Frame,
     agents: &[(String, AgentDisplayInfo)],

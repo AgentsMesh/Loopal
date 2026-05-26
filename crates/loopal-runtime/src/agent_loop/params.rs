@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use loopal_config::HarnessConfig;
-use loopal_context::ContextStore;
+use loopal_context::ContextBudget;
 use loopal_kernel::Kernel;
 use loopal_protocol::InterruptSignal;
 use loopal_provider_api::{ModelRouter, ThinkingConfig};
@@ -109,12 +109,9 @@ pub struct AgentLoopParams {
     pub config: AgentConfig,
     pub deps: AgentDeps,
     pub session: Session,
-    pub store: ContextStore,
-    pub interrupt: InterruptHandle,
-    /// Turns recovered from `turns.jsonl` on session resume. Empty for new
-    /// sessions. `AgentLoopRunner::new` uses this to seed `TurnStore` so the
-    /// next LLM call carries resumed history.
+    pub budget: ContextBudget,
     pub initial_turns: Vec<loopal_turn::Turn>,
+    pub interrupt: InterruptHandle,
     pub shared: Option<Arc<dyn std::any::Any + Send + Sync>>,
     pub memory_channel: Option<Arc<dyn MemoryChannel>>,
     pub one_shot_chat: Option<Arc<dyn OneShotChatService>>,

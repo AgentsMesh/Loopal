@@ -27,10 +27,9 @@ use navigation::{
     DEFAULT_WRAP_WIDTH, handle_down, handle_esc, handle_up, move_cursor_left, move_cursor_right,
 };
 
-/// Process a key event and update the app's input state.
 pub fn handle_key(app: &mut App, key: KeyEvent) -> InputAction {
-    // reason: kitty/iTerm2 keyboard enhancement reports Press + Release for every
-    // keystroke; without this guard cycle handlers (picker Left/Right) double-fire.
+    // kitty/iTerm2 keyboard enhancement reports Press + Release per keystroke;
+    // without this guard cycle handlers (picker Left/Right) double-fire.
     if !matches!(key.kind, KeyEventKind::Press | KeyEventKind::Repeat) {
         return InputAction::None;
     }
@@ -51,7 +50,6 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> InputAction {
     action
 }
 
-/// Handle global shortcuts: Ctrl combos, Shift+Tab.
 fn handle_global_keys(app: &mut App, key: &KeyEvent) -> Option<InputAction> {
     if key.modifiers.contains(KeyModifiers::CONTROL) {
         match key.code {
@@ -123,7 +121,6 @@ fn handle_panel_key(app: &mut App, key: &KeyEvent) -> InputAction {
             InputAction::None
         }
         KeyCode::Backspace => {
-            // Auto-switch to Input mode and delete
             app.focus_mode = FocusMode::Input;
             handle_backspace(app)
         }
@@ -151,7 +148,6 @@ fn handle_input_mode_key(app: &mut App, key: &KeyEvent) -> InputAction {
             InputAction::None
         }
         KeyCode::Enter => handle_enter(app),
-        // Only insert plain or Shift-modified characters; ignore Ctrl/Alt combos
         KeyCode::Char(c)
             if !key
                 .modifiers

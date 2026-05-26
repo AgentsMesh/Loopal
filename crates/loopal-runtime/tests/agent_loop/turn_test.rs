@@ -67,7 +67,7 @@ async fn test_turn_tool_then_text_non_interactive() {
 
     let output = runner.run().await.unwrap();
     // Tool executed, non-interactive agent exits after first turn
-    assert!(runner.params.store.len() >= 3);
+    assert!(runner.turns.view().len() >= 3);
     // Result may be empty since LLM text was empty (only tool use in the stream)
     assert_eq!(output.terminate_reason, TerminateReason::Goal);
 
@@ -155,8 +155,8 @@ async fn ask_user_plus_read_no_duplicate_via_run() {
 
     // Find the User message that contains tool results.
     let tool_result_msg = runner
-        .params
-        .store
+        .turns
+        .view()
         .messages()
         .iter()
         .find(|m| {

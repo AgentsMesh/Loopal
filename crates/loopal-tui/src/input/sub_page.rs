@@ -11,9 +11,7 @@ use super::sub_page_rewind::handle_rewind_picker_key;
 use super::task_detail_keys::handle_task_detail_key;
 use super::{InputAction, SubPageResult};
 
-/// Handle keys when a sub-page (picker) is active. All keys are consumed.
 pub(super) fn handle_sub_page_key(app: &mut App, key: &KeyEvent) -> InputAction {
-    // Ctrl+C closes sub-page; Ctrl+D quits
     if key.modifiers.contains(KeyModifiers::CONTROL) {
         match key.code {
             KeyCode::Char('c') => {
@@ -42,17 +40,12 @@ pub(super) fn handle_sub_page_key(app: &mut App, key: &KeyEvent) -> InputAction 
 
 // ── Generic picker navigation (Esc/Up/Down/Char/Backspace) ────────
 
-/// Result of generic picker key handling.
 enum PickerKeyResult {
-    /// Picker should be dismissed (Esc pressed).
     Dismiss,
-    /// Key was handled (navigation / filter edit).
     Handled,
-    /// Key not handled — caller should process (Enter, Left/Right, etc.).
     Unhandled,
 }
 
-/// Handle common PickerState keys. Does NOT touch `app.sub_page`.
 fn handle_generic_picker_key(picker: &mut PickerState, key: &KeyEvent) -> PickerKeyResult {
     match key.code {
         KeyCode::Esc => PickerKeyResult::Dismiss,
@@ -96,13 +89,10 @@ fn handle_generic_picker_key(picker: &mut PickerState, key: &KeyEvent) -> Picker
     }
 }
 
-/// Dismiss the picker overlay and reset ESC state.
 fn dismiss_picker(app: &mut App) {
     app.sub_page = None;
     app.last_esc_time = None;
 }
-
-// ── Model picker ──────────────────────────────────────────────────
 
 fn handle_model_picker_key(app: &mut App, key: &KeyEvent) -> InputAction {
     let picker = match app.sub_page.as_mut().unwrap() {

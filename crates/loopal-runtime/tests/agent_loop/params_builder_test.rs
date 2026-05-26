@@ -54,7 +54,7 @@ fn session_resume_error_carries_hook_name_and_reason() {
 async fn builder_default_optionals_yield_none_or_empty() {
     let fixture = TestFixture::new();
     let session = fixture.test_session("primary");
-    let store = loopal_context::ContextStore::new(loopal_context::ContextBudget {
+    let budget = loopal_context::ContextBudget {
         context_window: 1000,
         system_tokens: 0,
         tool_tokens: 0,
@@ -62,12 +62,12 @@ async fn builder_default_optionals_yield_none_or_empty() {
         safety_margin: 16,
         message_budget: 952,
         max_output_tokens: 64,
-    });
+    };
     let params = AgentLoopParamsBuilder::new(
         AgentConfig::default(),
         deps_for(&fixture),
         session,
-        store,
+        budget,
         InterruptHandle::new(),
     )
     .build();
@@ -83,7 +83,7 @@ async fn builder_default_optionals_yield_none_or_empty() {
 async fn builder_chained_setters_override_defaults() {
     let fixture = TestFixture::new();
     let session = fixture.test_session("primary");
-    let store = loopal_context::ContextStore::new(loopal_context::ContextBudget {
+    let budget = loopal_context::ContextBudget {
         context_window: 1000,
         system_tokens: 0,
         tool_tokens: 0,
@@ -91,13 +91,13 @@ async fn builder_chained_setters_override_defaults() {
         safety_margin: 16,
         message_budget: 952,
         max_output_tokens: 64,
-    });
+    };
     let hook: Arc<dyn SessionResumeHook> = Arc::new(NoopHook);
     let params = AgentLoopParamsBuilder::new(
         AgentConfig::default(),
         deps_for(&fixture),
         session,
-        store,
+        budget,
         InterruptHandle::new(),
     )
     .resume_hooks(vec![hook.clone()])
@@ -109,7 +109,7 @@ async fn builder_chained_setters_override_defaults() {
 async fn agent_loop_params_getter_session_returns_constructed_session() {
     let fixture = TestFixture::new();
     let session = fixture.test_session("named-session");
-    let store = loopal_context::ContextStore::new(loopal_context::ContextBudget {
+    let budget = loopal_context::ContextBudget {
         context_window: 1000,
         system_tokens: 0,
         tool_tokens: 0,
@@ -117,12 +117,12 @@ async fn agent_loop_params_getter_session_returns_constructed_session() {
         safety_margin: 16,
         message_budget: 952,
         max_output_tokens: 64,
-    });
+    };
     let params = AgentLoopParamsBuilder::new(
         AgentConfig::default(),
         deps_for(&fixture),
         session,
-        store,
+        budget,
         InterruptHandle::new(),
     )
     .build();
@@ -133,7 +133,7 @@ async fn agent_loop_params_getter_session_returns_constructed_session() {
 async fn agent_loop_params_getter_config_returns_constructed_config() {
     let fixture = TestFixture::new();
     let session = fixture.test_session("s");
-    let store = loopal_context::ContextStore::new(loopal_context::ContextBudget {
+    let budget = loopal_context::ContextBudget {
         context_window: 1000,
         system_tokens: 0,
         tool_tokens: 0,
@@ -141,7 +141,7 @@ async fn agent_loop_params_getter_config_returns_constructed_config() {
         safety_margin: 16,
         message_budget: 952,
         max_output_tokens: 64,
-    });
+    };
     let params = AgentLoopParamsBuilder::new(
         AgentConfig {
             permission_mode: loopal_tool_api::PermissionMode::Bypass,
@@ -149,7 +149,7 @@ async fn agent_loop_params_getter_config_returns_constructed_config() {
         },
         deps_for(&fixture),
         session,
-        store,
+        budget,
         InterruptHandle::new(),
     )
     .build();

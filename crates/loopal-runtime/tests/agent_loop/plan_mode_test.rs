@@ -47,7 +47,7 @@ async fn enter_plan_when_already_in_plan_returns_error() {
     .await
     .unwrap();
 
-    let msg = &runner.params.store.messages()[0];
+    let msg = &runner.turns.view().messages()[0];
     match &msg.content[0] {
         ContentBlock::ToolResult {
             content, is_error, ..
@@ -78,7 +78,7 @@ async fn enter_plan_blocked_for_task_lifecycle() {
     .await
     .unwrap();
 
-    let msg = &runner.params.store.messages()[0];
+    let msg = &runner.turns.view().messages()[0];
     match &msg.content[0] {
         ContentBlock::ToolResult {
             content, is_error, ..
@@ -109,7 +109,7 @@ async fn exit_plan_when_not_in_plan_returns_error() {
     .await
     .unwrap();
 
-    let msg = &runner.params.store.messages()[0];
+    let msg = &runner.turns.view().messages()[0];
     match &msg.content[0] {
         ContentBlock::ToolResult {
             content, is_error, ..
@@ -140,7 +140,7 @@ async fn exit_plan_without_plan_file_returns_error() {
     .await
     .unwrap();
 
-    let msg = &runner.params.store.messages()[0];
+    let msg = &runner.turns.view().messages()[0];
     match &msg.content[0] {
         ContentBlock::ToolResult {
             content, is_error, ..
@@ -186,7 +186,7 @@ async fn exit_plan_with_plan_file_approves_and_restores_mode() {
     assert_eq!(runner.params.config.mode, AgentMode::Act);
     assert!(runner.params.config.plan_state.is_none());
 
-    let msg = &runner.params.store.messages()[0];
+    let msg = &runner.turns.view().messages()[0];
     match &msg.content[0] {
         ContentBlock::ToolResult {
             content, is_error, ..

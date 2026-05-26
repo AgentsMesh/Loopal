@@ -31,6 +31,7 @@ fn step_updated_event_carries_state_transition() {
             is_error: false,
             images: vec![],
         }),
+        updated_at: None,
     };
     let json = serde_json::to_string(&event).unwrap();
     let back: TurnEvent = serde_json::from_str(&json).unwrap();
@@ -78,6 +79,7 @@ fn step_appended_carries_tool_batch() {
         turn_id: TurnId::from_string("t-1"),
         step_index: 0,
         step: TurnStep::ToolBatch(batch),
+        appended_at: None,
     };
     let json = serde_json::to_string(&event).unwrap();
     let _back: TurnEvent = serde_json::from_str(&json).unwrap();

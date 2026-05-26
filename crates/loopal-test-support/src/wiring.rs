@@ -1,11 +1,3 @@
-//! Core channel wiring logic — mirrors `bootstrap.rs:75-186`.
-//!
-//! When `permission_mode == Bypass`, uses `DenyAllHandler` (no channel needed).
-//! Otherwise, uses `ManualPermissionHandler` (test-only PermissionHandler that
-//! emits `ToolPermissionRequest` events and waits on a channel) so that
-//! `SessionController::respond_permission(tool_call_id, allow)` flows through
-//! to the agent loop in Local mode.
-
 use std::sync::Arc;
 
 use tokio::sync::mpsc;
@@ -13,7 +5,6 @@ use tokio::sync::mpsc;
 use loopal_agent::shared::AgentShared;
 use loopal_agent::task_store::TaskStore;
 use loopal_config::Settings;
-use loopal_context::ContextStore;
 use loopal_kernel::Kernel;
 use loopal_protocol::{AgentEvent, ControlCommand, Envelope, UserQuestionResponse};
 use loopal_provider_api::Provider;
@@ -28,9 +19,6 @@ use crate::fixture::TestFixture;
 use crate::harness::{HarnessBuilder, SpawnedHarness};
 use crate::mock_provider::MultiCallProvider;
 
-/// Wire all channels and construct the agent loop.
-///
-/// Async because `MessageRouter::register()` requires it.
 pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopRunner) {
     let fixture = TestFixture::new();
     let seed_messages = builder.messages.clone();
@@ -43,9 +31,8 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
     let interrupt = loopal_runtime::InterruptHandle::new();
     let interrupt_signal_for_test = interrupt.signal.clone();
 
-    // Bypass policy never returns Ask, so the handler is unreachable —
-    // use DenyAllHandler as a no-op that flags misconfig if it is ever called.
-    // Other modes need a real channel so tests can drive permission responses.
+    // Bypass policy never returns Ask → DenyAllHandler is a no-op that flags
+    // misconfig if it's ever called. Other modes need a real channel.
     let perm_handler: Box<dyn PermissionHandler> =
         if builder.permission_mode == PermissionMode::Bypass {
             Box::new(DenyAllHandler)
@@ -69,8 +56,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         )),
     ));
 
-    // Kernel: register builtin tools + agent tools + mock provider.
-    // Goal tools are root-only — only register when the test wired a goal_session.
+    // Goal tools are root-only — only register when test wired a goal_session.
     let settings = Settings {
         hooks: builder.hooks,
         ..Settings::default()
@@ -101,7 +87,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         .unwrap_or_else(|| fixture.path().to_path_buf());
     let session_cwd = cwd.clone();
 
-    // Mock hub connection (in-memory duplex — hub side is dropped).
+    // Mock hub connection (in-memory duplex; hub side dropped).
     let (hub_conn, _hub_peer) = loopal_ipc::duplex_pair();
     let (hub_connection, _hub_rx) = loopal_ipc::Connection::new(hub_conn).into_listening();
 
@@ -177,7 +163,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         } else {
             fixture.test_session("integration-test")
         },
-        ContextStore::from_messages(seed_messages.clone(), budget),
+        budget,
         interrupt,
     )
     .shared(shared_any)
@@ -199,16 +185,13 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
     let mut runner = AgentLoopRunner::new(params);
     let harness_cfg = loopal_config::HarnessConfig::default();
     runner.governance = loopal_runtime::agent_loop::governance::build_governance(&harness_cfg);
-    let seed_trigger = match seed_messages.as_slice() {
-        [msg] if matches!(msg.role, loopal_provider_api::MessageRole::User) => {
-            loopal_turn::TurnTrigger::UserInput {
-                envelope_id: "harness-seed".into(),
-                content: msg.text_content(),
-                images: Vec::new(),
-            }
-        }
-        _ => loopal_turn::TurnTrigger::Resume,
-    };
-    runner.start_turn_record(seed_trigger);
+    if !seed_messages.is_empty() {
+        let turns = crate::seed_history::reverse_project_messages_to_turns(seed_messages);
+        runner.seed_test_turns(turns);
+    }
+    // Don't auto-open a Resume turn for empty seed — run_loop handles empty
+    // store naturally (needs_input=true → idle phase). Pre-opening conflicted
+    // with F7 (try_start_turn refuses to overwrite an in-progress turn): user
+    // message ingestion saw Resume still open and failed to start UserInput.
     (harness, runner)
 }

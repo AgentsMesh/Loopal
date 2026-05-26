@@ -106,7 +106,7 @@ fn build_harness(hooks: Vec<Arc<dyn SessionResumeHook>>) -> Harness {
             decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
         },
         primary,
-        loopal_context::ContextStore::new(super::make_test_budget()),
+        super::make_test_budget(),
         InterruptHandle::new(),
     )
     .resume_hooks(hooks)

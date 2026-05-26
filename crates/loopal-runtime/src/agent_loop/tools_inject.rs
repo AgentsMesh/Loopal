@@ -7,21 +7,6 @@ use tracing::info;
 
 use super::runner::AgentLoopRunner;
 
-pub(super) fn tool_result_block(
-    id: &str,
-    content: &str,
-    is_error: bool,
-    metadata: Option<ToolResultMetadata>,
-) -> ContentBlock {
-    ContentBlock::ToolResult {
-        tool_use_id: id.to_string(),
-        content: content.to_string(),
-        images: Vec::new(),
-        is_error,
-        metadata,
-    }
-}
-
 impl AgentLoopRunner {
     // reason: 单点写回 tool_result event + ContentBlock，保证 view-state 与 LLM 同源
     // (历史上分两步调用导致 4 个 intercept handler 里 3 个漏 emit)。

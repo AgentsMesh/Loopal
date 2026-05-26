@@ -41,3 +41,29 @@ pub const LAYER1_TRUNCATE_MAX_BYTES: usize = 8_000;
 /// Below this, the older results pay for themselves in context; above
 /// it they outweigh their information value and get truncated.
 pub const LAYER1_TRIGGER_PERCENT: u32 = 60;
+
+/// Ratios applied during ingestion-time per-block capping. Server-tool
+/// outputs and tool_results are bounded to a fraction of message_budget
+/// so a single oversized block can't dominate the wire.
+///
+/// Fields are `pub(crate)` to prevent external code from constructing
+/// invalid (0-divisor) values that would panic at `message_budget / 0`.
+/// The `DEFAULT` const is the only sanctioned configuration today.
+#[derive(Debug, Clone, Copy)]
+pub struct IngestionCaps {
+    pub(crate) server_block_divisor: u32,
+    pub(crate) tool_result_divisor: u32,
+}
+
+impl IngestionCaps {
+    pub const DEFAULT: Self = Self {
+        server_block_divisor: 4,
+        tool_result_divisor: 8,
+    };
+}
+
+impl Default for IngestionCaps {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}

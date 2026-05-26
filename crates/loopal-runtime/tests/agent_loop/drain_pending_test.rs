@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use futures::stream::Stream as FutStream;
 use loopal_config::Settings;
-use loopal_context::{ContextBudget, ContextStore};
+use loopal_context::ContextBudget;
 use loopal_error::LoopalError;
 use loopal_kernel::Kernel;
 use loopal_protocol::AgentEvent;
@@ -131,11 +131,17 @@ async fn test_subagent_drains_pending_before_exit() {
             decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
         },
         fixture.test_session("drain-test"),
-        ContextStore::from_messages(
-            vec![loopal_provider_api::Message::user("run task")],
-            make_test_budget(),
-        ),
+        make_test_budget(),
         InterruptHandle::new(),
+    )
+    // reason: pre-seed a UserInput turn so the agent loop skips the idle
+    // phase (which would tokio::select! over a closed control channel +
+    // queued mailbox — race-prone). The pending mailbox message is what
+    // the test actually wants to verify gets drained after the turn.
+    .initial_turns(
+        loopal_test_support::seed_history::reverse_project_messages_to_turns(vec![
+            loopal_provider_api::Message::user("run task"),
+        ]),
     )
     .build();
 

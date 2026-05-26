@@ -67,6 +67,7 @@ fn append_and_load_events_roundtrip() {
             turn_id: turn_id.clone(),
             step_index: 0,
             step: empty_llm_step(),
+            appended_at: None,
         },
     )
     .unwrap();
@@ -105,6 +106,7 @@ fn load_turns_folds_events_into_completed_turn() {
             turn_id: turn_id.clone(),
             step_index: 0,
             step: empty_llm_step(),
+            appended_at: None,
         },
     )
     .unwrap();
@@ -146,6 +148,7 @@ fn step_update_patches_tool_state() {
             turn_id: turn_id.clone(),
             step_index: 0,
             step: tool_batch_step("x", "Read"),
+            appended_at: None,
         },
     )
     .unwrap();
@@ -160,6 +163,7 @@ fn step_update_patches_tool_state() {
                 is_error: false,
                 images: vec![],
             }),
+            updated_at: None,
         },
     )
     .unwrap();
@@ -191,6 +195,7 @@ fn missing_turn_ended_becomes_crash_recovery_cancelled() {
             turn_id: TurnId::from_string("t-x"),
             step_index: 0,
             step: tool_batch_step("y", "Bash"),
+            appended_at: None,
         },
     ];
     let turns = fold_events(events);

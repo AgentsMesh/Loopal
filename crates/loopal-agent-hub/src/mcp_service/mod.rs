@@ -59,3 +59,5 @@ impl Default for HubMcpService {
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_spawn_tree;

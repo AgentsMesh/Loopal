@@ -23,8 +23,6 @@ use loopal_test_support::mock_provider::MockStreamChunks;
 use loopal_tool_api::PermissionMode;
 use tokio::sync::mpsc;
 
-use super::make_test_budget;
-
 pub enum Outcome {
     Err(LoopalError),
     Stream(Vec<Result<StreamChunk, LoopalError>>),
@@ -62,12 +60,17 @@ impl Provider for SequencedProvider {
             .lock()
             .unwrap()
             .push(p.continuation_intent.clone());
+        // reason: panic on underflow rather than silently returning an
+        // empty stream. The empty default would hide regressions where
+        // an unintended extra LLM call gets made (drains outcomes, then
+        // unrelated calls see vec![] and treat it as immediate-Done) —
+        // fail loudly so the test author sees the over-call.
         let outcome = self
             .outcomes
             .lock()
             .unwrap()
             .pop_front()
-            .unwrap_or(Outcome::Stream(vec![]));
+            .expect("SequencedProvider outcomes underflow — test must provide enough outcomes");
         match outcome {
             Outcome::Err(e) => Err(e),
             Outcome::Stream(chunks) => Ok(Box::pin(MockStreamChunks::new(VecDeque::from(chunks)))),
@@ -139,10 +142,7 @@ pub fn make_runner_with_intents(
             decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
         },
         fixture.test_session("rt-test"),
-        loopal_context::ContextStore::from_messages(
-            vec![loopal_provider_api::Message::user("go")],
-            make_test_budget(),
-        ),
+        super::make_test_budget(),
         InterruptHandle::new(),
     )
     .build();
@@ -182,4 +182,65 @@ pub fn prefill_rejection_err() -> LoopalError {
         status: 400,
         message: "This model does not support assistant message prefill.".into(),
     })
+}
+
+/// Appends a synthetic LlmCall step to the default in-progress turn,
+/// closes it as Complete (matching the natural shape: a completed
+/// user→assistant exchange), then opens a fresh in-progress turn for
+/// the test to operate against. After this helper runs the store
+/// holds 2 turns (1 completed-with-assistant-reply + 1 in-progress),
+/// so `compactable_turns >= 1` and `force_compact` actually compacts.
+///
+/// Without this seed, the only turn in the store would be an empty
+/// `make_runner` placeholder with no assistant step — production
+/// never produces a [UserInput, UserInput] sequence with no
+/// intervening Assistant, so a fixture lacking the LlmCall step
+/// would test an unrealistic wire shape.
+pub fn seed_prior_completed_turn(runner: &mut AgentLoopRunner) {
+    runner
+        .append_step_record(loopal_turn::TurnStep::LlmCall {
+            model: "test-model".into(),
+            response: loopal_turn::AssistantOutput {
+                thinking: None,
+                text_blocks: vec![loopal_turn::TextBlock {
+                    text: "seed-reply".into(),
+                }],
+                tool_calls: Vec::new(),
+                server_blocks: Vec::new(),
+                stop_reason: loopal_turn::StopReason::EndTurn,
+            },
+        })
+        .expect("seed_prior_completed_turn: append_step_record must succeed");
+    runner.end_turn_record(loopal_turn::TurnOutcome::Complete);
+    // Second Complete turn so compactable_turns >= 2 satisfies the
+    // force_compact guard (reopen takes 1 turn as host, need >=1 prior).
+    runner
+        .start_turn_record(loopal_turn::TurnTrigger::UserInput {
+            envelope_id: "rt-prior2".into(),
+            content: "prior user msg 2".into(),
+            images: Vec::new(),
+        })
+        .expect("seed_prior_completed_turn: start_turn_record (prior2) must succeed");
+    runner
+        .append_step_record(loopal_turn::TurnStep::LlmCall {
+            model: "test-model".into(),
+            response: loopal_turn::AssistantOutput {
+                thinking: None,
+                text_blocks: vec![loopal_turn::TextBlock {
+                    text: "seed-reply-2".into(),
+                }],
+                tool_calls: Vec::new(),
+                server_blocks: Vec::new(),
+                stop_reason: loopal_turn::StopReason::EndTurn,
+            },
+        })
+        .expect("seed_prior_completed_turn: append (prior2) must succeed");
+    runner.end_turn_record(loopal_turn::TurnOutcome::Complete);
+    runner
+        .start_turn_record(loopal_turn::TurnTrigger::UserInput {
+            envelope_id: "rt-active".into(),
+            content: "next user msg".into(),
+            images: Vec::new(),
+        })
+        .expect("seed_prior_completed_turn: start_turn_record must succeed");
 }

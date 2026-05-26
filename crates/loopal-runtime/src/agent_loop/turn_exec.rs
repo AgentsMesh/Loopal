@@ -77,21 +77,15 @@ impl AgentLoopRunner {
             return Ok(TurnState::Cancelled);
         }
         debug_assert!(
-            self.params.store.last_role() == Some(MessageRole::User)
+            self.turns.view().last_role() == Some(MessageRole::User)
                 || turn_ctx.pending_continuation.is_some(),
             "ReadyToCall invariant violated: last_role={:?}, pending_continuation={}",
-            self.params.store.last_role(),
+            self.turns.view().last_role(),
             turn_ctx.pending_continuation.is_some()
         );
         self.check_and_microcompact().await?;
         self.check_and_compact(turn_ctx.cancel.token()).await?;
-        // reason: middleware still operates on Vec<Message> projection of the
-        // ContextStore; it runs against `working` but the resulting messages
-        // are not sent directly — the provider builds its wire request from
-        // self.turns.store. Middleware mutations to `working` are temporarily
-        // not propagated (see Issue/middleware migration TODO).
-        let mut working = self.params.store.prepare_for_llm();
-        self.run_context_pipeline(&mut working).await;
+        self.check_and_inject_config_refresh().await?;
         turn_ctx.metrics.llm_calls += 1;
         let intent = turn_ctx.pending_continuation.take();
         let result = self.stream_llm_with(intent, &turn_ctx.cancel).await?;

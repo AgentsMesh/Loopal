@@ -41,10 +41,6 @@ impl AgentLoopRunner {
 }
 
 impl DataPlaneBridge for AgentLoopRunner {
-    fn write_tool_result_stub(&mut self, msg: Message) {
-        self.record_injection_from_message(&msg);
-    }
-
     fn push_system_note(&mut self, msg: Message) {
         self.record_injection_from_message(&msg);
     }

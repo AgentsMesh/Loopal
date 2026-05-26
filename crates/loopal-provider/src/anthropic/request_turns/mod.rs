@@ -166,6 +166,12 @@ fn push_compaction_rehydrate(out: &mut Vec<Value>, r: &CompactionRehydrate) {
             }]
         }));
     }
+    if let Some(note) = r.partial_note.as_ref() {
+        out.push(json!({
+            "role": "user",
+            "content": [{"type": "text", "text": note}],
+        }));
+    }
 }
 
 #[cfg(test)]

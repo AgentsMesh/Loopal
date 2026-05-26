@@ -153,10 +153,15 @@ impl AgentLoopRunner {
         };
 
         let rehydrated_files = collect_rehydrated_files(&assistant.content, &user.content);
+        let partial_note = user.content.iter().find_map(|b| match b {
+            ContentBlock::Text { text } => Some(text.clone()),
+            _ => None,
+        });
         if !rehydrated_files.is_empty()
             && let Err(e) =
                 self.append_step_record(TurnStep::CompactionRehydrate(CompactionRehydrate {
                     files: rehydrated_files,
+                    partial_note,
                 }))
         {
             warn!(error = %e, "append_step(CompactionRehydrate) failed");

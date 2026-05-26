@@ -39,7 +39,7 @@ pub(super) fn project_compaction_rehydrate(r: &CompactionRehydrate) -> Vec<Messa
             input: serde_json::json!({ "file_path": f.path }),
         })
         .collect();
-    let user_blocks: Vec<ContentBlock> = r
+    let mut user_blocks: Vec<ContentBlock> = r
         .files
         .iter()
         .map(|f| ContentBlock::ToolResult {
@@ -50,6 +50,9 @@ pub(super) fn project_compaction_rehydrate(r: &CompactionRehydrate) -> Vec<Messa
             metadata: None,
         })
         .collect();
+    if let Some(note) = r.partial_note.as_ref() {
+        user_blocks.push(ContentBlock::Text { text: note.clone() });
+    }
     vec![
         Message {
             id: None,

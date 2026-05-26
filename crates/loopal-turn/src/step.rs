@@ -90,6 +90,10 @@ pub struct CompactionSummary {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompactionRehydrate {
     pub files: Vec<RehydratedFile>,
+    // Set when rehydrate finished with files_succeeded < files_attempted — the
+    // model needs to know which files dropped out so it re-Reads them on demand.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub partial_note: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

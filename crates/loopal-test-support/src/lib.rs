@@ -17,6 +17,7 @@ pub mod mcp_mock;
 pub mod mock_provider;
 pub mod scenarios;
 pub mod seed_history;
+pub mod tool_history;
 mod wiring;
 
 /// In-memory duplex transport pair — re-export of `loopal_ipc::duplex_pair`.

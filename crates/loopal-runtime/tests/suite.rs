@@ -41,6 +41,8 @@ mod goal_session_reopen_test;
 mod goal_session_support;
 #[path = "suite/goal_session_test.rs"]
 mod goal_session_test;
+#[path = "suite/governance_bridge_test.rs"]
+mod governance_bridge_test;
 #[path = "suite/hydrate_test.rs"]
 mod hydrate_test;
 #[path = "suite/loop_detector_edge_test.rs"]

@@ -179,14 +179,17 @@ fn permission_renders_tool_name_and_keys() {
         id: "1".into(),
         name: "Bash".into(),
         input: serde_json::json!({"cmd": "ls"}),
+        cursor: Default::default(),
     };
     let s = render_to_buffer(60, 6, |f, area| {
         permission_inline::render_prepared(f, &permission_inline::prepare(&p), area, None)
     });
     assert!(s.contains("⚠ Tool: Bash"));
-    assert!(s.contains("[y] Allow"));
-    assert!(s.contains("[n] Deny"));
-    assert!(s.contains("Esc Cancel"));
+    assert!(s.contains("Allow"), "Allow label missing:\n{s}");
+    assert!(s.contains("Deny"), "Deny label missing:\n{s}");
+    assert!(s.contains("[y]"));
+    assert!(s.contains("[n]"));
+    assert!(s.contains("Enter confirm"));
 }
 
 #[test]
@@ -199,6 +202,7 @@ fn permission_truncates_large_input_with_ellipsis() {
         id: "1".into(),
         name: "X".into(),
         input: serde_json::Value::Object(big),
+        cursor: Default::default(),
     };
     let s = render_to_buffer(80, 12, |f, area| {
         permission_inline::render_prepared(f, &permission_inline::prepare(&p), area, None)
@@ -212,6 +216,7 @@ fn permission_height_for_simple_input() {
         id: "1".into(),
         name: "X".into(),
         input: serde_json::json!({}),
+        cursor: Default::default(),
     };
     assert_eq!(permission_inline::height(&p, 80), 3);
 }

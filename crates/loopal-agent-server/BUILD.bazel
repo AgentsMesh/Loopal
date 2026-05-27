@@ -77,6 +77,7 @@ rust_test(
         "@crates//:serde_json",
         "@crates//:tempfile",
         "@crates//:tokio",
+        "@crates//:tokio-util",
         "@crates//:uuid",
     ],
     proc_macro_deps = ["@crates//:async-trait"],

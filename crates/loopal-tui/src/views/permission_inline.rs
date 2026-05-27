@@ -1,7 +1,7 @@
 use ratatui::prelude::*;
 use ratatui::widgets::Paragraph;
 
-use loopal_view_state::PendingPermission;
+use loopal_view_state::{PendingPermission, PermissionChoice};
 
 const MAX_JSON_LINES: usize = 6;
 const MAX_HEIGHT: u16 = 12;
@@ -10,6 +10,7 @@ pub struct Prepared {
     pub name: String,
     pub json_lines: Vec<String>,
     pub total_lines: usize,
+    pub cursor: PermissionChoice,
 }
 
 pub fn prepare(p: &PendingPermission) -> Prepared {
@@ -24,6 +25,7 @@ pub fn prepare(p: &PendingPermission) -> Prepared {
         name: p.name.clone(),
         json_lines,
         total_lines,
+        cursor: p.cursor,
     }
 }
 
@@ -51,10 +53,26 @@ pub fn render_prepared(f: &mut Frame, prepared: &Prepared, area: Rect, status: O
             Style::default().fg(Color::Yellow).bold(),
         ))
     } else {
+        let allow_focused = prepared.cursor == PermissionChoice::Allow;
+        let allow_style = if allow_focused {
+            Style::default().fg(Color::Black).bg(Color::Green).bold()
+        } else {
+            Style::default().fg(Color::Green).bold()
+        };
+        let deny_style = if !allow_focused {
+            Style::default().fg(Color::Black).bg(Color::Red).bold()
+        } else {
+            Style::default().fg(Color::Red).bold()
+        };
         Line::from(vec![
-            Span::styled("[y] Allow  ", Style::default().fg(Color::Green).bold()),
-            Span::styled("[n] Deny  ", Style::default().fg(Color::Red).bold()),
-            Span::styled("Esc Cancel", Style::default().fg(Color::DarkGray).italic()),
+            Span::styled(" Allow [y] ", allow_style),
+            Span::raw("  "),
+            Span::styled(" Deny [n] ", deny_style),
+            Span::raw("  "),
+            Span::styled(
+                "←/→ select  Enter confirm  Esc cancel",
+                Style::default().fg(Color::DarkGray).italic(),
+            ),
         ])
     };
 

@@ -6,8 +6,8 @@ pub mod state;
 pub mod view_proto;
 
 pub use conversation::{
-    AgentConversation, InboxOrigin, PendingPermission, PendingQuestion, SessionMessage,
-    format_thinking_content, format_token_display, parse_thinking_content,
+    AgentConversation, InboxOrigin, PendingPermission, PendingQuestion, PermissionChoice,
+    SessionMessage, format_thinking_content, format_token_display, parse_thinking_content,
 };
 pub use delta::ViewSnapshot;
 pub use loopal_tool_invocation::{

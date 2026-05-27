@@ -87,6 +87,7 @@ pub mod testing {
     pub use crate::cron_bridge::spawn as cron_bridge_spawn;
     pub use crate::cron_bridge::spawn_with_receiver as cron_bridge_spawn_with_receiver;
     pub use crate::ipc_handlers::SessionRef;
+    pub use crate::memory_consolidation::trigger_consolidation;
     pub use crate::params::AgentSetupResult;
     pub use crate::params::{StartParams, apply_start_overrides, build_kernel_with_provider};
     pub use crate::session_handlers_factory::build_session_handlers;

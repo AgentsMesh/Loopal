@@ -18,6 +18,7 @@ pub(super) fn tool_permission_request(
         id: id.to_string(),
         name: name.to_string(),
         input: input.clone(),
+        cursor: Default::default(),
     });
     MutationEffect::Mutated
 }

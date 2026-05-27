@@ -35,6 +35,11 @@ pub(super) fn handle_modal_keys(app: &mut App, key: &KeyEvent) -> Option<InputAc
         return Some(match key.code {
             KeyCode::Char('y') | KeyCode::Char('Y') => InputAction::ToolApprove,
             KeyCode::Char('n') | KeyCode::Char('N') => InputAction::ToolDeny,
+            KeyCode::Left | KeyCode::Right | KeyCode::Up | KeyCode::Down => {
+                InputAction::ToolPermissionToggle
+            }
+            KeyCode::Tab => InputAction::ToolPermissionToggle,
+            KeyCode::Enter => InputAction::ToolPermissionConfirm,
             KeyCode::Esc => InputAction::ToolDeny,
             _ if is_ctrl_c => InputAction::ToolDeny,
             _ => InputAction::None,

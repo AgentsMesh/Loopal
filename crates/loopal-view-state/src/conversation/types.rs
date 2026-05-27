@@ -27,9 +27,27 @@ pub struct InboxOrigin {
     pub summary: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PermissionChoice {
+    #[default]
+    Allow,
+    Deny,
+}
+
+impl PermissionChoice {
+    pub fn toggle(self) -> Self {
+        match self {
+            Self::Allow => Self::Deny,
+            Self::Deny => Self::Allow,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PendingPermission {
     pub id: String,
     pub name: String,
     pub input: serde_json::Value,
+    #[serde(default)]
+    pub cursor: PermissionChoice,
 }

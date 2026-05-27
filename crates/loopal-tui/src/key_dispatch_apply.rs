@@ -43,6 +43,14 @@ pub(crate) async fn apply_action(app: &mut App, action: InputAction) -> Dispatch
             crate::key_dispatch_ops::tool_deny(app).await;
             DispatchOutcome::Continue
         }
+        InputAction::ToolPermissionToggle => {
+            crate::key_dispatch_ops::tool_permission_toggle(app);
+            DispatchOutcome::Continue
+        }
+        InputAction::ToolPermissionConfirm => {
+            crate::key_dispatch_ops::tool_permission_confirm(app).await;
+            DispatchOutcome::Continue
+        }
         InputAction::Interrupt => {
             app.session.interrupt();
             DispatchOutcome::Continue

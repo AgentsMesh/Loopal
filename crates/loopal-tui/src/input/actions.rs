@@ -29,6 +29,10 @@ pub enum InputAction {
     ToolApprove,
     /// User denied tool use
     ToolDeny,
+    /// Toggle the permission cursor between Allow/Deny (arrow-key nav).
+    ToolPermissionToggle,
+    /// Commit whichever option the permission cursor points at.
+    ToolPermissionConfirm,
     /// Interrupt the agent's current work (ESC while busy)
     Interrupt,
     /// User wants to switch mode (from Shift+Tab shortcut)

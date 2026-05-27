@@ -27,6 +27,24 @@ pub(crate) async fn tool_deny(app: &mut App) {
     }
 }
 
+pub(crate) fn tool_permission_toggle(app: &mut App) {
+    app.with_active_conversation_mut(|conv| {
+        if let Some(p) = conv.pending_permission.as_mut() {
+            p.cursor = p.cursor.toggle();
+        }
+    });
+}
+
+pub(crate) async fn tool_permission_confirm(app: &mut App) {
+    let cursor =
+        app.with_active_conversation(|conv| conv.pending_permission.as_ref().map(|p| p.cursor));
+    match cursor {
+        Some(loopal_view_state::PermissionChoice::Allow) => tool_approve(app).await,
+        Some(loopal_view_state::PermissionChoice::Deny) => tool_deny(app).await,
+        None => {}
+    }
+}
+
 pub(crate) async fn push_to_inbox(app: &mut App, content: UserContent) {
     let history_text = match &content.skill_info {
         Some(si) if si.user_args.is_empty() => si.name.clone(),

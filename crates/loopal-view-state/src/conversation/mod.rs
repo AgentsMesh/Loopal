@@ -17,4 +17,4 @@ pub use pending_question::PendingQuestion;
 pub use question_state::QuestionState;
 pub use server_tool_display::format_server_tool_content;
 pub use thinking_display::{format_thinking_content, format_token_display, parse_thinking_content};
-pub use types::{InboxOrigin, PendingPermission, SessionMessage};
+pub use types::{InboxOrigin, PendingPermission, PermissionChoice, SessionMessage};

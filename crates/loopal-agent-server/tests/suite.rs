@@ -40,6 +40,8 @@ mod hub_interaction_edge_test;
 mod hub_interaction_test;
 #[path = "suite/interrupt_filter_test.rs"]
 mod interrupt_filter_test;
+#[path = "suite/memory_consolidation_test.rs"]
+mod memory_consolidation_test;
 #[path = "suite/observer_join_edge_test.rs"]
 mod observer_join_edge_test;
 #[path = "suite/observer_join_test.rs"]

@@ -36,6 +36,7 @@ fn set_pending_permission(app: &App, name: &str, input: &str) {
             id: "1".into(),
             name: name.into(),
             input: input.into(),
+            cursor: Default::default(),
         });
     });
 }

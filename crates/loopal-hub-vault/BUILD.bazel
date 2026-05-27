@@ -22,3 +22,19 @@ rust_test(
     crate = ":loopal-hub-vault",
     edition = "2024",
 )
+
+rust_test(
+    name = "loopal-hub-vault_test",
+    srcs = glob(["tests/**/*.rs"]),
+    crate_root = "tests/suite.rs",
+    edition = "2024",
+    deps = [
+        ":loopal-hub-vault",
+        "//crates/loopal-secret-client",
+        "//crates/loopal-vault-age",
+        "//crates/loopal-vault-api",
+        "@crates//:secrecy",
+        "@crates//:tempfile",
+        "@crates//:tokio",
+    ],
+)

@@ -10,7 +10,7 @@ use loopal_agent::shared::{AgentShared, SchedulerHandle};
 use loopal_agent::task_store::TaskStore;
 use loopal_agent_server::testing::trigger_consolidation;
 use loopal_config::Settings;
-use loopal_ipc::{Connection, Listening};
+use loopal_ipc::Connection;
 use loopal_kernel::Kernel;
 use loopal_scheduler::CronScheduler;
 use loopal_test_support::TestFixture;

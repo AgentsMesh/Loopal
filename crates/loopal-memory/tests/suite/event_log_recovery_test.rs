@@ -1,5 +1,6 @@
 use std::fs;
 use std::io::Write;
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
 use chrono::{Duration, Utc};
@@ -109,6 +110,7 @@ fn gc_streams_large_file_without_full_load() {
     assert_eq!(map.get("big").unwrap().recall_count, 1000);
 }
 
+#[cfg(unix)]
 #[test]
 fn gc_propagates_read_dir_permission_error() {
     let tmp = TempDir::new().unwrap();

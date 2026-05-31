@@ -12,7 +12,7 @@ use tracing::{info, warn};
 
 use loopal_agent::shared::AgentShared;
 use loopal_agent::spawn::{SpawnParams, SpawnTarget, spawn_agent, wait_agent};
-use loopal_memory::{MEMORY_AGENT_PROMPT, MemoryProcessor};
+use loopal_memory::{MEMORY_AGENT_PROMPT, MemoryProcessor, PROJECT_MEMORY_DIR};
 use loopal_tool_api::MemoryChannel;
 
 // ---------------------------------------------------------------------------
@@ -139,7 +139,7 @@ pub fn build_memory_channel(
     // Check if consolidation is due
     if settings.memory.consolidation_interval_days > 0
         && loopal_memory::consolidation::needs_consolidation(
-            &shared.cwd.join(".loopal/memory"),
+            &shared.cwd.join(PROJECT_MEMORY_DIR),
             settings.memory.consolidation_interval_days,
         )
     {

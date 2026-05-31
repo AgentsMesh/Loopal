@@ -6,6 +6,8 @@ rust_library(
     edition = "2024",
     visibility = ["//visibility:public"],
     deps = [
+        "@crates//:rusqlite",
+        "@crates//:serde_json",
         "@crates//:thiserror",
     ],
 )

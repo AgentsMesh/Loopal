@@ -155,6 +155,7 @@ pub async fn build_hub_harness_with(
             Some(fixture.path()),
             &hub,
             loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
+            "harness-session",
         ),
     )
     .await

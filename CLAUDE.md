@@ -279,10 +279,14 @@ Both syntaxes use the strict regex `[a-z][a-z0-9_]*` for NAME.
 ~/.loopal/settings.json          Global settings
 ~/.loopal/LOOPAL.md              Global instructions (injected into system prompt)
 ~/.loopal/classifier.md          Optional custom Classifier-mode system prompt
+~/.loopal/sessions/{id}/memory.db Per-session memory graph SQLite (derived from .loopal/memory/*.md)
 <project>/.loopal/settings.json  Project settings
 <project>/.loopal/classifier.md  Project-level Classifier prompt override
 <project>/.loopal/settings.local.json  Local overrides (gitignored)
+<project>/.loopal/memory/*.md    User-tracked source-of-truth memory notes (NOT runtime data)
 ```
+
+**Per-session derived data**: `memory.db` lives under `~/.loopal/sessions/{session_id}/`, NEVER under `.loopal/memory/`. The `.loopal/memory/` directory is user SSOT (`.md` source notes only). Derived index is rebuilt from source on each session start; no cross-session reuse.
 
 `classifier.md` is loaded in the same global → project → local order as settings, but with **replace semantics** (highest-priority non-empty layer wins; not concatenated). Absent on every layer ⇒ the built-in default prompt is used.
 

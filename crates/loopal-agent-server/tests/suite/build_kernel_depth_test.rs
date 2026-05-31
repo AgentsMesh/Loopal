@@ -55,6 +55,7 @@ async fn build_or_panic(
         None,
         std::path::PathBuf::from("."),
         "test".to_string(),
+        "test-session".to_string(),
     )
     .await
     .expect("build_kernel_from_config")

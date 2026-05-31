@@ -33,6 +33,7 @@ pub struct StartParams {
     pub fork_context: Option<serde_json::Value>,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn build_kernel_from_config(
     config: &ResolvedConfig,
     production: bool,
@@ -43,8 +44,10 @@ pub async fn build_kernel_from_config(
     >,
     cwd: std::path::PathBuf,
     agent_name: String,
+    session_id: String,
 ) -> anyhow::Result<Arc<Kernel>> {
     let mut settings = config.settings.clone();
+    let cwd_for_memory = cwd.clone();
     let secret_client: Option<Arc<dyn loopal_secret_client::SecretClient>> =
         hub_connection.map(|conn| {
             Arc::new(loopal_secret_client::HubSecretClient::new(
@@ -54,6 +57,7 @@ pub async fn build_kernel_from_config(
     if let Some(client) = secret_client.as_ref() {
         expand_provider_secrets(&mut settings, client.as_ref()).await;
     }
+    let settings_memory = settings.memory.clone();
     let mut kernel = Kernel::new(settings)?;
     if let Some(client) = secret_client {
         kernel.set_secret_client(client);
@@ -81,6 +85,17 @@ pub async fn build_kernel_from_config(
         }
     }
     loopal_agent::tools::register_all(&mut kernel);
+    // reason: 所有 depth 都注册 memory_recall — sub-agent 的 system prompt 也注入了
+    //  memory-guidance.md "always use memory_recall" 指令，若仅 root 注册会让 sub-agent
+    //  看到指令但找不到工具。memory.db 落在 ~/.loopal/sessions/{id}/memory.db，是
+    //  per-session 派生数据；不与 .loopal/memory/*.md（user SSOT）混居。
+    crate::memory_init::init_project_memory(
+        &mut kernel,
+        &cwd_for_memory,
+        &session_id,
+        &settings_memory,
+    )
+    .await;
     let kernel = Arc::new(kernel);
 
     if production {

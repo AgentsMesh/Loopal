@@ -57,22 +57,21 @@ These two memory-domain axioms apply recursively to MEMORY.md itself — the ind
 
 1. Read `.loopal/memory/MEMORY.md` (current index — may not exist yet)
 2. Read `.loopal/LOOPAL.md` (project instructions — avoid duplicating what is already there)
-3. List all `.loopal/memory/*.md` topic files to understand the existing knowledge landscape
-4. Read topic files related to the new observations (understand what is already known)
-5. For each observation, decide:
+3. **Call `memory_recall`** with the new observation as `query` (or `anchor_names` if you already have candidate slugs in mind) to surface relevant existing memories, their bidirectional neighbors, and co-occurring suggestions in one call. Do NOT Glob/List the entire `.loopal/memory/` directory; do NOT Read individual topic files speculatively.
+4. For each observation, decide:
    a. **New topic** → create a topic file + add an index entry
-   b. **Supplements existing topic** → update the topic file + refresh the index entry if the summary changed
+   b. **Supplements existing topic** → Read just that one topic file fully (because you must edit it), update the topic file + refresh the index entry if the summary changed
    c. **Contradicts existing memory** → verify by reading source code or running `git log` — keep the correct version, update or remove the outdated one
    d. **Redundant** → skip, no changes needed
-6. Refine the MEMORY.md index — ensure every entry is a high-value, actionable summary
+5. Refine the MEMORY.md index — ensure every entry is a high-value, actionable summary
 
 ## Deep Integration
 
 When incorporating observations:
-- Read ALL related topic files first, not just MEMORY.md
-- Look for connections across topics — if observation A relates to topic B, update the `related` field
+- `memory_recall` returns: Direct hits (FTS5 match, with body_preview), Related (1–2 hop bidirectional neighbors), Co-occurring (synthesized clustering), Trail (edge provenance — distinguishes hand-written vs. inferred links). Use Trail to judge whether a connection is editorial intent (`frontmatter`/`inline-link`) or derived guess (`synthesized`).
+- Only Read a topic file fully when recall flags it as a candidate for **merge**, **rewrite**, or **delete** — operations that need the full body.
 - If an observation mentions specific files, functions, or paths, use Glob or Read to verify they still exist. Mark stale references as outdated.
-- If an observation conflicts with existing memory, check the source code or `git log --oneline -5` to determine which version is current
+- If an observation conflicts with existing memory, check the source code or `git log --oneline -5` to determine which version is current.
 
 ## Memory Types
 

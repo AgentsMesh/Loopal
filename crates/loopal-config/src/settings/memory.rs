@@ -7,6 +7,8 @@ pub struct MemoryConfig {
     pub batch_window_ms: u64,
     pub channel_buffer: usize,
     pub consolidation_interval_days: u32,
+    pub gc_compress_after_days: u32,
+    pub gc_archive_after_days: u32,
 }
 
 impl Default for MemoryConfig {
@@ -20,6 +22,8 @@ impl Default for MemoryConfig {
             channel_buffer: 256,
             // Weekly full consolidation: balance between freshness and API cost.
             consolidation_interval_days: 7,
+            gc_compress_after_days: 90,
+            gc_archive_after_days: 365,
         }
     }
 }

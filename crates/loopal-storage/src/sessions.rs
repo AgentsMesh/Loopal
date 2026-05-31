@@ -69,9 +69,20 @@ impl SessionStore {
 
     /// Create a new session and persist it.
     pub fn create_session(&self, cwd: &Path, model: &str) -> Result<Session, StorageError> {
+        self.create_session_with_id(cwd, model, &Uuid::new_v4().to_string())
+    }
+
+    /// Create a session using a caller-supplied id (e.g. pre-generated so other
+    /// per-session resources can be wired before the session row exists).
+    pub fn create_session_with_id(
+        &self,
+        cwd: &Path,
+        model: &str,
+        id: &str,
+    ) -> Result<Session, StorageError> {
         let now = Utc::now();
         let session = Session {
-            id: Uuid::new_v4().to_string(),
+            id: id.to_string(),
             title: String::new(),
             model: model.to_string(),
             cwd: normalize_cwd(cwd),

@@ -43,6 +43,14 @@ impl SessionManager {
         Ok(session)
     }
 
+    /// Create a new session with a caller-supplied id. Lets per-session
+    /// resources (e.g. memory graph db) be wired before the session row exists.
+    pub fn create_session_with_id(&self, cwd: &Path, model: &str, id: &str) -> Result<Session> {
+        let session = self.session_store.create_session_with_id(cwd, model, id)?;
+        info!(session_id = %session.id, model = %model, cwd = %cwd.display(), "session created with preset id");
+        Ok(session)
+    }
+
     pub fn resume_session(&self, session_id: &str) -> Result<(Session, Vec<loopal_turn::Turn>)> {
         let session = self.session_store.load_session(session_id)?;
         let turns = self.turn_event_store.load_turns(session_id)?;

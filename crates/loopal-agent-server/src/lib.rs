@@ -28,6 +28,7 @@ mod ipc_handlers;
 mod mcp_settle;
 mod memory_adapter;
 mod memory_consolidation;
+mod memory_init;
 mod mock_loader;
 #[doc(hidden)]
 pub mod params;

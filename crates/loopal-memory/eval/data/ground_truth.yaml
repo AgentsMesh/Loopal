@@ -1,0 +1,545 @@
+queries:
+  - id: q01
+    description: How to avoid Twitter soft-ban via rate limits
+    mode: query
+    query: "twitter rate limit ban"
+    relevant:
+      - { id: twitter-rate-limit, relevance: 3 }
+      - { id: twitter-cooldown, relevance: 3 }
+      - { id: twitter-automation, relevance: 3 }
+      - { id: twitter-monitor-scraping, relevance: 2 }
+      - { id: twitter-dm-outreach, relevance: 1 }
+      - { id: twitter-reply-cold-start, relevance: 1 }
+
+  - id: q02
+    description: Scanner idempotency and replay guarantees
+    mode: query
+    query: "scanner idempotency replay"
+    relevant:
+      - { id: scanner-idempotency, relevance: 3 }
+      - { id: scanner-replay, relevance: 3 }
+      - { id: scanner-state, relevance: 2 }
+
+  - id: q03
+    description: Dashboard deploy and rollback flow
+    mode: query
+    query: "dashboard deploy"
+    relevant:
+      - { id: dashboard-deploy, relevance: 3 }
+      - { id: dashboard-metrics, relevance: 2 }
+      - { id: reference-grafana-dashboard, relevance: 2 }
+
+  - id: q04
+    description: Cold email deliverability and domain warmup
+    mode: query
+    query: "cold email deliverability warmup"
+    relevant:
+      - { id: cold-email-deliverability, relevance: 3 }
+      - { id: cold-email-templates, relevance: 2 }
+
+  - id: q05
+    description: User communication tone preferences
+    mode: query
+    query: "tone preference direct"
+    relevant:
+      - { id: user-tone-prefer-direct, relevance: 3 }
+
+  - id: q06
+    description: Starting from twitter-automation anchor, find policy ecosystem
+    mode: anchor
+    anchors: ["twitter-automation"]
+    relevant:
+      - { id: twitter-rate-limit, relevance: 3 }
+      - { id: twitter-cooldown, relevance: 3 }
+      - { id: chrome-cdp, relevance: 2 }
+      - { id: twitter-monitor-scraping, relevance: 2 }
+      - { id: twitter-long-tweets, relevance: 2 }
+      - { id: twitter-reply-cold-start, relevance: 1 }
+
+  - id: q07
+    description: Starting from scanner-state, find related operational docs
+    mode: anchor
+    anchors: ["scanner-state"]
+    relevant:
+      - { id: scanner-idempotency, relevance: 3 }
+      - { id: scanner-replay, relevance: 3 }
+      - { id: user-tone-prefer-direct, relevance: 1 }
+
+  - id: q08
+    description: Starting from dashboard-deploy, find ops surface
+    mode: anchor
+    anchors: ["dashboard-deploy"]
+    relevant:
+      - { id: dashboard-metrics, relevance: 3 }
+      - { id: reference-grafana-dashboard, relevance: 3 }
+
+  - id: q09
+    description: Mixed - chrome automation for twitter scraping
+    mode: mixed
+    query: "chrome cdp browser automation"
+    anchors: ["twitter-monitor-scraping"]
+    relevant:
+      - { id: chrome-cdp, relevance: 3 }
+      - { id: twitter-automation, relevance: 2 }
+      - { id: twitter-list-curation, relevance: 1 }
+
+  - id: q10
+    description: Mixed - GTM signal pipeline
+    mode: mixed
+    query: "high intent signals pipeline"
+    anchors: ["gtm-high-intent-radar"]
+    relevant:
+      - { id: scanner-state, relevance: 2 }
+      - { id: twitter-monitor-scraping, relevance: 2 }
+
+  - id: q11
+    description: "EASY: direct lookup for backup policy"
+    mode: query
+    query: what is our pgBackRest backup schedule and retention
+    relevant:
+      - { id: pgbackrest-backup-policy, relevance: 3 }
+      - { id: pitr-recovery-drill, relevance: 2 }
+      - { id: postgres-runbook, relevance: 1 }
+
+  - id: q12
+    description: "EASY: direct lookup for pool sizing formula"
+    mode: query
+    query: pgbouncer pool_size formula and why session pooling is banned
+    relevant:
+      - { id: pgbouncer-pool-sizing, relevance: 3 }
+      - { id: connection-storm-incident, relevance: 2 }
+
+  - id: q13
+    description: "EASY anchor: start at hub, want immediate neighbors"
+    mode: anchor
+    anchors: ["postgres-runbook"]
+    relevant:
+      - { id: pgbackrest-backup-policy, relevance: 2 }
+      - { id: streaming-replication-setup, relevance: 2 }
+      - { id: pgbouncer-pool-sizing, relevance: 2 }
+      - { id: slow-query-triage, relevance: 2 }
+
+  - id: q14
+    description: "MEDIUM: p99 latency spike, need triage path + likely culprits 1-2 hops away"
+    mode: mixed
+    query: "p99 query latency spiked, what to investigate first"
+    anchors: ["slow-query-triage"]
+    relevant:
+      - { id: slow-query-triage, relevance: 3 }
+      - { id: index-bloat-investigation, relevance: 3 }
+      - { id: vacuum-tuning-guide, relevance: 2 }
+      - { id: dashboard-metrics, relevance: 1 }
+
+  - id: q15
+    description: "MEDIUM: vague symptom, requires bridging from connection issues to migration cause"
+    mode: query
+    query: app workers getting connection errors after a deploy
+    relevant:
+      - { id: connection-storm-incident, relevance: 3 }
+      - { id: pgbouncer-pool-sizing, relevance: 2 }
+      - { id: schema-migration-flyway, relevance: 2 }
+
+  - id: q16
+    description: "MEDIUM: replica lag question with hub anchor"
+    mode: mixed
+    query: when should we page on replica lag
+    anchors: ["postgres-runbook"]
+    relevant:
+      - { id: replica-lag-alerting, relevance: 3 }
+      - { id: streaming-replication-setup, relevance: 2 }
+      - { id: dashboard-metrics, relevance: 1 }
+
+  - id: q17
+    description: "MEDIUM anchor-only: start from incident, find related rules + write-contention pattern"
+    mode: anchor
+    anchors: ["connection-storm-incident"]
+    relevant:
+      - { id: pgbouncer-pool-sizing, relevance: 3 }
+      - { id: schema-migration-flyway, relevance: 3 }
+      - { id: feedback-batch-rejected, relevance: 2 }
+
+  - id: q18
+    description: "MEDIUM: vacuum + partition interaction question"
+    mode: query
+    query: autovacuum settings for time-series partitioned tables
+    relevant:
+      - { id: vacuum-tuning-guide, relevance: 3 }
+      - { id: partition-rotation-cron, relevance: 3 }
+      - { id: index-bloat-investigation, relevance: 1 }
+
+  - id: q19
+    description: "HARD: vague safety question, ground truth requires connecting migration rules to incident"
+    mode: query
+    query: how to safely add an index without taking the site down
+    relevant:
+      - { id: schema-migration-flyway, relevance: 3 }
+      - { id: connection-storm-incident, relevance: 3 }
+      - { id: index-bloat-investigation, relevance: 1 }
+
+  - id: q20
+    description: "HARD: vague recovery question, anchor on backup, want PITR drill + replication catch-up"
+    mode: mixed
+    query: what happens if the primary dies right now
+    anchors: ["pgbackrest-backup-policy"]
+    relevant:
+      - { id: streaming-replication-setup, relevance: 3 }
+      - { id: pitr-recovery-drill, relevance: 2 }
+      - { id: postgres-runbook, relevance: 2 }
+
+  - id: q21
+    description: "HARD anchor: start at slow-query triage, want cross-cluster dashboard tie + 2-hop neighbors"
+    mode: anchor
+    anchors: ["slow-query-triage"]
+    relevant:
+      - { id: vacuum-tuning-guide, relevance: 3 }
+      - { id: index-bloat-investigation, relevance: 3 }
+      - { id: dashboard-metrics, relevance: 2 }
+      - { id: postgres-runbook, relevance: 1 }
+
+  - id: q22
+    description: "HARD: oblique question about old data, ground truth is partition rotation 2 hops from query words"
+    mode: query
+    query: "we keep too much historical event data, how is old data dropped"
+    relevant:
+      - { id: partition-rotation-cron, relevance: 3 }
+      - { id: vacuum-tuning-guide, relevance: 1 }
+      - { id: schema-migration-flyway, relevance: 1 }
+
+  - id: q23
+    description: "Easy: direct hub query naming the topic explicitly."
+    mode: query
+    query: How is our CI/CD pipeline organized end to end?
+    relevant:
+      - { id: cicd-pipeline-overview, relevance: 3 }
+      - { id: github-actions-workflow-layout, relevance: 2 }
+      - { id: deploy-canary-rollout, relevance: 1 }
+
+  - id: q24
+    description: "Easy: direct name match for self-hosted runners."
+    mode: query
+    query: What does our self-hosted GitHub Actions runner pool look like?
+    relevant:
+      - { id: self-hosted-runner-pool, relevance: 3 }
+      - { id: runner-autoscale-tuning, relevance: 2 }
+
+  - id: q25
+    description: "Easy: docker multi-stage is named in body and slug."
+    mode: query
+    query: Why is our Docker image so small now after the multi-stage refactor?
+    relevant:
+      - { id: docker-multistage-build, relevance: 3 }
+      - { id: artifact-cache-strategy, relevance: 1 }
+
+  - id: q26
+    description: "Medium: query mentions queue spike, anchor on runner pool. Quarantine retries are 2 hops away."
+    mode: mixed
+    query: Why did we get a queue storm in February and what did we change about retries?
+    anchors: ["self-hosted-runner-pool"]
+    relevant:
+      - { id: runner-autoscale-tuning, relevance: 3 }
+      - { id: flaky-test-quarantine, relevance: 2 }
+      - { id: self-hosted-runner-pool, relevance: 1 }
+
+  - id: q27
+    description: "Medium: query about credentials, anchor on canary deploy. OIDC is the bridge."
+    mode: mixed
+    query: How do deploy jobs get AWS credentials without a PAT?
+    anchors: ["deploy-canary-rollout"]
+    relevant:
+      - { id: secrets-oidc-vault, relevance: 3 }
+      - { id: self-hosted-runner-pool, relevance: 2 }
+      - { id: deploy-canary-rollout, relevance: 1 }
+
+  - id: q28
+    description: "Medium: vague query about test speed; sharding is the answer, cache and quarantine support."
+    mode: query
+    query: What did we do to make integration tests finish under 10 minutes?
+    relevant:
+      - { id: test-parallelization-shards, relevance: 3 }
+      - { id: bazel-remote-cache, relevance: 2 }
+      - { id: flaky-test-quarantine, relevance: 1 }
+
+  - id: q29
+    description: "Medium: query about recovery time after bad deploys; canary + blue-green both relevant."
+    mode: query
+    query: How do we recover quickly when a production deploy goes bad?
+    relevant:
+      - { id: blue-green-fallback, relevance: 3 }
+      - { id: deploy-canary-rollout, relevance: 2 }
+      - { id: dashboard-deploy, relevance: 1 }
+
+  - id: q30
+    description: "Anchor-only: starting from quarantine, expect to reach flaky causes and test sharding."
+    mode: anchor
+    anchors: ["flaky-test-quarantine"]
+    relevant:
+      - { id: flaky-test-quarantine, relevance: 3 }
+      - { id: test-parallelization-shards, relevance: 2 }
+      - { id: feedback-no-mocks-in-tests, relevance: 2 }
+      - { id: runner-autoscale-tuning, relevance: 1 }
+
+  - id: q31
+    description: Anchor on cache strategy; expect both bazel cache and docker build.
+    mode: anchor
+    anchors: ["artifact-cache-strategy"]
+    relevant:
+      - { id: artifact-cache-strategy, relevance: 3 }
+      - { id: bazel-remote-cache, relevance: 2 }
+      - { id: docker-multistage-build, relevance: 2 }
+
+  - id: q32
+    description: "Anchor on canary; expect blue-green fallback, secrets, and deploy dashboard."
+    mode: anchor
+    anchors: ["deploy-canary-rollout"]
+    relevant:
+      - { id: deploy-canary-rollout, relevance: 3 }
+      - { id: blue-green-fallback, relevance: 3 }
+      - { id: secrets-oidc-vault, relevance: 2 }
+      - { id: dashboard-deploy, relevance: 1 }
+
+  - id: q33
+    description: "Hard: vague query about cost/speed; anchor on overview. Bazel cache is 2 hops via artifact-cache."
+    mode: mixed
+    query: What's actually saving us the most build minutes on main?
+    anchors: ["cicd-pipeline-overview"]
+    relevant:
+      - { id: bazel-remote-cache, relevance: 3 }
+      - { id: artifact-cache-strategy, relevance: 2 }
+      - { id: test-parallelization-shards, relevance: 2 }
+      - { id: docker-multistage-build, relevance: 1 }
+
+  - id: q34
+    description: "Hard: vague query about an old leak; only mentions vault/OIDC indirectly via 'rotation'."
+    mode: query
+    query: What was the incident that pushed us off long-lived tokens last winter?
+    relevant:
+      - { id: secrets-oidc-vault, relevance: 3 }
+      - { id: self-hosted-runner-pool, relevance: 2 }
+      - { id: cicd-pipeline-overview, relevance: 1 }
+
+  - id: q35
+    description: Direct hub lookup - easy
+    mode: query
+    query: auth architecture overview
+    relevant:
+      - { id: auth-architecture, relevance: 3 }
+      - { id: oauth2-pkce-flow, relevance: 1 }
+      - { id: jwt-rs256-signing, relevance: 1 }
+
+  - id: q36
+    description: Easy - direct keyword match for PKCE
+    mode: query
+    query: PKCE code challenge S256 SPA login
+    relevant:
+      - { id: oauth2-pkce-flow, relevance: 3 }
+      - { id: jwt-rs256-signing, relevance: 1 }
+
+  - id: q37
+    description: Easy anchor - JWT signing neighbors
+    mode: anchor
+    anchors: ["jwt-rs256-signing"]
+    relevant:
+      - { id: jwt-rs256-signing, relevance: 3 }
+      - { id: jwt-clock-skew-incident, relevance: 3 }
+      - { id: oauth2-pkce-flow, relevance: 2 }
+      - { id: api-key-rotation, relevance: 2 }
+      - { id: auth-architecture, relevance: 1 }
+
+  - id: q38
+    description: "Medium - vague question about token TTL, should reach session-expiry + jwt"
+    mode: query
+    query: how long does a user stay logged in before reauth
+    relevant:
+      - { id: session-expiry-policy, relevance: 3 }
+      - { id: jwt-rs256-signing, relevance: 2 }
+      - { id: mfa-enrollment-flow, relevance: 1 }
+
+  - id: q39
+    description: Medium - MFA step-up triggers via anchor + vague query
+    mode: mixed
+    query: when do we force a second factor
+    anchors: ["mfa-enrollment-flow"]
+    relevant:
+      - { id: mfa-enrollment-flow, relevance: 3 }
+      - { id: suspicious-login-detection, relevance: 3 }
+      - { id: session-expiry-policy, relevance: 2 }
+      - { id: rbac-role-matrix, relevance: 1 }
+
+  - id: q40
+    description: "Medium - role permissions, lexical match weak"
+    mode: query
+    query: who can grant admin permissions and how is it logged
+    relevant:
+      - { id: rbac-role-matrix, relevance: 3 }
+      - { id: audit-log-retention, relevance: 3 }
+      - { id: mfa-enrollment-flow, relevance: 2 }
+
+  - id: q41
+    description: Medium anchor - audit log neighborhood
+    mode: anchor
+    anchors: ["audit-log-retention"]
+    relevant:
+      - { id: audit-log-retention, relevance: 3 }
+      - { id: rbac-role-matrix, relevance: 2 }
+      - { id: reference-grafana-dashboard, relevance: 2 }
+      - { id: suspicious-login-detection, relevance: 1 }
+      - { id: auth-architecture, relevance: 1 }
+
+  - id: q42
+    description: "Medium - password policy, NIST keyword"
+    mode: query
+    query: do we still force password rotation every 90 days
+    relevant:
+      - { id: password-rotation-policy, relevance: 3 }
+      - { id: api-key-rotation, relevance: 1 }
+      - { id: mfa-enrollment-flow, relevance: 1 }
+
+  - id: q43
+    description: "Hard - 429 during rotation, cross-cluster tie"
+    mode: mixed
+    query: M2M client getting 401 vs 429 during key swap
+    anchors: ["api-key-rotation"]
+    relevant:
+      - { id: api-key-rotation, relevance: 3 }
+      - { id: feedback-batch-rejected, relevance: 2 }
+      - { id: jwt-rs256-signing, relevance: 1 }
+
+  - id: q44
+    description: "Hard - impossible travel, vague phrasing far from hub"
+    mode: query
+    query: user logged in from two countries five minutes apart what happens
+    relevant:
+      - { id: suspicious-login-detection, relevance: 3 }
+      - { id: mfa-enrollment-flow, relevance: 2 }
+      - { id: audit-log-retention, relevance: 1 }
+
+  - id: q45
+    description: Hard - postmortem retrieval via vague symptom
+    mode: mixed
+    query: valid tokens being rejected after deploy
+    anchors: ["jwt-rs256-signing"]
+    relevant:
+      - { id: jwt-clock-skew-incident, relevance: 3 }
+      - { id: jwt-rs256-signing, relevance: 2 }
+      - { id: audit-log-retention, relevance: 1 }
+
+  - id: q46
+    description: "Hard anchor - session fixation, 2-hop reach"
+    mode: anchor
+    anchors: ["session-fixation-test"]
+    relevant:
+      - { id: session-fixation-test, relevance: 3 }
+      - { id: mfa-enrollment-flow, relevance: 2 }
+      - { id: session-expiry-policy, relevance: 2 }
+      - { id: rbac-role-matrix, relevance: 1 }
+
+  - id: q47
+    description: EASY — direct keyword match to hub
+    mode: query
+    query: what does our observability stack look like end to end
+    relevant:
+      - { id: observability-stack, relevance: 3 }
+      - { id: structured-log-schema, relevance: 2 }
+      - { id: otel-trace-propagation, relevance: 2 }
+
+  - id: q48
+    description: EASY — direct match on alert rules
+    mode: query
+    query: where do prometheus alert rules live and how are they named
+    relevant:
+      - { id: alert-rules-catalog, relevance: 3 }
+      - { id: oncall-runbook, relevance: 2 }
+
+  - id: q49
+    description: "MEDIUM — query mentions log fields, ground truth requires understanding cardinality link"
+    mode: query
+    query: why can't I put user_id as a label
+    relevant:
+      - { id: structured-log-schema, relevance: 3 }
+      - { id: metric-cardinality-budget, relevance: 3 }
+      - { id: log-retention-policy, relevance: 1 }
+
+  - id: q50
+    description: "MEDIUM — anchored at trace propagation, query about async jobs"
+    mode: mixed
+    query: how do background jobs keep the same trace as the request that enqueued them
+    anchors: ["otel-trace-propagation"]
+    relevant:
+      - { id: otel-trace-propagation, relevance: 3 }
+      - { id: scanner-state, relevance: 2 }
+      - { id: trace-sampling-policy, relevance: 1 }
+
+  - id: q51
+    description: MEDIUM — anchor-only expansion from oncall runbook
+    mode: anchor
+    anchors: ["oncall-runbook"]
+    relevant:
+      - { id: oncall-runbook, relevance: 3 }
+      - { id: alert-rules-catalog, relevance: 2 }
+      - { id: incident-postmortem-template, relevance: 2 }
+      - { id: trace-sampling-policy, relevance: 1 }
+
+  - id: q52
+    description: "HARD — vague query about noisy pages, ground truth requires multi-hop"
+    mode: query
+    query: "we keep getting paged for stuff that doesn't matter, what's the process to clean it up"
+    relevant:
+      - { id: alert-fatigue-audit, relevance: 3 }
+      - { id: alert-rules-catalog, relevance: 2 }
+      - { id: oncall-runbook, relevance: 1 }
+
+  - id: q53
+    description: MEDIUM — SLO query anchored at hub
+    mode: mixed
+    query: what's our error budget for the scanner and how is it enforced
+    anchors: ["observability-stack"]
+    relevant:
+      - { id: slo-definitions, relevance: 3 }
+      - { id: alert-rules-catalog, relevance: 2 }
+      - { id: incident-postmortem-template, relevance: 1 }
+
+  - id: q54
+    description: EASY — direct query about log retention
+    mode: query
+    query: how long do we keep logs in loki
+    relevant:
+      - { id: log-retention-policy, relevance: 3 }
+      - { id: structured-log-schema, relevance: 1 }
+
+  - id: q55
+    description: HARD — anchor-only from postmortem; expects related runbook + SLO context
+    mode: anchor
+    anchors: ["incident-postmortem-template"]
+    relevant:
+      - { id: incident-postmortem-template, relevance: 3 }
+      - { id: slo-definitions, relevance: 2 }
+      - { id: oncall-runbook, relevance: 2 }
+      - { id: otel-trace-propagation, relevance: 1 }
+
+  - id: q56
+    description: "MEDIUM — query is about sampling, expects policy + propagation linkage"
+    mode: query
+    query: do we sample all traces or just a percentage and how is the decision propagated
+    relevant:
+      - { id: trace-sampling-policy, relevance: 3 }
+      - { id: otel-trace-propagation, relevance: 2 }
+
+  - id: q57
+    description: "HARD — vague dashboards query anchored at grafana fixture, requires bridge through observability"
+    mode: mixed
+    query: where do I look to debug a paging alert in dashboards
+    anchors: ["reference-grafana-dashboard"]
+    relevant:
+      - { id: oncall-runbook, relevance: 3 }
+      - { id: alert-rules-catalog, relevance: 2 }
+      - { id: dashboard-metrics, relevance: 2 }
+      - { id: observability-stack, relevance: 1 }
+
+  - id: q58
+    description: MEDIUM — cardinality query with ground truth across two files
+    mode: query
+    query: what's the active series cap per service and what happens if we exceed
+    relevant:
+      - { id: metric-cardinality-budget, relevance: 3 }
+      - { id: alert-fatigue-audit, relevance: 1 }
+      - { id: structured-log-schema, relevance: 1 }

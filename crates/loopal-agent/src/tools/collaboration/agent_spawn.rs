@@ -94,7 +94,7 @@ pub(super) async fn action_spawn(
                     Ok(text) => {
                         if let Some(ch) = memory_channel {
                             for suggestion in
-                                loopal_memory::extraction::extract_memory_suggestions(&text)
+                                loopal_memory::agent_output::extract_memory_suggestions(&text)
                             {
                                 let _ = ch.try_send(suggestion);
                             }

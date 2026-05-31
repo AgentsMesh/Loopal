@@ -3,15 +3,26 @@ load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 rust_library(
     name = "loopal-memory",
     srcs = glob(["src/**/*.rs"]),
-    compile_data = glob(["agent-prompts/**"]),
+    compile_data = glob(["agent-prompts/**", "src/**/*.sql"]),
     edition = "2024",
     visibility = ["//visibility:public"],
     deps = [
         "//crates/loopal-error",
         "//crates/loopal-tool-api",
+        "@crates//:chrono",
+        "@crates//:flate2",
+        "@crates//:notify-debouncer-mini",
+        "@crates//:regex",
+        "@crates//:rusqlite",
+        "@crates//:serde",
         "@crates//:serde_json",
+        "@crates//:serde_yaml",
+        "@crates//:sha2",
+        "@crates//:thiserror",
         "@crates//:tokio",
         "@crates//:tracing",
+        "@crates//:unicode-segmentation",
+        "@crates//:walkdir",
     ],
     proc_macro_deps = ["@crates//:async-trait"],
 )
@@ -24,15 +35,18 @@ rust_test(
     deps = [
         ":loopal-memory",
         "//crates/loopal-backend",
+        "//crates/loopal-error",
+        "//crates/loopal-tool-api",
+        "@crates//:chrono",
+        "@crates//:flate2",
+        "@crates//:rusqlite",
         "@crates//:serde_json",
         "@crates//:tempfile",
         "@crates//:tokio",
-        "//crates/loopal-tool-api",
     ],
     proc_macro_deps = ["@crates//:async-trait"],
 )
 
-# Unit tests for #[cfg(test)] modules in src/ (date, consolidation, extraction)
 rust_test(
     name = "loopal-memory-unit-test",
     crate = ":loopal-memory",

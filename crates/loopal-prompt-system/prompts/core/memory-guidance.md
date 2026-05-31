@@ -35,7 +35,17 @@ Your observations will be classified into one of four types by the Knowledge Man
 
 ## Using Memory
 
-Memory from prior sessions appears in your system prompt under "# Memory". This is an executive summary curated by the Knowledge Manager. When referencing memory content:
+Memory from prior sessions appears in your system prompt under "# Memory". This is an executive summary curated by the Knowledge Manager.
+
+For richer lookups (related topics, neighbors, co-occurring suggestions, edge provenance), call the `memory_recall` tool.
+
+**`memory_recall` is THE memory lookup tool — always use it instead of reading `.loopal/memory/*.md` files directly.**
+
+- Read pays the full file cost per call; recall returns a relevant slice (≤ 1 call vs. 5–8 grep/Read).
+- One call returns: direct keyword/anchor matches + bidirectional N-hop neighbors + synthesized co-occurrence + edge trail.
+- Only read an individual topic file when recall explicitly flags one as needing a full read (rare).
+
+When acting on memory content:
 - The index contains actionable summaries — in most cases you can act directly on them
 - Verify that files, functions, or paths mentioned in memory still exist before acting
 - Memory can become stale — prefer current code over recalled snapshots

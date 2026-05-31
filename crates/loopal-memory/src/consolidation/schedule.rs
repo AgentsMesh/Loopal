@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use crate::date;
+use crate::sync::memory_index_path;
 
 pub fn needs_consolidation(memory_dir: &Path, interval_days: u32) -> bool {
     let marker = memory_dir.join(".last_consolidation");
@@ -10,7 +11,7 @@ pub fn needs_consolidation(memory_dir: &Path, interval_days: u32) -> bool {
             let today = date::today_str();
             date::days_between(last, &today).is_none_or(|d| d >= interval_days as i64)
         }
-        Err(_) => memory_dir.join("MEMORY.md").exists(),
+        Err(_) => memory_index_path(memory_dir).exists(),
     }
 }
 
@@ -54,7 +55,7 @@ mod tests {
         let dir = std::env::temp_dir().join("test_consol_no_marker_with_mem_v3");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("MEMORY.md"), "# Memory\nSome content").unwrap();
+        std::fs::write(memory_index_path(&dir), "# Memory\nSome content").unwrap();
         assert!(needs_consolidation(&dir, 7));
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -64,7 +65,7 @@ mod tests {
         let dir = std::env::temp_dir().join("test_consol_recent_v3");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("MEMORY.md"), "# Memory").unwrap();
+        std::fs::write(memory_index_path(&dir), "# Memory").unwrap();
         std::fs::write(dir.join(".last_consolidation"), date::today_str()).unwrap();
         assert!(!needs_consolidation(&dir, 7));
         let _ = std::fs::remove_dir_all(&dir);
@@ -75,7 +76,7 @@ mod tests {
         let dir = std::env::temp_dir().join("test_consol_overdue_v3");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("MEMORY.md"), "# Memory").unwrap();
+        std::fs::write(memory_index_path(&dir), "# Memory").unwrap();
         let old_days = now_secs() / 86400 - 10;
         let old_date = date::epoch_days_to_date(old_days as i64);
         std::fs::write(dir.join(".last_consolidation"), &old_date).unwrap();
@@ -89,7 +90,7 @@ mod tests {
         let dir = std::env::temp_dir().join("test_consol_corrupted_v3");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("MEMORY.md"), "# Memory").unwrap();
+        std::fs::write(memory_index_path(&dir), "# Memory").unwrap();
         std::fs::write(dir.join(".last_consolidation"), "not-a-date").unwrap();
         assert!(needs_consolidation(&dir, 7));
         let _ = std::fs::remove_dir_all(&dir);

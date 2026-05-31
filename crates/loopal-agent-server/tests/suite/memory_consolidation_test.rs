@@ -55,7 +55,7 @@ fn build_shared(fixture: &TestFixture) -> Arc<AgentShared> {
 async fn trigger_consolidation_skips_when_fresh_lock_exists() {
     let fixture = TestFixture::new();
     let shared = build_shared(&fixture);
-    let memory_dir = shared.cwd.join(".loopal/memory");
+    let memory_dir = shared.cwd.join(loopal_memory::PROJECT_MEMORY_DIR);
     std::fs::create_dir_all(&memory_dir).unwrap();
 
     // Pre-create a fresh lock (timestamp = now). trigger_consolidation must
@@ -85,7 +85,7 @@ async fn trigger_consolidation_skips_when_fresh_lock_exists() {
 async fn trigger_consolidation_acquires_lock_when_free() {
     let fixture = TestFixture::new();
     let shared = build_shared(&fixture);
-    let memory_dir = shared.cwd.join(".loopal/memory");
+    let memory_dir = shared.cwd.join(loopal_memory::PROJECT_MEMORY_DIR);
 
     let lock_path = memory_dir.join(".consolidation_lock");
     assert!(
@@ -124,7 +124,7 @@ async fn trigger_consolidation_skips_then_unlocked_caller_succeeds() {
     // dir again and acquires freshly.
     let fixture = TestFixture::new();
     let shared = build_shared(&fixture);
-    let memory_dir = shared.cwd.join(".loopal/memory");
+    let memory_dir = shared.cwd.join(loopal_memory::PROJECT_MEMORY_DIR);
     let lock_path = memory_dir.join(".consolidation_lock");
 
     trigger_consolidation(&shared, "test-model");

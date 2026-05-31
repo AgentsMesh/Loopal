@@ -156,6 +156,13 @@ crate.spec(package = "agent-client-protocol-schema", version = "0.11")
 crate.spec(package = "strum", version = "0.28", features = ["derive"])
 crate.spec(package = "derive_more", version = "2", features = ["from", "display"])
 
+# --- Memory Graph / Embedded SQLite ---
+crate.spec(package = "rusqlite", version = "0.32", features = ["bundled", "chrono"])
+crate.spec(package = "notify", version = "6")
+crate.spec(package = "notify-debouncer-mini", version = "0.4")
+crate.spec(package = "unicode-segmentation", version = "1")
+crate.spec(package = "flate2", version = "1")
+
 # --- Testing ---
 crate.spec(package = "tempfile", version = "3")
 crate.spec(package = "wiremock", version = "0.6")

@@ -52,6 +52,7 @@ async fn append_runtime_sections_lists_configured_servers_even_when_not_yet_read
         None,
         std::path::PathBuf::from("."),
         "test".to_string(),
+        "test-session".to_string(),
     )
     .await
     .expect("build");
@@ -91,6 +92,7 @@ async fn append_runtime_sections_omits_status_when_no_servers_configured() {
         None,
         std::path::PathBuf::from("."),
         "test".to_string(),
+        "test-session".to_string(),
     )
     .await
     .expect("build");
@@ -120,6 +122,7 @@ async fn append_runtime_sections_shows_failed_status_for_dead_binary() {
         None,
         std::path::PathBuf::from("."),
         "test".to_string(),
+        "test-session".to_string(),
     )
     .await
     .expect("build");

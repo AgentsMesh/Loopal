@@ -45,6 +45,10 @@ pub(crate) async fn start_session(
         } else {
             "sub".to_string()
         };
+        let preset_session_id = start
+            .resume
+            .clone()
+            .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
         let kernel = if is_production {
             crate::params::build_kernel_from_config(
                 &config,
@@ -54,6 +58,7 @@ pub(crate) async fn start_session(
                 Some(connection.clone()),
                 cwd.clone(),
                 agent_name,
+                preset_session_id.clone(),
             )
             .await?
         } else {
@@ -68,6 +73,7 @@ pub(crate) async fn start_session(
                         None,
                         cwd.clone(),
                         "test".to_string(),
+                        preset_session_id.clone(),
                     )
                     .await?
                 }
@@ -118,6 +124,7 @@ pub(crate) async fn start_session(
                 session_dir_override.as_deref(),
                 hub,
                 decision_context,
+                &preset_session_id,
             ))
             .await?;
         let agent_params = setup.params;

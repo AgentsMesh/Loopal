@@ -6,7 +6,7 @@ use tracing::{info, warn};
 
 use loopal_agent::shared::AgentShared;
 use loopal_agent::spawn::{SpawnParams, SpawnTarget, spawn_agent, wait_agent};
-use loopal_memory::MEMORY_CONSOLIDATION_PROMPT;
+use loopal_memory::{MEMORY_CONSOLIDATION_PROMPT, PROJECT_MEMORY_DIR};
 
 use super::memory_adapter::ServerMemoryProcessor;
 
@@ -15,7 +15,7 @@ use super::memory_adapter::ServerMemoryProcessor;
 /// Runs in the background (non-blocking). Uses a `.consolidation_lock` file
 /// as an optimistic lock to prevent concurrent consolidations.
 pub fn trigger_consolidation(shared: &Arc<AgentShared>, model: &str) {
-    let memory_dir = shared.cwd.join(".loopal/memory");
+    let memory_dir = shared.cwd.join(PROJECT_MEMORY_DIR);
 
     let lock_path = match loopal_memory::consolidation::try_acquire_lock(&memory_dir) {
         Some(path) => path,
@@ -28,7 +28,7 @@ pub fn trigger_consolidation(shared: &Arc<AgentShared>, model: &str) {
     let shared = shared.clone();
     let model = model.to_string();
     tokio::spawn(async move {
-        let memory_dir = shared.cwd.join(".loopal/memory");
+        let memory_dir = shared.cwd.join(PROJECT_MEMORY_DIR);
         let today = loopal_memory::date::today_str();
         let name = ServerMemoryProcessor::make_agent_name("memory-consolidation");
         let prompt = format!("{MEMORY_CONSOLIDATION_PROMPT}\n\nToday: {today}");

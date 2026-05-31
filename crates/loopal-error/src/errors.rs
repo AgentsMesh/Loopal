@@ -33,6 +33,9 @@ pub enum LoopalError {
     #[error("Backend IO: {0}")]
     BackendIo(#[from] crate::io_error::ToolIoError),
 
+    #[error("Memory graph: {0}")]
+    MemoryGraph(#[from] crate::memory_graph_error::MemoryGraphError),
+
     #[error("{0}")]
     Other(String),
 }

@@ -34,7 +34,7 @@ pub use sandbox::{
 };
 pub use settings::{
     CompactionSettings, CwdIsolation, FetchRefinerConfig, ImageSettings, McpServerConfig,
-    McpSharing, OpenAiCompatConfig, ProviderConfig, ProvidersConfig, Settings,
+    McpSharing, MemoryConfig, OpenAiCompatConfig, ProviderConfig, ProvidersConfig, Settings,
 };
 pub use skills::{Skill, format_skills_summary, scan_skills_dir};
 pub use telemetry::TelemetryConfig;

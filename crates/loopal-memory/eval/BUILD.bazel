@@ -1,0 +1,22 @@
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_test")
+
+rust_binary(
+    name = "eval_recall",
+    srcs = glob(["src/**/*.rs"]),
+    compile_data = glob(["data/**"]),
+    edition = "2024",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//crates/loopal-memory",
+        "@crates//:serde",
+        "@crates//:serde_yaml",
+        "@crates//:tempfile",
+        "@crates//:tokio",
+    ],
+)
+
+rust_test(
+    name = "eval_recall_test",
+    crate = ":eval_recall",
+    edition = "2024",
+)

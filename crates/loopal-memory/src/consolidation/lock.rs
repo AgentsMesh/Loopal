@@ -1,31 +1,66 @@
+use std::io::Write;
 use std::path::Path;
 
 use super::now_secs;
 
 const LOCK_STALE_THRESHOLD_SECS: u64 = 3600;
+const LOCK_INCOMPLETE_GRACE_SECS: u64 = 30;
 
 pub fn try_acquire_lock(memory_dir: &Path) -> Option<std::path::PathBuf> {
     let lock_path = memory_dir.join(".consolidation_lock");
-    let now = now_secs(); // capture once to avoid TOCTOU skew
-    if lock_path.exists() {
-        let is_stale = std::fs::read_to_string(&lock_path)
-            .ok()
-            .and_then(|s| s.trim().parse::<u64>().ok())
-            .map(|lock_ts| now.saturating_sub(lock_ts) > LOCK_STALE_THRESHOLD_SECS)
-            .unwrap_or(true); // unparseable → treat as stale
-        if !is_stale {
-            return None; // another session owns it
-        }
-        tracing::info!("stale consolidation lock detected, overwriting");
-    }
+    let now = now_secs();
     let _ = std::fs::create_dir_all(memory_dir);
-    match std::fs::write(&lock_path, now.to_string()) {
-        Ok(()) => Some(lock_path),
-        Err(e) => {
-            tracing::warn!("failed to create consolidation lock: {e}");
-            None
+
+    loop {
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&lock_path)
+        {
+            Ok(mut f) => {
+                if let Err(e) = writeln!(f, "{}", now) {
+                    tracing::warn!("failed to write consolidation lock body: {e}");
+                    let _ = std::fs::remove_file(&lock_path);
+                    return None;
+                }
+                return Some(lock_path);
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                let raw = std::fs::read_to_string(&lock_path).ok();
+                let is_stale = match raw.as_deref().map(str::trim) {
+                    None => true,
+                    Some("") => incomplete_lock_is_stale(&lock_path, now),
+                    Some(s) => match s.parse::<u64>() {
+                        Ok(lock_ts) => now.saturating_sub(lock_ts) > LOCK_STALE_THRESHOLD_SECS,
+                        Err(_) => true,
+                    },
+                };
+                if !is_stale {
+                    return None;
+                }
+                tracing::info!("stale consolidation lock detected, replacing");
+                if std::fs::remove_file(&lock_path).is_err() {
+                    return None;
+                }
+            }
+            Err(e) => {
+                tracing::warn!("failed to create consolidation lock: {e}");
+                return None;
+            }
         }
     }
+}
+
+fn incomplete_lock_is_stale(lock_path: &Path, now: u64) -> bool {
+    let mtime = std::fs::metadata(lock_path).and_then(|m| m.modified()).ok();
+    let Some(mtime) = mtime else {
+        return true;
+    };
+    let mtime_secs = mtime
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    now.saturating_sub(mtime_secs) > LOCK_INCOMPLETE_GRACE_SECS
 }
 
 pub fn release_lock(lock_path: &Path) {
@@ -38,7 +73,7 @@ mod tests {
 
     #[test]
     fn test_acquire_lock_fresh() {
-        let dir = std::env::temp_dir().join("test_lock_fresh_v3");
+        let dir = std::env::temp_dir().join("test_lock_fresh_v4");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
 
@@ -53,7 +88,7 @@ mod tests {
 
     #[test]
     fn test_acquire_lock_already_held() {
-        let dir = std::env::temp_dir().join("test_lock_held_v3");
+        let dir = std::env::temp_dir().join("test_lock_held_v4");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
 
@@ -69,7 +104,7 @@ mod tests {
 
     #[test]
     fn test_acquire_lock_stale() {
-        let dir = std::env::temp_dir().join("test_lock_stale_v3");
+        let dir = std::env::temp_dir().join("test_lock_stale_v4");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
 
@@ -85,7 +120,7 @@ mod tests {
 
     #[test]
     fn test_acquire_lock_corrupted() {
-        let dir = std::env::temp_dir().join("test_lock_corrupted_v3");
+        let dir = std::env::temp_dir().join("test_lock_corrupted_v4");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
 
@@ -100,6 +135,48 @@ mod tests {
 
     #[test]
     fn test_release_lock_nonexistent() {
-        release_lock(Path::new("/tmp/nonexistent_lock_file_v3"));
+        release_lock(Path::new("/tmp/nonexistent_lock_file_v4"));
+    }
+
+    #[test]
+    fn test_acquire_lock_empty_within_grace_period() {
+        let dir = std::env::temp_dir().join("test_lock_empty_fresh_v4");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join(".consolidation_lock"), "").unwrap();
+
+        let lock = try_acquire_lock(&dir);
+        assert!(
+            lock.is_none(),
+            "fresh empty lock should be treated as winner mid-write"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_acquire_lock_empty_past_grace_period() {
+        let dir = std::env::temp_dir().join("test_lock_empty_stale_v4");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let lock_path = dir.join(".consolidation_lock");
+        std::fs::write(&lock_path, "").unwrap();
+
+        let backdated = std::time::SystemTime::now()
+            - std::time::Duration::from_secs(LOCK_INCOMPLETE_GRACE_SECS + 60);
+        let f = std::fs::File::options()
+            .write(true)
+            .open(&lock_path)
+            .unwrap();
+        f.set_modified(backdated).unwrap();
+
+        let lock = try_acquire_lock(&dir);
+        assert!(
+            lock.is_some(),
+            "empty lock older than grace period should be reclaimable"
+        );
+
+        release_lock(&lock.unwrap());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

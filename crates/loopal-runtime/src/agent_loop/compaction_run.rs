@@ -151,6 +151,18 @@ impl AgentLoopRunner {
         ))
         .await?;
 
+        // Route the post-compact token truth through the canonical token path
+        // so the status bar's ctx counter refreshes; mirrors resume reset.
+        self.emit(AgentEventPayload::TokenUsage {
+            input_tokens: tokens_after,
+            output_tokens: 0,
+            context_window: self.turns.view().budget().context_window,
+            cache_creation_input_tokens: 0,
+            cache_read_input_tokens: 0,
+            thinking_tokens: 0,
+        })
+        .await?;
+
         // Done phase closes the progress stream so frontends can collapse
         // the inline indicator. Emitted last, after `Compacted` so any
         // listener that wants the final stats has them in hand.

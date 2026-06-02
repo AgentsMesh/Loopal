@@ -1,4 +1,4 @@
-use loopal_protocol::{AgentStatus, CompactPhase};
+use loopal_protocol::CompactPhase;
 
 use crate::state::SessionViewState;
 
@@ -17,7 +17,6 @@ pub(super) fn progress(
         }
         phase => {
             conv.compact_banner = Some(format_banner(phase, detail));
-            state.agent.observable.status = AgentStatus::Running;
         }
     }
     MutationEffect::Mutated

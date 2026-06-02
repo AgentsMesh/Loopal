@@ -20,15 +20,8 @@ pub fn init_logging(
     let writer = crate::log_writer::RotatingFileWriter::new(&log_dir);
     let log_path = writer.current_path();
 
-    let env_filter = std::env::var("LOOPAL_LOG").unwrap_or_else(|_| "info".to_string());
-    let filter_str = format!(
-        "loopal={env_filter},loopal_runtime={env_filter},\
-         loopal_provider={env_filter},loopal_kernel={env_filter},\
-         loopal_mcp={env_filter},loopal_tools={env_filter},\
-         loopal_context={env_filter},loopal_hooks={env_filter},\
-         loopal_storage={env_filter},loopal_config={env_filter}"
-    );
-    let env_filter = tracing_subscriber::EnvFilter::new(filter_str);
+    let level = std::env::var("LOOPAL_LOG").unwrap_or_else(|_| "debug".to_string());
+    let env_filter = loopal_telemetry::build_env_filter(&level);
 
     let guard = loopal_telemetry::init_subscriber(telemetry_config, writer, env_filter);
 

@@ -30,6 +30,7 @@ impl AgentLoopRunner {
         }
         let old = self.status;
         self.status = new_status;
+        tracing::debug!(?old, new = ?new_status, "agent status transition");
         let result = match new_status {
             AgentStatus::Starting => Ok(()),
             AgentStatus::Running => self.emit(AgentEventPayload::Running).await,

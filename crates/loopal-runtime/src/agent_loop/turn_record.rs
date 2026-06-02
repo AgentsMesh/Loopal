@@ -34,6 +34,24 @@ impl AgentLoopRunner {
         self.turns.try_start_turn(trigger, &logger)
     }
 
+    pub(super) async fn ensure_resume_turn_record(&mut self) -> loopal_error::Result<bool> {
+        if self.turns.current_turn_id().is_some()
+            || self.start_turn_record(TurnTrigger::Resume).is_some()
+        {
+            return Ok(true);
+        }
+        tracing::error!("TurnStarted persist failed on resume; cannot execute turn");
+        self.emit(loopal_protocol::AgentEventPayload::Error {
+            message: "Failed to start turn record on resume: persist log unavailable".to_string(),
+        })
+        .await?;
+        Ok(false)
+    }
+
+    pub fn recorded_turns(&self) -> &[loopal_turn::Turn] {
+        self.turns.store().turns()
+    }
+
     pub fn append_step_record(&mut self, step: TurnStep) -> Result<u32, TurnTrackerError> {
         let logger = make_logger(&self.params.deps.session_manager, &self.params.session.id);
         self.turns.try_append_step(step, &logger)

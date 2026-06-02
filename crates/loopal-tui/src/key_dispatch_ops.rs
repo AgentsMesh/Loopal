@@ -55,6 +55,11 @@ pub(crate) async fn push_to_inbox(app: &mut App, content: UserContent) {
     app.history_index = None;
     // SSOT: do not write the user row locally — `route_to_agent` emits
     // `UserMessageQueued` so every attached UI sees the same history.
+    tracing::debug!(
+        active_view = %app.session.lock().active_view,
+        text_len = content.text.len(),
+        "TUI routing user message to agent"
+    );
     app.session.route_message(content).await;
 }
 

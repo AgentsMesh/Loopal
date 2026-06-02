@@ -70,6 +70,7 @@ pub mod turn_history;
 pub(crate) mod turn_metrics;
 mod turn_observer_dispatch;
 mod turn_record;
+mod turn_recover;
 mod turn_response;
 mod turn_state;
 mod turn_telemetry;

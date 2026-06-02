@@ -76,4 +76,10 @@ pub fn handle_compaction(
              {kept} kept. {tokens_before}→{tokens_after} tokens ({pct}% freed).",
         ),
     );
+    // Self-correct ctx counter from the Compacted event alone, in case the
+    // paired TokenUsage emit is dropped or reordered.
+    conv.input_tokens = tokens_after;
+    conv.output_tokens = 0;
+    conv.cache_creation_tokens = 0;
+    conv.cache_read_tokens = 0;
 }

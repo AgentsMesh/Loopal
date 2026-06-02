@@ -7,6 +7,7 @@
 
 pub(crate) mod file_metric_exporter;
 pub(crate) mod file_span_exporter;
+mod filter;
 mod logs;
 mod metrics;
 mod resource;
@@ -14,5 +15,6 @@ mod shutdown;
 mod subscriber;
 mod traces;
 
+pub use filter::build_env_filter;
 pub use shutdown::TelemetryGuard;
 pub use subscriber::init_subscriber;

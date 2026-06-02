@@ -1,7 +1,7 @@
 use loopal_config::Settings;
 use loopal_error::LoopalError;
 use loopal_kernel::Kernel;
-use loopal_protocol::{AgentEvent, ControlCommand, Envelope};
+use loopal_protocol::{AgentEvent, ControlCommand, Envelope, MessageSource};
 use loopal_provider_api::{ChatParams, ChatStream, Provider, StopReason, StreamChunk};
 use loopal_provider_api::{ContentBlock, Message, MessageRole};
 use loopal_runtime::agent_loop::AgentLoopRunner;
@@ -69,11 +69,13 @@ fn make_runner_with_history(
     AgentLoopRunner,
     Arc<AtomicUsize>,
     mpsc::Receiver<AgentEvent>,
+    mpsc::Sender<Envelope>,
+    mpsc::Sender<ControlCommand>,
 ) {
     let fixture = TestFixture::new();
     let (event_tx, event_rx) = mpsc::channel::<AgentEvent>(64);
-    let (_mbox_tx, mailbox_rx) = mpsc::channel::<Envelope>(16);
-    let (_ctrl_tx, control_rx) = mpsc::channel::<ControlCommand>(16);
+    let (mbox_tx, mailbox_rx) = mpsc::channel::<Envelope>(16);
+    let (ctrl_tx, control_rx) = mpsc::channel::<ControlCommand>(16);
     let frontend = Arc::new(UnifiedFrontend::new(
         None,
         event_tx,
@@ -108,7 +110,7 @@ fn make_runner_with_history(
     let mut runner = AgentLoopRunner::new(params);
     let turns = loopal_test_support::seed_history::reverse_project_messages_to_turns(history);
     runner.seed_test_turns(turns);
-    (runner, call_count, event_rx)
+    (runner, call_count, event_rx, mbox_tx, ctrl_tx)
 }
 
 #[tokio::test]
@@ -119,7 +121,9 @@ async fn resume_with_assistant_tail_does_not_call_llm() {
     // skipped idle phase → ReadyToCall debug_assert panicked / release silently
     // sent assistant-tailed messages to the LLM.
     let history = vec![user("hello"), assistant("hi there")];
-    let (mut runner, calls, mut rx) = make_runner_with_history(history);
+    let (mut runner, calls, mut rx, mbox_tx, ctrl_tx) = make_runner_with_history(history);
+    drop(mbox_tx);
+    drop(ctrl_tx);
     tokio::spawn(async move { while rx.recv().await.is_some() {} });
 
     let _ = runner.run().await.unwrap();
@@ -138,7 +142,9 @@ async fn resume_with_user_tail_calls_llm_immediately() {
     // Sanity: when last message is a User (e.g. tool_result mid-turn), the
     // agent should resume the turn without waiting for further input.
     let history = vec![user("question")];
-    let (mut runner, calls, mut rx) = make_runner_with_history(history);
+    let (mut runner, calls, mut rx, mbox_tx, ctrl_tx) = make_runner_with_history(history);
+    drop(mbox_tx);
+    drop(ctrl_tx);
     tokio::spawn(async move { while rx.recv().await.is_some() {} });
 
     let _ = runner.run().await.unwrap();
@@ -152,7 +158,9 @@ async fn resume_with_user_tail_calls_llm_immediately() {
 
 #[tokio::test]
 async fn resume_with_empty_store_waits_for_input() {
-    let (mut runner, calls, mut rx) = make_runner_with_history(vec![]);
+    let (mut runner, calls, mut rx, mbox_tx, ctrl_tx) = make_runner_with_history(vec![]);
+    drop(mbox_tx);
+    drop(ctrl_tx);
     tokio::spawn(async move { while rx.recv().await.is_some() {} });
 
     let _ = runner.run().await.unwrap();
@@ -161,5 +169,80 @@ async fn resume_with_empty_store_waits_for_input() {
         calls.load(Ordering::SeqCst),
         0,
         "empty store must wait for user input"
+    );
+}
+
+#[tokio::test]
+async fn resume_user_tail_records_turn_with_llm_step() {
+    // Bug D regression: a User-tail history projects to a Complete turn, so
+    // `current_turn_id` is None on resume. Pre-fix, run_loop went straight to
+    // execute_turn without opening a turn record, and every append_step hit
+    // NoCurrentTurn — the LlmCall step was silently dropped (no turn recorded).
+    let history = vec![user("question")];
+    let (mut runner, _calls, mut rx, mbox_tx, ctrl_tx) = make_runner_with_history(history);
+    drop(mbox_tx);
+    drop(ctrl_tx);
+    tokio::spawn(async move { while rx.recv().await.is_some() {} });
+
+    let _ = runner.run().await.unwrap();
+
+    let has_llm_step = runner
+        .recorded_turns()
+        .iter()
+        .flat_map(|t| &t.body.steps)
+        .any(|s| matches!(s, loopal_turn::TurnStep::LlmCall { .. }));
+    assert!(
+        has_llm_step,
+        "resumed turn must open a turn record so its LlmCall step is persisted, \
+         not dropped by NoCurrentTurn",
+    );
+}
+
+#[tokio::test]
+async fn resume_then_followup_message_runs_second_turn() {
+    // Bug C end-to-end: after a User-tail cold-start resume runs its turn to
+    // completion, the loop must return to idle and consume queued input —
+    // proving the "continue not consumed" regression is gone. Pre-Bug-D-fix the
+    // resumed turn never closed cleanly, the loop never came back to idle, and
+    // a followup never ran.
+    //
+    // Delivery is gated on the agent's own AwaitingInput event so the followup
+    // is never injected during the resume turn's mid-turn drain window (which
+    // would absorb it into turn 1 and make the count ambiguous). First idle →
+    // send "continue"; second idle (turn 2 done) → drop both senders so
+    // wait_for_input observes a closed channel and the loop exits.
+    let history = vec![user("question")];
+    let (mut runner, calls, mut rx, mbox_tx, ctrl_tx) = make_runner_with_history(history);
+
+    tokio::spawn(async move {
+        let mut idle_count = 0;
+        while let Some(ev) = rx.recv().await {
+            if matches!(
+                ev.payload,
+                loopal_protocol::AgentEventPayload::AwaitingInput
+            ) {
+                idle_count += 1;
+                if idle_count == 1 {
+                    mbox_tx
+                        .send(Envelope::new(MessageSource::Human, "main", "continue"))
+                        .await
+                        .ok();
+                } else {
+                    drop(mbox_tx);
+                    drop(ctrl_tx);
+                    break;
+                }
+            }
+        }
+        while rx.recv().await.is_some() {}
+    });
+
+    let _ = runner.run().await.unwrap();
+
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        2,
+        "resume turn (1) + followup 'continue' turn (2); a count of 1 means the \
+         queued message was never consumed after the loop returned to idle",
     );
 }

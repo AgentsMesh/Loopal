@@ -1,4 +1,4 @@
-use loopal_protocol::{AgentEventPayload, CompactPhase, CompactionSummary};
+use loopal_protocol::{AgentEventPayload, AgentStatus, CompactPhase, CompactionSummary};
 use loopal_view_state::ViewStateReducer;
 
 fn progress(phase: CompactPhase, detail: Option<&str>) -> AgentEventPayload {
@@ -112,4 +112,41 @@ fn phase_transitions_replace_previous_banner() {
     r.apply(progress(CompactPhase::Summarize, None));
     let second = banner_of(&r).unwrap();
     assert_ne!(first, second, "transition must replace banner text");
+}
+
+#[test]
+fn compacted_event_refreshes_ctx() {
+    let mut r = ViewStateReducer::new("root");
+    r.apply(AgentEventPayload::Compacted(CompactionSummary {
+        kept: 9,
+        removed: 491,
+        tokens_before: 259_392,
+        tokens_after: 6_453,
+        strategy: "manual".into(),
+        summary_msg_id: None,
+        files_rehydrated: 5,
+    }));
+    assert_eq!(
+        r.state().agent.conversation.token_count(),
+        6_453,
+        "Compacted event must refresh ctx token count to tokens_after",
+    );
+}
+
+#[test]
+fn compact_progress_does_not_touch_status() {
+    let mut r = ViewStateReducer::new("root");
+    r.apply(AgentEventPayload::AwaitingInput);
+    let before = r.state().agent.observable.status;
+    assert_eq!(before, AgentStatus::WaitingForInput);
+
+    r.apply(progress(CompactPhase::Summarize, None));
+    r.apply(progress(CompactPhase::Rehydrate, Some("5 files")));
+    r.apply(progress(CompactPhase::Done, None));
+
+    assert_eq!(
+        r.state().agent.observable.status,
+        AgentStatus::WaitingForInput,
+        "compaction progress must not mutate backend-authoritative status",
+    );
 }

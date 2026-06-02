@@ -3,7 +3,7 @@ use loopal_turn::{
     AssistantOutput, ServerToolCall, ServerToolPair, ServerToolResult,
     StopReason as TurnStopReason, TextBlock, ThinkingBlock, ToolCall, ToolCallId, TurnStep,
 };
-use tracing::error;
+use tracing::{error, warn};
 
 use super::runner::AgentLoopRunner;
 
@@ -23,6 +23,11 @@ impl AgentLoopRunner {
         let has_tools = !tool_uses.is_empty();
         let has_server = !server_blocks.is_empty();
         if !has_thinking && !has_text && !has_tools && !has_server {
+            warn!(
+                "LLM returned an empty response (no text, tool_use, thinking, or \
+                 server block); turn ends with no assistant output — check the \
+                 provider/endpoint for dropped content on large or image requests"
+            );
             return;
         }
         let step = build_llm_call_step(

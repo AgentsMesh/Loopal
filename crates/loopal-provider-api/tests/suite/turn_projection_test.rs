@@ -75,6 +75,25 @@ fn user_trigger_emits_human_user_message() {
 }
 
 #[test]
+fn goal_continuation_trigger_projects_to_user_message() {
+    // The continuation skip-gate relies on this: a GoalContinuation turn
+    // projects to a User message, so goal_continuation_check (last_role != User)
+    // won't re-inject and loop after a skip.
+    let t = turn_with(
+        TurnTrigger::GoalContinuation {
+            envelope_id: "env-g".into(),
+            content: "keep going".into(),
+        },
+        vec![],
+    );
+    let msgs = project_turn_to_messages(&t);
+    assert_eq!(msgs.len(), 1);
+    // The skip-gate keys on view().last_role(); assert last (not first) to pin
+    // the actual load-bearing property even if projection grows more messages.
+    assert_eq!(msgs.last().unwrap().role, MessageRole::User);
+}
+
+#[test]
 fn cron_trigger_prefixed_with_scheduled() {
     let t = turn_with(
         TurnTrigger::Cron {

@@ -81,6 +81,8 @@ pub fn apply_event(state: &mut SessionState, event: AgentEvent) {
         | AgentEventPayload::HubDegraded { .. }
         | AgentEventPayload::HubRecovered { .. }
         | AgentEventPayload::DegenerationDetected(_)
+        | AgentEventPayload::ContinuationSkipped { .. }
+        | AgentEventPayload::TurnCancelled { .. }
         | AgentEventPayload::ContinuationGateChanged(_) => {}
     }
 }

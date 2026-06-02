@@ -27,9 +27,8 @@ impl AgentLoopRunner {
             }
         }
         if self.turns.current_turn_id().is_some() {
-            self.end_turn_record(loopal_turn::TurnOutcome::Cancelled {
-                cause: loopal_turn::CancelledCause::ParentTurnAborted,
-            });
+            self.finalize_turn_cancellation(loopal_turn::CancelledCause::ParentTurnAborted)
+                .await;
         }
         let Some(_turn_id) = self.start_turn_record(envelope_to_trigger(env)) else {
             error!(

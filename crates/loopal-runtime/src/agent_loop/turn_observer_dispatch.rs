@@ -31,6 +31,7 @@ impl AgentLoopRunner {
                 feedback_to_model,
             } => {
                 warn!(%reason, "governance aborted turn");
+                self.reset_continuation_state();
                 self.emit_in_turn(AgentEventPayload::Error {
                     message: reason.clone(),
                 })

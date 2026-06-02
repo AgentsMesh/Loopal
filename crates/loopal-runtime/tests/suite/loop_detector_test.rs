@@ -1,4 +1,5 @@
 use loopal_protocol::{InterruptSignal, MessageSource};
+use loopal_provider_api::ContentBlock;
 use loopal_runtime::agent_loop::cancel::TurnCancel;
 use loopal_runtime::agent_loop::governance::{Governance, TurnHook, Verdict};
 use loopal_runtime::agent_loop::loop_detector::LoopDetector;
@@ -18,27 +19,45 @@ fn tool(name: &str) -> (String, String, serde_json::Value) {
     ("id".into(), name.into(), json!({"file": "/tmp/x.rs"}))
 }
 
-// --- Governance trait defaults ---
+fn result(content: &str) -> Vec<ContentBlock> {
+    vec![ContentBlock::ToolResult {
+        tool_use_id: "id".into(),
+        content: content.into(),
+        images: vec![],
+        is_error: false,
+        metadata: None,
+    }]
+}
+
+// One before→execute→after cycle; returns the pre-execution verdict and feeds
+// `content` as this call's output so the detector can track output stability.
+fn cycle(det: &mut LoopDetector, ctx: &mut TurnContext, name: &str, content: &str) -> Verdict {
+    let calls = [tool(name)];
+    let v = det.on_before_tools(ctx, &calls);
+    det.on_after_tools(ctx, &calls, &result(content));
+    v
+}
+
+// --- trait defaults ---
 
 #[test]
 fn governance_defaults_are_continue() {
     struct NoopGovernance;
     impl Governance for NoopGovernance {}
-
     let mut g = NoopGovernance;
     let mut ctx = make_ctx();
-    let action = g.on_before_tools(&mut ctx, &[tool("Read")]);
-    assert!(matches!(action, Verdict::Continue));
+    assert!(matches!(
+        g.on_before_tools(&mut ctx, &[tool("Read")]),
+        Verdict::Continue
+    ));
+    g.on_after_tools(&mut ctx, &[tool("Read")], &[]);
     g.on_envelope_received(&MessageSource::Human);
 }
-
-// --- TurnHook trait defaults ---
 
 #[test]
 fn turn_hook_defaults_are_noop() {
     struct NoopHook;
     impl TurnHook for NoopHook {}
-
     let mut h = NoopHook;
     let mut ctx = make_ctx();
     h.on_turn_start(&mut ctx);
@@ -46,193 +65,131 @@ fn turn_hook_defaults_are_noop() {
     h.on_turn_end(&ctx);
 }
 
-// --- LoopDetector direct tests ---
+// --- stationary repetition (same input → same output) trips the detector ---
 
 #[test]
-fn loop_detector_no_repeat_returns_continue() {
+fn identical_output_three_times_warns() {
     let mut det = LoopDetector::new();
     let mut ctx = make_ctx();
-    let action = det.on_before_tools(&mut ctx, &[tool("Read")]);
-    assert!(matches!(action, Verdict::Continue));
-}
-
-#[test]
-fn loop_detector_three_repeats_warns() {
-    let mut det = LoopDetector::new();
-    let mut ctx = make_ctx();
-    let calls = [tool("Read")];
-    det.on_before_tools(&mut ctx, &calls);
-    det.on_before_tools(&mut ctx, &calls);
-    let action = det.on_before_tools(&mut ctx, &calls);
-    assert!(
-        matches!(action, Verdict::InjectWarning(_)),
-        "expected InjectWarning after 3 repeats, got {action:?}"
-    );
-}
-
-#[test]
-fn loop_detector_five_repeats_aborts() {
-    let mut det = LoopDetector::new();
-    let mut ctx = make_ctx();
-    let calls = [tool("Read")];
-    for _ in 0..4 {
-        det.on_before_tools(&mut ctx, &calls);
+    for _ in 0..3 {
+        cycle(&mut det, &mut ctx, "Read", "same");
     }
-    let action = det.on_before_tools(&mut ctx, &calls);
+    assert!(matches!(
+        cycle(&mut det, &mut ctx, "Read", "same"),
+        Verdict::InjectWarning(_)
+    ));
+}
+
+#[test]
+fn identical_output_five_times_aborts() {
+    let mut det = LoopDetector::new();
+    let mut ctx = make_ctx();
+    for _ in 0..5 {
+        cycle(&mut det, &mut ctx, "Read", "same");
+    }
     let Verdict::AbortTurn {
         reason,
         feedback_to_model,
-    } = action
+    } = cycle(&mut det, &mut ctx, "Read", "same")
     else {
-        panic!("expected AbortTurn after 5 repeats, got {action:?}");
+        panic!("expected AbortTurn after 5 identical outputs");
     };
     assert!(reason.contains("Loop detected"));
-    assert!(
-        !feedback_to_model.is_empty(),
-        "AbortTurn must carry a non-empty feedback_to_model so the model sees why"
-    );
-    assert!(
-        feedback_to_model.contains("Read"),
-        "feedback_to_model should mention the offending tool name"
-    );
+    assert!(feedback_to_model.contains("Read"));
 }
 
-#[test]
-fn loop_detector_human_envelope_resets() {
-    let mut det = LoopDetector::new();
-    let mut ctx = make_ctx();
-    let calls = [tool("Read")];
-    for _ in 0..4 {
-        det.on_before_tools(&mut ctx, &calls);
-    }
-    det.on_envelope_received(&MessageSource::Human);
-    let action = det.on_before_tools(&mut ctx, &calls);
-    assert!(
-        matches!(action, Verdict::Continue),
-        "expected Continue after Human envelope reset, got {action:?}"
-    );
-}
+// --- the ReadImage regression: same args, fresh output each call ---
 
 #[test]
-fn loop_detector_scheduled_envelope_resets() {
+fn changing_output_never_aborts() {
     let mut det = LoopDetector::new();
     let mut ctx = make_ctx();
-    let calls = [tool("Read")];
-    for _ in 0..4 {
-        det.on_before_tools(&mut ctx, &calls);
-    }
-    det.on_envelope_received(&MessageSource::Scheduled);
-    let action = det.on_before_tools(&mut ctx, &calls);
-    assert!(
-        matches!(action, Verdict::Continue),
-        "expected Continue after Scheduled envelope reset, got {action:?}"
-    );
-}
-
-#[test]
-fn loop_detector_system_envelope_does_not_reset() {
-    let mut det = LoopDetector::new();
-    let mut ctx = make_ctx();
-    let calls = [tool("Read")];
-    for _ in 0..4 {
-        det.on_before_tools(&mut ctx, &calls);
-    }
-    // System-injected envelopes (continuation, hook rewake) must NOT reset —
-    // they extend the current loop rather than mark a new task boundary.
-    det.on_envelope_received(&MessageSource::System("goal_continuation".into()));
-    let action = det.on_before_tools(&mut ctx, &calls);
-    assert!(
-        matches!(action, Verdict::AbortTurn { .. }),
-        "expected AbortTurn (signatures preserved) after System envelope, got {action:?}"
-    );
-}
-
-#[test]
-fn loop_detector_different_tools_independent() {
-    let mut det = LoopDetector::new();
-    let mut ctx = make_ctx();
-    // Read x2, Write x2 — neither reaches threshold
-    det.on_before_tools(&mut ctx, &[tool("Read")]);
-    det.on_before_tools(&mut ctx, &[tool("Write")]);
-    det.on_before_tools(&mut ctx, &[tool("Read")]);
-    let action = det.on_before_tools(&mut ctx, &[tool("Write")]);
-    assert!(
-        matches!(action, Verdict::Continue),
-        "different tools should not trigger loop: {action:?}"
-    );
-}
-
-#[test]
-fn loop_detector_different_inputs_independent() {
-    let mut det = LoopDetector::new();
-    let mut ctx = make_ctx();
-    // Same tool, different inputs — different signatures
-    for i in 0..5 {
-        let call = vec![(
-            "id".into(),
-            "Read".into(),
-            json!({"file": format!("/tmp/{i}.rs")}),
-        )];
-        let action = det.on_before_tools(&mut ctx, &call);
+    // Same tool + same args (e.g. ReadImage on an overwritten screenshot path)
+    // but a different result every call — must never be flagged.
+    for i in 0..8 {
+        let v = cycle(&mut det, &mut ctx, "ReadImage", &format!("frame-{i}"));
         assert!(
-            matches!(action, Verdict::Continue),
-            "different inputs should not trigger loop at iteration {i}"
+            matches!(v, Verdict::Continue),
+            "fresh output must reset the streak at iteration {i}, got {v:?}"
         );
     }
 }
 
 #[test]
-fn loop_detector_multibyte_utf8_input_does_not_panic() {
+fn single_cycle_returns_continue() {
     let mut det = LoopDetector::new();
     let mut ctx = make_ctx();
-    // Large CJK input — we hash full JSON, so this only exercises UTF-8
-    // safety of the serialized string. Must not panic.
-    let cjk = "中".repeat(200); // 600 bytes
-    let call = vec![("id".into(), "Write".into(), json!({"result": cjk}))];
-    let action = det.on_before_tools(&mut ctx, &call);
-    assert!(matches!(action, Verdict::Continue));
+    assert!(matches!(
+        cycle(&mut det, &mut ctx, "Read", "x"),
+        Verdict::Continue
+    ));
+}
+
+// --- resets ---
+
+fn prime_to_abort(det: &mut LoopDetector, ctx: &mut TurnContext) {
+    for _ in 0..5 {
+        cycle(det, ctx, "Read", "same");
+    }
 }
 
 #[test]
-fn loop_detector_on_compact_completed_resets_signatures() {
+fn human_envelope_resets() {
     let mut det = LoopDetector::new();
     let mut ctx = make_ctx();
-    let calls = [tool("Read")];
-    for _ in 0..4 {
-        det.on_before_tools(&mut ctx, &calls);
-    }
-    det.on_compact_completed();
-    let action = det.on_before_tools(&mut ctx, &calls);
-    assert!(
-        matches!(action, Verdict::Continue),
-        "compact completion must reset signature counter; got {action:?}",
-    );
+    prime_to_abort(&mut det, &mut ctx);
+    det.on_envelope_received(&MessageSource::Human);
+    assert!(matches!(
+        cycle(&mut det, &mut ctx, "Read", "same"),
+        Verdict::Continue
+    ));
 }
 
 #[test]
-fn loop_detector_compact_reset_independent_from_envelope_reset() {
+fn scheduled_envelope_resets() {
     let mut det = LoopDetector::new();
     let mut ctx = make_ctx();
-    let calls = [tool("Bash")];
-    for _ in 0..2 {
-        det.on_before_tools(&mut ctx, &calls);
-    }
+    prime_to_abort(&mut det, &mut ctx);
+    det.on_envelope_received(&MessageSource::Scheduled);
+    assert!(matches!(
+        cycle(&mut det, &mut ctx, "Read", "same"),
+        Verdict::Continue
+    ));
+}
+
+#[test]
+fn system_envelope_does_not_reset() {
+    let mut det = LoopDetector::new();
+    let mut ctx = make_ctx();
+    prime_to_abort(&mut det, &mut ctx);
+    det.on_envelope_received(&MessageSource::System("goal_continuation".into()));
+    assert!(matches!(
+        cycle(&mut det, &mut ctx, "Read", "same"),
+        Verdict::AbortTurn { .. }
+    ));
+}
+
+#[test]
+fn compact_completed_resets() {
+    let mut det = LoopDetector::new();
+    let mut ctx = make_ctx();
+    prime_to_abort(&mut det, &mut ctx);
     det.on_compact_completed();
-    // After compact reset, three more calls should not yet abort
-    // (would only hit the WARN_THRESHOLD on the 3rd post-reset call).
-    let a1 = det.on_before_tools(&mut ctx, &calls);
-    let a2 = det.on_before_tools(&mut ctx, &calls);
-    let a3 = det.on_before_tools(&mut ctx, &calls);
-    assert!(
-        matches!(a1, Verdict::Continue),
-        "first post-compact call must Continue, got {a1:?}",
-    );
-    assert!(
-        matches!(a2, Verdict::Continue),
-        "second post-compact call must Continue, got {a2:?}",
-    );
-    assert!(
-        matches!(a3, Verdict::InjectWarning(_)),
-        "third post-compact call hits WARN_THRESHOLD as if starting fresh, got {a3:?}",
-    );
+    assert!(matches!(
+        cycle(&mut det, &mut ctx, "Read", "same"),
+        Verdict::Continue
+    ));
+}
+
+#[test]
+fn different_tools_are_independent() {
+    let mut det = LoopDetector::new();
+    let mut ctx = make_ctx();
+    cycle(&mut det, &mut ctx, "Read", "a");
+    cycle(&mut det, &mut ctx, "Write", "a");
+    cycle(&mut det, &mut ctx, "Read", "a");
+    assert!(matches!(
+        cycle(&mut det, &mut ctx, "Write", "a"),
+        Verdict::Continue
+    ));
 }

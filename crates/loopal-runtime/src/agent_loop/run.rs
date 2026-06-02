@@ -84,7 +84,11 @@ impl AgentLoopRunner {
                     }
                     self.turn_count += 1;
                     if self.interrupt.take() {
-                        self.emit_interrupted().await?;
+                        self.collect_interrupted_turn().await?;
+                    } else if self.turns.current_turn_id().is_some() {
+                        // is_some guard: skip_stale_continuation_turn already
+                        // rewound the turn, leaving no current turn to end.
+                        self.end_turn_record(loopal_turn::TurnOutcome::Complete);
                     }
                 }
                 Err(e) => {
@@ -97,7 +101,7 @@ impl AgentLoopRunner {
                         continue;
                     }
                     if self.interrupt.take() {
-                        self.emit_interrupted().await?;
+                        self.collect_interrupted_turn().await?;
                         continue;
                     }
                     error!(error = %e, "LLM request failed");
@@ -176,6 +180,15 @@ impl AgentLoopRunner {
         info!("agent interrupted by user");
         self.status = AgentStatus::WaitingForInput;
         self.emit(AgentEventPayload::Interrupted).await
+    }
+
+    // finalize runs even if the Interrupted emit fails, so the turn is never
+    // left InProgress.
+    async fn collect_interrupted_turn(&mut self) -> Result<()> {
+        let emit_result = self.emit_interrupted().await;
+        self.finalize_turn_cancellation(loopal_turn::CancelledCause::UserInterrupt)
+            .await;
+        emit_result
     }
 
     pub async fn emit_inbox_consumed(&mut self) {

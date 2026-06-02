@@ -1,4 +1,4 @@
-use loopal_turn::{ToolExecState, TurnEvent, TurnStep};
+use loopal_turn::{CancelCause, ToolExecState, TurnEvent, TurnStep};
 
 use super::TurnTracker;
 use super::error::TurnTrackerError;
@@ -11,6 +11,40 @@ impl TurnTracker {
 
     pub fn close_tool_batch(&mut self) {
         self.current_tool_batch_step = None;
+    }
+
+    // Cancel every not-yet-terminal item in the open ToolBatch, then close it.
+    // reason: turn-level cancellation (parent abort) leaves spawned tools in
+    // Pending/Running; without this the wire serializes them as the bogus
+    // "Pending — runtime invariant violated" tool_result.
+    pub fn cancel_open_tool_batch(&mut self, cause: CancelCause, logger: &dyn TurnEventLogger) {
+        let Some(step_index) = self.current_tool_batch_step else {
+            return;
+        };
+        let pending: Vec<u32> = self
+            .store
+            .current_turn()
+            .and_then(|t| t.body.steps.get(step_index as usize))
+            .and_then(|s| match s {
+                TurnStep::ToolBatch(b) => Some(b),
+                _ => None,
+            })
+            .map(|b| {
+                b.items
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, it)| {
+                        matches!(it.state, ToolExecState::Pending | ToolExecState::Running)
+                    })
+                    .map(|(i, _)| i as u32)
+                    .collect()
+            })
+            .unwrap_or_default();
+        for idx in pending {
+            let _ =
+                self.try_update_tool_state(idx, ToolExecState::Cancelled(cause.clone()), logger);
+        }
+        self.close_tool_batch();
     }
 
     pub fn try_update_tool_state(

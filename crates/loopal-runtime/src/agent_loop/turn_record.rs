@@ -81,6 +81,20 @@ impl AgentLoopRunner {
         self.turns.close_tool_batch();
     }
 
+    pub(super) fn cancel_open_tool_batch_record(&mut self, cause: loopal_turn::CancelCause) {
+        let logger = make_logger(&self.params.deps.session_manager, &self.params.session.id);
+        self.turns.cancel_open_tool_batch(cause, &logger);
+    }
+
+    // reason: user-level cancellation MUST go through finalize_turn_cancellation
+    // (pairs tool_use/tool_result, resets continuation, emits TurnCancelled).
+    // Two paths intentionally bypass finalize and end here directly:
+    //   1. compaction's synthetic host turn (compaction/host.rs) — owns no tool
+    //      batch and no continuation state.
+    //   2. governance abort (turn_observer_dispatch.rs) — the turn made a real
+    //      LlmCall and ends Complete with Cancelled compensation items; it must
+    //      NOT call on_turn_cancelled (that would clear the very loop/degeneration
+    //      streak that triggered the abort) and must NOT emit TurnCancelled.
     pub fn end_turn_record(&mut self, outcome: TurnOutcome) {
         let logger = make_logger(&self.params.deps.session_manager, &self.params.session.id);
         if let Err(e) = self.turns.end_turn(outcome, &logger) {

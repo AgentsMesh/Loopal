@@ -18,6 +18,11 @@ impl TurnStore {
         self.current_turn_id.as_ref()
     }
 
+    pub fn current_turn_index(&self) -> Option<usize> {
+        let id = self.current_turn_id.as_ref()?;
+        self.turns.iter().position(|t| &t.id == id)
+    }
+
     pub fn len(&self) -> usize {
         self.turns.len()
     }

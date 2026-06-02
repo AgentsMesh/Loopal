@@ -77,6 +77,8 @@ pub enum CancelCause {
     GovernanceAbort,
     CrashRecovery,
     Timeout,
+    // Superseded: a new envelope arrived and aborted the in-progress turn.
+    ParentTurnAborted,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

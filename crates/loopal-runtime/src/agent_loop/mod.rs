@@ -63,6 +63,7 @@ mod tools_phase;
 pub(crate) mod tools_plan;
 mod tools_plan_exit;
 mod tools_resolve;
+mod turn_cancel_finalize;
 pub mod turn_context;
 mod turn_exec;
 pub mod turn_history;

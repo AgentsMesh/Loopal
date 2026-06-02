@@ -45,6 +45,8 @@ mod goal_session_test;
 mod governance_bridge_test;
 #[path = "suite/hydrate_test.rs"]
 mod hydrate_test;
+#[path = "suite/loop_detector_digest_test.rs"]
+mod loop_detector_digest_test;
 #[path = "suite/loop_detector_edge_test.rs"]
 mod loop_detector_edge_test;
 #[path = "suite/loop_detector_test.rs"]

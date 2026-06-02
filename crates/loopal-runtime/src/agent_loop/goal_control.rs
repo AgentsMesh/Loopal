@@ -68,7 +68,7 @@ impl AgentLoopRunner {
             return Ok(false);
         }
         if is_clear {
-            self.last_continuation_goal_id = None;
+            self.reset_continuation_state();
         }
         if kickoff_eligible {
             return self.goal_continuation_check().await;

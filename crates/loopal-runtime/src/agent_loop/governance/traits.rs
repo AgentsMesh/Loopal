@@ -46,6 +46,19 @@ pub trait Governance: Send + Sync {
     // not pre-classify so each Governance can apply its own semantics.
     fn on_envelope_received(&mut self, _source: &MessageSource) {}
 
+    // Post-execution observation for decision-makers that need tool OUTPUT to
+    // decide (e.g. LoopDetector keys its signature on input+output so that a
+    // tool re-reading a mutating path — same args, different result — is not
+    // flagged as a loop). `results[i]` is index-matched to `tool_uses[i]`.
+    // Cannot veto (the batch already ran); it feeds the next on_before_tools.
+    fn on_after_tools(
+        &mut self,
+        _ctx: &mut TurnContext,
+        _tool_uses: &[(String, String, serde_json::Value)],
+        _results: &[ContentBlock],
+    ) {
+    }
+
     // Compaction just rewrote earlier history: any cross-turn state derived
     // from the pre-compact conversation (e.g. signature counters that index
     // tool calls now absent from the store) is stale and must reset.
@@ -53,6 +66,12 @@ pub trait Governance: Send + Sync {
     // store has advanced. Default is no-op for governances without
     // cross-turn state.
     fn on_compact_completed(&mut self) {}
+
+    // A turn was cancelled (user interrupt / parent abort). Cross-turn state
+    // accrued from its batches is not a valid sample — a user interrupt should
+    // reset a loop streak rather than let it span the cancellation. Default
+    // no-op for governances whose state is not turn-scoped.
+    fn on_turn_cancelled(&mut self) {}
 
     /// Inspect the completed turn alongside trailing history; default
     /// returns `PostTurnAction::None`. Cross-turn safety nets (degeneration

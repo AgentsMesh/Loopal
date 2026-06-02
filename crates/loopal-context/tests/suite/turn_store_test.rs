@@ -56,6 +56,26 @@ fn tracker() -> TurnTracker {
 }
 
 #[test]
+fn current_turn_index_points_at_in_progress_turn() {
+    let mut t = tracker();
+    for i in 0..3 {
+        t.try_start_turn(
+            TurnTrigger::UserInput {
+                envelope_id: format!("env-{i}"),
+                content: format!("msg-{i}"),
+                images: Vec::new(),
+            },
+            &InMemoryLogger,
+        )
+        .unwrap();
+        t.end_turn(TurnOutcome::Complete, &InMemoryLogger).unwrap();
+    }
+    assert!(t.store().current_turn_index().is_none());
+    t.try_start_turn(user_trigger(), &InMemoryLogger).unwrap();
+    assert_eq!(t.store().current_turn_index(), Some(3));
+}
+
+#[test]
 fn empty_store_has_no_current_turn() {
     let t = tracker();
     assert!(t.store().current_turn().is_none());

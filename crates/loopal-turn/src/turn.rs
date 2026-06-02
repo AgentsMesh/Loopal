@@ -118,6 +118,15 @@ pub enum TurnTrigger {
     Resume,
 }
 
+impl TurnTrigger {
+    // reason: only goal-continuation turns are subject to the continuation
+    // consistency gate; every other trigger (real user input, cron, agent,
+    // channel, resume) must reach the LLM unconditionally.
+    pub fn is_goal_continuation(&self) -> bool {
+        matches!(self, TurnTrigger::GoalContinuation { .. })
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum TurnOutcome {
     InProgress,

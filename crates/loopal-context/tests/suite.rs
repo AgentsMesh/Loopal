@@ -1,4 +1,6 @@
 // Single test binary — includes all test modules
+#[path = "suite/cancel_open_batch_test.rs"]
+mod cancel_open_batch_test;
 #[path = "suite/compaction_pair_test.rs"]
 mod compaction_pair_test;
 #[path = "suite/file_snapshot_test.rs"]

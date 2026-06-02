@@ -165,6 +165,8 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
         | SessionResumeWarnings { .. }
         | QuestionDecided { .. }
         | DegenerationDetected(_)
+        | ContinuationSkipped { .. }
+        | TurnCancelled { .. }
         | ContinuationGateChanged(_) => MutationEffect::NoOp,
         CompactProgress { phase, detail } => compact::progress(state, *phase, detail.as_deref()),
     }

@@ -14,10 +14,7 @@ use crate::task_snapshot::TaskSnapshot;
 use crate::thread_goal::{GoalTransitionReason, ThreadGoal};
 
 /// Event payload. Runner/LLM/Tools only construct this enum.
-///
-/// `#[rustfmt::skip]` keeps single-field variants on one line so the file
-/// fits the 200-line budget; expanded form (`{ text: String }` on three
-/// lines) would push it well past with no readability gain.
+/// `#[rustfmt::skip]` keeps single-field variants on one line (200-line budget).
 #[rustfmt::skip]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AgentEventPayload {
@@ -196,4 +193,8 @@ pub enum AgentEventPayload {
     DegenerationDetected(DegenerationSummary),
     /// Continuation gate opened or closed. Drives UI status indicators.
     ContinuationGateChanged(ContinuationGateSummary),
+    /// A goal-continuation turn was skipped (goal changed) — keeps the skip observable, not silent.
+    ContinuationSkipped { reason: String },
+    /// A turn was cancelled (parent abort / governance / interrupt). `cause` is the rendered CancelledCause.
+    TurnCancelled { cause: String },
 }

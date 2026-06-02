@@ -75,6 +75,16 @@ impl ToolImageBlock {
         }
     }
 
+    // Content identity: Inline → base64 data, SessionResource → content-addressed
+    // id. Distinguishes different images at the same path (byte_size alone would
+    // collide two same-length-but-different images).
+    pub fn content_key(&self) -> &str {
+        match self {
+            Self::Inline { data, .. } => data,
+            Self::SessionResource { id, .. } => id,
+        }
+    }
+
     pub fn is_inline(&self) -> bool {
         matches!(self, Self::Inline { .. })
     }

@@ -72,6 +72,14 @@ impl AgentLoopRunner {
         }
 
         self.inject_pending_messages().await;
+        // A cancelled batch's results are synthetic "Interrupted by user" errors;
+        // feeding them to LoopDetector would let repeated interrupts accrue a
+        // false loop streak. Hooks (DiffTracker) still run on partial writes.
+        if !turn_ctx.cancel.is_cancelled() {
+            for g in &mut self.governance {
+                g.on_after_tools(turn_ctx, &tool_uses, &result_blocks);
+            }
+        }
         for h in &mut self.hooks {
             h.on_after_tools(turn_ctx, &tool_uses, &result_blocks);
         }

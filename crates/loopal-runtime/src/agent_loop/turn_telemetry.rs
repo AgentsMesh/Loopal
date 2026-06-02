@@ -31,6 +31,14 @@ impl AgentLoopRunner {
 
     async fn execute_turn_body(&mut self, turn_ctx: &mut TurnContext) -> Result<TurnOutput> {
         crate::otel_metrics::active_turns().add(1, &[]);
+        // Skip before on_turn_start/record so a stale continuation never enters
+        // turn_history (zero metrics would pollute degeneration streaks).
+        if self.skip_stale_continuation_turn(turn_ctx).await {
+            crate::otel_metrics::active_turns().add(-1, &[]);
+            return Ok(TurnOutput {
+                output: String::new(),
+            });
+        }
         for h in &mut self.hooks {
             h.on_turn_start(turn_ctx);
         }
@@ -76,24 +84,28 @@ impl AgentLoopRunner {
         let attrs = &[KeyValue::new("gen_ai.token.type", "output"), model_attr];
         crate::otel_metrics::token_usage().add(m.tokens_out as u64, attrs);
 
-        if let Err(emit_err) = self
-            .emit_in_turn(AgentEventPayload::TurnCompleted(
-                loopal_protocol::TurnSummary {
-                    turn_id: turn_ctx.turn_id,
-                    duration_ms,
-                    llm_calls: m.llm_calls,
-                    tool_calls_requested: m.tool_calls_requested,
-                    tool_calls_approved: m.tool_calls_approved,
-                    tool_calls_denied: m.tool_calls_denied,
-                    tool_errors: m.tool_errors,
-                    auto_continuations: m.auto_continuations,
-                    warnings_injected: m.warnings_injected,
-                    tokens_in: m.tokens_in,
-                    tokens_out: m.tokens_out,
-                    modified_files: files,
-                },
-            ))
-            .await
+        // A cancelled turn is reported via TurnCancelled (finalize), not
+        // TurnCompleted — emitting both would give the same turn_id divergent
+        // terminal states. OTel duration/token above still record the real cost.
+        if !turn_ctx.cancel.is_cancelled()
+            && let Err(emit_err) = self
+                .emit_in_turn(AgentEventPayload::TurnCompleted(
+                    loopal_protocol::TurnSummary {
+                        turn_id: turn_ctx.turn_id,
+                        duration_ms,
+                        llm_calls: m.llm_calls,
+                        tool_calls_requested: m.tool_calls_requested,
+                        tool_calls_approved: m.tool_calls_approved,
+                        tool_calls_denied: m.tool_calls_denied,
+                        tool_errors: m.tool_errors,
+                        auto_continuations: m.auto_continuations,
+                        warnings_injected: m.warnings_injected,
+                        tokens_in: m.tokens_in,
+                        tokens_out: m.tokens_out,
+                        modified_files: files,
+                    },
+                ))
+                .await
         {
             tracing::error!(
                 error = %emit_err,
@@ -108,6 +120,12 @@ impl AgentLoopRunner {
     }
 
     async fn record_turn_completion(&mut self, turn_ctx: &TurnContext) {
+        // A cancelled turn is not a degeneration/loop sample: it was interrupted,
+        // not the agent making (or failing to make) progress. tool_calls_approved
+        // counts permitted-not-completed tools, so it cannot stand in for progress.
+        if turn_ctx.cancel.is_cancelled() {
+            return;
+        }
         let record = TurnRecord {
             metrics: turn_ctx.metrics.clone(),
             text_hash: turn_ctx.metrics.text_hash,

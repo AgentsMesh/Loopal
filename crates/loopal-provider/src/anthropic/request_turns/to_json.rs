@@ -55,6 +55,7 @@ fn cancel_reason(c: &CancelCause) -> &'static str {
         CancelCause::GovernanceAbort => "Aborted by governance",
         CancelCause::CrashRecovery => "Cancelled (crash recovery)",
         CancelCause::Timeout => "Timed out",
+        CancelCause::ParentTurnAborted => "Cancelled (superseded by new input)",
     }
 }
 

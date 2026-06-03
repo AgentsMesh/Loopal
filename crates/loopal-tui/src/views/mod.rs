@@ -30,6 +30,7 @@ pub mod text_width;
 pub mod topology_overlay;
 pub mod unified_status;
 mod unified_status_goal;
+mod unified_status_label;
 
 /// Shared dim-grey color used for separators and inactive panel decoration.
 pub const DIM_SEPARATOR: ratatui::style::Color = ratatui::style::Color::Rgb(60, 60, 60);

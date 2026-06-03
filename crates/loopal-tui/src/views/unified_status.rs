@@ -8,6 +8,7 @@ use loopal_session::state::SessionState;
 use loopal_view_state::AgentConversation;
 
 use super::unified_status_goal::append_goal_indicator;
+use super::unified_status_label::{ActivityInputs, pick_label};
 use crate::app::App;
 
 pub const SPINNER: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
@@ -99,22 +100,22 @@ fn status_icon_and_label(
     elapsed: std::time::Duration,
     is_active: bool,
 ) -> (String, Style, &'static str) {
-    let spin = || spinner_frame(elapsed).to_string();
-    if conv.thinking_active {
-        (spin(), Style::default().fg(Color::Magenta), "Thinking")
-    } else if !conv.streaming_text.is_empty() {
-        (spin(), Style::default().fg(Color::Green), "Streaming")
-    } else if conv.pending_permission.is_some() {
-        ("●".into(), Style::default().fg(Color::Yellow), "Waiting")
-    } else if !active_agent_idle(app, state) {
-        (spin(), Style::default().fg(Color::Cyan), "Working")
-    } else if has_live_subagents(app) {
-        (spin(), Style::default().fg(Color::Blue), "Agents")
-    } else if is_active {
-        (spin(), Style::default().fg(Color::Cyan), "Working")
+    let inputs = ActivityInputs {
+        thinking: conv.thinking_active,
+        compacting: conv.compact_banner.is_some(),
+        streaming: !conv.streaming_text.is_empty(),
+        pending_permission: conv.pending_permission.is_some(),
+        agent_idle: active_agent_idle(app, state),
+        has_subagents: has_live_subagents(app),
+        recently_or_active: is_active,
+    };
+    let (use_spinner, color, label) = pick_label(&inputs);
+    let icon = if use_spinner {
+        spinner_frame(elapsed).to_string()
     } else {
-        ("●".into(), Style::default().fg(Color::DarkGray), "Idle")
-    }
+        "●".to_string()
+    };
+    (icon, Style::default().fg(color), label)
 }
 
 pub fn spinner_frame(elapsed: std::time::Duration) -> &'static str {
@@ -126,6 +127,7 @@ fn is_agent_active(app: &App, state: &SessionState, conv: &AgentConversation) ->
     !active_agent_idle(app, state)
         || !conv.streaming_text.is_empty()
         || conv.thinking_active
+        || conv.compact_banner.is_some()
         || has_live_subagents(app)
         || conv.is_recently_active(ACTIVITY_GRACE)
 }

@@ -54,7 +54,10 @@ mod tests {
 
     #[test]
     fn compacting_when_banner_present_and_agent_idle() {
-        let i = ActivityInputs { compacting: true, ..base() };
+        let i = ActivityInputs {
+            compacting: true,
+            ..base()
+        };
         let (spin, color, label) = pick_label(&i);
         assert_eq!(label, "Compacting");
         assert_eq!(color, Color::Cyan);
@@ -63,44 +66,67 @@ mod tests {
 
     #[test]
     fn thinking_outranks_compacting() {
-        let i = ActivityInputs { thinking: true, compacting: true, ..base() };
+        let i = ActivityInputs {
+            thinking: true,
+            compacting: true,
+            ..base()
+        };
         assert_eq!(pick_label(&i).2, "Thinking");
     }
 
     #[test]
     fn compacting_outranks_streaming() {
-        let i = ActivityInputs { compacting: true, streaming: true, ..base() };
+        let i = ActivityInputs {
+            compacting: true,
+            streaming: true,
+            ..base()
+        };
         assert_eq!(pick_label(&i).2, "Compacting");
     }
 
     #[test]
     fn streaming_when_only_streaming() {
-        let i = ActivityInputs { streaming: true, ..base() };
+        let i = ActivityInputs {
+            streaming: true,
+            ..base()
+        };
         assert_eq!(pick_label(&i).2, "Streaming");
     }
 
     #[test]
     fn waiting_uses_dot_not_spinner() {
-        let i = ActivityInputs { pending_permission: true, ..base() };
+        let i = ActivityInputs {
+            pending_permission: true,
+            ..base()
+        };
         let (spin, color, label) = pick_label(&i);
         assert_eq!((spin, color, label), (false, Color::Yellow, "Waiting"));
     }
 
     #[test]
     fn working_when_backend_not_idle() {
-        let i = ActivityInputs { agent_idle: false, ..base() };
+        let i = ActivityInputs {
+            agent_idle: false,
+            ..base()
+        };
         assert_eq!(pick_label(&i).2, "Working");
     }
 
     #[test]
     fn agents_when_subagents_live() {
-        let i = ActivityInputs { has_subagents: true, ..base() };
+        let i = ActivityInputs {
+            has_subagents: true,
+            ..base()
+        };
         assert_eq!(pick_label(&i).2, "Agents");
     }
 
     #[test]
     fn working_during_activity_grace() {
-        let i = ActivityInputs { recently_or_active: true, ..base() };
+        let i = ActivityInputs {
+            recently_or_active: true,
+            ..base()
+        };
         assert_eq!(pick_label(&i).2, "Working");
     }
 }

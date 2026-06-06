@@ -15,6 +15,7 @@ use super::turn_context::TurnContext;
 impl AgentLoopRunner {
     pub(super) async fn run_loop(&mut self) -> Result<AgentOutput> {
         let mut last_output = String::new();
+        let mut last_error: Option<String> = None;
         let mut server_block_retry = false;
         let mut context_overflow_retry = false;
         // Need user input whenever the last message isn't User — covers empty
@@ -108,16 +109,29 @@ impl AgentLoopRunner {
                         continue;
                     }
                     error!(error = %e, "LLM request failed");
-                    self.transition_error(LoopalError::to_string(&e)).await?;
+                    let msg = LoopalError::to_string(&e);
+                    self.transition_error(msg.clone()).await?;
+                    last_error = Some(msg);
+                    // reason: an ephemeral agent has no UI/parent to retry, so an
+                    // unrecovered turn error must terminate the loop with the real
+                    // error — not fall through to "idle, exiting" which would report
+                    // a successful empty result and hide the failure from the caller.
+                    if matches!(self.params.config.lifecycle, LifecycleMode::Ephemeral) {
+                        break;
+                    }
                 }
             }
             server_block_retry = false;
             context_overflow_retry = false;
         }
 
+        let (result, terminate_reason) = match last_error {
+            Some(err) if last_output.is_empty() => (err, TerminateReason::Error),
+            _ => (last_output, TerminateReason::Goal),
+        };
         Ok(AgentOutput {
-            result: last_output,
-            terminate_reason: TerminateReason::Goal,
+            result,
+            terminate_reason,
         })
     }
 

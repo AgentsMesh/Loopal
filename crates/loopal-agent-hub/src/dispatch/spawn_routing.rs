@@ -34,9 +34,30 @@ pub async fn handle_spawn_agent(
                 "'target_hub' cannot contain '/' (cross-hub address encoding), got: {target}"
             ));
         }
-        return super::cross_hub_forward::forward_cross_hub_spawn(hub, params, from_agent).await;
+        let own_hub = hub
+            .lock()
+            .await
+            .uplink
+            .as_ref()
+            .map(|u| u.hub_name().to_string());
+        if !is_self_target(own_hub.as_deref(), target) {
+            return super::cross_hub_forward::forward_cross_hub_spawn(hub, params, from_agent).await;
+        }
+        let mut local_params = params;
+        if let Some(obj) = local_params.as_object_mut() {
+            obj.remove("target_hub");
+        }
+        return spawn_local(hub, local_params, from_agent).await;
     }
     spawn_local(hub, params, from_agent).await
+}
+
+// reason: a hub targeting itself would pre-register a shadow then route back
+// through MetaHub into its own registry, colliding as "already registered" and
+// orphaning a forked process. Self-target must spawn locally — same registry,
+// no MetaHub round-trip.
+fn is_self_target(own_hub: Option<&str>, target: &str) -> bool {
+    own_hub == Some(target)
 }
 
 async fn spawn_local(
@@ -148,4 +169,24 @@ pub(super) async fn spawn_via_manager(
         .map_err(|e| format!("spawn failed: {e}"))?;
     info!(agent = %name, %agent_id, "spawn done");
     Ok(json!({"agent_id": agent_id, "name": name}))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_self_target;
+
+    #[test]
+    fn own_hub_equals_target_is_self() {
+        assert!(is_self_target(Some("hub-a"), "hub-a"));
+    }
+
+    #[test]
+    fn different_hub_is_not_self() {
+        assert!(!is_self_target(Some("hub-a"), "hub-b"));
+    }
+
+    #[test]
+    fn no_uplink_is_never_self() {
+        assert!(!is_self_target(None, "hub-a"));
+    }
 }

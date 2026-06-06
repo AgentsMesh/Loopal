@@ -1,6 +1,7 @@
 use loopal_error::{LoopalError, TerminateReason};
 use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::{StopReason, StreamChunk};
+use loopal_runtime::agent_loop::LifecycleMode;
 
 use super::mock_provider::{
     make_interactive_multi_runner, make_multi_runner, make_runner_with_mock_provider,
@@ -131,6 +132,32 @@ async fn test_prompt_driven_error_exits_cleanly() {
         ),
         "prompt-driven error should exit, got: {:?}",
         output.terminate_reason
+    );
+}
+
+/// Reproduces the cross-hub failure: a spawned (ephemeral) agent whose model
+/// has no provider on this hub. resolve_provider errors on the first LLM call;
+/// the loop must surface that error as the result + TerminateReason::Error
+/// instead of returning an empty, falsely-successful Goal completion.
+#[tokio::test]
+async fn test_ephemeral_unresolved_model_propagates_error_to_result() {
+    let calls = vec![vec![
+        Ok(StreamChunk::Text { text: "unused".into() }),
+        Ok(StreamChunk::Done {
+            stop_reason: StopReason::EndTurn,
+        }),
+    ]];
+    let (mut runner, _event_rx) = make_multi_runner(calls);
+    runner.params.config.lifecycle = LifecycleMode::Ephemeral;
+    runner.params.config.router =
+        loopal_provider_api::ModelRouter::new("unknown-model-xyz".to_string());
+
+    let output = runner.run().await.unwrap();
+    assert_eq!(output.terminate_reason, TerminateReason::Error);
+    assert!(
+        !output.result.is_empty() && output.result.contains("unknown-model-xyz"),
+        "real provider error must reach result (caller-visible), got: {:?}",
+        output.result
     );
 }
 

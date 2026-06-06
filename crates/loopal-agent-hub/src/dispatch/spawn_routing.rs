@@ -41,7 +41,8 @@ pub async fn handle_spawn_agent(
             .as_ref()
             .map(|u| u.hub_name().to_string());
         if !is_self_target(own_hub.as_deref(), target) {
-            return super::cross_hub_forward::forward_cross_hub_spawn(hub, params, from_agent).await;
+            return super::cross_hub_forward::forward_cross_hub_spawn(hub, params, from_agent)
+                .await;
         }
         let mut local_params = params;
         if let Some(obj) = local_params.as_object_mut() {

@@ -142,7 +142,9 @@ async fn test_prompt_driven_error_exits_cleanly() {
 #[tokio::test]
 async fn test_ephemeral_unresolved_model_propagates_error_to_result() {
     let calls = vec![vec![
-        Ok(StreamChunk::Text { text: "unused".into() }),
+        Ok(StreamChunk::Text {
+            text: "unused".into(),
+        }),
         Ok(StreamChunk::Done {
             stop_reason: StopReason::EndTurn,
         }),

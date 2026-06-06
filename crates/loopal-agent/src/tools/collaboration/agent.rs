@@ -29,7 +29,10 @@ impl Tool for AgentTool {
                 "prompt": { "type": "string" },
                 "name": { "type": "string" },
                 "subagent_type": { "type": "string" },
-                "model": { "type": "string" },
+                "model": {
+                    "type": "string",
+                    "description": "Omit to inherit the parent agent's model. Only set to override, and only to a model the target hub actually has — a cross-hub spawn forwards this name verbatim, so an unsupported model fails with 'Model not found'."
+                },
                 "target_hub": {
                     "type": "string",
                     "description": "Spawn on a remote hub in the cluster (e.g. 'hub-b'). Requires MetaHub connection."

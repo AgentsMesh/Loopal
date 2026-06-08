@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::content::{ServerToolPair, TextBlock, ThinkingBlock, ToolCall, ToolCallId, ToolResult};
+use crate::content::{ServerBlock, TextBlock, ToolCall, ToolCallId, ToolResult};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TurnStep {
@@ -27,16 +27,16 @@ pub enum TurnStep {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssistantOutput {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub thinking: Option<ThinkingBlock>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub text_blocks: Vec<TextBlock>,
     // reason: Vec 顺序 = LLM stream emission 顺序; ToolBatchItem 通过 id 匹配回此处的
     // tool_calls. I4 invariant (parallel ordering) 在此处的 Vec ordering 上锁定。
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tool_calls: Vec<ToolCall>,
+    // reason: reasoning(Reasoning) 与 server tool(ToolPair) 按 LLM 流顺序混排，
+    // 投影时 reasoning 必须先于其 web_search_call / 作为 Anthropic content 首块。
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub server_blocks: Vec<ServerToolPair>,
+    pub server_blocks: Vec<ServerBlock>,
     pub stop_reason: StopReason,
 }
 

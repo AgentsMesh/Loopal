@@ -100,6 +100,7 @@ mod permission_test_ext;
 mod plan_mode_filter_test;
 mod plan_mode_test;
 mod preflight_test;
+mod record_message_edge_test;
 mod record_message_test;
 mod recovery_invariant_test;
 mod resume_invariant_test;

@@ -23,7 +23,6 @@ fn llm_call_with_tools(ids: &[&str]) -> TurnStep {
     TurnStep::LlmCall {
         model: "m".into(),
         response: AssistantOutput {
-            thinking: None,
             text_blocks: Vec::new(),
             tool_calls: ids
                 .iter()

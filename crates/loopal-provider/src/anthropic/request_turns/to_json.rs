@@ -1,16 +1,18 @@
 use loopal_turn::{
-    AssistantOutput, CancelCause, OrderedToolBatch, ServerToolPair, TextBlock, ThinkingBlock,
-    ToolBatchItem, ToolCall, ToolExecState, ToolResult,
+    AssistantOutput, CancelCause, OrderedToolBatch, ServerBlock, ServerToolPair, TextBlock,
+    ThinkingBlock, ToolBatchItem, ToolCall, ToolExecState, ToolResult,
 };
 use serde_json::{Value, json};
 
 pub(super) fn build_assistant(response: &AssistantOutput) -> Value {
     let mut content: Vec<Value> = Vec::new();
-    if let Some(t) = &response.thinking {
-        content.push(thinking_to_json(t));
-    }
-    for pair in &response.server_blocks {
-        content.extend(server_pair_to_json(pair));
+    // reason: server_blocks 在最前 → thinking 必须是 assistant content 首块(Anthropic
+    // 硬约束)且紧贴其 server_tool_use。
+    for block in &response.server_blocks {
+        match block {
+            ServerBlock::Reasoning(t) => content.extend(thinking_to_json(t)),
+            ServerBlock::ToolPair(p) => content.extend(server_pair_to_json(p)),
+        }
     }
     for tb in &response.text_blocks {
         content.push(text_to_json(tb));
@@ -63,12 +65,15 @@ fn text_to_json(tb: &TextBlock) -> Value {
     json!({"type": "text", "text": tb.text})
 }
 
-fn thinking_to_json(t: &ThinkingBlock) -> Value {
-    json!({
+// reason: Anthropic 对 thinking 块密码学校验 signature，空/缺签名会 400。无签名的
+// Reasoning 直接跳过(纵深防御),正常 extended-thinking 流必带签名。
+fn thinking_to_json(t: &ThinkingBlock) -> Option<Value> {
+    let signature = t.signature.as_deref().filter(|s| !s.is_empty())?;
+    Some(json!({
         "type": "thinking",
         "thinking": t.thinking,
-        "signature": t.signature.as_deref().unwrap_or(""),
-    })
+        "signature": signature,
+    }))
 }
 
 fn tool_call_to_json(c: &ToolCall) -> Value {

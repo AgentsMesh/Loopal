@@ -31,10 +31,12 @@ fn record_text_metrics(turn_ctx: &mut TurnContext, text: &str) {
     turn_ctx.metrics.text_hash = Some(hash_text(text));
 }
 
-fn record_thinking_metrics(turn_ctx: &mut TurnContext, thinking_text: &str) {
-    if !thinking_text.is_empty() {
-        turn_ctx.metrics.thinking_block_count =
-            turn_ctx.metrics.thinking_block_count.saturating_add(1);
+fn record_thinking_metrics(turn_ctx: &mut TurnContext, thinking_blocks: u32) {
+    if thinking_blocks > 0 {
+        turn_ctx.metrics.thinking_block_count = turn_ctx
+            .metrics
+            .thinking_block_count
+            .saturating_add(thinking_blocks);
     }
 }
 
@@ -62,32 +64,26 @@ impl AgentLoopRunner {
 
         if result.stream_error {
             if !result.assistant_text.is_empty() {
-                self.record_assistant_message(
-                    &result.assistant_text,
-                    &[],
-                    &result.thinking_text,
-                    result.thinking_signature.as_deref(),
-                    result.server_blocks,
-                );
+                let thinking_blocks = result.thinking_block_count();
+                self.record_assistant_message(&result.assistant_text, &[], result.server_blocks);
                 c.last_text.clone_from(&result.assistant_text);
                 record_text_metrics(turn_ctx, &result.assistant_text);
-                record_thinking_metrics(turn_ctx, &result.thinking_text);
+                record_thinking_metrics(turn_ctx, thinking_blocks);
             }
             return Ok(TurnState::Complete);
         }
 
+        let thinking_blocks = result.thinking_block_count();
         self.record_assistant_message(
             &result.assistant_text,
             &result.tool_uses,
-            &result.thinking_text,
-            result.thinking_signature.as_deref(),
             result.server_blocks,
         );
         if !result.assistant_text.is_empty() {
             c.last_text.clone_from(&result.assistant_text);
             record_text_metrics(turn_ctx, &result.assistant_text);
         }
-        record_thinking_metrics(turn_ctx, &result.thinking_text);
+        record_thinking_metrics(turn_ctx, thinking_blocks);
 
         if result.tool_uses.is_empty() {
             return self
@@ -116,18 +112,13 @@ impl AgentLoopRunner {
         } else {
             &result.tool_uses
         };
-        self.record_assistant_message(
-            &result.assistant_text,
-            tools,
-            &result.thinking_text,
-            result.thinking_signature.as_deref(),
-            result.server_blocks,
-        );
+        let thinking_blocks = result.thinking_block_count();
+        self.record_assistant_message(&result.assistant_text, tools, result.server_blocks);
         if !result.assistant_text.is_empty() {
             c.last_text.clone_from(&result.assistant_text);
             record_text_metrics(turn_ctx, &result.assistant_text);
         }
-        record_thinking_metrics(turn_ctx, &result.thinking_text);
+        record_thinking_metrics(turn_ctx, thinking_blocks);
         if c.continuation_count >= c.max_continuations {
             return Ok(TurnState::Complete);
         }

@@ -201,7 +201,6 @@ pub fn seed_prior_completed_turn(runner: &mut AgentLoopRunner) {
         .append_step_record(loopal_turn::TurnStep::LlmCall {
             model: "test-model".into(),
             response: loopal_turn::AssistantOutput {
-                thinking: None,
                 text_blocks: vec![loopal_turn::TextBlock {
                     text: "seed-reply".into(),
                 }],
@@ -225,7 +224,6 @@ pub fn seed_prior_completed_turn(runner: &mut AgentLoopRunner) {
         .append_step_record(loopal_turn::TurnStep::LlmCall {
             model: "test-model".into(),
             response: loopal_turn::AssistantOutput {
-                thinking: None,
                 text_blocks: vec![loopal_turn::TextBlock {
                     text: "seed-reply-2".into(),
                 }],

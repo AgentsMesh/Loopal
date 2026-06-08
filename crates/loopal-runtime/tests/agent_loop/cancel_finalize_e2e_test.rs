@@ -26,7 +26,6 @@ fn in_progress_turn_with_open_tool() -> Turn {
         TurnStep::LlmCall {
             model: "m".into(),
             response: AssistantOutput {
-                thinking: None,
                 text_blocks: vec![],
                 tool_calls: vec![call.clone()],
                 server_blocks: vec![],

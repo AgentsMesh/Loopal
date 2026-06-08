@@ -42,7 +42,6 @@ fn llm_step() -> TurnStep {
     TurnStep::LlmCall {
         model: "claude-opus-4-7".into(),
         response: AssistantOutput {
-            thinking: None,
             text_blocks: vec![],
             tool_calls: vec![],
             server_blocks: vec![],

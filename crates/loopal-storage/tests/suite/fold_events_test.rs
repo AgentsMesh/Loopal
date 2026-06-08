@@ -9,7 +9,6 @@ fn empty_llm_step() -> TurnStep {
     TurnStep::LlmCall {
         model: "m".into(),
         response: AssistantOutput {
-            thinking: None,
             text_blocks: Vec::new(),
             tool_calls: Vec::new(),
             server_blocks: Vec::new(),

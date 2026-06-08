@@ -51,7 +51,6 @@ pub fn tool_history_turn(trigger_content: &str, steps: Vec<ToolStep>) -> Turn {
     turn.body.steps.push(TurnStep::LlmCall {
         model: "test".into(),
         response: AssistantOutput {
-            thinking: None,
             text_blocks: vec![],
             tool_calls: tool_calls.clone(),
             server_blocks: vec![],

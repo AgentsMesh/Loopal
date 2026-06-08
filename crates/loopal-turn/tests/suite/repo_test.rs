@@ -37,7 +37,6 @@ fn append_step_emits_event_and_grows_body() {
             TurnStep::LlmCall {
                 model: snapshot(),
                 response: AssistantOutput {
-                    thinking: None,
                     text_blocks: vec![],
                     tool_calls: vec![],
                     server_blocks: vec![],
@@ -103,7 +102,6 @@ fn cannot_append_after_end() {
             TurnStep::LlmCall {
                 model: snapshot(),
                 response: AssistantOutput {
-                    thinking: None,
                     text_blocks: vec![],
                     tool_calls: vec![],
                     server_blocks: vec![],
@@ -124,7 +122,6 @@ fn update_state_rejects_non_tool_batch_step() {
         TurnStep::LlmCall {
             model: snapshot(),
             response: AssistantOutput {
-                thinking: None,
                 text_blocks: vec![],
                 tool_calls: vec![],
                 server_blocks: vec![],

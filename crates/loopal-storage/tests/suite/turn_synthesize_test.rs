@@ -9,7 +9,6 @@ fn turn_with_llm_call_and_tools(tool_ids: &[&str]) -> Turn {
     turn.body.steps.push(TurnStep::LlmCall {
         model: "test".into(),
         response: AssistantOutput {
-            thinking: None,
             text_blocks: vec![],
             tool_calls: tool_ids
                 .iter()
@@ -30,7 +29,6 @@ fn llm_call_with_tool(id: &str) -> TurnStep {
     TurnStep::LlmCall {
         model: "test".into(),
         response: AssistantOutput {
-            thinking: None,
             text_blocks: Vec::new(),
             tool_calls: vec![ToolCall {
                 id: ToolCallId::new(id),

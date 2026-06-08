@@ -89,7 +89,6 @@ fn step_appended_carries_tool_batch() {
 fn assistant_output_with_thinking_serialization() {
     // 单 LLM call 即使 stop_reason=EndTurn 也合法（empty response 不算 protocol violation）
     let output = AssistantOutput {
-        thinking: None,
         text_blocks: vec![],
         tool_calls: vec![],
         server_blocks: vec![],

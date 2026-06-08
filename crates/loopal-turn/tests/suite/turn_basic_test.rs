@@ -45,7 +45,6 @@ fn ordered_tool_batch_preserves_call_order() {
     t.body.steps.push(TurnStep::LlmCall {
         model: snapshot(),
         response: AssistantOutput {
-            thinking: None,
             text_blocks: vec![],
             tool_calls: calls.clone(),
             server_blocks: vec![],
@@ -87,7 +86,6 @@ fn turn_with_steps_round_trip() {
     t.body.steps.push(TurnStep::LlmCall {
         model: snapshot(),
         response: AssistantOutput {
-            thinking: None,
             text_blocks: vec![],
             tool_calls: vec![],
             server_blocks: vec![],

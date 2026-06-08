@@ -31,7 +31,6 @@ pub fn reverse_project_messages_to_turns(messages: Vec<Message>) -> Vec<Turn> {
                 let step = TurnStep::LlmCall {
                     model: "test".into(),
                     response: AssistantOutput {
-                        thinking: None,
                         text_blocks: if text.is_empty() {
                             vec![]
                         } else {

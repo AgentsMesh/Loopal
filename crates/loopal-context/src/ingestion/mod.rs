@@ -88,7 +88,7 @@ fn condense_server_blocks_in_message(msg: &mut Message) {
                 replacements.push((
                     bi,
                     ContentBlock::Text {
-                        text: format!("[server tool '{name}' result condensed]"),
+                        text: server_tool_condensed_marker(name),
                     },
                 ));
             }
@@ -120,24 +120,39 @@ pub fn condense_old_server_blocks(messages: &mut [Message]) {
     }
 }
 
+// Unified placeholder a condensed server-tool result collapses to. Shared by the
+// ContentBlock-layer (wire Message) and AssistantOutput-layer (Turn) condensers.
+pub(crate) fn server_tool_condensed_marker(name: &str) -> String {
+    format!("[server tool '{name}' result condensed]")
+}
+
+// Fold one assistant response's server-tool pairs into text markers and drop the
+// server_blocks (reasoning included — its web_search_call no longer exists). Shared
+// by ingestion's defensive recovery and turn_degradation's old-turn budget trim.
+pub(crate) fn condense_server_pairs_into_text(response: &mut loopal_turn::AssistantOutput) {
+    use loopal_turn::{ServerBlock, TextBlock};
+    if response.server_blocks.is_empty() {
+        return;
+    }
+    for block in &response.server_blocks {
+        if let ServerBlock::ToolPair(p) = block {
+            response.text_blocks.push(TextBlock {
+                text: server_tool_condensed_marker(&p.call.name),
+            });
+        }
+    }
+    response.server_blocks.clear();
+}
+
 // Defensive recovery for Anthropic ServerBlockError: clears server tool
 // pairs across all turns and leaves a marker so next request validates.
 pub(crate) fn condense_server_blocks_in_turns(turns: &mut [loopal_turn::Turn]) {
-    use loopal_turn::{TextBlock, TurnStep};
+    use loopal_turn::TurnStep;
     for turn in turns {
         for step in &mut turn.body.steps {
-            let TurnStep::LlmCall { response, .. } = step else {
-                continue;
-            };
-            if response.server_blocks.is_empty() {
-                continue;
+            if let TurnStep::LlmCall { response, .. } = step {
+                condense_server_pairs_into_text(response);
             }
-            for pair in &response.server_blocks {
-                response.text_blocks.push(TextBlock {
-                    text: format!("[server tool '{}' result condensed]", pair.call.name),
-                });
-            }
-            response.server_blocks.clear();
         }
     }
 }

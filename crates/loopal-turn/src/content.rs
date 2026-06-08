@@ -1,4 +1,6 @@
 use loopal_tool_invocation::ToolImageBlock;
+use serde::de::{self, Deserializer};
+use serde::ser::Serializer;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
@@ -63,4 +65,43 @@ pub struct ServerToolResult {
 pub struct ServerToolPair {
     pub call: ServerToolCall,
     pub result: ServerToolResult,
+}
+
+// reason: OpenAI Responses 要求每个 web_search_call 紧贴其 reasoning item；
+// Anthropic 要求 thinking 块复现。reasoning 与 server tool 必须在同一序列里
+// 保留 LLM 的流式发射顺序，单一 Option 装不下多个交错的 reasoning。
+#[derive(Debug, Clone)]
+pub enum ServerBlock {
+    Reasoning(ThinkingBlock),
+    ToolPair(ServerToolPair),
+}
+
+impl Serialize for ServerBlock {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            ServerBlock::Reasoning(t) => t.serialize(serializer),
+            ServerBlock::ToolPair(p) => p.serialize(serializer),
+        }
+    }
+}
+
+// reason: 自定义 Deser 按 key 探测而非 #[serde(untagged)]，兼容旧 turns.jsonl
+// 里 `{call,result}` 形状(直接读回 ToolPair)且错误信息可读。
+impl<'de> Deserialize<'de> for ServerBlock {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = serde_json::Value::deserialize(deserializer)?;
+        if value.get("call").is_some() {
+            serde_json::from_value(value)
+                .map(ServerBlock::ToolPair)
+                .map_err(de::Error::custom)
+        } else if value.get("thinking").is_some() {
+            serde_json::from_value(value)
+                .map(ServerBlock::Reasoning)
+                .map_err(de::Error::custom)
+        } else {
+            Err(de::Error::custom(
+                "ServerBlock: expected `call` (ToolPair) or `thinking` (Reasoning) key",
+            ))
+        }
+    }
 }

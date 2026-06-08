@@ -36,8 +36,8 @@ pub fn condense_server_blocks(turns: &mut [Turn]) {
 mod tests {
     use super::*;
     use loopal_turn::{
-        AssistantOutput, ServerToolCall, ServerToolPair, ServerToolResult, StopReason, TextBlock,
-        Turn, TurnStep, TurnTrigger,
+        AssistantOutput, ServerBlock, ServerToolCall, ServerToolPair, ServerToolResult, StopReason,
+        TextBlock, Turn, TurnStep, TurnTrigger,
     };
 
     fn turn_with_server_blocks() -> Turn {
@@ -49,10 +49,9 @@ mod tests {
         t.body.steps.push(TurnStep::LlmCall {
             model: "m".into(),
             response: AssistantOutput {
-                thinking: None,
                 text_blocks: vec![TextBlock { text: "ok".into() }],
                 tool_calls: Vec::new(),
-                server_blocks: vec![ServerToolPair {
+                server_blocks: vec![ServerBlock::ToolPair(ServerToolPair {
                     call: ServerToolCall {
                         id: "s1".into(),
                         name: "web_search".into(),
@@ -62,7 +61,7 @@ mod tests {
                         block_type: "web_search_tool_result".into(),
                         content: serde_json::json!({"x": 1}),
                     },
-                }],
+                })],
                 stop_reason: StopReason::EndTurn,
             },
         });
@@ -119,7 +118,6 @@ mod tests {
         t.body.steps.push(TurnStep::LlmCall {
             model: "m".into(),
             response: AssistantOutput {
-                thinking: None,
                 text_blocks: Vec::new(),
                 tool_calls: vec![ToolCall {
                     id: ToolCallId::new("c1"),

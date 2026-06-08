@@ -3,9 +3,9 @@ use loopal_provider_api::{
     ContentBlock, MessageRole, project_turn_to_messages, project_turns_to_messages,
 };
 use loopal_turn::{
-    AssistantOutput, OrderedToolBatch, ServerToolCall, ServerToolPair, ServerToolResult,
-    StopReason, TextBlock, ToolBatchItem, ToolCall, ToolCallId, ToolExecState, ToolResult, Turn,
-    TurnBody, TurnStep, TurnTrigger,
+    AssistantOutput, OrderedToolBatch, ServerBlock, ServerToolCall, ServerToolPair,
+    ServerToolResult, StopReason, TextBlock, ThinkingBlock, ToolBatchItem, ToolCall, ToolCallId,
+    ToolExecState, ToolResult, Turn, TurnBody, TurnStep, TurnTrigger,
 };
 
 fn turn_with(trigger: TurnTrigger, steps: Vec<TurnStep>) -> Turn {
@@ -26,7 +26,6 @@ fn llm_step(text: &str, calls: Vec<ToolCall>) -> TurnStep {
     TurnStep::LlmCall {
         model: "m".into(),
         response: AssistantOutput {
-            thinking: None,
             text_blocks: if text.is_empty() {
                 vec![]
             } else {
@@ -252,10 +251,9 @@ fn server_tool_pair_emits_use_and_result() {
         vec![TurnStep::LlmCall {
             model: "m".into(),
             response: AssistantOutput {
-                thinking: None,
                 text_blocks: vec![],
                 tool_calls: vec![],
-                server_blocks: vec![pair],
+                server_blocks: vec![ServerBlock::ToolPair(pair)],
                 stop_reason: StopReason::EndTurn,
             },
         }],
@@ -274,6 +272,74 @@ fn server_tool_pair_emits_use_and_result() {
         .iter()
         .any(|b| matches!(b, ContentBlock::ServerToolResult { .. }));
     assert!(has_use && has_result);
+}
+
+// reason: 回归 #190 — reasoning 必须是 content 首块(Anthropic)且紧贴各自的
+// web_search_call(OpenAI);text/tool_calls 排在所有 server 块之后。
+#[test]
+fn reasoning_precedes_each_web_search_and_text_follows() {
+    let mk_pair = |id: &str| ServerToolPair {
+        call: ServerToolCall {
+            id: id.into(),
+            name: "web_search".into(),
+            input: serde_json::json!({}),
+        },
+        result: ServerToolResult {
+            block_type: "web_search_tool_result".into(),
+            content: serde_json::json!({}),
+        },
+    };
+    let mk_reason = |sig: &str| {
+        ServerBlock::Reasoning(ThinkingBlock {
+            thinking: "r".into(),
+            signature: Some(sig.into()),
+        })
+    };
+    let t = turn_with(
+        user_trigger("q"),
+        vec![TurnStep::LlmCall {
+            model: "m".into(),
+            response: AssistantOutput {
+                text_blocks: vec![TextBlock { text: "ans".into() }],
+                tool_calls: vec![],
+                server_blocks: vec![
+                    mk_reason("rs_1"),
+                    ServerBlock::ToolPair(mk_pair("ws_1")),
+                    mk_reason("rs_2"),
+                    ServerBlock::ToolPair(mk_pair("ws_2")),
+                ],
+                stop_reason: StopReason::EndTurn,
+            },
+        }],
+    );
+    let msgs = project_turn_to_messages(&t);
+    let asst = msgs
+        .iter()
+        .find(|m| m.role == MessageRole::Assistant)
+        .unwrap();
+    assert!(
+        matches!(asst.content[0], ContentBlock::Thinking { .. }),
+        "first block must be reasoning (Anthropic content[0] constraint)"
+    );
+    for (i, b) in asst.content.iter().enumerate() {
+        if matches!(b, ContentBlock::ServerToolUse { .. }) {
+            assert!(
+                matches!(asst.content[i - 1], ContentBlock::Thinking { .. }),
+                "web_search_call at idx {i} must be preceded by its reasoning"
+            );
+        }
+    }
+    let text_idx = asst
+        .content
+        .iter()
+        .position(|b| matches!(b, ContentBlock::Text { .. }))
+        .unwrap();
+    let last_server = asst
+        .content
+        .iter()
+        .rposition(|b| matches!(b, ContentBlock::ServerToolResult { .. }))
+        .unwrap();
+    assert!(text_idx > last_server, "text must follow all server blocks");
 }
 
 #[test]
@@ -359,7 +425,6 @@ fn compaction_summary_projects_before_other_steps() {
             TurnStep::LlmCall {
                 model: "claude-haiku-4-5".into(),
                 response: AssistantOutput {
-                    thinking: None,
                     text_blocks: vec![TextBlock {
                         text: "RESP".into(),
                     }],

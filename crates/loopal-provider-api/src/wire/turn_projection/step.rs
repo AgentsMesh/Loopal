@@ -1,5 +1,6 @@
 use loopal_turn::{
-    AssistantOutput, InjectionKind, OrderedToolBatch, ToolBatchItem, ToolExecState, TurnStep,
+    AssistantOutput, InjectionKind, OrderedToolBatch, ServerBlock, ToolBatchItem, ToolExecState,
+    TurnStep,
 };
 
 use super::super::message::{ContentBlock, Message, MessageRole};
@@ -20,19 +21,21 @@ pub(super) fn project_step(step: &TurnStep) -> Vec<Message> {
     }
 }
 
+// reason: server_blocks 在最前 → reasoning 作为 content 首块(Anthropic 约束)且
+// 紧贴其 web_search_call;text、tool_calls 随后(OpenAI: server 块先于 function_call)。
 fn project_assistant(response: &AssistantOutput) -> Message {
     let mut content = Vec::new();
-    if let Some(t) = &response.thinking {
-        content.push(thinking_block(t));
+    for block in &response.server_blocks {
+        match block {
+            ServerBlock::Reasoning(t) => content.push(thinking_block(t)),
+            ServerBlock::ToolPair(p) => content.extend(server_pair_blocks(p)),
+        }
     }
     for block in &response.text_blocks {
         content.push(text_block(block));
     }
     for call in &response.tool_calls {
         content.push(tool_use_block(call));
-    }
-    for pair in &response.server_blocks {
-        content.extend(server_pair_blocks(pair));
     }
     Message {
         id: None,

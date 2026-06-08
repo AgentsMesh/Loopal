@@ -73,7 +73,6 @@ fn turn_with_tool_images(tool_use_id: &str, images: Vec<ToolImageBlock>) -> Turn
             TurnStep::LlmCall {
                 model: "claude-test".into(),
                 response: AssistantOutput {
-                    thinking: None,
                     text_blocks: vec![],
                     tool_calls: vec![ToolCall {
                         id: ToolCallId::new(tool_use_id),

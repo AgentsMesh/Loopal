@@ -5,8 +5,8 @@ mod step;
 mod turn;
 
 pub use content::{
-    ServerToolCall, ServerToolPair, ServerToolResult, TextBlock, ThinkingBlock, ToolCall,
-    ToolCallId, ToolResult,
+    ServerBlock, ServerToolCall, ServerToolPair, ServerToolResult, TextBlock, ThinkingBlock,
+    ToolCall, ToolCallId, ToolResult,
 };
 pub use event::TurnEvent;
 pub use repo::{InMemoryTurnRepo, TurnRepo, TurnRepoError, TurnRepoResult};

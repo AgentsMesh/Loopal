@@ -178,3 +178,5 @@ fn push_compaction_rehydrate(out: &mut Vec<Value>, r: &CompactionRehydrate) {
 mod tests_boundary;
 #[cfg(test)]
 mod tests_merge;
+#[cfg(test)]
+mod tests_reasoning;

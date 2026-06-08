@@ -1,9 +1,10 @@
-use loopal_turn::{TextBlock, ToolExecState, Turn, TurnStep};
+use loopal_turn::{ServerBlock, ToolExecState, Turn, TurnStep};
 
 use crate::budget::ContextBudget;
 use crate::compact_config::{
     LAYER1_TRIGGER_PERCENT, LAYER1_TRUNCATE_MAX_BYTES, LAYER1_TRUNCATE_MAX_LINES,
 };
+use crate::ingestion::condense_server_pairs_into_text;
 use crate::token_counter::estimate_tokens;
 
 const CAP_MAX_LINES: usize = 500;
@@ -22,27 +23,9 @@ pub fn degrade_turns_for_wire(turns: &mut [Turn], budget: &ContextBudget) {
             match step {
                 TurnStep::LlmCall { response, .. } => {
                     if !is_current {
-                        // signature 是 OpenAI reasoning_item_id 跨 turn 配对锚点 —
-                        // 必须保留。早期写法依赖 server_blocks 非空判断 → 第二次
-                        // degrade 时 server_blocks 已清空，signature 被错误 drop。
-                        if response
-                            .thinking
-                            .as_ref()
-                            .is_none_or(|t| t.signature.is_none())
-                        {
-                            response.thinking = None;
-                        }
-                        if !response.server_blocks.is_empty() {
-                            for pair in &response.server_blocks {
-                                response.text_blocks.push(TextBlock {
-                                    text: format!(
-                                        "[server tool '{}' result condensed]",
-                                        pair.call.name
-                                    ),
-                                });
-                            }
-                            response.server_blocks.clear();
-                        }
+                        // 旧 turn：web_search_call 被 condense 成 text 后不复存在，
+                        // 其 reasoning 锚点(及 Anthropic thinking)无需保留 → 全清。
+                        condense_server_pairs_into_text(response);
                     }
                 }
                 TurnStep::ToolBatch(batch) => {
@@ -130,8 +113,10 @@ pub fn estimate_turns_tokens(turns: &[Turn]) -> u32 {
                     for t in &response.text_blocks {
                         total = total.saturating_add(estimate_tokens(&t.text));
                     }
-                    if let Some(t) = &response.thinking {
-                        total = total.saturating_add(estimate_tokens(&t.thinking));
+                    for block in &response.server_blocks {
+                        if let ServerBlock::Reasoning(t) = block {
+                            total = total.saturating_add(estimate_tokens(&t.thinking));
+                        }
                     }
                 }
                 TurnStep::ToolBatch(batch) => {

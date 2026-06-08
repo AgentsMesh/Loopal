@@ -1,6 +1,8 @@
+use std::collections::HashMap;
+
 use loopal_provider_api::ContentBlock;
 use loopal_turn::{
-    AssistantOutput, ServerToolCall, ServerToolPair, ServerToolResult,
+    AssistantOutput, ServerBlock, ServerToolCall, ServerToolPair, ServerToolResult,
     StopReason as TurnStopReason, TextBlock, ThinkingBlock, ToolCall, ToolCallId, TurnStep,
 };
 use tracing::{error, warn};
@@ -13,16 +15,13 @@ impl AgentLoopRunner {
         &mut self,
         assistant_text: &str,
         tool_uses: &[(String, String, serde_json::Value)],
-        thinking_text: &str,
-        thinking_signature: Option<&str>,
         server_blocks: Vec<ContentBlock>,
     ) {
-        let has_thinking = thinking_signature.is_some()
-            && (!thinking_text.is_empty() || !server_blocks.is_empty());
         let has_text = !assistant_text.is_empty();
         let has_tools = !tool_uses.is_empty();
+        // reason: reasoning(Thinking) 与 web_search 都在 server_blocks 里，非空即有内容
         let has_server = !server_blocks.is_empty();
-        if !has_thinking && !has_text && !has_tools && !has_server {
+        if !has_text && !has_tools && !has_server {
             warn!(
                 "LLM returned an empty response (no text, tool_use, thinking, or \
                  server block); turn ends with no assistant output — check the \
@@ -34,8 +33,6 @@ impl AgentLoopRunner {
             self.params.config.model(),
             assistant_text,
             tool_uses,
-            thinking_text,
-            thinking_signature,
             &server_blocks,
         );
         if let Err(e) = self.append_step_record(step) {
@@ -48,24 +45,8 @@ fn build_llm_call_step(
     model: &str,
     assistant_text: &str,
     tool_uses: &[(String, String, serde_json::Value)],
-    thinking_text: &str,
-    thinking_signature: Option<&str>,
     server_blocks: &[ContentBlock],
 ) -> TurnStep {
-    // reason: signature 在 OpenAI 路径上承载 reasoning_item_id；只要 signature
-    // 在场且 text 或 server_blocks 之一非空，就必须保留 ThinkingBlock。否则
-    // multi-turn web_search 跨 turn 配对（OpenAI server tool）会丢失 reasoning
-    // item id，下一次 wire projection 缺少必要锚点 → API 拒绝。
-    let thinking = if thinking_signature.is_some()
-        && (!thinking_text.is_empty() || !server_blocks.is_empty())
-    {
-        Some(ThinkingBlock {
-            thinking: thinking_text.to_string(),
-            signature: thinking_signature.map(String::from),
-        })
-    } else {
-        None
-    };
     let text_blocks = if assistant_text.is_empty() {
         vec![]
     } else {
@@ -81,7 +62,6 @@ fn build_llm_call_step(
             input: input.clone(),
         })
         .collect();
-    let server_pairs = pair_server_blocks(server_blocks);
     let stop_reason = if tool_uses.is_empty() {
         TurnStopReason::EndTurn
     } else {
@@ -90,44 +70,56 @@ fn build_llm_call_step(
     TurnStep::LlmCall {
         model: model.to_string(),
         response: AssistantOutput {
-            thinking,
             text_blocks,
             tool_calls,
-            server_blocks: server_pairs,
+            server_blocks: build_server_blocks(server_blocks),
             stop_reason,
         },
     }
 }
 
-fn pair_server_blocks(blocks: &[ContentBlock]) -> Vec<ServerToolPair> {
-    let mut uses: std::collections::HashMap<String, (String, serde_json::Value)> =
-        Default::default();
-    let mut pairs = Vec::new();
-    for b in blocks {
-        if let ContentBlock::ServerToolUse { id, name, input } = b {
-            uses.insert(id.clone(), (name.clone(), input.clone()));
-        }
-    }
+// reason: 单趟按 Thinking/ServerToolUse 的流位置构造 ServerBlock，保留 reasoning 与
+// web_search 的交错顺序（OpenAI 要求 reasoning 紧贴其 web_search_call）。result 按
+// id 查表配对，容忍 use/result 非紧邻；孤立 use(截断响应)被丢弃。
+fn build_server_blocks(blocks: &[ContentBlock]) -> Vec<ServerBlock> {
+    let mut results: HashMap<&str, (&str, &serde_json::Value)> = HashMap::new();
     for b in blocks {
         if let ContentBlock::ServerToolResult {
             block_type,
             tool_use_id,
             content,
         } = b
-            && let Some((name, input)) = uses.remove(tool_use_id)
         {
-            pairs.push(ServerToolPair {
-                call: ServerToolCall {
-                    id: tool_use_id.clone(),
-                    name,
-                    input,
-                },
-                result: ServerToolResult {
-                    block_type: block_type.clone(),
-                    content: content.clone(),
-                },
-            });
+            results.insert(tool_use_id, (block_type, content));
         }
     }
-    pairs
+    let mut out = Vec::new();
+    for b in blocks {
+        match b {
+            ContentBlock::Thinking {
+                thinking,
+                signature,
+            } => out.push(ServerBlock::Reasoning(ThinkingBlock {
+                thinking: thinking.clone(),
+                signature: signature.clone(),
+            })),
+            ContentBlock::ServerToolUse { id, name, input } => {
+                if let Some((block_type, content)) = results.get(id.as_str()) {
+                    out.push(ServerBlock::ToolPair(ServerToolPair {
+                        call: ServerToolCall {
+                            id: id.clone(),
+                            name: name.clone(),
+                            input: input.clone(),
+                        },
+                        result: ServerToolResult {
+                            block_type: (*block_type).to_string(),
+                            content: (*content).clone(),
+                        },
+                    }));
+                }
+            }
+            _ => {}
+        }
+    }
+    out
 }

@@ -31,6 +31,7 @@ pub(crate) struct AgentLoopAssembly {
     pub fetch_refiner_policy: Option<Arc<dyn FetchRefinerPolicy>>,
     pub goal_session: Option<Arc<GoalRuntimeSession>>,
     pub scheduler: Arc<loopal_scheduler::CronScheduler>,
+    pub decision_cell: loopal_runtime::frontend::DecisionCell,
 }
 
 pub(crate) fn assemble_agent_loop_params(a: AgentLoopAssembly) -> AgentLoopParams {
@@ -51,7 +52,8 @@ pub(crate) fn assemble_agent_loop_params(a: AgentLoopAssembly) -> AgentLoopParam
     .message_snapshot(a.message_snapshot)
     .resume_hooks(a.resume_hooks)
     .memory_channel_opt(a.memory_channel)
-    .scheduler(a.scheduler);
+    .scheduler(a.scheduler)
+    .decision_cell(a.decision_cell);
     let builder = match a.one_shot_chat {
         Some(s) => builder.one_shot_chat(s),
         None => builder,

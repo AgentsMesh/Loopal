@@ -21,6 +21,21 @@ pub(super) fn mode_changed(state: &mut SessionViewState, mode: &str) -> Mutation
     MutationEffect::Mutated
 }
 
+pub(super) fn permission_mode_changed(state: &mut SessionViewState, mode: &str) -> MutationEffect {
+    state.agent.observable.permission_mode = mode.to_string();
+    MutationEffect::Mutated
+}
+
+pub(super) fn decision_mode_changed(state: &mut SessionViewState, mode: &str) -> MutationEffect {
+    state.agent.observable.decision_mode = mode.to_string();
+    MutationEffect::Mutated
+}
+
+pub(super) fn sandbox_policy_changed(state: &mut SessionViewState, policy: &str) -> MutationEffect {
+    state.agent.observable.sandbox_policy = policy.to_string();
+    MutationEffect::Mutated
+}
+
 pub(super) fn thinking_changed(state: &mut SessionViewState, raw_json: &str) -> MutationEffect {
     state.agent.observable.thinking_config = normalize_thinking_label(raw_json);
     MutationEffect::Mutated

@@ -32,6 +32,12 @@ pub enum ControlCommand {
     },
     /// Switch thinking config at runtime. JSON string of ThinkingConfig.
     ThinkingSwitch(String),
+    /// Switch permission mode at runtime (bypass / ask_dangerous / ask_any_write).
+    PermissionModeSwitch(String),
+    /// Switch decision mode at runtime (manual / classifier / agent).
+    DecisionModeSwitch(String),
+    /// Switch sandbox policy at runtime (disabled / default_write / read_only).
+    SandboxPolicySwitch(String),
     /// Resume (hot-swap) to a different persisted session by ID.
     ResumeSession(String),
     /// Request MCP server status snapshot (agent responds with McpStatusReport event).

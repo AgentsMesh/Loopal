@@ -1,3 +1,4 @@
+mod backend;
 mod mcp;
 
 use std::sync::Arc;
@@ -54,6 +55,7 @@ pub struct Kernel {
     pub(super) mcp_resources: Vec<(String, McpResource)>,
     pub(super) mcp_prompts: Vec<(String, McpPrompt)>,
     pub(super) settings: Settings,
+    sandbox: std::sync::RwLock<loopal_config::SandboxConfig>,
     bg_store: Arc<BackgroundTaskStore>,
     secret_client: Option<Arc<dyn SecretClient>>,
 }
@@ -87,6 +89,7 @@ impl Kernel {
             mcp_instructions: Vec::new(),
             mcp_resources: Vec::new(),
             mcp_prompts: Vec::new(),
+            sandbox: std::sync::RwLock::new(settings.sandbox.clone()),
             settings,
             bg_store,
             secret_client: None,
@@ -120,25 +123,6 @@ impl Kernel {
         if let Some(local) = self.mcp.local() {
             local.manager().write().await.set_sampling(callback);
         }
-    }
-
-    pub fn create_backend(
-        &self,
-        cwd: &std::path::Path,
-        session_id: &str,
-    ) -> Arc<dyn loopal_tool_api::Backend> {
-        use loopal_config::SandboxPolicy;
-        let policy = if self.settings.sandbox.policy != SandboxPolicy::Disabled {
-            Some(loopal_sandbox::resolve_policy(&self.settings.sandbox, cwd))
-        } else {
-            None
-        };
-        let limits = loopal_backend::ResourceLimits {
-            image_max_bytes: self.settings.images.max_bytes,
-            image_max_pixels: self.settings.images.max_pixels,
-            ..loopal_backend::ResourceLimits::default()
-        };
-        loopal_backend::LocalBackend::new(cwd.to_path_buf(), policy, limits, session_id)
     }
 
     pub fn bg_store(&self) -> &Arc<BackgroundTaskStore> {

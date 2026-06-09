@@ -9,6 +9,7 @@ use loopal_classifier::ClassifierEngine;
 use loopal_protocol::Question;
 use loopal_provider_api::{ProviderResolver, TaskType};
 
+use super::super::decision_cell::DecisionCell;
 use super::super::decision_context::DecisionContext;
 use super::super::question_handler::{QuestionHandler, QuestionOutcome};
 use super::super::traits::EventEmitter;
@@ -27,6 +28,7 @@ pub struct ClassifierQuestionHandler {
     pub(super) context: DecisionContext,
     pub(super) emitter: Arc<dyn EventEmitter>,
     pub(super) progress_interval: Duration,
+    pub(super) decision: DecisionCell,
 }
 
 impl ClassifierQuestionHandler {
@@ -44,7 +46,13 @@ impl ClassifierQuestionHandler {
             context,
             emitter,
             progress_interval: Duration::from_millis(500),
+            decision: DecisionCell::new(loopal_decision_api::DecisionMode::Classifier),
         }
+    }
+
+    pub fn with_decision(mut self, decision: DecisionCell) -> Self {
+        self.decision = decision;
+        self
     }
 
     pub fn with_progress_interval(mut self, d: Duration) -> Self {
@@ -64,6 +72,9 @@ impl ClassifierQuestionHandler {
 #[async_trait]
 impl QuestionHandler for ClassifierQuestionHandler {
     async fn ask(&self, questions: Vec<Question>) -> QuestionOutcome {
+        if self.decision.get() == loopal_decision_api::DecisionMode::Manual {
+            return self.fallback.ask(questions).await;
+        }
         if self.classifier.is_degraded() {
             warn!("classifier degraded; pure manual");
             return self.fallback.ask(questions).await;

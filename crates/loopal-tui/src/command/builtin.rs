@@ -137,4 +137,7 @@ pub fn register_all(registry: &mut CommandRegistry) {
     registry.register(Arc::new(super::goal_cmd::GoalCmd));
     registry.register(Arc::new(super::suspend_cmd::SuspendCmd));
     registry.register(Arc::new(super::suspend_cmd::UnsuspendCmd));
+    registry.register(Arc::new(super::runtime_config_cmd::PermissionCmd));
+    registry.register(Arc::new(super::runtime_config_cmd::DecisionCmd));
+    registry.register(Arc::new(super::runtime_config_cmd::SandboxCmd));
 }

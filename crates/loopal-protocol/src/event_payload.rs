@@ -71,12 +71,12 @@ pub enum AgentEventPayload {
         thinking_tokens: u32,
     },
     ModeChanged { mode: String },
-    /// Mirrors runner's active model so attached clients render consistently.
     ModelChanged { model: String },
-    /// Raw JSON from `ControlCommand::ThinkingSwitch`; view normalizes.
     ThinkingChanged { thinking_config: String },
-    /// `context_window` lets the mutator sync the budget indicator without
-    /// depending on a paired `TokenUsage` event.
+    PermissionModeChanged { mode: String },
+    DecisionModeChanged { mode: String },
+    SandboxPolicyChanged { policy: String },
+    /// `context_window` syncs the budget indicator without a paired `TokenUsage`.
     Cleared { context_window: u32 },
     Started,
     /// Emitted on `WaitingForInput` → `Running`, before any LLM/tool call.

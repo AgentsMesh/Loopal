@@ -14,6 +14,11 @@ pub enum SubPageResult {
     RewindConfirmed(usize),
     /// A session was selected to resume (full session ID).
     SessionSelected(String),
+    /// A runtime config enum value was selected (permission / decision / sandbox).
+    EnumConfigSelected {
+        kind: crate::app::EnumPickerKind,
+        value: String,
+    },
 }
 
 /// Action resulting from input handling.

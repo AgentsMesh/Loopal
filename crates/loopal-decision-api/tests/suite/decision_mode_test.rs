@@ -97,3 +97,19 @@ fn display_round_trips_with_from_str() {
         assert_eq!(s.parse::<DecisionMode>().unwrap(), mode);
     }
 }
+
+#[test]
+fn as_u8_from_u8_round_trips() {
+    for mode in [
+        DecisionMode::Manual,
+        DecisionMode::Classifier,
+        DecisionMode::Agent,
+    ] {
+        assert_eq!(DecisionMode::from_u8(mode.as_u8()), mode);
+    }
+}
+
+#[test]
+fn from_u8_unknown_falls_back_to_manual() {
+    assert_eq!(DecisionMode::from_u8(99), DecisionMode::Manual);
+}

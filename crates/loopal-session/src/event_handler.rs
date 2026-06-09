@@ -54,6 +54,9 @@ pub fn apply_event(state: &mut SessionState, event: AgentEvent) {
         | AgentEventPayload::ModeChanged { .. }
         | AgentEventPayload::ModelChanged { .. }
         | AgentEventPayload::ThinkingChanged { .. }
+        | AgentEventPayload::PermissionModeChanged { .. }
+        | AgentEventPayload::DecisionModeChanged { .. }
+        | AgentEventPayload::SandboxPolicyChanged { .. }
         | AgentEventPayload::Cleared { .. }
         | AgentEventPayload::RetryError { .. }
         | AgentEventPayload::RetryCleared

@@ -28,6 +28,27 @@ impl SessionController {
             .await;
     }
 
+    pub async fn switch_permission_mode(&self, mode: String) {
+        let target = self.active_target();
+        self.backend
+            .send_control_to_agent(&target, ControlCommand::PermissionModeSwitch(mode))
+            .await;
+    }
+
+    pub async fn switch_decision_mode(&self, mode: String) {
+        let target = self.active_target();
+        self.backend
+            .send_control_to_agent(&target, ControlCommand::DecisionModeSwitch(mode))
+            .await;
+    }
+
+    pub async fn switch_sandbox_policy(&self, policy: String) {
+        let target = self.active_target();
+        self.backend
+            .send_control_to_agent(&target, ControlCommand::SandboxPolicySwitch(policy))
+            .await;
+    }
+
     pub async fn clear(&self) {
         let target = self.active_target();
         self.backend

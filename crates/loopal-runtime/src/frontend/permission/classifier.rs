@@ -7,6 +7,7 @@ use loopal_classifier::ClassifierEngine;
 use loopal_provider_api::{ProviderResolver, TaskType};
 use loopal_tool_api::PermissionDecision;
 
+use super::super::decision_cell::DecisionCell;
 use super::super::decision_context::DecisionContext;
 use super::super::degraded::DegradedAction;
 use super::super::permission_handler::{PermissionHandler, PermissionOutcome};
@@ -16,6 +17,7 @@ pub struct ClassifierPermissionHandler {
     fallback: Box<dyn PermissionHandler>,
     resolver: Arc<dyn ProviderResolver>,
     context: DecisionContext,
+    decision: DecisionCell,
     on_provider_error: DegradedAction,
 }
 
@@ -31,8 +33,14 @@ impl ClassifierPermissionHandler {
             fallback,
             resolver,
             context,
+            decision: DecisionCell::new(loopal_decision_api::DecisionMode::Classifier),
             on_provider_error: DegradedAction::Fallback,
         }
+    }
+
+    pub fn with_decision(mut self, decision: DecisionCell) -> Self {
+        self.decision = decision;
+        self
     }
 
     pub fn with_provider_error_action(mut self, action: DegradedAction) -> Self {
@@ -86,6 +94,9 @@ impl ClassifierPermissionHandler {
 #[async_trait]
 impl PermissionHandler for ClassifierPermissionHandler {
     async fn decide(&self, id: &str, name: &str, input: &serde_json::Value) -> PermissionOutcome {
+        if self.decision.get() == loopal_decision_api::DecisionMode::Manual {
+            return self.fallback.decide(id, name, input).await;
+        }
         if self.classifier.is_degraded() {
             warn!(tool = name, "classifier degraded");
             return self

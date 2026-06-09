@@ -150,3 +150,84 @@ async fn test_thinking_switch_command_updates_observable() {
     let ev = harness.collect_until_idle().await;
     assertions::assert_has_stream(&ev);
 }
+
+#[tokio::test]
+async fn test_permission_mode_switch_command_updates_observable() {
+    let calls = scenarios::n_turn(&["before.", "after."]);
+    let inner = HarnessBuilder::new()
+        .calls(calls)
+        .messages(vec![])
+        .build_spawned()
+        .await;
+    let mut harness = wrap_tui(inner);
+    let _ = harness.collect_until_idle().await;
+
+    harness
+        .inner
+        .control_tx
+        .send(ControlCommand::PermissionModeSwitch("ask_any_write".into()))
+        .await
+        .unwrap();
+    let _ = harness
+        .collect_until(|e| matches!(e, AgentEventPayload::PermissionModeChanged { .. }))
+        .await;
+    assert_eq!(
+        harness.app.observable_for("main").permission_mode,
+        "ask_any_write",
+        "observable.permission_mode must reflect PermissionModeSwitch"
+    );
+}
+
+#[tokio::test]
+async fn test_decision_mode_switch_command_updates_observable() {
+    let calls = scenarios::n_turn(&["before.", "after."]);
+    let inner = HarnessBuilder::new()
+        .calls(calls)
+        .messages(vec![])
+        .build_spawned()
+        .await;
+    let mut harness = wrap_tui(inner);
+    let _ = harness.collect_until_idle().await;
+
+    harness
+        .inner
+        .control_tx
+        .send(ControlCommand::DecisionModeSwitch("classifier".into()))
+        .await
+        .unwrap();
+    let _ = harness
+        .collect_until(|e| matches!(e, AgentEventPayload::DecisionModeChanged { .. }))
+        .await;
+    assert_eq!(
+        harness.app.observable_for("main").decision_mode,
+        "classifier",
+        "observable.decision_mode must reflect DecisionModeSwitch"
+    );
+}
+
+#[tokio::test]
+async fn test_sandbox_policy_switch_command_updates_observable() {
+    let calls = scenarios::n_turn(&["before.", "after."]);
+    let inner = HarnessBuilder::new()
+        .calls(calls)
+        .messages(vec![])
+        .build_spawned()
+        .await;
+    let mut harness = wrap_tui(inner);
+    let _ = harness.collect_until_idle().await;
+
+    harness
+        .inner
+        .control_tx
+        .send(ControlCommand::SandboxPolicySwitch("read_only".into()))
+        .await
+        .unwrap();
+    let _ = harness
+        .collect_until(|e| matches!(e, AgentEventPayload::SandboxPolicyChanged { .. }))
+        .await;
+    assert_eq!(
+        harness.app.observable_for("main").sandbox_policy,
+        "read_only",
+        "observable.sandbox_policy must reflect SandboxPolicySwitch"
+    );
+}

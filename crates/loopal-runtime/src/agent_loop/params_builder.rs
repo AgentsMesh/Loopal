@@ -29,6 +29,7 @@ pub struct AgentLoopParamsBuilder {
     message_snapshot: Option<Arc<std::sync::RwLock<Vec<Message>>>>,
     resume_hooks: Vec<Arc<dyn SessionResumeHook>>,
     scheduler: Option<Arc<loopal_scheduler::CronScheduler>>,
+    decision_cell: crate::frontend::DecisionCell,
 }
 
 impl AgentLoopParamsBuilder {
@@ -57,6 +58,9 @@ impl AgentLoopParamsBuilder {
             message_snapshot: None,
             resume_hooks: Vec::new(),
             scheduler: None,
+            decision_cell: crate::frontend::DecisionCell::new(
+                loopal_decision_api::DecisionMode::default(),
+            ),
         }
     }
 
@@ -120,6 +124,10 @@ impl AgentLoopParamsBuilder {
         self.scheduler = Some(s);
         self
     }
+    pub fn decision_cell(mut self, c: crate::frontend::DecisionCell) -> Self {
+        self.decision_cell = c;
+        self
+    }
 
     pub fn build(self) -> AgentLoopParams {
         AgentLoopParams {
@@ -140,6 +148,7 @@ impl AgentLoopParamsBuilder {
             message_snapshot: self.message_snapshot,
             resume_hooks: self.resume_hooks,
             scheduler: self.scheduler,
+            decision_cell: self.decision_cell,
         }
     }
 }

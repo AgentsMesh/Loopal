@@ -1,3 +1,4 @@
+mod decision_cell;
 mod decision_context;
 mod degraded;
 mod dispatch;
@@ -9,6 +10,7 @@ pub mod question_handler;
 pub mod traits;
 pub mod unified;
 
+pub use decision_cell::DecisionCell;
 pub use decision_context::DecisionContext;
 pub use degraded::DegradedAction;
 pub use dispatch::{into_permission_decided, into_question_decided};

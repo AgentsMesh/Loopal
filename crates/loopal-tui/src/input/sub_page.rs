@@ -27,6 +27,7 @@ pub(super) fn handle_sub_page_key(app: &mut App, key: &KeyEvent) -> InputAction 
     let sub_page = app.sub_page.as_mut().unwrap();
     match sub_page {
         SubPage::ModelPicker(_) => handle_model_picker_key(app, key),
+        SubPage::EnumPicker { .. } => super::sub_page_pickers::handle_enum_picker_key(app, key),
         SubPage::RewindPicker(_) => handle_rewind_picker_key(app, key),
         SubPage::SessionPicker(_) => handle_session_picker_key(app, key),
         SubPage::StatusPage(_) => handle_status_page_key(app, key),
@@ -40,13 +41,16 @@ pub(super) fn handle_sub_page_key(app: &mut App, key: &KeyEvent) -> InputAction 
 
 // ── Generic picker navigation (Esc/Up/Down/Char/Backspace) ────────
 
-enum PickerKeyResult {
+pub(super) enum PickerKeyResult {
     Dismiss,
     Handled,
     Unhandled,
 }
 
-fn handle_generic_picker_key(picker: &mut PickerState, key: &KeyEvent) -> PickerKeyResult {
+pub(super) fn handle_generic_picker_key(
+    picker: &mut PickerState,
+    key: &KeyEvent,
+) -> PickerKeyResult {
     match key.code {
         KeyCode::Esc => PickerKeyResult::Dismiss,
         KeyCode::Up => {
@@ -89,7 +93,7 @@ fn handle_generic_picker_key(picker: &mut PickerState, key: &KeyEvent) -> Picker
     }
 }
 
-fn dismiss_picker(app: &mut App) {
+pub(super) fn dismiss_picker(app: &mut App) {
     app.sub_page = None;
     app.last_esc_time = None;
 }

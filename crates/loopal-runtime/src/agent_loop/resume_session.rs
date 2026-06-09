@@ -53,10 +53,7 @@ impl AgentLoopRunner {
         // bash logs would leak to the old session's tmp dir and sandbox
         // path checks would use the old cwd.
         self.tool_ctx.session_id.clone_from(&self.params.session.id);
-        self.tool_ctx.backend = self.params.deps.kernel.create_backend(
-            std::path::Path::new(&self.params.session.cwd),
-            &self.params.session.id,
-        );
+        self.rebuild_backend();
         // reason: PlanFile caches cwd, so plan-mode writes would land in
         // the old cwd's `.loopal/plans/`.
         self.plan_file = PlanFile::new(std::path::Path::new(&self.params.session.cwd));

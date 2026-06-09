@@ -1,5 +1,3 @@
-//! Control command handling — mode switch, clear, compact, rewind, etc.
-
 use std::path::PathBuf;
 
 use crate::mode::AgentMode;
@@ -82,6 +80,9 @@ impl AgentLoopRunner {
                     Err(e) => error!(error = %e, "invalid thinking config"),
                 }
             }
+            ControlCommand::PermissionModeSwitch(s) => self.handle_permission_switch(s).await?,
+            ControlCommand::DecisionModeSwitch(s) => self.handle_decision_switch(s).await?,
+            ControlCommand::SandboxPolicySwitch(s) => self.handle_sandbox_switch(s).await?,
             ControlCommand::ResumeSession(session_id) => {
                 self.handle_resume_session(&session_id).await?;
             }

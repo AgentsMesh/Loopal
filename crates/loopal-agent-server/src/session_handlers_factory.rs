@@ -8,7 +8,7 @@ use loopal_runtime::frontend::permission_handler::PermissionHandler;
 use loopal_runtime::frontend::question_handler::QuestionHandler;
 use loopal_runtime::frontend::traits::EventEmitter;
 use loopal_runtime::frontend::{
-    ClassifierPermissionHandler, ClassifierQuestionHandler, DecisionContext,
+    ClassifierPermissionHandler, ClassifierQuestionHandler, DecisionCell, DecisionContext,
 };
 
 use crate::hub_broadcaster::HubBroadcaster;
@@ -35,21 +35,21 @@ pub fn build_session_handlers(
     kernel: &Arc<Kernel>,
     session: SessionRef,
     context: DecisionContext,
-) -> (Box<dyn PermissionHandler>, Box<dyn QuestionHandler>) {
+) -> (
+    Box<dyn PermissionHandler>,
+    Box<dyn QuestionHandler>,
+    DecisionCell,
+) {
     let ipc_perm: Box<dyn PermissionHandler> = Box::new(IpcPermissionHandler::new(session.clone()));
     let ipc_q_arc: Arc<dyn QuestionHandler> = Arc::new(IpcQuestionHandler::new(session.clone()));
-    match config.settings.decision_mode {
-        DecisionMode::Manual => {
-            let ipc_q: Box<dyn QuestionHandler> = Box::new(IpcQuestionHandler::new(session));
-            return (ipc_perm, ipc_q);
-        }
-        DecisionMode::Classifier => {}
-        DecisionMode::Agent => {
-            tracing::warn!(
-                "DecisionMode::Agent is not yet implemented; falling back to Classifier"
-            );
-        }
+    if config.settings.decision_mode == DecisionMode::Agent {
+        tracing::warn!("DecisionMode::Agent is not yet implemented; falling back to Classifier");
     }
+    // Always build the classifier-wrapped chain; the DecisionCell decides at
+    // request time whether to run the classifier or delegate to the IPC
+    // fallback (Manual). This lets /decision flip modes mid-session without
+    // rebuilding the handler chain.
+    let decision = DecisionCell::new(config.settings.decision_mode);
     let classifier = Arc::new(
         loopal_classifier::ClassifierEngine::new_with_thresholds(
             config.instructions.clone(),
@@ -70,14 +70,18 @@ pub fn build_session_handlers(
         router,
     });
     let emitter: Arc<dyn EventEmitter> = Arc::new(HubBroadcaster::new(session, None));
-    let auto_perm: Box<dyn PermissionHandler> = Box::new(ClassifierPermissionHandler::new(
-        classifier.clone(),
-        ipc_perm,
-        resolver.clone(),
-        context.clone(),
-    ));
-    let auto_q: Box<dyn QuestionHandler> = Box::new(ClassifierQuestionHandler::new(
-        classifier, ipc_q_arc, resolver, context, emitter,
-    ));
-    (auto_perm, auto_q)
+    let auto_perm: Box<dyn PermissionHandler> = Box::new(
+        ClassifierPermissionHandler::new(
+            classifier.clone(),
+            ipc_perm,
+            resolver.clone(),
+            context.clone(),
+        )
+        .with_decision(decision.clone()),
+    );
+    let auto_q: Box<dyn QuestionHandler> = Box::new(
+        ClassifierQuestionHandler::new(classifier, ipc_q_arc, resolver, context, emitter)
+            .with_decision(decision.clone()),
+    );
+    (auto_perm, auto_q, decision)
 }

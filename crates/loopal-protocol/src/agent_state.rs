@@ -29,6 +29,12 @@ pub struct ObservableAgentState {
     #[serde(default = "default_thinking_config")]
     pub thinking_config: String,
     pub mode: String,
+    #[serde(default)]
+    pub permission_mode: String,
+    #[serde(default)]
+    pub decision_mode: String,
+    #[serde(default)]
+    pub sandbox_policy: String,
 }
 
 fn default_thinking_config() -> String {
@@ -45,6 +51,9 @@ impl Default for ObservableAgentState {
             model: String::new(),
             thinking_config: default_thinking_config(),
             mode: "act".to_string(),
+            permission_mode: String::new(),
+            decision_mode: String::new(),
+            sandbox_policy: String::new(),
         }
     }
 }

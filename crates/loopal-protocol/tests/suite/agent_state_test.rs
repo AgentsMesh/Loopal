@@ -59,12 +59,18 @@ fn test_observable_agent_state_serde_roundtrip() {
         model: "claude-sonnet".to_string(),
         thinking_config: "effort".to_string(),
         mode: "plan".to_string(),
+        permission_mode: "bypass".to_string(),
+        decision_mode: "manual".to_string(),
+        sandbox_policy: "default_write".to_string(),
     };
     let json = serde_json::to_string(&state).unwrap();
     let restored: ObservableAgentState = serde_json::from_str(&json).unwrap();
     assert_eq!(restored.status, AgentStatus::Running);
     assert_eq!(restored.turn_count, 3);
     assert_eq!(restored.thinking_config, "effort");
+    assert_eq!(restored.permission_mode, "bypass");
+    assert_eq!(restored.decision_mode, "manual");
+    assert_eq!(restored.sandbox_policy, "default_write");
 }
 
 #[test]

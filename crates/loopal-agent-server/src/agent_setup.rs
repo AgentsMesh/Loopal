@@ -22,6 +22,7 @@ pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<A
         session_dir_override,
         hub,
         decision_context,
+        decision_cell,
         session_id,
     } = ctx;
     let router = build_model_router(&config.settings);
@@ -187,6 +188,7 @@ pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<A
             fetch_refiner_policy: Some(fetch_refiner_policy),
             goal_session,
             scheduler: scheduler.clone(),
+            decision_cell,
         },
     );
     Ok(AgentSetupResult {

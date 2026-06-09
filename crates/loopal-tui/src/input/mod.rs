@@ -13,6 +13,7 @@ mod paste_clipboard;
 mod skills_page_keys;
 mod status_page_keys;
 mod sub_page;
+mod sub_page_pickers;
 mod sub_page_rewind;
 mod task_detail_keys;
 

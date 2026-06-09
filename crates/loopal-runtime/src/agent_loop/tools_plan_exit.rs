@@ -100,6 +100,13 @@ impl AgentLoopRunner {
             mode: mode_str.into(),
         })
         .await?;
+        // Keep observable.permission_mode aligned with the restored runtime
+        // value — without this a plan round-trip leaves the view-state showing
+        // the pre-restore mode.
+        self.emit_in_turn(AgentEventPayload::PermissionModeChanged {
+            mode: self.params.config.permission_mode.to_string(),
+        })
+        .await?;
         info!("restored pre-plan mode: {mode_str}");
         Ok(())
     }

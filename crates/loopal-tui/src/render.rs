@@ -125,6 +125,9 @@ fn render_sub_page(
         SubPage::ModelPicker(p) | SubPage::SessionPicker(p) => {
             views::picker::render_picker(f, p, area);
         }
+        SubPage::EnumPicker { state, .. } => {
+            views::picker::render_picker(f, state, area);
+        }
         SubPage::RewindPicker(r) => views::rewind_picker::render_rewind_picker(f, r, area),
         SubPage::StatusPage(s) => views::status_page::render_status_page(f, s, area),
         SubPage::McpPage(s) => views::mcp_page::render_mcp_page(f, s, area),

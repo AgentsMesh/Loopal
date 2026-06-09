@@ -18,6 +18,18 @@ impl AgentLoopRunner {
         self.emit(AgentEventPayload::ThinkingChanged {
             thinking_config: thinking_json,
         })
+        .await?;
+        self.emit(AgentEventPayload::PermissionModeChanged {
+            mode: self.params.config.permission_mode.to_string(),
+        })
+        .await?;
+        self.emit(AgentEventPayload::DecisionModeChanged {
+            mode: self.params.decision_cell.get().to_string(),
+        })
+        .await?;
+        self.emit(AgentEventPayload::SandboxPolicyChanged {
+            policy: self.params.deps.kernel.sandbox_policy().to_string(),
+        })
         .await
     }
 }

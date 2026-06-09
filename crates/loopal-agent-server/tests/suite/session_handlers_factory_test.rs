@@ -39,7 +39,7 @@ async fn manual_decision_yields_ipc_only_no_primary_connection() {
     let config = empty_config(DecisionMode::Manual);
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
     let session = dummy_session();
-    let (perm, _q) = build_session_handlers(
+    let (perm, _q, _cell) = build_session_handlers(
         &config,
         &kernel,
         session,
@@ -63,7 +63,7 @@ async fn auto_decision_wraps_with_auto_handlers_and_falls_back() {
     let config = empty_config(DecisionMode::Classifier);
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
     let session = dummy_session();
-    let (perm, _q) = build_session_handlers(
+    let (perm, _q, _cell) = build_session_handlers(
         &config,
         &kernel,
         session,
@@ -92,7 +92,7 @@ async fn manual_question_path_cancels_without_connection() {
     let config = empty_config(DecisionMode::Manual);
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
     let session = dummy_session();
-    let (_perm, q) = build_session_handlers(
+    let (_perm, q, _cell) = build_session_handlers(
         &config,
         &kernel,
         session,
@@ -118,7 +118,7 @@ async fn auto_question_path_chains_fallback_when_provider_unresolvable() {
     let config = empty_config(DecisionMode::Classifier);
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
     let session = dummy_session();
-    let (_perm, q) = build_session_handlers(
+    let (_perm, q, _cell) = build_session_handlers(
         &config,
         &kernel,
         session,
@@ -140,13 +140,39 @@ async fn auto_question_path_chains_fallback_when_provider_unresolvable() {
 }
 
 #[tokio::test]
+async fn decision_cell_switch_flips_manual_to_classifier_at_runtime() {
+    let config = empty_config(DecisionMode::Manual);
+    let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
+    let session = dummy_session();
+    let (perm, _q, cell) = build_session_handlers(
+        &config,
+        &kernel,
+        session,
+        DecisionContext::with_cwd("/tmp/test"),
+    );
+    let manual = perm.decide("id1", "Bash", &serde_json::json!({})).await;
+    assert!(
+        manual.reason.contains("no primary connection"),
+        "Manual cell must delegate to fallback, got: {}",
+        manual.reason
+    );
+    cell.set(DecisionMode::Classifier);
+    let classifier = perm.decide("id2", "Bash", &serde_json::json!({})).await;
+    assert!(
+        classifier.reason.contains("provider lookup failed"),
+        "Classifier cell must run the classifier path, got: {}",
+        classifier.reason
+    );
+}
+
+#[tokio::test]
 async fn agent_decision_falls_back_to_classifier_path_today() {
     // Agent mode is not yet implemented; factory must transparently fall
     // back to Classifier behaviour so existing setups keep working.
     let config = empty_config(DecisionMode::Agent);
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
     let session = dummy_session();
-    let (perm, q) = build_session_handlers(
+    let (perm, q, _cell) = build_session_handlers(
         &config,
         &kernel,
         session,

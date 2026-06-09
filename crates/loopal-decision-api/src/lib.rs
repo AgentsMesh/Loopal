@@ -9,6 +9,24 @@ pub enum DecisionMode {
     Agent,
 }
 
+impl DecisionMode {
+    pub fn as_u8(self) -> u8 {
+        match self {
+            Self::Manual => 0,
+            Self::Classifier => 1,
+            Self::Agent => 2,
+        }
+    }
+
+    pub fn from_u8(v: u8) -> Self {
+        match v {
+            1 => Self::Classifier,
+            2 => Self::Agent,
+            _ => Self::Manual,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseDecisionModeError(pub String);
 

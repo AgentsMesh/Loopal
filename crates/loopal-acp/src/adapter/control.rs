@@ -39,7 +39,9 @@ impl AcpAdapter {
         }
     }
 
-    /// Handle `session/set_config_option` → HubClient.send_control(ModelSwitch|ThinkingSwitch).
+    /// Handle `session/set_config_option` → forwards the value as the matching
+    /// runtime `ControlCommand` (model / thinking / permission / decision /
+    /// sandbox). Unknown `configId`s are rejected with INVALID_REQUEST.
     pub(crate) async fn handle_set_config_option(&self, id: i64, params: Value) {
         let config_id = params["configId"].as_str().unwrap_or("");
         let value = params["value"].as_str().unwrap_or("").to_string();
@@ -47,6 +49,9 @@ impl AcpAdapter {
         let cmd = match config_id {
             "model" => ControlCommand::ModelSwitch(value),
             "thinking" => ControlCommand::ThinkingSwitch(value),
+            "permission" => ControlCommand::PermissionModeSwitch(value),
+            "decision" => ControlCommand::DecisionModeSwitch(value),
+            "sandbox" => ControlCommand::SandboxPolicySwitch(value),
             _ => {
                 self.acp_out
                     .respond_error(

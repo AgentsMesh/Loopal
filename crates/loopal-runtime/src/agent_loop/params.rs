@@ -10,6 +10,7 @@ use loopal_storage::Session;
 use loopal_tool_api::{FetchRefinerPolicy, MemoryChannel, OneShotChatService, PermissionMode};
 use tokio::sync::watch;
 
+use crate::frontend::DecisionCell;
 use crate::frontend::DecisionContext;
 use crate::frontend::traits::AgentFrontend;
 use crate::mode::AgentMode;
@@ -127,6 +128,10 @@ pub struct AgentLoopParams {
     /// Default is empty — runtime callers that don't supply hooks see no
     /// behavioral change.
     pub resume_hooks: Vec<Arc<dyn crate::session_resume_hook::SessionResumeHook>>,
+    /// Runtime-mutable decision mode shared with the classifier handlers.
+    /// `DecisionModeSwitch` writes it; defaults to `DecisionMode::default()`
+    /// (Manual) for callers that don't wire it to their handler chain.
+    pub decision_cell: DecisionCell,
 }
 
 impl AgentLoopParams {

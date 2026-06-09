@@ -12,6 +12,8 @@ mod model_cmd;
 pub mod registry;
 mod resume_cmd;
 mod rewind_cmd;
+mod runtime_config_cmd;
+mod runtime_config_picker;
 mod skill;
 mod skills_cmd;
 mod status_cmd;

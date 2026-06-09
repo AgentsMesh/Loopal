@@ -37,6 +37,7 @@ pub struct AgentSetupContext<'a> {
     pub session_dir_override: Option<&'a std::path::Path>,
     pub hub: &'a crate::session_hub::SessionHub,
     pub decision_context: loopal_runtime::frontend::DecisionContext,
+    pub decision_cell: loopal_runtime::frontend::DecisionCell,
     pub session_id: &'a str,
 }
 
@@ -54,6 +55,7 @@ impl<'a> AgentSetupContext<'a> {
         session_dir_override: Option<&'a std::path::Path>,
         hub: &'a crate::session_hub::SessionHub,
         decision_context: loopal_runtime::frontend::DecisionContext,
+        decision_cell: loopal_runtime::frontend::DecisionCell,
         session_id: &'a str,
     ) -> Self {
         Self {
@@ -68,6 +70,7 @@ impl<'a> AgentSetupContext<'a> {
             session_dir_override,
             hub,
             decision_context,
+            decision_cell,
             session_id,
         }
     }

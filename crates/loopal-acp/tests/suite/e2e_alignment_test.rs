@@ -79,6 +79,31 @@ async fn test_set_config_option_thinking() {
 }
 
 #[tokio::test]
+async fn test_set_config_option_runtime_switches() {
+    let mut harness = build_acp_harness(vec![]).await;
+    let _sid = setup_session(&mut harness).await;
+
+    for (config_id, value) in [
+        ("permission", "ask_any_write"),
+        ("decision", "classifier"),
+        ("sandbox", "read_only"),
+    ] {
+        let resp = harness
+            .request(
+                "session/set_config_option",
+                json!({"configId": config_id, "value": value}),
+            )
+            .await;
+        assertions::assert_json_rpc_ok(&resp);
+        assert_eq!(
+            resp["result"]["configOptions"],
+            json!([]),
+            "{config_id} switch should return the standard configOptions body"
+        );
+    }
+}
+
+#[tokio::test]
 async fn test_notification_uses_session_update_tag() {
     // Verify the wire format uses "sessionUpdate" (ACP standard) not "kind".
     let calls = vec![chunks::text_turn("Check format")];

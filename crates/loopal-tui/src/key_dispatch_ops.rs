@@ -112,6 +112,17 @@ pub(crate) async fn handle_sub_page_confirm(app: &mut App, result: SubPageResult
         SubPageResult::SessionSelected(session_id) => {
             app.session.resume_session(&session_id).await;
         }
+        SubPageResult::EnumConfigSelected { kind, value } => match kind {
+            crate::app::EnumPickerKind::Permission => {
+                app.session.switch_permission_mode(value).await;
+            }
+            crate::app::EnumPickerKind::Decision => {
+                app.session.switch_decision_mode(value).await;
+            }
+            crate::app::EnumPickerKind::Sandbox => {
+                app.session.switch_sandbox_policy(value).await;
+            }
+        },
     }
 }
 

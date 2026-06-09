@@ -1,8 +1,3 @@
-//! Config data collection for the `/status` sub-page.
-//!
-//! Serializes `Settings` to JSON, recursively flattens to dot-notation entries,
-//! and extracts provider auth/URL info.
-
 use crate::app::ConfigEntry;
 
 /// Serialize settings to JSON and recursively flatten to dot-notation key-value pairs.
@@ -45,10 +40,6 @@ pub(super) fn extract_provider_info(
     }
     (String::new(), String::new())
 }
-
-// ---------------------------------------------------------------------------
-// JSON flattening
-// ---------------------------------------------------------------------------
 
 const MAX_JSON_DEPTH: usize = 10;
 
@@ -116,5 +107,77 @@ fn format_scalar(v: &serde_json::Value) -> String {
         serde_json::Value::Number(n) => n.to_string(),
         serde_json::Value::String(s) => s.clone(),
         _ => v.to_string(),
+    }
+}
+
+/// Overlay the live runtime values for the session-switchable settings onto
+/// the disk-derived entries. Runtime `/permission`, `/decision`, `/sandbox`
+/// switches are session-only (never persisted), so the disk config would
+/// otherwise contradict what the pickers show as current. A differing live
+/// value is marked `(session)`.
+pub(super) fn overlay_runtime_values(
+    entries: &mut [ConfigEntry],
+    permission_mode: &str,
+    decision_mode: &str,
+    sandbox_policy: &str,
+) {
+    let live = [
+        ("permission_mode", permission_mode),
+        ("decision_mode", decision_mode),
+        ("sandbox.policy", sandbox_policy),
+    ];
+    for e in entries.iter_mut() {
+        if let Some((_, v)) = live.iter().find(|(k, _)| *k == e.key.as_str())
+            && !v.is_empty()
+            && *v != e.value
+        {
+            e.value = format!("{v} (session)");
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn entry(key: &str, value: &str) -> ConfigEntry {
+        ConfigEntry {
+            key: key.to_string(),
+            value: value.to_string(),
+        }
+    }
+
+    #[test]
+    fn overlay_keys_match_real_settings_serialization() {
+        // Pins the flattened serde keys against a real Settings: a rename or
+        // nesting change fails here instead of silently no-op'ing the overlay.
+        let settings = loopal_config::Settings {
+            permission_mode: loopal_tool_api::PermissionMode::AskDangerous,
+            sandbox: loopal_config::SandboxConfig {
+                policy: loopal_config::SandboxPolicy::ReadOnly,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut entries = build_config_entries(&settings);
+        // permission differs → marked; decision equals disk default → untouched.
+        overlay_runtime_values(&mut entries, "bypass", "manual", "default_write");
+        let get = |k: &str| {
+            entries
+                .iter()
+                .find(|e| e.key == k)
+                .map(|e| e.value.clone())
+                .unwrap_or_else(|| panic!("missing flattened key {k}"))
+        };
+        assert_eq!(get("permission_mode"), "bypass (session)");
+        assert_eq!(get("decision_mode"), "manual", "equal value not marked");
+        assert_eq!(get("sandbox.policy"), "default_write (session)");
+    }
+
+    #[test]
+    fn overlay_ignores_empty_live_values() {
+        let mut entries = vec![entry("permission_mode", "bypass")];
+        overlay_runtime_values(&mut entries, "", "", "");
+        assert_eq!(entries[0].value, "bypass");
     }
 }

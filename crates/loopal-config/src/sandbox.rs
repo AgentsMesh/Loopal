@@ -19,6 +19,30 @@ pub enum SandboxPolicy {
     ReadOnly,
 }
 
+impl std::str::FromStr for SandboxPolicy {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "disabled" => Ok(Self::Disabled),
+            "default_write" | "workspace_write" => Ok(Self::DefaultWrite),
+            "read_only" => Ok(Self::ReadOnly),
+            other => Err(format!(
+                "invalid sandbox policy '{other}', expected 'disabled', 'default_write', or 'read_only'"
+            )),
+        }
+    }
+}
+
+impl std::fmt::Display for SandboxPolicy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Disabled => "disabled",
+            Self::DefaultWrite => "default_write",
+            Self::ReadOnly => "read_only",
+        })
+    }
+}
+
 /// Sandbox configuration as stored in settings.json.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -94,4 +118,45 @@ pub enum PathDecision {
 pub enum CommandDecision {
     Allow,
     Deny(String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SandboxPolicy;
+
+    #[test]
+    fn from_str_accepts_known_and_alias() {
+        assert_eq!(
+            "disabled".parse::<SandboxPolicy>().unwrap(),
+            SandboxPolicy::Disabled
+        );
+        assert_eq!(
+            "default_write".parse::<SandboxPolicy>().unwrap(),
+            SandboxPolicy::DefaultWrite
+        );
+        assert_eq!(
+            "workspace_write".parse::<SandboxPolicy>().unwrap(),
+            SandboxPolicy::DefaultWrite
+        );
+        assert_eq!(
+            "read_only".parse::<SandboxPolicy>().unwrap(),
+            SandboxPolicy::ReadOnly
+        );
+    }
+
+    #[test]
+    fn from_str_rejects_unknown() {
+        assert!("nope".parse::<SandboxPolicy>().is_err());
+    }
+
+    #[test]
+    fn display_round_trips_canonical() {
+        for p in [
+            SandboxPolicy::Disabled,
+            SandboxPolicy::DefaultWrite,
+            SandboxPolicy::ReadOnly,
+        ] {
+            assert_eq!(p.to_string().parse::<SandboxPolicy>().unwrap(), p);
+        }
+    }
 }

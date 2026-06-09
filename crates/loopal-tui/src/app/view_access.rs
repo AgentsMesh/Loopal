@@ -25,6 +25,11 @@ impl App {
             .unwrap_or_default()
     }
 
+    pub fn active_observable(&self) -> ObservableAgentState {
+        let active = self.session.lock().active_view.clone();
+        self.observable_for(&active)
+    }
+
     pub fn tool_count_for(&self, agent: &str) -> u32 {
         self.view_clients
             .get(agent)

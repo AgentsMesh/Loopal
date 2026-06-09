@@ -162,6 +162,9 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
         | AgentEventPayload::UserMessageQueued { .. }
         | AgentEventPayload::ModelChanged { .. }
         | AgentEventPayload::ThinkingChanged { .. }
+        | AgentEventPayload::PermissionModeChanged { .. }
+        | AgentEventPayload::DecisionModeChanged { .. }
+        | AgentEventPayload::SandboxPolicyChanged { .. }
         | AgentEventPayload::ThreadGoalUpdated { .. }
         | AgentEventPayload::ClassifierProgress { .. }
         | AgentEventPayload::ClassifierFailed { .. }

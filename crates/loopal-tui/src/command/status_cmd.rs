@@ -1,8 +1,9 @@
 //! `/status` command — opens the status dashboard sub-page.
 
 use async_trait::async_trait;
+use loopal_protocol::ObservableAgentState;
 
-use super::status_config::{build_config_entries, extract_provider_info};
+use super::status_config::{build_config_entries, extract_provider_info, overlay_runtime_values};
 use super::{CommandEffect, CommandHandler};
 use crate::app::{
     App, ConfigSnapshot, SessionSnapshot, StatusPageState, StatusTab, SubPage, UsageSnapshot,
@@ -28,8 +29,8 @@ impl CommandHandler for StatusCmd {
 }
 
 async fn open_status_page(app: &mut App) {
-    let (mut session, usage) = collect_session_data(app);
-    let config = collect_config_snapshot(app);
+    let (mut session, usage, obs) = collect_session_data(app);
+    let config = collect_config_snapshot(app, &obs);
 
     if let Some(info) = &app.hub_reconnect_info {
         session.hub_endpoint = info.addr.clone();
@@ -47,8 +48,9 @@ async fn open_status_page(app: &mut App) {
     })));
 }
 
-/// Extract session/agent data from the locked session state.
-fn collect_session_data(app: &App) -> (SessionSnapshot, UsageSnapshot) {
+/// Returns the active agent's observable alongside the snapshots so the caller
+/// reuses it for the config overlay without re-locking the session.
+fn collect_session_data(app: &App) -> (SessionSnapshot, UsageSnapshot, ObservableAgentState) {
     let (context_window, context_used) =
         app.with_active_conversation(|conv| (conv.context_window, conv.token_count()));
     let state = app.session.lock();
@@ -74,11 +76,10 @@ fn collect_session_data(app: &App) -> (SessionSnapshot, UsageSnapshot) {
         turn_count: obs.turn_count,
         tool_count: app.tool_count_for(&state.active_view),
     };
-    (session, usage)
+    (session, usage, obs)
 }
 
-/// Load config from disk and build ConfigSnapshot.
-fn collect_config_snapshot(app: &App) -> ConfigSnapshot {
+fn collect_config_snapshot(app: &App, obs: &ObservableAgentState) -> ConfigSnapshot {
     let config = match loopal_config::load_config(&app.cwd) {
         Ok(c) => c,
         Err(_) => {
@@ -102,7 +103,13 @@ fn collect_config_snapshot(app: &App) -> ConfigSnapshot {
         .count();
 
     let (auth_env, base_url) = extract_provider_info(&config.settings.providers);
-    let entries = build_config_entries(&config.settings);
+    let mut entries = build_config_entries(&config.settings);
+    overlay_runtime_values(
+        &mut entries,
+        &obs.permission_mode,
+        &obs.decision_mode,
+        &obs.sandbox_policy,
+    );
 
     ConfigSnapshot {
         auth_env,

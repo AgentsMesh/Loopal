@@ -39,6 +39,9 @@ fn expected_view_effect(cmd: &ControlCommand) -> ExpectedViewEffect {
         ModelSwitch(_) => ViewMutation,
         Rewind { .. } => ViewMutation,
         ThinkingSwitch(_) => ViewMutation,
+        PermissionModeSwitch(_) => ViewMutation,
+        DecisionModeSwitch(_) => ViewMutation,
+        SandboxPolicySwitch(_) => ViewMutation,
         ResumeSession(_) => FixtureRequired("persisted session on disk"),
         QueryMcpStatus => ViewMutation,
         McpReconnect { .. } => FixtureRequired("registered MCP server"),
@@ -113,6 +116,18 @@ fn view_mutation_variants_are_exercised_by_dedicated_e2e_tests() {
             "e2e_control_lifecycle_test::test_thinking_switch_command_updates_observable",
         ),
         ("QueryMcpStatus", "e2e_mcp_test::*"),
+        (
+            "PermissionModeSwitch",
+            "e2e_control_lifecycle_test::test_permission_mode_switch_command_updates_observable",
+        ),
+        (
+            "DecisionModeSwitch",
+            "e2e_control_lifecycle_test::test_decision_mode_switch_command_updates_observable",
+        ),
+        (
+            "SandboxPolicySwitch",
+            "e2e_control_lifecycle_test::test_sandbox_policy_switch_command_updates_observable",
+        ),
     ];
     let mut covered = std::collections::HashSet::new();
     for (name, _) in expected_tests {
@@ -140,6 +155,9 @@ fn variant_name(cmd: &ControlCommand) -> &'static str {
         ModelSwitch(_) => "ModelSwitch",
         Rewind { .. } => "Rewind",
         ThinkingSwitch(_) => "ThinkingSwitch",
+        PermissionModeSwitch(_) => "PermissionModeSwitch",
+        DecisionModeSwitch(_) => "DecisionModeSwitch",
+        SandboxPolicySwitch(_) => "SandboxPolicySwitch",
         ResumeSession(_) => "ResumeSession",
         QueryMcpStatus => "QueryMcpStatus",
         McpReconnect { .. } => "McpReconnect",

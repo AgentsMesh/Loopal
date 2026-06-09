@@ -171,9 +171,12 @@ impl AgentShared {
         }
     }
 
-    /// Single source of truth for spawn paths that need to propagate
-    /// the flag to children — derived from `kernel.settings()` so it
-    /// reflects post-`apply_start_overrides` state, not just config files.
+    /// Whether child agents should inherit a disabled sandbox. Read from
+    /// startup `settings()` so spawn inheritance stays uniform with
+    /// `permission_mode` / `decision_mode` / `model` (all startup-sourced).
+    /// The parent's OWN tool enforcement tracks the live policy separately
+    /// via `kernel.create_backend` — runtime `/sandbox` switches are
+    /// parent-local and intentionally do not propagate to new children.
     pub fn no_sandbox(&self) -> bool {
         matches!(
             self.kernel.settings().sandbox.policy,

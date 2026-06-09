@@ -20,6 +20,7 @@ mod hub_health;
 mod ingest;
 mod input;
 mod input_control;
+mod input_control_config;
 mod input_mcp;
 mod input_resources;
 mod llm;

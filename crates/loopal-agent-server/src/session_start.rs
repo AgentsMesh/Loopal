@@ -94,7 +94,7 @@ pub(crate) async fn start_session(
         ));
         let decision_context =
             loopal_runtime::frontend::DecisionContext::with_cwd(cwd.to_string_lossy().into_owned());
-        let (perm_handler, q_handler) = build_session_handlers(
+        let (perm_handler, q_handler, decision_cell) = build_session_handlers(
             &config,
             &kernel,
             session_holder.clone(),
@@ -124,6 +124,7 @@ pub(crate) async fn start_session(
                 session_dir_override.as_deref(),
                 hub,
                 decision_context,
+                decision_cell,
                 &preset_session_id,
             ))
             .await?;

@@ -87,6 +87,11 @@ use crate::app::SkillsPageState;
 pub enum SubPage {
     /// Model picker — user selects from known models.
     ModelPicker(PickerState),
+    /// Runtime config enum picker (permission / decision / sandbox).
+    EnumPicker {
+        state: PickerState,
+        kind: EnumPickerKind,
+    },
     /// Rewind picker — user selects a turn to rewind to.
     RewindPicker(RewindPickerState),
     /// Session picker — user selects a session to resume.
@@ -103,6 +108,14 @@ pub enum SubPage {
     CronDetail(CronDetailState),
     /// Structured task detail — description + blocks + blocked_by.
     TaskDetail(TaskDetailState),
+}
+
+/// Which runtime config an [`SubPage::EnumPicker`] is editing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EnumPickerKind {
+    Permission,
+    Decision,
+    Sandbox,
 }
 
 /// State for the background task log viewer sub-page.

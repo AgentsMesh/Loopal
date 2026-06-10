@@ -166,4 +166,22 @@ impl AcpTestHarness {
             }
         }
     }
+
+    /// Read trailing notifications until one with `method` arrives (or timeout).
+    /// Observes post-response emissions like the snapshot replay that
+    /// `handle_new_session` fires after responding.
+    pub async fn read_until_method(&mut self, method: &str) -> Option<Value> {
+        loop {
+            let mut line = String::new();
+            match tokio::time::timeout(IO_TIMEOUT, self.client_reader.read_line(&mut line)).await {
+                Ok(Ok(n)) if n > 0 => {
+                    let parsed: Value = serde_json::from_str(line.trim()).ok()?;
+                    if parsed.get("method").and_then(|m| m.as_str()) == Some(method) {
+                        return Some(parsed);
+                    }
+                }
+                _ => return None,
+            }
+        }
+    }
 }

@@ -13,6 +13,8 @@ mod e2e_error_test;
 mod e2e_harness;
 #[path = "suite/e2e_lifecycle_test.rs"]
 mod e2e_lifecycle_test;
+#[path = "suite/e2e_loopal_test.rs"]
+mod e2e_loopal_test;
 #[path = "suite/e2e_multi_test.rs"]
 mod e2e_multi_test;
 #[path = "suite/e2e_new_methods_test.rs"]

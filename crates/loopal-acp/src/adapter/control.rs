@@ -4,6 +4,7 @@ use loopal_protocol::ControlCommand;
 use serde_json::Value;
 
 use crate::adapter::AcpAdapter;
+use crate::adapter::control_command::parse_loopal_control;
 use crate::jsonrpc;
 
 impl AcpAdapter {
@@ -74,6 +75,33 @@ impl AcpAdapter {
                 self.acp_out
                     .respond_error(id, jsonrpc::INTERNAL_ERROR, &e.to_string())
                     .await;
+            }
+        }
+    }
+
+    /// Handle `session/control_request` — AgentsMesh ACP extension carrying
+    /// Loopal control-panel actions (bgTaskKill / cronDelete / compact / clear)
+    /// and the runner's `set_model`. Unknown subtypes are rejected so the
+    /// runner degrades gracefully.
+    pub(crate) async fn handle_control_request(&self, id: i64, params: Value) {
+        let subtype = params["subtype"].as_str().unwrap_or("");
+        match parse_loopal_control(subtype, &params["params"]) {
+            Some(c) => match self.client.send_control(&c).await {
+                Ok(_) => self.acp_out.respond(id, serde_json::json!({})).await,
+                Err(e) => {
+                    self.acp_out
+                        .respond_error(id, jsonrpc::INTERNAL_ERROR, &e.to_string())
+                        .await
+                }
+            },
+            None => {
+                self.acp_out
+                    .respond_error(
+                        id,
+                        jsonrpc::METHOD_NOT_FOUND,
+                        &format!("unsupported control subtype: {subtype}"),
+                    )
+                    .await
             }
         }
     }

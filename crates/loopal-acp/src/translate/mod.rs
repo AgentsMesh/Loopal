@@ -5,6 +5,7 @@
 
 pub(crate) mod ext;
 mod messages;
+mod panel;
 mod tool_kind;
 mod tools;
 
@@ -131,51 +132,6 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
             Some(AcpNotification::Extension { method, params })
         }
 
-        // ── Events with no ACP counterpart ───────────────────────────
-        AgentEventPayload::AwaitingInput
-        | AgentEventPayload::AutoContinuation { .. }
-        | AgentEventPayload::Started
-        | AgentEventPayload::Running
-        | AgentEventPayload::Finished
-        | AgentEventPayload::MessageRouted { .. }
-        | AgentEventPayload::ToolPermissionRequest { .. }
-        | AgentEventPayload::UserQuestionRequest { .. }
-        | AgentEventPayload::ThinkingComplete { .. }
-        | AgentEventPayload::Rewound { .. }
-        | AgentEventPayload::Compacted(_)
-        | AgentEventPayload::ToolBatchStart { .. }
-        | AgentEventPayload::Interrupted
-        | AgentEventPayload::TurnDiffSummary { .. }
-        | AgentEventPayload::ServerToolUse { .. }
-        | AgentEventPayload::ServerToolResult { .. }
-        | AgentEventPayload::RetryCleared
-        | AgentEventPayload::SubAgentSpawned(_)
-        | AgentEventPayload::PermissionDecided { .. }
-        | AgentEventPayload::QuestionDecided { .. }
-        | AgentEventPayload::TurnCompleted(_)
-        | AgentEventPayload::McpStatusReport { .. }
-        | AgentEventPayload::BgTaskSpawned { .. }
-        | AgentEventPayload::BgTaskOutput { .. }
-        | AgentEventPayload::BgTaskCompleted { .. }
-        | AgentEventPayload::TasksChanged { .. }
-        | AgentEventPayload::CronsChanged { .. }
-        | AgentEventPayload::UserMessageQueued { .. }
-        | AgentEventPayload::ModelChanged { .. }
-        | AgentEventPayload::ThinkingChanged { .. }
-        | AgentEventPayload::PermissionModeChanged { .. }
-        | AgentEventPayload::DecisionModeChanged { .. }
-        | AgentEventPayload::SandboxPolicyChanged { .. }
-        | AgentEventPayload::ThreadGoalUpdated { .. }
-        | AgentEventPayload::ClassifierProgress { .. }
-        | AgentEventPayload::ClassifierFailed { .. }
-        | AgentEventPayload::ClassifierCompleted { .. }
-        | AgentEventPayload::CompactProgress { .. }
-        | AgentEventPayload::HubDegraded { .. }
-        | AgentEventPayload::HubRecovered { .. }
-        | AgentEventPayload::DegenerationDetected(_)
-        | AgentEventPayload::ContinuationSkipped { .. }
-        | AgentEventPayload::TurnCancelled { .. }
-        | AgentEventPayload::ContinuationGateChanged(_) => None,
         AgentEventPayload::ToolPermissionResolved { id } => Some(AcpNotification::Extension {
             method: "_loopal/permission_resolved".into(),
             params: serde_json::json!({
@@ -190,6 +146,9 @@ pub fn translate_event(payload: &AgentEventPayload, session_id: &str) -> Option<
                 "questionId": id,
             }),
         }),
+
+        // Loopal control-panel signals → `_loopal/*`; all other events → None.
+        _ => panel::translate_panel(payload, session_id),
     }
 }
 

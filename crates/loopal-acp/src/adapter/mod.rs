@@ -1,11 +1,13 @@
 //! ACP adapter — bridges ACP (session/*) with Hub via UiSession.
 
 mod control;
+mod control_command;
 mod events;
 mod lifecycle;
 mod permission;
 mod prompt;
 mod session;
+mod snapshot;
 
 use std::sync::Arc;
 
@@ -74,6 +76,7 @@ impl AcpAdapter {
             "session/close" => self.handle_close(id, params).await,
             "session/set_mode" => self.handle_set_mode(id, params).await,
             "session/set_config_option" => self.handle_set_config_option(id, params).await,
+            "session/control_request" => self.handle_control_request(id, params).await,
             "session/load" => {
                 self.acp_out
                     .respond_error(

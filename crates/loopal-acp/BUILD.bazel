@@ -29,6 +29,7 @@ rust_test(
 rust_test(
     name = "loopal-acp_test",
     srcs = glob(["tests/**/*.rs"]),
+    compile_data = glob(["tests/fixtures/*.json"]),
     crate_root = "tests/suite.rs",
     edition = "2024",
     local = True,

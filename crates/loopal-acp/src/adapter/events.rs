@@ -75,6 +75,19 @@ impl AcpAdapter {
                 }
             }
         }
+        // Mode dual-emit: translate_event already sent the standard ACP
+        // CurrentModeUpdate (for generic clients). Additionally surface
+        // `_loopal/mode` so the Loopal console status bar reads mode from the
+        // same loopalSession mirror as thinking/model — AgentsMesh does not
+        // consume the ACP session-mode channel.
+        if let AgentEventPayload::ModeChanged { mode } = &event.payload {
+            let (method, params) = crate::translate::ext::ext_notification(
+                session_id,
+                "mode",
+                serde_json::json!({ "mode": mode }),
+            );
+            self.acp_out.notify(&method, params).await;
+        }
         None
     }
 

@@ -13,6 +13,9 @@ use crate::user_content::UserContent;
 pub enum MessageSource {
     Human,
     Agent(QualifiedAddress),
+    AgentResult {
+        child: QualifiedAddress,
+    },
     Channel {
         channel: String,
         from: QualifiedAddress,
@@ -27,6 +30,7 @@ impl MessageSource {
         match self {
             Self::Human => "human".to_string(),
             Self::Agent(addr) => addr.to_string(),
+            Self::AgentResult { child } => child.to_string(),
             Self::Channel { from, .. } => from.to_string(),
             Self::Scheduled => "scheduled".to_string(),
             Self::System(kind) => format!("system:{kind}"),
@@ -67,7 +71,11 @@ impl MessageSource {
     pub fn is_task_boundary(&self) -> bool {
         matches!(
             self,
-            Self::Human | Self::Scheduled | Self::Agent(_) | Self::Channel { .. }
+            Self::Human
+                | Self::Scheduled
+                | Self::Agent(_)
+                | Self::AgentResult { .. }
+                | Self::Channel { .. }
         )
     }
 
@@ -76,6 +84,7 @@ impl MessageSource {
     pub fn prepend_hub(&mut self, self_hub: &str) {
         match self {
             Self::Agent(addr) => addr.prepend_hub(self_hub.to_string()),
+            Self::AgentResult { child } => child.prepend_hub(self_hub.to_string()),
             Self::Channel { from, .. } => from.prepend_hub(self_hub.to_string()),
             _ => {}
         }
@@ -87,6 +96,7 @@ impl MessageSource {
     pub fn prepend_hub_if_local(&mut self, self_hub: &str) {
         match self {
             Self::Agent(addr) => addr.prepend_hub_if_local(self_hub.to_string()),
+            Self::AgentResult { child } => child.prepend_hub_if_local(self_hub.to_string()),
             Self::Channel { from, .. } => from.prepend_hub_if_local(self_hub.to_string()),
             _ => {}
         }

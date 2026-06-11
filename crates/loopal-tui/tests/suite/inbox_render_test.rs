@@ -95,3 +95,18 @@ fn test_qualified_remote_agent_address_renders_in_label() {
     let text = flat(&message_to_lines(&m, 80));
     assert!(text.contains("📨 from hub-A/alpha"));
 }
+
+#[test]
+fn test_agent_result_inbox_origin_renders_result_label() {
+    let m = user_with_inbox(
+        "found 3 bugs",
+        MessageSource::AgentResult {
+            child: QualifiedAddress::local("worker"),
+        },
+        None,
+    );
+    let lines = message_to_lines(&m, 80);
+    let text = flat(&lines);
+    assert!(text.contains("✅ result from worker"));
+    assert!(text.contains("found 3 bugs"));
+}

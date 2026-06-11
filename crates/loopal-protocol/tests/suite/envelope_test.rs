@@ -248,3 +248,61 @@ fn test_non_human_sources_are_not_optimistically_rendered() {
         .is_optimistically_rendered()
     );
 }
+
+#[test]
+fn test_agent_result_label_uses_child_address() {
+    let local = MessageSource::AgentResult {
+        child: QualifiedAddress::local("worker"),
+    };
+    assert_eq!(local.label(), "worker");
+    let remote = MessageSource::AgentResult {
+        child: QualifiedAddress::remote(["hub-A"], "worker"),
+    };
+    assert_eq!(remote.label(), "hub-A/worker");
+}
+
+#[test]
+fn test_agent_result_is_task_boundary() {
+    assert!(
+        MessageSource::AgentResult {
+            child: QualifiedAddress::local("worker"),
+        }
+        .is_task_boundary()
+    );
+}
+
+#[test]
+fn test_agent_result_not_optimistically_rendered_nor_ephemeral() {
+    let src = MessageSource::AgentResult {
+        child: QualifiedAddress::local("worker"),
+    };
+    assert!(!src.is_optimistically_rendered());
+    assert!(!src.is_ephemeral_in_history());
+    assert!(!src.wakes_suspended_session());
+}
+
+#[test]
+fn test_agent_result_snat_stamps_child_hub() {
+    let mut env = Envelope::new(
+        MessageSource::AgentResult {
+            child: QualifiedAddress::local("worker"),
+        },
+        "hub-A/parent",
+        "done",
+    );
+    env.apply_snat("hub-B");
+    let MessageSource::AgentResult { child } = &env.source else {
+        panic!("expected AgentResult source");
+    };
+    assert_eq!(child, &QualifiedAddress::remote(["hub-B"], "worker"));
+}
+
+#[test]
+fn test_agent_result_serde_roundtrip() {
+    let src = MessageSource::AgentResult {
+        child: QualifiedAddress::remote(["hub-A"], "worker"),
+    };
+    let json = serde_json::to_string(&src).unwrap();
+    let back: MessageSource = serde_json::from_str(&json).unwrap();
+    assert_eq!(src, back);
+}

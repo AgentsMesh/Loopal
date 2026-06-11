@@ -94,6 +94,16 @@ pub enum TurnTrigger {
         from: String,
         content: String,
     },
+    /// A spawned child agent's completion result routed back to its parent.
+    /// `from` is the bare child name; projection re-wraps `content` in the
+    /// `<agent-result name="{from}">` marker the LLM expects. Unlike `Agent`,
+    /// this deliberately omits the `[from: ...]` prefix — the marker already
+    /// identifies the source, so the prefix would be redundant double-labeling.
+    AgentResult {
+        envelope_id: String,
+        from: String,
+        content: String,
+    },
     /// Routed via a named channel.
     Channel {
         envelope_id: String,

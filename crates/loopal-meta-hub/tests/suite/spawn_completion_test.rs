@@ -111,12 +111,16 @@ async fn completion_delivery_to_remote_parent() {
             let params = match &msg {
                 Incoming::Request { params, .. } | Incoming::Notification { params, .. } => params,
             };
-            let text = params
-                .get("content")
-                .and_then(|c| c.get("text"))
-                .and_then(|t| t.as_str())
-                .unwrap_or("");
-            if text.contains("agent-result") && text.contains("child-worker") {
+            // Completion is now a typed AgentResult source carrying the child
+            // name; the body is the raw output, not a wrapped marker.
+            let is_result = params
+                .get("source")
+                .and_then(|s| s.get("AgentResult"))
+                .and_then(|r| r.get("child"))
+                .and_then(|c| c.get("agent"))
+                .and_then(|a| a.as_str())
+                .is_some_and(|name| name == "child-worker");
+            if is_result {
                 return true;
             }
         }

@@ -70,13 +70,16 @@ impl AgentRegistry {
         } else {
             result.to_string()
         };
-        let content = format!("<agent-result name=\"{child_name}\">\n{body}\n</agent-result>");
-        // Source carries the child's local view; uplink SNAT stamps the
-        // origin hub when this completion is delivered to a remote parent.
+        // Source carries the child's local view (uplink SNAT stamps the origin
+        // hub on cross-hub delivery). The `<agent-result>` wrapper is rebuilt at
+        // LLM projection time — the envelope body stays raw so observers render
+        // it structurally.
         let envelope = Envelope::new(
-            MessageSource::Agent(QualifiedAddress::local(child_name)),
+            MessageSource::AgentResult {
+                child: QualifiedAddress::local(child_name),
+            },
             parent.clone(),
-            content,
+            body,
         );
         Some((tx, envelope))
     }
@@ -118,7 +121,8 @@ impl AgentRegistry {
                     .iter()
                     .filter(|c| {
                         self.agents.get(c.as_str()).is_some_and(|a| {
-                            a.info.lifecycle == AgentLifecycle::Running && !a.state.is_shadow() // shadows are remote, can't interrupt locally
+                            a.info.lifecycle == AgentLifecycle::Running && !a.state.is_shadow()
+                            // shadows are remote, can't interrupt locally
                         })
                     })
                     .cloned()

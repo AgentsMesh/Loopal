@@ -180,6 +180,7 @@ fn turn_text_summary(turn: &loopal_turn::Turn) -> String {
         TurnTrigger::UserInput { content, .. }
         | TurnTrigger::Cron { content, .. }
         | TurnTrigger::Agent { content, .. }
+        | TurnTrigger::AgentResult { content, .. }
         | TurnTrigger::Channel { content, .. }
         | TurnTrigger::GoalContinuation { content, .. }
         | TurnTrigger::BackgroundHook { content, .. } => content.clone(),

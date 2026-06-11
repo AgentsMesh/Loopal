@@ -114,12 +114,13 @@ pub async fn handle_reverse_requests(
                     let ok = if let Ok(env) =
                         serde_json::from_value::<loopal_protocol::Envelope>(params)
                     {
-                        // Remote agent completions arrive with the agent-result
-                        // marker in content. Detect by content (not source tag)
-                        // so it works with the typed Agent source after SNAT.
-                        if let Some(child) = extract_agent_result_name(&env) {
+                        // Remote agent completions arrive as a typed AgentResult
+                        // source (set by the origin hub, survives SNAT). The
+                        // child name is the bare agent segment.
+                        if let loopal_protocol::MessageSource::AgentResult { child } = &env.source {
                             let output = env.content.text.clone();
-                            crate::finish::deliver_cross_hub_completion(&hub, &child, output).await;
+                            crate::finish::deliver_cross_hub_completion(&hub, &child.agent, output)
+                                .await;
                         }
                         // Defense in depth: target should be local at this point
                         // (MetaHub router consumed the next-hop hub via DNAT).
@@ -168,12 +169,4 @@ pub async fn handle_reverse_requests(
         }
     }
     tracing::warn!(hub = %hub_name, "MetaHub reverse handler ended");
-}
-
-/// Extract child agent name from `<agent-result name="...">` envelope.
-fn extract_agent_result_name(env: &loopal_protocol::Envelope) -> Option<String> {
-    let text = &env.content.text;
-    let start = text.find("<agent-result name=\"")? + 20;
-    let end = text[start..].find('"')? + start;
-    Some(text[start..end].to_string())
 }

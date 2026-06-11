@@ -53,13 +53,12 @@ pub async fn finish_and_deliver(
         && parent.is_remote()
         && let Some(ul) = uplink
     {
-        let content = format!("<agent-result name=\"{name}\">\n{output_text}\n</agent-result>");
-        // Use Agent(local(child)) so uplink SNAT stamps the origin hub.
-        // System("agent-completed") cannot carry hub info — see review #3.
         let envelope = Envelope::new(
-            MessageSource::Agent(QualifiedAddress::local(name)),
+            MessageSource::AgentResult {
+                child: QualifiedAddress::local(name),
+            },
             parent.clone(),
-            content,
+            output_text,
         );
         if let Err(e) = ul.route(&envelope).await {
             tracing::warn!(agent = %name, parent = %parent, error = %e,

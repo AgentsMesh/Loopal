@@ -2,49 +2,41 @@ use loopal_turn::TurnTrigger;
 
 use super::super::message::{ContentBlock, ImageSource, Message, MessageRole};
 use super::super::origin::MessageOrigin;
+use super::prefix::trigger_llm_text;
 
 pub(super) fn project_trigger(trigger: &TurnTrigger) -> Option<Message> {
-    match trigger {
-        TurnTrigger::UserInput {
-            content, images, ..
-        } => Some(text_user_with_images(
+    // UserInput carries images — project structurally, not via text prefix.
+    if let TurnTrigger::UserInput {
+        content, images, ..
+    } = trigger
+    {
+        return Some(text_user_with_images(
             content,
             images,
             Some(MessageOrigin::Human),
-        )),
-        TurnTrigger::Cron { content, .. } => Some(text_user(
-            &format!("[scheduled] {content}"),
-            Some(MessageOrigin::Scheduled),
-        )),
-        TurnTrigger::Agent { from, content, .. } => Some(text_user(
-            &format!("[from: {from}] {content}"),
+        ));
+    }
+    let text = trigger_llm_text(trigger)?;
+    Some(text_user(&text, trigger_origin(trigger)))
+}
+
+fn trigger_origin(trigger: &TurnTrigger) -> Option<MessageOrigin> {
+    match trigger {
+        TurnTrigger::UserInput { .. } => Some(MessageOrigin::Human),
+        TurnTrigger::Cron { .. } => Some(MessageOrigin::Scheduled),
+        TurnTrigger::Agent { from, .. } | TurnTrigger::AgentResult { from, .. } => {
             Some(MessageOrigin::Agent {
                 label: from.clone(),
-            }),
-        )),
-        TurnTrigger::Channel {
-            channel,
-            from,
-            content,
-            ..
-        } => Some(text_user(
-            &format!("[from: #{channel}/{from}] {content}"),
-            Some(MessageOrigin::Channel {
-                name: channel.clone(),
-                from: from.clone(),
-            }),
-        )),
-        TurnTrigger::GoalContinuation { content, .. } => {
-            Some(text_user(content, Some(MessageOrigin::GoalContinuation)))
+            })
         }
-        TurnTrigger::BackgroundHook {
-            hook_kind, content, ..
-        } => Some(text_user(
-            content,
-            Some(MessageOrigin::Other {
-                label: hook_kind.clone(),
-            }),
-        )),
+        TurnTrigger::Channel { channel, from, .. } => Some(MessageOrigin::Channel {
+            name: channel.clone(),
+            from: from.clone(),
+        }),
+        TurnTrigger::GoalContinuation { .. } => Some(MessageOrigin::GoalContinuation),
+        TurnTrigger::BackgroundHook { hook_kind, .. } => Some(MessageOrigin::Other {
+            label: hook_kind.clone(),
+        }),
         TurnTrigger::Resume => None,
     }
 }

@@ -105,22 +105,7 @@ fn push_turn(out: &mut Vec<Value>, turn: &Turn) {
 }
 
 fn trigger_user(trigger: &TurnTrigger) -> Option<Value> {
-    match trigger {
-        TurnTrigger::UserInput { content, .. } => Some(text_user(content)),
-        TurnTrigger::Cron { content, .. } => Some(text_user(&format!("[scheduled] {content}"))),
-        TurnTrigger::Agent { from, content, .. } => {
-            Some(text_user(&format!("[from: {from}] {content}")))
-        }
-        TurnTrigger::Channel {
-            channel,
-            from,
-            content,
-            ..
-        } => Some(text_user(&format!("[from: #{channel}/{from}] {content}"))),
-        TurnTrigger::GoalContinuation { content, .. } => Some(text_user(content)),
-        TurnTrigger::BackgroundHook { content, .. } => Some(text_user(content)),
-        TurnTrigger::Resume => None,
-    }
+    loopal_provider_api::trigger_llm_text(trigger).map(|text| text_user(&text))
 }
 
 fn push_step(out: &mut Vec<Value>, step: &TurnStep) {

@@ -71,6 +71,7 @@ fn render_user(lines: &mut Vec<Line<'static>>, msg: &SessionMessage, width: u16)
 fn render_inbox_origin(lines: &mut Vec<Line<'static>>, origin: &InboxOrigin, width: u16) {
     let label = match &origin.source {
         MessageSource::Agent(addr) => format!("📨 from {addr}"),
+        MessageSource::AgentResult { child } => format!("✅ result from {child}"),
         MessageSource::Scheduled => "⏰ scheduled".to_string(),
         MessageSource::Channel { channel, from } => format!("📡 #{channel}/{from}"),
         MessageSource::System(kind) => format!("⚙ system:{kind}"),

@@ -73,13 +73,12 @@ impl Governance for DegenerationDetector {
     }
 
     fn on_envelope_received(&mut self, source: &MessageSource) {
-        // External signal (human/cron/peer-agent) clears the silenced flag
-        // so a fresh degeneration window can re-emit. Without this, an
-        // /unsuspend followed by relapse would be silent.
-        if matches!(
-            source,
-            MessageSource::Human | MessageSource::Scheduled | MessageSource::Channel { .. }
-        ) {
+        // A fresh external task boundary (human/cron/peer-agent/agent-result/
+        // channel) clears the silenced flag so a new degeneration window can
+        // re-emit. Reuses MessageSource::is_task_boundary so the boundary set
+        // stays single-sourced — the previous hand-rolled list silently
+        // dropped peer-agent envelopes the comment claimed to cover.
+        if source.is_task_boundary() {
             self.silenced_until_progress = false;
         }
     }
@@ -196,5 +195,24 @@ mod tests {
         let r = h.last().cloned().unwrap();
         d.on_envelope_received(&MessageSource::System("goal_continuation".into()));
         assert!(matches!(d.on_after_turn(&r, &h), PostTurnAction::None));
+    }
+
+    #[test]
+    fn peer_agent_and_agent_result_envelopes_clear_silence() {
+        use loopal_protocol::QualifiedAddress;
+        for src in [
+            MessageSource::Agent(QualifiedAddress::local("worker")),
+            MessageSource::AgentResult {
+                child: QualifiedAddress::local("worker"),
+            },
+        ] {
+            let mut d = DegenerationDetector::new(50, 3, 600);
+            let mut h = TurnHistory::with_capacity(100);
+            push_barren(&mut h, 3, 7);
+            assert_degen(&mut d, &h);
+            d.on_envelope_received(&src);
+            // Silence lifted → the next barren window re-triggers.
+            assert_degen(&mut d, &h);
+        }
     }
 }

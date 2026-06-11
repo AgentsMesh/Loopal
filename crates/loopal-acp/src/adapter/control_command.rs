@@ -51,6 +51,9 @@ pub(crate) fn parse_loopal_control(subtype: &str, p: &Value) -> Option<ControlCo
         "loopal.goalReopen" => Some(C::GoalUserReopen),
         "loopal.goalClear" => Some(C::GoalClear),
         "set_model" => p["model"].as_str().map(|s| C::ModelSwitch(s.to_string())),
+        "set_permission_mode" => p["mode"]
+            .as_str()
+            .map(|s| C::PermissionModeSwitch(s.to_string())),
         _ => None,
     }
 }
@@ -77,6 +80,10 @@ mod tests {
         assert!(matches!(
             parse_loopal_control("loopal.mode", &json!({"mode":"plan"})),
             Some(ControlCommand::ModeSwitch(AgentMode::Plan))
+        ));
+        assert!(matches!(
+            parse_loopal_control("set_permission_mode", &json!({"mode":"ask_dangerous"})),
+            Some(ControlCommand::PermissionModeSwitch(m)) if m == "ask_dangerous"
         ));
     }
 
@@ -105,5 +112,6 @@ mod tests {
         assert!(parse_loopal_control("loopal.bogus", &json!({})).is_none());
         assert!(parse_loopal_control("loopal.bgTaskKill", &json!({})).is_none());
         assert!(parse_loopal_control("loopal.mode", &json!({"mode":"bogus"})).is_none());
+        assert!(parse_loopal_control("set_permission_mode", &json!({})).is_none());
     }
 }

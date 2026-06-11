@@ -302,16 +302,19 @@ async fn cross_hub_completion_carries_origin_hub_in_source() {
     };
     let env: Envelope = serde_json::from_value(params).unwrap();
 
-    // Source: Agent(QA{hub=["hub-b"], agent="child"}) — proves SNAT applied.
+    // Source: AgentResult{child=QA{hub=["hub-b"], agent="child"}} — proves
+    // SNAT applied to the typed completion source.
     assert_eq!(
         env.source,
-        MessageSource::Agent(QualifiedAddress::remote(["hub-b"], "child")),
+        MessageSource::AgentResult {
+            child: QualifiedAddress::remote(["hub-b"], "child")
+        },
         "completion source must carry origin hub"
     );
     // Target: local("parent") — proves DNAT consumed hub-A from the path.
     assert_eq!(env.target, QualifiedAddress::local("parent"));
-    assert!(env.content.text.contains("<agent-result name=\"child\">"));
-    assert!(env.content.text.contains("ok"));
+    // Body is raw now — the <agent-result> wrapper is a projection concern.
+    assert_eq!(env.content.text, "ok");
 }
 
 /// Cross-hub spawn: a child registered with a qualified `hub/agent` parent

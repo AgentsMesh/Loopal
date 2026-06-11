@@ -28,6 +28,15 @@ pub fn envelope_to_trigger(env: &Envelope) -> TurnTrigger {
             from: addr.to_string(),
             content,
         },
+        MessageSource::AgentResult { child } => TurnTrigger::AgentResult {
+            envelope_id,
+            // reason: bare agent name (not child.to_string()) — the
+            // <agent-result name=...> marker must stay hub-agnostic. After
+            // uplink SNAT `child` carries a hub path; to_string() would leak
+            // it into the marker the parent LLM reads.
+            from: child.agent.clone(),
+            content,
+        },
         MessageSource::Channel { channel, from } => TurnTrigger::Channel {
             envelope_id,
             channel: channel.clone(),
@@ -49,6 +58,32 @@ pub fn envelope_to_trigger(env: &Envelope) -> TurnTrigger {
                     content,
                 }
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use loopal_protocol::QualifiedAddress;
+
+    #[test]
+    fn agent_result_source_maps_to_bare_child_name() {
+        let env = Envelope::new(
+            MessageSource::AgentResult {
+                child: QualifiedAddress::remote(["hub-a"], "worker"),
+            },
+            "parent",
+            "done",
+        );
+        match envelope_to_trigger(&env) {
+            TurnTrigger::AgentResult { from, content, .. } => {
+                // Hub path is stripped: marker stays hub-agnostic even for
+                // cross-hub completions whose source was SNAT-stamped.
+                assert_eq!(from, "worker");
+                assert_eq!(content, "done");
+            }
+            other => panic!("expected AgentResult trigger, got {other:?}"),
         }
     }
 }

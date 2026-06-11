@@ -97,15 +97,15 @@ async fn child_completion_delivered_to_parent_via_bridge() {
     assert!(
         matches!(
             envelope.source,
-            MessageSource::Agent(ref qa) if qa.agent == "child-a" && qa.is_local()
+            MessageSource::AgentResult { ref child } if child.agent == "child-a" && child.is_local()
         ),
-        "source should be Agent(local('child-a')), got: {:?}",
+        "source should be AgentResult(local('child-a')), got: {:?}",
         envelope.source
     );
     let text = &envelope.content.text;
     assert!(
-        text.contains("child-a") && text.contains("42 issues"),
-        "should contain child name and result, got: {text}"
+        text.contains("42 issues"),
+        "body should be the raw result, got: {text}"
     );
 }
 

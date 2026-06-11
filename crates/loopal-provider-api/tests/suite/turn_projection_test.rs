@@ -489,3 +489,24 @@ fn cancelled_item_produces_error_tool_result() {
     assert_eq!(block.0, "Cancelled");
     assert!(block.1);
 }
+
+#[test]
+fn agent_result_trigger_rewraps_in_agent_result_marker() {
+    let t = turn_with(
+        TurnTrigger::AgentResult {
+            envelope_id: "env-r".into(),
+            from: "worker".into(),
+            content: "found 3 bugs".into(),
+        },
+        vec![],
+    );
+    let msgs = project_turn_to_messages(&t);
+    assert_eq!(
+        msgs[0].text_content(),
+        "<agent-result name=\"worker\">\nfound 3 bugs\n</agent-result>"
+    );
+    assert!(matches!(
+        &msgs[0].origin,
+        Some(MessageOrigin::Agent { label }) if label == "worker"
+    ));
+}

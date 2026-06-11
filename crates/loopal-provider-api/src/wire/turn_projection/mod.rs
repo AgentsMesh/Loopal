@@ -1,7 +1,10 @@
 mod blocks;
 mod compaction;
+mod prefix;
 mod step;
 mod trigger;
+
+pub use self::prefix::trigger_llm_text;
 
 use loopal_turn::{Turn, TurnStep};
 

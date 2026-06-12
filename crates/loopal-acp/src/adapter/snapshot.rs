@@ -99,7 +99,32 @@ fn build_replay_events(session_id: &str, state: &Value) -> Vec<(String, Value)> 
             json!({ "servers": state["mcp_status"] }),
         ));
     }
+    push_config_observables(session_id, state, &mut events);
     events
+}
+
+/// Replay the agent's config observables (permission_mode / model / mode /
+/// thinking) from `state.agent.observable`. The bootstrap broadcast emits these
+/// on agent start, but `session/new` drains that channel before the IDE
+/// subscribes — the snapshot is the only cold-start source. `thinking` reads the
+/// snapshot's `thinking_config` but emits under `thinking` to match the live
+/// `ThinkingChanged` notification's field name.
+fn push_config_observables(session_id: &str, state: &Value, events: &mut Vec<(String, Value)>) {
+    let obs = &state["agent"]["observable"];
+    let mut push = |ext_type: &str, raw: &Value| {
+        if let Some(s) = raw.as_str().filter(|s| !s.is_empty()) {
+            let data = Value::Object(
+                [(ext_type.to_string(), Value::String(s.to_string()))]
+                    .into_iter()
+                    .collect(),
+            );
+            events.push(ext_notification(session_id, ext_type, data));
+        }
+    };
+    push("permission_mode", &obs["permission_mode"]);
+    push("model", &obs["model"]);
+    push("mode", &obs["mode"]);
+    push("thinking", &obs["thinking_config"]);
 }
 
 #[cfg(test)]
@@ -150,5 +175,27 @@ mod tests {
         let m = methods(&ev);
         assert!(!m.contains(&"_loopal/mcp"));
         assert!(m.contains(&"_loopal/crons"));
+    }
+
+    #[test]
+    fn replays_config_observables_skipping_empty() {
+        let state = json!({
+            "agent": {"observable": {
+                "permission_mode": "bypass", "model": "opus", "mode": "", "thinking_config": "auto"
+            }},
+            "bg_tasks": {}, "crons": [], "tasks": []
+        });
+        let ev = build_replay_events("s", &state);
+        let m = methods(&ev);
+        assert!(m.contains(&"_loopal/permission_mode"));
+        assert!(m.contains(&"_loopal/model"));
+        assert!(!m.contains(&"_loopal/mode")); // empty → skipped
+        assert!(m.contains(&"_loopal/thinking"));
+        let by = |k: &str| ev.iter().find(|(meth, _)| meth == k).unwrap().1.clone();
+        assert_eq!(
+            by("_loopal/permission_mode")["data"]["permission_mode"],
+            "bypass"
+        );
+        assert_eq!(by("_loopal/thinking")["data"]["thinking"], "auto"); // thinking_config → thinking
     }
 }

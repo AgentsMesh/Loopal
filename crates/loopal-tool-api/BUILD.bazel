@@ -13,6 +13,7 @@ rust_library(
         "@crates//:schemars",
         "@crates//:serde",
         "@crates//:serde_json",
+        "@crates//:strum",
         "@crates//:thiserror",
     ],
     proc_macro_deps = ["@crates//:async-trait"],

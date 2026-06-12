@@ -1,6 +1,8 @@
 //! ACP lifecycle handlers: initialize, authenticate.
 
+use loopal_tool_api::PermissionMode;
 use serde_json::Value;
+use strum::VariantNames;
 use tracing::info;
 
 use crate::adapter::AcpAdapter;
@@ -8,8 +10,8 @@ use crate::types::make_init_response;
 
 /// `initialize` result + AgentsMesh extensions: `controlRequest` (runner routes
 /// control-panel actions via `session/control_request`) and `permissionModes`
-/// (AgentsMesh selector renders loopal's modes, not Claude Code's).
-/// `permissionModes` must match `loopal_tool_api::PermissionMode` (SSOT).
+/// (AgentsMesh selector renders loopal's modes, not Claude Code's), derived from
+/// `PermissionMode::VARIANTS` (single source of truth).
 fn init_response_with_extensions() -> Value {
     let mut result = serde_json::to_value(make_init_response()).unwrap_or_default();
     if let Some(obj) = result.as_object_mut() {
@@ -17,7 +19,7 @@ fn init_response_with_extensions() -> Value {
             "agentsmeshExtensions".into(),
             serde_json::json!({
                 "controlRequest": true,
-                "permissionModes": ["bypass", "ask_dangerous", "ask_any_write"],
+                "permissionModes": PermissionMode::VARIANTS,
             }),
         );
     }

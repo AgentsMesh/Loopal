@@ -72,6 +72,11 @@ pub(crate) fn translate_panel(
             "thinking",
             serde_json::json!({ "thinking": thinking_config }),
         ),
+        AgentEventPayload::PermissionModeChanged { mode } => ext_notification(
+            session_id,
+            "permission_mode",
+            serde_json::json!({ "permission_mode": mode }),
+        ),
         _ => return None,
     };
     Some(AcpNotification::Extension { method, params })

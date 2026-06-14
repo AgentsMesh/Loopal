@@ -25,3 +25,6 @@ logs/
 runs/
 **/__pycache__/
 benchmarks/terminal_bench/bin/
+# Loopal memory runtime (auto-managed)
+.loopal/memory-events/archive/
+.loopal/memory-events/*.jsonl.gz

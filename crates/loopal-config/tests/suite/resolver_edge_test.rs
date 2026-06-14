@@ -79,7 +79,7 @@ fn test_resolve_null_settings_layer_skipped() {
     // Default ConfigLayer has settings = Value::Null
     resolver.add_layer(ConfigLayer::default());
     let config = resolver.resolve().unwrap();
-    assert_eq!(config.settings.model, "claude-opus-4-7");
+    assert_eq!(config.settings.model, "claude-opus-4-8");
 }
 
 #[test]

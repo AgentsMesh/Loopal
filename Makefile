@@ -44,7 +44,7 @@ check: clippy fmt test
 
 # ── Run ──────────────────────────────────────────────────────────────────────
 
-MODEL ?= claude-opus-4-7
+MODEL ?= claude-opus-4-8
 
 # Optional: attach to an existing Hub instead of starting a new one.
 # Example: make run ATTACH_HUB=127.0.0.1:54321 HUB_TOKEN=a3f4b9c...

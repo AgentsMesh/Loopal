@@ -291,7 +291,7 @@ Both syntaxes use the strict regex `[a-z][a-z0-9_]*` for NAME.
 `classifier.md` is loaded in the same global → project → local order as settings, but with **replace semantics** (highest-priority non-empty layer wins; not concatenated). Absent on every layer ⇒ the built-in default prompt is used.
 
 Environment variable overrides use `LOOPAL_` prefix. Key settings:
-- `LOOPAL_MODEL` — default model id (default: `claude-opus-4-7`)
+- `LOOPAL_MODEL` — default model id (default: `claude-opus-4-8`)
 - `LOOPAL_PERMISSION_MODE` — `bypass` / `ask_dangerous` / `ask_any_write`
 - `LOOPAL_DECISION_MODE` — `manual` / `classifier` / `agent`
 - `LOOPAL_CLASSIFIER_TIMEOUT_SECS` — Classifier LLM timeout (default 180s)

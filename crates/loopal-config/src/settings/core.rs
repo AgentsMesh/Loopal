@@ -79,7 +79,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            model: "claude-opus-4-7".to_string(),
+            model: "claude-opus-4-8".to_string(),
             model_routing: HashMap::new(),
             models: HashMap::new(),
             permission_mode: PermissionMode::default(),

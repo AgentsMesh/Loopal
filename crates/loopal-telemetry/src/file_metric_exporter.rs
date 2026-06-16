@@ -1,9 +1,7 @@
 //! JSONL file exporter for OpenTelemetry metrics.
 
 use std::fmt::Debug;
-use std::fs::{File, OpenOptions};
-use std::io::{BufWriter, Write};
-use std::path::PathBuf;
+use std::path::Path;
 use std::sync::Mutex;
 
 use async_trait::async_trait;
@@ -12,9 +10,11 @@ use opentelemetry_sdk::metrics::data::{Metric, ResourceMetrics};
 use opentelemetry_sdk::metrics::exporter::PushMetricExporter;
 use serde::Serialize;
 
+use crate::lazy_jsonl::LazyJsonlFile;
+
 /// Metric exporter that appends JSONL data points to a local file.
 pub(crate) struct JsonlMetricExporter {
-    writer: Mutex<BufWriter<File>>,
+    sink: Mutex<LazyJsonlFile>,
 }
 
 impl Debug for JsonlMetricExporter {
@@ -24,14 +24,13 @@ impl Debug for JsonlMetricExporter {
 }
 
 impl JsonlMetricExporter {
-    pub fn new(dir: &PathBuf) -> std::io::Result<Self> {
+    pub fn new(dir: &Path) -> std::io::Result<Self> {
         std::fs::create_dir_all(dir)?;
         let ts = chrono::Utc::now().format("%Y%m%d-%H%M%S");
         let pid = std::process::id();
         let path = dir.join(format!("metrics-{ts}-{pid}.jsonl"));
-        let file = OpenOptions::new().create(true).append(true).open(path)?;
         Ok(Self {
-            writer: Mutex::new(BufWriter::new(file)),
+            sink: Mutex::new(LazyJsonlFile::new(path)),
         })
     }
 
@@ -127,15 +126,15 @@ impl JsonlMetricExporter {
 
     fn write_json(&self, record: &MetricRecord) {
         if let Ok(json) = serde_json::to_string(record)
-            && let Ok(mut w) = self.writer.lock()
+            && let Ok(mut sink) = self.sink.lock()
         {
-            let _ = writeln!(w, "{json}");
+            sink.write_line(&json);
         }
     }
 
     fn flush(&self) {
-        if let Ok(mut w) = self.writer.lock() {
-            let _ = w.flush();
+        if let Ok(mut sink) = self.sink.lock() {
+            sink.flush();
         }
     }
 }

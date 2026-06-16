@@ -4,10 +4,8 @@
 //! Designed for offline analysis with `jq`, `pandas`, etc.
 
 use std::fmt::Debug;
-use std::fs::{File, OpenOptions};
 use std::future::Future;
-use std::io::{BufWriter, Write};
-use std::path::PathBuf;
+use std::path::Path;
 use std::pin::Pin;
 use std::time::SystemTime;
 
@@ -16,11 +14,13 @@ use opentelemetry_sdk::Resource;
 use opentelemetry_sdk::trace::{SpanData, SpanExporter};
 use serde::Serialize;
 
+use crate::lazy_jsonl::LazyJsonlFile;
+
 type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send>>;
 
 /// Span exporter that appends one JSONL line per span to a local file.
 pub(crate) struct JsonlSpanExporter {
-    writer: BufWriter<File>,
+    sink: LazyJsonlFile,
 }
 
 impl Debug for JsonlSpanExporter {
@@ -30,14 +30,13 @@ impl Debug for JsonlSpanExporter {
 }
 
 impl JsonlSpanExporter {
-    pub fn new(dir: &PathBuf) -> std::io::Result<Self> {
+    pub fn new(dir: &Path) -> std::io::Result<Self> {
         std::fs::create_dir_all(dir)?;
         let ts = chrono::Utc::now().format("%Y%m%d-%H%M%S");
         let pid = std::process::id();
         let path = dir.join(format!("traces-{ts}-{pid}.jsonl"));
-        let file = OpenOptions::new().create(true).append(true).open(path)?;
         Ok(Self {
-            writer: BufWriter::new(file),
+            sink: LazyJsonlFile::new(path),
         })
     }
 
@@ -65,7 +64,7 @@ impl JsonlSpanExporter {
                 .collect(),
         };
         if let Ok(json) = serde_json::to_string(&record) {
-            let _ = writeln!(self.writer, "{json}");
+            self.sink.write_line(&json);
         }
     }
 }
@@ -78,12 +77,12 @@ impl SpanExporter for JsonlSpanExporter {
         for span in &batch {
             self.write_span(span);
         }
-        let _ = self.writer.flush();
+        self.sink.flush();
         Box::pin(std::future::ready(Ok(())))
     }
 
     fn shutdown(&mut self) -> opentelemetry_sdk::error::OTelSdkResult {
-        let _ = self.writer.flush();
+        self.sink.flush();
         Ok(())
     }
 

@@ -16,6 +16,10 @@ pub fn init_logging(
 
     // Housekeep: remove old logs exceeding the retention policy
     crate::log_writer::cleanup_old_logs(&log_dir);
+    loopal_telemetry::cleanup_telemetry_files(
+        &telemetry_config.telemetry_dir(),
+        crate::bootstrap::is_alive,
+    );
 
     let writer = crate::log_writer::RotatingFileWriter::new(&log_dir);
     let log_path = writer.current_path();

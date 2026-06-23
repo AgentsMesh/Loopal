@@ -1,15 +1,25 @@
 //! Unit tests for `spawn_decision::worktree_allowed` / `build_spawn_target`.
 
-use super::{build_spawn_target, worktree_allowed};
+use super::{build_spawn_target, normalize_target_hub, worktree_allowed};
 use crate::spawn::SpawnTarget;
 use std::path::PathBuf;
 
 #[test]
 fn worktree_allowed_only_for_inhub() {
     assert!(worktree_allowed(&None, Some("worktree")));
+    assert!(worktree_allowed(&Some("".into()), Some("worktree")));
+    assert!(worktree_allowed(&Some("   ".into()), Some("worktree")));
     assert!(!worktree_allowed(&Some("hub-b".into()), Some("worktree")));
     assert!(!worktree_allowed(&None, None));
     assert!(!worktree_allowed(&None, Some("other")));
+}
+
+#[test]
+fn normalize_target_hub_treats_empty_as_local() {
+    assert_eq!(normalize_target_hub(None), None);
+    assert_eq!(normalize_target_hub(Some("")), None);
+    assert_eq!(normalize_target_hub(Some("   ")), None);
+    assert_eq!(normalize_target_hub(Some(" hub-b ")), Some("hub-b".into()));
 }
 
 #[test]
@@ -22,6 +32,34 @@ fn target_hub_some_yields_crosshub_dropping_cwd_and_fork_context() {
     match target {
         SpawnTarget::CrossHub { hub_id } => assert_eq!(hub_id, "hub-b"),
         _ => panic!("expected CrossHub"),
+    }
+}
+
+#[test]
+fn target_hub_empty_yields_inhub_carrying_cwd_and_fork_context() {
+    let target = build_spawn_target(
+        Some("".into()),
+        Some(PathBuf::from("/local/wt")),
+        Some(vec![loopal_provider_api::Message::user("ctx")]),
+    );
+    match target {
+        SpawnTarget::InHub {
+            cwd_override,
+            fork_context,
+        } => {
+            assert_eq!(cwd_override, Some(PathBuf::from("/local/wt")));
+            assert_eq!(fork_context.map(|v| v.len()), Some(1));
+        }
+        _ => panic!("expected InHub"),
+    }
+}
+
+#[test]
+fn target_hub_whitespace_yields_inhub() {
+    let target = build_spawn_target(Some(" \t ".into()), None, None);
+    match target {
+        SpawnTarget::InHub { .. } => {}
+        _ => panic!("expected InHub"),
     }
 }
 

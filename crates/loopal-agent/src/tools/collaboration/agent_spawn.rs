@@ -8,10 +8,17 @@ use loopal_tool_api::ToolResult;
 
 use super::agent_fork::{build_fork_context, spawn_bg_cleanup};
 use super::shared_extract::{create_agent_worktree, require_str};
-use super::spawn_decision::{build_spawn_target, worktree_allowed};
+use super::spawn_decision::{build_spawn_target, normalize_target_hub, worktree_allowed};
 use crate::config::load_agent_configs;
 use crate::shared::AgentShared;
 use crate::spawn::{SpawnParams, spawn_agent, wait_agent};
+
+fn normalize_model_override(model: Option<&str>) -> Option<String> {
+    model
+        .map(str::trim)
+        .filter(|model| !model.is_empty())
+        .map(String::from)
+}
 
 pub(super) async fn action_spawn(
     shared: Arc<AgentShared>,
@@ -25,19 +32,13 @@ pub(super) async fn action_spawn(
         .map(String::from)
         .unwrap_or_else(|| format!("agent-{}", &uuid::Uuid::new_v4().to_string()[..8]));
     let subagent_type = input.get("subagent_type").and_then(|v| v.as_str());
-    let model_override = input
-        .get("model")
-        .and_then(|v| v.as_str())
-        .map(String::from);
+    let model_override = normalize_model_override(input.get("model").and_then(|v| v.as_str()));
     let background = input
         .get("run_in_background")
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
     let isolation = input.get("isolation").and_then(|v| v.as_str());
-    let target_hub = input
-        .get("target_hub")
-        .and_then(|v| v.as_str())
-        .map(String::from);
+    let target_hub = normalize_target_hub(input.get("target_hub").and_then(|v| v.as_str()));
 
     let mut config = subagent_type
         .and_then(|t| load_agent_configs(&shared.cwd).remove(t))
@@ -111,5 +112,21 @@ pub(super) async fn action_spawn(
             }
             Ok(ToolResult::error(format!("Failed to spawn agent: {e}")))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_model_override;
+
+    #[test]
+    fn normalize_model_override_treats_empty_as_inherit() {
+        assert_eq!(normalize_model_override(None), None);
+        assert_eq!(normalize_model_override(Some("")), None);
+        assert_eq!(normalize_model_override(Some("   ")), None);
+        assert_eq!(
+            normalize_model_override(Some(" gpt-5.5 ")),
+            Some("gpt-5.5".into())
+        );
     }
 }

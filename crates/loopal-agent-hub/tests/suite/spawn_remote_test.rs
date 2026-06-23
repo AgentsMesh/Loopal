@@ -112,6 +112,44 @@ async fn local_spawn_path_unaffected_by_remote_handler() {
 }
 
 #[tokio::test]
+async fn empty_target_hub_uses_local_spawn_path() {
+    let hub = make_hub_with_cwd(PathBuf::from("/hub-local"));
+    // Include cwd so a mistaken cross-hub path would fail on the cross-hub
+    // forbidden-field check before reaching the local missing-name error.
+    let result = dispatch_hub_request(
+        &hub,
+        "hub/spawn_agent",
+        json!({"prompt": "x", "cwd": "/local/path", "target_hub": ""}),
+        "from-agent".into(),
+    )
+    .await;
+    let err = result.expect_err("missing name");
+    assert!(err.contains("name"), "got: {err}");
+    assert!(
+        !err.contains("cross-hub") && !err.contains("cwd"),
+        "empty target_hub must not use cross-hub validation, got: {err}"
+    );
+}
+
+#[tokio::test]
+async fn whitespace_target_hub_uses_local_spawn_path() {
+    let hub = make_hub_with_cwd(PathBuf::from("/hub-local"));
+    let result = dispatch_hub_request(
+        &hub,
+        "hub/spawn_agent",
+        json!({"prompt": "x", "cwd": "/local/path", "target_hub": "   "}),
+        "from-agent".into(),
+    )
+    .await;
+    let err = result.expect_err("missing name");
+    assert!(err.contains("name"), "got: {err}");
+    assert!(
+        !err.contains("cross-hub") && !err.contains("cwd"),
+        "blank target_hub must not use cross-hub validation, got: {err}"
+    );
+}
+
+#[tokio::test]
 async fn rejects_non_string_target_hub() {
     let hub = make_hub_with_cwd(PathBuf::from("/hub-local"));
     let result = dispatch_hub_request(

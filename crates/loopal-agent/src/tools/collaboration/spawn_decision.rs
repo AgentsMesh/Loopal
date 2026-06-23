@@ -6,10 +6,19 @@ use std::path::PathBuf;
 
 use crate::spawn::SpawnTarget;
 
+/// Normalize `target_hub` from tool input. Empty or whitespace-only values are
+/// equivalent to omitting the field, i.e. an in-hub spawn.
+pub(super) fn normalize_target_hub(target_hub: Option<&str>) -> Option<String> {
+    target_hub
+        .map(str::trim)
+        .filter(|hub| !hub.is_empty())
+        .map(String::from)
+}
+
 /// True iff worktree isolation can be applied: only in-hub spawns own a
 /// path on the caller's filesystem, so cross-hub spawns must skip it.
 pub(super) fn worktree_allowed(target_hub: &Option<String>, isolation: Option<&str>) -> bool {
-    target_hub.is_none() && isolation == Some("worktree")
+    normalize_target_hub(target_hub.as_deref()).is_none() && isolation == Some("worktree")
 }
 
 /// Map `target_hub` (and the in-hub-only context: cwd / fork_context)
@@ -21,7 +30,7 @@ pub(super) fn build_spawn_target(
     cwd_override: Option<PathBuf>,
     fork_context: Option<Vec<loopal_provider_api::Message>>,
 ) -> SpawnTarget {
-    match target_hub {
+    match normalize_target_hub(target_hub.as_deref()) {
         Some(hub_id) => SpawnTarget::CrossHub { hub_id },
         None => SpawnTarget::InHub {
             cwd_override,

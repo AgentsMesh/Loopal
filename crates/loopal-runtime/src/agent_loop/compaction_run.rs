@@ -158,13 +158,13 @@ impl AgentLoopRunner {
         files_rehydrated: usize,
     ) -> Result<()> {
         let after = self.turns.view().len();
-        let removed = before.saturating_sub(after);
+        let summarized = before.saturating_sub(after);
         let tokens_after = self.turns.view().current_tokens();
 
         self.emit(AgentEventPayload::Compacted(
             loopal_protocol::CompactionSummary {
                 kept: after,
-                removed,
+                summarized,
                 tokens_before,
                 tokens_after,
                 strategy: strategy.to_string(),
@@ -197,7 +197,7 @@ impl AgentLoopRunner {
 
         info!(
             before,
-            after, removed, tokens_before, tokens_after, strategy, "compaction complete"
+            after, summarized, tokens_before, tokens_after, strategy, "compaction complete"
         );
         Ok(())
     }

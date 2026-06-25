@@ -71,7 +71,7 @@ fn compacted_event_clears_banner() {
     assert!(banner_of(&r).is_some());
     r.apply(AgentEventPayload::Compacted(CompactionSummary {
         kept: 5,
-        removed: 100,
+        summarized: 100,
         tokens_before: 50_000,
         tokens_after: 5_000,
         strategy: "smart".into(),
@@ -119,7 +119,7 @@ fn compacted_event_refreshes_ctx() {
     let mut r = ViewStateReducer::new("root");
     r.apply(AgentEventPayload::Compacted(CompactionSummary {
         kept: 9,
-        removed: 491,
+        summarized: 491,
         tokens_before: 259_392,
         tokens_after: 6_453,
         strategy: "manual".into(),

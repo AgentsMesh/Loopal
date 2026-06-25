@@ -62,7 +62,7 @@ async fn compact_falls_back_to_bare_summary_on_llm_failure() {
             _ => None,
         })
         .expect("Compacted event must fire even on LLM failure");
-    assert!(summary.removed > 0);
+    assert!(summary.summarized > 0);
     assert!(summary.kept > 0);
 }
 

@@ -138,10 +138,10 @@ async fn force_compact_emits_compacted_event_with_kept_removed_stats() {
 
     assert_eq!(summary.strategy, "manual");
     // before: 5 user messages; after: [summary, ack, last_user_trigger] = 3
-    // → removed message count = 2. Exact value catches off-by-one regression.
+    // → summarized message count = 2. Exact value catches off-by-one regression.
     assert_eq!(
-        summary.removed, 2,
-        "Compacted.removed must reflect message-count delta (5 before → 3 after)"
+        summary.summarized, 2,
+        "Compacted.summarized must reflect message-count delta (5 before → 3 after)"
     );
     assert!(
         summary.tokens_before > 0,

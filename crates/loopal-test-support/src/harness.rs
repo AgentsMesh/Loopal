@@ -14,7 +14,7 @@ use loopal_runtime::AgentMode;
 use loopal_runtime::agent_loop::AgentLoopRunner;
 use loopal_runtime::goal::GoalRuntimeSession;
 use loopal_session::SessionController;
-use loopal_tool_api::PermissionMode;
+use loopal_tool_api::{OutstandingTasksDigest, PermissionMode};
 
 use crate::fixture::TestFixture;
 
@@ -35,6 +35,7 @@ pub struct HarnessBuilder {
     pub(crate) kernel_setup: Option<Box<dyn FnOnce(&mut Kernel)>>,
     pub(crate) scheduler: Option<Arc<loopal_scheduler::CronScheduler>>,
     pub(crate) goal_session: Option<Arc<GoalRuntimeSession>>,
+    pub(crate) outstanding_tasks: Option<Arc<dyn OutstandingTasksDigest>>,
     pub(crate) llm_chunk_delay: Option<std::time::Duration>,
 }
 
@@ -62,8 +63,14 @@ impl HarnessBuilder {
             kernel_setup: None,
             scheduler: None,
             goal_session: None,
+            outstanding_tasks: None,
             llm_chunk_delay: None,
         }
+    }
+
+    pub fn outstanding_tasks(mut self, p: Arc<dyn OutstandingTasksDigest>) -> Self {
+        self.outstanding_tasks = Some(p);
+        self
     }
 
     pub fn calls(mut self, c: Vec<Vec<Result<StreamChunk, LoopalError>>>) -> Self {

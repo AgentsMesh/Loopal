@@ -170,6 +170,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
     .scheduled_rx(scheduled_rx)
     .scheduler(scheduler_for_params)
     .goal_session_opt(builder.goal_session)
+    .outstanding_tasks_opt(builder.outstanding_tasks)
     .build();
 
     let harness = SpawnedHarness {

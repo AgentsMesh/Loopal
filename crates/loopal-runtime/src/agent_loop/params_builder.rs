@@ -4,7 +4,9 @@ use loopal_config::HarnessConfig;
 use loopal_context::ContextBudget;
 use loopal_provider_api::Message;
 use loopal_storage::Session;
-use loopal_tool_api::{FetchRefinerPolicy, MemoryChannel, OneShotChatService};
+use loopal_tool_api::{
+    FetchRefinerPolicy, MemoryChannel, OneShotChatService, OutstandingTasksDigest,
+};
 use loopal_turn::Turn;
 
 use super::params::{AgentConfig, AgentDeps, AgentLoopParams, InterruptHandle};
@@ -22,6 +24,7 @@ pub struct AgentLoopParamsBuilder {
     memory_channel: Option<Arc<dyn MemoryChannel>>,
     one_shot_chat: Option<Arc<dyn OneShotChatService>>,
     fetch_refiner_policy: Option<Arc<dyn FetchRefinerPolicy>>,
+    outstanding_tasks: Option<Arc<dyn OutstandingTasksDigest>>,
     goal_session: Option<Arc<GoalRuntimeSession>>,
     scheduled_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
     harness: HarnessConfig,
@@ -51,6 +54,7 @@ impl AgentLoopParamsBuilder {
             memory_channel: None,
             one_shot_chat: None,
             fetch_refiner_policy: None,
+            outstanding_tasks: None,
             goal_session: None,
             scheduled_rx: None,
             harness: HarnessConfig::default(),
@@ -87,6 +91,10 @@ impl AgentLoopParamsBuilder {
     }
     pub fn fetch_refiner_policy(mut self, p: Arc<dyn FetchRefinerPolicy>) -> Self {
         self.fetch_refiner_policy = Some(p);
+        self
+    }
+    pub fn outstanding_tasks_opt(mut self, t: Option<Arc<dyn OutstandingTasksDigest>>) -> Self {
+        self.outstanding_tasks = t;
         self
     }
     pub fn goal_session(mut self, g: Arc<GoalRuntimeSession>) -> Self {
@@ -141,6 +149,7 @@ impl AgentLoopParamsBuilder {
             memory_channel: self.memory_channel,
             one_shot_chat: self.one_shot_chat,
             fetch_refiner_policy: self.fetch_refiner_policy,
+            outstanding_tasks: self.outstanding_tasks,
             goal_session: self.goal_session,
             scheduled_rx: self.scheduled_rx,
             harness: self.harness,

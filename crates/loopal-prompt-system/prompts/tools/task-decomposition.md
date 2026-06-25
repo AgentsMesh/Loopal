@@ -23,6 +23,18 @@ If you do not decompose complex tasks into tracked steps, you **will** forget st
 - **TaskUpdate**: Mark each task as `in_progress` when you begin it, and `completed` as soon as you finish it. Do not batch — mark tasks completed one at a time as you go.
 - **TaskList**: Check your task list after completing each task to see what remains.
 
+### Reconcile your task list every turn
+
+Tasks are durable state that outlives any single turn, cron trigger, or context
+compaction. Before starting new work — **especially when you resume, are woken
+by a schedule, or see an `Outstanding tasks` list carried in after a
+compaction** — reconcile what is already open:
+
+- **Close what is done.** Mark any `in_progress` task you have actually finished as `completed`. A finished task left `in_progress` is a silent leak.
+- **Never strand an `in_progress` task.** If you are switching to different work (a new schedule fired, a new request arrived), do NOT leave a half-done task sitting `in_progress`. Either finish it now, or set it back to `pending` (or `deleted` if it is no longer relevant) before moving on.
+- **Drain or prune `pending`.** Pick up the highest-priority `pending` task, or delete it if it is stale/superseded. Do not let pending work pile up untouched across many turns.
+- Use **TaskList** at the start of a resumed/scheduled turn to see the real current state — do not rely on memory of earlier turns, which may have been compacted away.
+
 ### Rules
 
 - Mark each task as completed as soon as you are done with the task. Do not batch up multiple tasks before marking them as completed.

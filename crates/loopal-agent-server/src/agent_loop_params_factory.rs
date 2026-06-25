@@ -7,7 +7,9 @@ use loopal_runtime::{
     InterruptHandle, SessionResumeHook,
 };
 use loopal_storage::Session;
-use loopal_tool_api::{FetchRefinerPolicy, MemoryChannel, OneShotChatService};
+use loopal_tool_api::{
+    FetchRefinerPolicy, MemoryChannel, OneShotChatService, OutstandingTasksDigest,
+};
 use loopal_turn::Turn;
 
 /// Aggregate inputs for [`assemble_agent_loop_params`] — collapses what
@@ -29,6 +31,7 @@ pub(crate) struct AgentLoopAssembly {
     pub memory_channel: Option<Arc<dyn MemoryChannel>>,
     pub one_shot_chat: Option<Arc<dyn OneShotChatService>>,
     pub fetch_refiner_policy: Option<Arc<dyn FetchRefinerPolicy>>,
+    pub outstanding_tasks: Option<Arc<dyn OutstandingTasksDigest>>,
     pub goal_session: Option<Arc<GoalRuntimeSession>>,
     pub scheduler: Arc<loopal_scheduler::CronScheduler>,
     pub decision_cell: loopal_runtime::frontend::DecisionCell,
@@ -62,6 +65,7 @@ pub(crate) fn assemble_agent_loop_params(a: AgentLoopAssembly) -> AgentLoopParam
         Some(p) => builder.fetch_refiner_policy(p),
         None => builder,
     };
+    let builder = builder.outstanding_tasks_opt(a.outstanding_tasks);
     let builder = builder.goal_session_opt(a.goal_session);
     builder.build()
 }

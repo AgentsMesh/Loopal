@@ -104,8 +104,20 @@ impl AgentLoopRunner {
             ..
         } = output;
 
+        // Carry the not-yet-completed task list across the compaction boundary
+        // (TaskCreate/TaskUpdate records are otherwise summarized away, making
+        // the agent forget its in-progress/pending work).
+        let mut summary_text = summary_msg.text_content();
+        let task_digest = match &self.params.outstanding_tasks {
+            Some(p) => p.outstanding_tasks_digest().await,
+            None => None,
+        };
+        if let Some(digest) = task_digest {
+            summary_text.push_str(&digest);
+        }
+
         if let Err(e) = self.append_step_record(TurnStep::CompactionSummary(CompactionSummary {
-            summary_text: summary_msg.text_content(),
+            summary_text,
             ack_text: ack_msg.text_content(),
             kept_turn_count,
             removed_turn_count,

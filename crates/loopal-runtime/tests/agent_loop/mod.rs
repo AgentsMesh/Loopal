@@ -63,6 +63,7 @@ mod compact_hooks_e2e_test;
 mod compact_instructions_e2e_test;
 mod compact_phases_e2e_test;
 mod compact_provider_error_e2e_test;
+mod compact_tasks_carryover_e2e_test;
 mod compact_token_sync_test;
 mod compaction_run_e2e_test;
 mod cron_e2e_test;

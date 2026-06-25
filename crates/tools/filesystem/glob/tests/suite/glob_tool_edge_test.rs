@@ -84,3 +84,52 @@ async fn test_glob_default_limit_is_100() {
     assert!(result.content.contains("Found 105 files. Showing 1-100:"));
     assert!(result.content.contains("Use offset=100"));
 }
+
+fn make_ctx_zero_walk(cwd: &std::path::Path) -> ToolContext {
+    let limits = loopal_backend::ResourceLimits {
+        walk_timeout: std::time::Duration::ZERO,
+        ..Default::default()
+    };
+    let backend =
+        loopal_backend::LocalBackend::new(cwd.to_path_buf(), None, limits, "test-session");
+    ToolContext::new(backend, "test")
+}
+
+#[tokio::test]
+async fn test_glob_timeout_surfaces_notice() {
+    let tmp = tempfile::tempdir().unwrap();
+    std::fs::write(tmp.path().join("foo.rs"), "fn main() {}").unwrap();
+
+    let tool = make_tool();
+    let ctx = make_ctx_zero_walk(tmp.path());
+
+    let result = tool
+        .execute(json!({"pattern": "**/*.rs"}), &ctx)
+        .await
+        .unwrap();
+
+    assert!(!result.is_error);
+    assert!(result.content.contains("timed out"));
+}
+
+#[tokio::test]
+async fn test_glob_output_order_is_deterministic() {
+    let tmp = tempfile::tempdir().unwrap();
+    for i in 0..20 {
+        std::fs::write(tmp.path().join(format!("f{i:02}.rs")), "").unwrap();
+    }
+
+    let tool = make_tool();
+    let ctx = make_ctx(tmp.path());
+
+    let r1 = tool
+        .execute(json!({"pattern": "*.rs"}), &ctx)
+        .await
+        .unwrap();
+    let r2 = tool
+        .execute(json!({"pattern": "*.rs"}), &ctx)
+        .await
+        .unwrap();
+
+    assert_eq!(r1.content, r2.content);
+}

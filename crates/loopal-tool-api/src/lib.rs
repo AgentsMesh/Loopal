@@ -38,9 +38,9 @@ pub use stderr_buf::{STDERR_CAP_BYTES, StderrCappedBuffer};
 pub use tool::{Tool, ToolDefinition, ToolDispatch, ToolResult};
 pub use tool_context::ToolContext;
 pub use truncate::{
-    DEFAULT_MAX_OUTPUT_BYTES, DEFAULT_MAX_OUTPUT_LINES, OverflowResult, extract_overflow_path,
-    handle_overflow, humanize_size, needs_truncation, save_to_overflow_file, truncate_output,
-    truncate_tail,
+    DEFAULT_MAX_OUTPUT_BYTES, DEFAULT_MAX_OUTPUT_LINES, OverflowResult, SEARCH_TIMEOUT_NOTICE,
+    extract_overflow_path, handle_overflow, humanize_size, needs_truncation, save_to_overflow_file,
+    truncate_output, truncate_tail,
 };
 pub use truncate_middle::truncate_middle;
 pub use typed_bridge::TypedBridge;

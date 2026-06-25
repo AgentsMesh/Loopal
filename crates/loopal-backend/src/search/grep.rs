@@ -1,6 +1,7 @@
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::time::Instant;
 
 use globset::Glob;
 use ignore::WalkState;
@@ -55,12 +56,14 @@ pub fn grep_search(
         None => None,
     };
 
-    let max = opts.max_matches.min(limits.max_grep_matches);
+    let max = opts.max_matches.min(limits.max_grep_matches).max(1);
     let ctx_before = opts.context_before;
     let ctx_after = opts.context_after;
     let multiline = opts.multiline;
     let total = Arc::new(AtomicUsize::new(0));
     let done = Arc::new(AtomicBool::new(false));
+    let timed_out = Arc::new(AtomicBool::new(false));
+    let deadline = Instant::now() + limits.walk_timeout;
     let results: Arc<Mutex<Vec<FileMatchResult>>> = Arc::new(Mutex::new(Vec::new()));
     let search_path = Arc::new(search_path);
     let glob_matcher = Arc::new(glob_matcher);
@@ -74,9 +77,15 @@ pub fn grep_search(
         let search_path = Arc::clone(&search_path);
         let total = Arc::clone(&total);
         let done = Arc::clone(&done);
+        let timed_out = Arc::clone(&timed_out);
         let results = Arc::clone(&results);
         Box::new(move |entry| {
             if done.load(Ordering::Relaxed) {
+                return WalkState::Quit;
+            }
+            if Instant::now() >= deadline {
+                done.store(true, Ordering::Relaxed);
+                timed_out.store(true, Ordering::Relaxed);
                 return WalkState::Quit;
             }
             let entry = match entry {
@@ -100,9 +109,10 @@ pub fn grep_search(
     });
 
     let file_matches = Arc::try_unwrap(results).unwrap().into_inner();
-    let truncated = done.load(Ordering::Relaxed);
+    let truncated = total.load(Ordering::Relaxed) >= max;
     Ok(GrepSearchResult {
         total_match_count: total.load(Ordering::Relaxed),
+        timed_out: timed_out.load(Ordering::Relaxed),
         overflow_path: maybe_save_overflow(truncated, &file_matches),
         file_matches,
     })

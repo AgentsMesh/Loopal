@@ -16,7 +16,6 @@ use tracing::{debug, info};
 
 use crate::frontend::traits::EventEmitter;
 use crate::mode::AgentMode;
-use crate::tool_pipeline::execute_tool;
 
 #[derive(Debug, Clone)]
 pub struct ToolUseArrived {
@@ -111,7 +110,9 @@ pub fn feed_tool(
         .join_set
         .spawn(loopal_protocol::event_id::propagate_to_spawn(async move {
             let tool_start = Instant::now();
-            let result = execute_tool(&kernel, &name, input, &tool_ctx, &mode).await;
+            let result =
+                super::tool_exec::execute_tool_watchdogged(&kernel, &name, input, &tool_ctx, &mode)
+                    .await;
             let tool_duration = tool_start.elapsed();
 
             let (block, event) = match result {

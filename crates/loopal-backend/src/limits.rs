@@ -22,6 +22,11 @@ pub struct ResourceLimits {
     pub max_fetch_bytes: usize,
     /// Default shell command timeout.
     pub default_timeout: Duration,
+    /// Cooperative deadline checked between glob/grep walk entries: bounds
+    /// slow-but-responsive trees and returns partial results. A syscall stuck
+    /// on a dead mount can't be interrupted here — that case is bounded by the
+    /// runtime per-tool watchdog instead.
+    pub walk_timeout: Duration,
     /// HTTP fetch timeout.
     pub fetch_timeout: Duration,
     /// Maximum image file size in bytes.
@@ -40,6 +45,7 @@ impl Default for ResourceLimits {
             max_grep_matches: 500,
             max_fetch_bytes: 5 * 1024 * 1024,          // 5 MB
             default_timeout: Duration::from_secs(300), // 5 min
+            walk_timeout: Duration::from_secs(30),
             fetch_timeout: Duration::from_secs(30),
             image_max_bytes: IMAGE_MAX_BYTES,
             image_max_pixels: IMAGE_MAX_PIXELS,

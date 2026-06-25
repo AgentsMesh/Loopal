@@ -7,7 +7,7 @@ use ignore::types::TypesBuilder;
 
 /// Build a `WalkBuilder` with shared defaults.
 ///
-/// * Follows symlinks.
+/// * Does not follow symlinks (ripgrep default) — avoids cross-mount escape and traversal cycles.
 /// * Respects `.gitignore` (ignore crate default).
 /// * Applies file-type filtering when `type_filter` is given.
 ///
@@ -15,7 +15,7 @@ use ignore::types::TypesBuilder;
 /// caller should short-circuit with an empty result.
 pub fn build_walker(search_path: &Path, type_filter: Option<&str>) -> Option<WalkBuilder> {
     let mut builder = WalkBuilder::new(search_path);
-    builder.follow_links(true);
+    builder.follow_links(false);
 
     if let Some(ty) = type_filter {
         let mut tb = TypesBuilder::new();

@@ -81,6 +81,7 @@ pub struct GlobOptions {
 pub struct GlobSearchResult {
     pub entries: Vec<GlobEntry>,
     pub truncated: bool,
+    pub timed_out: bool,
     pub overflow_path: Option<String>,
 }
 
@@ -108,6 +109,7 @@ pub struct GrepOptions {
 pub struct GrepSearchResult {
     pub file_matches: Vec<FileMatchResult>,
     pub total_match_count: usize,
+    pub timed_out: bool,
     pub overflow_path: Option<String>,
 }
 

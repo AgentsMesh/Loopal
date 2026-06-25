@@ -1,17 +1,18 @@
-//! Glob pattern search with file-type filtering and modification time.
-
 use std::path::Path;
-use std::time::UNIX_EPOCH;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::{Instant, UNIX_EPOCH};
 
 use globset::Glob;
+use ignore::WalkState;
 use loopal_error::ToolIoError;
 use loopal_tool_api::backend_types::{GlobEntry, GlobOptions, GlobSearchResult};
 use loopal_tool_api::save_to_overflow_file;
+use parking_lot::Mutex;
 
 use crate::limits::ResourceLimits;
 use crate::search::{overflow_fmt, walker};
 
-/// Execute a glob search and return matching entries.
 pub fn glob_search(
     opts: &GlobOptions,
     cwd: &Path,
@@ -25,50 +26,75 @@ pub fn glob_search(
 
     let glob =
         Glob::new(&opts.pattern).map_err(|e| ToolIoError::Other(format!("invalid glob: {e}")))?;
-    let matcher = glob.compile_matcher();
+    let max = opts.max_results.min(limits.max_glob_results).max(1);
 
-    let max = opts.max_results.min(limits.max_glob_results);
-    let Some(walker) = walker::build_walker(&search_path, opts.type_filter.as_deref()) else {
+    let Some(w) = walker::build_walker(&search_path, opts.type_filter.as_deref()) else {
         return Ok(GlobSearchResult {
             entries: Vec::new(),
             truncated: false,
+            timed_out: false,
             overflow_path: None,
         });
     };
 
-    let mut entries = Vec::new();
-    let mut truncated = false;
+    let deadline = Instant::now() + limits.walk_timeout;
+    let done = Arc::new(AtomicBool::new(false));
+    let timed_out = Arc::new(AtomicBool::new(false));
+    let entries: Arc<Mutex<Vec<GlobEntry>>> = Arc::new(Mutex::new(Vec::new()));
+    let search_path = Arc::new(search_path);
+    let matcher = Arc::new(glob.compile_matcher());
 
-    for entry in walker.build().flatten() {
-        if !entry.file_type().is_some_and(|ft| ft.is_file()) {
-            continue;
-        }
-        let path = entry.path();
-        let rel = match path.strip_prefix(&search_path) {
-            Ok(r) => r,
-            Err(_) => continue,
-        };
-        if !matcher.is_match(rel) {
-            continue;
-        }
-        let modified_secs = entry
-            .metadata()
-            .ok()
-            .and_then(|m| m.modified().ok())
-            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-            .map(|d| d.as_secs());
+    w.build_parallel().run(|| {
+        let done = Arc::clone(&done);
+        let timed_out = Arc::clone(&timed_out);
+        let entries = Arc::clone(&entries);
+        let search_path = Arc::clone(&search_path);
+        let matcher = Arc::clone(&matcher);
+        Box::new(move |entry| {
+            if done.load(Ordering::Relaxed) {
+                return WalkState::Quit;
+            }
+            if Instant::now() >= deadline {
+                done.store(true, Ordering::Relaxed);
+                timed_out.store(true, Ordering::Relaxed);
+                return WalkState::Quit;
+            }
+            let Ok(entry) = entry else {
+                return WalkState::Continue;
+            };
+            if !entry.file_type().is_some_and(|ft| ft.is_file()) {
+                return WalkState::Continue;
+            }
+            let Ok(rel) = entry.path().strip_prefix(search_path.as_path()) else {
+                return WalkState::Continue;
+            };
+            if !matcher.is_match(rel) {
+                return WalkState::Continue;
+            }
+            let modified_secs = entry
+                .metadata()
+                .ok()
+                .and_then(|m| m.modified().ok())
+                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                .map(|d| d.as_secs());
+            let n = {
+                let mut guard = entries.lock();
+                guard.push(GlobEntry {
+                    path: entry.path().to_string_lossy().into_owned(),
+                    modified_secs,
+                });
+                guard.len()
+            };
+            if n >= max {
+                done.store(true, Ordering::Relaxed);
+                return WalkState::Quit;
+            }
+            WalkState::Continue
+        })
+    });
 
-        entries.push(GlobEntry {
-            path: path.to_string_lossy().into_owned(),
-            modified_secs,
-        });
-
-        if entries.len() >= max {
-            truncated = true;
-            break;
-        }
-    }
-
+    let entries = Arc::try_unwrap(entries).unwrap().into_inner();
+    let truncated = entries.len() >= max;
     let overflow_path = if truncated {
         Some(save_to_overflow_file(
             &overflow_fmt::serialize_glob_results(&entries),
@@ -81,6 +107,7 @@ pub fn glob_search(
     Ok(GlobSearchResult {
         entries,
         truncated,
+        timed_out: timed_out.load(Ordering::Relaxed),
         overflow_path,
     })
 }

@@ -1,6 +1,8 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
-use loopal_tool_api::{GlobOptions, PermissionLevel, ToolContext, ToolResult, TypedTool};
+use loopal_tool_api::{
+    GlobOptions, PermissionLevel, SEARCH_TIMEOUT_NOTICE, ToolContext, ToolResult, TypedTool,
+};
 use schemars::JsonSchema;
 use serde::Deserialize;
 
@@ -72,11 +74,21 @@ impl TypedTool<GlobParams> for GlobTool {
             LoopalError::Tool(loopal_error::ToolError::ExecutionFailed(e.to_string()))
         })?;
 
+        let timed_out = result.timed_out;
         let mut entries = result.entries;
-        entries.sort_by(|a, b| b.modified_secs.cmp(&a.modified_secs));
+        entries.sort_by(|a, b| {
+            b.modified_secs
+                .cmp(&a.modified_secs)
+                .then_with(|| a.path.cmp(&b.path))
+        });
 
         let total_found = entries.len();
         if total_found == 0 {
+            if timed_out {
+                return Ok(ToolResult::success(format!(
+                    "No files matched before the search timed out.{SEARCH_TIMEOUT_NOTICE}"
+                )));
+            }
             return Ok(ToolResult::success("No files matched the pattern."));
         }
 
@@ -97,6 +109,9 @@ impl TypedTool<GlobParams> for GlobTool {
 
         if page_end < total_found {
             output.push_str(&format!("\n\n(Use offset={page_end} to see more.)"));
+        }
+        if timed_out {
+            output.push_str(SEARCH_TIMEOUT_NOTICE);
         }
 
         Ok(ToolResult::success(output))

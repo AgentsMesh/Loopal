@@ -43,7 +43,7 @@ async fn test_model_switch_bails_out_when_event_emit_fails() {
     let (mut runner, event_rx, _mbox_tx, ctrl_tx, _perm_tx) = make_runner_with_channels();
     drop(event_rx);
 
-    let original = runner.params.config.model().to_string();
+    let original = runner.params.config.model();
     ctrl_tx
         .send(ControlCommand::ModelSwitch("claude-opus-4-7".into()))
         .await

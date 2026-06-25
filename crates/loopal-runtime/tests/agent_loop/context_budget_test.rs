@@ -28,7 +28,7 @@ fn test_effective_context_window_cap_larger_than_model() {
     // cap > model_window → use model_window (min semantics)
     let (runner, _) = super::make_runner();
     let mut mc = runner.model_config.clone();
-    mc.context_tokens_cap = 500_000;
+    mc.context_tokens_cap = mc.max_context_tokens + 500_000;
     assert_eq!(mc.effective_context_window(), mc.max_context_tokens);
 }
 

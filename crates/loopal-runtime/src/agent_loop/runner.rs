@@ -77,7 +77,7 @@ impl AgentLoopRunner {
         .with_goal_session_opt(goal_adapter)
         .with_secret_client_opt(params.deps.kernel.secret_client().cloned());
         let model_config = ModelConfig::from_model(
-            params.config.model(),
+            &params.config.model(),
             params.config.thinking_config.clone(),
             params.config.context_tokens_cap,
         );

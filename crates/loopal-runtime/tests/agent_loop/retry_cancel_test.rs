@@ -92,7 +92,7 @@ async fn test_cancel_during_retry_sleep() {
         .params
         .deps
         .kernel
-        .resolve_provider(runner.params.config.model())
+        .resolve_provider(&runner.params.config.model())
         .unwrap();
 
     // Signal cancel after a short delay (during retry sleep)
@@ -144,7 +144,7 @@ async fn test_cancel_before_stream_chat_attempt() {
         .params
         .deps
         .kernel
-        .resolve_provider(runner.params.config.model())
+        .resolve_provider(&runner.params.config.model())
         .unwrap();
 
     let stream = in_turn(runner.retry_stream_chat(&params, &*provider, &cancel))

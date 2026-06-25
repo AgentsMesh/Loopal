@@ -10,11 +10,13 @@ use loopal_protocol::InterruptSignal;
 use loopal_runtime::agent_input::AgentInput;
 
 use crate::agent_setup;
+use crate::agent_setup_helpers::build_model_router;
 use crate::hub_frontend::HubFrontend;
 use crate::session_handlers_factory::build_session_handlers;
 use crate::session_hub::{SessionHub, SharedSession};
 use crate::session_spawn::{parse_start_params, spawn_agent_and_bridges};
 use crate::session_start_prompt::push_prompt_envelope;
+use loopal_provider_api::SharedModelRouter;
 
 pub(crate) struct SessionHandle {
     pub session_id: String,
@@ -94,11 +96,13 @@ pub(crate) async fn start_session(
         ));
         let decision_context =
             loopal_runtime::frontend::DecisionContext::with_cwd(cwd.to_string_lossy().into_owned());
+        let model_router = SharedModelRouter::new(build_model_router(&config.settings));
         let (perm_handler, q_handler, decision_cell) = build_session_handlers(
             &config,
             &kernel,
             session_holder.clone(),
             decision_context.clone(),
+            model_router.reader(),
         );
         let frontend_placeholder = Arc::new(HubFrontend::new(
             session_holder,
@@ -126,6 +130,7 @@ pub(crate) async fn start_session(
                 decision_context,
                 decision_cell,
                 &preset_session_id,
+                model_router,
             ))
             .await?;
         let agent_params = setup.params;

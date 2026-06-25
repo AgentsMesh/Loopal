@@ -6,20 +6,17 @@ use std::time::Duration;
 
 use loopal_config::{CompactionSettings, ResolvedConfig, Settings};
 use loopal_protocol::{AgentEvent, AgentEventPayload};
-use loopal_provider_api::{ContentBlock, Message, MessageRole, ModelRouter, TaskType};
+use loopal_provider_api::{ContentBlock, Message, MessageRole, ModelRouter};
 use loopal_runtime::frontend::traits::AgentFrontend;
 use loopal_turn::{InjectionKind, Turn, TurnOutcome, TurnStep, TurnTrigger};
 
 use crate::params::StartParams;
 
-const DEFAULT_SUMMARIZATION_MODEL: &str = "claude-haiku-4-5-20251001";
-
+/// No hardcoded per-task default: unconfigured tasks fall back to the main
+/// model via `ModelRouter::resolve` — a pinned default could reference an
+/// unconfigured provider and silently break compaction.
 pub fn build_model_router(settings: &Settings) -> ModelRouter {
-    let mut routing = settings.model_routing.clone();
-    routing
-        .entry(TaskType::Summarization)
-        .or_insert_with(|| DEFAULT_SUMMARIZATION_MODEL.to_string());
-    ModelRouter::from_parts(settings.model.clone(), routing)
+    ModelRouter::from_parts(settings.model.clone(), settings.model_routing.clone())
 }
 
 /// Resolve the microcompact idle duration. Logs a hint when the user has

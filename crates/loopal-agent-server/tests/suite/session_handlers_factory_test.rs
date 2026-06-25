@@ -1,11 +1,33 @@
 use indexmap::IndexMap;
 use std::sync::Arc;
 
-use loopal_agent_server::testing::{SessionRef, SharedSession, build_session_handlers};
+use loopal_agent_server::testing::{
+    SessionRef, SharedSession, build_model_router, build_session_handlers,
+};
 use loopal_config::{ResolvedConfig, Settings};
 use loopal_decision_api::DecisionMode;
 use loopal_kernel::Kernel;
-use loopal_runtime::frontend::DecisionContext;
+use loopal_provider_api::SharedModelRouter;
+use loopal_runtime::frontend::permission_handler::PermissionHandler;
+use loopal_runtime::frontend::question_handler::QuestionHandler;
+use loopal_runtime::frontend::{DecisionCell, DecisionContext};
+
+type Handlers = (
+    Box<dyn PermissionHandler>,
+    Box<dyn QuestionHandler>,
+    DecisionCell,
+);
+
+fn handlers(config: &ResolvedConfig, kernel: &Arc<Kernel>, session: SessionRef) -> Handlers {
+    let router = SharedModelRouter::new(build_model_router(&config.settings)).reader();
+    build_session_handlers(
+        config,
+        kernel,
+        session,
+        DecisionContext::with_cwd("/tmp/test"),
+        router,
+    )
+}
 
 fn empty_config(decision: DecisionMode) -> ResolvedConfig {
     let settings = Settings {
@@ -39,12 +61,7 @@ async fn manual_decision_yields_ipc_only_no_primary_connection() {
     let config = empty_config(DecisionMode::Manual);
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
     let session = dummy_session();
-    let (perm, _q, _cell) = build_session_handlers(
-        &config,
-        &kernel,
-        session,
-        DecisionContext::with_cwd("/tmp/test"),
-    );
+    let (perm, _q, _cell) = handlers(&config, &kernel, session);
     let outcome = perm.decide("id1", "Bash", &serde_json::json!({})).await;
     assert_eq!(
         outcome.decision,
@@ -63,12 +80,7 @@ async fn auto_decision_wraps_with_auto_handlers_and_falls_back() {
     let config = empty_config(DecisionMode::Classifier);
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
     let session = dummy_session();
-    let (perm, _q, _cell) = build_session_handlers(
-        &config,
-        &kernel,
-        session,
-        DecisionContext::with_cwd("/tmp/test"),
-    );
+    let (perm, _q, _cell) = handlers(&config, &kernel, session);
     let outcome = perm.decide("id1", "Bash", &serde_json::json!({})).await;
     assert_eq!(
         outcome.decision,
@@ -92,12 +104,7 @@ async fn manual_question_path_cancels_without_connection() {
     let config = empty_config(DecisionMode::Manual);
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
     let session = dummy_session();
-    let (_perm, q, _cell) = build_session_handlers(
-        &config,
-        &kernel,
-        session,
-        DecisionContext::with_cwd("/tmp/test"),
-    );
+    let (_perm, q, _cell) = handlers(&config, &kernel, session);
     let outcome = q.ask(vec![]).await;
     assert!(
         matches!(
@@ -118,12 +125,7 @@ async fn auto_question_path_chains_fallback_when_provider_unresolvable() {
     let config = empty_config(DecisionMode::Classifier);
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
     let session = dummy_session();
-    let (_perm, q, _cell) = build_session_handlers(
-        &config,
-        &kernel,
-        session,
-        DecisionContext::with_cwd("/tmp/test"),
-    );
+    let (_perm, q, _cell) = handlers(&config, &kernel, session);
     let outcome = q.ask(vec![]).await;
     assert!(
         matches!(
@@ -144,12 +146,7 @@ async fn decision_cell_switch_flips_manual_to_classifier_at_runtime() {
     let config = empty_config(DecisionMode::Manual);
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
     let session = dummy_session();
-    let (perm, _q, cell) = build_session_handlers(
-        &config,
-        &kernel,
-        session,
-        DecisionContext::with_cwd("/tmp/test"),
-    );
+    let (perm, _q, cell) = handlers(&config, &kernel, session);
     let manual = perm.decide("id1", "Bash", &serde_json::json!({})).await;
     assert!(
         manual.reason.contains("no primary connection"),
@@ -172,12 +169,7 @@ async fn agent_decision_falls_back_to_classifier_path_today() {
     let config = empty_config(DecisionMode::Agent);
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
     let session = dummy_session();
-    let (perm, q, _cell) = build_session_handlers(
-        &config,
-        &kernel,
-        session,
-        DecisionContext::with_cwd("/tmp/test"),
-    );
+    let (perm, q, _cell) = handlers(&config, &kernel, session);
     // Permission path: Agent → Classifier → IpcPermission fallback denies (no conn)
     let outcome = perm.decide("id1", "Bash", &serde_json::json!({})).await;
     assert_eq!(

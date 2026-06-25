@@ -39,6 +39,7 @@ rust_test(
         "//crates/loopal-error",
         "//crates/loopal-mcp",
         "//crates/loopal-provider",
+        "//crates/loopal-provider-api",
         "//crates/loopal-tool-api",
         "@crates//:rmcp",
         "@crates//:serde_json",

@@ -39,7 +39,9 @@ fn test_model_info_defaults_for_unknown_model() {
 
     let params = AgentLoopParamsBuilder::new(
         AgentConfig {
-            router: loopal_provider_api::ModelRouter::new("unknown-model-xyz".to_string()),
+            router: loopal_provider_api::SharedModelRouter::with_default(
+                "unknown-model-xyz".to_string(),
+            ),
             permission_mode: PermissionMode::AskAnyWrite,
             ..Default::default()
         },

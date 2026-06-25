@@ -12,7 +12,7 @@ use loopal_error::LoopalError;
 
 pub use chat::{ChatParams, ChatStream, StopReason, StreamChunk};
 pub use model::*;
-pub use model_router::ModelRouter;
+pub use model_router::{ModelRouter, ModelRouterReader, SharedModelRouter};
 pub use resolver::ProviderResolver;
 pub use thinking::*;
 pub use wire::{

@@ -34,11 +34,8 @@ impl AgentLoopRunner {
             )
             .await?;
         }
-        let provider = self
-            .params
-            .deps
-            .kernel
-            .resolve_provider(self.params.config.model())?;
+        let model = self.params.config.model();
+        let provider = self.params.deps.kernel.resolve_provider(&model)?;
 
         // PreRequest hook: notify before LLM call.
         crate::fire_hooks::fire_hooks(
@@ -53,7 +50,7 @@ impl AgentLoopRunner {
 
         let llm_start = Instant::now();
         info!(
-            model = %self.params.config.model(), turns = chat_params.turns.len(),
+            model = %model, turns = chat_params.turns.len(),
             tools = chat_params.tools.len(), max_tokens = chat_params.max_tokens,
             thinking = ?chat_params.thinking, "LLM request"
         );
@@ -105,10 +102,7 @@ impl AgentLoopRunner {
             "LLM complete"
         );
         let llm_attrs = &[
-            KeyValue::new(
-                "gen_ai.request.model",
-                self.params.config.model().to_string(),
-            ),
+            KeyValue::new("gen_ai.request.model", model),
             KeyValue::new("gen_ai.system", provider.name().to_string()),
         ];
         crate::otel_metrics::llm_duration().record(llm_duration.as_secs_f64(), llm_attrs);

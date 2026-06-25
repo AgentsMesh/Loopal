@@ -1,6 +1,6 @@
 use crate::agent_setup_context::AgentSetupContext;
 use crate::agent_setup_helpers::{
-    build_fork_synthetic_turn, build_microcompact_idle, build_model_router, collect_feature_tags,
+    build_fork_synthetic_turn, build_microcompact_idle, collect_feature_tags,
     spawn_sub_agent_forwarder,
 };
 use crate::params::AgentSetupResult;
@@ -24,11 +24,9 @@ pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<A
         decision_context,
         decision_cell,
         session_id,
+        router,
     } = ctx;
-    let router = build_model_router(&config.settings);
-    let model = router
-        .resolve(loopal_provider_api::TaskType::Default)
-        .to_string();
+    let model = router.model();
     let permission_mode = config.settings.permission_mode;
     let thinking_config = config.settings.thinking.clone();
     let (mode, mode_str) = match start.mode.as_deref() {

@@ -54,12 +54,16 @@ impl ExecutorFactory for DefaultExecutorFactory {
                     error!("Prompt hook requires a Provider but none available, skipping");
                     return None;
                 };
+                // No cross-provider default model: an unset `model` is a config
+                // error, not a silent fallback to some provider's model that may
+                // not even be registered.
+                let Some(model) = config.model.clone() else {
+                    error!("Prompt hook requires an explicit `model`; none set, skipping");
+                    return None;
+                };
                 Some(Box::new(PromptExecutor {
                     system_prompt: config.prompt.clone().unwrap_or_default(),
-                    model: config
-                        .model
-                        .clone()
-                        .unwrap_or_else(|| "claude-haiku-4-5-20251001".into()),
+                    model,
                     provider: provider.clone(),
                     timeout,
                     max_tokens: 256,

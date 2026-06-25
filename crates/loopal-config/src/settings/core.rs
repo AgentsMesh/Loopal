@@ -15,6 +15,9 @@ use loopal_decision_api::DecisionMode;
 use loopal_provider_api::{ModelOverride, TaskType, ThinkingConfig};
 use loopal_tool_api::{BgTaskConfig, PermissionMode};
 
+/// Fallback model id when no config layer sets `model`.
+const DEFAULT_MODEL: &str = "claude-opus-4-8";
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
@@ -79,7 +82,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            model: "claude-opus-4-8".to_string(),
+            model: DEFAULT_MODEL.to_string(),
             model_routing: HashMap::new(),
             models: HashMap::new(),
             permission_mode: PermissionMode::default(),

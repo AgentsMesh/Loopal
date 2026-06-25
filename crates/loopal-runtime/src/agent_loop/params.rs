@@ -5,7 +5,7 @@ use loopal_config::HarnessConfig;
 use loopal_context::ContextBudget;
 use loopal_kernel::Kernel;
 use loopal_protocol::InterruptSignal;
-use loopal_provider_api::{ModelRouter, ThinkingConfig};
+use loopal_provider_api::{SharedModelRouter, ThinkingConfig};
 use loopal_storage::Session;
 use loopal_tool_api::{FetchRefinerPolicy, MemoryChannel, OneShotChatService, PermissionMode};
 use tokio::sync::watch;
@@ -25,7 +25,7 @@ pub enum LifecycleMode {
 
 pub struct AgentConfig {
     pub lifecycle: LifecycleMode,
-    pub router: ModelRouter,
+    pub router: SharedModelRouter,
     pub system_prompt: String,
     pub mode: AgentMode,
     pub permission_mode: PermissionMode,
@@ -46,8 +46,8 @@ pub struct PlanModeState {
 }
 
 impl AgentConfig {
-    pub fn model(&self) -> &str {
-        self.router.resolve(loopal_provider_api::TaskType::Default)
+    pub fn model(&self) -> String {
+        self.router.model()
     }
 }
 
@@ -55,7 +55,10 @@ impl Default for AgentConfig {
     fn default() -> Self {
         Self {
             lifecycle: LifecycleMode::default(),
-            router: ModelRouter::new("claude-sonnet-4-20250514".into()),
+            // reason: test-only fixture (production sets the real router in
+            // agent_setup). Pinned to a specific model so token-math tests stay
+            // calibrated — NOT coupled to the production default model.
+            router: SharedModelRouter::with_default("claude-sonnet-4-20250514".into()),
             system_prompt: String::new(),
             mode: AgentMode::Act,
             permission_mode: PermissionMode::Bypass,

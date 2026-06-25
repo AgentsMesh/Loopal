@@ -4,7 +4,7 @@ use std::sync::Arc;
 use loopal_config::Settings;
 use loopal_kernel::Kernel;
 use loopal_protocol::{AgentEvent, ControlCommand, Envelope};
-use loopal_provider_api::{ModelRouter, TaskType};
+use loopal_provider_api::{SharedModelRouter, TaskType};
 use loopal_runtime::agent_loop::AgentLoopRunner;
 use loopal_runtime::frontend::{DenyAllHandler, UnsupportedQuestionHandler};
 use loopal_runtime::{
@@ -36,7 +36,7 @@ fn make_runner_with_routing(
 
     let mut routing = HashMap::new();
     routing.insert(TaskType::Summarization, summarization_model.to_string());
-    let router = ModelRouter::from_parts("claude-sonnet-4-20250514".into(), routing);
+    let router = SharedModelRouter::from_parts("claude-sonnet-4-20250514".into(), routing);
 
     let params = AgentLoopParamsBuilder::new(
         AgentConfig {
@@ -63,7 +63,12 @@ fn test_router_resolves_default_model() {
 
     assert_eq!(runner.params.config.model(), "claude-sonnet-4-20250514");
     assert_eq!(
-        runner.params.config.router.resolve(TaskType::Default),
+        runner
+            .params
+            .config
+            .router
+            .read()
+            .resolve(TaskType::Default),
         "claude-sonnet-4-20250514"
     );
 }
@@ -73,14 +78,19 @@ fn test_router_resolves_summarization_override() {
     let (runner, _rx) = make_runner_with_routing("claude-haiku-3-5-20241022");
 
     assert_eq!(
-        runner.params.config.router.resolve(TaskType::Summarization),
+        runner
+            .params
+            .config
+            .router
+            .read()
+            .resolve(TaskType::Summarization),
         "claude-haiku-3-5-20241022"
     );
 }
 
 #[test]
 fn test_model_switch_preserves_summarization_override() {
-    let (mut runner, _rx) = make_runner_with_routing("claude-haiku-3-5-20241022");
+    let (runner, _rx) = make_runner_with_routing("claude-haiku-3-5-20241022");
 
     // Switch the default model
     runner
@@ -93,7 +103,12 @@ fn test_model_switch_preserves_summarization_override() {
     assert_eq!(runner.params.config.model(), "claude-opus-4-6");
     // Summarization override untouched
     assert_eq!(
-        runner.params.config.router.resolve(TaskType::Summarization),
+        runner
+            .params
+            .config
+            .router
+            .read()
+            .resolve(TaskType::Summarization),
         "claude-haiku-3-5-20241022"
     );
 }
@@ -118,7 +133,7 @@ fn test_model_routing_default_override_via_config_model() {
     // User sets model_routing.default to override the base model
     let mut routing = HashMap::new();
     routing.insert(TaskType::Default, "claude-opus-4-6".into());
-    let router = ModelRouter::from_parts("claude-sonnet-4-20250514".into(), routing);
+    let router = SharedModelRouter::from_parts("claude-sonnet-4-20250514".into(), routing);
 
     let params = AgentLoopParamsBuilder::new(
         AgentConfig {

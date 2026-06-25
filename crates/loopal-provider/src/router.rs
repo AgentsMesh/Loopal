@@ -72,6 +72,14 @@ impl ProviderRegistry {
     pub fn get(&self, name: &str) -> Option<Arc<dyn Provider>> {
         self.providers.get(name).cloned()
     }
+
+    /// Whether `model` resolves to a registered provider. Keyed by model
+    /// (catalog → prefix-map → heuristic), not by provider name, so it
+    /// mirrors what `resolve` would actually return. Used by preflight to
+    /// surface dead routes before they fail at call time.
+    pub fn is_model_resolvable(&self, model: &str) -> bool {
+        self.resolve(model).is_ok()
+    }
 }
 
 impl Default for ProviderRegistry {

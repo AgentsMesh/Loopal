@@ -152,7 +152,7 @@ async fn test_ephemeral_unresolved_model_propagates_error_to_result() {
     let (mut runner, _event_rx) = make_multi_runner(calls);
     runner.params.config.lifecycle = LifecycleMode::Ephemeral;
     runner.params.config.router =
-        loopal_provider_api::ModelRouter::new("unknown-model-xyz".to_string());
+        loopal_provider_api::SharedModelRouter::with_default("unknown-model-xyz".to_string());
 
     let output = runner.run().await.unwrap();
     assert_eq!(output.terminate_reason, TerminateReason::Error);

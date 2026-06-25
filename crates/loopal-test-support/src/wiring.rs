@@ -139,7 +139,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
                 if let Some(m) = builder.summarization_model {
                     routing.insert(loopal_provider_api::TaskType::Summarization, m);
                 }
-                loopal_provider_api::ModelRouter::from_parts(builder.model, routing)
+                loopal_provider_api::SharedModelRouter::from_parts(builder.model, routing)
             },
             system_prompt: builder.system_prompt,
             mode: builder.mode,

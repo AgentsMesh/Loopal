@@ -11,5 +11,7 @@ mod kernel_mcp_test;
 mod kernel_openai_test;
 #[path = "suite/kernel_provider_registry_test.rs"]
 mod kernel_provider_registry_test;
+#[path = "suite/kernel_resolve_test.rs"]
+mod kernel_resolve_test;
 #[path = "suite/kernel_sandbox_test.rs"]
 mod kernel_sandbox_test;

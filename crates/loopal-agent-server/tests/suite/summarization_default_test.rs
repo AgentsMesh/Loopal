@@ -4,8 +4,6 @@ use loopal_agent_server::testing::build_model_router;
 use loopal_config::Settings;
 use loopal_provider_api::TaskType;
 
-const HAIKU: &str = "claude-haiku-4-5-20251001";
-
 fn settings_with(model: &str, routing: HashMap<TaskType, String>) -> Settings {
     Settings {
         model: model.into(),
@@ -15,9 +13,9 @@ fn settings_with(model: &str, routing: HashMap<TaskType, String>) -> Settings {
 }
 
 #[test]
-fn summarization_defaults_to_haiku_when_unconfigured() {
+fn summarization_falls_back_to_main_model_when_unconfigured() {
     let router = build_model_router(&settings_with("claude-opus-4-7", HashMap::new()));
-    assert_eq!(router.resolve(TaskType::Summarization), HAIKU);
+    assert_eq!(router.resolve(TaskType::Summarization), "claude-opus-4-7");
 }
 
 #[test]
@@ -29,7 +27,7 @@ fn user_summarization_model_overrides_default() {
 }
 
 #[test]
-fn default_task_unaffected_by_summarization_injection() {
+fn default_task_resolves_to_main_model() {
     let router = build_model_router(&settings_with("claude-opus-4-7", HashMap::new()));
     assert_eq!(router.resolve(TaskType::Default), "claude-opus-4-7");
 }
@@ -42,8 +40,8 @@ fn other_task_types_fall_back_to_default_model() {
 }
 
 #[test]
-fn empty_routing_still_yields_haiku_for_summarization() {
-    let router = build_model_router(&settings_with("anthropic-test-model", HashMap::new()));
-    assert_eq!(router.resolve(TaskType::Summarization), HAIKU);
-    assert_eq!(router.resolve(TaskType::Default), "anthropic-test-model");
+fn gpt_only_deployment_summarizes_with_its_main_model() {
+    let router = build_model_router(&settings_with("gpt-5.5", HashMap::new()));
+    assert_eq!(router.resolve(TaskType::Summarization), "gpt-5.5");
+    assert_eq!(router.resolve(TaskType::Default), "gpt-5.5");
 }

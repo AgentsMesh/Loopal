@@ -68,10 +68,7 @@ impl AgentLoopRunner {
         );
 
         crate::otel_metrics::active_turns().add(-1, &[]);
-        let model_attr = KeyValue::new(
-            "gen_ai.request.model",
-            self.params.config.model().to_string(),
-        );
+        let model_attr = KeyValue::new("gen_ai.request.model", self.params.config.model());
         crate::otel_metrics::turn_duration().record(
             turn_duration.as_secs_f64(),
             std::slice::from_ref(&model_attr),

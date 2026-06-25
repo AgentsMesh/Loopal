@@ -25,16 +25,27 @@ impl AgentLoopRunner {
         strategy: &'static str,
         cancel: &CancellationToken,
     ) -> Result<bool> {
-        let compact_model = self
-            .params
-            .config
-            .router
-            .resolve(loopal_provider_api::TaskType::Summarization)
-            .to_string();
-        let provider = match self.params.deps.kernel.resolve_provider(&compact_model) {
-            Ok(p) => p,
+        let resolved = {
+            let router = self.params.config.router.read();
+            self.params
+                .deps
+                .kernel
+                .resolve_task(&router, loopal_provider_api::TaskType::Summarization)
+        };
+        let (compact_model, provider) = match resolved {
+            Ok(pair) => pair,
             Err(e) => {
-                warn!(error = %e, model = %compact_model, "summarization provider unavailable");
+                warn!(error = %e, "summarization provider unavailable");
+                // Inline notice, best-effort — NOT AgentEventPayload::Error,
+                // which frontends treat as agent termination (snapping a viewed
+                // sub-agent back to root every auto-compact tick).
+                self.emit_cosmetic(AgentEventPayload::Stream {
+                    text: format!(
+                        "[compaction unavailable: summarization model has no provider ({e}); \
+                         set model_routing.summarization or configure the provider]\n"
+                    ),
+                })
+                .await;
                 return Ok(false);
             }
         };

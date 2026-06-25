@@ -60,10 +60,22 @@ async fn test_factory_prompt_with_provider_creates_executor() {
     ];
     let provider: Arc<dyn loopal_provider_api::Provider> = Arc::new(MockProvider::new(chunks));
     let factory = DefaultExecutorFactory::new(Some(provider));
-    let executor = factory.create(&make_config(HookType::Prompt)).unwrap();
+    // Prompt hooks now require an explicit model (no cross-provider default).
+    let mut config = make_config(HookType::Prompt);
+    config.model = Some("claude-sonnet-4-20250514".into());
+    let executor = factory.create(&config).unwrap();
     let result = executor.execute(serde_json::json!({})).await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap().exit_code, 0);
+}
+
+#[tokio::test]
+async fn test_factory_prompt_without_model_returns_none() {
+    use loopal_test_support::mock_provider::MockProvider;
+    let provider: Arc<dyn loopal_provider_api::Provider> = Arc::new(MockProvider::new(vec![]));
+    let factory = DefaultExecutorFactory::new(Some(provider));
+    // Provider present but `model` unset → no executor (no cross-provider default).
+    assert!(factory.create(&make_config(HookType::Prompt)).is_none());
 }
 
 #[tokio::test]

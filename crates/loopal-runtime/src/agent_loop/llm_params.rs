@@ -56,11 +56,12 @@ impl AgentLoopRunner {
             .budget()
             .clamp_output_tokens(estimated_input);
 
-        let capability = get_thinking_capability(self.params.config.model());
+        let model = self.params.config.model();
+        let capability = get_thinking_capability(&model);
         let resolved_thinking =
             resolve_thinking_config(&self.model_config.thinking, capability, safe_max_tokens);
         Ok(ChatParams {
-            model: self.params.config.model().to_string(),
+            model,
             turns,
             system_prompt: full_system_prompt,
             tools: tool_defs,

@@ -17,6 +17,7 @@ pub struct AgentSetupResult {
     pub agent_shared: Arc<AgentShared>,
 }
 
+#[derive(Default)]
 pub struct StartParams {
     #[allow(dead_code)]
     pub cwd: Option<String>,
@@ -97,12 +98,35 @@ pub async fn build_kernel_from_config(
     )
     .await;
     let kernel = Arc::new(kernel);
+    log_unresolvable_routing(&kernel);
 
     if production {
         spawn_proxy_mcp_settle_poll(Arc::downgrade(&kernel));
     }
 
     Ok(kernel)
+}
+
+/// Logging policy for unresolvable routes: the unreachable main model is an
+/// error (LLM calls will fail), a bad `model_routing` entry is a warning (it
+/// falls back to the main model). Soft by design — never aborts startup, since
+/// sub-agent/proxy and test paths legitimately register fewer providers.
+fn log_unresolvable_routing(kernel: &Kernel) {
+    for entry in kernel.unresolvable_models() {
+        match entry.slot {
+            loopal_kernel::RoutedSlot::MainModel => tracing::error!(
+                model = %entry.model,
+                "configured main model resolves to no registered provider; \
+                 LLM calls will fail — configure its provider or set `model`"
+            ),
+            loopal_kernel::RoutedSlot::Task(task) => tracing::warn!(
+                model = %entry.model,
+                ?task,
+                "model_routing entry resolves to no registered provider; \
+                 that task will fail when invoked"
+            ),
+        }
+    }
 }
 
 pub fn build_kernel_with_provider(

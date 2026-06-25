@@ -6,7 +6,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use tokio::sync::{Mutex, mpsc, watch};
+use tokio::sync::{mpsc, watch};
 
 use loopal_error::AgentOutput;
 use loopal_ipc::StdioTransport;
@@ -19,7 +19,7 @@ use loopal_test_support::mock_provider::MultiCallProvider;
 use loopal_test_support::scenarios::Calls;
 
 use loopal_agent_server::testing::{
-    AgentInput, SharedSession, StartParams, build_kernel_with_provider,
+    AgentInput, SharedSession, StartParams, build_kernel_with_provider, build_model_router,
 };
 
 pub const T: Duration = Duration::from_secs(10);
@@ -108,14 +108,11 @@ pub async fn build_hub_harness_with(
     let (watch_tx, watch_rx) = watch::channel(0u64);
     let interrupt_tx = Arc::new(watch_tx);
 
-    let session = Arc::new(SharedSession {
-        session_id: "hub-test".into(),
-        clients: Mutex::new(Vec::new()),
-        input_tx: input_tx.clone(),
-        interrupt: interrupt.clone(),
-        interrupt_tx: interrupt_tx.clone(),
-        agent_shared: Mutex::new(None),
-    });
+    let session = Arc::new(SharedSession::placeholder(
+        input_tx.clone(),
+        interrupt.clone(),
+        interrupt_tx.clone(),
+    ));
     let (server_conn, client_conn, client_rx) = conn_pair();
     session.add_client("test".into(), server_conn).await;
 
@@ -125,18 +122,8 @@ pub async fn build_hub_harness_with(
         config.settings.permission_mode = pm;
     }
     let start = StartParams {
-        cwd: None,
-        model: None,
-        mode: None,
-        prompt: None,
-        permission_mode: None,
-        decision_mode: None,
         no_sandbox: true,
-        resume: None,
-        lifecycle: loopal_runtime::LifecycleMode::Persistent,
-        agent_type: None,
-        depth: None,
-        fork_context: None,
+        ..Default::default()
     };
     let (hub_conn, _hub_peer) = loopal_ipc::duplex_pair();
     let (hub_connection, _hub_rx) = loopal_ipc::Connection::new(hub_conn).into_listening();
@@ -157,6 +144,7 @@ pub async fn build_hub_harness_with(
             loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
             loopal_runtime::frontend::DecisionCell::new(loopal_decision_api::DecisionMode::Manual),
             "harness-session",
+            loopal_provider_api::SharedModelRouter::new(build_model_router(&config.settings)),
         ),
     )
     .await

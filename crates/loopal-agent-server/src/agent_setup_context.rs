@@ -10,6 +10,7 @@ use std::sync::Arc;
 use loopal_config::ResolvedConfig;
 use loopal_kernel::Kernel;
 use loopal_protocol::InterruptSignal;
+use loopal_provider_api::SharedModelRouter;
 use loopal_runtime::frontend::traits::AgentFrontend;
 
 use crate::params::StartParams;
@@ -39,6 +40,7 @@ pub struct AgentSetupContext<'a> {
     pub decision_context: loopal_runtime::frontend::DecisionContext,
     pub decision_cell: loopal_runtime::frontend::DecisionCell,
     pub session_id: &'a str,
+    pub router: SharedModelRouter,
 }
 
 impl<'a> AgentSetupContext<'a> {
@@ -57,6 +59,7 @@ impl<'a> AgentSetupContext<'a> {
         decision_context: loopal_runtime::frontend::DecisionContext,
         decision_cell: loopal_runtime::frontend::DecisionCell,
         session_id: &'a str,
+        router: SharedModelRouter,
     ) -> Self {
         Self {
             cwd,
@@ -72,6 +75,7 @@ impl<'a> AgentSetupContext<'a> {
             decision_context,
             decision_cell,
             session_id,
+            router,
         }
     }
 }

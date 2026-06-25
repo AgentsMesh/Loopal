@@ -150,3 +150,20 @@ fn test_prefix_takes_priority_over_heuristic() {
     let provider = registry.resolve("llama-3").unwrap();
     assert_eq!(provider.name(), "ollama");
 }
+
+// -- is_model_resolvable ---------------------------------------------------
+
+#[test]
+fn is_model_resolvable_true_for_registered_provider() {
+    let mut registry = ProviderRegistry::new();
+    registry.register(Arc::new(MockProvider::new("openai")));
+    assert!(registry.is_model_resolvable("gpt-4o"));
+}
+
+#[test]
+fn is_model_resolvable_false_when_routed_provider_absent() {
+    let mut registry = ProviderRegistry::new();
+    registry.register(Arc::new(MockProvider::new("openai")));
+    // claude → anthropic, which is not registered.
+    assert!(!registry.is_model_resolvable("claude-sonnet-4-20250514"));
+}

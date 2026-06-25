@@ -3,7 +3,7 @@ use std::sync::Arc;
 use loopal_config::ResolvedConfig;
 use loopal_decision_api::DecisionMode;
 use loopal_kernel::Kernel;
-use loopal_provider_api::{ModelRouter, Provider, ProviderResolver, TaskType};
+use loopal_provider_api::{ModelRouterReader, Provider, ProviderResolver, TaskType};
 use loopal_runtime::frontend::permission_handler::PermissionHandler;
 use loopal_runtime::frontend::question_handler::QuestionHandler;
 use loopal_runtime::frontend::traits::EventEmitter;
@@ -16,7 +16,7 @@ use crate::ipc_handlers::{IpcPermissionHandler, IpcQuestionHandler, SessionRef};
 
 struct KernelProviderResolver {
     kernel: Arc<Kernel>,
-    router: ModelRouter,
+    router: ModelRouterReader,
 }
 
 impl ProviderResolver for KernelProviderResolver {
@@ -24,9 +24,7 @@ impl ProviderResolver for KernelProviderResolver {
         &self,
         task: TaskType,
     ) -> Result<(String, Arc<dyn Provider>), loopal_error::LoopalError> {
-        let model = self.router.resolve(task).to_string();
-        let provider = self.kernel.resolve_provider(&model)?;
-        Ok((model, provider))
+        self.kernel.resolve_task(&self.router.read(), task)
     }
 }
 
@@ -35,6 +33,7 @@ pub fn build_session_handlers(
     kernel: &Arc<Kernel>,
     session: SessionRef,
     context: DecisionContext,
+    router: ModelRouterReader,
 ) -> (
     Box<dyn PermissionHandler>,
     Box<dyn QuestionHandler>,
@@ -60,10 +59,6 @@ pub fn build_session_handlers(
             config.settings.harness.classifier_timeout_secs,
         ))
         .with_question_system_prompt(config.classifier_prompt.clone()),
-    );
-    let router = ModelRouter::from_parts(
-        config.settings.model.clone(),
-        config.settings.model_routing.clone(),
     );
     let resolver: Arc<dyn ProviderResolver> = Arc::new(KernelProviderResolver {
         kernel: kernel.clone(),

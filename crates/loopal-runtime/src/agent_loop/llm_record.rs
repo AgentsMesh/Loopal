@@ -30,7 +30,7 @@ impl AgentLoopRunner {
             return;
         }
         let step = build_llm_call_step(
-            self.params.config.model(),
+            &self.params.config.model(),
             assistant_text,
             tool_uses,
             &server_blocks,

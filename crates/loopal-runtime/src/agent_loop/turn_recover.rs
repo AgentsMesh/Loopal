@@ -12,7 +12,7 @@ impl AgentLoopRunner {
             .params
             .deps
             .kernel
-            .resolve_provider(self.params.config.model())
+            .resolve_provider(&self.params.config.model())
         {
             Ok(provider) => provider.classify_error(err),
             Err(_) => default_classify_error(err),

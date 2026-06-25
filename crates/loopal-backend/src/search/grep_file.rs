@@ -43,6 +43,7 @@ pub(crate) fn empty_result() -> GrepSearchResult {
     GrepSearchResult {
         file_matches: Vec::new(),
         total_match_count: 0,
+        timed_out: false,
         overflow_path: None,
     }
 }
@@ -90,6 +91,7 @@ pub(crate) fn search_single_file(
     let overflow_path = maybe_save_overflow(truncated, &file_matches);
     Ok(GrepSearchResult {
         total_match_count: count,
+        timed_out: false,
         file_matches,
         overflow_path,
     })

@@ -4,7 +4,8 @@ use std::time::Instant;
 use loopal_kernel::Kernel;
 use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::ContentBlock;
-use loopal_tool_api::{OutputTail, ToolContext};
+use loopal_tool_api::{OutputTail, ToolContext, ToolResult};
+use serde_json::Value;
 use tracing::{Instrument, info};
 
 use crate::frontend::traits::AgentFrontend;
@@ -14,6 +15,26 @@ use crate::tool_pipeline::execute_tool;
 use super::cancel::TurnCancel;
 use super::tool_collect::collect_results;
 use super::tool_progress::maybe_spawn_progress;
+
+/// Single convergence point for tool execution: applies the per-tool watchdog
+/// deadline. Both the normal pipeline and the streaming early-start path
+/// (`feed_tool`) route through here, so a tool can never run unbounded on one
+/// path while bounded on the other.
+pub(crate) async fn execute_tool_watchdogged(
+    kernel: &Kernel,
+    name: &str,
+    input: Value,
+    ctx: &ToolContext,
+    mode: &AgentMode,
+) -> loopal_error::Result<ToolResult> {
+    let Some(deadline) = super::tool_watchdog::watchdog_deadline(name, &input) else {
+        return execute_tool(kernel, name, input, ctx, mode).await;
+    };
+    match tokio::time::timeout(deadline, execute_tool(kernel, name, input, ctx, mode)).await {
+        Ok(r) => r,
+        Err(_) => Ok(super::tool_watchdog::timeout_result(deadline)),
+    }
+}
 
 /// Execute approved tools in parallel via JoinSet, with cancellation support.
 ///
@@ -62,16 +83,8 @@ pub async fn execute_approved_tools(
                     maybe_spawn_progress(&name, &input, id.clone(), progress_emitter, tail);
 
                 let tool_start = Instant::now();
-                let watchdog_deadline = super::tool_watchdog::watchdog_deadline(&name, &input);
-                let result = if let Some(deadline) = watchdog_deadline {
-                    let exec = execute_tool(&kernel, &name, input, &tool_ctx, &mode);
-                    match tokio::time::timeout(deadline, exec).await {
-                        Ok(r) => r,
-                        Err(_) => Ok(super::tool_watchdog::timeout_result(deadline)),
-                    }
-                } else {
-                    execute_tool(&kernel, &name, input, &tool_ctx, &mode).await
-                };
+                let result =
+                    execute_tool_watchdogged(&kernel, &name, input, &tool_ctx, &mode).await;
                 let tool_duration = tool_start.elapsed();
 
                 if let Some(h) = progress {

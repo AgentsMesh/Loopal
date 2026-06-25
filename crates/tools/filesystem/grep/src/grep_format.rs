@@ -1,6 +1,7 @@
 use std::fmt::Write;
 
 use loopal_error::LoopalError;
+use loopal_tool_api::SEARCH_TIMEOUT_NOTICE;
 use loopal_tool_api::backend_types::{GrepSearchResult, MatchLine};
 
 use crate::grep_format_summary::{format_count, format_files};
@@ -51,6 +52,9 @@ pub fn format_results(
     fmt_opts: &FormatOptions,
 ) -> String {
     if results.file_matches.is_empty() {
+        if results.timed_out {
+            return format!("No matches found before the search timed out.{SEARCH_TIMEOUT_NOTICE}");
+        }
         return "No matches found.".to_string();
     }
 
@@ -66,6 +70,9 @@ pub fn format_results(
             "\n... (search stopped at {max_total_matches} matches)"
         )
         .unwrap();
+    }
+    if results.timed_out {
+        output.push_str(SEARCH_TIMEOUT_NOTICE);
     }
     output
 }

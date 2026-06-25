@@ -1,6 +1,10 @@
 pub const DEFAULT_MAX_OUTPUT_LINES: usize = 2_000;
 pub const DEFAULT_MAX_OUTPUT_BYTES: usize = 512_000;
 
+pub const SEARCH_TIMEOUT_NOTICE: &str = "\n\n⚠️ Search timed out before scanning the whole tree — \
+results are incomplete. Narrow `path` to a specific project subdirectory and retry \
+(a broad `path` over a network mount or huge tree cannot finish in time).";
+
 pub fn truncate_output(output: &str, max_lines: usize, max_bytes: usize) -> String {
     if output.is_empty() {
         return String::new();

@@ -6,21 +6,29 @@ use serde_json::Value;
 
 const GRACE: Duration = Duration::from_secs(30);
 const BASH_MAX_TIMEOUT: Duration = Duration::from_secs(600);
+const FS_READ_TIMEOUT: Duration = Duration::from_secs(60);
 
 pub fn watchdog_deadline(tool_name: &str, input: &Value) -> Option<Duration> {
-    if tool_name != "Bash" {
-        return None;
+    match tool_name {
+        "Bash" => {
+            let timeout =
+                TimeoutSecs::from_tool_input(input, 300).to_duration_clamped(BASH_MAX_TIMEOUT);
+            Some(timeout + GRACE)
+        }
+        // Read-only filesystem tools can hang on a dead/slow mount; bound them so
+        // a stuck syscall cannot wedge the agent loop (glob/grep also self-bound
+        // cooperatively via ResourceLimits::walk_timeout, this is the hard floor).
+        "Glob" | "Grep" | "Ls" | "Read" | "ReadPdf" | "ReadImage" | "ReadHtml" => {
+            Some(FS_READ_TIMEOUT)
+        }
+        _ => None,
     }
-    let timeout = TimeoutSecs::from_tool_input(input, 300).to_duration_clamped(BASH_MAX_TIMEOUT);
-    Some(timeout + GRACE)
 }
 
 pub fn timeout_result(deadline: Duration) -> ToolResult {
     let secs = deadline.as_secs();
     ToolResult {
-        content: format!(
-            "Watchdog timeout: tool did not return within {secs}s (timeout + 30s grace)",
-        ),
+        content: format!("Watchdog timeout: tool did not return within {secs}s"),
         images: Vec::new(),
         is_error: true,
         metadata: Some(ToolResultMetadata::stale(StaleReason::WatchdogTimeout)),
@@ -33,8 +41,14 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn watchdog_only_for_bash() {
-        assert!(watchdog_deadline("Read", &json!({})).is_none());
+    fn watchdog_covers_bash_and_fs_read_tools() {
+        let want = Some(Duration::from_secs(60));
+        for t in ["Glob", "Grep", "Ls", "Read"] {
+            assert_eq!(watchdog_deadline(t, &json!({})), want, "tool {t}");
+        }
+        for t in ["ReadPdf", "ReadImage", "ReadHtml"] {
+            assert_eq!(watchdog_deadline(t, &json!({})), want, "tool {t}");
+        }
         assert!(watchdog_deadline("Write", &json!({})).is_none());
         assert!(watchdog_deadline("Edit", &json!({})).is_none());
         assert!(watchdog_deadline("Agent", &json!({})).is_none());

@@ -5,6 +5,8 @@ mod approved_paths_test;
 mod batch_test;
 #[path = "suite/fetch_headers_test.rs"]
 mod fetch_headers_test;
+#[path = "suite/glob_parallel_test.rs"]
+mod glob_parallel_test;
 #[path = "suite/image_test.rs"]
 mod image_test;
 #[path = "suite/log_file_test.rs"]
@@ -15,5 +17,7 @@ mod path_approval_test;
 mod process_group_test;
 #[path = "suite/resolve_checked_test.rs"]
 mod resolve_checked_test;
+#[path = "suite/search_timeout_test.rs"]
+mod search_timeout_test;
 #[path = "suite/tmp_cleanup_test.rs"]
 mod tmp_cleanup_test;

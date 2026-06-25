@@ -76,7 +76,7 @@ pub(super) fn auto_continuation(
 pub(super) fn compacted(
     state: &mut SessionViewState,
     kept: usize,
-    removed: usize,
+    summarized: usize,
     tokens_before: u32,
     tokens_after: u32,
     strategy: &str,
@@ -85,7 +85,7 @@ pub(super) fn compacted(
     conversation_display::handle_compaction(
         &mut state.agent.conversation,
         kept,
-        removed,
+        summarized,
         tokens_before,
         tokens_after,
         strategy,

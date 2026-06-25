@@ -71,7 +71,7 @@ async fn compact_event_payload_carries_manual_strategy_label() {
     });
     let stats = stats.expect("Compacted event must fire");
     assert!(stats.kept > 0);
-    assert!(stats.removed > 0);
+    assert!(stats.summarized > 0);
     assert!(
         stats.strategy.starts_with("manual"),
         "expected manual-* strategy, got {}",

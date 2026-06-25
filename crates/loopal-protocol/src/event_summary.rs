@@ -36,7 +36,10 @@ pub enum CompactPhase {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompactionSummary {
     pub kept: usize,
-    pub removed: usize,
+    /// Message-count reduction (before − after). These were condensed into the
+    /// summary, NOT discarded — their content survives in the summary plus the
+    /// re-read (`files_rehydrated`) files.
+    pub summarized: usize,
     pub tokens_before: u32,
     pub tokens_after: u32,
     pub strategy: String,

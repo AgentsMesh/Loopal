@@ -107,7 +107,7 @@ fn compacted_event_clears_stale_banner_from_frame() {
     app.dispatch_event(AgentEvent::root(AgentEventPayload::Compacted(
         CompactionSummary {
             kept: 4,
-            removed: 80,
+            summarized: 80,
             tokens_before: 40_000,
             tokens_after: 4_000,
             strategy: "auto".into(),

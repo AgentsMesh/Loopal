@@ -58,7 +58,7 @@ pub fn handle_auto_continuation(conv: &mut AgentConversation, cont: u32, max: u3
 pub fn handle_compaction(
     conv: &mut AgentConversation,
     kept: usize,
-    removed: usize,
+    summarized: usize,
     tokens_before: u32,
     tokens_after: u32,
     strategy: &str,
@@ -69,11 +69,12 @@ pub fn handle_compaction(
     } else {
         0
     };
+    let before = kept + summarized;
     push_system_msg(
         conv,
         &format!(
-            "Context compacted ({strategy}): {removed} messages removed, \
-             {kept} kept. {tokens_before}→{tokens_after} tokens ({pct}% freed).",
+            "Context compacted ({strategy}): {before}→{kept} messages \
+             ({summarized} summarized), {tokens_before}→{tokens_after} tokens ({pct}% freed).",
         ),
     );
     // Self-correct ctx counter from the Compacted event alone, in case the

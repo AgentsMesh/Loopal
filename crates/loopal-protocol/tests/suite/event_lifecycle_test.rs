@@ -80,7 +80,7 @@ fn test_turn_completed_wire_format_unchanged() {
 fn test_compacted_wire_format_unchanged() {
     let event = AgentEvent::root(AgentEventPayload::Compacted(CompactionSummary {
         kept: 5,
-        removed: 10,
+        summarized: 10,
         tokens_before: 1000,
         tokens_after: 500,
         strategy: "smart".into(),
@@ -89,7 +89,7 @@ fn test_compacted_wire_format_unchanged() {
     }));
     let json = serde_json::to_string(&event).unwrap();
     assert!(
-        json.contains(r#""Compacted":{"kept":5,"removed":10"#),
+        json.contains(r#""Compacted":{"kept":5,"summarized":10"#),
         "wire shape regressed: {json}"
     );
 }

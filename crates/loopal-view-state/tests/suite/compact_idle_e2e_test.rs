@@ -38,7 +38,7 @@ fn manual_compact_from_idle_keeps_idle_and_refreshes_ctx() {
     r.apply(summarize("259392 tokens before"));
     r.apply(AgentEventPayload::Compacted(CompactionSummary {
         kept: 9,
-        removed: 491,
+        summarized: 491,
         tokens_before: 259_392,
         tokens_after: 6_453,
         strategy: "manual".into(),
@@ -81,7 +81,7 @@ fn manual_compact_idle_without_token_usage_still_consistent() {
     r.apply(summarize("259392 tokens before"));
     r.apply(AgentEventPayload::Compacted(CompactionSummary {
         kept: 9,
-        removed: 491,
+        summarized: 491,
         tokens_before: 259_392,
         tokens_after: 6_453,
         strategy: "manual".into(),

@@ -111,7 +111,7 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
         Compacted(s) => interactive::compacted(
             state,
             s.kept,
-            s.removed,
+            s.summarized,
             s.tokens_before,
             s.tokens_after,
             &s.strategy,

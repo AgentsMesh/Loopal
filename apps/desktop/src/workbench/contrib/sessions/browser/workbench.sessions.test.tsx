@@ -87,9 +87,10 @@ describe('Workbench session lifecycle', () => {
       openSession: async () => sessionDetail(failed),
     })
     render(<Workbench api={api} />)
-    await waitFor(() => expect(
-      screen.getByRole('button', { name: 'Restart session' }),
-    ).toBeEnabled())
+    await screen.findByText(
+      `Conversation for ${failed.title}`, {}, { timeout: 5_000 },
+    )
+    expect(screen.getByRole('button', { name: 'Restart session' })).toBeEnabled()
     expect(screen.getByLabelText('Message Loopal')).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Stop session' })).toBeDisabled()
 

@@ -85,7 +85,7 @@ impl Drop for SettingsFileLock {
             let _ = unsafe { libc::flock(self.file.as_raw_fd(), libc::LOCK_UN) };
         }
         #[cfg(not(unix))]
-        if std::fs::read_to_string(&self.path).as_deref() == Ok(self.owner.as_str()) {
+        if std::fs::read_to_string(&self.path).is_ok_and(|owner| owner == self.owner) {
             let _ = std::fs::remove_file(&self.path);
         }
     }

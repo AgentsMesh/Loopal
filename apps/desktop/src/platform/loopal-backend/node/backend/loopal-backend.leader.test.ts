@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { CancellationToken } from '../../../../base/common/cancellation'
 import { type DesktopEvent } from '../../../../shared/contracts'
 import { createBackend } from './loopal-backend.test-fixtures'
+import { nativeTestPath } from './loopal-backend.test-paths'
 
 describe('LoopalDesktopBackend workspace leader transitions', () => {
   it('publishes a fresh leader attached while the last leader is stopping', async () => {
@@ -49,7 +50,8 @@ describe('LoopalDesktopBackend workspace leader transitions', () => {
     await backend.restartSession('session-1')
     await backend.gitStatus('local-workspace', CancellationToken.None)
     expect(inputs.at(-1)).toEqual({
-      workspaceId: 'local-workspace', cwd: '/workspace/project', resumeSessionId: 'session-1',
+      workspaceId: 'local-workspace', cwd: nativeTestPath('/workspace/project'),
+      resumeSessionId: 'session-1',
     })
     expect(events).toContainEqual({ type: 'host_status', status: 'ready' })
     const snapshot = await backend.bootstrap()

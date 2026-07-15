@@ -89,7 +89,7 @@ impl RootGuard {
     }
 }
 
-fn canonicalize(path: &Path) -> Result<PathBuf, WorkspaceError> {
+pub(crate) fn canonicalize(path: &Path) -> Result<PathBuf, WorkspaceError> {
     path.canonicalize()
         .map(loopal_backend::path::strip_win_prefix)
         .map_err(WorkspaceError::io)

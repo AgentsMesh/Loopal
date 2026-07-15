@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { type Workspace } from '../../../../shared/contracts'
 import { createBackend } from '../backend/loopal-backend.test-fixtures'
+import { nativeTestFileUri, nativeTestPath } from '../backend/loopal-backend.test-paths'
 
 describe('Loopal session creation activation', () => {
   let root = ''
@@ -52,12 +53,12 @@ describe('Loopal session creation activation', () => {
     expect(hosts[1]!.start).toHaveBeenCalledWith(expect.any(Function))
     expect(methods).not.toContain('desktop/cleanupWorktree')
     expect((await backend.bootstrap()).workspaces).toContainEqual(expect.objectContaining({
-      rootUri: 'file:///project/.loopal/worktrees/recover', kind: 'git_worktree',
+      rootUri: nativeTestFileUri('/project/.loopal/worktrees/recover'), kind: 'git_worktree',
     }))
     const persisted = JSON.parse(await readFile(statePath, 'utf8'))
     expect(persisted.runningSessionIds).not.toContain('session-3')
     expect(persisted.sessionLocations).toContainEqual(expect.objectContaining({
-      sessionId: 'session-3', cwd: '/project/.loopal/worktrees/recover',
+      sessionId: 'session-3', cwd: nativeTestPath('/project/.loopal/worktrees/recover'),
     }))
     await expect(backend.createSession({
       authorizationId: input.authorizationId, launchMode: 'directory',
@@ -78,7 +79,7 @@ describe('Loopal session creation activation', () => {
     backend.onEvent((event) => {
       if (event.type !== 'runtime_updated' || event.runtime.sessionId !== 'session-3') return
       visibility.push(internals.workspaces.values().some(
-        ({ rootUri }) => rootUri === 'file:///project/feature',
+        ({ rootUri }) => rootUri === nativeTestFileUri('/project/feature'),
       ))
     })
     const selected = await backend.authorizeSessionDirectory('/project/feature')
@@ -127,7 +128,7 @@ describe('Loopal session creation activation', () => {
     )
     expect(methods).not.toContain('desktop/cleanupWorktree')
     expect((await backend.bootstrap()).workspaces).toContainEqual(expect.objectContaining({
-      rootUri: 'file:///project/.loopal/worktrees/unknown',
+      rootUri: nativeTestFileUri('/project/.loopal/worktrees/unknown'),
     }))
     await expect(backend.createSession({
       authorizationId: input.authorizationId, launchMode: 'directory',
@@ -155,7 +156,7 @@ describe('Loopal session creation activation', () => {
       'directory_retained: session_creation_state_unknown',
     )
     expect((await backend.bootstrap()).workspaces).toContainEqual(expect.objectContaining({
-      rootUri: 'file:///project/direct', kind: 'folder',
+      rootUri: nativeTestFileUri('/project/direct'), kind: 'folder',
     }))
     await expect(backend.createSession(input)).rejects.toThrow('directory_authorization_invalid')
   })

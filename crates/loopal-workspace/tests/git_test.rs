@@ -81,6 +81,8 @@ async fn git_status_diff_and_worktrees_are_structured() {
         .await
         .unwrap();
     assert_eq!(worktrees.len(), 2);
+    let main = worktrees.iter().find(|worktree| worktree.is_main).unwrap();
+    assert_eq!(main.id, "local-workspace");
     service
         .remove_worktree(RemoveWorktreeParams {
             workspace_id: "local-workspace".into(),
@@ -89,6 +91,22 @@ async fn git_status_diff_and_worktrees_are_structured() {
         })
         .await
         .unwrap();
+}
+
+#[tokio::test]
+async fn worktree_management_rejects_nested_workspace_root() {
+    let dir = tempfile::tempdir().unwrap();
+    init_repo(dir.path());
+    let nested = dir.path().join("nested");
+    std::fs::create_dir(&nested).unwrap();
+    let service = WorkspaceService::new(&nested).unwrap();
+    let error = service
+        .list_worktrees(WorkspaceParams {
+            workspace_id: "local-workspace".into(),
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(error.code, "git_root_outside_workspace");
 }
 
 fn init_repo(path: &Path) {

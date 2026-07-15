@@ -1,8 +1,8 @@
 import { mkdir, mkdtemp, readFile, realpath, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { pathToFileURL } from 'node:url'
 import { createBackend } from './loopal-backend.test-fixtures'
+import { nativeTestFileUri, nativeTestPath } from './loopal-backend.test-paths'
 
 describe('LoopalDesktopBackend session directories', () => {
   it('routes two directories through isolated workspace IDs and preserves cwd on restart', async () => {
@@ -22,14 +22,14 @@ describe('LoopalDesktopBackend session directories', () => {
     })
     expect(first.session.workspaceId).not.toBe(second.session.workspaceId)
     expect((await backend.bootstrap()).workspaces).toEqual(expect.arrayContaining([
-      expect.objectContaining({ rootUri: pathToFileURL('/projects/one').href }),
-      expect.objectContaining({ rootUri: pathToFileURL('/projects/two').href }),
+      expect.objectContaining({ rootUri: nativeTestFileUri('/projects/one') }),
+      expect.objectContaining({ rootUri: nativeTestFileUri('/projects/two') }),
     ]))
     await backend.stopSession(first.session.id)
     await backend.restartSession(first.session.id)
     expect(inputs.at(-1)).toMatchObject({
       workspaceId: first.session.workspaceId,
-      cwd: '/projects/one', resumeSessionId: first.session.id,
+      cwd: nativeTestPath('/projects/one'), resumeSessionId: first.session.id,
     })
   })
 
@@ -43,7 +43,7 @@ describe('LoopalDesktopBackend session directories', () => {
     await backend.createSession({
       authorizationId: selected.authorizationId, launchMode: 'directory',
     })
-    expect(inputs.at(-1)?.cwd).toBe('/projects/new')
+    expect(inputs.at(-1)?.cwd).toBe(nativeTestPath('/projects/new'))
   })
 
   it('restores a selected session cwd and workspace across app relaunch', async () => {
@@ -69,7 +69,7 @@ describe('LoopalDesktopBackend session directories', () => {
       })
       expect(restored.workspaces).toContainEqual(expect.objectContaining({
         id: created.session.workspaceId,
-        rootUri: pathToFileURL(project).href,
+        rootUri: nativeTestFileUri(project),
       }))
       await second.backend.shutdown()
     } finally {
@@ -98,7 +98,7 @@ describe('LoopalDesktopBackend session directories', () => {
       const second = createBackend({ sessionStatePath: state, sessionDirectoryRequest: request })
       const restored = await second.backend.bootstrap()
       expect(second.inputs[0]).toEqual({
-        workspaceId: 'local-workspace', cwd: '/workspace/project',
+        workspaceId: 'local-workspace', cwd: nativeTestPath('/workspace/project'),
       })
       expect(restored.sessions).toContainEqual(expect.objectContaining({
         id: created.session.id, status: 'failed', attention: 'failure',

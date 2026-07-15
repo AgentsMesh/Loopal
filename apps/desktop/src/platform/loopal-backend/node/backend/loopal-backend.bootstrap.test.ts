@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createBackend, timestamp } from './loopal-backend.test-fixtures'
+import { nativeTestFileUri, nativeTestPath } from './loopal-backend.test-paths'
 
 describe('LoopalDesktopBackend bootstrap and lifecycle', () => {
   it('boots protocol v2 with a live waiting session and stopped catalog sessions', async () => {
@@ -12,7 +13,7 @@ describe('LoopalDesktopBackend bootstrap and lifecycle', () => {
       activeSessionId: 'session-1',
       workspaces: [{
         id: 'local-workspace', name: 'project',
-        rootUri: 'file:///workspace/project', kind: 'folder',
+        rootUri: nativeTestFileUri('/workspace/project'), kind: 'folder',
       }],
     })
     expect(bootstrap.sessions).toEqual([
@@ -48,7 +49,9 @@ describe('LoopalDesktopBackend bootstrap and lifecycle', () => {
     await backend.bootstrap()
     const stopped = await backend.openSession('session-2')
 
-    expect(inputs).toEqual([{ workspaceId: 'local-workspace', cwd: '/workspace/project' }])
+    expect(inputs).toEqual([{
+      workspaceId: 'local-workspace', cwd: nativeTestPath('/workspace/project'),
+    }])
     expect(hosts).toHaveLength(1)
     expect(stopped).toMatchObject({
       session: { id: 'session-2', status: 'stopped' },
@@ -59,8 +62,11 @@ describe('LoopalDesktopBackend bootstrap and lifecycle', () => {
     const detail = await backend.openSession('session-2')
 
     expect(inputs).toEqual([
-      { workspaceId: 'local-workspace', cwd: '/workspace/project' },
-      { workspaceId: 'local-workspace', cwd: '/workspace/project', resumeSessionId: 'session-2' },
+      { workspaceId: 'local-workspace', cwd: nativeTestPath('/workspace/project') },
+      {
+        workspaceId: 'local-workspace', cwd: nativeTestPath('/workspace/project'),
+        resumeSessionId: 'session-2',
+      },
     ])
     expect(hosts).toHaveLength(2)
     expect(runtime).toMatchObject({ sessionId: 'session-2', state: 'ready' })

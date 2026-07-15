@@ -7,7 +7,7 @@ import {
 } from './runtime-mode'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, win32 } from 'node:path'
 
 describe('packaged runtime boundaries', () => {
   const temporaryDirectories: string[] = []
@@ -57,7 +57,7 @@ describe('packaged runtime boundaries', () => {
       resourcesPath: 'C:/resources',
       platform: 'win32',
       cwd: 'C:/cwd',
-    })).toBe('C:/resources/bin/loopal.exe')
+    })).toBe(win32.join('C:/resources', 'bin', 'loopal.exe'))
   })
 
   it('falls back when development overrides are absent', () => {

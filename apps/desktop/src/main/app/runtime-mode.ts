@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs'
-import { isAbsolute, join, resolve } from 'node:path'
+import { isAbsolute, join, posix, win32 } from 'node:path'
 
 export function useFakeBackend(isPackaged: boolean, env: NodeJS.ProcessEnv): boolean {
   return !isPackaged && env.LOOPAL_DESKTOP_BACKEND === 'fake'
@@ -32,13 +32,18 @@ export function resolveLoopalBinary(options: {
   readonly platform: NodeJS.Platform
   readonly cwd: string
 }): string | undefined {
+  const platformPath = options.platform === 'win32' ? win32 : posix
   if (!options.isPackaged) {
     const override = options.env.LOOPAL_DESKTOP_BINARY
-    if (override) return isAbsolute(override) ? override : resolve(options.cwd, override)
+    if (override) {
+      return platformPath.isAbsolute(override)
+        ? override
+        : platformPath.resolve(options.cwd, override)
+    }
     return resolveRunfile(options.env.LOOPAL_DESKTOP_BINARY_RUNFILE, options.env)
   }
   const executable = options.platform === 'win32' ? 'loopal.exe' : 'loopal'
-  return join(options.resourcesPath, 'bin', executable)
+  return platformPath.join(options.resourcesPath, 'bin', executable)
 }
 
 function resolveRunfile(

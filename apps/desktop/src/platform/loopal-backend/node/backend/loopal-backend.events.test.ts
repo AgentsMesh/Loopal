@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { CancellationToken } from '../../../../base/common/cancellation'
 import { type DesktopEvent } from '../../../../shared/contracts'
 import { agentEvent, createBackend, timestamp } from './loopal-backend.test-fixtures'
+import { nativeTestPath } from './loopal-backend.test-paths'
 
 describe('LoopalDesktopBackend scoped events', () => {
   it('routes messages and equal revisions independently across two sessions', async () => {
@@ -147,7 +148,8 @@ describe('LoopalDesktopBackend scoped events', () => {
     await expect(backend.gitStatus('local-workspace', CancellationToken.None))
       .resolves.toMatchObject({ branch: 'main' })
     expect(inputs.at(-1)).toEqual({
-      workspaceId: 'local-workspace', cwd: '/workspace/project', resumeSessionId: 'session-2',
+      workspaceId: 'local-workspace', cwd: nativeTestPath('/workspace/project'),
+      resumeSessionId: 'session-2',
     })
   })
 

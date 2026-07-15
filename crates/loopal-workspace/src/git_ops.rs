@@ -4,6 +4,7 @@ use crate::git_command::read_git;
 use crate::git_parse;
 use crate::git_types::{CreateWorktreeParams, GitStatus, RemoveWorktreeParams, Worktree};
 use crate::git_validate::validate_worktree_name;
+use crate::path_guard::canonicalize;
 use crate::types::WorkspaceParams;
 use crate::{WorkspaceError, WorkspaceService};
 
@@ -40,7 +41,7 @@ impl WorkspaceService {
         let mut result = Vec::new();
         for raw in git_parse::worktrees(&String::from_utf8_lossy(&output.stdout)) {
             let path = PathBuf::from(&raw.path);
-            let is_main = path.canonicalize().ok().as_ref() == Some(&repo);
+            let is_main = canonicalize(&path).is_ok_and(|path| path == repo);
             let has_changes = read_git(path.clone(), vec!["status".into(), "--porcelain".into()])
                 .await
                 .map(|value| !value.stdout.is_empty())
@@ -108,7 +109,7 @@ impl WorkspaceService {
         let root = self.guard.root();
         let repo = loopal_git::repo_root(root)
             .ok_or_else(|| WorkspaceError::new("not_git_repository", "workspace is not in git"))?;
-        let repo = repo.canonicalize().map_err(WorkspaceError::io)?;
+        let repo = canonicalize(&repo)?;
         (repo == root).then_some(repo).ok_or_else(|| {
             WorkspaceError::new(
                 "git_root_outside_workspace",

@@ -32,6 +32,23 @@ pub(super) fn text_user(text: &str) -> Value {
     json!({"role": "user", "content": [{"type": "text", "text": text}]})
 }
 
+pub(super) fn user_input<'a>(
+    text: &str,
+    images: impl IntoIterator<Item = (&'a str, &'a str)>,
+) -> Value {
+    let mut content = Vec::new();
+    if !text.is_empty() {
+        content.push(json!({"type": "text", "text": text}));
+    }
+    for (media_type, data) in images {
+        content.push(json!({
+            "type": "image",
+            "source": {"type": "base64", "media_type": media_type, "data": data},
+        }));
+    }
+    json!({"role": "user", "content": content})
+}
+
 fn tool_batch_item_to_json(item: &ToolBatchItem) -> Value {
     let id = item.call.id.as_str();
     match &item.state {

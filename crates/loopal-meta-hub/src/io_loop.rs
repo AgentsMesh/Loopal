@@ -25,6 +25,21 @@ pub async fn meta_hub_io_loop(
     while let Some(msg) = rx.recv().await {
         match msg {
             Incoming::Request { id, method, params } => {
+                if method == methods::META_UNREGISTER.name {
+                    meta_hub
+                        .lock()
+                        .await
+                        .registry
+                        .unregister_connection(&hub_name, &conn);
+                    let _ = conn.respond(id, serde_json::json!({"ok": true})).await;
+                    continue;
+                }
+                if method == methods::META_HEARTBEAT.name {
+                    let count = params["agent_count"].as_u64().unwrap_or(0) as usize;
+                    let _ = meta_hub.lock().await.registry.heartbeat(&hub_name, count);
+                    let _ = conn.respond(id, serde_json::json!({"ok": true})).await;
+                    continue;
+                }
                 match dispatch_meta_request(&meta_hub, &method, params, hub_name.clone()).await {
                     Ok(result) => {
                         let _ = conn.respond(id, result).await;
@@ -50,5 +65,5 @@ pub async fn meta_hub_io_loop(
     // Sub-Hub disconnected — cleanup
     tracing::info!(hub = %hub_name, "Sub-Hub IO loop ended, cleaning up");
     let mut mh = meta_hub.lock().await;
-    mh.remove_hub(&hub_name);
+    mh.registry.unregister_connection(&hub_name, &conn);
 }

@@ -38,21 +38,30 @@ pub fn handle_token_usage(
     cache_creation: u32,
     cache_read: u32,
 ) {
-    conv.input_tokens = input;
-    conv.output_tokens = output;
+    if input > 0 || cache_creation > 0 || cache_read > 0 {
+        conv.input_tokens = input;
+        conv.output_tokens = output;
+        conv.cache_creation_tokens = cache_creation;
+        conv.cache_read_tokens = cache_read;
+    } else {
+        conv.output_tokens = output;
+    }
     conv.context_window = context_window;
-    conv.cache_creation_tokens = cache_creation;
-    conv.cache_read_tokens = cache_read;
     if input == 0 && output == 0 {
         conv.thinking_tokens = 0;
     }
 }
 
-pub fn handle_auto_continuation(conv: &mut AgentConversation, cont: u32, max: u32) {
-    push_system_msg(
-        conv,
-        &format!("Output truncated (max_tokens). Auto-continuing ({cont}/{max})"),
-    );
+pub fn handle_auto_continuation(conv: &mut AgentConversation, cont: u32, max: u32, reason: &str) {
+    let label = match reason {
+        "max_tokens_with_tools" => {
+            "Output truncated during tool calls (max_tokens); incomplete tools discarded."
+        }
+        "pause_turn" => "Provider paused the turn.",
+        "stream_truncated" => "Response stream ended unexpectedly.",
+        _ => "Output truncated (max_tokens).",
+    };
+    push_system_msg(conv, &format!("{label} Auto-continuing ({cont}/{max})"));
 }
 
 pub fn handle_compaction(

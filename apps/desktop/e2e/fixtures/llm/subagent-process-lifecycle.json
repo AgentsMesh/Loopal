@@ -1,0 +1,87 @@
+{
+  "version": 2,
+  "name": "subagent-process-lifecycle",
+  "calls": [
+    {
+      "expect": { "userContains": "Spawn the interruptible process child" },
+      "chunks": [{
+        "type": "tool_use", "id": "spawn-interrupt", "name": "Agent",
+        "input": {
+          "action": "spawn", "name": "interrupt-child",
+          "prompt": "Hold the interrupt child stream", "run_in_background": true
+        }
+      }, { "type": "done" }]
+    },
+    {
+      "expect": { "userContains": "Hold the interrupt child stream" },
+      "chunks": [
+        { "type": "text", "text": "INTERRUPT CHILD STREAM ACTIVE" },
+        { "type": "delay", "ms": 30000 },
+        { "type": "text", "text": "INTERRUPT CHILD LATE OUTPUT" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "spawn-interrupt", "bodyContains": "spawned in background" },
+      "chunks": [{ "type": "text", "text": "Interrupt child is running." }, { "type": "done" }]
+    },
+    {
+      "expect": { "userContains": "INTERRUPT CHILD STREAM ACTIVE" },
+      "chunks": [{ "type": "text", "text": "Root observed interrupted child completion." }, { "type": "done" }]
+    },
+    {
+      "expect": { "userContains": "Spawn the stop cleanup child" },
+      "chunks": [{
+        "type": "tool_use", "id": "spawn-stop", "name": "Agent",
+        "input": {
+          "action": "spawn", "name": "stop-child",
+          "prompt": "Hold the stop child stream", "run_in_background": true
+        }
+      }, { "type": "done" }]
+    },
+    {
+      "expect": { "userContains": "Hold the stop child stream" },
+      "chunks": [
+        { "type": "text", "text": "STOP CHILD STREAM ACTIVE" },
+        { "type": "delay", "ms": 30000 },
+        { "type": "text", "text": "STOP CHILD LATE OUTPUT" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "spawn-stop", "bodyContains": "spawned in background" },
+      "chunks": [{ "type": "text", "text": "Stop child is running." }, { "type": "done" }]
+    },
+    {
+      "expect": { "userContains": "Recover after stopping the Session" },
+      "chunks": [{ "type": "text", "text": "Session recovered after stop cleanup." }, { "type": "done" }]
+    },
+    {
+      "expect": { "userContains": "Spawn the restart cleanup child" },
+      "chunks": [{
+        "type": "tool_use", "id": "spawn-restart", "name": "Agent",
+        "input": {
+          "action": "spawn", "name": "restart-child",
+          "prompt": "Hold the restart child stream", "run_in_background": true
+        }
+      }, { "type": "done" }]
+    },
+    {
+      "expect": { "userContains": "Hold the restart child stream" },
+      "chunks": [
+        { "type": "text", "text": "RESTART CHILD STREAM ACTIVE" },
+        { "type": "delay", "ms": 30000 },
+        { "type": "text", "text": "RESTART CHILD LATE OUTPUT" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "spawn-restart", "bodyContains": "spawned in background" },
+      "chunks": [{ "type": "text", "text": "Restart child is running." }, { "type": "done" }]
+    },
+    {
+      "expect": { "userContains": "Recover after restarting the Session" },
+      "chunks": [{ "type": "text", "text": "Session recovered after restart cleanup." }, { "type": "done" }]
+    }
+  ]
+}

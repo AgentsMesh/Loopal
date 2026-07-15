@@ -1,0 +1,81 @@
+"""Rust tests owned by the root Bazel package."""
+
+load("@rules_rust//rust:defs.bzl", "rust_test")
+load("//build_defs/rust:desktop_test.bzl", "desktop_serve_test")
+
+def _binary_e2e(name, src, deps):
+    rust_test(
+        name = name,
+        srcs = [src],
+        data = [":loopal"],
+        edition = "2024",
+        env = {"LOOPAL_BINARY": "$(rootpath :loopal)"},
+        local = True,
+        deps = deps,
+    )
+
+def loopal_root_tests():
+    _binary_e2e(
+        name = "system_ipc_test",
+        src = "tests/e2e/system_ipc.rs",
+        deps = [
+            "//crates/loopal-ipc",
+            "//crates/loopal-protocol",
+            "@crates//:serde_json",
+            "@crates//:tempfile",
+            "@crates//:tokio",
+        ],
+    )
+    _binary_e2e(
+        name = "hub_lifecycle_test",
+        src = "tests/e2e/hub_lifecycle.rs",
+        deps = [
+            "@crates//:anyhow",
+            "@crates//:serde_json",
+            "@crates//:tempfile",
+            "@crates//:tokio",
+        ],
+    )
+    _binary_e2e(
+        name = "join_hub_e2e_test",
+        src = "tests/e2e/join_hub.rs",
+        deps = [
+            "@crates//:anyhow",
+            "@crates//:serde_json",
+            "@crates//:tempfile",
+            "@crates//:tokio",
+        ],
+    )
+    _binary_e2e(
+        name = "hub_only_mcp_deadlock_test",
+        src = "tests/regressions/hub_only_mcp_deadlock.rs",
+        deps = [
+            "@crates//:serde_json",
+            "@crates//:tempfile",
+            "@crates//:tokio",
+        ],
+    )
+    _binary_e2e(
+        name = "bootstrap_typestate_e2e_test",
+        src = "tests/e2e/bootstrap_typestate.rs",
+        deps = [
+            "@crates//:tempfile",
+            "@crates//:tokio",
+        ],
+    )
+    desktop_serve_test()
+    rust_test(
+        name = "loopal-unit-test",
+        crate = ":loopal",
+        edition = "2024",
+    )
+    rust_test(
+        name = "architecture_boundary_test",
+        srcs = ["tests/architecture/boundaries.rs"],
+        edition = "2024",
+        local = True,
+        deps = [
+            "@crates//:regex",
+            "@crates//:walkdir",
+        ],
+    )

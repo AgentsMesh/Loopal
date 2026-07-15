@@ -1,0 +1,40 @@
+{
+  "version": 2,
+  "name": "subagent-ui-interrupt",
+  "calls": [
+    {
+      "expect": { "userContains": "Spawn the UI interrupt child" },
+      "chunks": [{
+        "type": "tool_use", "id": "spawn-ui-interrupt", "name": "Agent",
+        "input": {
+          "action": "spawn", "name": "ui-interrupt-child",
+          "prompt": "Hold the UI interrupt child stream", "run_in_background": true
+        }
+      }, { "type": "done" }]
+    },
+    {
+      "expect": { "userContains": "Hold the UI interrupt child stream" },
+      "chunks": [
+        { "type": "text", "text": "UI CHILD STREAM ACTIVE" },
+        { "type": "delay", "ms": 30000 },
+        { "type": "text", "text": "UI CHILD LATE OUTPUT" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "toolResultId": "spawn-ui-interrupt",
+        "bodyContains": "spawned in background"
+      },
+      "chunks": [{ "type": "text", "text": "UI child is running in background." }, { "type": "done" }]
+    },
+    {
+      "expect": { "userContains": "UI CHILD STREAM ACTIVE" },
+      "chunks": [{ "type": "text", "text": "Root observed the UI child interrupt." }, { "type": "done" }]
+    },
+    {
+      "expect": { "userContains": "Continue after the UI child interrupt" },
+      "chunks": [{ "type": "text", "text": "Root remained usable after the UI interrupt." }, { "type": "done" }]
+    }
+  ]
+}

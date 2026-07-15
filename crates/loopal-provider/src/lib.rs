@@ -1,10 +1,12 @@
 pub mod anthropic;
+mod endpoint;
 pub mod google;
 pub mod model_info;
 pub mod openai;
 pub mod openai_compat;
 pub(crate) mod resilient_client;
 pub mod router;
+pub(crate) mod safe_diagnostics;
 pub mod sse;
 pub mod thinking_resolver;
 pub(crate) mod tool_result_text;

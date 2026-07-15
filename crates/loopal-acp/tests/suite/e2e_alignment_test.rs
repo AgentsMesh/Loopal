@@ -71,7 +71,10 @@ async fn test_set_config_option_thinking() {
     let resp = harness
         .request(
             "session/set_config_option",
-            json!({"configId": "thinking", "value": "high"}),
+            json!({
+                "configId": "thinking",
+                "value": r#"{"type":"effort","level":"high"}"#
+            }),
         )
         .await;
 

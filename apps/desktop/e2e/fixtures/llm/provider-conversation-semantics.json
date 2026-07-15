@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "name": "provider-conversation-semantics",
+  "calls": [
+    {
+      "expect": {
+        "protocol": "anthropic",
+        "userContains": "Render deterministic conversation semantics",
+        "messageCount": 1
+      },
+      "chunks": [
+        {
+          "type": "text",
+          "text": "# Conversation semantics\n\n## Native structure\n\nParagraph with **bold detail** and `inline-code`.\n\n> Quoted **bold** and `quoted-code`.\n\n- Unordered alpha\n- [Unsafe HTTP](http://example.com/http)\n\n1. Ordered first\n2. Ordered second\n\n```typescript\nconst safe = \"<script>not executed</script>\"\n```\n\n[HTTPS reference](https://example.com/secure)\n\n[Unsafe script](javascript:evil)\n\n[Unsafe relative](/private)"
+        },
+        { "type": "usage", "input": 28, "output": 46 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

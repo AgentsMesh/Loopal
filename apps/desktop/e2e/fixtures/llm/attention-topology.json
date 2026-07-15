@@ -1,0 +1,146 @@
+{
+  "version": 1,
+  "name": "attention-topology",
+  "calls": [
+    {
+      "expect": { "userContains": "Ask me which verification path to use" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "ask-path",
+          "name": "AskUser",
+          "input": {
+            "questions": [{
+              "header": "Verification",
+              "question": "Choose a verification path",
+              "multiSelect": false,
+              "options": [
+                { "label": "Fast", "description": "Exercise the shortest path." },
+                { "label": "Thorough", "description": "Exercise every real IPC hop." }
+              ]
+            }]
+          }
+        },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "chunks": [
+        { "type": "delay", "ms": 5000 },
+        {
+          "type": "text",
+          "text": "{\"answers\":[[]],\"reason\":\"subjective preference\"}"
+        },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "ask-path" },
+      "chunks": [
+        { "type": "text", "text": "Question answer reached the real runtime." },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Try a write that I will deny" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "deny-write",
+          "name": "Write",
+          "input": { "file_path": "${PROJECT}/denied.txt", "content": "real approval path\n" }
+        },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "deny-write" },
+      "chunks": [
+        { "type": "text", "text": "Denied write was handled and the runtime continued." },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Perform the approved write" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "allow-write",
+          "name": "Write",
+          "input": { "file_path": "${PROJECT}/approved.txt", "content": "real approval path\n" }
+        },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "allow-write" },
+      "chunks": [
+        { "type": "text", "text": "Approved write completed through the real runtime." },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Spawn the retained desktop child" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "spawn-child",
+          "name": "Agent",
+          "input": {
+            "action": "spawn",
+            "name": "desktop-child",
+            "prompt": "Finish after answering the verification question."
+          }
+        },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Finish after answering the verification question." },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "child-ask-path",
+          "name": "AskUser",
+          "input": {
+            "questions": [{
+              "header": "Verification",
+              "question": "Choose a verification path",
+              "multiSelect": false,
+              "options": [
+                { "label": "Fast", "description": "Exercise the shortest path." },
+                { "label": "Thorough", "description": "Exercise every real IPC hop." }
+              ]
+            }]
+          }
+        },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "child-ask-path" },
+      "chunks": [
+        { "type": "text", "text": "CHILD RESPONSE RETAINED" },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "spawn-child" },
+      "chunks": [
+        { "type": "text", "text": "Root received the retained child result." },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

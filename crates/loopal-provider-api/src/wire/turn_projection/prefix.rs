@@ -6,7 +6,9 @@ use loopal_turn::TurnTrigger;
 /// `UserInput` are structural and handled by the caller — this is text only.
 pub fn trigger_llm_text(trigger: &TurnTrigger) -> Option<String> {
     match trigger {
-        TurnTrigger::UserInput { content, .. } => Some(content.clone()),
+        TurnTrigger::UserInput { content, .. } | TurnTrigger::SkillInput { content, .. } => {
+            Some(content.clone())
+        }
         TurnTrigger::Cron { content, .. } => Some(format!("[scheduled] {content}")),
         TurnTrigger::Agent { from, content, .. } => Some(format!("[from: {from}] {content}")),
         TurnTrigger::AgentResult { from, content, .. } => Some(format!(

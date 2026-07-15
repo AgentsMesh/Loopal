@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use serde_json::{Value, json};
 use tokio::sync::Mutex;
@@ -6,6 +7,8 @@ use tokio::sync::Mutex;
 use loopal_ipc::protocol::methods;
 
 use crate::meta_hub::MetaHub;
+
+const SPAWN_FORWARD_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Dispatch a single request from a Sub-Hub.
 pub async fn dispatch_meta_request(
@@ -19,6 +22,9 @@ pub async fn dispatch_meta_request(
         m if m == methods::META_SPAWN.name => handle_meta_spawn(meta_hub, params).await,
         m if m == methods::META_LIST_HUBS.name => handle_meta_list_hubs(meta_hub).await,
         m if m == methods::META_TOPOLOGY.name => handle_meta_topology(meta_hub).await,
+        m if m == methods::META_REMOTE_RELAY.name => {
+            crate::remote_relay::forward(meta_hub, params).await
+        }
         _ => Err(format!("unknown meta method: {method}")),
     }
 }
@@ -41,22 +47,22 @@ async fn handle_meta_route(
         ));
     }
 
-    let mut mh = meta_hub.lock().await;
-    let candidates: Vec<(
-        String,
-        Arc<loopal_ipc::connection::Connection<loopal_ipc::connection::Listening>>,
-    )> = mh
-        .registry
-        .alive_hubs()
-        .into_iter()
-        .map(|(name, conn)| (name.to_string(), conn.clone()))
-        .collect();
+    let (router, candidates) = {
+        let mh = meta_hub.lock().await;
+        let candidates = mh
+            .registry
+            .alive_hubs()
+            .into_iter()
+            .map(|(name, conn)| (name.to_string(), conn.clone()))
+            .collect::<Vec<_>>();
+        (mh.router, candidates)
+    };
     let refs: Vec<(
         &str,
         &Arc<loopal_ipc::connection::Connection<loopal_ipc::connection::Listening>>,
     )> = candidates.iter().map(|(n, c)| (n.as_str(), c)).collect();
 
-    mh.router.route(&envelope, &refs).await?;
+    router.route(&envelope, &refs).await?;
     Ok(json!({"ok": true}))
 }
 
@@ -88,15 +94,19 @@ async fn handle_meta_spawn(meta_hub: &Arc<Mutex<MetaHub>>, params: Value) -> Res
         obj.remove("target_hub");
     }
 
-    conn.send_request(methods::HUB_SPAWN_REMOTE_AGENT.name, spawn_params)
-        .await
-        .map_err(|e| format!("spawn on '{target_hub}' failed: {e}"))
+    tokio::time::timeout(
+        SPAWN_FORWARD_TIMEOUT,
+        conn.send_request(methods::HUB_SPAWN_REMOTE_AGENT.name, spawn_params),
+    )
+    .await
+    .map_err(|_| format!("spawn on '{target_hub}' timed out"))?
+    .map_err(|e| format!("spawn on '{target_hub}' failed: {e}"))
 }
 
 /// List all connected Sub-Hubs.
 async fn handle_meta_list_hubs(meta_hub: &Arc<Mutex<MetaHub>>) -> Result<Value, String> {
     let mh = meta_hub.lock().await;
-    let hubs: Vec<Value> = mh
+    let mut hubs: Vec<Value> = mh
         .registry
         .snapshot()
         .into_iter()
@@ -105,6 +115,7 @@ async fn handle_meta_list_hubs(meta_hub: &Arc<Mutex<MetaHub>>) -> Result<Value, 
                "agent_count": i.agent_count, "capabilities": i.capabilities})
         })
         .collect();
+    hubs.sort_by(|left, right| left["name"].as_str().cmp(&right["name"].as_str()));
     Ok(json!({"hubs": hubs}))
 }
 
@@ -119,20 +130,46 @@ async fn handle_meta_topology(meta_hub: &Arc<Mutex<MetaHub>>) -> Result<Value, S
             .collect::<Vec<_>>()
     };
 
-    let mut hubs = Vec::new();
-    let timeout = std::time::Duration::from_secs(10);
-    for (name, conn) in &candidates {
-        let topology = match tokio::time::timeout(
-            timeout,
-            conn.send_request(methods::HUB_TOPOLOGY.name, json!({})),
-        )
-        .await
-        {
-            Ok(Ok(v)) => v,
-            Ok(Err(_)) => json!({"error": "unreachable"}),
-            Err(_) => json!({"error": "timeout"}),
-        };
-        hubs.push(json!({"hub": name, "topology": topology}));
+    let mut pending = tokio::task::JoinSet::new();
+    for (name, conn) in candidates {
+        pending.spawn(async move {
+            let topology = match tokio::time::timeout(
+                std::time::Duration::from_secs(2),
+                conn.send_request(methods::HUB_TOPOLOGY.name, json!({})),
+            )
+            .await
+            {
+                Ok(Ok(value)) => without_shadows(value),
+                Ok(Err(_)) => json!({"error": "unreachable"}),
+                Err(_) => json!({"error": "timeout"}),
+            };
+            json!({"hub": name, "topology": topology})
+        });
     }
+    let mut hubs = Vec::new();
+    while let Some(result) = pending.join_next().await {
+        if let Ok(value) = result {
+            hubs.push(value);
+        }
+    }
+    hubs.sort_by(|left, right| left["hub"].as_str().cmp(&right["hub"].as_str()));
     Ok(json!({"hubs": hubs}))
+}
+
+fn without_shadows(mut topology: Value) -> Value {
+    let Some(agents) = topology.get_mut("agents").and_then(Value::as_array_mut) else {
+        return topology;
+    };
+    let shadows = agents
+        .iter()
+        .filter(|agent| agent["shadow"].as_bool() == Some(true))
+        .filter_map(|agent| agent["name"].as_str().map(String::from))
+        .collect::<std::collections::HashSet<_>>();
+    agents.retain(|agent| agent["shadow"].as_bool() != Some(true));
+    for agent in agents {
+        if let Some(children) = agent.get_mut("children").and_then(Value::as_array_mut) {
+            children.retain(|child| child.as_str().is_none_or(|name| !shadows.contains(name)));
+        }
+    }
+    topology
 }

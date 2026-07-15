@@ -1,0 +1,6 @@
+exports_files([
+    "desktop_test.bzl",
+    "platforms.bzl",
+    "root_binary.bzl",
+    "root_tests.bzl",
+])

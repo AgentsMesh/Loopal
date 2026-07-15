@@ -5,24 +5,54 @@ use loopal_vault_api::VaultError;
 
 use crate::cli::{Cli, build_cli};
 
+#[path = "modes/acp.rs"]
 mod acp;
-mod attach_bridge;
+#[path = "modes/attach_mode.rs"]
 mod attach_mode;
-mod discovery;
-mod hub_bootstrap;
+#[path = "modes/desktop.rs"]
+mod desktop;
+#[path = "modes/hub_cli.rs"]
 mod hub_cli;
+#[path = "modes/hub_only.rs"]
 mod hub_only;
-mod hub_spawn;
+#[path = "modes/meta_hub.rs"]
 mod meta_hub;
+#[path = "modes/multiprocess.rs"]
 mod multiprocess;
+#[path = "modes/server_mode.rs"]
 mod server_mode;
-mod sub_agent_resume;
+
+#[path = "hub/attach_bridge.rs"]
+mod attach_bridge;
+#[path = "hub/discovery.rs"]
+mod discovery;
+#[path = "hub/hub_bootstrap.rs"]
+mod hub_bootstrap;
+#[path = "hub/hub_registration.rs"]
+mod hub_registration;
+#[path = "hub/hub_spawn.rs"]
+mod hub_spawn;
+#[path = "hub/token_channel/mod.rs"]
 mod token_channel;
+#[path = "hub/typestate/mod.rs"]
 pub(crate) mod typestate;
+#[path = "hub/uplink_bootstrap.rs"]
 mod uplink_bootstrap;
+
+#[path = "process/housekeeping.rs"]
+mod housekeeping;
+#[path = "process/parent_liveness.rs"]
+mod parent_liveness;
+#[path = "process/startup_protocol.rs"]
+mod startup_protocol;
+
+#[path = "session/sub_agent_resume.rs"]
+mod sub_agent_resume;
+#[path = "session/worktree_session.rs"]
 mod worktree_session;
 
 #[cfg(test)]
+#[path = "tests/normalize_vault_at.rs"]
 mod normalize_vault_at_test;
 
 use worktree_session::{
@@ -31,6 +61,8 @@ use worktree_session::{
 };
 
 pub(crate) use discovery::is_alive;
+pub(crate) use housekeeping::abbreviate_home;
+use housekeeping::{cleanup_bash_log_orphans, startup_housekeeping};
 
 pub(crate) fn normalize_vault_at_syntax(mut args: Vec<String>) -> Result<Vec<String>, VaultError> {
     let Some(first) = args.get(1).cloned() else {
@@ -59,6 +91,9 @@ pub async fn run() -> anyhow::Result<()> {
     let matches = build_cli().get_matches_from(raw_args);
 
     match matches.subcommand() {
+        Some(("desktop", desktop_matches)) => {
+            return desktop::dispatch(desktop_matches, &cwd).await;
+        }
         Some(("vault", sub)) => {
             std::process::exit(loopal_vault_age::cli::dispatch_vault(sub, &cwd).await);
         }
@@ -72,21 +107,9 @@ pub async fn run() -> anyhow::Result<()> {
         "matches just produced by build_cli().get_matches_from; from_arg_matches cannot fail",
     );
 
-    loopal_config::housekeeping::startup_cleanup();
-    if let Some(repo_root) = loopal_git::repo_root(&cwd) {
-        loopal_git::cleanup_stale_worktrees(&repo_root);
-    }
-    discovery::cleanup_stale();
-    // reason: orphan cleanup scans every session dir (list_sessions reads +
-    // parses every session.json). The hub-only child is always spawned by a
-    // parent that ran this same scan seconds earlier, so re-running it here is
-    // pure duplication — and on a large ~/.loopal/sessions tree it can exceed
-    // the 30s handshake timeout (hub_spawn::HANDSHAKE_TIMEOUT), getting the
-    // child killed as an unreachable orphan. Every other entry (incl. serve /
-    // acp daemons) still owns sessions and must run it to bound tmp growth.
-    if !cli.parent_only.hub_only {
-        cleanup_bash_log_orphans().await;
-    }
+    // Hub children skip their parent's expensive session scan so startup stays
+    // within the machine-handshake deadline.
+    startup_housekeeping(&cwd, cli.parent_only.hub_only).await;
 
     let mut config = load_config(&cwd)?;
     cli.apply_overrides(&mut config.settings);
@@ -103,7 +126,7 @@ pub async fn run() -> anyhow::Result<()> {
     }
 
     if let Some(ref bind_addr) = cli.parent_only.meta_hub {
-        return meta_hub::run(bind_addr).await;
+        return meta_hub::run(bind_addr, cli.parent_only.meta_hub_parent_pid).await;
     }
 
     if cli.parent_only.hub_only {
@@ -169,29 +192,4 @@ pub async fn run() -> anyhow::Result<()> {
     }
 
     result.map(|_| ())
-}
-
-pub(crate) fn abbreviate_home(path: &std::path::Path) -> String {
-    if let Some(home) = dirs::home_dir()
-        && let Ok(rel) = path.strip_prefix(&home)
-    {
-        return format!("~/{}", rel.display());
-    }
-    path.display().to_string()
-}
-
-// reason: any `$TMPDIR/loopal/{id}/` dir whose id is not in
-// `~/.loopal/sessions/` is an orphan left by a previous crash. Clean it on
-// every startup so the tmp dir doesn't grow indefinitely on long-lived
-// machines. Failure is non-fatal (warn only).
-async fn cleanup_bash_log_orphans() {
-    let live_sessions: std::collections::HashSet<String> = match loopal_storage::SessionStore::new()
-    {
-        Ok(store) => store
-            .list_sessions()
-            .map(|ss| ss.into_iter().map(|s| s.id).collect())
-            .unwrap_or_default(),
-        Err(_) => std::collections::HashSet::new(),
-    };
-    loopal_backend::cleanup_orphans(&live_sessions).await;
 }

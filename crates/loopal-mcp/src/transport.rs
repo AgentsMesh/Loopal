@@ -14,6 +14,8 @@ use tracing::{info, warn};
 
 use crate::client::McpClient;
 use crate::handler::SamplingCallback;
+use crate::safe_diagnostics::{REDACTED_STDERR, connection_failed, endpoint_label};
+use crate::stdio_command::stdio_command;
 
 /// Connect to an MCP server over stdio (child process).
 pub async fn connect_stdio(
@@ -24,31 +26,27 @@ pub async fn connect_stdio(
     sampling: Option<Arc<dyn SamplingCallback>>,
     stderr_tail: Option<Arc<Mutex<VecDeque<String>>>>,
 ) -> Result<McpClient, McpError> {
-    info!(command, ?args, "spawning MCP stdio server");
+    info!(
+        transport = "stdio",
+        arg_count = args.len(),
+        env_count = env.len(),
+        "spawning MCP server"
+    );
 
-    let mut cmd = tokio::process::Command::new(command);
-    cmd.args(args);
-    for (k, v) in env {
-        cmd.env(k, v);
-    }
+    let cmd = stdio_command(command, args, env);
     // reason: ensure MCP child is reaped when its parent (Hub or root agent)
     // exits. Without this, killing Hub leaves chrome-devtools-mcp / chrome
     // grandchildren running indefinitely. Set kill_on_drop so the Tokio child
     // handle's Drop sends SIGKILL.
-    cmd.kill_on_drop(true);
-
     let (transport, stderr) = TokioChildProcess::builder(cmd)
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| McpError::ConnectionFailed(format!("{command}: {e}")))?;
+        .map_err(|_| connection_failed("MCP stdio spawn failed"))?;
 
-    // Drain child stderr to tracing so MCP server errors are visible in logs,
-    // AND retain the tail in a per-connection buffer so the user can see
-    // server diagnostics in the /mcp page when a connection fails.
+    // Retain only the presence of stderr; server output may echo expanded secrets.
     if let Some(stderr) = stderr {
-        let cmd_name = command.to_string();
         tokio::spawn(async move {
-            drain_stderr(stderr, &cmd_name, stderr_tail).await;
+            drain_stderr(stderr, stderr_tail).await;
         });
     }
 
@@ -70,11 +68,8 @@ pub async fn connect_http(
         StreamableHttpClientTransportConfig, StreamableHttpClientWorker,
     };
 
-    info!(
-        url,
-        header_count = headers.len(),
-        "connecting to MCP HTTP server"
-    );
+    let endpoint = endpoint_label(url);
+    info!(%endpoint, header_count = headers.len(), "connecting to MCP HTTP server");
 
     let http_client = build_http_client(headers)?;
     let config = StreamableHttpClientTransportConfig::with_uri(url);
@@ -84,10 +79,10 @@ pub async fn connect_http(
     match McpClient::connect(transport, timeout, sampling.clone()).await {
         Ok(client) => Ok(client),
         Err(e) if is_auth_error(&e) => {
-            warn!(url, "auth required, starting OAuth flow");
+            warn!(%endpoint, "auth required, starting OAuth flow");
             crate::oauth::flow::connect_with_oauth(url, timeout, sampling).await
         }
-        Err(e) => Err(e),
+        Err(_) => Err(connection_failed("MCP HTTP connection failed")),
     }
 }
 
@@ -102,9 +97,9 @@ fn build_http_client(headers: &HashMap<String, String>) -> Result<reqwest::Clien
     let mut header_map = reqwest::header::HeaderMap::new();
     for (k, v) in headers {
         let name = reqwest::header::HeaderName::from_bytes(k.as_bytes())
-            .map_err(|e| McpError::ConnectionFailed(format!("invalid header '{k}': {e}")))?;
+            .map_err(|_| connection_failed("invalid MCP HTTP header name"))?;
         let value = reqwest::header::HeaderValue::from_str(v)
-            .map_err(|e| McpError::ConnectionFailed(format!("invalid header value: {e}")))?;
+            .map_err(|_| connection_failed("invalid MCP HTTP header value"))?;
         header_map.insert(name, value);
     }
 
@@ -112,33 +107,35 @@ fn build_http_client(headers: &HashMap<String, String>) -> Result<reqwest::Clien
         .default_headers(header_map)
         .connect_timeout(std::time::Duration::from_secs(30))
         .build()
-        .map_err(|e| McpError::ConnectionFailed(format!("HTTP client: {e}")))
+        .map_err(|_| connection_failed("MCP HTTP client initialization failed"))
 }
 
-/// Forward child process stderr lines to tracing as warnings, AND retain
-/// the tail in `stderr_tail` for `/mcp` page diagnostics.
+/// Record bounded, redacted stderr presence for diagnostics.
 async fn drain_stderr(
     stderr: tokio::process::ChildStderr,
-    server: &str,
     stderr_tail: Option<Arc<Mutex<VecDeque<String>>>>,
 ) {
-    use tokio::io::{AsyncBufReadExt, BufReader};
-    let mut reader = BufReader::new(stderr);
-    let mut line = String::new();
+    use tokio::io::AsyncReadExt;
+    let mut reader = stderr;
+    let mut buffer = [0u8; 8192];
+    let mut recorded = false;
     loop {
-        line.clear();
-        match reader.read_line(&mut line).await {
+        match reader.read(&mut buffer).await {
             Ok(0) | Err(_) => break,
-            Ok(_) => {
-                let trimmed = line.trim();
-                if !trimmed.is_empty() {
-                    warn!(server, "MCP stderr: {trimmed}");
+            Ok(length) => {
+                if !recorded
+                    && buffer[..length]
+                        .iter()
+                        .any(|byte| !byte.is_ascii_whitespace())
+                {
+                    recorded = true;
+                    warn!(transport = "stdio", "{REDACTED_STDERR}");
                     if let Some(tail) = stderr_tail.as_ref() {
                         let mut t = tail.lock().await;
                         if t.len() == t.capacity().max(16) {
                             t.pop_front();
                         }
-                        t.push_back(trimmed.to_string());
+                        t.push_back(REDACTED_STDERR.to_string());
                     }
                 }
             }

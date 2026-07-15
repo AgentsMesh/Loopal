@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "name": "attention-session-permission",
+  "calls": [
+    {
+      "expect": { "userContains": "Grant a session write" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "session-write-one",
+          "name": "Write",
+          "input": { "file_path": "${PROJECT}/session-one.txt", "content": "one\n" }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "session-write-one" },
+      "chunks": [
+        { "type": "text", "text": "Session permission stored after the first write." },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Reuse the session write grant" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "session-write-two",
+          "name": "Write",
+          "input": { "file_path": "${PROJECT}/session-two.txt", "content": "two\n" }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "session-write-two" },
+      "chunks": [
+        { "type": "text", "text": "Second write reused the session permission." },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

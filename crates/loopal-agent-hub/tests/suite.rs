@@ -5,10 +5,28 @@ mod advanced_scenarios_test;
 mod agent_completed_result_test;
 #[path = "suite/collaboration_test.rs"]
 mod collaboration_test;
+#[path = "suite/completed_agent_tombstone_test.rs"]
+mod completed_agent_tombstone_test;
 #[path = "suite/completion_injection_test.rs"]
 mod completion_injection_test;
+#[path = "suite/completion_notification_policy_test.rs"]
+mod completion_notification_policy_test;
 #[path = "suite/completion_output_test.rs"]
 mod completion_output_test;
+#[path = "suite/cross_hub_completion_shadow_test.rs"]
+mod cross_hub_completion_shadow_test;
+#[path = "suite/desktop_mcp_layer_precedence_test.rs"]
+mod desktop_mcp_layer_precedence_test;
+#[path = "suite/desktop_mcp_settings_rpc_test.rs"]
+mod desktop_mcp_settings_rpc_test;
+#[path = "suite/desktop_provider_settings_rpc_test.rs"]
+mod desktop_provider_settings_rpc_test;
+#[path = "suite/desktop_sessions_rpc_test.rs"]
+mod desktop_sessions_rpc_test;
+#[path = "suite/desktop_settings_rpc_test.rs"]
+mod desktop_settings_rpc_test;
+#[path = "suite/desktop_skills_rpc_test.rs"]
+mod desktop_skills_rpc_test;
 #[path = "suite/dispatch_test.rs"]
 mod dispatch_test;
 #[path = "suite/e2e_bootstrap_test.rs"]
@@ -41,6 +59,10 @@ mod parallel_spawn_test;
 mod permission_lifecycle_test;
 #[path = "suite/permission_race_test.rs"]
 mod permission_race_test;
+#[path = "suite/permission_session_grant_test.rs"]
+mod permission_session_grant_test;
+#[path = "suite/plan_approval_relay_test.rs"]
+mod plan_approval_relay_test;
 #[path = "suite/race_condition_test.rs"]
 mod race_condition_test;
 #[path = "suite/relay_test.rs"]
@@ -69,3 +91,9 @@ mod view_snapshot_seed_test;
 mod view_state_routing_test;
 #[path = "suite/wait_nonblocking_test.rs"]
 mod wait_nonblocking_test;
+#[path = "suite/workspace_git_rpc_test.rs"]
+mod workspace_git_rpc_test;
+#[path = "suite/workspace_rpc_support.rs"]
+mod workspace_rpc_support;
+#[path = "suite/workspace_rpc_test.rs"]
+mod workspace_rpc_test;

@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use tokio::sync::{Mutex, mpsc};
 
-use loopal_agent_hub::{Hub, start_event_loop};
+use loopal_agent_hub::{AgentLifecycle, Hub, start_event_loop};
 use loopal_ipc::Connection;
 use loopal_protocol::{AgentEvent, AgentEventPayload, AgentStatus, QualifiedAddress};
 
@@ -24,11 +24,11 @@ fn make_hub() -> (
 async fn register_test_agent(hub: &Arc<Mutex<Hub>>, name: &str) {
     let (_t1, t2) = loopal_ipc::duplex_pair();
     let (conn, _rx) = Connection::new(t2).into_listening();
-    hub.lock()
-        .await
-        .registry
+    let mut h = hub.lock().await;
+    h.registry
         .register_connection(name, conn)
         .expect("register agent");
+    h.registry.set_lifecycle(name, AgentLifecycle::Running);
 }
 
 fn named_event(agent: &str, payload: AgentEventPayload) -> AgentEvent {
@@ -41,6 +41,10 @@ fn named_event(agent: &str, payload: AgentEventPayload) -> AgentEvent {
 async fn observable_event_updates_hub_reducer() {
     let (hub, raw_tx, raw_rx) = make_hub();
     register_test_agent(&hub, "worker").await;
+    hub.lock()
+        .await
+        .registry
+        .set_lifecycle("worker", AgentLifecycle::Spawning);
     let _handle = start_event_loop(hub.clone(), raw_rx);
 
     raw_tx
@@ -58,6 +62,16 @@ async fn observable_event_updates_hub_reducer() {
     assert_eq!(
         reducer.state().agent.observable.status,
         AgentStatus::Running
+    );
+    drop(reducer);
+    assert_eq!(
+        hub.lock()
+            .await
+            .registry
+            .agent_info("worker")
+            .unwrap()
+            .lifecycle,
+        AgentLifecycle::Running
     );
 }
 
@@ -116,4 +130,52 @@ async fn event_for_unknown_agent_is_silently_ignored() {
         .expect("timeout")
         .expect("recv");
     assert!(matches!(received.payload, AgentEventPayload::Running));
+}
+
+#[tokio::test]
+async fn error_event_marks_topology_failed_and_finished_preserves_it() {
+    let (hub, raw_tx, raw_rx) = make_hub();
+    register_test_agent(&hub, "worker").await;
+    let mut ui_rx = hub.lock().await.ui.subscribe_events();
+    let _handle = start_event_loop(hub.clone(), raw_rx);
+
+    raw_tx
+        .send(named_event(
+            "worker",
+            AgentEventPayload::Error {
+                message: "provider failed".into(),
+            },
+        ))
+        .await
+        .unwrap();
+    tokio::time::timeout(Duration::from_millis(200), ui_rx.recv())
+        .await
+        .expect("error broadcast timeout")
+        .expect("error broadcast");
+
+    {
+        let mut h = hub.lock().await;
+        assert_eq!(
+            h.registry.agent_info("worker").unwrap().lifecycle,
+            AgentLifecycle::Failed("provider failed".into())
+        );
+        h.registry.emit_agent_finished("worker", None);
+    }
+    tokio::time::timeout(Duration::from_millis(200), ui_rx.recv())
+        .await
+        .expect("finished broadcast timeout")
+        .expect("finished broadcast");
+
+    let view = {
+        let h = hub.lock().await;
+        assert_eq!(
+            h.registry.agent_info("worker").unwrap().lifecycle,
+            AgentLifecycle::Failed("provider failed".into())
+        );
+        h.registry.agent_view("worker").unwrap()
+    };
+    assert_eq!(
+        view.lock().await.state().agent.observable.status,
+        AgentStatus::Error
+    );
 }

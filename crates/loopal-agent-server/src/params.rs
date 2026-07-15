@@ -67,22 +67,25 @@ pub async fn build_kernel_from_config(
         kernel.register_goal_tools();
     }
     if production {
+        let uses_proxy = hub_client.is_some();
         if let Some(client) = hub_client {
             let proxy = loopal_mcp::McpProxyClient::new(client);
             kernel.set_mcp_provider(Arc::new(proxy));
         }
-        let wait = mcp_startup_wait();
-        let settled = tokio::time::timeout(
-            wait + std::time::Duration::from_secs(1),
-            kernel.finalize_mcp_tools(wait),
-        )
-        .await
-        .unwrap_or(false);
-        if !settled {
-            tracing::warn!(
-                wait_secs = wait.as_secs(),
-                "MCP startup did not settle in time; slow servers will register later"
-            );
+        if depth == 0 || !uses_proxy {
+            let wait = mcp_startup_wait();
+            let settled = tokio::time::timeout(
+                wait + std::time::Duration::from_secs(1),
+                kernel.finalize_mcp_tools(wait),
+            )
+            .await
+            .unwrap_or(false);
+            if !settled {
+                tracing::warn!(
+                    wait_secs = wait.as_secs(),
+                    "MCP startup did not settle in time; slow servers will register later"
+                );
+            }
         }
     }
     loopal_agent::tools::register_all(&mut kernel);

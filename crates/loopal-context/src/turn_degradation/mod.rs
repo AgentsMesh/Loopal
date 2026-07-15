@@ -39,6 +39,9 @@ pub fn degrade_turns_for_wire(turns: &mut [Turn], budget: &ContextBudget) {
                         if !is_current && !r.images.is_empty() {
                             r.images.clear();
                         }
+                        if exceeds_content_limits(&r.content, CAP_MAX_LINES, CAP_MAX_BYTES) {
+                            truncate_content_in_place(&mut r.content, CAP_MAX_LINES, CAP_MAX_BYTES);
+                        }
                         let tokens = estimate_tokens(&r.content);
                         if tokens > max_result_tokens {
                             truncate_content_in_place(&mut r.content, CAP_MAX_LINES, CAP_MAX_BYTES);
@@ -90,8 +93,12 @@ fn truncate_older_results(turns: &mut [Turn], budget: &ContextBudget) {
     }
 }
 
+fn exceeds_content_limits(content: &str, max_lines: usize, max_bytes: usize) -> bool {
+    content.len() > max_bytes || content.lines().take(max_lines + 1).count() > max_lines
+}
+
 fn truncate_content_in_place(content: &mut String, max_lines: usize, max_bytes: usize) {
-    if content.len() <= max_bytes && content.lines().count() <= max_lines {
+    if !exceeds_content_limits(content, max_lines, max_bytes) {
         return;
     }
     let original_bytes = content.len();

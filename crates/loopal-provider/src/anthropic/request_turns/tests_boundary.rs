@@ -137,3 +137,23 @@ fn boundary_turn_projects_summary_before_trigger() {
         "expected summary < ack < trigger, got: {flat:?}"
     );
 }
+
+#[test]
+fn user_trigger_projects_text_and_inline_images() {
+    let provider = AnthropicProvider::new(String::new());
+    let turn = Turn::new(TurnTrigger::UserInput {
+        envelope_id: "image-turn".into(),
+        content: "inspect".into(),
+        images: vec![loopal_tool_invocation::ToolImageBlock::inline(
+            "image/png",
+            "iVBORw==",
+        )],
+    });
+    let params = ChatParams::new("claude-opus-4-8".into(), vec![turn], String::new());
+    let out = provider.build_messages_json_from_turns(&params);
+    let content = out[0]["content"].as_array().unwrap();
+    assert_eq!(content[0]["text"], "inspect");
+    assert_eq!(content[1]["type"], "image");
+    assert_eq!(content[1]["source"]["media_type"], "image/png");
+    assert_eq!(content[1]["source"]["data"], "iVBORw==");
+}

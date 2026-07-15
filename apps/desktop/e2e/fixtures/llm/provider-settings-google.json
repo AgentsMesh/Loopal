@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "name": "provider-settings-google",
+  "calls": [{
+    "expect": {
+      "protocol": "google", "model": "gemini-2.0-flash",
+      "userContains": "Use Google saved in Desktop Settings"
+    },
+    "chunks": [
+      { "type": "text", "text": "Desktop Settings activated the authenticated Google provider." },
+      { "type": "usage", "input": 19, "output": 8 },
+      { "type": "done" }
+    ]
+  }]
+}

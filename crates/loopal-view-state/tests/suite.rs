@@ -1,4 +1,6 @@
 // Single test binary — includes all test modules
+#[path = "suite/auto_continuation_reason_test.rs"]
+mod auto_continuation_reason_test;
 #[path = "suite/classifier_status_mutator_test.rs"]
 mod classifier_status_mutator_test;
 #[path = "suite/compact_banner_mutator_test.rs"]
@@ -19,6 +21,8 @@ mod free_text_test;
 mod pending_question_nav_test;
 #[path = "suite/pending_question_test.rs"]
 mod pending_question_test;
+#[path = "suite/plan_approval_test.rs"]
+mod plan_approval_test;
 #[path = "suite/reducer_aggregate_test.rs"]
 mod reducer_aggregate_test;
 #[path = "suite/reducer_bg_test.rs"]
@@ -27,6 +31,8 @@ mod reducer_bg_test;
 mod reducer_edge_test;
 #[path = "suite/reducer_lifecycle_test.rs"]
 mod reducer_lifecycle_test;
+#[path = "suite/reducer_session_history_test.rs"]
+mod reducer_session_history_test;
 #[path = "suite/reducer_status_test.rs"]
 mod reducer_status_test;
 #[path = "suite/reducer_tool_test.rs"]

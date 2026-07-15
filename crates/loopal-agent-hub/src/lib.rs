@@ -17,6 +17,7 @@ mod hub_ui_client;
 mod hub_ui_client_responses;
 pub mod mcp_service;
 pub mod pending_relay;
+mod remote_relay;
 mod routing;
 pub mod spawn_manager;
 pub mod spawn_registry;
@@ -27,6 +28,9 @@ mod ui_dispatcher;
 mod ui_request_loop;
 pub mod ui_session;
 pub mod uplink;
+pub mod uplink_connection;
+mod uplink_requests;
+mod uplink_tasks;
 pub mod view_router;
 
 pub use agent_registry::AgentRegistry;

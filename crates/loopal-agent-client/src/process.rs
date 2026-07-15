@@ -1,15 +1,16 @@
 //! Agent child process management — spawn, monitor, and clean up.
 
 use std::path::PathBuf;
-use std::process::Stdio;
 use std::sync::Arc;
 use std::time::Duration;
 
-use tokio::process::{Child, Command};
+use tokio::process::Child;
 use tracing::{info, warn};
 
 use loopal_ipc::StdioTransport;
 use loopal_ipc::transport::Transport;
+
+use crate::process_command::agent_command;
 
 /// Grace period before SIGKILL after requesting shutdown.
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(3);
@@ -35,16 +36,7 @@ impl AgentProcess {
 
         info!(exe = %exe_path.display(), "spawning agent process");
 
-        let mut cmd = Command::new(&exe_path);
-        cmd.arg("--serve")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .kill_on_drop(true);
-        for (key, val) in env_vars {
-            cmd.env(key, val);
-        }
-
+        let mut cmd = agent_command(&exe_path, env_vars);
         let mut child = cmd.spawn()?;
 
         let stdin = child

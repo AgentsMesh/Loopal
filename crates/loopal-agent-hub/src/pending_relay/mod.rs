@@ -6,11 +6,14 @@
 
 mod cleanup;
 mod handle;
+mod plan;
+mod remote;
 mod resolve;
 mod types;
 
 pub use handle::{handle_agent_permission, handle_agent_question};
+pub use plan::{handle_agent_plan_approval, resolve_plan_approval};
 pub use resolve::{resolve_permission, resolve_question};
-pub use types::{PendingPermissionInfo, PendingQuestionInfo};
+pub use types::{PendingPermissionInfo, PendingPlanApprovalInfo, PendingQuestionInfo};
 
 pub(crate) use cleanup::cleanup_pending_for_agent;

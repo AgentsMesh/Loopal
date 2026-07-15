@@ -10,12 +10,21 @@ use serde::{Deserialize, Serialize};
 pub enum MessageOrigin {
     /// Real human typing into the prompt.
     Human,
+    HumanSkill {
+        name: String,
+        user_args: String,
+    },
     /// Scheduled trigger (cron / timer).
     Scheduled,
     /// Routed from another agent. `label` is the address rendered for audit only.
-    Agent { label: String },
+    Agent {
+        label: String,
+    },
     /// Routed via a named channel.
-    Channel { name: String, from: String },
+    Channel {
+        name: String,
+        from: String,
+    },
     /// Goal-kickoff continuation envelope produced by `goal_continuation_check`.
     GoalContinuation,
     /// LoopDetector abort compensation (synthetic tool_result stubs).
@@ -32,7 +41,9 @@ pub enum MessageOrigin {
     /// by `compact_rehydrate` to restore top-N touched files.
     CompactionRehydrate,
     /// Forward-compatible fallback for unrecognised system labels.
-    Other { label: String },
+    Other {
+        label: String,
+    },
 }
 
 impl MessageOrigin {
@@ -42,14 +53,18 @@ impl MessageOrigin {
     pub fn is_task_boundary(&self) -> bool {
         matches!(
             self,
-            Self::Human | Self::Scheduled | Self::Agent { .. } | Self::Channel { .. }
+            Self::Human
+                | Self::HumanSkill { .. }
+                | Self::Scheduled
+                | Self::Agent { .. }
+                | Self::Channel { .. }
         )
     }
 
     /// True iff this origin represents a real human typing into the prompt
     /// (NOT scheduled, system-injected, or relayed from another agent).
     pub fn is_human_input(&self) -> bool {
-        matches!(self, Self::Human)
+        matches!(self, Self::Human | Self::HumanSkill { .. })
     }
 
     /// True iff this origin is a compaction artifact (summary, ack, or

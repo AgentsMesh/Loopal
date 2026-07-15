@@ -38,12 +38,14 @@ impl AgentLoopRunner {
                 info!("context overflow detected, force-compacting and retrying");
                 // Emit banner ONLY after compact succeeded — pre-fix showed
                 // "retrying" then errored when force_compact silently bailed.
-                let compacted = self.force_compact(None).await?;
+                let compacted = self
+                    .force_compact_with_strategy(None, "context_overflow")
+                    .await?;
                 if !compacted {
                     warn!("force_compact declined; ContextOverflow propagates");
                     return Ok(false);
                 }
-                self.emit_cosmetic(AgentEventPayload::Error {
+                self.emit_cosmetic(AgentEventPayload::ProviderWarning {
                     message: CONTEXT_OVERFLOW_BANNER.into(),
                 })
                 .await;

@@ -13,8 +13,7 @@ use tokio::sync::{Mutex, mpsc};
 
 use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
-use loopal_protocol::Envelope;
-use serde_json::{Value, json};
+use serde_json::json;
 
 /// Connection from a Hub to its parent MetaHub.
 ///
@@ -26,6 +25,7 @@ pub struct HubUplink {
     conn: Arc<Connection<Listening>>,
     /// This Hub's registered name on the MetaHub.
     hub_name: String,
+    meta_address: Option<String>,
 }
 
 impl HubUplink {
@@ -34,7 +34,23 @@ impl HubUplink {
     /// The caller is responsible for TCP connect + `meta/register` handshake.
     /// This constructor just wraps the authenticated connection.
     pub fn new(conn: Arc<Connection<Listening>>, hub_name: String) -> Self {
-        Self { conn, hub_name }
+        Self {
+            conn,
+            hub_name,
+            meta_address: None,
+        }
+    }
+
+    pub fn with_address(
+        conn: Arc<Connection<Listening>>,
+        hub_name: String,
+        meta_address: String,
+    ) -> Self {
+        Self {
+            conn,
+            hub_name,
+            meta_address: Some(meta_address),
+        }
     }
 
     /// This Hub's name as registered on the MetaHub.
@@ -42,48 +58,19 @@ impl HubUplink {
         &self.hub_name
     }
 
+    pub fn meta_address(&self) -> Option<&str> {
+        self.meta_address.as_deref()
+    }
+
     /// The underlying connection (for advanced use / event subscription).
     pub fn connection(&self) -> &Arc<Connection<Listening>> {
         &self.conn
     }
 
-    /// Route an envelope to a remote agent via MetaHub.
-    ///
-    /// Applies SNAT before forwarding: stamps this hub's name onto the
-    /// envelope source so the receiver sees the full return path.
-    pub async fn route(&self, envelope: &Envelope) -> Result<(), String> {
-        let mut env = envelope.clone();
-        env.apply_snat(&self.hub_name);
-        let params = serde_json::to_value(&env).map_err(|e| format!("serialize envelope: {e}"))?;
-        let resp = self
-            .conn
-            .send_request(methods::META_ROUTE.name, params)
-            .await
-            .map_err(|e| format!("meta/route failed: {e}"))?;
-        // JSON-RPC errors come back as Ok(json with code/message)
-        if let Some(msg) = resp.get("message").and_then(|m| m.as_str()) {
-            return Err(format!("meta/route error: {msg}"));
-        }
-        Ok(())
-    }
-
-    /// Delegate agent spawn to a remote Hub via MetaHub.
-    pub async fn spawn_agent(&self, params: Value) -> Result<Value, String> {
-        let resp = self
-            .conn
-            .send_request(methods::META_SPAWN.name, params)
-            .await
-            .map_err(|e| format!("meta/spawn failed: {e}"))?;
-        if let Some(msg) = resp.get("message").and_then(|m| m.as_str()) {
-            return Err(format!("meta/spawn error: {msg}"));
-        }
-        Ok(resp)
-    }
-
     /// Send heartbeat to MetaHub with current agent count.
     pub async fn heartbeat(&self, agent_count: usize) -> Result<(), String> {
         self.conn
-            .send_notification(
+            .send_request(
                 methods::META_HEARTBEAT.name,
                 json!({
                     "hub_name": self.hub_name,
@@ -91,6 +78,7 @@ impl HubUplink {
                 }),
             )
             .await
+            .map(|_| ())
             .map_err(|e| format!("meta/heartbeat failed: {e}"))
     }
 }
@@ -119,7 +107,7 @@ pub async fn handle_reverse_requests(
                         // child name is the bare agent segment.
                         if let loopal_protocol::MessageSource::AgentResult { child } = &env.source {
                             let output = env.content.text.clone();
-                            crate::finish::deliver_cross_hub_completion(&hub, &child.agent, output)
+                            crate::finish::record_cross_hub_completion(&hub, &child.agent, output)
                                 .await;
                         }
                         // Defense in depth: target should be local at this point

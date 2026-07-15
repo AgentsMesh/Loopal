@@ -63,8 +63,8 @@ impl LocalMcpProvider {
             let results = crate::manager::connect_all(prepared).await;
             {
                 let mut mgr = manager.write().await;
-                if let Err(e) = mgr.absorb_connections(results) {
-                    tracing::warn!(error = %e, "MCP background spawn finished with error");
+                if mgr.absorb_connections(results).is_err() {
+                    tracing::warn!("MCP background spawn finished with error");
                 }
             }
             signal.mark_settled();
@@ -85,8 +85,12 @@ impl LocalMcpProvider {
 
     pub async fn try_reconnect(&self, server: &str) -> bool {
         let mut mgr = self.manager.write().await;
-        if let Err(e) = mgr.restart_connection(server).await {
-            tracing::warn!(server, error = %e, "MCP restart_connection failed");
+        if mgr.disconnect_connection(server).await.is_err() {
+            tracing::warn!(server, "MCP disconnect before reconnect failed");
+            return false;
+        }
+        if mgr.restart_connection(server).await.is_err() {
+            tracing::warn!(server, "MCP restart_connection failed");
             return false;
         }
         true
@@ -125,21 +129,27 @@ impl McpProvider for LocalMcpProvider {
             .await
             .call_tool(server, tool, args)
             .await;
-        match first {
-            Err(McpError::TransportClosed(_)) => {
-                tracing::warn!(server, tool, "MCP transport closed, attempting reconnect");
-                let reconnected = self.try_reconnect(server).await;
-                if !reconnected {
-                    return first;
-                }
-                self.manager
+        let transport_closed = matches!(&first, Err(McpError::TransportClosed(_)))
+            || self
+                .manager
+                .read()
+                .await
+                .connections
+                .get(server)
+                .and_then(|connection| connection.client())
+                .is_none_or(|client| client.is_closed());
+        if first.is_err() && transport_closed {
+            tracing::warn!(server, tool, "MCP transport closed, attempting reconnect");
+            if self.try_reconnect(server).await {
+                return self
+                    .manager
                     .read()
                     .await
                     .call_tool(server, tool, args)
-                    .await
+                    .await;
             }
-            other => other,
         }
+        first
     }
 
     async fn snapshot(&self, _budget: loopal_ipc::IpcBudget) -> Vec<McpConnectionSnapshot> {

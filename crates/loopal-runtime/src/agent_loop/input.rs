@@ -39,7 +39,12 @@ impl AgentLoopRunner {
                     return Ok(Some(result));
                 }
                 SelectResult::AgentInput(Some(AgentInput::Control(ctrl))) => {
-                    if self.handle_control(ctrl).await? {
+                    if self.apply_untracked_control(ctrl).await? {
+                        return Ok(Some(WaitResult::ContinuationInjected));
+                    }
+                }
+                SelectResult::AgentInput(Some(AgentInput::TrackedControl(request))) => {
+                    if self.apply_tracked_control(request).await? {
                         return Ok(Some(WaitResult::ContinuationInjected));
                     }
                 }
@@ -96,8 +101,13 @@ impl AgentLoopRunner {
             match input {
                 AgentInput::Message(env) => pending.push(env),
                 AgentInput::Control(cmd) => {
-                    if let Err(e) = self.handle_control(cmd).await {
+                    if let Err(e) = self.apply_untracked_control(cmd).await {
                         tracing::warn!(error = %e, "failed to handle drained control");
+                    }
+                }
+                AgentInput::TrackedControl(request) => {
+                    if let Err(e) = self.apply_tracked_control(request).await {
+                        tracing::warn!(error = %e, "failed to handle tracked control");
                     }
                 }
             }

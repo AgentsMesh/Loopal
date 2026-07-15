@@ -1,0 +1,44 @@
+{
+  "version": 2,
+  "name": "metahub-remote-interrupt",
+  "calls": [
+    {
+      "expect": { "userContains": "Spawn the remote interrupt child" },
+      "chunks": [{
+        "type": "tool_use", "id": "remote-spawn", "name": "Agent",
+        "input": {
+          "action": "spawn", "name": "remote-cancel",
+          "prompt": "Hold the remote child stream", "target_hub": "hub-b",
+          "run_in_background": true
+        }
+      }, { "type": "done" }]
+    },
+    {
+      "expect": { "userContains": "Hold the remote child stream" },
+      "chunks": [
+        { "type": "text", "text": "REMOTE INTERRUPT STREAM ACTIVE 84F1" },
+        { "type": "delay", "ms": 30000 },
+        { "type": "text", "text": "REMOTE INTERRUPT LATE OUTPUT 84F1" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "toolResultId": "remote-spawn", "bodyContains": "spawned in background"
+      },
+      "chunks": [
+        { "type": "text", "text": "Remote cancellable child is running." },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "userContains": "<agent-result name=\"remote-cancel\">\nREMOTE INTERRUPT STREAM ACTIVE 84F1"
+      },
+      "chunks": [
+        { "type": "text", "text": "Root observed remote child interruption." },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

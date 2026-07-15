@@ -1,5 +1,8 @@
-use loopal_protocol::projected::{ProjectedMessage, ProjectedToolCall};
-use loopal_provider_api::{ContentBlock, Message, MessageRole};
+use loopal_protocol::{
+    SkillInvocation,
+    projected::{ProjectedMessage, ProjectedToolCall},
+};
+use loopal_provider_api::{ContentBlock, Message, MessageOrigin, MessageRole};
 
 use std::collections::HashMap;
 
@@ -82,6 +85,13 @@ pub fn project_messages_to_display(messages: &[Message]) -> Vec<ProjectedMessage
             content,
             tool_calls,
             image_count,
+            skill_info: match &msg.origin {
+                Some(MessageOrigin::HumanSkill { name, user_args }) => Some(SkillInvocation {
+                    name: name.clone(),
+                    user_args: user_args.clone(),
+                }),
+                _ => None,
+            },
         });
     }
 

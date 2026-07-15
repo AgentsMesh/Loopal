@@ -72,6 +72,7 @@ pub(super) async fn action_spawn(
             agent_type: subagent_type.map(String::from),
             depth: shared.depth + 1,
             no_sandbox,
+            notify_parent_on_completion: true,
             target,
         },
     )

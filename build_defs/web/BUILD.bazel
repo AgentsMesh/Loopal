@@ -1,0 +1,17 @@
+load("@aspect_rules_js//js:defs.bzl", "js_library")
+
+exports_files([
+    "electron.bzl",
+    "desktop_package.bzl",
+    "playwright.bzl",
+    "npm_workspace.bzl",
+    "typescript.bzl",
+    "vitest.bzl",
+    "vitest_shim.cjs",
+])
+
+js_library(
+    name = "vitest_shim",
+    srcs = ["vitest_shim.cjs"],
+    visibility = ["//visibility:public"],
+)

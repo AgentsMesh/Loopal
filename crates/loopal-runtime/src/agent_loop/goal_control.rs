@@ -3,15 +3,19 @@ use loopal_protocol::{ControlCommand, GoalTransitionReason, ThreadGoal, ThreadGo
 use loopal_tool_api::GoalSessionError;
 use tracing::warn;
 
+use super::input_control::ControlOutcome;
 use super::runner::AgentLoopRunner;
 
 impl AgentLoopRunner {
-    pub(super) async fn handle_goal_control(&mut self, ctrl: ControlCommand) -> Result<bool> {
+    pub(super) async fn handle_goal_control(
+        &mut self,
+        ctrl: ControlCommand,
+    ) -> Result<ControlOutcome> {
         let session = match self.params.goal_session.as_ref() {
             Some(s) => s.clone(),
             None => {
                 warn!("goal control received but goal feature is disabled");
-                return Ok(false);
+                return Ok(ControlOutcome::rejected("goal feature is disabled"));
             }
         };
         let kickoff_eligible = matches!(
@@ -60,20 +64,26 @@ impl AgentLoopRunner {
             ControlCommand::GoalClear => session.clear().await.map(|()| None),
             other => {
                 warn!(?other, "non-goal control routed through goal handler");
-                return Ok(false);
+                return Ok(ControlOutcome::rejected("command is not a goal control"));
             }
         };
         if let Err(err) = outcome {
             warn!(error = %err, "goal control rejected");
-            return Ok(false);
+            return Ok(ControlOutcome::rejected(format!(
+                "goal control rejected: {err}"
+            )));
         }
         if is_clear {
             self.reset_continuation_state();
         }
         if kickoff_eligible {
-            return self.goal_continuation_check().await;
+            return Ok(if self.goal_continuation_check().await? {
+                ControlOutcome::continuation()
+            } else {
+                ControlOutcome::applied()
+            });
         }
-        Ok(false)
+        Ok(ControlOutcome::applied())
     }
 }
 

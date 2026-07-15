@@ -28,3 +28,13 @@ benchmarks/terminal_bench/bin/
 # Loopal memory runtime (auto-managed)
 .loopal/memory-events/archive/
 .loopal/memory-events/*.jsonl.gz
+
+# Node / Electron desktop
+node_modules/
+apps/desktop/out/
+apps/desktop/dist/
+apps/desktop/release/
+apps/desktop/coverage/
+apps/desktop/playwright-report/
+apps/desktop/test-results/
+apps/desktop/.vite/

@@ -55,3 +55,30 @@ jobs:
 
       - name: Rustfmt check
         run: bazel build //... --config=rustfmt
+
+  desktop-e2e:
+    name: Desktop E2E
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@0.14.0
+        with:
+          bazelisk-cache: true
+          repository-cache: true
+
+      - name: Electron UI and real Loopal Host E2E
+        run: >-
+          bazel test
+          //apps/desktop:e2e
+          //apps/desktop:e2e_host
+          //apps/desktop:e2e_llm_backend
+          --test_tag_filters=e2e
+          --test_output=errors
+
+      - name: Optimized sidecar staging smoke
+        run: bazel test //apps/desktop:staging_smoke -c opt --test_output=errors
+
+      - name: Build desktop distribution
+        run: bazel build //apps/desktop:dist -c opt

@@ -6,6 +6,7 @@
 pub mod bridge;
 mod client;
 mod process;
+mod process_command;
 mod start_params;
 pub(crate) mod stderr_drain;
 

@@ -1,0 +1,194 @@
+@import './workbench-tokens.css';
+@import './workbench-chrome.css';
+@import './stage2-workbench.css';
+@import '../contrib/conversation/browser/conversation-rich.css';
+@import '../contrib/conversation/browser/slash-command-menu.css';
+@import '../contrib/session-panels/browser/inspector-rich.css';
+@import '../contrib/agents/browser/agent-controls.css';
+@import '../contrib/session-panels/browser/session-panel-deck.css';
+@import '../contrib/session-panels/browser/session-panels.css';
+@import '../contrib/federation/browser/federation-workspace.css';
+@import './window-drag-region.css';
+@import '../contrib/sessions/browser/session-context-menu.css';
+@import '../contrib/sessions/browser/session-create-dialog.css';
+@import '../contrib/sessions/browser/session-navigator.css';
+
+:root {
+  color-scheme: dark;
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #0b0d12;
+  color: #e9ebf1;
+  font-synthesis: none;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+button, input, textarea { font: inherit; }
+button { color: inherit; }
+
+.workbench {
+  display: grid;
+  grid-template-columns: var(--wb-rail-width) var(--wb-sidebar-width) minmax(560px, 1fr);
+  grid-template-rows: minmax(0, 1fr) var(--wb-status-height);
+  height: 100%;
+  background:
+    radial-gradient(circle at 55% -20%, rgba(71, 92, 165, 0.14), transparent 36%),
+    #0b0d12;
+}
+.workbench.sidebar-collapsed { grid-template-columns: var(--wb-rail-width) minmax(0, 1fr); }
+
+.activity-bar, .session-navigator, .session-workspace { min-height: 0; }
+.activity-bar {
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--wb-space-2);
+  padding: 10px 6px;
+  background: #090b0f;
+  border-right: 1px solid #20232d;
+}
+.activity-group { display: flex; flex-direction: column; gap: 5px; }
+.brand-mark {
+  width: 31px;
+  height: 31px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, #f0f2ff, #8f9bcf);
+  color: #111421;
+  font-weight: 900;
+}
+.activity {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #747b91;
+  cursor: pointer;
+}
+.activity svg { width: 18px; height: 18px; }
+.activity:hover, .activity.active { background: #202432; color: #dfe3f4; }
+.activity-spacer { flex: 1; }
+
+.session-navigator {
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  background: rgba(15, 17, 23, 0.96);
+  border-right: 1px solid #252935;
+}
+.navigator-header, .session-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 16px 12px;
+}
+.eyebrow, .session-path { color: #697087; font-size: 10px; letter-spacing: 0.12em; }
+.navigator-header h1, .session-toolbar h2 { margin: 3px 0 0; font-size: 17px; }
+.new-session, .toolbar-actions button, .composer-lifecycle {
+  border: 1px solid #323746;
+  background: #1a1e28;
+  border-radius: 7px;
+  height: 30px;
+  min-width: 30px;
+  cursor: pointer;
+}
+.session-search {
+  margin: 2px 12px 10px;
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  padding: 7px 9px;
+  border: 1px solid #282d39;
+  border-radius: 7px;
+  background: #11141b;
+  color: #697087;
+}
+.session-search input { min-width: 0; width: 100%; border: 0; outline: 0; background: transparent; color: #dfe2ec; font-size: 12px; }
+.session-list { overflow: auto; padding: 0 7px 18px; }
+.session-card {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 9px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.session-card:hover { background: #171a22; }
+.session-card.selected { background: #1d2230; border-color: #30384e; }
+.session-copy { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 4px; }
+.session-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 590; }
+.session-copy small, .resource-row small, .artifact-card small { color: #747b91; font-size: 10px; text-transform: capitalize; }
+.status-dot, .agent-state { width: 7px; height: 7px; margin-top: 4px; border-radius: 50%; background: #5b6275; }
+.status-running, .agent-running { background: #72dbb0; box-shadow: 0 0 8px rgba(114, 219, 176, 0.45); }
+.status-waiting, .agent-waiting { background: #e7b65f; }
+.status-stopped, .status-archived, .agent-completed { background: #7585ca; }
+.status-failed, .agent-failed { background: #ef7272; }
+.attention { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: #9c7432; font-size: 10px; }
+
+.session-workspace { grid-row: 1; display: flex; flex-direction: column; background: rgba(12, 14, 19, 0.68); }
+.session-toolbar { min-height: 64px; border-bottom: 1px solid #242834; }
+.session-identity { min-width: 0; }
+.session-title-row { min-width: 0; display: flex; align-items: baseline; gap: 9px; }
+.session-title-row h2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.session-agent-route { display: flex; align-items: baseline; gap: 5px; color: var(--wb-text-secondary); font-size: 10px; white-space: nowrap; }
+.session-agent-route > span, .session-agent-route small { color: var(--wb-text-muted); }
+.toolbar-actions { display: flex; align-items: center; gap: 9px; }
+.session-details { border-bottom: 1px solid #242834; background: #11141b; }
+.session-metadata { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 10px max(28px, 8vw); }
+.session-more-actions { display: flex; align-items: center; gap: 8px; padding: 0 max(28px, 8vw) 10px; }
+.session-more-actions strong { margin-right: auto; color: #7e869b; font-size: 10px; }
+.session-more-actions button, .agent-mode-picker select { border: 1px solid #303645; border-radius: 5px; background: #171b24; color: #cbd0dc; font-size: 10px; }
+.session-metadata div, .artifact-metadata div { min-width: 0; }
+.session-metadata dt, .artifact-metadata dt { color: #697087; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+.session-metadata dd, .artifact-metadata dd { overflow: hidden; margin: 3px 0 0; color: #cdd2df; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.conversation { min-height: 120px; flex: 1; overflow: auto; padding: 26px max(28px, 8vw); }
+.message { margin: 0 auto 22px; max-width: 760px; }
+.message-role { display: block; margin-bottom: 7px; color: #717990; font-size: 9px; letter-spacing: 0.11em; text-transform: uppercase; }
+.message p { margin: 0; line-height: 1.65; color: #d5d9e5; font-size: var(--conversation-font-size, 13px); white-space: pre-wrap; }
+.message-user { padding: 12px 14px; border: 1px solid #292f3e; border-radius: 10px; background: #171b25; }
+.message-system p { color: #8c93a8; font-style: italic; }
+.composer { flex: 0 0 auto; margin: 0 max(24px, 7vw) 22px; border: 1px solid #343a4c; border-radius: 11px; background: #151922; box-shadow: 0 14px 45px rgba(0,0,0,.25); }
+.composer textarea { width: 100%; min-height: 64px; max-height: 160px; resize: vertical; padding: 13px; border: 0; outline: 0; background: transparent; color: #e6e9f2; }
+.composer-row { display: flex; align-items: center; justify-content: space-between; padding: 7px 8px 8px 12px; border-top: 1px solid #242936; color: #737b91; font-size: 10px; }
+.composer-tools, .composer-actions, .pending-images { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.pending-images { padding: 9px 12px 0; }
+.pending-image { display: flex; align-items: center; gap: 5px; max-width: 220px; padding: 4px 7px; border: 1px solid #303748; border-radius: 7px; color: #aeb6ca; }
+.pending-image > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pending-image button, .attach-images { border: 0; background: transparent; color: #9099b0; cursor: pointer; }
+.agent-mode-picker { display: flex; align-items: center; gap: 5px; }
+.send-button { border: 0; border-radius: 7px; padding: 6px 13px; background: #d9def5; color: #171a24; cursor: pointer; font-weight: 700; }
+.send-button:disabled, .composer-lifecycle:disabled { opacity: .35; cursor: default; }
+
+.inspector-content { flex: 1; overflow: auto; padding: 13px; }
+.artifact-card, .resource-row { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid #292e3b; border-radius: 8px; background: #14171f; text-align: left; }
+.artifact-card { cursor: pointer; margin-bottom: 8px; }
+.artifact-item { margin-bottom: 8px; }
+.artifact-item .artifact-card { margin-bottom: 0; }
+.artifact-metadata { margin: 0; padding: 9px 10px; border: 1px solid #292e3b; border-top: 0; border-radius: 0 0 8px 8px; background: #10131a; }
+.artifact-metadata div + div { margin-top: 7px; }
+.artifact-card span:last-child, .resource-row div { display: flex; flex-direction: column; gap: 3px; }
+.artifact-icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; background: #242a3b; color: #aab5e4; }
+.resource-row { border: 0; border-bottom: 1px solid #252a35; border-radius: 0; background: transparent; }
+.agent-node { transition: padding-left 120ms ease; }
+.empty-inspector { height: 100%; display: grid; place-content: center; justify-items: center; color: #687086; text-align: center; font-size: 12px; }
+.empty-inspector > span { font-size: 28px; }
+.empty-inspector p { max-width: 190px; line-height: 1.5; }
+.metric { display: flex; justify-content: space-between; padding: 12px 4px; border-bottom: 1px solid #252a35; }
+.metric strong { font-size: 11px; text-transform: capitalize; }
+.metric span { color: #747b90; font-size: 10px; }
+.error-banner { max-width: 760px; margin: auto; padding: 12px; border: 1px solid #713f47; border-radius: 8px; background: #321d22; color: #f0aeb7; }
+.loading, .empty-state { color: #737b90; text-align: center; font-size: 12px; }
+
+@media (max-width: 1050px) {
+  .workbench { grid-template-columns: var(--wb-rail-width) var(--wb-sidebar-width) minmax(0, 1fr); }
+  .workbench.sidebar-collapsed { grid-template-columns: var(--wb-rail-width) minmax(0, 1fr); }
+  .session-agent-route small { display: none; }
+}

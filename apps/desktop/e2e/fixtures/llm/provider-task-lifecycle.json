@@ -1,0 +1,83 @@
+{
+  "version": 2,
+  "name": "provider-task-lifecycle",
+  "calls": [
+    {
+      "expect": { "userContains": "Build a persisted task dependency lifecycle" },
+      "chunks": [{ "type": "tool_use", "id": "task-create-foundation", "name": "TaskCreate",
+        "input": { "subject": "Foundation task", "description": "Complete before dependent work." } },
+        { "type": "usage" }, { "type": "done" }]
+    },
+    {
+      "expect": { "toolResultId": "task-create-foundation" },
+      "chunks": [{ "type": "tool_use", "id": "task-create-dependent", "name": "TaskCreate",
+        "input": { "subject": "Dependent task", "description": "Wait for the foundation task." } },
+        { "type": "usage" }, { "type": "done" }]
+    },
+    {
+      "expect": { "toolResultId": "task-create-dependent" },
+      "chunks": [{ "type": "tool_use", "id": "task-foundation-start", "name": "TaskUpdate",
+        "input": { "taskId": "1", "status": "in_progress", "activeForm": "Running foundation lifecycle", "addBlocks": ["2"] } },
+        { "type": "usage" }, { "type": "done" }]
+    },
+    {
+      "expect": { "toolResultId": "task-foundation-start" },
+      "chunks": [{ "type": "tool_use", "id": "task-dependent-block", "name": "TaskUpdate",
+        "input": { "taskId": "2", "addBlockedBy": ["1"] } },
+        { "type": "usage" }, { "type": "done" }]
+    },
+    {
+      "expect": { "toolResultId": "task-dependent-block" },
+      "chunks": [{ "type": "tool_use", "id": "task-get-dependent", "name": "TaskGet",
+        "input": { "taskId": "2" } }, { "type": "usage" }, { "type": "done" }]
+    },
+    {
+      "expect": { "toolResultId": "task-get-dependent", "bodyContains": "Dependent task" },
+      "chunks": [{ "type": "tool_use", "id": "task-list", "name": "TaskList", "input": {} },
+        { "type": "usage" }, { "type": "done" }]
+    },
+    {
+      "expect": { "toolResultId": "task-list", "bodyContains": "Foundation task" },
+      "chunks": [{ "type": "tool_use", "id": "task-foundation-complete", "name": "TaskUpdate",
+        "input": { "taskId": "1", "status": "completed" } },
+        { "type": "usage" }, { "type": "done" }]
+    },
+    {
+      "expect": { "toolResultId": "task-foundation-complete" },
+      "chunks": [{ "type": "tool_use", "id": "task-dependent-start", "name": "TaskUpdate",
+        "input": { "taskId": "2", "status": "in_progress", "activeForm": "Running dependent lifecycle" } },
+        { "type": "usage" }, { "type": "done" }]
+    },
+    {
+      "expect": { "toolResultId": "task-dependent-start" },
+      "chunks": [{ "type": "text", "text": "Task lifecycle is ready for a Session restart." },
+        { "type": "usage" }, { "type": "done" }]
+    },
+    {
+      "expect": { "userContains": "Complete the persisted dependent task" },
+      "chunks": [{ "type": "tool_use", "id": "task-list-after-restart", "name": "TaskList",
+        "input": {} }, { "type": "usage" }, { "type": "done" }]
+    },
+    {
+      "expect": { "toolResultId": "task-list-after-restart", "bodyContains": "completed" },
+      "chunks": [{ "type": "tool_use", "id": "task-get-after-restart", "name": "TaskGet",
+        "input": { "taskId": "2" } }, { "type": "usage" }, { "type": "done" }]
+    },
+    {
+      "expect": { "toolResultId": "task-get-after-restart", "bodyContains": "in_progress" },
+      "chunks": [{ "type": "tool_use", "id": "task-dependent-complete", "name": "TaskUpdate",
+        "input": { "taskId": "2", "status": "completed" } },
+        { "type": "usage" }, { "type": "done" }]
+    },
+    {
+      "expect": { "toolResultId": "task-dependent-complete" },
+      "chunks": [{ "type": "tool_use", "id": "task-list-final", "name": "TaskList", "input": {} },
+        { "type": "usage" }, { "type": "done" }]
+    },
+    {
+      "expect": { "toolResultId": "task-list-final", "bodyContains": "completed" },
+      "chunks": [{ "type": "text", "text": "Persisted task lifecycle completed after restart." },
+        { "type": "usage" }, { "type": "done" }]
+    }
+  ]
+}

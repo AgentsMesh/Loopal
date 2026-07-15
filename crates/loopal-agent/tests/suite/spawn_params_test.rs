@@ -14,6 +14,7 @@ fn base_params(target: SpawnTarget) -> SpawnParams {
         agent_type: None,
         depth: 1,
         no_sandbox: false,
+        notify_parent_on_completion: true,
         target,
     }
 }
@@ -107,6 +108,18 @@ fn inhub_propagates_no_sandbox_false() {
     });
     let req = build_spawn_request(&params, &parent_cwd);
     assert_eq!(req["no_sandbox"], false);
+}
+
+#[test]
+fn internal_spawn_can_suppress_parent_completion_notification() {
+    let parent_cwd = PathBuf::from("/parent/dir");
+    let mut params = base_params(SpawnTarget::InHub {
+        cwd_override: None,
+        fork_context: None,
+    });
+    params.notify_parent_on_completion = false;
+    let req = build_spawn_request(&params, &parent_cwd);
+    assert_eq!(req["notify_parent_on_completion"], false);
 }
 
 #[test]

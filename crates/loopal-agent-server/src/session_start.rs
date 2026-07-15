@@ -15,7 +15,7 @@ use crate::hub_frontend::HubFrontend;
 use crate::session_handlers_factory::build_session_handlers;
 use crate::session_hub::{SessionHub, SharedSession};
 use crate::session_spawn::{parse_start_params, spawn_agent_and_bridges};
-use crate::session_start_prompt::push_prompt_envelope;
+use crate::session_start_prompt::push_start_prompt;
 use loopal_provider_api::SharedModelRouter;
 
 pub(crate) struct SessionHandle {
@@ -175,9 +175,7 @@ pub(crate) async fn start_session(
         // Enqueue --prompt BEFORE spawning agent task — pushing after races
         // the ephemeral lifecycle's drain_pending_input, which exits when
         // the queue is empty.
-        if let Some(prompt) = &start.prompt {
-            push_prompt_envelope(&session, prompt, start.fork_context.is_some()).await;
-        }
+        push_start_prompt(&session, &start).await;
 
         let agent_task = spawn_agent_and_bridges(
             agent_params,

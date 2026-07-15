@@ -1,7 +1,8 @@
 use loopal_error::Result;
 use loopal_protocol::AgentEventPayload;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
+use super::input_control::ControlOutcome;
 use super::runner::AgentLoopRunner;
 
 impl AgentLoopRunner {
@@ -14,10 +15,12 @@ impl AgentLoopRunner {
         );
     }
 
-    pub(super) async fn handle_permission_switch(&mut self, s: String) -> Result<()> {
+    pub(super) async fn handle_permission_switch(&mut self, s: String) -> Result<ControlOutcome> {
         let Ok(mode) = s.parse::<loopal_tool_api::PermissionMode>() else {
             error!(value = %s, "invalid permission mode");
-            return Ok(());
+            return Ok(ControlOutcome::rejected(format!(
+                "invalid permission mode: {s}"
+            )));
         };
         info!(?mode, "switching permission mode");
         self.emit(AgentEventPayload::PermissionModeChanged {
@@ -30,16 +33,20 @@ impl AgentLoopRunner {
         if let Some(ps) = self.params.config.plan_state.as_mut() {
             ps.previous_permission_mode = mode;
         }
-        Ok(())
+        Ok(ControlOutcome::applied())
     }
 
-    pub(super) async fn handle_decision_switch(&mut self, s: String) -> Result<()> {
+    pub(super) async fn handle_decision_switch(&mut self, s: String) -> Result<ControlOutcome> {
         let Ok(mode) = s.parse::<loopal_decision_api::DecisionMode>() else {
             error!(value = %s, "invalid decision mode");
-            return Ok(());
+            return Ok(ControlOutcome::rejected(format!(
+                "invalid decision mode: {s}"
+            )));
         };
         if mode == loopal_decision_api::DecisionMode::Agent {
-            warn!("DecisionMode::Agent is not yet implemented; behaves as Classifier");
+            return Ok(ControlOutcome::rejected(
+                "decision mode 'agent' is not implemented; use 'classifier'",
+            ));
         }
         info!(%mode, "switching decision mode");
         self.emit(AgentEventPayload::DecisionModeChanged {
@@ -47,13 +54,15 @@ impl AgentLoopRunner {
         })
         .await?;
         self.params.decision_cell.set(mode);
-        Ok(())
+        Ok(ControlOutcome::applied())
     }
 
-    pub(super) async fn handle_sandbox_switch(&mut self, s: String) -> Result<()> {
+    pub(super) async fn handle_sandbox_switch(&mut self, s: String) -> Result<ControlOutcome> {
         let Ok(policy) = s.parse::<loopal_config::SandboxPolicy>() else {
             error!(value = %s, "invalid sandbox policy");
-            return Ok(());
+            return Ok(ControlOutcome::rejected(format!(
+                "invalid sandbox policy: {s}"
+            )));
         };
         info!(%policy, "switching sandbox policy");
         self.emit(AgentEventPayload::SandboxPolicyChanged {
@@ -62,6 +71,6 @@ impl AgentLoopRunner {
         .await?;
         self.params.deps.kernel.set_sandbox_policy(policy);
         self.rebuild_backend();
-        Ok(())
+        Ok(ControlOutcome::applied())
     }
 }

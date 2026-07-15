@@ -97,7 +97,7 @@ impl Provider for GoogleProvider {
             .await
             .map_err(|e| {
                 self.client.report_network_error(client_gen);
-                ProviderError::Http(format!("{e:#}"))
+                crate::safe_diagnostics::network_error("google", &e)
             })?;
         self.client.report_success(client_gen);
 
@@ -115,11 +115,13 @@ impl Provider for GoogleProvider {
                 tracing::warn!(retry_after_ms, "rate limited by API");
                 return Err(ProviderError::RateLimited { retry_after_ms }.into());
             }
-            let text = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "failed to read body".into());
-            tracing::error!(status = status.as_u16(), body = %text, "API error");
+            let text = crate::safe_diagnostics::response_error_message(
+                "google",
+                response,
+                &[&self.api_key, &self.base_url],
+            )
+            .await;
+            tracing::error!(status = status.as_u16(), "API error");
             return Err(ProviderError::Api {
                 status: status.as_u16(),
                 message: text,

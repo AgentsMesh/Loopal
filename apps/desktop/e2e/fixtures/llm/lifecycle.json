@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "name": "lifecycle",
+  "calls": [
+    {
+      "expect": { "userContains": "Retain this turn across Stop" },
+      "chunks": [
+        { "type": "text", "text": "REAL LIFECYCLE RESPONSE" },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "userContains": "Continue after the restarted runtime",
+        "bodyContains": "REAL LIFECYCLE RESPONSE",
+        "messageCount": 3
+      },
+      "chunks": [
+        { "type": "text", "text": "RESTARTED RUNTIME RETAINED MODEL CONTEXT" },
+        { "type": "usage", "input": 25, "output": 8 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

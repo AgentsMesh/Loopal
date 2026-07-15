@@ -44,16 +44,22 @@ impl AgentLoopRunner {
     pub(super) async fn handle_response_recorded(
         &mut self,
         turn_ctx: &mut TurnContext,
-        result: LlmStreamResult,
+        mut result: LlmStreamResult,
         c: &mut TurnLoopCounters,
     ) -> Result<TurnState> {
+        if let Some(error) = result.terminal_error.take() {
+            return Err(error);
+        }
         let truncated = result.stop_reason == StopReason::MaxTokens && !result.tool_uses.is_empty();
         if truncated {
             warn!("max_tokens hit with tool calls — discarding");
         }
         let stream_truncated = result.stream_error
             && !turn_ctx.cancel.is_cancelled()
-            && !(result.assistant_text.is_empty() && result.tool_uses.is_empty());
+            && (!result.assistant_text.is_empty()
+                || !result.tool_uses.is_empty()
+                || !result.thinking_text.is_empty()
+                || !result.server_blocks.is_empty());
         let needs_auto_continue = truncated || result.stop_reason == StopReason::PauseTurn;
 
         if needs_auto_continue || stream_truncated {
@@ -122,13 +128,6 @@ impl AgentLoopRunner {
         if c.continuation_count >= c.max_continuations {
             return Ok(TurnState::Complete);
         }
-        c.continuation_count += 1;
-        turn_ctx.metrics.auto_continuations = c.continuation_count;
-        self.emit_in_turn(AgentEventPayload::AutoContinuation {
-            continuation: c.continuation_count,
-            max_continuations: c.max_continuations,
-        })
-        .await?;
         let reason = if stream_truncated {
             ContinuationReason::StreamTruncated
         } else if truncated {
@@ -136,6 +135,14 @@ impl AgentLoopRunner {
         } else {
             ContinuationReason::PauseTurn
         };
+        c.continuation_count += 1;
+        turn_ctx.metrics.auto_continuations = c.continuation_count;
+        self.emit_in_turn(AgentEventPayload::AutoContinuation {
+            continuation: c.continuation_count,
+            max_continuations: c.max_continuations,
+            reason: continuation_reason_wire(reason).into(),
+        })
+        .await?;
         Ok(TurnState::NeedsContinuation { reason })
     }
 
@@ -151,6 +158,7 @@ impl AgentLoopRunner {
             self.emit_in_turn(AgentEventPayload::AutoContinuation {
                 continuation: c.continuation_count,
                 max_continuations: c.max_continuations,
+                reason: continuation_reason_wire(ContinuationReason::MaxTokensWithoutTools).into(),
             })
             .await?;
             return Ok(TurnState::NeedsContinuation {
@@ -164,5 +172,15 @@ impl AgentLoopRunner {
             return Ok(TurnState::NeedsStopFeedback { feedback });
         }
         Ok(TurnState::Complete)
+    }
+}
+
+fn continuation_reason_wire(reason: ContinuationReason) -> &'static str {
+    match reason {
+        ContinuationReason::MaxTokensWithoutTools => "max_tokens_without_tools",
+        ContinuationReason::MaxTokensWithTools => "max_tokens_with_tools",
+        ContinuationReason::PauseTurn => "pause_turn",
+        ContinuationReason::StreamTruncated => "stream_truncated",
+        ContinuationReason::RecoveryRetry => "recovery_retry",
     }
 }

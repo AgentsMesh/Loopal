@@ -1,0 +1,44 @@
+{
+  "version": 2,
+  "name": "provider-server-search-google",
+  "calls": [
+    {
+      "expect": {
+        "protocol": "google",
+        "userContains": "Use native Google server search",
+        "minTools": 1
+      },
+      "chunks": [
+        {
+          "type": "server_tool_result",
+          "block_type": "web_search_tool_result",
+          "tool_use_id": "google_grounding_1",
+          "content": [
+            {
+              "url": "https://fixture.loopal.invalid/google-search",
+              "title": "Fixture Google source"
+            }
+          ]
+        },
+        { "type": "text", "text": "Google native search rendered." },
+        { "type": "usage", "input": 29, "output": 8 },
+        { "type": "done", "reason": "max_tokens" }
+      ]
+    },
+    {
+      "expect": {
+        "protocol": "google",
+        "userContains": "Use native Google server search",
+        "bodyContains": "Fixture Google source",
+        "messageCount": 2,
+        "assistantBlockTypes": ["server_tool_use", "server_tool_result", "text"],
+        "serverBlockCount": 2
+      },
+      "chunks": [
+        { "type": "text", "text": "Google search history remained ordered." },
+        { "type": "usage", "input": 41, "output": 8 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-use loopal_config::Settings;
+use loopal_config::{ConfigLayer, ConfigResolver, LayerSource, Settings};
 use loopal_provider_api::TaskType;
 
 #[test]
@@ -63,5 +63,30 @@ fn test_settings_roundtrip_with_routing() {
     assert_eq!(
         back.model_routing.get(&TaskType::Default).unwrap(),
         "gpt-4o"
+    );
+}
+
+#[test]
+fn null_route_tombstone_restores_default_model_fallback() {
+    let mut resolver = ConfigResolver::new();
+    resolver.add_layer(ConfigLayer {
+        source: LayerSource::Project,
+        settings: serde_json::json!({
+            "model_routing": {"summarization": "inherited-summary"}
+        }),
+        ..Default::default()
+    });
+    resolver.add_layer(ConfigLayer {
+        source: LayerSource::Local,
+        settings: serde_json::json!({"model_routing": {"summarization": null}}),
+        ..Default::default()
+    });
+
+    let resolved = resolver.resolve().unwrap();
+    assert!(
+        !resolved
+            .settings
+            .model_routing
+            .contains_key(&TaskType::Summarization)
     );
 }

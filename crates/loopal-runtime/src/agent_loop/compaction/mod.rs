@@ -96,6 +96,15 @@ impl AgentLoopRunner {
     /// ContextOverflow recovery MUST check the return value — blindly retrying
     /// after a `false` loops against unchanged state.
     pub async fn force_compact(&mut self, instructions: Option<String>) -> Result<bool> {
+        self.force_compact_with_strategy(instructions, "manual")
+            .await
+    }
+
+    pub(super) async fn force_compact_with_strategy(
+        &mut self,
+        instructions: Option<String>,
+        strategy: &'static str,
+    ) -> Result<bool> {
         let turn_count = self.turns.store().turns().len();
         let in_progress_offset = if self.turns.current_turn_id().is_some() {
             1
@@ -167,7 +176,7 @@ impl AgentLoopRunner {
                 before_count,
                 tokens_before,
                 instructions,
-                "manual",
+                strategy,
                 cancel.token(),
             )
             .await;

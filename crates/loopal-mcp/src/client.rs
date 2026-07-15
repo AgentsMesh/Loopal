@@ -37,15 +37,18 @@ impl McpClient {
         E: std::error::Error + From<std::io::Error> + Send + Sync + 'static,
     {
         let handler = LoopalClientHandler::new(sampling);
-        let service = handler
-            .serve(transport)
-            .await
-            .map_err(|e| McpError::ConnectionFailed(e.to_string()))?;
+        let service = handler.serve(transport).await.map_err(|error| {
+            let detail = error.to_string().to_ascii_lowercase();
+            if detail.contains("auth") || detail.contains("401") || detail.contains("unauthorized")
+            {
+                McpError::ConnectionFailed("MCP authentication required".into())
+            } else {
+                McpError::ConnectionFailed("MCP handshake failed".into())
+            }
+        })?;
 
         if let Some(info) = service.peer_info() {
             info!(
-                server = %info.server_info.name,
-                version = %info.server_info.version,
                 protocol = ?info.protocol_version,
                 "MCP server connected"
             );
@@ -143,7 +146,7 @@ impl McpClient {
                 .service
                 .send_cancellable_request(request, options)
                 .await
-                .map_err(|e| McpError::TransportClosed(e.to_string()))?;
+                .map_err(|_| McpError::TransportClosed("MCP transport request failed".into()))?;
 
             handle.await_response().await.map_err(|e| match e {
                 ServiceError::Timeout { timeout } => {
@@ -152,7 +155,7 @@ impl McpClient {
                 ServiceError::TransportClosed => {
                     McpError::TransportClosed("transport closed".into())
                 }
-                other => McpError::Protocol(other.to_string()),
+                _ => McpError::Protocol("MCP request failed".into()),
             })
         }
         .instrument(mcp_span)

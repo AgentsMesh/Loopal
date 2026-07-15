@@ -1,0 +1,27 @@
+{
+  "version": 2,
+  "name": "provider-google-partial",
+  "calls": [
+    {
+      "expect": {
+        "protocol": "google", "model": "gemini-2.0-flash",
+        "userContains": "Recover a partial Google stream"
+      },
+      "chunks": [
+        { "type": "text", "text": "GOOGLE PARTIAL STREAM MARKER" },
+        { "type": "invalid_sse", "data": "{invalid-google-sse" }
+      ]
+    },
+    {
+      "expect": {
+        "protocol": "google", "model": "gemini-2.0-flash",
+        "bodyContains": "GOOGLE PARTIAL STREAM MARKER"
+      },
+      "chunks": [
+        { "type": "text", "text": "Google recovered its partial stream through continuation." },
+        { "type": "usage", "input": 29, "output": 9 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

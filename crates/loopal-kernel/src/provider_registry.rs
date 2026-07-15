@@ -90,10 +90,17 @@ pub fn register_providers(settings: &Settings, registry: &mut ProviderRegistry) 
 
     if let Some(api_key) = google_key {
         let mut provider = GoogleProvider::new(api_key);
-        if let Some(ref config) = providers.google
-            && let Some(ref base_url) = config.base_url
-        {
-            provider = provider.with_base_url(base_url.clone());
+        let base_url = providers
+            .google
+            .as_ref()
+            .and_then(|config| config.base_url.clone())
+            .or_else(|| {
+                std::env::var("GOOGLE_BASE_URL")
+                    .ok()
+                    .filter(|url| !url.is_empty())
+            });
+        if let Some(url) = base_url {
+            provider = provider.with_base_url(url);
         }
         registry.register(Arc::new(provider));
         info!("registered google provider");

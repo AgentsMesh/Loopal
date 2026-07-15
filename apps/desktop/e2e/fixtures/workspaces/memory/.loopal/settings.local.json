@@ -1,0 +1,7 @@
+{
+  "permission_mode": "bypass",
+  "memory": {
+    "batch_window_ms": 250,
+    "consolidation_interval_days": 0
+  }
+}

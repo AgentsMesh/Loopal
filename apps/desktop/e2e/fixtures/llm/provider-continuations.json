@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "name": "provider-continuations",
+  "calls": [
+    {
+      "expect": { "userContains": "Exercise pause continuation" },
+      "chunks": [
+        { "type": "text", "text": "PAUSE PARTIAL" },
+        { "type": "usage", "input": 11, "output": 4 },
+        { "type": "done", "reason": "pause_turn" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "PAUSE PARTIAL" },
+      "chunks": [
+        { "type": "text", "text": "Pause continuation completed." },
+        { "type": "usage", "input": 15, "output": 5 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Discard max token tool" },
+      "chunks": [
+        { "type": "text", "text": "MAX TOOL PARTIAL" },
+        {
+          "type": "tool_use",
+          "id": "max-tool-write",
+          "name": "Write",
+          "input": { "file_path": "${PROJECT}/must-not-exist-max.txt", "content": "bad" }
+        },
+        { "type": "usage", "input": 17, "output": 7 },
+        { "type": "done", "reason": "max_tokens" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "MAX TOOL PARTIAL", "bodyExcludes": "max-tool-write" },
+      "chunks": [
+        { "type": "text", "text": "Max-token tool was discarded safely." },
+        { "type": "usage", "input": 20, "output": 6 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Recover dropped stream" },
+      "chunks": [
+        { "type": "text", "text": "STREAM DROPPED AFTER PARTIAL" },
+        {
+          "type": "tool_use",
+          "id": "dropped-tool-write",
+          "name": "Write",
+          "input": { "file_path": "${PROJECT}/must-not-exist-stream.txt", "content": "bad" }
+        },
+        { "type": "disconnect" }
+      ]
+    },
+    {
+      "expect": {
+        "bodyContains": "STREAM DROPPED AFTER PARTIAL",
+        "bodyExcludes": "dropped-tool-write"
+      },
+      "chunks": [
+        { "type": "text", "text": "Dropped stream continued without running its tool." },
+        { "type": "usage", "input": 22, "output": 8 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Reach continuation cap" },
+      "chunks": [
+        { "type": "text", "text": "CAP SEGMENT ONE" },
+        { "type": "done", "reason": "max_tokens" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "CAP SEGMENT ONE" },
+      "chunks": [
+        { "type": "text", "text": "CAP SEGMENT TWO" },
+        { "type": "done", "reason": "max_tokens" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "CAP SEGMENT TWO" },
+      "chunks": [
+        { "type": "text", "text": "CAP SEGMENT THREE" },
+        { "type": "done", "reason": "max_tokens" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "CAP SEGMENT THREE" },
+      "chunks": [
+        { "type": "text", "text": "CAP SEGMENT FOUR" },
+        { "type": "usage", "input": 25, "output": 9 },
+        { "type": "done", "reason": "max_tokens" }
+      ]
+    }
+  ]
+}

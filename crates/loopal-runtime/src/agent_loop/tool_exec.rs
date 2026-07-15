@@ -79,6 +79,17 @@ pub async fn execute_approved_tools(
 
         join_set.spawn(
             loopal_protocol::event_id::propagate_to_spawn(async move {
+                emitter
+                    .emit_best_effort(
+                        AgentEventPayload::ToolProgress {
+                            id: id.clone(),
+                            name: name.clone(),
+                            output_tail: String::new(),
+                            elapsed_ms: 0,
+                        },
+                        "agent_loop::tool_exec::tool_started",
+                    )
+                    .await;
                 let progress =
                     maybe_spawn_progress(&name, &input, id.clone(), progress_emitter, tail);
 

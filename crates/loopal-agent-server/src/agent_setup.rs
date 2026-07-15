@@ -49,7 +49,6 @@ pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<A
     if let Some(fork_turn) = build_fork_synthetic_turn(start) {
         initial_turns.insert(0, fork_turn);
     }
-
     let event_tx = spawn_sub_agent_forwarder(frontend.clone());
 
     // Scheduler's async bind to the session id runs in session_start::run
@@ -173,6 +172,7 @@ pub async fn build_with_frontend(ctx: AgentSetupContext<'_>) -> anyhow::Result<A
                 decision_context,
             },
             session,
+            hydrate_initial_history: start.resume.is_some() || !initial_turns.is_empty(),
             initial_turns,
             budget,
             interrupt,

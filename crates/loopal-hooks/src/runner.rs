@@ -3,8 +3,9 @@ use std::time::Duration;
 use loopal_config::{HookConfig, HookResult};
 use loopal_error::HookError;
 use tokio::io::AsyncWriteExt;
-use tokio::process::Command;
 use tracing::debug;
+
+use crate::child_command::shell_command;
 
 /// Execute a hook command, passing `stdin_data` as JSON to its stdin.
 pub async fn run_hook(
@@ -13,12 +14,7 @@ pub async fn run_hook(
 ) -> Result<HookResult, HookError> {
     debug!(command = %config.command, "running hook");
 
-    let mut child = Command::new("sh")
-        .arg("-c")
-        .arg(&config.command)
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
+    let mut child = shell_command(&config.command)
         .spawn()
         .map_err(|e| HookError::ExecutionFailed(e.to_string()))?;
 

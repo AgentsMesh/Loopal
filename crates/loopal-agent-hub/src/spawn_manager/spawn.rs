@@ -4,7 +4,7 @@ use tracing::{info, warn};
 
 use crate::hub::Hub;
 
-use super::register::register_agent_connection;
+use super::register::register_agent_connection_with_policy;
 
 /// Spawn a real agent process, initialize, start, and register in Hub.
 #[allow(clippy::too_many_arguments)]
@@ -21,6 +21,7 @@ pub async fn spawn_and_register(
     depth: Option<u32>,
     fork_context: Option<serde_json::Value>,
     no_sandbox: bool,
+    notify_parent_on_completion: bool,
 ) -> Result<String, String> {
     if parent.is_some() {
         let h = hub.lock().await;
@@ -74,7 +75,7 @@ pub async fn spawn_and_register(
     };
 
     let (conn, incoming_rx) = client.into_parts();
-    match register_agent_connection(
+    match register_agent_connection_with_policy(
         hub.clone(),
         &name,
         conn,
@@ -82,6 +83,7 @@ pub async fn spawn_and_register(
         parent.as_deref(),
         model_for_registry.as_deref(),
         session_id.as_deref(),
+        notify_parent_on_completion,
     )
     .await
     {

@@ -1,0 +1,37 @@
+.workbench-center { position: relative; grid-row: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.workbench-center > .session-workspace { flex: 1; min-height: 0; }
+.stage2-error { padding: 7px 12px; border-bottom: 1px solid #713f47; background: #321d22; color: #f0aeb7; font-size: 10px; }
+
+.activity-badge {
+  min-width: 17px;
+  height: 17px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: #be784f;
+  color: #fff;
+  font-size: 9px;
+}
+
+.attention-pane { display: flex; flex-direction: column; gap: 9px; }
+.attention-card { padding: 11px; border: 1px solid #303543; border-radius: 8px; background: #171a22; }
+.attention-card.risk-high { border-color: #704149; }
+.attention-kind { color: #c09055; font-size: 8px; letter-spacing: .08em; text-transform: uppercase; }
+.classifier-status { display: block; margin-top: 5px; color: #8fa8e8; font-size: 9px; }
+.classifier-failed { color: #dd7d89; }
+.classifier-completed { color: #79be8d; }
+.attention-card h3 { margin: 7px 0; color: #d8dce7; font-size: 11px; }
+.attention-card p { color: #8991a6; font-size: 10px; line-height: 1.5; }
+.attention-card > code { display: block; overflow: auto; padding: 7px; border-radius: 5px; background: #0e1016; color: #d2a778; font-size: 9px; }
+.attention-actions { display: flex; justify-content: flex-end; gap: 7px; margin-top: 10px; }
+.attention-actions button, .question-choices button { border: 1px solid #363b49; border-radius: 6px; background: #20242e; color: #bdc3d2; font-size: 9px; cursor: pointer; }
+.attention-actions button { padding: 5px 10px; }
+.attention-actions .primary { border-color: #8590be; background: #7885b6; color: #fff; }
+.question-choices { display: flex; flex-direction: column; gap: 6px; }
+.question-choices button { display: flex; flex-direction: column; gap: 3px; padding: 8px; text-align: left; }
+.question-choices button.selected { border-color: #8590be; background: #30384e; color: #fff; }
+.attention-actions button:disabled { opacity: .4; cursor: default; }
+.question-choices small { color: #7e879a; }
+.question-other { display: grid; gap: 5px; margin-top: 8px; color: #8991a6; font-size: 9px; }
+.question-other input { min-width: 0; padding: 7px 8px; border: 1px solid #363b49; border-radius: 6px; outline: none; background: #10131a; color: #d8dce7; font: inherit; }
+.question-other input:focus { border-color: #8590be; }

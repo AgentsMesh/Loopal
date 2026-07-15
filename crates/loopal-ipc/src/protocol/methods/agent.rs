@@ -88,6 +88,10 @@ pub const AGENT_QUESTION: Method = Method {
     name: "agent/question",
 };
 
+pub const AGENT_PLAN_APPROVAL: Method = Method {
+    name: "agent/plan_approval",
+};
+
 // ── Multi-client session sharing ───────────────────────────────
 
 pub const AGENT_JOIN: Method = Method { name: "agent/join" };

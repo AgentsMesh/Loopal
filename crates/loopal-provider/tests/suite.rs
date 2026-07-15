@@ -23,6 +23,8 @@ mod openai_reasoning_e2e_test;
 mod openai_stream_edge_test;
 #[path = "suite/openai_stream_test.rs"]
 mod openai_stream_test;
+#[path = "suite/provider_contract_regression_test.rs"]
+mod provider_contract_regression_test;
 #[path = "suite/router_test.rs"]
 mod router_test;
 #[path = "suite/stream_anthropic_edge_test.rs"]
@@ -37,3 +39,5 @@ mod stream_helpers;
 mod stream_openai_edge_test;
 #[path = "suite/stream_openai_test.rs"]
 mod stream_openai_test;
+#[path = "suite/stream_terminal_semantics_test.rs"]
+mod stream_terminal_semantics_test;

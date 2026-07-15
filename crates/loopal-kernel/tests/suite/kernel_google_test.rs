@@ -1,5 +1,9 @@
 use loopal_config::{ProviderConfig, ProvidersConfig, Settings};
+use loopal_mock_llm_lib::{Scenario, serve};
 use loopal_provider::ProviderRegistry;
+use loopal_provider_api::ChatParams;
+use serde_json::json;
+use tokio::net::TcpListener;
 
 #[test]
 fn test_register_providers_google_with_config() {
@@ -112,4 +116,55 @@ fn test_register_providers_google_no_base_url() {
         registry.get("google").is_some(),
         "google should be registered even without base_url"
     );
+}
+
+#[tokio::test]
+async fn google_base_url_env_reaches_the_real_provider() {
+    let scenario = Scenario::from_slice(
+        &serde_json::to_vec(&json!({
+            "version": 2,
+            "calls": [{
+                "expect": {"protocol": "google", "model": "env-model"},
+                "chunks": [{"type": "done"}]
+            }]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base_url = format!("http://{}", listener.local_addr().unwrap());
+    let task = tokio::spawn(serve(listener, scenario, "env-google-key".into()));
+    let original = std::env::var("GOOGLE_BASE_URL").ok();
+    unsafe { std::env::set_var("GOOGLE_BASE_URL", &base_url) };
+
+    let settings = Settings {
+        providers: ProvidersConfig {
+            google: Some(ProviderConfig {
+                api_key: Some("env-google-key".into()),
+                api_key_env: None,
+                base_url: None,
+            }),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let mut registry = ProviderRegistry::new();
+    loopal_kernel::register_providers(&settings, &mut registry);
+    let provider = registry.get("google").unwrap();
+    let result = provider
+        .stream_chat(&ChatParams::new(
+            "env-model".into(),
+            Vec::new(),
+            String::new(),
+        ))
+        .await;
+
+    unsafe {
+        match original {
+            Some(value) => std::env::set_var("GOOGLE_BASE_URL", value),
+            None => std::env::remove_var("GOOGLE_BASE_URL"),
+        }
+    }
+    task.abort();
+    assert!(result.is_ok());
 }

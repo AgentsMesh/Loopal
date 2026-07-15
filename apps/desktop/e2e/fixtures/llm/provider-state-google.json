@@ -1,0 +1,33 @@
+{
+  "version": 2,
+  "name": "provider-state-google",
+  "calls": [{
+    "expect": {
+      "protocol": "google", "model": "gemini-2.5-flash-preview-04-17",
+      "userContains": "Observe Google provider state", "thinkingEnabled": true
+    },
+    "chunks": [
+      { "type": "thinking", "text": "GOOGLE THINKING STATE MARKER" },
+      { "type": "delay", "ms": 1200 },
+      { "type": "thinking_signature", "signature": "state-google-signature" },
+      { "type": "text", "text": "GOOGLE STREAMING STATE MARKER" },
+      { "type": "delay", "ms": 1200 },
+      { "type": "tool_use", "id": "google-state-read", "name": "Read",
+        "input": { "file_path": "${PROJECT}/README.md" } },
+      { "type": "usage", "input": 37, "output": 13, "thinking": 11,
+        "cache_creation": 3, "cache_read": 5 },
+      { "type": "done" }
+    ]
+  }, {
+    "expect": {
+      "protocol": "google", "model": "gemini-2.5-flash-preview-04-17",
+      "bodyContains": "state-google-signature",
+      "assistantBlockTypes": ["thinking", "text", "tool_use"]
+    },
+    "chunks": [
+      { "type": "text", "text": "GOOGLE SIGNATURE REPLAY MARKER" },
+      { "type": "usage", "input": 37, "output": 13 },
+      { "type": "done" }
+    ]
+  }]
+}

@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "name": "provider-context-recovery",
+  "calls": [
+    {
+      "expect": { "userContains": "Seed recovery context one" },
+      "chunks": [
+        { "type": "text", "text": "RECOVERY SEED ONE" },
+        { "type": "usage", "input": 45, "output": 6 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Seed recovery context two" },
+      "chunks": [
+        { "type": "text", "text": "RECOVERY SEED TWO" },
+        { "type": "usage", "input": 60, "output": 7 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Trigger context overflow recovery" },
+      "status": 400,
+      "body": {
+        "type": "error",
+        "error": { "type": "invalid_request_error", "message": "prompt is too long" }
+      }
+    },
+    {
+      "expect": {
+        "bodyContains": "You produce structured working state summaries"
+      },
+      "chunks": [
+        { "type": "delay", "ms": 1000 },
+        { "type": "text", "text": "<summary>CONTEXT RECOVERY SUMMARY</summary>" },
+        { "type": "usage", "input": 70, "output": 12 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "CONTEXT RECOVERY SUMMARY" },
+      "chunks": [
+        { "type": "text", "text": "Context overflow recovered after real compaction." },
+        { "type": "usage", "input": 30, "output": 9 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

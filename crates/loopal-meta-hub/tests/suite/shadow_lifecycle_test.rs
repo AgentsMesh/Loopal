@@ -95,7 +95,7 @@ async fn wait_agent_resolves_on_shadow_completion() {
     );
 }
 
-/// Shadow is cleaned up after completion (no memory leak).
+/// Active shadow resources are released while its completed tombstone remains.
 #[tokio::test]
 async fn shadow_cleaned_up_after_completion() {
     let (hub, _) = make_hub();
@@ -116,10 +116,24 @@ async fn shadow_cleaned_up_after_completion() {
         h.registry.unregister_connection("child");
     }
 
-    // Shadow should be gone
+    // Connection/control state is gone; read-only completion state is retained.
     assert!(
-        hub.lock().await.registry.agent_info("child").is_none(),
-        "shadow should be removed after completion"
+        !hub.lock()
+            .await
+            .registry
+            .list_agents()
+            .iter()
+            .any(|(name, _)| name == "child"),
+        "shadow should leave the active registry after completion"
+    );
+    assert_eq!(
+        hub.lock()
+            .await
+            .registry
+            .agent_info("child")
+            .unwrap()
+            .lifecycle,
+        loopal_agent_hub::AgentLifecycle::Finished,
     );
     // But output should be cached (wait_agent on already-finished returns cached)
     let cached = loopal_agent_hub::dispatch::dispatch_hub_request(

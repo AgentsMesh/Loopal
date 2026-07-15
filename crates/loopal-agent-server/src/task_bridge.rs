@@ -28,6 +28,13 @@ pub fn spawn(
     frontend: Arc<dyn AgentFrontend>,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
+        let tasks = snapshot_all(&task_store).await;
+        if let Err(e) = frontend
+            .emit(AgentEventPayload::TasksChanged { tasks })
+            .await
+        {
+            tracing::warn!(error = %e, "failed to emit initial TasksChanged");
+        }
         loop {
             match change_rx.recv().await {
                 Ok(()) => {}

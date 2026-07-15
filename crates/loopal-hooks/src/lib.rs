@@ -1,4 +1,5 @@
 pub mod async_store;
+mod child_command;
 pub mod executor;
 pub mod executor_command;
 pub mod executor_http;

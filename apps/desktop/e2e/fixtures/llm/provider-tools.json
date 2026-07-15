@@ -1,0 +1,129 @@
+{
+  "version": 1,
+  "name": "provider-tools",
+  "calls": [
+    {
+      "expect": { "userContains": "Exercise server tools" },
+      "chunks": [
+        {
+          "type": "server_tool_use",
+          "id": "web-search-1",
+          "name": "web_search",
+          "input": { "query": "Loopal deterministic contract" },
+          "inputFragments": ["{\"query\":", "\"Loopal deterministic contract\"}"]
+        },
+        {
+          "type": "server_tool_result",
+          "block_type": "web_search_tool_result",
+          "tool_use_id": "web-search-1",
+          "content": [
+            { "type": "web_search_result", "title": "Fixture result", "text": "SERVER RESULT BODY" }
+          ]
+        },
+        { "type": "text", "text": "Server-side search blocks rendered." },
+        { "type": "usage", "input": 31, "output": 9, "cache_creation": 5, "cache_read": 7 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "userContains": "Exercise failed tools",
+        "bodyContains": "[server tool 'web_search' result condensed]"
+      },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "missing-read",
+          "name": "Read",
+          "input": { "file_path": "${PROJECT}/missing-file.txt" }
+        },
+        {
+          "type": "tool_use",
+          "id": "unknown-tool",
+          "name": "NoSuchDesktopTool",
+          "input": { "marker": "unknown" }
+        },
+        { "type": "usage", "input": 35, "output": 12 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "missing-read", "bodyContains": "unknown-tool" },
+      "chunks": [
+        { "type": "text", "text": "Both tool failures returned to the model." },
+        { "type": "usage", "input": 40, "output": 8 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Exercise parallel tools" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "parallel-readme",
+          "name": "Read",
+          "input": { "file_path": "${PROJECT}/README.md" }
+        },
+        {
+          "type": "tool_use",
+          "id": "parallel-source",
+          "name": "Read",
+          "input": { "file_path": "${PROJECT}/src/main.rs" }
+        },
+        { "type": "usage", "input": 44, "output": 10 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "parallel-readme", "bodyContains": "parallel-source" },
+      "chunks": [
+        { "type": "text", "text": "Parallel tool batch completed." },
+        { "type": "usage", "input": 48, "output": 7 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Exercise tool progress" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "progress-bash",
+          "name": "Bash",
+          "input": {
+            "command": "printf 'MODEL TOOL START\\n'; sleep 8; printf 'MODEL TOOL END\\n'",
+            "timeout": 15
+          }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "progress-bash" },
+      "chunks": [
+        { "type": "text", "text": "Long-running tool progress completed." },
+        { "type": "usage", "input": 52, "output": 8 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Exercise image tool result" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "read-image-result",
+          "name": "ReadImage",
+          "input": { "file_path": "${PROJECT}/pixel.png" }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "read-image-result", "bodyContains": "\"type\":\"image\"" },
+      "chunks": [
+        { "type": "text", "text": "Image tool output reached the model request." },
+        { "type": "usage", "input": 54, "output": 8 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

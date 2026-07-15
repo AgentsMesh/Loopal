@@ -36,19 +36,9 @@ pub fn cleanup_stale_worktrees(repo_root: &Path) {
         // Canonicalize for reliable comparison (handles macOS /tmp → /private/tmp).
         let canonical = path.canonicalize().unwrap_or_else(|_| path.clone());
         if !active_paths.contains(&canonical) {
-            // Try git-managed removal first; fall back to direct deletion if
-            // git no longer knows about this worktree (already pruned).
-            if remove_worktree(repo_root, name, true).is_err() {
-                let _ = std::fs::remove_dir_all(&path);
-            }
-            // Also clean up the orphan branch if it exists.
-            let branch = format!("loopal-wt-{name}");
-            let _ = Command::new("git")
-                .args(["branch", "-D", &branch])
-                .current_dir(repo_root)
-                .stdout(std::process::Stdio::null())
-                .stderr(std::process::Stdio::null())
-                .status();
+            // Unknown directories and unmerged branches are retained: startup
+            // cleanup has no user authorization for destructive removal.
+            let _ = remove_worktree(repo_root, name, false);
         }
     }
 }

@@ -1,0 +1,105 @@
+.session-panel-deck {
+  --panel-bg: #0f1218;
+  --panel-border: #292e3a;
+  position: relative;
+  flex: 0 0 auto;
+  border-top: 1px solid var(--panel-border);
+  background: rgba(16, 19, 26, .98);
+}
+.session-panel-bar {
+  min-width: 0;
+  height: 37px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px max(24px, 7vw);
+  background: #11151c;
+}
+.session-panel-tabs {
+  min-width: 0;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.session-panel-tabs::-webkit-scrollbar { display: none; }
+.session-panel-tabs [role="tab"] {
+  min-width: max-content;
+  height: 27px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #747e94;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 620;
+  letter-spacing: .035em;
+}
+.session-panel-tabs [role="tab"]:hover { color: #c5ccda; background: #191e28; }
+.session-panel-tabs [role="tab"][aria-selected="true"] {
+  border-color: #353d50;
+  background: #202633;
+  color: #e0e4ee;
+}
+.session-panel-tabs [role="tab"]:focus-visible,
+.session-panel-toggle:focus-visible { outline: 2px solid #7786ba; outline-offset: 1px; }
+.session-panel-tabs [role="tab"].has-alert::before {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #d58b69;
+  content: '';
+}
+.session-panel-tabs small {
+  min-width: 15px;
+  padding: 1px 4px;
+  border-radius: 999px;
+  background: #2b3242;
+  color: #96a1b8;
+  text-align: center;
+  font-size: 8px;
+}
+.session-panel-toggle {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  border: 1px solid #303747;
+  border-radius: 6px;
+  background: #171b24;
+  color: #8993a9;
+  cursor: pointer;
+}
+.session-panel-content {
+  position: absolute;
+  z-index: 10;
+  right: 0;
+  bottom: 37px;
+  left: 0;
+  height: clamp(132px, 21vh, 238px);
+  overflow: auto;
+  padding: 0 max(24px, 7vw) 8px;
+  border: 1px solid #2b3240;
+  border-right: 0;
+  border-left: 0;
+  background: var(--panel-bg);
+  box-shadow: 0 -18px 38px rgba(0, 0, 0, .38);
+}
+.session-panel-content > .inspector-content {
+  min-height: 100%;
+  overflow: visible;
+  padding: 10px 0;
+}
+.density-compact .session-panel-bar { height: 32px; padding-top: 3px; padding-bottom: 3px; }
+.density-compact .session-panel-content { bottom: 32px; }
+.density-compact .session-panel-content > .inspector-content { padding: 5px 0; }
+
+@media (max-width: 720px) {
+  .session-panel-bar, .session-panel-content { padding-left: 12px; padding-right: 12px; }
+  .session-panel-content { height: clamp(120px, 25vh, 210px); }
+}

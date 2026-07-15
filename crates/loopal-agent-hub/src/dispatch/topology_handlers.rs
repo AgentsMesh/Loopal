@@ -11,8 +11,7 @@ pub async fn handle_agent_info(hub: &Arc<Mutex<Hub>>, params: Value) -> Result<V
     let name = params["name"].as_str().ok_or("missing 'name'")?;
     let h = hub.lock().await;
 
-    // Check finished_outputs first (agent may already be unregistered)
-    let output = h.registry.finished_outputs.get(name).cloned();
+    let output = h.registry.completion_output(name).map(String::from);
 
     if let Some(info) = h.registry.agent_info(name) {
         Ok(json!({
@@ -22,13 +21,6 @@ pub async fn handle_agent_info(hub: &Arc<Mutex<Hub>>, params: Value) -> Result<V
             "lifecycle": format!("{:?}", info.lifecycle),
             "model": info.model,
             "output": output,
-        }))
-    } else if let Some(ref out) = output {
-        // Agent unregistered but output cached
-        Ok(json!({
-            "name": name,
-            "lifecycle": "Finished",
-            "output": out,
         }))
     } else {
         Err(format!("agent '{name}' not found"))

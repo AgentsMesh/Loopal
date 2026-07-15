@@ -1,0 +1,32 @@
+{
+  "version": 2,
+  "name": "provider-tool-interrupt",
+  "calls": [
+    {
+      "expect": { "userContains": "Start an interruptible model tool" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "interrupt-bash",
+          "name": "Bash",
+          "input": {
+            "command": "printf 'TOOL EARLY\\n'; sleep 3; printf 'TOOL LATE\\n'; printf 'late\\n' > '${PROJECT}/tool-late-marker.txt'",
+            "timeout": 60
+          }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "userContains": "Recover after cancelling a model tool",
+        "toolResultId": "interrupt-bash",
+        "bodyContains": "Interrupted by user"
+      },
+      "chunks": [
+        { "type": "text", "text": "The Session remained reusable after tool cancellation." },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

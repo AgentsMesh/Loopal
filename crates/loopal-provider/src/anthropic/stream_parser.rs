@@ -15,10 +15,10 @@ pub(crate) fn parse_anthropic_event(
 ) -> Vec<Result<StreamChunk, LoopalError>> {
     let parsed: Value = match serde_json::from_str(data) {
         Ok(v) => v,
-        Err(e) => {
-            return vec![Err(ProviderError::SseParse(format!(
-                "invalid JSON: {e}: {data}"
-            ))
+        Err(_) => {
+            return vec![Err(ProviderError::SseParse(
+                "invalid provider SSE JSON".into(),
+            )
             .into())];
         }
     };

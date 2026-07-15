@@ -19,12 +19,18 @@ mod loader_settings_merge_test;
 mod loader_settings_test;
 #[path = "suite/loader_unit_test.rs"]
 mod loader_unit_test;
+#[path = "suite/local_writer_concurrency_test.rs"]
+mod local_writer_concurrency_test;
+#[path = "suite/local_writer_gitignore_test.rs"]
+mod local_writer_gitignore_test;
 #[path = "suite/local_writer_test.rs"]
 mod local_writer_test;
 #[path = "suite/locations_test.rs"]
 mod locations_test;
 #[path = "suite/mcp_json_test.rs"]
 mod mcp_json_test;
+#[path = "suite/plugin_inventory_test.rs"]
+mod plugin_inventory_test;
 #[path = "suite/plugin_test.rs"]
 mod plugin_test;
 #[path = "suite/resolver_edge_test.rs"]
@@ -37,6 +43,8 @@ mod resolver_test;
 mod settings_routing_test;
 #[path = "suite/skills_loader_test.rs"]
 mod skills_loader_test;
+#[path = "suite/skills_management_test.rs"]
+mod skills_management_test;
 #[path = "suite/skills_parser_test.rs"]
 mod skills_parser_test;
 #[path = "suite/telemetry_edge_test.rs"]

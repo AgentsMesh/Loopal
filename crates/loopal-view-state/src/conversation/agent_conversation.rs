@@ -4,16 +4,19 @@ use serde::{Deserialize, Serialize};
 
 use super::pending_question::PendingQuestion;
 use super::thinking_display::format_thinking_content;
-use super::types::{PendingPermission, SessionMessage};
+use super::types::{PendingPermission, PendingPlanApproval, SessionMessage};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AgentConversation {
     pub messages: Vec<SessionMessage>,
+    #[serde(default)]
+    pub history_truncated: bool,
     pub streaming_text: String,
     pub streaming_thinking: String,
     pub thinking_active: bool,
     pub pending_permission: Option<PendingPermission>,
     pub pending_question: Option<PendingQuestion>,
+    pub pending_plan_approval: Option<PendingPlanApproval>,
     pub retry_banner: Option<String>,
     pub compact_banner: Option<String>,
     pub turn_count: u32,
@@ -30,6 +33,8 @@ pub struct AgentConversation {
     /// Bridge gap between `AwaitingInput` and next `Running` so spinner doesn't flicker.
     #[serde(skip)]
     last_active_at: Option<Instant>,
+    #[serde(skip)]
+    pub(super) flushed_thinking_index: Option<usize>,
 }
 
 impl AgentConversation {
@@ -49,6 +54,7 @@ impl AgentConversation {
     /// Mark the start of a new turn (agent begins working).
     pub fn begin_turn(&mut self) {
         if self.turn_start.is_none() {
+            self.flushed_thinking_index = None;
             self.turn_start = Some(Instant::now());
         }
     }
@@ -99,6 +105,7 @@ impl AgentConversation {
     /// flicker back. Used by the `SessionResumed` mutator.
     pub fn clear_history(&mut self) {
         self.messages.clear();
+        self.history_truncated = false;
         self.streaming_text.clear();
         self.streaming_thinking.clear();
         self.thinking_active = false;
@@ -112,7 +119,23 @@ impl AgentConversation {
         self.thinking_tokens = 0;
         self.pending_permission = None;
         self.pending_question = None;
+        self.pending_plan_approval = None;
+        self.flushed_thinking_index = None;
         self.reset_timer();
+    }
+
+    pub fn replace_history(&mut self, messages: Vec<SessionMessage>, truncated: bool) {
+        self.messages = messages;
+        self.history_truncated = truncated;
+        self.streaming_text.clear();
+        self.streaming_thinking.clear();
+        self.thinking_active = false;
+        self.retry_banner = None;
+        self.compact_banner = None;
+        self.pending_permission = None;
+        self.pending_question = None;
+        self.pending_plan_approval = None;
+        self.flushed_thinking_index = None;
     }
 
     /// Flush buffered streaming text and thinking into SessionMessages.
@@ -121,6 +144,7 @@ impl AgentConversation {
             let thinking = std::mem::take(&mut self.streaming_thinking);
             let token_est = thinking.len() as u32 / 4;
             let content = format_thinking_content(&thinking, token_est);
+            self.flushed_thinking_index = Some(self.messages.len());
             self.messages.push(SessionMessage {
                 role: "thinking".to_string(),
                 content,

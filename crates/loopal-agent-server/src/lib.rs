@@ -15,6 +15,7 @@ mod bg_task_bridge;
 mod bg_task_bridge_monitor;
 mod bg_task_bridge_sampler;
 mod connection_mcp_client;
+mod control_forward;
 mod cron_bridge;
 #[doc(hidden)]
 pub mod dispatch;
@@ -96,5 +97,6 @@ pub mod testing {
     pub use crate::session_hub_storage::SessionHubError;
     pub use crate::session_resources::resolve_sessions_root;
     pub use crate::spawn_policy::build_depth_tool_filter;
+    pub use crate::task_bridge::spawn as task_bridge_spawn;
     pub use loopal_runtime::agent_input::AgentInput;
 }

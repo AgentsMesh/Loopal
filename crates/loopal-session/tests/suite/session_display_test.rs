@@ -22,6 +22,7 @@ fn projected_msg(tool_calls: Vec<ProjectedToolCall>) -> ProjectedMessage {
         content: "hi".to_string(),
         tool_calls,
         image_count: 0,
+        skill_info: None,
     }
 }
 

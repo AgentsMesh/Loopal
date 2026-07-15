@@ -66,4 +66,29 @@ impl HubClient {
             warn!(agent_name, question_id, "hub/question_cancel failed: {e}");
         }
     }
+
+    pub async fn respond_plan_approval(
+        &self,
+        agent_name: &str,
+        request_id: &str,
+        decision: &str,
+        edited_plan: Option<&str>,
+    ) {
+        let params = serde_json::json!({
+            "agent_name": agent_name,
+            "request_id": request_id,
+            "decision": decision,
+            "edited_plan": edited_plan,
+        });
+        if let Err(e) = self
+            .connection()
+            .send_request(methods::HUB_PLAN_APPROVAL_RESPONSE.name, params)
+            .await
+        {
+            warn!(
+                agent_name,
+                request_id, "hub/plan_approval_response failed: {e}"
+            );
+        }
+    }
 }

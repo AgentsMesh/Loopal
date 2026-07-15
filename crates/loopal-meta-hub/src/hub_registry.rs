@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use loopal_ipc::connection::{Connection, Listening};
 
@@ -42,9 +42,14 @@ impl HubRegistry {
         conn: Arc<Connection<Listening>>,
         capabilities: Vec<String>,
     ) -> Result<(), String> {
-        if self.hubs.contains_key(name) {
+        if self
+            .hubs
+            .get(name)
+            .is_some_and(|hub| hub.connection().is_connected())
+        {
             return Err(format!("hub '{name}' already registered"));
         }
+        self.hubs.remove(name);
         let info = HubInfo::new(name, capabilities);
         self.hubs
             .insert(name.to_string(), ManagedHub::new(conn, info));
@@ -59,6 +64,22 @@ impl HubRegistry {
             tracing::info!(hub = %name, "sub-hub unregistered");
         }
         removed
+    }
+
+    pub fn unregister_connection(
+        &mut self,
+        name: &str,
+        conn: &Arc<Connection<Listening>>,
+    ) -> Option<ManagedHub> {
+        if self
+            .hubs
+            .get(name)
+            .is_some_and(|hub| Arc::ptr_eq(hub.connection(), conn))
+        {
+            self.unregister(name)
+        } else {
+            None
+        }
     }
 
     /// Get a sub-hub by name.
@@ -108,20 +129,32 @@ impl HubRegistry {
     /// Check all hubs for heartbeat timeout, update status accordingly.
     /// Returns names of hubs that transitioned to Disconnected.
     pub fn check_health(&mut self) -> Vec<String> {
+        self.check_health_at(
+            Instant::now(),
+            HEARTBEAT_DEGRADED_TIMEOUT,
+            HEARTBEAT_DISCONNECT_TIMEOUT,
+        )
+    }
+
+    #[doc(hidden)]
+    pub fn check_health_at(
+        &mut self,
+        now: Instant,
+        degraded_after: Duration,
+        disconnect_after: Duration,
+    ) -> Vec<String> {
         let mut disconnected = Vec::new();
         for (name, hub) in &mut self.hubs {
-            let elapsed = hub.info().last_heartbeat.elapsed();
-            match hub.info().status {
-                HubStatus::Connected if elapsed > HEARTBEAT_DEGRADED_TIMEOUT => {
-                    hub.info_mut().mark_degraded();
-                    tracing::warn!(hub = %name, "sub-hub heartbeat degraded");
-                }
-                HubStatus::Degraded if elapsed > HEARTBEAT_DISCONNECT_TIMEOUT => {
+            let elapsed = now.saturating_duration_since(hub.info().last_heartbeat);
+            if elapsed > disconnect_after {
+                if hub.info().status != HubStatus::Disconnected {
                     hub.info_mut().mark_disconnected();
                     tracing::error!(hub = %name, "sub-hub heartbeat timed out");
                     disconnected.push(name.clone());
                 }
-                _ => {}
+            } else if elapsed > degraded_after && hub.info().status == HubStatus::Connected {
+                hub.info_mut().mark_degraded();
+                tracing::warn!(hub = %name, "sub-hub heartbeat degraded");
             }
         }
         disconnected

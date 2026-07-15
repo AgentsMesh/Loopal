@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use loopal_provider_api::{ChatParams, ContentBlock, Message, MessageRole};
 use serde_json::{Value, json};
 use tracing::error;
@@ -12,6 +14,14 @@ impl GoogleProvider {
         messages: &[Message],
         _params: &ChatParams,
     ) -> Vec<Value> {
+        let tool_names: HashMap<&str, &str> = messages
+            .iter()
+            .flat_map(|message| &message.content)
+            .filter_map(|block| match block {
+                ContentBlock::ToolUse { id, name, .. } => Some((id.as_str(), name.as_str())),
+                _ => None,
+            })
+            .collect();
         messages
             .iter()
             .filter(|m| m.role != MessageRole::System)
@@ -31,7 +41,7 @@ impl GoogleProvider {
                             "functionCall": { "name": name, "args": input }
                         })],
                         ContentBlock::ToolResult {
-                            tool_use_id: _,
+                            tool_use_id,
                             content,
                             images,
                             ..
@@ -39,7 +49,7 @@ impl GoogleProvider {
                             let placeholder = placeholder_text(content, !images.is_empty());
                             let mut out = vec![json!({
                                 "functionResponse": {
-                                    "name": "",
+                                    "name": tool_names.get(tool_use_id.as_str()).copied().unwrap_or(""),
                                     "response": {"result": placeholder}
                                 }
                             })];
@@ -66,10 +76,16 @@ impl GoogleProvider {
                                 "data": source.data
                             }
                         })],
-                        ContentBlock::Thinking { thinking, .. } => vec![json!({
-                            "text": thinking,
-                            "thought": true
-                        })],
+                        ContentBlock::Thinking {
+                            thinking,
+                            signature,
+                        } => {
+                            let mut part = json!({"text": thinking, "thought": true});
+                            if let Some(value) = signature {
+                                part["thoughtSignature"] = json!(value);
+                            }
+                            vec![part]
+                        }
                         // Server-side blocks from other providers preserved as text.
                         // Content is formatted for readability when crossing providers.
                         ContentBlock::ServerToolUse { name, input, .. } => {

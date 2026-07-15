@@ -1,0 +1,107 @@
+.session-create-overlay {
+  position: fixed;
+  z-index: var(--wb-overlay);
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(6, 8, 12, .72);
+  backdrop-filter: blur(6px);
+}
+.session-create-dialog {
+  width: min(560px, 100%);
+  max-height: min(760px, calc(100vh - 48px));
+  overflow: auto;
+  border: 1px solid #303746;
+  border-radius: 12px;
+  background: #11151d;
+  box-shadow: var(--wb-shadow);
+}
+.session-create-dialog > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid #282e3a;
+}
+.session-create-dialog h2 { margin: 0; font-size: 17px; }
+.session-create-dialog header p { margin: 5px 0 0; color: #7d869a; font-size: 10px; }
+.session-create-dialog header button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #343b4a;
+  border-radius: 6px;
+  background: #191e27;
+  cursor: pointer;
+}
+.session-create-dialog > section { padding: 17px 22px 0; }
+.session-create-section-title { display: flex; flex-direction: column; gap: 4px; margin-bottom: 9px; }
+.session-create-section-title strong { color: #c7cdd9; font-size: 11px; }
+.session-create-section-title small { color: #747e91; font-size: 9px; }
+.session-directory {
+  width: 100%;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 11px;
+  border: 1px solid #384153;
+  border-radius: 7px;
+  background: #181d27;
+  text-align: left;
+  cursor: pointer;
+}
+.session-directory span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.session-directory small { flex: none; color: #91a0cc; }
+.session-directory-meta { display: flex; gap: 7px; align-items: center; margin-top: 7px; font-size: 9px; }
+.session-directory-meta strong { color: #aeb6c7; }
+.session-directory-meta span { color: #737e94; }
+.launch-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 7px 0;
+  padding: 10px;
+  border: 1px solid #2d3442;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.launch-choice.selected { border-color: #6373a6; background: #1b2130; }
+.launch-choice input { margin: 2px 0 0; accent-color: #8798d1; }
+.launch-choice span { display: flex; flex-direction: column; gap: 4px; }
+.launch-choice strong { color: #c5cbd7; font-size: 10px; }
+.launch-choice small, .worktree-name small { color: #778196; font-size: 9px; }
+.worktree-name { display: grid; gap: 6px; margin: 10px 0 0 27px; color: #aeb6c7; font-size: 10px; }
+.worktree-name input {
+  height: 31px;
+  padding: 0 9px;
+  border: 1px solid #394153;
+  border-radius: 6px;
+  outline: 0;
+  background: #151a23;
+  color: #d6dae4;
+}
+.worktree-name input:focus { border-color: #7180b5; box-shadow: 0 0 0 1px #7180b5; }
+.worktree-name input[aria-invalid="true"] { border-color: #ac5f64; }
+.session-create-warning, .session-create-error, .session-create-empty {
+  margin: 11px 22px 0;
+  padding: 9px 10px;
+  border-radius: 6px;
+  color: #aab2c3;
+  background: #191e27;
+  font-size: 9px;
+}
+.session-create-warning { margin-left: 27px; color: #d5ad69; background: #211c16; }
+.session-create-error { color: #ef9ba0; background: #28171b; }
+.session-create-dialog > footer { display: flex; justify-content: flex-end; gap: 8px; padding: 18px 22px 20px; }
+.session-create-dialog > footer button {
+  min-height: 31px;
+  padding: 0 13px;
+  border: 1px solid #3a4354;
+  border-radius: 6px;
+  background: #1a1f29;
+  cursor: pointer;
+}
+.session-create-dialog > footer button.primary { border-color: #6979ae; background: #39466d; }
+.session-create-dialog button:disabled { opacity: .45; cursor: default; }

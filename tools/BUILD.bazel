@@ -1,3 +1,10 @@
 exports_files([
     "version_stamp.sh",
 ])
+
+sh_test(
+    name = "version_stamp_test",
+    srcs = ["version_stamp_test.sh"],
+    args = ["$(rootpath :version_stamp.sh)"],
+    data = [":version_stamp.sh"],
+)

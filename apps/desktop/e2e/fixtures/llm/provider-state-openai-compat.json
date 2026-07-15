@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "name": "provider-state-openai-compat",
+  "calls": [{
+    "expect": {
+      "protocol": "openai_compat", "model": "deepseek-reasoner",
+      "userContains": "Observe compatible provider state", "thinkingEnabled": true,
+      "bodyContains": "\"reasoning_effort\":\"high\""
+    },
+    "chunks": [
+      { "type": "thinking", "text": "COMPAT THINKING STATE MARKER" },
+      { "type": "delay", "ms": 1200 },
+      { "type": "thinking_signature", "signature": "state-compat-signature" },
+      { "type": "text", "text": "COMPAT STREAMING STATE MARKER" },
+      { "type": "delay", "ms": 1200 },
+      { "type": "usage", "input": 37, "output": 13, "thinking": 11,
+        "cache_creation": 3, "cache_read": 5 },
+      { "type": "done" }
+    ]
+  }]
+}

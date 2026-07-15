@@ -60,6 +60,7 @@ pub fn grep_search(
     let ctx_before = opts.context_before;
     let ctx_after = opts.context_after;
     let multiline = opts.multiline;
+    let max_file_bytes = limits.max_file_read_bytes;
     let total = Arc::new(AtomicUsize::new(0));
     let done = Arc::new(AtomicBool::new(false));
     let timed_out = Arc::new(AtomicBool::new(false));
@@ -100,7 +101,15 @@ pub fn grep_search(
                 return WalkState::Continue;
             }
             if let Some(fm) = search_one_file(
-                &path, &re, multiline, ctx_before, ctx_after, max, &total, &done,
+                &path,
+                &re,
+                multiline,
+                ctx_before,
+                ctx_after,
+                max,
+                max_file_bytes,
+                &total,
+                &done,
             ) {
                 results.lock().push(fm);
             }

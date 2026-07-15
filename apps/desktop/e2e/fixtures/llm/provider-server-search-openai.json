@@ -1,0 +1,40 @@
+{
+  "version": 2,
+  "name": "provider-server-search-openai",
+  "calls": [
+    {
+      "expect": {
+        "protocol": "openai_responses",
+        "userContains": "Use native OpenAI server search",
+        "minTools": 1
+      },
+      "chunks": [
+        { "type": "thinking", "text": "Selecting a server search query." },
+        { "type": "thinking_signature", "signature": "rs_openai_search_1" },
+        {
+          "type": "server_tool_use",
+          "id": "ws_openai_search_1",
+          "name": "WebSearch",
+          "input": { "query": "Loopal native OpenAI search contract" }
+        },
+        { "type": "text", "text": "OpenAI native search rendered." },
+        { "type": "usage", "input": 31, "output": 9, "thinking": 4 },
+        { "type": "done", "reason": "max_tokens" }
+      ]
+    },
+    {
+      "expect": {
+        "protocol": "openai_responses",
+        "userContains": "Use native OpenAI server search",
+        "messageCount": 2,
+        "assistantBlockTypes": ["reasoning", "web_search_call", "message"],
+        "serverBlockCount": 1
+      },
+      "chunks": [
+        { "type": "text", "text": "OpenAI search history remained ordered." },
+        { "type": "usage", "input": 43, "output": 8 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

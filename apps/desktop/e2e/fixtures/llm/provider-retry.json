@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "name": "provider-retry",
+  "calls": [
+    {
+      "expect": { "userContains": "Recover from a scripted rate limit" },
+      "status": 429,
+      "retryAfterMs": 2000,
+      "body": {
+        "type": "error",
+        "error": { "type": "rate_limit_error", "message": "mock capacity reached" }
+      }
+    },
+    {
+      "expect": { "userContains": "Recover from a scripted rate limit" },
+      "chunks": [
+        { "type": "text", "text": "Recovered through the real provider retry loop." },
+        { "type": "usage", "input": 21, "output": 9 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

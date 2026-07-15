@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "name": "session-directories",
+  "calls": [
+    {
+      "expect": { "userContains": "Verify the plain directory" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "plain-pwd",
+          "name": "Bash",
+          "input": { "command": "pwd" }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "toolResultId": "plain-pwd",
+        "bodyContains": "${ROOT}/session-directories/plain workspace"
+      },
+      "chunks": [
+        { "type": "text", "text": "Plain directory verified." },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Verify the Git directory directly" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "git-direct-pwd",
+          "name": "Bash",
+          "input": { "command": "pwd; git branch --show-current" }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "toolResultId": "git-direct-pwd",
+        "bodyContains": "${ROOT}/session-directories/git workspace"
+      },
+      "chunks": [
+        { "type": "text", "text": "Git directory verified." },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Verify the isolated worktree" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "worktree-pwd",
+          "name": "Bash",
+          "input": {
+            "command": "pwd; git branch --show-current; printf 'isolated\\n' > worktree-only.txt"
+          }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "toolResultId": "worktree-pwd",
+        "bodyContains": "loopal-wt-e2e-isolated"
+      },
+      "chunks": [
+        { "type": "text", "text": "Worktree isolation verified." },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Verify the restarted isolated worktree" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "restarted-worktree-pwd",
+          "name": "Bash",
+          "input": { "command": "pwd; git branch --show-current; test -f worktree-only.txt" }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "toolResultId": "restarted-worktree-pwd",
+        "bodyContains": "loopal-wt-e2e-isolated"
+      },
+      "chunks": [
+        { "type": "text", "text": "Restarted worktree verified." },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Verify the relaunched isolated worktree" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "relaunched-worktree-pwd",
+          "name": "Bash",
+          "input": { "command": "pwd; git branch --show-current; test -f worktree-only.txt" }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "toolResultId": "relaunched-worktree-pwd",
+        "bodyContains": "loopal-wt-e2e-isolated"
+      },
+      "chunks": [
+        { "type": "text", "text": "Relaunched worktree verified." },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

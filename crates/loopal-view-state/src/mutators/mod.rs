@@ -45,6 +45,7 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
         Finished => observable::finished(state),
         Interrupted => observable::interrupted(state),
         Error { message } => observable::error(state, message),
+        ProviderWarning { message } => observable::provider_warning(state, message),
         ToolCall { id, name, input } => tool::tool_call(state, id, name, input),
         ToolResult {
             id,
@@ -62,6 +63,12 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
             interactive::tool_permission_request(state, id, name, input)
         }
         ToolPermissionResolved { id } => interactive::tool_permission_resolved(state, id),
+        PlanApprovalRequest {
+            id,
+            plan_content,
+            plan_path,
+        } => interactive::plan_approval_request(state, id, plan_content, plan_path),
+        PlanApprovalResolved { id } => interactive::plan_approval_resolved(state, id),
         UserQuestionRequest {
             id,
             questions,
@@ -79,7 +86,14 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
             envelope_id,
             content,
             image_count,
-        } => interactive::user_message_queued(state, envelope_id, content, *image_count),
+            skill_info,
+        } => interactive::user_message_queued(
+            state,
+            envelope_id,
+            content,
+            *image_count,
+            skill_info.clone(),
+        ),
         Stream { text } => stream::stream(state, text),
         ThinkingStream { text } => stream::thinking_stream(state, text),
         ThinkingComplete { token_count } => stream::thinking_complete(state, *token_count),
@@ -107,7 +121,8 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
         AutoContinuation {
             continuation,
             max_continuations,
-        } => interactive::auto_continuation(state, *continuation, *max_continuations),
+            reason,
+        } => interactive::auto_continuation(state, *continuation, *max_continuations, reason),
         Compacted(s) => interactive::compacted(
             state,
             s.kept,
@@ -140,6 +155,7 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
         PermissionModeChanged { mode } => lifecycle::permission_mode_changed(state, mode),
         DecisionModeChanged { mode } => lifecycle::decision_mode_changed(state, mode),
         SandboxPolicyChanged { policy } => lifecycle::sandbox_policy_changed(state, policy),
+        ContinuationGateChanged(summary) => lifecycle::continuation_gate_changed(state, summary),
         Cleared { context_window } => lifecycle::cleared(state, *context_window),
         TurnCompleted(_) => observable::turn_completed(state),
         TasksChanged { tasks } => aggregate::tasks_changed(state, tasks),
@@ -159,6 +175,7 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
         McpStatusReport { servers } => aggregate::mcp_status(state, servers),
         SubAgentSpawned(s) => aggregate::sub_agent_spawned(state, &s.name),
         SessionResumed { session_id, .. } => aggregate::session_resumed(state, session_id),
+        SessionHistoryLoaded(history) => aggregate::session_history_loaded(state, history),
         ThreadGoalUpdated { goal, .. } => aggregate::thread_goal_updated(state, goal),
         HubDegraded { since_unix_ms } => aggregate::hub_degraded(state, *since_unix_ms),
         HubRecovered { .. } => aggregate::hub_recovered(state),
@@ -169,8 +186,7 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
         | QuestionDecided { .. }
         | DegenerationDetected(_)
         | ContinuationSkipped { .. }
-        | TurnCancelled { .. }
-        | ContinuationGateChanged(_) => MutationEffect::NoOp,
+        | TurnCancelled { .. } => MutationEffect::NoOp,
         CompactProgress { phase, detail } => compact::progress(state, *phase, detail.as_deref()),
     }
 }

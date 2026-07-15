@@ -157,11 +157,11 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
             decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
         },
         if has_cwd_override {
-            let mut s = fixture.test_session("integration-test");
+            let mut s = fixture.unique_test_session("integration-test");
             s.cwd = session_cwd.to_string_lossy().into_owned();
             s
         } else {
-            fixture.test_session("integration-test")
+            fixture.unique_test_session("integration-test")
         },
         budget,
         interrupt,

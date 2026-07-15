@@ -6,10 +6,8 @@ pub fn envelope_to_trigger(env: &Envelope) -> TurnTrigger {
     let envelope_id = env.id.to_string();
     let content = env.content.text.clone();
     match &env.source {
-        MessageSource::Human => TurnTrigger::UserInput {
-            envelope_id,
-            content,
-            images: env
+        MessageSource::Human => {
+            let images = env
                 .content
                 .images
                 .iter()
@@ -17,8 +15,22 @@ pub fn envelope_to_trigger(env: &Envelope) -> TurnTrigger {
                     media_type: img.media_type.clone(),
                     data: img.data.clone(),
                 })
-                .collect(),
-        },
+                .collect();
+            match &env.content.skill_info {
+                Some(skill) => TurnTrigger::SkillInput {
+                    envelope_id,
+                    content,
+                    name: skill.name.clone(),
+                    user_args: skill.user_args.clone(),
+                    images,
+                },
+                None => TurnTrigger::UserInput {
+                    envelope_id,
+                    content,
+                    images,
+                },
+            }
+        }
         MessageSource::Scheduled => TurnTrigger::Cron {
             envelope_id,
             content,

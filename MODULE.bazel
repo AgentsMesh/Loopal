@@ -4,10 +4,36 @@ module(
 )
 
 # Bazel skylib
-bazel_dep(name = "bazel_skylib", version = "1.7.1")
+bazel_dep(name = "bazel_skylib", version = "1.8.2")
 
 # Platforms (needed for cross-compilation platform() targets)
 bazel_dep(name = "platforms", version = "1.0.0")
+
+# TypeScript / Electron desktop. pnpm resolves the external graph; Bazel owns
+# every build, test, coverage, E2E, and packaging action.
+bazel_dep(name = "aspect_bazel_lib", version = "2.19.2")
+bazel_dep(name = "aspect_rules_js", version = "2.9.2")
+bazel_dep(name = "aspect_rules_ts", version = "3.8.3")
+bazel_dep(name = "rules_nodejs", version = "6.3.3")
+
+rules_ts_ext = use_extension("@aspect_rules_ts//ts:extensions.bzl", "ext")
+rules_ts_ext.deps(ts_version = "5.9.3")
+use_repo(rules_ts_ext, "npm_typescript")
+
+node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node")
+node.toolchain(node_version = "22.12.0")
+use_repo(node, "nodejs_toolchains")
+register_toolchains("@nodejs_toolchains//:all")
+
+npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm")
+npm.npm_translate_lock(
+    name = "npm",
+    custom_postinstalls = {"electron@43.1.0": "node install.js"},
+    data = ["//:package.json", "//:pnpm-workspace.yaml"],
+    pnpm_lock = "//:pnpm-lock.yaml",
+    verify_node_modules_ignored = "//:.bazelignore",
+)
+use_repo(npm, "npm")
 
 # Rust rules
 bazel_dep(name = "rules_rust", version = "0.69.0")
@@ -29,6 +55,7 @@ single_version_override(
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 rust.toolchain(
     edition = "2024",
+    urls = ["https://static.rust-lang.org/dist/{}.tar.xz", "https://mirrors.sjtug.sjtu.edu.cn/rust-static/dist/{}.tar.xz", "https://mirrors.ustc.edu.cn/rust-static/dist/{}.tar.xz"],
     versions = ["1.94.0"],
     extra_target_triples = [
         "aarch64-apple-darwin",
@@ -91,7 +118,7 @@ crate.spec(package = "walkdir", version = "2")
 # Union of all feature sets used across crates (main + test-support)
 crate.spec(
     package = "rmcp",
-    version = "1.2",
+    version = "=1.7.0",
     features = [
         "client",
         "transport-child-process",
@@ -110,7 +137,7 @@ crate.spec(package = "rand", version = "0.9")
 # --- Utilities ---
 crate.spec(package = "parking_lot", version = "0.12")
 crate.spec(package = "dirs", version = "6")
-crate.spec(package = "indexmap", version = "2")
+crate.spec(package = "indexmap", version = "2", features = ["serde"])
 crate.spec(package = "libc", version = "0.2")
 crate.spec(package = "sha2", version = "0.10")
 crate.spec(package = "windows-sys", version = "0.59", features = ["Win32_System_Console", "Win32_Foundation"])

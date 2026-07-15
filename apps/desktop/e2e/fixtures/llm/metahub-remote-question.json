@@ -1,0 +1,49 @@
+{
+  "version": 2,
+  "name": "metahub-remote-question",
+  "calls": [
+    {
+      "expect": { "userContains": "Spawn the remote question child" },
+      "chunks": [{
+        "type": "tool_use", "id": "remote-question-spawn", "name": "Agent",
+        "input": {
+          "action": "spawn", "name": "remote-question",
+          "prompt": "Ask the parent Desktop for remote verification",
+          "target_hub": "hub-b"
+        }
+      }, { "type": "done" }]
+    },
+    {
+      "expect": { "userContains": "Ask the parent Desktop for remote verification" },
+      "chunks": [{
+        "type": "tool_use", "id": "remote-ask", "name": "AskUser",
+        "input": { "questions": [{
+          "header": "Remote",
+          "question": "Choose remote verification",
+          "multiSelect": false,
+          "options": [
+            { "label": "Fast", "description": "Verify the relay quickly." },
+            { "label": "Deep", "description": "Verify the relay deeply." }
+          ]
+        }] }
+      }, { "type": "done" }]
+    },
+    {
+      "expect": { "toolResultId": "remote-ask", "bodyContains": "Fast" },
+      "chunks": [
+        { "type": "text", "text": "REMOTE QUESTION ANSWER Fast 2C71" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "toolResultId": "remote-question-spawn",
+        "bodyContains": "REMOTE QUESTION ANSWER Fast 2C71"
+      },
+      "chunks": [
+        { "type": "text", "text": "Root observed the remote question answer." },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

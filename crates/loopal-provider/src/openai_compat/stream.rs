@@ -8,14 +8,15 @@ use std::task::{Context, Poll};
 
 #[derive(Default)]
 pub(crate) struct ToolCallAccumulator {
-    /// Maps tool call index -> (id, name, arguments_json)
     pub(super) calls: Vec<(String, String, String)>,
+    pub(super) pending_stop: Option<StopReason>,
 }
 
 pub(crate) struct CompatStream {
     pub(crate) inner: Pin<Box<dyn Stream<Item = Result<String, LoopalError>> + Send>>,
     pub(crate) state: ToolCallAccumulator,
     pub(crate) buffer: VecDeque<Result<StreamChunk, LoopalError>>,
+    pub(crate) emit_reasoning: bool,
 }
 
 impl Stream for CompatStream {
@@ -28,7 +29,8 @@ impl Stream for CompatStream {
         }
         match this.inner.as_mut().poll_next(cx) {
             Poll::Ready(Some(Ok(data))) => {
-                let chunks = parse_chat_completions_event(&data, &mut this.state);
+                let chunks =
+                    parse_chat_completions_event(&data, &mut this.state, this.emit_reasoning);
                 let mut iter = chunks.into_iter();
                 if let Some(first) = iter.next() {
                     this.buffer.extend(iter);
@@ -39,7 +41,10 @@ impl Stream for CompatStream {
                 }
             }
             Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e))),
-            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Ready(None) => match this.state.pending_stop.take() {
+                Some(stop_reason) => Poll::Ready(Some(Ok(StreamChunk::Done { stop_reason }))),
+                None => Poll::Ready(None),
+            },
             Poll::Pending => Poll::Pending,
         }
     }
@@ -51,25 +56,28 @@ impl Unpin for CompatStream {}
 pub(crate) fn parse_chat_completions_event(
     data: &str,
     state: &mut ToolCallAccumulator,
+    emit_reasoning: bool,
 ) -> Vec<Result<StreamChunk, LoopalError>> {
     let parsed: Value = match serde_json::from_str(data) {
         Ok(v) => v,
-        Err(e) => {
-            return vec![Err(ProviderError::SseParse(format!(
-                "invalid JSON: {e}: {data}"
-            ))
+        Err(_) => {
+            return vec![Err(ProviderError::SseParse(
+                "invalid provider SSE JSON".into(),
+            )
             .into())];
         }
     };
 
     let mut chunks = Vec::new();
 
+    let mut saw_usage = false;
     if let Some(usage) = parsed.get("usage").filter(|u| !u.is_null())
         && let (Some(input), Some(output)) = (
             usage["prompt_tokens"].as_u64(),
             usage["completion_tokens"].as_u64(),
         )
     {
+        saw_usage = true;
         let thinking_tokens = usage["completion_tokens_details"]["reasoning_tokens"]
             .as_u64()
             .unwrap_or(0) as u32;
@@ -80,6 +88,9 @@ pub(crate) fn parse_chat_completions_event(
             cache_read_input_tokens: 0,
             thinking_tokens,
         }));
+        if let Some(stop_reason) = state.pending_stop.take() {
+            chunks.push(Ok(StreamChunk::Done { stop_reason }));
+        }
     }
 
     let Some(choices) = parsed["choices"].as_array() else {
@@ -89,6 +100,15 @@ pub(crate) fn parse_chat_completions_event(
     for choice in choices {
         let delta = &choice["delta"];
         let finish_reason = choice["finish_reason"].as_str();
+
+        if emit_reasoning
+            && let Some(reasoning) = delta["reasoning_content"].as_str()
+            && !reasoning.is_empty()
+        {
+            chunks.push(Ok(StreamChunk::Thinking {
+                text: reasoning.to_string(),
+            }));
+        }
 
         if let Some(content) = delta["content"].as_str()
             && !content.is_empty()
@@ -128,13 +148,15 @@ pub(crate) fn parse_chat_completions_event(
                     chunks.push(Ok(StreamChunk::ToolUse { id, name, input }));
                 }
             }
-            if finish_reason == Some("stop") || finish_reason == Some("length") {
-                let stop_reason = if finish_reason == Some("length") {
-                    StopReason::MaxTokens
-                } else {
-                    StopReason::EndTurn
-                };
+            let stop_reason = if finish_reason == Some("length") {
+                StopReason::MaxTokens
+            } else {
+                StopReason::EndTurn
+            };
+            if saw_usage {
                 chunks.push(Ok(StreamChunk::Done { stop_reason }));
+            } else {
+                state.pending_stop = Some(stop_reason);
             }
         }
     }

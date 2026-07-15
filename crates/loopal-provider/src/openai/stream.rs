@@ -47,10 +47,10 @@ impl Unpin for OpenAiStream {}
 pub(crate) fn parse_responses_event(data: &str) -> Vec<Result<StreamChunk, LoopalError>> {
     let parsed: Value = match serde_json::from_str(data) {
         Ok(v) => v,
-        Err(e) => {
-            return vec![Err(ProviderError::SseParse(format!(
-                "invalid JSON: {e}: {data}"
-            ))
+        Err(_) => {
+            return vec![Err(ProviderError::SseParse(
+                "invalid provider SSE JSON".into(),
+            )
             .into())];
         }
     };
@@ -82,46 +82,24 @@ pub(crate) fn parse_responses_event(data: &str) -> Vec<Result<StreamChunk, Loopa
             parse_completed(&parsed["response"], &mut chunks);
         }
         "response.failed" => {
-            if let Some(err) = parsed["response"]["error"].as_object() {
-                let code = err
-                    .get("code")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("unknown");
-                let message = err
-                    .get("message")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("unknown error");
-
-                if code == "rate_limit_exceeded" {
-                    chunks.push(Err(ProviderError::RateLimited {
-                        retry_after_ms: 30_000,
-                    }
-                    .into()));
-                } else if code == "context_length_exceeded" {
-                    chunks.push(Err(ProviderError::ContextOverflow {
-                        message: format!("{code}: {message}"),
-                    }
-                    .into()));
-                } else {
-                    chunks.push(Err(ProviderError::Api {
-                        status: 400,
-                        message: format!("{code}: {message}"),
-                    }
-                    .into()));
-                }
+            chunks.push(Err(super::stream_error::response_failed(&parsed)));
+        }
+        "response.incomplete" => {
+            let reason = parsed
+                .pointer("/response/incomplete_details/reason")
+                .and_then(Value::as_str);
+            if reason == Some("max_output_tokens") {
+                parse_usage(&parsed["response"], &mut chunks);
+                chunks.push(Ok(StreamChunk::Done {
+                    stop_reason: StopReason::MaxTokens,
+                }));
             } else {
-                // Unrecognized error structure -- emit generic error
                 chunks.push(Err(ProviderError::Api {
                     status: 400,
-                    message: format!("response.failed: {}", parsed["response"]),
+                    message: "openai response incomplete for an unsupported reason".into(),
                 }
                 .into()));
             }
-        }
-        "response.incomplete" => {
-            chunks.push(Ok(StreamChunk::Done {
-                stop_reason: StopReason::MaxTokens,
-            }));
         }
         _ => {} // Ignore other events (response.created, response.output_item.added, etc.)
     }
@@ -175,6 +153,13 @@ fn parse_output_item_done(item: &Value, chunks: &mut Vec<Result<StreamChunk, Loo
 
 /// Parse the response.completed event for usage stats.
 fn parse_completed(response: &Value, chunks: &mut Vec<Result<StreamChunk, LoopalError>>) {
+    parse_usage(response, chunks);
+    chunks.push(Ok(StreamChunk::Done {
+        stop_reason: StopReason::EndTurn,
+    }));
+}
+
+fn parse_usage(response: &Value, chunks: &mut Vec<Result<StreamChunk, LoopalError>>) {
     if let Some(usage) = response.get("usage") {
         let input_tokens = usage["input_tokens"].as_u64().unwrap_or(0) as u32;
         let output_tokens = usage["output_tokens"].as_u64().unwrap_or(0) as u32;
@@ -192,7 +177,4 @@ fn parse_completed(response: &Value, chunks: &mut Vec<Result<StreamChunk, Loopal
             thinking_tokens,
         }));
     }
-    chunks.push(Ok(StreamChunk::Done {
-        stop_reason: StopReason::EndTurn,
-    }));
 }

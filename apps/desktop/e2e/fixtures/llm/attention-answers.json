@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "name": "attention-answers",
+  "calls": [
+    {
+      "expect": { "userContains": "Ask for a custom answer" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "ask-custom",
+          "name": "AskUser",
+          "input": {
+            "questions": [{
+              "header": "Custom",
+              "question": "Describe the verification style",
+              "multiSelect": false,
+              "options": [{ "label": "Default", "description": "Use the default style." }]
+            }]
+          }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "ask-custom", "bodyContains": "custom fixture answer" },
+      "chunks": [
+        { "type": "text", "text": "Custom free-text answer reached the model." },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Ask multiple questions" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "ask-multiple",
+          "name": "AskUser",
+          "input": {
+            "questions": [
+              {
+                "header": "Checks",
+                "question": "Pick several checks",
+                "multiSelect": true,
+                "options": [
+                  { "label": "Build", "description": "Run the build." },
+                  { "label": "Tests", "description": "Run the tests." }
+                ]
+              },
+              {
+                "header": "Depth",
+                "question": "Pick one depth",
+                "multiSelect": false,
+                "options": [
+                  { "label": "Fast", "description": "Use the fast path." },
+                  { "label": "Deep", "description": "Use the deep path." }
+                ]
+              }
+            ]
+          }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "ask-multiple", "bodyContains": "custom multi check" },
+      "chunks": [
+        { "type": "text", "text": "Multi-select and custom answers reached the model." },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Ask a cancellable question" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "ask-cancel",
+          "name": "AskUser",
+          "input": {
+            "questions": [{
+              "header": "Cancel",
+              "question": "Cancel this verification request",
+              "multiSelect": false,
+              "options": [{ "label": "Continue", "description": "Do not cancel." }]
+            }]
+          }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "ask-cancel", "bodyContains": "cancelled by user" },
+      "chunks": [
+        { "type": "text", "text": "Question cancellation reached the model." },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

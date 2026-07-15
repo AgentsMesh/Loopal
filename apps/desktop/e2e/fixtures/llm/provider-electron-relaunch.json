@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "name": "provider-electron-relaunch",
+  "calls": [
+    {
+      "expect": {
+        "userContains": "PRE_RELAUNCH_USER_MARKER",
+        "messageCount": 1
+      },
+      "chunks": [
+        { "type": "text", "text": "PRE_RELAUNCH_ASSISTANT_MARKER" },
+        { "type": "usage", "input": 11, "output": 5 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "userContains": "POST_RELAUNCH_USER_MARKER",
+        "bodyContains": "PRE_RELAUNCH_USER_MARKER\",\"type\":\"text\"}],\"role\":\"user\"},{\"content\":[{\"text\":\"PRE_RELAUNCH_ASSISTANT_MARKER",
+        "messageCount": 3
+      },
+      "chunks": [
+        { "type": "text", "text": "POST_RELAUNCH_ASSISTANT_MARKER" },
+        { "type": "usage", "input": 29, "output": 7 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

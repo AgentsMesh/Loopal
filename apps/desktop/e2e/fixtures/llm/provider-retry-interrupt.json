@@ -1,0 +1,23 @@
+{
+  "version": 2,
+  "name": "provider-retry-interrupt",
+  "calls": [
+    {
+      "expect": { "userContains": "Wait on a long provider retry" },
+      "status": 429,
+      "retryAfterMs": 30000,
+      "body": {
+        "type": "error",
+        "error": { "type": "rate_limit_error", "message": "long deterministic backoff" }
+      }
+    },
+    {
+      "expect": { "userContains": "Recover after interrupting retry wait" },
+      "chunks": [
+        { "type": "text", "text": "Recovered without waiting for the cancelled backoff." },
+        { "type": "usage", "input": 19, "output": 7 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

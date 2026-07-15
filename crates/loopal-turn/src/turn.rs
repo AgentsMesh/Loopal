@@ -82,6 +82,14 @@ pub enum TurnTrigger {
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         images: Vec<loopal_tool_invocation::ToolImageBlock>,
     },
+    SkillInput {
+        envelope_id: String,
+        content: String,
+        name: String,
+        user_args: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        images: Vec<loopal_tool_invocation::ToolImageBlock>,
+    },
     /// Scheduled cron / timer envelope.
     Cron {
         envelope_id: String,

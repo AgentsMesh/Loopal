@@ -1,0 +1,60 @@
+{
+  "version": 2,
+  "name": "provider-compat-tool-semantics",
+  "calls": [
+    {
+      "expect": {
+        "protocol": "openai_compat", "model": "deepseek-reasoner",
+        "userContains": "Exercise compatible tool failure", "minTools": 1,
+        "thinkingEnabled": true
+      },
+      "chunks": [
+        { "type": "thinking", "text": "COMPAT TOOL FAILURE REASONING" },
+        { "type": "thinking_signature", "signature": "compat-tool-reasoning-signature" },
+        { "type": "tool_use", "id": "compat-missing-read", "name": "Read",
+          "input": { "file_path": "${PROJECT}/missing-compat-provider.txt" } },
+        { "type": "usage", "input": 21, "output": 7, "thinking": 5 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "protocol": "openai_compat", "model": "deepseek-reasoner",
+        "toolResultId": "compat-missing-read", "bodyContains": "COMPAT TOOL FAILURE REASONING",
+        "assistantBlockTypes": ["thinking", "tool_use"]
+      },
+      "chunks": [
+        { "type": "text", "text": "Compatible provider observed the failed tool result." },
+        { "type": "usage", "input": 27, "output": 8 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "protocol": "openai_compat", "model": "deepseek-reasoner",
+        "userContains": "Start a compatible cancellable tool", "minTools": 1
+      },
+      "chunks": [
+        { "type": "tool_use", "id": "compat-cancel-bash", "name": "Bash",
+          "input": {
+            "command": "printf 'COMPAT TOOL EARLY\\n'; sleep 3; printf 'late\\n' > '${PROJECT}/compat-late.txt'",
+            "timeout": 60
+          } },
+        { "type": "usage", "input": 31, "output": 8 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "protocol": "openai_compat", "model": "deepseek-reasoner",
+        "userContains": "Recover compatible tool cancellation",
+        "toolResultId": "compat-cancel-bash", "bodyContains": "Interrupted by user"
+      },
+      "chunks": [
+        { "type": "text", "text": "Compatible provider retained the cancelled tool result." },
+        { "type": "usage", "input": 37, "output": 9 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

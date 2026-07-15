@@ -5,6 +5,7 @@
 //! resolution is needed — the address tells the router everything.
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use loopal_ipc::connection::{Connection, Listening};
 use loopal_protocol::Envelope;
@@ -13,7 +14,7 @@ use loopal_protocol::Envelope;
 ///
 /// Routing decisions come from the envelope's qualified target.
 /// The router does not own connections — it borrows from `HubRegistry`.
-#[derive(Default)]
+#[derive(Clone, Copy, Default)]
 pub struct GlobalRouter;
 
 impl GlobalRouter {
@@ -24,7 +25,7 @@ impl GlobalRouter {
     /// Route an envelope: pop the next-hop hub from the target (DNAT),
     /// then deliver the envelope to that sub-hub.
     pub async fn route(
-        &mut self,
+        &self,
         envelope: &Envelope,
         candidates: &[(&str, &Arc<Connection<Listening>>)],
     ) -> Result<(), String> {
@@ -49,9 +50,13 @@ impl GlobalRouter {
         let params =
             serde_json::to_value(&forwarded).map_err(|e| format!("serialize envelope: {e}"))?;
 
-        conn.send_request("agent/message", params)
-            .await
-            .map_err(|e| format!("route to hub '{next_hop}' failed: {e}"))?;
+        tokio::time::timeout(
+            Duration::from_secs(5),
+            conn.send_request("agent/message", params),
+        )
+        .await
+        .map_err(|_| format!("route to hub '{next_hop}' timed out"))?
+        .map_err(|e| format!("route to hub '{next_hop}' failed: {e}"))?;
 
         tracing::debug!(
             hub = %next_hop,

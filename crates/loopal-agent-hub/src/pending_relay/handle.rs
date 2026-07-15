@@ -25,7 +25,8 @@ pub async fn handle_agent_permission(
     let tool_name = params
         .get("tool_name")
         .and_then(|v| v.as_str())
-        .unwrap_or("");
+        .unwrap_or("")
+        .to_string();
     let tool_input = params.get("tool_input").cloned().unwrap_or_default();
 
     if tool_call_id.is_empty() {
@@ -35,12 +36,24 @@ pub async fn handle_agent_permission(
             .await;
         return;
     }
+    let grant_key = (agent_name.to_string(), tool_name.clone());
+    if hub
+        .lock()
+        .await
+        .session_permission_grants
+        .contains(&grant_key)
+    {
+        let _ = agent_conn
+            .respond(agent_ipc_id, serde_json::json!({"allow": true}))
+            .await;
+        return;
+    }
 
     let event = AgentEvent::named(
         QualifiedAddress::local(agent_name),
         AgentEventPayload::ToolPermissionRequest {
             id: tool_call_id.clone(),
-            name: tool_name.to_string(),
+            name: tool_name.clone(),
             input: tool_input,
         },
     );
@@ -56,6 +69,7 @@ pub async fn handle_agent_permission(
                     agent_conn: agent_conn.clone(),
                     agent_ipc_id,
                     agent_name: agent_name.to_string(),
+                    tool_name: tool_name.clone(),
                 },
             );
             if h.registry.event_sender().try_send(event).is_err() {
@@ -125,6 +139,18 @@ pub async fn handle_agent_question(
             classifier_running,
         },
     );
+    if super::remote::relay_question_if_remote(
+        hub,
+        agent_conn.clone(),
+        agent_ipc_id,
+        agent_name,
+        &question_id,
+        event.payload.clone(),
+    )
+    .await
+    {
+        return;
+    }
     let key = (agent_name.to_string(), question_id.clone());
     let outcome = {
         let mut h = hub.lock().await;

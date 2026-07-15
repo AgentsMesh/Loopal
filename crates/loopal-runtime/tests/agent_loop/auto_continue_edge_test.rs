@@ -89,9 +89,11 @@ async fn test_auto_continue_emits_event() {
         AgentEventPayload::AutoContinuation {
             continuation,
             max_continuations,
+            reason,
         } => {
             assert_eq!(*continuation, 1);
             assert_eq!(*max_continuations, 3);
+            assert_eq!(reason, "max_tokens_without_tools");
         }
         _ => unreachable!(),
     }

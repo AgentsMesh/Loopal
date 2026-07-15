@@ -6,7 +6,7 @@ use loopal_error::{ConfigError, LoopalError};
 
 use self::vault::build_secret_store;
 use crate::layer::{ConfigLayer, LayerSource};
-use crate::loader::deep_merge;
+use crate::loader::merge_settings;
 use crate::resolved::{HookEntry, McpServerEntry, ResolvedConfig, SkillEntry};
 use crate::settings::Settings;
 
@@ -40,7 +40,7 @@ impl ConfigResolver {
             sources.push(layer.source.clone());
 
             if !layer.settings.is_null() {
-                deep_merge(&mut merged_settings, layer.settings);
+                merge_settings(&mut merged_settings, layer.settings);
             }
 
             for (name, config) in layer.mcp_servers {

@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "name": "provider-stream-faults",
+  "calls": [
+    {
+      "expect": { "userContains": "Recover malformed partial stream" },
+      "chunks": [
+        { "type": "text", "text": "MALFORMED PARTIAL RESPONSE" },
+        { "type": "invalid_sse", "data": "{not-json" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "MALFORMED PARTIAL RESPONSE" },
+      "chunks": [
+        { "type": "text", "text": "Malformed SSE recovered through continuation." },
+        { "type": "usage", "input": 19, "output": 7 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Handle empty stream disconnect" },
+      "chunks": [
+        { "type": "disconnect" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Continue after empty disconnect" },
+      "chunks": [
+        { "type": "text", "text": "Session remained usable after an empty disconnect." },
+        { "type": "usage", "input": 21, "output": 8 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Recover thinking-only disconnect" },
+      "chunks": [
+        { "type": "thinking", "text": "THINKING BEFORE DISCONNECT" },
+        { "type": "thinking_signature", "signature": "partial-thinking-signature" },
+        { "type": "disconnect" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "partial-thinking-signature" },
+      "chunks": [
+        { "type": "text", "text": "Thinking-only disconnect recovered." },
+        { "type": "usage", "input": 23, "output": 8 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Recover server-only disconnect" },
+      "chunks": [
+        {
+          "type": "server_tool_use",
+          "id": "partial-server-tool",
+          "name": "web_search",
+          "input": { "query": "partial server stream" }
+        },
+        {
+          "type": "server_tool_result",
+          "block_type": "web_search_tool_result",
+          "tool_use_id": "partial-server-tool",
+          "content": { "text": "PARTIAL SERVER RESULT" }
+        },
+        { "type": "disconnect" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "partial-server-tool" },
+      "chunks": [
+        { "type": "text", "text": "Server-only disconnect recovered." },
+        { "type": "usage", "input": 25, "output": 8 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

@@ -42,6 +42,7 @@ pub fn trigger_consolidation(shared: &Arc<AgentShared>, model: &str) {
             agent_type: None,
             depth: shared.depth + 1,
             no_sandbox,
+            notify_parent_on_completion: false,
             target: SpawnTarget::InHub {
                 cwd_override: None,
                 fork_context: None,

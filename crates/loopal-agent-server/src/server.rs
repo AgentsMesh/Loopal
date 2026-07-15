@@ -27,7 +27,9 @@ pub async fn run_agent_server_with_mock(mock_path: &str) -> anyhow::Result<()> {
     info!(mock_path, "agent server starting with mock provider");
     let provider = crate::mock_loader::load_mock_provider(mock_path)?;
     let cwd = std::env::current_dir().unwrap_or_default();
-    let session_dir = std::env::temp_dir().join("loopal-test-sessions");
+    let session_dir = std::env::var_os("LOOPAL_TEST_SESSION_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| std::env::temp_dir().join("loopal-test-sessions"));
     let transport: Arc<dyn Transport> = Arc::new(StdioTransport::from_std());
     crate::test_server::run_server_for_test(transport, provider, cwd, session_dir).await
 }

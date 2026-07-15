@@ -36,6 +36,18 @@ fn test_duplicate_name_rejected() {
 }
 
 #[test]
+fn test_create_and_remove_with_canonical_root() {
+    let dir = tempfile::tempdir().unwrap();
+    init_repo(dir.path());
+    let root = dir.path().canonicalize().unwrap();
+
+    let info = create_worktree(&root, "canonical").unwrap();
+    assert!(info.path.exists());
+    remove_worktree(&root, "canonical", false).unwrap();
+    assert!(!info.path.exists());
+}
+
+#[test]
 fn test_worktree_has_changes_detects_modifications() {
     let dir = tempfile::tempdir().unwrap();
     init_repo(dir.path());
@@ -52,48 +64,28 @@ fn test_worktree_has_changes_detects_modifications() {
 }
 
 #[test]
-fn test_worktree_creation_writes_loopal_gitignore() {
+fn test_worktree_creation_uses_local_exclude_and_keeps_source_clean() {
     let dir = tempfile::tempdir().unwrap();
     init_repo(dir.path());
+    let exclude = dir.path().join(".git/info/exclude");
+    std::fs::write(&exclude, "# user-owned rule\n*.scratch\n").unwrap();
+    assert!(git_output(dir.path(), &["status", "--porcelain"]).is_empty());
 
     create_worktree(dir.path(), "gi-test").unwrap();
 
-    let gi = dir.path().join(".loopal").join(".gitignore");
-    let content = std::fs::read_to_string(&gi).unwrap();
-    assert!(content.contains("worktrees/"));
-    assert!(content.contains("plans/"));
-    assert!(content.contains("settings.local.json"));
-    assert!(content.contains("LOOPAL.local.md"));
-
-    // Outer .gitignore must NOT be touched by the new mechanism.
+    let content = std::fs::read_to_string(&exclude).unwrap();
+    assert!(content.contains("# user-owned rule\n*.scratch\n"));
+    assert_eq!(content.matches("/.loopal/worktrees/").count(), 1);
     assert!(!dir.path().join(".gitignore").exists());
+    assert!(!dir.path().join(".loopal/.gitignore").exists());
+    assert!(git_output(dir.path(), &["status", "--porcelain"]).is_empty());
 
-    // Second create remains idempotent: same content, no duplication.
-    let before = std::fs::read_to_string(&gi).unwrap();
     remove_worktree(dir.path(), "gi-test", false).unwrap();
     create_worktree(dir.path(), "gi-test2").unwrap();
-    let after = std::fs::read_to_string(&gi).unwrap();
-    assert_eq!(before, after);
-
+    let content = std::fs::read_to_string(&exclude).unwrap();
+    assert_eq!(content.matches("/.loopal/worktrees/").count(), 1);
+    assert!(git_output(dir.path(), &["status", "--porcelain"]).is_empty());
     remove_worktree(dir.path(), "gi-test2", false).unwrap();
-}
-
-#[test]
-fn test_orphan_branch_cleaned_on_create() {
-    let dir = tempfile::tempdir().unwrap();
-    init_repo(dir.path());
-
-    // Create and force-remove (leaves branch behind in some scenarios)
-    let info = create_worktree(dir.path(), "orphan").unwrap();
-    // Manually delete the directory to simulate a crash
-    std::fs::remove_dir_all(&info.path).unwrap();
-    // Prune git's worktree list
-    crate::run(dir.path(), &["git", "worktree", "prune"]);
-
-    // Re-create should succeed (stale branch is cleaned up)
-    let info2 = create_worktree(dir.path(), "orphan").unwrap();
-    assert!(info2.path.exists());
-    remove_worktree(dir.path(), "orphan", false).unwrap();
 }
 
 #[test]
@@ -124,11 +116,8 @@ fn test_cleanup_noop_on_missing_dir() {
     cleanup_stale_worktrees(dir.path());
 }
 
-/// Verify that `cleanup_stale_worktrees` uses `git worktree list` to detect stale
-/// entries: a directory that still exists but was pruned from git's bookkeeping
-/// should be cleaned up.
 #[test]
-fn test_cleanup_detects_pruned_worktree() {
+fn test_cleanup_preserves_unverifiable_pruned_worktree() {
     let dir = tempfile::tempdir().unwrap();
     init_repo(dir.path());
 
@@ -143,14 +132,13 @@ fn test_cleanup_detects_pruned_worktree() {
     }
     crate::run(dir.path(), &["git", "worktree", "prune"]);
 
-    // Cleanup should detect it's not in the active worktree list and remove it.
     cleanup_stale_worktrees(dir.path());
 
-    // The stale directory should no longer exist.
     assert!(
-        !info.path.exists(),
-        "stale worktree directory should be removed"
+        info.path.exists(),
+        "startup cleanup must retain a directory it cannot prove safe"
     );
+    assert!(!git_output(dir.path(), &["branch", "--list", "loopal-wt-pruned"]).is_empty());
 }
 
 /// Verify that `create_worktree` does NOT delete a branch that belongs to an
@@ -182,4 +170,18 @@ fn test_create_preserves_active_worktree_branch() {
     );
 
     remove_worktree(dir.path(), "alpha", false).unwrap();
+}
+
+fn git_output(path: &std::path::Path, args: &[&str]) -> String {
+    let result = std::process::Command::new("git")
+        .args(args)
+        .current_dir(path)
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    String::from_utf8(result.stdout).unwrap().trim().to_string()
 }

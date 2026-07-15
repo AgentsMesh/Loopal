@@ -20,6 +20,30 @@ pub async fn register_agent_connection(
     model: Option<&str>,
     session_id: Option<&str>,
 ) -> Result<String, String> {
+    register_agent_connection_with_policy(
+        hub,
+        name,
+        conn,
+        incoming_rx,
+        parent,
+        model,
+        session_id,
+        true,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn register_agent_connection_with_policy(
+    hub: Arc<Mutex<Hub>>,
+    name: &str,
+    conn: Arc<Connection<Listening>>,
+    incoming_rx: mpsc::Receiver<Incoming>,
+    parent: Option<&str>,
+    model: Option<&str>,
+    session_id: Option<&str>,
+    notify_parent_on_completion: bool,
+) -> Result<String, String> {
     let agent_id = uuid::Uuid::new_v4().to_string();
 
     let (completion_tx, completion_rx) = mpsc::channel::<Envelope>(32);
@@ -50,12 +74,13 @@ pub async fn register_agent_connection(
         {
             warn!(agent = %name, parent = %p, "parent not found");
         }
-        if let Err(e) = h.registry.register_connection_with_parent(
+        if let Err(e) = h.registry.register_connection_with_parent_policy(
             name,
             conn.clone(),
             parent_addr.clone(),
             model,
             Some(completion_tx),
+            notify_parent_on_completion,
         ) {
             warn!(agent = %name, error = %e, "registration failed");
             return Err(format!("agent registration failed: {e}"));

@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "name": "provider-settings-anthropic",
+  "calls": [{
+    "expect": {
+      "protocol": "anthropic", "model": "claude-opus-4-8",
+      "userContains": "Use Anthropic saved in Desktop Settings"
+    },
+    "chunks": [
+      { "type": "text", "text": "Desktop Settings activated the authenticated Anthropic provider." },
+      { "type": "usage", "input": 17, "output": 8 },
+      { "type": "done" }
+    ]
+  }]
+}

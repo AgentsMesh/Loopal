@@ -1,6 +1,6 @@
 //! Event routing — consumes raw agent events and broadcasts to subscribers.
 //!
-//! Two responsibilities, both driven by the same `raw_rx` consumer so
+//! Three responsibilities, all driven by the same `raw_rx` consumer so
 //! event ordering is preserved per agent:
 //! 1. **UI broadcast** — emit each event to `UiDispatcher.event_broadcaster()`.
 //!    UI clients (TUI / ACP / TCP attach) listen here for the live event
@@ -9,15 +9,17 @@
 //!    agent's `ViewStateReducer` so `view/snapshot` returns the latest
 //!    observable state. There is no separate `view/delta` channel; the
 //!    UI broadcast is the incremental update stream.
+//! 3. **Topology lifecycle** — project runtime state into topology nodes.
 
 use std::sync::Arc;
 
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
-use loopal_protocol::AgentEvent;
+use loopal_protocol::{AgentEvent, AgentEventPayload};
 
 use crate::hub::Hub;
+use crate::topology::AgentLifecycle;
 
 /// Start the hub event loop. Consumes raw events, applies them to the
 /// per-agent ViewStateReducer (stamping the resulting `rev` onto the
@@ -56,11 +58,19 @@ async fn apply_to_view_state(
         return None;
     }
     let reducer = {
-        let h = hub.lock().await;
-        h.registry
-            .agents
-            .get(&addr.agent)
-            .map(|ma| ma.view.clone())?
+        let mut h = hub.lock().await;
+        match &event.payload {
+            AgentEventPayload::Running | AgentEventPayload::Started => {
+                h.registry
+                    .set_lifecycle(&addr.agent, AgentLifecycle::Running);
+            }
+            AgentEventPayload::Error { message } => {
+                h.registry
+                    .set_lifecycle(&addr.agent, AgentLifecycle::Failed(message.clone()));
+            }
+            _ => {}
+        }
+        h.registry.agent_view(&addr.agent)?
     };
     let mut guard = reducer.lock().await;
     guard.apply(event.payload.clone())

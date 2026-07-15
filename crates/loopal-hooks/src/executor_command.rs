@@ -6,9 +6,9 @@ use std::time::Duration;
 
 use loopal_error::HookError;
 use tokio::io::AsyncWriteExt;
-use tokio::process::Command;
 use tracing::debug;
 
+use crate::child_command::shell_command;
 use crate::executor::{HookExecutor, RawHookOutput};
 
 /// Executes a hook by spawning `sh -c <command>` and piping JSON to stdin.
@@ -22,12 +22,7 @@ impl HookExecutor for CommandExecutor {
     async fn execute(&self, input: serde_json::Value) -> Result<RawHookOutput, HookError> {
         debug!(command = %self.command, "running command hook");
 
-        let mut child = Command::new("sh")
-            .arg("-c")
-            .arg(&self.command)
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
+        let mut child = shell_command(&self.command)
             .spawn()
             .map_err(|e| HookError::ExecutionFailed(e.to_string()))?;
 

@@ -5,7 +5,8 @@
 #   - Exact tag, clean tree:           v0.4.0
 #   - Tag + commits ahead, clean:      v0.4.0-3-g85b8b97-dev
 #   - Dirty tree (any state):          v0.4.0-3-g85b8b97-dirty-dev
-#   - No git / no tags:                0.0.0-unknown-dev
+#   - No tags / non-SemVer tag:        0.0.0-dev.g85b8b97
+#   - No git:                          0.0.0-unknown
 
 set -eu
 
@@ -25,5 +26,12 @@ else
 fi
 
 VERSION="${VERSION#v}"
+
+if ! printf '%s\n' "${VERSION}" | grep -Eq \
+    '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'; then
+    REVISION=$(git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
+    VERSION="0.0.0-dev.g${REVISION}"
+    [ -z "${DIRTY:-}" ] || VERSION="${VERSION}.dirty"
+fi
 
 echo "STABLE_LOOPAL_VERSION ${VERSION}"

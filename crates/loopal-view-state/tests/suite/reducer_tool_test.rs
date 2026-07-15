@@ -123,6 +123,33 @@ fn token_usage_replaces_input_output_counters() {
 }
 
 #[test]
+fn split_anthropic_usage_preserves_prompt_and_cache_tokens() {
+    let mut r = ViewStateReducer::new("root");
+    r.apply(AgentEventPayload::TokenUsage {
+        input_tokens: 100,
+        output_tokens: 0,
+        context_window: 200_000,
+        cache_creation_input_tokens: 20,
+        cache_read_input_tokens: 30,
+        thinking_tokens: 0,
+    });
+    r.apply(AgentEventPayload::TokenUsage {
+        input_tokens: 0,
+        output_tokens: 50,
+        context_window: 200_000,
+        cache_creation_input_tokens: 0,
+        cache_read_input_tokens: 0,
+        thinking_tokens: 0,
+    });
+
+    let agent = &r.state().agent;
+    assert_eq!(agent.observable.input_tokens, 100);
+    assert_eq!(agent.observable.output_tokens, 50);
+    assert_eq!(agent.conversation.cache_creation_tokens, 20);
+    assert_eq!(agent.conversation.cache_read_tokens, 30);
+}
+
+#[test]
 fn mode_changed_updates_mode_string() {
     let mut r = ViewStateReducer::new("root");
     r.apply(AgentEventPayload::ModeChanged {
@@ -151,4 +178,5 @@ fn turn_completed_increments_turn_count() {
         },
     ));
     assert_eq!(r.state().agent.observable.turn_count, 1);
+    assert_eq!(r.state().agent.conversation.turn_count, 1);
 }

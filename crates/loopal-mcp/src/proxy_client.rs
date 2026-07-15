@@ -24,23 +24,31 @@ pub struct McpProxyClient {
     client: Arc<dyn HubMcpClient>,
 }
 
+enum ProxyRpcError {
+    Forbidden,
+    TimedOut,
+    Remote,
+}
+
 impl McpProxyClient {
     pub fn new(client: Arc<dyn HubMcpClient>) -> Self {
         Self { client }
     }
 
-    async fn rpc(&self, method: &str, params: Value, budget: IpcBudget) -> Result<Value, String> {
+    async fn rpc(
+        &self,
+        method: &str,
+        params: Value,
+        budget: IpcBudget,
+    ) -> Result<Value, ProxyRpcError> {
         let timeout = match budget {
-            IpcBudget::Forbidden => {
-                return Err(format!(
-                    "{method} rejected: IpcBudget::Forbidden on critical path"
-                ));
-            }
+            IpcBudget::Forbidden => return Err(ProxyRpcError::Forbidden),
             IpcBudget::Allowed(d) => d,
         };
         match tokio::time::timeout(timeout, self.client.send_request(method, params)).await {
-            Ok(inner) => inner,
-            Err(_) => Err(format!("{method} timed out after {timeout:?}")),
+            Ok(Ok(value)) => Ok(value),
+            Ok(Err(_)) => Err(ProxyRpcError::Remote),
+            Err(_) => Err(ProxyRpcError::TimedOut),
         }
     }
 }
@@ -57,15 +65,15 @@ impl McpProvider for McpProxyClient {
             .await
         {
             Ok(v) => v,
-            Err(e) => {
-                tracing::warn!(error = %e, "hub/mcp/list_tools failed");
+            Err(_) => {
+                tracing::warn!("hub/mcp/list_tools failed");
                 return Vec::new();
             }
         };
         let parsed: McpListToolsResponse = match serde_json::from_value(resp) {
             Ok(p) => p,
-            Err(e) => {
-                tracing::warn!(error = %e, "hub/mcp/list_tools: invalid payload");
+            Err(_) => {
+                tracing::warn!("hub/mcp/list_tools returned invalid payload");
                 return Vec::new();
             }
         };
@@ -98,13 +106,21 @@ impl McpProvider for McpProxyClient {
             args: args.clone(),
         };
         let params = serde_json::to_value(&req)
-            .map_err(|e| McpError::Protocol(format!("encode call_tool: {e}")))?;
+            .map_err(|_| McpError::Protocol("encode call_tool failed".into()))?;
         let resp = self
             .rpc(methods::HUB_MCP_CALL_TOOL.name, params, budget)
             .await
-            .map_err(|e| McpError::TransportClosed(format!("hub/mcp/call_tool: {e}")))?;
+            .map_err(|error| match error {
+                ProxyRpcError::Forbidden => {
+                    McpError::TransportClosed("IpcBudget::Forbidden on critical path".into())
+                }
+                ProxyRpcError::TimedOut => McpError::Timeout("hub/mcp/call_tool timed out".into()),
+                ProxyRpcError::Remote => {
+                    McpError::TransportClosed("hub/mcp/call_tool failed".into())
+                }
+            })?;
         let parsed: McpCallToolResponse = serde_json::from_value(resp)
-            .map_err(|e| McpError::Protocol(format!("call_tool response: {e}")))?;
+            .map_err(|_| McpError::Protocol("invalid call_tool response".into()))?;
 
         let content: Vec<Content> = parsed
             .content
@@ -128,15 +144,15 @@ impl McpProvider for McpProxyClient {
             .await
         {
             Ok(v) => v,
-            Err(e) => {
-                tracing::warn!(error = %e, "hub/mcp/snapshot failed");
+            Err(_) => {
+                tracing::warn!("hub/mcp/snapshot failed");
                 return Vec::new();
             }
         };
         let parsed: McpSnapshotResponse = match serde_json::from_value(resp) {
             Ok(p) => p,
-            Err(e) => {
-                tracing::warn!(error = %e, "hub/mcp/snapshot: invalid payload");
+            Err(_) => {
+                tracing::warn!("hub/mcp/snapshot returned invalid payload");
                 return Vec::new();
             }
         };

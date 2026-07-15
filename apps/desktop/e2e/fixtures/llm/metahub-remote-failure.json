@@ -1,0 +1,33 @@
+{
+  "version": 2,
+  "name": "metahub-remote-failure",
+  "calls": [
+    {
+      "expect": { "userContains": "Spawn the remote provider failure child" },
+      "chunks": [{
+        "type": "tool_use", "id": "remote-failure-spawn", "name": "Agent",
+        "input": {
+          "action": "spawn", "name": "remote-failed",
+          "prompt": "Fail the remote child provider call", "target_hub": "hub-b"
+        }
+      }, { "type": "done" }]
+    },
+    {
+      "expect": { "userContains": "Fail the remote child provider call" },
+      "status": 400,
+      "body": {
+        "error": {
+          "type": "invalid_request_error",
+          "message": "scripted remote child failure"
+        }
+      }
+    },
+    {
+      "expect": { "toolResultId": "remote-failure-spawn" },
+      "chunks": [
+        { "type": "text", "text": "Root observed the remote provider failure." },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

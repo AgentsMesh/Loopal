@@ -1,7 +1,7 @@
 //! Skill-based command handler — wraps a `.md` skill template as a CommandHandler.
 
 use async_trait::async_trait;
-use loopal_config::Skill;
+use loopal_config::{Skill, expand_skill};
 use loopal_protocol::SkillInvocation;
 
 use super::{CommandEffect, CommandHandler};
@@ -52,17 +52,5 @@ impl CommandHandler for SkillHandler {
             user_args: args_str.trim().to_string(),
         });
         CommandEffect::InboxPush(content)
-    }
-}
-
-/// Expand a skill template by replacing `$ARGUMENTS` with the given args.
-pub fn expand_skill(body: &str, args: &str) -> String {
-    let trimmed = args.trim();
-    if body.contains("$ARGUMENTS") {
-        body.replace("$ARGUMENTS", trimmed)
-    } else if !trimmed.is_empty() {
-        format!("{body}\n{trimmed}")
-    } else {
-        body.to_string()
     }
 }

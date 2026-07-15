@@ -1,7 +1,7 @@
 //! Tests: hub/status, meta/list_hubs, heartbeat.
 
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use tokio::sync::Mutex;
 
@@ -83,14 +83,15 @@ async fn heartbeat_updates_agent_count() {
 #[tokio::test]
 async fn heartbeat_timeout_degrades_and_disconnects() {
     let meta_hub = Arc::new(Mutex::new(MetaHub::new()));
-    let (_, meta_transport) = loopal_ipc::duplex_pair();
+    let (hub_transport, meta_transport) = loopal_ipc::duplex_pair();
+    let (_hub_conn, _hub_rx) = Connection::new(hub_transport).into_listening();
     let (meta_conn, _rx) = Connection::new(meta_transport).into_listening();
 
     // Register with a hub_info that has an old heartbeat
     {
         let mut mh = meta_hub.lock().await;
         mh.registry
-            .register("stale-hub", meta_conn, vec![])
+            .register("stale-hub", meta_conn.clone(), vec![])
             .unwrap();
     }
 
@@ -104,7 +105,25 @@ async fn heartbeat_timeout_degrades_and_disconnects() {
         );
     }
 
-    // Verify initial status
-    let info = meta_hub.lock().await.registry.snapshot();
-    assert_eq!(format!("{:?}", info[0].status), "Connected");
+    let now = Instant::now();
+    let disconnected = meta_hub.lock().await.registry.check_health_at(
+        now + Duration::from_secs(31),
+        Duration::from_secs(30),
+        Duration::from_secs(90),
+    );
+    assert!(disconnected.is_empty());
+    assert_eq!(
+        format!("{:?}", meta_hub.lock().await.registry.snapshot()[0].status),
+        "Degraded"
+    );
+
+    loopal_meta_hub::server::sweep_unhealthy_at(
+        &meta_hub,
+        now + Duration::from_secs(91),
+        Duration::from_secs(30),
+        Duration::from_secs(90),
+    )
+    .await;
+    assert!(meta_hub.lock().await.registry.is_empty());
+    assert!(!meta_conn.is_connected());
 }

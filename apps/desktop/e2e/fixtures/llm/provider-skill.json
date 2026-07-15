@@ -1,0 +1,32 @@
+{
+  "version": 2,
+  "name": "provider-skill",
+  "calls": [
+    {
+      "expect": {
+        "protocol": "anthropic",
+        "userContains": "SKILL_E2E_BODY_MARKER",
+        "bodyContains": "Run the deterministic Desktop skill contract",
+        "messageCount": 1
+      },
+      "chunks": [
+        { "type": "text", "text": "Skill invocation reached the production runtime." },
+        { "type": "usage", "input": 27, "output": 8 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "protocol": "anthropic",
+        "userContains": "SKILL_E2E_AFTER_RELAUNCH",
+        "bodyContains": "SKILL_E2E_BODY_MARKER",
+        "messageCount": 3
+      },
+      "chunks": [
+        { "type": "text", "text": "Skill history survived the Electron relaunch." },
+        { "type": "usage", "input": 41, "output": 9 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

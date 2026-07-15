@@ -14,11 +14,20 @@ pub async fn resolve_permission(
     agent_name: &str,
     tool_call_id: &str,
     allow: bool,
+    remember_session: bool,
 ) -> bool {
     let key = (agent_name.to_string(), tool_call_id.to_string());
     let info = {
         let mut h = hub.lock().await;
-        h.pending_permissions.remove(&key)
+        let info = h.pending_permissions.remove(&key);
+        if allow
+            && remember_session
+            && let Some(info) = info.as_ref()
+        {
+            h.session_permission_grants
+                .insert((info.agent_name.clone(), info.tool_name.clone()));
+        }
+        info
     };
     let Some(info) = info else {
         return false;

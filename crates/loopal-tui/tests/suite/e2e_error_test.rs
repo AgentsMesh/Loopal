@@ -1,5 +1,6 @@
 //! E2E tests for error handling: provider errors, missing files, unknown tools.
 
+use loopal_protocol::AgentEventPayload;
 use loopal_test_support::{assertions, chunks};
 
 use super::e2e_harness::build_tui_harness;
@@ -14,7 +15,16 @@ async fn test_provider_error_mid_stream() {
     let mut harness = build_tui_harness(calls, 80, 24).await;
     let events = harness.collect_until_idle().await;
 
-    assertions::assert_has_error(&events);
+    assertions::assert_has_stream(&events);
+    assert_provider_warning(&events, "connection timeout");
+    assert!(
+        events.iter().any(|event| matches!(
+            event,
+            AgentEventPayload::AutoContinuation { reason, .. } if reason == "stream_truncated"
+        )),
+        "a truncated provider stream must trigger recovery: {events:?}"
+    );
+    assertions::assert_has_terminal(&events);
 }
 
 #[tokio::test]
@@ -24,8 +34,14 @@ async fn test_provider_error_only() {
     let mut harness = build_tui_harness(calls, 80, 24).await;
     let events = harness.collect_until_idle().await;
 
-    assertions::assert_has_error(&events);
+    assert_provider_warning(&events, "service unavailable");
     assertions::assert_has_terminal(&events);
+    assert!(
+        !events
+            .iter()
+            .any(|event| matches!(event, AgentEventPayload::Error { .. })),
+        "a recoverable provider failure must not terminate the session: {events:?}"
+    );
 }
 
 #[tokio::test]
@@ -76,17 +92,21 @@ async fn test_malformed_tool_input() {
 }
 
 #[tokio::test]
-async fn test_error_event_text_captured() {
+async fn test_provider_warning_text_captured() {
     let calls = vec![vec![chunks::provider_error("api key expired")]];
     let mut harness = build_tui_harness(calls, 100, 30).await;
     let events = harness.collect_until_idle().await;
 
-    let error_msgs: Vec<&str> = events
-        .iter()
-        .filter_map(|e| match e {
-            loopal_protocol::AgentEventPayload::Error { message } => Some(message.as_str()),
-            _ => None,
-        })
-        .collect();
-    assert!(!error_msgs.is_empty(), "should have error events");
+    assert_provider_warning(&events, "api key expired");
+}
+
+fn assert_provider_warning(events: &[AgentEventPayload], expected: &str) {
+    let expected = format!("Provider error: HTTP error: {expected}");
+    assert!(
+        events.iter().any(|event| matches!(
+            event,
+            AgentEventPayload::ProviderWarning { message } if message == &expected
+        )),
+        "expected provider warning {expected:?}: {events:?}"
+    );
 }

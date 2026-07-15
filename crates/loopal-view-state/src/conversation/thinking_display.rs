@@ -12,11 +12,18 @@ pub fn handle_thinking_complete(conv: &mut AgentConversation, token_count: u32) 
     if !conv.streaming_thinking.is_empty() {
         let thinking = std::mem::take(&mut conv.streaming_thinking);
         let content = format_thinking_content(&thinking, token_count);
+        conv.flushed_thinking_index = None;
         conv.messages.push(SessionMessage {
             role: "thinking".to_string(),
             content,
             ..Default::default()
         });
+    } else if let Some(index) = conv.flushed_thinking_index.take()
+        && let Some(message) = conv.messages.get_mut(index)
+        && message.role == "thinking"
+    {
+        let text = parse_thinking_content(&message.content).1.to_owned();
+        message.content = format_thinking_content(&text, token_count);
     }
 }
 
@@ -73,5 +80,16 @@ mod tests {
     #[test]
     fn format_token_display_small() {
         assert_eq!(format_token_display(500), "500");
+    }
+
+    #[test]
+    fn completion_reconciles_a_thinking_row_flushed_by_a_tool() {
+        let mut conv = AgentConversation::default();
+        conv.streaming_thinking = "provider reasoning".into();
+        conv.thinking_active = true;
+        conv.flush_streaming();
+        handle_thinking_complete(&mut conv, 11);
+        assert_eq!(parse_thinking_content(&conv.messages[0].content).0, 11);
+        assert_eq!(conv.thinking_tokens, 11);
     }
 }

@@ -391,7 +391,10 @@ Loopal runs as a multi-process, Hub-centric system. Multiple Hubs can form a clu
 - **Events** are broadcast to all UI clients. **Permissions** are raced to all connected UIs — first response wins. In cluster mode, permissions propagate through MetaHub.
 - All communication uses JSON-RPC 2.0, whether over stdio or TCP.
 
-Built as 40+ Rust crates in a layered architecture — see [CLAUDE.md](./CLAUDE.md) for the full dependency graph and development guide.
+Built as 40+ Rust crates plus a Bazel-built Electron application. See the
+[repository layout and dependency boundaries](./docs/repository-layout.md), the
+[Desktop documentation index](./docs/desktop/README.md), and
+[CLAUDE.md](./CLAUDE.md) for contributor guidance.
 
 ## CLI Reference
 

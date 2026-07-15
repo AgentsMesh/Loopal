@@ -1,0 +1,34 @@
+{
+  "name": "loopal",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.12.4",
+  "dependencies": {
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "react-markdown": "10.1.0",
+    "remark-gfm": "4.0.1",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/react": "16.3.2",
+    "@types/node": "25.0.9",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "5.2.0",
+    "@vitest/coverage-v8": "4.0.18",
+    "electron": "43.1.0",
+    "electron-builder": "26.15.3",
+    "electron-builder-squirrel-windows": "26.15.3",
+    "electron-vite": "5.0.0",
+    "jsdom": "28.1.0",
+    "typescript": "5.9.3",
+    "vite": "7.3.6",
+    "vitest": "4.0.18"
+  },
+  "engines": {
+    "node": ">=22.12.0 <23"
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "name": "production-rich",
+  "calls": [
+    {
+      "expect": { "userContains": "Inspect the project and report with rich formatting" },
+      "chunks": [
+        { "type": "delay", "ms": 250 },
+        { "type": "thinking", "text": "Inspecting the real Host workspace." },
+        { "type": "delay", "ms": 900 },
+        { "type": "thinking_signature", "signature": "desktop-e2e-thinking" },
+        {
+          "type": "tool_use",
+          "id": "read-project",
+          "name": "Read",
+          "input": { "file_path": "${PROJECT}/README.md" },
+          "inputFragments": ["{\"file_", "path\":\"${PROJECT}/README.md\"}"]
+        },
+        { "type": "delay", "ms": 1200 },
+        { "type": "usage", "input": 24, "output": 12, "thinking": 8 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "read-project" },
+      "chunks": [
+        { "type": "text", "text": "Preparing a real tool call." },
+        { "type": "delay", "ms": 1200 },
+        {
+          "type": "tool_use",
+          "id": "create-task",
+          "name": "TaskCreate",
+          "input": {
+            "subject": "Verify the real Desktop Host",
+            "description": "Exercise real IPC, streaming, thinking, tools, and task projection."
+          }
+        },
+        { "type": "delay", "ms": 700 },
+        { "type": "usage", "input": 18, "output": 6 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "create-task" },
+      "chunks": [
+        {
+          "type": "text",
+          "text": "# Real Host verified\n\n> Production stream quote\n\n1. **Markdown rendered**\n\n```rust\nfn contract() -> bool { true }\n```\n\n[Loopal reference](https://example.com/loopal)\n\n"
+        },
+        { "type": "delay", "ms": 700 },
+        { "type": "text", "text": "The final streamed chunk arrived." },
+        { "type": "usage", "input": 32, "output": 14 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

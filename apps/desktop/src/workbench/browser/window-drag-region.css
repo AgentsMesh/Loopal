@@ -1,0 +1,26 @@
+html[data-platform="darwin"] :where(
+  .activity-bar,
+  .navigator-header,
+  .session-toolbar,
+  .settings-header
+) {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+html[data-platform="darwin"] .activity-bar {
+  padding-top: 42px;
+}
+
+html[data-platform="darwin"] :where(
+  .activity-bar,
+  .navigator-header,
+  .session-toolbar,
+  .settings-header
+) :where(
+  button, input, textarea, select, a,
+  [contenteditable="true"], [role="button"], [role="tab"],
+  .toolbar-actions
+) {
+  -webkit-app-region: no-drag;
+}

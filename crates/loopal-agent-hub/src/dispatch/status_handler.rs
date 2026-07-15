@@ -11,12 +11,13 @@ pub async fn handle_status(hub: &Arc<Mutex<Hub>>) -> Result<Value, String> {
     let h = hub.lock().await;
     let uplink_info = h.uplink.as_ref().map(|u| {
         json!({
-            "connected": true,
+            "connected": u.connection().is_connected(),
             "hub_name": u.hub_name(),
+            "address": u.meta_address(),
         })
     });
     Ok(json!({
-        "agent_count": h.registry.agent_count(),
+        "agent_count": h.registry.managed_agent_count(),
         "uplink": uplink_info,
     }))
 }

@@ -20,6 +20,7 @@ pub struct AgentLoopParamsBuilder {
     budget: ContextBudget,
     interrupt: InterruptHandle,
     initial_turns: Vec<Turn>,
+    hydrate_initial_history: bool,
     shared: Option<Arc<dyn std::any::Any + Send + Sync>>,
     memory_channel: Option<Arc<dyn MemoryChannel>>,
     one_shot_chat: Option<Arc<dyn OneShotChatService>>,
@@ -50,6 +51,7 @@ impl AgentLoopParamsBuilder {
             budget,
             interrupt,
             initial_turns: Vec::new(),
+            hydrate_initial_history: false,
             shared: None,
             memory_channel: None,
             one_shot_chat: None,
@@ -70,6 +72,11 @@ impl AgentLoopParamsBuilder {
 
     pub fn initial_turns(mut self, turns: Vec<Turn>) -> Self {
         self.initial_turns = turns;
+        self
+    }
+
+    pub fn hydrate_initial_history(mut self, hydrate: bool) -> Self {
+        self.hydrate_initial_history = hydrate;
         self
     }
 
@@ -144,6 +151,7 @@ impl AgentLoopParamsBuilder {
             session: self.session,
             budget: self.budget,
             initial_turns: self.initial_turns,
+            hydrate_initial_history: self.hydrate_initial_history,
             interrupt: self.interrupt,
             shared: self.shared,
             memory_channel: self.memory_channel,

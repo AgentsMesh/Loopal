@@ -1,0 +1,36 @@
+{
+  "version": 2,
+  "name": "provider-mcp",
+  "calls": [
+    {
+      "expect": {
+        "userContains": "Exercise real stdio MCP echo",
+        "bodyContains": "fixture_echo",
+        "minTools": 1
+      },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "fixture-echo-call",
+          "name": "fixture_echo",
+          "input": { "message": "desktop-mcp-roundtrip" }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "toolResultId": "fixture-echo-call",
+        "bodyContains": "fixture_echo result: desktop-mcp-roundtrip"
+      },
+      "chunks": [
+        {
+          "type": "text",
+          "text": "Real stdio MCP tool completed through the production model loop."
+        },
+        { "type": "usage", "input": 32, "output": 11 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

@@ -24,18 +24,20 @@ pub async fn finish_and_deliver(
 
     crate::pending_relay::cleanup_pending_for_agent(hub, name).await;
 
-    let (pending, uplink, parent_addr, spawn_registry, mcp_service) = {
+    let (pending, uplink, parent_addr, notify_parent, spawn_registry, mcp_service) = {
         let mut h = hub.lock().await;
         let parent = h
             .registry
             .agent_info(name)
             .and_then(|info| info.parent.clone());
+        let notify_parent = h.registry.notifies_parent_on_completion(name);
         let pending = h.registry.emit_agent_finished(name, output);
         h.registry.unregister_connection(name);
         (
             pending,
             h.uplink.clone(),
             parent,
+            notify_parent,
             h.spawn_registry.clone(),
             h.mcp_service.clone(),
         )
@@ -49,7 +51,8 @@ pub async fn finish_and_deliver(
         if tx.send(envelope).await.is_err() {
             tracing::warn!(agent = %name, "parent completion channel closed");
         }
-    } else if let Some(parent) = parent_addr
+    } else if notify_parent
+        && let Some(parent) = parent_addr
         && parent.is_remote()
         && let Some(ul) = uplink
     {
@@ -72,25 +75,13 @@ pub async fn finish_and_deliver(
     conn.close().await;
 }
 
-/// Deliver a cross-hub completion that arrived through the uplink reverse
-/// handler: emit the finished event, unregister, and dispatch the pending
-/// envelope to the local parent's `completion_tx` if any. Mirrors the
-/// pending-then-deliver pattern in `finish_and_deliver` to ensure the
-/// parent agent's conversation actually receives the agent-result envelope.
-pub async fn deliver_cross_hub_completion(hub: &Arc<Mutex<Hub>>, child: &str, output: String) {
+/// Record a completion received through the uplink before its original,
+/// qualified envelope is routed to the local parent.
+pub async fn record_cross_hub_completion(hub: &Arc<Mutex<Hub>>, child: &str, output: String) {
     crate::pending_relay::cleanup_pending_for_agent(hub, child).await;
-    let pending = {
-        let mut h = hub.lock().await;
-        let pending = h.registry.emit_agent_finished(child, Some(output));
-        h.registry.unregister_connection(child);
-        pending
-    };
-    if let Some((tx, envelope)) = pending
-        && tx.send(envelope).await.is_err()
     {
-        tracing::warn!(
-            agent = %child,
-            "parent completion channel closed (cross-hub)"
-        );
+        let mut h = hub.lock().await;
+        h.registry.emit_agent_finished(child, Some(output));
+        h.registry.unregister_connection(child);
     }
 }

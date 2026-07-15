@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "name": "provider-google-safety",
+  "calls": [
+    {
+      "expect": { "protocol": "google", "userContains": "Exercise Google safety terminal" },
+      "rawSse": [
+        "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"Google safety terminal completed.\"}]},\"finishReason\":\"SAFETY\"}]}"
+      ]
+    }
+  ]
+}

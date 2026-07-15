@@ -46,17 +46,16 @@ impl Unpin for GoogleStream {}
 pub(crate) fn parse_google_event(data: &str) -> Vec<Result<StreamChunk, LoopalError>> {
     let parsed: Value = match serde_json::from_str(data) {
         Ok(v) => v,
-        Err(e) => {
-            return vec![Err(ProviderError::SseParse(format!(
-                "invalid JSON: {e}: {data}"
-            ))
+        Err(_) => {
+            return vec![Err(ProviderError::SseParse(
+                "invalid provider SSE JSON".into(),
+            )
             .into())];
         }
     };
 
     let mut chunks = Vec::new();
 
-    // Usage metadata
     if let Some(usage) = parsed.get("usageMetadata") {
         let input = usage["promptTokenCount"].as_u64().unwrap_or(0) as u32;
         let output = usage["candidatesTokenCount"].as_u64().unwrap_or(0) as u32;
@@ -97,6 +96,12 @@ pub(crate) fn parse_google_event(data: &str) -> Vec<Result<StreamChunk, LoopalEr
                         }
                     }
 
+                    if let Some(signature) = part["thoughtSignature"].as_str() {
+                        chunks.push(Ok(StreamChunk::ThinkingSignature {
+                            signature: signature.to_string(),
+                        }));
+                    }
+
                     if let Some(fc) = part.get("functionCall") {
                         let name = fc["name"].as_str().unwrap_or("").to_string();
                         let args = fc.get("args").cloned().unwrap_or(json!({}));
@@ -120,7 +125,10 @@ pub(crate) fn parse_google_event(data: &str) -> Vec<Result<StreamChunk, LoopalEr
                         stop_reason: StopReason::EndTurn,
                     }));
                 }
-                _ => {}
+                Some("FINISH_REASON_UNSPECIFIED") | None => {}
+                Some(_) => chunks.push(Ok(StreamChunk::Done {
+                    stop_reason: StopReason::EndTurn,
+                })),
             }
 
             // Parse grounding metadata (Google Search Grounding results)
@@ -128,6 +136,15 @@ pub(crate) fn parse_google_event(data: &str) -> Vec<Result<StreamChunk, LoopalEr
                 parse_grounding_metadata(meta, &mut chunks);
             }
         }
+    }
+
+    if parsed["promptFeedback"]["blockReason"]
+        .as_str()
+        .is_some_and(|reason| !reason.is_empty() && reason != "BLOCK_REASON_UNSPECIFIED")
+    {
+        chunks.push(Ok(StreamChunk::Done {
+            stop_reason: StopReason::EndTurn,
+        }));
     }
 
     chunks

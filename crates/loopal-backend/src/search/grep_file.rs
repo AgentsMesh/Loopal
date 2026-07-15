@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+use std::io::Read;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
@@ -16,13 +18,14 @@ pub(crate) fn search_one_file(
     ctx_before: usize,
     ctx_after: usize,
     max: usize,
+    max_file_bytes: u64,
     total: &AtomicUsize,
     done: &AtomicBool,
 ) -> Option<FileMatchResult> {
     if binary::is_likely_binary(path) {
         return None;
     }
-    let content = std::fs::read_to_string(path).ok()?;
+    let content = read_text(path, max_file_bytes)?;
     let lines: Vec<&str> = content.lines().collect();
     let indices = grep_match::find_match_indices(&content, &lines, re, multiline);
     if indices.is_empty() {
@@ -32,6 +35,11 @@ pub(crate) fn search_one_file(
     if prev + indices.len() >= max {
         done.store(true, Ordering::Relaxed);
     }
+    let remaining = max.saturating_sub(prev);
+    if remaining == 0 {
+        return None;
+    }
+    let indices = indices.into_iter().take(remaining).collect();
     let groups = grep_match::collect_context_groups(&lines, &indices, ctx_before, ctx_after);
     Some(FileMatchResult {
         path: path.to_string_lossy().into_owned(),
@@ -68,7 +76,7 @@ pub(crate) fn search_single_file(
         return Ok(empty_result());
     }
     let re = super::grep::build_regex(opts)?;
-    let Ok(content) = std::fs::read_to_string(path) else {
+    let Some(content) = read_text(path, limits.max_file_read_bytes) else {
         return Ok(empty_result());
     };
     let lines: Vec<&str> = content.lines().collect();
@@ -76,11 +84,13 @@ pub(crate) fn search_single_file(
     if indices.is_empty() {
         return Ok(empty_result());
     }
-    let truncated = indices.len() > limits.max_grep_matches;
-    let count = indices.len().min(limits.max_grep_matches);
+    let max = opts.max_matches.min(limits.max_grep_matches).max(1);
+    let truncated = indices.len() > max;
+    let count = indices.len().min(max);
+    let limited: BTreeSet<_> = indices.iter().copied().take(count).collect();
     let groups = grep_match::collect_context_groups(
         &lines,
-        &indices,
+        &limited,
         opts.context_before,
         opts.context_after,
     );
@@ -95,4 +105,17 @@ pub(crate) fn search_single_file(
         file_matches,
         overflow_path,
     })
+}
+
+fn read_text(path: &Path, max_bytes: u64) -> Option<String> {
+    let mut bytes = Vec::new();
+    std::fs::File::open(path)
+        .ok()?
+        .take(max_bytes.saturating_add(1))
+        .read_to_end(&mut bytes)
+        .ok()?;
+    if bytes.len() as u64 > max_bytes {
+        return None;
+    }
+    String::from_utf8(bytes).ok()
 }

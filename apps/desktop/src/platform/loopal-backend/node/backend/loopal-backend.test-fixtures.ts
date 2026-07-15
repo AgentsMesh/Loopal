@@ -8,6 +8,7 @@ import { type JsonRpcNotification } from '../../../desktop-host/node/rpc/jsonrpc
 import { type DesktopHostClient, LoopalDesktopBackend } from './loopal-backend'
 import { SessionRuntimeRegistry } from '../runtime/session-runtime-registry'
 import { type SessionDirectoryRequest } from '../sessions/session-directory-authority'
+import { defaultTestWorkspacePath } from './loopal-backend.test-paths'
 export const timestamp = new Date('2026-07-11T12:00:00.000Z')
 interface CatalogRow {
   id: string
@@ -141,7 +142,7 @@ export function createBackend(options: {
   })
   const backend = new LoopalDesktopBackend({
     binaryPath: '/bin/loopal',
-    cwd: options.cwd ?? '/workspace/project',
+    cwd: options.cwd ?? defaultTestWorkspacePath,
     parentPid: 7,
     runtimeRegistry: registry,
     ...(options.sessionStatePath ? { sessionStatePath: options.sessionStatePath } : {}),

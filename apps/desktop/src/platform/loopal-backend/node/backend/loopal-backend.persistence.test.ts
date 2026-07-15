@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createBackend } from './loopal-backend.test-fixtures'
-import { nativeTestPath } from './loopal-backend.test-paths'
+import { defaultTestWorkspacePath, nativeTestPath } from './loopal-backend.test-paths'
 
 describe('LoopalDesktopBackend persisted runtime intent', () => {
   let root = ''
@@ -21,7 +21,7 @@ describe('LoopalDesktopBackend persisted runtime intent', () => {
 
     const bootstrap = await backend.bootstrap()
     expect(inputs).toEqual([{
-      workspaceId: 'local-workspace', cwd: nativeTestPath('/workspace/project'),
+      workspaceId: 'local-workspace', cwd: nativeTestPath(defaultTestWorkspacePath),
       resumeSessionId: 'session-2',
     }])
     expect(bootstrap.activeSessionId).toBe('session-2')
@@ -46,20 +46,21 @@ describe('LoopalDesktopBackend persisted runtime intent', () => {
     const bootstrap = await backend.bootstrap()
     expect(inputs).toEqual([
       {
-        workspaceId: 'local-workspace', cwd: nativeTestPath('/workspace/project'),
+        workspaceId: 'local-workspace', cwd: nativeTestPath(defaultTestWorkspacePath),
         resumeSessionId: 'missing-session',
       },
-      { workspaceId: 'local-workspace', cwd: nativeTestPath('/workspace/project') },
+      { workspaceId: 'local-workspace', cwd: nativeTestPath(defaultTestWorkspacePath) },
     ])
     expect(bootstrap.activeSessionId).toBe('session-1')
     expect(JSON.parse(await readFile(statePath, 'utf8'))).toMatchObject({
+      workspace: defaultTestWorkspacePath,
       activeSessionId: 'session-1', runningSessionIds: ['session-1'],
     })
   })
 
   it('normalizes persisted running intent to the runtime actually recovered', async () => {
     await writeFile(statePath, JSON.stringify({
-      version: 1, workspace: nativeTestPath('/workspace/project'), activeSessionId: 'session-2',
+      version: 1, workspace: defaultTestWorkspacePath, activeSessionId: 'session-2',
       runningSessionIds: ['session-2', 'session-1'],
     }))
     const { backend } = createBackend({ sessionStatePath: statePath })
@@ -67,6 +68,7 @@ describe('LoopalDesktopBackend persisted runtime intent', () => {
     await backend.bootstrap()
 
     expect(JSON.parse(await readFile(statePath, 'utf8'))).toMatchObject({
+      workspace: defaultTestWorkspacePath,
       activeSessionId: 'session-2', runningSessionIds: ['session-2'],
     })
   })
@@ -74,7 +76,7 @@ describe('LoopalDesktopBackend persisted runtime intent', () => {
 
 async function seed(path: string, sessionId: string): Promise<void> {
   await writeFile(path, JSON.stringify({
-    version: 1, workspace: nativeTestPath('/workspace/project'), activeSessionId: sessionId,
+    version: 1, workspace: defaultTestWorkspacePath, activeSessionId: sessionId,
     runningSessionIds: [sessionId],
   }))
 }

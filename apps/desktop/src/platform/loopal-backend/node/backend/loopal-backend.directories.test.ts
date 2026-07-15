@@ -40,10 +40,11 @@ describe('LoopalDesktopBackend session directories', () => {
     await backend.bootstrap()
     await backend.stopSession('session-1')
     const selected = await backend.authorizeSessionDirectory('/projects/new')
+    expect(selected.path).toBe('/projects/new')
     await backend.createSession({
       authorizationId: selected.authorizationId, launchMode: 'directory',
     })
-    expect(inputs.at(-1)?.cwd).toBe(nativeTestPath('/projects/new'))
+    expect(inputs.at(-1)?.cwd).toBe(selected.path)
   })
 
   it('restores a selected session cwd and workspace across app relaunch', async () => {

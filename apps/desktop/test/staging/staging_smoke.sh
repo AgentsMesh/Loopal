@@ -13,4 +13,5 @@ grep -q '"main":"./out/main/index.cjs"' "$stage/package.json"
 grep -q 'beforeBuild: ./dist_staging/builder-before-build.cjs' "$stage/electron-builder.yml"
 grep -q 'afterExtract: ./dist_staging/builder-after-extract.cjs' "$stage/electron-builder.yml"
 grep -q 'electronDist: ../../../node_modules/electron/dist' "$stage/electron-builder.yml"
+grep -Eq '"version":"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?"' "$stage/package.json"
 "$stage/runtime/loopal" --version >/dev/null

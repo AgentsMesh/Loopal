@@ -36,6 +36,18 @@ fn test_duplicate_name_rejected() {
 }
 
 #[test]
+fn test_create_and_remove_with_canonical_root() {
+    let dir = tempfile::tempdir().unwrap();
+    init_repo(dir.path());
+    let root = dir.path().canonicalize().unwrap();
+
+    let info = create_worktree(&root, "canonical").unwrap();
+    assert!(info.path.exists());
+    remove_worktree(&root, "canonical", false).unwrap();
+    assert!(!info.path.exists());
+}
+
+#[test]
 fn test_worktree_has_changes_detects_modifications() {
     let dir = tempfile::tempdir().unwrap();
     init_repo(dir.path());

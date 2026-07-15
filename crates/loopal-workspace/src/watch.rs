@@ -136,10 +136,10 @@ impl Batch {
             if relative.ends_with(".loopal.tmp") {
                 continue;
             }
-            self.git_changed = true;
             if relative.split('/').any(|part| part == ".git") {
                 continue;
             }
+            self.git_changed = true;
             if self.files.len() < MAX_FILE_EVENTS || self.files.contains_key(&relative) {
                 self.files.insert(relative, kind);
             } else {

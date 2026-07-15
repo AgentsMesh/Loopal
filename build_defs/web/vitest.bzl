@@ -31,8 +31,10 @@ def vitest_test(name, srcs, config = "vitest.config.ts", coverage = False, data 
             "//:node_modules",
             "//:node_modules/vitest",
         ],
-        env = {"VITEST": "true"},
-        chdir = native.package_name() + "/" + source_tree,
+        env = {
+            "VITEST": "true",
+            "VITEST_RUNFILES_WORKDIR": "$(rlocationpath :%s)" % source_tree,
+        },
         size = "large",
         tags = tags or [],
     )

@@ -39,6 +39,20 @@ fn batch_deduplicates_paths_and_requests_resync_on_overflow() {
     assert_eq!(notifications[2].params["reason"], "watcher_error");
 }
 
+#[test]
+fn git_metadata_is_not_a_workspace_change() {
+    let root = tempfile::tempdir().unwrap();
+    let guard = RootGuard::new(root.path()).unwrap();
+    let mut batch = Batch::default();
+    batch.add(
+        &guard,
+        WatchInput::Event(event(guard.root().join(".git/index"))),
+    );
+    let (tx, mut rx) = tokio::sync::broadcast::channel(8);
+    batch.publish("local-workspace", &tx);
+    assert!(rx.try_recv().is_err());
+}
+
 fn event(path: impl Into<std::path::PathBuf>) -> Event {
     Event::new(EventKind::Modify(ModifyKind::Any)).add_path(path.into())
 }

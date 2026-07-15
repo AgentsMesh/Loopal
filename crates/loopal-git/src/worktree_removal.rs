@@ -6,7 +6,8 @@ use crate::worktree::{WorktreeInfo, validate_name, worktree_has_changes};
 
 pub fn remove_worktree(repo_root: &Path, name: &str, force: bool) -> Result<(), GitError> {
     validate_name(name)?;
-    let path = repo_root.join(".loopal").join("worktrees").join(name);
+    let relative = Path::new(".loopal").join("worktrees").join(name);
+    let path = repo_root.join(&relative);
     let branch = format!("loopal-wt-{name}");
     if !force {
         require_merged(repo_root, &path, "HEAD", name)?;
@@ -19,7 +20,7 @@ pub fn remove_worktree(repo_root: &Path, name: &str, force: bool) -> Result<(), 
     if force {
         args.push("--force");
     }
-    let path_value = path.to_string_lossy().into_owned();
+    let path_value = relative.to_string_lossy().into_owned();
     args.push(&path_value);
     run(repo_root, &args)?;
 

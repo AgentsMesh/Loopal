@@ -45,7 +45,8 @@ fn create_worktree_from(
 ) -> Result<WorktreeInfo, GitError> {
     validate_name(name)?;
 
-    let wt_dir = repo_root.join(".loopal").join("worktrees").join(name);
+    let relative = Path::new(".loopal").join("worktrees").join(name);
+    let wt_dir = repo_root.join(&relative);
     if wt_dir.exists() {
         return Err(GitError::WorktreeExists(name.to_string()));
     }
@@ -62,7 +63,7 @@ fn create_worktree_from(
 
     let output = Command::new("git")
         .args(["worktree", "add", "-b", &branch])
-        .arg(&wt_dir)
+        .arg(&relative)
         .arg(start_point)
         .current_dir(repo_root)
         .output()?;

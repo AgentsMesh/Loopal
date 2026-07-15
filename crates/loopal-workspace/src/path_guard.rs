@@ -9,7 +9,7 @@ pub struct RootGuard {
 
 impl RootGuard {
     pub fn new(root: impl AsRef<Path>) -> Result<Self, WorkspaceError> {
-        let root = root.as_ref().canonicalize().map_err(WorkspaceError::io)?;
+        let root = canonicalize(root.as_ref())?;
         if !root.is_dir() {
             return Err(WorkspaceError::invalid("workspace root is not a directory"));
         }
@@ -46,7 +46,7 @@ impl RootGuard {
         let resolved = if allow_missing {
             self.resolve_missing(&joined)?
         } else {
-            joined.canonicalize().map_err(WorkspaceError::io)?
+            canonicalize(&joined)?
         };
         if !resolved.starts_with(&self.root) {
             return Err(WorkspaceError::new(
@@ -67,7 +67,8 @@ impl RootGuard {
         let mut cursor = path;
         loop {
             match cursor.canonicalize() {
-                Ok(mut resolved) => {
+                Ok(resolved) => {
+                    let mut resolved = loopal_backend::path::strip_win_prefix(resolved);
                     for part in missing.iter().rev() {
                         resolved.push(part);
                     }
@@ -86,6 +87,12 @@ impl RootGuard {
             }
         }
     }
+}
+
+fn canonicalize(path: &Path) -> Result<PathBuf, WorkspaceError> {
+    path.canonicalize()
+        .map(loopal_backend::path::strip_win_prefix)
+        .map_err(WorkspaceError::io)
 }
 
 #[cfg(test)]

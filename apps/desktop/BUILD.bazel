@@ -38,6 +38,10 @@ ts_project(
     resolve_json_module = True,
     transpiler = "tsc",
     tsconfig = "tsconfig.json",
+    validate = select({
+        "@platforms//os:windows": False,
+        "//conditions:default": True,
+    }),
     deps = ["//:node_modules"],
 )
 

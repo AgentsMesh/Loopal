@@ -1,3 +1,4 @@
+#[cfg(unix)]
 use std::fs::{File, OpenOptions};
 use std::io::ErrorKind;
 use std::path::PathBuf;
@@ -84,7 +85,7 @@ impl Drop for SettingsFileLock {
             let _ = unsafe { libc::flock(self.file.as_raw_fd(), libc::LOCK_UN) };
         }
         #[cfg(not(unix))]
-        if std::fs::read_to_string(&self.path).as_deref() == Ok(&self.owner) {
+        if std::fs::read_to_string(&self.path).as_deref() == Ok(self.owner.as_str()) {
             let _ = std::fs::remove_file(&self.path);
         }
     }

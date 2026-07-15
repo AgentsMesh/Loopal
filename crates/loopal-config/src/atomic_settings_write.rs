@@ -1,5 +1,7 @@
 use std::fs::{File, OpenOptions};
-use std::io::{ErrorKind, Write};
+#[cfg(unix)]
+use std::io::ErrorKind;
+use std::io::Write;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -40,14 +42,16 @@ pub(super) fn create_private(path: &Path, mode: u32) -> Result<File, LoopalError
         use std::os::unix::fs::OpenOptionsExt;
         options.mode(mode);
     }
+    #[cfg(not(unix))]
+    let _ = mode;
     options.open(path).map_err(LoopalError::Io)
 }
 
-fn existing_private_mode(path: &Path) -> Result<u32, LoopalError> {
+fn existing_private_mode(_path: &Path) -> Result<u32, LoopalError> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        match std::fs::metadata(path) {
+        match std::fs::metadata(_path) {
             Ok(metadata) => {
                 let mode = metadata.permissions().mode() & 0o600;
                 Ok(if mode == 0 { 0o600 } else { mode })

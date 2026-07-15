@@ -5,6 +5,7 @@ exports_files([
     "desktop_package.bzl",
     "playwright.bzl",
     "npm_workspace.bzl",
+    "typescript.bzl",
     "vitest.bzl",
     "vitest_shim.cjs",
 ])

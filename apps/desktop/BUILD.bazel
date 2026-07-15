@@ -1,5 +1,5 @@
-load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
 load("//build_defs/web:electron.bzl", "electron_app", "electron_builder_app", "electron_vite_build")
+load("//build_defs/web:typescript.bzl", "typescript_check")
 load("//build_defs/web:vitest.bzl", "vitest_test")
 load(":desktop_tests.bzl", "desktop_playwright_tests")
 
@@ -18,7 +18,7 @@ filegroup(
     srcs = glob(["e2e/fixtures/**"]),
 )
 
-ts_project(
+typescript_check(
     name = "typecheck",
     srcs = glob(
         [
@@ -33,16 +33,7 @@ ts_project(
         "electron.vite.config.ts",
         "playwright.config.ts",
     ],
-    declaration = False,
-    no_emit = True,
-    resolve_json_module = True,
-    transpiler = "tsc",
-    tsconfig = "tsconfig.json",
-    validate = select({
-        "@platforms//os:windows": False,
-        "//conditions:default": True,
-    }),
-    deps = ["//:node_modules"],
+    data = ["//:node_modules"],
 )
 
 electron_vite_build(

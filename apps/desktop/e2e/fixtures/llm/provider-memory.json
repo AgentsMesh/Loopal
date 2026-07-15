@@ -1,0 +1,166 @@
+{
+  "version": 2,
+  "name": "provider-memory",
+  "calls": [
+    {
+      "expect": {
+        "userContains": "ACTIVE_SESSION_MEMORY_DISABLED",
+        "bodyContains": "memory_recall"
+      },
+      "chunks": [
+        {
+          "type": "tool_use", "id": "memory-disabled", "name": "Memory",
+          "input": { "observation": "ACTIVE_SESSION_MEMORY_DISABLED must not be recorded" }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "toolResultId": "memory-disabled", "bodyContains": "Memory is not enabled"
+      },
+      "chunks": [
+        { "type": "text", "text": "The already-running Session kept memory disabled." },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "NEW_SESSION_MEMORY_OBSERVATION" },
+      "chunks": [
+        {
+          "type": "tool_use", "id": "memory-new-session", "name": "Memory",
+          "input": {
+            "observation": "NEW_SESSION_MEMORY_OBSERVATION: desktopmemoryrank observations persist across Desktop restarts"
+          }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "memory-new-session", "bodyContains": "Noted." },
+      "chunks": [
+        { "type": "text", "text": "The new Session queued the memory observation." },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "bodyContains": "NEW_SESSION_MEMORY_OBSERVATION", "minTools": 1
+      },
+      "chunks": [
+        {
+          "type": "tool_use", "id": "observer-recall", "name": "memory_recall",
+          "input": { "query": "desktopmemoryrank", "depth": 0 }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "observer-recall" },
+      "chunks": [
+        {
+          "type": "tool_use", "id": "observer-write", "name": "Write",
+          "input": {
+            "file_path": "${PROJECT}/.loopal/memory/memory-observer-roundtrip.md",
+            "content": "---\nname: Memory Observer Roundtrip\ndescription: Desktop memory observation persistence contract\ntype: project\ncreated_at: 2099-01-01\nupdated_at: 2099-01-01\nttl_days: 90\nrelated: []\n---\n\nOBSERVER PERSISTED CONTRACT: desktopmemoryrank observations survive Desktop Session restarts.\n"
+          }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "observer-write" },
+      "chunks": [
+        { "type": "text", "text": "Memory observation persisted by the Knowledge Manager." },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "RESTARTED_SESSION_MEMORY_OBSERVATION" },
+      "chunks": [
+        {
+          "type": "tool_use", "id": "memory-restarted-session", "name": "Memory",
+          "input": {
+            "observation": "RESTARTED_SESSION_MEMORY_OBSERVATION: the desktopmemoryrank rule is unchanged"
+          }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "memory-restarted-session", "bodyContains": "Noted." },
+      "chunks": [
+        { "type": "text", "text": "The restarted Session queued another observation." },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "RESTARTED_SESSION_MEMORY_OBSERVATION" },
+      "chunks": [
+        { "type": "text", "text": "No memory update needed; the observation is redundant." },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "RECALL_OBSERVER_MEMORY_BEFORE_IMPORTANCE" },
+      "chunks": [
+        {
+          "type": "tool_use", "id": "main-recall-before", "name": "memory_recall",
+          "input": { "query": "desktopmemoryrank", "depth": 0, "max_results": 2 }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "toolResultId": "main-recall-before", "bodyContains": "OBSERVER PERSISTED CONTRACT"
+      },
+      "chunks": [
+        { "type": "text", "text": "The model received the recalled observer memory." },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "TAG_BASELINE_MEMORY_IMPORTANCE" },
+      "chunks": [
+        {
+          "type": "tool_use", "id": "main-importance", "name": "memory_set_importance",
+          "input": {
+            "node": "stable-desktop-contract", "importance": 10,
+            "tags": ["desktop-e2e"], "note": "verify restart persistence"
+          }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "toolResultId": "main-importance",
+        "bodyContains": "Tagged `stable-desktop-contract` with importance=10"
+      },
+      "chunks": [
+        { "type": "text", "text": "The importance result reached the model." },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "RECALL_MEMORY_AFTER_RESTART" },
+      "chunks": [
+        {
+          "type": "tool_use", "id": "main-recall-after", "name": "memory_recall",
+          "input": { "query": "desktopmemoryrank", "depth": 0, "max_results": 2 }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "toolResultId": "main-recall-after", "bodyContains": "OBSERVER PERSISTED CONTRACT"
+      },
+      "chunks": [
+        { "type": "text", "text": "Restarted recall preserved memory and importance ordering." },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

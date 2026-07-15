@@ -12,10 +12,13 @@ use loopal_tool_api::PermissionDecision;
 
 use crate::hub_broadcaster::HubBroadcaster;
 use crate::hub_input_receiver::HubInputReceiver;
-use crate::ipc_handlers::{IpcPermissionHandler, IpcQuestionHandler, SessionRef};
+use crate::ipc_handlers::{
+    IpcPermissionHandler, IpcQuestionHandler, SessionRef, request_plan_approval,
+};
 use crate::session_hub::SharedSession;
 
 pub struct HubFrontend {
+    session: SessionRef,
     broadcaster: HubBroadcaster,
     input: HubInputReceiver,
     permission_handler: Box<dyn PermissionHandler>,
@@ -33,6 +36,7 @@ impl HubFrontend {
     ) -> Self {
         let qa = agent_name.map(loopal_protocol::QualifiedAddress::local);
         Self {
+            session: session.clone(),
             broadcaster: HubBroadcaster::new(session, qa),
             input: HubInputReceiver::new(input_rx, interrupt_rx),
             permission_handler,
@@ -95,6 +99,14 @@ impl AgentFrontend for HubFrontend {
         let (response, payload) = loopal_runtime::frontend::into_question_decided(n, outcome);
         let _ = self.broadcaster.broadcast(payload).await;
         response
+    }
+
+    async fn request_plan_approval(
+        &self,
+        plan_content: &str,
+        plan_path: &str,
+    ) -> loopal_runtime::frontend::traits::PlanApproval {
+        request_plan_approval(&self.session, plan_content, plan_path).await
     }
 
     fn try_emit(&self, payload: AgentEventPayload) -> bool {

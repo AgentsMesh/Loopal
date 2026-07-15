@@ -78,6 +78,17 @@ pub const HUB_QUESTION_RESPONSE: Method = Method {
     name: "hub/question_response",
 };
 
+/// MetaHub → Sub-Hub: allowlisted remote attention/control relay.
+pub const HUB_REMOTE_RELAY: Method = Method {
+    name: "hub/remote_relay",
+};
+
+/// UI → Hub: resolve a pending plan approval request.
+/// Params: `{ agent_name, request_id, decision, edited_plan? }`.
+pub const HUB_PLAN_APPROVAL_RESPONSE: Method = Method {
+    name: "hub/plan_approval_response",
+};
+
 /// Route a control command to a named agent.
 pub const HUB_CONTROL: Method = Method {
     name: "hub/control",
@@ -90,6 +101,16 @@ pub const HUB_INTERRUPT: Method = Method {
 
 /// Query Hub status (uplink, agent count, etc).
 pub const HUB_STATUS: Method = Method { name: "hub/status" };
+
+/// UI -> Hub: connect this running Hub to a MetaHub coordinator.
+pub const HUB_JOIN_META: Method = Method {
+    name: "hub/join_meta",
+};
+
+/// UI -> Hub: close this Hub's active MetaHub uplink.
+pub const HUB_LEAVE_META: Method = Method {
+    name: "hub/leave_meta",
+};
 
 /// Sub-agent → Hub: list all MCP tools available on the root agent.
 /// Response: `Vec<(server_name, ToolDefinition)>`. Used at sub-agent

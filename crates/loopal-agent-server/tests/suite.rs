@@ -12,6 +12,10 @@ mod bridge_edge_test;
 mod bridge_helpers;
 #[path = "suite/build_kernel_depth_test.rs"]
 mod build_kernel_depth_test;
+#[path = "suite/control_ack_test.rs"]
+mod control_ack_test;
+#[path = "suite/control_ack_transport.rs"]
+mod control_ack_transport;
 #[path = "suite/cron_bridge_edge_test.rs"]
 mod cron_bridge_edge_test;
 #[path = "suite/cron_bridge_helpers.rs"]
@@ -26,6 +30,8 @@ mod cron_resume_e2e_test;
 mod dispatch_loop_test;
 #[path = "suite/dispatch_test.rs"]
 mod dispatch_test;
+#[path = "suite/fork_synthetic_turn_test.rs"]
+mod fork_synthetic_turn_test;
 #[path = "suite/hub_drain_test.rs"]
 mod hub_drain_test;
 #[path = "suite/hub_frontend_edge_test.rs"]
@@ -72,5 +78,7 @@ mod spawn_policy_test;
 mod start_failure_responds_error_test;
 #[path = "suite/summarization_default_test.rs"]
 mod summarization_default_test;
+#[path = "suite/task_bridge_test.rs"]
+mod task_bridge_test;
 #[path = "suite/tcp_multi_client_test.rs"]
 mod tcp_multi_client_test;

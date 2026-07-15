@@ -5,9 +5,7 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use indexmap::IndexMap;
-use loopal_agent_server::testing::{
-    StartParams, build_fork_synthetic_turn, collect_feature_tags, spawn_sub_agent_forwarder,
-};
+use loopal_agent_server::testing::{collect_feature_tags, spawn_sub_agent_forwarder};
 use loopal_config::{ResolvedConfig, Settings};
 use loopal_error::Result;
 use loopal_protocol::{AgentEvent, AgentEventPayload};
@@ -65,61 +63,6 @@ impl AgentFrontend for CaptureFrontend {
             events: self.events.clone(),
         })
     }
-}
-
-fn blank_start() -> StartParams {
-    StartParams {
-        cwd: None,
-        model: None,
-        mode: None,
-        prompt: None,
-        permission_mode: None,
-        decision_mode: None,
-        no_sandbox: false,
-        resume: None,
-        lifecycle: loopal_runtime::LifecycleMode::Ephemeral,
-        agent_type: None,
-        depth: None,
-        fork_context: None,
-    }
-}
-
-#[test]
-fn fork_synthetic_turn_none_when_no_fork() {
-    let turn = build_fork_synthetic_turn(&blank_start());
-    assert!(turn.is_none());
-}
-
-#[test]
-fn fork_synthetic_turn_built_from_fork_messages() {
-    let mut start = blank_start();
-    let fork_msgs = vec![loopal_provider_api::Message::user("fork msg 1")];
-    start.fork_context = Some(serde_json::to_value(&fork_msgs).unwrap());
-    let turn = build_fork_synthetic_turn(&start).expect("should produce turn");
-    assert_eq!(turn.body.steps.len(), 1);
-    match &turn.body.steps[0] {
-        loopal_turn::TurnStep::Injection { kind, text } => {
-            assert!(matches!(kind, loopal_turn::InjectionKind::SystemNote));
-            assert!(text.contains("fork msg 1"));
-        }
-        _ => panic!("expected Injection step"),
-    }
-}
-
-#[test]
-fn fork_synthetic_turn_ignored_when_resuming() {
-    let mut start = blank_start();
-    start.resume = Some("sid".into());
-    let fork_msgs = vec![loopal_provider_api::Message::user("fork msg")];
-    start.fork_context = Some(serde_json::to_value(&fork_msgs).unwrap());
-    assert!(build_fork_synthetic_turn(&start).is_none());
-}
-
-#[test]
-fn fork_synthetic_turn_none_on_bad_json() {
-    let mut start = blank_start();
-    start.fork_context = Some(serde_json::json!({"not_a_message_array": true}));
-    assert!(build_fork_synthetic_turn(&start).is_none());
 }
 
 #[test]

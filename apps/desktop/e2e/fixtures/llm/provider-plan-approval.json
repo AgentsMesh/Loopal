@@ -1,0 +1,76 @@
+{
+  "version": 2,
+  "name": "provider-plan-approval",
+  "calls": [
+    {
+      "expect": { "userContains": "Enter deterministic plan mode" },
+      "chunks": [
+        { "type": "tool_use", "id": "enter-plan-one", "name": "EnterPlanMode", "input": {} },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "enter-plan-one" },
+      "chunks": [
+        { "type": "text", "text": "Plan mode is ready for fixture seeding." },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Request a rejected plan review" },
+      "chunks": [
+        { "type": "tool_use", "id": "exit-plan-reject", "name": "ExitPlanMode", "input": {} },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "exit-plan-reject", "bodyContains": "User rejected the plan" },
+      "chunks": [
+        { "type": "text", "text": "The rejected plan returned to the model for revision." },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Request an edited plan approval" },
+      "chunks": [
+        { "type": "tool_use", "id": "exit-plan-edited", "name": "ExitPlanMode", "input": {} },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "exit-plan-edited", "bodyContains": "EDITED PLAN MARKER" },
+      "chunks": [
+        { "type": "text", "text": "The edited approval returned to the model and restored Act mode." },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Enter plan mode for direct approval" },
+      "chunks": [
+        { "type": "tool_use", "id": "enter-plan-two", "name": "EnterPlanMode", "input": {} },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "enter-plan-two" },
+      "chunks": [
+        { "type": "text", "text": "Second plan review is ready." },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Request direct plan approval" },
+      "chunks": [
+        { "type": "tool_use", "id": "exit-plan-approve", "name": "ExitPlanMode", "input": {} },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "exit-plan-approve", "bodyContains": "DIRECT PLAN MARKER" },
+      "chunks": [
+        { "type": "text", "text": "The direct approval returned to the model." },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

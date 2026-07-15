@@ -45,6 +45,8 @@ pub fn apply_event(state: &mut SessionState, event: AgentEvent) {
         | AgentEventPayload::ToolProgress { .. }
         | AgentEventPayload::ToolPermissionRequest { .. }
         | AgentEventPayload::ToolPermissionResolved { .. }
+        | AgentEventPayload::PlanApprovalRequest { .. }
+        | AgentEventPayload::PlanApprovalResolved { .. }
         | AgentEventPayload::UserQuestionRequest { .. }
         | AgentEventPayload::UserQuestionResolved { .. }
         | AgentEventPayload::UserMessageQueued { .. }
@@ -60,6 +62,7 @@ pub fn apply_event(state: &mut SessionState, event: AgentEvent) {
         | AgentEventPayload::Cleared { .. }
         | AgentEventPayload::RetryError { .. }
         | AgentEventPayload::RetryCleared
+        | AgentEventPayload::ProviderWarning { .. }
         | AgentEventPayload::AutoContinuation { .. }
         | AgentEventPayload::PermissionDecided { .. }
         | AgentEventPayload::QuestionDecided { .. }
@@ -70,6 +73,7 @@ pub fn apply_event(state: &mut SessionState, event: AgentEvent) {
         | AgentEventPayload::InboxEnqueued { .. }
         | AgentEventPayload::InboxConsumed { .. }
         | AgentEventPayload::MessageRouted { .. }
+        | AgentEventPayload::SessionHistoryLoaded(_)
         | AgentEventPayload::SessionResumeWarnings { .. }
         | AgentEventPayload::BgTaskSpawned { .. }
         | AgentEventPayload::BgTaskOutput { .. }

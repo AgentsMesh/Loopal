@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "name": "provider-controls",
+  "calls": [
+    {
+      "expect": { "userContains": "Seed control history" },
+      "chunks": [
+        { "type": "text", "text": "CONTROL BASELINE MARKER" },
+        { "type": "usage", "input": 15, "output": 5 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "model": "claude-sonnet-4-6",
+        "userContains": "Observe high thinking controls",
+        "bodyContains": "\"effort\":\"high\""
+      },
+      "chunks": [
+        { "type": "thinking", "text": "CONTROLLED THINKING STREAM" },
+        { "type": "thinking_signature", "signature": "controlled-thinking-signature" },
+        { "type": "text", "text": "High thinking and model switch reached the provider." },
+        { "type": "usage", "input": 22, "output": 9 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "model": "claude-sonnet-4-6",
+        "userContains": "Observe disabled thinking controls",
+        "thinkingEnabled": false
+      },
+      "chunks": [
+        { "type": "text", "text": "Disabled thinking reached the provider." },
+        { "type": "usage", "input": 24, "output": 6 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "model": "claude-sonnet-4-6",
+        "userContains": "Verify clear request history",
+        "bodyExcludes": "CONTROL BASELINE MARKER",
+        "messageCount": 1
+      },
+      "chunks": [
+        { "type": "text", "text": "Clear removed prior model history." },
+        { "type": "usage", "input": 12, "output": 6 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Seed rewind second turn" },
+      "chunks": [
+        { "type": "text", "text": "REWIND SECOND MARKER" },
+        { "type": "usage", "input": 18, "output": 6 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "userContains": "Verify rewind request history",
+        "bodyExcludes": "REWIND SECOND MARKER",
+        "messageCount": 1
+      },
+      "chunks": [
+        { "type": "text", "text": "Rewind removed later model history." },
+        { "type": "usage", "input": 12, "output": 6 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

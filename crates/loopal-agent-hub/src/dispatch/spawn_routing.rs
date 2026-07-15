@@ -14,21 +14,6 @@ use tracing::info;
 
 use crate::hub::Hub;
 
-fn normalize_target_hub_value(value: Option<&Value>) -> Result<Option<String>, String> {
-    let Some(v) = value else {
-        return Ok(None);
-    };
-    let target = v
-        .as_str()
-        .ok_or_else(|| format!("'target_hub' must be a string, got: {v}"))?
-        .trim();
-    if target.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(target.to_string()))
-    }
-}
-
 /// In-hub spawn entry point. If `target_hub` is set, forward to MetaHub
 /// after rejecting any filesystem-coupled fields (cwd / fork_context /
 /// resume). Otherwise spawn locally.
@@ -37,7 +22,9 @@ pub async fn handle_spawn_agent(
     params: Value,
     from_agent: &str,
 ) -> Result<Value, String> {
-    if let Some(target) = normalize_target_hub_value(params.get("target_hub"))? {
+    if let Some(target) =
+        super::spawn_parent_policy::normalize_target_hub_value(params.get("target_hub"))?
+    {
         // Mirror the agent-name check in cross_hub_forward::preflight: a
         // hub identifier with '/' would be ambiguous with QualifiedAddress
         // multi-hop encoding (`hub-c/hub-d/agent`) — reject up front.
@@ -52,7 +39,7 @@ pub async fn handle_spawn_agent(
             .uplink
             .as_ref()
             .map(|u| u.hub_name().to_string());
-        if !is_self_target(own_hub.as_deref(), &target) {
+        if !super::spawn_parent_policy::is_self_target(own_hub.as_deref(), &target) {
             let mut cross_params = params;
             if let Some(obj) = cross_params.as_object_mut() {
                 obj.insert("target_hub".into(), Value::String(target));
@@ -77,14 +64,6 @@ pub async fn handle_spawn_agent(
     spawn_local(hub, local_params, from_agent).await
 }
 
-// reason: a hub targeting itself would pre-register a shadow then route back
-// through MetaHub into its own registry, colliding as "already registered" and
-// orphaning a forked process. Self-target must spawn locally — same registry,
-// no MetaHub round-trip.
-fn is_self_target(own_hub: Option<&str>, target: &str) -> bool {
-    own_hub == Some(target)
-}
-
 async fn spawn_local(
     hub: &Arc<Mutex<Hub>>,
     params: Value,
@@ -103,10 +82,8 @@ async fn spawn_local(
     let depth = params["depth"].as_u64().map(|v| v as u32);
     let fork_context = params.get("fork_context").cloned();
     let no_sandbox = params["no_sandbox"].as_bool().unwrap_or(false);
-    let parent = params["parent"]
-        .as_str()
-        .map(String::from)
-        .or_else(|| Some(from_agent.to_string()));
+    let (parent, notify_parent_on_completion) =
+        super::spawn_parent_policy::local_parent_policy(&params, from_agent)?;
 
     info!(agent = %name, parent = ?parent, "handle_spawn_agent local start");
     spawn_via_manager(
@@ -122,6 +99,7 @@ async fn spawn_local(
         depth,
         fork_context,
         no_sandbox,
+        notify_parent_on_completion,
     )
     .await
 }
@@ -151,6 +129,7 @@ pub async fn handle_spawn_remote_agent(
         args.depth,
         None,
         args.no_sandbox,
+        true,
     )
     .await
 }
@@ -169,6 +148,7 @@ pub(super) async fn spawn_via_manager(
     depth: Option<u32>,
     fork_context: Option<Value>,
     no_sandbox: bool,
+    notify_parent_on_completion: bool,
 ) -> Result<Value, String> {
     let name_clone = name.clone();
     let handle = tokio::spawn(async move {
@@ -185,6 +165,7 @@ pub(super) async fn spawn_via_manager(
             depth,
             fork_context,
             no_sandbox,
+            notify_parent_on_completion,
         )
         .await
     });
@@ -194,46 +175,4 @@ pub(super) async fn spawn_via_manager(
         .map_err(|e| format!("spawn failed: {e}"))?;
     info!(agent = %name, %agent_id, "spawn done");
     Ok(json!({"agent_id": agent_id, "name": name}))
-}
-
-#[cfg(test)]
-mod tests {
-    use serde_json::json;
-
-    use super::{is_self_target, normalize_target_hub_value};
-
-    #[test]
-    fn own_hub_equals_target_is_self() {
-        assert!(is_self_target(Some("hub-a"), "hub-a"));
-    }
-
-    #[test]
-    fn different_hub_is_not_self() {
-        assert!(!is_self_target(Some("hub-a"), "hub-b"));
-    }
-
-    #[test]
-    fn no_uplink_is_never_self() {
-        assert!(!is_self_target(None, "hub-a"));
-    }
-
-    #[test]
-    fn normalize_target_hub_value_treats_empty_as_absent() {
-        assert_eq!(normalize_target_hub_value(None).unwrap(), None);
-        assert_eq!(normalize_target_hub_value(Some(&json!(""))).unwrap(), None);
-        assert_eq!(
-            normalize_target_hub_value(Some(&json!("   "))).unwrap(),
-            None
-        );
-        assert_eq!(
-            normalize_target_hub_value(Some(&json!(" hub-b "))).unwrap(),
-            Some("hub-b".into())
-        );
-    }
-
-    #[test]
-    fn normalize_target_hub_value_rejects_non_string() {
-        let err = normalize_target_hub_value(Some(&json!(42))).expect_err("must reject");
-        assert!(err.contains("target_hub") && err.contains("string"));
-    }
 }

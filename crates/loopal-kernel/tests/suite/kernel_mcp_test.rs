@@ -113,12 +113,6 @@ async fn register_mcp_tools_for_server_unknown_local_server_is_silent() {
 
 #[tokio::test]
 async fn register_mcp_tools_for_server_picks_up_late_connected_tools() {
-    // User-facing reconnect flow: user presses 'r' in /mcp page → control
-    // McpReconnect → manager.restart_connection → register_mcp_tools_for_server.
-    // We can't really run restart_connection (it needs a real subprocess),
-    // but we can inject a fake-connected connection directly into the
-    // manager and verify the second half — that register_mcp_tools_for_server
-    // picks up tools and puts them into ToolRegistry where the LLM finds them.
     use loopal_mcp::{ConnectionStatus, McpConnection};
     let kernel = Kernel::new(Settings::default()).unwrap();
 
@@ -163,10 +157,6 @@ async fn register_mcp_tools_for_server_picks_up_late_connected_tools() {
 
 #[tokio::test]
 async fn register_all_settled_mcp_tools_is_idempotent_on_reentry() {
-    // The late-registration listener triggers register_all_settled_mcp_tools
-    // every time mark_settled fires. If multiple spawn_background events
-    // occur (e.g. user toggles a server), the same tool name must not
-    // double-register or panic.
     use loopal_mcp::{ConnectionStatus, McpConnection};
     let kernel = Kernel::new(Settings::default()).unwrap();
 

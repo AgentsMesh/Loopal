@@ -22,6 +22,8 @@ pub mod task_snapshot;
 pub mod thread_goal;
 pub mod user_content;
 
+pub const META_HUB_TOKEN_ENV: &str = "LOOPAL_META_HUB_TOKEN";
+
 pub use address::QualifiedAddress;
 pub use agent_state::{AgentStatus, ObservableAgentState};
 pub use agent_state_snapshot::AgentStateSnapshot;
@@ -43,7 +45,7 @@ pub use mcp_ipc::{
 };
 pub use mcp_snapshot::McpServerSnapshot;
 pub use naming::ROOT_AGENT_NAME;
-pub use projected::{ProjectedMessage, ProjectedToolCall};
+pub use projected::{ProjectedMessage, ProjectedToolCall, SessionHistorySnapshot};
 pub use question::{Question, QuestionOption, ResolveSource, UserQuestionResponse};
 pub use secret_ipc::{
     SecretCaller, SecretGetRequest, SecretGetResponse, SecretHealthRequest, SecretHealthResponse,

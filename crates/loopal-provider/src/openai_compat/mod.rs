@@ -1,9 +1,12 @@
 mod message_builder;
 mod stream;
+mod thinking;
 
 use async_trait::async_trait;
 use loopal_error::{LoopalError, ProviderError};
-use loopal_provider_api::{ChatParams, ChatStream, ErrorClass, Provider, default_classify_error};
+use loopal_provider_api::{
+    ChatParams, ChatStream, ErrorClass, Provider, ThinkingCapability, default_classify_error,
+};
 use serde_json::json;
 use std::collections::VecDeque;
 use std::time::Duration;
@@ -61,11 +64,14 @@ impl Provider for OpenAiCompatProvider {
         if let Some(temp) = params.temperature {
             body["temperature"] = json!(temp);
         }
+        if let Some(ref config) = params.thinking {
+            body["reasoning_effort"] = json!(thinking::reasoning_effort(config));
+        }
         body["stream_options"] = json!({"include_usage": true});
 
         tracing::info!(
             model = %params.model,
-            url = %format!("{}/v1/chat/completions", self.base_url),
+            provider = "openai-compatible",
             messages = normalized.len(),
             tools = params.tools.len(),
             "API request"
@@ -74,7 +80,10 @@ impl Provider for OpenAiCompatProvider {
         let http_span = tracing::info_span!("http_request", gen_ai.system = "openai_compat");
         let (client, client_gen) = self.client.get();
         let response = client
-            .post(format!("{}/v1/chat/completions", self.base_url))
+            .post(crate::endpoint::join_v1(
+                &self.base_url,
+                "/v1/chat/completions",
+            ))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
             .json(&body)
@@ -83,7 +92,7 @@ impl Provider for OpenAiCompatProvider {
             .await
             .map_err(|e| {
                 self.client.report_network_error(client_gen);
-                ProviderError::Http(format!("{e:#}"))
+                crate::safe_diagnostics::network_error("openai-compatible", &e)
             })?;
         self.client.report_success(client_gen);
 
@@ -100,8 +109,13 @@ impl Provider for OpenAiCompatProvider {
                     .unwrap_or(30_000);
                 return Err(ProviderError::RateLimited { retry_after_ms }.into());
             }
-            let text = response.text().await.unwrap_or_default();
-            tracing::error!(status = status.as_u16(), body = %text, "API error");
+            let text = crate::safe_diagnostics::response_error_message(
+                "openai-compatible",
+                response,
+                &[&self.api_key, &self.base_url],
+            )
+            .await;
+            tracing::error!(status = status.as_u16(), "API error");
             return Err(ProviderError::Api {
                 status: status.as_u16(),
                 message: text,
@@ -114,6 +128,8 @@ impl Provider for OpenAiCompatProvider {
             inner: Box::pin(sse),
             state: ToolCallAccumulator::default(),
             buffer: VecDeque::new(),
+            emit_reasoning: crate::get_thinking_capability(&params.model)
+                != ThinkingCapability::None,
         };
         Ok(Box::pin(stream))
     }
@@ -142,6 +158,7 @@ fn is_openai_compat_context_overflow_keyword(message: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use loopal_provider_api::{ContentBlock, ImageSource, Message};
 
     #[test]
     fn test_name_returns_configured_name() {
@@ -151,5 +168,24 @@ mod tests {
             "ollama".to_string(),
         );
         assert_eq!(provider.name(), "ollama");
+    }
+
+    #[test]
+    fn caption_and_image_share_one_user_message() {
+        let provider = OpenAiCompatProvider::new("key".into(), "http://mock".into(), "mock".into());
+        let mut message = Message::user("caption");
+        message.content.push(ContentBlock::Image {
+            source: ImageSource {
+                source_type: "base64".into(),
+                media_type: "image/png".into(),
+                data: "AA==".into(),
+            },
+        });
+        let params = ChatParams::new("mock".into(), vec![], String::new());
+        let messages = provider.build_messages_from_messages(&[message], &params);
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0]["role"], "user");
+        assert_eq!(messages[0]["content"][0]["text"], "caption");
+        assert_eq!(messages[0]["content"][1]["type"], "image_url");
     }
 }

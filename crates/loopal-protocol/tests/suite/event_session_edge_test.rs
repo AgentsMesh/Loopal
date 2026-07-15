@@ -1,4 +1,4 @@
-use loopal_protocol::{AgentEvent, AgentEventPayload};
+use loopal_protocol::{AgentEvent, AgentEventPayload, ProjectedMessage, SessionHistorySnapshot};
 
 #[test]
 fn test_event_session_resumed_serde_roundtrip() {
@@ -54,4 +54,30 @@ fn test_event_session_resume_warnings_empty_warnings_roundtrips() {
     } else {
         panic!("expected SessionResumeWarnings");
     }
+}
+
+#[test]
+fn session_history_loaded_serde_roundtrip() {
+    let event = AgentEvent::root(AgentEventPayload::SessionHistoryLoaded(
+        SessionHistorySnapshot {
+            session_id: "session-1".into(),
+            messages: vec![ProjectedMessage {
+                role: "user".into(),
+                content: "persisted".into(),
+                tool_calls: vec![],
+                image_count: 1,
+                skill_info: None,
+            }],
+            truncated: true,
+        },
+    ));
+    let decoded: AgentEvent =
+        serde_json::from_str(&serde_json::to_string(&event).unwrap()).unwrap();
+    let AgentEventPayload::SessionHistoryLoaded(history) = decoded.payload else {
+        panic!("expected SessionHistoryLoaded");
+    };
+    assert_eq!(history.session_id, "session-1");
+    assert_eq!(history.messages[0].content, "persisted");
+    assert_eq!(history.messages[0].image_count, 1);
+    assert!(history.truncated);
 }

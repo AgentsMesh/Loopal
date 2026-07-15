@@ -1,0 +1,32 @@
+{
+  "version": 2,
+  "name": "provider-command-surface",
+  "calls": [
+    {
+      "expect": {
+        "protocol": "anthropic",
+        "userContains": "COMMAND_SURFACE_NORMAL_PROMPT",
+        "bodyExcludes": "SKILL_E2E_BODY_MARKER",
+        "messageCount": 1
+      },
+      "chunks": [
+        { "type": "text", "text": "Ordinary prompt crossed the model boundary once." },
+        { "type": "usage", "input": 21, "output": 8 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "protocol": "anthropic",
+        "userContains": "SKILL_E2E_BODY_MARKER",
+        "bodyContains": "Apply the Desktop skill to alpha beta.",
+        "messageCount": 3
+      },
+      "chunks": [
+        { "type": "text", "text": "Dynamic Skill was expanded by the production Hub." },
+        { "type": "usage", "input": 39, "output": 9 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

@@ -51,3 +51,10 @@ pub struct PendingPermission {
     #[serde(default)]
     pub cursor: PermissionChoice,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PendingPlanApproval {
+    pub id: String,
+    pub plan_content: String,
+    pub plan_path: String,
+}

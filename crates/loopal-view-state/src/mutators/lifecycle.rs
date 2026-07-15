@@ -1,3 +1,5 @@
+use loopal_protocol::{AgentStatus, ContinuationGateSummary, GateCloseReason};
+
 use crate::state::SessionViewState;
 
 use super::MutationEffect;
@@ -38,6 +40,25 @@ pub(super) fn sandbox_policy_changed(state: &mut SessionViewState, policy: &str)
 
 pub(super) fn thinking_changed(state: &mut SessionViewState, raw_json: &str) -> MutationEffect {
     state.agent.observable.thinking_config = normalize_thinking_label(raw_json);
+    MutationEffect::Mutated
+}
+
+pub(super) fn continuation_gate_changed(
+    state: &mut SessionViewState,
+    summary: &ContinuationGateSummary,
+) -> MutationEffect {
+    let current = state.agent.observable.status;
+    let next = if !summary.open && summary.closed_reason == Some(GateCloseReason::UserSuspend) {
+        AgentStatus::Suspended
+    } else if summary.open && current == AgentStatus::Suspended {
+        AgentStatus::Running
+    } else {
+        return MutationEffect::NoOp;
+    };
+    if current == next {
+        return MutationEffect::NoOp;
+    }
+    state.agent.observable.status = next;
     MutationEffect::Mutated
 }
 

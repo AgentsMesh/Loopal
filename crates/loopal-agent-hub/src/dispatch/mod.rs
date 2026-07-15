@@ -9,12 +9,14 @@ use tokio::sync::Mutex;
 use crate::hub::Hub;
 
 mod cross_hub_forward;
-mod dispatch_handlers;
+pub(crate) mod dispatch_handlers;
 mod mcp_handlers;
 mod registry;
-mod relay_response_handlers;
+pub(crate) mod relay_response_handlers;
 mod secret_handlers;
 mod shutdown_handler;
+mod skill_routing;
+mod spawn_parent_policy;
 #[doc(hidden)]
 pub mod spawn_prepare;
 mod spawn_routing;

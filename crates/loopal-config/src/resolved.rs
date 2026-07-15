@@ -37,16 +37,46 @@ pub struct ResolvedConfig {
 impl std::fmt::Debug for ResolvedConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ResolvedConfig")
-            .field("settings", &self.settings)
-            .field("mcp_servers", &self.mcp_servers)
-            .field("skills", &self.skills)
-            .field("hooks", &self.hooks)
-            .field("instructions", &self.instructions)
-            .field("memory", &self.memory)
-            .field("classifier_prompt", &self.classifier_prompt)
-            .field("layers", &self.layers)
+            .field("mcp_server_count", &self.mcp_servers.len())
+            .field("skill_count", &self.skills.len())
+            .field("hook_count", &self.hooks.len())
+            .field("instruction_bytes", &self.instructions.len())
+            .field("memory_bytes", &self.memory.len())
+            .field("has_classifier_prompt", &self.classifier_prompt.is_some())
+            .field("layer_count", &self.layers.len())
             .field("secrets", &self.secrets.is_some())
             .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::settings::ProviderConfig;
+
+    #[test]
+    fn debug_reports_shape_without_configuration_contents() {
+        let marker = "resolved-config-secret-marker";
+        let mut settings = Settings::default();
+        settings.providers.anthropic = Some(ProviderConfig {
+            api_key: Some(marker.into()),
+            api_key_env: None,
+            base_url: None,
+        });
+        let resolved = ResolvedConfig {
+            settings,
+            mcp_servers: Default::default(),
+            skills: Default::default(),
+            hooks: Vec::new(),
+            instructions: marker.into(),
+            memory: marker.into(),
+            classifier_prompt: Some(marker.into()),
+            layers: vec![LayerSource::Local],
+            secrets: None,
+        };
+        let debug = format!("{resolved:?}");
+        assert!(!debug.contains(marker));
+        assert!(debug.contains("mcp_server_count"));
     }
 }
 

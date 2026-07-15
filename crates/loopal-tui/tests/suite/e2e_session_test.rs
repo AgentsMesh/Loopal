@@ -30,17 +30,16 @@ async fn test_session_persistence_roundtrip() {
         .build()
         .await;
 
-    // The session dir is <fixture>/sessions/sessions/integration-test/
-    // (session_manager base_dir = <fixture>/sessions, storage adds sessions/<id>/)
-    let session_dir = harness
-        .fixture
-        .path()
-        .join("sessions/sessions/integration-test");
-
     let _ = harness.runner.run().await;
 
-    // The runner saves messages via session_manager.save_message().
-    // Check that the session directory was created with message files.
+    let sessions_root = harness.fixture.path().join("sessions/sessions");
+    let session_dirs: Vec<_> = std::fs::read_dir(&sessions_root)
+        .expect("read sessions root")
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| entry.path().is_dir())
+        .collect();
+    assert_eq!(session_dirs.len(), 1, "expected one persisted session");
+    let session_dir = session_dirs[0].path();
     assert!(
         session_dir.exists(),
         "session directory should exist at {}",

@@ -1,0 +1,48 @@
+{
+  "version": 2,
+  "name": "metahub-inflight-reconnect",
+  "calls": [
+    {
+      "expect": { "userContains": "REMOTE INFLIGHT INITIATE" },
+      "chunks": [
+        {
+          "type": "tool_use", "id": "remote-inflight-send", "name": "SendMessage",
+          "input": { "to": "hub-a/main", "message": "REMOTE INFLIGHT REQUEST" }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "remote-inflight-send" },
+      "chunks": [
+        { "type": "text", "text": "REMOTE INFLIGHT SEND ACK" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "[from: hub-b/main] REMOTE INFLIGHT REQUEST" },
+      "delayMs": 3000,
+      "chunks": [
+        {
+          "type": "tool_use", "id": "desktop-inflight-reply", "name": "SendMessage",
+          "input": { "to": "hub-b/main", "message": "DESKTOP INFLIGHT REPLY" }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "desktop-inflight-reply" },
+      "chunks": [
+        { "type": "text", "text": "DESKTOP INFLIGHT ACK" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "[from: hub-a/main] DESKTOP INFLIGHT REPLY" },
+      "chunks": [
+        { "type": "text", "text": "REMOTE INFLIGHT OBSERVED" },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "name": "provider-settings-openai-compatible",
+  "calls": [
+    {
+      "expect": {
+        "protocol": "openai_compat",
+        "model": "compat-e2e/deepseek-reasoner",
+        "userContains": "Use compatible provider saved in Desktop Settings"
+      },
+      "chunks": [
+        { "type": "thinking", "text": "Settings route verified. " },
+        { "type": "text", "text": "Desktop Settings activated the authenticated compatible provider." },
+        { "type": "usage", "input": 19, "output": 10, "thinking": 4 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

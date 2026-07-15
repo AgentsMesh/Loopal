@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "name": "provider-terminal-max",
+  "calls": [
+    {
+      "expect": { "userContains": "Exercise provider max token terminal" },
+      "chunks": [
+        { "type": "text", "text": "PROVIDER TERMINAL PARTIAL" },
+        { "type": "usage", "input": 13, "output": 5 },
+        { "type": "done", "reason": "max_tokens" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "PROVIDER TERMINAL PARTIAL" },
+      "chunks": [
+        { "type": "text", "text": "Provider-specific max token continuation completed." },
+        { "type": "usage", "input": 18, "output": 7 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

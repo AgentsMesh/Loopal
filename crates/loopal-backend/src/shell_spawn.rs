@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use loopal_config::ResolvedPolicy;
 use loopal_error::ToolIoError;
+use loopal_protocol::META_HUB_TOKEN_ENV;
 use loopal_tool_api::backend_types::EnvOverride;
 use loopal_tool_api::output_tail::OutputTail;
 use loopal_tool_api::{HeadTail, StderrCappedBuffer};
@@ -62,6 +63,7 @@ pub(crate) async fn prepare_spawn(
     for (k, v) in &env_overrides.vars {
         cmd.env(k, v);
     }
+    cmd.env_remove(META_HUB_TOKEN_ENV);
     configure_process_group(&mut cmd);
 
     let mut child = cmd

@@ -1,4 +1,4 @@
-use loopal_error::Result;
+use loopal_error::{LoopalError, ProviderError, Result};
 use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::ContentBlock;
 use loopal_provider_api::StreamChunk;
@@ -85,7 +85,9 @@ impl AgentLoopRunner {
                 result.thinking_tokens += thinking_tokens;
                 let full_input =
                     input_tokens + cache_creation_input_tokens + cache_read_input_tokens;
-                self.turns.record_actual_input_tokens(full_input);
+                if full_input > 0 {
+                    self.turns.record_actual_input_tokens(full_input);
+                }
                 self.emit_in_turn(AgentEventPayload::TokenUsage {
                     input_tokens,
                     output_tokens,
@@ -103,14 +105,27 @@ impl AgentLoopRunner {
             }
             Err(e) => {
                 error!(error = %e, turn = self.turn_count, model = %self.params.config.model(), "stream error");
-                self.emit_in_turn(AgentEventPayload::Error {
+                self.emit_in_turn(AgentEventPayload::ProviderWarning {
                     message: e.to_string(),
                 })
                 .await?;
-                result.stream_error = true;
+                if is_transport_truncation(&e) {
+                    result.stream_error = true;
+                } else {
+                    result.terminal_error = Some(e);
+                }
                 return Ok(false);
             }
         }
         Ok(true)
     }
+}
+
+fn is_transport_truncation(error: &LoopalError) -> bool {
+    matches!(
+        error,
+        LoopalError::Provider(
+            ProviderError::Http(_) | ProviderError::SseParse(_) | ProviderError::StreamEnded
+        )
+    )
 }

@@ -77,6 +77,12 @@ pub fn build_fork_synthetic_turn(start: &StartParams) -> Option<Turn> {
         kind: InjectionKind::SystemNote,
         text,
     });
+    if let Some(prompt) = start.prompt.as_deref() {
+        turn.body.steps.push(TurnStep::Injection {
+            kind: InjectionKind::SystemNote,
+            text: format!("{}{prompt}", loopal_context::fork::FORK_BOILERPLATE),
+        });
+    }
     turn.outcome = TurnOutcome::Complete;
     Some(turn)
 }

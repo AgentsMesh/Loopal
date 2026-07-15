@@ -3,7 +3,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::GitError;
-use crate::gitignore::ensure_loopal_gitignore;
+use crate::gitignore::ensure_worktree_exclude;
+
+pub use crate::worktree_removal::{cleanup_if_clean, remove_worktree};
 
 /// Information about a created worktree.
 #[derive(Debug, Clone)]
@@ -18,6 +20,29 @@ pub struct WorktreeInfo {
 /// The worktree is created on a new branch `loopal-wt-<name>` based on HEAD.
 /// The `.loopal/worktrees/` directory is created if it does not exist.
 pub fn create_worktree(repo_root: &Path, name: &str) -> Result<WorktreeInfo, GitError> {
+    create_worktree_from(repo_root, name, "HEAD")
+}
+
+pub fn create_worktree_at(
+    repo_root: &Path,
+    name: &str,
+    start_point: &str,
+) -> Result<WorktreeInfo, GitError> {
+    let valid_oid = matches!(start_point.len(), 40 | 64)
+        && start_point.bytes().all(|value| value.is_ascii_hexdigit());
+    if !valid_oid {
+        return Err(GitError::CommandFailed(
+            "worktree start point must be a full Git object ID".into(),
+        ));
+    }
+    create_worktree_from(repo_root, name, start_point)
+}
+
+fn create_worktree_from(
+    repo_root: &Path,
+    name: &str,
+    start_point: &str,
+) -> Result<WorktreeInfo, GitError> {
     validate_name(name)?;
 
     let wt_dir = repo_root.join(".loopal").join("worktrees").join(name);
@@ -26,31 +51,26 @@ pub fn create_worktree(repo_root: &Path, name: &str) -> Result<WorktreeInfo, Git
     }
 
     let branch = format!("loopal-wt-{name}");
-
-    // Only delete orphaned branches — skip if the branch is used by an active worktree.
-    let (_, active_branches) = parse_worktree_list(repo_root);
-    if !active_branches.contains(&branch) {
-        let _ = Command::new("git")
-            .args(["branch", "-D", &branch])
-            .current_dir(repo_root)
-            .stderr(std::process::Stdio::null())
-            .stdout(std::process::Stdio::null())
-            .status();
+    if local_branch_exists(repo_root, &branch)? {
+        return Err(GitError::WorktreeExists(name.to_string()));
     }
 
+    ensure_worktree_exclude(repo_root)?;
     if let Some(parent) = wt_dir.parent() {
         std::fs::create_dir_all(parent)?;
     }
 
-    ensure_loopal_gitignore(&repo_root.join(".loopal"));
-
     let output = Command::new("git")
         .args(["worktree", "add", "-b", &branch])
         .arg(&wt_dir)
+        .arg(start_point)
         .current_dir(repo_root)
         .output()?;
 
     if !output.status.success() {
+        if local_branch_exists(repo_root, &branch).unwrap_or(false) {
+            return Err(GitError::WorktreeExists(name.to_string()));
+        }
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
         return Err(GitError::CommandFailed(stderr));
     }
@@ -62,38 +82,20 @@ pub fn create_worktree(repo_root: &Path, name: &str) -> Result<WorktreeInfo, Git
     })
 }
 
-/// Remove a worktree by name.
-///
-/// If `force` is true, uses `--force` to remove even with uncommitted changes.
-pub fn remove_worktree(repo_root: &Path, name: &str, force: bool) -> Result<(), GitError> {
-    validate_name(name)?;
-
-    let wt_dir = repo_root.join(".loopal").join("worktrees").join(name);
-    let mut args = vec!["worktree", "remove"];
-    if force {
-        args.push("--force");
-    }
-    let wt_str = wt_dir.to_string_lossy().to_string();
-    args.push(&wt_str);
-
+fn local_branch_exists(repo_root: &Path, branch: &str) -> Result<bool, GitError> {
+    let reference = format!("refs/heads/{branch}");
     let output = Command::new("git")
-        .args(&args)
+        .args(["show-ref", "--verify", "--quiet", &reference])
         .current_dir(repo_root)
         .output()?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        return Err(GitError::CommandFailed(stderr));
+    if output.status.success() {
+        return Ok(true);
     }
-
-    // Also delete the branch
-    let branch = format!("loopal-wt-{name}");
-    let _ = Command::new("git")
-        .args(["branch", "-D", &branch])
-        .current_dir(repo_root)
-        .output();
-
-    Ok(())
+    if output.status.code() == Some(1) {
+        return Ok(false);
+    }
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    Err(GitError::CommandFailed(stderr))
 }
 
 /// Check whether the worktree has uncommitted changes or untracked files.
@@ -112,22 +114,10 @@ pub fn worktree_has_changes(worktree_path: &Path) -> Result<bool, GitError> {
     Ok(!stdout.trim().is_empty())
 }
 
-/// Remove a worktree if it has no uncommitted changes. Returns `true` if removed.
-/// Canonical cleanup logic shared by bootstrap, agent spawn, and spawn-failure paths.
-pub fn cleanup_if_clean(repo_root: &Path, info: &WorktreeInfo) -> bool {
-    let has_changes = worktree_has_changes(&info.path).unwrap_or(true);
-    if !has_changes {
-        let _ = remove_worktree(repo_root, &info.name, false);
-        return true;
-    }
-    false
-}
-
 /// Parse `git worktree list --porcelain` for active worktree paths and branch names.
 ///
-/// Returns `(canonicalized_paths, branch_names)`. Used by `create_worktree`
-/// (to avoid deleting branches in use) and `cleanup_stale_worktrees`
-/// (to detect directories not tracked by git).
+/// Returns `(canonicalized_paths, branch_names)`. Used to detect directories
+/// not tracked by git during stale worktree cleanup.
 pub(crate) fn parse_worktree_list(repo_root: &Path) -> (HashSet<PathBuf>, HashSet<String>) {
     let Ok(output) = Command::new("git")
         .args(["worktree", "list", "--porcelain"])
@@ -157,7 +147,7 @@ pub(crate) fn parse_worktree_list(repo_root: &Path) -> (HashSet<PathBuf>, HashSe
 }
 
 /// Reject names that could escape `.loopal/worktrees/` or inject into git commands.
-fn validate_name(name: &str) -> Result<(), GitError> {
+pub(crate) fn validate_name(name: &str) -> Result<(), GitError> {
     let invalid = name.is_empty()
         || name.len() > 200
         || name.contains('/')

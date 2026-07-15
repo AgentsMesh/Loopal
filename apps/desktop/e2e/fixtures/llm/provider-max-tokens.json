@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "name": "provider-max-tokens",
+  "calls": [
+    {
+      "expect": { "userContains": "Exercise max token continuation" },
+      "chunks": [
+        { "type": "text", "text": "PARTIAL MAX TOKEN OUTPUT" },
+        { "type": "usage", "input": 18, "output": 12 },
+        { "type": "done", "reason": "max_tokens" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "PARTIAL MAX TOKEN OUTPUT" },
+      "chunks": [
+        { "type": "text", "text": "Continuation completed over a second HTTP request." },
+        { "type": "usage", "input": 30, "output": 10 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

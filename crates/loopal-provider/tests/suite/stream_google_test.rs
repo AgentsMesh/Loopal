@@ -87,6 +87,25 @@ data: {\"candidates\":[{\"content\":{\"parts\":[{\"functionCall\":{\"name\":\"re
 }
 
 #[tokio::test]
+async fn google_stream_preserves_thought_signature() {
+    let server = MockServer::start().await;
+    let sse = "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"reason\",\"thought\":true},{\"thoughtSignature\":\"sig-1\"}]},\"finishReason\":\"STOP\"}]}\n\n";
+    Mock::given(method("POST"))
+        .and(path("/models/test-model:streamGenerateContent"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(sse, "text/event-stream"))
+        .mount(&server)
+        .await;
+    let provider = GoogleProvider::new("key".into()).with_base_url(server.uri());
+    let chunks = collect_chunks(provider.stream_chat(&test_chat_params()).await.unwrap()).await;
+    assert!(chunks.iter().any(|chunk| matches!(
+        chunk, Ok(StreamChunk::Thinking { text }) if text == "reason"
+    )));
+    assert!(chunks.iter().any(|chunk| matches!(
+        chunk, Ok(StreamChunk::ThinkingSignature { signature }) if signature == "sig-1"
+    )));
+}
+
+#[tokio::test]
 async fn test_google_stream_chat_rate_limited() {
     let mock_server = MockServer::start().await;
 
@@ -133,5 +152,28 @@ async fn test_google_stream_chat_server_error() {
             assert!(message.contains("server failure"));
         }
         other => panic!("expected Api error, got: {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn google_error_never_surfaces_query_api_key_or_oversized_body() {
+    const MARKER: &str = "google-query-api-key-secret-marker";
+    let mock_server = MockServer::start().await;
+    let body = format!("Authorization: Bearer {MARKER} {}", "x".repeat(70_000));
+    Mock::given(method("POST"))
+        .and(path("/models/test-model:streamGenerateContent"))
+        .respond_with(ResponseTemplate::new(500).set_body_string(body))
+        .mount(&mock_server)
+        .await;
+    let provider = GoogleProvider::new(MARKER.into()).with_base_url(mock_server.uri());
+
+    let error = expect_err(provider.stream_chat(&test_chat_params()).await);
+    assert!(!format!("{error}").contains(MARKER));
+    assert!(!format!("{error:?}").contains(MARKER));
+    match error {
+        LoopalError::Provider(ProviderError::Api { message, .. }) => {
+            assert_eq!(message, "google API request failed");
+        }
+        other => panic!("expected safe Google API error, got: {other:?}"),
     }
 }

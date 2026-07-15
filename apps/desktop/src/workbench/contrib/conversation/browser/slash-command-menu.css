@@ -1,0 +1,51 @@
+.composer { position: relative; }
+
+.command-menu {
+  position: absolute;
+  z-index: 30;
+  right: 0;
+  bottom: calc(100% + 8px);
+  left: 0;
+  overflow: auto;
+  max-height: min(390px, 48vh);
+  padding: 5px;
+  border: 1px solid #343b4d;
+  border-radius: 10px;
+  background: #11151d;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .48);
+}
+
+.command-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #cbd1de;
+  text-align: left;
+  cursor: pointer;
+}
+
+.command-option:hover,
+.command-option.selected { background: #202637; }
+
+.command-option-copy,
+.command-option-meta { min-width: 0; display: flex; align-items: baseline; gap: 9px; }
+.command-option-copy { flex: 1; }
+.command-option-copy strong { color: #e0e4ef; font-size: 12px; }
+.command-option-copy small { overflow: hidden; color: #8b94aa; text-overflow: ellipsis; white-space: nowrap; }
+.command-option-meta { flex: none; color: #717b92; font-size: 9px; }
+.command-option-meta code { color: #858faa; font: 9px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.command-menu-empty { padding: 12px; color: #7d869b; font-size: 11px; text-align: center; }
+
+.command-error {
+  padding: 8px 12px;
+  border-bottom: 1px solid #57323a;
+  background: #25171b;
+  color: #e3989f;
+  font-size: 10px;
+}

@@ -1,7 +1,7 @@
 use loopal_protocol::MessageSource;
 
 use crate::SessionMessage;
-use crate::conversation::{PendingPermission, conversation_display};
+use crate::conversation::{PendingPermission, PendingPlanApproval, conversation_display};
 use crate::state::SessionViewState;
 
 use super::MutationEffect;
@@ -35,19 +35,40 @@ pub(super) fn tool_permission_resolved(state: &mut SessionViewState, id: &str) -
     }
 }
 
+pub(super) fn plan_approval_request(
+    state: &mut SessionViewState,
+    id: &str,
+    plan_content: &str,
+    plan_path: &str,
+) -> MutationEffect {
+    let conv = &mut state.agent.conversation;
+    conv.flush_streaming();
+    conv.pending_plan_approval = Some(PendingPlanApproval {
+        id: id.to_string(),
+        plan_content: plan_content.to_string(),
+        plan_path: plan_path.to_string(),
+    });
+    MutationEffect::Mutated
+}
+
+pub(super) fn plan_approval_resolved(state: &mut SessionViewState, id: &str) -> MutationEffect {
+    let pending = &mut state.agent.conversation.pending_plan_approval;
+    if pending.as_ref().is_some_and(|value| value.id == id) {
+        *pending = None;
+        MutationEffect::Mutated
+    } else {
+        MutationEffect::NoOp
+    }
+}
+
 pub(super) fn user_message_queued(
     state: &mut SessionViewState,
     message_id: &str,
     content: &str,
     image_count: usize,
+    skill_info: Option<loopal_protocol::SkillInvocation>,
 ) -> MutationEffect {
-    let already_present = state
-        .agent
-        .conversation
-        .messages
-        .iter()
-        .any(|m| m.role == "user" && m.message_id.as_deref() == Some(message_id));
-    if already_present {
+    if message_seen(state, message_id) {
         return MutationEffect::NoOp;
     }
     let mut text = content.to_string();
@@ -58,6 +79,7 @@ pub(super) fn user_message_queued(
         role: "user".to_string(),
         content: text,
         image_count,
+        skill_info,
         message_id: Some(message_id.to_string()),
         ..Default::default()
     });
@@ -68,8 +90,14 @@ pub(super) fn auto_continuation(
     state: &mut SessionViewState,
     cont: u32,
     max: u32,
+    reason: &str,
 ) -> MutationEffect {
-    conversation_display::handle_auto_continuation(&mut state.agent.conversation, cont, max);
+    conversation_display::handle_auto_continuation(
+        &mut state.agent.conversation,
+        cont,
+        max,
+        reason,
+    );
     MutationEffect::Mutated
 }
 
@@ -100,7 +128,10 @@ pub(super) fn inbox_enqueued(
     content: &str,
     summary: Option<&str>,
 ) -> MutationEffect {
-    if source.is_optimistically_rendered() {
+    if source.is_ephemeral_in_history() {
+        return MutationEffect::NoOp;
+    }
+    if message_seen(state, message_id) {
         return MutationEffect::NoOp;
     }
     conversation_display::push_inbox_msg(
@@ -111,6 +142,16 @@ pub(super) fn inbox_enqueued(
         summary.map(String::from),
     );
     MutationEffect::Mutated
+}
+
+fn message_seen(state: &SessionViewState, message_id: &str) -> bool {
+    state.agent.conversation.messages.iter().any(|message| {
+        message.message_id.as_deref() == Some(message_id)
+            || message
+                .inbox
+                .as_ref()
+                .is_some_and(|inbox| inbox.message_id == message_id)
+    })
 }
 
 pub(super) fn permission_decided(

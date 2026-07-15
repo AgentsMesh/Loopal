@@ -1,0 +1,29 @@
+.status-bar {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 10px;
+  border-top: 1px solid var(--wb-border-subtle);
+  background: var(--wb-surface-2);
+  color: var(--wb-text-muted);
+  font-size: 9px;
+}
+.status-bar > button { border: 0; background: transparent; color: inherit; cursor: pointer; }
+.status-federation { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.status-federation > span { width: 6px; height: 6px; border-radius: 50%; background: var(--wb-text-muted); }
+.status-federation.state-connected > span { background: var(--wb-success); }
+.status-federation.state-running > span { background: var(--wb-warning); }
+.status-federation.state-error > span { background: var(--wb-danger); }
+.status-federation small { color: var(--wb-text-muted); font-size: 9px; }
+
+.settings-overlay {
+  position: absolute;
+  z-index: var(--wb-overlay);
+  inset: 0;
+  display: flex;
+  background: rgba(8, 10, 14, .82);
+  backdrop-filter: blur(8px);
+}
+.settings-overlay > .settings-view { width: 100%; box-shadow: var(--wb-shadow); }

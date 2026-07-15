@@ -1,5 +1,6 @@
 mod backend;
 mod mcp;
+mod mcp_proxy;
 mod resolve;
 
 use std::sync::Arc;

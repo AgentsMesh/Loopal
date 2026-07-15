@@ -5,9 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Skill invocation metadata (display-side; serialized when carried inside
-/// per-agent `ViewSnapshot` payloads, but stripped from `UserContent`
-/// before IPC routing).
+/// Skill invocation metadata carried through routing and display projection.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SkillInvocation {
     pub name: String,
@@ -20,8 +18,7 @@ pub struct UserContent {
     pub text: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub images: Vec<ImageAttachment>,
-    /// Skill invocation origin — transient, never serialized over IPC.
-    #[serde(skip)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub skill_info: Option<SkillInvocation>,
 }
 

@@ -29,9 +29,34 @@ pub fn deep_merge(base: &mut serde_json::Value, overlay: serde_json::Value) {
     }
 }
 
+pub(crate) fn merge_settings(base: &mut serde_json::Value, mut overlay: serde_json::Value) {
+    if let Some(routes) = overlay
+        .get_mut("model_routing")
+        .and_then(|value| value.as_object_mut())
+    {
+        let tombstones = routes
+            .iter()
+            .filter(|(_, value)| value.is_null())
+            .map(|(key, _)| key.clone())
+            .collect::<Vec<_>>();
+        if let Some(base_routes) = base
+            .get_mut("model_routing")
+            .and_then(|value| value.as_object_mut())
+        {
+            for key in &tombstones {
+                base_routes.remove(key);
+            }
+        }
+        for key in tombstones {
+            routes.remove(&key);
+        }
+    }
+    deep_merge(base, overlay);
+}
+
 /// Load a JSON file and return its Value, or Null if the file does not exist.
 pub fn load_json_file(path: &Path) -> Result<serde_json::Value, LoopalError> {
-    match std::fs::read_to_string(path) {
+    match crate::bounded_json_file::read(path) {
         Ok(contents) => {
             let value: serde_json::Value = serde_json::from_str(&contents)
                 .map_err(|e| ConfigError::Parse(format!("{}: {}", path.display(), e)))?;

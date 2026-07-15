@@ -5,7 +5,7 @@
 
 use serde_json::json;
 
-use loopal_test_support::assertions;
+use loopal_test_support::{assertions, chunks};
 
 use super::e2e_harness::{AcpTestHarness, build_acp_harness};
 
@@ -46,7 +46,49 @@ async fn test_control_request_compact_ok() {
 }
 
 #[tokio::test]
-async fn test_control_request_bgtask_kill_ok() {
+async fn test_control_request_bgtask_kill_running_process() {
+    let calls = vec![
+        chunks::tool_turn(
+            "tc-bg",
+            "Bash",
+            json!({
+                "command": "sleep 60",
+                "run_in_background": true,
+                "description": "acp background fixture"
+            }),
+        ),
+        chunks::text_turn("Background process started."),
+    ];
+    let mut harness = build_acp_harness(calls).await;
+    let sid = setup_session(&mut harness).await;
+    let (prompt, notifications) = harness
+        .request_with_notifications(
+            "session/prompt",
+            json!({"sessionId": sid, "prompt": [{"type": "text", "text": "start it"}]}),
+        )
+        .await;
+    assertions::assert_json_rpc_ok(&prompt);
+    let process_id = notifications
+        .iter()
+        .find(|notification| notification["method"] == "_loopal/bgTask.spawned")
+        .and_then(|notification| notification["params"]["data"]["id"].as_str())
+        .expect("background spawn notification");
+
+    let resp = harness
+        .request(
+            "session/control_request",
+            json!({
+                "sessionId": sid,
+                "subtype": "loopal.bgTaskKill",
+                "params": {"id": process_id}
+            }),
+        )
+        .await;
+    assertions::assert_json_rpc_ok(&resp);
+}
+
+#[tokio::test]
+async fn test_control_request_bgtask_kill_rejects_missing_process() {
     let mut harness = build_acp_harness(vec![]).await;
     let sid = setup_session(&mut harness).await;
     let resp = harness
@@ -55,7 +97,13 @@ async fn test_control_request_bgtask_kill_ok() {
             json!({"sessionId": sid, "subtype": "loopal.bgTaskKill", "params": {"id": "bg1"}}),
         )
         .await;
-    assertions::assert_json_rpc_ok(&resp);
+    assertions::assert_json_rpc_error(&resp, -32603);
+    assert!(
+        resp["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("Process not found: bg1")),
+        "missing process rejection should preserve the runtime reason: {resp}"
+    );
 }
 
 #[tokio::test]

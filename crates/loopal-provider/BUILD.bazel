@@ -4,6 +4,7 @@ rust_library(
     name = "loopal-provider",
     srcs = glob(["src/**/*.rs"]),
     edition = "2024",
+    proc_macro_deps = ["@crates//:async-trait"],
     visibility = ["//visibility:public"],
     deps = [
         "//crates/loopal-error",
@@ -20,13 +21,13 @@ rust_library(
         "@crates//:tokio",
         "@crates//:tracing",
     ],
-    proc_macro_deps = ["@crates//:async-trait"],
 )
 
 rust_test(
     name = "loopal-provider-unit-test",
     crate = ":loopal-provider",
     edition = "2024",
+    deps = ["//crates/loopal-tool-invocation"],
 )
 
 rust_test(
@@ -34,6 +35,7 @@ rust_test(
     srcs = glob(["tests/**/*.rs"]),
     crate_root = "tests/suite.rs",
     edition = "2024",
+    proc_macro_deps = ["@crates//:async-trait"],
     deps = [
         ":loopal-provider",
         "//crates/loopal-error",
@@ -42,9 +44,8 @@ rust_test(
         "//crates/loopal-tool-invocation",
         "//crates/loopal-turn",
         "@crates//:futures",
+        "@crates//:serde_json",
         "@crates//:tokio",
         "@crates//:wiremock",
-        "@crates//:serde_json",
     ],
-    proc_macro_deps = ["@crates//:async-trait"],
 )

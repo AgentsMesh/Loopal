@@ -1,0 +1,91 @@
+{
+  "version": 2,
+  "name": "metahub-cross-hub-agent",
+  "calls": [
+    {
+      "expect": { "userContains": "Exercise the cross-hub Agent lifecycle" },
+      "chunks": [
+        {
+          "type": "tool_use", "id": "cross-list-hubs", "name": "ListHubs",
+          "input": {}
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "toolResultId": "cross-list-hubs",
+        "bodyContains": "Connected to MetaHub as 'hub-a-"
+      },
+      "chunks": [
+        {
+          "type": "tool_use", "id": "cross-spawn", "name": "Agent",
+          "input": {
+            "action": "spawn",
+            "name": "remote-worker",
+            "prompt": "Return REMOTE CHILD PROVIDER COMPLETION 7E92",
+            "target_hub": "hub-b",
+            "run_in_background": true
+          }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Return REMOTE CHILD PROVIDER COMPLETION 7E92" },
+      "delayMs": 9000,
+      "chunks": [
+        { "type": "text", "text": "REMOTE CHILD PROVIDER COMPLETION 7E92" },
+        { "type": "usage", "input": 31, "output": 7 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "toolResultId": "cross-spawn",
+        "bodyContains": "spawned in background"
+      },
+      "chunks": [
+        {
+          "type": "tool_use", "id": "cross-status", "name": "Agent",
+          "input": {
+            "action": "status", "name": "remote-worker", "prompt": "Read status"
+          }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "cross-status", "bodyContains": "Running" },
+      "chunks": [
+        { "type": "text", "text": "Remote child status is running." },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "userContains": "<agent-result name=\"remote-worker\">\nREMOTE CHILD PROVIDER COMPLETION 7E92"
+      },
+      "chunks": [
+        {
+          "type": "tool_use", "id": "cross-result", "name": "Agent",
+          "input": {
+            "action": "result", "name": "remote-worker", "prompt": "Read result"
+          }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "toolResultId": "cross-result",
+        "bodyContains": "REMOTE CHILD PROVIDER COMPLETION 7E92"
+      },
+      "chunks": [
+        { "type": "text", "text": "Cross-hub result observed exactly once." },
+        { "type": "usage", "input": 45, "output": 8 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

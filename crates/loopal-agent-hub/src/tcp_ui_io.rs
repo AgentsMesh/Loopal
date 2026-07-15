@@ -45,16 +45,69 @@ pub fn start_tcp_ui_io(
             h.ui.register_client(&n, conn.clone());
             h.ui.subscribe_events()
         };
+        let service_rx = hub
+            .lock()
+            .await
+            .workspace
+            .as_ref()
+            .map(|service| service.subscribe());
         let conn_io = conn.clone();
         let hub_io = hub_for_io.clone();
         let n_io = n.clone();
 
         let forward = tokio::spawn(forward_events(n.clone(), event_rx, conn_for_forward));
+        let service_forward =
+            service_rx.map(|rx| tokio::spawn(forward_service_events(n.clone(), rx, conn.clone())));
         ui_client_io_loop(hub_io, dispatcher, conn_io, rx, n_io).await;
         forward.abort();
+        if let Some(task) = service_forward {
+            task.abort();
+        }
         hub.lock().await.ui.unregister_client(&n);
         info!(client = %n, "TCP UI client disconnected");
     });
+}
+
+async fn forward_service_events(
+    client: String,
+    mut event_rx: tokio::sync::broadcast::Receiver<loopal_workspace::ServiceNotification>,
+    conn: Arc<Connection<Listening>>,
+) {
+    loop {
+        match event_rx.recv().await {
+            Ok(event) => {
+                if conn
+                    .send_notification(event.method, event.params)
+                    .await
+                    .is_err()
+                {
+                    return;
+                }
+            }
+            Err(RecvError::Lagged(n)) => {
+                warn!(client = %client, lagged = n, "workspace event forward lagged");
+                if send_service_lag(&conn, n).await.is_err() {
+                    return;
+                }
+            }
+            Err(RecvError::Closed) => return,
+        }
+    }
+}
+
+async fn send_service_lag(
+    conn: &Connection<Listening>,
+    dropped: u64,
+) -> Result<(), loopal_ipc::rpc_error::RpcError> {
+    conn.send_notification(
+        methods::WORKSPACE_RESYNC_REQUIRED.name,
+        serde_json::json!({
+            "workspaceId": loopal_workspace::LOCAL_WORKSPACE_ID,
+            "reason": "event_lag",
+            "droppedEvents": dropped,
+        }),
+    )
+    .await
 }
 
 async fn forward_events(

@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "name": "provider-background-lifecycle",
+  "calls": [
+    {
+      "expect": { "userContains": "Run deterministic background lifecycles" },
+      "chunks": [
+        { "type": "tool_use", "id": "background-success", "name": "Bash", "input": {
+          "command": "printf 'BG_SUCCESS_START\\n'; sleep 4; printf 'BG_SUCCESS_DONE\\n'",
+          "run_in_background": true, "description": "Successful background fixture" } },
+        { "type": "tool_use", "id": "background-failure", "name": "Bash", "input": {
+          "command": "printf 'BG_FAILURE_START\\n'; sleep 7; printf 'BG_FAILURE_ERR\\n' >&2; exit 7",
+          "run_in_background": true, "description": "Failed background fixture" } },
+        { "type": "tool_use", "id": "background-guard", "name": "Bash", "input": {
+          "command": "printf 'BG_GUARD_START\\n'; sleep 120",
+          "run_in_background": true, "description": "Killable background fixture" } },
+        { "type": "usage" }, { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "background-success", "bodyContains": "bg_" },
+      "chunks": [{ "type": "text", "text": "Background lifecycle processes are running." },
+        { "type": "usage" }, { "type": "done" }]
+    }
+  ]
+}

@@ -20,7 +20,7 @@ impl AnthropicProvider {
     ) -> Result<ChatStream, LoopalError> {
         let body = self.build_request_body(params);
         tracing::info!(
-            model = %params.model, url = %format!("{}/v1/messages", self.base_url),
+            model = %params.model, provider = "anthropic",
             messages = params.turns.len(), tools = params.tools.len(),
             max_tokens = params.max_tokens,
             body_bytes = body.to_string().len(),
@@ -40,7 +40,7 @@ impl AnthropicProvider {
             .await
             .map_err(|e| {
                 self.client.report_network_error(client_gen);
-                ProviderError::Http(format!("{e:#}"))
+                crate::safe_diagnostics::network_error("anthropic", &e)
             })?;
         self.client.report_success(client_gen);
 
@@ -139,11 +139,13 @@ impl AnthropicProvider {
             tracing::warn!(retry_after_ms, "rate limited by API");
             return ProviderError::RateLimited { retry_after_ms }.into();
         }
-        let text = response
-            .text()
-            .await
-            .unwrap_or_else(|_| "failed to read body".into());
-        tracing::error!(status = status.as_u16(), body = %text, "API error");
+        let text = crate::safe_diagnostics::response_error_message(
+            "anthropic",
+            response,
+            &[&self.api_key, &self.base_url],
+        )
+        .await;
+        tracing::error!(status = status.as_u16(), "API error");
         ProviderError::Api {
             status: status.as_u16(),
             message: text,

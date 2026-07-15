@@ -1,0 +1,91 @@
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { richView } from '../../../../../test/fixtures/workbench/rich-session'
+import {
+  createTestAPI, sessionDetail, sessionOne, updatedAt,
+} from '../../../../../test/support/workbench/api-stub'
+import { Workbench } from '../../../browser/workbench'
+
+describe('Workbench child agent selection', () => {
+  it('routes messages and resources to a live child while retaining completed output', async () => {
+    const detail = {
+      ...sessionDetail(sessionOne),
+      agents: [{
+        id: 'agent-session-1', name: 'Loopal', status: 'running' as const,
+        children: ['child'],
+      }, {
+        id: 'child', name: 'Research child', status: 'waiting' as const,
+        parentId: 'agent-session-1', conversation: [],
+        view: richView({
+          compactBanner: 'Child context compacted.',
+          goal: {
+            id: 'child-goal', objective: 'Child-only goal', status: 'active',
+            createdAt: updatedAt, updatedAt,
+          },
+        }),
+      }],
+    }
+    const sendMessage = vi.fn(async () => undefined)
+    const { api, events } = createTestAPI({ openSession: async () => detail, sendMessage })
+    render(<Workbench api={api} />)
+    await screen.findByText(`Conversation for ${sessionOne.title}`)
+    fireEvent.change(screen.getByLabelText('Message Loopal'), {
+      target: { value: 'Root-only draft' },
+    })
+    fireEvent.click(screen.getByRole('tab', { name: 'Agents' }))
+    fireEvent.click(screen.getByRole('treeitem', { name: /Research child/ }))
+    expect(screen.getByText('Child context compacted.')).toBeInTheDocument()
+    expect(screen.getByText('Child-only goal')).toBeInTheDocument()
+    const composer = screen.getByLabelText('Message Research child')
+    expect(composer).toHaveValue('')
+    fireEvent.change(composer, { target: { value: 'Report status' } })
+    fireEvent.keyDown(composer, { key: 'Enter', isComposing: true })
+    expect(sendMessage).not.toHaveBeenCalled()
+    fireEvent.keyDown(composer, { key: 'Enter', shiftKey: false })
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith(
+      sessionOne.id, 'Report status', 'child',
+    ))
+    replaceChild(events, detail, { status: 'starting' })
+    expect(screen.getByLabelText('Message Research child')).toBeEnabled()
+    replaceChild(events, detail, { status: 'waiting', controllable: false })
+    expect(screen.getByLabelText('Message Research child')).toBeDisabled()
+    replaceChild(events, detail, { status: 'completed' })
+    const retained = screen.getByLabelText('Message Research child')
+    expect(retained).toBeDisabled()
+    expect(retained).toHaveAttribute('placeholder', expect.stringContaining('read-only'))
+  })
+
+  it('renders a child with no projected conversation or view', async () => {
+    const detail = {
+      ...sessionDetail(sessionOne),
+      agents: [{
+        id: 'agent-session-1', name: 'Loopal', status: 'running' as const,
+        children: ['starting-child'],
+      }, {
+        id: 'starting-child', name: 'Starting child', status: 'starting' as const,
+        parentId: 'agent-session-1', error: 'waiting for registration',
+      }],
+    }
+    const { api } = createTestAPI({ openSession: async () => detail })
+    render(<Workbench api={api} />)
+    await screen.findByText(`Conversation for ${sessionOne.title}`)
+    fireEvent.click(screen.getByRole('tab', { name: 'Agents' }))
+    fireEvent.click(screen.getByRole('treeitem', { name: /Starting child/ }))
+    expect(screen.getByTestId('conversation')).toHaveTextContent(
+      'Viewing Starting child · starting · waiting for registration',
+    )
+  })
+})
+
+function replaceChild(
+  events: ReturnType<typeof createTestAPI>['events'],
+  detail: Awaited<ReturnType<typeof sessionDetail>>,
+  patch: { readonly status: 'starting' | 'waiting' | 'completed'; readonly controllable?: boolean },
+): void {
+  act(() => events.fire({
+    type: 'session_detail_replaced',
+    detail: {
+      ...detail,
+      agents: detail.agents.map((agent) => agent.id === 'child' ? { ...agent, ...patch } : agent),
+    },
+  }))
+}

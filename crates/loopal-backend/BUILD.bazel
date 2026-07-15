@@ -4,10 +4,12 @@ rust_library(
     name = "loopal-backend",
     srcs = glob(["src/**/*.rs"]),
     edition = "2024",
+    proc_macro_deps = ["@crates//:async-trait"],
     visibility = ["//visibility:public"],
     deps = [
         "//crates/loopal-config",
         "//crates/loopal-error",
+        "//crates/loopal-protocol",
         "//crates/loopal-sandbox",
         "//crates/loopal-tool-api",
         "//crates/loopal-tool-invocation",
@@ -26,7 +28,6 @@ rust_library(
         "@platforms//os:windows": ["@crates//:windows-sys"],
         "//conditions:default": ["@crates//:libc"],
     }),
-    proc_macro_deps = ["@crates//:async-trait"],
 )
 
 rust_test(
@@ -40,15 +41,16 @@ rust_test(
     srcs = glob(["tests/**/*.rs"]),
     crate_root = "tests/suite.rs",
     edition = "2024",
+    proc_macro_deps = ["@crates//:async-trait"],
     deps = [
         ":loopal-backend",
         "//crates/loopal-config",
         "//crates/loopal-error",
+        "//crates/loopal-protocol",
         "//crates/loopal-tool-api",
         "@crates//:parking_lot",
         "@crates//:tempfile",
         "@crates//:tokio",
         "@crates//:uuid",
     ],
-    proc_macro_deps = ["@crates//:async-trait"],
 )

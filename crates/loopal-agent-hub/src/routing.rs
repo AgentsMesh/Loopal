@@ -28,6 +28,7 @@ pub async fn route_to_agent(
                 envelope_id: envelope.id.to_string(),
                 content: envelope.content.text.clone(),
                 image_count: envelope.content.images.len(),
+                skill_info: envelope.content.skill_info.clone(),
             },
         );
         if observation_tx.try_send(queued).is_err() {

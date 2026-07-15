@@ -1,0 +1,30 @@
+.session-more-actions { display: block; }
+.agent-control-panel { display: grid; width: 100%; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; }
+.control-panel-heading { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; }
+.control-panel-heading strong { margin: 0; color: #cbd0dc; font-size: 11px; }
+.control-panel-heading span { color: #788196; font-size: 9px; text-transform: capitalize; }
+.control-quick-actions { display: flex; align-items: end; gap: 6px; }
+.agent-control-row { display: grid; min-width: 0; grid-template-columns: 1fr auto; gap: 5px; align-items: end; }
+.agent-control-row > span { grid-column: 1 / -1; color: #777f93; font-size: 9px; }
+.agent-control-row input, .agent-control-row select, .goal-create input {
+  min-width: 0; height: 27px; border: 1px solid #303645; border-radius: 5px;
+  padding: 0 7px; outline: 0; background: #171b24; color: #cbd0dc; font-size: 10px;
+}
+.agent-control-row select { grid-column: 1 / -1; }
+.agent-control-panel button, .resource-actions button, .resource-heading button,
+.inspector-section-heading button, .goal-create button {
+  min-height: 27px; border: 1px solid #303645; border-radius: 5px;
+  padding: 0 8px; background: #171b24; color: #cbd0dc; font-size: 9px; cursor: pointer;
+}
+.agent-control-panel button:disabled, .resource-actions button:disabled,
+.resource-heading button:disabled, .inspector-section-heading button:disabled,
+.goal-create button:disabled { opacity: .4; cursor: default; }
+.resource-actions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.resource-heading, .inspector-section-heading { display: flex; align-items: center; gap: 6px; }
+.resource-heading strong, .inspector-section-heading h3 { flex: 1; min-width: 0; }
+.inspector-section-heading { margin-bottom: 8px; }
+.inspector-section-heading h3 { margin: 0; }
+.goal-create { display: grid; grid-template-columns: 1fr auto; gap: 5px; }
+.background-task .resource-heading { padding: 8px; }
+.background-task .resource-heading button, .cron-row .resource-heading button { min-height: 22px; }
+.mcp-row .resource-actions { padding: 0 8px 8px; }

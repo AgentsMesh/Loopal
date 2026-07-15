@@ -4,7 +4,7 @@ use loopal_provider_api::ChatParams;
 use loopal_turn::{CompactionRehydrate, CompactionSummary, Turn, TurnStep, TurnTrigger};
 use serde_json::{Value, json};
 
-use self::to_json::{build_assistant, build_user_from_batch, text_user};
+use self::to_json::{build_assistant, build_user_from_batch, text_user, user_input};
 use super::AnthropicProvider;
 use crate::model_info::get_model_info;
 
@@ -105,6 +105,15 @@ fn push_turn(out: &mut Vec<Value>, turn: &Turn) {
 }
 
 fn trigger_user(trigger: &TurnTrigger) -> Option<Value> {
+    if let TurnTrigger::UserInput {
+        content, images, ..
+    } = trigger
+    {
+        return Some(user_input(
+            content,
+            images.iter().filter_map(|image| image.as_inline()),
+        ));
+    }
     loopal_provider_api::trigger_llm_text(trigger).map(|text| text_user(&text))
 }
 

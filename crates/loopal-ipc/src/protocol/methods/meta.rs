@@ -13,6 +13,11 @@ pub const META_HEARTBEAT: Method = Method {
     name: "meta/heartbeat",
 };
 
+/// Sub-Hub explicitly unregisters before closing its uplink.
+pub const META_UNREGISTER: Method = Method {
+    name: "meta/unregister",
+};
+
 /// Cross-hub message routing (envelope forwarding).
 pub const META_ROUTE: Method = Method { name: "meta/route" };
 
@@ -27,4 +32,9 @@ pub const META_LIST_HUBS: Method = Method {
 /// Global agent topology across all Sub-Hubs.
 pub const META_TOPOLOGY: Method = Method {
     name: "meta/topology",
+};
+
+/// Sub-Hub → MetaHub: allowlisted remote attention/control relay.
+pub const META_REMOTE_RELAY: Method = Method {
+    name: "meta/remote_relay",
 };

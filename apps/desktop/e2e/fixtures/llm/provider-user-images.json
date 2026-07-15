@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "name": "provider-user-images",
+  "calls": [
+    {
+      "expect": {
+        "userContains": "Describe the attached pixel",
+        "bodyContains": "\"media_type\":\"image/png\""
+      },
+      "chunks": [
+        { "type": "text", "text": "The caption and image reached the production provider." },
+        { "type": "usage", "input": 29, "output": 9 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "messageCount": 3,
+        "bodyContains": "\"media_type\":\"image/png\""
+      },
+      "chunks": [
+        { "type": "text", "text": "The image-only turn also reached the production provider." },
+        { "type": "usage", "input": 37, "output": 10 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

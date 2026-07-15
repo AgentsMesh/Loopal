@@ -171,13 +171,12 @@ pub(crate) async fn wait_for_recorded_text(
     }
 }
 
-/// reason: tests use this to inspect the trigger content and any assistant
-/// text-block output of a Turn. Mirrors the old `Message::text_content` flat
-/// view but adapted to Turn's split trigger/steps shape.
+/// Mirrors trigger content and assistant text into the old flat test view.
 fn turn_text_summary(turn: &loopal_turn::Turn) -> String {
     use loopal_turn::{TurnStep, TurnTrigger};
     let mut out = match &turn.trigger {
         TurnTrigger::UserInput { content, .. }
+        | TurnTrigger::SkillInput { content, .. }
         | TurnTrigger::Cron { content, .. }
         | TurnTrigger::Agent { content, .. }
         | TurnTrigger::AgentResult { content, .. }

@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "name": "provider-http-errors",
+  "calls": [
+    {
+      "expect": { "userContains": "Recover one server error" },
+      "status": 503,
+      "body": { "error": { "type": "overloaded_error", "message": "fixture overloaded" } }
+    },
+    {
+      "expect": { "userContains": "Recover one server error" },
+      "chunks": [
+        { "type": "text", "text": "Recovered after one HTTP 503." },
+        { "type": "usage", "input": 14, "output": 6 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Exercise fatal authentication" },
+      "status": 401,
+      "body": { "error": { "type": "authentication_error", "message": "fixture denied" } }
+    },
+    {
+      "expect": { "userContains": "Recover after fatal provider error" },
+      "chunks": [
+        { "type": "text", "text": "Session recovered after a fatal provider turn." },
+        { "type": "usage", "input": 16, "output": 7 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Exhaust provider retries" },
+      "status": 429,
+      "retryAfterMs": 0,
+      "body": { "error": { "type": "rate_limit_error", "message": "fixture limit 1" } }
+    },
+    {
+      "expect": { "userContains": "Exhaust provider retries" },
+      "status": 429,
+      "retryAfterMs": 0,
+      "body": { "error": { "type": "rate_limit_error", "message": "fixture limit 2" } }
+    },
+    {
+      "expect": { "userContains": "Exhaust provider retries" },
+      "status": 429,
+      "retryAfterMs": 0,
+      "body": { "error": { "type": "rate_limit_error", "message": "fixture limit 3" } }
+    },
+    {
+      "expect": { "userContains": "Exhaust provider retries" },
+      "status": 429,
+      "retryAfterMs": 0,
+      "body": { "error": { "type": "rate_limit_error", "message": "fixture limit 4" } }
+    },
+    {
+      "expect": { "userContains": "Exhaust provider retries" },
+      "status": 429,
+      "retryAfterMs": 0,
+      "body": { "error": { "type": "rate_limit_error", "message": "fixture limit 5" } }
+    },
+    {
+      "expect": { "userContains": "Exhaust provider retries" },
+      "status": 429,
+      "retryAfterMs": 0,
+      "body": { "error": { "type": "rate_limit_error", "message": "fixture limit 6" } }
+    },
+    {
+      "expect": { "userContains": "Exhaust provider retries" },
+      "status": 429,
+      "retryAfterMs": 0,
+      "body": { "error": { "type": "rate_limit_error", "message": "fixture limit final" } }
+    }
+  ]
+}

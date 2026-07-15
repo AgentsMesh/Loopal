@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "name": "runtime-resources",
+  "calls": [
+    {
+      "expect": { "userContains": "Create deterministic runtime resources" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "goal-create",
+          "name": "create_goal",
+          "input": { "objective": "Verify Desktop runtime resource panels" }
+        },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "goal-create" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "task-create",
+          "name": "TaskCreate",
+          "input": {
+            "subject": "Inspect runtime resource panels",
+            "description": "Keep a pending task visible in LoopalDesktop."
+          }
+        },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "task-create" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "background-start",
+          "name": "Bash",
+          "input": {
+            "command": "sleep 120",
+            "run_in_background": true,
+            "description": "Desktop fixture background process"
+          }
+        },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "background-start" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "cron-create",
+          "name": "CronCreate",
+          "input": {
+            "cron": "0 0 1 1 *",
+            "prompt": "Run the deterministic Desktop fixture check",
+            "recurring": true,
+            "durable": false
+          }
+        },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "cron-create" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "resource-write",
+          "name": "Write",
+          "input": {
+            "file_path": "${PROJECT}/runtime-fixture.txt",
+            "content": "runtime fixture artifact\n"
+          }
+        },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "resource-write" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "goal-complete",
+          "name": "update_goal",
+          "input": { "status": "complete" }
+        },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "goal-complete" },
+      "chunks": [
+        { "type": "text", "text": "All deterministic runtime resources are ready." },
+        { "type": "usage", "input": 60, "output": 14 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

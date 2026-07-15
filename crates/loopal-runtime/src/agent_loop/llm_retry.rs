@@ -71,15 +71,8 @@ impl AgentLoopRunner {
 
     /// Emit ThinkingComplete if thinking content or tokens were received.
     pub(super) async fn emit_thinking_complete(&self, result: &LlmStreamResult) -> Result<()> {
-        if result.thinking_text.is_empty() && result.thinking_tokens == 0 {
+        let Some(token_count) = result.thinking_completion_tokens() else {
             return Ok(());
-        }
-        let token_count = if result.thinking_text.is_empty() {
-            result.thinking_tokens
-        } else {
-            result
-                .thinking_tokens
-                .max(result.thinking_text.len() as u32 / 4)
         };
         self.emit_in_turn(AgentEventPayload::ThinkingComplete { token_count })
             .await

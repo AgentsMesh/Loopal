@@ -1,0 +1,36 @@
+.loopal-mcp-settings { display: grid; gap: 10px; }
+.mcp-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+.mcp-heading h3, .mcp-heading p { margin: 0; }
+.mcp-heading p { margin-top: 4px; }
+.mcp-server-list { display: grid; gap: 7px; }
+.mcp-server-card {
+  display: grid; grid-template-columns: minmax(120px, 1fr) auto; align-items: center; gap: 6px 12px;
+  padding: 9px; border: 1px solid #292e3b; border-radius: 6px; background: #14171f;
+}
+.mcp-server-card > div:first-child { display: grid; gap: 2px; }
+.mcp-server-card small, .mcp-secret-row small { color: #788196; font-size: 9px; }
+.mcp-server-card > code { overflow: hidden; color: #aab5e4; font-size: 10px; text-overflow: ellipsis; }
+.mcp-server-card > span { font-size: 9px; }
+.mcp-server-card > span.enabled { color: #73d19a; }
+.mcp-server-card > span.disabled { color: #d39b53; }
+.mcp-server-form { display: grid; gap: 10px; }
+.mcp-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
+.mcp-server-form input, .mcp-server-form select, .mcp-server-form textarea, .mcp-secret-add input {
+  min-width: 0; border: 1px solid #303645; border-radius: 5px;
+  padding: 6px 8px; outline: 0; background: #171b24; color: #cbd0dc; font-size: 10px;
+}
+.mcp-server-form textarea { min-height: 62px; resize: vertical; }
+.mcp-warning { margin: 0; color: #c19a62; font-size: 9px; }
+.mcp-secrets { display: grid; gap: 7px; margin: 0; border: 1px solid #292e3b; border-radius: 6px; }
+.mcp-secrets legend { color: #aeb5c5; font-size: 10px; }
+.mcp-secrets p { margin: 0; }
+.mcp-secret-row { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(150px, 1fr) auto; gap: 7px; }
+.mcp-secret-row > span { display: grid; }
+.mcp-secret-add { display: grid; grid-template-columns: 1fr 1fr auto; gap: 7px; }
+.mcp-actions { display: flex; flex-wrap: wrap; justify-content: end; gap: 6px; }
+.mcp-heading button, .mcp-actions button, .mcp-secret-row button, .mcp-secret-add button {
+  min-height: 28px; border: 1px solid #303645; border-radius: 5px;
+  padding: 0 9px; background: #171b24; color: #cbd0dc; font-size: 9px; cursor: pointer;
+}
+.mcp-heading button:disabled, .mcp-actions button:disabled,
+.mcp-secret-row button:disabled, .mcp-secret-add button:disabled { opacity: .4; cursor: default; }

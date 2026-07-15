@@ -1,0 +1,82 @@
+{
+  "version": 2,
+  "name": "metahub-data-plane",
+  "calls": [
+    {
+      "expect": { "userContains": "REMOTE INITIATE ONE" },
+      "chunks": [
+        {
+          "type": "tool_use", "id": "remote-send-one", "name": "SendMessage",
+          "input": { "to": "hub-a/main", "message": "REMOTE REQUEST ONE" }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "remote-send-one" },
+      "chunks": [
+        { "type": "text", "text": "REMOTE SEND ACK ONE" }, { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "[from: hub-b/main] REMOTE REQUEST ONE" },
+      "chunks": [
+        {
+          "type": "tool_use", "id": "metahub-reply-one", "name": "SendMessage",
+          "input": { "to": "hub-b/main", "message": "DESKTOP MODEL REPLY ONE" }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "metahub-reply-one" },
+      "chunks": [
+        { "type": "text", "text": "DESKTOP LOCAL ACK ONE" }, { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "[from: hub-a/main] DESKTOP MODEL REPLY ONE" },
+      "chunks": [
+        { "type": "text", "text": "REMOTE MODEL OBSERVED ONE" }, { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "REMOTE INITIATE TWO" },
+      "chunks": [
+        {
+          "type": "tool_use", "id": "remote-send-two", "name": "SendMessage",
+          "input": { "to": "hub-a/main", "message": "REMOTE REQUEST TWO" }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "remote-send-two" },
+      "chunks": [
+        { "type": "text", "text": "REMOTE SEND ACK TWO" }, { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "[from: hub-b/main] REMOTE REQUEST TWO" },
+      "chunks": [
+        {
+          "type": "tool_use", "id": "metahub-reply-two", "name": "SendMessage",
+          "input": { "to": "hub-b/main", "message": "DESKTOP MODEL REPLY TWO" }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "metahub-reply-two" },
+      "chunks": [
+        { "type": "text", "text": "DESKTOP LOCAL ACK TWO" }, { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "[from: hub-a/main] DESKTOP MODEL REPLY TWO" },
+      "chunks": [
+        { "type": "text", "text": "REMOTE MODEL OBSERVED TWO" }, { "type": "done" }
+      ]
+    }
+  ]
+}

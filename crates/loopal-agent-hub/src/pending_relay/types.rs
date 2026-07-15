@@ -6,9 +6,16 @@ pub struct PendingPermissionInfo {
     pub agent_conn: Arc<Connection<Listening>>,
     pub agent_ipc_id: i64,
     pub agent_name: String,
+    pub tool_name: String,
 }
 
 pub struct PendingQuestionInfo {
+    pub agent_conn: Arc<Connection<Listening>>,
+    pub agent_ipc_id: i64,
+    pub agent_name: String,
+}
+
+pub struct PendingPlanApprovalInfo {
     pub agent_conn: Arc<Connection<Listening>>,
     pub agent_ipc_id: i64,
     pub agent_name: String,

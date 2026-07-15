@@ -29,68 +29,84 @@ impl OpenAiCompatProvider {
                     }));
                 }
                 MessageRole::User => {
+                    let text = msg
+                        .content
+                        .iter()
+                        .filter_map(|block| match block {
+                            ContentBlock::Text { text } => Some(text.as_str()),
+                            _ => None,
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    let images = msg
+                        .content
+                        .iter()
+                        .filter_map(|block| match block {
+                            ContentBlock::Image { source } => Some(json!({
+                                "type": "image_url",
+                                "image_url": {"url": format!(
+                                    "data:{};base64,{}", source.media_type, source.data
+                                )}
+                            })),
+                            _ => None,
+                        })
+                        .collect::<Vec<_>>();
+                    push_user_content(&mut messages, &text, images);
                     for block in &msg.content {
-                        match block {
-                            ContentBlock::Text { text } => {
-                                messages.push(json!({
-                                    "role": "user",
-                                    "content": text
-                                }));
-                            }
-                            ContentBlock::ToolResult {
-                                tool_use_id,
-                                content,
-                                images,
-                                ..
-                            } => {
-                                let placeholder = placeholder_text(content, !images.is_empty());
-                                messages.push(json!({
-                                    "role": "tool",
-                                    "tool_call_id": tool_use_id,
-                                    "content": placeholder
-                                }));
-                                if !images.is_empty() {
-                                    let parts: Vec<Value> = images
-                                        .iter()
-                                        .filter_map(|img| match img.as_inline() {
-                                            Some((media_type, data)) => Some(json!({
-                                                "type": "image_url",
-                                                "image_url": {
-                                                    "url": format!(
-                                                        "data:{};base64,{}",
-                                                        media_type, data
-                                                    )
-                                                }
-                                            })),
-                                            None => {
-                                                error!(
-                                                    media_type = img.media_type(),
-                                                    "SessionResource reached OpenAI-compat provider without hydration; dropping image"
-                                                );
-                                                None
+                        if let ContentBlock::ToolResult {
+                            tool_use_id,
+                            content,
+                            images,
+                            ..
+                        } = block
+                        {
+                            let placeholder = placeholder_text(content, !images.is_empty());
+                            messages.push(json!({
+                                "role": "tool",
+                                "tool_call_id": tool_use_id,
+                                "content": placeholder
+                            }));
+                            if !images.is_empty() {
+                                let parts: Vec<Value> = images
+                                    .iter()
+                                    .filter_map(|img| match img.as_inline() {
+                                        Some((media_type, data)) => Some(json!({
+                                            "type": "image_url",
+                                            "image_url": {
+                                                "url": format!(
+                                                    "data:{};base64,{}",
+                                                    media_type, data
+                                                )
                                             }
-                                        })
-                                        .collect();
-                                    if !parts.is_empty() {
-                                        messages.push(json!({
-                                            "role": "user",
-                                            "content": parts
-                                        }));
-                                    }
+                                        })),
+                                        None => {
+                                            error!(
+                                                media_type = img.media_type(),
+                                                "SessionResource reached OpenAI-compat provider without hydration; dropping image"
+                                            );
+                                            None
+                                        }
+                                    })
+                                    .collect();
+                                if !parts.is_empty() {
+                                    push_user_content(&mut messages, "", parts);
                                 }
                             }
-                            _ => {}
                         }
                     }
                 }
                 MessageRole::Assistant => {
                     let mut content_text = String::new();
+                    let mut reasoning_text = String::new();
                     let mut tool_calls = Vec::new();
 
                     for block in &msg.content {
                         match block {
                             ContentBlock::Text { text } => {
                                 content_text.push_str(text);
+                            }
+                            ContentBlock::Thinking { thinking, .. } => {
+                                reasoning_text.push_str(thinking);
                             }
                             ContentBlock::ToolUse { id, name, input } => {
                                 tool_calls.push(json!({
@@ -109,6 +125,9 @@ impl OpenAiCompatProvider {
                     let mut assistant_msg = json!({"role": "assistant"});
                     if !content_text.is_empty() {
                         assistant_msg["content"] = json!(content_text);
+                    }
+                    if !reasoning_text.is_empty() {
+                        assistant_msg["reasoning_content"] = json!(reasoning_text);
                     }
                     if !tool_calls.is_empty() {
                         assistant_msg["tool_calls"] = json!(tool_calls);
@@ -137,4 +156,17 @@ impl OpenAiCompatProvider {
             })
             .collect()
     }
+}
+
+fn push_user_content(messages: &mut Vec<Value>, text: &str, mut images: Vec<Value>) {
+    if images.is_empty() {
+        if !text.is_empty() {
+            messages.push(json!({"role": "user", "content": text}));
+        }
+        return;
+    }
+    if !text.is_empty() {
+        images.insert(0, json!({"type": "text", "text": text}));
+    }
+    messages.push(json!({"role": "user", "content": images}));
 }

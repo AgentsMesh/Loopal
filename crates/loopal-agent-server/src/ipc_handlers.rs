@@ -9,6 +9,7 @@ use loopal_ipc::protocol::methods;
 use loopal_protocol::{Question, UserQuestionResponse};
 use loopal_runtime::frontend::permission_handler::{PermissionHandler, PermissionOutcome};
 use loopal_runtime::frontend::question_handler::{AskOptions, QuestionHandler, QuestionOutcome};
+use loopal_runtime::frontend::traits::PlanApproval;
 
 use crate::session_hub::SharedSession;
 
@@ -109,5 +110,34 @@ impl QuestionHandler for IpcQuestionHandler {
                 QuestionOutcome::cancelled("", format!("ipc failure: {e}"))
             }
         }
+    }
+}
+
+pub async fn request_plan_approval(
+    session: &SessionRef,
+    plan_content: &str,
+    plan_path: &str,
+) -> PlanApproval {
+    let Some(conn) = primary_connection(session).await else {
+        return PlanApproval::Reject;
+    };
+    let params = serde_json::json!({
+        "plan_content": plan_content,
+        "plan_path": plan_path,
+    });
+    let Ok(value) = conn
+        .send_request(methods::AGENT_PLAN_APPROVAL.name, params)
+        .await
+    else {
+        return PlanApproval::Reject;
+    };
+    match value.get("decision").and_then(Value::as_str) {
+        Some("approve") => PlanApproval::Approve,
+        Some("approve_with_edits") => value
+            .get("edited_plan")
+            .and_then(Value::as_str)
+            .map(|value| PlanApproval::ApproveWithEdits(value.to_string()))
+            .unwrap_or(PlanApproval::Reject),
+        _ => PlanApproval::Reject,
     }
 }

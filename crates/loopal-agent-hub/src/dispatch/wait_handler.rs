@@ -21,7 +21,7 @@ pub async fn handle_wait_agent(hub: &Arc<Mutex<Hub>>, params: Value) -> Result<V
         let mut h = hub.lock().await;
 
         // Check cached output first (agent already finished before we got here)
-        if let Some(output) = h.registry.finished_outputs.get(&name) {
+        if let Some(output) = h.registry.completion_output(&name) {
             info!(agent = %name, "handle_wait_agent: found cached output");
             return Ok(json!({"output": output}));
         }

@@ -2,6 +2,7 @@ use std::path::Path;
 
 use loopal_error::ToolIoError;
 use loopal_tool_api::backend_types::{FileInfo, ReadResult};
+use tokio::io::AsyncReadExt;
 
 use crate::limits::ResourceLimits;
 
@@ -27,7 +28,7 @@ pub async fn read_file(
         });
     }
 
-    let bytes = tokio::fs::read(path).await?;
+    let bytes = read_bounded(path, limits.max_file_read_bytes).await?;
 
     if is_binary(&bytes) {
         return Err(ToolIoError::BinaryFile(path.display().to_string()));
@@ -67,7 +68,7 @@ pub async fn read_raw_file(path: &Path, limits: &ResourceLimits) -> Result<Strin
         });
     }
 
-    let bytes = tokio::fs::read(path).await?;
+    let bytes = read_bounded(path, limits.max_file_read_bytes).await?;
 
     if is_binary(&bytes) {
         return Err(ToolIoError::BinaryFile(path.display().to_string()));
@@ -76,7 +77,7 @@ pub async fn read_raw_file(path: &Path, limits: &ResourceLimits) -> Result<Strin
     Ok(String::from_utf8_lossy(&bytes).into_owned())
 }
 
-pub use crate::fs_write::write_file;
+pub use crate::fs_write::{ExpectedContent, write_file, write_file_if_unchanged};
 
 pub async fn get_file_info(path: &Path) -> Result<FileInfo, ToolIoError> {
     let meta = tokio::fs::metadata(path).await.map_err(|e| {
@@ -130,10 +131,26 @@ pub async fn remove_path(path: &Path) -> Result<(), ToolIoError> {
 }
 
 pub async fn peek_bytes(path: &Path, n: usize) -> Result<Vec<u8>, ToolIoError> {
-    use tokio::io::AsyncReadExt;
     let mut f = tokio::fs::File::open(path).await?;
     let mut buf = vec![0u8; n];
     let read = f.read(&mut buf).await?;
     buf.truncate(read);
     Ok(buf)
+}
+
+async fn read_bounded(path: &Path, limit: u64) -> Result<Vec<u8>, ToolIoError> {
+    let mut bytes = Vec::new();
+    tokio::fs::File::open(path)
+        .await?
+        .take(limit.saturating_add(1))
+        .read_to_end(&mut bytes)
+        .await?;
+    if bytes.len() as u64 > limit {
+        return Err(ToolIoError::TooLarge {
+            path: path.display().to_string(),
+            size: bytes.len() as u64,
+            limit,
+        });
+    }
+    Ok(bytes)
 }

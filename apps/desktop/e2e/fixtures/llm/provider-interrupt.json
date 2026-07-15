@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "name": "provider-interrupt",
+  "calls": [
+    {
+      "expect": { "userContains": "Hold this provider stream" },
+      "chunks": [
+        { "type": "text", "text": "STREAM START BEFORE INTERRUPT" },
+        { "type": "delay", "ms": 30000 },
+        { "type": "text", "text": "LATE CHUNK MUST NOT RENDER" },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Recover after interrupt" },
+      "chunks": [
+        { "type": "text", "text": "Recovered after cancelling the real HTTP stream." },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

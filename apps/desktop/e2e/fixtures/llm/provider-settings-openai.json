@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "name": "provider-settings-openai",
+  "calls": [
+    {
+      "expect": {
+        "protocol": "openai_responses",
+        "model": "gpt-4.1",
+        "userContains": "Use the provider saved in Desktop Settings",
+        "messageCount": 1
+      },
+      "chunks": [
+        { "type": "text", "text": "Desktop Settings selected the OpenAI model." },
+        { "type": "usage", "input": 17, "output": 8 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

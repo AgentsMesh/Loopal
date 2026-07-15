@@ -1,0 +1,61 @@
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_test")
+
+rust_library(
+    name = "loopal-mock-llm-lib",
+    srcs = glob(
+        ["src/**/*.rs"],
+        exclude = ["src/main.rs"],
+    ),
+    edition = "2024",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@crates//:anyhow",
+        "@crates//:serde",
+        "@crates//:serde_json",
+        "@crates//:tokio",
+    ],
+)
+
+rust_binary(
+    name = "loopal-mock-llm",
+    srcs = ["src/main.rs"],
+    edition = "2024",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":loopal-mock-llm-lib",
+        "@crates//:anyhow",
+        "@crates//:clap",
+        "@crates//:tokio",
+    ],
+)
+
+rust_test(
+    name = "loopal-mock-llm_test",
+    srcs = ["tests/suite.rs"],
+    edition = "2024",
+    deps = [
+        ":loopal-mock-llm-lib",
+        "@crates//:reqwest",
+        "@crates//:serde_json",
+        "@crates//:tokio",
+    ],
+)
+
+rust_test(
+    name = "provider_contract_test",
+    srcs = glob(["tests/provider_contract_suite/**/*.rs"]) + ["tests/provider_contract_suite.rs"],
+    crate_root = "tests/provider_contract_suite.rs",
+    edition = "2024",
+    deps = [
+        ":loopal-mock-llm-lib",
+        "//crates/loopal-provider",
+        "//crates/loopal-provider-api",
+        "//crates/loopal-tool-api",
+        "//crates/loopal-turn",
+        "@crates//:anyhow",
+        "@crates//:futures",
+        "@crates//:reqwest",
+        "@crates//:serde_json",
+        "@crates//:tokio",
+    ],
+)

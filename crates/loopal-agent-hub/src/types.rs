@@ -57,12 +57,16 @@ pub(crate) struct ManagedAgent {
     /// When a child of this agent finishes, Hub sends an Envelope here.
     /// None for agents that don't spawn children (or weren't given a channel).
     pub(crate) completion_tx: Option<mpsc::Sender<Envelope>>,
+    pub(crate) notify_parent_on_completion: bool,
     /// Per-agent ViewState reducer. The Hub event router applies each
     /// incoming `AgentEvent` here so `view/snapshot` returns the latest
     /// observable state. UI clients subscribe to the existing
     /// `agent/event` broadcast for incremental updates and apply the
     /// same events locally — there is no separate `view/delta` channel.
     pub(crate) view: Arc<Mutex<ViewStateReducer>>,
+    /// Final result captured before the connection is detached. Kept here
+    /// only during the short emit → unregister window.
+    pub(crate) output: Option<String>,
 }
 
 impl ManagedAgent {
@@ -71,4 +75,13 @@ impl ManagedAgent {
     pub(crate) fn new_view_reducer(agent_name: &str) -> Arc<Mutex<ViewStateReducer>> {
         Arc::new(Mutex::new(ViewStateReducer::new(agent_name)))
     }
+}
+
+/// Read-only state retained after an agent connection is detached.
+/// Deliberately excludes connection and control channels.
+pub(crate) struct CompletedAgent {
+    pub(crate) info: AgentInfo,
+    pub(crate) output: String,
+    pub(crate) view: Arc<Mutex<ViewStateReducer>>,
+    pub(crate) shadow: bool,
 }

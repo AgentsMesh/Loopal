@@ -76,9 +76,17 @@ pub async fn handle_mcp_call_tool(
 }
 
 pub async fn handle_mcp_snapshot(hub: &Arc<Mutex<Hub>>, from_agent: &str) -> Result<Value, String> {
-    let (provider, _cwd) = resolve_provider(hub, from_agent).await?;
-    let servers = provider
-        .snapshot(loopal_mcp::HUB_RPC_BUDGET)
+    let (mcp_service, cwd) = {
+        let h = hub.lock().await;
+        let cwd = h
+            .spawn_registry
+            .cwd_of(from_agent)
+            .unwrap_or_else(|| h.default_cwd.clone());
+        (h.mcp_service.clone(), cwd)
+    };
+    let _ = mcp_service.provider_for(&cwd).await;
+    let servers = mcp_service
+        .snapshots_for(from_agent, &cwd)
         .await
         .into_iter()
         .map(|s| loopal_protocol::McpServerSnapshot {
@@ -94,22 +102,6 @@ pub async fn handle_mcp_snapshot(hub: &Arc<Mutex<Hub>>, from_agent: &str) -> Res
         .collect();
     serde_json::to_value(McpSnapshotResponse { servers })
         .map_err(|e| format!("encode snapshot: {e}"))
-}
-
-async fn resolve_provider(
-    hub: &Arc<Mutex<Hub>>,
-    from_agent: &str,
-) -> Result<(Arc<dyn loopal_mcp::McpProvider>, std::path::PathBuf), String> {
-    let (mcp_service, cwd) = {
-        let h = hub.lock().await;
-        let cwd = h
-            .spawn_registry
-            .cwd_of(from_agent)
-            .unwrap_or_else(|| h.default_cwd.clone());
-        (h.mcp_service.clone(), cwd)
-    };
-    let provider = mcp_service.provider_for(&cwd).await;
-    Ok((provider, cwd))
 }
 
 async fn expand_secret_refs_in_args(

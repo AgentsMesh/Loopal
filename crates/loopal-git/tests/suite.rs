@@ -1,8 +1,14 @@
 // Single test binary — includes all test modules
+#[path = "suite/branch_conflict_test.rs"]
+mod branch_conflict_test;
 #[path = "suite/gitignore_test.rs"]
 mod gitignore_test;
 #[path = "suite/repo_test.rs"]
 mod repo_test;
+#[path = "suite/safe_removal_test.rs"]
+mod safe_removal_test;
+#[path = "suite/start_point_test.rs"]
+mod start_point_test;
 #[path = "suite/validate_test.rs"]
 mod validate_test;
 #[path = "suite/worktree_test.rs"]

@@ -2,8 +2,8 @@
 //!
 //! Cluster coordinator. No UI clients connect here directly — UI lives on
 //! individual Sub-Hubs and reaches cross-hub agents via `meta/route`.
-//! Cross-hub agents (spawned via `meta/spawn`) run without interactive
-//! permission support; they must use `BypassPermissions` or `Plan` mode.
+//! Cross-hub agents relay interactive questions to the parent Hub's UI.
+//! Tool permissions still require `BypassPermissions` or `Plan` mode.
 //!
 //! ## Architecture
 //! - `HubRegistry` — Sub-Hub connection lifecycle management
@@ -20,6 +20,7 @@ mod hub_registry;
 pub mod io_loop;
 mod managed_hub;
 mod meta_hub;
+mod remote_relay;
 mod router;
 pub mod server;
 

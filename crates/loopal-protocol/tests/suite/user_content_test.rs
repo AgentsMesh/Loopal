@@ -1,6 +1,6 @@
 //! Tests for UserContent: constructors, image queries, text preview, equality.
 
-use loopal_protocol::{ImageAttachment, UserContent};
+use loopal_protocol::{ImageAttachment, SkillInvocation, UserContent};
 
 fn sample_image() -> ImageAttachment {
     ImageAttachment {
@@ -83,4 +83,20 @@ fn test_partial_eq() {
 
     let c = UserContent::text_only("different");
     assert_ne!(a, c);
+}
+
+#[test]
+fn skill_metadata_survives_ipc_serialization() {
+    let content = UserContent {
+        text: "expanded prompt".into(),
+        images: vec![],
+        skill_info: Some(SkillInvocation {
+            name: "/desktop-check".into(),
+            user_args: "alpha beta".into(),
+        }),
+    };
+    let encoded = serde_json::to_string(&content).unwrap();
+    let decoded: UserContent = serde_json::from_str(&encoded).unwrap();
+    assert_eq!(decoded, content);
+    assert!(encoded.contains("skill_info"));
 }

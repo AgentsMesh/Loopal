@@ -96,3 +96,24 @@ async fn was_root_false_must_not_drop_spawn_tree_even_for_root_agent() {
     svc.on_agent_detach("root", false).await;
     assert!(svc.spawn_tree.read().await.contains_key("root"));
 }
+
+#[tokio::test]
+async fn snapshots_include_spawn_tree_servers_visible_to_children() {
+    let dir = tempfile::tempdir().unwrap();
+    let canonical = dir.path().canonicalize().unwrap();
+    write_settings(&canonical, "spawn-tree");
+    let registry = Arc::new(SpawnRegistry::new());
+    registry.register("root".into(), canonical.clone(), None);
+    registry.register("child".into(), canonical.clone(), Some("root".into()));
+    let svc = HubMcpService::new().with_spawn_registry(registry);
+
+    svc.on_agent_attach("root".into(), canonical.clone(), None)
+        .await;
+    let provider = svc.spawn_tree.read().await["root"].clone();
+    provider
+        .wait_until_settled(std::time::Duration::from_secs(2))
+        .await;
+
+    let snapshots = svc.snapshots_for("child", &canonical).await;
+    assert!(snapshots.iter().any(|server| server.name == "test-server"));
+}

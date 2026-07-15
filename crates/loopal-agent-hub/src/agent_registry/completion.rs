@@ -21,7 +21,7 @@ impl AgentRegistry {
         self.set_lifecycle(name, AgentLifecycle::Finished);
 
         let text = output.unwrap_or_else(|| "(no output)".into());
-        self.finished_outputs.insert(name.to_string(), text.clone());
+        self.remember_output(name, text.clone());
 
         // Prepare delivery envelope (actual send happens after lock release).
         let pending_delivery = self.prepare_parent_delivery(name, &text);
@@ -52,7 +52,11 @@ impl AgentRegistry {
         child_name: &str,
         result: &str,
     ) -> Option<(mpsc::Sender<Envelope>, Envelope)> {
-        let parent = self.agents.get(child_name)?.info.parent.as_ref()?;
+        let child = self.agents.get(child_name)?;
+        if !child.notify_parent_on_completion {
+            return None;
+        }
+        let parent = child.info.parent.as_ref()?;
         // Local-only delivery path. Remote parents take the uplink route in
         // `finish::finish_and_deliver` instead.
         if parent.is_remote() {
@@ -82,6 +86,12 @@ impl AgentRegistry {
             body,
         );
         Some((tx, envelope))
+    }
+
+    pub(crate) fn notifies_parent_on_completion(&self, name: &str) -> bool {
+        self.agents
+            .get(name)
+            .is_some_and(|agent| agent.notify_parent_on_completion)
     }
 
     /// Create a completion watcher for a named agent.

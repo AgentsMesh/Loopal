@@ -25,7 +25,7 @@ impl AnthropicProvider {
 }
 
 fn is_anthropic_server_block_keyword(message: &str) -> bool {
-    message.contains("code_execution")
+    (message.contains("code_execution") || message.contains("web_search"))
         && (message.contains("without a corresponding") || message.contains("tool_result"))
 }
 
@@ -33,4 +33,22 @@ fn is_anthropic_context_overflow_keyword(message: &str) -> bool {
     message.contains("prompt is too long")
         || message.contains("maximum context length")
         || message.contains("exceed context limit")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_anthropic_server_block_keyword;
+
+    #[test]
+    fn recognizes_supported_server_tool_pair_rejections() {
+        assert!(is_anthropic_server_block_keyword(
+            "web_search block without a corresponding tool_result"
+        ));
+        assert!(is_anthropic_server_block_keyword(
+            "code_execution block without a corresponding tool_result"
+        ));
+        assert!(!is_anthropic_server_block_keyword(
+            "ordinary client tool without a corresponding tool_result"
+        ));
+    }
 }

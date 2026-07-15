@@ -10,7 +10,9 @@ use loopal_protocol::AgentEvent;
 
 use crate::dispatch::dispatch_hub_request_with;
 use crate::hub::Hub;
-use crate::pending_relay::{handle_agent_permission, handle_agent_question};
+use crate::pending_relay::{
+    handle_agent_permission, handle_agent_plan_approval, handle_agent_question,
+};
 
 const WAIT_AGENT_METHOD: &str = "hub/wait_agent";
 
@@ -115,6 +117,10 @@ async fn handle_request(
     }
     if method == methods::AGENT_QUESTION.name {
         handle_agent_question(hub, conn.clone(), id, params, agent_name).await;
+        return;
+    }
+    if method == methods::AGENT_PLAN_APPROVAL.name {
+        handle_agent_plan_approval(hub, conn.clone(), id, params, agent_name).await;
         return;
     }
     warn!(agent = %agent_name, %method, "unknown request");

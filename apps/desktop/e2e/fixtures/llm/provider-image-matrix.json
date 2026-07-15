@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "name": "provider-image-matrix",
+  "calls": [
+    {
+      "expect": {
+        "userContains": "Exercise provider image input",
+        "imageBlockCount": 1,
+        "messageCount": 1
+      },
+      "chunks": [
+        { "type": "text", "text": "Provider image adapter completed its model turn." },
+        { "type": "usage", "input": 19, "output": 7 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

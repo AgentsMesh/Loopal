@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "name": "provider-openai-failed",
+  "calls": [
+    {
+      "expect": { "protocol": "openai_responses", "userContains": "Trigger OpenAI failed" },
+      "rawSse": [
+        "{\"type\":\"response.failed\",\"response\":{\"error\":{\"code\":\"invalid_request_error\",\"message\":\"sensitive upstream detail\"}}}"
+      ]
+    },
+    {
+      "expect": { "protocol": "openai_responses", "userContains": "Recover from OpenAI failed" },
+      "chunks": [
+        { "type": "text", "text": "OpenAI Session recovered after a structured terminal failure." },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

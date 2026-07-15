@@ -31,7 +31,7 @@ pub fn start_agent_io(
     let conn3 = conn.clone();
     tokio::spawn(async move {
         let (completion_tx, completion_rx) = tokio::sync::mpsc::channel::<Envelope>(32);
-        {
+        let root_services = {
             let mut h = hub.lock().await;
             if let Err(e) = h.registry.register_connection_with_parent(
                 &n,
@@ -46,6 +46,17 @@ pub fn start_agent_io(
                 }
                 return;
             }
+            (n == loopal_protocol::ROOT_AGENT_NAME).then(|| {
+                (
+                    h.spawn_registry.clone(),
+                    h.mcp_service.clone(),
+                    h.default_cwd.clone(),
+                )
+            })
+        };
+        if let Some((registry, mcp, cwd)) = root_services {
+            registry.register(n.clone(), cwd.clone(), None);
+            mcp.on_agent_attach(n.clone(), cwd, None).await;
         }
         crate::spawn_manager::spawn_completion_bridge(&n, conn3, completion_rx);
         info!(agent = %n, "agent registered in Hub");

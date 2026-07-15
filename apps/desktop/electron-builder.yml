@@ -1,0 +1,49 @@
+appId: dev.loopal.desktop
+productName: Loopal Desktop
+copyright: Copyright © 2026 Loopal
+electronVersion: 43.1.0
+electronDist: ../../../node_modules/electron/dist
+
+directories:
+  output: ../dist
+
+files:
+  - out/**/*
+  - package.json
+  - "!**/*.{map,ts,tsx}"
+
+extraResources:
+  - from: runtime/loopal
+    to: bin/loopal
+
+asar: true
+npmRebuild: true
+beforeBuild: ./dist_staging/builder-before-build.cjs
+afterExtract: ./dist_staging/builder-after-extract.cjs
+
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - dmg
+    - zip
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  binaries:
+    - Contents/Resources/bin/loopal
+
+win:
+  target:
+    - nsis
+  extraResources:
+    - from: runtime/loopal
+      to: bin/loopal.exe
+
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Development
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true

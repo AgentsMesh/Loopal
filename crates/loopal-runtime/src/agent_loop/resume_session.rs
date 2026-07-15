@@ -99,6 +99,7 @@ impl AgentLoopRunner {
             message_count,
         })
         .await?;
+        self.emit_session_history().await?;
 
         // Reset token display
         self.emit(AgentEventPayload::TokenUsage {

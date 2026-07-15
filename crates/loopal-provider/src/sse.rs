@@ -40,8 +40,8 @@ impl SseStream {
                         Some(Ok(data))
                     }
                 }
-                Err(e) => Some(Err(LoopalError::Provider(ProviderError::SseParse(
-                    e.to_string(),
+                Err(_) => Some(Err(LoopalError::Provider(ProviderError::SseParse(
+                    "invalid provider SSE frame".into(),
                 )))),
             };
             futures::future::ready(out)

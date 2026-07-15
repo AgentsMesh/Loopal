@@ -1,5 +1,8 @@
-use loopal_protocol::{CronJobSnapshot, McpServerSnapshot, TaskSnapshot, ThreadGoal};
+use loopal_protocol::{
+    CronJobSnapshot, McpServerSnapshot, SessionHistorySnapshot, TaskSnapshot, ThreadGoal,
+};
 
+use crate::conversation::into_session_message;
 use crate::state::SessionViewState;
 
 use super::MutationEffect;
@@ -45,6 +48,24 @@ pub(super) fn session_resumed(state: &mut SessionViewState, session_id: &str) ->
     state.thread_goal = None;
     // Clear stale Hub-health snapshot; the next poller tick will re-sync.
     state.hub_degraded_since_ms = None;
+    MutationEffect::Mutated
+}
+
+pub(super) fn session_history_loaded(
+    state: &mut SessionViewState,
+    history: &SessionHistorySnapshot,
+) -> MutationEffect {
+    state.agent.session_id = Some(history.session_id.clone());
+    let messages = history
+        .messages
+        .iter()
+        .cloned()
+        .map(into_session_message)
+        .collect();
+    state
+        .agent
+        .conversation
+        .replace_history(messages, history.truncated);
     MutationEffect::Mutated
 }
 

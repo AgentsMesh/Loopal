@@ -27,6 +27,9 @@ pub(super) fn awaiting_input(state: &mut SessionViewState) -> MutationEffect {
 }
 
 pub(super) fn finished(state: &mut SessionViewState) -> MutationEffect {
+    if state.agent.observable.status == AgentStatus::Error {
+        return MutationEffect::NoOp;
+    }
     set_idle(state, AgentStatus::Finished);
     MutationEffect::MutatedEndedTurn
 }
@@ -50,6 +53,13 @@ pub(super) fn error(state: &mut SessionViewState, message: &str) -> MutationEffe
     MutationEffect::MutatedEndedTurn
 }
 
+pub(super) fn provider_warning(state: &mut SessionViewState, message: &str) -> MutationEffect {
+    let conv = &mut state.agent.conversation;
+    conv.flush_streaming();
+    crate::conversation::conversation_display::push_system_msg(conv, message);
+    MutationEffect::Mutated
+}
+
 pub(super) fn token_usage(
     state: &mut SessionViewState,
     input: u32,
@@ -59,8 +69,12 @@ pub(super) fn token_usage(
     cache_read: u32,
 ) -> MutationEffect {
     let obs = &mut state.agent.observable;
-    obs.input_tokens = input;
-    obs.output_tokens = output;
+    if input > 0 || cache_creation > 0 || cache_read > 0 {
+        obs.input_tokens = input;
+        obs.output_tokens = output;
+    } else {
+        obs.output_tokens = output;
+    }
     crate::conversation::conversation_display::handle_token_usage(
         &mut state.agent.conversation,
         input,
@@ -73,8 +87,9 @@ pub(super) fn token_usage(
 }
 
 pub(super) fn turn_completed(state: &mut SessionViewState) -> MutationEffect {
-    let obs = &mut state.agent.observable;
-    obs.turn_count = obs.turn_count.saturating_add(1);
+    let agent = &mut state.agent;
+    agent.conversation.turn_count = agent.conversation.turn_count.saturating_add(1);
+    agent.observable.turn_count = agent.observable.turn_count.saturating_add(1);
     MutationEffect::MutatedEndedTurn
 }
 
@@ -82,15 +97,9 @@ fn set_idle(state: &mut SessionViewState, status: AgentStatus) {
     let conv = &mut state.agent.conversation;
     conv.flush_streaming();
     conv.end_turn();
-    if status != AgentStatus::Finished {
-        conv.turn_count += 1;
-    }
     conv.retry_banner = None;
     conv.compact_banner = None;
     state.agent.observable.status = status;
-    if status != AgentStatus::Finished {
-        state.agent.observable.turn_count = state.agent.observable.turn_count.saturating_add(1);
-    }
 }
 
 fn ensure_started_at(state: &mut SessionViewState) {

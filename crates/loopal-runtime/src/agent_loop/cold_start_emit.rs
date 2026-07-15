@@ -5,6 +5,7 @@ use super::runner::AgentLoopRunner;
 
 impl AgentLoopRunner {
     pub(super) async fn emit_cold_start_observables(&self) -> Result<()> {
+        self.emit_initial_session_history().await?;
         self.emit(AgentEventPayload::ModelChanged {
             model: self.params.config.model(),
         })

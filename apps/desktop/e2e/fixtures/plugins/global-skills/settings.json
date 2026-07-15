@@ -1,0 +1,9 @@
+{
+  "mcp_servers": {
+    "fixture-mcp": {
+      "type": "stdio",
+      "command": "fixture-mcp",
+      "enabled": false
+    }
+  }
+}

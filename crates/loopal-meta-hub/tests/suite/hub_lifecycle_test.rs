@@ -22,3 +22,42 @@ async fn hub_disconnect_cleans_up_registry() {
         assert_eq!(mh.registry.len(), 0);
     }
 }
+
+#[tokio::test]
+async fn stale_connection_cleanup_cannot_remove_its_replacement() {
+    let meta_hub = Arc::new(Mutex::new(MetaHub::new()));
+    let (old_transport, _) = loopal_ipc::duplex_pair();
+    let (old, _old_rx) = loopal_ipc::connection::Connection::new(old_transport).into_listening();
+    meta_hub
+        .lock()
+        .await
+        .registry
+        .register("desktop", old.clone(), vec![])
+        .unwrap();
+    old.close().await;
+    let (new_transport, _) = loopal_ipc::duplex_pair();
+    let (new, _new_rx) = loopal_ipc::connection::Connection::new(new_transport).into_listening();
+    meta_hub
+        .lock()
+        .await
+        .registry
+        .register("desktop", new.clone(), vec![])
+        .unwrap();
+    assert!(
+        meta_hub
+            .lock()
+            .await
+            .registry
+            .unregister_connection("desktop", &old)
+            .is_none()
+    );
+    assert!(Arc::ptr_eq(
+        &meta_hub
+            .lock()
+            .await
+            .registry
+            .connection("desktop")
+            .unwrap(),
+        &new,
+    ));
+}

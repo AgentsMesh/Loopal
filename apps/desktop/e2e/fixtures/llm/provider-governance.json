@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "name": "provider-governance",
+  "calls": [
+    {
+      "expect": { "userContains": "Degeneration sample one" },
+      "chunks": [
+        { "type": "text", "text": "IDENTICAL DEGENERATION OUTPUT" },
+        { "type": "usage", "input": 10, "output": 4 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Degeneration sample two" },
+      "chunks": [
+        { "type": "text", "text": "IDENTICAL DEGENERATION OUTPUT" },
+        { "type": "usage", "input": 11, "output": 4 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Degeneration sample three" },
+      "chunks": [
+        { "type": "text", "text": "IDENTICAL DEGENERATION OUTPUT" },
+        { "type": "usage", "input": 12, "output": 4 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Degeneration sample four" },
+      "chunks": [
+        { "type": "text", "text": "IDENTICAL DEGENERATION OUTPUT" },
+        { "type": "usage", "input": 13, "output": 4 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Degeneration sample five" },
+      "chunks": [
+        { "type": "text", "text": "IDENTICAL DEGENERATION OUTPUT" },
+        { "type": "usage", "input": 14, "output": 4 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Resume after degeneration" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "governance-progress-read",
+          "name": "Read",
+          "input": { "file_path": "${PROJECT}/README.md" }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "governance-progress-read" },
+      "chunks": [
+        { "type": "text", "text": "Fresh human progress reopened governance." },
+        { "type": "usage", "input": 18, "output": 6 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

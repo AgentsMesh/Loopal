@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -9,7 +9,7 @@ use loopal_protocol::AgentEvent;
 
 use crate::agent_registry::AgentRegistry;
 use crate::mcp_service::HubMcpService;
-use crate::pending_relay::{PendingPermissionInfo, PendingQuestionInfo};
+use crate::pending_relay::{PendingPermissionInfo, PendingPlanApprovalInfo, PendingQuestionInfo};
 use crate::spawn_registry::SpawnRegistry;
 use crate::ui_dispatcher::UiDispatcher;
 use crate::uplink::HubUplink;
@@ -27,7 +27,11 @@ pub struct Hub {
     pub mcp_service: Arc<HubMcpService>,
     pub pending_permissions: HashMap<(String, String), PendingPermissionInfo>,
     pub pending_questions: HashMap<(String, String), PendingQuestionInfo>,
+    pub pending_plan_approvals: HashMap<(String, String), PendingPlanApprovalInfo>,
+    pub session_permission_grants: HashSet<(String, String)>,
     pub shutdown_signal: Arc<Notify>,
+    pub workspace: Option<Arc<loopal_workspace::WorkspaceService>>,
+    pub user_config_dir: Option<PathBuf>,
 }
 
 impl Hub {
@@ -50,6 +54,13 @@ impl Hub {
         let spawn_registry = Arc::new(SpawnRegistry::new());
         let mcp_service =
             Arc::new(HubMcpService::new().with_spawn_registry(spawn_registry.clone()));
+        let workspace = match loopal_workspace::WorkspaceService::new(&canonical) {
+            Ok(service) => Some(service),
+            Err(error) => {
+                tracing::error!(%error, "workspace service unavailable");
+                None
+            }
+        };
         Self {
             registry: AgentRegistry::new(event_tx),
             ui: UiDispatcher::new(),
@@ -63,7 +74,11 @@ impl Hub {
             mcp_service,
             pending_permissions: HashMap::new(),
             pending_questions: HashMap::new(),
+            pending_plan_approvals: HashMap::new(),
+            session_permission_grants: HashSet::new(),
             shutdown_signal: Arc::new(Notify::new()),
+            workspace,
+            user_config_dir: loopal_config::global_config_dir().ok(),
         }
     }
 

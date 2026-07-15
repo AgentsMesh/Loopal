@@ -20,6 +20,7 @@ pub(crate) struct AgentLoopAssembly {
     pub deps: AgentDeps,
     pub session: Session,
     pub initial_turns: Vec<Turn>,
+    pub hydrate_initial_history: bool,
     pub budget: loopal_context::ContextBudget,
     pub interrupt: InterruptSignal,
     pub interrupt_tx: Arc<tokio::sync::watch::Sender<u64>>,
@@ -49,6 +50,7 @@ pub(crate) fn assemble_agent_loop_params(a: AgentLoopAssembly) -> AgentLoopParam
         },
     )
     .initial_turns(a.initial_turns)
+    .hydrate_initial_history(a.hydrate_initial_history)
     .shared(a.shared)
     .scheduled_rx(a.scheduled_rx)
     .harness(a.harness)

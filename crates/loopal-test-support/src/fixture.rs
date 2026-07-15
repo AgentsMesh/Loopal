@@ -1,6 +1,7 @@
 //! RAII test fixture — isolated tempdir with file helpers.
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use chrono::Utc;
 use loopal_runtime::SessionManager;
@@ -10,6 +11,8 @@ use loopal_storage::Session;
 pub struct TestFixture {
     dir: tempfile::TempDir,
 }
+
+static NEXT_SESSION: AtomicU64 = AtomicU64::new(1);
 
 impl TestFixture {
     /// Create a new fixture with a unique temporary directory.
@@ -71,6 +74,11 @@ impl TestFixture {
             mode: "default".into(),
             sub_agents: Vec::new(),
         }
+    }
+
+    pub fn unique_test_session(&self, prefix: &str) -> Session {
+        let sequence = NEXT_SESSION.fetch_add(1, Ordering::Relaxed);
+        self.test_session(&format!("{prefix}-{}-{sequence}", std::process::id()))
     }
 
     /// Build a `SessionManager` writing to a subdirectory of this fixture.

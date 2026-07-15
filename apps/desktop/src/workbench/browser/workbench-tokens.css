@@ -1,0 +1,44 @@
+:root {
+  --wb-bg: #090b10;
+  --wb-surface-1: #0d1016;
+  --wb-surface-2: #121620;
+  --wb-surface-3: #181d28;
+  --wb-surface-raised: #1d2330;
+  --wb-border-subtle: #202632;
+  --wb-border: #2b3342;
+  --wb-border-strong: #3c475b;
+  --wb-text: #e8ebf2;
+  --wb-text-secondary: #a9b1c1;
+  --wb-text-muted: #747e92;
+  --wb-accent: #94a7ff;
+  --wb-accent-soft: #202943;
+  --wb-focus: #91a5ff;
+  --wb-success: #70d6a7;
+  --wb-warning: #e0ad58;
+  --wb-danger: #ee787f;
+  --wb-info: #7f9ee8;
+  --wb-space-1: 4px;
+  --wb-space-2: 8px;
+  --wb-space-3: 12px;
+  --wb-space-4: 16px;
+  --wb-space-5: 24px;
+  --wb-control-sm: 28px;
+  --wb-control: 32px;
+  --wb-radius-sm: 6px;
+  --wb-radius: 9px;
+  --wb-radius-lg: 13px;
+  --wb-shadow: 0 18px 48px rgba(0, 0, 0, .32);
+  --wb-rail-width: 48px;
+  --wb-sidebar-width: 272px;
+  --wb-status-height: 24px;
+  --wb-overlay: 30;
+}
+
+:where(button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--wb-focus);
+  outline-offset: 2px;
+}
+
+@media (max-width: 1279px) {
+  :root { --wb-sidebar-width: 240px; }
+}

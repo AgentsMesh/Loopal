@@ -1,5 +1,6 @@
 use loopal_protocol::ControlCommand;
 use loopal_protocol::Envelope;
+use tokio::sync::mpsc;
 
 /// Input to the agent loop — either a data message or a control command.
 ///
@@ -17,4 +18,43 @@ pub enum AgentInput {
     Message(Envelope),
     /// A control-plane command (mode switch, clear, compact, model switch).
     Control(ControlCommand),
+    /// A control command whose caller waits for runtime application.
+    TrackedControl(ControlRequest),
+}
+
+#[derive(Debug, Clone)]
+pub struct ControlRequest {
+    command: ControlCommand,
+    acknowledgement: mpsc::Sender<ControlAcknowledgement>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ControlAcknowledgement {
+    Applied,
+    Rejected(String),
+}
+
+impl ControlRequest {
+    pub fn tracked(command: ControlCommand) -> (Self, mpsc::Receiver<ControlAcknowledgement>) {
+        let (acknowledgement, receiver) = mpsc::channel(1);
+        (
+            Self {
+                command,
+                acknowledgement,
+            },
+            receiver,
+        )
+    }
+
+    pub fn command(&self) -> &ControlCommand {
+        &self.command
+    }
+
+    pub fn caller_is_waiting(&self) -> bool {
+        !self.acknowledgement.is_closed()
+    }
+
+    pub async fn acknowledge(&self, outcome: ControlAcknowledgement) {
+        let _ = self.acknowledgement.send(outcome).await;
+    }
 }

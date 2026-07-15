@@ -1,0 +1,44 @@
+.session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.session-section { min-width: 0; }
+.session-section h2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0;
+  padding: 6px 9px 7px;
+  color: #727b91;
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.session-section h2 small {
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: #1b202b;
+  color: #818ba3;
+  font-size: 9px;
+  text-align: center;
+}
+.session-section + .session-section {
+  padding-top: 10px;
+  border-top: 1px solid #242a36;
+}
+.session-section-history .session-card:not(.selected) { opacity: .76; }
+
+.session-empty-state {
+  margin: 4px 10px;
+  padding: 18px 10px;
+  border: 1px dashed #2d3340;
+  border-radius: 8px;
+  color: #737c91;
+  font-size: 11px;
+  line-height: 1.55;
+  text-align: center;
+}

@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "name": "provider-matrix",
+  "calls": [
+    {
+      "expect": { "userContains": "Exercise provider wire", "minTools": 1 },
+      "chunks": [
+        { "type": "thinking", "text": "Inspecting the deterministic workspace." },
+        {
+          "type": "tool_use",
+          "id": "provider-readme",
+          "name": "Read",
+          "input": { "file_path": "${PROJECT}/README.md" }
+        },
+        { "type": "usage", "input": 23, "output": 8, "thinking": 4 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "Loopal Desktop E2E" },
+      "chunks": [
+        { "type": "text", "text": "Provider wire completed through the production runtime." },
+        { "type": "usage", "input": 31, "output": 10 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

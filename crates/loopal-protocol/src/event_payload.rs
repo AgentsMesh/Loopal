@@ -13,7 +13,6 @@ use crate::question::{Question, ResolveSource};
 use crate::task_snapshot::TaskSnapshot;
 use crate::thread_goal::{GoalTransitionReason, ThreadGoal};
 
-/// Event payload. Runner/LLM/Tools only construct this enum.
 /// `#[rustfmt::skip]` keeps single-field variants on one line (200-line budget).
 #[rustfmt::skip]
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -49,7 +48,10 @@ pub enum AgentEventPayload {
         name: String,
         input: serde_json::Value,
     },
+    PlanApprovalRequest { id: String, plan_content: String, plan_path: String },
+    PlanApprovalResolved { id: String },
     Error { message: String },
+    ProviderWarning { message: String },
     /// Transient retry error — not persisted in message history.
     RetryError {
         message: String,
@@ -58,10 +60,7 @@ pub enum AgentEventPayload {
     },
     RetryCleared,
     AwaitingInput,
-    AutoContinuation {
-        continuation: u32,
-        max_continuations: u32,
-    },
+    AutoContinuation { continuation: u32, max_continuations: u32, #[serde(default)] reason: String },
     TokenUsage {
         input_tokens: u32,
         output_tokens: u32,
@@ -88,7 +87,6 @@ pub enum AgentEventPayload {
         target: QualifiedAddress,
         content_preview: String,
     },
-    /// Fires on the receiving runtime once the message is enqueued, for any source.
     InboxEnqueued {
         envelope_id: String,
         source: MessageSource,
@@ -96,12 +94,13 @@ pub enum AgentEventPayload {
         #[serde(skip_serializing_if = "Option::is_none")]
         summary: Option<String>,
     },
-    /// Pairs with `InboxEnqueued` by id.
     InboxConsumed { envelope_id: String },
     UserMessageQueued {
         envelope_id: String,
         content: String,
         image_count: usize,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        skill_info: Option<crate::SkillInvocation>,
     },
     UserQuestionRequest {
         id: String,
@@ -167,6 +166,7 @@ pub enum AgentEventPayload {
         source: ResolveSource,
     },
     SessionResumed { session_id: String, message_count: usize },
+    SessionHistoryLoaded(crate::SessionHistorySnapshot),
     /// `SessionResumeHook` adapter failed during swap. Resume completed; cron/task state may be stale.
     SessionResumeWarnings { session_id: String, warnings: Vec<String> },
     BgTaskSpawned { id: String, description: String, created_at_unix_ms: u64 },

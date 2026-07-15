@@ -1,0 +1,6 @@
+onlyBuiltDependencies:
+  - electron
+  - esbuild
+
+overrides:
+  electron-builder-squirrel-windows: 26.15.3

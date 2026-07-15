@@ -14,7 +14,7 @@ use crate::hub_harness::{build_hub_harness, build_hub_harness_with, has_stream};
 #[tokio::test]
 async fn hub_provider_error_then_new_message_succeeds() {
     let calls = vec![
-        vec![chunks::provider_error("502 Bad Gateway")],
+        vec![chunks::non_retryable_error("invalid request")],
         chunks::text_turn("recovered"),
     ];
     let mut h = build_hub_harness(calls).await;
@@ -22,9 +22,11 @@ async fn hub_provider_error_then_new_message_succeeds() {
     h.send_message("first attempt").await;
     let ev1 = h.collect_events().await;
     assert!(
-        ev1.iter()
-            .any(|e| matches!(e, AgentEventPayload::Error { .. })),
-        "should emit error event"
+        ev1.iter().any(|e| matches!(
+            e,
+            AgentEventPayload::Error { message } if message.contains("invalid request")
+        )),
+        "fatal provider error should be surfaced before returning to input"
     );
 
     h.send_message("try again").await;

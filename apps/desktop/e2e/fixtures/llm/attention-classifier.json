@@ -1,0 +1,145 @@
+{
+  "version": 1,
+  "name": "attention-classifier",
+  "calls": [
+    {
+      "expect": { "userContains": "Let the classifier answer" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "classifier-question-win",
+          "name": "AskUser",
+          "input": {
+            "questions": [{
+              "header": "Automatic",
+              "question": "Choose the inferable verification mode",
+              "multiSelect": false,
+              "options": [
+                { "label": "Fast", "description": "Use a short check." },
+                { "label": "Thorough", "description": "Use the requested thorough check." }
+              ]
+            }]
+          }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "Choose the inferable verification mode" },
+      "chunks": [
+        { "type": "delay", "ms": 800 },
+        {
+          "type": "text",
+          "text": "{\"answers\":[[\"Thorough\"]],\"reason\":\"The user requested classifier coverage.\"}"
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "classifier-question-win" },
+      "chunks": [
+        { "type": "text", "text": "Classifier answer won the real race." },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Make the classifier fail" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "classifier-question-fail",
+          "name": "AskUser",
+          "input": {
+            "questions": [{
+              "header": "Fallback",
+              "question": "Choose after classifier failure",
+              "multiSelect": false,
+              "options": [
+                { "label": "Manual", "description": "Answer manually." },
+                { "label": "Stop", "description": "Stop the check." }
+              ]
+            }]
+          }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "Choose after classifier failure" },
+      "chunks": [
+        { "type": "delay", "ms": 500 },
+        { "type": "text", "text": "not valid classifier json" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "classifier-question-fail" },
+      "chunks": [
+        { "type": "text", "text": "Manual fallback answered after classifier failure." },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Classifier allow this write" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "classifier-write-allow",
+          "name": "Write",
+          "input": { "file_path": "${PROJECT}/classifier-allowed.txt", "content": "allowed\n" }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "classifier-allowed.txt", "messageCount": 1 },
+      "chunks": [
+        {
+          "type": "text",
+          "text": "{\"should_block\":false,\"reason\":\"Project-local deterministic write.\"}"
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "classifier-write-allow" },
+      "chunks": [
+        { "type": "text", "text": "Permission classifier allowed the write." },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Classifier deny this write" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "classifier-write-deny",
+          "name": "Write",
+          "input": { "file_path": "${PROJECT}/classifier-denied.txt", "content": "denied\n" }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "classifier-denied.txt", "messageCount": 1 },
+      "chunks": [
+        {
+          "type": "text",
+          "text": "{\"should_block\":true,\"reason\":\"Scripted denial for contract coverage.\"}"
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "classifier-write-deny" },
+      "chunks": [
+        { "type": "text", "text": "Permission classifier denial returned to the model." },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

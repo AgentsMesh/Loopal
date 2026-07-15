@@ -1,0 +1,127 @@
+load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
+load("//build_defs/web:electron.bzl", "electron_app", "electron_builder_app", "electron_vite_build")
+load("//build_defs/web:vitest.bzl", "vitest_test")
+load(":desktop_tests.bzl", "desktop_playwright_tests")
+
+filegroup(
+    name = "sources",
+    srcs = glob([
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "src/**/*.css",
+        "src/**/*.html",
+    ]),
+)
+
+filegroup(
+    name = "e2e_fixtures",
+    srcs = glob(["e2e/fixtures/**"]),
+)
+
+ts_project(
+    name = "typecheck",
+    srcs = glob(
+        [
+            "src/**/*.ts",
+            "src/**/*.tsx",
+            "test/**/*.ts",
+            "test/**/*.tsx",
+            "e2e/**/*.ts",
+        ],
+        allow_empty = True,
+    ) + [
+        "electron.vite.config.ts",
+        "playwright.config.ts",
+    ],
+    declaration = False,
+    no_emit = True,
+    resolve_json_module = True,
+    transpiler = "tsc",
+    tsconfig = "tsconfig.json",
+    deps = ["//:node_modules"],
+)
+
+electron_vite_build(
+    name = "out",
+    srcs = [
+        "electron.vite.config.ts",
+        "tsconfig.json",
+        ":sources",
+        "//:package_json_bin",
+    ],
+)
+
+electron_builder_app(
+    name = "dist",
+    out = ":out",
+    config = "electron-builder.yml",
+    packaging_srcs = [
+        "builder-after-extract.cjs",
+        "builder-before-build.cjs",
+    ],
+    sidecar = "//:loopal",
+)
+
+electron_app(
+    name = "app",
+    out = ":out",
+    sidecar = "//:loopal",
+)
+
+electron_app(
+    name = "app_fake",
+    out = ":out",
+    fake_backend = True,
+)
+
+sh_test(
+    name = "staging_smoke",
+    srcs = ["test/staging/staging_smoke.sh"],
+    args = ["$(rootpath :dist_staging)"],
+    data = [":dist_staging"],
+    tags = [
+        "local",
+        "manual",
+        "no-sandbox",
+        "packaging",
+    ],
+)
+
+vitest_test(
+    name = "unit",
+    srcs = glob(
+        [
+            "src/**/*.test.ts",
+            "src/**/*.test.tsx",
+            "test/**/*.ts",
+            "test/**/*.tsx",
+        ],
+        allow_empty = True,
+    ),
+    data = [
+        "tsconfig.json",
+        ":sources",
+        "//:package_json_bin",
+    ],
+)
+
+vitest_test(
+    name = "coverage",
+    srcs = glob(
+        [
+            "src/**/*.test.ts",
+            "src/**/*.test.tsx",
+            "test/**/*.ts",
+            "test/**/*.tsx",
+        ],
+        allow_empty = True,
+    ),
+    coverage = True,
+    data = [
+        "tsconfig.json",
+        ":sources",
+        "//:package_json_bin",
+    ],
+)
+
+desktop_playwright_tests()

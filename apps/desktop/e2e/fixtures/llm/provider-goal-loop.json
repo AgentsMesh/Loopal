@@ -1,0 +1,47 @@
+{
+  "version": 2,
+  "name": "provider-goal-loop",
+  "calls": [
+    {
+      "expect": { "userContains": "Start a deterministic persistent goal" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "goal-loop-create",
+          "name": "create_goal",
+          "input": { "objective": "Exercise the autonomous Desktop goal loop" }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "goal-loop-create" },
+      "chunks": [
+        { "type": "text", "text": "The goal remains active after its first phase." },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "userContains": "Continue working toward the active thread goal",
+        "bodyContains": "Exercise the autonomous Desktop goal loop"
+      },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "goal-loop-complete",
+          "name": "update_goal",
+          "input": { "status": "complete" }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "goal-loop-complete" },
+      "chunks": [
+        { "type": "text", "text": "Goal continuation completed without another human turn." },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

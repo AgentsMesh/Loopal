@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use async_trait::async_trait;
 use loopal_error::LoopalError;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
+use tokio::io::{AsyncWriteExt, BufReader, BufWriter};
 use tokio::net::TcpStream;
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::sync::Mutex;
@@ -39,6 +39,7 @@ impl TcpTransport {
 #[async_trait]
 impl Transport for TcpTransport {
     async fn send(&self, data: &[u8]) -> Result<(), LoopalError> {
+        crate::frame::validate_outgoing_frame(data)?;
         let mut w = self.writer.lock().await;
         let result = async {
             w.write_all(data).await?;
@@ -56,23 +57,11 @@ impl Transport for TcpTransport {
 
     async fn recv(&self) -> Result<Option<Vec<u8>>, LoopalError> {
         let mut reader = self.reader.lock().await;
-        let mut line = String::new();
-        loop {
-            line.clear();
-            let n = reader
-                .read_line(&mut line)
-                .await
-                .map_err(|e| LoopalError::Ipc(format!("read failed: {e}")))?;
-            if n == 0 {
-                self.connected.store(false, Ordering::Release);
-                return Ok(None); // EOF / peer closed
-            }
-            let trimmed = line.trim();
-            if !trimmed.is_empty() {
-                return Ok(Some(trimmed.as_bytes().to_vec()));
-            }
-            // Skip blank lines
+        let result = crate::frame::read_frame(&mut *reader).await;
+        if result.as_ref().is_err() || matches!(&result, Ok(None)) {
+            self.connected.store(false, Ordering::Release);
         }
+        result
     }
 
     fn is_connected(&self) -> bool {

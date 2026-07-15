@@ -81,9 +81,13 @@ impl AgentLoopRunner {
         // Stream EOF without Done → connection dropped mid-stream.
         // Exclude cancellation: retry_stream_chat returns empty stream on cancel,
         // which would look like truncation but is intentional.
-        if !received_done && !result.stream_error && !cancel.is_cancelled() {
+        if !received_done
+            && !result.stream_error
+            && result.terminal_error.is_none()
+            && !cancel.is_cancelled()
+        {
             warn!("SSE stream ended without message_stop — treating as stream truncation");
-            self.emit_in_turn(AgentEventPayload::Error {
+            self.emit_in_turn(AgentEventPayload::ProviderWarning {
                 message: "Response stream ended unexpectedly — possible network interruption"
                     .to_string(),
             })
@@ -92,6 +96,7 @@ impl AgentLoopRunner {
         }
 
         self.emit_thinking_complete(&result).await?;
+        result.preserve_residual_thinking();
         let llm_duration = llm_start.elapsed();
         info!(
             duration_ms = llm_duration.as_millis() as u64,

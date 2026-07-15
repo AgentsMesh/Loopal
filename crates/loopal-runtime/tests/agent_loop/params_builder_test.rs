@@ -77,6 +77,7 @@ async fn builder_default_optionals_yield_none_or_empty() {
     assert!(params.rewake_rx.is_none());
     assert!(params.message_snapshot.is_none());
     assert!(params.resume_hooks.is_empty());
+    assert!(!params.hydrate_initial_history);
 }
 
 #[tokio::test]
@@ -101,8 +102,10 @@ async fn builder_chained_setters_override_defaults() {
         InterruptHandle::new(),
     )
     .resume_hooks(vec![hook.clone()])
+    .hydrate_initial_history(true)
     .build();
     assert_eq!(params.resume_hooks.len(), 1);
+    assert!(params.hydrate_initial_history);
 }
 
 #[tokio::test]

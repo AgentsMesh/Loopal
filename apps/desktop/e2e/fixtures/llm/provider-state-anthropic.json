@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "name": "provider-state-anthropic",
+  "calls": [{
+    "expect": {
+      "protocol": "anthropic", "model": "claude-opus-4-8",
+      "userContains": "Observe Anthropic provider state", "thinkingEnabled": true
+    },
+    "chunks": [
+      { "type": "thinking", "text": "ANTHROPIC THINKING STATE MARKER 12345678901234567890" },
+      { "type": "delay", "ms": 1200 },
+      { "type": "thinking_signature", "signature": "state-anthropic-signature" },
+      { "type": "text", "text": "ANTHROPIC STREAMING STATE MARKER" },
+      { "type": "delay", "ms": 1200 },
+      { "type": "usage", "input": 37, "output": 13, "thinking": 11,
+        "cache_creation": 3, "cache_read": 5 },
+      { "type": "done" }
+    ]
+  }]
+}

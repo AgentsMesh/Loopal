@@ -17,6 +17,28 @@ pub enum AgentLifecycle {
     Failed(String),
 }
 
+impl AgentLifecycle {
+    pub(crate) fn is_terminal(&self) -> bool {
+        matches!(self, Self::Finished | Self::Failed(_))
+    }
+
+    pub fn state(&self) -> &'static str {
+        match self {
+            Self::Spawning => "spawning",
+            Self::Running => "running",
+            Self::Finished => "finished",
+            Self::Failed(_) => "failed",
+        }
+    }
+
+    pub fn error(&self) -> Option<&str> {
+        match self {
+            Self::Failed(error) => Some(error),
+            _ => None,
+        }
+    }
+}
+
 /// Metadata and relationship info for a managed agent.
 #[derive(Debug, Clone)]
 pub struct AgentInfo {
@@ -43,21 +65,5 @@ impl AgentInfo {
             model: model.map(String::from),
             spawned_at: Instant::now(),
         }
-    }
-
-    /// Collect all descendant names (depth-first).
-    pub(crate) fn descendants(
-        &self,
-        agents: &std::collections::HashMap<String, super::types::ManagedAgent>,
-    ) -> Vec<String> {
-        let mut result = Vec::new();
-        let mut stack: Vec<String> = self.children.clone();
-        while let Some(name) = stack.pop() {
-            result.push(name.clone());
-            if let Some(agent) = agents.get(&name) {
-                stack.extend(agent.info.children.iter().cloned());
-            }
-        }
-        result
     }
 }

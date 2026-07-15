@@ -7,6 +7,27 @@ use tracing::{error, info};
 
 use super::runner::AgentLoopRunner;
 
+pub(super) enum ControlOutcome {
+    Applied { continuation: bool },
+    Rejected(String),
+}
+
+impl ControlOutcome {
+    pub(super) fn applied() -> Self {
+        Self::Applied {
+            continuation: false,
+        }
+    }
+
+    pub(super) fn continuation() -> Self {
+        Self::Applied { continuation: true }
+    }
+
+    pub(super) fn rejected(reason: impl Into<String>) -> Self {
+        Self::Rejected(reason.into())
+    }
+}
+
 fn persist_local_setting(cwd: &str, key: &str, value: serde_json::Value) {
     let cwd = PathBuf::from(cwd);
     if let Err(e) = loopal_config::update_local_settings_field(&cwd, key, value) {
@@ -18,7 +39,7 @@ impl AgentLoopRunner {
     /// Handle a control command. Returns `true` when handling injected a
     /// synthetic User envelope (currently only goal kickoff) — idle-phase
     /// callers must propagate that as `WaitResult::MessageAdded`.
-    pub(super) async fn handle_control(&mut self, ctrl: ControlCommand) -> Result<bool> {
+    pub(super) async fn handle_control(&mut self, ctrl: ControlCommand) -> Result<ControlOutcome> {
         match ctrl {
             ControlCommand::ModeSwitch(new_mode) => {
                 // Emit-first: if the event drops, leave the runner's mode
@@ -43,6 +64,9 @@ impl AgentLoopRunner {
                 let _ = self.force_compact(instructions).await?;
             }
             ControlCommand::ModelSwitch(new_model) => {
+                if new_model.trim().is_empty() {
+                    return Ok(ControlOutcome::rejected("model must not be empty"));
+                }
                 info!(from = %self.params.config.model(), to = %new_model, "switching model");
                 // Emit-first; abort the swap on emit failure so the model
                 // surfaced to view-state matches the runner.
@@ -60,7 +84,7 @@ impl AgentLoopRunner {
                 );
             }
             ControlCommand::Rewind { turn_index } => {
-                self.handle_rewind(turn_index).await?;
+                return self.handle_rewind(turn_index).await;
             }
             ControlCommand::ThinkingSwitch(json) => {
                 match serde_json::from_str::<loopal_provider_api::ThinkingConfig>(&json) {
@@ -77,12 +101,23 @@ impl AgentLoopRunner {
                             persist_local_setting(&self.params.session.cwd, "thinking", value);
                         }
                     }
-                    Err(e) => error!(error = %e, "invalid thinking config"),
+                    Err(e) => {
+                        error!(error = %e, "invalid thinking config");
+                        return Ok(ControlOutcome::rejected(format!(
+                            "invalid thinking config: {e}"
+                        )));
+                    }
                 }
             }
-            ControlCommand::PermissionModeSwitch(s) => self.handle_permission_switch(s).await?,
-            ControlCommand::DecisionModeSwitch(s) => self.handle_decision_switch(s).await?,
-            ControlCommand::SandboxPolicySwitch(s) => self.handle_sandbox_switch(s).await?,
+            ControlCommand::PermissionModeSwitch(s) => {
+                return self.handle_permission_switch(s).await;
+            }
+            ControlCommand::DecisionModeSwitch(s) => {
+                return self.handle_decision_switch(s).await;
+            }
+            ControlCommand::SandboxPolicySwitch(s) => {
+                return self.handle_sandbox_switch(s).await;
+            }
             ControlCommand::ResumeSession(session_id) => {
                 self.handle_resume_session(&session_id).await?;
             }
@@ -90,16 +125,16 @@ impl AgentLoopRunner {
                 self.handle_query_mcp_status().await?;
             }
             ControlCommand::McpReconnect { server } => {
-                self.handle_mcp_reconnect(server).await?;
+                return self.handle_mcp_reconnect(server).await;
             }
             ControlCommand::McpDisconnect { server } => {
-                self.handle_mcp_disconnect(server).await?;
+                return self.handle_mcp_disconnect(server).await;
             }
             ControlCommand::BgTaskKill { id } => {
-                self.handle_bg_task_kill(id).await;
+                return Ok(self.handle_bg_task_kill(id).await);
             }
             ControlCommand::CronDelete { id } => {
-                self.handle_cron_delete(id).await;
+                return Ok(self.handle_cron_delete(id).await);
             }
             ctrl @ (ControlCommand::GoalCreate { .. }
             | ControlCommand::GoalUserPause
@@ -113,10 +148,10 @@ impl AgentLoopRunner {
                 info!("session suspend requested");
                 self.continuation_gate
                     .close(super::continuation_gate::GateClose::UserSuspend);
+                self.transition(AgentStatus::Suspended).await?;
                 let gate = self.continuation_gate.summary();
                 self.emit(AgentEventPayload::ContinuationGateChanged(gate))
                     .await?;
-                self.transition(AgentStatus::Suspended).await?;
             }
             ControlCommand::Unsuspend => {
                 info!("session unsuspend requested");
@@ -127,10 +162,10 @@ impl AgentLoopRunner {
                 self.transition(AgentStatus::Running).await?;
             }
         }
-        Ok(false)
+        Ok(ControlOutcome::applied())
     }
 
-    pub(super) async fn handle_rewind(&mut self, turn_index: usize) -> Result<()> {
+    pub(super) async fn handle_rewind(&mut self, turn_index: usize) -> Result<ControlOutcome> {
         // reason: TUI picker counts user messages in display projection;
         // TurnStore may contain interleaved synthetic Resume turns (from
         // `/compact while idle`) whose indices don't line up. Map the
@@ -144,7 +179,9 @@ impl AgentLoopRunner {
                     total = self.turns.store().turns().len(),
                     "invalid user-turn ordinal for rewind"
                 );
-                return Ok(());
+                return Ok(ControlOutcome::rejected(format!(
+                    "rewind turn index {turn_index} does not exist"
+                )));
             }
         };
         info!(
@@ -157,6 +194,6 @@ impl AgentLoopRunner {
             remaining_turns: real_index,
         })
         .await?;
-        Ok(())
+        Ok(ControlOutcome::applied())
     }
 }

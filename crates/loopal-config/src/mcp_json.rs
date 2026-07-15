@@ -43,7 +43,7 @@ const DEFAULT_MCP_TIMEOUT: u64 = 30_000;
 ///
 /// Missing file or parse errors are handled gracefully (logged, not fatal).
 pub fn load_mcp_json(path: &Path) -> IndexMap<String, McpServerConfig> {
-    let contents = match std::fs::read_to_string(path) {
+    let contents = match crate::bounded_json_file::read(path) {
         Ok(c) => c,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return IndexMap::new(),
         Err(e) => {

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "name": "default-ok",
+  "calls": [],
+  "fallback": {
+    "chunks": [
+      { "type": "text", "text": "ok" },
+      { "type": "usage" },
+      { "type": "done" }
+    ]
+  }
+}

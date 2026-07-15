@@ -78,8 +78,13 @@ impl AgentLoopRunner {
                     self.ingest_message(&env).await;
                 }
                 crate::agent_input::AgentInput::Control(cmd) => {
-                    if let Err(e) = self.handle_control(cmd).await {
+                    if let Err(e) = self.apply_untracked_control(cmd).await {
                         tracing::warn!(error = %e, "failed to handle drained control");
+                    }
+                }
+                crate::agent_input::AgentInput::TrackedControl(request) => {
+                    if let Err(e) = self.apply_tracked_control(request).await {
+                        tracing::warn!(error = %e, "failed to handle tracked control");
                     }
                 }
             }

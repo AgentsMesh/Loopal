@@ -15,6 +15,7 @@ use super::callback;
 use super::store::FileCredentialStore;
 use crate::client::McpClient;
 use crate::handler::SamplingCallback;
+use crate::safe_diagnostics::{connection_failed, endpoint_label};
 
 /// Attempt an OAuth-authenticated connection to an MCP HTTP server.
 ///
@@ -27,11 +28,12 @@ pub async fn connect_with_oauth(
     timeout: Duration,
     sampling: Option<Arc<dyn SamplingCallback>>,
 ) -> Result<McpClient, McpError> {
-    info!(url, "starting OAuth flow for MCP server");
+    let endpoint = endpoint_label(url);
+    info!(%endpoint, "starting OAuth flow for MCP server");
 
     let mut auth_manager = AuthorizationManager::new(url)
         .await
-        .map_err(|e| McpError::ConnectionFailed(format!("OAuth metadata discovery: {e}")))?;
+        .map_err(|_| connection_failed("OAuth metadata discovery failed"))?;
 
     auth_manager.set_credential_store(FileCredentialStore::new(url));
 
@@ -42,44 +44,44 @@ pub async fn connect_with_oauth(
                 info!("using cached OAuth credentials");
                 return connect_authed(url, auth_manager, timeout, sampling).await;
             }
-            Err(e) => {
-                warn!(error = %e, "OAuth token refresh failed, re-authorizing");
+            Err(_) => {
+                warn!(%endpoint, "OAuth token refresh failed, re-authorizing");
                 let _ = FileCredentialStore::new(url).clear().await;
             }
         },
         Ok(false) => {
             info!("no cached OAuth credentials found");
         }
-        Err(e) => {
-            warn!(error = %e, "failed to load cached OAuth credentials");
+        Err(_) => {
+            warn!(%endpoint, "failed to load cached OAuth credentials");
         }
     }
 
     // Browser-based authorization flow.
     let (port, code_rx) = callback::start_callback_server()
         .await
-        .map_err(|e| McpError::ConnectionFailed(format!("callback server: {e}")))?;
+        .map_err(|_| connection_failed("OAuth callback server failed"))?;
 
     let redirect_uri = format!("http://localhost:{port}/oauth_callback");
 
     let mut oauth_state = OAuthState::new(url, None)
         .await
-        .map_err(|e| McpError::ConnectionFailed(format!("OAuth state init: {e}")))?;
+        .map_err(|_| connection_failed("OAuth state initialization failed"))?;
 
     oauth_state
         .start_authorization(&[], &redirect_uri, Some("loopal"))
         .await
-        .map_err(|e| McpError::ConnectionFailed(format!("OAuth start auth: {e}")))?;
+        .map_err(|_| connection_failed("OAuth authorization start failed"))?;
 
     let auth_url = oauth_state
         .get_authorization_url()
         .await
-        .map_err(|e| McpError::ConnectionFailed(format!("get auth URL: {e}")))?;
+        .map_err(|_| connection_failed("OAuth authorization URL unavailable"))?;
 
     // Open browser (best-effort).
     info!("opening browser for OAuth authorization");
     if opener::open(auth_url.as_str()).is_err() {
-        warn!("could not open browser; authorize manually:\n  {auth_url}");
+        warn!(%endpoint, "could not open OAuth authorization browser");
     }
 
     // Wait for callback (60s timeout).
@@ -91,7 +93,7 @@ pub async fn connect_with_oauth(
     oauth_state
         .handle_callback(&params.code, &params.state)
         .await
-        .map_err(|e| McpError::ConnectionFailed(format!("token exchange: {e}")))?;
+        .map_err(|_| connection_failed("OAuth token exchange failed"))?;
 
     let mut auth_manager = oauth_state
         .into_authorization_manager()
@@ -113,10 +115,12 @@ async fn connect_authed(
     let http_client = reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(30))
         .build()
-        .map_err(|e| McpError::ConnectionFailed(format!("HTTP client: {e}")))?;
+        .map_err(|_| connection_failed("OAuth HTTP client initialization failed"))?;
     let auth_client = AuthClient::new(http_client, auth_manager);
     let config = StreamableHttpClientTransportConfig::with_uri(url);
     let worker = StreamableHttpClientWorker::new(auth_client, config);
     let transport = WorkerTransport::spawn(worker);
-    McpClient::connect(transport, timeout, sampling).await
+    McpClient::connect(transport, timeout, sampling)
+        .await
+        .map_err(|_| connection_failed("OAuth MCP connection failed"))
 }

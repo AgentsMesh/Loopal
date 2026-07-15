@@ -14,12 +14,17 @@ pub fn load_plugin_layers() -> Result<Vec<ConfigLayer>, LoopalError> {
         Ok(d) => d,
         Err(_) => return Ok(Vec::new()),
     };
+    load_plugin_layers_from(&plugins_dir)
+}
 
+pub(crate) fn load_plugin_layers_from(
+    plugins_dir: &std::path::Path,
+) -> Result<Vec<ConfigLayer>, LoopalError> {
     if !plugins_dir.is_dir() {
         return Ok(Vec::new());
     }
 
-    let mut entries: Vec<_> = std::fs::read_dir(&plugins_dir)?
+    let mut entries: Vec<_> = std::fs::read_dir(plugins_dir)?
         .flatten()
         .filter(|e| e.path().is_dir())
         .collect();

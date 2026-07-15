@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "name": "provider-server-block-recovery",
+  "calls": [
+    {
+      "expect": { "userContains": "Trigger server block recovery" },
+      "chunks": [
+        {
+          "type": "server_tool_use",
+          "id": "search-server-1",
+          "name": "web_search",
+          "input": { "query": "deterministic server block history" }
+        },
+        {
+          "type": "server_tool_result",
+          "block_type": "web_search_tool_result",
+          "tool_use_id": "search-server-1",
+          "content": [
+            { "type": "web_search_result", "title": "History", "text": "fixture" }
+          ]
+        },
+        {
+          "type": "tool_use",
+          "id": "server-recovery-read",
+          "name": "Read",
+          "input": { "file_path": "${PROJECT}/README.md" }
+        },
+        { "type": "usage", "input": 32, "output": 8 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "toolResultId": "server-recovery-read",
+        "bodyContains": "search-server-1"
+      },
+      "status": 400,
+      "body": {
+        "type": "error",
+        "error": {
+          "type": "invalid_request_error",
+          "message": "web_search block without a corresponding tool_result"
+        }
+      }
+    },
+    {
+      "expect": {
+        "toolResultId": "server-recovery-read",
+        "bodyExcludes": "search-server-1"
+      },
+      "chunks": [
+        { "type": "text", "text": "Server blocks condensed and the request recovered." },
+        { "type": "usage", "input": 28, "output": 9 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

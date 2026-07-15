@@ -1,7 +1,4 @@
-// StreamingToolExec receives ToolUse notifications via a channel and spawns
-// PermissionLevel::ReadOnly tools early (no side effects, safe to discard if
-// the stream truncates). turn_exec orchestrates this in parallel with LLM
-// streaming and merges results.
+// Runs read-only tools early and merges their results after LLM streaming.
 
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -109,6 +106,17 @@ pub fn feed_tool(
     handle
         .join_set
         .spawn(loopal_protocol::event_id::propagate_to_spawn(async move {
+            emitter
+                .emit_best_effort(
+                    AgentEventPayload::ToolProgress {
+                        id: id.clone(),
+                        name: name.clone(),
+                        output_tail: String::new(),
+                        elapsed_ms: 0,
+                    },
+                    "agent_loop::streaming_tool_exec::tool_started",
+                )
+                .await;
             let tool_start = Instant::now();
             let result =
                 super::tool_exec::execute_tool_watchdogged(&kernel, &name, input, &tool_ctx, &mode)

@@ -47,6 +47,7 @@ pub struct SpawnParams {
     /// Behavior flag — not filesystem-coupled, so it crosses hub boundaries
     /// safely (unlike `cwd` / `fork_context`).
     pub no_sandbox: bool,
+    pub notify_parent_on_completion: bool,
     /// In-hub vs cross-hub semantics.
     pub target: SpawnTarget,
 }
@@ -73,6 +74,9 @@ pub fn build_spawn_request(
         "depth": params.depth,
         "no_sandbox": params.no_sandbox,
     });
+    if !params.notify_parent_on_completion {
+        request["notify_parent_on_completion"] = json!(false);
+    }
 
     match &params.target {
         SpawnTarget::InHub {

@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "name": "provider-preheader-retry",
+  "calls": [
+    {
+      "expect": { "userContains": "Recover from a pre-header disconnect" },
+      "closeBeforeHeaders": true
+    },
+    {
+      "expect": { "userContains": "Recover from a pre-header disconnect" },
+      "chunks": [
+        { "type": "text", "text": "Recovered after the transport disappeared before headers." },
+        { "type": "usage", "input": 17, "output": 8 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

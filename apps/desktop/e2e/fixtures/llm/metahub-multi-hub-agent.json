@@ -1,0 +1,102 @@
+{
+  "version": 2,
+  "name": "metahub-multi-hub-agent",
+  "calls": [
+    {
+      "expect": { "userContains": "Exercise two remote Hubs concurrently" },
+      "chunks": [
+        {
+          "type": "tool_use", "id": "multi-spawn-b", "name": "Agent",
+          "input": {
+            "action": "spawn", "name": "worker-b",
+            "prompt": "Return REMOTE HUB B RESULT 84B7",
+            "target_hub": "hub-b", "run_in_background": true
+          }
+        },
+        {
+          "type": "tool_use", "id": "multi-spawn-c", "name": "Agent",
+          "input": {
+            "action": "spawn", "name": "worker-c",
+            "prompt": "Return REMOTE HUB C RESULT 52C9",
+            "target_hub": "hub-c", "run_in_background": true
+          }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Return REMOTE HUB B RESULT 84B7" },
+      "delayMs": 7000,
+      "chunks": [
+        { "type": "text", "text": "REMOTE HUB B RESULT 84B7" },
+        { "type": "usage", "input": 23, "output": 6 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Return REMOTE HUB C RESULT 52C9" },
+      "delayMs": 11000,
+      "chunks": [
+        { "type": "text", "text": "REMOTE HUB C RESULT 52C9" },
+        { "type": "usage", "input": 25, "output": 6 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "toolResultId": "multi-spawn-b", "bodyContains": "multi-spawn-c"
+      },
+      "chunks": [
+        { "type": "text", "text": "Both remote agents are running." },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "userContains": "<agent-result name=\"worker-b\">\nREMOTE HUB B RESULT 84B7"
+      },
+      "chunks": [
+        {
+          "type": "tool_use", "id": "multi-result-b", "name": "Agent",
+          "input": {
+            "action": "result", "name": "worker-b", "prompt": "Read B result"
+          }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "toolResultId": "multi-result-b", "bodyContains": "REMOTE HUB B RESULT 84B7"
+      },
+      "chunks": [
+        { "type": "text", "text": "Hub B result observed exactly once." },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "userContains": "<agent-result name=\"worker-c\">\nREMOTE HUB C RESULT 52C9"
+      },
+      "chunks": [
+        {
+          "type": "tool_use", "id": "multi-result-c", "name": "Agent",
+          "input": {
+            "action": "result", "name": "worker-c", "prompt": "Read C result"
+          }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "toolResultId": "multi-result-c", "bodyContains": "REMOTE HUB C RESULT 52C9"
+      },
+      "chunks": [
+        { "type": "text", "text": "Hub C result observed exactly once." },
+        { "type": "usage", "input": 49, "output": 9 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

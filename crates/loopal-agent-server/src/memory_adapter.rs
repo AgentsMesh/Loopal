@@ -65,6 +65,7 @@ impl ServerMemoryProcessor {
             agent_type: None,
             depth: self.shared.depth + 1,
             no_sandbox,
+            notify_parent_on_completion: false,
             target: SpawnTarget::InHub {
                 cwd_override: None,
                 fork_context: None,

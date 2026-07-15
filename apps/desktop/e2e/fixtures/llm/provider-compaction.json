@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "name": "provider-compaction",
+  "calls": [
+    {
+      "expect": { "userContains": "Manual compact seed one" },
+      "chunks": [
+        { "type": "text", "text": "MANUAL COMPACT SEED ONE" },
+        { "type": "usage", "input": 40, "output": 6 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Manual compact seed two" },
+      "chunks": [
+        { "type": "text", "text": "MANUAL COMPACT SEED TWO" },
+        { "type": "usage", "input": 55, "output": 7 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "bodyContains": "Preserve contract markers",
+        "bodyExcludes": "[Continue from where you left off]"
+      },
+      "chunks": [
+        { "type": "delay", "ms": 1500 },
+        { "type": "text", "text": "<summary>MANUAL COMPACTION SUMMARY MARKER</summary>" },
+        { "type": "usage", "input": 65, "output": 12 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "MANUAL COMPACTION SUMMARY MARKER" },
+      "chunks": [
+        { "type": "text", "text": "Post-compaction request used the summary boundary." },
+        { "type": "usage", "input": 25, "output": 8 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

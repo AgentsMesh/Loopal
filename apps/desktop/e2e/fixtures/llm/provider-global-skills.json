@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "name": "provider-global-skills",
+  "calls": [
+    {
+      "expect": {
+        "protocol": "anthropic",
+        "userContains": "GLOBAL_SKILL_EDITED_BODY_MARKER",
+        "messageCount": 1
+      },
+      "chunks": [
+        {
+          "type": "text",
+          "text": "Global Skill invocation reached the production runtime."
+        },
+        { "type": "usage", "input": 31, "output": 8 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

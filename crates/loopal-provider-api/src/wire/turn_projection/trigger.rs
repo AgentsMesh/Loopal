@@ -8,12 +8,15 @@ pub(super) fn project_trigger(trigger: &TurnTrigger) -> Option<Message> {
     // UserInput carries images — project structurally, not via text prefix.
     if let TurnTrigger::UserInput {
         content, images, ..
+    }
+    | TurnTrigger::SkillInput {
+        content, images, ..
     } = trigger
     {
         return Some(text_user_with_images(
             content,
             images,
-            Some(MessageOrigin::Human),
+            trigger_origin(trigger),
         ));
     }
     let text = trigger_llm_text(trigger)?;
@@ -23,6 +26,12 @@ pub(super) fn project_trigger(trigger: &TurnTrigger) -> Option<Message> {
 fn trigger_origin(trigger: &TurnTrigger) -> Option<MessageOrigin> {
     match trigger {
         TurnTrigger::UserInput { .. } => Some(MessageOrigin::Human),
+        TurnTrigger::SkillInput {
+            name, user_args, ..
+        } => Some(MessageOrigin::HumanSkill {
+            name: name.clone(),
+            user_args: user_args.clone(),
+        }),
         TurnTrigger::Cron { .. } => Some(MessageOrigin::Scheduled),
         TurnTrigger::Agent { from, .. } | TurnTrigger::AgentResult { from, .. } => {
             Some(MessageOrigin::Agent {

@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "name": "topology-model-lifecycle",
+  "calls": [
+    {
+      "expect": { "userContains": "Spawn parallel model children" },
+      "chunks": [
+        {
+          "type": "tool_use", "id": "spawn-alpha", "name": "Agent",
+          "input": { "action": "spawn", "name": "parallel-alpha", "prompt": "Return ALPHA CHILD RESULT" }
+        },
+        {
+          "type": "tool_use", "id": "spawn-beta", "name": "Agent",
+          "input": { "action": "spawn", "name": "parallel-beta", "prompt": "Return BETA CHILD RESULT" }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "Return ALPHA CHILD RESULT" },
+      "chunks": [
+        { "type": "text", "text": "ALPHA CHILD RESULT" },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "Return BETA CHILD RESULT" },
+      "chunks": [
+        { "type": "text", "text": "BETA CHILD RESULT" },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "spawn-alpha", "bodyContains": "spawn-beta" },
+      "chunks": [
+        { "type": "text", "text": "Parallel child results returned to root." },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Spawn a failing model child" },
+      "chunks": [
+        {
+          "type": "tool_use", "id": "spawn-failed", "name": "Agent",
+          "input": { "action": "spawn", "name": "failed-child", "prompt": "Fail this child provider call" }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "Fail this child provider call" },
+      "status": 400,
+      "body": { "error": { "type": "invalid_request_error", "message": "scripted child failure" } }
+    },
+    {
+      "expect": { "toolResultId": "spawn-failed" },
+      "chunks": [
+        { "type": "text", "text": "Failed child result returned to root." },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Spawn a nested model child" },
+      "chunks": [
+        {
+          "type": "tool_use", "id": "spawn-parent", "name": "Agent",
+          "input": { "action": "spawn", "name": "parent-child", "prompt": "Spawn nested grandchild now" }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "Spawn nested grandchild now" },
+      "chunks": [
+        {
+          "type": "tool_use", "id": "spawn-grandchild", "name": "Agent",
+          "input": { "action": "spawn", "name": "nested-grandchild", "prompt": "Return GRANDCHILD RESULT" }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "bodyContains": "Return GRANDCHILD RESULT" },
+      "chunks": [
+        { "type": "text", "text": "GRANDCHILD RESULT" },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "spawn-grandchild" },
+      "chunks": [
+        { "type": "text", "text": "PARENT RECEIVED GRANDCHILD RESULT" },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "spawn-parent" },
+      "chunks": [
+        { "type": "text", "text": "Nested child result returned to root." },
+        { "type": "usage" },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

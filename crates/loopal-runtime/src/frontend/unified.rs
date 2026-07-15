@@ -4,7 +4,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
 use crate::agent_input::AgentInput;
-use crate::frontend::traits::{AgentFrontend, EventEmitter};
+use crate::frontend::traits::{AgentFrontend, EventEmitter, PlanApproval};
 use loopal_error::Result;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::Envelope;
@@ -24,6 +24,7 @@ pub struct UnifiedFrontend {
     cancel_token: Option<CancellationToken>,
     permission_handler: Box<dyn PermissionHandler>,
     question_handler: Box<dyn QuestionHandler>,
+    plan_approval: PlanApproval,
 }
 
 impl UnifiedFrontend {
@@ -44,7 +45,13 @@ impl UnifiedFrontend {
             cancel_token,
             permission_handler,
             question_handler,
+            plan_approval: PlanApproval::Reject,
         }
+    }
+
+    pub fn with_plan_approval(mut self, approval: PlanApproval) -> Self {
+        self.plan_approval = approval;
+        self
     }
 }
 
@@ -133,6 +140,10 @@ impl AgentFrontend for UnifiedFrontend {
             tracing::error!(ctx = "unified::question_decided", error = %e, "event emit failed");
         }
         response
+    }
+
+    async fn request_plan_approval(&self, _plan_content: &str, _plan_path: &str) -> PlanApproval {
+        self.plan_approval.clone()
     }
 
     fn try_emit(&self, payload: AgentEventPayload) -> bool {

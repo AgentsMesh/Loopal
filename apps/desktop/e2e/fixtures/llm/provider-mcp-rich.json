@@ -1,0 +1,73 @@
+{
+  "version": 2,
+  "name": "provider-mcp-rich",
+  "calls": [
+    {
+      "expect": { "userContains": "Exercise rich MCP content" },
+      "chunks": [
+        { "type": "tool_use", "id": "mcp-rich-call", "name": "fixture_rich", "input": {} },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "mcp-rich-call", "bodyContains": "fixture embedded body" },
+      "chunks": [
+        { "type": "text", "text": "Rich MCP content reached the model." },
+        { "type": "usage", "input": 31, "output": 8 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Exercise MCP error result" },
+      "chunks": [
+        { "type": "tool_use", "id": "mcp-error-call", "name": "fixture_error", "input": {} },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "mcp-error-call", "bodyContains": "fixture MCP error result" },
+      "chunks": [
+        { "type": "text", "text": "MCP error result was preserved for the model." },
+        { "type": "usage", "input": 43, "output": 9 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Exercise MCP transport reconnect" },
+      "chunks": [
+        {
+          "type": "tool_use", "id": "mcp-reconnect-call", "name": "fixture_reconnect",
+          "input": { "marker": "${ROOT}/mcp-reconnect-marker.txt" }
+        },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "mcp-reconnect-call", "bodyContains": "reconnected after transport close" },
+      "chunks": [
+        { "type": "text", "text": "MCP transport reconnected and retried exactly once." },
+        { "type": "usage", "input": 55, "output": 10 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Start cancellable MCP tool" },
+      "chunks": [
+        { "type": "tool_use", "id": "mcp-slow-call", "name": "fixture_slow", "input": {} },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "userContains": "Recover after cancelling MCP tool",
+        "toolResultId": "mcp-slow-call",
+        "bodyContains": "Interrupted by user"
+      },
+      "chunks": [
+        { "type": "text", "text": "Session remained reusable after MCP cancellation." },
+        { "type": "usage", "input": 67, "output": 11 },
+        { "type": "done" }
+      ]
+    }
+  ]
+}

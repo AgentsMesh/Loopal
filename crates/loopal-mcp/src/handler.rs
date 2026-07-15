@@ -94,9 +94,13 @@ impl ClientHandler for LoopalClientHandler {
                 SamplingMessage::new(Role::Assistant, SamplingMessageContent::text(&text)),
                 model,
             )),
-            Err(e) => {
-                warn!(error = %e, "sampling callback failed");
-                Err(ErrorData::new(ErrorCode::INTERNAL_ERROR, e, None))
+            Err(_) => {
+                warn!("sampling callback failed");
+                Err(ErrorData::new(
+                    ErrorCode::INTERNAL_ERROR,
+                    "sampling callback failed",
+                    None,
+                ))
             }
         }
     }

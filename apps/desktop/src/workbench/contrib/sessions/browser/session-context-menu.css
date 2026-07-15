@@ -1,0 +1,41 @@
+.session-context-menu {
+  position: fixed;
+  z-index: 80;
+  min-width: 188px;
+  padding: 5px;
+  border: 1px solid #363c4d;
+  border-radius: 8px;
+  background: #171a22;
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.46);
+  outline: none;
+  -webkit-app-region: no-drag;
+}
+
+.session-context-menu button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 9px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #e1e4ed;
+  text-align: left;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.session-context-menu button:hover,
+.session-context-menu button:focus-visible { background: #262b38; outline: none; }
+.session-context-menu button:disabled { color: #72798c; cursor: default; }
+.session-context-menu button:disabled:hover { background: transparent; }
+
+.session-federation-mark {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #737b90;
+}
+.session-federation-mark.state-connected { background: #72dbb0; }
+.session-federation-mark.state-error { background: #ef7272; }

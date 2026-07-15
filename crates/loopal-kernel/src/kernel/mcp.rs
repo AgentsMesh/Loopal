@@ -55,7 +55,7 @@ impl Kernel {
     pub async fn finalize_mcp_tools(&mut self, max_wait: Duration) -> bool {
         let settled = match self.mcp.local() {
             Some(local) => local.wait_until_settled(max_wait).await,
-            None => true,
+            None => self.wait_for_proxy_mcp(max_wait).await,
         };
 
         let (instructions, resources, prompts) = self.snapshot_local_mcp_metadata().await;

@@ -1,0 +1,92 @@
+{
+  "version": 2,
+  "name": "desktop-demo",
+  "calls": [
+    {
+      "chunks": [
+        { "type": "thinking", "text": "Preparing a production-path Desktop demonstration." },
+        { "type": "delay", "ms": 600 },
+        { "type": "thinking_signature", "signature": "loopal-desktop-demo" },
+        {
+          "type": "tool_use",
+          "id": "demo-goal",
+          "name": "create_goal",
+          "input": { "objective": "Explore the LoopalDesktop production runtime" }
+        },
+        {
+          "type": "tool_use",
+          "id": "demo-task",
+          "name": "TaskCreate",
+          "input": {
+            "subject": "Inspect the dynamic Desktop panels",
+            "description": "Keep a real production Runtime task visible during the demo."
+          }
+        },
+        { "type": "usage", "input": 24, "output": 12 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "demo-task", "bodyContains": "demo-goal" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "demo-task-start",
+          "name": "TaskUpdate",
+          "input": {
+            "taskId": "1",
+            "status": "in_progress",
+            "activeForm": "Rendering the conversation-first Desktop"
+          }
+        },
+        { "type": "usage", "input": 28, "output": 10 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "demo-task-start" },
+      "chunks": [
+        {
+          "type": "tool_use",
+          "id": "demo-task-complete",
+          "name": "TaskUpdate",
+          "input": { "taskId": "1", "status": "completed" }
+        },
+        {
+          "type": "tool_use",
+          "id": "demo-goal-complete",
+          "name": "update_goal",
+          "input": { "status": "complete" }
+        },
+        { "type": "usage", "input": 26, "output": 10 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": {
+        "toolResultId": "demo-goal-complete",
+        "bodyContains": "demo-task-complete"
+      },
+      "chunks": [
+        {
+          "type": "text",
+          "text": "# Loopal Desktop is connected\n\nThis turn travelled through the real production Runtime, IPC bridge, and Renderer.\n\n- Markdown is rendered as structured content.\n- Runtime work appears only while it is active.\n- The conversation remains the primary surface.\n\n> Goal and task state completed cleanly without an automatic continuation loop.\n\n```sh\nbazel test //apps/desktop:unit\n```"
+        },
+        { "type": "usage", "input": 34, "output": 42 },
+        { "type": "done" }
+      ]
+    }
+  ],
+  "fallback": {
+    "chunks": [
+      { "type": "text", "text": "# LoopalDesktop is connected\n\n" },
+      { "type": "delay", "ms": 450 },
+      {
+        "type": "text",
+        "text": "This response travelled through the real production Kernel, Anthropic HTTP/SSE adapter, Runtime, IPC bridge, and Renderer."
+      },
+      { "type": "usage", "input": 32, "output": 18 },
+      { "type": "done" }
+    ]
+  }
+}

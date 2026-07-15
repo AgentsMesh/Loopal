@@ -13,8 +13,7 @@ use crate::handler::SamplingCallback;
 use crate::transport;
 use crate::types::{CapabilitySummary, ConnectionStatus, McpPrompt, McpResource};
 
-// Surfaced to `/mcp` page when a stdio server enters Failed state so the
-// user sees the server's own error output, not just our wrapper message.
+// Surfaced to `/mcp` as redacted stderr-presence diagnostics.
 const STDERR_RETENTION: usize = 16;
 
 pub struct McpConnection {
@@ -85,8 +84,8 @@ impl McpConnection {
                     warn!(server = %self.name, errors = ?self.errors, "connected with errors");
                 }
             }
-            Err(e) => {
-                let msg = format!("connection failed: {e}");
+            Err(_) => {
+                let msg = "connection failed: MCP connection failed".to_string();
                 self.errors.push(msg.clone());
                 self.status = ConnectionStatus::Failed(msg);
             }
@@ -149,7 +148,7 @@ impl McpConnection {
                         })
                         .collect();
                 }
-                Err(e) => self.errors.push(format!("tools/list: {e}")),
+                Err(_) => self.errors.push("tools/list failed".into()),
             }
         }
         if caps.resources {
@@ -166,7 +165,7 @@ impl McpConnection {
                         })
                         .collect();
                 }
-                Err(e) => self.errors.push(format!("resources/list: {e}")),
+                Err(_) => self.errors.push("resources/list failed".into()),
             }
         }
         if caps.prompts {
@@ -181,7 +180,7 @@ impl McpConnection {
                         })
                         .collect();
                 }
-                Err(e) => self.errors.push(format!("prompts/list: {e}")),
+                Err(_) => self.errors.push("prompts/list failed".into()),
             }
         }
     }

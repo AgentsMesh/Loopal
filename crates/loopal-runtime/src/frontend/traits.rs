@@ -67,7 +67,7 @@ pub trait AgentFrontend: Send + Sync {
     }
 
     async fn request_plan_approval(&self, _plan_content: &str, _plan_path: &str) -> PlanApproval {
-        PlanApproval::Approve
+        PlanApproval::Reject
     }
 
     fn try_emit(&self, _payload: AgentEventPayload) -> bool {

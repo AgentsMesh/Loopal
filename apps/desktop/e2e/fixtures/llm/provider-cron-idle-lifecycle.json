@@ -1,0 +1,40 @@
+{
+  "version": 2,
+  "name": "provider-cron-idle-lifecycle",
+  "calls": [
+    {
+      "expect": { "userContains": "Schedule a durable idle wake" },
+      "chunks": [{ "type": "tool_use", "id": "cron-goal", "name": "create_goal",
+        "input": { "objective": "Verify durable scheduled wake behavior" } },
+        { "type": "usage" }, { "type": "done" }]
+    },
+    {
+      "expect": { "toolResultId": "cron-goal" },
+      "chunks": [{ "type": "tool_use", "id": "cron-create", "name": "CronCreate", "input": {
+        "cron": "* * * * *", "prompt": "DURABLE CRON WAKE MARKER",
+        "recurring": true, "durable": true } },
+        { "type": "usage" }, { "type": "done" }]
+    },
+    {
+      "expect": { "toolResultId": "cron-create", "bodyContains": "durable" },
+      "chunks": [{ "type": "tool_use", "id": "cron-idle", "name": "request_idle", "input": {
+        "reason": "Waiting for the durable Desktop cron fixture",
+        "max_idle_duration_secs": 120, "expected_wake_signal": "cron" } },
+        { "type": "usage" }, { "type": "done" }]
+    },
+    {
+      "expect": { "userContains": "DURABLE CRON WAKE MARKER" },
+      "chunks": [
+        { "type": "tool_use", "id": "cron-list-after-wake", "name": "CronList", "input": {} },
+        { "type": "tool_use", "id": "cron-goal-complete", "name": "update_goal",
+          "input": { "status": "complete" } },
+        { "type": "usage" }, { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "toolResultId": "cron-list-after-wake", "bodyContains": "cron-goal-complete" },
+      "chunks": [{ "type": "text", "text": "Durable cron woke the suspended production Session." },
+        { "type": "usage" }, { "type": "done" }]
+    }
+  ]
+}

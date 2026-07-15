@@ -1,6 +1,8 @@
 pub mod approved;
 pub mod batch;
 pub mod fs;
+#[cfg(windows)]
+mod fs_replace;
 mod fs_write;
 pub mod image;
 pub mod limits;

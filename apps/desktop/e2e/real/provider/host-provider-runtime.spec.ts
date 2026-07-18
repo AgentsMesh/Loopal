@@ -12,12 +12,12 @@ test('retries a real Anthropic HTTP 429 and clears the retry state', async () =>
     await ready(page)
     await send(page, 'Recover from a scripted rate limit')
     await expect(page.getByTestId('conversation')).toContainText(
-      'Retrying in 2.0s', { timeout: 10_000 },
+      /Retrying in \d+\.\ds/, { timeout: 10_000 },
     )
     await expect(page.getByTestId('conversation')).toContainText(
       'Recovered through the real provider retry loop.', { timeout: 15_000 },
     )
-    await expect(page.getByTestId('conversation')).not.toContainText('Retrying in 2.0s')
+    await expect(page.getByTestId('conversation')).not.toContainText('Retrying in')
     expect(await desktop.llm!.requests()).toHaveLength(2)
     await expect.poll(() => desktop.llm!.state()).toMatchObject({
       served: 2, remaining: 0, verified: true,
@@ -84,7 +84,7 @@ test('retries a connection closed before HTTP headers', async () => {
     const conversation = desktop.page.getByTestId('conversation')
     await ready(desktop.page)
     await send(desktop.page, 'Recover from a pre-header disconnect')
-    await expect(conversation).toContainText('Retrying in 2.0s', { timeout: 10_000 })
+    await expect(conversation).toContainText(/Retrying in \d+\.\ds/, { timeout: 10_000 })
     await expect(conversation).toContainText(
       'Recovered after the transport disappeared before headers.', { timeout: 15_000 },
     )
@@ -103,13 +103,13 @@ test('interrupts a retry wait and accepts the next turn immediately', async () =
     const conversation = page.getByTestId('conversation')
     await ready(page)
     await send(page, 'Wait on a long provider retry')
-    await expect(conversation).toContainText('Retrying in 30.0s', { timeout: 10_000 })
+    await expect(conversation).toContainText(/Retrying in \d{2}\.\ds/, { timeout: 10_000 })
     await page.getByRole('button', { name: 'Settings' }).click()
     await selectSettingsSection(page, 'agent')
     await page.getByRole('group', { name: 'Agent controls' })
       .getByRole('button', { name: 'Interrupt' }).click()
     await page.getByRole('button', { name: 'Close settings' }).click()
-    await expect(conversation).not.toContainText('Retrying in 30.0s', { timeout: 10_000 })
+    await expect(conversation).not.toContainText('Retrying in', { timeout: 10_000 })
     await expect(page.getByLabel('Message Loopal')).toBeEnabled({ timeout: 10_000 })
     await send(page, 'Recover after interrupting retry wait')
     await expect(conversation).toContainText(

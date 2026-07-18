@@ -63,7 +63,10 @@ describe('LoopalDefaultSettings', () => {
     expect(restartButton).toBeEnabled()
     fireEvent.click(restartButton)
     await waitFor(() => expect(restart).toHaveBeenCalledWith('session'))
-    expect(screen.getByRole('status')).toHaveTextContent('restarted with the saved')
+    // The status line updates only after the restart promise resolves and
+    // commits — waiting on the mock call alone races that commit.
+    await waitFor(() => expect(screen.getByRole('status'))
+      .toHaveTextContent('restarted with the saved'))
   })
 
   it('surfaces load, validation, save, and restart failures without leaking credentials', async () => {

@@ -66,3 +66,9 @@ mod sandbox_test;
 
 #[path = "fs_tools_test.rs"]
 mod fs_tools_test;
+
+#[path = "auto_compaction_test.rs"]
+mod auto_compaction_test;
+
+#[path = "tool_interrupt_test.rs"]
+mod tool_interrupt_test;

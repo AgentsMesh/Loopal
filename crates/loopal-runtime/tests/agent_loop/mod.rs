@@ -66,6 +66,7 @@ mod stream_truncation_test;
 mod suspend_cron_e2e_test;
 mod suspend_e2e_test;
 mod thinking_continue_test;
+mod tools_edit_safety_test;
 mod tools_test;
 pub mod try_recover_helpers;
 mod try_recover_test;

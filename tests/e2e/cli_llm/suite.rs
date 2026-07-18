@@ -42,3 +42,12 @@ mod permission_test;
 
 #[path = "resume_test.rs"]
 mod resume_test;
+
+#[path = "controls_test.rs"]
+mod controls_test;
+
+#[path = "queued_message_test.rs"]
+mod queued_message_test;
+
+#[path = "loop_guard_test.rs"]
+mod loop_guard_test;

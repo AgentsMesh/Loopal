@@ -59,8 +59,9 @@ impl AgentLoopRunner {
             .unwrap_or_default();
 
         let warnings = std::mem::take(&mut turn_ctx.pending_warnings);
-        let warning_count = warnings.len();
-        turn_ctx.metrics.warnings_injected = warning_count as u32;
+        // reason: += not = — a turn can run several tool batches, and each
+        // batch drains its own warnings; overwriting would keep only the last.
+        turn_ctx.metrics.warnings_injected += warnings.len() as u32;
         if !warnings.is_empty() {
             let text = warnings.join("\n");
             if let Err(e) = self.append_step_record(TurnStep::Injection {

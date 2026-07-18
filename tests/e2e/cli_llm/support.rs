@@ -194,9 +194,15 @@ async fn boot_process(
     Arc<Connection<Listening>>,
     Receiver<Incoming>,
 ) {
+    // Isolated TMPDIR: startup housekeeping cleans "orphan" bash-log dirs
+    // under the shared temp root, so concurrently starting sibling test
+    // processes would otherwise delete each other's live session dirs.
+    let tmp = home.join("tmp");
+    std::fs::create_dir_all(&tmp).unwrap();
     let mut cmd = tokio::process::Command::new(binary_path());
     cmd.arg("--serve")
         .env("HOME", home)
+        .env("TMPDIR", &tmp)
         .env("LOOPAL_TEST_SESSION_DIR", home.join("sessions"))
         .env("LOOPAL_PERMISSION_MODE", "bypass")
         .env("LOOPAL_HUB_HEALTH_TICK_SECS", "1")
@@ -459,6 +465,13 @@ impl CliHarness {
     /// Send a follow-up user message into the persistent session and collect the
     /// resulting turn (which settles back to idle).
     pub async fn turn_via_message(&mut self, text: &str) -> TurnOutcome {
+        self.message_fire(text).await;
+        self.collect_persistent().await
+    }
+
+    /// Deliver a user message without collecting — for injecting input while a
+    /// turn is already in flight.
+    pub async fn message_fire(&self, text: &str) {
         let envelope = loopal_protocol::Envelope {
             id: uuid::Uuid::new_v4(),
             source: loopal_protocol::MessageSource::Human,
@@ -474,7 +487,6 @@ impl CliHarness {
             )
             .await
             .expect("agent_message");
-        self.collect_persistent().await
     }
 
     /// Send a control command (e.g. Compact) into the persistent session and collect.
@@ -486,7 +498,18 @@ impl CliHarness {
         self.collect_persistent().await
     }
 
-    async fn collect_persistent(&mut self) -> TurnOutcome {
+    /// Fire a control command that does not run a turn (ModelSwitch, Clear,
+    /// Rewind, …); pair with `await_event` for its effect notification.
+    pub async fn control_fire(&self, command: Value) {
+        self.conn
+            .send_request(methods::AGENT_CONTROL.name, command)
+            .await
+            .expect("agent_control");
+    }
+
+    /// Collect one turn's events from a persistent session until it settles
+    /// (Finished / AwaitingInput / Error).
+    pub async fn collect_persistent(&mut self) -> TurnOutcome {
         let mut out = TurnOutcome::default();
         let deadline = tokio::time::Instant::now() + TIMEOUT;
         while tokio::time::Instant::now() < deadline {

@@ -30,3 +30,9 @@ mod compaction_test;
 
 #[path = "mcp_test.rs"]
 mod mcp_test;
+
+#[path = "secrets_test.rs"]
+mod secrets_test;
+
+#[path = "degraded_test.rs"]
+mod degraded_test;

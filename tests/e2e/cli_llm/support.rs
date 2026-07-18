@@ -105,6 +105,37 @@ impl TurnOutcome {
     }
 }
 
+/// The harness's Hub-side secret vault: serve-mode agents resolve
+/// `<secret_ref:NAME>` via `hub/secret/get` IPC to the stdio peer, so tests
+/// stock this vault and (for outage scenarios) flip it into failing mode.
+#[derive(Default)]
+pub struct HarnessVault {
+    entries: std::sync::Mutex<std::collections::HashMap<String, String>>,
+    failing: std::sync::atomic::AtomicBool,
+    gets: std::sync::Mutex<Vec<Value>>,
+}
+
+impl HarnessVault {
+    pub fn insert(&self, name: &str, plaintext: &str) {
+        self.entries
+            .lock()
+            .unwrap()
+            .insert(name.to_string(), plaintext.to_string());
+    }
+
+    /// While failing, every `hub/secret/get` returns a transport-style error
+    /// (classified transient on the agent side, driving HubHealth degradation).
+    pub fn set_failing(&self, failing: bool) {
+        self.failing
+            .store(failing, std::sync::atomic::Ordering::Release);
+    }
+
+    /// Recorded `hub/secret/get` request params, in arrival order.
+    pub fn gets(&self) -> Vec<Value> {
+        self.gets.lock().unwrap().clone()
+    }
+}
+
 pub struct CliHarness {
     pub base_url: String,
     conn: Arc<Connection<Listening>>,
@@ -116,6 +147,7 @@ pub struct CliHarness {
     _home: tempfile::TempDir,
     provider: Provider,
     mcp_calls: Arc<std::sync::Mutex<Vec<Value>>>,
+    vault: Arc<HarnessVault>,
 }
 
 impl CliHarness {
@@ -156,6 +188,7 @@ impl CliHarness {
             .env("HOME", home.path())
             .env("LOOPAL_TEST_SESSION_DIR", home.path().join("sessions"))
             .env("LOOPAL_PERMISSION_MODE", "bypass")
+            .env("LOOPAL_HUB_HEALTH_TICK_SECS", "1")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -170,7 +203,8 @@ impl CliHarness {
         ));
         let (conn, raw_rx) = Connection::new(transport).into_listening();
         let mcp_calls = Arc::new(std::sync::Mutex::new(Vec::new()));
-        let rx = spawn_hub_dispatcher(conn.clone(), raw_rx, mcp, mcp_calls.clone());
+        let vault = Arc::new(HarnessVault::default());
+        let rx = spawn_hub_dispatcher(conn.clone(), raw_rx, mcp, mcp_calls.clone(), vault.clone());
 
         tokio::time::timeout(
             TIMEOUT,
@@ -191,12 +225,42 @@ impl CliHarness {
             _home: home,
             provider,
             mcp_calls,
+            vault,
         }
     }
 
     /// `hub/mcp/call_tool` requests the agent sent to the harness's Hub role.
     pub fn mcp_calls(&self) -> Vec<Value> {
         self.mcp_calls.lock().unwrap().clone()
+    }
+
+    /// The harness's Hub-side secret vault.
+    pub fn vault(&self) -> Arc<HarnessVault> {
+        self.vault.clone()
+    }
+
+    /// Drain events until one whose Debug form contains `needle` arrives.
+    /// Used for out-of-turn notifications (e.g. HubDegraded / HubRecovered
+    /// from the health poller) that race turn boundaries.
+    pub async fn await_event(&mut self, needle: &str, budget: Duration) -> bool {
+        let deadline = tokio::time::Instant::now() + budget;
+        while tokio::time::Instant::now() < deadline {
+            match tokio::time::timeout(Duration::from_millis(250), self.rx.recv()).await {
+                Ok(Some(Incoming::Notification { method, params }))
+                    if method == methods::AGENT_EVENT.name =>
+                {
+                    if let Ok(event) = serde_json::from_value::<AgentEvent>(params)
+                        && format!("{:?}", event.payload).contains(needle)
+                    {
+                        return true;
+                    }
+                }
+                Ok(Some(_)) => {}
+                Ok(None) => return false,
+                Err(_) => {}
+            }
+        }
+        false
     }
 
     /// Send a prompt and collect the turn's events until Finished/Error.
@@ -442,26 +506,40 @@ impl Drop for CliHarness {
     }
 }
 
+enum HubReply {
+    Ok(Value),
+    Err(String),
+    Unhandled,
+}
+
 /// The serve-mode agent treats its stdio peer as the Hub and sends it
-/// agent→client requests (`hub/mcp/*`). Answer those inline and forward
-/// notifications untouched, so collect loops never see requests and the
-/// kernel's MCP proxy settles during `agent/start` instead of timing out.
+/// agent→client requests (`hub/mcp/*`, `hub/secret/*`). Answer those inline
+/// and forward notifications untouched, so collect loops never see requests
+/// and the kernel's proxies settle during `agent/start` instead of timing out.
 fn spawn_hub_dispatcher(
     conn: Arc<Connection<Listening>>,
     mut raw_rx: Receiver<Incoming>,
     advertise_mcp: bool,
     calls: Arc<std::sync::Mutex<Vec<Value>>>,
+    vault: Arc<HarnessVault>,
 ) -> Receiver<Incoming> {
     let (tx, rx) = tokio::sync::mpsc::channel(256);
     tokio::spawn(async move {
         while let Some(incoming) = raw_rx.recv().await {
             match incoming {
                 Incoming::Request { id, method, params } => {
-                    match hub_mcp_reply(&method, &params, advertise_mcp, &calls) {
-                        Some(value) => {
+                    let reply = match hub_mcp_reply(&method, &params, advertise_mcp, &calls) {
+                        Some(value) => HubReply::Ok(value),
+                        None => hub_secret_reply(&method, &params, &vault),
+                    };
+                    match reply {
+                        HubReply::Ok(value) => {
                             let _ = conn.respond(id, value).await;
                         }
-                        None => {
+                        HubReply::Err(message) => {
+                            let _ = conn.respond_error(id, -32000, &message).await;
+                        }
+                        HubReply::Unhandled => {
                             let _ = conn
                                 .respond_error(id, -32601, "not implemented by e2e harness")
                                 .await;
@@ -477,6 +555,25 @@ fn spawn_hub_dispatcher(
         }
     });
     rx
+}
+
+fn hub_secret_reply(method: &str, params: &Value, vault: &Arc<HarnessVault>) -> HubReply {
+    if method == methods::HUB_SECRET_GET.name {
+        vault.gets.lock().unwrap().push(params.clone());
+        if vault.failing.load(std::sync::atomic::Ordering::Acquire) {
+            return HubReply::Err("e2e vault outage".into());
+        }
+        let name = params["name"].as_str().unwrap_or_default();
+        return match vault.entries.lock().unwrap().get(name) {
+            Some(plaintext) => HubReply::Ok(json!({"plaintext": plaintext})),
+            None => HubReply::Err(format!("e2e vault has no entry named {name}")),
+        };
+    }
+    if method == methods::HUB_SECRET_LIST_NAMES.name {
+        let names: Vec<String> = vault.entries.lock().unwrap().keys().cloned().collect();
+        return HubReply::Ok(json!({"names": names}));
+    }
+    HubReply::Unhandled
 }
 
 fn hub_mcp_reply(

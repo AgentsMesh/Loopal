@@ -23,7 +23,7 @@ async fn second_ui_client_observes_the_turn_stream() {
 
     let (out, seen) = tokio::join!(
         h.turn("please run the observed turn"),
-        observer.collect_until_settled(Duration::from_secs(20)),
+        observer.collect_until_settled(Duration::from_secs(50)),
     );
     assert!(
         out.finished && out.text.contains("observed-answer"),

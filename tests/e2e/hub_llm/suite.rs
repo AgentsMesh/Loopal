@@ -2,6 +2,8 @@
 //! processes, Hub-owned MCP subprocesses) × in-process mock LLM HTTP server,
 //! driven over the Hub's TCP attach protocol.
 
+#![cfg(unix)]
+
 #[path = "support.rs"]
 pub mod support;
 

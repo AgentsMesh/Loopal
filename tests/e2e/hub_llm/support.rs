@@ -25,7 +25,10 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc::Receiver;
 
 pub const API_KEY: &str = "loopal-e2e-key";
-const TIMEOUT: Duration = Duration::from_secs(30);
+// reason: generous — the gate job runs both e2e suites concurrently and CI
+// machines are slow; a green run never comes near this, it only pads the
+// failure verdict under co-load.
+const TIMEOUT: Duration = Duration::from_secs(60);
 
 #[derive(Default, Debug)]
 pub struct TurnOutcome {
@@ -281,7 +284,9 @@ impl ObserverClient {
         }
     }
 
-    /// Collect broadcast events until the root agent settles (or quiet budget).
+    /// Collect broadcast events until the root agent settles or the budget
+    /// runs out. Quiet gaps do NOT end collection — under co-load a turn can
+    /// stall for seconds between events.
     pub async fn collect_until_settled(&mut self, budget: Duration) -> Vec<String> {
         let mut events = Vec::new();
         let deadline = tokio::time::Instant::now() + budget;
@@ -301,7 +306,8 @@ impl ObserverClient {
                     }
                 }
                 Ok(Some(_)) => {}
-                Ok(None) | Err(_) => break,
+                Ok(None) => break,
+                Err(_) => {}
             }
         }
         events

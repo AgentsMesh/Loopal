@@ -56,6 +56,25 @@ jobs:
       - name: Rustfmt check
         run: bazel build //... --config=rustfmt
 
+  agent-e2e:
+    name: Agent E2E
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@0.14.0
+        with:
+          bazelisk-cache: true
+          repository-cache: true
+
+      - name: Agent behavior E2E (serve + hub topology, mock LLM wire)
+        run: >-
+          bazel test
+          //:cli_llm_e2e_test
+          //:hub_llm_e2e_test
+          --test_output=errors
+
   desktop-e2e:
     name: Desktop E2E
     runs-on: macos-latest

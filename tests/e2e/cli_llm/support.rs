@@ -22,7 +22,10 @@ use tokio::net::TcpListener;
 use tokio::sync::mpsc::Receiver;
 
 pub const API_KEY: &str = "loopal-e2e-key";
-const TIMEOUT: Duration = Duration::from_secs(20);
+// reason: generous — the gate job runs both e2e suites concurrently and CI
+// machines are slow; a green run never comes near this, it only pads the
+// failure verdict under co-load.
+const TIMEOUT: Duration = Duration::from_secs(40);
 
 /// Which production provider adapter the spawned agent uses to reach the mock.
 /// One semantic scenario drives every provider's wire; only the config differs.

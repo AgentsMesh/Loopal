@@ -1,6 +1,8 @@
 //! Full-stack Rust CLI behavior tests: real `loopal --serve` agent process ×
 //! in-process mock LLM HTTP server, over the production provider adapter/wire.
 
+#![cfg(unix)]
+
 #[path = "support.rs"]
 pub mod support;
 

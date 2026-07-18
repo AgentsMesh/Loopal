@@ -71,6 +71,12 @@ def loopal_root_tests():
         edition = "2024",
         env = {"LOOPAL_BINARY": "$(rootpath :loopal)"},
         local = True,
+        # reason: excluded from `//...` wildcards (three-OS CI matrix) and run
+        # by the dedicated Agent E2E gate job, mirroring the desktop e2e setup.
+        tags = [
+            "e2e",
+            "manual",
+        ],
         deps = [
             "//crates/loopal-ipc",
             "//crates/loopal-mock-llm:loopal-mock-llm-lib",
@@ -103,6 +109,10 @@ def loopal_root_tests():
             "LOOPAL_MOCK_MCP_BINARY": "$(rootpath :mock_mcp_server)",
         },
         local = True,
+        tags = [
+            "e2e",
+            "manual",
+        ],
         deps = [
             "//crates/loopal-ipc",
             "//crates/loopal-mock-llm:loopal-mock-llm-lib",

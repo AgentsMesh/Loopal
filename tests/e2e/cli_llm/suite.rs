@@ -63,3 +63,6 @@ mod system_prompt_test;
 
 #[path = "sandbox_test.rs"]
 mod sandbox_test;
+
+#[path = "fs_tools_test.rs"]
+mod fs_tools_test;

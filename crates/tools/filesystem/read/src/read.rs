@@ -67,7 +67,16 @@ impl TypedTool<ReadParams> for ReadTool {
         let limit = input.limit.unwrap_or(2000) as usize;
 
         match ctx.backend.read(&path, offset - 1, limit).await {
-            Ok(result) => Ok(ToolResult::success(result.content)),
+            Ok(result) => {
+                // Record what the model just observed so a later Write can detect the
+                // file being changed out from under it (see FileReadTracker).
+                if let Some(tracker) = &ctx.read_tracker
+                    && let Ok(full) = ctx.backend.read_raw(&path).await
+                {
+                    tracker.record(&path, &full);
+                }
+                Ok(ToolResult::success(result.content))
+            }
             Err(e) => {
                 let msg = if matches!(e, loopal_error::ToolIoError::TooLarge { .. }) {
                     format!("{e}. Use the `offset` and `limit` parameters to read in chunks.")

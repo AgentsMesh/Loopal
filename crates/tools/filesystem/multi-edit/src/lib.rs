@@ -111,10 +111,15 @@ impl TypedTool<MultiEditParams> for MultiEditTool {
         };
 
         match ctx.backend.write(&path, &outcome.content).await {
-            Ok(_) => Ok(ToolResult::success(format!(
-                "Applied {} edit(s) to {}",
-                outcome.applied, input.file_path
-            ))),
+            Ok(_) => {
+                if let Some(tracker) = &ctx.read_tracker {
+                    tracker.record(&path, &outcome.content);
+                }
+                Ok(ToolResult::success(format!(
+                    "Applied {} edit(s) to {}",
+                    outcome.applied, input.file_path
+                )))
+            }
             Err(e) => Ok(ToolResult::error(e.to_string())),
         }
     }

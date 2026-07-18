@@ -61,16 +61,35 @@ impl TypedTool<WriteParams> for WriteTool {
         }
 
         match ctx.backend.resolve_path(file_path, true) {
-            Ok(path) => match ctx.backend.write(&path, content).await {
-                Ok(result) => Ok(ToolResult::success(format!(
-                    "Successfully wrote {} bytes to {}",
-                    result.bytes_written, file_path
-                ))
-                .with_metadata(ToolResultMetadata::bytes_written(
-                    result.bytes_written as u64,
-                ))),
-                Err(e) => Ok(ToolResult::error(e.to_string())),
-            },
+            Ok(path) => {
+                // reason: refuse to clobber a file that changed on disk since the model
+                // read it (user or another agent process edited it). Loopal runs many
+                // agents that can share a cwd, so this race is real, not theoretical.
+                if let Some(tracker) = &ctx.read_tracker
+                    && let Ok(current) = ctx.backend.read_raw(&path).await
+                    && tracker.is_stale(&path, &current)
+                {
+                    return Ok(ToolResult::error(format!(
+                        "{file_path} changed on disk since you last read it. Re-read it before \
+                         overwriting so your write doesn't discard another edit."
+                    )));
+                }
+                match ctx.backend.write(&path, content).await {
+                    Ok(result) => {
+                        if let Some(tracker) = &ctx.read_tracker {
+                            tracker.record(&path, content);
+                        }
+                        Ok(ToolResult::success(format!(
+                            "Successfully wrote {} bytes to {}",
+                            result.bytes_written, file_path
+                        ))
+                        .with_metadata(ToolResultMetadata::bytes_written(
+                            result.bytes_written as u64,
+                        )))
+                    }
+                    Err(e) => Ok(ToolResult::error(e.to_string())),
+                }
+            }
             Err(e) => Ok(ToolResult::error(e.to_string())),
         }
     }

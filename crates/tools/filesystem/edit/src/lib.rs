@@ -77,10 +77,15 @@ impl TypedTool<EditParams> for EditTool {
                 match search_replace(&content, &input.old_string, &input.new_string, replace_all) {
                     SearchReplaceResult::Ok(new_content) => {
                         match ctx.backend.write(&path, &new_content).await {
-                            Ok(_) => Ok(ToolResult::success(format!(
-                                "Successfully edited {}",
-                                input.file_path
-                            ))),
+                            Ok(_) => {
+                                if let Some(tracker) = &ctx.read_tracker {
+                                    tracker.record(&path, &new_content);
+                                }
+                                Ok(ToolResult::success(format!(
+                                    "Successfully edited {}",
+                                    input.file_path
+                                )))
+                            }
                             Err(e) => Ok(ToolResult::error(e.to_string())),
                         }
                     }

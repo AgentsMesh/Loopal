@@ -322,6 +322,12 @@ impl CliHarness {
         self.permissions.clone()
     }
 
+    /// The agent's working directory — for pre-staging project files
+    /// (`.loopal/settings.json`, `.loopal/memory/*.md`, …) before a turn.
+    pub fn cwd(&self) -> &std::path::Path {
+        self.cwd.path()
+    }
+
     /// `hub/mcp/call_tool` requests the agent sent to the harness's Hub role.
     pub fn mcp_calls(&self) -> Vec<Value> {
         self.mcp_calls.lock().unwrap().clone()

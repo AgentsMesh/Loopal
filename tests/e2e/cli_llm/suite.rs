@@ -51,3 +51,9 @@ mod queued_message_test;
 
 #[path = "loop_guard_test.rs"]
 mod loop_guard_test;
+
+#[path = "memory_recall_test.rs"]
+mod memory_recall_test;
+
+#[path = "hooks_test.rs"]
+mod hooks_test;

@@ -199,3 +199,38 @@ pub fn make_interactive_multi_runner(
     runner.start_turn_record(loopal_turn::TurnTrigger::Resume);
     (runner, event_rx, mbox_tx, ctrl_tx)
 }
+
+/// Build a runner backed by a caller-supplied provider (e.g. one that stalls).
+pub fn make_runner_with_dyn_provider(
+    provider: Arc<dyn Provider>,
+) -> (AgentLoopRunner, mpsc::Receiver<AgentEvent>) {
+    let fixture = TestFixture::new();
+    let (event_tx, event_rx) = mpsc::channel(64);
+    let (_mbox_tx, mailbox_rx) = mpsc::channel::<Envelope>(16);
+    let (_ctrl_tx, control_rx) = mpsc::channel::<ControlCommand>(16);
+    let frontend = Arc::new(UnifiedFrontend::new(
+        None,
+        event_tx,
+        mailbox_rx,
+        control_rx,
+        None,
+        Box::new(DenyAllHandler),
+        Box::new(UnsupportedQuestionHandler),
+    ));
+    let mut kernel = Kernel::new(Settings::default()).unwrap();
+    kernel.register_provider(provider);
+    let params = build_params_with_config(
+        Arc::new(kernel),
+        frontend,
+        &fixture,
+        vec![loopal_provider_api::Message::user("go")],
+        AgentConfig::default(),
+    );
+    let mut runner = AgentLoopRunner::new(params);
+    runner.start_turn_record(loopal_turn::TurnTrigger::UserInput {
+        envelope_id: "test-seed-stall".into(),
+        content: "go".into(),
+        images: Vec::new(),
+    });
+    (runner, event_rx)
+}

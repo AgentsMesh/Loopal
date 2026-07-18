@@ -59,6 +59,7 @@ mod resume_invariant_test;
 mod resume_session_hook_test;
 mod retry_cancel_test;
 mod run_test;
+mod stream_idle_timeout_test;
 mod stream_partial_semantics_test;
 mod stream_truncation_edge_test;
 mod stream_truncation_test;

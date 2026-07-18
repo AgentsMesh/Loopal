@@ -82,6 +82,9 @@ describe('MetaHubSettingsSection', () => {
     })
     const view = render(<MetaHubSettingsSection api={api} target={target} />)
     const panel = await screen.findByTestId('metahub-settings')
+    // The form is disabled until the persisted settings replace the
+    // placeholder defaults; the loaded hub name marks that moment.
+    await within(panel).findByDisplayValue('desktop-ui')
     fireEvent.change(within(panel).getByLabelText('MetaHub address'), {
       target: { value: 'meta.internal:9000' },
     })

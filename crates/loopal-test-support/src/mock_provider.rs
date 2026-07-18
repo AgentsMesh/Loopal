@@ -194,3 +194,42 @@ impl Provider for MultiCallProvider {
         Ok(Box::pin(stream))
     }
 }
+
+/// First `stream_chat` yields `first` then goes silent for `stall` (simulating a
+/// hung transport that never closes the socket); later calls drain `rest`
+/// synchronously. Drive under `#[tokio::test(start_paused = true)]` so the stall
+/// is bounded by the runtime's idle timeout without real waiting.
+pub struct StallThenProvider {
+    first: Mutex<Option<Vec<Result<StreamChunk, LoopalError>>>>,
+    rest: Mutex<VecDeque<Vec<Result<StreamChunk, LoopalError>>>>,
+    stall: Duration,
+}
+
+impl StallThenProvider {
+    pub fn new(
+        first: Vec<Result<StreamChunk, LoopalError>>,
+        rest: Vec<Vec<Result<StreamChunk, LoopalError>>>,
+        stall: Duration,
+    ) -> Self {
+        Self {
+            first: Mutex::new(Some(first)),
+            rest: Mutex::new(VecDeque::from(rest)),
+            stall,
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl Provider for StallThenProvider {
+    fn name(&self) -> &str {
+        "anthropic"
+    }
+    async fn stream_chat(&self, _params: &ChatParams) -> Result<ChatStream, LoopalError> {
+        if let Some(first) = self.first.lock().unwrap().take() {
+            let stream = MockStreamChunks::new(VecDeque::from(first)).with_delay(self.stall);
+            return Ok(Box::pin(stream));
+        }
+        let chunks = self.rest.lock().unwrap().pop_front().unwrap_or_default();
+        Ok(Box::pin(MockStreamChunks::new(VecDeque::from(chunks))))
+    }
+}

@@ -4,6 +4,7 @@ use std::sync::Arc;
 use loopal_secret_client::SecretClient;
 
 use crate::backend::Backend;
+use crate::file_read_tracker::FileReadTracker;
 use crate::goal_session::GoalSession;
 use crate::memory_channel::MemoryChannel;
 use crate::output_tail::OutputTail;
@@ -20,6 +21,7 @@ pub struct ToolContext {
     pub fetch_refiner_policy: Option<Arc<dyn FetchRefinerPolicy>>,
     pub goal_session: Option<Arc<dyn GoalSession>>,
     pub secret_client: Option<Arc<dyn SecretClient>>,
+    pub read_tracker: Option<Arc<FileReadTracker>>,
 }
 
 impl ToolContext {
@@ -34,6 +36,7 @@ impl ToolContext {
             fetch_refiner_policy: None,
             goal_session: None,
             secret_client: None,
+            read_tracker: None,
         }
     }
 
@@ -101,6 +104,11 @@ impl ToolContext {
         self.secret_client = c;
         self
     }
+
+    pub fn with_read_tracker(mut self, t: Arc<FileReadTracker>) -> Self {
+        self.read_tracker = Some(t);
+        self
+    }
 }
 
 impl Clone for ToolContext {
@@ -115,6 +123,7 @@ impl Clone for ToolContext {
             fetch_refiner_policy: self.fetch_refiner_policy.clone(),
             goal_session: self.goal_session.clone(),
             secret_client: self.secret_client.clone(),
+            read_tracker: self.read_tracker.clone(),
         }
     }
 }

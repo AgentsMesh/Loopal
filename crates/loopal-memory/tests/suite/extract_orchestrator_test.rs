@@ -13,7 +13,7 @@ fn extracts_full_project_memory() {
     assert_eq!(n.name, "Twitter Auto");
     assert_eq!(n.description.as_deref(), Some("rate limits"));
     assert_eq!(n.ttl_days, Some(90));
-    assert!(n.body_preview.contains("strict cooldowns"));
+    assert!(n.body.contains("strict cooldowns"));
     assert_eq!(n.content_hash.len(), 64);
 }
 
@@ -66,12 +66,12 @@ fn memory_index_file_classified_as_index() {
 }
 
 #[test]
-fn body_preview_truncates_to_300_bytes_on_char_boundary() {
-    let mut body = String::from("---\ntype: reference\n---\n\n");
-    body.push_str(&"a".repeat(500));
-    let r = extract_file("foo.md", &body);
-    assert!(r.nodes[0].body_preview.len() <= 300);
-    assert_eq!(r.nodes[0].body_preview.len(), 300);
+fn body_stores_full_content_for_indexing() {
+    let mut src = String::from("---\ntype: reference\n---\n\n");
+    src.push_str(&"a".repeat(500));
+    let r = extract_file("foo.md", &src);
+    // The whole body is stored (indexed by FTS), not truncated to a preview.
+    assert!(r.nodes[0].body.len() >= 500);
 }
 
 #[test]

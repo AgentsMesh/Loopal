@@ -1,6 +1,7 @@
 pub mod diff;
 pub mod hunks;
 pub mod multi_edit;
+pub mod no_match_hint;
 pub mod omission_detector;
 pub mod omission_message;
 pub mod patch_parser;

@@ -47,7 +47,8 @@ impl AgentLoopRunner {
             h.on_turn_end(turn_ctx);
         }
 
-        turn_ctx.metrics.warnings_injected = turn_ctx.pending_warnings.len() as u32;
+        // warnings_injected accumulates at each tool-phase drain; pending_warnings
+        // is empty again by turn end, so recomputing from it here would zero it.
         turn_ctx.metrics.tokens_in = self.tokens.input;
         turn_ctx.metrics.tokens_out = self.tokens.output;
         let m = &turn_ctx.metrics;

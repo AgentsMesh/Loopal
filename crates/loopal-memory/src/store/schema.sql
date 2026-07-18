@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS memory_nodes (
     name          TEXT NOT NULL,
     description   TEXT,
     file_path     TEXT NOT NULL,
-    body_preview  TEXT,
+    body  TEXT,
     created_at    INTEGER NOT NULL,
     updated_at    INTEGER NOT NULL,
     ttl_days      INTEGER,
@@ -64,24 +64,24 @@ CREATE INDEX IF NOT EXISTS idx_unresolved_from   ON memory_unresolved_links(from
 CREATE INDEX IF NOT EXISTS idx_unresolved_target ON memory_unresolved_links(target_name);
 
 CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(
-    id, name, description, body_preview,
+    id, name, description, body,
     content='memory_nodes',
     content_rowid='rowid'
 );
 
 CREATE TRIGGER IF NOT EXISTS memory_nodes_ai AFTER INSERT ON memory_nodes BEGIN
-    INSERT INTO memory_fts(rowid, id, name, description, body_preview)
-    VALUES (NEW.rowid, NEW.id, NEW.name, NEW.description, NEW.body_preview);
+    INSERT INTO memory_fts(rowid, id, name, description, body)
+    VALUES (NEW.rowid, NEW.id, NEW.name, NEW.description, NEW.body);
 END;
 
 CREATE TRIGGER IF NOT EXISTS memory_nodes_ad AFTER DELETE ON memory_nodes BEGIN
-    INSERT INTO memory_fts(memory_fts, rowid, id, name, description, body_preview)
-    VALUES ('delete', OLD.rowid, OLD.id, OLD.name, OLD.description, OLD.body_preview);
+    INSERT INTO memory_fts(memory_fts, rowid, id, name, description, body)
+    VALUES ('delete', OLD.rowid, OLD.id, OLD.name, OLD.description, OLD.body);
 END;
 
 CREATE TRIGGER IF NOT EXISTS memory_nodes_au AFTER UPDATE ON memory_nodes BEGIN
-    INSERT INTO memory_fts(memory_fts, rowid, id, name, description, body_preview)
-    VALUES ('delete', OLD.rowid, OLD.id, OLD.name, OLD.description, OLD.body_preview);
-    INSERT INTO memory_fts(rowid, id, name, description, body_preview)
-    VALUES (NEW.rowid, NEW.id, NEW.name, NEW.description, NEW.body_preview);
+    INSERT INTO memory_fts(memory_fts, rowid, id, name, description, body)
+    VALUES ('delete', OLD.rowid, OLD.id, OLD.name, OLD.description, OLD.body);
+    INSERT INTO memory_fts(rowid, id, name, description, body)
+    VALUES (NEW.rowid, NEW.id, NEW.name, NEW.description, NEW.body);
 END;

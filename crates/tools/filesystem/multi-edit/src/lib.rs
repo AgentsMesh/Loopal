@@ -98,7 +98,9 @@ impl TypedTool<MultiEditParams> for MultiEditTool {
             Ok(o) => o,
             Err(MultiEditError::NotFound { index }) => {
                 return Ok(ToolResult::error(format!(
-                    "Edit {index}: old_string not found in current content"
+                    "Edit {index}: old_string not found in current content. Earlier edits in \
+                     this batch may have already changed that text, or the file changed since \
+                     you read it — re-read the file and match the current exact text."
                 )));
             }
             Err(MultiEditError::MultipleMatches { index, count }) => {
@@ -109,10 +111,15 @@ impl TypedTool<MultiEditParams> for MultiEditTool {
         };
 
         match ctx.backend.write(&path, &outcome.content).await {
-            Ok(_) => Ok(ToolResult::success(format!(
-                "Applied {} edit(s) to {}",
-                outcome.applied, input.file_path
-            ))),
+            Ok(_) => {
+                if let Some(tracker) = &ctx.read_tracker {
+                    tracker.record(&path, &outcome.content);
+                }
+                Ok(ToolResult::success(format!(
+                    "Applied {} edit(s) to {}",
+                    outcome.applied, input.file_path
+                )))
+            }
             Err(e) => Ok(ToolResult::error(e.to_string())),
         }
     }

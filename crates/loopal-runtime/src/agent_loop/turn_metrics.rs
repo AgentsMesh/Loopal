@@ -9,7 +9,7 @@
 /// - `llm_calls`: each `stream_llm_with` invocation
 /// - `tool_calls_*`: from `ToolExecStats` returned by `execute_tools`
 /// - `auto_continuations`: from inner loop continuation count
-/// - `warnings_injected`: from `pending_warnings.len()`
+/// - `warnings_injected`: accumulated per tool phase when warnings drain
 /// - `tokens_*`: from `TokenAccumulator` delta
 #[derive(Debug, Default, Clone)]
 pub struct TurnMetrics {

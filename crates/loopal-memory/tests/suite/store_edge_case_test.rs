@@ -9,7 +9,7 @@ fn node(id: &str) -> MemoryNode {
         name: id.into(),
         description: None,
         file_path: format!("{}.md", id),
-        body_preview: id.into(),
+        body: id.into(),
         created_at: 1,
         updated_at: 1,
         ttl_days: None,
@@ -57,7 +57,7 @@ async fn unicode_slug_is_preserved() {
     let mut n = node("a");
     n.id = "中文-slug-_测试".into();
     n.name = "中文 name with emoji ✨".into();
-    n.body_preview = "测试 body 内容".into();
+    n.body = "测试 body 内容".into();
     n.file_path = "中文-slug-_测试.md".into();
     g.upsert_node(n.clone()).await.unwrap();
     let got = g.get_node("中文-slug-_测试").await.unwrap().unwrap();

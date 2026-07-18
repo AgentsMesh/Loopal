@@ -7,7 +7,7 @@ fn node(id: &str, ttl_days: Option<u32>, created_at: i64) -> MemoryNode {
         name: id.into(),
         description: None,
         file_path: format!("{}.md", id),
-        body_preview: id.into(),
+        body: id.into(),
         created_at,
         updated_at: created_at,
         ttl_days,

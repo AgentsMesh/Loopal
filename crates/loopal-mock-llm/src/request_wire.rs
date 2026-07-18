@@ -43,6 +43,7 @@ fn anthropic(body: &Value) -> CanonicalRequest {
         image_block_count: anthropic_image_count(messages),
         last_user_text: last_text(messages, "user", anthropic_text),
         has_system: body.get("system").is_some(),
+        system_text: anthropic_system_text(body),
         thinking_enabled: body.get("thinking").is_some(),
         stream: body["stream"].as_bool().unwrap_or(false),
         max_tokens: body["max_tokens"].as_u64().unwrap_or(0),
@@ -86,6 +87,7 @@ fn responses(body: &Value) -> CanonicalRequest {
         image_block_count: nested_type_count(input, "input_image"),
         last_user_text: last_text(input, "user", responses_text),
         has_system: body.get("instructions").is_some(),
+        system_text: body["instructions"].as_str().unwrap_or_default().into(),
         thinking_enabled: body.get("reasoning").is_some(),
         stream: body["stream"].as_bool().unwrap_or(false),
         max_tokens: body["max_output_tokens"].as_u64().unwrap_or(0),
@@ -176,6 +178,18 @@ pub(crate) fn nested_type_count(items: &[Value], kind: &str) -> usize {
                 .count()
         })
         .sum()
+}
+
+fn anthropic_system_text(body: &Value) -> String {
+    match body.get("system") {
+        Some(Value::String(text)) => text.clone(),
+        Some(Value::Array(blocks)) => blocks
+            .iter()
+            .filter_map(|block| block["text"].as_str())
+            .collect::<Vec<_>>()
+            .join("\n"),
+        _ => String::new(),
+    }
 }
 
 #[cfg(test)]

@@ -1,4 +1,6 @@
 // Single test binary — includes all test modules
+#[path = "suite/file_read_tracker_test.rs"]
+mod file_read_tracker_test;
 #[path = "suite/head_tail_test.rs"]
 mod head_tail_test;
 #[path = "suite/input_normalize_test.rs"]

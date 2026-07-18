@@ -25,6 +25,11 @@ export function MetaHubSettingsSection(props: {
 }): React.JSX.Element | null {
   const { t } = useI18n()
   const [settings, setSettings] = useState(emptySettings)
+  // reason: until the persisted settings arrive, `settings` holds placeholder
+  // defaults — editing or saving in that window would overwrite the user's
+  // stored values (and join under the placeholder hub name), so the form and
+  // every settings-writing action stay disabled while !loaded.
+  const [loaded, setLoaded] = useState(false)
   const [token, setToken] = useState('')
   const [runtime, setRuntime] = useState(props.initialState)
   const [local, setLocal] = useState<LocalMetaHubStatus>({ state: 'stopped' })
@@ -34,7 +39,7 @@ export function MetaHubSettingsSection(props: {
     let active = true
     const acceptError = (value: unknown): void => { if (active) setError(message(value)) }
     void props.api.getMetaHubSettings().then((next) => {
-      if (active) setSettings(next)
+      if (active) { setSettings(next); setLoaded(true) }
     }).catch(acceptError)
     void props.api.getLocalMetaHubStatus().then((next) => {
       if (active) setLocal(next)
@@ -106,39 +111,42 @@ export function MetaHubSettingsSection(props: {
       <div className="metahub-fields">
         <Field label={t('settings.metahub.address')}>
           <input aria-label={t('settings.metahub.addressAria')} value={settings.address}
+            disabled={!loaded}
             onChange={(event) => setSettings({ ...settings, address: event.target.value })} />
         </Field>
         <Field label={t('settings.metahub.hubName')}>
           <input aria-label={t('settings.metahub.hubNameAria')} value={settings.hubName}
+            disabled={!loaded}
             onChange={(event) => setSettings({ ...settings, hubName: event.target.value })} />
         </Field>
         <Field label={t('settings.metahub.token')}>
           <input aria-label={t('settings.metahub.tokenAria')} type="password" value={token}
-            autoComplete="off" placeholder={t(settings.tokenConfigured
+            autoComplete="off" disabled={!loaded} placeholder={t(settings.tokenConfigured
               ? 'settings.metahub.tokenConfigured'
               : 'settings.metahub.tokenRequired')}
             onChange={(event) => setToken(event.target.value)} />
         </Field>
       </div>
       <label className="settings-check"><input aria-label={t('settings.metahub.joinOnStartAria')}
-        type="checkbox" checked={settings.joinOnStart}
+        type="checkbox" checked={settings.joinOnStart} disabled={!loaded}
         onChange={(event) => setSettings({ ...settings, joinOnStart: event.target.checked })} />
         <span>{t('settings.metahub.joinOnStart')}</span></label>
       <label className="settings-check"><input aria-label={t('settings.metahub.startLocalAria')}
-        type="checkbox" checked={settings.startLocalOnLaunch}
+        type="checkbox" checked={settings.startLocalOnLaunch} disabled={!loaded}
         onChange={(event) => setSettings({ ...settings, startLocalOnLaunch: event.target.checked })} />
         <span>{t('settings.metahub.startLocal')}</span></label>
       <div className="metahub-actions">
-        <button disabled={busy} onClick={() => void execute(async () => { await save() })}>
+        <button disabled={busy || !loaded} onClick={() => void execute(async () => { await save() })}>
           {t('common.save')}
         </button>
-        <button disabled={busy || !settings.tokenConfigured} onClick={() => void execute(async () => {
-          const next = UpdateMetaHubSettingsInputSchema.parse({
-            ...settings, clearToken: true,
-          })
-          setSettings(await props.api.updateMetaHubSettings(next)); setToken('')
-        })}>{t('settings.metahub.clearToken')}</button>
-        <button disabled={busy || !props.target} onClick={join}>
+        <button disabled={busy || !loaded || !settings.tokenConfigured}
+          onClick={() => void execute(async () => {
+            const next = UpdateMetaHubSettingsInputSchema.parse({
+              ...settings, clearToken: true,
+            })
+            setSettings(await props.api.updateMetaHubSettings(next)); setToken('')
+          })}>{t('settings.metahub.clearToken')}</button>
+        <button disabled={busy || !loaded || !props.target} onClick={join}>
           {t('settings.metahub.join')}
         </button>
         <button disabled={busy || !props.target || runtime?.state === 'disconnected'}

@@ -12,11 +12,11 @@ test('OpenAI retries a transport closed before response headers', async () => {
     const conversation = page.getByTestId('conversation')
     await ready(page)
     await send(page, 'Recover OpenAI before headers')
-    await expect(conversation).toContainText('Retrying in 2.0s', { timeout: 10_000 })
+    await expect(conversation).toContainText(/Retrying in \d+\.\ds/, { timeout: 10_000 })
     await expect(conversation).toContainText(
       'OpenAI recovered after its pre-header transport failure.', { timeout: 20_000 },
     )
-    await expect(conversation).not.toContainText('Retrying in 2.0s')
+    await expect(conversation).not.toContainText('Retrying in')
     expect((await desktop.llm!.requests()).map((request) => request.protocol))
       .toEqual(['openai_responses', 'openai_responses'])
     await expect.poll(() => desktop.llm!.state()).toMatchObject({

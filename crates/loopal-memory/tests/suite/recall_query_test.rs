@@ -8,7 +8,7 @@ fn make(id: &str, kind: MemoryKind, name: &str, body: &str) -> MemoryNode {
         name: name.into(),
         description: Some(format!("{}: described", name)),
         file_path: format!("{}.md", id),
-        body_preview: body.into(),
+        body: body.into(),
         created_at: 1,
         updated_at: 1,
         ttl_days: None,

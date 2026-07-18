@@ -10,11 +10,11 @@ test('renders retry, fatal, recovery, and retry-exhaustion HTTP states', async (
     await ready(page)
 
     await send(page, 'Recover one server error')
-    await expect(conversation).toContainText('Retrying in 2.0s', { timeout: 10_000 })
+    await expect(conversation).toContainText(/Retrying in \d+\.\ds/, { timeout: 10_000 })
     await expect(conversation).toContainText('Recovered after one HTTP 503.', {
       timeout: 20_000,
     })
-    await expect(conversation).not.toContainText('Retrying in 2.0s')
+    await expect(conversation).not.toContainText('Retrying in')
     await ready(page)
 
     await send(page, 'Exercise fatal authentication')

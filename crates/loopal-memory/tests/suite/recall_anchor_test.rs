@@ -9,7 +9,7 @@ fn node(id: &str, kind: MemoryKind) -> MemoryNode {
         name: id.into(),
         description: Some(format!("desc-{}", id)),
         file_path: format!("{}.md", id),
-        body_preview: format!("body of {}", id),
+        body: format!("body of {}", id),
         created_at: 1,
         updated_at: 1,
         ttl_days: None,

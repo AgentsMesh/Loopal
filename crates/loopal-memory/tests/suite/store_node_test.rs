@@ -7,7 +7,7 @@ fn make_node(id: &str, kind: MemoryKind, path: &str) -> MemoryNode {
         name: id.into(),
         description: Some(format!("desc-{}", id)),
         file_path: path.into(),
-        body_preview: format!("body of {}", id),
+        body: format!("body of {}", id),
         created_at: 1_700_000_000_000,
         updated_at: 1_700_000_000_000,
         ttl_days: Some(90),

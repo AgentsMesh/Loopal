@@ -2,6 +2,7 @@ pub mod backend;
 pub mod backend_types;
 pub mod batch;
 pub mod bg_config;
+pub mod file_read_tracker;
 pub mod goal_session;
 pub mod head_tail;
 pub mod input_normalize;
@@ -28,6 +29,7 @@ pub use backend_types::{
 };
 pub use batch::{AppliedKind, AppliedOp, BatchOp, BatchOutcome, BatchWriteKind, FailedOp};
 pub use bg_config::BgTaskConfig;
+pub use file_read_tracker::FileReadTracker;
 pub use goal_session::{GoalSession, GoalSessionError};
 pub use head_tail::HeadTail;
 pub use memory_channel::MemoryChannel;

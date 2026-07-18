@@ -6,8 +6,12 @@ use loopal_error::Result;
 use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::ContinuationIntent;
 use opentelemetry::KeyValue;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use tracing::{info, warn};
+
+/// Max silence between stream chunks before a stalled response is treated as a
+/// recoverable truncation instead of blocking on the provider's 300s request cap.
+const STREAM_IDLE_TIMEOUT: Duration = Duration::from_secs(90);
 
 impl AgentLoopRunner {
     /// Stream the LLM response. `intent` carries continuation context that the
@@ -64,10 +68,30 @@ impl AgentLoopRunner {
         loop {
             tokio::select! {
                 biased;
-                chunk = stream.next() => {
-                    let Some(chunk_result) = chunk else { break; };
-                    if !self.handle_stream_chunk(chunk_result, &mut result, &mut received_done).await? {
-                        break;
+                polled = tokio::time::timeout(STREAM_IDLE_TIMEOUT, stream.next()) => {
+                    match polled {
+                        Ok(Some(chunk_result)) => {
+                            if !self.handle_stream_chunk(chunk_result, &mut result, &mut received_done).await? {
+                                break;
+                            }
+                        }
+                        Ok(None) => break,
+                        Err(_elapsed) => {
+                            // reason: a provider/proxy can stop yielding without closing the
+                            // socket; without this the turn blocks on the 300s request cap.
+                            // Surface as truncation so the existing auto-continue path recovers.
+                            warn!(
+                                idle_secs = STREAM_IDLE_TIMEOUT.as_secs(),
+                                "LLM stream idle past timeout — treating as truncation"
+                            );
+                            self.emit_in_turn(AgentEventPayload::ProviderWarning {
+                                message: "Response stream stalled (no data received) — treating as interruption"
+                                    .to_string(),
+                            })
+                            .await?;
+                            result.stream_error = true;
+                            break;
+                        }
                     }
                 }
                 _ = cancel.cancelled() => {

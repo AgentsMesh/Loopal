@@ -92,11 +92,25 @@ async fn prune_dir_except(dir: &Path, keep: &HashSet<&Path>) -> bool {
     remaining == 0
 }
 
+/// How long a session tmp dir must stay untouched before it may be treated
+/// as an orphan.
+pub const ORPHAN_MIN_AGE: std::time::Duration = std::time::Duration::from_secs(48 * 60 * 60);
+
 pub async fn cleanup_orphans(live_sessions: &HashSet<String>) {
-    cleanup_orphans_in(&loopal_tmp_root(), live_sessions).await
+    cleanup_orphans_in(&loopal_tmp_root(), live_sessions, ORPHAN_MIN_AGE).await
 }
 
-pub async fn cleanup_orphans_in(root: &Path, live_sessions: &HashSet<String>) {
+// reason: `live_sessions` comes from THIS process's SessionStore, but the
+// shared `$TMPDIR/loopal/` root is written by every loopal instance on the
+// machine — sessions of another config HOME are invisible here and would be
+// misjudged as orphans while their agent is mid-turn, racing its next bash
+// log write. Recent activity is the only cross-home liveness signal, so a
+// dir must also have been quiet for `min_age` before it is deleted.
+pub async fn cleanup_orphans_in(
+    root: &Path,
+    live_sessions: &HashSet<String>,
+    min_age: std::time::Duration,
+) {
     let mut entries = match tokio::fs::read_dir(root).await {
         Ok(e) => e,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return,
@@ -112,10 +126,45 @@ pub async fn cleanup_orphans_in(root: &Path, live_sessions: &HashSet<String>) {
             continue;
         }
         let p = entry.path();
+        if !quiet_for(&p, min_age).await {
+            continue;
+        }
         if let Err(e) = tokio::fs::remove_dir_all(&p).await
             && e.kind() != std::io::ErrorKind::NotFound
         {
             tracing::warn!(error = %e, path = %p.display(), "orphan cleanup failed");
         }
     }
+}
+
+/// True iff nothing under `path` (two levels deep — session root, `bash/`,
+/// and its log files) was modified within `min_age`. Unreadable metadata
+/// counts as activity: never delete what cannot be judged.
+async fn quiet_for(path: &Path, min_age: std::time::Duration) -> bool {
+    if min_age.is_zero() {
+        return true;
+    }
+    let mut stack = vec![(path.to_path_buf(), 0u8)];
+    while let Some((current, depth)) = stack.pop() {
+        let Ok(meta) = tokio::fs::metadata(&current).await else {
+            return false;
+        };
+        let recent = meta
+            .modified()
+            .ok()
+            .and_then(|t| t.elapsed().ok())
+            .is_none_or(|elapsed| elapsed < min_age);
+        if recent {
+            return false;
+        }
+        if meta.is_dir() && depth < 2 {
+            let Ok(mut children) = tokio::fs::read_dir(&current).await else {
+                return false;
+            };
+            while let Ok(Some(child)) = children.next_entry().await {
+                stack.push((child.path(), depth + 1));
+            }
+        }
+    }
+    true
 }

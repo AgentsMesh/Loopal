@@ -46,7 +46,10 @@ describe('Workbench session catalog', () => {
 
     fireEvent.click(list.getByText('Write the guide'))
     await waitFor(() => expect(openSession).toHaveBeenCalledWith(docsSession.id))
-    expect(screen.getByTestId('active-session-title')).toHaveTextContent('Write the guide')
+    // The header re-renders after the openSession promise resolves — waiting
+    // on the mock call alone races that commit.
+    await waitFor(() => expect(screen.getByTestId('active-session-title'))
+      .toHaveTextContent('Write the guide'))
     expect(screen.getByText('Conversation for Write the guide')).toBeInTheDocument()
   })
 

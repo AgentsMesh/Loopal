@@ -1,6 +1,6 @@
 """Rust tests owned by the root Bazel package."""
 
-load("@rules_rust//rust:defs.bzl", "rust_test")
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_test")
 load("//build_defs/rust:desktop_test.bzl", "desktop_serve_test")
 
 def _binary_e2e(name, src, deps):
@@ -59,6 +59,69 @@ def loopal_root_tests():
         name = "bootstrap_typestate_e2e_test",
         src = "tests/e2e/bootstrap_typestate.rs",
         deps = [
+            "@crates//:tempfile",
+            "@crates//:tokio",
+        ],
+    )
+    rust_test(
+        name = "cli_llm_e2e_test",
+        srcs = native.glob(["tests/e2e/cli_llm/*.rs"]),
+        crate_root = "tests/e2e/cli_llm/suite.rs",
+        data = [":loopal"],
+        edition = "2024",
+        env = {"LOOPAL_BINARY": "$(rootpath :loopal)"},
+        local = True,
+        # reason: excluded from `//...` wildcards (three-OS CI matrix) and run
+        # by the dedicated Agent E2E gate job, mirroring the desktop e2e setup.
+        tags = [
+            "e2e",
+            "manual",
+        ],
+        deps = [
+            "//crates/loopal-ipc",
+            "//crates/loopal-mock-llm:loopal-mock-llm-lib",
+            "//crates/loopal-protocol",
+            "@crates//:chrono",
+            "@crates//:reqwest",
+            "@crates//:serde_json",
+            "@crates//:tempfile",
+            "@crates//:tokio",
+            "@crates//:uuid",
+        ],
+    )
+    rust_binary(
+        name = "mock_mcp_server",
+        srcs = ["tests/fixtures/mock_mcp_server/main.rs"],
+        edition = "2024",
+        deps = ["@crates//:serde_json"],
+    )
+    rust_test(
+        name = "hub_llm_e2e_test",
+        srcs = native.glob(["tests/e2e/hub_llm/*.rs"]),
+        crate_root = "tests/e2e/hub_llm/suite.rs",
+        data = [
+            ":loopal",
+            ":mock_mcp_server",
+        ],
+        edition = "2024",
+        env = {
+            "LOOPAL_BINARY": "$(rootpath :loopal)",
+            "LOOPAL_MOCK_MCP_BINARY": "$(rootpath :mock_mcp_server)",
+        },
+        local = True,
+        tags = [
+            "e2e",
+            "manual",
+        ],
+        deps = [
+            "//crates/loopal-ipc",
+            "//crates/loopal-mock-llm:loopal-mock-llm-lib",
+            "//crates/loopal-protocol",
+            "//crates/loopal-vault-age",
+            "//crates/loopal-vault-api",
+            "@crates//:reqwest",
+            "@crates//:secrecy",
+            "@crates//:serde_json",
             "@crates//:tempfile",
             "@crates//:tokio",
         ],

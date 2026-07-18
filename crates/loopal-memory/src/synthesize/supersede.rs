@@ -19,7 +19,7 @@ pub fn synthesize_sync(conn: &Connection, now: i64) -> Result<usize, MemoryGraph
     let known_ids: std::collections::HashSet<String> = nodes.iter().map(|n| n.id.clone()).collect();
     let mut added = 0usize;
     for n in &nodes {
-        for cap in SUPERSEDE_RE.captures_iter(&n.body_preview) {
+        for cap in SUPERSEDE_RE.captures_iter(&n.body) {
             let target = match cap.get(1) {
                 Some(m) => m.as_str().to_string(),
                 None => continue,

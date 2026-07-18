@@ -5,6 +5,8 @@ mod diff_algorithm_test;
 mod hunks_test;
 #[path = "suite/multi_edit_test.rs"]
 mod multi_edit_test;
+#[path = "suite/no_match_hint_test.rs"]
+mod no_match_hint_test;
 #[path = "suite/omission_detector_test.rs"]
 mod omission_detector_test;
 #[path = "suite/omission_message_test.rs"]

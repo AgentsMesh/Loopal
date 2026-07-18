@@ -5,11 +5,30 @@ use tempfile::TempDir;
 fn test_load_settings_all_env_var_scenarios() {
     // Combined test to avoid env var race conditions between parallel tests.
     // All subtests that touch LOOPAL_* env vars are serialized here.
+    // reason: HOME is isolated too — load_config merges the GLOBAL layer from
+    // ~/.loopal, so a developer machine with a real settings.json there would
+    // otherwise leak its model into the "defaults" scenario.
+    let isolated_home = TempDir::new().unwrap();
+    let original_home = std::env::var_os("HOME");
+    let original_profile = std::env::var_os("USERPROFILE");
     unsafe {
+        std::env::set_var("HOME", isolated_home.path());
+        std::env::set_var("USERPROFILE", isolated_home.path());
         std::env::remove_var("LOOPAL_MODEL");
         std::env::remove_var("LOOPAL_PERMISSION_MODE");
         std::env::remove_var("LOOPAL_DECISION_MODE");
     }
+    let restore_home = scopeguard(move || unsafe {
+        match &original_home {
+            Some(value) => std::env::set_var("HOME", value),
+            None => std::env::remove_var("HOME"),
+        }
+        match &original_profile {
+            Some(value) => std::env::set_var("USERPROFILE", value),
+            None => std::env::remove_var("USERPROFILE"),
+        }
+    });
+    let _restore_home = &restore_home;
 
     // --- Scenario 1: Defaults (no config files, no env vars) ---
     {
@@ -185,4 +204,16 @@ fn test_load_settings_invalid_json_returns_error() {
     assert!(result.is_err(), "invalid JSON should produce an error");
     let err = result.unwrap_err().to_string();
     assert!(err.contains("Parse") || err.contains("parse") || err.contains("settings.json"));
+}
+
+struct EnvRestore<F: FnMut()>(F);
+
+impl<F: FnMut()> Drop for EnvRestore<F> {
+    fn drop(&mut self) {
+        (self.0)()
+    }
+}
+
+fn scopeguard<F: FnMut()>(restore: F) -> EnvRestore<F> {
+    EnvRestore(restore)
 }

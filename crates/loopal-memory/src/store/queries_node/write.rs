@@ -25,7 +25,7 @@ pub fn upsert(conn: &Connection, node: &MemoryNode) -> Result<(), MemoryGraphErr
 
     conn.execute(
         "INSERT INTO memory_nodes (
-            id, kind, name, description, file_path, body_preview,
+            id, kind, name, description, file_path, body,
             created_at, updated_at, ttl_days, content_hash, indexed_at
         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
         ON CONFLICT(id) DO UPDATE SET
@@ -33,7 +33,7 @@ pub fn upsert(conn: &Connection, node: &MemoryNode) -> Result<(), MemoryGraphErr
             name = excluded.name,
             description = excluded.description,
             file_path = excluded.file_path,
-            body_preview = excluded.body_preview,
+            body = excluded.body,
             updated_at = CASE
                 WHEN content_hash != excluded.content_hash THEN excluded.updated_at
                 ELSE updated_at
@@ -47,7 +47,7 @@ pub fn upsert(conn: &Connection, node: &MemoryNode) -> Result<(), MemoryGraphErr
             node.name,
             node.description,
             node.file_path,
-            node.body_preview,
+            node.body,
             node.created_at,
             node.updated_at,
             node.ttl_days,

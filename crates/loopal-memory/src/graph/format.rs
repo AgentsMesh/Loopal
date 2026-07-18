@@ -27,8 +27,8 @@ fn write_direct_hits(out: &mut String, hits: &[crate::graph::recall::ScoredNode]
     out.push_str("## Direct hits\n\n");
     for hit in hits {
         write_node_header(out, &hit.node);
-        if !hit.node.body_preview.trim().is_empty() {
-            out.push_str(hit.node.body_preview.trim());
+        if !hit.node.body.trim().is_empty() {
+            out.push_str(&preview(hit.node.body.trim()));
             out.push_str("\n\n");
         }
     }
@@ -140,4 +140,18 @@ fn format_date(ms: i64) -> String {
     chrono::DateTime::from_timestamp_millis(ms)
         .map(|dt| dt.format("%Y-%m-%d").to_string())
         .unwrap_or_else(|| "unknown".into())
+}
+
+/// Truncate a node body to a compact preview for recall output; the full body is
+/// stored and indexed for search, but recall context stays concise.
+fn preview(body: &str) -> String {
+    const MAX: usize = 280;
+    if body.len() <= MAX {
+        return body.to_string();
+    }
+    let mut end = MAX;
+    while end > 0 && !body.is_char_boundary(end) {
+        end -= 1;
+    }
+    format!("{}…", &body[..end])
 }

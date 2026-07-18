@@ -8,7 +8,7 @@ use crate::store::types::{MemoryKind, MemoryNode};
 pub fn get(conn: &Connection, id: &str) -> Result<Option<MemoryNode>, MemoryGraphError> {
     let result = conn
         .query_row(
-            "SELECT id, kind, name, description, file_path, body_preview,
+            "SELECT id, kind, name, description, file_path, body,
                     created_at, updated_at, ttl_days, content_hash, indexed_at
              FROM memory_nodes WHERE id = ?1",
             params![id],
@@ -32,7 +32,7 @@ pub fn get_many(conn: &Connection, ids: &[String]) -> Result<Vec<MemoryNode>, Me
         .collect::<Vec<_>>()
         .join(",");
     let sql = format!(
-        "SELECT id, kind, name, description, file_path, body_preview,
+        "SELECT id, kind, name, description, file_path, body,
                 created_at, updated_at, ttl_days, content_hash, indexed_at
          FROM memory_nodes WHERE id IN ({})",
         placeholders
@@ -49,7 +49,7 @@ pub fn get_many(conn: &Connection, ids: &[String]) -> Result<Vec<MemoryNode>, Me
 pub fn list(conn: &Connection, limit: Option<usize>) -> Result<Vec<MemoryNode>, MemoryGraphError> {
     let lim = limit.map(|n| n as i64).unwrap_or(-1);
     let mut stmt = conn.prepare(
-        "SELECT id, kind, name, description, file_path, body_preview,
+        "SELECT id, kind, name, description, file_path, body,
                 created_at, updated_at, ttl_days, content_hash, indexed_at
          FROM memory_nodes ORDER BY updated_at DESC LIMIT ?1",
     )?;
@@ -63,7 +63,7 @@ pub fn list_by_kind(
     kind: MemoryKind,
 ) -> Result<Vec<MemoryNode>, MemoryGraphError> {
     let mut stmt = conn.prepare(
-        "SELECT id, kind, name, description, file_path, body_preview,
+        "SELECT id, kind, name, description, file_path, body,
                 created_at, updated_at, ttl_days, content_hash, indexed_at
          FROM memory_nodes WHERE kind = ?1 ORDER BY updated_at DESC",
     )?;
@@ -78,7 +78,7 @@ pub fn find_by_file_path(
 ) -> Result<Option<MemoryNode>, MemoryGraphError> {
     let result = conn
         .query_row(
-            "SELECT id, kind, name, description, file_path, body_preview,
+            "SELECT id, kind, name, description, file_path, body,
                     created_at, updated_at, ttl_days, content_hash, indexed_at
              FROM memory_nodes WHERE file_path = ?1",
             params![file_path],

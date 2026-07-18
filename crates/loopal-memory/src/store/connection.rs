@@ -6,7 +6,7 @@ use tokio::sync::Mutex;
 
 use loopal_error::MemoryGraphError;
 
-use crate::store::migrations::{CURRENT_SCHEMA_VERSION, ensure_version};
+use crate::store::migrations::{CURRENT_SCHEMA_VERSION, ensure_version, reset_if_outdated};
 use crate::store::schema::apply_schema;
 
 #[derive(Clone)]
@@ -29,6 +29,7 @@ impl DbConnection {
     }
 
     fn init(conn: Connection) -> Result<Self, MemoryGraphError> {
+        reset_if_outdated(&conn)?;
         apply_schema(&conn)?;
         ensure_version(&conn, CURRENT_SCHEMA_VERSION)?;
         Ok(Self {

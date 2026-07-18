@@ -8,7 +8,7 @@ fn node(id: &str, kind: MemoryKind) -> MemoryNode {
         name: id.into(),
         description: None,
         file_path: format!("{}.md", id),
-        body_preview: id.into(),
+        body: id.into(),
         created_at: chrono::Utc::now().timestamp_millis(),
         updated_at: chrono::Utc::now().timestamp_millis(),
         ttl_days: None,

@@ -23,7 +23,7 @@ pub fn synthesize_sync(conn: &Connection, now: i64) -> Result<usize, MemoryGraph
 
     let per_doc_tokens: Vec<Vec<String>> = nodes
         .iter()
-        .map(|n| tokenize(&format!("{} {}", n.name, n.body_preview)))
+        .map(|n| tokenize(&format!("{} {}", n.name, n.body)))
         .collect();
     let df = document_frequency(&per_doc_tokens);
     let vectors: Vec<_> = per_doc_tokens

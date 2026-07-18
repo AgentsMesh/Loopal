@@ -8,7 +8,7 @@ fn node(id: &str, body: &str) -> MemoryNode {
         name: id.into(),
         description: None,
         file_path: format!("{}.md", id),
-        body_preview: body.into(),
+        body: body.into(),
         created_at: 1,
         updated_at: 1,
         ttl_days: None,

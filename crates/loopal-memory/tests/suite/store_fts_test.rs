@@ -7,7 +7,7 @@ fn node_with(id: &str, kind: MemoryKind, name: &str, desc: &str, body: &str) -> 
         name: name.into(),
         description: Some(desc.into()),
         file_path: format!("{}.md", id),
-        body_preview: body.into(),
+        body: body.into(),
         created_at: 1,
         updated_at: 1,
         ttl_days: None,
@@ -175,4 +175,27 @@ async fn updated_node_reflects_new_body_in_fts() {
 
     assert_eq!(g.search("alpha", None, 10).await.unwrap().len(), 0);
     assert_eq!(g.search("beta", None, 10).await.unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn search_finds_keyword_deep_in_long_body() {
+    let g = MemoryGraph::in_memory().unwrap();
+    let mut long = "filler ".repeat(200); // ~1400 bytes, well past the old 300-byte cutoff
+    long.push_str("zarquonmarker at the very end");
+    g.upsert_node(node_with(
+        "deep",
+        MemoryKind::Project,
+        "deep note",
+        "",
+        &long,
+    ))
+    .await
+    .unwrap();
+    let hits = g.search("zarquonmarker", None, 10).await.unwrap();
+    assert_eq!(
+        hits.len(),
+        1,
+        "a keyword past the old 300-byte preview cutoff should now be searchable"
+    );
+    assert_eq!(hits[0].node.id, "deep");
 }

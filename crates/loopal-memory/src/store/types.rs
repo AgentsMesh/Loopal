@@ -114,7 +114,7 @@ pub struct MemoryNode {
     pub name: String,
     pub description: Option<String>,
     pub file_path: String,
-    pub body_preview: String,
+    pub body: String,
     pub created_at: i64,
     pub updated_at: i64,
     pub ttl_days: Option<u32>,

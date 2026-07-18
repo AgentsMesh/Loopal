@@ -12,8 +12,6 @@ use crate::extract::related::normalize_related;
 use crate::extract::wikilink::scan;
 use crate::store::types::{EdgeKind, MemoryEdge, MemoryKind, MemoryNode, Provenance};
 
-const BODY_PREVIEW_BYTES: usize = 300;
-
 pub struct ExtractionResult {
     pub nodes: Vec<MemoryNode>,
     pub edges: Vec<MemoryEdge>,
@@ -38,7 +36,9 @@ pub fn extract_file(file_path: &str, content: &str) -> ExtractionResult {
         .clone()
         .unwrap_or_else(|| slug.clone());
     let content_hash = sha256_hex(content);
-    let body_preview = preview(&parsed.body);
+    // reason: store the whole note body so full-text search reaches content past
+    // the first few hundred bytes; display sites truncate to a preview.
+    let body = parsed.body.trim_start().to_string();
     let created_at = parse_iso_date(parsed.frontmatter.created_at.as_deref()).unwrap_or(now);
     let updated_at = parse_iso_date(parsed.frontmatter.updated_at.as_deref()).unwrap_or(now);
 
@@ -48,7 +48,7 @@ pub fn extract_file(file_path: &str, content: &str) -> ExtractionResult {
         name,
         description: parsed.frontmatter.description.clone(),
         file_path: file_path.to_string(),
-        body_preview,
+        body,
         created_at,
         updated_at,
         ttl_days: parsed.frontmatter.ttl_days,
@@ -141,18 +141,6 @@ fn pick_kind(declared: &Option<String>, slug: &str) -> MemoryKind {
         Some("index") => MemoryKind::Index,
         _ => MemoryKind::Reference,
     }
-}
-
-fn preview(body: &str) -> String {
-    let trimmed = body.trim_start();
-    if trimmed.len() <= BODY_PREVIEW_BYTES {
-        return trimmed.to_string();
-    }
-    let mut end = BODY_PREVIEW_BYTES;
-    while end > 0 && !trimmed.is_char_boundary(end) {
-        end -= 1;
-    }
-    trimmed[..end].to_string()
 }
 
 fn sha256_hex(s: &str) -> String {

@@ -8,7 +8,7 @@ fn node(id: &str, kind: MemoryKind, desc: &str) -> MemoryNode {
         name: id.into(),
         description: Some(desc.into()),
         file_path: format!(".loopal/memory/{}.md", id),
-        body_preview: format!("body of {}", id),
+        body: format!("body of {}", id),
         created_at: 1_700_000_000_000,
         updated_at: 1_700_000_000_000,
         ttl_days: None,

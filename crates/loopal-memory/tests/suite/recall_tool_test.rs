@@ -12,7 +12,7 @@ fn n(id: &str) -> MemoryNode {
         name: format!("{} name", id),
         description: Some("desc".into()),
         file_path: format!(".loopal/memory/{}.md", id),
-        body_preview: format!("body of {}", id),
+        body: format!("body of {}", id),
         created_at: 1,
         updated_at: 1,
         ttl_days: None,

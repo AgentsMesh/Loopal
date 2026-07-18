@@ -19,7 +19,7 @@ pub(super) fn map_row(row: &Row<'_>) -> rusqlite::Result<MemoryNode> {
         name: row.get("name")?,
         description: row.get("description")?,
         file_path: row.get("file_path")?,
-        body_preview: row.get("body_preview")?,
+        body: row.get("body")?,
         created_at: row.get("created_at")?,
         updated_at: row.get("updated_at")?,
         ttl_days: row.get("ttl_days")?,

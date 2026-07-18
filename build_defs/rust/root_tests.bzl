@@ -1,6 +1,6 @@
 """Rust tests owned by the root Bazel package."""
 
-load("@rules_rust//rust:defs.bzl", "rust_test")
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_test")
 load("//build_defs/rust:desktop_test.bzl", "desktop_serve_test")
 
 def _binary_e2e(name, src, deps):
@@ -81,6 +81,36 @@ def loopal_root_tests():
             "@crates//:tempfile",
             "@crates//:tokio",
             "@crates//:uuid",
+        ],
+    )
+    rust_binary(
+        name = "mock_mcp_server",
+        srcs = ["tests/fixtures/mock_mcp_server/main.rs"],
+        edition = "2024",
+        deps = ["@crates//:serde_json"],
+    )
+    rust_test(
+        name = "hub_llm_e2e_test",
+        srcs = native.glob(["tests/e2e/hub_llm/*.rs"]),
+        crate_root = "tests/e2e/hub_llm/suite.rs",
+        data = [
+            ":loopal",
+            ":mock_mcp_server",
+        ],
+        edition = "2024",
+        env = {
+            "LOOPAL_BINARY": "$(rootpath :loopal)",
+            "LOOPAL_MOCK_MCP_BINARY": "$(rootpath :mock_mcp_server)",
+        },
+        local = True,
+        deps = [
+            "//crates/loopal-ipc",
+            "//crates/loopal-mock-llm:loopal-mock-llm-lib",
+            "//crates/loopal-protocol",
+            "@crates//:reqwest",
+            "@crates//:serde_json",
+            "@crates//:tempfile",
+            "@crates//:tokio",
         ],
     )
     desktop_serve_test()

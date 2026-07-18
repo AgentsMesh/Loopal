@@ -22,8 +22,62 @@ use tokio::net::TcpListener;
 use tokio::sync::mpsc::Receiver;
 
 pub const API_KEY: &str = "loopal-e2e-key";
-pub const MODEL: &str = "claude-opus-4-8";
 const TIMEOUT: Duration = Duration::from_secs(20);
+
+/// Which production provider adapter the spawned agent uses to reach the mock.
+/// One semantic scenario drives every provider's wire; only the config differs.
+#[derive(Clone, Copy, Debug)]
+pub enum Provider {
+    Anthropic,
+    Google,
+    OpenAiResponses,
+    OpenAiCompat,
+}
+
+impl Provider {
+    pub fn model(self) -> &'static str {
+        match self {
+            Provider::Anthropic => "claude-opus-4-8",
+            Provider::Google => "gemini-2.0-flash",
+            Provider::OpenAiResponses => "gpt-4o",
+            Provider::OpenAiCompat => "mockcompat-model",
+        }
+    }
+
+    fn configure(self, cmd: &mut tokio::process::Command, home: &std::path::Path, base_url: &str) {
+        match self {
+            Provider::Anthropic => {
+                cmd.env("ANTHROPIC_API_KEY", API_KEY)
+                    .env("ANTHROPIC_BASE_URL", base_url);
+            }
+            Provider::Google => {
+                cmd.env("GOOGLE_API_KEY", API_KEY)
+                    .env("GOOGLE_BASE_URL", base_url);
+            }
+            Provider::OpenAiResponses => {
+                cmd.env("OPENAI_API_KEY", API_KEY)
+                    .env("OPENAI_BASE_URL", base_url);
+            }
+            Provider::OpenAiCompat => {
+                let dir = home.join(".loopal");
+                std::fs::create_dir_all(&dir).unwrap();
+                let settings = json!({
+                    "providers": {"openai_compat": [{
+                        "name": "mockcompat",
+                        "base_url": base_url,
+                        "api_key": API_KEY,
+                        "model_prefix": "mockcompat-"
+                    }]}
+                });
+                std::fs::write(
+                    dir.join("settings.json"),
+                    serde_json::to_vec_pretty(&settings).unwrap(),
+                )
+                .unwrap();
+            }
+        }
+    }
+}
 
 fn binary_path() -> String {
     std::env::var("LOOPAL_BINARY")
@@ -34,10 +88,21 @@ fn binary_path() -> String {
 #[derive(Default, Debug)]
 pub struct TurnOutcome {
     pub text: String,
+    pub thinking: String,
     pub finished: bool,
     pub cancelled: bool,
     pub error: Option<String>,
     pub events: Vec<String>,
+}
+
+impl TurnOutcome {
+    /// How many `ToolResult` events the turn produced.
+    pub fn tool_result_count(&self) -> usize {
+        self.events
+            .iter()
+            .filter(|e| e.starts_with("ToolResult"))
+            .count()
+    }
 }
 
 pub struct CliHarness {
@@ -49,10 +114,15 @@ pub struct CliHarness {
     http: reqwest::Client,
     cwd: tempfile::TempDir,
     _home: tempfile::TempDir,
+    provider: Provider,
 }
 
 impl CliHarness {
     pub async fn start(scenario: Value) -> Self {
+        Self::start_with(scenario, Provider::Anthropic).await
+    }
+
+    pub async fn start_with(scenario: Value, provider: Provider) -> Self {
         let scenario =
             Scenario::from_slice(&serde_json::to_vec(&scenario).unwrap()).expect("valid scenario");
         let listener = TcpListener::bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0))
@@ -63,19 +133,17 @@ impl CliHarness {
 
         let home = tempfile::tempdir().unwrap();
         let cwd = tempfile::tempdir().unwrap();
-        let mut child = tokio::process::Command::new(binary_path())
-            .arg("--serve")
+        let mut cmd = tokio::process::Command::new(binary_path());
+        cmd.arg("--serve")
             .env("HOME", home.path())
             .env("LOOPAL_TEST_SESSION_DIR", home.path().join("sessions"))
-            .env("ANTHROPIC_API_KEY", API_KEY)
-            .env("ANTHROPIC_BASE_URL", &base_url)
             .env("LOOPAL_PERMISSION_MODE", "bypass")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .kill_on_drop(true)
-            .spawn()
-            .expect("spawn loopal --serve");
+            .kill_on_drop(true);
+        provider.configure(&mut cmd, home.path(), &base_url);
+        let mut child = cmd.spawn().expect("spawn loopal --serve");
         let stdin = child.stdin.take().unwrap();
         let stdout = child.stdout.take().unwrap();
         let transport: Arc<dyn loopal_ipc::transport::Transport> = Arc::new(StdioTransport::new(
@@ -101,6 +169,7 @@ impl CliHarness {
             http: reqwest::Client::new(),
             cwd,
             _home: home,
+            provider,
         }
     }
 
@@ -111,7 +180,7 @@ impl CliHarness {
                 methods::AGENT_START.name,
                 json!({
                     "prompt": prompt,
-                    "model": MODEL,
+                    "model": self.provider.model(),
                     "cwd": self.cwd.path().to_string_lossy(),
                 }),
             )
@@ -129,6 +198,9 @@ impl CliHarness {
                         out.events.push(format!("{:?}", event.payload));
                         match event.payload {
                             AgentEventPayload::Stream { text } => out.text.push_str(&text),
+                            AgentEventPayload::ThinkingStream { text } => {
+                                out.thinking.push_str(&text)
+                            }
                             AgentEventPayload::Error { message } => {
                                 out.error = Some(message);
                                 break;
@@ -155,7 +227,7 @@ impl CliHarness {
                 methods::AGENT_START.name,
                 json!({
                     "prompt": prompt,
-                    "model": MODEL,
+                    "model": self.provider.model(),
                     "cwd": self.cwd.path().to_string_lossy(),
                 }),
             )

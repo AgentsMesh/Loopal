@@ -7,6 +7,9 @@ pub mod support;
 #[path = "basic_test.rs"]
 mod basic_test;
 
+#[path = "multi_provider_test.rs"]
+mod multi_provider_test;
+
 #[path = "tool_loop_test.rs"]
 mod tool_loop_test;
 
@@ -15,3 +18,6 @@ mod resilience_test;
 
 #[path = "cancel_test.rs"]
 mod cancel_test;
+
+#[path = "behaviors_test.rs"]
+mod behaviors_test;

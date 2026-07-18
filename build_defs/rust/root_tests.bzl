@@ -75,10 +75,12 @@ def loopal_root_tests():
             "//crates/loopal-ipc",
             "//crates/loopal-mock-llm:loopal-mock-llm-lib",
             "//crates/loopal-protocol",
+            "@crates//:chrono",
             "@crates//:reqwest",
             "@crates//:serde_json",
             "@crates//:tempfile",
             "@crates//:tokio",
+            "@crates//:uuid",
         ],
     )
     desktop_serve_test()

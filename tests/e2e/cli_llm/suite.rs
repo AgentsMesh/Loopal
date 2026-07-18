@@ -21,3 +21,9 @@ mod cancel_test;
 
 #[path = "behaviors_test.rs"]
 mod behaviors_test;
+
+#[path = "multiturn_test.rs"]
+mod multiturn_test;
+
+#[path = "compaction_test.rs"]
+mod compaction_test;

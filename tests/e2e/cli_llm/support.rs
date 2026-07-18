@@ -220,6 +220,104 @@ impl CliHarness {
         out
     }
 
+    /// Start the agent in **persistent** mode (no initial prompt) and drain the
+    /// startup events until it is idle. Follow-up turns are driven with
+    /// `turn_via_message` / `control` — this keeps the conversation alive across
+    /// turns, unlike the one-shot ephemeral `run_turn`.
+    pub async fn begin_persistent(&mut self) {
+        self.conn
+            .send_request(
+                methods::AGENT_START.name,
+                json!({
+                    "model": self.provider.model(),
+                    "cwd": self.cwd.path().to_string_lossy(),
+                    "lifecycle": "persistent",
+                }),
+            )
+            .await
+            .expect("agent_start persistent");
+        let deadline = tokio::time::Instant::now() + TIMEOUT;
+        while tokio::time::Instant::now() < deadline {
+            match tokio::time::timeout(Duration::from_secs(8), self.rx.recv()).await {
+                Ok(Some(Incoming::Notification { method, params }))
+                    if method == methods::AGENT_EVENT.name =>
+                {
+                    if let Ok(event) = serde_json::from_value::<AgentEvent>(params)
+                        && matches!(event.payload, AgentEventPayload::AwaitingInput)
+                    {
+                        break;
+                    }
+                }
+                Ok(Some(_)) => {}
+                Ok(None) | Err(_) => break,
+            }
+        }
+    }
+
+    /// Send a follow-up user message into the persistent session and collect the
+    /// resulting turn (which settles back to idle).
+    pub async fn turn_via_message(&mut self, text: &str) -> TurnOutcome {
+        let envelope = loopal_protocol::Envelope {
+            id: uuid::Uuid::new_v4(),
+            source: loopal_protocol::MessageSource::Human,
+            target: "main".into(),
+            content: loopal_protocol::UserContent::text_only(text),
+            timestamp: chrono::Utc::now(),
+            summary: None,
+        };
+        self.conn
+            .send_request(
+                methods::AGENT_MESSAGE.name,
+                serde_json::to_value(&envelope).unwrap(),
+            )
+            .await
+            .expect("agent_message");
+        self.collect_persistent().await
+    }
+
+    /// Send a control command (e.g. Compact) into the persistent session and collect.
+    pub async fn control(&mut self, command: Value) -> TurnOutcome {
+        self.conn
+            .send_request(methods::AGENT_CONTROL.name, command)
+            .await
+            .expect("agent_control");
+        self.collect_persistent().await
+    }
+
+    async fn collect_persistent(&mut self) -> TurnOutcome {
+        let mut out = TurnOutcome::default();
+        let deadline = tokio::time::Instant::now() + TIMEOUT;
+        while tokio::time::Instant::now() < deadline {
+            match tokio::time::timeout(Duration::from_secs(8), self.rx.recv()).await {
+                Ok(Some(Incoming::Notification { method, params }))
+                    if method == methods::AGENT_EVENT.name =>
+                {
+                    if let Ok(event) = serde_json::from_value::<AgentEvent>(params) {
+                        out.events.push(format!("{:?}", event.payload));
+                        match event.payload {
+                            AgentEventPayload::Stream { text } => out.text.push_str(&text),
+                            AgentEventPayload::ThinkingStream { text } => {
+                                out.thinking.push_str(&text)
+                            }
+                            AgentEventPayload::Error { message } => {
+                                out.error = Some(message);
+                                break;
+                            }
+                            AgentEventPayload::Finished | AgentEventPayload::AwaitingInput => {
+                                out.finished = true;
+                                break;
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                Ok(Some(_)) => {}
+                Ok(None) | Err(_) => break,
+            }
+        }
+        out
+    }
+
     /// Start a turn without collecting it to completion — for interruption tests.
     pub async fn begin_turn(&self, prompt: &str) {
         self.conn

@@ -32,8 +32,10 @@ describe('Workbench child agent selection', () => {
       target: { value: 'Root-only draft' },
     })
     fireEvent.click(screen.getByRole('tab', { name: 'Agents' }))
-    fireEvent.click(screen.getByRole('treeitem', { name: /Research child/ }))
-    expect(screen.getByText('Child context compacted.')).toBeInTheDocument()
+    // The agent tree fills in when the async session detail lands, which can
+    // trail the conversation header on slow machines — findBy* retries.
+    fireEvent.click(await screen.findByRole('treeitem', { name: /Research child/ }))
+    expect(await screen.findByText('Child context compacted.')).toBeInTheDocument()
     expect(screen.getByText('Child-only goal')).toBeInTheDocument()
     const composer = screen.getByLabelText('Message Research child')
     expect(composer).toHaveValue('')
@@ -69,10 +71,10 @@ describe('Workbench child agent selection', () => {
     render(<Workbench api={api} />)
     await screen.findByText(`Conversation for ${sessionOne.title}`)
     fireEvent.click(screen.getByRole('tab', { name: 'Agents' }))
-    fireEvent.click(screen.getByRole('treeitem', { name: /Starting child/ }))
-    expect(screen.getByTestId('conversation')).toHaveTextContent(
+    fireEvent.click(await screen.findByRole('treeitem', { name: /Starting child/ }))
+    await waitFor(() => expect(screen.getByTestId('conversation')).toHaveTextContent(
       'Viewing Starting child · starting · waiting for registration',
-    )
+    ))
   })
 })
 

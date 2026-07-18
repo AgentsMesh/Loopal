@@ -27,3 +27,6 @@ mod multiturn_test;
 
 #[path = "compaction_test.rs"]
 mod compaction_test;
+
+#[path = "mcp_test.rs"]
+mod mcp_test;

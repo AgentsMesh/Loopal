@@ -115,14 +115,29 @@ pub struct CliHarness {
     cwd: tempfile::TempDir,
     _home: tempfile::TempDir,
     provider: Provider,
+    mcp_calls: Arc<std::sync::Mutex<Vec<Value>>>,
 }
 
 impl CliHarness {
     pub async fn start(scenario: Value) -> Self {
-        Self::start_with(scenario, Provider::Anthropic).await
+        Self::spawn(scenario, Provider::Anthropic, false).await
     }
 
     pub async fn start_with(scenario: Value, provider: Provider) -> Self {
+        Self::spawn(scenario, provider, false).await
+    }
+
+    /// Start with an MCP server configured in the agent's cwd. In `--serve`
+    /// mode the agent never spawns MCP processes itself — its kernel proxies
+    /// every MCP operation over IPC to the stdio peer (the Hub in production).
+    /// The harness plays that Hub role: it advertises one `mcp_echo` tool and
+    /// answers `hub/mcp/*` requests, so a turn exercises config discovery,
+    /// proxy tool registration, and tool dispatch through the real stack.
+    pub async fn start_with_mcp(scenario: Value) -> Self {
+        Self::spawn(scenario, Provider::Anthropic, true).await
+    }
+
+    async fn spawn(scenario: Value, provider: Provider, mcp: bool) -> Self {
         let scenario =
             Scenario::from_slice(&serde_json::to_vec(&scenario).unwrap()).expect("valid scenario");
         let listener = TcpListener::bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0))
@@ -133,6 +148,9 @@ impl CliHarness {
 
         let home = tempfile::tempdir().unwrap();
         let cwd = tempfile::tempdir().unwrap();
+        if mcp {
+            write_mcp_settings(cwd.path());
+        }
         let mut cmd = tokio::process::Command::new(binary_path());
         cmd.arg("--serve")
             .env("HOME", home.path())
@@ -150,7 +168,9 @@ impl CliHarness {
             Box::new(BufReader::new(stdout)),
             Box::new(stdin),
         ));
-        let (conn, rx) = Connection::new(transport).into_listening();
+        let (conn, raw_rx) = Connection::new(transport).into_listening();
+        let mcp_calls = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let rx = spawn_hub_dispatcher(conn.clone(), raw_rx, mcp, mcp_calls.clone());
 
         tokio::time::timeout(
             TIMEOUT,
@@ -170,7 +190,13 @@ impl CliHarness {
             cwd,
             _home: home,
             provider,
+            mcp_calls,
         }
+    }
+
+    /// `hub/mcp/call_tool` requests the agent sent to the harness's Hub role.
+    pub fn mcp_calls(&self) -> Vec<Value> {
+        self.mcp_calls.lock().unwrap().clone()
     }
 
     /// Send a prompt and collect the turn's events until Finished/Error.
@@ -414,4 +440,102 @@ impl Drop for CliHarness {
     fn drop(&mut self) {
         self.mock.abort();
     }
+}
+
+/// The serve-mode agent treats its stdio peer as the Hub and sends it
+/// agent→client requests (`hub/mcp/*`). Answer those inline and forward
+/// notifications untouched, so collect loops never see requests and the
+/// kernel's MCP proxy settles during `agent/start` instead of timing out.
+fn spawn_hub_dispatcher(
+    conn: Arc<Connection<Listening>>,
+    mut raw_rx: Receiver<Incoming>,
+    advertise_mcp: bool,
+    calls: Arc<std::sync::Mutex<Vec<Value>>>,
+) -> Receiver<Incoming> {
+    let (tx, rx) = tokio::sync::mpsc::channel(256);
+    tokio::spawn(async move {
+        while let Some(incoming) = raw_rx.recv().await {
+            match incoming {
+                Incoming::Request { id, method, params } => {
+                    match hub_mcp_reply(&method, &params, advertise_mcp, &calls) {
+                        Some(value) => {
+                            let _ = conn.respond(id, value).await;
+                        }
+                        None => {
+                            let _ = conn
+                                .respond_error(id, -32601, "not implemented by e2e harness")
+                                .await;
+                        }
+                    }
+                }
+                note @ Incoming::Notification { .. } => {
+                    if tx.send(note).await.is_err() {
+                        break;
+                    }
+                }
+            }
+        }
+    });
+    rx
+}
+
+fn hub_mcp_reply(
+    method: &str,
+    params: &Value,
+    advertise: bool,
+    calls: &Arc<std::sync::Mutex<Vec<Value>>>,
+) -> Option<Value> {
+    if method == methods::HUB_MCP_SNAPSHOT.name {
+        let servers = if advertise {
+            vec![json!({
+                "name": "mock", "transport": "stdio", "source": "project",
+                "status": "connected", "tool_count": 1,
+                "resource_count": 0, "prompt_count": 0, "errors": []
+            })]
+        } else {
+            vec![]
+        };
+        return Some(json!({"servers": servers}));
+    }
+    if method == methods::HUB_MCP_LIST_TOOLS.name {
+        let tools = if advertise {
+            vec![json!({
+                "server": "mock", "name": "mcp_echo",
+                "description": "Echo back the given text.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"text": {"type": "string"}},
+                    "required": ["text"]
+                }
+            })]
+        } else {
+            vec![]
+        };
+        return Some(json!({"tools": tools}));
+    }
+    if method == methods::HUB_MCP_CALL_TOOL.name {
+        calls.lock().unwrap().push(params.clone());
+        let text = params["args"]["text"].as_str().unwrap_or_default();
+        return Some(json!({
+            "content": [{"type": "text", "text": format!("mcp_echo: {text}")}],
+            "is_error": false
+        }));
+    }
+    None
+}
+
+/// Declare one MCP server in the agent-cwd project config. The command is
+/// never spawned — serve-mode agents proxy MCP to the Hub peer — but the
+/// entry drives config discovery, the proxy settle wait, and prompt listing.
+fn write_mcp_settings(cwd: &std::path::Path) {
+    let dir = cwd.join(".loopal");
+    std::fs::create_dir_all(&dir).unwrap();
+    let settings = json!({
+        "mcp_servers": {"mock": {"type": "stdio", "command": "true"}}
+    });
+    std::fs::write(
+        dir.join("settings.json"),
+        serde_json::to_vec_pretty(&settings).unwrap(),
+    )
+    .unwrap();
 }

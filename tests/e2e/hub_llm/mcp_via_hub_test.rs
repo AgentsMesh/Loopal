@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use serde_json::json;
 
 use crate::support::HubHarness;
@@ -26,10 +24,6 @@ async fn hub_spawned_mcp_tool_round_trips_through_a_real_turn() {
         "fallback": {"chunks": [{"type": "text", "text": "fallback"}, {"type": "done"}]}
     }))
     .await;
-
-    // The Hub spawns MCP in the background (non-blocking startup contract);
-    // give the spawn + dynamic tool registration a moment to settle.
-    tokio::time::sleep(Duration::from_millis(1500)).await;
 
     let out = h.turn("please echo through the hub").await;
     assert!(

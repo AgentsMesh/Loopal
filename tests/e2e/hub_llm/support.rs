@@ -110,7 +110,7 @@ impl HubHarness {
             "hub/register rejected: {response}"
         );
 
-        Self {
+        let mut harness = Self {
             base_url,
             session_id,
             conn,
@@ -120,6 +120,31 @@ impl HubHarness {
             http: reqwest::Client::new(),
             _home: home,
             _cwd: cwd,
+        };
+        harness.drain_startup_backlog().await;
+        harness
+    }
+
+    /// A freshly registered UI client receives the session's replayed startup
+    /// events; consume them up to the first idle so `turn` never mistakes the
+    /// backlog's AwaitingInput for a turn boundary.
+    async fn drain_startup_backlog(&mut self) {
+        let deadline = tokio::time::Instant::now() + TIMEOUT;
+        while tokio::time::Instant::now() < deadline {
+            match tokio::time::timeout(Duration::from_millis(1500), self.rx.recv()).await {
+                Ok(Some(Incoming::Notification { method, params }))
+                    if method == methods::AGENT_EVENT.name =>
+                {
+                    if let Ok(event) = serde_json::from_value::<AgentEvent>(params)
+                        && matches!(event.payload, AgentEventPayload::AwaitingInput)
+                    {
+                        return;
+                    }
+                }
+                Ok(Some(_)) => {}
+                // quiet channel: whatever backlog existed has been replayed
+                Ok(None) | Err(_) => return,
+            }
         }
     }
 
@@ -158,10 +183,8 @@ impl HubHarness {
                                 break;
                             }
                             AgentEventPayload::AwaitingInput => {
-                                if !out.text.is_empty() || !out.events.is_empty() {
-                                    out.finished = true;
-                                    break;
-                                }
+                                out.finished = true;
+                                break;
                             }
                             _ => {}
                         }

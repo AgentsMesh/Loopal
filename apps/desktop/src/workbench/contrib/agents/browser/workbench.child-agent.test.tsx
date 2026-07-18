@@ -1,9 +1,21 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { richView } from '../../../../../test/fixtures/workbench/rich-session'
 import {
   createTestAPI, sessionDetail, sessionOne, updatedAt,
 } from '../../../../../test/support/workbench/api-stub'
 import { Workbench } from '../../../browser/workbench'
+
+// Clicking an already-selected panel tab COLLAPSES the panel (toggle
+// semantics), so a blind click races the zone's initial expansion state and
+// can hide the tree it meant to open. Converge instead: each retry expands
+// the panel if it is collapsed, then selects the agent node.
+async function selectAgent(root: HTMLElement, name: RegExp): Promise<void> {
+  await waitFor(() => {
+    const tab = within(root).getByRole('tab', { name: 'Agents' })
+    if (tab.getAttribute('aria-expanded') !== 'true') fireEvent.click(tab)
+    fireEvent.click(within(root).getByRole('treeitem', { name }))
+  }, { timeout: 15_000 })
+}
 
 describe('Workbench child agent selection', () => {
   it('routes messages and resources to a live child while retaining completed output', async () => {
@@ -26,18 +38,12 @@ describe('Workbench child agent selection', () => {
     }
     const sendMessage = vi.fn(async () => undefined)
     const { api, events } = createTestAPI({ openSession: async () => detail, sendMessage })
-    render(<Workbench api={api} />)
+    const { container } = render(<Workbench api={api} />)
     await screen.findByText(`Conversation for ${sessionOne.title}`)
     fireEvent.change(screen.getByLabelText('Message Loopal'), {
       target: { value: 'Root-only draft' },
     })
-    fireEvent.click(screen.getByRole('tab', { name: 'Agents' }))
-    // The agent tree fills in when the async session detail lands, which can
-    // trail the conversation header by SECONDS on a loaded CI worker — the
-    // findBy* default 1s retry window is not enough.
-    fireEvent.click(
-      await screen.findByRole('treeitem', { name: /Research child/ }, { timeout: 15_000 }),
-    )
+    await selectAgent(container, /Research child/)
     expect(
       await screen.findByText('Child context compacted.', {}, { timeout: 15_000 }),
     ).toBeInTheDocument()
@@ -73,13 +79,10 @@ describe('Workbench child agent selection', () => {
       }],
     }
     const { api } = createTestAPI({ openSession: async () => detail })
-    render(<Workbench api={api} />)
+    const { container } = render(<Workbench api={api} />)
     await screen.findByText(`Conversation for ${sessionOne.title}`)
-    fireEvent.click(screen.getByRole('tab', { name: 'Agents' }))
-    fireEvent.click(
-      await screen.findByRole('treeitem', { name: /Starting child/ }, { timeout: 15_000 }),
-    )
-    await waitFor(() => expect(screen.getByTestId('conversation')).toHaveTextContent(
+    await selectAgent(container, /Starting child/)
+    await waitFor(() => expect(within(container).getByTestId('conversation')).toHaveTextContent(
       'Viewing Starting child · starting · waiting for registration',
     ), { timeout: 15_000 })
   })

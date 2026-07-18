@@ -12,3 +12,6 @@ mod tool_loop_test;
 
 #[path = "resilience_test.rs"]
 mod resilience_test;
+
+#[path = "cancel_test.rs"]
+mod cancel_test;

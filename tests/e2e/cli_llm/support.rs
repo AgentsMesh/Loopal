@@ -35,6 +35,7 @@ fn binary_path() -> String {
 pub struct TurnOutcome {
     pub text: String,
     pub finished: bool,
+    pub cancelled: bool,
     pub error: Option<String>,
     pub events: Vec<String>,
 }
@@ -142,6 +143,73 @@ impl CliHarness {
                 }
                 Ok(Some(_)) => {}
                 Ok(None) | Err(_) => break,
+            }
+        }
+        out
+    }
+
+    /// Start a turn without collecting it to completion — for interruption tests.
+    pub async fn begin_turn(&self, prompt: &str) {
+        self.conn
+            .send_request(
+                methods::AGENT_START.name,
+                json!({
+                    "prompt": prompt,
+                    "model": MODEL,
+                    "cwd": self.cwd.path().to_string_lossy(),
+                }),
+            )
+            .await
+            .expect("agent_start");
+    }
+
+    /// Signal the running turn to cancel (`agent/interrupt` over the live wire).
+    pub async fn interrupt(&self) {
+        self.conn
+            .send_notification(methods::AGENT_INTERRUPT.name, json!({}))
+            .await
+            .expect("interrupt");
+    }
+
+    /// Collect events until the turn settles (cancelled / finished / error), used
+    /// after an interrupt to assert the in-flight turn was actually cancelled.
+    pub async fn await_settled(&mut self, budget: Duration) -> TurnOutcome {
+        let mut out = TurnOutcome::default();
+        let deadline = tokio::time::Instant::now() + budget;
+        while tokio::time::Instant::now() < deadline {
+            match tokio::time::timeout(Duration::from_secs(1), self.rx.recv()).await {
+                Ok(Some(Incoming::Notification { method, params }))
+                    if method == methods::AGENT_EVENT.name =>
+                {
+                    if let Ok(event) = serde_json::from_value::<AgentEvent>(params) {
+                        out.events.push(format!("{:?}", event.payload));
+                        match event.payload {
+                            AgentEventPayload::TurnCancelled { .. }
+                            | AgentEventPayload::Interrupted => {
+                                out.cancelled = true;
+                                break;
+                            }
+                            AgentEventPayload::AwaitingInput => {
+                                // cancelled turns return to idle without Finishing.
+                                out.cancelled = !out.finished;
+                                break;
+                            }
+                            AgentEventPayload::Finished => {
+                                out.finished = true;
+                                break;
+                            }
+                            AgentEventPayload::Error { message } => {
+                                out.error = Some(message);
+                                break;
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                Ok(Some(_)) => {}
+                Ok(None) => break,
+                // inner timeout — keep waiting until the outer deadline
+                Err(_) => {}
             }
         }
         out

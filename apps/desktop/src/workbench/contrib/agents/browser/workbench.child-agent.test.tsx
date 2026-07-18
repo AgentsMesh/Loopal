@@ -33,9 +33,14 @@ describe('Workbench child agent selection', () => {
     })
     fireEvent.click(screen.getByRole('tab', { name: 'Agents' }))
     // The agent tree fills in when the async session detail lands, which can
-    // trail the conversation header on slow machines — findBy* retries.
-    fireEvent.click(await screen.findByRole('treeitem', { name: /Research child/ }))
-    expect(await screen.findByText('Child context compacted.')).toBeInTheDocument()
+    // trail the conversation header by SECONDS on a loaded CI worker — the
+    // findBy* default 1s retry window is not enough.
+    fireEvent.click(
+      await screen.findByRole('treeitem', { name: /Research child/ }, { timeout: 15_000 }),
+    )
+    expect(
+      await screen.findByText('Child context compacted.', {}, { timeout: 15_000 }),
+    ).toBeInTheDocument()
     expect(screen.getByText('Child-only goal')).toBeInTheDocument()
     const composer = screen.getByLabelText('Message Research child')
     expect(composer).toHaveValue('')
@@ -71,10 +76,12 @@ describe('Workbench child agent selection', () => {
     render(<Workbench api={api} />)
     await screen.findByText(`Conversation for ${sessionOne.title}`)
     fireEvent.click(screen.getByRole('tab', { name: 'Agents' }))
-    fireEvent.click(await screen.findByRole('treeitem', { name: /Starting child/ }))
+    fireEvent.click(
+      await screen.findByRole('treeitem', { name: /Starting child/ }, { timeout: 15_000 }),
+    )
     await waitFor(() => expect(screen.getByTestId('conversation')).toHaveTextContent(
       'Viewing Starting child · starting · waiting for registration',
-    ))
+    ), { timeout: 15_000 })
   })
 })
 

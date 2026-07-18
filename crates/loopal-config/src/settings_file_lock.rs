@@ -66,7 +66,14 @@ impl SettingsFileLock {
                     file.sync_all().map_err(LoopalError::Io)?;
                     return Ok(Self { path, owner });
                 }
-                Err(LoopalError::Io(error)) if error.kind() == ErrorKind::AlreadyExists => {
+                // reason: PermissionDenied is retried alongside AlreadyExists —
+                // Windows reports ACCESS_DENIED for a create_new that races the
+                // previous holder's pending delete of the lock file; treating
+                // it as fatal makes concurrent writers panic instead of wait.
+                Err(LoopalError::Io(error))
+                    if error.kind() == ErrorKind::AlreadyExists
+                        || error.kind() == ErrorKind::PermissionDenied =>
+                {
                     reclaim_stale(&path);
                     std::thread::sleep(Duration::from_millis(10));
                 }

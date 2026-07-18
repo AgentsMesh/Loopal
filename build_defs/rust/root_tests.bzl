@@ -63,6 +63,24 @@ def loopal_root_tests():
             "@crates//:tokio",
         ],
     )
+    rust_test(
+        name = "cli_llm_e2e_test",
+        srcs = native.glob(["tests/e2e/cli_llm/*.rs"]),
+        crate_root = "tests/e2e/cli_llm/suite.rs",
+        data = [":loopal"],
+        edition = "2024",
+        env = {"LOOPAL_BINARY": "$(rootpath :loopal)"},
+        local = True,
+        deps = [
+            "//crates/loopal-ipc",
+            "//crates/loopal-mock-llm:loopal-mock-llm-lib",
+            "//crates/loopal-protocol",
+            "@crates//:reqwest",
+            "@crates//:serde_json",
+            "@crates//:tempfile",
+            "@crates//:tokio",
+        ],
+    )
     desktop_serve_test()
     rust_test(
         name = "loopal-unit-test",

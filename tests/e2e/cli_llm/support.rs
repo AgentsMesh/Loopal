@@ -140,11 +140,28 @@ impl HarnessVault {
 /// arrive; ask-mode tests flip `set_allow` and read back what was asked.
 /// Defaults to deny so an unexpected ask fails loudly instead of silently
 /// executing a tool.
-#[derive(Default)]
 pub struct PermissionDesk {
     allow: std::sync::atomic::AtomicBool,
     hold: std::sync::atomic::AtomicBool,
     asks: std::sync::Mutex<Vec<Value>>,
+    question_answers: std::sync::Mutex<Vec<String>>,
+    question_asks: std::sync::Mutex<Vec<Value>>,
+    plan_decision: std::sync::Mutex<String>,
+    plan_requests: std::sync::Mutex<Vec<Value>>,
+}
+
+impl Default for PermissionDesk {
+    fn default() -> Self {
+        Self {
+            allow: Default::default(),
+            hold: Default::default(),
+            asks: Default::default(),
+            question_answers: Default::default(),
+            question_asks: Default::default(),
+            plan_decision: std::sync::Mutex::new("approve".into()),
+            plan_requests: Default::default(),
+        }
+    }
 }
 
 impl PermissionDesk {
@@ -162,6 +179,26 @@ impl PermissionDesk {
     /// Recorded `agent/permission` request params, in arrival order.
     pub fn asks(&self) -> Vec<Value> {
         self.asks.lock().unwrap().clone()
+    }
+
+    /// Answers (option labels) the seat returns to `agent/question` asks.
+    pub fn set_question_answers(&self, answers: &[&str]) {
+        *self.question_answers.lock().unwrap() = answers.iter().map(|s| s.to_string()).collect();
+    }
+
+    /// Recorded `agent/question` request params, in arrival order.
+    pub fn question_asks(&self) -> Vec<Value> {
+        self.question_asks.lock().unwrap().clone()
+    }
+
+    /// Decision returned to `agent/plan_approval` ("approve" / "reject").
+    pub fn set_plan_decision(&self, decision: &str) {
+        *self.plan_decision.lock().unwrap() = decision.to_string();
+    }
+
+    /// Recorded `agent/plan_approval` request params, in arrival order.
+    pub fn plan_requests(&self) -> Vec<Value> {
+        self.plan_requests.lock().unwrap().clone()
     }
 }
 
@@ -424,6 +461,11 @@ impl CliHarness {
         self.start_persistent_with(json!({})).await.0
     }
 
+    /// `begin_persistent` with extra `agent/start` params (e.g. `mode`).
+    pub async fn begin_persistent_with(&mut self, extra: Value) -> String {
+        self.start_persistent_with(extra).await.0
+    }
+
     /// Resume a persisted session in a persistent process; returns the session
     /// id plus the startup events drained on the way to idle (which is where
     /// `SessionResumed` surfaces).
@@ -677,6 +719,27 @@ fn spawn_hub_dispatcher(
                         }
                         let allow = permissions.allow.load(std::sync::atomic::Ordering::Acquire);
                         HubReply::Ok(json!({"allow": allow}))
+                    } else if method == methods::AGENT_QUESTION.name {
+                        permissions
+                            .question_asks
+                            .lock()
+                            .unwrap()
+                            .push(params.clone());
+                        let answers = permissions.question_answers.lock().unwrap().clone();
+                        let question_id = params["question_id"].as_str().unwrap_or_default();
+                        HubReply::Ok(json!({
+                            "kind": "answered",
+                            "question_id": question_id,
+                            "answers": answers,
+                        }))
+                    } else if method == methods::AGENT_PLAN_APPROVAL.name {
+                        permissions
+                            .plan_requests
+                            .lock()
+                            .unwrap()
+                            .push(params.clone());
+                        let decision = permissions.plan_decision.lock().unwrap().clone();
+                        HubReply::Ok(json!({"decision": decision}))
                     } else {
                         match hub_mcp_reply(&method, &params, advertise_mcp, &calls) {
                             Some(value) => HubReply::Ok(value),

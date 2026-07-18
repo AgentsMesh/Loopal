@@ -72,3 +72,9 @@ mod auto_compaction_test;
 
 #[path = "tool_interrupt_test.rs"]
 mod tool_interrupt_test;
+
+#[path = "ask_user_test.rs"]
+mod ask_user_test;
+
+#[path = "plan_mode_test.rs"]
+mod plan_mode_test;

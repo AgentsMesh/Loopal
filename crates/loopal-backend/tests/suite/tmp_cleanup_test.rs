@@ -116,10 +116,30 @@ async fn cleanup_orphans_removes_dirs_not_in_live_sessions() {
     let mut live: HashSet<String> = HashSet::new();
     live.insert(alive.clone());
 
-    cleanup_orphans_in(&root, &live).await;
+    cleanup_orphans_in(&root, &live, std::time::Duration::ZERO).await;
 
     assert!(!root.join(&orphan).exists(), "orphan dir must be removed");
     assert!(root.join(&alive).exists(), "live session dir must survive");
+}
+
+/// A session dir belonging to ANOTHER config home is not in this process's
+/// live set, yet was just written to — the min-age guard must keep it alive
+/// instead of racing that agent's next bash log write.
+#[tokio::test]
+async fn cleanup_orphans_skips_recently_active_foreign_sessions() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path().to_path_buf();
+
+    let foreign = unique_session_id();
+    let _ = make_isolated_session(&root, &foreign).await;
+    let live: HashSet<String> = HashSet::new();
+
+    cleanup_orphans_in(&root, &live, loopal_backend::ORPHAN_MIN_AGE).await;
+
+    assert!(
+        root.join(&foreign).exists(),
+        "a freshly-touched foreign session dir must survive orphan cleanup"
+    );
 }
 
 #[tokio::test]
@@ -127,7 +147,7 @@ async fn cleanup_orphans_handles_missing_root() {
     let tmp = TempDir::new().unwrap();
     let missing = tmp.path().join("does-not-exist");
     let live: HashSet<String> = HashSet::new();
-    cleanup_orphans_in(&missing, &live).await;
+    cleanup_orphans_in(&missing, &live, std::time::Duration::ZERO).await;
     assert!(!missing.exists());
 }
 

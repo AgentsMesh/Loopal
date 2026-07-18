@@ -27,6 +27,6 @@ pub use log_writer::{
 };
 pub use process_group::{KillOutcome, SpawnedChild, kill_process_group};
 pub use tmp_cleanup::{
-    cleanup_orphans, cleanup_orphans_in, cleanup_session_tmp, cleanup_session_tmp_in,
-    loopal_tmp_root, session_tmp_root, session_tmp_root_in,
+    ORPHAN_MIN_AGE, cleanup_orphans, cleanup_orphans_in, cleanup_session_tmp,
+    cleanup_session_tmp_in, loopal_tmp_root, session_tmp_root, session_tmp_root_in,
 };

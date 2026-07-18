@@ -57,3 +57,9 @@ mod memory_recall_test;
 
 #[path = "hooks_test.rs"]
 mod hooks_test;
+
+#[path = "system_prompt_test.rs"]
+mod system_prompt_test;
+
+#[path = "sandbox_test.rs"]
+mod sandbox_test;

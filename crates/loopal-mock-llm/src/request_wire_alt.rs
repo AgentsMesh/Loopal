@@ -24,6 +24,12 @@ pub(crate) fn compat(body: &Value) -> CanonicalRequest {
         image_block_count: nested_type_count(messages, "image_url"),
         last_user_text: last_text(messages, "user", compat_text),
         has_system: messages.iter().any(|m| m["role"] == "system"),
+        system_text: messages
+            .iter()
+            .filter(|m| m["role"] == "system")
+            .filter_map(|m| m["content"].as_str())
+            .collect::<Vec<_>>()
+            .join("\n"),
         thinking_enabled: body.get("reasoning_effort").is_some(),
         stream: body["stream"].as_bool().unwrap_or(false),
         max_tokens: body["max_completion_tokens"].as_u64().unwrap_or(0),
@@ -52,6 +58,11 @@ pub(crate) fn google(body: &Value, model: &str) -> CanonicalRequest {
         image_block_count: nested_key_count(contents, "inlineData"),
         last_user_text: last_text(contents, "user", google_text),
         has_system: body.get("systemInstruction").is_some(),
+        system_text: crate::request_wire::array(&body["systemInstruction"], "parts")
+            .iter()
+            .filter_map(|part| part["text"].as_str())
+            .collect::<Vec<_>>()
+            .join("\n"),
         thinking_enabled: body["generationConfig"].get("thinkingConfig").is_some(),
         stream: true,
         max_tokens: body["generationConfig"]["maxOutputTokens"]

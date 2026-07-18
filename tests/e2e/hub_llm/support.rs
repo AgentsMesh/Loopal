@@ -35,11 +35,35 @@ pub struct TurnOutcome {
     pub events: Vec<String>,
 }
 
+/// Pre-spawn environment for a Hub topology: create it first, stage files
+/// (vault, SSH identity, project fixtures) into `home`/`cwd`, then `launch`.
+pub struct HubEnv {
+    pub home: tempfile::TempDir,
+    pub cwd: tempfile::TempDir,
+}
+
+impl HubEnv {
+    pub fn new() -> Self {
+        Self {
+            home: tempfile::tempdir().unwrap(),
+            cwd: tempfile::tempdir().unwrap(),
+        }
+    }
+}
+
+impl Default for HubEnv {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct HubHarness {
     pub base_url: String,
     pub session_id: String,
     conn: Arc<Connection<Listening>>,
     rx: Receiver<Incoming>,
+    hub_addr: String,
+    hub_token: String,
     _child: tokio::process::Child,
     mock: tokio::task::AbortHandle,
     http: reqwest::Client,
@@ -48,9 +72,18 @@ pub struct HubHarness {
 }
 
 impl HubHarness {
+    pub async fn start(scenario: Value) -> Self {
+        Self::launch(HubEnv::new(), scenario, false).await
+    }
+
     /// Boot a full Hub topology with one MCP server configured; the Hub
     /// spawns the real `mock_mcp_server` subprocess itself.
     pub async fn start_with_mcp(scenario: Value) -> Self {
+        Self::launch(HubEnv::new(), scenario, true).await
+    }
+
+    pub async fn launch(env: HubEnv, scenario: Value, mcp: bool) -> Self {
+        let HubEnv { home, cwd } = env;
         let scenario =
             Scenario::from_slice(&serde_json::to_vec(&scenario).unwrap()).expect("valid scenario");
         let listener = TcpListener::bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0))
@@ -59,9 +92,9 @@ impl HubHarness {
         let base_url = format!("http://{}", listener.local_addr().unwrap());
         let mock = tokio::spawn(serve(listener, scenario, API_KEY.to_string())).abort_handle();
 
-        let home = tempfile::tempdir().unwrap();
-        let cwd = tempfile::tempdir().unwrap();
-        write_hub_settings(home.path());
+        if mcp {
+            write_hub_settings(home.path());
+        }
         let tmp = home.path().join("tmp");
         std::fs::create_dir_all(&tmp).unwrap();
 
@@ -92,29 +125,15 @@ impl HubHarness {
         let token = parts.next().expect("hub token").to_string();
         let session_id = parts.next().expect("hub session").trim().to_string();
 
-        let stream = TcpStream::connect(&addr).await.expect("connect hub");
-        let transport: Arc<dyn Transport> = Arc::new(TcpTransport::new(stream));
-        let (conn, rx) = Connection::new(transport).into_listening();
-        let response = tokio::time::timeout(
-            TIMEOUT,
-            conn.send_request(
-                methods::HUB_REGISTER.name,
-                json!({"name": "e2e-harness", "token": token, "role": "ui_client"}),
-            ),
-        )
-        .await
-        .expect("hub/register timed out")
-        .expect("hub/register failed");
-        assert!(
-            response.get("error").is_none(),
-            "hub/register rejected: {response}"
-        );
+        let (conn, rx) = register_ui_client(&addr, &token, "e2e-harness").await;
 
         let mut harness = Self {
             base_url,
             session_id,
             conn,
             rx,
+            hub_addr: addr,
+            hub_token: token,
             _child: child,
             mock,
             http: reqwest::Client::new(),
@@ -123,6 +142,20 @@ impl HubHarness {
         };
         harness.drain_startup_backlog().await;
         harness
+    }
+
+    /// The Hub's working directory (the project the root agent runs in).
+    pub fn cwd(&self) -> &std::path::Path {
+        self._cwd.path()
+    }
+
+    /// Attach one more UI client to the same Hub — an observer that receives
+    /// the same broadcast event stream.
+    pub async fn second_client(&self, name: &str) -> ObserverClient {
+        let (conn, rx) = register_ui_client(&self.hub_addr, &self.hub_token, name).await;
+        let mut observer = ObserverClient { _conn: conn, rx };
+        observer.drain_backlog().await;
+        observer
     }
 
     /// A freshly registered UI client receives the session's replayed startup
@@ -171,18 +204,23 @@ impl HubHarness {
                     if method == methods::AGENT_EVENT.name =>
                 {
                     if let Ok(event) = serde_json::from_value::<AgentEvent>(params) {
+                        // Sub-agent events are broadcast on the same stream;
+                        // only the ROOT agent's terminal events end the turn.
+                        let root = event
+                            .agent_name
+                            .as_ref()
+                            .map(|a| format!("{a:?}").contains(ROOT_AGENT_NAME))
+                            .unwrap_or(true);
                         out.events.push(format!("{:?}", event.payload));
                         match event.payload {
-                            AgentEventPayload::Stream { text } => out.text.push_str(&text),
-                            AgentEventPayload::Error { message } => {
+                            AgentEventPayload::Stream { text } if root => out.text.push_str(&text),
+                            AgentEventPayload::Error { message } if root => {
                                 out.error = Some(message);
                                 break;
                             }
-                            AgentEventPayload::Finished => {
-                                out.finished = true;
-                                break;
-                            }
-                            AgentEventPayload::AwaitingInput => {
+                            AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
+                                if root =>
+                            {
                                 out.finished = true;
                                 break;
                             }
@@ -214,6 +252,85 @@ impl Drop for HubHarness {
     fn drop(&mut self) {
         self.mock.abort();
     }
+}
+
+/// A second registered UI client: read-only observer of the Hub's broadcast
+/// event stream.
+pub struct ObserverClient {
+    _conn: Arc<Connection<Listening>>,
+    rx: Receiver<Incoming>,
+}
+
+impl ObserverClient {
+    async fn drain_backlog(&mut self) {
+        let deadline = tokio::time::Instant::now() + TIMEOUT;
+        while tokio::time::Instant::now() < deadline {
+            match tokio::time::timeout(Duration::from_millis(1500), self.rx.recv()).await {
+                Ok(Some(Incoming::Notification { method, params }))
+                    if method == methods::AGENT_EVENT.name =>
+                {
+                    if let Ok(event) = serde_json::from_value::<AgentEvent>(params)
+                        && matches!(event.payload, AgentEventPayload::AwaitingInput)
+                    {
+                        return;
+                    }
+                }
+                Ok(Some(_)) => {}
+                Ok(None) | Err(_) => return,
+            }
+        }
+    }
+
+    /// Collect broadcast events until the root agent settles (or quiet budget).
+    pub async fn collect_until_settled(&mut self, budget: Duration) -> Vec<String> {
+        let mut events = Vec::new();
+        let deadline = tokio::time::Instant::now() + budget;
+        while tokio::time::Instant::now() < deadline {
+            match tokio::time::timeout(Duration::from_secs(2), self.rx.recv()).await {
+                Ok(Some(Incoming::Notification { method, params }))
+                    if method == methods::AGENT_EVENT.name =>
+                {
+                    if let Ok(event) = serde_json::from_value::<AgentEvent>(params) {
+                        events.push(format!("{:?}", event.payload));
+                        if matches!(
+                            event.payload,
+                            AgentEventPayload::Finished | AgentEventPayload::AwaitingInput
+                        ) {
+                            break;
+                        }
+                    }
+                }
+                Ok(Some(_)) => {}
+                Ok(None) | Err(_) => break,
+            }
+        }
+        events
+    }
+}
+
+async fn register_ui_client(
+    addr: &str,
+    token: &str,
+    name: &str,
+) -> (Arc<Connection<Listening>>, Receiver<Incoming>) {
+    let stream = TcpStream::connect(addr).await.expect("connect hub");
+    let transport: Arc<dyn Transport> = Arc::new(TcpTransport::new(stream));
+    let (conn, rx) = Connection::new(transport).into_listening();
+    let response = tokio::time::timeout(
+        TIMEOUT,
+        conn.send_request(
+            methods::HUB_REGISTER.name,
+            json!({"name": name, "token": token, "role": "ui_client"}),
+        ),
+    )
+    .await
+    .expect("hub/register timed out")
+    .expect("hub/register failed");
+    assert!(
+        response.get("error").is_none(),
+        "hub/register rejected: {response}"
+    );
+    (conn, rx)
 }
 
 fn binary_path() -> String {

@@ -7,3 +7,12 @@ pub mod support;
 
 #[path = "mcp_via_hub_test.rs"]
 mod mcp_via_hub_test;
+
+#[path = "subagent_test.rs"]
+mod subagent_test;
+
+#[path = "observer_test.rs"]
+mod observer_test;
+
+#[path = "vault_test.rs"]
+mod vault_test;

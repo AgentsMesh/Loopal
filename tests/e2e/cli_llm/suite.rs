@@ -36,3 +36,9 @@ mod secrets_test;
 
 #[path = "degraded_test.rs"]
 mod degraded_test;
+
+#[path = "permission_test.rs"]
+mod permission_test;
+
+#[path = "resume_test.rs"]
+mod resume_test;

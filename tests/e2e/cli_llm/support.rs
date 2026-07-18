@@ -136,6 +136,35 @@ impl HarnessVault {
     }
 }
 
+/// The harness's user seat for `agent/permission` asks. Under bypass no asks
+/// arrive; ask-mode tests flip `set_allow` and read back what was asked.
+/// Defaults to deny so an unexpected ask fails loudly instead of silently
+/// executing a tool.
+#[derive(Default)]
+pub struct PermissionDesk {
+    allow: std::sync::atomic::AtomicBool,
+    hold: std::sync::atomic::AtomicBool,
+    asks: std::sync::Mutex<Vec<Value>>,
+}
+
+impl PermissionDesk {
+    pub fn set_allow(&self, allow: bool) {
+        self.allow
+            .store(allow, std::sync::atomic::Ordering::Release);
+    }
+
+    /// While held, asks are recorded but never answered — the user seat stays
+    /// silent so a racing classifier decision must win.
+    pub fn set_hold(&self, hold: bool) {
+        self.hold.store(hold, std::sync::atomic::Ordering::Release);
+    }
+
+    /// Recorded `agent/permission` request params, in arrival order.
+    pub fn asks(&self) -> Vec<Value> {
+        self.asks.lock().unwrap().clone()
+    }
+}
+
 pub struct CliHarness {
     pub base_url: String,
     conn: Arc<Connection<Listening>>,
@@ -146,8 +175,55 @@ pub struct CliHarness {
     cwd: tempfile::TempDir,
     _home: tempfile::TempDir,
     provider: Provider,
+    mcp: bool,
     mcp_calls: Arc<std::sync::Mutex<Vec<Value>>>,
     vault: Arc<HarnessVault>,
+    permissions: Arc<PermissionDesk>,
+}
+
+async fn boot_process(
+    provider: Provider,
+    home: &std::path::Path,
+    base_url: &str,
+    mcp: bool,
+    mcp_calls: Arc<std::sync::Mutex<Vec<Value>>>,
+    vault: Arc<HarnessVault>,
+    permissions: Arc<PermissionDesk>,
+) -> (
+    tokio::process::Child,
+    Arc<Connection<Listening>>,
+    Receiver<Incoming>,
+) {
+    let mut cmd = tokio::process::Command::new(binary_path());
+    cmd.arg("--serve")
+        .env("HOME", home)
+        .env("LOOPAL_TEST_SESSION_DIR", home.join("sessions"))
+        .env("LOOPAL_PERMISSION_MODE", "bypass")
+        .env("LOOPAL_HUB_HEALTH_TICK_SECS", "1")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+    provider.configure(&mut cmd, home, base_url);
+    let mut child = cmd.spawn().expect("spawn loopal --serve");
+    let stdin = child.stdin.take().unwrap();
+    let stdout = child.stdout.take().unwrap();
+    let transport: Arc<dyn loopal_ipc::transport::Transport> = Arc::new(StdioTransport::new(
+        Box::new(BufReader::new(stdout)),
+        Box::new(stdin),
+    ));
+    let (conn, raw_rx) = Connection::new(transport).into_listening();
+    let rx = spawn_hub_dispatcher(conn.clone(), raw_rx, mcp, mcp_calls, vault, permissions);
+
+    tokio::time::timeout(
+        TIMEOUT,
+        conn.send_request("initialize", json!({"protocol_version": 1})),
+    )
+    .await
+    .expect("initialize timed out")
+    .expect("initialize failed");
+
+    (child, conn, rx)
 }
 
 impl CliHarness {
@@ -183,36 +259,19 @@ impl CliHarness {
         if mcp {
             write_mcp_settings(cwd.path());
         }
-        let mut cmd = tokio::process::Command::new(binary_path());
-        cmd.arg("--serve")
-            .env("HOME", home.path())
-            .env("LOOPAL_TEST_SESSION_DIR", home.path().join("sessions"))
-            .env("LOOPAL_PERMISSION_MODE", "bypass")
-            .env("LOOPAL_HUB_HEALTH_TICK_SECS", "1")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .kill_on_drop(true);
-        provider.configure(&mut cmd, home.path(), &base_url);
-        let mut child = cmd.spawn().expect("spawn loopal --serve");
-        let stdin = child.stdin.take().unwrap();
-        let stdout = child.stdout.take().unwrap();
-        let transport: Arc<dyn loopal_ipc::transport::Transport> = Arc::new(StdioTransport::new(
-            Box::new(BufReader::new(stdout)),
-            Box::new(stdin),
-        ));
-        let (conn, raw_rx) = Connection::new(transport).into_listening();
         let mcp_calls = Arc::new(std::sync::Mutex::new(Vec::new()));
         let vault = Arc::new(HarnessVault::default());
-        let rx = spawn_hub_dispatcher(conn.clone(), raw_rx, mcp, mcp_calls.clone(), vault.clone());
-
-        tokio::time::timeout(
-            TIMEOUT,
-            conn.send_request("initialize", json!({"protocol_version": 1})),
+        let permissions = Arc::new(PermissionDesk::default());
+        let (child, conn, rx) = boot_process(
+            provider,
+            home.path(),
+            &base_url,
+            mcp,
+            mcp_calls.clone(),
+            vault.clone(),
+            permissions.clone(),
         )
-        .await
-        .expect("initialize timed out")
-        .expect("initialize failed");
+        .await;
 
         Self {
             base_url,
@@ -224,9 +283,37 @@ impl CliHarness {
             cwd,
             _home: home,
             provider,
+            mcp,
             mcp_calls,
             vault,
+            permissions,
         }
+    }
+
+    /// Kill the agent process and boot a fresh one against the same HOME,
+    /// session store, mock server, and Hub-role state — the cross-process
+    /// half of a session-resume scenario.
+    pub async fn restart(&mut self) {
+        let _ = self._child.start_kill();
+        let _ = self._child.wait().await;
+        let (child, conn, rx) = boot_process(
+            self.provider,
+            self._home.path(),
+            &self.base_url,
+            self.mcp,
+            self.mcp_calls.clone(),
+            self.vault.clone(),
+            self.permissions.clone(),
+        )
+        .await;
+        self._child = child;
+        self.conn = conn;
+        self.rx = rx;
+    }
+
+    /// The harness's user seat answering `agent/permission` asks.
+    pub fn permissions(&self) -> Arc<PermissionDesk> {
+        self.permissions.clone()
     }
 
     /// `hub/mcp/call_tool` requests the agent sent to the harness's Hub role.
@@ -265,15 +352,22 @@ impl CliHarness {
 
     /// Send a prompt and collect the turn's events until Finished/Error.
     pub async fn run_turn(&mut self, prompt: &str) -> TurnOutcome {
+        self.run_turn_with(prompt, json!({})).await
+    }
+
+    /// `run_turn` with extra `agent/start` params merged in (e.g.
+    /// `permission_mode`, `decision_mode`, `mode`).
+    pub async fn run_turn_with(&mut self, prompt: &str, extra: Value) -> TurnOutcome {
+        let mut params = json!({
+            "prompt": prompt,
+            "model": self.provider.model(),
+            "cwd": self.cwd.path().to_string_lossy(),
+        });
+        if let (Some(base), Value::Object(overlay)) = (params.as_object_mut(), extra) {
+            base.extend(overlay);
+        }
         self.conn
-            .send_request(
-                methods::AGENT_START.name,
-                json!({
-                    "prompt": prompt,
-                    "model": self.provider.model(),
-                    "cwd": self.cwd.path().to_string_lossy(),
-                }),
-            )
+            .send_request(methods::AGENT_START.name, params)
             .await
             .expect("agent_start");
 
@@ -313,35 +407,53 @@ impl CliHarness {
     /// Start the agent in **persistent** mode (no initial prompt) and drain the
     /// startup events until it is idle. Follow-up turns are driven with
     /// `turn_via_message` / `control` — this keeps the conversation alive across
-    /// turns, unlike the one-shot ephemeral `run_turn`.
-    pub async fn begin_persistent(&mut self) {
-        self.conn
-            .send_request(
-                methods::AGENT_START.name,
-                json!({
-                    "model": self.provider.model(),
-                    "cwd": self.cwd.path().to_string_lossy(),
-                    "lifecycle": "persistent",
-                }),
-            )
+    /// turns, unlike the one-shot ephemeral `run_turn`. Returns the session id.
+    pub async fn begin_persistent(&mut self) -> String {
+        self.start_persistent_with(json!({})).await.0
+    }
+
+    /// Resume a persisted session in a persistent process; returns the session
+    /// id plus the startup events drained on the way to idle (which is where
+    /// `SessionResumed` surfaces).
+    pub async fn resume_persistent(&mut self, session_id: &str) -> (String, Vec<String>) {
+        self.start_persistent_with(json!({"resume": session_id}))
+            .await
+    }
+
+    async fn start_persistent_with(&mut self, extra: Value) -> (String, Vec<String>) {
+        let mut params = json!({
+            "model": self.provider.model(),
+            "cwd": self.cwd.path().to_string_lossy(),
+            "lifecycle": "persistent",
+        });
+        if let (Some(base), Value::Object(overlay)) = (params.as_object_mut(), extra) {
+            base.extend(overlay);
+        }
+        let resp = self
+            .conn
+            .send_request(methods::AGENT_START.name, params)
             .await
             .expect("agent_start persistent");
+        let session_id = resp["session_id"].as_str().unwrap_or_default().to_string();
+        let mut events = Vec::new();
         let deadline = tokio::time::Instant::now() + TIMEOUT;
         while tokio::time::Instant::now() < deadline {
             match tokio::time::timeout(Duration::from_secs(8), self.rx.recv()).await {
                 Ok(Some(Incoming::Notification { method, params }))
                     if method == methods::AGENT_EVENT.name =>
                 {
-                    if let Ok(event) = serde_json::from_value::<AgentEvent>(params)
-                        && matches!(event.payload, AgentEventPayload::AwaitingInput)
-                    {
-                        break;
+                    if let Ok(event) = serde_json::from_value::<AgentEvent>(params) {
+                        events.push(format!("{:?}", event.payload));
+                        if matches!(event.payload, AgentEventPayload::AwaitingInput) {
+                            break;
+                        }
                     }
                 }
                 Ok(Some(_)) => {}
                 Ok(None) | Err(_) => break,
             }
         }
+        (session_id, events)
     }
 
     /// Send a follow-up user message into the persistent session and collect the
@@ -522,15 +634,25 @@ fn spawn_hub_dispatcher(
     advertise_mcp: bool,
     calls: Arc<std::sync::Mutex<Vec<Value>>>,
     vault: Arc<HarnessVault>,
+    permissions: Arc<PermissionDesk>,
 ) -> Receiver<Incoming> {
     let (tx, rx) = tokio::sync::mpsc::channel(256);
     tokio::spawn(async move {
         while let Some(incoming) = raw_rx.recv().await {
             match incoming {
                 Incoming::Request { id, method, params } => {
-                    let reply = match hub_mcp_reply(&method, &params, advertise_mcp, &calls) {
-                        Some(value) => HubReply::Ok(value),
-                        None => hub_secret_reply(&method, &params, &vault),
+                    let reply = if method == methods::AGENT_PERMISSION.name {
+                        permissions.asks.lock().unwrap().push(params.clone());
+                        if permissions.hold.load(std::sync::atomic::Ordering::Acquire) {
+                            continue;
+                        }
+                        let allow = permissions.allow.load(std::sync::atomic::Ordering::Acquire);
+                        HubReply::Ok(json!({"allow": allow}))
+                    } else {
+                        match hub_mcp_reply(&method, &params, advertise_mcp, &calls) {
+                            Some(value) => HubReply::Ok(value),
+                            None => hub_secret_reply(&method, &params, &vault),
+                        }
                     };
                     match reply {
                         HubReply::Ok(value) => {

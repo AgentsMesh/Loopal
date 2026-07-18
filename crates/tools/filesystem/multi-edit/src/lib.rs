@@ -98,7 +98,9 @@ impl TypedTool<MultiEditParams> for MultiEditTool {
             Ok(o) => o,
             Err(MultiEditError::NotFound { index }) => {
                 return Ok(ToolResult::error(format!(
-                    "Edit {index}: old_string not found in current content"
+                    "Edit {index}: old_string not found in current content. Earlier edits in \
+                     this batch may have already changed that text, or the file changed since \
+                     you read it — re-read the file and match the current exact text."
                 )));
             }
             Err(MultiEditError::MultipleMatches { index, count }) => {

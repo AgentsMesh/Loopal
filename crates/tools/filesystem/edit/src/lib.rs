@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use loopal_edit_core::no_match_hint::no_match_hint;
 use loopal_edit_core::omission_detector::detect_omissions;
 use loopal_edit_core::omission_message::format_omission_error;
 use loopal_edit_core::search_replace::{SearchReplaceResult, search_replace};
@@ -84,8 +85,9 @@ impl TypedTool<EditParams> for EditTool {
                         }
                     }
                     SearchReplaceResult::NotFound => Ok(ToolResult::error(format!(
-                        "old_string not found in {}",
-                        input.file_path
+                        "old_string not found in {}.\n{}",
+                        input.file_path,
+                        no_match_hint(&content, &input.old_string)
                     ))),
                     SearchReplaceResult::MultipleMatches(n) => Ok(ToolResult::error(format!(
                         "old_string found {n} times in {}; use replace_all=true or provide more context",

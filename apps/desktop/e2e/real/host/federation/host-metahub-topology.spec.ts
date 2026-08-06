@@ -10,6 +10,9 @@ import {
   type DesktopFixture,
 } from '../../../support/electron/electron-fixture'
 import { isolatedTestEnvironment } from '../../../support/providers/mock-llm-fixture'
+import {
+  type HubProbe, registerCapableUiBeforeReady,
+} from '../../../support/federation/desktop-ready-ui'
 
 interface MetaFixture {
   readonly child: ChildProcess
@@ -17,10 +20,15 @@ interface MetaFixture {
   readonly token: string
 }
 
+interface RemoteFixture {
+  readonly child: ChildProcess
+  readonly probe: HubProbe
+}
+
 test('streams remote Hub joins and leaves into the central qualified Agent topology', async () => {
   const meta = await startMetaHub()
   let desktop: DesktopFixture | undefined
-  let remote: ChildProcess | undefined
+  let remote: RemoteFixture | undefined
   try {
     desktop = await launchDesktop('real')
     const target = await desktop.page.evaluate(async ({ address, token }) => {
@@ -52,7 +60,8 @@ test('streams remote Hub joins and leaves into the central qualified Agent topol
       qualifiedName: 'hub-b/main', hubPath: ['hub-b'], controllable: false,
     })
 
-    await stop(remote)
+    remote.probe.close()
+    await stop(remote.child)
     remote = undefined
     await expect(remoteNode).toHaveCount(0, { timeout: 15_000 })
     await desktop.page.evaluate(async (value) => {
@@ -62,7 +71,8 @@ test('streams remote Hub joins and leaves into the central qualified Agent topol
       'Start a Federation for your Loopal sessions.',
     )
   } finally {
-    if (remote) await stop(remote)
+    remote?.probe.close()
+    if (remote) await stop(remote.child)
     if (desktop) await closeDesktop(desktop)
     await stop(meta.child)
   }
@@ -86,7 +96,7 @@ async function startMetaHub(): Promise<MetaFixture> {
   }
 }
 
-async function startRemoteHub(desktop: DesktopFixture, meta: MetaFixture): Promise<ChildProcess> {
+async function startRemoteHub(desktop: DesktopFixture, meta: MetaFixture): Promise<RemoteFixture> {
   const home = join(desktop.root, 'remote-home')
   await mkdir(home)
   const child = spawn(loopalBinaryPath(), [
@@ -106,8 +116,8 @@ async function startRemoteHub(desktop: DesktopFixture, meta: MetaFixture): Promi
   })
   child.stderr?.resume()
   try {
-    await waitForLine(child, 'LOOPAL_DESKTOP ', 20_000, (value) => value.phase === 'ready')
-    return child
+    const probe = await registerCapableUiBeforeReady(child)
+    return { child, probe }
   } catch (error) {
     await stop(child)
     throw error

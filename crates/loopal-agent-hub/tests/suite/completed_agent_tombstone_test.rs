@@ -53,7 +53,7 @@ async fn publish(
 }
 
 async fn cold_state(hub: Arc<Mutex<Hub>>, agent: &str) -> (ViewSnapshot, serde_json::Value) {
-    let ui = UiSession::connect(hub, "cold-ui").await;
+    let ui = UiSession::connect(hub, "cold-ui", loopal_protocol::UiCapabilities::ALL).await;
     let response = ui
         .client
         .connection()

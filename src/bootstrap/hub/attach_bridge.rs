@@ -11,10 +11,16 @@ use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
 use loopal_protocol::{AgentEvent, AgentEventPayload};
 
-pub async fn connect_and_register(
-    addr: &str,
-    token: &str,
-) -> anyhow::Result<(Arc<Connection<Listening>>, mpsc::Receiver<Incoming>)> {
+/// A live, authenticated UI lease and its original incoming stream.
+///
+/// Keeping these together prevents startup probes from being mistaken for the
+/// TUI that will consume initial agent events.
+pub struct RegisteredUi {
+    pub conn: Arc<Connection<Listening>>,
+    pub incoming_rx: mpsc::Receiver<Incoming>,
+}
+
+pub async fn connect_and_register(addr: &str, token: &str) -> anyhow::Result<RegisteredUi> {
     let stream = TcpStream::connect(addr).await?;
     let transport: Arc<dyn Transport> = Arc::new(TcpTransport::new(stream));
     let (conn, incoming_rx) = Connection::new(transport).into_listening();
@@ -26,6 +32,11 @@ pub async fn connect_and_register(
                 "name": client_name,
                 "token": token,
                 "role": "ui_client",
+                "capabilities": {
+                    "permission": true,
+                    "question": true,
+                    "plan_approval": true,
+                },
             }),
         )
         .await
@@ -34,7 +45,7 @@ pub async fn connect_and_register(
         anyhow::bail!("hub/register failed: {response}");
     }
     info!(client = %client_name, "TUI attach: registered as UI client");
-    Ok((conn, incoming_rx))
+    Ok(RegisteredUi { conn, incoming_rx })
 }
 
 pub fn bridge_events(

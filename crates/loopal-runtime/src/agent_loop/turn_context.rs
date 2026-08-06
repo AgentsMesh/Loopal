@@ -36,6 +36,10 @@ impl TurnContext {
         self.tool_signaled_turn_end = true;
     }
 
+    pub fn turn_end_after_tools_signaled(&self) -> bool {
+        self.tool_signaled_turn_end
+    }
+
     pub(super) fn take_turn_end_signal(&mut self) -> bool {
         std::mem::take(&mut self.tool_signaled_turn_end)
     }

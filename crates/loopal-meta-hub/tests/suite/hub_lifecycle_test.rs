@@ -61,3 +61,39 @@ async fn stale_connection_cleanup_cannot_remove_its_replacement() {
         &new,
     ));
 }
+
+#[tokio::test]
+async fn stale_connection_heartbeat_cannot_refresh_its_replacement() {
+    let meta_hub = Arc::new(Mutex::new(MetaHub::new()));
+    let (old_transport, _) = loopal_ipc::duplex_pair();
+    let (old, _old_rx) = Connection::new(old_transport).into_listening();
+    meta_hub
+        .lock()
+        .await
+        .registry
+        .register("desktop", old.clone(), vec![])
+        .unwrap();
+    meta_hub
+        .lock()
+        .await
+        .registry
+        .unregister_connection("desktop", &old);
+
+    let (new_transport, _) = loopal_ipc::duplex_pair();
+    let (new, _new_rx) = Connection::new(new_transport).into_listening();
+    meta_hub
+        .lock()
+        .await
+        .registry
+        .register("desktop", new, vec![])
+        .unwrap();
+
+    let error = meta_hub
+        .lock()
+        .await
+        .registry
+        .heartbeat_connection("desktop", &old, 99)
+        .unwrap_err();
+    assert!(error.contains("no longer active"));
+    assert_eq!(meta_hub.lock().await.registry.snapshot()[0].agent_count, 0);
+}

@@ -33,9 +33,20 @@ pub struct AgentSpawned {
         Arc<loopal_ipc::connection::Connection<loopal_ipc::connection::Listening>>,
 }
 
+/// The Hub event reducer is live and the root agent has not been started.
+///
+/// Interactive frontends must install their real UI lease while holding this
+/// state, then consume it through `start_root_agent`.
+pub struct RootPending {
+    pub(crate) hub: Arc<Mutex<Hub>>,
+    pub(crate) hub_token: String,
+    pub(crate) agent_proc: loopal_agent_client::AgentProcess,
+    pub(crate) client_conn:
+        Arc<loopal_ipc::connection::Connection<loopal_ipc::connection::Listening>>,
+}
+
 pub struct Ready {
     pub(crate) hub: Arc<Mutex<Hub>>,
-    pub(crate) event_rx: mpsc::Receiver<AgentEvent>,
     pub(crate) hub_token: String,
     pub(crate) agent_proc: loopal_agent_client::AgentProcess,
     pub(crate) root_session_id: String,

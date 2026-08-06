@@ -1,4 +1,48 @@
 // Single test binary — includes all test modules
+use std::sync::Arc;
+use std::time::Duration;
+
+use loopal_agent_hub::Hub;
+use tokio::sync::Mutex;
+
+async fn permission_interaction_id(hub: &Arc<Mutex<Hub>>, agent: &str, logical_id: &str) -> String {
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if let Some(id) = hub
+                .lock()
+                .await
+                .pending_permissions
+                .get(&(agent.to_string(), logical_id.to_string()))
+                .map(|info| info.interaction_id.clone())
+            {
+                return id;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("permission interaction should become pending")
+}
+
+async fn plan_interaction_id(hub: &Arc<Mutex<Hub>>, agent: &str, logical_id: &str) -> String {
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if let Some(id) = hub
+                .lock()
+                .await
+                .pending_plan_approvals
+                .get(&(agent.to_string(), logical_id.to_string()))
+                .map(|info| info.interaction_id.clone())
+            {
+                return id;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("plan interaction should become pending")
+}
+
 #[path = "suite/advanced_scenarios_test.rs"]
 mod advanced_scenarios_test;
 #[path = "suite/agent_completed_result_test.rs"]
@@ -47,6 +91,14 @@ mod hub_lifecycle_test;
 mod hub_secret_client_test;
 #[path = "suite/hub_shutdown_test.rs"]
 mod hub_shutdown_test;
+#[path = "suite/interaction_cardinality_test.rs"]
+mod interaction_cardinality_test;
+#[path = "suite/interaction_cleanup_test.rs"]
+mod interaction_cleanup_test;
+#[path = "suite/interaction_generation_test.rs"]
+mod interaction_generation_test;
+#[path = "suite/interaction_terminal_delivery_test.rs"]
+mod interaction_terminal_delivery_test;
 #[path = "suite/multi_agent_test.rs"]
 mod multi_agent_test;
 #[path = "suite/multi_ui_attach_test.rs"]
@@ -77,12 +129,16 @@ mod spawn_prepare_test;
 mod spawn_registry_test;
 #[path = "suite/spawn_remote_test.rs"]
 mod spawn_remote_test;
+#[path = "suite/tcp_principal_test.rs"]
+mod tcp_principal_test;
 #[path = "suite/tcp_ui_cleanup_test.rs"]
 mod tcp_ui_cleanup_test;
 #[path = "suite/tcp_ui_client_test.rs"]
 mod tcp_ui_client_test;
 #[path = "suite/transport_close_test.rs"]
 mod transport_close_test;
+#[path = "suite/ui_capability_lifecycle_test.rs"]
+mod ui_capability_lifecycle_test;
 #[path = "suite/view_protocol_test.rs"]
 mod view_protocol_test;
 #[path = "suite/view_snapshot_seed_test.rs"]

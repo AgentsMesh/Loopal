@@ -45,4 +45,6 @@ pub fn build_initial_budget(
 pub use loopal_error::{AgentOutput, TerminateReason};
 // Re-export frontend traits and agent input for external consumers.
 pub use agent_input::AgentInput;
-pub use frontend::traits::{AgentFrontend, EventEmitter, PlanApproval};
+pub use frontend::traits::{
+    AgentFrontend, EventEmitter, PlanApproval, PlanApprovalCancellationReason,
+};

@@ -60,7 +60,7 @@ async fn permission_resolved_by_ui_response() {
     let (hub, raw_rx) = make_hub();
     let _event_loop = start_event_loop(hub.clone(), raw_rx);
 
-    let ui = UiSession::connect(hub.clone(), "ui-1").await;
+    let ui = UiSession::connect(hub.clone(), "ui-1", loopal_protocol::UiCapabilities::ALL).await;
     let (agent_conn, _) = hub_server::connect_local(hub.clone(), "agent-1");
 
     tokio::spawn(approve_via_events(ui.event_rx, ui.client, true));
@@ -82,7 +82,7 @@ async fn question_resolved_by_ui_response() {
     let (hub, raw_rx) = make_hub();
     let _event_loop = start_event_loop(hub.clone(), raw_rx);
 
-    let ui = UiSession::connect(hub.clone(), "ui-1").await;
+    let ui = UiSession::connect(hub.clone(), "ui-1", loopal_protocol::UiCapabilities::ALL).await;
     let (agent_conn, _) = hub_server::connect_local(hub.clone(), "agent-1");
 
     tokio::spawn(answer_via_events(
@@ -106,7 +106,7 @@ async fn question_resolved_by_ui_response() {
 async fn pending_recorded_then_emitted_event() {
     let (hub, raw_rx) = make_hub();
     let _event_loop = start_event_loop(hub.clone(), raw_rx);
-    let ui = UiSession::connect(hub.clone(), "ui-1").await;
+    let ui = UiSession::connect(hub.clone(), "ui-1", loopal_protocol::UiCapabilities::ALL).await;
     let (agent_conn, _) = hub_server::connect_local(hub.clone(), "agent-1");
 
     tokio::time::sleep(Duration::from_millis(30)).await;
@@ -132,10 +132,10 @@ async fn pending_recorded_then_emitted_event() {
     .await
     .expect("timeout waiting for ToolPermissionRequest");
 
-    assert!(matches!(
-        event.payload,
-        AgentEventPayload::ToolPermissionRequest { ref id, .. } if id == "tc-7"
-    ));
+    let interaction_id = match event.payload {
+        AgentEventPayload::ToolPermissionRequest { id, .. } => id,
+        _ => unreachable!(),
+    };
     assert!(
         hub.lock()
             .await
@@ -143,7 +143,9 @@ async fn pending_recorded_then_emitted_event() {
             .contains_key(&("agent-1".to_string(), "tc-7".to_string()))
     );
 
-    ui.client.respond_permission("agent-1", "tc-7", false).await;
+    ui.client
+        .respond_permission("agent-1", &interaction_id, false)
+        .await;
     let resp = req_handle.await.expect("agent task panicked");
     assert!(resp.is_ok());
     assert_eq!(resp.unwrap()["allow"], false);
@@ -159,11 +161,17 @@ async fn pending_recorded_then_emitted_event() {
 async fn ui_client_lifecycle() {
     let (hub, _event_rx) = make_hub();
 
-    assert!(!hub.lock().await.ui.is_ui_client("my-ui"));
+    assert!(!hub.lock().await.ui.has_client_name("my-ui"));
 
-    let _ui = UiSession::connect(hub.clone(), "my-ui").await;
-    assert!(hub.lock().await.ui.is_ui_client("my-ui"));
+    let ui = UiSession::connect(hub.clone(), "my-ui", loopal_protocol::UiCapabilities::ALL).await;
+    assert!(hub.lock().await.ui.is_ui_client(&ui.lease_id));
 
-    hub.lock().await.ui.unregister_client("my-ui");
-    assert!(!hub.lock().await.ui.is_ui_client("my-ui"));
+    drop(ui);
+    tokio::time::timeout(Duration::from_secs(1), async {
+        while hub.lock().await.ui.has_client_name("my-ui") {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("dropping the session owner must release its UI lease");
 }

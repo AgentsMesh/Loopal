@@ -3,7 +3,6 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use loopal_error::{LoopalError, Result};
-use loopal_ipc::protocol::methods;
 use loopal_protocol::{AgentEvent, AgentEventPayload, QualifiedAddress};
 use loopal_runtime::frontend::traits::EventEmitter;
 
@@ -50,20 +49,7 @@ impl HubBroadcaster {
         let params = serde_json::to_value(&event)
             .map_err(|e| LoopalError::Ipc(format!("serialize event: {e}")))?;
         let session = self.session.read().await.clone();
-        let conns = session.all_connections().await;
-        let mut dead = Vec::new();
-        for (i, conn) in conns.iter().enumerate() {
-            if conn
-                .send_notification(methods::AGENT_EVENT.name, params.clone())
-                .await
-                .is_err()
-            {
-                dead.push(i);
-            }
-        }
-        if !dead.is_empty() {
-            session.remove_dead_connections(&dead).await;
-        }
+        crate::event_delivery::deliver(&session, params).await;
         Ok(())
     }
 
@@ -77,11 +63,7 @@ impl HubBroadcaster {
             Err(_) => return false,
         };
         tokio::spawn(async move {
-            for conn in session.all_connections().await {
-                let _ = conn
-                    .send_notification(methods::AGENT_EVENT.name, params.clone())
-                    .await;
-            }
+            crate::event_delivery::deliver(&session, params).await;
         });
         true
     }

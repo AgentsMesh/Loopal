@@ -19,6 +19,8 @@ use crate::session_start::SessionHandle;
 pub(crate) enum ForwardResult {
     /// Agent completed or connection closed. Carries the agent's output (if any).
     Done(Option<AgentOutput>),
+    /// The peer requested process shutdown while this session was active.
+    Shutdown,
     /// A new agent/start request arrived during active session.
     NewStart { id: i64, params: serde_json::Value },
 }
@@ -38,6 +40,7 @@ pub(crate) async fn forward_loop(
                     // Connection closed (EOF). Signal agent to exit cleanly.
                     session.interrupt.signal();
                     session.interrupt_tx.send_modify(|v| *v = v.wrapping_add(1));
+                    handle.shutdown.cancel();
                     // Brief wait; if agent didn't exit, re-signal to cover the
                     // race where it consumed the first interrupt during turn
                     // teardown before re-entering recv_input().
@@ -62,8 +65,21 @@ pub(crate) async fn forward_loop(
                             // New session requested — stop current, return pending
                             session.interrupt.signal();
                             session.interrupt_tx.send_modify(|v| *v = v.wrapping_add(1));
+                            handle.shutdown.cancel();
                             let _ = (&mut handle.agent_task).await;
                             return ForwardResult::NewStart { id, params };
+                        }
+                        if method == methods::AGENT_SHUTDOWN.name {
+                            // `agent/shutdown` terminates the server, not merely
+                            // the current turn. Signal first so the ACK proves
+                            // cancellation is observable, then propagate the
+                            // shutdown disposition to `run_connection`.
+                            signal_interrupt(session);
+                            handle.shutdown.cancel();
+                            let _ = connection
+                                .respond(id, serde_json::json!({"ok": true}))
+                                .await;
+                            return ForwardResult::Shutdown;
                         }
                         if method == methods::AGENT_CONTROL.name {
                             crate::control_forward::spawn(
@@ -106,6 +122,12 @@ async fn route_request(
     connection: &Connection<Listening>,
 ) {
     match method {
+        m if m == methods::AGENT_INTERRUPT.name => {
+            signal_interrupt(session);
+            let _ = connection
+                .respond(id, serde_json::json!({"ok": true}))
+                .await;
+        }
         m if m == methods::AGENT_MESSAGE.name => match serde_json::from_value::<Envelope>(params) {
             Ok(env) => {
                 let _ = session.input_tx.send(AgentInput::Message(env)).await;
@@ -119,15 +141,6 @@ async fn route_request(
                     .await;
             }
         },
-        m if m == methods::AGENT_SHUTDOWN.name => {
-            session.interrupt.signal();
-            // Also notify the watch channel so recv_input wakes up
-            // when the agent is idle (waiting for input).
-            session.interrupt_tx.send_modify(|v| *v = v.wrapping_add(1));
-            let _ = connection
-                .respond(id, serde_json::json!({"ok": true}))
-                .await;
-        }
         m if m == methods::AGENT_STATE_SNAPSHOT.name => {
             // Hub-side ViewState rebuild: dump tasks/crons/bg_tasks.
             // Empty payload if no agent is bound yet (placeholder window)
@@ -153,6 +166,13 @@ async fn route_request(
                 .await;
         }
     }
+}
+
+fn signal_interrupt(session: &crate::session_hub::SharedSession) {
+    session.interrupt.signal();
+    session
+        .interrupt_tx
+        .send_modify(|value| *value = value.wrapping_add(1));
 }
 
 /// Observer loop: joined client receives events via HubFrontend broadcast.
@@ -188,3 +208,6 @@ pub(crate) async fn observer_loop(
     }
     session.remove_client(client_id).await;
 }
+#[cfg(test)]
+#[path = "session_forward/interrupt_tests.rs"]
+mod interrupt_tests;

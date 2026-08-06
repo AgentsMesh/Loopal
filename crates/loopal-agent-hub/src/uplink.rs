@@ -15,6 +15,24 @@ use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use serde_json::json;
 
+const REVERSE_RESPONSE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
+
+#[path = "uplink/reverse_route.rs"]
+mod reverse_route;
+
+/// Capability token proving a request came from this Hub's authenticated
+/// reverse MetaHub transport. Its private field prevents string identities
+/// from manufacturing the authority.
+pub(crate) struct TrustedMetaHubContext {
+    connection: Arc<Connection<Listening>>,
+}
+
+impl TrustedMetaHubContext {
+    pub(crate) fn matches(&self, uplink: &HubUplink) -> bool {
+        Arc::ptr_eq(&self.connection, uplink.connection())
+    }
+}
+
 /// Connection from a Hub to its parent MetaHub.
 ///
 /// This is the **sole injection point** for cross-hub communication.
@@ -117,28 +135,30 @@ pub async fn handle_reverse_requests(
                             "target should be local after MetaHub DNAT, got {:?}",
                             env.target
                         );
-                        hub.lock().await.registry.route_message(&env).await.is_ok()
+                        reverse_route::deliver(&hub, &env).await
                     } else {
                         false
                     };
-                    let _ = conn.respond(id, json!({"ok": ok})).await;
+                    if !respond_reverse(&conn, id, Ok(json!({"ok": ok}))).await {
+                        break;
+                    }
                 } else {
-                    match crate::dispatch::dispatch_hub_request_with(
-                        &dispatcher,
-                        &method,
-                        params,
-                        format!("meta:{hub_name}"),
-                    )
-                    .await
-                    {
-                        Ok(r) => {
-                            let _ = conn.respond(id, r).await;
-                        }
-                        Err(e) => {
-                            let _ = conn
-                                .respond_error(id, loopal_ipc::jsonrpc::INVALID_REQUEST, &e)
-                                .await;
-                        }
+                    let result = if method == methods::HUB_REMOTE_RELAY.name {
+                        let trusted = TrustedMetaHubContext {
+                            connection: conn.clone(),
+                        };
+                        crate::remote_relay::handle(&hub, params, &trusted).await
+                    } else {
+                        crate::dispatch::dispatch_hub_request_with(
+                            &dispatcher,
+                            &method,
+                            params,
+                            format!("uplink:{hub_name}"),
+                        )
+                        .await
+                    };
+                    if !respond_reverse(&conn, id, result).await {
+                        break;
                     }
                 }
             }
@@ -151,10 +171,48 @@ pub async fn handle_reverse_requests(
                         "notification target should be local after DNAT, got {:?}",
                         env.target
                     );
-                    let _ = hub.lock().await.registry.route_message(&env).await;
+                    let _ = reverse_route::deliver(&hub, &env).await;
+                } else if method == methods::REQUEST_CANCEL.name {
+                    // Requests are handled serially above. By the time their
+                    // cancellation reaches this loop, the handler has already
+                    // completed; interaction state has its own token cleanup.
+                    tracing::debug!("late reverse request cancellation observed");
                 }
             }
         }
     }
     tracing::warn!(hub = %hub_name, "MetaHub reverse handler ended");
+}
+
+async fn respond_reverse(
+    conn: &Arc<Connection<Listening>>,
+    id: i64,
+    result: Result<serde_json::Value, String>,
+) -> bool {
+    let response = async {
+        match result {
+            Ok(value) => conn.respond(id, value).await,
+            Err(error) => {
+                conn.respond_error(id, loopal_ipc::jsonrpc::INVALID_REQUEST, &error)
+                    .await
+            }
+        }
+    };
+    match tokio::time::timeout(REVERSE_RESPONSE_TIMEOUT, response).await {
+        Ok(Ok(())) => true,
+        Ok(Err(error)) => {
+            tracing::warn!(%error, "MetaHub reverse response failed; closing uplink");
+            close_reverse(conn).await;
+            false
+        }
+        Err(_) => {
+            tracing::warn!("MetaHub reverse response timed out; closing uplink");
+            close_reverse(conn).await;
+            false
+        }
+    }
+}
+
+async fn close_reverse(conn: &Connection<Listening>) {
+    let _ = tokio::time::timeout(REVERSE_RESPONSE_TIMEOUT, conn.close()).await;
 }

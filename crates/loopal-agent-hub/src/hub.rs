@@ -1,15 +1,18 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
-use tokio::sync::{Notify, mpsc};
+use tokio::sync::{Mutex, Notify, mpsc};
 
 use loopal_hub_vault::HubVaultService;
-use loopal_protocol::AgentEvent;
+use loopal_protocol::{AgentEvent, DEFAULT_INTERACTION_LIFETIME};
 
 use crate::agent_registry::AgentRegistry;
 use crate::mcp_service::HubMcpService;
-use crate::pending_relay::{PendingPermissionInfo, PendingPlanApprovalInfo, PendingQuestionInfo};
+use crate::pending_relay::{
+    PendingPermissionInfo, PendingPlanApprovalInfo, PendingQuestionInfo, PendingRemoteQuestionInfo,
+};
 use crate::spawn_registry::SpawnRegistry;
 use crate::ui_dispatcher::UiDispatcher;
 use crate::uplink::HubUplink;
@@ -28,6 +31,13 @@ pub struct Hub {
     pub pending_permissions: HashMap<(String, String), PendingPermissionInfo>,
     pub pending_questions: HashMap<(String, String), PendingQuestionInfo>,
     pub pending_plan_approvals: HashMap<(String, String), PendingPlanApprovalInfo>,
+    /// Destination-side authoritative relay records, keyed by
+    /// `(qualified_agent, interaction_id)`.
+    pub pending_remote_questions: HashMap<(String, String), PendingRemoteQuestionInfo>,
+    /// Reducers for qualified remote agents. These make `view/snapshot`
+    /// recover remote questions after UI lag/reconnect.
+    pub remote_views: HashMap<String, Arc<Mutex<loopal_view_state::ViewStateReducer>>>,
+    pending_interaction_timeout: Duration,
     pub session_permission_grants: HashSet<(String, String)>,
     pub shutdown_signal: Arc<Notify>,
     pub workspace: Option<Arc<loopal_workspace::WorkspaceService>>,
@@ -75,6 +85,9 @@ impl Hub {
             pending_permissions: HashMap::new(),
             pending_questions: HashMap::new(),
             pending_plan_approvals: HashMap::new(),
+            pending_remote_questions: HashMap::new(),
+            remote_views: HashMap::new(),
+            pending_interaction_timeout: DEFAULT_INTERACTION_LIFETIME,
             session_permission_grants: HashSet::new(),
             shutdown_signal: Arc::new(Notify::new()),
             workspace,
@@ -88,6 +101,14 @@ impl Hub {
 
     pub fn set_mcp_service(&mut self, mcp: Arc<HubMcpService>) {
         self.mcp_service = mcp;
+    }
+
+    pub fn set_pending_interaction_timeout(&mut self, timeout: Duration) {
+        self.pending_interaction_timeout = timeout;
+    }
+
+    pub(crate) fn pending_interaction_timeout(&self) -> Duration {
+        self.pending_interaction_timeout
     }
 
     pub fn noop() -> Self {

@@ -44,6 +44,18 @@ pub async fn agent_io_loop(
                     break;
                 } else if method == methods::AGENT_EVENT.name {
                     forward_agent_event(&hub, &agent_name, params).await;
+                } else if method == methods::REQUEST_CANCEL.name {
+                    let Some(request_id) = params.get("id").and_then(|value| value.as_i64()) else {
+                        warn!(agent = %agent_name, "malformed request cancellation ignored");
+                        continue;
+                    };
+                    crate::pending_relay::cancel_pending_request(
+                        &hub,
+                        &agent_name,
+                        &conn,
+                        request_id,
+                    )
+                    .await;
                 }
             }
             Incoming::Request { id, method, params } => {

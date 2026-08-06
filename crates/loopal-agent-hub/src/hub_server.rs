@@ -10,6 +10,7 @@
 //!   handled by `tcp_ui_io::start_tcp_ui_io`.
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
@@ -17,22 +18,25 @@ use tracing::{info, warn};
 
 use loopal_ipc::TcpTransport;
 use loopal_ipc::connection::{Connection, Incoming, Listening};
-use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
 
 use crate::hub::Hub;
 
-/// Role declared by a registering TCP client.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ClientRole {
-    Agent,
-    UiClient,
-}
+#[path = "hub_server/register.rs"]
+mod register;
+use register::{ClientRole, wait_for_register};
+#[path = "hub_server/agent_registration.rs"]
+mod agent_registration;
 
-struct RegisterResult {
-    name: String,
-    role: ClientRole,
-}
+#[cfg(not(test))]
+const REGISTER_WAIT_DEADLINE: Duration = Duration::from_secs(10);
+#[cfg(test)]
+const REGISTER_WAIT_DEADLINE: Duration = Duration::from_millis(50);
+#[cfg(not(test))]
+const REGISTER_ACK_DEADLINE: Duration = Duration::from_secs(2);
+#[cfg(test)]
+const REGISTER_ACK_DEADLINE: Duration = Duration::from_millis(50);
+const TRANSPORT_CLOSE_DEADLINE: Duration = Duration::from_secs(2);
 
 /// Start the Hub TCP server. Returns the listener, port, and auth token.
 pub async fn start_hub_listener(
@@ -79,7 +83,7 @@ pub async fn accept_loop(listener: TcpListener, hub: Arc<Mutex<Hub>>, token: Str
             let transport: Arc<dyn Transport> = Arc::new(TcpTransport::new(stream));
             let (conn, mut rx) = Connection::new(transport).into_listening();
 
-            match wait_for_register(&conn, &mut rx, &token).await {
+            match receive_register(&conn, &mut rx, &token).await {
                 Ok(result) => {
                     info!(client = %result.name, role = ?result.role,
                         "Hub: TCP client authenticated and registered");
@@ -93,19 +97,30 @@ pub async fn accept_loop(listener: TcpListener, hub: Arc<Mutex<Hub>>, token: Str
                     });
                     match result.role {
                         ClientRole::Agent => {
-                            let dispatcher =
-                                Arc::new(crate::dispatch::build_hub_dispatcher(hub.clone()));
-                            crate::agent_io::start_agent_io(
+                            if let Err(error) = agent_registration::reserve_ack_and_start(
+                                hub, conn, owned_rx, result,
+                            )
+                            .await
+                            {
+                                warn!(%error, "Hub: TCP agent registration failed");
+                            }
+                        }
+                        ClientRole::UiClient => {
+                            // A capability lease becomes authoritative only
+                            // after its registration ACK is written successfully.
+                            if acknowledge_register(&conn, &result).await.is_err() {
+                                close_bounded(&conn).await;
+                                return;
+                            }
+                            crate::tcp_ui_io::start_tcp_ui_io(
                                 hub,
-                                dispatcher,
                                 &result.name,
                                 conn,
                                 owned_rx,
-                                None,
-                            );
-                        }
-                        ClientRole::UiClient => {
-                            crate::tcp_ui_io::start_tcp_ui_io(hub, &result.name, conn, owned_rx);
+                                result.capabilities,
+                                result.lease_id,
+                            )
+                            .await;
                         }
                     }
                 }
@@ -117,63 +132,61 @@ pub async fn accept_loop(listener: TcpListener, hub: Arc<Mutex<Hub>>, token: Str
     }
 }
 
-/// Wait for `hub/register` with valid token. Returns agent name + role.
-async fn wait_for_register(
+async fn acknowledge_register(
+    conn: &Connection<Listening>,
+    result: &register::RegisterResult,
+) -> Result<(), String> {
+    let result = match tokio::time::timeout(
+        REGISTER_ACK_DEADLINE,
+        conn.respond(
+            result.request_id,
+            serde_json::json!({
+                "ok": true,
+                "lease_id": result.lease_id,
+                "capabilities": result.capabilities,
+            }),
+        ),
+    )
+    .await
+    {
+        Ok(result) => result.map_err(|error| error.to_string()),
+        Err(_) => Err("hub/register acknowledgement timed out".to_string()),
+    };
+    if result.is_err() {
+        close_bounded(conn).await;
+    }
+    result
+}
+
+async fn receive_register(
     conn: &Arc<Connection<Listening>>,
     rx: &mut tokio::sync::mpsc::Receiver<Incoming>,
-    expected_token: &str,
-) -> anyhow::Result<RegisterResult> {
-    loop {
-        let Some(msg) = rx.recv().await else {
-            anyhow::bail!("connection closed before hub/register");
-        };
-        if let Incoming::Request { id, method, params } = msg {
-            if method == methods::HUB_REGISTER.name {
-                let client_token = params["token"].as_str().unwrap_or("");
-                if client_token != expected_token {
-                    let _ = conn
-                        .respond_error(id, loopal_ipc::jsonrpc::INVALID_REQUEST, "invalid token")
-                        .await;
-                    anyhow::bail!("invalid token");
-                }
-                let name = params["name"]
-                    .as_str()
-                    .ok_or_else(|| anyhow::anyhow!("hub/register: missing 'name'"))?
-                    .to_string();
-                let role = match params["role"].as_str() {
-                    Some("ui_client") => ClientRole::UiClient,
-                    Some("agent") => ClientRole::Agent,
-                    Some(other) => {
-                        let _ = conn
-                            .respond_error(
-                                id,
-                                loopal_ipc::jsonrpc::INVALID_REQUEST,
-                                &format!("unknown role: {other}"),
-                            )
-                            .await;
-                        anyhow::bail!("unknown role: {other}");
-                    }
-                    None => {
-                        let _ = conn
-                            .respond_error(
-                                id,
-                                loopal_ipc::jsonrpc::INVALID_REQUEST,
-                                "hub/register: missing 'role' (expected \"agent\" or \"ui_client\")",
-                            )
-                            .await;
-                        anyhow::bail!("hub/register: missing role");
-                    }
-                };
-                let _ = conn.respond(id, serde_json::json!({"ok": true})).await;
-                return Ok(RegisterResult { name, role });
-            }
-            let _ = conn
-                .respond_error(
-                    id,
-                    loopal_ipc::jsonrpc::INVALID_REQUEST,
-                    "expected hub/register first",
-                )
-                .await;
-        }
+    token: &str,
+) -> Result<register::RegisterResult, String> {
+    let result = match tokio::time::timeout(
+        REGISTER_WAIT_DEADLINE,
+        wait_for_register(conn, rx, token),
+    )
+    .await
+    {
+        Ok(result) => result.map_err(|error| error.to_string()),
+        Err(_) => Err("hub/register timed out".to_string()),
+    };
+    if result.is_err() {
+        close_bounded(conn).await;
+    }
+    result
+}
+
+async fn close_bounded(conn: &Connection<Listening>) {
+    if tokio::time::timeout(TRANSPORT_CLOSE_DEADLINE, conn.close())
+        .await
+        .is_err()
+    {
+        warn!("Hub TCP transport close timed out");
     }
 }
+
+#[cfg(test)]
+#[path = "hub_server/tests.rs"]
+mod tests;

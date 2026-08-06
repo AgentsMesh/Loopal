@@ -42,6 +42,10 @@ pub struct App {
     pub cwd: PathBuf,
     pub last_esc_time: Option<Instant>,
     pub input_scroll: usize,
+    pub plan_approval_scroll: usize,
+    /// Content rows available to the plan modal in its most recent frame.
+    /// Key handling uses this to keep scrolling aligned with the actual layout.
+    pub plan_approval_viewport_rows: usize,
     pub paste_map: HashMap<String, String>,
     pub show_topology: bool,
     pub panel_sections: Vec<PanelSectionState>,
@@ -115,6 +119,8 @@ impl App {
             cwd,
             last_esc_time: None,
             input_scroll: 0,
+            plan_approval_scroll: 0,
+            plan_approval_viewport_rows: crate::views::plan_approval_inline::CONTENT_ROWS,
             paste_map: HashMap::new(),
             show_topology: true,
             panel_sections,

@@ -71,30 +71,45 @@ impl SessionController {
         self.backend.interrupt_target(name);
     }
 
-    /// Resolve a `ToolPermissionRequest` event for `(agent_name, tool_call_id)`.
-    /// Caller clears `pending_permission` in the ViewClient.
-    pub async fn respond_permission(&self, agent_name: &str, tool_call_id: &str, allow: bool) {
+    /// Resolve a `ToolPermissionRequest` using its opaque event `id`.
+    /// The matching Hub `ToolPermissionResolved` event clears the ViewClient state.
+    pub async fn respond_permission(&self, agent_name: &str, interaction_id: &str, allow: bool) {
         self.backend
-            .respond_permission(agent_name, tool_call_id, allow)
+            .respond_permission(agent_name, interaction_id, allow)
             .await;
     }
 
-    /// Resolve a `UserQuestionRequest` event for `(agent_name, question_id)`.
-    /// Caller clears `pending_question` in the ViewClient.
+    /// Resolve a `UserQuestionRequest` using its opaque event `id`.
+    /// The matching Hub `UserQuestionResolved` event clears the ViewClient state.
     pub async fn respond_question(
         &self,
         agent_name: &str,
-        question_id: &str,
+        interaction_id: &str,
         answers: Vec<String>,
     ) {
         self.backend
-            .respond_question(agent_name, question_id, answers)
+            .respond_question(agent_name, interaction_id, answers)
+            .await;
+    }
+
+    /// Resolve a `PlanApprovalRequest` using its opaque event `id`.
+    /// The matching Hub `PlanApprovalResolved` event clears the ViewClient state.
+    pub async fn respond_plan_approval(
+        &self,
+        agent_name: &str,
+        interaction_id: &str,
+        approve: bool,
+    ) {
+        self.backend
+            .respond_plan_approval(agent_name, interaction_id, approve)
             .await;
     }
 
     /// Cancel an in-flight `UserQuestionRequest`.
-    pub async fn cancel_question(&self, agent_name: &str, question_id: &str) {
-        self.backend.cancel_question(agent_name, question_id).await;
+    pub async fn cancel_question(&self, agent_name: &str, interaction_id: &str) {
+        self.backend
+            .cancel_question(agent_name, interaction_id)
+            .await;
     }
 
     /// Send `hub/shutdown` to the Hub, asking it to shut down all agents

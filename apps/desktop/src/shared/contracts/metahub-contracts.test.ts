@@ -40,8 +40,11 @@ describe('MetaHub contracts', () => {
     })
     expect(MetaHubRuntimeStateSchema.parse({
       state: 'connected', address: 'meta:9', hubName: 'hub-a', hubs: [hub],
-      topology: [agent], refreshedAt: '2026-01-01T00:00:00.000Z',
-    })).toMatchObject({ state: 'connected', hubs: [hub] })
+      topology: [agent], topologyUnavailableHubs: ['hub-b'],
+      refreshedAt: '2026-01-01T00:00:00.000Z',
+    })).toMatchObject({
+      state: 'connected', hubs: [hub], topologyUnavailableHubs: ['hub-b'],
+    })
   })
 
   it('rejects unsafe or incomplete values', () => {

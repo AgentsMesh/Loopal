@@ -29,6 +29,7 @@ impl QuestionHandler for ManualQuestionHandler {
         let id = uuid::Uuid::new_v4().to_string();
         let event = AgentEvent::root(AgentEventPayload::UserQuestionRequest {
             id: id.clone(),
+            logical_id: id.clone(),
             questions,
             classifier_running: false,
         });

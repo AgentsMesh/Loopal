@@ -73,7 +73,7 @@ impl ControlBackend {
     pub(crate) async fn respond_permission(
         &self,
         agent_name: &str,
-        tool_call_id: &str,
+        interaction_id: &str,
         allow: bool,
     ) {
         match self {
@@ -84,7 +84,7 @@ impl ControlBackend {
             }
             Self::Hub(client) => {
                 client
-                    .respond_permission(agent_name, tool_call_id, allow)
+                    .respond_permission(agent_name, interaction_id, allow)
                     .await;
             }
         }
@@ -93,40 +93,59 @@ impl ControlBackend {
     pub(crate) async fn respond_question(
         &self,
         agent_name: &str,
-        question_id: &str,
+        interaction_id: &str,
         answers: Vec<String>,
     ) {
         match self {
             Self::Local(ch) => {
                 if let Err(e) = ch
                     .question_tx
-                    .send(UserQuestionResponse::answered(question_id, answers))
+                    .send(UserQuestionResponse::answered(interaction_id, answers))
                     .await
                 {
-                    tracing::warn!(question_id = %question_id, error = %e, "controller_ops local question answered send failed");
+                    tracing::warn!(interaction_id, error = %e, "controller_ops local question answered send failed");
                 }
             }
             Self::Hub(client) => {
                 client
-                    .respond_question(agent_name, question_id, answers)
+                    .respond_question(agent_name, interaction_id, answers)
                     .await;
             }
         }
     }
 
-    pub(crate) async fn cancel_question(&self, agent_name: &str, question_id: &str) {
+    pub(crate) async fn respond_plan_approval(
+        &self,
+        agent_name: &str,
+        interaction_id: &str,
+        approve: bool,
+    ) {
+        match self {
+            // Plan approval requests only originate from a Hub relay. Local
+            // controllers exist for tests and cannot have a pending relay.
+            Self::Local(_) => {}
+            Self::Hub(client) => {
+                let decision = if approve { "approve" } else { "reject" };
+                client
+                    .respond_plan_approval(agent_name, interaction_id, decision, None)
+                    .await;
+            }
+        }
+    }
+
+    pub(crate) async fn cancel_question(&self, agent_name: &str, interaction_id: &str) {
         match self {
             Self::Local(ch) => {
                 if let Err(e) = ch
                     .question_tx
-                    .send(UserQuestionResponse::cancelled(question_id))
+                    .send(UserQuestionResponse::cancelled(interaction_id))
                     .await
                 {
-                    tracing::warn!(question_id = %question_id, error = %e, "controller_ops local question cancelled send failed");
+                    tracing::warn!(interaction_id, error = %e, "controller_ops local question cancelled send failed");
                 }
             }
             Self::Hub(client) => {
-                client.cancel_question(agent_name, question_id).await;
+                client.cancel_question(agent_name, interaction_id).await;
             }
         }
     }

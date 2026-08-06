@@ -48,6 +48,11 @@ pub struct ParentOnlyArgs {
     #[arg(long, hide = true)]
     pub hub_only: bool,
 
+    /// Internal parent/child contract: do not start root before the parent TUI
+    /// has registered its real interactive UI lease.
+    #[arg(long, hide = true, requires = "hub_only")]
+    pub require_ui_ready: bool,
+
     /// List active hub processes on this machine
     #[arg(long)]
     pub list_hubs: bool,

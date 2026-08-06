@@ -77,7 +77,7 @@ describe('LoopalLiveAttention', () => {
     ])
   })
 
-  it('retains remote requests until their relayed resolution event arrives', () => {
+  it('retains remote requests while their authoritative snapshot is unavailable', () => {
     const events: DesktopEvent[] = []
     const attention = new LoopalLiveAttention(scope, now, (event) => events.push(event))
     attention.accept('question_requested', {
@@ -86,12 +86,32 @@ describe('LoopalLiveAttention', () => {
     }, 'hub-b/worker')
     events.length = 0
 
+    expect(attention.remoteAgentIds()).toEqual(new Set(['hub-b/worker']))
     attention.reconcile([])
     expect(events).toEqual([])
     attention.accept('question_resolved', { id: 'remote-question' }, 'hub-b/worker')
     expect(events).toEqual([expect.objectContaining({
       type: 'question_resolved', agentId: 'hub-b/worker', requestId: 'remote-question',
     })])
+    expect(attention.remoteAgentIds()).toEqual(new Set())
+    expect(attention.retire()).toEqual([])
+  })
+
+  it('resolves a remote request absent from a successful authoritative snapshot', () => {
+    const events: DesktopEvent[] = []
+    const attention = new LoopalLiveAttention(scope, now, (event) => events.push(event))
+    attention.accept('question_requested', {
+      id: 'remote-question',
+      questions: [{ question: 'Remote?', options: [], allow_multiple: false }],
+    }, 'hub-b/worker')
+    events.length = 0
+
+    attention.reconcile([], new Set(['hub-b/worker']))
+
+    expect(events).toEqual([expect.objectContaining({
+      type: 'question_resolved', agentId: 'hub-b/worker', requestId: 'remote-question',
+    })])
+    expect(attention.remoteAgentIds()).toEqual(new Set())
     expect(attention.retire()).toEqual([])
   })
 })

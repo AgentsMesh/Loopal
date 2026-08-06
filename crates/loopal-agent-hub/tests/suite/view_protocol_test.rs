@@ -50,7 +50,7 @@ async fn view_snapshot_returns_current_state() {
         .unwrap();
     tokio::time::sleep(Duration::from_millis(50)).await;
 
-    let ui = UiSession::connect(hub.clone(), "tui-1").await;
+    let ui = UiSession::connect(hub.clone(), "tui-1", loopal_protocol::UiCapabilities::ALL).await;
     let req = ViewSnapshotRequest {
         agent: "worker".into(),
     };
@@ -74,7 +74,7 @@ async fn view_snapshot_unknown_agent_returns_error() {
     let (hub, _raw_tx, raw_rx) = make_hub();
     let _handle = start_event_loop(hub.clone(), raw_rx);
 
-    let ui = UiSession::connect(hub.clone(), "tui-1").await;
+    let ui = UiSession::connect(hub.clone(), "tui-1", loopal_protocol::UiCapabilities::ALL).await;
     let req = ViewSnapshotRequest {
         agent: "ghost".into(),
     };

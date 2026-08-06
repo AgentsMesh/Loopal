@@ -86,6 +86,41 @@ describe('LoopalLiveSession', () => {
     expect(() => base.state.detail).toThrow('not ready')
   })
 
+  it('applies snapshot attention before replaying buffered live events', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const value = harness()
+    const implementation = value.request.getMockImplementation()!
+    value.request.mockImplementation(async (method, params, signal) => {
+      if (method === 'view/snapshot') await gate
+      return implementation(method, params, signal)
+    })
+    const pending = value.state.initialize()
+    await vi.waitFor(() => expect(value.request).toHaveBeenCalledWith(
+      'view/snapshot', { agent: 'main' },
+    ))
+    value.state.accept('agent/event', event({
+      UserQuestionRequest: {
+        id: 'during-sync',
+        questions: [{ question: 'Continue?', options: [], allow_multiple: false }],
+      },
+    }, 3))
+
+    release()
+    await pending
+
+    expect(value.events).toContainEqual(expect.objectContaining({
+      type: 'question_requested',
+      request: expect.objectContaining({ id: 'during-sync' }),
+    }))
+    expect(value.events).not.toContainEqual(expect.objectContaining({
+      type: 'question_resolved', requestId: 'during-sync',
+    }))
+    expect(value.state.retire()).toContainEqual(expect.objectContaining({
+      type: 'question_resolved', requestId: 'during-sync',
+    }))
+  })
+
   it('retains deduplicated artifacts produced by root and child turns', async () => {
     const { state, events } = harness()
     await state.initialize()

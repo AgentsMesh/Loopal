@@ -42,13 +42,21 @@ async fn run_with_protocol(
     info!(?startup_protocol, "starting Hub-backed host mode");
 
     let (alive_tx, alive_rx) = oneshot::channel();
-    let bootstrap = super::hub_bootstrap::bootstrap_hub_and_agent_with_alive(
-        cli,
-        cwd,
-        config,
-        resume,
-        Some(alive_tx),
-    );
+    let bootstrap = async {
+        let prepared = super::hub_bootstrap::prepare_hub_and_agent_with_alive(
+            cli,
+            cwd,
+            config,
+            Some(alive_tx),
+        )
+        .await?;
+        let requires_ui = cli.parent_only.require_ui_ready
+            || matches!(startup_protocol, StartupProtocol::Desktop { .. });
+        if requires_ui {
+            super::ui_ready_gate::wait_for_interactive_ui(&prepared).await?;
+        }
+        super::hub_bootstrap::start_prepared_hub_and_agent(prepared, cli, cwd, config, resume).await
+    };
     let alive_task = tokio::spawn(async move {
         if let Ok(info) = alive_rx.await {
             startup_protocol.write_alive(info.addr, info.token).await;
@@ -89,8 +97,7 @@ async fn run_with_protocol(
             .await;
     }
 
-    let _event_loop = loopal_agent_hub::start_event_loop(ctx.hub.clone(), ctx.event_rx);
-    if let Err(error) = wait_for_root_view(&ctx.hub).await {
+    if let Err(error) = super::root_view_ready::wait(&ctx.hub).await {
         startup_protocol
             .write_error("root_view_not_ready", error.to_string())
             .await;
@@ -156,41 +163,4 @@ async fn run_with_protocol(
     registration.withdraw();
     let _ = ctx.agent_proc.shutdown().await;
     Ok(())
-}
-
-async fn wait_for_root_view(
-    hub: &std::sync::Arc<tokio::sync::Mutex<loopal_agent_hub::Hub>>,
-) -> anyhow::Result<()> {
-    let timeout = std::env::var("LOOPAL_TEST_ROOT_VIEW_TIMEOUT_MS")
-        .ok()
-        .filter(|_| std::env::var_os("LOOPAL_TEST_PROVIDER").is_some())
-        .and_then(|value| value.parse().ok())
-        .map(std::time::Duration::from_millis)
-        .unwrap_or_else(|| std::time::Duration::from_secs(2));
-    if timeout.is_zero() {
-        return Err(anyhow::anyhow!(
-            "root ViewState stayed Starting before Desktop READY"
-        ));
-    }
-    let ready = async {
-        loop {
-            let view = {
-                let hub = hub.lock().await;
-                hub.registry.agent_view(loopal_protocol::ROOT_AGENT_NAME)
-            };
-            if let Some(view) = view {
-                let view = view.lock().await;
-                if view.rev() > 0
-                    && view.state().agent.observable.status
-                        != loopal_protocol::AgentStatus::Starting
-                {
-                    return;
-                }
-            }
-            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
-        }
-    };
-    tokio::time::timeout(timeout, ready)
-        .await
-        .map_err(|_| anyhow::anyhow!("root ViewState stayed Starting before Desktop READY"))
 }

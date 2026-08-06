@@ -1,6 +1,7 @@
 use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::ContentBlock;
 use loopal_tool_api::PermissionDecision;
+use loopal_tool_invocation::{CancelCause, ToolResultMetadata};
 use loopal_tool_plan_mode::ENTER_PLAN_NAME;
 use tracing::{debug, info, warn};
 
@@ -13,7 +14,7 @@ use crate::plan_file::build_plan_mode_filter;
 impl AgentLoopRunner {
     pub(super) async fn handle_enter_plan(
         &mut self,
-        _turn_ctx: &mut TurnContext,
+        turn_ctx: &mut TurnContext,
         idx: usize,
         id: &str,
     ) -> loopal_error::Result<(usize, ContentBlock)> {
@@ -41,13 +42,34 @@ impl AgentLoopRunner {
         }
 
         self.refresh_decision_context().await;
-        let decision = self
-            .params
-            .deps
-            .frontend
-            .request_permission(id, ENTER_PLAN_NAME, &serde_json::json!({}))
-            .await;
-        if decision != PermissionDecision::Allow {
+        let decision = {
+            let input = serde_json::json!({});
+            let request = self
+                .params
+                .deps
+                .frontend
+                .request_permission(id, ENTER_PLAN_NAME, &input);
+            tokio::pin!(request);
+            tokio::select! {
+                biased;
+                _ = turn_ctx.cancel.cancelled() => None,
+                decision = &mut request => Some(decision),
+            }
+        };
+        if decision.is_none() {
+            return Ok((
+                idx,
+                self.emit_and_block(
+                    id,
+                    ENTER_PLAN_NAME,
+                    "Interrupted by user",
+                    true,
+                    Some(ToolResultMetadata::cancelled(CancelCause::UserInterrupt)),
+                )
+                .await?,
+            ));
+        }
+        if decision != Some(PermissionDecision::Allow) {
             return Ok((
                 idx,
                 self.emit_and_block(

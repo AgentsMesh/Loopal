@@ -9,6 +9,8 @@ mod e2e_tcp_test;
 mod forward_timeout_test;
 #[path = "suite/hub_lifecycle_test.rs"]
 mod hub_lifecycle_test;
+#[path = "suite/io_lifecycle_test.rs"]
+mod io_lifecycle_test;
 #[path = "suite/nat_routing_test.rs"]
 mod nat_routing_test;
 #[path = "suite/relay_event_test.rs"]

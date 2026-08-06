@@ -118,6 +118,9 @@ pub async fn build_hub_harness_with(
 
     let frontend = loopal_agent_server::hub_frontend_for_test(session, input_rx, watch_rx);
     let mut config = loopal_config::load_config(fixture.path()).unwrap();
+    // The injected test provider is registered as `anthropic`; isolate the
+    // harness from the developer's configured default model.
+    config.settings.model = "claude-opus-4-8".to_string();
     if let Some(pm) = permission_mode {
         config.settings.permission_mode = pm;
     }

@@ -11,6 +11,15 @@ use crate::hub::Hub;
 
 use super::dispatch_loop::agent_io_loop;
 
+struct RegisteredAgent {
+    completion_rx: tokio::sync::mpsc::Receiver<Envelope>,
+    root_services: Option<(
+        Arc<crate::spawn_registry::SpawnRegistry>,
+        Arc<crate::HubMcpService>,
+        std::path::PathBuf,
+    )>,
+}
+
 /// Register the agent connection with the Hub and spawn the IO loop.
 ///
 /// `ready_tx`, if provided, is signaled once the agent is registered and the
@@ -24,49 +33,36 @@ pub fn start_agent_io(
     rx: tokio::sync::mpsc::Receiver<Incoming>,
     ready_tx: Option<tokio::sync::oneshot::Sender<()>>,
 ) {
-    let hub2 = hub.clone();
     let n = name.to_string();
-    let n2 = name.to_string();
-    let conn2 = conn.clone();
-    let conn3 = conn.clone();
     tokio::spawn(async move {
-        let (completion_tx, completion_rx) = tokio::sync::mpsc::channel::<Envelope>(32);
-        let root_services = {
-            let mut h = hub.lock().await;
-            if let Err(e) = h.registry.register_connection_with_parent(
-                &n,
-                conn2,
-                None,
-                None,
-                Some(completion_tx),
-            ) {
-                tracing::warn!(agent = %n, error = %e, "registration failed");
-                if let Some(tx) = ready_tx {
-                    drop(tx);
-                }
+        let registered = match register_agent(&hub, &n, conn.clone(), false).await {
+            Ok(registered) => registered,
+            Err(error) => {
+                tracing::warn!(agent = %n, %error, "registration failed");
+                drop(ready_tx);
+                close_bounded(&conn).await;
                 return;
             }
-            (n == loopal_protocol::ROOT_AGENT_NAME).then(|| {
-                (
-                    h.spawn_registry.clone(),
-                    h.mcp_service.clone(),
-                    h.default_cwd.clone(),
-                )
-            })
         };
-        if let Some((registry, mcp, cwd)) = root_services {
-            registry.register(n.clone(), cwd.clone(), None);
-            mcp.on_agent_attach(n.clone(), cwd, None).await;
-        }
-        crate::spawn_manager::spawn_completion_bridge(&n, conn3, completion_rx);
-        info!(agent = %n, "agent registered in Hub");
-        if let Some(tx) = ready_tx {
-            let _ = tx.send(());
-        }
-        let output = agent_io_loop(hub2, dispatcher, conn.clone(), rx, n.clone()).await;
-        finish_and_deliver(&hub, &n2, output, &conn).await;
-        info!(agent = %n2, "agent IO loop ended");
+        run_registered_agent(hub, dispatcher, n, conn, rx, registered, ready_tx).await;
     });
+}
+
+/// Activate an ACKed TCP registration reservation and start its IO owner.
+///
+/// The caller must reserve the same `(name, conn)` before writing the ACK.
+pub(crate) async fn start_reserved_agent_io(
+    hub: Arc<Mutex<Hub>>,
+    dispatcher: Arc<loopal_ipc::Dispatcher>,
+    name: String,
+    conn: Arc<Connection<Listening>>,
+    rx: tokio::sync::mpsc::Receiver<Incoming>,
+) -> Result<(), String> {
+    let registered = register_agent(&hub, &name, conn.clone(), true).await?;
+    tokio::spawn(run_registered_agent(
+        hub, dispatcher, name, conn, rx, registered, None,
+    ));
+    Ok(())
 }
 
 /// Spawn ONLY the IO loop. The caller is responsible for having already
@@ -86,4 +82,66 @@ pub fn spawn_io_loop(
         finish_and_deliver(&hub, &n2, output, &conn).await;
         info!(agent = %n2, "agent IO loop ended");
     });
+}
+
+async fn register_agent(
+    hub: &Arc<Mutex<Hub>>,
+    name: &str,
+    conn: Arc<Connection<Listening>>,
+    reserved: bool,
+) -> Result<RegisteredAgent, String> {
+    let (completion_tx, completion_rx) = tokio::sync::mpsc::channel::<Envelope>(32);
+    let root_services = {
+        let mut hub = hub.lock().await;
+        if reserved {
+            hub.registry
+                .activate_reserved_connection(name, conn, completion_tx)?;
+        } else {
+            hub.registry.register_connection_with_parent(
+                name,
+                conn,
+                None,
+                None,
+                Some(completion_tx),
+            )?;
+        }
+        (name == loopal_protocol::ROOT_AGENT_NAME).then(|| {
+            (
+                hub.spawn_registry.clone(),
+                hub.mcp_service.clone(),
+                hub.default_cwd.clone(),
+            )
+        })
+    };
+    Ok(RegisteredAgent {
+        completion_rx,
+        root_services,
+    })
+}
+
+async fn run_registered_agent(
+    hub: Arc<Mutex<Hub>>,
+    dispatcher: Arc<loopal_ipc::Dispatcher>,
+    name: String,
+    conn: Arc<Connection<Listening>>,
+    rx: tokio::sync::mpsc::Receiver<Incoming>,
+    registered: RegisteredAgent,
+    ready_tx: Option<tokio::sync::oneshot::Sender<()>>,
+) {
+    if let Some((registry, mcp, cwd)) = registered.root_services {
+        registry.register(name.clone(), cwd.clone(), None);
+        mcp.on_agent_attach(name.clone(), cwd, None).await;
+    }
+    crate::spawn_manager::spawn_completion_bridge(&name, conn.clone(), registered.completion_rx);
+    info!(agent = %name, "agent registered in Hub");
+    if let Some(tx) = ready_tx {
+        let _ = tx.send(());
+    }
+    let output = agent_io_loop(hub.clone(), dispatcher, conn.clone(), rx, name.clone()).await;
+    finish_and_deliver(&hub, &name, output, &conn).await;
+    info!(agent = %name, "agent IO loop ended");
+}
+
+async fn close_bounded(conn: &Connection<Listening>) {
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(2), conn.close()).await;
 }

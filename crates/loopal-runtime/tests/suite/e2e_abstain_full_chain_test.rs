@@ -101,6 +101,7 @@ async fn abstain_emits_failed_and_view_state_mirrors_it() {
     let mut r = ViewStateReducer::new("root");
     r.apply(AgentEventPayload::UserQuestionRequest {
         id: qid.clone(),
+        logical_id: qid.clone(),
         questions: vec![make_question()],
         classifier_running: true,
     });

@@ -42,7 +42,7 @@ async fn next_resolved(rx: &mut broadcast::Receiver<AgentEvent>) -> Option<Strin
 async fn agent_finish_cleans_pending_permission_and_emits_resolved() {
     let (hub, raw_rx) = make_hub();
     let _event_loop = start_event_loop(hub.clone(), raw_rx);
-    let ui = UiSession::connect(hub.clone(), "ui-1").await;
+    let ui = UiSession::connect(hub.clone(), "ui-1", loopal_protocol::UiCapabilities::ALL).await;
     let (agent_conn, _) = hub_server::connect_local(hub.clone(), "agent-1");
     tokio::time::sleep(Duration::from_millis(30)).await;
 
@@ -67,9 +67,16 @@ async fn agent_finish_cleans_pending_permission_and_emits_resolved() {
         tokio::time::sleep(Duration::from_millis(20)).await;
     }
     assert!(pending_has(&hub, "agent-1", "tc-stranded").await);
+    let interaction_id = crate::permission_interaction_id(&hub, "agent-1", "tc-stranded").await;
 
     // Simulate agent crash: tear down its IO loop.
-    loopal_agent_hub::finish::finish_and_deliver(&hub, "agent-1", None, &agent_conn).await;
+    let hub_side_conn = hub
+        .lock()
+        .await
+        .registry
+        .get_agent_connection("agent-1")
+        .unwrap();
+    loopal_agent_hub::finish::finish_and_deliver(&hub, "agent-1", None, &hub_side_conn).await;
 
     // Pending must be gone.
     assert!(!pending_has(&hub, "agent-1", "tc-stranded").await);
@@ -77,7 +84,7 @@ async fn agent_finish_cleans_pending_permission_and_emits_resolved() {
     // UI must observe ToolPermissionResolved (the cleanup-emitted one).
     let mut event_rx = ui.event_rx;
     let resolved = next_resolved(&mut event_rx).await;
-    assert_eq!(resolved.as_deref(), Some("tc-stranded"));
+    assert_eq!(resolved.as_deref(), Some(interaction_id.as_str()));
 
     // Original IPC request returns an error or a deny — either is acceptable
     // because we close the conn during finish_and_deliver. We just shouldn't hang.
@@ -95,7 +102,7 @@ async fn agent_finish_cleans_pending_permission_and_emits_resolved() {
 async fn ui_response_consumes_pending_exactly_once() {
     let (hub, raw_rx) = make_hub();
     let _event_loop = start_event_loop(hub.clone(), raw_rx);
-    let ui = UiSession::connect(hub.clone(), "ui-1").await;
+    let ui = UiSession::connect(hub.clone(), "ui-1", loopal_protocol::UiCapabilities::ALL).await;
     let (agent_conn, _) = hub_server::connect_local(hub.clone(), "agent-1");
     tokio::time::sleep(Duration::from_millis(30)).await;
 
@@ -110,9 +117,9 @@ async fn ui_response_consumes_pending_exactly_once() {
                 .await
         }
     });
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    let interaction_id = crate::permission_interaction_id(&hub, "agent-1", "tc-race").await;
     ui.client
-        .respond_permission("agent-1", "tc-race", true)
+        .respond_permission("agent-1", &interaction_id, true)
         .await;
 
     let resp = req_handle.await.unwrap().unwrap();
@@ -121,7 +128,7 @@ async fn ui_response_consumes_pending_exactly_once() {
 
     // A second respond on the same key is a no-op (pending consumed).
     ui.client
-        .respond_permission("agent-1", "tc-race", false)
+        .respond_permission("agent-1", &interaction_id, false)
         .await;
 }
 
@@ -129,8 +136,8 @@ async fn ui_response_consumes_pending_exactly_once() {
 async fn second_ui_respond_after_first_returns_unresolved() {
     let (hub, raw_rx) = make_hub();
     let _event_loop = start_event_loop(hub.clone(), raw_rx);
-    let ui_a = UiSession::connect(hub.clone(), "ui-a").await;
-    let ui_b = UiSession::connect(hub.clone(), "ui-b").await;
+    let ui_a = UiSession::connect(hub.clone(), "ui-a", loopal_protocol::UiCapabilities::ALL).await;
+    let ui_b = UiSession::connect(hub.clone(), "ui-b", loopal_protocol::UiCapabilities::ALL).await;
     let (agent_conn, _) = hub_server::connect_local(hub.clone(), "agent-1");
     tokio::time::sleep(Duration::from_millis(50)).await;
 
@@ -145,22 +152,25 @@ async fn second_ui_respond_after_first_returns_unresolved() {
                 .await
         }
     });
-    tokio::time::sleep(Duration::from_millis(80)).await;
+    let interaction_id = crate::permission_interaction_id(&hub, "agent-1", "tc-double").await;
 
     ui_a.client
-        .respond_permission("agent-1", "tc-double", true)
+        .respond_permission("agent-1", &interaction_id, true)
         .await;
     let resp = req_handle.await.unwrap().unwrap();
     assert_eq!(resp["allow"], true);
 
     // UI B's respond arrives after pending is gone — must not panic, returns resolved:false.
     ui_b.client
-        .respond_permission("agent-1", "tc-double", false)
+        .respond_permission("agent-1", &interaction_id, false)
         .await;
 
     // Both UIs see exactly one Resolved event for tc-double.
     let mut rx_b = ui_b.event_rx;
-    assert_eq!(next_resolved(&mut rx_b).await.as_deref(), Some("tc-double"));
+    assert_eq!(
+        next_resolved(&mut rx_b).await.as_deref(),
+        Some(interaction_id.as_str())
+    );
     // No second Resolved should appear within a short window.
     let second = tokio::time::timeout(Duration::from_millis(200), next_resolved(&mut rx_b)).await;
     assert!(
@@ -174,7 +184,7 @@ async fn emit_failure_synchronously_denies_and_cleans_pending() {
     // Tiny channel + no event_loop drain → second emit will fail try_send.
     let (tx, _rx) = mpsc::channel::<AgentEvent>(1);
     let hub = Arc::new(Mutex::new(Hub::new(tx)));
-    let _ui = UiSession::connect(hub.clone(), "ui-1").await;
+    let _ui = UiSession::connect(hub.clone(), "ui-1", loopal_protocol::UiCapabilities::ALL).await;
     let (agent_conn, _) = hub_server::connect_local(hub.clone(), "agent-1");
     tokio::time::sleep(Duration::from_millis(30)).await;
 

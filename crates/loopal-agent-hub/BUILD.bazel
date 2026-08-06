@@ -34,6 +34,8 @@ rust_test(
     name = "loopal-agent-hub-unit-test",
     crate = ":loopal-agent-hub",
     edition = "2024",
+    deps = ["//crates/loopal-error"],
+    proc_macro_deps = ["@crates//:async-trait"],
 )
 
 rust_test(

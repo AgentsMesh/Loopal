@@ -4,6 +4,8 @@
 
 #[path = "session_phase.rs"]
 mod session_phase;
+#[path = "startup_ui.rs"]
+mod startup_ui;
 #[path = "support.rs"]
 mod support;
 
@@ -41,10 +43,11 @@ async fn desktop_serve_emits_versioned_handshake_and_exits_with_parent() {
     let mut desktop = spawn_desktop(&home, &fixture, parent_pid);
     let desktop_pid = desktop.id().expect("desktop pid");
     let stdout = desktop.stdout.take().expect("captured Desktop stdout");
-    let (alive, ready, observed_lines) = timeout(STARTUP_DEADLINE, read_alive_and_ready(stdout))
-        .await
-        .expect("Desktop handshake deadline")
-        .expect("read Desktop handshake");
+    let (alive, ready, observed_lines, _startup_ui) =
+        timeout(STARTUP_DEADLINE, read_alive_and_ready(stdout))
+            .await
+            .expect("Desktop handshake deadline")
+            .expect("read Desktop handshake");
 
     assert!(
         observed_lines
@@ -113,7 +116,7 @@ async fn hub_shutdown_withdraws_registration_before_exit() {
     let mut desktop = spawn_desktop(&home, &fixture, parent_pid);
     let desktop_pid = desktop.id().expect("desktop pid");
     let stdout = desktop.stdout.take().expect("captured Desktop stdout");
-    let (alive, _, _) = timeout(STARTUP_DEADLINE, read_alive_and_ready(stdout))
+    let (alive, _, _, _startup_ui) = timeout(STARTUP_DEADLINE, read_alive_and_ready(stdout))
         .await
         .expect("Desktop handshake deadline")
         .expect("read Desktop handshake");

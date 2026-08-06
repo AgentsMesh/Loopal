@@ -45,7 +45,16 @@ async fn connect_ui(
     let (conn, rx) = Connection::new(transport).into_listening();
     conn.send_request(
         methods::HUB_REGISTER.name,
-        json!({"name": name, "token": token, "role": "ui_client"}),
+        json!({
+            "name": name,
+            "token": token,
+            "role": "ui_client",
+            "capabilities": {
+                "permission": true,
+                "question": true,
+                "plan_approval": true,
+            },
+        }),
     )
     .await
     .unwrap();
@@ -211,13 +220,28 @@ async fn permission_resolved_event_reaches_non_winning_ui() {
         "tool_name": "Bash",
         "tool_input": {"command": "ls"},
     });
-    let resp = agent_side
-        .send_request(methods::AGENT_PERMISSION.name, perm)
+    let response = tokio::spawn(async move {
+        agent_side
+            .send_request(methods::AGENT_PERMISSION.name, perm)
+            .await
+    });
+    let requested = next_event_matching(&mut rx_b, |payload| {
+        matches!(payload, AgentEventPayload::ToolPermissionRequest { .. })
+    })
+    .await;
+    let AgentEventPayload::ToolPermissionRequest {
+        id: interaction_id, ..
+    } = requested.payload
+    else {
+        unreachable!()
+    };
+    let resp = response
         .await
+        .expect("agent permission task panicked")
         .expect("agent gets permission response");
     assert_eq!(resp.get("allow").and_then(|v| v.as_bool()), Some(true));
 
-    // UI B (the loser) must observe ToolPermissionResolved with id "perm-1".
+    // UI B (the loser) must observe Resolved for the same opaque interaction.
     let resolved = next_event_matching(&mut rx_b, |p| {
         matches!(p, AgentEventPayload::ToolPermissionResolved { .. })
     })
@@ -225,5 +249,5 @@ async fn permission_resolved_event_reaches_non_winning_ui() {
     let AgentEventPayload::ToolPermissionResolved { id } = resolved.payload else {
         panic!();
     };
-    assert_eq!(id, "perm-1");
+    assert_eq!(id, interaction_id);
 }

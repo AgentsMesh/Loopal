@@ -35,5 +35,7 @@ mod mcp_snapshot_test;
 mod task_snapshot_test;
 #[path = "suite/thread_goal_test.rs"]
 mod thread_goal_test;
+#[path = "suite/ui_capabilities_test.rs"]
+mod ui_capabilities_test;
 #[path = "suite/user_content_test.rs"]
 mod user_content_test;

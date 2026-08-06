@@ -9,6 +9,9 @@
 
 #![cfg(unix)]
 
+#[path = "startup_ui_gate.rs"]
+mod startup_ui_gate;
+
 use std::process::Stdio;
 use std::time::{Duration, Instant};
 

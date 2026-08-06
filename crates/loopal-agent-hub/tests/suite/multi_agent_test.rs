@@ -39,7 +39,12 @@ async fn concurrent_permissions_from_two_agents() {
     let (hub, raw_rx) = make_hub();
     let _event_loop = start_event_loop(hub.clone(), raw_rx);
 
-    let ui = loopal_agent_hub::UiSession::connect(hub.clone(), "tui").await;
+    let ui = loopal_agent_hub::UiSession::connect(
+        hub.clone(),
+        "tui",
+        loopal_protocol::UiCapabilities::ALL,
+    )
+    .await;
     let ui_client = ui.client.clone();
     tokio::spawn(async move {
         let mut event_rx = ui.event_rx;

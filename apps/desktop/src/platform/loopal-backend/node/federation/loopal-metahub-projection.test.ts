@@ -85,6 +85,27 @@ describe('MetaHub projection', () => {
     vi.useRealTimers()
   })
 
+  it('preserves per-hub topology query failures for authoritative reconciliation', async () => {
+    const target = host(async (method) => {
+      if (method === 'hub/status') return status
+      if (method === 'meta/list_hubs') return list
+      return { hubs: [
+        { hub: 'hub-b', topology: { error: 'temporarily unavailable' } },
+        { hub: 'hub-c', topology: { agents: [{
+          name: 'worker', parent: null, children: [], lifecycle: 'running',
+        }] } },
+      ] }
+    })
+
+    const value = await loadMetaHubState(target, new Date('2026-01-01T00:00:00Z'), true)
+
+    expect(value).toMatchObject({
+      state: 'connected',
+      topologyUnavailableHubs: ['hub-b'],
+      topology: [expect.objectContaining({ id: 'hub-c/worker' })],
+    })
+  })
+
   it('projects qualified paths and joins remote parents to the local root', () => {
     const projected = projectTopology(topology)
     expect(projected[0]).toMatchObject({

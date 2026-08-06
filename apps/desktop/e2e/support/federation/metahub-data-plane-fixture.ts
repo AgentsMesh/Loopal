@@ -86,6 +86,7 @@ export class HubProbe {
     const probe = new HubProbe(socket)
     await probe.call('hub/register', {
       name: `metahub-e2e-${randomUUID()}`, token, role: 'ui_client',
+      capabilities: { permission: false, question: false, plan_approval: false },
     })
     return probe
   }

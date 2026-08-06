@@ -71,9 +71,10 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
         PlanApprovalResolved { id } => interactive::plan_approval_resolved(state, id),
         UserQuestionRequest {
             id,
+            logical_id,
             questions,
             classifier_running,
-        } => question::user_question_request(state, id, questions, *classifier_running),
+        } => question::user_question_request(state, id, logical_id, questions, *classifier_running),
         UserQuestionResolved { id, .. } => question::user_question_resolved(state, id),
         ClassifierProgress { id, elapsed_ms } => {
             question::classifier_progress(state, id, *elapsed_ms)

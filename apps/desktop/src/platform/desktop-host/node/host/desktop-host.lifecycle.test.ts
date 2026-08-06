@@ -23,6 +23,7 @@ describe('LoopalDesktopHost lifecycle', () => {
       name: 'desktop-test',
       token: 'secret',
       role: 'ui_client',
+      capabilities: { permission: true, question: true, plan_approval: true },
     })
 
     const listener = vi.fn()

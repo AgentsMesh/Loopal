@@ -158,12 +158,15 @@ export class LoopalLiveSession {
       this.refreshShouldEmit = false
       const snapshot = await loadSessionDetail(
         this.runtime.host, this.summaryValue, this.now, this.projector,
-        this.detailValue,
+        this.detailValue, this.attention.remoteAgentIds(),
       )
       if (!this.active) return
       this.detailValue = { ...snapshot.detail, session: this.summaryValue }
+      this.attention.reconcile(
+        snapshot.pendingAttention,
+        new Set(snapshot.authoritativeRemoteAgents),
+      )
       this.projector.finishSync(snapshot.revision, snapshot.revisions)
-      this.attention.reconcile(snapshot.pendingAttention)
       if (emit) this.sink.event({ type: 'session_detail_replaced', detail: this.detailValue })
     }
   }

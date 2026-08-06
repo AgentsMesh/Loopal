@@ -28,6 +28,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     // negligible. Permission uses the lighter `prepare` borrow path because
     // its `input` JSON can be much larger.
     let pending_question = conv.pending_question.clone();
+    let pending_plan = conv.pending_plan_approval.clone();
     let prepared_perm = conv
         .pending_permission
         .as_ref()
@@ -37,6 +38,8 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         views::question_inline::height(q, size.width)
     } else if let Some(ref prep) = prepared_perm {
         views::permission_inline::height_of(prep)
+    } else if let Some(ref plan) = pending_plan {
+        views::plan_approval_inline::height(plan, size.width)
     } else {
         input_view::input_height(&app.input, size.width, pw)
     };
@@ -94,6 +97,20 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     } else if let Some(ref prep) = prepared_perm {
         let status = app.current_transient_status().map(String::from);
         views::permission_inline::render_prepared(f, prep, layout.input, status.as_deref());
+    } else if let Some(ref plan) = pending_plan {
+        let viewport_rows = views::plan_approval_inline::content_viewport_rows(layout.input.height);
+        app.plan_approval_viewport_rows = viewport_rows;
+        app.plan_approval_scroll = app
+            .plan_approval_scroll
+            .min(views::plan_approval_inline::max_scroll(plan, viewport_rows));
+        let status = app.current_transient_status().map(String::from);
+        views::plan_approval_inline::render(
+            f,
+            plan,
+            app.plan_approval_scroll,
+            layout.input,
+            status.as_deref(),
+        );
     } else {
         let image_count = app.pending_image_count();
         views::input_view::render_input(

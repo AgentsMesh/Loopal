@@ -58,7 +58,7 @@ async fn resumed_desktop_does_not_emit_session_created() {
 
     let mut fresh = spawn_desktop_with_resume(&home, &fixture, parent_pid, None);
     let stdout = fresh.stdout.take().expect("fresh stdout");
-    let (alive, ready, _) = timeout(STARTUP_DEADLINE, read_alive_and_ready(stdout))
+    let (alive, ready, _, _startup_ui) = timeout(STARTUP_DEADLINE, read_alive_and_ready(stdout))
         .await
         .expect("fresh deadline")
         .expect("fresh handshakes");
@@ -69,10 +69,11 @@ async fn resumed_desktop_does_not_emit_session_created() {
 
     let mut resumed = spawn_desktop_with_resume(&home, &fixture, parent_pid, Some(&session_id));
     let stdout = resumed.stdout.take().expect("resume stdout");
-    let (alive, ready, lines) = timeout(STARTUP_DEADLINE, read_alive_and_ready(stdout))
-        .await
-        .expect("resume deadline")
-        .expect("resume handshakes");
+    let (alive, ready, lines, _startup_ui) =
+        timeout(STARTUP_DEADLINE, read_alive_and_ready(stdout))
+            .await
+            .expect("resume deadline")
+            .expect("resume handshakes");
     assert_eq!(ready_session_id(ready), session_id);
     assert!(
         !lines
@@ -112,6 +113,7 @@ async fn root_view_failure_follows_fresh_session_marker() {
 async fn read_until_root_error(stdout: tokio::process::ChildStdout) -> Vec<String> {
     let mut reader = BufReader::new(stdout);
     let mut lines = Vec::new();
+    let mut _startup_ui = None;
     loop {
         let mut line = String::new();
         assert_ne!(reader.read_line(&mut line).await.expect("read stdout"), 0);
@@ -119,9 +121,19 @@ async fn read_until_root_error(stdout: tokio::process::ChildStdout) -> Vec<Strin
         let Some(record) = DesktopHandshake::parse(&line).expect("valid protocol") else {
             continue;
         };
-        if let DesktopHandshakeEvent::Error { code, .. } = record.event {
-            assert_eq!(code, "root_view_not_ready");
-            return lines;
+        match record.event {
+            DesktopHandshakeEvent::Alive { addr, token, .. } => {
+                _startup_ui = Some(
+                    super::startup_ui::register(&addr, &token)
+                        .await
+                        .expect("register startup UI"),
+                );
+            }
+            DesktopHandshakeEvent::Error { code, .. } => {
+                assert_eq!(code, "root_view_not_ready");
+                return lines;
+            }
+            _ => {}
         }
     }
 }

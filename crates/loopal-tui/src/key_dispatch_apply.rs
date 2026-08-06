@@ -51,6 +51,15 @@ pub(crate) async fn apply_action(app: &mut App, action: InputAction) -> Dispatch
             crate::key_dispatch_ops::tool_permission_confirm(app).await;
             DispatchOutcome::Continue
         }
+        action @ (InputAction::PlanApprove | InputAction::PlanReject) => {
+            crate::plan_approval_ops::resolve(app, matches!(action, InputAction::PlanApprove))
+                .await;
+            DispatchOutcome::Continue
+        }
+        InputAction::PlanScroll(delta) => {
+            crate::plan_approval_ops::scroll(app, delta);
+            DispatchOutcome::Continue
+        }
         InputAction::Interrupt => {
             app.session.interrupt();
             DispatchOutcome::Continue

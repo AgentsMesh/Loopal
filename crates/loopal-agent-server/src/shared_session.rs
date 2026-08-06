@@ -23,6 +23,12 @@ pub struct ClientHandle {
     pub is_primary: bool,
 }
 
+#[derive(Clone)]
+pub(crate) struct ClientConnectionLease {
+    pub id: String,
+    pub connection: Arc<Connection<Listening>>,
+}
+
 /// A shared session that multiple clients can observe.
 pub struct SharedSession {
     pub session_id: String,
@@ -119,36 +125,42 @@ impl SharedSession {
             .collect()
     }
 
+    pub(crate) async fn connection_leases(&self) -> Vec<ClientConnectionLease> {
+        self.clients
+            .lock()
+            .await
+            .iter()
+            .map(|client| ClientConnectionLease {
+                id: client.id.clone(),
+                connection: client.connection.clone(),
+            })
+            .collect()
+    }
+
     /// Broadcast a raw AgentEvent to all clients (preserving agent_name).
     /// Used for sub-agent event forwarding where agent_name must be retained.
     pub async fn broadcast_event(&self, event: &loopal_protocol::AgentEvent) {
         if let Ok(params) = serde_json::to_value(event) {
-            for conn in self.all_connections().await {
-                let _ = conn
-                    .send_notification(
-                        loopal_ipc::protocol::methods::AGENT_EVENT.name,
-                        params.clone(),
-                    )
-                    .await;
-            }
+            crate::event_delivery::deliver(self, params).await;
         }
     }
 
-    /// Remove disconnected clients by index (called by HubFrontend after broadcast).
-    pub async fn remove_dead_connections(&self, dead_indices: &[usize]) {
+    /// Remove only the exact failed connection generations captured by a send.
+    pub(crate) async fn remove_failed_connections(&self, failed: &[ClientConnectionLease]) {
         let mut clients = self.clients.lock().await;
-        // Remove in reverse order to preserve indices
-        for &idx in dead_indices.iter().rev() {
-            if idx < clients.len() {
-                let removed = clients.remove(idx);
-                tracing::info!(client = %removed.id, "removed dead connection");
+        clients.retain(|client| {
+            let remove = failed.iter().any(|lease| {
+                lease.id == client.id && Arc::ptr_eq(&lease.connection, &client.connection)
+            });
+            if remove {
+                tracing::info!(client = %client.id, "removed failed event connection");
             }
-        }
-        // Promote new primary if needed
+            !remove
+        });
         let has_primary = clients.iter().any(|c| c.is_primary);
         if !has_primary && let Some(first) = clients.first_mut() {
             first.is_primary = true;
-            tracing::info!(client = %first.id, "promoted to primary (dead cleanup)");
+            tracing::info!(client = %first.id, "promoted to primary (event delivery cleanup)");
         }
     }
 }

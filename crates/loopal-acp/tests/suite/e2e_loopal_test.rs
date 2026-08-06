@@ -68,11 +68,20 @@ async fn test_control_request_bgtask_kill_running_process() {
         )
         .await;
     assertions::assert_json_rpc_ok(&prompt);
-    let process_id = notifications
+    let spawned = match notifications
         .iter()
         .find(|notification| notification["method"] == "_loopal/bgTask.spawned")
-        .and_then(|notification| notification["params"]["data"]["id"].as_str())
-        .expect("background spawn notification");
+        .cloned()
+    {
+        Some(notification) => notification,
+        None => harness
+            .read_until_method("_loopal/bgTask.spawned")
+            .await
+            .expect("background spawn notification"),
+    };
+    let process_id = spawned["params"]["data"]["id"]
+        .as_str()
+        .expect("background process id");
 
     let resp = harness
         .request(

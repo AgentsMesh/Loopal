@@ -78,7 +78,16 @@ pub async fn build_acp_harness(
     let _event_loop = loopal_agent_hub::start_event_loop(hub.clone(), event_rx);
 
     // 4. Connect ACP as UI client via UiSession BEFORE agent starts
-    let ui_session = UiSession::connect(hub.clone(), "acp").await;
+    let ui_session = UiSession::connect(
+        hub.clone(),
+        "acp",
+        loopal_protocol::UiCapabilities {
+            permission: true,
+            question: true,
+            plan_approval: false,
+        },
+    )
+    .await;
 
     // 5. Connect to agent, initialize + start it
     let (agent_conn, agent_incoming) = Connection::new(agent_transport).into_listening();
@@ -86,7 +95,14 @@ pub async fn build_acp_harness(
         .send_request("initialize", serde_json::json!({"protocol_version": 1}))
         .await;
     let _ = agent_conn
-        .send_request("agent/start", serde_json::json!({"cwd": cwd}))
+        .send_request(
+            "agent/start",
+            serde_json::json!({
+                "cwd": cwd,
+                // The injected test provider is registered as `anthropic`.
+                "model": "claude-opus-4-8",
+            }),
+        )
         .await;
 
     // 6. Register agent in Hub and spawn IO loop

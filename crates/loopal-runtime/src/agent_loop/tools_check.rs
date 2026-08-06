@@ -55,7 +55,7 @@ impl AgentLoopRunner {
             }
         }
 
-        self.resolve_pending(&mut approved, &mut denied, needs_classify)
+        self.resolve_pending(&mut approved, &mut denied, needs_classify, cancel)
             .await?;
 
         for (_, name, input) in &approved {

@@ -70,7 +70,9 @@ async fn apply_to_view_state(
             }
             _ => {}
         }
-        h.registry.agent_view(&addr.agent)?
+        h.registry
+            .agent_view(&addr.agent)
+            .or_else(|| h.remote_views.get(&addr.agent).cloned())?
     };
     let mut guard = reducer.lock().await;
     guard.apply(event.payload.clone())

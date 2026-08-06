@@ -32,7 +32,8 @@ pub const AGENT_CONTROL: Method = Method {
     name: "agent/control",
 };
 
-/// Interrupt the agent's current work. Fire-and-forget notification.
+/// Interrupt current work. Requests are acknowledged after the cancel signal
+/// is set; legacy fire-and-forget notifications remain supported.
 pub const AGENT_INTERRUPT: Method = Method {
     name: "agent/interrupt",
 };
@@ -90,6 +91,12 @@ pub const AGENT_QUESTION: Method = Method {
 
 pub const AGENT_PLAN_APPROVAL: Method = Method {
     name: "agent/plan_approval",
+};
+
+/// Best-effort JSON-RPC request cancellation notification.
+/// Params: `{ id: i64, method?: String }`.
+pub const REQUEST_CANCEL: Method = Method {
+    name: "$/cancelRequest",
 };
 
 // ── Multi-client session sharing ───────────────────────────────

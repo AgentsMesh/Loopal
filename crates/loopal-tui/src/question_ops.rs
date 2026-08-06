@@ -129,7 +129,9 @@ pub fn route_paste(app: &mut App, text: &str) -> bool {
 /// AskUser call) and signals `cancelled=true` to the LLM via the protocol.
 pub(crate) async fn cancel(app: &mut App) {
     app.clear_transient_status();
-    let pending = app.with_active_conversation_mut(|conv| conv.pending_question.take());
+    // The Hub's Resolved event is authoritative. Keep the prompt visible if
+    // the response RPC fails so the user can retry instead of losing it.
+    let pending = app.with_active_conversation(|conv| conv.pending_question.clone());
     if let Some(q) = pending {
         let agent = app.session.lock().active_view.clone();
         app.session.cancel_question(&agent, &q.id).await;
@@ -147,7 +149,7 @@ pub(crate) async fn confirm(app: &mut App) {
         return;
     }
     app.clear_transient_status();
-    let pending = app.with_active_conversation_mut(|conv| conv.pending_question.take());
+    let pending = app.with_active_conversation(|conv| conv.pending_question.clone());
     if let Some(q) = pending {
         let answers = compute_question_answers(&q);
         let agent = app.session.lock().active_view.clone();

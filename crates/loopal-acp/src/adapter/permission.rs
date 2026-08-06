@@ -15,13 +15,13 @@ impl AcpAdapter {
     pub(crate) async fn handle_permission_request(
         &self,
         agent_name: String,
-        tool_call_id: String,
+        interaction_id: String,
         tool_name: String,
         tool_input: Value,
         session_id: &str,
     ) {
         let tool_call = ToolCallUpdate::new(
-            ToolCallId::new(tool_call_id.as_str()),
+            ToolCallId::new(interaction_id.as_str()),
             ToolCallUpdateFields::new()
                 .status(ToolCallStatus::Pending)
                 .title(tool_name.clone())
@@ -72,14 +72,14 @@ impl AcpAdapter {
         };
 
         self.client
-            .respond_permission(&agent_name, &tool_call_id, allow)
+            .respond_permission(&agent_name, &interaction_id, allow)
             .await;
     }
 
     pub(crate) async fn handle_question_request(
         &self,
         agent_name: String,
-        question_id: String,
+        interaction_id: String,
         questions: Vec<Question>,
     ) {
         let ext_params = serde_json::json!({
@@ -100,10 +100,12 @@ impl AcpAdapter {
         };
 
         if answers.is_empty() {
-            self.client.cancel_question(&agent_name, &question_id).await;
+            self.client
+                .cancel_question(&agent_name, &interaction_id)
+                .await;
         } else {
             self.client
-                .respond_question(&agent_name, &question_id, answers)
+                .respond_question(&agent_name, &interaction_id, answers)
                 .await;
         }
     }

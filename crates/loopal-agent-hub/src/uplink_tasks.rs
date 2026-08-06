@@ -50,14 +50,16 @@ pub(crate) async fn heartbeat(uplink: &HubUplink, count: usize) -> Result<(), St
 }
 
 pub(crate) async fn cleanup(hub: &Arc<Mutex<Hub>>, uplink: &Arc<HubUplink>) {
-    let mut locked = hub.lock().await;
-    if locked
-        .uplink
-        .as_ref()
-        .is_some_and(|active| Arc::ptr_eq(active, uplink))
     {
-        locked.uplink = None;
+        let mut locked = hub.lock().await;
+        if locked
+            .uplink
+            .as_ref()
+            .is_some_and(|active| Arc::ptr_eq(active, uplink))
+        {
+            locked.uplink = None;
+        }
     }
-    drop(locked);
+    crate::pending_relay::cleanup_pending_for_uplink(hub, uplink).await;
     uplink.connection().close().await;
 }

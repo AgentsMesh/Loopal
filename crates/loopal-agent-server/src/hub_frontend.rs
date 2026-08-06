@@ -9,6 +9,7 @@ use loopal_runtime::frontend::permission_handler::PermissionHandler;
 use loopal_runtime::frontend::question_handler::QuestionHandler;
 use loopal_runtime::frontend::traits::{AgentFrontend, EventEmitter};
 use loopal_tool_api::PermissionDecision;
+use tokio_util::sync::CancellationToken;
 
 use crate::hub_broadcaster::HubBroadcaster;
 use crate::hub_input_receiver::HubInputReceiver;
@@ -31,6 +32,7 @@ impl HubFrontend {
         input_rx: tokio::sync::mpsc::Receiver<AgentInput>,
         agent_name: Option<String>,
         interrupt_rx: tokio::sync::watch::Receiver<u64>,
+        shutdown: CancellationToken,
         permission_handler: Box<dyn PermissionHandler>,
         question_handler: Box<dyn QuestionHandler>,
     ) -> Self {
@@ -38,7 +40,7 @@ impl HubFrontend {
         Self {
             session: session.clone(),
             broadcaster: HubBroadcaster::new(session, qa),
-            input: HubInputReceiver::new(input_rx, interrupt_rx),
+            input: HubInputReceiver::new(input_rx, interrupt_rx, shutdown),
             permission_handler,
             question_handler,
         }
@@ -59,7 +61,15 @@ impl HubFrontend {
         let perm: Box<dyn PermissionHandler> =
             Box::new(IpcPermissionHandler::new(session_ref.clone()));
         let q: Box<dyn QuestionHandler> = Box::new(IpcQuestionHandler::new(session_ref.clone()));
-        Self::new(session_ref, input_rx, agent_name, interrupt_rx, perm, q)
+        Self::new(
+            session_ref,
+            input_rx,
+            agent_name,
+            interrupt_rx,
+            CancellationToken::new(),
+            perm,
+            q,
+        )
     }
 }
 

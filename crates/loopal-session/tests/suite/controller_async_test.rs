@@ -96,6 +96,53 @@ async fn hub_respond_permission_sends_request() {
     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 }
 
+async fn capture_plan_response(approve: bool) -> serde_json::Value {
+    use loopal_agent_hub::HubClient;
+    use std::sync::Arc;
+    use tokio::io::AsyncBufReadExt as _;
+
+    let (client_end, server_end) = tokio::io::duplex(4096);
+    let (client_reader, client_writer) = tokio::io::split(client_end);
+    let (server_reader, _server_writer) = tokio::io::split(server_end);
+    let transport: Arc<dyn loopal_ipc::transport::Transport> =
+        Arc::new(loopal_ipc::StdioTransport::new(
+            Box::new(tokio::io::BufReader::new(client_reader)),
+            Box::new(client_writer),
+        ));
+    let (conn, _rx) = loopal_ipc::connection::Connection::new(transport).into_listening();
+    let ctrl = SessionController::with_hub(Arc::new(HubClient::new(conn)));
+    let send = tokio::spawn(async move {
+        ctrl.respond_plan_approval("main", "plan-42", approve).await;
+    });
+
+    let mut line = String::new();
+    tokio::time::timeout(
+        std::time::Duration::from_millis(500),
+        tokio::io::BufReader::new(server_reader).read_line(&mut line),
+    )
+    .await
+    .expect("server side must receive a request")
+    .expect("read ok");
+    send.abort();
+    serde_json::from_str(line.trim()).expect("valid JSON-RPC request")
+}
+
+#[tokio::test]
+async fn hub_plan_approval_sends_approve_response() {
+    let request = capture_plan_response(true).await;
+    assert_eq!(request["method"], "hub/plan_approval_response");
+    assert_eq!(request["params"]["agent_name"], "main");
+    assert_eq!(request["params"]["request_id"], "plan-42");
+    assert_eq!(request["params"]["decision"], "approve");
+}
+
+#[tokio::test]
+async fn hub_plan_approval_sends_reject_response() {
+    let request = capture_plan_response(false).await;
+    assert_eq!(request["params"]["decision"], "reject");
+    assert!(request["params"]["edited_plan"].is_null());
+}
+
 #[tokio::test]
 async fn shutdown_hub_local_mode_is_noop() {
     let (ctrl, mut control_rx, mut perm_rx) = make_controller();

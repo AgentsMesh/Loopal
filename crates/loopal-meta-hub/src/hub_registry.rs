@@ -20,6 +20,7 @@ const HEARTBEAT_DISCONNECT_TIMEOUT: Duration = Duration::from_secs(90);
 /// Manages the set of connected sub-hubs.
 pub struct HubRegistry {
     hubs: HashMap<String, ManagedHub>,
+    reservations: HashMap<String, Arc<Connection<Listening>>>,
 }
 
 impl Default for HubRegistry {
@@ -32,6 +33,7 @@ impl HubRegistry {
     pub fn new() -> Self {
         Self {
             hubs: HashMap::new(),
+            reservations: HashMap::new(),
         }
     }
 
@@ -42,6 +44,10 @@ impl HubRegistry {
         conn: Arc<Connection<Listening>>,
         capabilities: Vec<String>,
     ) -> Result<(), String> {
+        self.remove_stale_reservation(name);
+        if self.reservations.contains_key(name) {
+            return Err(format!("hub '{name}' registration is already pending"));
+        }
         if self
             .hubs
             .get(name)
@@ -55,6 +61,72 @@ impl HubRegistry {
             .insert(name.to_string(), ManagedHub::new(conn, info));
         tracing::info!(hub = %name, "sub-hub registered");
         Ok(())
+    }
+
+    /// Reserve a hub name while its registration acknowledgement is written.
+    /// Reservations are not routable or visible in registry snapshots.
+    pub fn reserve_registration(
+        &mut self,
+        name: &str,
+        conn: Arc<Connection<Listening>>,
+    ) -> Result<(), String> {
+        self.remove_stale_reservation(name);
+        if self.reservations.contains_key(name) {
+            return Err(format!("hub '{name}' registration is already pending"));
+        }
+        if self
+            .hubs
+            .get(name)
+            .is_some_and(|hub| hub.connection().is_connected())
+        {
+            return Err(format!("hub '{name}' already registered"));
+        }
+        self.hubs.remove(name);
+        self.reservations.insert(name.to_string(), conn);
+        Ok(())
+    }
+
+    /// Promote the reservation owned by `conn` to an active registry entry.
+    pub fn activate_registration(
+        &mut self,
+        name: &str,
+        conn: &Arc<Connection<Listening>>,
+        capabilities: Vec<String>,
+    ) -> Result<(), String> {
+        let Some(reserved) = self.reservations.get(name) else {
+            return Err(format!("hub '{name}' registration reservation was lost"));
+        };
+        if !Arc::ptr_eq(reserved, conn) {
+            return Err(format!(
+                "hub '{name}' registration reservation changed owner"
+            ));
+        }
+        if !conn.is_connected() {
+            self.reservations.remove(name);
+            return Err(format!(
+                "hub '{name}' disconnected before registration activation"
+            ));
+        }
+        self.reservations.remove(name);
+        let info = HubInfo::new(name, capabilities);
+        self.hubs
+            .insert(name.to_string(), ManagedHub::new(conn.clone(), info));
+        tracing::info!(hub = %name, "sub-hub registered");
+        Ok(())
+    }
+
+    /// Cancel only the reservation owned by `conn`.
+    pub fn cancel_registration(&mut self, name: &str, conn: &Arc<Connection<Listening>>) -> bool {
+        if self
+            .reservations
+            .get(name)
+            .is_some_and(|reserved| Arc::ptr_eq(reserved, conn))
+        {
+            self.reservations.remove(name);
+            true
+        } else {
+            false
+        }
     }
 
     /// Unregister a sub-hub (on disconnect or shutdown).
@@ -92,6 +164,13 @@ impl HubRegistry {
         self.hubs.get(name).map(|h| Arc::clone(&h.conn))
     }
 
+    /// Whether `conn` still owns the active registration for `name`.
+    pub fn is_active_connection(&self, name: &str, conn: &Arc<Connection<Listening>>) -> bool {
+        self.hubs
+            .get(name)
+            .is_some_and(|hub| Arc::ptr_eq(hub.connection(), conn))
+    }
+
     /// Update heartbeat for a sub-hub.
     pub fn heartbeat(&mut self, name: &str, agent_count: usize) -> Result<(), String> {
         let hub = self
@@ -100,6 +179,19 @@ impl HubRegistry {
             .ok_or_else(|| format!("unknown hub '{name}'"))?;
         hub.info_mut().heartbeat(agent_count);
         Ok(())
+    }
+
+    /// Update heartbeat only if it comes from the active connection lease.
+    pub fn heartbeat_connection(
+        &mut self,
+        name: &str,
+        conn: &Arc<Connection<Listening>>,
+        agent_count: usize,
+    ) -> Result<(), String> {
+        if !self.is_active_connection(name, conn) {
+            return Err(format!("hub '{name}' connection is no longer active"));
+        }
+        self.heartbeat(name, agent_count)
     }
 
     /// List all registered hub names.
@@ -163,5 +255,15 @@ impl HubRegistry {
     /// Get a snapshot of all hub info (for topology queries).
     pub fn snapshot(&self) -> Vec<HubInfo> {
         self.hubs.values().map(|h| h.info().clone()).collect()
+    }
+
+    fn remove_stale_reservation(&mut self, name: &str) {
+        if self
+            .reservations
+            .get(name)
+            .is_some_and(|conn| !conn.is_connected())
+        {
+            self.reservations.remove(name);
+        }
     }
 }

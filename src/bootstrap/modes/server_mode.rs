@@ -12,7 +12,7 @@ use std::sync::Arc;
 use tracing::info;
 
 use loopal_agent_hub::{HubClient, UiSession};
-use loopal_protocol::{AgentEvent, AgentEventPayload};
+use loopal_protocol::{AgentEvent, AgentEventPayload, UiCapabilities};
 
 use crate::cli::Cli;
 
@@ -26,13 +26,18 @@ pub async fn run(
         cli.child.ephemeral
     );
 
-    let ctx = super::hub_bootstrap::bootstrap_hub_and_agent(cli, cwd, config, None).await?;
-    // Subscribe BEFORE starting the broadcast forwarder so we do not
-    // miss early events emitted during agent boot (Started, model
-    // info, AwaitingInput, etc.).
-    let ui_session = UiSession::connect(ctx.hub.clone(), "server").await;
+    let prepared = super::hub_bootstrap::prepare_hub_and_agent(cli, cwd, config).await?;
+    // Install the real responder lease before consuming the typestate that is
+    // allowed to start the root agent.
+    let capabilities = UiCapabilities {
+        permission: true,
+        question: true,
+        plan_approval: true,
+    };
+    let ui_session = UiSession::connect(prepared.hub().clone(), "server", capabilities).await;
     info!("server client connected to Hub");
-    let _event_loop = loopal_agent_hub::start_event_loop(ctx.hub.clone(), ctx.event_rx);
+    let ctx = super::hub_bootstrap::start_prepared_hub_and_agent(prepared, cli, cwd, config, None)
+        .await?;
 
     let output = consume_events(ui_session.event_rx, ui_session.client.clone()).await;
 
@@ -86,6 +91,12 @@ async fn consume_events(
                             .collect();
                         client.respond_question(&agent_name, &id, answers).await;
                     }
+                    AgentEventPayload::PlanApprovalRequest { id, .. } => {
+                        info!(agent = %agent_name, request_id = %id, "server: auto-approving plan");
+                        client
+                            .respond_plan_approval(&agent_name, &id, "approve", None)
+                            .await;
+                    }
                     AgentEventPayload::AwaitingInput if seen_stream => break,
                     AgentEventPayload::Finished => break,
                     AgentEventPayload::Error { message } => {
@@ -104,4 +115,48 @@ async fn consume_events(
 
     eprintln!();
     last_text
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use loopal_ipc::connection::{Connection, Incoming};
+
+    #[tokio::test]
+    async fn server_auto_approves_plan_requests() {
+        let (client_transport, server_transport) = loopal_ipc::duplex_pair();
+        let (client_conn, _client_rx) = Connection::new(client_transport).into_listening();
+        let (server_conn, mut server_rx) = Connection::new(server_transport).into_listening();
+        let responder = tokio::spawn(async move {
+            let Some(Incoming::Request { id, method, params }) = server_rx.recv().await else {
+                panic!("expected plan approval response request");
+            };
+            assert_eq!(
+                method,
+                loopal_ipc::protocol::methods::HUB_PLAN_APPROVAL_RESPONSE.name
+            );
+            assert_eq!(params["request_id"], "plan-1");
+            assert_eq!(params["decision"], "approve");
+            server_conn
+                .respond(id, serde_json::json!({"resolved": true}))
+                .await
+                .unwrap();
+        });
+
+        let (event_tx, event_rx) = tokio::sync::broadcast::channel(4);
+        event_tx
+            .send(AgentEvent::root(AgentEventPayload::PlanApprovalRequest {
+                id: "plan-1".into(),
+                plan_content: "# Plan".into(),
+                plan_path: "/tmp/plan.md".into(),
+            }))
+            .unwrap();
+        event_tx
+            .send(AgentEvent::root(AgentEventPayload::Finished))
+            .unwrap();
+
+        let client = Arc::new(HubClient::new(client_conn));
+        assert!(consume_events(event_rx, client).await.is_empty());
+        responder.await.unwrap();
+    }
 }

@@ -326,7 +326,16 @@ async fn register_ui_client(
         TIMEOUT,
         conn.send_request(
             methods::HUB_REGISTER.name,
-            json!({"name": name, "token": token, "role": "ui_client"}),
+            json!({
+                "name": name,
+                "token": token,
+                "role": "ui_client",
+                "capabilities": {
+                    "permission": false,
+                    "question": false,
+                    "plan_approval": false,
+                },
+            }),
         ),
     )
     .await

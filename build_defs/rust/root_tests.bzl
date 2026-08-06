@@ -3,10 +3,11 @@
 load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_test")
 load("//build_defs/rust:desktop_test.bzl", "desktop_serve_test")
 
-def _binary_e2e(name, src, deps):
+def _binary_e2e(name, src, deps, extra_srcs = []):
     rust_test(
         name = name,
-        srcs = [src],
+        srcs = [src] + extra_srcs,
+        crate_root = src,
         data = [":loopal"],
         edition = "2024",
         env = {"LOOPAL_BINARY": "$(rootpath :loopal)"},
@@ -58,7 +59,10 @@ def loopal_root_tests():
     _binary_e2e(
         name = "bootstrap_typestate_e2e_test",
         src = "tests/e2e/bootstrap_typestate.rs",
+        extra_srcs = ["tests/e2e/startup_ui_gate.rs"],
         deps = [
+            "//crates/loopal-ipc",
+            "@crates//:serde_json",
             "@crates//:tempfile",
             "@crates//:tokio",
         ],

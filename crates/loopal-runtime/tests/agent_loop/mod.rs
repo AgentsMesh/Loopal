@@ -1,6 +1,7 @@
 mod runner_support;
 pub use runner_support::{
-    in_turn, make_cancel, make_runner, make_runner_with_channels, make_test_budget, make_turn_ctx,
+    in_turn, make_cancel, make_runner, make_runner_with_channels,
+    make_runner_with_question_channel, make_test_budget, make_turn_ctx,
 };
 
 mod ask_user_schema_err_test;
@@ -34,6 +35,7 @@ mod input_resources_test;
 mod input_scheduled_test;
 mod input_test;
 mod integration_test;
+mod interactive_cancel_test;
 mod llm_test;
 mod llm_truncation_test;
 mod microcompact_e2e_test;
@@ -47,7 +49,9 @@ mod continuation_bypass_test;
 mod dispatch_test;
 mod model_routing_test;
 mod params_builder_test;
+mod permission_serial_test;
 mod permission_test_ext;
+mod plan_approval_cancel_test;
 mod plan_mode_filter_test;
 mod plan_mode_test;
 mod preflight_test;

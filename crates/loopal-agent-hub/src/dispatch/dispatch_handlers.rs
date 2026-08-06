@@ -1,6 +1,7 @@
 //! Hub request handlers — `hub/*` method implementations.
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use loopal_ipc::protocol::methods;
 use loopal_protocol::Envelope;
@@ -9,6 +10,9 @@ use tokio::sync::Mutex;
 
 use crate::hub::Hub;
 use crate::routing;
+
+#[path = "agent_command.rs"]
+mod agent_command;
 
 pub async fn handle_route(hub: &Arc<Mutex<Hub>>, params: Value) -> Result<Value, String> {
     let mut envelope: Envelope =
@@ -91,9 +95,15 @@ pub async fn handle_control(hub: &Arc<Mutex<Hub>>, params: Value) -> Result<Valu
             .get_agent_connection(&target)
             .ok_or_else(|| format!("no agent: '{target}'"))?
     };
-    conn.send_request(methods::AGENT_CONTROL.name, command)
-        .await
-        .map_err(|e| format!("control to '{target}' failed: {e}"))
+    agent_command::request(
+        conn,
+        methods::AGENT_CONTROL.name,
+        command,
+        &target,
+        "control",
+        agent_command::CONTROL_DEADLINE,
+    )
+    .await
 }
 
 pub async fn handle_interrupt(hub: &Arc<Mutex<Hub>>, params: Value) -> Result<Value, String> {
@@ -111,24 +121,62 @@ pub async fn handle_interrupt(hub: &Arc<Mutex<Hub>>, params: Value) -> Result<Va
             .get_agent_connection(&target)
             .ok_or_else(|| format!("no agent: '{target}'"))?
     };
-    conn.send_notification(methods::AGENT_INTERRUPT.name, json!({}))
+    let hub = hub.clone();
+    let coordinator = tokio::spawn(async move {
+        let result = tokio::time::timeout(
+            Duration::from_secs(2),
+            conn.send_request(methods::AGENT_INTERRUPT.name, json!({})),
+        )
+        .await;
+        let error = match result {
+            Ok(Ok(_)) => None,
+            Ok(Err(error)) => Some(format!("interrupt to '{target}' failed: {error}")),
+            Err(_) => Some(format!("interrupt to '{target}' timed out")),
+        };
+        if error.is_some() {
+            let _ = tokio::time::timeout(Duration::from_secs(2), conn.close()).await;
+        }
+        crate::pending_relay::cancel_pending_for_agent_connection(&hub, &target, &conn).await;
+        match error {
+            Some(error) => Err(error),
+            None => {
+                tracing::info!(target, "handle_interrupt: interrupt acknowledged");
+                Ok(json!({"ok": true}))
+            }
+        }
+    });
+    coordinator
         .await
-        .map_err(|e| format!("interrupt to '{target}' failed: {e}"))?;
-    tracing::info!(target, "handle_interrupt: notification sent");
-    Ok(json!({"ok": true}))
+        .map_err(|error| format!("interrupt coordinator failed: {error}"))?
 }
 
 pub async fn handle_shutdown_agent(hub: &Arc<Mutex<Hub>>, params: Value) -> Result<Value, String> {
-    let target = params["target"].as_str().ok_or("missing 'target' field")?;
+    let target = params["target"]
+        .as_str()
+        .ok_or("missing 'target' field")?
+        .to_string();
     let conn = {
         let h = hub.lock().await;
         h.registry
-            .get_agent_connection(target)
+            .get_agent_connection(&target)
             .ok_or_else(|| format!("no agent: '{target}'"))?
     };
-    // Send shutdown request to the agent — it will close its loop and disconnect.
-    let _ = conn
-        .send_request(methods::AGENT_SHUTDOWN.name, json!({}))
-        .await;
+    agent_command::request(
+        conn,
+        methods::AGENT_SHUTDOWN.name,
+        json!({}),
+        &target,
+        "shutdown",
+        agent_command::SHUTDOWN_DEADLINE,
+    )
+    .await?;
     Ok(json!({"ok": true}))
 }
+
+#[cfg(test)]
+#[path = "interrupt_generation_tests.rs"]
+mod interrupt_generation_tests;
+
+#[cfg(test)]
+#[path = "interrupt_tests.rs"]
+mod interrupt_tests;

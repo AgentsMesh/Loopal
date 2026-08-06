@@ -23,7 +23,7 @@ pub(crate) async fn forward(
         .ok_or("remote relay missing operation")?;
     if !matches!(
         operation,
-        "question_request" | "question_response" | "control" | "interrupt"
+        "question_request" | "question_response" | "question_cancel" | "control" | "interrupt"
     ) {
         return Err(format!("unsupported remote relay operation: {operation}"));
     }

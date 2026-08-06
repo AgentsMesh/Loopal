@@ -50,10 +50,9 @@ async fn compat_preserves_every_reasoning_effort_on_wire() {
         Mock::given(method("POST"))
             .and(path("/v1/chat/completions"))
             .and(body_partial_json(json!({"reasoning_effort": expected})))
-            .respond_with(ResponseTemplate::new(200).set_body_raw(
-                "data: [DONE]\n\n",
-                "text/event-stream",
-            ))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_raw("data: [DONE]\n\n", "text/event-stream"),
+            )
             .expect(1)
             .mount(&server)
             .await;
@@ -68,11 +67,8 @@ async fn compat_preserves_every_reasoning_effort_on_wire() {
 
 #[tokio::test]
 async fn compat_rejects_budget_before_sending_request() {
-    let provider = OpenAiCompatProvider::new(
-        "key".into(),
-        "http://127.0.0.1:1".into(),
-        "compat".into(),
-    );
+    let provider =
+        OpenAiCompatProvider::new("key".into(), "http://127.0.0.1:1".into(), "compat".into());
     let mut params = test_chat_params();
     params.thinking = Some(ThinkingConfig::Budget { tokens: 4_096 });
     let error = match provider.stream_chat(&params).await {

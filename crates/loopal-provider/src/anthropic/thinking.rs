@@ -28,6 +28,7 @@ pub fn to_anthropic_output_config(config: &ThinkingConfig) -> Option<Value> {
     match config {
         ThinkingConfig::Effort { level } => {
             let effort = match level {
+                EffortLevel::None | EffortLevel::XHigh => return None,
                 EffortLevel::Low => "low",
                 EffortLevel::Medium => "medium",
                 EffortLevel::High => "high",

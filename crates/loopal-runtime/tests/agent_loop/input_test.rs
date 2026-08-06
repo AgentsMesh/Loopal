@@ -1,6 +1,7 @@
 use loopal_protocol::AgentEventPayload;
 use loopal_protocol::ControlCommand;
 use loopal_protocol::{Envelope, MessageSource};
+use loopal_provider_api::{EffortLevel, ThinkingConfig};
 use loopal_runtime::AgentMode;
 
 use super::{make_runner, make_runner_with_channels};
@@ -109,6 +110,56 @@ async fn test_wait_for_input_mode_switch() {
 
     let e1 = event_rx.recv().await.unwrap();
     assert!(matches!(e1.payload, AgentEventPayload::ModeChanged { ref mode } if mode == "plan"));
+}
+
+#[tokio::test]
+async fn test_wait_for_input_thinking_switch_preserves_full_effort() {
+    for level in [EffortLevel::None, EffortLevel::XHigh, EffortLevel::Max] {
+        let (mut runner, mut event_rx, _mbox_tx, ctrl_tx, _perm_tx) = make_runner_with_channels();
+        let json = serde_json::to_string(&ThinkingConfig::Effort { level }).unwrap();
+        ctrl_tx
+            .send(ControlCommand::ThinkingSwitch(json.clone()))
+            .await
+            .unwrap();
+        drop(ctrl_tx);
+
+        let _ = tokio::time::timeout(
+            std::time::Duration::from_millis(100),
+            runner.wait_for_input(),
+        )
+        .await;
+
+        assert!(matches!(
+            runner.model_config.thinking,
+            ThinkingConfig::Effort { level: actual } if actual == level
+        ));
+        let event = event_rx.recv().await.unwrap();
+        assert!(matches!(
+            event.payload,
+            AgentEventPayload::ThinkingChanged { thinking_config } if thinking_config == json
+        ));
+    }
+}
+
+#[tokio::test]
+async fn test_wait_for_input_rejects_invalid_thinking_effort() {
+    let (mut runner, mut event_rx, _mbox_tx, ctrl_tx, _perm_tx) = make_runner_with_channels();
+    let original = serde_json::to_string(&runner.model_config.thinking).unwrap();
+    ctrl_tx
+        .send(ControlCommand::ThinkingSwitch(
+            r#"{"type":"effort","level":"extreme"}"#.into(),
+        ))
+        .await
+        .unwrap();
+    drop(ctrl_tx);
+
+    let result = runner.wait_for_input().await.unwrap();
+    assert!(result.is_none());
+    assert_eq!(
+        serde_json::to_string(&runner.model_config.thinking).unwrap(),
+        original
+    );
+    assert!(event_rx.try_recv().is_err());
 }
 
 #[tokio::test]

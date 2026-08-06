@@ -65,7 +65,7 @@ impl Provider for OpenAiProvider {
             body["tool_choice"] = json!("auto");
         }
         if let Some(ref thinking_config) = params.thinking {
-            body["reasoning"] = thinking::to_openai_reasoning(thinking_config);
+            body["reasoning"] = thinking::to_openai_reasoning(thinking_config)?;
         } else if let Some(temp) = params.temperature {
             body["temperature"] = json!(temp);
         }

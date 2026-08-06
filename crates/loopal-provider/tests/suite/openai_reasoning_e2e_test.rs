@@ -1,7 +1,8 @@
 use super::stream_helpers::{collect_chunks, test_chat_params};
 use loopal_provider::OpenAiProvider;
-use loopal_provider_api::{Provider, StreamChunk};
-use wiremock::matchers::{method, path};
+use loopal_provider_api::{EffortLevel, Provider, StreamChunk, ThinkingConfig};
+use serde_json::json;
+use wiremock::matchers::{body_partial_json, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 #[tokio::test]
@@ -100,5 +101,39 @@ data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_1\",\"usage\"
             !matches!(chunk, StreamChunk::ThinkingSignature { .. }),
             "empty reasoning ID should not emit ThinkingSignature"
         );
+    }
+}
+
+#[tokio::test]
+async fn gpt_5_6_preserves_every_reasoning_effort_on_wire() {
+    for (level, expected) in [
+        (EffortLevel::None, "none"),
+        (EffortLevel::Low, "low"),
+        (EffortLevel::Medium, "medium"),
+        (EffortLevel::High, "high"),
+        (EffortLevel::XHigh, "xhigh"),
+        (EffortLevel::Max, "max"),
+    ] {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/responses"))
+            .and(body_partial_json(json!({
+                "model": "gpt-5.6-sol",
+                "reasoning": {"effort": expected, "summary": "auto"}
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_raw(
+                "event: response.completed\ndata: {\"type\":\"response.completed\",\"response\":{}}\n\n",
+                "text/event-stream",
+            ))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        let provider = OpenAiProvider::new("test-key".into()).with_base_url(mock_server.uri());
+        let mut params = test_chat_params();
+        params.model = "gpt-5.6-sol".into();
+        params.thinking = Some(ThinkingConfig::Effort { level });
+        let stream = provider.stream_chat(&params).await.unwrap();
+        drop(stream);
     }
 }

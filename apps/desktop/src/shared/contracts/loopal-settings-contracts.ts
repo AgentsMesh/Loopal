@@ -13,7 +13,7 @@ export const LoopalThinkingSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('disabled') }).strict(),
   z.object({
     type: z.literal('effort'),
-    level: z.enum(['low', 'medium', 'high', 'max']),
+    level: z.enum(['none', 'low', 'medium', 'high', 'xhigh', 'max']),
   }).strict(),
   z.object({
     type: z.literal('budget'),

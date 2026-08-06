@@ -59,7 +59,7 @@ impl AgentLoopRunner {
         let model = self.params.config.model();
         let capability = get_thinking_capability(&model);
         let resolved_thinking =
-            resolve_thinking_config(&self.model_config.thinking, capability, safe_max_tokens);
+            resolve_thinking_config(&self.model_config.thinking, capability, safe_max_tokens)?;
         Ok(ChatParams {
             model,
             turns,

@@ -16,11 +16,11 @@ export const ThinkingConfigSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('disabled') }).strict(),
   z.object({
     type: z.literal('effort'),
-    level: z.enum(['low', 'medium', 'high', 'max']),
+    level: z.enum(['none', 'low', 'medium', 'high', 'xhigh', 'max']),
   }).strict(),
   z.object({
     type: z.literal('budget'),
-    tokens: z.number().int().positive().max(10_000_000),
+    tokens: z.number().int().positive().max(4_294_967_295),
   }).strict(),
 ])
 export type ThinkingConfig = z.infer<typeof ThinkingConfigSchema>

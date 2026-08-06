@@ -20,7 +20,7 @@ pub async fn start(scenario: Value) -> (String, JoinHandle<anyhow::Result<()>>) 
     (format!("http://{address}"), task)
 }
 
-pub fn params() -> ChatParams {
+pub fn params(thinking: ThinkingConfig) -> ChatParams {
     ChatParams {
         model: "deepseek-reasoner".into(),
         turns: vec![loopal_turn::Turn::single_user_prompt(
@@ -37,15 +37,15 @@ pub fn params() -> ChatParams {
         }],
         max_tokens: 256,
         temperature: None,
-        thinking: Some(ThinkingConfig::Budget { tokens: 64 }),
+        thinking: Some(thinking),
         continuation_intent: None,
         debug_dump_dir: None,
     }
 }
 
-pub async fn collect(provider: &dyn Provider) -> Vec<StreamChunk> {
+pub async fn collect(provider: &dyn Provider, thinking: ThinkingConfig) -> Vec<StreamChunk> {
     provider
-        .stream_chat(&params())
+        .stream_chat(&params(thinking))
         .await
         .unwrap()
         .map(|item| item.unwrap())

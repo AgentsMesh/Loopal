@@ -1,7 +1,10 @@
 use super::stream_helpers::{collect_chunks, test_chat_params};
 use loopal_provider::{GoogleProvider, OpenAiCompatProvider, OpenAiProvider};
-use loopal_provider_api::{ContentBlock, Message, MessageRole, Provider, StreamChunk};
-use wiremock::matchers::{method, path};
+use loopal_provider_api::{
+    ContentBlock, EffortLevel, Message, MessageRole, Provider, StreamChunk, ThinkingConfig,
+};
+use serde_json::json;
+use wiremock::matchers::{body_partial_json, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 #[tokio::test]
@@ -31,6 +34,48 @@ async fn compat_tool_finish_emits_done_and_accepts_v1_base_url() {
         matches!(chunks.first(), Some(Ok(StreamChunk::ToolUse { name, .. })) if name == "Read")
     );
     assert!(matches!(chunks.get(1), Some(Ok(StreamChunk::Done { .. }))));
+}
+
+#[tokio::test]
+async fn compat_preserves_every_reasoning_effort_on_wire() {
+    for (level, expected) in [
+        (EffortLevel::None, "none"),
+        (EffortLevel::Low, "low"),
+        (EffortLevel::Medium, "medium"),
+        (EffortLevel::High, "high"),
+        (EffortLevel::XHigh, "xhigh"),
+        (EffortLevel::Max, "max"),
+    ] {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/chat/completions"))
+            .and(body_partial_json(json!({"reasoning_effort": expected})))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_raw("data: [DONE]\n\n", "text/event-stream"),
+            )
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let provider = OpenAiCompatProvider::new("key".into(), server.uri(), "compat".into());
+        let mut params = test_chat_params();
+        params.thinking = Some(ThinkingConfig::Effort { level });
+        let stream = provider.stream_chat(&params).await.unwrap();
+        drop(stream);
+    }
+}
+
+#[tokio::test]
+async fn compat_rejects_budget_before_sending_request() {
+    let provider =
+        OpenAiCompatProvider::new("key".into(), "http://127.0.0.1:1".into(), "compat".into());
+    let mut params = test_chat_params();
+    params.thinking = Some(ThinkingConfig::Budget { tokens: 4_096 });
+    let error = match provider.stream_chat(&params).await {
+        Ok(_) => panic!("budget must be rejected"),
+        Err(error) => error,
+    };
+    assert!(error.to_string().contains("does not accept a token budget"));
 }
 
 #[tokio::test]

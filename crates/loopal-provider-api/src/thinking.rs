@@ -11,6 +11,8 @@ pub enum ThinkingCapability {
     Adaptive,
     /// OpenAI reasoning_effort parameter (o1/o3/o3-mini/o4-mini).
     ReasoningEffort,
+    /// OpenAI full reasoning effort range (GPT-5.6 family).
+    FullReasoningEffort,
     /// Google thinkingBudget parameter (Gemini 2.5 Pro/Flash).
     ThinkingBudget,
 }
@@ -32,8 +34,31 @@ pub enum ThinkingConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum EffortLevel {
+    None,
     Low,
     Medium,
     High,
+    XHigh,
     Max,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn effort_levels_round_trip_as_lowercase_json() {
+        for (level, expected) in [
+            (EffortLevel::None, "none"),
+            (EffortLevel::Low, "low"),
+            (EffortLevel::Medium, "medium"),
+            (EffortLevel::High, "high"),
+            (EffortLevel::XHigh, "xhigh"),
+            (EffortLevel::Max, "max"),
+        ] {
+            let json = serde_json::to_string(&level).unwrap();
+            assert_eq!(json, format!("\"{expected}\""));
+            assert_eq!(serde_json::from_str::<EffortLevel>(&json).unwrap(), level);
+        }
+    }
 }

@@ -51,9 +51,11 @@ export function LoopalSettingsForm(props: Props): React.JSX.Element {
     <SelectField label={t('settings.loopal.thinking')} value={thinking} disabled={props.disabled}
       options={[
         ['auto', t('settings.loopal.auto')], ['disabled', t('settings.loopal.disabled')],
+        ['effort:none', t('settings.loopal.thinking.none')],
         ['effort:low', t('settings.loopal.thinking.low')],
         ['effort:medium', t('settings.loopal.thinking.medium')],
         ['effort:high', t('settings.loopal.thinking.high')],
+        ['effort:xhigh', t('settings.loopal.thinking.xhigh')],
         ['effort:max', t('settings.loopal.thinking.max')],
         ['budget', t('settings.loopal.thinking.budget')],
       ]} onChange={(next) => update({ thinking: parseThinking(next, props.value.thinking) })} />
@@ -121,5 +123,5 @@ function thinkingKey(value: LoopalThinking): string {
 function parseThinking(value: string, current: LoopalThinking): LoopalThinking {
   if (value === 'auto' || value === 'disabled') return { type: value }
   if (value === 'budget') return current.type === 'budget' ? current : { type: 'budget', tokens: 4096 }
-  return { type: 'effort', level: value.slice(7) as 'low' | 'medium' | 'high' | 'max' }
+  return { type: 'effort', level: value.slice(7) as 'none' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' }
 }

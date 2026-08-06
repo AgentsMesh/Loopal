@@ -115,8 +115,7 @@ async fn test_wait_for_input_mode_switch() {
 #[tokio::test]
 async fn test_wait_for_input_thinking_switch_preserves_full_effort() {
     for level in [EffortLevel::None, EffortLevel::XHigh, EffortLevel::Max] {
-        let (mut runner, mut event_rx, _mbox_tx, ctrl_tx, _perm_tx) =
-            make_runner_with_channels();
+        let (mut runner, mut event_rx, _mbox_tx, ctrl_tx, _perm_tx) = make_runner_with_channels();
         let json = serde_json::to_string(&ThinkingConfig::Effort { level }).unwrap();
         ctrl_tx
             .send(ControlCommand::ThinkingSwitch(json.clone()))

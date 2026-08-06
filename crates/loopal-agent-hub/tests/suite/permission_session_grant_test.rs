@@ -12,7 +12,12 @@ async fn session_permission_grant_skips_the_next_prompt_for_the_same_tool() {
     let (tx, rx) = mpsc::channel::<AgentEvent>(16);
     let hub = Arc::new(Mutex::new(Hub::new(tx)));
     let _events = start_event_loop(hub.clone(), rx);
-    let ui = UiSession::connect(hub.clone(), "ui-session-grant").await;
+    let ui = UiSession::connect(
+        hub.clone(),
+        "ui-session-grant",
+        loopal_protocol::UiCapabilities::ALL,
+    )
+    .await;
     let (agent, _) = hub_server::connect_local(hub.clone(), "agent-1");
     tokio::time::sleep(Duration::from_millis(50)).await;
 
@@ -41,14 +46,16 @@ async fn session_permission_grant_skips_the_next_prompt_for_the_same_tool() {
     })
     .await
     .unwrap();
-    assert!(matches!(event.payload,
-        AgentEventPayload::ToolPermissionRequest { ref id, .. } if id == "write-1"));
+    let interaction_id = match event.payload {
+        AgentEventPayload::ToolPermissionRequest { id, .. } => id,
+        _ => unreachable!(),
+    };
     ui.client
         .connection()
         .send_request(
             methods::HUB_PERMISSION_RESPONSE.name,
             json!({
-                "agent_name": "agent-1", "tool_call_id": "write-1",
+                "agent_name": "agent-1", "tool_call_id": interaction_id,
                 "allow": true, "remember_session": true,
             }),
         )

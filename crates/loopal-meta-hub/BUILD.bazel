@@ -27,11 +27,13 @@ rust_test(
     deps = [
         ":loopal-meta-hub",
         "//crates/loopal-agent-hub",
+        "//crates/loopal-error",
         "//crates/loopal-ipc",
         "//crates/loopal-protocol",
         "@crates//:tokio",
         "@crates//:serde_json",
     ],
+    proc_macro_deps = ["@crates//:async-trait"],
 )
 
 # End-to-end cluster tests (real binary, real TCP, real agent processes)

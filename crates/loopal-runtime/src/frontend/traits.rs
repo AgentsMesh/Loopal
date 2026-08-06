@@ -11,6 +11,16 @@ pub enum PlanApproval {
     Approve,
     Reject,
     ApproveWithEdits(String),
+    Cancelled(PlanApprovalCancellationReason),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlanApprovalCancellationReason {
+    Interrupted,
+    Unavailable,
+    TimedOut,
+    Superseded,
+    Transport,
 }
 
 /// Agent → consumer event/control surface.
@@ -67,7 +77,7 @@ pub trait AgentFrontend: Send + Sync {
     }
 
     async fn request_plan_approval(&self, _plan_content: &str, _plan_path: &str) -> PlanApproval {
-        PlanApproval::Reject
+        PlanApproval::Cancelled(PlanApprovalCancellationReason::Unavailable)
     }
 
     fn try_emit(&self, _payload: AgentEventPayload) -> bool {

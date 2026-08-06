@@ -8,6 +8,16 @@ pub(super) fn is_control_request(method: &str) -> bool {
     CONTROL_REQUEST_METHODS.contains(&method)
 }
 
+pub(super) fn is_recovery_request(method: &str) -> bool {
+    RECOVERY_REQUEST_METHODS.contains(&method)
+}
+
+const RECOVERY_REQUEST_METHODS: &[&str] = &[
+    methods::HUB_INTERRUPT.name,
+    methods::HUB_SHUTDOWN.name,
+    methods::HUB_SHUTDOWN_AGENT.name,
+];
+
 const CONTROL_REQUEST_METHODS: &[&str] = &[
     methods::HUB_CONTROL.name,
     methods::HUB_INTERRUPT.name,
@@ -111,5 +121,10 @@ mod tests {
         assert!(is_control_request(methods::DESKTOP_DELETE_SKILL.name));
         assert!(!is_control_request(methods::DESKTOP_LIST_SKILLS.name));
         assert!(!is_control_request(methods::DESKTOP_LIST_PLUGINS.name));
+        for method in RECOVERY_REQUEST_METHODS {
+            assert!(is_control_request(method));
+            assert!(is_recovery_request(method));
+        }
+        assert!(!is_recovery_request(methods::HUB_CONTROL.name));
     }
 }

@@ -4,7 +4,6 @@ import {
   type SessionSummary,
 } from '../../../../shared/contracts'
 import { type DesktopHostClient } from '../backend/loopal-backend-types'
-import { type AttentionEventKind } from '../attention/loopal-attention'
 import { LoopalEventProjector } from '../projections/loopal-event-projector'
 import { projectMessages } from '../projections/loopal-message-projection'
 import {
@@ -16,11 +15,20 @@ import {
 import {
   TopologySchema,
   ViewSnapshotSchema,
-  AgentListSchema,
   type Topology,
   type ViewSnapshot,
 } from '../runtime/loopal-wire'
 import { mergeRemoteAgents, readMetaHubState } from '../federation/loopal-metahub-projection'
+import {
+  loadAgentSnapshots,
+  loadControllableAgents,
+  remoteAgentIds,
+  remoteSnapshotAuthority,
+  snapshotAttention,
+  type SnapshotAttention,
+} from './loopal-session-agent-snapshots'
+
+export { type SnapshotAttention } from './loopal-session-agent-snapshots'
 
 export async function loadSessionDetail(
   host: DesktopHostClient,
@@ -28,10 +36,12 @@ export async function loadSessionDetail(
   now: () => Date,
   projector: LoopalEventProjector,
   previous?: SessionDetail,
+  knownRemoteAgents: ReadonlySet<string> = new Set(),
 ): Promise<{
   detail: SessionDetail
   revision: number
   revisions: Readonly<Record<string, number>>
+  authoritativeRemoteAgents: readonly string[]
   pendingAttention: readonly SnapshotAttention[]
 }> {
   projector.beginSync()
@@ -43,7 +53,16 @@ export async function loadSessionDetail(
   const metaHub = readMetaHubState(host, now())
   const main = ViewSnapshotSchema.parse(mainValue)
   const topology = TopologySchema.parse(topologyValue)
-  const snapshots = await loadAgentSnapshots(host, main, topology)
+  const currentRemoteAgents = remoteAgentIds(metaHub)
+  const previousRemoteAgents = new Set([
+    ...knownRemoteAgents,
+    ...(previous?.agents.flatMap((agent) => (
+      agent.qualifiedName ? [agent.qualifiedName] : []
+    )) ?? []),
+  ])
+  const snapshots = await loadAgentSnapshots(
+    host, main, topology, currentRemoteAgents, previousRemoteAgents,
+  )
   const previousLocal = previous?.agents.filter((agent) => !agent.qualifiedName) ?? []
   const agents = mergeRemoteAgents(
     mergeAgents(snapshots, topology, previousLocal, now(), controllable),
@@ -62,79 +81,13 @@ export async function loadSessionDetail(
     revisions: Object.fromEntries(
       [...snapshots].map(([agentId, snapshot]) => [agentId, snapshot.rev]),
     ),
+    authoritativeRemoteAgents: remoteSnapshotAuthority(
+      metaHub, currentRemoteAgents, previousRemoteAgents, snapshots,
+    ),
     pendingAttention: [...snapshots].flatMap(([agentId, snapshot]) => (
       snapshotAttention(agentId, snapshot)
     )),
   }
-}
-
-async function loadControllableAgents(host: DesktopHostClient): Promise<ReadonlySet<string>> {
-  try {
-    const list = AgentListSchema.parse(await host.request('hub/list_agents', {}))
-    return new Set(list.agents.filter((agent) => (
-      agent.state === 'local' || agent.state === 'connected'
-    )).map((agent) => agent.name))
-  } catch {
-    return new Set()
-  }
-}
-
-export interface SnapshotAttention {
-  readonly kind: Extract<AttentionEventKind,
-    'permission_requested' | 'question_requested' | 'plan_approval_requested'>
-  readonly agentId: string
-  readonly value: unknown
-}
-
-function snapshotAttention(agentId: string, snapshot: ViewSnapshot): SnapshotAttention[] {
-  const conversation = snapshot.state.agent.conversation
-  const pending: SnapshotAttention[] = []
-  if (conversation.pending_permission) {
-    pending.push({
-      kind: 'permission_requested', agentId, value: conversation.pending_permission,
-    })
-  }
-  if (conversation.pending_question) {
-    const question = conversation.pending_question
-    pending.push({
-      kind: 'question_requested', agentId,
-      value: {
-        id: question.id,
-        questions: question.questions,
-        classifier_running: question.classifier_status?.kind === 'running',
-        classifier_status: question.classifier_status,
-      },
-    })
-  }
-  if (conversation.pending_plan_approval) {
-    pending.push({
-      kind: 'plan_approval_requested', agentId,
-      value: conversation.pending_plan_approval,
-    })
-  }
-  return pending
-}
-
-async function loadAgentSnapshots(
-  host: DesktopHostClient,
-  main: ViewSnapshot,
-  topology: Topology,
-): Promise<Map<string, ViewSnapshot>> {
-  const result = new Map<string, ViewSnapshot>([['main', main]])
-  const names = topology.agents.map((agent) => agent.name).filter((name) => name !== 'main')
-  const snapshots = await Promise.all(names.map(async (name) => {
-    try {
-      return [name, ViewSnapshotSchema.parse(
-        await host.request('view/snapshot', { agent: name }),
-      )] as const
-    } catch {
-      return undefined
-    }
-  }))
-  for (const snapshot of snapshots) {
-    if (snapshot) result.set(snapshot[0], snapshot[1])
-  }
-  return result
 }
 
 function mergeAgents(

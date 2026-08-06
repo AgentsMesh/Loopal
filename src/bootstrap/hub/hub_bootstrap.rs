@@ -2,26 +2,24 @@ use tokio::sync::oneshot;
 
 use crate::cli::Cli;
 
-use super::typestate::{HubAliveInfo, HubBuilt};
+use super::typestate::{HubAliveInfo, HubBuilt, RootPending};
 
 pub use super::typestate::BootstrapContext;
 
-pub async fn bootstrap_hub_and_agent(
+pub async fn prepare_hub_and_agent(
     cli: &Cli,
     cwd: &std::path::Path,
     config: &loopal_config::ResolvedConfig,
-    resume: Option<&str>,
-) -> anyhow::Result<BootstrapContext> {
-    bootstrap_hub_and_agent_with_alive(cli, cwd, config, resume, None).await
+) -> anyhow::Result<RootPending> {
+    prepare_hub_and_agent_with_alive(cli, cwd, config, None).await
 }
 
-pub async fn bootstrap_hub_and_agent_with_alive(
+pub async fn prepare_hub_and_agent_with_alive(
     cli: &Cli,
     cwd: &std::path::Path,
     config: &loopal_config::ResolvedConfig,
-    resume: Option<&str>,
     alive_tx: Option<oneshot::Sender<HubAliveInfo>>,
-) -> anyhow::Result<BootstrapContext> {
+) -> anyhow::Result<RootPending> {
     let bs = HubBuilt::new(cwd, config).await;
     let bs = bs.bind_listener().await?;
     if let Some(tx) = alive_tx {
@@ -29,8 +27,18 @@ pub async fn bootstrap_hub_and_agent_with_alive(
     }
     let bs = bs.register_handlers(cli).await?;
     let bs = bs.spawn_agent_process().await?;
+    Ok(bs.start_event_loop())
+}
+
+pub async fn start_prepared_hub_and_agent(
+    prepared: RootPending,
+    cli: &Cli,
+    cwd: &std::path::Path,
+    config: &loopal_config::ResolvedConfig,
+    resume: Option<&str>,
+) -> anyhow::Result<BootstrapContext> {
     let params = build_start_params(cli, cwd, config, resume);
-    let bs = bs.start_root_agent(&params).await?;
+    let bs = prepared.start_root_agent(&params).await?;
     Ok(bs.into_context())
 }
 

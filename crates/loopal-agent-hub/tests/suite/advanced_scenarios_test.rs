@@ -85,13 +85,18 @@ async fn permission_denied_when_tui_disconnects_mid_request() {
     let (hub, _) = make_hub();
 
     // TUI connects but will be dropped before responding
-    let _tui = loopal_agent_hub::UiSession::connect(hub.clone(), "tui").await;
+    let tui = loopal_agent_hub::UiSession::connect(
+        hub.clone(),
+        "tui",
+        loopal_protocol::UiCapabilities::ALL,
+    )
+    .await;
 
     let (agent_conn, _) = hub_server::connect_local(hub.clone(), "requester");
     tokio::time::sleep(Duration::from_millis(50)).await;
 
-    // Unregister TUI from Hub (simulates TUI crash)
-    hub.lock().await.ui.unregister_client("tui");
+    // Dropping the owner must revoke the lease (simulates a TUI crash).
+    drop(tui);
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Agent requests permission — TUI gone, should get deny quickly

@@ -21,7 +21,8 @@ async fn relays_all_plan_approval_decisions() {
     ] {
         let (hub, raw_rx) = make_hub();
         let _loop = start_event_loop(hub.clone(), raw_rx);
-        let ui = UiSession::connect(hub.clone(), "desktop").await;
+        let ui =
+            UiSession::connect(hub.clone(), "desktop", loopal_protocol::UiCapabilities::ALL).await;
         let (agent, _) = hub_server::connect_local(hub.clone(), "main");
         tokio::time::sleep(Duration::from_millis(20)).await;
         let request = tokio::spawn(async move {
@@ -71,7 +72,7 @@ async fn relays_all_plan_approval_decisions() {
 }
 
 #[tokio::test]
-async fn no_ui_rejects_plan_without_leaking_pending_state() {
+async fn no_ui_cancels_plan_without_leaking_pending_state() {
     let (hub, _rx) = make_hub();
     let (agent, _) = hub_server::connect_local(hub.clone(), "main");
     let response = agent
@@ -83,6 +84,7 @@ async fn no_ui_rejects_plan_without_leaking_pending_state() {
         )
         .await
         .unwrap();
-    assert_eq!(response["decision"], "reject");
+    assert_eq!(response["decision"], "cancelled");
+    assert_eq!(response["reason"], "unavailable");
     assert!(hub.lock().await.pending_plan_approvals.is_empty());
 }

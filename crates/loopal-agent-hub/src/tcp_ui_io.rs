@@ -18,52 +18,95 @@ use tracing::{debug, info, warn};
 
 use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
-use loopal_protocol::AgentEvent;
+use loopal_protocol::{AgentEvent, UiCapabilities};
 
 use crate::dispatch::build_hub_dispatcher;
 use crate::hub::Hub;
 use crate::ui_request_loop::ui_client_io_loop;
+
+#[cfg(not(test))]
+const UI_FORWARD_DEADLINE: std::time::Duration = std::time::Duration::from_secs(5);
+#[cfg(test)]
+const UI_FORWARD_DEADLINE: std::time::Duration = std::time::Duration::from_millis(200);
 
 /// Spawn the per-TCP-UI-client tasks.
 ///
 /// 1. Register the client connection in `UiDispatcher`.
 /// 2. Spawn a forward task: subscribe broadcast → push `agent/event` notifications.
 /// 3. Spawn the IO loop that handles incoming `hub/*` and `view/*` requests.
-pub fn start_tcp_ui_io(
+pub async fn start_tcp_ui_io(
     hub: Arc<Mutex<Hub>>,
     name: &str,
     conn: Arc<Connection<Listening>>,
     rx: mpsc::Receiver<Incoming>,
+    capabilities: UiCapabilities,
+    lease_id: String,
 ) {
     let n = name.to_string();
+    let lease = lease_id;
     let hub_for_io = hub.clone();
     let conn_for_forward = conn.clone();
+    let shutdown_conn = conn.clone();
     let dispatcher = Arc::new(build_hub_dispatcher(hub.clone()));
+    let event_rx = {
+        let mut h = hub.lock().await;
+        h.ui.register_client_with_lease(&lease, &n, conn.clone(), capabilities);
+        h.ui.subscribe_events()
+    };
+    let service_rx = hub
+        .lock()
+        .await
+        .workspace
+        .as_ref()
+        .map(|service| service.subscribe());
     tokio::spawn(async move {
-        let event_rx = {
-            let mut h = hub.lock().await;
-            h.ui.register_client(&n, conn.clone());
-            h.ui.subscribe_events()
-        };
-        let service_rx = hub
-            .lock()
-            .await
-            .workspace
-            .as_ref()
-            .map(|service| service.subscribe());
         let conn_io = conn.clone();
         let hub_io = hub_for_io.clone();
-        let n_io = n.clone();
+        let n_io = lease.clone();
 
-        let forward = tokio::spawn(forward_events(n.clone(), event_rx, conn_for_forward));
-        let service_forward =
-            service_rx.map(|rx| tokio::spawn(forward_service_events(n.clone(), rx, conn.clone())));
-        ui_client_io_loop(hub_io, dispatcher, conn_io, rx, n_io).await;
-        forward.abort();
-        if let Some(task) = service_forward {
-            task.abort();
+        let mut forward = tokio::spawn(forward_events(n.clone(), event_rx, conn_for_forward));
+        let mut service_forward = tokio::spawn({
+            let n = n.clone();
+            let conn = conn.clone();
+            async move {
+                match service_rx {
+                    Some(rx) => forward_service_events(n, rx, conn).await,
+                    None => std::future::pending().await,
+                }
+            }
+        });
+        let mut input = tokio::spawn(ui_client_io_loop(hub_io, dispatcher, conn_io, rx, n_io));
+        enum Finished {
+            Input,
+            Events,
+            Service,
         }
-        hub.lock().await.ui.unregister_client(&n);
+        let finished = tokio::select! {
+            _ = &mut input => Finished::Input,
+            _ = &mut forward => Finished::Events,
+            _ = &mut service_forward => Finished::Service,
+        };
+        match finished {
+            Finished::Input => {
+                forward.abort();
+                service_forward.abort();
+                let _ = tokio::join!(forward, service_forward);
+            }
+            Finished::Events => {
+                input.abort();
+                service_forward.abort();
+                let _ = tokio::join!(input, service_forward);
+            }
+            Finished::Service => {
+                input.abort();
+                forward.abort();
+                let _ = tokio::join!(input, forward);
+            }
+        }
+        hub.lock().await.ui.unregister_client(&lease);
+        crate::pending_relay::cleanup_without_capable_ui(&hub).await;
+        let _ =
+            tokio::time::timeout(std::time::Duration::from_secs(2), shutdown_conn.close()).await;
         info!(client = %n, "TCP UI client disconnected");
     });
 }
@@ -76,8 +119,7 @@ async fn forward_service_events(
     loop {
         match event_rx.recv().await {
             Ok(event) => {
-                if conn
-                    .send_notification(event.method, event.params)
+                if send_notification_bounded(&conn, event.method, event.params)
                     .await
                     .is_err()
                 {
@@ -90,16 +132,16 @@ async fn forward_service_events(
                     return;
                 }
             }
-            Err(RecvError::Closed) => return,
+            // WorkspaceService can be replaced while the UI connection stays
+            // alive. Its old broadcast closing is not a transport failure.
+            Err(RecvError::Closed) => std::future::pending().await,
         }
     }
 }
 
-async fn send_service_lag(
-    conn: &Connection<Listening>,
-    dropped: u64,
-) -> Result<(), loopal_ipc::rpc_error::RpcError> {
-    conn.send_notification(
+async fn send_service_lag(conn: &Connection<Listening>, dropped: u64) -> Result<(), String> {
+    send_notification_bounded(
+        conn,
         methods::WORKSPACE_RESYNC_REQUIRED.name,
         serde_json::json!({
             "workspaceId": loopal_workspace::LOCAL_WORKSPACE_ID,
@@ -121,8 +163,7 @@ async fn forward_events(
                 let Ok(payload) = serde_json::to_value(&event) else {
                     continue;
                 };
-                if conn
-                    .send_notification(methods::AGENT_EVENT.name, payload)
+                if send_notification_bounded(&conn, methods::AGENT_EVENT.name, payload)
                     .await
                     .is_err()
                 {
@@ -132,11 +173,41 @@ async fn forward_events(
             }
             Err(RecvError::Lagged(n)) => {
                 warn!(client = %client, lagged = n, "TCP UI forward lagged; signaling resync");
-                let _ = conn
-                    .send_notification(methods::VIEW_RESYNC_REQUIRED.name, serde_json::json!({}))
-                    .await;
+                if send_notification_bounded(
+                    &conn,
+                    methods::VIEW_RESYNC_REQUIRED.name,
+                    serde_json::json!({}),
+                )
+                .await
+                .is_err()
+                {
+                    return;
+                }
             }
             Err(RecvError::Closed) => return,
         }
     }
 }
+
+async fn send_notification_bounded(
+    conn: &Connection<Listening>,
+    method: &str,
+    params: serde_json::Value,
+) -> Result<(), String> {
+    match tokio::time::timeout(UI_FORWARD_DEADLINE, conn.send_notification(method, params)).await {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(error)) => Err(error.to_string()),
+        Err(_) => {
+            warn!(
+                method,
+                "TCP UI notification timed out; closing lease transport"
+            );
+            let _ = tokio::time::timeout(std::time::Duration::from_secs(2), conn.close()).await;
+            Err(format!("{method} timed out"))
+        }
+    }
+}
+
+#[cfg(test)]
+#[path = "tcp_ui_io_tests.rs"]
+mod tests;

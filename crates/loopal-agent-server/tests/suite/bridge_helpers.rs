@@ -62,6 +62,9 @@ pub async fn init_and_start_with(
     let mut params = serde_json::json!({
         "prompt": prompt,
         "cwd": fixture.path().to_string_lossy().as_ref(),
+        // The injected test provider is registered as `anthropic`.
+        // Never let a developer's global default model select another provider.
+        "model": "claude-opus-4-8",
     });
     if let serde_json::Value::Object(map) = extra {
         for (k, v) in map {

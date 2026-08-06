@@ -24,7 +24,16 @@ async fn local_ui_responds_with_uplink_present() {
         hub.lock().await.uplink = Some(ul);
     }
 
-    let ui = loopal_agent_hub::UiSession::connect(hub.clone(), "local-ui").await;
+    let ui = loopal_agent_hub::UiSession::connect(
+        hub.clone(),
+        "local-ui",
+        loopal_protocol::UiCapabilities {
+            permission: true,
+            question: false,
+            plan_approval: false,
+        },
+    )
+    .await;
     let ui_client = ui.client.clone();
     tokio::spawn(async move {
         let mut event_rx = ui.event_rx;

@@ -41,14 +41,14 @@ async fn hub_interrupt_reaches_target_agent() {
     let (sender, sr) = hub_server::connect_local(hub.clone(), "sender");
     spawn_mock_agent(sender.clone(), sr);
 
-    // Target: capture incoming notification method
+    // Target: acknowledge only after the interrupt request is observed.
     let (target_conn, target_rx) = hub_server::connect_local(hub.clone(), "target");
     let (method_tx, mut method_rx) = mpsc::channel::<String>(1);
     tokio::spawn(async move {
-        let _keep = target_conn; // keep connection alive
         let mut rx = target_rx;
         while let Some(msg) = rx.recv().await {
-            if let Incoming::Notification { method, .. } = msg {
+            if let Incoming::Request { id, method, .. } = msg {
+                let _ = target_conn.respond(id, json!({"ok": true})).await;
                 let _ = method_tx.send(method).await;
             }
         }

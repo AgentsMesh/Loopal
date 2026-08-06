@@ -5,4 +5,5 @@ mod dispatch_loop;
 mod spawn;
 
 pub use dispatch_loop::agent_io_loop;
+pub(crate) use spawn::start_reserved_agent_io;
 pub use spawn::{spawn_io_loop, start_agent_io};

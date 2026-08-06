@@ -158,6 +158,7 @@ fn parent_only_flags_do_not_leak_into_child() {
         "--attach-hub",
         "--hub-token",
         "--hub-only",
+        "--require-ui-ready",
         "--list-hubs",
         "--attach-hub-pid",
         "--kill-hub",

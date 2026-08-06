@@ -14,6 +14,7 @@ pub mod mcp_page;
 pub mod panel_header;
 pub mod permission_inline;
 pub mod picker;
+pub mod plan_approval_inline;
 pub mod progress;
 pub mod question_inline;
 mod question_inline_body;

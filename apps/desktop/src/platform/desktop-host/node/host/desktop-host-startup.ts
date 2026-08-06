@@ -120,6 +120,7 @@ export async function initializeGeneration(
       name: options.clientName ?? `loopal-desktop-${randomUUID()}`,
       token: alive.token,
       role: 'ui_client',
+      capabilities: { permission: true, question: true, plan_approval: true },
     }),
     timeout,
     'Loopal Desktop Host did not register with the Hub in time',

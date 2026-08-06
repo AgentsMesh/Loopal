@@ -1,18 +1,22 @@
 use loopal_runtime::agent_input::AgentInput;
+use tokio_util::sync::CancellationToken;
 
 pub(crate) struct HubInputReceiver {
     input_rx: tokio::sync::Mutex<tokio::sync::mpsc::Receiver<AgentInput>>,
     interrupt_rx: tokio::sync::Mutex<tokio::sync::watch::Receiver<u64>>,
+    shutdown: CancellationToken,
 }
 
 impl HubInputReceiver {
     pub fn new(
         input_rx: tokio::sync::mpsc::Receiver<AgentInput>,
         interrupt_rx: tokio::sync::watch::Receiver<u64>,
+        shutdown: CancellationToken,
     ) -> Self {
         Self {
             input_rx: tokio::sync::Mutex::new(input_rx),
             interrupt_rx: tokio::sync::Mutex::new(interrupt_rx),
+            shutdown,
         }
     }
 
@@ -23,6 +27,10 @@ impl HubInputReceiver {
         // doesn't fire immediately on re-entry.
         interrupt_rx.borrow_and_update();
         tokio::select! {
+            biased;
+            // Session shutdown is level-triggered: a turn cancellation cannot
+            // consume it before the runtime returns to the idle receive.
+            _ = self.shutdown.cancelled() => None,
             msg = rx.recv() => msg,
             _ = interrupt_rx.changed() => None,
         }
@@ -35,5 +43,27 @@ impl HubInputReceiver {
             inputs.push(msg);
         }
         inputs
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn shutdown_remains_observable_after_turn_teardown() {
+        let (_input_tx, input_rx) = tokio::sync::mpsc::channel(1);
+        let (_interrupt_tx, interrupt_rx) = tokio::sync::watch::channel(0);
+        let shutdown = CancellationToken::new();
+        shutdown.cancel();
+        let input = HubInputReceiver::new(input_rx, interrupt_rx, shutdown);
+
+        let result = tokio::time::timeout(Duration::from_secs(1), input.next())
+            .await
+            .expect("pre-existing shutdown must wake the next idle receive");
+
+        assert!(result.is_none());
     }
 }

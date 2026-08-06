@@ -52,6 +52,8 @@ mod input_scroll_edge_test;
 mod input_scroll_test;
 #[path = "suite/input_test.rs"]
 mod input_test;
+#[path = "suite/interaction_terminal_state_test.rs"]
+mod interaction_terminal_state_test;
 #[path = "suite/kill_hub_cmd_test.rs"]
 mod kill_hub_cmd_test;
 #[path = "suite/line_cache_test.rs"]
@@ -104,6 +106,8 @@ mod panel_tab_crons_test;
 mod panel_tab_test;
 #[path = "suite/permission_arrow_nav_test.rs"]
 mod permission_arrow_nav_test;
+#[path = "suite/plan_approval_test.rs"]
+mod plan_approval_test;
 #[path = "suite/question_classifier_status_test.rs"]
 mod question_classifier_status_test;
 #[path = "suite/question_confirm_test.rs"]

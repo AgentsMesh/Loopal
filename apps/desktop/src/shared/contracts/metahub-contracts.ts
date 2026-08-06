@@ -55,6 +55,7 @@ export const MetaHubRuntimeStateSchema = z.object({
   hubName: z.string().optional(),
   hubs: z.array(MetaHubInfoSchema),
   topology: z.array(MetaHubTopologyAgentSchema),
+  topologyUnavailableHubs: z.array(z.string().min(1)).optional(),
   error: z.string().optional(),
   refreshedAt: z.string().datetime(),
 })

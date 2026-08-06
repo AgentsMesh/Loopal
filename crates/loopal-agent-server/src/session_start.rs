@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use tokio::sync::Mutex;
+use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, info};
 
 use loopal_config::load_config;
@@ -23,6 +24,8 @@ pub(crate) struct SessionHandle {
     pub session: Arc<SharedSession>,
     pub agent_task: tokio::task::JoinHandle<Option<AgentOutput>>,
     pub lifecycle: loopal_runtime::LifecycleMode,
+    /// Level-triggered session termination, distinct from per-turn interrupt.
+    pub shutdown: CancellationToken,
 }
 
 pub(crate) async fn start_session(
@@ -86,6 +89,7 @@ pub(crate) async fn start_session(
         let interrupt = InterruptSignal::new();
         let (watch_tx, watch_rx) = tokio::sync::watch::channel(0u64);
         let interrupt_tx = Arc::new(watch_tx);
+        let shutdown = CancellationToken::new();
 
         let session_holder: crate::ipc_handlers::SessionRef = Arc::new(tokio::sync::RwLock::new(
             Arc::new(SharedSession::placeholder(
@@ -109,6 +113,7 @@ pub(crate) async fn start_session(
             input_rx,
             None,
             watch_rx,
+            shutdown.clone(),
             perm_handler,
             q_handler,
         ));
@@ -191,6 +196,7 @@ pub(crate) async fn start_session(
             session,
             agent_task,
             lifecycle,
+            shutdown,
         })
     }
     .instrument(session_span)

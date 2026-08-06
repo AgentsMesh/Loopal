@@ -16,22 +16,27 @@ pub async fn run(
     resume: Option<&str>,
 ) -> anyhow::Result<Option<String>> {
     info!("starting in unified Hub mode (spawn + attach)");
-    let mut handshake = super::hub_spawn::spawn_hub_subprocess(cli, cwd, resume).await?;
+    let handshake = super::hub_spawn::spawn_hub_subprocess(cli, cwd, resume).await?;
+    let super::hub_spawn::HubHandshake {
+        addr,
+        token,
+        root_session_id,
+        ui,
+        mut child,
+    } = handshake;
 
-    eprintln!("Hub listening on {}", handshake.addr);
+    eprintln!("Hub listening on {addr}");
     eprintln!("To attach a second TUI:");
-    eprintln!(
-        "  loopal --attach-hub {} --hub-token {}",
-        handshake.addr, handshake.token
-    );
+    eprintln!("  loopal --attach-hub {} --hub-token {}", addr, token);
 
-    let outcome = match super::attach_mode::run_with_addr(
+    let outcome = match super::attach_mode::run_with_registered_ui(
         cwd,
         config,
-        &handshake.addr,
-        &handshake.token,
-        Some(&handshake.root_session_id),
+        &addr,
+        &token,
+        Some(&root_session_id),
         resume,
+        ui,
     )
     .await
     {
@@ -41,8 +46,8 @@ pub async fn run(
             // attach failure we MUST kill it explicitly or it lives on
             // as an orphan that no one can reach.
             warn!(error = %e, "TUI attach failed; killing hub child to avoid orphan");
-            let _ = handshake.child.kill().await;
-            let _ = handshake.child.wait().await;
+            let _ = child.kill().await;
+            let _ = child.wait().await;
             return Err(e);
         }
     };
@@ -54,7 +59,7 @@ pub async fn run(
     // Hub was asked to shut down (`/exit` or `/kill-hub`). Wait for the
     // child to actually exit before returning so callers (worktree
     // cleanup) do not race with agent flushes.
-    match tokio::time::timeout(HUB_EXIT_GRACE, handshake.child.wait()).await {
+    match tokio::time::timeout(HUB_EXIT_GRACE, child.wait()).await {
         Ok(Ok(status)) => info!(?status, "hub child exited cleanly"),
         Ok(Err(e)) => warn!(error = %e, "hub child wait failed"),
         Err(_) => {
@@ -73,7 +78,5 @@ pub async fn run(
             eprintln!("  Run `loopal --list-hubs` to verify.");
         }
     }
-    Ok(Some(
-        outcome.session_id.unwrap_or(handshake.root_session_id),
-    ))
+    Ok(Some(outcome.session_id.unwrap_or(root_session_id)))
 }

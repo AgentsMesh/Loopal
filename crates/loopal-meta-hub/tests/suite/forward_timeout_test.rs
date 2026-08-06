@@ -22,12 +22,17 @@ async fn blackhole_forwarding_is_bounded_without_holding_registry_lock() {
         .unwrap();
     let (seen_tx, mut seen_rx) = mpsc::channel(2);
     let peer = tokio::spawn(async move {
-        for _ in 0..2 {
-            assert!(matches!(
-                peer_rx.recv().await,
-                Some(Incoming::Request { .. })
-            ));
-            seen_tx.send(()).await.unwrap();
+        let mut requests = 0;
+        while requests < 2 {
+            match peer_rx.recv().await {
+                Some(Incoming::Request { .. }) => {
+                    requests += 1;
+                    seen_tx.send(()).await.unwrap();
+                }
+                Some(Incoming::Notification { method, .. })
+                    if method == methods::REQUEST_CANCEL.name => {}
+                other => panic!("unexpected blackhole peer message: {other:?}"),
+            }
         }
     });
 

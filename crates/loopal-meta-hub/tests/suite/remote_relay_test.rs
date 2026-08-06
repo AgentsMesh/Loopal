@@ -12,7 +12,16 @@ use crate::test_helpers::*;
 #[tokio::test]
 async fn remote_question_round_trips_through_parent_hub_ui() {
     let cluster = cluster().await;
-    let ui = UiSession::connect(cluster.hub_a.clone(), "desktop-ui").await;
+    let ui = UiSession::connect(
+        cluster.hub_a.clone(),
+        "desktop-ui",
+        loopal_protocol::UiCapabilities {
+            permission: false,
+            question: true,
+            plan_approval: false,
+        },
+    )
+    .await;
     let (remote_agent, _) =
         register_mock_agent(&cluster.hub_b, "remote-worker", Some("hub-a/main")).await;
     let request = tokio::spawn(async move {
@@ -42,19 +51,23 @@ async fn remote_question_round_trips_through_parent_hub_ui() {
     .await
     .expect("remote question did not reach parent UI");
     assert_eq!(
-        event.agent_name.unwrap().agent,
+        event.agent_name.as_ref().unwrap().agent,
         "hub-b/remote-worker",
         "Desktop must receive a qualified remote agent id"
     );
+    let interaction_id = match event.payload {
+        AgentEventPayload::UserQuestionRequest { id, .. } => id,
+        _ => unreachable!(),
+    };
     ui.client
         .connection()
         .send_request(
             methods::HUB_QUESTION_RESPONSE.name,
             json!({
                 "agent_name": "hub-b/remote-worker",
-                "question_id": "remote-question",
+                "question_id": interaction_id.clone(),
                 "response": {
-                    "kind": "answered", "question_id": "remote-question",
+                    "kind": "answered", "question_id": interaction_id,
                     "answers": ["Fast"]
                 }
             }),
@@ -81,9 +94,89 @@ async fn remote_question_round_trips_through_parent_hub_ui() {
 }
 
 #[tokio::test]
-async fn qualified_remote_interrupt_reaches_child_agent() {
+async fn last_question_ui_disconnect_cancels_origin_and_snapshot_reconciles() {
     let cluster = cluster().await;
-    let ui = UiSession::connect(cluster.hub_a.clone(), "desktop-ui").await;
+    let ui = UiSession::connect(
+        cluster.hub_a.clone(),
+        "desktop-ui",
+        loopal_protocol::UiCapabilities {
+            permission: false,
+            question: true,
+            plan_approval: false,
+        },
+    )
+    .await;
+    let mut events = ui.event_rx.resubscribe();
+    let (remote_agent, _) =
+        register_mock_agent(&cluster.hub_b, "remote-worker", Some("hub-a/main")).await;
+    let request = tokio::spawn(async move {
+        remote_agent
+            .send_request(
+                methods::AGENT_QUESTION.name,
+                json!({"question_id": "disconnect", "questions": []}),
+            )
+            .await
+    });
+    let interaction_id = tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            let event = events.recv().await.unwrap();
+            if let AgentEventPayload::UserQuestionRequest { id, .. } = event.payload {
+                break id;
+            }
+        }
+    })
+    .await
+    .expect("remote question did not reach destination UI");
+
+    let snapshot = loopal_agent_hub::view_router::handle_snapshot(
+        &cluster.hub_a,
+        json!({"agent": "hub-b/remote-worker"}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        snapshot["state"]["agent"]["conversation"]["pending_question"]["id"],
+        interaction_id
+    );
+    assert_eq!(cluster.hub_a.lock().await.pending_remote_questions.len(), 1);
+
+    drop(ui);
+    let response = tokio::time::timeout(Duration::from_secs(2), request)
+        .await
+        .expect("origin agent must be cancelled immediately when the final UI disconnects")
+        .unwrap()
+        .unwrap();
+    assert_eq!(response["kind"], "cancelled");
+    assert_eq!(response["question_id"], "disconnect");
+    assert!(
+        cluster
+            .hub_a
+            .lock()
+            .await
+            .pending_remote_questions
+            .is_empty()
+    );
+
+    let snapshot = loopal_agent_hub::view_router::handle_snapshot(
+        &cluster.hub_a,
+        json!({"agent": "hub-b/remote-worker"}),
+    )
+    .await
+    .unwrap();
+    assert!(snapshot["state"]["agent"]["conversation"]["pending_question"].is_null());
+}
+
+#[tokio::test]
+async fn qualified_remote_interrupt_request_is_acknowledged_by_child_agent() {
+    let cluster = cluster().await;
+    let ui = UiSession::connect(
+        cluster.hub_a.clone(),
+        "desktop-ui",
+        loopal_protocol::UiCapabilities::NONE,
+    )
+    .await;
+    // The mock agent acknowledges every request before forwarding a copy to
+    // this receiver, so awaiting the Hub RPC below proves the ACK round trip.
     let (_agent, mut incoming) =
         register_mock_agent(&cluster.hub_b, "remote-worker", Some("hub-a/main")).await;
     ui.client
@@ -100,7 +193,7 @@ async fn qualified_remote_interrupt_reaches_child_agent() {
         .expect("remote agent connection closed");
     assert!(matches!(
         message,
-        Incoming::Notification { method, .. } if method == methods::AGENT_INTERRUPT.name
+        Incoming::Request { method, .. } if method == methods::AGENT_INTERRUPT.name
     ));
 }
 

@@ -3,7 +3,7 @@ use std::process::Stdio;
 use std::sync::Arc;
 use std::time::Duration;
 
-use loopal_ipc::connection::Connection;
+use loopal_ipc::connection::{Connection, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
 use loopal_ipc::{DESKTOP_PROTOCOL_VERSION, DesktopHandshake, DesktopHandshakeEvent, TcpTransport};
@@ -102,10 +102,16 @@ pub fn assert_common_metadata(handshake: &DesktopHandshake, pid: u32, parent_pid
 
 pub async fn read_alive_and_ready(
     stdout: tokio::process::ChildStdout,
-) -> std::io::Result<(DesktopHandshake, DesktopHandshake, Vec<String>)> {
+) -> std::io::Result<(
+    DesktopHandshake,
+    DesktopHandshake,
+    Vec<String>,
+    Arc<Connection<Listening>>,
+)> {
     let mut reader = BufReader::new(stdout);
     let mut alive = None;
     let mut ready = None;
+    let mut ui = None;
     let mut observed = Vec::new();
 
     for _ in 0..64 {
@@ -122,7 +128,10 @@ pub async fn read_alive_and_ready(
             continue;
         };
         match &handshake.event {
-            DesktopHandshakeEvent::Alive { .. } => alive = Some(handshake.clone()),
+            DesktopHandshakeEvent::Alive { addr, token, .. } => {
+                alive = Some(handshake.clone());
+                ui = Some(super::startup_ui::register(addr, token).await?);
+            }
             DesktopHandshakeEvent::SessionCreated { .. } => {}
             DesktopHandshakeEvent::Ready { .. } => ready = Some(handshake.clone()),
             DesktopHandshakeEvent::Error { code, message } => {
@@ -131,8 +140,13 @@ pub async fn read_alive_and_ready(
                 )));
             }
         }
-        if alive.is_some() && ready.is_some() {
-            return Ok((alive.take().unwrap(), ready.take().unwrap(), observed));
+        if alive.is_some() && ready.is_some() && ui.is_some() {
+            return Ok((
+                alive.take().unwrap(),
+                ready.take().unwrap(),
+                observed,
+                ui.take().unwrap(),
+            ));
         }
     }
     Err(std::io::Error::other(
@@ -147,7 +161,16 @@ pub async fn request_hub_shutdown(addr: &str, token: &str) {
     let registered = connection
         .send_request(
             methods::HUB_REGISTER.name,
-            serde_json::json!({"name": "desktop-e2e", "token": token, "role": "ui_client"}),
+            serde_json::json!({
+                "name": "desktop-e2e",
+                "token": token,
+                "role": "ui_client",
+                "capabilities": {
+                    "permission": false,
+                    "question": false,
+                    "plan_approval": false,
+                },
+            }),
         )
         .await
         .expect("register Desktop E2E client");

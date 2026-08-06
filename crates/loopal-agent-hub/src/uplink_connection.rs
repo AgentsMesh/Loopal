@@ -13,7 +13,10 @@ use loopal_ipc::tcp::TcpTransport;
 use crate::{Hub, HubUplink};
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+#[cfg(not(test))]
 const META_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
+#[cfg(test)]
+const META_REQUEST_TIMEOUT: Duration = Duration::from_millis(100);
 const UNREGISTER_TIMEOUT: Duration = Duration::from_secs(2);
 
 #[derive(Debug, Deserialize)]
@@ -41,6 +44,7 @@ pub async fn connect(
         }
     };
     if let Some(stale) = stale {
+        crate::pending_relay::cleanup_pending_for_uplink(hub, &stale).await;
         stale.connection().close().await;
     }
     let stream = tokio::time::timeout(CONNECT_TIMEOUT, TcpStream::connect(address))
@@ -103,6 +107,7 @@ pub async fn connect(
 pub async fn disconnect(hub: &Arc<Mutex<Hub>>) -> Result<Value, String> {
     let uplink = hub.lock().await.uplink.take();
     if let Some(uplink) = uplink {
+        crate::pending_relay::cleanup_pending_for_uplink(hub, &uplink).await;
         let unregister = uplink
             .connection()
             .send_request(methods::META_UNREGISTER.name, json!({}));

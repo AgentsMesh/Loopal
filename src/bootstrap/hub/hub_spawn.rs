@@ -19,6 +19,8 @@ pub struct HubHandshake {
     pub addr: String,
     pub token: String,
     pub root_session_id: String,
+    /// The real TUI lease registered between ALIVE and READY.
+    pub ui: super::attach_bridge::RegisteredUi,
     /// Hub child process handle. `kill_on_drop(false)` is set, so dropping
     /// without `wait()` leaves the child running (the detach case).
     pub child: Child,
@@ -57,8 +59,8 @@ pub async fn spawn_hub_subprocess(
                 HANDSHAKE_TIMEOUT.as_secs()
             )
         });
-    let (addr, token, root_session_id) = match outcome.and_then(|res| res) {
-        Ok(triple) => triple,
+    let (addr, token, root_session_id, ui) = match outcome.and_then(|res| res) {
+        Ok(handshake) => handshake,
         Err(e) => {
             // Hub child is detached (setsid + kill_on_drop=false). On
             // handshake failure we MUST kill it explicitly or it lives
@@ -73,16 +75,20 @@ pub async fn spawn_hub_subprocess(
         addr,
         token,
         root_session_id,
+        ui,
         child,
     })
 }
 
-async fn read_handshake<R>(mut reader: BufReader<R>) -> anyhow::Result<(String, String, String)>
+async fn read_handshake<R>(
+    mut reader: BufReader<R>,
+) -> anyhow::Result<(String, String, String, super::attach_bridge::RegisteredUi)>
 where
     R: tokio::io::AsyncRead + Unpin,
 {
     let mut alive: Option<(String, String)> = None;
     let mut ready_session: Option<String> = None;
+    let mut ui = None;
     let mut skipped = Vec::new();
 
     for _ in 0..HANDSHAKE_MAX_LINES {
@@ -102,23 +108,27 @@ where
             }
             Some(HandshakeLine::Ready { session_id }) => {
                 ready_session = Some(session_id);
-                if let Some((addr, token)) = alive.clone() {
-                    return Ok((addr, token, ready_session.unwrap()));
-                }
             }
             Some(HandshakeLine::Legacy {
                 addr,
                 token,
                 session_id,
             }) => {
-                return Ok((addr, token, session_id));
+                alive = Some((addr, token));
+                ready_session = Some(session_id);
             }
             None => skipped.push(line.trim_end().to_string()),
         }
+        if ui.is_none()
+            && let Some((addr, token)) = &alive
+        {
+            ui = Some(super::attach_bridge::connect_and_register(addr, token).await?);
+        }
         if let Some((addr, token)) = &alive
             && let Some(session_id) = &ready_session
+            && let Some(ui) = ui.take()
         {
-            return Ok((addr.clone(), token.clone(), session_id.clone()));
+            return Ok((addr.clone(), token.clone(), session_id.clone(), ui));
         }
     }
     anyhow::bail!(
@@ -140,6 +150,7 @@ fn format_skipped_lines(skipped: &[String]) -> String {
 
 fn build_hub_only_argv(cli: &Cli, resume: Option<&str>) -> Vec<std::ffi::OsString> {
     let mut argv = cli.child.to_args();
+    argv.push("--require-ui-ready".into());
     if let Some(id) = resume {
         argv.push("--resume".into());
         argv.push(id.into());

@@ -3,10 +3,10 @@ use std::sync::Arc;
 use loopal_config::Settings;
 use loopal_context::ContextBudget;
 use loopal_kernel::Kernel;
-use loopal_protocol::{AgentEvent, ControlCommand, Envelope};
+use loopal_protocol::{AgentEvent, ControlCommand, Envelope, UserQuestionResponse};
 use loopal_runtime::agent_loop::{AgentLoopRunner, cancel::TurnCancel};
 use loopal_runtime::frontend::{
-    DenyAllHandler, ManualPermissionHandler, UnsupportedQuestionHandler,
+    DenyAllHandler, ManualPermissionHandler, ManualQuestionHandler, UnsupportedQuestionHandler,
 };
 use loopal_runtime::{
     AgentConfig, AgentDeps, AgentLoopParamsBuilder, InterruptHandle, UnifiedFrontend,
@@ -125,4 +125,45 @@ pub fn make_runner_with_channels() -> (
     let mut runner = AgentLoopRunner::new(params);
     runner.start_turn_record(loopal_turn::TurnTrigger::Resume);
     (runner, event_rx, mbox_tx, ctrl_tx, perm_tx)
+}
+
+pub fn make_runner_with_question_channel() -> (
+    AgentLoopRunner,
+    mpsc::Receiver<AgentEvent>,
+    mpsc::Sender<UserQuestionResponse>,
+) {
+    let fixture = TestFixture::new();
+    let (event_tx, event_rx) = mpsc::channel(16);
+    let (_mbox_tx, mailbox_rx) = mpsc::channel::<Envelope>(16);
+    let (_ctrl_tx, control_rx) = mpsc::channel::<ControlCommand>(16);
+    let (question_tx, question_rx) = mpsc::channel(16);
+    let frontend = Arc::new(
+        UnifiedFrontend::new(
+            None,
+            event_tx.clone(),
+            mailbox_rx,
+            control_rx,
+            None,
+            Box::new(DenyAllHandler),
+            Box::new(ManualQuestionHandler::new(event_tx, question_rx)),
+        )
+        .with_plan_approval(loopal_runtime::PlanApproval::Approve),
+    );
+    let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
+    let params = AgentLoopParamsBuilder::new(
+        AgentConfig::default(),
+        AgentDeps {
+            kernel,
+            frontend,
+            session_manager: fixture.session_manager(),
+            decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
+        },
+        fixture.test_session("test-question-channel"),
+        make_test_budget(),
+        InterruptHandle::new(),
+    )
+    .build();
+    let mut runner = AgentLoopRunner::new(params);
+    runner.start_turn_record(loopal_turn::TurnTrigger::Resume);
+    (runner, event_rx, question_tx)
 }

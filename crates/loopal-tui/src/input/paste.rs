@@ -25,7 +25,9 @@ const LARGE_PASTE_CHAR_THRESHOLD: usize = 500;
 
 pub fn apply_paste_result(app: &mut App, result: PasteResult) {
     let in_modal = app.with_active_conversation(|conv| {
-        conv.pending_question.is_some() || conv.pending_permission.is_some()
+        conv.pending_question.is_some()
+            || conv.pending_permission.is_some()
+            || conv.pending_plan_approval.is_some()
     });
     match result {
         PasteResult::Image(attachment) => {

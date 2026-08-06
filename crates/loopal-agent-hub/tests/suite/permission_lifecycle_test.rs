@@ -33,7 +33,7 @@ fn key_for(agent: &str, id: &str) -> (String, String) {
 async fn ui_deny_returns_false_to_agent() {
     let (hub, raw_rx) = make_hub();
     let _event_loop = start_event_loop(hub.clone(), raw_rx);
-    let ui = UiSession::connect(hub.clone(), "ui-1").await;
+    let ui = UiSession::connect(hub.clone(), "ui-1", loopal_protocol::UiCapabilities::ALL).await;
     let (agent_conn, _) = hub_server::connect_local(hub.clone(), "agent-1");
 
     let client = ui.client.clone();
@@ -88,10 +88,10 @@ async fn no_ui_fast_denies_permission() {
 }
 
 #[tokio::test]
-async fn same_agent_duplicate_tool_call_id_overwrites_pending() {
+async fn duplicate_tool_call_id_preserves_old_pending_and_rejects_new_rpc() {
     let (hub, raw_rx) = make_hub();
     let _event_loop = start_event_loop(hub.clone(), raw_rx);
-    let ui = UiSession::connect(hub.clone(), "ui-1").await;
+    let ui = UiSession::connect(hub.clone(), "ui-1", loopal_protocol::UiCapabilities::ALL).await;
     let (agent_conn, _) = hub_server::connect_local(hub.clone(), "agent-1");
     tokio::time::sleep(Duration::from_millis(30)).await;
 
@@ -115,13 +115,19 @@ async fn same_agent_duplicate_tool_call_id_overwrites_pending() {
             )
             .await
     });
-    tokio::time::sleep(Duration::from_millis(80)).await;
-
-    ui.client.respond_permission("agent-1", "dup", true).await;
-
     let result2 = req2.await.unwrap().unwrap();
-    assert_eq!(result2["allow"], true);
-    drop(req1);
+    assert_eq!(result2["allow"], false);
+    assert!(
+        !req1.is_finished(),
+        "the original request must remain pending"
+    );
+
+    let interaction_id = crate::permission_interaction_id(&hub, "agent-1", "dup").await;
+    ui.client
+        .respond_permission("agent-1", &interaction_id, true)
+        .await;
+    let result1 = req1.await.unwrap().unwrap();
+    assert_eq!(result1["allow"], true);
     assert!(
         !hub.lock()
             .await
@@ -134,7 +140,7 @@ async fn same_agent_duplicate_tool_call_id_overwrites_pending() {
 async fn cross_agent_same_tool_call_id_isolated() {
     let (hub, raw_rx) = make_hub();
     let _event_loop = start_event_loop(hub.clone(), raw_rx);
-    let ui = UiSession::connect(hub.clone(), "ui-1").await;
+    let ui = UiSession::connect(hub.clone(), "ui-1", loopal_protocol::UiCapabilities::ALL).await;
     let (conn_a, _) = hub_server::connect_local(hub.clone(), "agent-a");
     let (conn_b, _) = hub_server::connect_local(hub.clone(), "agent-b");
     tokio::time::sleep(Duration::from_millis(30)).await;
@@ -173,11 +179,13 @@ async fn cross_agent_same_tool_call_id_isolated() {
         );
     }
 
+    let interaction_a = crate::permission_interaction_id(&hub, "agent-a", "shared").await;
+    let interaction_b = crate::permission_interaction_id(&hub, "agent-b", "shared").await;
     ui.client
-        .respond_permission("agent-a", "shared", true)
+        .respond_permission("agent-a", &interaction_a, true)
         .await;
     ui.client
-        .respond_permission("agent-b", "shared", false)
+        .respond_permission("agent-b", &interaction_b, false)
         .await;
 
     let resp_a = req_a.await.unwrap().unwrap();
@@ -199,6 +207,6 @@ async fn no_ui_question_returns_default_answer() {
     .await
     .expect("must not timeout")
     .unwrap();
-    let answer = result["answers"][0].as_str().unwrap_or("");
-    assert!(answer.contains("no UI"));
+    assert_eq!(result["kind"], "unsupported");
+    assert_eq!(result["reason"], "no question-capable UI");
 }

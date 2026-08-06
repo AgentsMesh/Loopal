@@ -6,7 +6,11 @@ use super::question_state::QuestionState;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PendingQuestion {
+    /// UI-facing opaque interaction capability.
     pub id: String,
+    /// Runtime-owned id used only for classifier progress correlation.
+    #[serde(default)]
+    pub logical_id: String,
     pub questions: Vec<Question>,
     #[serde(default)]
     pub states: Vec<QuestionState>,
@@ -22,12 +26,20 @@ impl PendingQuestion {
             .map(|q| QuestionState::new(q.options.len()))
             .collect();
         Self {
+            logical_id: id.clone(),
             id,
             questions,
             states,
             current_question: 0,
             classifier_status: ClassifierStatus::None,
         }
+    }
+
+    pub fn with_logical_id(mut self, logical_id: String) -> Self {
+        if !logical_id.is_empty() {
+            self.logical_id = logical_id;
+        }
+        self
     }
 
     pub fn with_classifier_running(mut self, running: bool) -> Self {

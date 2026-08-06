@@ -58,7 +58,12 @@ async fn snapshot_includes_pre_attach_conversation() {
     }
     tokio::time::sleep(Duration::from_millis(50)).await;
 
-    let ui = UiSession::connect(hub.clone(), "late-tui").await;
+    let ui = UiSession::connect(
+        hub.clone(),
+        "late-tui",
+        loopal_protocol::UiCapabilities::ALL,
+    )
+    .await;
     let req = ViewSnapshotRequest {
         agent: "worker".into(),
     };
@@ -122,7 +127,12 @@ async fn snapshot_includes_completed_tool_call() {
         .unwrap();
     tokio::time::sleep(Duration::from_millis(50)).await;
 
-    let ui = UiSession::connect(hub.clone(), "late-tui").await;
+    let ui = UiSession::connect(
+        hub.clone(),
+        "late-tui",
+        loopal_protocol::UiCapabilities::ALL,
+    )
+    .await;
     let resp = ui
         .client
         .connection()

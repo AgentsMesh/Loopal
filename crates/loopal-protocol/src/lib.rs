@@ -11,6 +11,7 @@ pub mod event_id;
 pub mod event_payload;
 mod event_snat;
 pub mod event_summary;
+pub mod interaction;
 pub mod interrupt;
 pub mod mcp_ipc;
 pub mod mcp_snapshot;
@@ -20,6 +21,7 @@ pub mod question;
 pub mod secret_ipc;
 pub mod task_snapshot;
 pub mod thread_goal;
+pub mod ui_capabilities;
 pub mod user_content;
 
 pub const META_HUB_TOKEN_ENV: &str = "LOOPAL_META_HUB_TOKEN";
@@ -38,6 +40,9 @@ pub use event_summary::{
     CompactPhase, CompactionSummary, ContinuationGateSummary, DegenerationSignal,
     DegenerationSummary, GateCloseReason, SubAgentSpawn, TurnSummary,
 };
+pub use interaction::{
+    DEFAULT_INTERACTION_LIFETIME, DEFAULT_INTERACTION_RPC_TIMEOUT, INTERACTION_RPC_COMPLETION_GRACE,
+};
 pub use interrupt::InterruptSignal;
 pub use mcp_ipc::{
     McpCallToolRequest, McpCallToolResponse, McpContentBlock, McpListToolsResponse,
@@ -53,4 +58,5 @@ pub use secret_ipc::{
 };
 pub use task_snapshot::{TaskSnapshot, TaskSnapshotStatus};
 pub use thread_goal::{GoalTransitionReason, ThreadGoal, ThreadGoalStatus};
+pub use ui_capabilities::{UiCapabilities, UiCapability};
 pub use user_content::{ImageAttachment, SkillInvocation, UserContent};

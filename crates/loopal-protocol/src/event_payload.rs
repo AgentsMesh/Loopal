@@ -104,13 +104,13 @@ pub enum AgentEventPayload {
     },
     UserQuestionRequest {
         id: String,
+        #[serde(default)] logical_id: String,
         questions: Vec<Question>,
         /// True if a classifier is racing the user. UI should render a
         /// "thinking" status strip alongside the option dialog.
         #[serde(default)]
         classifier_running: bool,
     },
-    /// Broadcast so other UI clients drop their `pending_permission` dialog.
     ToolPermissionResolved { id: String },
     /// Broadcast so other UI clients drop their `pending_question` dialog.
     /// `by` records who answered first.

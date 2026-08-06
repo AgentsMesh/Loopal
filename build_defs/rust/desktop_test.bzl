@@ -8,6 +8,7 @@ def desktop_serve_test():
         srcs = [
             "tests/e2e/desktop/serve.rs",
             "tests/e2e/desktop/session_phase.rs",
+            "tests/e2e/desktop/startup_ui.rs",
             "tests/e2e/desktop/support.rs",
         ],
         crate_root = "tests/e2e/desktop/serve.rs",

@@ -49,17 +49,17 @@ pub(crate) async fn dispatch_loop(
     hub: &SessionHub,
     is_production: bool,
 ) -> anyhow::Result<()> {
-    loop {
+    let output = loop {
         let Some(msg) = incoming_rx.recv().await else {
             info!("connection closed");
-            break;
+            break None;
         };
         let Incoming::Request { id, method, params } = msg else {
             continue;
         };
 
         if method == methods::AGENT_START.name {
-            let agent_output = run_session(
+            let outcome = run_session(
                 &connection,
                 &mut incoming_rx,
                 hub,
@@ -68,20 +68,21 @@ pub(crate) async fn dispatch_loop(
                 params,
             )
             .await?;
-            if agent_output.is_some() {
-                send_agent_completed(&connection, agent_output.as_ref()).await;
-                break;
+            match outcome {
+                SessionOutcome::ReadyForStart => continue,
+                SessionOutcome::Exit(output) => {
+                    break output;
+                }
             }
-            continue;
         }
 
         let should_break = method == methods::AGENT_SHUTDOWN.name;
         respond_with(&connection, id, dispatch_simple(&method, params, hub).await).await;
         if should_break {
-            break;
+            break None;
         }
-    }
-    send_agent_completed(&connection, None).await;
+    };
+    send_agent_completed(&connection, output.as_ref()).await;
     info!("server shutting down");
     Ok(())
 }
@@ -93,7 +94,7 @@ async fn run_session(
     is_production: bool,
     id: i64,
     params: serde_json::Value,
-) -> anyhow::Result<Option<loopal_error::AgentOutput>> {
+) -> anyhow::Result<SessionOutcome> {
     let mut handle =
         start_session_or_respond_error(connection, id, params, hub, is_production).await?;
     let mut forward_result =
@@ -115,16 +116,27 @@ async fn run_session(
 
     let agent_output = match forward_result {
         crate::session_forward::ForwardResult::Done(output) => output,
-        _ => None,
+        crate::session_forward::ForwardResult::Shutdown => {
+            info!("active session received shutdown, server exiting");
+            return Ok(SessionOutcome::Exit(None));
+        }
+        crate::session_forward::ForwardResult::NewStart { .. } => {
+            unreachable!("agent/start chaining is exhausted above")
+        }
     };
 
     if handle.lifecycle == loopal_runtime::LifecycleMode::Ephemeral {
         info!("ephemeral session complete, server exiting");
-        Ok(agent_output)
+        Ok(SessionOutcome::Exit(agent_output))
     } else {
         info!("persistent session ended, ready for next");
-        Ok(None)
+        Ok(SessionOutcome::ReadyForStart)
     }
+}
+
+enum SessionOutcome {
+    ReadyForStart,
+    Exit(Option<loopal_error::AgentOutput>),
 }
 
 async fn send_agent_completed(

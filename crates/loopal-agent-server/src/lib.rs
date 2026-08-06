@@ -19,6 +19,7 @@ mod control_forward;
 mod cron_bridge;
 #[doc(hidden)]
 pub mod dispatch;
+mod event_delivery;
 mod hub_broadcaster;
 #[doc(hidden)]
 pub mod hub_frontend;
@@ -72,6 +73,7 @@ pub fn hub_frontend_for_test(
         input_rx,
         None,
         interrupt_rx,
+        tokio_util::sync::CancellationToken::new(),
         perm,
         question,
     ))

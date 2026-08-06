@@ -17,6 +17,7 @@ fn one_question() -> Question {
 fn open_pending(r: &mut ViewStateReducer, id: &str, auto_running: bool) {
     r.apply(AgentEventPayload::UserQuestionRequest {
         id: id.into(),
+        logical_id: id.into(),
         questions: vec![one_question()],
         classifier_running: auto_running,
     });

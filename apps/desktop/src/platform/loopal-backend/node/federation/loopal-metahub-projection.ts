@@ -82,6 +82,11 @@ async function queryMetaHubState(
       request(host, 'meta/list_hubs'),
       request(host, 'meta/topology'),
     ])
+    const topologyValue = MetaHubTopologyWireSchema.parse(topology)
+    const topologyUnavailableHubs = topologyValue.hubs
+      .filter((entry) => 'error' in entry.topology)
+      .map((entry) => entry.hub)
+      .sort((left, right) => left.localeCompare(right))
     return {
       state: 'connected',
       address: status.uplink.address ?? undefined,
@@ -92,7 +97,8 @@ async function queryMetaHubState(
         agentCount: hub.agent_count,
         capabilities: hub.capabilities,
       })).sort((left, right) => left.name.localeCompare(right.name)),
-      topology: projectTopology(MetaHubTopologyWireSchema.parse(topology)),
+      topology: projectTopology(topologyValue),
+      ...(topologyUnavailableHubs.length > 0 ? { topologyUnavailableHubs } : {}),
       refreshedAt: now.toISOString(),
     }
   } catch (error) {

@@ -7,6 +7,7 @@ use crate::app::App;
 #[derive(Default)]
 struct ModalState {
     has_perm: bool,
+    has_plan: bool,
     has_question: bool,
     on_other: bool,
     multi: bool,
@@ -15,12 +16,14 @@ struct ModalState {
 fn read_modal_state(app: &App) -> ModalState {
     app.with_active_conversation(|conv| {
         let has_perm = conv.pending_permission.is_some();
+        let has_plan = conv.pending_plan_approval.is_some();
         let (has_question, on_other, multi) = match conv.pending_question.as_ref() {
             Some(q) => (true, q.cursor_on_other(), q.allow_multiple_for_current()),
             None => (false, false, false),
         };
         ModalState {
             has_perm,
+            has_plan,
             has_question,
             on_other,
             multi,
@@ -31,6 +34,9 @@ fn read_modal_state(app: &App) -> ModalState {
 pub(super) fn handle_modal_keys(app: &mut App, key: &KeyEvent) -> Option<InputAction> {
     let st = read_modal_state(app);
     let is_ctrl_c = key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c');
+    if st.has_question {
+        return Some(question_action(key, &st, is_ctrl_c));
+    }
     if st.has_perm {
         return Some(match key.code {
             KeyCode::Char('y') | KeyCode::Char('Y') => InputAction::ToolApprove,
@@ -45,8 +51,17 @@ pub(super) fn handle_modal_keys(app: &mut App, key: &KeyEvent) -> Option<InputAc
             _ => InputAction::None,
         });
     }
-    if st.has_question {
-        return Some(question_action(key, &st, is_ctrl_c));
+    if st.has_plan {
+        return Some(match key.code {
+            KeyCode::Char('y') | KeyCode::Char('Y') => InputAction::PlanApprove,
+            KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => InputAction::PlanReject,
+            KeyCode::Up => InputAction::PlanScroll(-1),
+            KeyCode::Down => InputAction::PlanScroll(1),
+            KeyCode::PageUp => InputAction::PlanScroll(-7),
+            KeyCode::PageDown => InputAction::PlanScroll(7),
+            _ if is_ctrl_c => InputAction::PlanReject,
+            _ => InputAction::None,
+        });
     }
     if app.sub_page.is_some() {
         return Some(handle_sub_page_key(app, key));

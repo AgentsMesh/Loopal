@@ -5,11 +5,10 @@
 use std::sync::Arc;
 
 use loopal_ipc::connection::{Connection, Listening};
-use loopal_protocol::Envelope;
+use loopal_protocol::{AgentEvent, Envelope};
 use loopal_view_state::ViewStateReducer;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, mpsc};
 
-use crate::routing;
 use crate::topology::{AgentInfo, AgentLifecycle};
 use crate::types::AgentConnectionState;
 
@@ -37,6 +36,15 @@ impl AgentRegistry {
 
     pub fn get_agent_connection(&self, name: &str) -> Option<Arc<Connection<Listening>>> {
         self.agents.get(name).and_then(|a| a.state.connection())
+    }
+
+    pub(crate) fn is_current_connection(
+        &self,
+        name: &str,
+        expected: &Arc<Connection<Listening>>,
+    ) -> bool {
+        self.get_agent_connection(name)
+            .is_some_and(|current| Arc::ptr_eq(&current, expected))
     }
 
     /// Per-agent ViewState reducer handle. Used by the hub event router
@@ -69,11 +77,16 @@ impl AgentRegistry {
             .collect()
     }
 
-    pub async fn route_message(&self, envelope: &Envelope) -> Result<(), String> {
+    /// Clone the routing handles needed for delivery while the registry is
+    /// borrowed. Callers must perform network I/O after releasing the Hub lock.
+    pub fn route_target(
+        &self,
+        envelope: &Envelope,
+    ) -> Result<(Arc<Connection<Listening>>, mpsc::Sender<AgentEvent>), String> {
         let conn = self
             .get_agent_connection(&envelope.target.agent)
             .ok_or_else(|| format!("no agent: '{}'", envelope.target))?;
-        routing::route_to_agent(&conn, envelope, &self.event_tx).await
+        Ok((conn, self.event_tx.clone()))
     }
 
     pub fn agent_info(&self, name: &str) -> Option<&AgentInfo> {

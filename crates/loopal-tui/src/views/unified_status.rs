@@ -104,7 +104,8 @@ fn status_icon_and_label(
         thinking: conv.thinking_active,
         compacting: conv.compact_banner.is_some(),
         streaming: !conv.streaming_text.is_empty(),
-        pending_permission: conv.pending_permission.is_some(),
+        pending_permission: conv.pending_permission.is_some()
+            || conv.pending_plan_approval.is_some(),
         agent_idle: active_agent_idle(app, state),
         has_subagents: has_live_subagents(app),
         recently_or_active: is_active,

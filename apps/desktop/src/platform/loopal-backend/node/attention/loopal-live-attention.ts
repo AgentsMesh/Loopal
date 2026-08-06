@@ -30,7 +30,20 @@ export class LoopalLiveAttention {
     this.fire(event)
   }
 
-  reconcile(pending: readonly SnapshotAttention[]): void {
+  remoteAgentIds(): ReadonlySet<string> {
+    const result = new Set<string>()
+    for (const requests of [this.permissions, this.questions, this.plans]) {
+      for (const request of requests.values()) {
+        if (request.agentId.includes('/')) result.add(request.agentId)
+      }
+    }
+    return result
+  }
+
+  reconcile(
+    pending: readonly SnapshotAttention[],
+    authoritativeRemoteAgents: ReadonlySet<string> = new Set(),
+  ): void {
     const events = pending.flatMap((item) => {
       const event = projectAttentionEvent(
         item.kind, item.value, this.scope, item.agentId, this.now,
@@ -52,9 +65,15 @@ export class LoopalLiveAttention {
         ? [key(event.request.agentId, event.request.id)]
         : []
     )))
-    this.resolveMissing(this.permissions, permissionKeys, 'permission_resolved')
-    this.resolveMissing(this.questions, questionKeys, 'question_resolved')
-    this.resolveMissing(this.plans, planKeys, 'plan_approval_resolved')
+    this.resolveMissing(
+      this.permissions, permissionKeys, authoritativeRemoteAgents, 'permission_resolved',
+    )
+    this.resolveMissing(
+      this.questions, questionKeys, authoritativeRemoteAgents, 'question_resolved',
+    )
+    this.resolveMissing(
+      this.plans, planKeys, authoritativeRemoteAgents, 'plan_approval_resolved',
+    )
     for (const event of events) {
       this.track(event)
       this.fire(event)
@@ -96,10 +115,13 @@ export class LoopalLiveAttention {
   private resolveMissing(
     requests: Map<string, PendingRequest>,
     desired: ReadonlySet<string>,
+    authoritativeRemoteAgents: ReadonlySet<string>,
     type: 'permission_resolved' | 'question_resolved' | 'plan_approval_resolved',
   ): void {
     for (const [requestKey, request] of requests) {
-      if (desired.has(requestKey) || request.agentId.includes('/')) continue
+      const remoteUnavailable = request.agentId.includes('/')
+        && !authoritativeRemoteAgents.has(request.agentId)
+      if (desired.has(requestKey) || remoteUnavailable) continue
       this.fire({ type, ...this.scopeFields(), ...request })
       requests.delete(requestKey)
     }

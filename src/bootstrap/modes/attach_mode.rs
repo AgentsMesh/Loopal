@@ -6,7 +6,7 @@ use loopal_agent_hub::HubClient;
 use loopal_context::project_messages_to_display;
 use loopal_session::SessionController;
 
-use super::attach_bridge::{bridge_events, connect_and_register};
+use super::attach_bridge::{RegisteredUi, bridge_events, connect_and_register};
 use crate::cli::Cli;
 
 pub struct AttachOutcome {
@@ -38,10 +38,33 @@ pub async fn run_with_addr(
     resume: Option<&str>,
 ) -> anyhow::Result<AttachOutcome> {
     info!(hub = %hub_addr, "TUI attach: connecting");
-    let (conn, incoming_rx) = connect_and_register(hub_addr, hub_token).await?;
+    let ui = connect_and_register(hub_addr, hub_token).await?;
+    run_with_registered_ui(
+        cwd,
+        config,
+        hub_addr,
+        hub_token,
+        root_session_id,
+        resume,
+        ui,
+    )
+    .await
+}
+
+pub async fn run_with_registered_ui(
+    cwd: &std::path::Path,
+    config: &loopal_config::ResolvedConfig,
+    hub_addr: &str,
+    hub_token: &str,
+    root_session_id: Option<&str>,
+    resume: Option<&str>,
+    ui: RegisteredUi,
+) -> anyhow::Result<AttachOutcome> {
+    let RegisteredUi { conn, incoming_rx } = ui;
+    let lease_conn = conn.clone();
 
     let mut app = loopal_tui::app::App::new(
-        SessionController::with_hub(Arc::new(HubClient::new(conn))),
+        SessionController::with_hub(Arc::new(HubClient::new_with_transport_lease(conn))),
         cwd.to_path_buf(),
     );
     app.hub_reconnect_info = Some(loopal_tui::app::HubReconnectInfo {
@@ -59,7 +82,9 @@ pub async fn run_with_addr(
     }
     seed_resume_or_welcome(&mut app, &config.settings.model, cwd, resume);
 
-    let exit_info = loopal_tui::run_tui(app, event_rx, resync_rx).await?;
+    let tui_result = loopal_tui::run_tui(app, event_rx, resync_rx).await;
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(2), lease_conn.close()).await;
+    let exit_info = tui_result?;
     let detached = exit_info.detach_requested;
     print_post_exit_message(&exit_info);
 

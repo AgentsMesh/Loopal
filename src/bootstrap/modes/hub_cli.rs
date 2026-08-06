@@ -108,6 +108,11 @@ pub async fn run_kill_hub(pid: u32) -> Result<()> {
                 "name": client_name,
                 "token": token,
                 "role": "ui_client",
+                "capabilities": {
+                    "permission": false,
+                    "question": false,
+                    "plan_approval": false,
+                },
             }),
         )
         .await

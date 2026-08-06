@@ -16,9 +16,12 @@ fn argv_strs(argv: &[std::ffi::OsString]) -> Vec<String> {
 }
 
 #[test]
-fn empty_cli_emits_no_args() {
+fn parent_spawn_requires_real_ui_before_root_start() {
     let cli = parse(&[]);
-    assert!(build_hub_only_argv(&cli, None).is_empty());
+    assert_eq!(
+        argv_strs(&build_hub_only_argv(&cli, None)),
+        vec!["--require-ui-ready"]
+    );
 }
 
 #[test]
@@ -92,7 +95,7 @@ fn resume_is_omitted_when_none_even_if_cli_had_resume_flag() {
 fn prompt_words_are_forwarded_in_order() {
     let cli = parse(&["fix", "the", "bug"]);
     let strs = argv_strs(&build_hub_only_argv(&cli, None));
-    assert_eq!(strs, vec!["fix", "the", "bug"]);
+    assert_eq!(strs, vec!["--require-ui-ready", "fix", "the", "bug"]);
 }
 
 #[test]

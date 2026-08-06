@@ -8,6 +8,7 @@ use super::MutationEffect;
 pub(super) fn user_question_request(
     state: &mut SessionViewState,
     id: &str,
+    logical_id: &str,
     questions: &[Question],
     classifier_running: bool,
 ) -> MutationEffect {
@@ -15,6 +16,7 @@ pub(super) fn user_question_request(
     conv.flush_streaming();
     conv.pending_question = Some(
         PendingQuestion::new(id.to_string(), questions.to_vec())
+            .with_logical_id(logical_id.to_string())
             .with_classifier_running(classifier_running),
     );
     MutationEffect::Mutated
@@ -36,7 +38,7 @@ pub(super) fn classifier_progress(
     elapsed_ms: u64,
 ) -> MutationEffect {
     let pending = match state.agent.conversation.pending_question.as_mut() {
-        Some(p) if p.id == id => p,
+        Some(p) if p.logical_id == id => p,
         _ => return MutationEffect::NoOp,
     };
     if matches!(
@@ -55,7 +57,7 @@ pub(super) fn classifier_failed(
     reason: &str,
 ) -> MutationEffect {
     let pending = match state.agent.conversation.pending_question.as_mut() {
-        Some(p) if p.id == id => p,
+        Some(p) if p.logical_id == id => p,
         _ => return MutationEffect::NoOp,
     };
     // reason: terminal status (Failed/Completed) must not be overwritten by
@@ -79,7 +81,7 @@ pub(super) fn classifier_completed(
     answers: &[String],
 ) -> MutationEffect {
     let pending = match state.agent.conversation.pending_question.as_mut() {
-        Some(p) if p.id == id => p,
+        Some(p) if p.logical_id == id => p,
         _ => return MutationEffect::NoOp,
     };
     if matches!(

@@ -55,6 +55,9 @@ pub async fn build_ipc_harness(
     client
         .start_agent(&loopal_agent_client::StartAgentParams {
             cwd: fixture.path().to_path_buf(),
+            // The injected provider is registered as "anthropic"; do not let
+            // a developer's configured default model select another provider.
+            model: Some("claude-opus-4-8".to_string()),
             prompt: Some("hello".to_string()),
             ..Default::default()
         })

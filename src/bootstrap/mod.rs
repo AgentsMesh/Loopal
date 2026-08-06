@@ -32,10 +32,14 @@ mod hub_bootstrap;
 mod hub_registration;
 #[path = "hub/hub_spawn.rs"]
 mod hub_spawn;
+#[path = "hub/root_view_ready.rs"]
+mod root_view_ready;
 #[path = "hub/token_channel/mod.rs"]
 mod token_channel;
 #[path = "hub/typestate/mod.rs"]
 pub(crate) mod typestate;
+#[path = "hub/ui_ready_gate.rs"]
+mod ui_ready_gate;
 #[path = "hub/uplink_bootstrap.rs"]
 mod uplink_bootstrap;
 

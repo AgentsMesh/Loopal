@@ -2,6 +2,27 @@ use super::App;
 
 impl App {
     pub fn dispatch_event(&mut self, event: loopal_protocol::AgentEvent) {
+        let active = self.session.lock().active_view.clone();
+        let targets_active = event.agent_name.as_ref().map_or_else(
+            || active == loopal_protocol::ROOT_AGENT_NAME,
+            |address| address.agent == active,
+        );
+        let reset_plan_scroll = targets_active
+            && match &event.payload {
+                loopal_protocol::AgentEventPayload::PlanApprovalRequest { .. } => true,
+                loopal_protocol::AgentEventPayload::PlanApprovalResolved { id } => self
+                    .with_active_conversation(|conversation| {
+                        conversation
+                            .pending_plan_approval
+                            .as_ref()
+                            .is_some_and(|pending| pending.id == id.as_str())
+                    }),
+                _ => false,
+            };
+        if reset_plan_scroll {
+            self.plan_approval_scroll = 0;
+            self.plan_approval_viewport_rows = crate::views::plan_approval_inline::CONTENT_ROWS;
+        }
         if let loopal_protocol::AgentEventPayload::SubAgentSpawned(ref s) = event.payload
             && !self.view_clients.contains_key(&s.name)
         {

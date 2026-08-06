@@ -10,6 +10,7 @@ pub mod markdown;
 mod panel_ops;
 pub mod panel_provider;
 pub mod panel_state;
+mod plan_approval_ops;
 pub mod providers;
 mod question_ops;
 pub mod render;

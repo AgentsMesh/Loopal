@@ -38,6 +38,12 @@ pub enum InputAction {
     ToolPermissionToggle,
     /// Commit whichever option the permission cursor points at.
     ToolPermissionConfirm,
+    /// Approve the pending plan.
+    PlanApprove,
+    /// Reject the pending plan.
+    PlanReject,
+    /// Scroll the pending plan by a signed number of lines.
+    PlanScroll(i32),
     /// Interrupt the agent's current work (ESC while busy)
     Interrupt,
     /// User wants to switch mode (from Shift+Tab shortcut)

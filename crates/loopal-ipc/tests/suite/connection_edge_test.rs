@@ -106,6 +106,44 @@ async fn concurrent_requests_each_get_correct_response() {
 }
 
 #[tokio::test]
+async fn dropping_request_notifies_peer_of_cancellation() {
+    let ConnPair {
+        client,
+        mut server_rx,
+        ..
+    } = connection_pair();
+
+    let request = tokio::spawn(async move {
+        client
+            .send_request("agent/plan_approval", serde_json::json!({}))
+            .await
+    });
+    let request_id = match server_rx.recv().await.unwrap() {
+        Incoming::Request { id, method, .. } => {
+            assert_eq!(method, "agent/plan_approval");
+            id
+        }
+        other => panic!("expected request, got {other:?}"),
+    };
+
+    request.abort();
+    let _ = request.await;
+
+    let cancelled = tokio::time::timeout(std::time::Duration::from_secs(2), server_rx.recv())
+        .await
+        .expect("peer must receive cancellation")
+        .expect("peer connection must remain open");
+    match cancelled {
+        Incoming::Notification { method, params } => {
+            assert_eq!(method, "$/cancelRequest");
+            assert_eq!(params["id"], request_id);
+            assert_eq!(params["method"], "agent/plan_approval");
+        }
+        other => panic!("expected cancellation notification, got {other:?}"),
+    }
+}
+
+#[tokio::test]
 async fn incoming_channel_returns_none_on_eof() {
     let (a_tx, _a_rx) = tokio::io::duplex(4096);
     let (_b_tx, b_rx) = tokio::io::duplex(4096);

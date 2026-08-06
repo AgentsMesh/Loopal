@@ -11,10 +11,13 @@ async fn route_and_spawn_requests_are_bounded_against_blackhole_meta_hub() {
     let (_peer, mut peer_rx) = Connection::new(peer_transport).into_listening();
     let peer = tokio::spawn(async move {
         for _ in 0..3 {
-            assert!(matches!(
-                peer_rx.recv().await,
-                Some(Incoming::Request { .. })
-            ));
+            loop {
+                match peer_rx.recv().await {
+                    Some(Incoming::Request { .. }) => break,
+                    Some(Incoming::Notification { .. }) => continue,
+                    None => panic!("peer connection closed before all requests arrived"),
+                }
+            }
         }
     });
     let uplink = HubUplink::new(client.clone(), "hub-a".into());

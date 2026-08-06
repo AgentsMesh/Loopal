@@ -1,17 +1,18 @@
 use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::ContentBlock;
+use loopal_tool_invocation::{CancelCause, ToolResultMetadata};
 use loopal_tool_plan_mode::EXIT_PLAN_NAME;
 use tracing::{debug, info, warn};
 
 use super::runner::AgentLoopRunner;
 use super::turn_context::TurnContext;
-use crate::frontend::traits::PlanApproval;
+use crate::frontend::traits::{PlanApproval, PlanApprovalCancellationReason};
 use crate::mode::AgentMode;
 
 impl AgentLoopRunner {
     pub(super) async fn handle_exit_plan(
         &mut self,
-        _turn_ctx: &mut TurnContext,
+        turn_ctx: &mut TurnContext,
         idx: usize,
         id: &str,
     ) -> loopal_error::Result<(usize, ContentBlock)> {
@@ -47,13 +48,22 @@ impl AgentLoopRunner {
             }
         };
 
-        let plan_path_str = self.plan_file.path().to_string_lossy().to_string();
-        let approval = self
-            .params
-            .deps
-            .frontend
-            .request_plan_approval(&plan_content, &plan_path_str)
-            .await;
+        let approval = {
+            let plan_path_str = self.plan_file.path().to_string_lossy().to_string();
+            let approval_request = self
+                .params
+                .deps
+                .frontend
+                .request_plan_approval(&plan_content, &plan_path_str);
+            tokio::pin!(approval_request);
+            tokio::select! {
+                biased;
+                _ = turn_ctx.cancel.cancelled() => {
+                    PlanApproval::Cancelled(PlanApprovalCancellationReason::Interrupted)
+                },
+                approval = &mut approval_request => approval,
+            }
+        };
 
         match approval {
             PlanApproval::Approve => {
@@ -78,6 +88,26 @@ impl AgentLoopRunner {
                 )
                 .await?,
             )),
+            PlanApproval::Cancelled(reason) => {
+                turn_ctx.signal_turn_end_after_tools();
+                let metadata = match reason {
+                    PlanApprovalCancellationReason::Interrupted => {
+                        Some(ToolResultMetadata::cancelled(CancelCause::UserInterrupt))
+                    }
+                    _ => None,
+                };
+                Ok((
+                    idx,
+                    self.emit_and_block(
+                        id,
+                        EXIT_PLAN_NAME,
+                        plan_cancellation_message(reason),
+                        true,
+                        metadata,
+                    )
+                    .await?,
+                ))
+            }
         }
     }
 
@@ -135,5 +165,15 @@ impl AgentLoopRunner {
             self.emit_and_block(id, EXIT_PLAN_NAME, content, false, None)
                 .await?,
         ))
+    }
+}
+
+fn plan_cancellation_message(reason: PlanApprovalCancellationReason) -> &'static str {
+    match reason {
+        PlanApprovalCancellationReason::Interrupted => "Interrupted by user",
+        PlanApprovalCancellationReason::Unavailable => "Plan approval is unavailable",
+        PlanApprovalCancellationReason::TimedOut => "Plan approval timed out",
+        PlanApprovalCancellationReason::Superseded => "Plan approval request was superseded",
+        PlanApprovalCancellationReason::Transport => "Plan approval connection was lost",
     }
 }

@@ -14,6 +14,14 @@ use loopal_ipc::tcp::TcpTransport;
 use crate::io_loop::meta_hub_io_loop;
 use crate::meta_hub::MetaHub;
 
+#[path = "server/registration.rs"]
+mod registration;
+#[doc(hidden)]
+pub use registration::register_acknowledged_connection;
+
+const REGISTRATION_ACK_DEADLINE: Duration = Duration::from_secs(2);
+const TRANSPORT_CLOSE_DEADLINE: Duration = Duration::from_secs(2);
+
 /// Start MetaHub TCP listener on the given address. Returns listener + auth token.
 pub async fn start_meta_listener(addr: &str) -> anyhow::Result<(TcpListener, String)> {
     let listener = TcpListener::bind(addr).await?;
@@ -83,25 +91,17 @@ pub async fn meta_accept_loop_with_timeout(
                         )
                         .await;
                     }
-                    // Register in HubRegistry
-                    let registration =
-                        mh.lock()
-                            .await
-                            .registry
-                            .register(&name, conn.clone(), capabilities);
-                    if let Err(error) = registration {
-                        let _ = conn
-                            .respond_error(request_id, INVALID_REQUEST, &error)
-                            .await;
-                        tracing::warn!(hub = %name, %error, "registration failed");
-                        return;
-                    }
-                    if conn
-                        .respond(request_id, serde_json::json!({"ok": true}))
-                        .await
-                        .is_err()
+                    if let Err(error) = register_acknowledged_connection(
+                        &mh,
+                        &conn,
+                        request_id,
+                        &name,
+                        capabilities,
+                        REGISTRATION_ACK_DEADLINE,
+                    )
+                    .await
                     {
-                        mh.lock().await.registry.unregister_connection(&name, &conn);
+                        tracing::warn!(hub = %name, %error, "registration failed");
                         return;
                     }
                     tracing::info!(hub = %name, "Sub-Hub registered");
@@ -111,14 +111,23 @@ pub async fn meta_accept_loop_with_timeout(
                 }
                 Ok(Err(e)) => {
                     tracing::warn!(%addr, error = %e, "registration handshake failed");
-                    conn.close().await;
+                    close_bounded(&conn).await;
                 }
                 Err(_) => {
                     tracing::warn!(%addr, "registration handshake timed out");
-                    conn.close().await;
+                    close_bounded(&conn).await;
                 }
             }
         });
+    }
+}
+
+async fn close_bounded(conn: &Connection<Listening>) {
+    if tokio::time::timeout(TRANSPORT_CLOSE_DEADLINE, conn.close())
+        .await
+        .is_err()
+    {
+        tracing::warn!("MetaHub transport close timed out");
     }
 }
 

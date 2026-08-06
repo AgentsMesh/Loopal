@@ -1,20 +1,31 @@
+use loopal_error::{ConfigError, Result};
 use loopal_provider_api::{EffortLevel, ThinkingConfig};
 use serde_json::{Value, json};
 
-/// Translate a resolved `ThinkingConfig` into OpenAI Responses API `reasoning` object.
-pub fn to_openai_reasoning(config: &ThinkingConfig) -> Value {
-    let effort = match config {
-        ThinkingConfig::Effort { level } => match level {
-            EffortLevel::Low => "low",
-            EffortLevel::Medium => "medium",
-            EffortLevel::High | EffortLevel::Max => "high",
-        },
-        _ => "medium",
+/// Translate a resolved config into the Responses API `reasoning` object.
+pub fn to_openai_reasoning(config: &ThinkingConfig) -> Result<Value> {
+    let ThinkingConfig::Effort { level } = config else {
+        return Err(ConfigError::InvalidValue {
+            field: "thinking".into(),
+            reason: "OpenAI reasoning requires an effort level".into(),
+        }
+        .into());
     };
-    json!({
-        "effort": effort,
+    Ok(json!({
+        "effort": effort_name(*level),
         "summary": "auto"
-    })
+    }))
+}
+
+fn effort_name(level: EffortLevel) -> &'static str {
+    match level {
+        EffortLevel::None => "none",
+        EffortLevel::Low => "low",
+        EffortLevel::Medium => "medium",
+        EffortLevel::High => "high",
+        EffortLevel::XHigh => "xhigh",
+        EffortLevel::Max => "max",
+    }
 }
 
 #[cfg(test)]
@@ -22,16 +33,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn effort_max_maps_to_high() {
-        let v = to_openai_reasoning(&ThinkingConfig::Effort {
-            level: EffortLevel::Max,
-        });
-        assert_eq!(v["effort"], "high");
+    fn all_efforts_are_preserved() {
+        for (level, expected) in [
+            (EffortLevel::None, "none"),
+            (EffortLevel::Low, "low"),
+            (EffortLevel::Medium, "medium"),
+            (EffortLevel::High, "high"),
+            (EffortLevel::XHigh, "xhigh"),
+            (EffortLevel::Max, "max"),
+        ] {
+            let value = to_openai_reasoning(&ThinkingConfig::Effort { level }).unwrap();
+            assert_eq!(value["effort"], expected);
+            assert_eq!(value["summary"], "auto");
+        }
     }
 
     #[test]
-    fn budget_degrades_to_medium() {
-        let v = to_openai_reasoning(&ThinkingConfig::Budget { tokens: 5000 });
-        assert_eq!(v["effort"], "medium");
+    fn budget_is_rejected() {
+        assert!(to_openai_reasoning(&ThinkingConfig::Budget { tokens: 5_000 }).is_err());
     }
 }

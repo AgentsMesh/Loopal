@@ -24,35 +24,28 @@ fn key(code: KeyCode) -> KeyEvent {
     KeyEvent::new(code, KeyModifiers::NONE)
 }
 
-fn picker_with_five_thinking() -> PickerState {
+fn picker_with_thinking_options() -> PickerState {
     PickerState {
         title: "Switch Model".into(),
         items: vec![],
         filter: String::new(),
         filter_cursor: 0,
         selected: 0,
-        thinking_options: vec![
-            ThinkingOption {
-                label: "Auto",
-                value: r#"{"type":"auto"}"#.into(),
-            },
-            ThinkingOption {
-                label: "Low",
-                value: r#"{"type":"effort","level":"low"}"#.into(),
-            },
-            ThinkingOption {
-                label: "Medium",
-                value: r#"{"type":"effort","level":"medium"}"#.into(),
-            },
-            ThinkingOption {
-                label: "High",
-                value: r#"{"type":"effort","level":"high"}"#.into(),
-            },
-            ThinkingOption {
-                label: "Disabled",
-                value: r#"{"type":"disabled"}"#.into(),
-            },
-        ],
+        thinking_options: [
+            ("Auto", r#"{"type":"auto"}"#),
+            ("None", r#"{"type":"effort","level":"none"}"#),
+            ("Low", r#"{"type":"effort","level":"low"}"#),
+            ("Medium", r#"{"type":"effort","level":"medium"}"#),
+            ("High", r#"{"type":"effort","level":"high"}"#),
+            ("XHigh", r#"{"type":"effort","level":"xhigh"}"#),
+            ("Max", r#"{"type":"effort","level":"max"}"#),
+        ]
+        .into_iter()
+        .map(|(label, value)| ThinkingOption {
+            label,
+            value: value.into(),
+        })
+        .collect(),
         thinking_selected: 0,
     }
 }
@@ -67,7 +60,7 @@ fn read_thinking_selected(app: &App) -> usize {
 #[test]
 fn right_arrow_advances_thinking_selected() {
     let mut app = make_app();
-    app.sub_page = Some(SubPage::ModelPicker(picker_with_five_thinking()));
+    app.sub_page = Some(SubPage::ModelPicker(picker_with_thinking_options()));
     handle_key(&mut app, key(KeyCode::Right));
     assert_eq!(read_thinking_selected(&app), 1, "Right must advance");
 }
@@ -75,11 +68,11 @@ fn right_arrow_advances_thinking_selected() {
 #[test]
 fn left_arrow_wraps_to_last() {
     let mut app = make_app();
-    app.sub_page = Some(SubPage::ModelPicker(picker_with_five_thinking()));
+    app.sub_page = Some(SubPage::ModelPicker(picker_with_thinking_options()));
     handle_key(&mut app, key(KeyCode::Left));
     assert_eq!(
         read_thinking_selected(&app),
-        4,
+        6,
         "Left from 0 must wrap to last"
     );
 }
@@ -96,7 +89,7 @@ fn key_release(code: KeyCode) -> KeyEvent {
 #[test]
 fn release_event_must_not_advance_thinking_selected() {
     let mut app = make_app();
-    app.sub_page = Some(SubPage::ModelPicker(picker_with_five_thinking()));
+    app.sub_page = Some(SubPage::ModelPicker(picker_with_thinking_options()));
     handle_key(&mut app, key_release(KeyCode::Right));
     assert_eq!(
         read_thinking_selected(&app),
@@ -108,7 +101,7 @@ fn release_event_must_not_advance_thinking_selected() {
 #[test]
 fn release_char_event_must_not_be_inserted_into_filter() {
     let mut app = make_app();
-    let mut p = picker_with_five_thinking();
+    let mut p = picker_with_thinking_options();
     p.items = vec![loopal_tui::app::PickerItem {
         label: "claude".into(),
         description: "".into(),
@@ -129,7 +122,7 @@ fn release_char_event_must_not_be_inserted_into_filter() {
 #[test]
 fn filter_chars_do_not_affect_thinking_selected() {
     let mut app = make_app();
-    let mut p = picker_with_five_thinking();
+    let mut p = picker_with_thinking_options();
     p.items = vec![loopal_tui::app::PickerItem {
         label: "claude".into(),
         description: "".into(),

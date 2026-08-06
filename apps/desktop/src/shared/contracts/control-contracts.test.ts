@@ -47,8 +47,10 @@ describe('desktop agent control contracts', () => {
 
   it('bounds enums, payloads, thinking JSON, and extra fields', () => {
     for (const config of [
-      { type: 'auto' }, { type: 'disabled' }, { type: 'effort', level: 'max' },
-      { type: 'budget', tokens: 4_096 },
+      { type: 'auto' }, { type: 'disabled' },
+      { type: 'effort', level: 'none' }, { type: 'effort', level: 'xhigh' },
+      { type: 'effort', level: 'max' },
+      { type: 'budget', tokens: 4_294_967_295 },
     ]) expect(ThinkingConfigSchema.safeParse(config).success).toBe(true)
     for (const command of [
       { type: 'mode', mode: 'agent' },

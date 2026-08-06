@@ -150,6 +150,17 @@ fn test_new_model_o4_mini() {
 }
 
 #[test]
+fn test_gpt_5_6_sol_metadata() {
+    let info = get_model_info("gpt-5.6-sol").unwrap();
+    assert_eq!(info.provider, "openai");
+    assert_eq!(info.context_window, 1_050_000);
+    assert_eq!(info.max_output_tokens, 128_000);
+    assert_eq!(info.thinking, ThinkingCapability::FullReasoningEffort);
+    assert!(info.supports_tools);
+    assert!(info.supports_vision);
+}
+
+#[test]
 fn test_new_model_gemini_2_5_flash() {
     let info = get_model_info("gemini-2.5-flash-preview-04-17").unwrap();
     assert_eq!(info.provider, "google");
@@ -185,6 +196,10 @@ fn test_thinking_capability_known_model() {
 
 #[test]
 fn test_thinking_capability_unknown_model_heuristic() {
+    assert_eq!(
+        get_thinking_capability("gpt-5.6-latest"),
+        ThinkingCapability::FullReasoningEffort
+    );
     // o4-something → ReasoningEffort
     assert_eq!(
         get_thinking_capability("o4-turbo-xyz"),

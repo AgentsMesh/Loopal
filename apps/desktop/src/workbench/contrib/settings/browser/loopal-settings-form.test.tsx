@@ -51,17 +51,29 @@ describe('LoopalSettingsForm', () => {
     view.rerender(<LoopalSettingsForm value={{ ...base, thinking: { type: 'auto' } }}
       disabled={false} onChange={onChange} />)
     fireEvent.change(screen.getByLabelText('Default thinking'), { target: { value: 'budget' } })
-    fireEvent.change(screen.getByLabelText('Default thinking'), { target: { value: 'effort:max' } })
+    for (const [value, level] of [
+      ['effort:none', 'none'],
+      ['effort:xhigh', 'xhigh'],
+      ['effort:max', 'max'],
+    ] as const) {
+      fireEvent.change(screen.getByLabelText('Default thinking'), { target: { value } })
+      expect(onChange).toHaveBeenCalledWith({ thinking: { type: 'effort', level } })
+    }
     fireEvent.change(screen.getByLabelText('Default thinking'), { target: { value: 'disabled' } })
     fireEvent.change(screen.getByLabelText('Default thinking'), { target: { value: 'auto' } })
     expect(onChange).toHaveBeenCalledWith({ thinking: { type: 'budget', tokens: 4096 } })
-    expect(onChange).toHaveBeenCalledWith({ thinking: { type: 'effort', level: 'max' } })
     expect(onChange).toHaveBeenCalledWith({ thinking: { type: 'disabled' } })
     expect(onChange).toHaveBeenCalledWith({ thinking: { type: 'auto' } })
+    for (const level of ['none', 'xhigh', 'max'] as const) {
+      view.rerender(<LoopalSettingsForm value={{
+        ...base, thinking: { type: 'effort', level },
+      }} disabled={false} onChange={onChange} />)
+      expect(screen.getByLabelText('Default thinking')).toHaveValue(`effort:${level}`)
+    }
     view.rerender(<LoopalSettingsForm value={{
-      ...base, thinking: { type: 'effort', level: 'medium' },
+      ...base, thinking: { type: 'disabled' },
     }} disabled={false} onChange={onChange} />)
-    expect(screen.getByLabelText('Default thinking')).toHaveValue('effort:medium')
+    expect(screen.getByLabelText('Default thinking')).toHaveValue('disabled')
   })
 
   it('disables all controls while a save or restart is pending', () => {

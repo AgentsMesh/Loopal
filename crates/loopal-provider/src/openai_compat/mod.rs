@@ -64,8 +64,10 @@ impl Provider for OpenAiCompatProvider {
         if let Some(temp) = params.temperature {
             body["temperature"] = json!(temp);
         }
-        if let Some(ref config) = params.thinking {
-            body["reasoning_effort"] = json!(thinking::reasoning_effort(config));
+        if let Some(ref config) = params.thinking
+            && let Some(effort) = thinking::reasoning_effort(config)?
+        {
+            body["reasoning_effort"] = json!(effort);
         }
         body["stream_options"] = json!({"include_usage": true});
 

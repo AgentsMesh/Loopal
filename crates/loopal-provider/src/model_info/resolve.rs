@@ -41,7 +41,10 @@ pub fn get_thinking_capability(model_id: &str) -> ThinkingCapability {
     if let Some(entry) = known_models().find(|m| m.id == model_id) {
         return entry.thinking;
     }
-    if model_id.starts_with("o1") || model_id.starts_with("o3") || model_id.starts_with("o4") {
+    if model_id.starts_with("gpt-5.6") {
+        ThinkingCapability::FullReasoningEffort
+    } else if model_id.starts_with("o1") || model_id.starts_with("o3") || model_id.starts_with("o4")
+    {
         ThinkingCapability::ReasoningEffort
     } else if model_id.contains("gemini-2.5") {
         ThinkingCapability::ThinkingBudget

@@ -31,6 +31,14 @@ describe('Loopal default settings contracts', () => {
       ...projection })
   })
 
+  it('accepts the complete reasoning effort range', () => {
+    for (const level of ['none', 'low', 'medium', 'high', 'xhigh', 'max']) {
+      expect(LoopalSettingsValuesSchema.safeParse({
+        ...settings, thinking: { type: 'effort', level },
+      }).success).toBe(true)
+    }
+  })
+
   it('strictly rejects secrets, unknown modes, and invalid numeric bounds', () => {
     expect(UpdateLoopalSettingsInputSchema.safeParse({
       workspaceId: 'workspace', settings: { ...settings, apiKey: 'secret' },

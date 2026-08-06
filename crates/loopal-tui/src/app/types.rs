@@ -26,7 +26,7 @@ pub struct PickerItem {
 /// A single thinking effort option for ←→ cycling in the model picker.
 #[derive(Debug, Clone)]
 pub struct ThinkingOption {
-    /// Display label: "Auto", "Low", "Medium", "High", "Disabled"
+    /// Display label: "Auto", "None", "Low", "Medium", "High", "XHigh", "Max"
     pub label: &'static str,
     /// Serialized ThinkingConfig JSON value.
     pub value: String,

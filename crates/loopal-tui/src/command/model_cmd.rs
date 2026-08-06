@@ -68,12 +68,16 @@ fn open_model_picker(app: &mut App) {
     }));
 }
 
-/// Build the 5 thinking options and determine which one is currently selected.
+/// Build thinking options and determine which one is currently selected.
 fn build_thinking_options(current: &str) -> (Vec<ThinkingOption>, usize) {
     let options = vec![
         ThinkingOption {
             label: "Auto",
             value: r#"{"type":"auto"}"#.to_string(),
+        },
+        ThinkingOption {
+            label: "None",
+            value: r#"{"type":"effort","level":"none"}"#.to_string(),
         },
         ThinkingOption {
             label: "Low",
@@ -88,16 +92,57 @@ fn build_thinking_options(current: &str) -> (Vec<ThinkingOption>, usize) {
             value: r#"{"type":"effort","level":"high"}"#.to_string(),
         },
         ThinkingOption {
-            label: "Disabled",
-            value: r#"{"type":"disabled"}"#.to_string(),
+            label: "XHigh",
+            value: r#"{"type":"effort","level":"xhigh"}"#.to_string(),
+        },
+        ThinkingOption {
+            label: "Max",
+            value: r#"{"type":"effort","level":"max"}"#.to_string(),
         },
     ];
     let idx = match current {
-        "low" => 1,
-        "medium" => 2,
-        "high" => 3,
-        "disabled" => 4,
+        "none" => 1,
+        "low" => 2,
+        "medium" => 3,
+        "high" => 4,
+        "xhigh" => 5,
+        "max" => 6,
+        "disabled" => 1,
         _ => 0, // "auto" or unknown
     };
     (options, idx)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn thinking_options_have_stable_wire_values() {
+        let (options, selected) = build_thinking_options("auto");
+        let actual: Vec<(&str, &str)> = options
+            .iter()
+            .map(|option| (option.label, option.value.as_str()))
+            .collect();
+        assert_eq!(
+            actual,
+            vec![
+                ("Auto", r#"{"type":"auto"}"#),
+                ("None", r#"{"type":"effort","level":"none"}"#),
+                ("Low", r#"{"type":"effort","level":"low"}"#),
+                ("Medium", r#"{"type":"effort","level":"medium"}"#),
+                ("High", r#"{"type":"effort","level":"high"}"#),
+                ("XHigh", r#"{"type":"effort","level":"xhigh"}"#),
+                ("Max", r#"{"type":"effort","level":"max"}"#),
+            ]
+        );
+        assert_eq!(selected, 0);
+    }
+
+    #[test]
+    fn thinking_selection_restores_new_and_legacy_values() {
+        for (current, expected) in [("none", 1), ("xhigh", 5), ("max", 6), ("disabled", 1)] {
+            assert_eq!(build_thinking_options(current).1, expected);
+        }
+    }
 }

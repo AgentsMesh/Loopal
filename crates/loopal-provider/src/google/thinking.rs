@@ -6,6 +6,9 @@ pub fn to_google_thinking(config: &ThinkingConfig) -> Value {
     match config {
         ThinkingConfig::Effort { level } => {
             let budget = match level {
+                EffortLevel::None | EffortLevel::XHigh => {
+                    unreachable!("thinking resolver rejects OpenAI-only effort levels for Google")
+                }
                 EffortLevel::Low => 1024,
                 EffortLevel::Medium => 8192,
                 EffortLevel::High => 16384,

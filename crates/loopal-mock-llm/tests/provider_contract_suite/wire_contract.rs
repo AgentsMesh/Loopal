@@ -1,5 +1,5 @@
 use loopal_provider::{AnthropicProvider, GoogleProvider, OpenAiCompatProvider, OpenAiProvider};
-use loopal_provider_api::{Provider, StopReason, StreamChunk};
+use loopal_provider_api::{EffortLevel, Provider, StopReason, StreamChunk, ThinkingConfig};
 use serde_json::json;
 
 use super::helpers::{API_KEY, collect, semantic_call, start};
@@ -12,14 +12,18 @@ async fn one_semantic_scenario_drives_every_real_provider() {
         "version": 2, "name": "multi-provider-wire", "calls": calls
     }))
     .await;
-    let providers: Vec<(&str, Box<dyn Provider>)> = vec![
+    let providers: Vec<(&str, Box<dyn Provider>, ThinkingConfig)> = vec![
         (
             "anthropic",
             Box::new(AnthropicProvider::new(API_KEY.into()).with_base_url(base.clone())),
+            ThinkingConfig::Budget { tokens: 64 },
         ),
         (
             "openai_responses",
             Box::new(OpenAiProvider::new(API_KEY.into()).with_base_url(base.clone())),
+            ThinkingConfig::Effort {
+                level: EffortLevel::Medium,
+            },
         ),
         (
             "openai_compat",
@@ -28,15 +32,19 @@ async fn one_semantic_scenario_drives_every_real_provider() {
                 base.clone(),
                 "compat-contract".into(),
             )),
+            ThinkingConfig::Effort {
+                level: EffortLevel::Medium,
+            },
         ),
         (
             "google",
             Box::new(GoogleProvider::new(API_KEY.into()).with_base_url(base.clone())),
+            ThinkingConfig::Budget { tokens: 64 },
         ),
     ];
 
-    for (protocol, provider) in providers {
-        assert_semantics(protocol, &collect(provider.as_ref()).await);
+    for (protocol, provider, thinking) in providers {
+        assert_semantics(protocol, &collect(provider.as_ref(), thinking).await);
     }
     assert_journal(&base, &protocols).await;
     task.abort();

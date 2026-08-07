@@ -3,6 +3,7 @@ import { type Event } from '../../../../base/common/event'
 import { RemoteError } from '../../../ipc/common/wire'
 import { type ServerChannel } from '../../../ipc/common/channel'
 import {
+  AgentControlDispositionSchema,
   AgentControlInputSchema,
   AgentControlTargetSchema,
   CreateSessionInputSchema,
@@ -82,8 +83,9 @@ export class DesktopBackendChannel<Context> implements ServerChannel<Context> {
       }
       case 'controlAgent': {
         const input = AgentControlInputSchema.parse(arg)
-        await this.backend.controlAgent(input, token)
-        return undefined
+        return AgentControlDispositionSchema.parse(
+          await this.backend.controlAgent(input, token),
+        )
       }
       case 'getDesktopPreferences':
         return DesktopPreferencesSchema.parse(await this.backend.getDesktopPreferences(token))

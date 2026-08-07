@@ -1,5 +1,4 @@
-//! Tests for bridge_child_events: the core logic that collects sub-agent output.
-//! Verifies what the parent Agent tool actually receives as the sub-agent's result.
+//! Tests for the legacy direct-client bridge's authoritative completion contract.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -9,7 +8,9 @@ use tokio_util::sync::CancellationToken;
 
 use loopal_agent::bridge::bridge_child_events;
 use loopal_agent_client::AgentClient;
-use loopal_protocol::AgentEvent;
+use loopal_ipc::connection::Connection;
+use loopal_ipc::protocol::methods;
+use loopal_protocol::{AgentCompletion, AgentEvent, AgentEventPayload};
 use loopal_test_support::TestFixture;
 use loopal_test_support::chunks;
 use loopal_test_support::mock_provider::MultiCallProvider;
@@ -18,6 +19,27 @@ use loopal_test_support::scenarios;
 pub(crate) use loopal_test_support::make_duplex_pair;
 
 const T: Duration = Duration::from_secs(10);
+
+async fn scripted_completion_result(reason: &str, result: Option<&str>) -> Result<String, String> {
+    let (server_transport, client_transport) = make_duplex_pair();
+    let (server, _server_rx) = Connection::new(server_transport).into_listening();
+    let client = AgentClient::new(client_transport);
+    server
+        .send_notification(
+            methods::AGENT_COMPLETED.name,
+            serde_json::to_value(AgentCompletion {
+                reason: reason.into(),
+                result: result.map(String::from),
+            })
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let (event_tx, _event_rx) = mpsc::channel(16);
+    let cancel = CancellationToken::new();
+    bridge_child_events(client, &event_tx, "test", &cancel).await
+}
 
 /// Start a mock child server, return an initialized+started AgentClient.
 pub(crate) async fn start_bridge_client(
@@ -58,9 +80,9 @@ pub(crate) async fn start_bridge_client(
 
 // ── Tests ────────────────────────────────────────────────────────────
 
-/// Sub-agent streams text -> bridge returns accumulated stream text.
+/// A real child result crosses server IPC through the authoritative completion.
 #[tokio::test]
-async fn bridge_returns_stream_text() {
+async fn bridge_returns_completed_result() {
     let (client, event_tx, cancel, _fix) =
         start_bridge_client(scenarios::simple_text("hello from sub-agent")).await;
 
@@ -71,41 +93,128 @@ async fn bridge_returns_stream_text() {
     let text = result.expect("should succeed");
     assert!(
         text.contains("hello from sub-agent"),
-        "should return stream text, got: {text}"
+        "should return completed result, got: {text}"
     );
 }
 
-/// Sub-agent produces no text (tools only, then finish) -> default message.
+/// Stream and Finished are observational; only agent/completed supplies result.
 #[tokio::test]
-async fn bridge_returns_default_when_no_output() {
-    let calls = vec![chunks::tool_turn(
-        "tc-1",
-        "Ls",
-        serde_json::json!({"path": "."}),
-    )];
-    let (client, event_tx, cancel, _fix) = start_bridge_client(calls).await;
+async fn bridge_ignores_stream_as_result_and_waits_for_completion() {
+    let (server_transport, client_transport) = make_duplex_pair();
+    let (server, _server_rx) = Connection::new(server_transport).into_listening();
+    let client = AgentClient::new(client_transport);
 
+    for payload in [
+        AgentEventPayload::Stream {
+            text: "observational stream text".into(),
+        },
+        AgentEventPayload::Finished,
+    ] {
+        server
+            .send_notification(
+                methods::AGENT_EVENT.name,
+                serde_json::to_value(AgentEvent::root(payload)).unwrap(),
+            )
+            .await
+            .unwrap();
+    }
+    server
+        .send_notification(
+            methods::AGENT_COMPLETED.name,
+            serde_json::to_value(AgentCompletion {
+                reason: "goal".into(),
+                result: Some("authoritative result".into()),
+            })
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let (event_tx, _event_rx) = mpsc::channel(16);
+    let cancel = CancellationToken::new();
     let result = tokio::time::timeout(T, bridge_child_events(client, &event_tx, "test", &cancel))
         .await
         .unwrap();
 
-    let text = result.expect("should succeed");
-    assert!(!text.is_empty(), "should return non-empty text");
+    assert_eq!(result.unwrap(), "authoritative result");
 }
 
-/// Finished event -> bridge exits cleanly within timeout (regression for hang bug).
+/// A real child sends agent/completed after Finished and the bridge exits cleanly.
 #[tokio::test]
-async fn bridge_exits_on_finished() {
+async fn bridge_exits_on_agent_completed() {
     let (client, event_tx, cancel, _fix) =
         start_bridge_client(scenarios::simple_text("done")).await;
 
-    let result =
-        tokio::time::timeout(T, bridge_child_events(client, &event_tx, "test", &cancel)).await;
+    let result = tokio::time::timeout(T, bridge_child_events(client, &event_tx, "test", &cancel))
+        .await
+        .expect("bridge should exit on agent/completed, not hang");
 
-    assert!(result.is_ok(), "bridge should exit on Finished, not hang");
+    assert_eq!(result.unwrap(), "done");
 }
 
-/// Cancel token fired -> bridge sends shutdown and exits.
+/// A terminal child error must not be disguised as a successful empty result.
+#[tokio::test]
+async fn bridge_propagates_child_error() {
+    let calls = vec![vec![chunks::non_retryable_error("invalid child request")]];
+    let (client, event_tx, cancel, _fix) = start_bridge_client(calls).await;
+
+    let error = tokio::time::timeout(T, bridge_child_events(client, &event_tx, "test", &cancel))
+        .await
+        .expect("bridge should reach agent/completed")
+        .expect_err("terminal Error must fail the bridge result");
+
+    assert!(
+        error.contains("invalid child request"),
+        "child error should remain caller-visible, got: {error}"
+    );
+}
+
+/// Every non-goal terminal reason is a failure, including future reason tags.
+#[tokio::test]
+async fn bridge_rejects_non_goal_completion_reasons() {
+    for (reason, result) in [
+        ("aborted", Some("parent stopped child")),
+        ("shutdown", None),
+        ("future-reason", Some("new protocol detail")),
+    ] {
+        let error = scripted_completion_result(reason, result)
+            .await
+            .expect_err("only goal completion may succeed");
+
+        assert!(
+            error.contains(reason),
+            "failure should preserve completion reason, got: {error}"
+        );
+        if let Some(result) = result {
+            assert!(
+                error.contains(result),
+                "failure should preserve completion detail, got: {error}"
+            );
+        }
+    }
+}
+
+/// Transport EOF before agent/completed is a failed child, not empty success.
+#[tokio::test]
+async fn bridge_rejects_disconnect_before_completion() {
+    let (server_transport, client_transport) = make_duplex_pair();
+    let client = AgentClient::new(client_transport);
+    drop(server_transport);
+
+    let (event_tx, _event_rx) = mpsc::channel(16);
+    let cancel = CancellationToken::new();
+    let error = tokio::time::timeout(T, bridge_child_events(client, &event_tx, "test", &cancel))
+        .await
+        .expect("bridge should observe transport EOF")
+        .expect_err("disconnect must not become an empty success result");
+
+    assert_eq!(
+        error,
+        "sub-agent test connection closed before agent/completed"
+    );
+}
+
+/// Cancel token fired -> bridge sends shutdown and reports cancellation.
 #[tokio::test]
 async fn bridge_cancel_sends_shutdown() {
     let calls = vec![vec![
@@ -151,5 +260,6 @@ async fn bridge_cancel_sends_shutdown() {
     )
     .await;
 
-    assert!(result.is_ok(), "bridge should exit after cancel");
+    let result = result.expect("bridge should exit after cancel");
+    assert_eq!(result.unwrap_err(), "sub-agent test cancelled");
 }

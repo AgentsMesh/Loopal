@@ -3,6 +3,8 @@ import {
   throwIfCancelled,
 } from '../../../../base/common/cancellation'
 import {
+  AgentControlDispositionSchema,
+  type AgentControlDisposition,
   type AgentControlInput,
   type AgentControlTarget,
 } from '../../../../shared/contracts'
@@ -13,7 +15,10 @@ import { AgentListSchema } from '../runtime/loopal-wire'
 
 export interface AgentControlOperations {
   interruptAgent(target: AgentControlTarget, token?: CancellationToken): Promise<void>
-  controlAgent(input: AgentControlInput, token?: CancellationToken): Promise<void>
+  controlAgent(
+    input: AgentControlInput,
+    token?: CancellationToken,
+  ): Promise<AgentControlDisposition>
 }
 
 interface ControlSession {
@@ -38,7 +43,7 @@ export class LoopalAgentControl implements AgentControlOperations {
   async controlAgent(
     input: AgentControlInput,
     token = CancellationToken.None,
-  ): Promise<void> {
+  ): Promise<AgentControlDisposition> {
     const runtime = await this.resolve(input.target, token)
     let acknowledgement: unknown
     try {
@@ -49,17 +54,19 @@ export class LoopalAgentControl implements AgentControlOperations {
     } catch (error) {
       if (token.isCancellationRequested) throw error
       const message = errorMessage(error)
-      const code = message.toLowerCase().includes('timed out')
-        ? 'CONTROL_TIMEOUT'
-        : 'CONTROL_REJECTED'
-      throw controlError(code, `Agent control was not applied: ${message}`)
+      if (message.toLowerCase().includes('timed out')) return { status: 'unknown' }
+      const legacyRejection = legacyRejectionReason(message)
+      if (legacyRejection) return { status: 'rejected', reason: legacyRejection }
+      throw controlError('CONTROL_FAILED', `Agent control failed: ${message}`)
     }
-    if (!isAppliedAcknowledgement(acknowledgement)) {
+    const disposition = AgentControlDispositionSchema.safeParse(acknowledgement)
+    if (!disposition.success) {
       throw controlError(
-        'CONTROL_REJECTED',
-        'Agent control returned an invalid application acknowledgement',
+        'CONTROL_PROTOCOL',
+        'Agent control returned an invalid disposition',
       )
     }
+    return disposition.data
   }
 
   private async resolve(
@@ -130,10 +137,11 @@ function controlError(code: string, message: string): Error & { code: string } {
   return Object.assign(new Error(message), { code })
 }
 
-function isAppliedAcknowledgement(value: unknown): boolean {
-  return typeof value === 'object' && value !== null
-    && !Array.isArray(value)
-    && (value as Record<string, unknown>).status === 'applied'
+function legacyRejectionReason(message: string): string | undefined {
+  const marker = 'control rejected:'
+  const index = message.toLowerCase().lastIndexOf(marker)
+  if (index < 0) return undefined
+  return message.slice(index + marker.length).trim() || 'Agent rejected control'
 }
 
 function errorMessage(error: unknown): string {

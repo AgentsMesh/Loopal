@@ -9,7 +9,9 @@ use tokio::sync::{Mutex, mpsc};
 
 use loopal_agent_hub::{AgentLifecycle, Hub, start_event_loop};
 use loopal_ipc::Connection;
-use loopal_protocol::{AgentEvent, AgentEventPayload, AgentStatus, QualifiedAddress};
+use loopal_protocol::{
+    AgentCompletion, AgentEvent, AgentEventPayload, AgentStatus, QualifiedAddress,
+};
 
 fn make_hub() -> (
     Arc<Mutex<Hub>>,
@@ -133,7 +135,7 @@ async fn event_for_unknown_agent_is_silently_ignored() {
 }
 
 #[tokio::test]
-async fn error_event_marks_topology_failed_and_finished_preserves_it() {
+async fn error_event_and_typed_failure_keep_topology_failed() {
     let (hub, raw_tx, raw_rx) = make_hub();
     register_test_agent(&hub, "worker").await;
     let mut ui_rx = hub.lock().await.ui.subscribe_events();
@@ -153,14 +155,18 @@ async fn error_event_marks_topology_failed_and_finished_preserves_it() {
         .expect("error broadcast timeout")
         .expect("error broadcast");
 
-    {
+    let mut completion = {
         let mut h = hub.lock().await;
         assert_eq!(
             h.registry.agent_info("worker").unwrap().lifecycle,
             AgentLifecycle::Failed("provider failed".into())
         );
-        h.registry.emit_agent_finished("worker", None);
-    }
+        h.registry.emit_agent_completion(
+            "worker",
+            AgentCompletion::new("error", Some("provider failed".into())),
+        )
+    };
+    completion.deliver_events().await.unwrap();
     tokio::time::timeout(Duration::from_millis(200), ui_rx.recv())
         .await
         .expect("finished broadcast timeout")

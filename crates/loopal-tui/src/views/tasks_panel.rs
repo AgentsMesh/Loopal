@@ -12,7 +12,7 @@ use ratatui::prelude::*;
 use ratatui::widgets::Paragraph;
 
 use super::text_width::truncate_to_width;
-use super::unified_status::spinner_frame;
+use crate::animation::spinner_frame;
 
 pub const MAX_TASK_VISIBLE: usize = 5;
 
@@ -36,7 +36,7 @@ pub fn render_tasks_panel(
     f: &mut Frame,
     snapshots: &[TaskSnapshot],
     focused: Option<&str>,
-    elapsed: std::time::Duration,
+    animation_elapsed: std::time::Duration,
     offset: usize,
     area: Rect,
 ) {
@@ -52,7 +52,7 @@ pub fn render_tasks_panel(
     let end = (clamped + MAX_TASK_VISIBLE).min(total);
     let lines: Vec<Line<'static>> = active[clamped..end]
         .iter()
-        .map(|t| render_task_line(t, focused, elapsed, area.width as usize))
+        .map(|t| render_task_line(t, focused, animation_elapsed, area.width as usize))
         .collect();
 
     let bg = Style::default().bg(Color::Rgb(25, 25, 30));
@@ -62,7 +62,7 @@ pub fn render_tasks_panel(
 fn render_task_line(
     task: &TaskSnapshot,
     focused: Option<&str>,
-    elapsed: std::time::Duration,
+    animation_elapsed: std::time::Duration,
     width: usize,
 ) -> Line<'static> {
     let is_focused = focused == Some(task.id.as_str());
@@ -72,7 +72,7 @@ fn render_task_line(
     } else {
         Style::default()
     };
-    let (icon, icon_style) = status_icon(&task.status, &task.blocked_by, elapsed);
+    let (icon, icon_style) = status_icon(&task.status, &task.blocked_by, animation_elapsed);
     let id_label = format!("#{:<3}", task.id);
     let id_style = if is_focused {
         Style::default().fg(Color::Cyan).bold()
@@ -108,12 +108,12 @@ fn render_task_line(
 fn status_icon(
     status: &TaskSnapshotStatus,
     blocked_by: &[String],
-    elapsed: std::time::Duration,
+    animation_elapsed: std::time::Duration,
 ) -> (String, Style) {
     match status {
         TaskSnapshotStatus::Completed => ("✓".into(), Style::default().fg(Color::Green)),
         TaskSnapshotStatus::InProgress => (
-            spinner_frame(elapsed).to_string(),
+            spinner_frame(animation_elapsed).to_string(),
             Style::default().fg(Color::Green),
         ),
         TaskSnapshotStatus::Pending if !blocked_by.is_empty() => {

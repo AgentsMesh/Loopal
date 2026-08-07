@@ -24,19 +24,16 @@ fn collect_tool_result_bodies(runner: &loopal_runtime::agent_loop::AgentLoopRunn
     out
 }
 
-async fn drain_microcompact_event(
+async fn drain_compact_phases(
     rx: &mut tokio::sync::mpsc::Receiver<loopal_protocol::AgentEvent>,
-) -> bool {
+) -> Vec<CompactPhase> {
     let evts = loopal_test_support::events::drain_pending(rx).await;
-    evts.iter().any(|e| {
-        matches!(
-            e,
-            AgentEventPayload::CompactProgress {
-                phase: CompactPhase::Microcompact,
-                ..
-            }
-        )
-    })
+    evts.into_iter()
+        .filter_map(|e| match e {
+            AgentEventPayload::CompactProgress { phase, .. } => Some(phase),
+            _ => None,
+        })
+        .collect()
 }
 
 #[tokio::test]
@@ -64,9 +61,10 @@ async fn microcompact_scrubs_idle_tool_results_e2e() {
         bodies.iter().all(|b| b == CLEARED_MARKER),
         "all tool results scrubbed, got: {bodies:?}"
     );
-    assert!(
-        drain_microcompact_event(&mut h.event_rx).await,
-        "expected CompactProgress(Microcompact) event"
+    assert_eq!(
+        drain_compact_phases(&mut h.event_rx).await,
+        vec![CompactPhase::Microcompact, CompactPhase::Done],
+        "microcompact progress must always reach a terminal Done phase"
     );
 }
 
@@ -87,7 +85,7 @@ async fn microcompact_noop_when_recent_activity_e2e() {
 
     assert_eq!(collect_tool_result_bodies(&h.runner), vec!["stays as-is"]);
     assert!(
-        !drain_microcompact_event(&mut h.event_rx).await,
+        drain_compact_phases(&mut h.event_rx).await.is_empty(),
         "no event should fire inside idle window"
     );
 }
@@ -171,7 +169,7 @@ async fn microcompact_disabled_when_idle_duration_is_zero() {
 
     assert_eq!(collect_tool_result_bodies(&h.runner), vec!["stays as-is"]);
     assert!(
-        !drain_microcompact_event(&mut h.event_rx).await,
+        drain_compact_phases(&mut h.event_rx).await.is_empty(),
         "idle=0 must disable microcompact"
     );
 }

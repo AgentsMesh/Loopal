@@ -9,6 +9,70 @@ use serde_json::json;
 
 use super::e2e_event_waiters::{wait_for_call_count, wait_for_gate_change};
 
+#[tokio::test]
+async fn suspend_wins_turn_boundary_over_queued_scheduled_envelope() {
+    let calls = vec![
+        chunks::text_turn("kickoff complete"),
+        chunks::text_turn("scheduled input processed after unsuspend"),
+    ];
+    let harness = HarnessBuilder::new()
+        .calls(calls)
+        .messages(vec![])
+        .lifecycle(loopal_runtime::LifecycleMode::Persistent)
+        .llm_chunk_delay(Duration::from_millis(40))
+        .build()
+        .await;
+    let mut event_rx = harness.event_rx;
+    let mailbox_tx = harness.mailbox_tx;
+    let control_tx = harness.control_tx;
+    let recorded = harness.recorded_messages;
+    let mut runner = harness.runner;
+    let (scheduled_tx, scheduled_rx) = tokio::sync::mpsc::channel(4);
+    runner.trigger_rx = Some(scheduled_rx);
+
+    mailbox_tx
+        .send(Envelope::new(MessageSource::Human, "main", "kickoff"))
+        .await
+        .unwrap();
+    let agent = tokio::spawn(async move { runner.run().await });
+    wait_for_call_count(&recorded, 1, Duration::from_secs(5)).await;
+
+    scheduled_tx
+        .send(Envelope::new(
+            MessageSource::Scheduled,
+            "main",
+            "queued scheduled input",
+        ))
+        .await
+        .unwrap();
+    control_tx.send(ControlCommand::Suspend).await.unwrap();
+    let closed = wait_for_gate_change(&mut event_rx, false).await;
+    assert_eq!(closed.closed_reason, Some(GateCloseReason::UserSuspend));
+
+    tokio::time::sleep(Duration::from_millis(150)).await;
+    assert_eq!(
+        recorded.lock().unwrap().len(),
+        1,
+        "poll_pending_input must leave scheduled work queued after Suspend wins"
+    );
+
+    control_tx.send(ControlCommand::Unsuspend).await.unwrap();
+    wait_for_gate_change(&mut event_rx, true).await;
+    wait_for_call_count(&recorded, 2, Duration::from_secs(5)).await;
+    assert!(matches!(
+        recorded.lock().unwrap()[1]
+            .last()
+            .map(|turn| &turn.trigger),
+        Some(loopal_turn::TurnTrigger::Cron { content, .. })
+            if content == "queued scheduled input"
+    ));
+
+    drop(scheduled_tx);
+    drop(control_tx);
+    drop(mailbox_tx);
+    let _ = tokio::time::timeout(Duration::from_secs(5), agent).await;
+}
+
 #[tokio::test(start_paused = true)]
 async fn suspend_blocks_scheduled_envelope_unsuspend_drains_pending() {
     let t0 = Utc.with_ymd_and_hms(2026, 5, 21, 10, 0, 30).unwrap();

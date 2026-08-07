@@ -101,7 +101,7 @@ pub async fn build_hub_harness_with(
 ) -> HubTestHarness {
     let fixture = TestFixture::new();
     let provider = Arc::new(MultiCallProvider::new(calls));
-    let kernel = build_kernel_with_provider(provider).unwrap();
+    let kernel = build_kernel_with_provider(provider, None).unwrap();
 
     let (input_tx, input_rx) = mpsc::channel::<AgentInput>(16);
     let interrupt = InterruptSignal::new();

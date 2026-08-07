@@ -65,3 +65,31 @@ export const AgentControlInputSchema = z.object({
   command: AgentControlCommandSchema,
 }).strict()
 export type AgentControlInput = z.infer<typeof AgentControlInputSchema>
+
+const TypedAgentControlDispositionSchema = z.discriminatedUnion('status', [
+  z.object({ status: z.literal('applied') }).strict(),
+  z.object({ status: z.literal('queued') }).strict(),
+  z.object({ status: z.literal('unknown') }).strict(),
+  z.object({ status: z.literal('rejected'), reason: ValueSchema }).strict(),
+])
+
+/**
+ * Parses the cross-process control disposition. Pre-disposition agents used
+ * `{ ok: true }` after queueing the command, so compatibility maps that shape
+ * to `queued`; it never upgrades legacy queue acceptance to `applied`.
+ */
+export const AgentControlDispositionSchema = z.preprocess((value) => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return value
+  const legacy = value as Record<string, unknown>
+  if (legacy.ok === true) return { status: 'queued' }
+  if (legacy.ok === false) {
+    const reason = typeof legacy.reason === 'string'
+      ? legacy.reason
+      : typeof legacy.error === 'string'
+        ? legacy.error
+        : 'Legacy agent rejected control'
+    return { status: 'rejected', reason }
+  }
+  return value
+}, TypedAgentControlDispositionSchema)
+export type AgentControlDisposition = z.output<typeof AgentControlDispositionSchema>

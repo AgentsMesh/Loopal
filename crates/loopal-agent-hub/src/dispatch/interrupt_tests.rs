@@ -129,16 +129,64 @@ async fn failed_interrupt_request_still_cleans_pending_and_closes_transport() {
 }
 
 #[tokio::test]
-async fn blackhole_control_times_out_and_closes_captured_connection() {
-    let (hub, transport, _sent) = fixture(false).await;
-    let error = handle_control(
+async fn blackhole_control_returns_unknown_and_preserves_connection_for_late_ack() {
+    let (hub, transport, mut sent) = fixture(false).await;
+    let disposition = handle_control(
         &hub,
         serde_json::json!({"target": "main", "command": {"type": "resume"}}),
     )
     .await
-    .unwrap_err();
-    assert!(error.contains("timed out"));
-    assert!(transport.closed.load(Ordering::SeqCst));
+    .unwrap();
+    assert_eq!(disposition, serde_json::json!({"status": "unknown"}));
+    assert!(
+        !transport.closed.load(Ordering::SeqCst),
+        "an indeterminate control outcome must preserve the connection"
+    );
+
+    let first = sent.recv().await.unwrap();
+    let first: serde_json::Value = serde_json::from_slice(&first).unwrap();
+    assert_eq!(first["method"], "agent/control");
+    let first_id = first["id"].as_i64().unwrap();
+    transport
+        .incoming_tx
+        .send(loopal_ipc::jsonrpc::encode_response(
+            first_id,
+            serde_json::json!({"status": "applied"}),
+        ))
+        .unwrap();
+
+    let follow_up = tokio::spawn({
+        let hub = hub.clone();
+        async move {
+            handle_control(
+                &hub,
+                serde_json::json!({"target": "main", "command": {"type": "resume"}}),
+            )
+            .await
+        }
+    });
+    let second = tokio::time::timeout(Duration::from_secs(1), sent.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    let second: serde_json::Value = serde_json::from_slice(&second).unwrap();
+    assert_eq!(
+        second["method"], "agent/control",
+        "the timed-out request must retain its waiter instead of cancelling it"
+    );
+    let second_id = second["id"].as_i64().unwrap();
+    transport
+        .incoming_tx
+        .send(loopal_ipc::jsonrpc::encode_response(
+            second_id,
+            serde_json::json!({"status": "queued"}),
+        ))
+        .unwrap();
+    assert_eq!(
+        follow_up.await.unwrap().unwrap(),
+        serde_json::json!({"status": "queued"})
+    );
+    assert!(!transport.closed.load(Ordering::SeqCst));
 }
 
 #[tokio::test]

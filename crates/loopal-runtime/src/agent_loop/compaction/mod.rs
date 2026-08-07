@@ -1,4 +1,5 @@
 mod host;
+mod progress;
 
 use std::time::{Duration, SystemTime};
 
@@ -8,6 +9,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, info, warn};
 
 use self::host::CompactionHostGuard;
+use self::progress::CompactProgressGuard;
 use super::runner::AgentLoopRunner;
 
 impl AgentLoopRunner {
@@ -30,14 +32,16 @@ impl AgentLoopRunner {
             idle_seconds = idle.as_secs(),
             "microcompact scrubbed old tool results"
         );
-        self.emit_cosmetic(AgentEventPayload::CompactProgress {
-            phase: CompactPhase::Microcompact,
-            detail: Some(format!(
+        let progress = CompactProgressGuard::start(
+            self.params.deps.frontend.clone(),
+            CompactPhase::Microcompact,
+            Some(format!(
                 "scrubbed {} stale tool results",
                 stats.results_cleared
             )),
-        })
+        )
         .await;
+        progress.finish(None).await;
         Ok(())
     }
 
@@ -68,21 +72,25 @@ impl AgentLoopRunner {
                 "auto compaction triggered"
             );
 
-            self.emit_cosmetic(AgentEventPayload::CompactProgress {
-                phase: CompactPhase::Summarize,
-                detail: Some(format!("{tokens_before} tokens before")),
-            })
+            let progress = CompactProgressGuard::start(
+                self.params.deps.frontend.clone(),
+                CompactPhase::Summarize,
+                Some(format!("{tokens_before} tokens before")),
+            )
             .await;
 
-            let compacted = self
+            let result = self
                 .run_smart_compact(before_count, tokens_before, None, "auto", cancel)
-                .await?;
-            if !compacted {
-                self.emit_cosmetic(AgentEventPayload::CompactProgress {
-                    phase: CompactPhase::Done,
-                    detail: Some("auto-compact declined: no summary produced".to_string()),
-                })
                 .await;
+            let detail = match &result {
+                Ok(true) => None,
+                Ok(false) => Some("auto-compact declined: no summary produced".to_string()),
+                Err(e) => Some(format!("auto-compact failed: {e}")),
+            };
+            progress.finish(detail).await;
+
+            let compacted = result?;
+            if !compacted {
                 warn!("auto-compact run_smart_compact returned false");
             }
             Ok(())
@@ -113,8 +121,8 @@ impl AgentLoopRunner {
         };
         let compactable_turns = turn_count.saturating_sub(in_progress_offset);
         if compactable_turns < 2 {
-            self.emit_cosmetic(AgentEventPayload::Stream {
-                text: "[nothing to compact — conversation is short]\n".to_string(),
+            self.emit_cosmetic(AgentEventPayload::ProviderWarning {
+                message: "Nothing to compact: conversation is short.".to_string(),
             })
             .await;
             self.emit_cosmetic(AgentEventPayload::CompactProgress {
@@ -144,28 +152,27 @@ impl AgentLoopRunner {
             "manual compaction triggered"
         );
 
-        self.emit_cosmetic(AgentEventPayload::CompactProgress {
-            phase: CompactPhase::Summarize,
-            detail: Some(format!("{tokens_before} tokens before")),
-        })
+        let progress = CompactProgressGuard::start(
+            self.params.deps.frontend.clone(),
+            CompactPhase::Summarize,
+            Some(format!("{tokens_before} tokens before")),
+        )
         .await;
 
         let host = self.ensure_compaction_host_turn();
         if matches!(host, CompactionHostGuard::OpenFailed) {
             warn!("force_compact: failed to open synthetic host turn; aborting");
-            self.emit_cosmetic(AgentEventPayload::CompactProgress {
-                phase: CompactPhase::Done,
-                detail: Some("aborted: cannot persist host turn".to_string()),
-            })
-            .await;
+            progress
+                .finish(Some("aborted: cannot persist host turn".to_string()))
+                .await;
             return Ok(false);
         }
         if matches!(host, CompactionHostGuard::AlreadySummarized) {
-            self.emit_cosmetic(AgentEventPayload::CompactProgress {
-                phase: CompactPhase::Done,
-                detail: Some("nothing new to compact since last summary".to_string()),
-            })
-            .await;
+            progress
+                .finish(Some(
+                    "nothing new to compact since last summary".to_string(),
+                ))
+                .await;
             return Ok(false);
         }
 
@@ -182,15 +189,13 @@ impl AgentLoopRunner {
             .await;
 
         let summary_appended = matches!(result, Ok(true));
-        if matches!(result, Ok(false)) {
-            self.emit_cosmetic(AgentEventPayload::CompactProgress {
-                phase: CompactPhase::Done,
-                detail: Some("no summary produced".to_string()),
-            })
-            .await;
-        }
-
         self.close_compaction_host(host, summary_appended);
+        let detail = match &result {
+            Ok(true) => None,
+            Ok(false) => Some("no summary produced".to_string()),
+            Err(e) => Some(format!("compaction failed: {e}")),
+        };
+        progress.finish(detail).await;
         result
     }
 }

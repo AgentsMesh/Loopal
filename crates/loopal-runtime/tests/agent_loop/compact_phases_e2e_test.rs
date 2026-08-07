@@ -1,8 +1,10 @@
 use loopal_context::ContextBudget;
+use loopal_context::middleware::touched_files::rank_touched_files;
 use loopal_protocol::{AgentEventPayload, CompactPhase};
 use loopal_provider_api::Message;
 use loopal_test_support::tool_history::{ToolStep, tool_history_turn};
 use loopal_test_support::{HarnessBuilder, chunks};
+use loopal_turn::{Turn, TurnOutcome, TurnTrigger};
 
 fn tiny_budget() -> ContextBudget {
     ContextBudget {
@@ -45,12 +47,30 @@ async fn compact_emits_full_phase_sequence_with_rehydrate() {
     // file and rehydrate picks it up.
     h.runner.seed_test_turns(vec![tool_history_turn(
         "go",
-        vec![ToolStep::done(
+        vec![ToolStep::done_with_input(
             "Read",
             "t1",
-            &format!("file_path: {}", touched_file.to_string_lossy()),
+            serde_json::json!({ "file_path": touched_file }),
+            "rehydrated body",
         )],
     )]);
+    // Manual compaction hosts its summary on the latest completed turn and
+    // keeps that turn out of the summarized prefix. Add a tail so the Read
+    // history above is part of the prefix whose touched files are rehydrated.
+    let mut tail = Turn::new(TurnTrigger::UserInput {
+        envelope_id: "tail".into(),
+        content: "continue".into(),
+        images: Vec::new(),
+    });
+    tail.outcome = TurnOutcome::Complete;
+    h.runner.seed_test_turns(vec![tail]);
+    let ranked = rank_touched_files(h.runner.turns.view().messages(), 5);
+    assert!(
+        ranked
+            .iter()
+            .any(|file| file.path == touched_file.to_string_lossy()),
+        "seeded successful Read must be discoverable before compaction: {ranked:?}"
+    );
 
     h.runner.force_compact(None).await.unwrap();
 
@@ -68,12 +88,13 @@ async fn compact_emits_full_phase_sequence_with_rehydrate() {
     let find = |label: &str| positions.iter().find(|(_, p)| *p == label).map(|(i, _)| *i);
 
     let summarize = find("Summarize").expect("Summarize phase missing");
+    let rehydrate = find("Rehydrate").expect("Rehydrate phase missing");
     let compacted = find("Compacted").expect("Compacted event missing");
     let done = find("Done").expect("Done phase missing");
 
     assert!(
-        summarize < compacted,
-        "Summarize must precede Compacted: {positions:?}"
+        summarize < rehydrate && rehydrate < compacted,
+        "Summarize, Rehydrate, and Compacted must be ordered: {positions:?}"
     );
     assert!(
         compacted < done,

@@ -94,7 +94,7 @@ async fn concurrent_permissions_from_two_agents() {
 
 #[tokio::test]
 async fn route_to_disconnected_agent_returns_error() {
-    let (hub, _) = make_hub();
+    let (hub, _event_rx) = make_hub();
 
     // Register then immediately unregister (simulate disconnect)
     {
@@ -125,7 +125,7 @@ async fn route_to_disconnected_agent_returns_error() {
 
 #[tokio::test]
 async fn sibling_agents_communicate_via_hub() {
-    let (hub, _) = make_hub();
+    let (hub, _event_rx) = make_hub();
 
     let (conn_b, rx_b) = hub_server::connect_local(hub.clone(), "sibling-b");
     let (method_tx, mut method_rx) = mpsc::channel::<String>(1);
@@ -163,7 +163,7 @@ async fn sibling_agents_communicate_via_hub() {
 
 #[tokio::test]
 async fn wait_already_finished_agent_returns_immediately() {
-    let (hub, _) = make_hub();
+    let (hub, _event_rx) = make_hub();
 
     // Register and immediately finish
     let (_t1, t2) = loopal_ipc::duplex_pair();
@@ -178,7 +178,8 @@ async fn wait_already_finished_agent_returns_immediately() {
         .await
         .registry
         .unregister_connection("done-agent");
-    hub.lock()
+    let _pending = hub
+        .lock()
         .await
         .registry
         .emit_agent_finished("done-agent", None);
@@ -205,7 +206,7 @@ async fn wait_already_finished_agent_returns_immediately() {
 
 #[tokio::test]
 async fn multiple_waiters_on_same_agent() {
-    let (hub, _) = make_hub();
+    let (hub, _event_rx) = make_hub();
 
     let (_t1, t2) = loopal_ipc::duplex_pair();
     let (conn, rx) = Connection::new(t2).into_listening();
@@ -237,7 +238,8 @@ async fn multiple_waiters_on_same_agent() {
     });
 
     tokio::time::sleep(Duration::from_millis(100)).await;
-    hub.lock()
+    let _pending = hub
+        .lock()
         .await
         .registry
         .emit_agent_finished("shared-target", None);

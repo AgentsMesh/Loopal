@@ -1,5 +1,6 @@
 use loopal_tool_api::{Tool, ToolContext, TypedBridge};
 use loopal_tool_apply_patch::{ApplyPatchParams, ApplyPatchTool};
+use loopal_tool_invocation::ToolResultMetadata;
 use serde_json::json;
 
 fn make_ctx(cwd: &std::path::Path) -> ToolContext {
@@ -174,6 +175,14 @@ async fn mixed_ops_success_message_includes_all_counts() {
     assert!(r.content.contains("1 created"), "got: {}", r.content);
     assert!(r.content.contains("1 deleted"), "got: {}", r.content);
     assert!(r.content.starts_with("Applied: "), "got: {}", r.content);
+    let Some(ToolResultMetadata::ModifiedFiles { paths }) = r.metadata else {
+        panic!("successful batch must report its actual modified paths");
+    };
+    let canonical_root = std::fs::canonicalize(tmp.path()).unwrap();
+    assert_eq!(paths.len(), 3);
+    assert!(paths.contains(&canonical_root.join("created.txt").display().to_string()));
+    assert!(paths.contains(&canonical_root.join("update.txt").display().to_string()));
+    assert!(paths.contains(&canonical_root.join("delete.txt").display().to_string()));
 }
 
 #[tokio::test]
@@ -227,5 +236,16 @@ async fn commit_failure_reports_applied_list_and_failed_index() {
     assert!(
         !tmp.path().join("blocker/file.txt").exists(),
         "third Add never written"
+    );
+    let Some(ToolResultMetadata::ModifiedFiles { paths }) = r.metadata else {
+        panic!("partial failure must report paths that reached disk");
+    };
+    let canonical_root = std::fs::canonicalize(tmp.path()).unwrap();
+    assert_eq!(
+        paths,
+        vec![
+            canonical_root.join("a.txt").display().to_string(),
+            canonical_root.join("b.txt").display().to_string(),
+        ]
     );
 }

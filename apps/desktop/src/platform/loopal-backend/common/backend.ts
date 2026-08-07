@@ -1,6 +1,7 @@
 import { type Event } from '../../../base/common/event'
 import { createServiceIdentifier } from '../../instantiation/common/services'
 import {
+  type AgentControlDisposition,
   type AgentControlInput,
   type AgentControlTarget,
   type CreateSessionInput,
@@ -61,7 +62,10 @@ export interface DesktopBackend {
     images?: readonly DesktopImageAttachment[],
   ): Promise<void>
   interruptAgent(input: AgentControlTarget, token: CancellationToken): Promise<void>
-  controlAgent(input: AgentControlInput, token: CancellationToken): Promise<void>
+  controlAgent(
+    input: AgentControlInput,
+    token: CancellationToken,
+  ): Promise<AgentControlDisposition>
   getDesktopPreferences(token: CancellationToken): Promise<DesktopPreferences>
   updateDesktopPreferences(
     input: UpdateDesktopPreferencesInput, token: CancellationToken,

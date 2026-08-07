@@ -2,12 +2,10 @@ use std::sync::Arc;
 
 use loopal_ipc::connection::{Connection, Listening};
 use loopal_ipc::jsonrpc;
-use loopal_protocol::ControlCommand;
+use loopal_protocol::{ControlCommand, ControlDisposition};
 use loopal_runtime::agent_input::{AgentInput, ControlAcknowledgement, ControlRequest};
 
 use crate::session_hub::SharedSession;
-
-const CONTROL_APPLY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(8);
 
 pub(crate) fn spawn(
     request_id: i64,
@@ -48,17 +46,20 @@ async fn forward(
         reject(connection, request_id, "agent input channel is closed").await;
         return;
     }
-    match wait_for_acknowledgement(&mut acknowledgement, CONTROL_APPLY_TIMEOUT).await {
+    match wait_for_acknowledgement(
+        &mut acknowledgement,
+        loopal_protocol::DEFAULT_CONTROL_APPLICATION_TIMEOUT,
+    )
+    .await
+    {
         AckWait::Received(ControlAcknowledgement::Applied) => {
-            let _ = connection
-                .respond(request_id, serde_json::json!({"status": "applied"}))
-                .await;
+            respond_disposition(connection, request_id, ControlDisposition::Applied).await;
         }
         AckWait::Received(ControlAcknowledgement::Rejected(reason)) => {
-            reject(
+            respond_disposition(
                 connection,
                 request_id,
-                format!("control rejected: {reason}"),
+                ControlDisposition::Rejected { reason },
             )
             .await;
         }
@@ -71,8 +72,28 @@ async fn forward(
             .await;
         }
         AckWait::TimedOut => {
-            acknowledgement.close();
-            reject(connection, request_id, "control application timed out").await;
+            // The command is already accepted into the runtime input queue.
+            // Report that distinction honestly, then keep the acknowledgement
+            // receiver alive so `ControlRequest::application_is_live` remains
+            // true and the runtime still applies it at the next turn boundary.
+            respond_disposition(connection, request_id, ControlDisposition::Queued).await;
+            tokio::spawn(log_late_acknowledgement(acknowledgement));
+        }
+    }
+}
+
+async fn log_late_acknowledgement(
+    mut receiver: tokio::sync::mpsc::Receiver<ControlAcknowledgement>,
+) {
+    match receiver.recv().await {
+        Some(ControlAcknowledgement::Applied) => {
+            tracing::info!("queued control applied after acknowledgement deadline");
+        }
+        Some(ControlAcknowledgement::Rejected(reason)) => {
+            tracing::warn!(%reason, "queued control rejected after acknowledgement deadline");
+        }
+        None => {
+            tracing::info!("queued control dropped because the runtime input channel closed");
         }
     }
 }
@@ -101,6 +122,15 @@ async fn reject(connection: &Connection<Listening>, request_id: i64, reason: imp
         .await;
 }
 
+async fn respond_disposition(
+    connection: &Connection<Listening>,
+    request_id: i64,
+    disposition: ControlDisposition,
+) {
+    let value = serde_json::to_value(disposition).expect("control disposition must serialize");
+    let _ = connection.respond(request_id, value).await;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -120,5 +150,21 @@ mod tests {
         let result =
             wait_for_acknowledgement(&mut receiver, std::time::Duration::from_secs(1)).await;
         assert_eq!(result, AckWait::Closed);
+    }
+
+    #[tokio::test]
+    async fn timed_out_request_remains_live_for_late_application() {
+        let (request, mut receiver) = ControlRequest::tracked(ControlCommand::Suspend);
+        let result =
+            wait_for_acknowledgement(&mut receiver, std::time::Duration::from_millis(1)).await;
+        assert_eq!(result, AckWait::TimedOut);
+
+        let late = tokio::spawn(async move { receiver.recv().await });
+        assert!(
+            request.application_is_live(),
+            "the queued runtime request must not become stale after response timeout"
+        );
+        request.acknowledge(ControlAcknowledgement::Applied).await;
+        assert_eq!(late.await.unwrap(), Some(ControlAcknowledgement::Applied));
     }
 }

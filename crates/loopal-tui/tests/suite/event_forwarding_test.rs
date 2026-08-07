@@ -15,7 +15,7 @@ async fn send_and_recv(event: AgentEvent) -> AgentEvent {
     let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(2);
     while tokio::time::Instant::now() < deadline {
         match tokio::time::timeout(std::time::Duration::from_millis(500), handler.next()).await {
-            Ok(Some(AppEvent::Agent(e))) => return e,
+            Ok(Some(AppEvent::Agent(e))) => return *e,
             Ok(Some(_)) => continue,
             _ => break,
         }

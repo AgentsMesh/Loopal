@@ -137,17 +137,17 @@ pub enum AgentEventPayload {
     /// Cancel signal or new message arrived while runner was busy.
     Interrupted,
     TurnDiffSummary { modified_files: Vec<String> },
-    /// Observational — server-side tool invoked (e.g. web_search).
+    /// Observational server-side tool lifecycle (e.g. web_search).
     ServerToolUse {
         id: String,
         name: String,
         input: serde_json::Value,
     },
-    /// Observational — server-side tool result received.
     ServerToolResult {
         tool_use_id: String,
         content: serde_json::Value,
     },
+    ServerToolDiscarded { tool_use_id: String, reason: loopal_tool_invocation::StaleReason },
     SubAgentSpawned(SubAgentSpawn),
     PermissionDecided {
         tool_name: String,

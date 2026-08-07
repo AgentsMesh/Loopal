@@ -34,16 +34,21 @@ async fn test_error_preserves_prior_output() {
 async fn test_non_interactive_exits_after_tool_turn() {
     let tmp = std::env::temp_dir().join(format!("la_mt_{}.txt", std::process::id()));
     std::fs::write(&tmp, "y").unwrap();
-    let calls = vec![vec![
-        Ok(StreamChunk::ToolUse {
-            id: "tc-1".into(),
-            name: "Read".into(),
-            input: serde_json::json!({"file_path": tmp.to_str().unwrap()}),
-        }),
-        Ok(StreamChunk::Done {
+    let calls = vec![
+        vec![
+            Ok(StreamChunk::ToolUse {
+                id: "tc-1".into(),
+                name: "Read".into(),
+                input: serde_json::json!({"file_path": tmp.to_str().unwrap()}),
+            }),
+            Ok(StreamChunk::Done {
+                stop_reason: StopReason::EndTurn,
+            }),
+        ],
+        vec![Ok(StreamChunk::Done {
             stop_reason: StopReason::EndTurn,
-        }),
-    ]];
+        })],
+    ];
     let (mut runner, mut event_rx) = make_multi_runner(calls, false);
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 
@@ -96,7 +101,7 @@ async fn test_empty_final_response_preserves_last_text() {
 /// Regression test: tool call with text -> next LLM call stream error ->
 /// output preserves the text from the successful iteration (not empty).
 /// This was the root cause of sub-agents returning empty results.
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn test_stream_error_after_tool_preserves_last_text() {
     let tmp = std::env::temp_dir().join(format!("la_se_{}.txt", std::process::id()));
     std::fs::write(&tmp, "data").unwrap();
@@ -127,7 +132,7 @@ async fn test_stream_error_after_tool_preserves_last_text() {
     // The key assertion: even though the second LLM call had a stream error,
     // the output preserves "I will read the file." from the first iteration.
     assert_eq!(output.result, "I will read the file.");
-    assert_eq!(output.terminate_reason, TerminateReason::Goal);
+    assert_eq!(output.terminate_reason, TerminateReason::Error);
 
     let _ = std::fs::remove_file(&tmp);
 }

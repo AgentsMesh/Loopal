@@ -44,12 +44,12 @@ test('interrupts a real background child through the selected Agent UI', async (
     })
     await page.getByRole('button', { name: 'Close settings' }).click()
 
-    await expect(conversation).toContainText('Viewing ui-interrupt-child · completed', {
+    await expect(conversation).toContainText('Viewing ui-interrupt-child · failed', {
       timeout: 30_000,
     })
     await expect(conversation).toContainText('UI CHILD STREAM ACTIVE')
     await expect(conversation).not.toContainText('UI CHILD LATE OUTPUT')
-    await expect(child).toContainText('completed')
+    await expect(child).toContainText('failed')
 
     await agents.locator('[data-agent-id="main"]').click()
     await expect(page.getByLabel('Message Loopal')).toBeEnabled()

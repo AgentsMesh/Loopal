@@ -6,6 +6,7 @@ use loopal_turn::{
 pub struct ToolStep {
     pub tool_use_id: String,
     pub tool_name: String,
+    pub input: serde_json::Value,
     pub result_body: String,
     pub state: ToolExecState,
 }
@@ -15,19 +16,28 @@ impl ToolStep {
         Self {
             tool_use_id: id.into(),
             tool_name: tool.into(),
+            input: serde_json::json!({}),
             result_body: body.into(),
             state: ToolExecState::Done(ToolResult {
                 content: body.into(),
                 images: Vec::new(),
                 is_error: false,
+                metadata: None,
             }),
         }
+    }
+
+    pub fn done_with_input(tool: &str, id: &str, input: serde_json::Value, body: &str) -> Self {
+        let mut step = Self::done(tool, id, body);
+        step.input = input;
+        step
     }
 
     pub fn cancelled(tool: &str, id: &str, cause: loopal_turn::CancelCause) -> Self {
         Self {
             tool_use_id: id.into(),
             tool_name: tool.into(),
+            input: serde_json::json!({}),
             result_body: String::new(),
             state: ToolExecState::Cancelled(cause),
         }
@@ -45,7 +55,7 @@ pub fn tool_history_turn(trigger_content: &str, steps: Vec<ToolStep>) -> Turn {
         .map(|s| ToolCall {
             id: ToolCallId::new(&s.tool_use_id),
             name: s.tool_name.clone(),
-            input: serde_json::json!({}),
+            input: s.input.clone(),
         })
         .collect();
     turn.body.steps.push(TurnStep::LlmCall {
@@ -63,7 +73,7 @@ pub fn tool_history_turn(trigger_content: &str, steps: Vec<ToolStep>) -> Turn {
             call: ToolCall {
                 id: ToolCallId::new(&s.tool_use_id),
                 name: s.tool_name,
-                input: serde_json::json!({}),
+                input: s.input,
             },
             state: s.state,
         })

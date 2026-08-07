@@ -132,34 +132,6 @@ async fn test_pending_consumed_ids_record_message_ids_for_each_ingest() {
 }
 
 #[tokio::test]
-async fn test_inject_pending_messages_emits_inbox_enqueued_for_mid_turn_arrivals() {
-    let (mut runner, mut event_rx, mbox_tx, _ctrl_tx, _perm_tx) = make_runner_with_channels();
-    let src = MessageSource::Agent(QualifiedAddress::local("worker"));
-    let env = Envelope::new(src.clone(), "main", "mid-turn");
-    mbox_tx.send(env).await.unwrap();
-    drop(mbox_tx);
-
-    runner.inject_pending_messages().await;
-
-    let mut found = false;
-    while let Ok(event) = event_rx.try_recv() {
-        if let AgentEventPayload::InboxEnqueued {
-            source, content, ..
-        } = event.payload
-        {
-            assert_eq!(source, src);
-            assert_eq!(content, "mid-turn");
-            found = true;
-            break;
-        }
-    }
-    assert!(
-        found,
-        "inject_pending_messages must emit InboxEnqueued so UI sees mid-turn arrivals"
-    );
-}
-
-#[tokio::test]
 async fn test_failed_inbox_enqueued_emit_does_not_leave_orphan_consume_id() {
     let (mut runner, event_rx, mbox_tx, _ctrl_tx, _perm_tx) = make_runner_with_channels();
     drop(event_rx);

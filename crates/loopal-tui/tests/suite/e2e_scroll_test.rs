@@ -61,9 +61,9 @@ fn ctrl_d() -> KeyEvent {
 }
 
 fn stream_event(text: &str) -> AppEvent {
-    AppEvent::Agent(AgentEvent::root(AgentEventPayload::Stream {
+    AppEvent::Agent(Box::new(AgentEvent::root(AgentEventPayload::Stream {
         text: text.to_string(),
-    }))
+    })))
 }
 
 // --- Bug 1 regression: scroll events → scroll content, not history ---

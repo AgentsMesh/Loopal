@@ -41,7 +41,7 @@ impl PanelProvider for AgentPanelProvider {
         app: &App,
         state: &SessionState,
         focused: Option<&str>,
-        _elapsed: Duration,
+        animation_elapsed: Duration,
         area: Rect,
     ) {
         let offset = app.section(PanelKind::Agents).scroll_offset;
@@ -51,6 +51,7 @@ impl PanelProvider for AgentPanelProvider {
             focused,
             &state.active_view,
             offset,
+            animation_elapsed,
             area,
         );
     }

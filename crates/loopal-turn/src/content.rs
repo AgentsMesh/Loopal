@@ -1,4 +1,4 @@
-use loopal_tool_invocation::ToolImageBlock;
+use loopal_tool_invocation::{ToolImageBlock, ToolResultMetadata};
 use serde::de::{self, Deserializer};
 use serde::ser::Serializer;
 use serde::{Deserialize, Serialize};
@@ -38,6 +38,10 @@ pub struct ToolCall {
 pub struct ToolResult {
     pub content: String,
     pub is_error: bool,
+    /// Structured side effects and terminal details from tool execution.
+    /// Optional for compatibility with turns persisted before metadata existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<ToolResultMetadata>,
     /// Image attachments produced by the tool (e.g. Read on PNG/JPEG, screenshot
     /// tools). `Inline { media_type, data }` carries base64-encoded bytes;
     /// `SessionResource { id, media_type, byte_size }` references storage by

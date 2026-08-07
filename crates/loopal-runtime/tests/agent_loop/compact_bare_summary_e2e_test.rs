@@ -1,5 +1,5 @@
 use loopal_context::ContextBudget;
-use loopal_protocol::AgentEventPayload;
+use loopal_protocol::{AgentEventPayload, CompactPhase};
 use loopal_provider_api::{ContentBlock, Message};
 use loopal_test_support::{HarnessBuilder, chunks};
 
@@ -34,6 +34,42 @@ fn first_text(h: &loopal_test_support::IntegrationHarness) -> String {
             })
         })
         .unwrap_or_default()
+}
+
+#[tokio::test]
+async fn compact_retry_then_fatal_error_clears_before_compacted_and_done() {
+    let mut h = HarnessBuilder::new()
+        .calls(vec![
+            vec![chunks::provider_error("simulated retryable 502")],
+            vec![chunks::non_retryable_error("simulated fatal 400")],
+        ])
+        .messages(padded_seed(15))
+        .build()
+        .await;
+    h.runner.turns.update_budget(tiny_budget());
+
+    h.runner.force_compact(None).await.unwrap();
+
+    let events = loopal_test_support::events::drain_pending(&mut h.event_rx).await;
+    let lifecycle: Vec<_> = events
+        .iter()
+        .filter_map(|event| match event {
+            AgentEventPayload::RetryError { .. } => Some("retry"),
+            AgentEventPayload::RetryCleared => Some("cleared"),
+            AgentEventPayload::Compacted(_) => Some("compacted"),
+            AgentEventPayload::CompactProgress {
+                phase: CompactPhase::Done,
+                ..
+            } => Some("done"),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        lifecycle,
+        vec!["retry", "cleared", "compacted", "done"],
+        "terminal provider failure must clear retry state before compaction finishes; \
+         events: {events:?}"
+    );
 }
 
 #[tokio::test]

@@ -11,6 +11,14 @@ use super::tool_display::render_tool_calls;
 use super::welcome::render_welcome;
 
 pub fn message_to_lines(msg: &SessionMessage, width: u16) -> Vec<Line<'static>> {
+    message_to_lines_with_animation_elapsed(msg, width, crate::animation::elapsed())
+}
+
+pub(crate) fn message_to_lines_with_animation_elapsed(
+    msg: &SessionMessage,
+    width: u16,
+    animation_elapsed: std::time::Duration,
+) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
 
     match msg.role.as_str() {
@@ -30,7 +38,7 @@ pub fn message_to_lines(msg: &SessionMessage, width: u16) -> Vec<Line<'static>> 
     }
 
     if !msg.tool_calls.is_empty() {
-        lines.extend(render_tool_calls(&msg.tool_calls, width));
+        lines.extend(render_tool_calls(&msg.tool_calls, width, animation_elapsed));
     }
 
     lines.push(Line::from(""));

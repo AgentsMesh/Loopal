@@ -43,10 +43,10 @@ impl AgentLoopRunner {
             self.status = old;
             return result;
         }
-        // Domain mirror: a transition to WaitingForInput/Finished closes the
-        // currently in-progress Turn. Errors close it with an Error outcome.
+        // Domain mirror: every idle/terminal transition closes the currently
+        // in-progress Turn. Errors close it with an Error outcome.
         match new_status {
-            AgentStatus::WaitingForInput => {
+            AgentStatus::WaitingForInput | AgentStatus::Suspended => {
                 if self.turns.current_turn_id().is_some() {
                     self.end_turn_record(loopal_turn::TurnOutcome::Complete);
                 }

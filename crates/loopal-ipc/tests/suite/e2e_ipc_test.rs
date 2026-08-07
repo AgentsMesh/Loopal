@@ -57,6 +57,7 @@ async fn e2e_message_then_event_roundtrip() {
                 turn_id: 0,
                 correlation_id: 0,
                 rev: None,
+                routing_generation: None,
                 payload: AgentEventPayload::Stream {
                     text: "reply".into(),
                 },
@@ -78,6 +79,7 @@ async fn e2e_message_then_event_roundtrip() {
         content: loopal_protocol::UserContent::text_only("hello"),
         timestamp: chrono::Utc::now(),
         summary: None,
+        agent_completion: None,
     };
     handles.mailbox_tx.send(envelope).await.unwrap();
 

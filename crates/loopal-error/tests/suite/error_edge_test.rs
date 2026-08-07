@@ -23,6 +23,7 @@ fn test_api_400_invalid_request_not_retryable() {
     let err = ProviderError::Api {
         status: 400,
         message: r#"{"type":"error","error":{"type":"invalid_request_error"}}"#.into(),
+        retry_after_ms: None,
     };
     assert!(!err.is_retryable());
 }
@@ -39,6 +40,7 @@ fn test_prefill_rejection_not_context_overflow() {
     let err = ProviderError::Api {
         status: 400,
         message: body.into(),
+        retry_after_ms: None,
     };
     assert!(
         !err.is_context_overflow(),
@@ -55,6 +57,7 @@ fn test_api_500_not_context_overflow() {
     let err = ProviderError::Api {
         status: 500,
         message: "internal".into(),
+        retry_after_ms: None,
     };
     assert!(!err.is_context_overflow());
     assert!(err.is_retryable());

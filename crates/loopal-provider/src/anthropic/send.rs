@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use loopal_error::{LoopalError, ProviderError};
+use loopal_error::LoopalError;
 use loopal_provider_api::{ChatParams, ChatStream};
 use serde_json::json;
 use tracing::Instrument;
@@ -27,24 +27,30 @@ impl AnthropicProvider {
             "API request"
         );
 
-        let http_span = tracing::info_span!("http_request", gen_ai.system = "anthropic");
+        let endpoint = format!("{}/v1/messages", self.base_url);
+        let http_span = crate::http_telemetry::request_span("anthropic", &endpoint);
         let (client, client_gen) = self.client.get();
         let response = client
-            .post(format!("{}/v1/messages", self.base_url))
+            .post(endpoint)
             .header("x-api-key", &self.api_key)
             .header("anthropic-version", "2023-06-01")
             .header("content-type", "application/json")
             .json(&body)
             .send()
-            .instrument(http_span)
-            .await
-            .map_err(|e| {
+            .instrument(http_span.clone())
+            .await;
+        let response = match response {
+            Ok(response) => response,
+            Err(e) => {
+                crate::http_telemetry::record_transport_error(&http_span);
                 self.client.report_network_error(client_gen);
-                crate::safe_diagnostics::network_error("anthropic", &e)
-            })?;
+                return Err(crate::safe_diagnostics::network_error("anthropic", &e).into());
+            }
+        };
         self.client.report_success(client_gen);
 
         let status = response.status();
+        crate::http_telemetry::record_response(&http_span, status);
         tracing::info!(status = status.as_u16(), "API response");
         if !status.is_success() {
             self.dump_failed_request(&body, params, status);
@@ -128,16 +134,16 @@ impl AnthropicProvider {
         response: reqwest::Response,
         status: reqwest::StatusCode,
     ) -> LoopalError {
+        let retry_after_ms = crate::retry_after::from_headers(response.headers());
         if status.as_u16() == 429 {
-            let retry_after_ms = response
-                .headers()
-                .get("retry-after")
-                .and_then(|v| v.to_str().ok())
-                .and_then(|s| s.parse::<f64>().ok())
-                .map(|secs| (secs * 1000.0) as u64)
-                .unwrap_or(30_000);
+            let error = crate::retry_after::provider_error(
+                status.as_u16(),
+                "rate limited by API".into(),
+                retry_after_ms,
+            );
+            let retry_after_ms = error.retry_after_ms().unwrap_or_default();
             tracing::warn!(retry_after_ms, "rate limited by API");
-            return ProviderError::RateLimited { retry_after_ms }.into();
+            return error.into();
         }
         let text = crate::safe_diagnostics::response_error_message(
             "anthropic",
@@ -146,10 +152,6 @@ impl AnthropicProvider {
         )
         .await;
         tracing::error!(status = status.as_u16(), "API error");
-        ProviderError::Api {
-            status: status.as_u16(),
-            message: text,
-        }
-        .into()
+        crate::retry_after::provider_error(status.as_u16(), text, retry_after_ms).into()
     }
 }

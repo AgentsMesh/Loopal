@@ -71,6 +71,7 @@ pub fn handle_compaction(
     tokens_before: u32,
     tokens_after: u32,
     strategy: &str,
+    files_rehydrated: usize,
 ) {
     let freed = tokens_before.saturating_sub(tokens_after);
     let pct = if tokens_before > 0 {
@@ -78,12 +79,18 @@ pub fn handle_compaction(
     } else {
         0
     };
+    let rehydrate_suffix = match files_rehydrated {
+        0 => String::new(),
+        1 => ", 1 file rehydrated".to_string(),
+        count => format!(", {count} files rehydrated"),
+    };
     let before = kept + summarized;
     push_system_msg(
         conv,
         &format!(
             "Context compacted ({strategy}): {before}→{kept} messages \
-             ({summarized} summarized), {tokens_before}→{tokens_after} tokens ({pct}% freed).",
+             ({summarized} summarized), {tokens_before}→{tokens_after} tokens \
+             ({pct}% freed){rehydrate_suffix}.",
         ),
     );
     // Self-correct ctx counter from the Compacted event alone, in case the

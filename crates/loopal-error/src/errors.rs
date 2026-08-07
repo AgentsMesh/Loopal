@@ -49,7 +49,14 @@ pub enum ProviderError {
     SseParse(String),
 
     #[error("API error: status={status}, message={message}")]
-    Api { status: u16, message: String },
+    Api {
+        status: u16,
+        message: String,
+        /// Server-directed delay from the HTTP `Retry-After` header. This is
+        /// retained for every status, rather than only 429, because gateways
+        /// commonly attach it to transient 5xx responses as well.
+        retry_after_ms: Option<u64>,
+    },
 
     #[error("Model not found: {0}")]
     ModelNotFound(String),

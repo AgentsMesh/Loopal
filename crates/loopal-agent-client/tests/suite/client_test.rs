@@ -78,6 +78,35 @@ async fn recv_delivers_agent_events() {
 }
 
 #[tokio::test]
+async fn recv_delivers_authoritative_agent_completion() {
+    let (transport, server, _server_rx) = make_pair();
+    let mut client = AgentClient::new(transport);
+
+    server
+        .send_notification(
+            methods::AGENT_COMPLETED.name,
+            serde_json::json!({
+                "reason": "goal",
+                "result": "final result",
+            }),
+        )
+        .await
+        .unwrap();
+
+    let event = tokio::time::timeout(std::time::Duration::from_secs(2), client.recv())
+        .await
+        .unwrap();
+
+    match event {
+        Some(loopal_agent_client::AgentClientEvent::AgentCompleted(completion)) => {
+            assert_eq!(completion.reason, "goal");
+            assert_eq!(completion.result.as_deref(), Some("final result"));
+        }
+        other => panic!("expected AgentCompleted, got: {other:?}"),
+    }
+}
+
+#[tokio::test]
 async fn into_parts_transfers_connection() {
     let (transport, server, _server_rx) = make_pair();
     let client = AgentClient::new(transport);

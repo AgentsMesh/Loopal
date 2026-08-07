@@ -18,13 +18,16 @@ pub enum AgentInput {
     Message(Envelope),
     /// A control-plane command (mode switch, clear, compact, model switch).
     Control(ControlCommand),
-    /// A control command whose caller waits for runtime application.
+    /// A control command carrying an application acknowledgement lease.
     TrackedControl(ControlRequest),
 }
 
 #[derive(Debug, Clone)]
 pub struct ControlRequest {
     command: ControlCommand,
+    /// Receiver lifetime is an execution lease. The RPC caller may already
+    /// have received `{status:"queued"}` while a late-ack keeper still owns
+    /// the receiver so the accepted command remains eligible for application.
     acknowledgement: mpsc::Sender<ControlAcknowledgement>,
 }
 
@@ -50,7 +53,7 @@ impl ControlRequest {
         &self.command
     }
 
-    pub fn caller_is_waiting(&self) -> bool {
+    pub fn application_is_live(&self) -> bool {
         !self.acknowledgement.is_closed()
     }
 

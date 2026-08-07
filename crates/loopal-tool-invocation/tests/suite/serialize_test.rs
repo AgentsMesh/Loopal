@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use loopal_tool_invocation::{
     FailureKind, InvocationId, InvocationState, Outcome, ProgressSnapshot, StaleReason,
-    ToolInvocation, TransitionCmd, transition,
+    ToolInvocation, ToolResultMetadata, TransitionCmd, transition,
 };
 
 fn inv(state_name: &str) -> ToolInvocation {
@@ -122,6 +122,14 @@ fn stale_reason_display_is_human_readable() {
     assert_eq!(StaleReason::WatchdogTimeout.to_string(), "watchdog timeout");
     assert_eq!(StaleReason::TurnEnded.to_string(), "turn ended");
     assert_eq!(StaleReason::ConnectionLost.to_string(), "connection lost");
+    assert_eq!(
+        StaleReason::IncompleteModelResponse.to_string(),
+        "incomplete model response"
+    );
+    assert_eq!(
+        serde_json::to_value(StaleReason::IncompleteModelResponse).unwrap(),
+        "incomplete_model_response"
+    );
 }
 
 #[test]
@@ -144,7 +152,6 @@ fn failure_kind_display_is_human_readable() {
 
 #[test]
 fn invocation_metadata_round_trips() {
-    use loopal_tool_invocation::ToolResultMetadata;
     use std::time::{Duration, Instant};
     let now = Instant::now();
     let inv = ToolInvocation {
@@ -169,4 +176,18 @@ fn invocation_metadata_round_trips() {
         Some(&ToolResultMetadata::bytes_written(1024))
     );
     assert_eq!(back.state.duration(), Some(Duration::from_millis(500)));
+}
+
+#[test]
+fn modified_files_metadata_round_trips() {
+    let metadata = ToolResultMetadata::modified_files(vec![
+        "/workspace/a.rs".into(),
+        "/workspace/b.rs".into(),
+    ]);
+    let json = serde_json::to_value(&metadata).unwrap();
+    assert_eq!(json["kind"], "modified_files");
+    assert_eq!(json["paths"][0], "/workspace/a.rs");
+
+    let decoded: ToolResultMetadata = serde_json::from_value(json).unwrap();
+    assert_eq!(decoded, metadata);
 }

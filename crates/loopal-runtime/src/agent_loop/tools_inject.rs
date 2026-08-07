@@ -65,29 +65,4 @@ impl AgentLoopRunner {
         }
         Ok(())
     }
-
-    pub async fn inject_pending_messages(&mut self) {
-        let pending = self.params.deps.frontend.drain_pending().await;
-        for input in pending {
-            match input {
-                crate::agent_input::AgentInput::Message(env) => {
-                    info!(
-                        text_len = env.content.text.len(),
-                        "injecting pending message"
-                    );
-                    self.ingest_message(&env).await;
-                }
-                crate::agent_input::AgentInput::Control(cmd) => {
-                    if let Err(e) = self.apply_untracked_control(cmd).await {
-                        tracing::warn!(error = %e, "failed to handle drained control");
-                    }
-                }
-                crate::agent_input::AgentInput::TrackedControl(request) => {
-                    if let Err(e) = self.apply_tracked_control(request).await {
-                        tracing::warn!(error = %e, "failed to handle tracked control");
-                    }
-                }
-            }
-        }
-    }
 }

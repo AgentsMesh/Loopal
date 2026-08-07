@@ -108,8 +108,9 @@ fn test_tool_call_pending_shows_spinner() {
     };
     let lines = message_to_lines(&m, 80);
     let text = all_text(&lines);
+    let icon = text.chars().next().expect("tool header icon");
     assert!(
-        text.contains("⠋") || text.contains("●") || text.contains("⠙") || text.contains("⠹"),
+        ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'].contains(&icon),
         "pending should have spinner: {text}"
     );
 }

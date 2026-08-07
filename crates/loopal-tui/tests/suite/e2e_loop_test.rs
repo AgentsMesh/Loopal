@@ -1,11 +1,15 @@
 //! TUI loop E2E tests — verify `run_tui_loop` with TestBackend and injected events.
 
+use std::collections::VecDeque;
+use std::convert::Infallible;
 use std::sync::Arc;
 use std::time::Duration;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::Terminal;
-use ratatui::backend::TestBackend;
+use ratatui::backend::{Backend, ClearType, TestBackend, WindowSize};
+use ratatui::buffer::Cell;
+use ratatui::layout::{Position, Size};
 use tokio::sync::{mpsc, watch};
 
 use loopal_protocol::{
@@ -14,7 +18,84 @@ use loopal_protocol::{
 use loopal_session::SessionController;
 use loopal_tui::app::App;
 use loopal_tui::event::{AppEvent, EventHandler};
-use loopal_tui::run_tui_loop;
+use loopal_tui::view_client::ViewClient;
+use loopal_tui::{run_tui_loop, run_tui_loop_with_animation_clock};
+use loopal_view_state::{ViewSnapshot, ViewStateReducer};
+
+struct FrameRecordingBackend {
+    inner: TestBackend,
+    frame_tx: mpsc::UnboundedSender<String>,
+}
+
+impl FrameRecordingBackend {
+    fn new(width: u16, height: u16, frame_tx: mpsc::UnboundedSender<String>) -> Self {
+        Self {
+            inner: TestBackend::new(width, height),
+            frame_tx,
+        }
+    }
+}
+
+impl Backend for FrameRecordingBackend {
+    type Error = Infallible;
+
+    fn draw<'a, I>(&mut self, content: I) -> Result<(), Self::Error>
+    where
+        I: Iterator<Item = (u16, u16, &'a Cell)>,
+    {
+        self.inner.draw(content)?;
+        let buffer = self.inner.buffer();
+        let mut text = String::new();
+        for y in 0..buffer.area.height {
+            for x in 0..buffer.area.width {
+                text.push_str(buffer[(x, y)].symbol());
+            }
+            text.push('\n');
+        }
+        let _ = self.frame_tx.send(text);
+        Ok(())
+    }
+
+    fn append_lines(&mut self, n: u16) -> Result<(), Self::Error> {
+        self.inner.append_lines(n)
+    }
+
+    fn hide_cursor(&mut self) -> Result<(), Self::Error> {
+        self.inner.hide_cursor()
+    }
+
+    fn show_cursor(&mut self) -> Result<(), Self::Error> {
+        self.inner.show_cursor()
+    }
+
+    fn get_cursor_position(&mut self) -> Result<Position, Self::Error> {
+        self.inner.get_cursor_position()
+    }
+
+    fn set_cursor_position<P: Into<Position>>(&mut self, position: P) -> Result<(), Self::Error> {
+        self.inner.set_cursor_position(position)
+    }
+
+    fn clear(&mut self) -> Result<(), Self::Error> {
+        self.inner.clear()
+    }
+
+    fn clear_region(&mut self, clear_type: ClearType) -> Result<(), Self::Error> {
+        self.inner.clear_region(clear_type)
+    }
+
+    fn size(&self) -> Result<Size, Self::Error> {
+        self.inner.size()
+    }
+
+    fn window_size(&mut self) -> Result<WindowSize, Self::Error> {
+        self.inner.window_size()
+    }
+
+    fn flush(&mut self) -> Result<(), Self::Error> {
+        self.inner.flush()
+    }
+}
 
 fn build_loop_rig() -> (
     Terminal<TestBackend>,
@@ -39,6 +120,96 @@ fn build_loop_rig() -> (
     let events = EventHandler::from_channel(tx.clone(), rx);
 
     (terminal, app, events, tx)
+}
+
+fn install_running_wire_snapshot(app: &mut App) {
+    let mut hub_reducer = ViewStateReducer::new("main");
+    hub_reducer.apply(AgentEventPayload::Running);
+    hub_reducer.apply(AgentEventPayload::ToolCall {
+        id: "tool-1".into(),
+        name: "Read".into(),
+        input: serde_json::json!({"file_path": "/tmp/input"}),
+    });
+
+    let wire = serde_json::to_string(&hub_reducer.snapshot()).expect("serialize snapshot");
+    let snapshot: ViewSnapshot = serde_json::from_str(&wire).expect("deserialize snapshot");
+    app.view_clients
+        .insert("main".into(), ViewClient::from_snapshot("main", snapshot));
+
+    assert_eq!(
+        app.view_clients["main"]
+            .state()
+            .conversation()
+            .turn_elapsed(),
+        Duration::ZERO,
+        "wire snapshot must reproduce the missing process-local timer"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn ticks_redraw_snapshot_spinners_without_new_agent_events() {
+    let (_agent_tx, agent_rx) = mpsc::channel::<AgentEvent>(16);
+    let (_resync_tx, resync_rx) = mpsc::channel::<()>(8);
+    let events = EventHandler::new(agent_rx, resync_rx);
+    let quit_tx = events.sender();
+
+    let (ctrl_tx, _ctrl_rx) = mpsc::channel::<ControlCommand>(16);
+    let (perm_tx, _perm_rx) = mpsc::channel::<bool>(16);
+    let (question_tx, _question_rx) = mpsc::channel::<UserQuestionResponse>(16);
+    let session = SessionController::new(
+        ctrl_tx,
+        perm_tx,
+        question_tx,
+        InterruptSignal::new(),
+        Arc::new(watch::channel(0u64).0),
+    );
+    let mut app = App::new(session, std::env::temp_dir());
+    install_running_wire_snapshot(&mut app);
+
+    let (frame_tx, mut frame_rx) = mpsc::unbounded_channel();
+    let mut terminal = Terminal::new(FrameRecordingBackend::new(80, 24, frame_tx)).unwrap();
+    let mut clock = VecDeque::from([
+        Duration::ZERO,
+        Duration::from_millis(100),
+        Duration::from_millis(200),
+    ]);
+
+    let loop_task = tokio::spawn(async move {
+        run_tui_loop_with_animation_clock(&mut terminal, events, &mut app, || {
+            clock.pop_front().expect("unexpected extra redraw")
+        })
+        .await
+    });
+
+    let initial = frame_rx.recv().await.expect("initial frame");
+    let first_tick = frame_rx.recv().await.expect("first tick redraw");
+    tokio::time::advance(Duration::from_millis(100)).await;
+    let second_tick = frame_rx.recv().await.expect("second tick redraw");
+
+    assert!(
+        initial.contains("⠋ Working") && initial.contains("⠋ Read"),
+        "initial snapshot frame did not use the local animation clock: {initial}"
+    );
+    assert!(
+        first_tick.contains("⠙ Working") && first_tick.contains("⠙ Read"),
+        "AppEvent::Tick did not redraw the next spinner frame: {first_tick}"
+    );
+    assert!(
+        second_tick.contains("⠹ Working") && second_tick.contains("⠹ Read"),
+        "the next AppEvent::Tick did not keep animation moving: {second_tick}"
+    );
+
+    quit_tx
+        .send(AppEvent::Key(KeyEvent::new(
+            KeyCode::Char('d'),
+            KeyModifiers::CONTROL,
+        )))
+        .await
+        .expect("send quit");
+    loop_task
+        .await
+        .expect("join TUI loop")
+        .expect("run TUI loop");
 }
 
 #[tokio::test]
@@ -71,7 +242,7 @@ async fn test_e2e_loop_renders_agent_event() {
         let stream = AgentEvent::root(AgentEventPayload::Stream {
             text: "Agent says hi".into(),
         });
-        let _ = tx.send(AppEvent::Agent(stream)).await;
+        let _ = tx.send(AppEvent::Agent(Box::new(stream))).await;
         tokio::time::sleep(Duration::from_millis(30)).await;
         let key = KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL);
         let _ = tx2.send(AppEvent::Key(key)).await;

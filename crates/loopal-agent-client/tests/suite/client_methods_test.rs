@@ -82,6 +82,7 @@ async fn send_message_delivers_envelope() {
         content: loopal_protocol::UserContent::text_only("test"),
         timestamp: chrono::Utc::now(),
         summary: None,
+        agent_completion: None,
     };
     client.send_message(&envelope).await.unwrap();
 }

@@ -8,7 +8,7 @@ pub const CONTEXT_OVERFLOW_BANNER: &str = "Context overflow — compacting and r
 
 use super::LifecycleMode;
 use super::cancel::TurnCancel;
-use super::input::WaitResult;
+use super::input::{PendingInput, QueuedInput, WaitResult};
 use super::runner::AgentLoopRunner;
 use super::turn_context::TurnContext;
 
@@ -16,6 +16,7 @@ impl AgentLoopRunner {
     pub(super) async fn run_loop(&mut self) -> Result<AgentOutput> {
         let mut last_output = String::new();
         let mut last_error: Option<String> = None;
+        let mut terminate_reason = TerminateReason::Goal;
         let mut server_block_retry = false;
         let mut context_overflow_retry = false;
         // Need user input whenever the last message isn't User — covers empty
@@ -26,11 +27,32 @@ impl AgentLoopRunner {
         loop {
             // ── Idle phase ──────────────────────────────────────────
             if needs_input {
-                let injected_continuation =
-                    matches!(self.params.config.lifecycle, LifecycleMode::Persistent)
-                        && self.goal_continuation_check().await?;
-                if !injected_continuation {
-                    self.transition(AgentStatus::WaitingForInput).await?;
+                let mut ready_for_turn = false;
+                let mut queued_input: Option<Box<QueuedInput>> = None;
+                let mut input_closed = false;
+                if matches!(self.params.config.lifecycle, LifecycleMode::Persistent) {
+                    match self.poll_pending_input().await? {
+                        PendingInput::Ready(_result) => ready_for_turn = true,
+                        PendingInput::Queued(input) => queued_input = Some(input),
+                        PendingInput::Empty => {}
+                        PendingInput::Closed => input_closed = true,
+                    }
+                    if !input_closed && !ready_for_turn && queued_input.is_none() {
+                        ready_for_turn = self.goal_continuation_check().await?;
+                    }
+                }
+                if !ready_for_turn {
+                    // Suspend owns the Suspended state and already emitted its
+                    // AwaitingInput projection while closing the gate.
+                    if !matches!(self.status, AgentStatus::Suspended) {
+                        self.transition(AgentStatus::WaitingForInput).await?;
+                    }
+                    // Preserve the ordinary idle projection before shutdown,
+                    // while never letting a closed frontend fall through to a
+                    // synthetic goal continuation.
+                    if input_closed {
+                        break;
+                    }
 
                     match self.params.config.lifecycle {
                         LifecycleMode::Ephemeral => {
@@ -43,7 +65,11 @@ impl AgentLoopRunner {
                                 self.ingest_message(env).await;
                             }
                         }
-                        LifecycleMode::Persistent => match self.wait_for_input().await? {
+                        LifecycleMode::Persistent => match if let Some(input) = queued_input {
+                            Some(self.consume_queued_input(input).await)
+                        } else {
+                            self.wait_for_input().await?
+                        } {
                             Some(WaitResult::MessageAdded) => {
                                 self.interrupt.take();
                             }
@@ -69,6 +95,11 @@ impl AgentLoopRunner {
             if !self.ensure_resume_turn_record().await? {
                 break;
             }
+            // A real new turn supersedes a prior persistent-session failure or
+            // interruption. The attempt below will set a new terminal reason if
+            // it fails or is cancelled in turn.
+            last_error = None;
+            terminate_reason = TerminateReason::Goal;
             self.emit_inbox_consumed().await;
 
             let cancel = TurnCancel::new(self.interrupt.clone(), self.interrupt_tx.clone());
@@ -89,6 +120,7 @@ impl AgentLoopRunner {
                     self.turn_count += 1;
                     if self.interrupt.take() {
                         self.collect_interrupted_turn().await?;
+                        terminate_reason = TerminateReason::Aborted;
                     } else if self.turns.current_turn_id().is_some() {
                         // is_some guard: skip_stale_continuation_turn already
                         // rewound the turn, leaving no current turn to end.
@@ -96,6 +128,9 @@ impl AgentLoopRunner {
                     }
                 }
                 Err(e) => {
+                    if !turn_ctx.best_effort_output().is_empty() {
+                        last_output = turn_ctx.best_effort_output().to_owned();
+                    }
                     let class = self.classify_turn_error(&e);
                     let recovered = self
                         .try_recover(class, &mut server_block_retry, &mut context_overflow_retry)
@@ -106,12 +141,14 @@ impl AgentLoopRunner {
                     }
                     if self.interrupt.take() {
                         self.collect_interrupted_turn().await?;
+                        terminate_reason = TerminateReason::Aborted;
                         continue;
                     }
                     error!(error = %e, "LLM request failed");
                     let msg = LoopalError::to_string(&e);
                     self.transition_error(msg.clone()).await?;
                     last_error = Some(msg);
+                    terminate_reason = TerminateReason::Error;
                     // reason: an ephemeral agent has no UI/parent to retry, so an
                     // unrecovered turn error must terminate the loop with the real
                     // error — not fall through to "idle, exiting" which would report
@@ -125,9 +162,9 @@ impl AgentLoopRunner {
             context_overflow_retry = false;
         }
 
-        let (result, terminate_reason) = match last_error {
-            Some(err) if last_output.is_empty() => (err, TerminateReason::Error),
-            _ => (last_output, TerminateReason::Goal),
+        let result = match last_error {
+            Some(err) if last_output.is_empty() => err,
+            _ => last_output,
         };
         Ok(AgentOutput {
             result,

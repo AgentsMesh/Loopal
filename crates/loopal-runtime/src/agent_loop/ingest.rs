@@ -7,15 +7,22 @@ use super::turn_trigger_map::envelope_to_trigger;
 
 impl AgentLoopRunner {
     pub(super) async fn ingest_message(&mut self, env: &Envelope) -> WaitResult {
-        if matches!(self.status, AgentStatus::Suspended)
+        let was_suspended = matches!(self.status, AgentStatus::Suspended);
+        if was_suspended
             && env.source.wakes_suspended_session()
             && let Err(err) = self.transition(AgentStatus::Running).await
         {
             tracing::warn!(error = %err, "transition out of Suspended on human input failed");
         }
         let was_closed = !self.continuation_gate.is_open();
-        self.continuation_gate.open_for_envelope();
-        if was_closed {
+        // Automatic/peer envelopes may already be queued when Suspend wins the
+        // turn-boundary race. They must not reopen the continuation gate. A
+        // human envelope may do so only after the Running transition succeeds.
+        let may_open_gate = !matches!(self.status, AgentStatus::Suspended);
+        if may_open_gate {
+            self.continuation_gate.open_for_envelope();
+        }
+        if was_closed && may_open_gate {
             let summary = self.continuation_gate.summary();
             if let Err(err) = self
                 .emit(loopal_protocol::AgentEventPayload::ContinuationGateChanged(

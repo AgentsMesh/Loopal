@@ -5,7 +5,8 @@ use ratatui::widgets::Paragraph;
 
 use loopal_protocol::AgentStatus;
 
-use super::unified_status::{format_duration, spinner_frame};
+use super::unified_status::format_duration;
+use crate::animation::spinner_frame;
 
 // Must match key_dispatch_ops::MAX_VISIBLE — scroll calculations assume parity.
 pub const MAX_VISIBLE: usize = 5;
@@ -45,6 +46,7 @@ pub fn render_agent_panel(
     focused: Option<&str>,
     active_view: &str,
     agent_panel_offset: usize,
+    animation_elapsed: Duration,
     area: Rect,
 ) {
     if area.height == 0 || agents.is_empty() {
@@ -76,7 +78,13 @@ pub fn render_agent_panel(
 
     for (name, agent) in &live_agents[offset..window_end] {
         let is_focused = focused == Some(name.as_str());
-        lines.push(render_agent_line(name, agent, is_focused, max_name));
+        lines.push(render_agent_line(
+            name,
+            agent,
+            is_focused,
+            max_name,
+            animation_elapsed,
+        ));
     }
 
     if window_end < total {
@@ -95,6 +103,7 @@ fn render_agent_line(
     agent: &AgentDisplayInfo,
     is_focused: bool,
     name_width: usize,
+    animation_elapsed: Duration,
 ) -> Line<'static> {
     let mut spans: Vec<Span<'static>> = Vec::with_capacity(10);
 
@@ -115,7 +124,8 @@ fn render_agent_line(
     spans.push(Span::raw("  "));
 
     let elapsed = agent.elapsed;
-    let (icon, label, icon_style) = status_display(&agent.status, agent.tools_in_flight, elapsed);
+    let (icon, label, icon_style) =
+        status_display(&agent.status, agent.tools_in_flight, animation_elapsed);
     spans.push(Span::styled(format!("{icon} {label:<12}"), icon_style));
     spans.push(Span::raw(" "));
 
@@ -144,11 +154,11 @@ fn render_agent_line(
 fn status_display(
     status: &AgentStatus,
     tools_in_flight: u32,
-    elapsed: std::time::Duration,
+    animation_elapsed: std::time::Duration,
 ) -> (&'static str, String, Style) {
     match status {
         AgentStatus::Starting => {
-            let frame = spinner_frame(elapsed);
+            let frame = spinner_frame(animation_elapsed);
             (
                 frame,
                 "Starting".to_string(),
@@ -156,7 +166,7 @@ fn status_display(
             )
         }
         AgentStatus::Running => {
-            let frame = spinner_frame(elapsed);
+            let frame = spinner_frame(animation_elapsed);
             let label = if tools_in_flight > 1 {
                 format!("Working ({tools_in_flight})")
             } else if tools_in_flight == 0 {

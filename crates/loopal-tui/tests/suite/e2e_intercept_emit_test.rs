@@ -15,11 +15,10 @@ async fn run_intercept_emit_scenario(
     mode: AgentMode,
     tool_input_id: &str,
 ) -> Vec<AgentEventPayload> {
-    let calls = vec![chunks::tool_turn(
-        tool_input_id,
-        "EnterPlanMode",
-        serde_json::json!({}),
-    )];
+    let calls = vec![
+        chunks::tool_turn(tool_input_id, "EnterPlanMode", serde_json::json!({})),
+        chunks::text_turn("Plan mode is unavailable in this context."),
+    ];
     let harness = HarnessBuilder::new()
         .calls(calls)
         .messages(vec![Message::user("trigger plan intercept")])

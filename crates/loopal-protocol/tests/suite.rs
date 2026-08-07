@@ -1,6 +1,8 @@
 // Single test binary — includes all test modules
 #[path = "suite/address_test.rs"]
 mod address_test;
+#[path = "suite/agent_completion_test.rs"]
+mod agent_completion_test;
 #[path = "suite/agent_state_test.rs"]
 mod agent_state_test;
 #[path = "suite/command_test.rs"]

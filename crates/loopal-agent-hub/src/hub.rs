@@ -1,12 +1,12 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use std::time::Duration;
 
 use tokio::sync::{Mutex, Notify, mpsc};
 
 use loopal_hub_vault::HubVaultService;
-use loopal_protocol::{AgentEvent, DEFAULT_INTERACTION_LIFETIME};
+use loopal_protocol::{AgentCompletion, AgentEvent, DEFAULT_INTERACTION_LIFETIME, Envelope};
 
 use crate::agent_registry::AgentRegistry;
 use crate::mcp_service::HubMcpService;
@@ -34,6 +34,14 @@ pub struct Hub {
     /// Destination-side authoritative relay records, keyed by
     /// `(qualified_agent, interaction_id)`.
     pub pending_remote_questions: HashMap<(String, String), PendingRemoteQuestionInfo>,
+    /// Generation/lease-bound cache preventing an instant remote completion
+    /// from overtaking its caller-side `SubAgentSpawned` event.
+    shadow_spawn_admissions: HashMap<String, ShadowSpawnAdmission>,
+    /// Names terminalized after an indeterminate remote spawn outcome. Without
+    /// a protocol-level remote generation id, the same uplink lease must not
+    /// reuse these names: a late completion could otherwise finish the new
+    /// registration.
+    shadow_spawn_quarantines: HashMap<String, Weak<HubUplink>>,
     /// Reducers for qualified remote agents. These make `view/snapshot`
     /// recover remote questions after UI lag/reconnect.
     pub remote_views: HashMap<String, Arc<Mutex<loopal_view_state::ViewStateReducer>>>,
@@ -86,6 +94,8 @@ impl Hub {
             pending_questions: HashMap::new(),
             pending_plan_approvals: HashMap::new(),
             pending_remote_questions: HashMap::new(),
+            shadow_spawn_admissions: HashMap::new(),
+            shadow_spawn_quarantines: HashMap::new(),
             remote_views: HashMap::new(),
             pending_interaction_timeout: DEFAULT_INTERACTION_LIFETIME,
             session_permission_grants: HashSet::new(),
@@ -111,8 +121,134 @@ impl Hub {
         self.pending_interaction_timeout
     }
 
+    pub(crate) fn install_shadow_spawn_admission(
+        &mut self,
+        name: &str,
+        generation: u64,
+        uplink: Arc<HubUplink>,
+    ) {
+        self.shadow_spawn_admissions.insert(
+            name.to_string(),
+            ShadowSpawnAdmission {
+                generation,
+                uplink,
+                completion: None,
+            },
+        );
+    }
+
+    pub(crate) fn cache_shadow_spawn_completion(
+        &mut self,
+        name: &str,
+        completion: AgentCompletion,
+        envelope: Envelope,
+    ) -> bool {
+        let Some(admission) = self.shadow_spawn_admissions.get_mut(name) else {
+            return false;
+        };
+        if self.registry.generation(name) != Some(admission.generation)
+            || !self
+                .uplink
+                .as_ref()
+                .is_some_and(|uplink| Arc::ptr_eq(uplink, &admission.uplink))
+        {
+            return false;
+        }
+        if admission.completion.is_none() {
+            admission.completion = Some(CachedShadowCompletion {
+                completion,
+                envelope,
+            });
+        }
+        true
+    }
+
+    pub(crate) fn take_shadow_spawn_completion(
+        &mut self,
+        name: &str,
+        generation: u64,
+        uplink: &Arc<HubUplink>,
+    ) -> Option<CachedShadowCompletion> {
+        let matches_admission = self
+            .shadow_spawn_admissions
+            .get(name)
+            .is_some_and(|admission| {
+                admission.generation == generation && Arc::ptr_eq(&admission.uplink, uplink)
+            });
+        if !matches_admission {
+            return None;
+        }
+        let admission = self
+            .shadow_spawn_admissions
+            .remove(name)
+            .expect("checked shadow admission disappeared");
+        if self.registry.generation(name) != Some(generation) {
+            tracing::warn!(agent = %name, generation, "discarding stale shadow spawn admission");
+            return None;
+        }
+        admission.completion
+    }
+
+    pub(crate) fn shadow_name_is_quarantined(
+        &mut self,
+        name: &str,
+        uplink: &Arc<HubUplink>,
+    ) -> bool {
+        let same_lease = self
+            .shadow_spawn_quarantines
+            .get(name)
+            .and_then(Weak::upgrade)
+            .is_some_and(|lease| Arc::ptr_eq(&lease, uplink));
+        if !same_lease {
+            self.shadow_spawn_quarantines.remove(name);
+        }
+        same_lease
+    }
+
+    pub(crate) fn quarantine_shadow_name(&mut self, name: &str, uplink: Arc<HubUplink>) {
+        self.shadow_spawn_quarantines
+            .insert(name.to_string(), Arc::downgrade(&uplink));
+    }
+
+    pub(crate) fn should_drop_quarantined_completion(
+        &self,
+        name: &str,
+        connection: &Arc<loopal_ipc::Connection<loopal_ipc::Listening>>,
+    ) -> bool {
+        self.shadow_spawn_quarantines
+            .get(name)
+            .and_then(Weak::upgrade)
+            .is_some_and(|lease| {
+                Arc::ptr_eq(lease.connection(), connection)
+                    && self
+                        .uplink
+                        .as_ref()
+                        .is_some_and(|active| Arc::ptr_eq(active, &lease))
+            })
+    }
+
+    pub(crate) fn is_active_uplink_connection(
+        &self,
+        connection: &Arc<loopal_ipc::Connection<loopal_ipc::Listening>>,
+    ) -> bool {
+        self.uplink
+            .as_ref()
+            .is_some_and(|uplink| Arc::ptr_eq(uplink.connection(), connection))
+    }
+
     pub fn noop() -> Self {
         let (tx, _rx) = mpsc::channel(1);
         Self::with_cwd(tx, PathBuf::from("."))
     }
+}
+
+struct ShadowSpawnAdmission {
+    generation: u64,
+    uplink: Arc<HubUplink>,
+    completion: Option<CachedShadowCompletion>,
+}
+
+pub(crate) struct CachedShadowCompletion {
+    pub(crate) completion: AgentCompletion,
+    pub(crate) envelope: Envelope,
 }

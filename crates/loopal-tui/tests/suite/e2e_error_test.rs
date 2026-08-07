@@ -8,10 +8,13 @@ use super::e2e_harness::build_tui_harness;
 #[tokio::test]
 async fn test_provider_error_mid_stream() {
     // Provider returns partial text then errors out
-    let calls = vec![vec![
-        chunks::text("partial response"),
-        chunks::provider_error("connection timeout"),
-    ]];
+    let calls = vec![
+        vec![
+            chunks::text("partial response"),
+            chunks::provider_error("connection timeout"),
+        ],
+        chunks::text_turn("continued response"),
+    ];
     let mut harness = build_tui_harness(calls, 80, 24).await;
     let events = harness.collect_until_idle().await;
 
@@ -30,11 +33,14 @@ async fn test_provider_error_mid_stream() {
 #[tokio::test]
 async fn test_provider_error_only() {
     // Provider errors immediately — no text at all
-    let calls = vec![vec![chunks::provider_error("service unavailable")]];
+    let calls = vec![
+        vec![chunks::provider_error("service unavailable")],
+        chunks::text_turn("recovered response"),
+    ];
     let mut harness = build_tui_harness(calls, 80, 24).await;
     let events = harness.collect_until_idle().await;
 
-    assert_provider_warning(&events, "service unavailable");
+    assert_provider_retry(&events, "service unavailable");
     assertions::assert_has_terminal(&events);
     assert!(
         !events
@@ -92,12 +98,26 @@ async fn test_malformed_tool_input() {
 }
 
 #[tokio::test]
-async fn test_provider_warning_text_captured() {
-    let calls = vec![vec![chunks::provider_error("api key expired")]];
+async fn test_provider_retry_text_captured() {
+    let calls = vec![
+        vec![chunks::provider_error("api key expired")],
+        chunks::text_turn("recovered response"),
+    ];
     let mut harness = build_tui_harness(calls, 100, 30).await;
     let events = harness.collect_until_idle().await;
 
-    assert_provider_warning(&events, "api key expired");
+    assert_provider_retry(&events, "api key expired");
+}
+
+fn assert_provider_retry(events: &[AgentEventPayload], expected: &str) {
+    assert!(
+        events.iter().any(|event| matches!(
+            event,
+            AgentEventPayload::RetryError { message, .. }
+                if message.contains(expected)
+        )),
+        "expected provider retry containing {expected:?}: {events:?}"
+    );
 }
 
 fn assert_provider_warning(events: &[AgentEventPayload], expected: &str) {

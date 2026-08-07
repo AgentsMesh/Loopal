@@ -412,3 +412,62 @@ async fn force_compact_single_complete_turn_bails_no_flicker() {
     });
     assert!(!has_summary, "single-turn bail must NOT append any summary");
 }
+
+#[tokio::test]
+async fn cancelled_compaction_does_not_rewrite_history_or_emit_compacted() {
+    let mut h = HarnessBuilder::new()
+        .calls(vec![chunks::text_turn(
+            "<summary>must not commit</summary>",
+        )])
+        .messages(five_user_messages())
+        .build()
+        .await;
+    let turns_before = h.runner.turns.store().turns().len();
+    h.interrupt.signal();
+
+    let result = h.runner.force_compact(None).await;
+
+    assert!(matches!(result, Ok(false)), "cancel result: {result:?}");
+    assert_eq!(h.runner.turns.store().turns().len(), turns_before);
+    assert!(h.runner.turns.store().turns().iter().all(|turn| {
+        turn.body
+            .steps
+            .iter()
+            .all(|step| !matches!(step, TurnStep::CompactionSummary(_)))
+    }));
+    let events = loopal_test_support::events::drain_pending(&mut h.event_rx).await;
+    assert!(
+        events
+            .iter()
+            .all(|event| !matches!(event, AgentEventPayload::Compacted(_))),
+        "cancelled compaction emitted Compacted: {events:?}"
+    );
+}
+
+#[tokio::test]
+async fn committed_summary_remains_success_when_frontend_delivery_is_closed() {
+    let mut h = HarnessBuilder::new()
+        .calls(vec![chunks::text_turn(
+            "<summary>durable summary</summary>",
+        )])
+        .messages(five_user_messages())
+        .build()
+        .await;
+    h.event_rx.close();
+
+    let result = h.runner.force_compact(None).await;
+
+    assert!(
+        matches!(result, Ok(true)),
+        "a post-commit delivery failure cannot report no-op: {result:?}"
+    );
+    let last = h.runner.turns.store().turns().last().unwrap();
+    assert!(matches!(last.outcome, loopal_turn::TurnOutcome::Complete));
+    assert!(last.body.steps.iter().any(|step| {
+        matches!(
+            step,
+            TurnStep::CompactionSummary(summary)
+                if summary.summary_text.contains("durable summary")
+        )
+    }));
+}

@@ -8,6 +8,7 @@ impl AnthropicProvider {
         if let LoopalError::Provider(ProviderError::Api {
             status: 400,
             message,
+            ..
         }) = err
         {
             if message.contains("does not support assistant message prefill") {

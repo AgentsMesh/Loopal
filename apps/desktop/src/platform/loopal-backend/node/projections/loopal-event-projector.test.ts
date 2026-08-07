@@ -1,9 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import {
-  LoopalEventProjector,
-  normalizeAgentStatus,
-  normalizeRole,
-} from './loopal-event-projector'
+import { LoopalEventProjector } from './loopal-event-projector'
 
 const now = () => new Date('2026-07-11T12:00:00.000Z')
 
@@ -22,13 +18,17 @@ function harness() {
   const append = vi.fn()
   const appendAgent = vi.fn()
   const updateSession = vi.fn()
+  const updateAgentLifecycle = vi.fn()
   const attention = vi.fn()
   const overflow = vi.fn()
   const artifacts = vi.fn()
   const projector = new LoopalEventProjector(now, {
-    append, appendAgent, updateSession, attention, overflow, artifacts,
+    append, appendAgent, updateSession, updateAgentLifecycle, attention, overflow, artifacts,
   })
-  return { projector, append, appendAgent, updateSession, attention, overflow, artifacts }
+  return {
+    projector, append, appendAgent, updateSession, updateAgentLifecycle,
+    attention, overflow, artifacts,
+  }
 }
 
 describe('LoopalEventProjector', () => {
@@ -47,7 +47,7 @@ describe('LoopalEventProjector', () => {
   })
 
   it('projects every lifecycle, attention, error, and tool payload', () => {
-    const { projector, append, updateSession, attention } = harness()
+    const { projector, append, updateSession, updateAgentLifecycle, attention } = harness()
     projector.finishSync(0)
     projector.accept(wire({ Stream: { text: 'answer' } }, 1))
     projector.accept(wire({ ToolPermissionRequest: { id: 'p' } }, 2))
@@ -79,6 +79,9 @@ describe('LoopalEventProjector', () => {
     expect(updateSession).not.toHaveBeenLastCalledWith('waiting', 'completed')
     projector.accept(wire('AwaitingInput'))
     expect(updateSession).toHaveBeenLastCalledWith('waiting', 'completed')
+    expect(updateAgentLifecycle).toHaveBeenCalledWith('main', 'Error', { message: 'failed' })
+    expect(updateAgentLifecycle).toHaveBeenCalledWith('main', 'Running', undefined)
+    expect(updateAgentLifecycle).toHaveBeenCalledWith('main', 'AwaitingInput', undefined)
     projector.accept(wire({ ToolCall: { name: 'Read' } }))
     projector.accept(wire({ ToolCall: {} }))
     expect(append).toHaveBeenCalledWith(expect.objectContaining({ text: 'Running Read' }))
@@ -130,7 +133,7 @@ describe('LoopalEventProjector', () => {
   })
 
   it('keeps event-only lifecycle notices visible for root and child agents', () => {
-    const { projector, append, appendAgent, updateSession } = harness()
+    const { projector, append, appendAgent, updateSession, updateAgentLifecycle } = harness()
     projector.finishSync(0, { worker: 0 })
     projector.accept(wire({ SessionResumeWarnings: {
       session_id: 'session', warnings: ['scheduler restore failed', 4],
@@ -157,6 +160,12 @@ describe('LoopalEventProjector', () => {
     expect(appendAgent).toHaveBeenCalledWith(expect.objectContaining({
       role: 'error', text: 'child failed to start', agentId: 'worker',
     }), 'worker')
+    expect(updateAgentLifecycle).toHaveBeenCalledWith('worker', 'TurnCancelled', {
+      cause: 'parent abort',
+    })
+    expect(updateAgentLifecycle).toHaveBeenCalledWith('worker', 'Error', {
+      message: 'child failed to start',
+    })
   })
 
   it('bounds sync buffering and reports one overflow', () => {
@@ -178,16 +187,5 @@ describe('LoopalEventProjector', () => {
     expect(overflow).toHaveBeenCalledOnce()
     projector.accept(wire({ SessionHistoryLoaded: { messages: [] } }, 4))
     expect(overflow).toHaveBeenCalledOnce()
-  })
-
-  it('normalizes snapshot roles and statuses', () => {
-    expect(normalizeRole('user')).toBe('user')
-    expect(normalizeRole('assistant')).toBe('assistant')
-    expect(normalizeRole('tool')).toBe('system')
-    expect(['Running', 'Starting'].map(normalizeAgentStatus)).toEqual(['running', 'starting'])
-    expect(['WaitingForInput', 'Suspended'].map(normalizeAgentStatus)).toEqual(['waiting', 'suspended'])
-    expect(normalizeAgentStatus('Finished')).toBe('completed')
-    expect(normalizeAgentStatus('Error')).toBe('failed')
-    expect(normalizeAgentStatus('Unknown')).toBe('idle')
   })
 })

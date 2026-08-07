@@ -8,7 +8,9 @@ use std::sync::Arc;
 use tokio::sync::{Mutex, mpsc};
 
 use loopal_ipc::connection::{Connection, Listening};
-use loopal_protocol::{ControlCommand, Envelope, InterruptSignal, UserQuestionResponse};
+use loopal_protocol::{
+    AgentCompletion, ControlCommand, Envelope, InterruptSignal, UserQuestionResponse,
+};
 use loopal_view_state::ViewStateReducer;
 
 use crate::topology::AgentInfo;
@@ -53,6 +55,10 @@ pub struct LocalChannels {
 pub(crate) struct ManagedAgent {
     pub(crate) state: AgentConnectionState,
     pub(crate) info: AgentInfo,
+    /// Hub-local generation of a local parent captured when this edge was
+    /// registered. Names alone are not ownership: a reconnected same-name
+    /// parent must not receive or cascade an older child's completion.
+    pub(crate) parent_generation: Option<u64>,
     /// Channel for delivering sub-agent completion notifications to this agent.
     /// When a child of this agent finishes, Hub sends an Envelope here.
     /// None for agents that don't spawn children (or weren't given a channel).
@@ -64,9 +70,15 @@ pub(crate) struct ManagedAgent {
     /// `agent/event` broadcast for incremental updates and apply the
     /// same events locally — there is no separate `view/delta` channel.
     pub(crate) view: Arc<Mutex<ViewStateReducer>>,
-    /// Final result captured before the connection is detached. Kept here
-    /// only during the short emit → unregister window.
-    pub(crate) output: Option<String>,
+    /// Authoritative terminal completion captured before the connection is
+    /// detached. Kept here only during the short emit → unregister window.
+    pub(crate) completion: Option<AgentCompletion>,
+    /// Whether the latest admitted lifecycle event is an Error that has not
+    /// been followed by Running/Started. This is admission state, independent
+    /// of the asynchronously reduced topology projection.
+    pub(crate) admitted_error: bool,
+    /// Monotonic Hub-local identity for this same-name registration.
+    pub(crate) generation: u64,
 }
 
 impl ManagedAgent {
@@ -81,7 +93,9 @@ impl ManagedAgent {
 /// Deliberately excludes connection and control channels.
 pub(crate) struct CompletedAgent {
     pub(crate) info: AgentInfo,
-    pub(crate) output: String,
+    pub(crate) parent_generation: Option<u64>,
+    pub(crate) completion: AgentCompletion,
     pub(crate) view: Arc<Mutex<ViewStateReducer>>,
     pub(crate) shadow: bool,
+    pub(crate) generation: u64,
 }

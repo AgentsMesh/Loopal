@@ -85,7 +85,8 @@ async fn wait_agent_does_not_block_io_loop() {
     tokio::time::sleep(Duration::from_millis(100)).await;
     {
         let mut h = hub.lock().await;
-        h.registry
+        let _pending = h
+            .registry
             .emit_agent_finished("child-b", Some("result-b".into()));
     }
 
@@ -99,7 +100,8 @@ async fn wait_agent_does_not_block_io_loop() {
     // Now complete child-a
     {
         let mut h = hub.lock().await;
-        h.registry
+        let _pending = h
+            .registry
             .emit_agent_finished("child-a", Some("result-a".into()));
     }
 

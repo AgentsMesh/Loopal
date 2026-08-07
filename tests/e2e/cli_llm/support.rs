@@ -274,11 +274,17 @@ async fn boot_process(
 
 impl CliHarness {
     pub async fn start(scenario: Value) -> Self {
-        Self::spawn(scenario, Provider::Anthropic, false).await
+        Self::spawn(scenario, Provider::Anthropic, false, false).await
+    }
+
+    /// Start with deterministic local trace export enabled. This is reserved
+    /// for observability assertions that inspect the production OTel bridge.
+    pub async fn start_with_telemetry(scenario: Value) -> Self {
+        Self::spawn(scenario, Provider::Anthropic, false, true).await
     }
 
     pub async fn start_with(scenario: Value, provider: Provider) -> Self {
-        Self::spawn(scenario, provider, false).await
+        Self::spawn(scenario, provider, false, false).await
     }
 
     /// Start with an MCP server configured in the agent's cwd. In `--serve`
@@ -288,10 +294,15 @@ impl CliHarness {
     /// answers `hub/mcp/*` requests, so a turn exercises config discovery,
     /// proxy tool registration, and tool dispatch through the real stack.
     pub async fn start_with_mcp(scenario: Value) -> Self {
-        Self::spawn(scenario, Provider::Anthropic, true).await
+        Self::spawn(scenario, Provider::Anthropic, true, false).await
     }
 
-    async fn spawn(scenario: Value, provider: Provider, mcp: bool) -> Self {
+    async fn spawn(
+        scenario: Value,
+        provider: Provider,
+        mcp: bool,
+        deterministic_telemetry: bool,
+    ) -> Self {
         let scenario =
             Scenario::from_slice(&serde_json::to_vec(&scenario).unwrap()).expect("valid scenario");
         let listener = TcpListener::bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0))
@@ -302,6 +313,9 @@ impl CliHarness {
 
         let home = tempfile::tempdir().unwrap();
         let cwd = tempfile::tempdir().unwrap();
+        if deterministic_telemetry {
+            write_telemetry_settings(home.path());
+        }
         if mcp {
             write_mcp_settings(cwd.path());
         }
@@ -366,6 +380,11 @@ impl CliHarness {
     /// (`.loopal/settings.json`, `.loopal/memory/*.md`, …) before a turn.
     pub fn cwd(&self) -> &std::path::Path {
         self.cwd.path()
+    }
+
+    /// Directory used by the production JSONL span exporter.
+    pub fn telemetry_dir(&self) -> std::path::PathBuf {
+        self._home.path().join(".loopal").join("telemetry")
     }
 
     /// `hub/mcp/call_tool` requests the agent sent to the harness's Hub role.
@@ -439,10 +458,13 @@ impl CliHarness {
                             }
                             AgentEventPayload::Error { message } => {
                                 out.error = Some(message);
-                                break;
                             }
                             AgentEventPayload::Finished => {
-                                out.finished = true;
+                                // Terminal failures are emitted as the ordered
+                                // pair Error -> Finished. Consume the boundary
+                                // without reclassifying the failed turn as Goal
+                                // or leaking Finished into the next run_turn.
+                                out.finished = out.error.is_none();
                                 break;
                             }
                             _ => {}
@@ -530,6 +552,7 @@ impl CliHarness {
             content: loopal_protocol::UserContent::text_only(text),
             timestamp: chrono::Utc::now(),
             summary: None,
+            agent_completion: None,
         };
         self.conn
             .send_request(
@@ -558,8 +581,8 @@ impl CliHarness {
             .expect("agent_control");
     }
 
-    /// Collect one turn's events from a persistent session until it settles
-    /// (Finished / AwaitingInput / Error).
+    /// Collect one turn's events from a persistent session until its terminal
+    /// boundary. Error is state, while Finished/AwaitingInput closes the turn.
     pub async fn collect_persistent(&mut self) -> TurnOutcome {
         let mut out = TurnOutcome::default();
         let deadline = tokio::time::Instant::now() + TIMEOUT;
@@ -577,10 +600,9 @@ impl CliHarness {
                             }
                             AgentEventPayload::Error { message } => {
                                 out.error = Some(message);
-                                break;
                             }
                             AgentEventPayload::Finished | AgentEventPayload::AwaitingInput => {
-                                out.finished = true;
+                                out.finished = out.error.is_none();
                                 break;
                             }
                             _ => {}
@@ -846,6 +868,27 @@ fn write_mcp_settings(cwd: &std::path::Path) {
     std::fs::create_dir_all(&dir).unwrap();
     let settings = json!({
         "mcp_servers": {"mock": {"type": "stdio", "command": "true"}}
+    });
+    std::fs::write(
+        dir.join("settings.json"),
+        serde_json::to_vec_pretty(&settings).unwrap(),
+    )
+    .unwrap();
+}
+
+fn write_telemetry_settings(home: &std::path::Path) {
+    let dir = home.join(".loopal");
+    std::fs::create_dir_all(&dir).unwrap();
+    let settings = json!({
+        "telemetry": {
+            "enabled": true,
+            "traces": true,
+            "metrics": false,
+            "logs": false,
+            "sample_rate": 1.0,
+            "file_export": true,
+            "telemetry_dir": dir.join("telemetry").to_string_lossy()
+        }
     });
     std::fs::write(
         dir.join("settings.json"),

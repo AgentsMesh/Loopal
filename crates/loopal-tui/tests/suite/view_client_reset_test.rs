@@ -1,5 +1,6 @@
+use loopal_protocol::{AgentEvent, AgentEventPayload, AgentStatus};
 use loopal_tui::view_client::ViewClient;
-use loopal_view_state::{SessionMessage, SessionViewState, ViewSnapshot};
+use loopal_view_state::{SessionMessage, SessionViewState, ViewSnapshot, ViewStateReducer};
 
 fn message(role: &str, content: &str, ui_local: bool) -> SessionMessage {
     SessionMessage {
@@ -110,4 +111,39 @@ fn reset_to_snapshot_replaces_observable_state() {
         loopal_protocol::AgentStatus::Finished
     );
     assert_eq!(vc.rev(), 7);
+}
+
+#[test]
+fn same_rev_running_event_cannot_restore_snapshot_skipped_local_clock() {
+    let mut hub_reducer = ViewStateReducer::new("main");
+    hub_reducer.apply(AgentEventPayload::Running);
+
+    // Exercise the real IPC boundary: process-local Instant fields are
+    // skipped by serde while the authoritative Running status and rev remain.
+    let wire = serde_json::to_string(&hub_reducer.snapshot()).expect("serialize snapshot");
+    let snapshot: ViewSnapshot = serde_json::from_str(&wire).expect("deserialize snapshot");
+    let snapshot_rev = snapshot.rev;
+    let vc = ViewClient::from_snapshot("main", snapshot);
+
+    assert_eq!(
+        vc.state().state().agent.observable.status,
+        AgentStatus::Running
+    );
+    assert_eq!(
+        vc.state().conversation().turn_elapsed(),
+        std::time::Duration::ZERO
+    );
+
+    // A Running event already covered by the snapshot is correctly deduped,
+    // so it cannot recreate the skipped timer. Visual animation must therefore
+    // be driven by a TUI-local clock instead of turn_elapsed().
+    let mut queued_running = AgentEvent::root(AgentEventPayload::Running);
+    queued_running.rev = Some(snapshot_rev);
+    vc.apply_event(&queued_running);
+
+    assert_eq!(vc.rev(), snapshot_rev);
+    assert_eq!(
+        vc.state().conversation().turn_elapsed(),
+        std::time::Duration::ZERO
+    );
 }

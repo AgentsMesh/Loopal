@@ -21,6 +21,7 @@ fn default_classify_500_is_retryable() {
     let err = LoopalError::Provider(ProviderError::Api {
         status: 500,
         message: "internal".into(),
+        retry_after_ms: None,
     });
     assert_eq!(default_classify_error(&err), ErrorClass::Retryable);
 }
@@ -37,6 +38,7 @@ fn default_classify_400_generic_is_fatal() {
     let err = LoopalError::Provider(ProviderError::Api {
         status: 400,
         message: "anything not matching keywords".into(),
+        retry_after_ms: None,
     });
     assert_eq!(default_classify_error(&err), ErrorClass::Fatal);
 }
@@ -53,6 +55,7 @@ fn openai_classify_400_context_overflow_keywords() {
         let err = LoopalError::Provider(ProviderError::Api {
             status: 400,
             message: msg.into(),
+            retry_after_ms: None,
         });
         assert_eq!(
             p.classify_error(&err),
@@ -68,6 +71,7 @@ fn openai_classify_400_unrelated_is_fatal() {
     let err = LoopalError::Provider(ProviderError::Api {
         status: 400,
         message: r#"{"error":{"type":"invalid_request_error"}}"#.into(),
+        retry_after_ms: None,
     });
     assert_eq!(p.classify_error(&err), ErrorClass::Fatal);
 }
@@ -92,6 +96,7 @@ fn google_classify_400_context_overflow_keywords() {
         let err = LoopalError::Provider(ProviderError::Api {
             status: 400,
             message: msg.into(),
+            retry_after_ms: None,
         });
         assert_eq!(
             p.classify_error(&err),
@@ -107,6 +112,7 @@ fn google_classify_500_retryable() {
     let err = LoopalError::Provider(ProviderError::Api {
         status: 500,
         message: "internal".into(),
+        retry_after_ms: None,
     });
     assert_eq!(p.classify_error(&err), ErrorClass::Retryable);
 }
@@ -122,6 +128,7 @@ fn openai_compat_classify_400_context_overflow_keywords() {
         let err = LoopalError::Provider(ProviderError::Api {
             status: 400,
             message: msg.into(),
+            retry_after_ms: None,
         });
         assert_eq!(
             p.classify_error(&err),
@@ -137,6 +144,7 @@ fn openai_compat_classify_invalid_request_fatal() {
     let err = LoopalError::Provider(ProviderError::Api {
         status: 400,
         message: "tool_choice value is invalid".into(),
+        retry_after_ms: None,
     });
     assert_eq!(p.classify_error(&err), ErrorClass::Fatal);
 }

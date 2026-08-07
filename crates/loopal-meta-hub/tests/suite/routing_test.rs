@@ -15,7 +15,7 @@ use crate::test_helpers::*;
 #[tokio::test]
 async fn route_message_across_hubs() {
     let meta_hub = Arc::new(Mutex::new(MetaHub::new()));
-    let (hub_b, _) = make_hub();
+    let (hub_b, _hub_b_event_rx) = make_hub();
     let _conn_b = wire_hub_to_meta("hub-b", &hub_b, &meta_hub).await;
     let (_agent_conn, _rx) = register_mock_agent(&hub_b, "target", None).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
@@ -42,8 +42,8 @@ async fn route_message_across_hubs() {
 #[tokio::test]
 async fn hub_uplink_escalates_unknown_agent() {
     let meta_hub = Arc::new(Mutex::new(MetaHub::new()));
-    let (hub_a, _) = make_hub();
-    let (hub_b, _) = make_hub();
+    let (hub_a, _hub_a_event_rx) = make_hub();
+    let (hub_b, _hub_b_event_rx) = make_hub();
     let hub_a_conn = wire_hub_to_meta("hub-a", &hub_a, &meta_hub).await;
     let _hub_b_conn = wire_hub_to_meta("hub-b", &hub_b, &meta_hub).await;
     {
@@ -79,8 +79,8 @@ async fn hub_uplink_escalates_unknown_agent() {
 #[tokio::test]
 async fn qualified_address_routes_via_uplink() {
     let meta_hub = Arc::new(Mutex::new(MetaHub::new()));
-    let (hub_a, _) = make_hub();
-    let (hub_b, _) = make_hub();
+    let (hub_a, _hub_a_event_rx) = make_hub();
+    let (hub_b, _hub_b_event_rx) = make_hub();
     let hub_a_conn = wire_hub_to_meta("hub-a", &hub_a, &meta_hub).await;
     let _hub_b_conn = wire_hub_to_meta("hub-b", &hub_b, &meta_hub).await;
     {
@@ -111,7 +111,7 @@ async fn qualified_address_routes_via_uplink() {
 #[tokio::test]
 async fn route_to_nonexistent_agent_fails() {
     let meta_hub = Arc::new(Mutex::new(MetaHub::new()));
-    let (hub_a, _) = make_hub();
+    let (hub_a, _hub_a_event_rx) = make_hub();
     let hub_a_conn = wire_hub_to_meta("hub-a", &hub_a, &meta_hub).await;
     {
         let ul = Arc::new(loopal_agent_hub::HubUplink::new(hub_a_conn, "hub-a".into()));
@@ -144,8 +144,8 @@ async fn route_to_nonexistent_agent_fails() {
 #[tokio::test]
 async fn route_after_hub_disconnect_fails() {
     let meta_hub = Arc::new(Mutex::new(MetaHub::new()));
-    let (hub_a, _) = make_hub();
-    let (hub_b, _) = make_hub();
+    let (hub_a, _hub_a_event_rx) = make_hub();
+    let (hub_b, _hub_b_event_rx) = make_hub();
 
     let hub_a_conn = wire_hub_to_meta("hub-a", &hub_a, &meta_hub).await;
     let _hub_b_conn = wire_hub_to_meta("hub-b", &hub_b, &meta_hub).await;

@@ -30,7 +30,7 @@ export function createBackendStub(overrides: Partial<DesktopBackend> = {}): Desk
     })),
     sendMessage: vi.fn(async () => undefined),
     interruptAgent: vi.fn(async () => undefined),
-    controlAgent: vi.fn(async () => undefined),
+    controlAgent: vi.fn(async () => ({ status: 'applied' as const })),
     getDesktopPreferences: vi.fn(async () => ({ locale: 'system' as const })),
     updateDesktopPreferences: vi.fn(async (input) => ({ ...input })),
     getLoopalSettings: vi.fn<DesktopBackend['getLoopalSettings']>(async (workspaceId) => ({

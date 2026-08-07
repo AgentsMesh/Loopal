@@ -2,8 +2,8 @@
 #[tokio::test]
 async fn tcp_cluster_cross_hub_route() {
     let (addr, token, _meta_hub) = boot_meta_hub().await;
-    let (hub_a, _) = make_hub();
-    let (hub_b, _) = make_hub();
+    let (hub_a, _hub_a_event_rx) = make_hub();
+    let (hub_b, _hub_b_event_rx) = make_hub();
 
     let _conn_a = join_hub_tcp(&hub_a, &addr, &token, "hub-a").await;
     let _conn_b = join_hub_tcp(&hub_b, &addr, &token, "hub-b").await;
@@ -37,8 +37,8 @@ async fn tcp_cluster_cross_hub_route() {
 #[tokio::test]
 async fn tcp_cluster_list_hubs() {
     let (addr, token, meta_hub) = boot_meta_hub().await;
-    let (hub_a, _) = make_hub();
-    let (hub_b, _) = make_hub();
+    let (hub_a, _hub_a_event_rx) = make_hub();
+    let (hub_b, _hub_b_event_rx) = make_hub();
     let _conn_a = join_hub_tcp(&hub_a, &addr, &token, "hub-a").await;
     let _conn_b = join_hub_tcp(&hub_b, &addr, &token, "hub-b").await;
     tokio::time::sleep(Duration::from_millis(100)).await;
@@ -60,7 +60,7 @@ async fn tcp_cluster_list_hubs() {
 #[tokio::test]
 async fn dynamic_leave_and_immediate_rejoin_reuses_hub_name() {
     let (addr, token, meta_hub) = boot_meta_hub().await;
-    let (hub, _) = make_hub();
+    let (hub, _hub_event_rx) = make_hub();
     loopal_agent_hub::uplink_connection::connect(&hub, &addr, &token, "desktop-a")
         .await
         .unwrap();
@@ -83,7 +83,7 @@ async fn dynamic_leave_and_immediate_rejoin_reuses_hub_name() {
 #[tokio::test]
 async fn dynamic_join_publishes_initial_agent_count_before_returning() {
     let (addr, token, meta_hub) = boot_meta_hub().await;
-    let (hub, _) = make_hub();
+    let (hub, _hub_event_rx) = make_hub();
     let (_agent, _messages) = register_mock(&hub, "main").await;
     loopal_agent_hub::uplink_connection::connect(&hub, &addr, &token, "desktop-a")
         .await
@@ -96,7 +96,7 @@ async fn dynamic_join_publishes_initial_agent_count_before_returning() {
 #[tokio::test]
 async fn dynamic_rejoin_recovers_a_stale_network_uplink() {
     let (addr, token, meta_hub) = boot_meta_hub().await;
-    let (hub, _) = make_hub();
+    let (hub, _hub_event_rx) = make_hub();
     loopal_agent_hub::uplink_connection::connect(&hub, &addr, &token, "desktop-a")
         .await
         .unwrap();

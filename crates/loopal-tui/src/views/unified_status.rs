@@ -1,5 +1,4 @@
-use std::sync::OnceLock;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use ratatui::prelude::*;
 use ratatui::widgets::Paragraph;
@@ -9,9 +8,8 @@ use loopal_view_state::AgentConversation;
 
 use super::unified_status_goal::append_goal_indicator;
 use super::unified_status_label::{ActivityInputs, pick_label};
+use crate::animation::spinner_frame;
 use crate::app::App;
-
-pub const SPINNER: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 // Bridge the brief gap between `AwaitingInput` and the next `Running`
 // event (~hub IPC jitter) so the spinner doesn't flicker.
@@ -22,6 +20,7 @@ pub fn render_unified_status(
     app: &App,
     state: &SessionState,
     conv: &AgentConversation,
+    animation_elapsed: Duration,
     area: Rect,
 ) {
     let observable = app.observable_for(&state.active_view);
@@ -30,15 +29,10 @@ pub fn render_unified_status(
     let mut spans: Vec<Span<'static>> = Vec::with_capacity(16);
     let base_elapsed = conv.turn_elapsed();
     let is_active = is_agent_active(app, state, conv);
-    let spinner_elapsed = if is_active {
-        animation_clock()
-    } else {
-        base_elapsed
-    };
 
     spans.push(Span::raw(" "));
     let (icon, icon_style, label) =
-        status_icon_and_label(app, state, conv, spinner_elapsed, is_active);
+        status_icon_and_label(app, state, conv, animation_elapsed, is_active);
     spans.push(Span::styled(icon, icon_style));
     spans.push(Span::styled(format!(" {label}"), icon_style));
     spans.push(Span::raw("  "));
@@ -97,7 +91,7 @@ fn status_icon_and_label(
     app: &App,
     state: &SessionState,
     conv: &AgentConversation,
-    elapsed: std::time::Duration,
+    animation_elapsed: std::time::Duration,
     is_active: bool,
 ) -> (String, Style, &'static str) {
     let inputs = ActivityInputs {
@@ -112,16 +106,11 @@ fn status_icon_and_label(
     };
     let (use_spinner, color, label) = pick_label(&inputs);
     let icon = if use_spinner {
-        spinner_frame(elapsed).to_string()
+        spinner_frame(animation_elapsed).to_string()
     } else {
         "●".to_string()
     };
     (icon, Style::default().fg(color), label)
-}
-
-pub fn spinner_frame(elapsed: std::time::Duration) -> &'static str {
-    let idx = (elapsed.as_millis() / 100) as usize % SPINNER.len();
-    SPINNER[idx]
 }
 
 fn is_agent_active(app: &App, state: &SessionState, conv: &AgentConversation) -> bool {
@@ -140,11 +129,6 @@ fn active_agent_idle(app: &App, state: &SessionState) -> bool {
         status,
         AgentStatus::WaitingForInput | AgentStatus::Finished | AgentStatus::Error
     )
-}
-
-fn animation_clock() -> Duration {
-    static START: OnceLock<Instant> = OnceLock::new();
-    START.get_or_init(Instant::now).elapsed()
 }
 
 fn has_live_subagents(app: &App) -> bool {

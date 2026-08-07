@@ -1,4 +1,5 @@
 pub mod address;
+pub mod agent_completion;
 pub mod agent_state;
 pub mod agent_state_snapshot;
 pub mod bg_task;
@@ -27,11 +28,18 @@ pub mod user_content;
 pub const META_HUB_TOKEN_ENV: &str = "LOOPAL_META_HUB_TOKEN";
 
 pub use address::QualifiedAddress;
+pub use agent_completion::{
+    AgentCompletion, NO_AGENT_OUTPUT, PROTOCOL_ERROR_REASON, TRANSPORT_ERROR_REASON,
+    WAIT_AGENT_TYPED_RESPONSE_V1, WaitAgentResponse, WaitAgentStatus,
+};
 pub use agent_state::{AgentStatus, ObservableAgentState};
 pub use agent_state_snapshot::AgentStateSnapshot;
 pub use bg_task::{BgTaskDetail, BgTaskSnapshot, BgTaskStatus};
 pub use command::AgentMode;
-pub use control::ControlCommand;
+pub use control::{
+    CONTROL_RPC_COMPLETION_GRACE, ControlCommand, ControlDisposition,
+    DEFAULT_CONTROL_APPLICATION_TIMEOUT, DEFAULT_CONTROL_RPC_TIMEOUT,
+};
 pub use cron_snapshot::CronJobSnapshot;
 pub use envelope::{Envelope, MessageSource};
 pub use event::AgentEvent;

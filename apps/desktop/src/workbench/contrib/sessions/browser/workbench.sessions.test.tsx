@@ -111,7 +111,7 @@ describe('Workbench session lifecycle', () => {
       agents: [], view: undefined,
     }
     const sendMessage = vi.fn(async () => undefined)
-    const controlAgent = vi.fn(async () => undefined)
+    const controlAgent = vi.fn(async () => ({ status: 'applied' as const }))
     const { api } = createTestAPI({
       openSession: async () => empty, sendMessage, controlAgent,
     })
@@ -135,7 +135,7 @@ describe('Workbench session lifecycle', () => {
     }
     const detail = { ...sessionDetail(sessionOne), agents: [root] }
     const interruptAgent = vi.fn(async () => undefined)
-    const controlAgent = vi.fn(async () => undefined)
+    const controlAgent = vi.fn(async () => ({ status: 'applied' as const }))
     const { api, events } = createTestAPI({
       openSession: async () => detail,
       interruptAgent,

@@ -2,6 +2,7 @@ import { CancellationToken, throwIfCancelled } from '../../../../base/common/can
 import { Emitter } from '../../../../base/common/event'
 import { type IDisposable } from '../../../../base/common/lifecycle'
 import {
+  type AgentControlDisposition,
   type AgentControlInput,
   type AgentControlTarget,
   type CreateSessionInput,
@@ -106,7 +107,7 @@ export class UnavailableDesktopBackend implements DesktopBackend, IDisposable {
   async controlAgent(
     _input: AgentControlInput,
     token = CancellationToken.None,
-  ): Promise<void> {
+  ): Promise<AgentControlDisposition> {
     throwIfCancelled(token)
     throw new Error(this.reason)
   }

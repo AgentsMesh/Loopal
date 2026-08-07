@@ -76,6 +76,12 @@ async fn blackhole_forwarding_is_bounded_without_holding_registry_lock() {
         "spawn held MetaHub mutex across IO"
     );
     tokio::time::advance(Duration::from_secs(31)).await;
-    assert!(spawn.await.unwrap().unwrap_err().contains("timed out"));
+    let outcome: loopal_ipc::cross_hub::RemoteSpawnOutcome =
+        serde_json::from_value(spawn.await.unwrap().unwrap()).unwrap();
+    assert!(matches!(
+        outcome,
+        loopal_ipc::cross_hub::RemoteSpawnOutcome::OutcomeUnknown { ref message }
+            if message.contains("timed out")
+    ));
     peer.await.unwrap();
 }

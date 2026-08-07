@@ -5,7 +5,11 @@ load("@npm//:@playwright/test/package_json.bzl", playwright_bin = "bin")
 
 def playwright_test(name, srcs, data = None, config = "playwright.config.ts", env = None, package_json = "//:package_json_bin", tags = None, tsconfig = "tsconfig.json"):
     merged_tags = list(tags or [])
-    for required in ["e2e", "manual", "no-sandbox", "local"]:
+
+    # Electron suites launch real Loopal/Hub process trees. Bazel's local tag
+    # only controls execution locality; exclusive prevents sibling E2E targets
+    # from consuming their startup and IPC deadline budgets.
+    for required in ["e2e", "exclusive", "manual", "no-sandbox", "local"]:
         if required not in merged_tags:
             merged_tags.append(required)
     source_tree = name + "_test_sources"

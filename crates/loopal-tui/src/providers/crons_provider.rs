@@ -38,10 +38,10 @@ impl PanelProvider for CronsPanelProvider {
         app: &App,
         state: &SessionState,
         focused: Option<&str>,
-        _elapsed: Duration,
+        _animation_elapsed: Duration,
         area: Rect,
     ) {
-        // `_elapsed` is intentionally unused: cron rows have no spinner
+        // `_animation_elapsed` is intentionally unused: cron rows have no spinner
         // animation. The countdown ("next 2m 30s") is recomputed inside
         // `render_crons_panel` from `Utc::now()` each frame, so the panel
         // refreshes through the TUI's existing 100ms redraw tick.

@@ -108,7 +108,12 @@ impl Provider for JsonMockProvider {
             .lock()
             .expect("mock provider mutex poisoned")
             .pop_front()
-            .unwrap_or_default();
+            .ok_or_else(|| {
+                LoopalError::Other(
+                    "JsonMockProvider script exhausted: add an explicit response for every expected LLM call"
+                        .into(),
+                )
+            })?;
         let stream = JsonMockStream {
             items: VecDeque::from(chunks),
             sleep: None,
@@ -120,6 +125,11 @@ impl Provider for JsonMockProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures::StreamExt;
+
+    fn params() -> ChatParams {
+        ChatParams::new("mock".into(), Vec::new(), String::new())
+    }
 
     #[test]
     fn parses_rich_script_items() {
@@ -135,5 +145,30 @@ mod tests {
             parse_item(serde_json::json!({"type": "delay", "ms": 25})),
             MockItem::Delay(duration) if duration == Duration::from_millis(25)
         ));
+    }
+
+    #[tokio::test]
+    async fn explicit_empty_call_is_eof_but_queue_underflow_is_a_fixture_error() {
+        let provider = JsonMockProvider {
+            calls: std::sync::Mutex::new(VecDeque::from([Vec::new()])),
+        };
+
+        let mut stream = provider
+            .stream_chat(&params())
+            .await
+            .expect("an explicit empty call is a valid EOF fixture");
+        assert!(stream.next().await.is_none());
+
+        let error = provider
+            .stream_chat(&params())
+            .await
+            .err()
+            .expect("an unscripted call must fail fast");
+        assert!(!error.is_retryable());
+        assert!(
+            error
+                .to_string()
+                .contains("JsonMockProvider script exhausted")
+        );
     }
 }

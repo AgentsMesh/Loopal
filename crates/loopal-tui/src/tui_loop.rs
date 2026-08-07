@@ -10,7 +10,6 @@ use crate::app::{App, HubReconnectInfo, SubPage};
 use crate::event::{AppEvent, EventHandler};
 use crate::input::paste;
 use crate::key_dispatch::handle_key_action;
-use crate::render::draw;
 use crate::resume_display::{load_resumed_display, push_session_warning};
 use crate::terminal::TerminalGuard;
 use crate::tui_sync::sync_panel_caches;
@@ -55,14 +54,33 @@ pub async fn run_tui(
 
 pub async fn run_tui_loop<B: Backend>(
     terminal: &mut Terminal<B>,
-    mut events: EventHandler,
+    events: EventHandler,
     app: &mut App,
 ) -> anyhow::Result<()>
 where
     B::Error: Send + Sync + 'static,
 {
+    run_tui_loop_with_animation_clock(terminal, events, app, crate::animation::elapsed).await
+}
+
+/// Runs the production event loop with an injectable process-local animation
+/// clock. This is exposed only so event-loop tests can advance animation
+/// deterministically without sleeping on wall-clock boundaries.
+#[doc(hidden)]
+pub async fn run_tui_loop_with_animation_clock<B, C>(
+    terminal: &mut Terminal<B>,
+    mut events: EventHandler,
+    app: &mut App,
+    mut animation_elapsed: C,
+) -> anyhow::Result<()>
+where
+    B: Backend,
+    B::Error: Send + Sync + 'static,
+    C: FnMut() -> std::time::Duration,
+{
     sync_panel_caches(app);
-    terminal.draw(|f| draw(f, app))?;
+    let elapsed = animation_elapsed();
+    terminal.draw(|f| crate::render::draw_with_animation_elapsed(f, app, elapsed))?;
 
     loop {
         let Some(first) = events.next().await else {
@@ -86,7 +104,7 @@ where
                         break;
                     }
                 }
-                AppEvent::Agent(agent_event) => handle_agent_event(app, agent_event),
+                AppEvent::Agent(agent_event) => handle_agent_event(app, *agent_event),
                 AppEvent::Paste(result) => paste::apply_paste_result(app, result),
                 AppEvent::Resync => should_resync = true,
                 AppEvent::Resize(_, _) | AppEvent::Tick => {}
@@ -100,7 +118,8 @@ where
             app.resync_view_clients().await;
         }
         sync_panel_caches(app);
-        terminal.draw(|f| draw(f, app))?;
+        let elapsed = animation_elapsed();
+        terminal.draw(|f| crate::render::draw_with_animation_elapsed(f, app, elapsed))?;
     }
 
     Ok(())

@@ -12,7 +12,7 @@ use crate::test_helpers::{make_hub, register_mock_agent, wire_hub_to_meta};
 #[tokio::test]
 async fn topology_queries_slow_hubs_concurrently_with_one_bound() {
     let meta = Arc::new(Mutex::new(MetaHub::new()));
-    let (fast, _) = make_hub();
+    let (fast, _fast_event_rx) = make_hub();
     let _fast = wire_hub_to_meta("fast", &fast, &meta).await;
     let mut stalled = Vec::new();
     for name in ["slow-a", "slow-b", "slow-c"] {
@@ -51,8 +51,8 @@ async fn topology_queries_slow_hubs_concurrently_with_one_bound() {
 #[tokio::test]
 async fn global_topology_removes_source_shadows_and_keeps_remote_parent_path() {
     let meta = Arc::new(Mutex::new(MetaHub::new()));
-    let (hub_a, _) = make_hub();
-    let (hub_b, _) = make_hub();
+    let (hub_a, _hub_a_event_rx) = make_hub();
+    let (hub_b, _hub_b_event_rx) = make_hub();
     let (_main, _main_rx) = register_mock_agent(&hub_a, "main", None).await;
     hub_a
         .lock()

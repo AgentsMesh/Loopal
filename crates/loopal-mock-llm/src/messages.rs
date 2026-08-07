@@ -84,6 +84,13 @@ pub(crate) async fn handle_completion(
     }
     let actions = plan_protocol_sse(protocol, &call.response)?;
     write_sse_head(stream, &call.response.headers).await?;
+    // `disconnectAfterEvents: 0` models an HTTP 200 whose body reaches EOF
+    // before even one SSE frame. This is materially different from a failed
+    // handshake and is required to exercise attempt-terminal guarantees.
+    if call.response.disconnect_after_events == Some(0) {
+        state.record_scripted_disconnect();
+        return Ok(());
+    }
     let mut events = 0usize;
     for action in actions {
         match action {

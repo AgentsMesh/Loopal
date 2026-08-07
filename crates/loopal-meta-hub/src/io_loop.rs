@@ -197,6 +197,19 @@ async fn serve_request(
         _ = &mut cancel => return true,
         result = request => result,
     };
+    // Spawn-handler errors are validation/target-lookup rejections that occur
+    // before destination forwarding. Preserve that definitive classification
+    // in the successful RPC payload; transport errors remain outcome-unknown.
+    let result = if method == methods::META_SPAWN.name {
+        result.or_else(|message| {
+            Ok(
+                loopal_ipc::cross_hub::RemoteSpawnOutcome::RejectedBeforeSideEffect { message }
+                    .into_value(),
+            )
+        })
+    } else {
+        result
+    };
     if let Err(error) = &result {
         tracing::warn!(hub = %hub_name, %method, %error, "request failed");
     }

@@ -104,3 +104,60 @@ async fn model_override_applied_in_session_start() {
         "should receive stream events (model override applied)"
     );
 }
+
+#[tokio::test]
+async fn injected_provider_and_model_router_share_effective_settings() {
+    use loopal_protocol::AgentEventPayload;
+    use loopal_test_support::chunks;
+
+    let (client, mut rx, fixture) = start_test_server(vec![chunks::text_turn("mock output")]).await;
+
+    // Deliberately make the ambient project model incompatible with the injected
+    // Anthropic provider. The test kernel's settings and provider registry form
+    // one effective configuration and must not be split by rebuilding the router
+    // from this independently loaded config.
+    let project_config = fixture.path().join(".loopal");
+    std::fs::create_dir_all(&project_config).unwrap();
+    std::fs::write(
+        project_config.join("settings.json"),
+        r#"{"model":"gpt-5.5"}"#,
+    )
+    .unwrap();
+
+    client
+        .send_request("initialize", serde_json::json!({"protocol_version": 1}))
+        .await
+        .unwrap();
+    client
+        .send_request(
+            methods::AGENT_START.name,
+            serde_json::json!({
+                "cwd": fixture.path().to_string_lossy(),
+                "prompt": "use the injected provider"
+            }),
+        )
+        .await
+        .unwrap();
+
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+    let mut streamed = String::new();
+    while tokio::time::Instant::now() < deadline {
+        let Ok(Some(Incoming::Notification { method, params })) =
+            tokio::time::timeout(Duration::from_secs(3), rx.recv()).await
+        else {
+            break;
+        };
+        if method != methods::AGENT_EVENT.name {
+            continue;
+        }
+        let event: loopal_protocol::AgentEvent = serde_json::from_value(params).unwrap();
+        match event.payload {
+            AgentEventPayload::Stream { text } => streamed.push_str(&text),
+            AgentEventPayload::Error { message } => panic!("unexpected agent error: {message}"),
+            AgentEventPayload::Finished => break,
+            _ => {}
+        }
+    }
+
+    assert_eq!(streamed, "mock output");
+}

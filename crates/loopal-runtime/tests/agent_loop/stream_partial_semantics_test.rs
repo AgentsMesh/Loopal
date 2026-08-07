@@ -1,9 +1,11 @@
 use std::sync::atomic::Ordering;
 
 use loopal_error::{LoopalError, ProviderError, TerminateReason};
+use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::{
     ContentBlock, ContinuationIntent, ContinuationReason, StopReason, StreamChunk,
 };
+use loopal_tool_invocation::StaleReason;
 
 use super::mock_provider::make_multi_runner_with_intents;
 use super::try_recover_helpers::{
@@ -18,6 +20,14 @@ fn done(text: &str) -> Vec<Result<StreamChunk, LoopalError>> {
             stop_reason: StopReason::EndTurn,
         }),
     ]
+}
+
+fn retryable_stream_error() -> Result<StreamChunk, LoopalError> {
+    Err(LoopalError::Provider(ProviderError::Api {
+        status: 502,
+        message: "gateway reset".into(),
+        retry_after_ms: Some(1),
+    }))
 }
 
 fn assert_stream_continuation(intents: &[Option<ContinuationIntent>]) {
@@ -43,6 +53,39 @@ async fn thinking_only_eof_auto_continues() {
     let output = runner.run().await.unwrap();
     assert_eq!(output.result, "answer");
     assert_stream_continuation(&intents.lock().unwrap());
+}
+
+#[tokio::test]
+async fn retryable_error_after_text_uses_continuation_without_replay() {
+    let calls = vec![
+        vec![
+            Ok(StreamChunk::Text {
+                text: "partial".into(),
+            }),
+            retryable_stream_error(),
+        ],
+        done("completed"),
+    ];
+    let (mut runner, mut event_rx, intents) = make_multi_runner_with_intents(calls);
+    let events = tokio::spawn(async move {
+        let mut payloads = Vec::new();
+        while let Some(event) = event_rx.recv().await {
+            payloads.push(event.payload);
+        }
+        payloads
+    });
+
+    let output = runner.run().await.unwrap();
+    assert_eq!(output.result, "completed");
+    assert_stream_continuation(&intents.lock().unwrap());
+    drop(runner);
+    let payloads = events.await.unwrap();
+    assert!(
+        !payloads
+            .iter()
+            .any(|event| matches!(event, AgentEventPayload::RetryError { .. })),
+        "a request with emitted text must not be replayed"
+    );
 }
 
 #[tokio::test]
@@ -74,9 +117,42 @@ async fn server_blocks_eof_persists_pair_and_discards_orphan() {
         done("answer"),
     ];
     let (mut runner, mut event_rx, intents) = make_multi_runner_with_intents(calls);
-    tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 
     runner.run().await.unwrap();
+    let events = loopal_test_support::events::drain_pending(&mut event_rx).await;
+    let orphan_use = events
+        .iter()
+        .position(
+            |event| matches!(event, AgentEventPayload::ServerToolUse { id, .. } if id == "orphan"),
+        )
+        .expect("orphan server tool is initially provisional");
+    let discarded = events
+        .iter()
+        .position(|event| {
+            matches!(
+                event,
+                AgentEventPayload::ServerToolDiscarded {
+                    tool_use_id,
+                    reason: StaleReason::IncompleteModelResponse,
+                } if tool_use_id == "orphan"
+            )
+        })
+        .expect("orphan server tool must become terminal");
+    let continuation = events
+        .iter()
+        .position(|event| matches!(event, AgentEventPayload::AutoContinuation { .. }))
+        .expect("incomplete server tool response must continue");
+    assert!(
+        orphan_use < discarded && discarded < continuation,
+        "server tool terminalization must precede continuation: {events:?}"
+    );
+    assert!(events.iter().all(|event| {
+        !matches!(
+            event,
+            AgentEventPayload::ServerToolDiscarded { tool_use_id, .. }
+                if tool_use_id == "complete"
+        )
+    }));
     assert_stream_continuation(&intents.lock().unwrap());
     let blocks: Vec<_> = runner
         .turns
@@ -135,6 +211,7 @@ async fn in_stream_fatal_error_is_not_a_goal_completion() {
     let error = LoopalError::Provider(ProviderError::Api {
         status: 400,
         message: "invalid request".into(),
+        retry_after_ms: None,
     });
     let (mut runner, _calls, mut event_rx) = make_runner(vec![Outcome::Stream(vec![Err(error)])]);
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });

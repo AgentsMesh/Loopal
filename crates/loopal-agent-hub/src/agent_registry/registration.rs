@@ -120,13 +120,46 @@ impl AgentRegistry {
         true
     }
 
+    pub(crate) fn unregister_generation_if_current(
+        &mut self,
+        name: &str,
+        expected_generation: u64,
+    ) -> bool {
+        if self
+            .agents
+            .get(name)
+            .is_none_or(|agent| agent.generation != expected_generation)
+        {
+            return false;
+        }
+        self.unregister_connection(name);
+        true
+    }
+
     pub fn register_shadow(&mut self, name: &str, parent: QualifiedAddress) -> Result<(), String> {
+        self.register_shadow_with_parent_policy(name, parent, true)
+    }
+
+    pub fn register_shadow_with_parent_policy(
+        &mut self,
+        name: &str,
+        parent: QualifiedAddress,
+        notify_parent_on_completion: bool,
+    ) -> Result<(), String> {
         self.remove_stale_reservation(name);
         if self.agents.contains_key(name) || self.reservations.contains_key(name) {
             return Err(format!("agent '{name}' already registered"));
         }
         self.forget_completed(name);
+        let generation = self.allocate_generation();
         let parent_for_children = parent.clone();
+        let parent_generation = if parent_for_children.is_local() {
+            self.agents
+                .get(&parent_for_children.agent)
+                .map(|parent| parent.generation)
+        } else {
+            None
+        };
         let mut info = AgentInfo::new(name, Some(parent), None);
         info.lifecycle = AgentLifecycle::Running;
         let view = ManagedAgent::new_view_reducer(name);
@@ -135,13 +168,16 @@ impl AgentRegistry {
             ManagedAgent {
                 state: AgentConnectionState::Shadow,
                 info,
+                parent_generation,
                 completion_tx: None,
-                notify_parent_on_completion: true,
+                notify_parent_on_completion,
                 view,
-                output: None,
+                completion: None,
+                admitted_error: false,
+                generation,
             },
         );
-        if parent_for_children.is_local()
+        if parent_generation.is_some()
             && let Some(parent) = self.agents.get_mut(&parent_for_children.agent)
         {
             parent.info.children.push(name.to_string());
@@ -164,8 +200,15 @@ impl AgentRegistry {
             return Err(format!("agent '{name}' already registered"));
         }
         self.forget_completed(name);
+        let generation = self.allocate_generation();
+        let parent_generation = parent.as_ref().and_then(|parent| {
+            parent
+                .is_local()
+                .then(|| self.agents.get(&parent.agent).map(|agent| agent.generation))
+                .flatten()
+        });
         if let Some(parent) = &parent
-            && parent.is_local()
+            && parent_generation.is_some()
             && let Some(parent_agent) = self.agents.get_mut(&parent.agent)
         {
             parent_agent.info.children.push(name.to_string());
@@ -176,10 +219,13 @@ impl AgentRegistry {
             ManagedAgent {
                 state: AgentConnectionState::Connected(conn),
                 info: AgentInfo::new(name, parent, model),
+                parent_generation,
                 completion_tx,
                 notify_parent_on_completion,
                 view,
-                output: None,
+                completion: None,
+                admitted_error: false,
+                generation,
             },
         );
         Ok(())

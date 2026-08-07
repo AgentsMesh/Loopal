@@ -1,4 +1,5 @@
 use std::time::Duration;
+use std::{error::Error, fmt};
 
 use futures::future::join_all;
 use loopal_ipc::protocol::methods;
@@ -11,8 +12,41 @@ use crate::shared_session::ClientConnectionLease;
 // protocol-level grace period so transport policy cannot drift by layer.
 pub(crate) const EVENT_DELIVERY_DEADLINE: Duration = INTERACTION_RPC_COMPLETION_GRACE;
 
-pub(crate) async fn deliver(session: &SharedSession, params: serde_json::Value) {
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum DeliveryError {
+    NoConnections,
+    AllConnectionsFailed { attempted: usize },
+    PrimaryConnectionFailed { client_id: String },
+}
+
+impl fmt::Display for DeliveryError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NoConnections => formatter.write_str("agent event has no connected clients"),
+            Self::AllConnectionsFailed { attempted } => write!(
+                formatter,
+                "agent event delivery failed for all {attempted} connected clients"
+            ),
+            Self::PrimaryConnectionFailed { client_id } => write!(
+                formatter,
+                "agent event delivery failed for primary client {client_id}"
+            ),
+        }
+    }
+}
+
+impl Error for DeliveryError {}
+
+pub(crate) async fn deliver(
+    session: &SharedSession,
+    params: serde_json::Value,
+) -> Result<(), DeliveryError> {
     let leases = session.connection_leases().await;
+    if leases.is_empty() {
+        return Err(DeliveryError::NoConnections);
+    }
+
+    let attempted = leases.len();
     let failed = join_all(leases.into_iter().map(|lease| {
         let params = params.clone();
         async move {
@@ -32,6 +66,17 @@ pub(crate) async fn deliver(session: &SharedSession, params: serde_json::Value) 
     if !failed.is_empty() {
         session.remove_failed_connections(&failed).await;
     }
+
+    if failed.len() == attempted {
+        return Err(DeliveryError::AllConnectionsFailed { attempted });
+    }
+    if let Some(primary) = failed.iter().find(|lease| lease.is_primary) {
+        return Err(DeliveryError::PrimaryConnectionFailed {
+            client_id: primary.id.clone(),
+        });
+    }
+
+    Ok(())
 }
 
 async fn send_bounded(lease: &ClientConnectionLease, params: serde_json::Value) -> bool {

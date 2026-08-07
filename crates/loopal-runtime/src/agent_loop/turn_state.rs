@@ -12,7 +12,7 @@ use super::llm_result::LlmStreamResult;
 pub(super) enum TurnState {
     ReadyToCall,
     ResponseRecorded {
-        result: LlmStreamResult,
+        result: Box<LlmStreamResult>,
     },
     NeedsContinuation {
         reason: ContinuationReason,

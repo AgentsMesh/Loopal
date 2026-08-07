@@ -139,6 +139,7 @@ mod tests {
                     content: "old content".into(),
                     images: Vec::new(),
                     is_error: false,
+                    metadata: None,
                 }),
             }],
         }));

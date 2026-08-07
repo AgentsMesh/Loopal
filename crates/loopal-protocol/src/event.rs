@@ -19,6 +19,10 @@ pub struct AgentEvent {
     /// Per-agent ViewState rev after Hub-side apply.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rev: Option<u64>,
+    /// Hub-local registration generation used to reject queued events after a
+    /// same-name reconnect. This routing metadata never crosses IPC.
+    #[serde(skip)]
+    pub routing_generation: Option<u64>,
     pub payload: AgentEventPayload,
 }
 
@@ -43,6 +47,7 @@ impl AgentEvent {
             turn_id: ctx.turn_id,
             correlation_id: ctx.correlation_id,
             rev: None,
+            routing_generation: None,
             payload,
         }
     }
@@ -62,6 +67,7 @@ impl AgentEvent {
             turn_id: ctx.turn_id,
             correlation_id: ctx.correlation_id,
             rev: None,
+            routing_generation: None,
             payload,
         }
     }

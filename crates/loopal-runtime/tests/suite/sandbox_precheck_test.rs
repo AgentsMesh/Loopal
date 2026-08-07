@@ -1,4 +1,4 @@
-//! Tests for sandbox_precheck: extract_paths, patch timestamp stripping.
+//! Tests for sandbox_precheck path extraction.
 
 use loopal_runtime::agent_loop::sandbox_precheck::extract_paths;
 use serde_json::json;
@@ -86,21 +86,46 @@ fn numeric_file_path_returns_empty() {
 // ── ApplyPatch path extraction ───────────────────────────────────
 
 #[test]
-fn apply_patch_extracts_star_lines() {
+fn apply_patch_extracts_operation_paths_from_canonical_ast() {
     let input = json!({
-        "patch": "*** /etc/nginx.conf\n--- old\n+++ new\n@@ -1 +1 @@\n-old\n+new"
+        "patch": "\
+*** Begin Patch
+*** Update File: /etc/nginx.conf
+@@
+-old
++new
+*** Add File: generated.conf
++content
+*** Delete File: obsolete.conf
+*** End Patch
+"
     });
     let paths = extract_paths("ApplyPatch", &input);
-    assert_eq!(paths, vec![("/etc/nginx.conf".to_string(), true)]);
+    assert_eq!(
+        paths,
+        vec![
+            ("/etc/nginx.conf".to_string(), true),
+            ("generated.conf".to_string(), true),
+            ("obsolete.conf".to_string(), true),
+        ]
+    );
 }
 
 #[test]
-fn apply_patch_strips_timestamp() {
+fn apply_patch_does_not_treat_envelope_as_paths() {
     let input = json!({
-        "patch": "*** /etc/nginx.conf\t2024-01-01 12:00:00\n"
+        "patch": "*** Begin Patch\n*** Add File: only.txt\n+content\n*** End Patch\n"
     });
     let paths = extract_paths("ApplyPatch", &input);
-    assert_eq!(paths, vec![("/etc/nginx.conf".to_string(), true)]);
+    assert_eq!(paths, vec![("only.txt".to_string(), true)]);
+}
+
+#[test]
+fn apply_patch_invalid_document_returns_no_paths() {
+    let input = json!({
+        "patch": "*** Begin Patch\n*** Add File: blocked.txt\n+content\n"
+    });
+    assert!(extract_paths("ApplyPatch", &input).is_empty());
 }
 
 #[test]

@@ -1,6 +1,7 @@
 use loopal_error::Result;
 use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::{ContinuationReason, StopReason};
+use loopal_tool_invocation::{StaleReason, ToolResultMetadata};
 use std::hash::{Hash, Hasher};
 use tracing::warn;
 
@@ -10,7 +11,6 @@ use super::turn_context::TurnContext;
 use super::turn_state::TurnState;
 
 pub(super) struct TurnLoopCounters {
-    pub last_text: String,
     pub continuation_count: u32,
     pub stop_feedback_count: u32,
     pub max_continuations: u32,
@@ -48,18 +48,29 @@ impl AgentLoopRunner {
         c: &mut TurnLoopCounters,
     ) -> Result<TurnState> {
         if let Some(error) = result.terminal_error.take() {
+            self.terminalize_discarded_tool_calls(&result.tool_uses)
+                .await?;
+            self.terminalize_discarded_server_tool_calls(&result.incomplete_server_tool_uses())
+                .await?;
+            if !result.assistant_text.is_empty() {
+                turn_ctx.record_output(&result.assistant_text);
+                record_text_metrics(turn_ctx, &result.assistant_text);
+            }
             return Err(error);
         }
         let truncated = result.stop_reason == StopReason::MaxTokens && !result.tool_uses.is_empty();
         if truncated {
             warn!("max_tokens hit with tool calls — discarding");
         }
-        let stream_truncated = result.stream_error
-            && !turn_ctx.cancel.is_cancelled()
-            && (!result.assistant_text.is_empty()
-                || !result.tool_uses.is_empty()
-                || !result.thinking_text.is_empty()
-                || !result.server_blocks.is_empty());
+        let incomplete_server_tools = result.incomplete_server_tool_uses();
+        let cancelled = turn_ctx.cancel.is_cancelled();
+        let stream_truncated = !cancelled
+            && (!incomplete_server_tools.is_empty()
+                || (result.stream_error
+                    && (!result.assistant_text.is_empty()
+                        || !result.tool_uses.is_empty()
+                        || !result.thinking_text.is_empty()
+                        || !result.server_blocks.is_empty())));
         let needs_auto_continue = truncated || result.stop_reason == StopReason::PauseTurn;
 
         if needs_auto_continue || stream_truncated {
@@ -69,14 +80,23 @@ impl AgentLoopRunner {
         }
 
         if result.stream_error {
+            self.terminalize_discarded_tool_calls(&result.tool_uses)
+                .await?;
+            self.terminalize_discarded_server_tool_calls(&incomplete_server_tools)
+                .await?;
             if !result.assistant_text.is_empty() {
                 let thinking_blocks = result.thinking_block_count();
                 self.record_assistant_message(&result.assistant_text, &[], result.server_blocks);
-                c.last_text.clone_from(&result.assistant_text);
+                turn_ctx.record_output(&result.assistant_text);
                 record_text_metrics(turn_ctx, &result.assistant_text);
                 record_thinking_metrics(turn_ctx, thinking_blocks);
             }
             return Ok(TurnState::Complete);
+        }
+
+        if cancelled {
+            self.terminalize_discarded_server_tool_calls(&incomplete_server_tools)
+                .await?;
         }
 
         let thinking_blocks = result.thinking_block_count();
@@ -86,7 +106,7 @@ impl AgentLoopRunner {
             result.server_blocks,
         );
         if !result.assistant_text.is_empty() {
-            c.last_text.clone_from(&result.assistant_text);
+            turn_ctx.record_output(&result.assistant_text);
             record_text_metrics(turn_ctx, &result.assistant_text);
         }
         record_thinking_metrics(turn_ctx, thinking_blocks);
@@ -113,6 +133,12 @@ impl AgentLoopRunner {
         if stream_truncated {
             warn!("stream truncated — discarding incomplete tool calls");
         }
+        if truncated || stream_truncated {
+            self.terminalize_discarded_tool_calls(&result.tool_uses)
+                .await?;
+            self.terminalize_discarded_server_tool_calls(&result.incomplete_server_tool_uses())
+                .await?;
+        }
         let tools = if truncated || stream_truncated {
             &[][..]
         } else {
@@ -121,11 +147,16 @@ impl AgentLoopRunner {
         let thinking_blocks = result.thinking_block_count();
         self.record_assistant_message(&result.assistant_text, tools, result.server_blocks);
         if !result.assistant_text.is_empty() {
-            c.last_text.clone_from(&result.assistant_text);
+            turn_ctx.record_output(&result.assistant_text);
             record_text_metrics(turn_ctx, &result.assistant_text);
         }
         record_thinking_metrics(turn_ctx, thinking_blocks);
         if c.continuation_count >= c.max_continuations {
+            if stream_truncated {
+                return Err(result
+                    .stream_failure
+                    .unwrap_or_else(|| loopal_error::ProviderError::StreamEnded.into()));
+            }
             return Ok(TurnState::Complete);
         }
         let reason = if stream_truncated {
@@ -144,6 +175,40 @@ impl AgentLoopRunner {
         })
         .await?;
         Ok(TurnState::NeedsContinuation { reason })
+    }
+
+    async fn terminalize_discarded_tool_calls(
+        &self,
+        tool_uses: &[(String, String, serde_json::Value)],
+    ) -> Result<()> {
+        for (id, name, _) in tool_uses {
+            self.emit_in_turn(AgentEventPayload::ToolResult {
+                id: id.clone(),
+                name: name.clone(),
+                result: "Tool call discarded because the model response was incomplete".into(),
+                is_error: true,
+                duration_ms: None,
+                metadata: Some(ToolResultMetadata::stale(
+                    StaleReason::IncompleteModelResponse,
+                )),
+            })
+            .await?;
+        }
+        Ok(())
+    }
+
+    async fn terminalize_discarded_server_tool_calls(
+        &self,
+        tool_uses: &[(String, String)],
+    ) -> Result<()> {
+        for (tool_use_id, _) in tool_uses {
+            self.emit_in_turn(AgentEventPayload::ServerToolDiscarded {
+                tool_use_id: tool_use_id.clone(),
+                reason: StaleReason::IncompleteModelResponse,
+            })
+            .await?;
+        }
+        Ok(())
     }
 
     async fn classify_post_tool_empty(

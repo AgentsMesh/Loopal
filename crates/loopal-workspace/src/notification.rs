@@ -12,6 +12,14 @@ struct GitChanged<'a> {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+struct FileChanged<'a> {
+    workspace_id: &'a str,
+    path: &'a str,
+    kind: &'a str,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct ResyncRequired<'a> {
     workspace_id: &'a str,
     reason: &'a str,
@@ -24,8 +32,28 @@ pub struct ServiceNotification {
 }
 
 impl WorkspaceService {
+    pub(crate) fn publish_file_changed(&self, path: &str, kind: &str) {
+        publish_file_changed(&self.events, &self.workspace_id, path, kind);
+    }
+
     pub(crate) fn publish_git_changed(&self) {
         publish_git_changed(&self.events, &self.workspace_id);
+    }
+}
+
+pub(crate) fn publish_file_changed(
+    events: &tokio::sync::broadcast::Sender<ServiceNotification>,
+    workspace_id: &str,
+    path: &str,
+    kind: &str,
+) {
+    let payload = FileChanged {
+        workspace_id,
+        path,
+        kind,
+    };
+    if let Ok(notification) = ServiceNotification::broadcast("workspace/fileChanged", &payload) {
+        let _ = events.send(notification);
     }
 }
 

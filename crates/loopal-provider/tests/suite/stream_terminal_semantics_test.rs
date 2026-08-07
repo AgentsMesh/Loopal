@@ -1,6 +1,6 @@
 use super::stream_helpers::{collect_chunks, test_chat_params};
 use loopal_error::{LoopalError, ProviderError};
-use loopal_provider::{GoogleProvider, OpenAiCompatProvider, OpenAiProvider};
+use loopal_provider::{AnthropicProvider, GoogleProvider, OpenAiCompatProvider, OpenAiProvider};
 use loopal_provider_api::{Provider, StreamChunk};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -55,13 +55,13 @@ async fn responses_failed_preserves_rate_limit() {
 }
 
 #[tokio::test]
-async fn google_explicit_block_reasons_emit_done() {
+async fn google_explicit_block_reasons_fail_closed_without_done() {
     let server = MockServer::start().await;
     let sse = concat!(
-        "data: {\"candidates\":[",
-        "{\"content\":{\"parts\":[{\"text\":\"blocked\"}]},\"finishReason\":\"SAFETY\"},",
-        "{\"content\":{\"parts\":[{\"text\":\"quoted\"}]},\"finishReason\":\"RECITATION\"}",
-        "]}\n\n",
+        "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"blocked\"}]},",
+        "\"finishReason\":\"SAFETY\"}]}\n\n",
+        "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"quoted\"}]},",
+        "\"finishReason\":\"RECITATION\"}]}\n\n",
         "data: {\"promptFeedback\":{\"blockReason\":\"SAFETY\"}}\n\n",
     );
     Mock::given(method("POST"))
@@ -71,12 +71,28 @@ async fn google_explicit_block_reasons_emit_done() {
         .await;
     let provider = GoogleProvider::new("key".into()).with_base_url(server.uri());
     let chunks = collect_chunks(provider.stream_chat(&test_chat_params()).await.unwrap()).await;
-    assert_eq!(
+    assert!(
         chunks
             .iter()
-            .filter(|chunk| matches!(chunk, Ok(StreamChunk::Done { .. })))
-            .count(),
-        3
+            .all(|chunk| !matches!(chunk, Ok(StreamChunk::Done { .. }))),
+        "blocked responses cannot carry a successful terminal marker: {chunks:?}"
+    );
+    let errors = chunks
+        .iter()
+        .filter_map(|chunk| chunk.as_ref().err())
+        .collect::<Vec<_>>();
+    assert_eq!(errors.len(), 3, "chunks: {chunks:?}");
+    assert!(errors.iter().all(|error| {
+        !error.is_retryable()
+            && matches!(
+                error,
+                LoopalError::Provider(ProviderError::Api { status: 400, .. })
+            )
+    }));
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.to_string().contains("RECITATION"))
     );
 }
 
@@ -111,4 +127,54 @@ async fn compat_reasoning_content_requires_catalog_capability() {
             .iter()
             .any(|chunk| matches!(chunk, Ok(StreamChunk::Thinking { .. })))
     );
+}
+
+#[tokio::test]
+async fn every_http_adapter_preserves_retry_after_on_504() {
+    let server = MockServer::start().await;
+    for endpoint in [
+        "/v1/messages",
+        "/v1/responses",
+        "/v1/chat/completions",
+        "/models/test-model:streamGenerateContent",
+    ] {
+        Mock::given(method("POST"))
+            .and(path(endpoint))
+            .respond_with(
+                ResponseTemplate::new(504)
+                    .insert_header("retry-after", "1.25")
+                    .set_body_string("gateway timeout"),
+            )
+            .mount(&server)
+            .await;
+    }
+
+    let providers: Vec<Box<dyn Provider>> = vec![
+        Box::new(AnthropicProvider::new("key".into()).with_base_url(server.uri())),
+        Box::new(OpenAiProvider::new("key".into()).with_base_url(server.uri())),
+        Box::new(OpenAiCompatProvider::new(
+            "key".into(),
+            server.uri(),
+            "compat".into(),
+        )),
+        Box::new(GoogleProvider::new("key".into()).with_base_url(server.uri())),
+    ];
+
+    for provider in providers {
+        let error = match provider.stream_chat(&test_chat_params()).await {
+            Ok(_) => panic!("{} unexpectedly accepted a 504", provider.name()),
+            Err(error) => error,
+        };
+        assert!(error.is_retryable(), "provider={}", provider.name());
+        assert_eq!(
+            error.retry_after_ms(),
+            Some(1_250),
+            "provider={}",
+            provider.name()
+        );
+        assert!(matches!(
+            error,
+            LoopalError::Provider(ProviderError::Api { status: 504, .. })
+        ));
+    }
 }

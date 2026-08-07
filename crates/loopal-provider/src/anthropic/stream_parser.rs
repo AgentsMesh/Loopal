@@ -38,10 +38,49 @@ pub(crate) fn parse_anthropic_event(
                 stop_reason: reason,
             }));
         }
+        // Anthropic can surface overloads and other provider failures after
+        // the HTTP 200/SSE handshake. Preserve them as typed stream errors so
+        // the runtime applies the same retry policy and telemetry as an HTTP
+        // status failure.
+        "error" => chunks.push(Err(parse_stream_error(&parsed))),
         _ => {}
     }
 
     chunks
+}
+
+fn parse_stream_error(event: &Value) -> LoopalError {
+    let kind = event["error"]["type"].as_str().unwrap_or("api_error");
+    match kind {
+        "rate_limit_error" => ProviderError::RateLimited {
+            retry_after_ms: 30_000,
+        }
+        .into(),
+        "overloaded_error" => ProviderError::Api {
+            status: 529,
+            message: "anthropic API overloaded".into(),
+            retry_after_ms: None,
+        }
+        .into(),
+        "timeout_error" => ProviderError::Api {
+            status: 504,
+            message: "anthropic API timed out".into(),
+            retry_after_ms: None,
+        }
+        .into(),
+        "api_error" | "internal_server_error" => ProviderError::Api {
+            status: 500,
+            message: "anthropic API stream failed".into(),
+            retry_after_ms: None,
+        }
+        .into(),
+        _ => ProviderError::Api {
+            status: 400,
+            message: "anthropic API stream failed".into(),
+            retry_after_ms: None,
+        }
+        .into(),
+    }
 }
 
 fn handle_block_start(
@@ -193,5 +232,36 @@ fn parse_usage_and_stop(
             "pause_turn" => Some(StopReason::PauseTurn),
             _ => Some(StopReason::EndTurn),
         };
+    }
+}
+
+#[cfg(test)]
+mod stream_error_tests {
+    use super::*;
+
+    #[test]
+    fn overloaded_stream_event_is_retryable() {
+        let error = parse_stream_error(&json!({
+            "type": "error",
+            "error": {"type": "overloaded_error", "message": "overloaded"}
+        }));
+        assert!(error.is_retryable());
+        assert!(matches!(
+            error,
+            LoopalError::Provider(ProviderError::Api { status: 529, .. })
+        ));
+    }
+
+    #[test]
+    fn invalid_request_stream_event_is_fatal() {
+        let error = parse_stream_error(&json!({
+            "type": "error",
+            "error": {"type": "invalid_request_error"}
+        }));
+        assert!(!error.is_retryable());
+        assert!(matches!(
+            error,
+            LoopalError::Provider(ProviderError::Api { status: 400, .. })
+        ));
     }
 }

@@ -72,7 +72,12 @@ pub(super) async fn action_spawn(
             agent_type: subagent_type.map(String::from),
             depth: shared.depth + 1,
             no_sandbox,
-            notify_parent_on_completion: true,
+            // Foreground spawns already consume the authoritative completion
+            // through wait_agent and return it as this tool's ToolResult. A
+            // second push into the parent frontend would create a duplicate
+            // model turn at the next turn boundary. Background spawns have no
+            // waiter, so they retain push delivery.
+            notify_parent_on_completion: background,
             target,
         },
     )

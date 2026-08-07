@@ -108,7 +108,16 @@ impl Provider for HangingProvider {
 
 // ── Providers ──────────────────────────────────────────────────────
 
-/// Single-call mock provider. Returns the configured chunks once, then empty.
+const SCRIPT_EXHAUSTED: &str = "mock provider script exhausted";
+
+fn script_exhausted(provider: &str) -> LoopalError {
+    LoopalError::Other(format!(
+        "{SCRIPT_EXHAUSTED} ({provider}): add an explicit response for every expected LLM call"
+    ))
+}
+
+/// Single-call mock provider. Returns the configured chunks exactly once.
+/// A second call is a fixture error rather than an implicit empty stream.
 pub struct MockProvider {
     pub chunks: std::sync::Mutex<Option<Vec<Result<StreamChunk, LoopalError>>>>,
 }
@@ -127,7 +136,12 @@ impl Provider for MockProvider {
         "anthropic"
     }
     async fn stream_chat(&self, _params: &ChatParams) -> Result<ChatStream, LoopalError> {
-        let chunks = self.chunks.lock().unwrap().take().unwrap_or_default();
+        let chunks = self
+            .chunks
+            .lock()
+            .unwrap()
+            .take()
+            .ok_or_else(|| script_exhausted("MockProvider"))?;
         Ok(Box::pin(MockStreamChunks::new(VecDeque::from(chunks))))
     }
 }
@@ -186,7 +200,12 @@ impl Provider for MultiCallProvider {
             .lock()
             .unwrap()
             .push(p.turns.to_vec());
-        let chunks = self.calls.lock().unwrap().pop_front().unwrap_or_default();
+        let chunks = self
+            .calls
+            .lock()
+            .unwrap()
+            .pop_front()
+            .ok_or_else(|| script_exhausted("MultiCallProvider"))?;
         let mut stream = MockStreamChunks::new(VecDeque::from(chunks));
         if let Some(d) = self.delay {
             stream = stream.with_delay(d);
@@ -229,7 +248,67 @@ impl Provider for StallThenProvider {
             let stream = MockStreamChunks::new(VecDeque::from(first)).with_delay(self.stall);
             return Ok(Box::pin(stream));
         }
-        let chunks = self.rest.lock().unwrap().pop_front().unwrap_or_default();
+        let chunks = self
+            .rest
+            .lock()
+            .unwrap()
+            .pop_front()
+            .ok_or_else(|| script_exhausted("StallThenProvider"))?;
         Ok(Box::pin(MockStreamChunks::new(VecDeque::from(chunks))))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn params() -> ChatParams {
+        ChatParams::new("mock".into(), Vec::new(), String::new())
+    }
+
+    fn assert_fixture_exhausted(error: LoopalError, provider: &str) {
+        assert!(!error.is_retryable(), "fixture underflow must fail fast");
+        let message = error.to_string();
+        assert!(message.contains(SCRIPT_EXHAUSTED), "error: {message}");
+        assert!(message.contains(provider), "error: {message}");
+    }
+
+    #[tokio::test]
+    async fn single_call_provider_distinguishes_explicit_empty_stream_from_underflow() {
+        let provider = MockProvider::new(Vec::new());
+        assert!(provider.stream_chat(&params()).await.is_ok());
+
+        let error = provider
+            .stream_chat(&params())
+            .await
+            .err()
+            .expect("second call must expose fixture underflow");
+        assert_fixture_exhausted(error, "MockProvider");
+    }
+
+    #[tokio::test]
+    async fn multi_call_provider_distinguishes_explicit_empty_stream_from_underflow() {
+        let provider = MultiCallProvider::new(vec![Vec::new()]);
+        assert!(provider.stream_chat(&params()).await.is_ok());
+
+        let error = provider
+            .stream_chat(&params())
+            .await
+            .err()
+            .expect("unscripted call must expose fixture underflow");
+        assert_fixture_exhausted(error, "MultiCallProvider");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn stall_then_provider_exposes_rest_underflow() {
+        let provider = StallThenProvider::new(Vec::new(), Vec::new(), Duration::from_secs(1));
+        assert!(provider.stream_chat(&params()).await.is_ok());
+
+        let error = provider
+            .stream_chat(&params())
+            .await
+            .err()
+            .expect("missing recovery response must expose fixture underflow");
+        assert_fixture_exhausted(error, "StallThenProvider");
     }
 }

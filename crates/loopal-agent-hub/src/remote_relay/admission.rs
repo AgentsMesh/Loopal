@@ -6,6 +6,7 @@ use serde_json::{Value, json};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
+use crate::authoritative_events::PreparedAuthoritativeEvent;
 use crate::pending_relay::PendingRemoteQuestionInfo;
 use crate::{Hub, HubUplink};
 
@@ -27,7 +28,7 @@ pub(super) async fn emit_question(
         .filter(|value| *value > 0)
         .map(Duration::from_millis);
     let event = AgentEvent::named(QualifiedAddress::local(&qualified_agent), payload.clone());
-    let (emitted, admitted) = {
+    let admission = {
         let mut h = hub.lock().await;
         if !h
             .uplink
@@ -41,7 +42,7 @@ pub(super) async fn emit_question(
             .min(h.pending_interaction_timeout());
         let deadline = tokio::time::Instant::now() + timeout;
         if !h.ui.has_capability(UiCapability::Question) {
-            (false, None)
+            AdmissionOutcome::Rejected
         } else {
             admit(
                 &mut h,
@@ -59,15 +60,50 @@ pub(super) async fn emit_question(
             )
         }
     };
-    if let Some(admitted) = admitted {
-        super::cleanup::schedule_remote_timeout(
-            hub,
-            admitted.key,
-            admitted.uplink,
-            admitted.deadline,
-        );
+    match admission {
+        AdmissionOutcome::Rejected => Ok(json!({"emitted": false})),
+        AdmissionOutcome::Retry => Ok(json!({"emitted": true})),
+        AdmissionOutcome::Admitted(admitted) => {
+            let mut admitted = *admitted;
+            let delivery_hub = hub.clone();
+            let cleanup_key = admitted.key.clone();
+            let cleanup_uplink = admitted.uplink.clone();
+            let coordinator_key = cleanup_key.clone();
+            let coordinator_uplink = cleanup_uplink.clone();
+            let coordinator = tokio::spawn(async move {
+                match admitted.delivery.deliver().await {
+                    Ok(()) => {
+                        super::cleanup::schedule_remote_timeout(
+                            &delivery_hub,
+                            admitted.key,
+                            admitted.uplink,
+                            admitted.deadline,
+                        );
+                        Ok(())
+                    }
+                    Err(error) => {
+                        remove_if_current(&delivery_hub, &coordinator_key, &coordinator_uplink)
+                            .await;
+                        Err(format!("remote question event admission failed: {error}"))
+                    }
+                }
+            });
+            match coordinator.await {
+                Ok(Ok(())) => Ok(json!({"emitted": true})),
+                Ok(Err(error)) => {
+                    remove_if_current(hub, &cleanup_key, &cleanup_uplink).await;
+                    Err(error)
+                }
+                Err(error) => {
+                    hub.lock().await.shutdown_signal.notify_one();
+                    remove_if_current(hub, &cleanup_key, &cleanup_uplink).await;
+                    Err(format!(
+                        "remote question admission coordinator failed: {error}"
+                    ))
+                }
+            }
+        }
     }
-    Ok(json!({"emitted": emitted}))
 }
 
 struct Admission<'a> {
@@ -86,9 +122,16 @@ struct AdmittedRemoteQuestion {
     key: (String, String),
     uplink: Arc<HubUplink>,
     deadline: tokio::time::Instant,
+    delivery: PreparedAuthoritativeEvent,
 }
 
-fn admit(hub: &mut Hub, admission: Admission<'_>) -> (bool, Option<AdmittedRemoteQuestion>) {
+enum AdmissionOutcome {
+    Rejected,
+    Retry,
+    Admitted(Box<AdmittedRemoteQuestion>),
+}
+
+fn admit(hub: &mut Hub, admission: Admission<'_>) -> AdmissionOutcome {
     let key = (
         admission.qualified_agent.clone(),
         admission.interaction_id.clone(),
@@ -98,14 +141,18 @@ fn admit(hub: &mut Hub, admission: Admission<'_>) -> (bool, Option<AdmittedRemot
             && current.origin_agent == admission.agent
             && current.logical_id == admission.logical_id
             && Arc::ptr_eq(&current.uplink, &admission.uplink);
-        return (is_retry, None);
+        return if is_retry {
+            AdmissionOutcome::Retry
+        } else {
+            AdmissionOutcome::Rejected
+        };
     }
     if hub
         .pending_remote_questions
         .keys()
         .any(|(name, _)| name == &admission.qualified_agent)
     {
-        return (false, None);
+        return AdmissionOutcome::Rejected;
     }
     hub.remote_views
         .entry(admission.qualified_agent.clone())
@@ -128,19 +175,28 @@ fn admit(hub: &mut Hub, admission: Admission<'_>) -> (bool, Option<AdmittedRemot
             forwarding: false,
         },
     );
-    let sender = hub.registry.event_sender();
-    if sender.try_send(admission.event).is_err() {
-        hub.pending_remote_questions.remove(&key);
-        return (false, None);
+    AdmissionOutcome::Admitted(Box::new(AdmittedRemoteQuestion {
+        key,
+        uplink: admission.uplink,
+        deadline: admission.deadline,
+        delivery: PreparedAuthoritativeEvent::from_hub(hub, admission.event),
+    }))
+}
+
+async fn remove_if_current(
+    hub: &Arc<Mutex<Hub>>,
+    key: &(String, String),
+    uplink: &Arc<HubUplink>,
+) -> bool {
+    let mut hub = hub.lock().await;
+    if !hub
+        .pending_remote_questions
+        .get(key)
+        .is_some_and(|record| Arc::ptr_eq(&record.uplink, uplink))
+    {
+        return false;
     }
-    (
-        true,
-        Some(AdmittedRemoteQuestion {
-            key,
-            uplink: admission.uplink,
-            deadline: admission.deadline,
-        }),
-    )
+    hub.pending_remote_questions.remove(key).is_some()
 }
 
 fn question_ids(payload: &AgentEventPayload) -> Result<(String, String), String> {

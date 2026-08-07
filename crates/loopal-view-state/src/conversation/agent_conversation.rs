@@ -44,6 +44,11 @@ impl AgentConversation {
     }
 
     /// Current turn working duration.
+    ///
+    /// This is business-lifecycle time, not an animation clock. Its
+    /// `Instant` anchor is process-local and intentionally does not cross a
+    /// serialized view snapshot; TUI animations must use their own monotonic
+    /// clock instead.
     pub fn turn_elapsed(&self) -> Duration {
         match self.turn_start {
             Some(start) => start.elapsed(),

@@ -18,22 +18,29 @@ use ratatui::prelude::*;
 
 use loopal_view_state::{InvocationState, ToolInvocation};
 
-use crate::views::unified_status::spinner_frame;
+use crate::animation::spinner_frame;
 
 const EXPAND_MAX_LINES: usize = 4;
 
-pub fn render_tool_calls(tool_calls: &[ToolInvocation], _width: u16) -> Vec<Line<'static>> {
-    tool_calls.iter().flat_map(render_one).collect()
+pub fn render_tool_calls(
+    tool_calls: &[ToolInvocation],
+    _width: u16,
+    animation_elapsed: std::time::Duration,
+) -> Vec<Line<'static>> {
+    tool_calls
+        .iter()
+        .flat_map(|tc| render_one(tc, animation_elapsed))
+        .collect()
 }
 
-fn render_one(tc: &ToolInvocation) -> Vec<Line<'static>> {
-    let mut lines = vec![render_header(tc)];
+fn render_one(tc: &ToolInvocation, animation_elapsed: std::time::Duration) -> Vec<Line<'static>> {
+    let mut lines = vec![render_header(tc, animation_elapsed)];
     lines.extend(render_body(tc));
     lines
 }
 
-fn render_header(tc: &ToolInvocation) -> Line<'static> {
-    let (icon, color) = status_icon(tc);
+fn render_header(tc: &ToolInvocation, animation_elapsed: std::time::Duration) -> Line<'static> {
+    let (icon, color) = status_icon(tc, animation_elapsed);
     let detail = extract_detail(tc);
 
     let mut spans = vec![
@@ -174,7 +181,7 @@ fn truncate_chars(s: &str, max: usize) -> String {
     }
 }
 
-fn status_icon(tc: &ToolInvocation) -> (String, Color) {
+fn status_icon(tc: &ToolInvocation, animation_elapsed: std::time::Duration) -> (String, Color) {
     match &tc.state {
         InvocationState::Done {
             outcome: loopal_view_state::Outcome::Success { .. },
@@ -187,8 +194,7 @@ fn status_icon(tc: &ToolInvocation) -> (String, Color) {
         InvocationState::Stale { .. } => ("◐".to_string(), Color::Yellow),
         InvocationState::Cancelled { .. } => ("○".to_string(), Color::DarkGray),
         InvocationState::Pending | InvocationState::Running { .. } => {
-            let elapsed = tc.elapsed(std::time::Instant::now());
-            (spinner_frame(elapsed).to_string(), Color::Yellow)
+            (spinner_frame(animation_elapsed).to_string(), Color::Yellow)
         }
     }
 }

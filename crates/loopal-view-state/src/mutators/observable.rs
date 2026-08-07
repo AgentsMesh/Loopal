@@ -15,6 +15,11 @@ pub(super) fn started(state: &mut SessionViewState) -> MutationEffect {
 
 pub(super) fn running(state: &mut SessionViewState) -> MutationEffect {
     state.agent.observable.status = AgentStatus::Running;
+    // A new running phase cannot belong to an older compaction lifecycle.
+    // This also repairs snapshots captured after a start event whose terminal
+    // progress event was lost during a process or transport failure.
+    state.agent.conversation.compact_banner = None;
+    state.agent.conversation.retry_banner = None;
     state.agent.conversation.begin_turn();
     state.agent.conversation.mark_active();
     ensure_started_at(state);

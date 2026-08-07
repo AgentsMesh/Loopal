@@ -6,6 +6,8 @@ use loopal_turn::Turn;
 use tokio_util::sync::CancellationToken;
 
 use super::bare_summary::{bare_summary, build_summary_message};
+use super::compact_retry::NoopCompactRetryObserver;
+pub use super::compact_retry::{CompactRetryEvent, CompactRetryObserver};
 use super::conversation_text::build_conversation_text;
 use super::smart_compact_llm::call_summarization_llm;
 use super::summary_parse::extract_summary;
@@ -35,6 +37,31 @@ pub async fn compact_to_boundary(
     custom_instructions: Option<&str>,
     cancel: &CancellationToken,
 ) -> Result<Option<CompactOutput>, LoopalError> {
+    let retry_observer = NoopCompactRetryObserver;
+    compact_to_boundary_observed(
+        turns,
+        provider,
+        model,
+        boundary_turn_at,
+        custom_instructions,
+        cancel,
+        &retry_observer,
+    )
+    .await
+}
+
+/// `compact_to_boundary` with a structured observer for retry lifecycle
+/// updates. Frontends should consume this instead of inferring retry state
+/// from log lines or elapsed time.
+pub async fn compact_to_boundary_observed(
+    turns: &[Turn],
+    provider: &dyn Provider,
+    model: &str,
+    boundary_turn_at: usize,
+    custom_instructions: Option<&str>,
+    cancel: &CancellationToken,
+    retry_observer: &dyn CompactRetryObserver,
+) -> Result<Option<CompactOutput>, LoopalError> {
     let Some(old_turns) = slice_old_turns(turns, boundary_turn_at) else {
         return Ok(None);
     };
@@ -48,8 +75,9 @@ pub async fn compact_to_boundary(
         custom_instructions,
         &touched_files,
         cancel,
+        retry_observer,
     )
-    .await;
+    .await?;
 
     tracing::info!(
         summary_len = summary_text.len(),
@@ -77,8 +105,9 @@ fn slice_old_turns(turns: &[Turn], boundary_turn_at: usize) -> Option<&[Turn]> {
     Some(&turns[..boundary_turn_at])
 }
 
-/// Call the LLM with retry; on any terminal failure fall back to a
-/// deterministic outline so compaction always produces *something*.
+/// Call the LLM with retry; on provider failure fall back to a deterministic
+/// outline. Cancellation is control flow, not provider failure, and must
+/// propagate without rewriting conversation history.
 /// Pulling this out lets tests exercise the fallback path without a
 /// full provider stub.
 async fn produce_summary_text(
@@ -88,7 +117,8 @@ async fn produce_summary_text(
     custom_instructions: Option<&str>,
     touched_files: &[TouchedFile],
     cancel: &CancellationToken,
-) -> String {
+    retry_observer: &dyn CompactRetryObserver,
+) -> Result<String, LoopalError> {
     let conversation_text = build_conversation_text(old_messages);
     match call_summarization_llm(
         provider,
@@ -96,6 +126,7 @@ async fn produce_summary_text(
         &conversation_text,
         custom_instructions,
         cancel,
+        retry_observer,
     )
     .await
     {
@@ -109,12 +140,16 @@ async fn produce_summary_text(
                     touched_files = touched_files.len(),
                     "compaction LLM returned no summary; using deterministic fallback"
                 );
-                bare_summary(old_messages, touched_files)
+                Ok(bare_summary(old_messages, touched_files))
             } else {
-                extracted
+                Ok(extracted)
             }
         }
         Err(e) => {
+            if cancel.is_cancelled() {
+                tracing::info!("compaction cancelled before summary commit");
+                return Err(e);
+            }
             tracing::warn!(
                 fallback = "bare_summary",
                 cause = "llm_call_exhausted",
@@ -123,7 +158,7 @@ async fn produce_summary_text(
                 touched_files = touched_files.len(),
                 "compaction LLM exhausted retries; using deterministic fallback"
             );
-            bare_summary(old_messages, touched_files)
+            Ok(bare_summary(old_messages, touched_files))
         }
     }
 }

@@ -1,5 +1,10 @@
 use crate::{LoopalError, ProviderError};
 
+/// Upper bound for a provider-directed retry delay. This is enforced at the
+/// error contract so every caller, including main turns and compaction, makes
+/// progress even if an adapter or test double supplies an extreme value.
+pub const MAX_RETRY_AFTER_MS: u64 = 5 * 60 * 1000;
+
 impl ProviderError {
     /// Check if this is a rate limit error
     pub fn is_rate_limited(&self) -> bool {
@@ -12,7 +17,12 @@ impl ProviderError {
             ProviderError::RateLimited { .. } => true,
             // Network-level errors (connection reset, timeout, DNS) are transient.
             ProviderError::Http(_) => true,
-            ProviderError::Api { status, .. } => matches!(status, 429 | 500 | 502 | 503 | 529),
+            ProviderError::Api { status, .. } => {
+                matches!(status, 429 | 500 | 502 | 503 | 504 | 529)
+            }
+            // A stream that closes before its protocol terminal marker is a
+            // transient transport failure when no semantic output was seen.
+            ProviderError::StreamEnded => true,
             ProviderError::ContextOverflow { .. } => false,
             _ => false,
         }
@@ -28,12 +38,14 @@ impl ProviderError {
         matches!(self, ProviderError::ContextOverflow { .. })
     }
 
-    /// Get the retry-after duration in milliseconds, if this is a rate limit error
+    /// Get the bounded server-directed retry delay in milliseconds.
     pub fn retry_after_ms(&self) -> Option<u64> {
         match self {
             ProviderError::RateLimited { retry_after_ms } => Some(*retry_after_ms),
+            ProviderError::Api { retry_after_ms, .. } => *retry_after_ms,
             _ => None,
         }
+        .map(|delay| delay.min(MAX_RETRY_AFTER_MS))
     }
 }
 
@@ -51,12 +63,10 @@ impl LoopalError {
         matches!(self, LoopalError::Provider(e) if e.is_retryable())
     }
 
-    /// Get the retry-after duration in milliseconds, if this is a rate limit error
+    /// Get the bounded server-directed retry delay in milliseconds.
     pub fn retry_after_ms(&self) -> Option<u64> {
         match self {
-            LoopalError::Provider(ProviderError::RateLimited { retry_after_ms }) => {
-                Some(*retry_after_ms)
-            }
+            LoopalError::Provider(error) => error.retry_after_ms(),
             _ => None,
         }
     }

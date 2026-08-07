@@ -12,10 +12,10 @@ use loopal_agent_hub::Hub;
 use loopal_agent_hub::agent_io::agent_io_loop;
 use loopal_ipc::connection::{Connection, Listening};
 use loopal_ipc::protocol::methods;
-use loopal_protocol::AgentEvent;
+use loopal_protocol::{AgentCompletion, AgentEvent, PROTOCOL_ERROR_REASON, TRANSPORT_ERROR_REASON};
 use serde_json::json;
 
-type IoHandle = tokio::task::JoinHandle<Option<String>>;
+type IoHandle = tokio::task::JoinHandle<AgentCompletion>;
 
 /// Set up a Hub + duplex connection + spawn agent_io_loop. Returns the
 /// client-side connection (to send notifications) and the io_loop join handle.
@@ -50,8 +50,9 @@ async fn agent_completed_with_result() {
         .unwrap();
 
     let result = tokio::time::timeout(Duration::from_secs(3), io_handle).await;
-    let output = result.unwrap().unwrap();
-    assert_eq!(output.as_deref(), Some("Found 42 issues."));
+    let completion = result.unwrap().unwrap();
+    assert_eq!(completion.reason, "goal");
+    assert_eq!(completion.result.as_deref(), Some("Found 42 issues."));
 }
 
 /// agent/completed without result field → agent_io_loop returns None.
@@ -66,8 +67,9 @@ async fn agent_completed_without_result() {
         .unwrap();
 
     let result = tokio::time::timeout(Duration::from_secs(3), io_handle).await;
-    let output = result.unwrap().unwrap();
-    assert_eq!(output, None, "no result field → None");
+    let completion = result.unwrap().unwrap();
+    assert_eq!(completion.reason, "shutdown");
+    assert_eq!(completion.result, None, "no result field → None");
 }
 
 /// Stream events are forwarded to UI but NOT used as output source.
@@ -97,10 +99,13 @@ async fn stream_events_not_used_as_output() {
         .unwrap();
 
     let result = tokio::time::timeout(Duration::from_secs(3), io_handle).await;
-    let output = result.unwrap().unwrap();
+    let completion = result.unwrap().unwrap();
     // Old behavior: would have returned "I'm exploring the codebase..."
     // New behavior: returns None (stream text is not an output source)
-    assert_eq!(output, None, "stream text should NOT be used as output");
+    assert_eq!(
+        completion.result, None,
+        "stream text should NOT be used as output"
+    );
 }
 
 /// agent/completed result field takes precedence even when stream was active.
@@ -133,9 +138,9 @@ async fn result_field_overrides_stream_text() {
         .unwrap();
 
     let result = tokio::time::timeout(Duration::from_secs(3), io_handle).await;
-    let output = result.unwrap().unwrap();
+    let completion = result.unwrap().unwrap();
     assert_eq!(
-        output.as_deref(),
+        completion.result.as_deref(),
         Some("Comprehensive analysis report."),
         "should use result from agent/completed, not stream text"
     );
@@ -155,10 +160,47 @@ async fn error_reason_with_partial_result() {
         .unwrap();
 
     let result = tokio::time::timeout(Duration::from_secs(3), io_handle).await;
-    let output = result.unwrap().unwrap();
+    let completion = result.unwrap().unwrap();
+    assert_eq!(completion.reason, "error");
     assert_eq!(
-        output.as_deref(),
+        completion.result.as_deref(),
         Some("Partial findings before crash"),
         "error reason should still carry partial result"
     );
+}
+
+#[tokio::test]
+async fn transport_close_without_agent_completed_is_failure() {
+    let (agent_conn, io_handle) = setup_agent("crashed").await;
+
+    agent_conn.close().await;
+
+    let completion = tokio::time::timeout(Duration::from_secs(3), io_handle)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(completion.reason, TRANSPORT_ERROR_REASON);
+    assert!(!completion.is_success());
+    assert!(completion.output().contains("before agent/completed"));
+}
+
+#[tokio::test]
+async fn malformed_agent_completed_is_protocol_failure() {
+    let (agent_conn, io_handle) = setup_agent("malformed").await;
+
+    agent_conn
+        .send_notification(
+            methods::AGENT_COMPLETED.name,
+            json!({"result": "missing required reason"}),
+        )
+        .await
+        .unwrap();
+
+    let completion = tokio::time::timeout(Duration::from_secs(3), io_handle)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(completion.reason, PROTOCOL_ERROR_REASON);
+    assert!(!completion.is_success());
+    assert!(completion.output().contains("malformed agent/completed"));
 }

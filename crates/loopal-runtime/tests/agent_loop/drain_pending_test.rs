@@ -1,4 +1,4 @@
-//! Integration test for inject_pending_messages() before !interactive break.
+//! Integration test for boundary draining before an ephemeral agent exits.
 //!
 //! Verifies that sub-agents drain pending messages even when LLM returns
 //! pure text (no tool calls), preventing message loss.
@@ -64,7 +64,11 @@ impl Provider for TextOnlyProvider {
     }
 
     async fn stream_chat(&self, _p: &ChatParams) -> Result<ChatStream, LoopalError> {
-        let chunks = self.chunks.lock().unwrap().take().unwrap_or_default();
+        let chunks = self.chunks.lock().unwrap().take().ok_or_else(|| {
+            LoopalError::Other(
+                "TextOnlyProvider script exhausted: add the missing LLM response".into(),
+            )
+        })?;
         Ok(Box::pin(MockStream {
             chunks: VecDeque::from(chunks),
         }))

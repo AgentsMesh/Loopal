@@ -161,6 +161,7 @@ fn step_update_patches_tool_state() {
                 content: "OK".into(),
                 is_error: false,
                 images: vec![],
+                metadata: None,
             }),
             updated_at: None,
         },

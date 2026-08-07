@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { type AgentControlDisposition } from '../../../../shared/contracts'
 import {
   createTestAPI,
   sessionDetail,
@@ -24,7 +25,7 @@ const target = {
 
 describe('useAgentControl', () => {
   it('builds an exact runtime target for control and interrupt', async () => {
-    const controlAgent = vi.fn(async () => undefined)
+    const controlAgent = vi.fn(async () => ({ status: 'applied' as const }))
     const interruptAgent = vi.fn(async () => undefined)
     const { api } = createTestAPI({ controlAgent, interruptAgent })
     const hook = renderHook(() => useAgentControl(api, projection))
@@ -46,7 +47,7 @@ describe('useAgentControl', () => {
   })
 
   it('rejects incomplete projections before crossing preload', async () => {
-    const controlAgent = vi.fn(async () => undefined)
+    const controlAgent = vi.fn(async () => ({ status: 'applied' as const }))
     const { api } = createTestAPI({ controlAgent })
     const { detail: _detail, ...projectionWithoutDetail } = projection
     const hook = renderHook(
@@ -88,7 +89,9 @@ describe('useAgentControl', () => {
 
   it('reports failures and suppresses concurrent commands', async () => {
     let release!: () => void
-    const pending = new Promise<void>((resolve) => { release = resolve })
+    const pending = new Promise<{ status: 'applied' }>((resolve) => {
+      release = () => resolve({ status: 'applied' })
+    })
     const controlAgent = vi.fn(() => pending)
     const { api } = createTestAPI({ controlAgent })
     const hook = renderHook(() => useAgentControl(api, projection))
@@ -111,5 +114,35 @@ describe('useAgentControl', () => {
     controlAgent.mockRejectedValueOnce(new Error('closed'))
     await act(async () => hook.result.current.control(runtime.rootAgent, { type: 'clear' }))
     expect(hook.result.current.error).toBe('closed')
+  })
+
+  it('keeps accepted and indeterminate dispositions distinct from rejection', async () => {
+    let next: AgentControlDisposition = { status: 'queued' }
+    const controlAgent = vi.fn(async () => next)
+    const { api } = createTestAPI({ controlAgent })
+    const hook = renderHook(() => useAgentControl(api, projection))
+
+    await act(async () => {
+      await expect(hook.result.current.control(runtime.rootAgent, { type: 'suspend' }))
+        .resolves.toBe(true)
+    })
+    expect(hook.result.current.disposition).toEqual({ status: 'queued' })
+    expect(hook.result.current.error).toBeUndefined()
+
+    next = { status: 'unknown' }
+    await act(async () => {
+      await expect(hook.result.current.control(runtime.rootAgent, { type: 'clear' }))
+        .resolves.toBe(true)
+    })
+    expect(hook.result.current.disposition).toEqual({ status: 'unknown' })
+    expect(hook.result.current.error).toBeUndefined()
+
+    next = { status: 'rejected', reason: 'unsupported control' }
+    await act(async () => {
+      await expect(hook.result.current.control(runtime.rootAgent, { type: 'clear' }))
+        .resolves.toBe(false)
+    })
+    expect(hook.result.current.disposition).toEqual(next)
+    expect(hook.result.current.error).toBe('unsupported control')
   })
 })

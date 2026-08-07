@@ -125,6 +125,7 @@ async fn bridge_forwards_mailbox_messages_to_ipc() {
         content: loopal_protocol::UserContent::text_only("hello"),
         timestamp: chrono::Utc::now(),
         summary: None,
+        agent_completion: None,
     };
 
     handles.mailbox_tx.send(envelope).await.unwrap();

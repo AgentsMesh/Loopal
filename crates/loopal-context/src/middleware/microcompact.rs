@@ -85,6 +85,7 @@ mod tests {
                     content: body.to_string(),
                     images: Vec::new(),
                     is_error: false,
+                    metadata: None,
                 }),
             }],
         }));

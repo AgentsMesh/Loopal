@@ -94,6 +94,7 @@ fn turn_with_tool_images(tool_use_id: &str, images: Vec<ToolImageBlock>) -> Turn
                         content: String::new(),
                         is_error: false,
                         images,
+                        metadata: None,
                     }),
                 }],
             }),

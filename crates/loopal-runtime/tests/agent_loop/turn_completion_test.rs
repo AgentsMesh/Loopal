@@ -49,7 +49,12 @@ impl Provider for MultiCallProvider {
         "anthropic"
     }
     async fn stream_chat(&self, _p: &ChatParams) -> Result<ChatStream, LoopalError> {
-        let chunks = self.calls.lock().unwrap().pop_front().unwrap_or_default();
+        let chunks = self.calls.lock().unwrap().pop_front().ok_or_else(|| {
+            LoopalError::Other(
+                "turn_completion MultiCallProvider script exhausted; add the missing LLM response"
+                    .into(),
+            )
+        })?;
         Ok(Box::pin(MultiMockStream(VecDeque::from(chunks))))
     }
 }

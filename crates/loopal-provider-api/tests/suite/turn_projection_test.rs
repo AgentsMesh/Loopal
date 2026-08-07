@@ -2,6 +2,7 @@ use loopal_provider_api::MessageOrigin;
 use loopal_provider_api::{
     ContentBlock, MessageRole, project_turn_to_messages, project_turns_to_messages,
 };
+use loopal_tool_invocation::ToolResultMetadata;
 use loopal_turn::{
     AssistantOutput, OrderedToolBatch, ServerBlock, ServerToolCall, ServerToolPair,
     ServerToolResult, StopReason, TextBlock, ThinkingBlock, ToolBatchItem, ToolCall, ToolCallId,
@@ -53,6 +54,7 @@ fn done_item(call: ToolCall, body: &str) -> ToolBatchItem {
             content: body.into(),
             is_error: false,
             images: vec![],
+            metadata: None,
         }),
     }
 }
@@ -488,6 +490,41 @@ fn cancelled_item_produces_error_tool_result() {
         .unwrap();
     assert_eq!(block.0, "Cancelled");
     assert!(block.1);
+}
+
+#[test]
+fn completed_tool_metadata_survives_turn_projection() {
+    let call = tool_call("patch", "ApplyPatch");
+    let expected = ToolResultMetadata::modified_files(vec![
+        "/workspace/a.rs".into(),
+        "/workspace/b.rs".into(),
+    ]);
+    let batch = OrderedToolBatch {
+        items: vec![ToolBatchItem {
+            call: call.clone(),
+            state: ToolExecState::Done(ToolResult {
+                content: "partial failure".into(),
+                is_error: true,
+                images: vec![],
+                metadata: Some(expected.clone()),
+            }),
+        }],
+    };
+    let turn = turn_with(
+        user_trigger("patch"),
+        vec![llm_step("", vec![call]), TurnStep::ToolBatch(batch)],
+    );
+
+    let messages = project_turn_to_messages(&turn);
+    let metadata = messages
+        .iter()
+        .flat_map(|message| &message.content)
+        .find_map(|block| match block {
+            ContentBlock::ToolResult { metadata, .. } => metadata.as_ref(),
+            _ => None,
+        });
+
+    assert_eq!(metadata, Some(&expected));
 }
 
 #[test]

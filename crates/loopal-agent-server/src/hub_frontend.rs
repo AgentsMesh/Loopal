@@ -37,9 +37,30 @@ impl HubFrontend {
         question_handler: Box<dyn QuestionHandler>,
     ) -> Self {
         let qa = agent_name.map(loopal_protocol::QualifiedAddress::local);
+        let broadcaster = HubBroadcaster::new(session.clone(), qa);
+        Self::new_with_broadcaster(
+            session,
+            broadcaster,
+            input_rx,
+            interrupt_rx,
+            shutdown,
+            permission_handler,
+            question_handler,
+        )
+    }
+
+    pub(crate) fn new_with_broadcaster(
+        session: SessionRef,
+        broadcaster: HubBroadcaster,
+        input_rx: tokio::sync::mpsc::Receiver<AgentInput>,
+        interrupt_rx: tokio::sync::watch::Receiver<u64>,
+        shutdown: CancellationToken,
+        permission_handler: Box<dyn PermissionHandler>,
+        question_handler: Box<dyn QuestionHandler>,
+    ) -> Self {
         Self {
-            session: session.clone(),
-            broadcaster: HubBroadcaster::new(session, qa),
+            session,
+            broadcaster,
             input: HubInputReceiver::new(input_rx, interrupt_rx, shutdown),
             permission_handler,
             question_handler,
@@ -85,6 +106,12 @@ impl AgentFrontend for HubFrontend {
 
     async fn recv_input(&self) -> Option<AgentInput> {
         self.input.next().await
+    }
+
+    async fn try_recv_input(
+        &self,
+    ) -> std::result::Result<AgentInput, tokio::sync::mpsc::error::TryRecvError> {
+        self.input.try_next().await
     }
 
     async fn request_permission(

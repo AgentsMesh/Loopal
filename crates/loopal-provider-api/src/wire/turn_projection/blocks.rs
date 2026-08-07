@@ -29,7 +29,7 @@ pub(super) fn tool_result_block(tool_use_id: &str, r: &ToolResult) -> ContentBlo
         content: r.content.clone(),
         images: r.images.clone(),
         is_error: r.is_error,
-        metadata: None,
+        metadata: r.metadata.clone(),
     }
 }
 

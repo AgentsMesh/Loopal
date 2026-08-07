@@ -64,3 +64,35 @@ async fn test_hub_drain_pending_controls() {
         AgentInput::Control(ControlCommand::Clear)
     ));
 }
+
+#[tokio::test]
+async fn test_hub_try_recv_preserves_control_queue_order() {
+    let (session, input_tx, input_rx, watch_rx) = make_session();
+    let frontend = HubFrontend::new_for_test(session, input_rx, None, watch_rx);
+
+    input_tx
+        .send(AgentInput::Control(ControlCommand::Suspend))
+        .await
+        .unwrap();
+    input_tx
+        .send(AgentInput::Message(Envelope::new(
+            MessageSource::Human,
+            "main",
+            "wake later",
+        )))
+        .await
+        .unwrap();
+
+    assert!(matches!(
+        frontend.try_recv_input().await.unwrap(),
+        AgentInput::Control(ControlCommand::Suspend)
+    ));
+    assert!(matches!(
+        frontend.try_recv_input().await.unwrap(),
+        AgentInput::Message(_)
+    ));
+    assert!(matches!(
+        frontend.try_recv_input().await,
+        Err(tokio::sync::mpsc::error::TryRecvError::Empty)
+    ));
+}

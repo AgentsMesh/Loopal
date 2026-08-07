@@ -34,11 +34,13 @@ async fn internal_child_keeps_parent_topology_without_injecting_completion() {
     let delivery =
         registry.emit_agent_finished("memory-worker", Some("memory maintenance complete".into()));
 
-    assert!(delivery.is_none());
+    assert!(!delivery.has_parent_delivery());
     assert!(parent_rx.try_recv().is_err());
+    let observed = completion.borrow().clone().unwrap();
+    assert_eq!(observed.reason, "goal");
     assert_eq!(
-        completion.borrow().as_deref(),
-        Some("memory maintenance complete"),
+        observed.result.as_deref(),
+        Some("memory maintenance complete")
     );
     assert_eq!(
         registry.agent_info("memory-worker").unwrap().parent,
@@ -48,4 +50,25 @@ async fn internal_child_keeps_parent_topology_without_injecting_completion() {
         registry.agent_info("main").unwrap().children,
         vec!["memory-worker"],
     );
+}
+
+#[tokio::test]
+async fn multiple_watchers_receive_the_same_typed_completion() {
+    let (event_tx, _event_rx) = mpsc::channel::<AgentEvent>(8);
+    let mut registry = AgentRegistry::new(event_tx);
+    registry
+        .register_connection("shared", connection())
+        .unwrap();
+    let mut first = registry.watch_completion("shared");
+    let mut second = registry.watch_completion("shared");
+
+    let _pending = registry.emit_agent_completion(
+        "shared",
+        loopal_protocol::AgentCompletion::new("error", Some("partial".into())),
+    );
+
+    let first = first.borrow_and_update().clone().unwrap();
+    let second = second.borrow_and_update().clone().unwrap();
+    assert_eq!(first, second);
+    assert_eq!(first.reason, "error");
 }

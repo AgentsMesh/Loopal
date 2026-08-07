@@ -43,6 +43,7 @@ async fn e2e_streaming_events_ordered() {
             turn_id: 0,
             correlation_id: 0,
             rev: None,
+            routing_generation: None,
             payload: AgentEventPayload::Stream {
                 text: format!("chunk-{i}"),
             },
@@ -108,6 +109,7 @@ async fn e2e_bridge_stops_on_incoming_close() {
         turn_id: 0,
         correlation_id: 0,
         rev: None,
+        routing_generation: None,
         payload: AgentEventPayload::Stream { text: "one".into() },
     };
     fwd_tx

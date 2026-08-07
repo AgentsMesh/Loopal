@@ -56,6 +56,13 @@ pub trait AgentFrontend: Send + Sync {
 
     async fn recv_input(&self) -> Option<AgentInput>;
 
+    /// Non-blocking counterpart to `recv_input` used at turn boundaries.
+    /// External messages and controls already queued by the frontend must be
+    /// observed before the runtime injects synthetic goal continuation work.
+    async fn try_recv_input(
+        &self,
+    ) -> std::result::Result<AgentInput, tokio::sync::mpsc::error::TryRecvError>;
+
     async fn request_permission(
         &self,
         id: &str,

@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::sync::Arc;
 
 use loopal_context::middleware::file_snapshot::FileSnapshot;
@@ -39,6 +40,10 @@ pub struct AgentLoopRunner {
     pub trigger_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
     /// Async hook rewake channel — background hooks send Envelopes here.
     pub rewake_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
+    /// Frontend envelopes received while suspended that are not allowed to
+    /// wake the session. They remain ordered and are consumed one per turn
+    /// after a Human envelope or Unsuspend reopens the session.
+    pub deferred_frontend_messages: VecDeque<loopal_protocol::Envelope>,
     /// Local status for idempotent `transition()` checks.
     ///
     /// This is NOT the authoritative status for external observers. The session
@@ -108,6 +113,7 @@ impl AgentLoopRunner {
             config_snapshots: Vec::new(),
             trigger_rx,
             rewake_rx,
+            deferred_frontend_messages: VecDeque::new(),
             status: AgentStatus::Starting,
             plan_file,
             pending_consumed_ids: Vec::new(),

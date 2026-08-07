@@ -78,20 +78,64 @@ impl AgentFrontend for UnifiedFrontend {
     async fn recv_input(&self) -> Option<AgentInput> {
         let mut mbox = self.mailbox_rx.lock().await;
         let mut ctrl = self.control_rx.lock().await;
-        if let Some(ref token) = self.cancel_token {
+        loop {
+            let mailbox_drained = mbox.is_closed() && mbox.is_empty();
+            let control_drained = ctrl.is_closed() && ctrl.is_empty();
+            if mailbox_drained && control_drained {
+                return None;
+            }
+
             tokio::select! {
-                env = mbox.recv() => env.map(AgentInput::Message),
-                cmd = ctrl.recv() => cmd.map(AgentInput::Control),
-                () = token.cancelled() => {
+                env = mbox.recv(), if !mailbox_drained => {
+                    if let Some(env) = env {
+                        return Some(AgentInput::Message(env));
+                    }
+                }
+                cmd = ctrl.recv(), if !control_drained => {
+                    if let Some(cmd) = cmd {
+                        return Some(AgentInput::Control(cmd));
+                    }
+                }
+                () = async {
+                    match self.cancel_token.as_ref() {
+                        Some(token) => token.cancelled().await,
+                        None => std::future::pending().await,
+                    }
+                } => {
                     info!("cancellation triggered in unified frontend");
-                    None
+                    return None;
                 }
             }
-        } else {
-            tokio::select! {
-                env = mbox.recv() => env.map(AgentInput::Message),
-                cmd = ctrl.recv() => cmd.map(AgentInput::Control),
+        }
+    }
+
+    async fn try_recv_input(&self) -> std::result::Result<AgentInput, mpsc::error::TryRecvError> {
+        if self
+            .cancel_token
+            .as_ref()
+            .is_some_and(CancellationToken::is_cancelled)
+        {
+            return Err(mpsc::error::TryRecvError::Disconnected);
+        }
+
+        let mut mbox = self.mailbox_rx.lock().await;
+        let mut ctrl = self.control_rx.lock().await;
+
+        // The control plane wins a same-boundary race. In particular, a queued
+        // Suspend must close the continuation gate before automatic goal work
+        // can start another provider request.
+        let control_disconnected = match ctrl.try_recv() {
+            Ok(command) => return Ok(AgentInput::Control(command)),
+            Err(mpsc::error::TryRecvError::Empty) => false,
+            Err(mpsc::error::TryRecvError::Disconnected) => true,
+        };
+        match mbox.try_recv() {
+            Ok(envelope) => Ok(AgentInput::Message(envelope)),
+            Err(mpsc::error::TryRecvError::Empty) => Err(mpsc::error::TryRecvError::Empty),
+            Err(mpsc::error::TryRecvError::Disconnected) if control_disconnected => {
+                Err(mpsc::error::TryRecvError::Disconnected)
             }
+            Err(mpsc::error::TryRecvError::Disconnected) => Err(mpsc::error::TryRecvError::Empty),
         }
     }
 

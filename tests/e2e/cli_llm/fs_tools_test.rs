@@ -72,6 +72,239 @@ async fn write_read_edit_round_trip_with_diff_summary() {
     );
 }
 
+/// Regression for the ApplyPatch contract used by model-generated patches.
+/// The real `loopal --serve` child receives an enveloped patch over Anthropic
+/// HTTP/SSE, executes all operation kinds, reports the canonical paths, and
+/// sends the successful ToolResult back over the next provider request.
+#[tokio::test]
+async fn apply_patch_envelope_round_trips_over_http_and_reports_operation_paths() {
+    const PATCH: &str = "\
+*** Begin Patch
+*** Update File: existing.txt
+@@
+-old value
++updated value
+*** Delete File: obsolete.txt
+*** Add File: alpha.txt
++alpha
+*** Add File: nested/beta.txt
++beta
+*** Add File: file with spaces.txt
++spaces
+*** End Patch
+";
+
+    let mut h = CliHarness::start(json!({
+        "version": 2,
+        "name": "apply_patch_envelope",
+        "calls": [
+            {"expect": {"protocol": "anthropic", "userContains": "apply the envelope patch"},
+             "chunks": [
+                {"type": "tool_use", "id": "ap1", "name": "ApplyPatch",
+                 "input": {"patch": PATCH}},
+                {"type": "done"}
+             ]},
+            {"expect": {"protocol": "anthropic", "toolResultId": "ap1"},
+             "chunks": [
+                {"type": "text", "text": "patch round-trip complete"},
+                {"type": "done"}
+             ]}
+        ],
+        "fallback": {"chunks": [{"type": "text", "text": "fallback"}, {"type": "done"}]}
+    }))
+    .await;
+
+    std::fs::write(h.cwd().join("existing.txt"), "old value\n").unwrap();
+    std::fs::write(h.cwd().join("obsolete.txt"), "remove me\n").unwrap();
+
+    let out = h.run_turn("please apply the envelope patch").await;
+    assert!(
+        out.error.is_none() && out.finished && out.text.contains("patch round-trip complete"),
+        "turn failed: {out:?}"
+    );
+    assert_eq!(out.tool_result_count(), 1, "events: {:?}", out.events);
+    assert!(
+        out.events.iter().any(|event| {
+            event.starts_with("ToolCall") && event.contains("ApplyPatch") && event.contains("ap1")
+        }),
+        "the HTTP ToolUse must reach the production registry; events: {:?}",
+        out.events
+    );
+    assert!(
+        out.events.iter().any(|event| {
+            event.starts_with("ToolResult")
+                && event.contains("ap1")
+                && event.contains("is_error: false")
+        }),
+        "ApplyPatch must produce a successful ToolResult; events: {:?}",
+        out.events
+    );
+
+    assert_eq!(
+        std::fs::read_to_string(h.cwd().join("existing.txt")).unwrap(),
+        "updated value\n"
+    );
+    assert!(!h.cwd().join("obsolete.txt").exists());
+    assert_eq!(
+        std::fs::read_to_string(h.cwd().join("alpha.txt")).unwrap(),
+        "alpha\n"
+    );
+    assert_eq!(
+        std::fs::read_to_string(h.cwd().join("nested/beta.txt")).unwrap(),
+        "beta\n"
+    );
+    assert_eq!(
+        std::fs::read_to_string(h.cwd().join("file with spaces.txt")).unwrap(),
+        "spaces\n"
+    );
+
+    let diff = out
+        .events
+        .iter()
+        .find(|event| event.starts_with("TurnDiffSummary"))
+        .expect("a successful ApplyPatch must emit TurnDiffSummary");
+    for path in [
+        "existing.txt",
+        "obsolete.txt",
+        "alpha.txt",
+        "nested/beta.txt",
+        "file with spaces.txt",
+    ] {
+        assert!(
+            diff.contains(path),
+            "TurnDiffSummary must contain {path:?}; event: {diff}"
+        );
+    }
+
+    let journal = h.journal().await;
+    assert_eq!(
+        journal.as_array().map(Vec::len),
+        Some(2),
+        "journal: {journal}"
+    );
+    assert_eq!(journal[0]["protocol"], "anthropic", "journal: {journal}");
+    assert_eq!(journal[0]["matched"], true, "journal: {journal}");
+    assert!(
+        journal[0]["toolNames"]
+            .as_array()
+            .is_some_and(|names| names.iter().any(|name| name == "ApplyPatch")),
+        "the production provider request must advertise ApplyPatch; journal: {journal}"
+    );
+    assert_eq!(
+        journal[1]["toolResultIds"],
+        json!(["ap1"]),
+        "journal: {journal}"
+    );
+    assert_eq!(
+        journal[1]["toolResultErrorIds"],
+        json!([]),
+        "the successful ToolResult must not be encoded as an error; journal: {journal}"
+    );
+    assert_eq!(journal[1]["matched"], true, "journal: {journal}");
+
+    let verify = h.verify().await;
+    assert_eq!(verify["name"], "apply_patch_envelope", "verify: {verify}");
+    assert_eq!(verify["served"], 2, "verify: {verify}");
+    assert_eq!(verify["remaining"], 0, "verify: {verify}");
+    assert_eq!(verify["requestCount"], 2, "verify: {verify}");
+    assert_eq!(verify["unmatchedRequests"], 0, "verify: {verify}");
+    assert_eq!(verify["verified"], true, "verify: {verify}");
+}
+
+/// A best-effort patch may mutate earlier files before a later operation
+/// fails. The real child must retain those side effects in typed metadata,
+/// publish an exact diff summary, and encode the ToolResult as an error on the
+/// next Anthropic request.
+#[tokio::test]
+async fn partial_apply_patch_preserves_committed_paths_over_http() {
+    const PATCH: &str = "\
+*** Begin Patch
+*** Add File: committed-a.txt
++first
+*** Add File: committed-b.txt
++second
+*** Add File: blocker/never.txt
++third
+*** End Patch
+";
+
+    let mut h = CliHarness::start(json!({
+        "version": 2,
+        "name": "apply_patch_partial_commit",
+        "calls": [
+            {"expect": {"protocol": "anthropic", "userContains": "apply the partial patch"},
+             "chunks": [
+                 {"type": "tool_use", "id": "ap-partial", "name": "ApplyPatch",
+                  "input": {"patch": PATCH}},
+                 {"type": "done"}
+             ]},
+            {"expect": {"protocol": "anthropic", "toolResultId": "ap-partial",
+                        "bodyContains": "already applied"},
+             "chunks": [
+                 {"type": "text", "text": "partial patch failure handled"},
+                 {"type": "done"}
+             ]}
+        ]
+    }))
+    .await;
+    std::fs::write(h.cwd().join("blocker"), "not a directory\n").unwrap();
+
+    let out = h.run_turn("please apply the partial patch").await;
+    assert!(
+        out.error.is_none() && out.finished && out.text.contains("partial patch failure handled"),
+        "turn failed: {out:?}"
+    );
+    assert_eq!(
+        std::fs::read_to_string(h.cwd().join("committed-a.txt")).unwrap(),
+        "first\n"
+    );
+    assert_eq!(
+        std::fs::read_to_string(h.cwd().join("committed-b.txt")).unwrap(),
+        "second\n"
+    );
+    assert!(!h.cwd().join("blocker/never.txt").exists());
+
+    let tool_result = out
+        .events
+        .iter()
+        .find(|event| event.starts_with("ToolResult") && event.contains("ap-partial"))
+        .expect("partial ApplyPatch must publish its typed ToolResult");
+    assert!(
+        tool_result.contains("is_error: true"),
+        "event: {tool_result}"
+    );
+    assert!(
+        tool_result.contains("ModifiedFiles")
+            && tool_result.contains("committed-a.txt")
+            && tool_result.contains("committed-b.txt"),
+        "partial side-effect metadata was lost: {tool_result}"
+    );
+
+    let diff = out
+        .events
+        .iter()
+        .find(|event| event.starts_with("TurnDiffSummary"))
+        .expect("partial ApplyPatch must emit TurnDiffSummary");
+    assert!(
+        diff.contains("committed-a.txt") && diff.contains("committed-b.txt"),
+        "committed paths missing from diff: {diff}"
+    );
+    assert!(
+        !diff.contains("blocker/never.txt"),
+        "failed operation must not enter the diff: {diff}"
+    );
+
+    let journal = h.journal().await;
+    assert_eq!(journal[1]["toolResultIds"], json!(["ap-partial"]));
+    assert_eq!(journal[1]["toolResultErrorIds"], json!(["ap-partial"]));
+    assert_eq!(journal[1]["matched"], true, "journal: {journal}");
+
+    let verify = h.verify().await;
+    assert_eq!(verify["served"], 2, "verify: {verify}");
+    assert_eq!(verify["remaining"], 0, "verify: {verify}");
+    assert_eq!(verify["verified"], true, "verify: {verify}");
+}
+
 /// Vault safety at the write boundary: a Write whose content carries a wire
 /// secret ref must be rejected by the tool's precheck — placeholders never
 /// land in user files.

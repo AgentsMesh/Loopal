@@ -16,6 +16,9 @@ def desktop_serve_test():
         data = [":loopal"],
         env = {"LOOPAL_BINARY": "$(rootpath :loopal)"},
         local = True,
+        # The tests launch real Desktop/Hub processes and enforce startup
+        # deadlines, so their timing must not include unrelated //... load.
+        tags = ["exclusive"],
         deps = [
             "//crates/loopal-ipc",
             "@crates//:serde_json",

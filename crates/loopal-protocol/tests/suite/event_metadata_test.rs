@@ -2,6 +2,17 @@ use loopal_protocol::{AgentEvent, AgentEventPayload};
 use loopal_tool_invocation::{CancelCause, StaleReason, ToolResultMetadata};
 
 #[test]
+fn hub_routing_generation_never_crosses_ipc() {
+    let mut event = AgentEvent::named("worker", AgentEventPayload::Running);
+    event.routing_generation = Some(42);
+
+    let json = serde_json::to_string(&event).unwrap();
+    assert!(!json.contains("routing_generation"));
+    let restored: AgentEvent = serde_json::from_str(&json).unwrap();
+    assert_eq!(restored.routing_generation, None);
+}
+
+#[test]
 fn tool_result_stale_metadata_round_trips_over_wire() {
     let event = AgentEvent::root(AgentEventPayload::ToolResult {
         id: "tc_stale".into(),
@@ -63,4 +74,22 @@ fn tool_result_no_metadata_serializes_without_field() {
         panic!("expected ToolResult");
     };
     assert!(metadata.is_none());
+}
+
+#[test]
+fn discarded_server_tool_reason_round_trips_over_wire() {
+    let event = AgentEvent::root(AgentEventPayload::ServerToolDiscarded {
+        tool_use_id: "web-search-1".into(),
+        reason: StaleReason::IncompleteModelResponse,
+    });
+    let json = serde_json::to_string(&event).unwrap();
+    assert!(json.contains("incomplete_model_response"));
+    let deserialized: AgentEvent = serde_json::from_str(&json).unwrap();
+    assert!(matches!(
+        deserialized.payload,
+        AgentEventPayload::ServerToolDiscarded {
+            tool_use_id,
+            reason: StaleReason::IncompleteModelResponse,
+        } if tool_use_id == "web-search-1"
+    ));
 }

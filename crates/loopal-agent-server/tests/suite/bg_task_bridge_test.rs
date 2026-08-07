@@ -70,6 +70,14 @@ impl loopal_runtime::frontend::traits::AgentFrontend for CaptureFrontend {
     async fn recv_input(&self) -> Option<loopal_runtime::agent_input::AgentInput> {
         None
     }
+    async fn try_recv_input(
+        &self,
+    ) -> std::result::Result<
+        loopal_runtime::agent_input::AgentInput,
+        tokio::sync::mpsc::error::TryRecvError,
+    > {
+        Err(tokio::sync::mpsc::error::TryRecvError::Disconnected)
+    }
     async fn request_permission(
         &self,
         _id: &str,

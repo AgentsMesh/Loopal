@@ -14,6 +14,10 @@ pub struct TurnContext {
     pub pending_warnings: Vec<String>,
     pub pending_continuation: Option<ContinuationIntent>,
     pub metrics: TurnMetrics,
+    /// Latest caller-visible text produced during this turn. This lives on the
+    /// turn context, rather than the happy-path return value, so cancellation
+    /// and provider errors can still return useful partial work.
+    best_effort_output: String,
     // 唯一 setter: handle_request_idle (turn_exec::ToolResultsWritten 分支 take).
     tool_signaled_turn_end: bool,
 }
@@ -28,8 +32,18 @@ impl TurnContext {
             pending_warnings: Vec::new(),
             pending_continuation: None,
             metrics: TurnMetrics::default(),
+            best_effort_output: String::new(),
             tool_signaled_turn_end: false,
         }
+    }
+
+    pub(super) fn record_output(&mut self, text: &str) {
+        self.best_effort_output.clear();
+        self.best_effort_output.push_str(text);
+    }
+
+    pub(super) fn best_effort_output(&self) -> &str {
+        &self.best_effort_output
     }
 
     pub(super) fn signal_turn_end_after_tools(&mut self) {

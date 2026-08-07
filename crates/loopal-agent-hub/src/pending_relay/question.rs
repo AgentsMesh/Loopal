@@ -11,6 +11,7 @@ use uuid::Uuid;
 use super::cleanup::{InteractionKind, remove_if_current, schedule_timeout};
 use super::completion::complete_detached;
 use super::types::{FastPath, InteractionAudience, PendingQuestionInfo};
+use crate::authoritative_events::PreparedAuthoritativeEvent;
 use crate::hub::Hub;
 
 pub async fn handle_agent_question(
@@ -90,11 +91,9 @@ pub async fn handle_agent_question(
                     audience: InteractionAudience::LocalUi,
                 },
             );
-            let outcome = if h.registry.event_sender().try_send(event).is_err() {
-                FastPath::EmitFailed
-            } else {
-                FastPath::Pending
-            };
+            let event = h.registry.prepare_generation_event(agent_name, event);
+            let outcome =
+                FastPath::Pending(Box::new(PreparedAuthoritativeEvent::from_hub(&h, event)));
             (outcome, h.pending_interaction_timeout())
         }
     };
@@ -115,32 +114,68 @@ pub async fn handle_agent_question(
                 .unwrap_or(serde_json::Value::Null);
             complete_detached(agent_conn, agent_ipc_id, response, None);
         }
-        FastPath::EmitFailed => {
-            warn!(agent = %agent_name, question_id, "UserQuestionRequest dropped (channel full); answering with error");
-            if remove_if_current(
-                hub,
-                InteractionKind::Question,
-                agent_name,
-                &question_id,
-                &interaction_id,
-            )
-            .await
-            {
-                complete_detached(
-                    agent_conn,
-                    agent_ipc_id,
-                    serde_json::json!({"answers": ["(event dropped)"]}),
-                    None,
-                );
+        FastPath::Pending(mut delivery) => {
+            let delivery_hub = hub.clone();
+            let delivery_conn = agent_conn.clone();
+            let delivery_agent = agent_name.to_string();
+            let delivery_logical_id = question_id.clone();
+            let delivery_interaction_id = interaction_id.clone();
+            let coordinator = tokio::spawn(async move {
+                match delivery.deliver().await {
+                    Ok(()) => schedule_timeout(
+                        &delivery_hub,
+                        InteractionKind::Question,
+                        delivery_agent,
+                        delivery_logical_id,
+                        delivery_interaction_id,
+                        timeout,
+                    ),
+                    Err(error) => {
+                        warn!(
+                            agent = %delivery_agent,
+                            question_id = %delivery_logical_id,
+                            %error,
+                            "question event admission failed; cancelling request"
+                        );
+                        if remove_if_current(
+                            &delivery_hub,
+                            InteractionKind::Question,
+                            &delivery_agent,
+                            &delivery_logical_id,
+                            &delivery_interaction_id,
+                        )
+                        .await
+                        {
+                            let response = serde_json::to_value(UserQuestionResponse::unsupported(
+                                &delivery_logical_id,
+                                "Hub event router unavailable",
+                            ))
+                            .unwrap_or(serde_json::Value::Null);
+                            complete_detached(delivery_conn, agent_ipc_id, response, None);
+                        }
+                    }
+                }
+            });
+            if let Err(error) = coordinator.await {
+                tracing::error!(agent = %agent_name, %error, "question admission coordinator failed");
+                hub.lock().await.shutdown_signal.notify_one();
+                if remove_if_current(
+                    hub,
+                    InteractionKind::Question,
+                    agent_name,
+                    &question_id,
+                    &interaction_id,
+                )
+                .await
+                {
+                    let response = serde_json::to_value(UserQuestionResponse::unsupported(
+                        &question_id,
+                        "Hub event admission failed",
+                    ))
+                    .unwrap_or(serde_json::Value::Null);
+                    complete_detached(agent_conn, agent_ipc_id, response, None);
+                }
             }
         }
-        FastPath::Pending => schedule_timeout(
-            hub,
-            InteractionKind::Question,
-            agent_name.to_string(),
-            question_id,
-            interaction_id,
-            timeout,
-        ),
     }
 }

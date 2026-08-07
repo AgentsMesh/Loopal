@@ -104,6 +104,226 @@ async fn register_agent_connection_makes_agent_routable() {
     assert!(result.is_ok(), "should route to mock agent");
 }
 
+#[tokio::test]
+async fn register_waits_for_spawn_event_capacity_without_holding_hub_lock() {
+    let (event_tx, mut event_rx) = mpsc::channel(1);
+    event_tx
+        .send(AgentEvent::root(AgentEventPayload::Running))
+        .await
+        .unwrap();
+    let hub = Arc::new(Mutex::new(Hub::new(event_tx)));
+    let (agent_client, agent_server) = loopal_ipc::duplex_pair();
+    let (_agent_conn, _agent_rx) = Connection::new(agent_client).into_listening();
+    let (server_conn, server_rx) = Connection::new(agent_server).into_listening();
+
+    let registration = tokio::spawn({
+        let hub = hub.clone();
+        async move {
+            register_agent_connection(
+                hub,
+                "backpressured-worker",
+                server_conn,
+                server_rx,
+                None,
+                None,
+                None,
+            )
+            .await
+        }
+    });
+    tokio::task::yield_now().await;
+    assert!(
+        !registration.is_finished(),
+        "registration must wait until SubAgentSpawned enters the authoritative queue"
+    );
+    assert!(
+        hub.lock()
+            .await
+            .registry
+            .get_agent_connection("backpressured-worker")
+            .is_some(),
+        "registration state must be committed before event backpressure"
+    );
+    let guard = tokio::time::timeout(Duration::from_millis(100), hub.lock())
+        .await
+        .expect("spawn event backpressure must not hold the Hub lock");
+    drop(guard);
+
+    assert!(matches!(
+        event_rx.recv().await.unwrap().payload,
+        AgentEventPayload::Running
+    ));
+    let spawned = tokio::time::timeout(Duration::from_secs(1), event_rx.recv())
+        .await
+        .expect("SubAgentSpawned must be delivered when capacity returns")
+        .unwrap();
+    assert!(matches!(
+        spawned.payload,
+        AgentEventPayload::SubAgentSpawned(ref spawn) if spawn.name == "backpressured-worker"
+    ));
+    assert!(!registration.await.unwrap().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn buffered_completion_cannot_overtake_sub_agent_spawned() {
+    let (hub, mut event_rx) = make_hub();
+    let (agent_client, agent_server) = loopal_ipc::duplex_pair();
+    let (agent_conn, _agent_rx) = Connection::new(agent_client).into_listening();
+    let (server_conn, server_rx) = Connection::new(agent_server).into_listening();
+
+    // Queue completion before registration installs the IO owner. A very short
+    // real agent can produce exactly this ordering during process bootstrap.
+    agent_conn
+        .send_notification(
+            methods::AGENT_COMPLETED.name,
+            json!({"reason": "error", "result": "failed immediately"}),
+        )
+        .await
+        .unwrap();
+    register_agent_connection(
+        hub,
+        "instant-worker",
+        server_conn,
+        server_rx,
+        None,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+
+    let spawned = tokio::time::timeout(Duration::from_secs(1), event_rx.recv())
+        .await
+        .expect("SubAgentSpawned missing")
+        .unwrap();
+    assert!(matches!(
+        spawned.payload,
+        AgentEventPayload::SubAgentSpawned(ref spawn) if spawn.name == "instant-worker"
+    ));
+    let error = tokio::time::timeout(Duration::from_secs(1), event_rx.recv())
+        .await
+        .expect("Error missing")
+        .unwrap();
+    assert!(matches!(error.payload, AgentEventPayload::Error { .. }));
+    let finished = tokio::time::timeout(Duration::from_secs(1), event_rx.recv())
+        .await
+        .expect("Finished missing")
+        .unwrap();
+    assert!(matches!(finished.payload, AgentEventPayload::Finished));
+}
+
+#[tokio::test]
+async fn parent_reconnect_during_spawn_backpressure_prevents_orphan_start() {
+    let (event_tx, mut event_rx) = mpsc::channel(1);
+    event_tx
+        .send(AgentEvent::root(AgentEventPayload::Running))
+        .await
+        .unwrap();
+    let hub = Arc::new(Mutex::new(Hub::new(event_tx)));
+    let (old_parent_peer, old_parent_transport) = loopal_ipc::duplex_pair();
+    let (_old_parent, _old_parent_rx) = Connection::new(old_parent_peer).into_listening();
+    let (old_parent, _old_hub_rx) = Connection::new(old_parent_transport).into_listening();
+    hub.lock()
+        .await
+        .registry
+        .register_connection("parent", old_parent)
+        .unwrap();
+    let (child_peer, child_transport) = loopal_ipc::duplex_pair();
+    let (_child, _child_rx) = Connection::new(child_peer).into_listening();
+    let (child, child_incoming) = Connection::new(child_transport).into_listening();
+
+    let registration = tokio::spawn({
+        let hub = hub.clone();
+        async move {
+            register_agent_connection(
+                hub,
+                "stale-parent-child",
+                child,
+                child_incoming,
+                Some("parent"),
+                None,
+                None,
+            )
+            .await
+        }
+    });
+    tokio::time::timeout(Duration::from_secs(1), async {
+        while hub
+            .lock()
+            .await
+            .registry
+            .agent_info("stale-parent-child")
+            .is_none()
+        {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    let (new_parent_peer, new_parent_transport) = loopal_ipc::duplex_pair();
+    let (_new_parent, _new_parent_rx) = Connection::new(new_parent_peer).into_listening();
+    let (new_parent, _new_hub_rx) = Connection::new(new_parent_transport).into_listening();
+    {
+        let mut hub = hub.lock().await;
+        hub.registry.unregister_connection("parent");
+        hub.registry
+            .register_connection("parent", new_parent)
+            .unwrap();
+    }
+
+    assert!(matches!(
+        event_rx.recv().await.unwrap().payload,
+        AgentEventPayload::Running
+    ));
+    assert!(matches!(
+        event_rx.recv().await.unwrap().payload,
+        AgentEventPayload::SubAgentSpawned(_)
+    ));
+    let error = registration.await.unwrap().unwrap_err();
+    assert!(error.contains("reconnected before spawn admission"));
+    assert!(
+        hub.lock()
+            .await
+            .registry
+            .agent_info("stale-parent-child")
+            .is_none()
+    );
+}
+
+#[tokio::test]
+async fn closed_spawn_event_queue_unregisters_the_new_agent() {
+    let (event_tx, event_rx) = mpsc::channel(1);
+    drop(event_rx);
+    let hub = Arc::new(Mutex::new(Hub::new(event_tx)));
+    let shutdown = hub.lock().await.shutdown_signal.clone();
+    let (agent_client, agent_server) = loopal_ipc::duplex_pair();
+    let (_agent_conn, _agent_rx) = Connection::new(agent_client).into_listening();
+    let (server_conn, server_rx) = Connection::new(agent_server).into_listening();
+
+    let error = register_agent_connection(
+        hub.clone(),
+        "unobservable-worker",
+        server_conn,
+        server_rx,
+        None,
+        None,
+        None,
+    )
+    .await
+    .unwrap_err();
+    assert!(error.contains("authoritative Hub event queue closed"));
+    assert!(
+        hub.lock()
+            .await
+            .registry
+            .get_agent_connection("unobservable-worker")
+            .is_none()
+    );
+    tokio::time::timeout(Duration::from_millis(100), shutdown.notified())
+        .await
+        .expect("closed spawn event queue must invalidate the Hub");
+}
+
 // ── Wait for agent completion ───────────────────────────────────────
 
 #[tokio::test]
@@ -145,7 +365,8 @@ async fn wait_agent_returns_when_agent_disconnects() {
     // Simulate agent completion (in production, this happens when stdio closes)
     {
         let mut h = hub.lock().await;
-        h.registry
+        let _pending = h
+            .registry
             .emit_agent_finished("ephemeral", Some("test output".into()));
     }
 

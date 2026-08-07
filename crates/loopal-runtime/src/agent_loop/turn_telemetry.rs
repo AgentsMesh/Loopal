@@ -14,11 +14,24 @@ use super::runner::AgentLoopRunner;
 use super::turn_context::TurnContext;
 use super::turn_history::TurnRecord;
 
+fn telemetry_turn_uuid(turn_id: Option<&loopal_turn::TurnId>) -> &str {
+    let Some(turn_id) = turn_id else {
+        return "unrecorded";
+    };
+    let journal_id = turn_id.as_str();
+    journal_id
+        .strip_prefix("t-")
+        .filter(|candidate| uuid::Uuid::parse_str(candidate).is_ok())
+        .unwrap_or(journal_id)
+}
+
 impl AgentLoopRunner {
     pub(super) async fn execute_turn(&mut self, turn_ctx: &mut TurnContext) -> Result<TurnOutput> {
+        let journal_turn_uuid = telemetry_turn_uuid(self.turns.current_turn_id());
         let span = info_span!(
             "turn",
             loopal.turn.id = turn_ctx.turn_id,
+            loopal.turn.uuid = %journal_turn_uuid,
             gen_ai.request.model = %self.params.config.model(),
         );
         let turn_id = turn_ctx.turn_id;
@@ -169,5 +182,25 @@ impl AgentLoopRunner {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod telemetry_tests {
+    use super::telemetry_turn_uuid;
+    use loopal_turn::TurnId;
+
+    #[test]
+    fn turn_uuid_strips_only_a_valid_generated_prefix() {
+        let raw = "a681302d-bda9-45ac-bb60-d2dd76b663bc";
+        let generated = TurnId::from_string(format!("t-{raw}"));
+        assert_eq!(telemetry_turn_uuid(Some(&generated)), raw);
+
+        let legacy = TurnId::from_string("legacy-turn-id");
+        assert_eq!(telemetry_turn_uuid(Some(&legacy)), "legacy-turn-id");
+
+        let malformed = TurnId::from_string("t-not-a-uuid");
+        assert_eq!(telemetry_turn_uuid(Some(&malformed)), "t-not-a-uuid");
+        assert_eq!(telemetry_turn_uuid(None), "unrecorded");
     }
 }

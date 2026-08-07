@@ -1,4 +1,5 @@
 use loopal_tool_api::{AppliedKind, BatchOp, BatchOutcome, ToolContext, ToolResult};
+use loopal_tool_invocation::ToolResultMetadata;
 
 pub async fn commit_patch(ops: Vec<BatchOp>, ctx: &ToolContext) -> Result<ToolResult, String> {
     let outcome = ctx
@@ -34,21 +35,22 @@ fn format_outcome(outcome: BatchOutcome) -> ToolResult {
         format!("Applied: {}", parts.join(", "))
     };
 
+    let applied_paths: Vec<String> = outcome
+        .applied
+        .iter()
+        .map(|applied| applied.path.display().to_string())
+        .collect();
+    let metadata = ToolResultMetadata::modified_files(applied_paths.clone());
+
     match outcome.failed_at {
-        Some(failed) => {
-            let applied_paths: Vec<String> = outcome
-                .applied
-                .iter()
-                .map(|a| a.path.display().to_string())
-                .collect();
-            ToolResult::error(format!(
-                "{summary}; failed at op {} ({}): {}; already applied: [{}]",
-                failed.index,
-                failed.path.display(),
-                failed.error,
-                applied_paths.join(", ")
-            ))
-        }
-        None => ToolResult::success(summary),
+        Some(failed) => ToolResult::error(format!(
+            "{summary}; failed at op {} ({}): {}; already applied: [{}]",
+            failed.index,
+            failed.path.display(),
+            failed.error,
+            applied_paths.join(", ")
+        ))
+        .with_metadata(metadata),
+        None => ToolResult::success(summary).with_metadata(metadata),
     }
 }

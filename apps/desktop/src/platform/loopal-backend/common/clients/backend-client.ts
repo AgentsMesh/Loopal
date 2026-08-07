@@ -1,6 +1,7 @@
 import { type Event } from '../../../../base/common/event'
 import { type ChannelClient } from '../../../ipc/common/channel'
 import {
+  AgentControlDispositionSchema,
   DirectoryListingSchema,
   DesktopEventSchema,
   FileDocumentSchema,
@@ -14,6 +15,7 @@ import {
   WorktreeListSchema,
   WorktreeSchema,
   type AgentControlInput,
+  type AgentControlDisposition,
   type AgentControlTarget,
   type CreateSessionInput,
   type CreateWorktreeInput,
@@ -111,8 +113,10 @@ export class DesktopBackendClient implements LoopalDesktopAPI {
   async interruptAgent(input: AgentControlTarget): Promise<void> {
     await this.client.call('desktopBackend', 'interruptAgent', input)
   }
-  async controlAgent(input: AgentControlInput): Promise<void> {
-    await this.client.call('desktopBackend', 'controlAgent', input)
+  async controlAgent(input: AgentControlInput): Promise<AgentControlDisposition> {
+    return AgentControlDispositionSchema.parse(
+      await this.client.call('desktopBackend', 'controlAgent', input),
+    )
   }
 
   async getLoopalSettings(workspaceId: string): Promise<LoopalDefaultSettings> {

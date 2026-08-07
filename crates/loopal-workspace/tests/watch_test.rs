@@ -12,10 +12,6 @@ async fn readonly_git_status_does_not_feed_watcher() {
     init_repo(root.path());
     let service = WorkspaceService::new(root.path()).unwrap();
     let mut events = service.subscribe();
-    std::fs::write(root.path().join("tracked.txt"), "after\n").unwrap();
-    wait_for(&mut events, "workspace/fileChanged").await;
-    tokio::time::sleep(Duration::from_millis(400)).await;
-    drain(&mut events);
 
     for _ in 0..5 {
         service
@@ -35,8 +31,7 @@ async fn readonly_git_status_does_not_feed_watcher() {
         })
         .await
         .unwrap();
-    tokio::time::sleep(Duration::from_millis(500)).await;
-    assert!((1..=2).contains(&count_git(&mut events)));
+    assert_eq!(count_git(&mut events), 1);
 }
 
 #[cfg(unix)]
@@ -69,25 +64,6 @@ async fn search_ignores_symlink_escape_without_a_glob() {
     .unwrap();
     assert_eq!(result.matches.len(), 1);
     assert_eq!(result.matches[0].path, "src/main.rs");
-}
-
-async fn wait_for(
-    events: &mut broadcast::Receiver<loopal_workspace::ServiceNotification>,
-    method: &str,
-) {
-    tokio::time::timeout(Duration::from_secs(5), async {
-        loop {
-            if events.recv().await.unwrap().method == method {
-                return;
-            }
-        }
-    })
-    .await
-    .unwrap();
-}
-
-fn drain(events: &mut broadcast::Receiver<loopal_workspace::ServiceNotification>) {
-    while events.try_recv().is_ok() {}
 }
 
 fn count_git(events: &mut broadcast::Receiver<loopal_workspace::ServiceNotification>) -> usize {

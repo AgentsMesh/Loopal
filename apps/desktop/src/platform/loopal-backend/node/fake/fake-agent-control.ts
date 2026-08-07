@@ -1,6 +1,7 @@
 import { CancellationToken, throwIfCancelled } from '../../../../base/common/cancellation'
 import {
   type AgentControlCommand,
+  type AgentControlDisposition,
   type AgentControlInput,
   type AgentControlTarget,
   type DesktopEvent,
@@ -42,11 +43,12 @@ class FakeAgentControl implements AgentControlOperations {
   async controlAgent(
     input: AgentControlInput,
     token = CancellationToken.None,
-  ): Promise<void> {
+  ): Promise<AgentControlDisposition> {
     const { detail, agent } = this.resolve(input.target, token)
     this.apply(detail, agent, input.command)
     detail.session = { ...detail.session, updatedAt: this.now() }
     this.publish(detail)
+    return { status: 'applied' }
   }
 
   private resolve(target: AgentControlTarget, token: CancellationToken) {

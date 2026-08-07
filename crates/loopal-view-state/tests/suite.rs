@@ -39,6 +39,8 @@ mod reducer_status_test;
 mod reducer_tool_test;
 #[path = "suite/server_tool_format_test.rs"]
 mod server_tool_format_test;
+#[path = "suite/server_tool_terminal_test.rs"]
+mod server_tool_terminal_test;
 #[path = "suite/tool_handler_batch_test.rs"]
 mod tool_handler_batch_test;
 #[path = "suite/tool_handler_edge_test.rs"]

@@ -193,7 +193,7 @@ async fn rehydrate_respects_total_bytes_budget() {
 }
 
 #[tokio::test]
-async fn rehydrate_emits_summary_stream_event() {
+async fn rehydrate_does_not_emit_synthetic_model_stream() {
     let mut h = HarnessBuilder::new()
         .calls(vec![chunks::text_turn("noop")])
         .build()
@@ -210,13 +210,12 @@ async fn rehydrate_emits_summary_stream_event() {
     assert_eq!(stats.files_succeeded, 1);
 
     let evts = loopal_test_support::events::drain_pending(&mut h.event_rx).await;
-    let stream_text = evts.iter().find_map(|e| match e {
-        AgentEventPayload::Stream { text } if text.contains("rehydrated") => Some(text.clone()),
-        _ => None,
-    });
-    let text = stream_text.expect("rehydrate Stream event must fire");
-    assert!(text.contains("rehydrated 1 files"));
-    assert!(text.contains("bytes"));
+    assert!(
+        !evts
+            .iter()
+            .any(|e| matches!(e, AgentEventPayload::Stream { .. })),
+        "rehydrate is an internal compact phase, not model output: {evts:?}"
+    );
 }
 
 #[tokio::test]

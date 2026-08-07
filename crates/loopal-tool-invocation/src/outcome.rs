@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// `Outcome` carries only the textual result and (for failures) the
 /// failure kind. Structured side data — `ToolResultMetadata`'s
-/// `Stale`/`Cancelled`/`BytesWritten` variants — lives on the wrapping
+/// `Stale`/`Cancelled`/`BytesWritten`/`ModifiedFiles` variants — lives on the wrapping
 /// `ToolInvocation.metadata`, NOT here. Single-sourced.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -28,6 +28,10 @@ pub enum StaleReason {
     WatchdogTimeout,
     TurnEnded,
     ConnectionLost,
+    /// The provider exposed a complete-looking tool call, but the surrounding
+    /// model response never reached a valid terminal boundary. The runtime
+    /// discarded the provisional call without executing it.
+    IncompleteModelResponse,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -48,12 +52,14 @@ pub enum CancelCause {
 /// - `{"kind": "stale", "reason": "watchdog_timeout"}`
 /// - `{"kind": "cancelled", "cause": "user_interrupt"}`
 /// - `{"kind": "bytes_written", "count": 1024}`
+/// - `{"kind": "modified_files", "paths": ["/workspace/a.rs"]}`
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ToolResultMetadata {
     Stale { reason: StaleReason },
     Cancelled { cause: CancelCause },
     BytesWritten { count: u64 },
+    ModifiedFiles { paths: Vec<String> },
 }
 
 impl ToolResultMetadata {
@@ -67,6 +73,10 @@ impl ToolResultMetadata {
 
     pub fn bytes_written(count: u64) -> Self {
         Self::BytesWritten { count }
+    }
+
+    pub fn modified_files(paths: Vec<String>) -> Self {
+        Self::ModifiedFiles { paths }
     }
 }
 
@@ -89,6 +99,7 @@ impl std::fmt::Display for StaleReason {
             Self::WatchdogTimeout => "watchdog timeout",
             Self::TurnEnded => "turn ended",
             Self::ConnectionLost => "connection lost",
+            Self::IncompleteModelResponse => "incomplete model response",
         };
         f.write_str(s)
     }

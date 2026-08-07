@@ -30,7 +30,7 @@ fn spawn_mock_agent(conn: Arc<Connection<Listening>>, mut rx: mpsc::Receiver<Inc
 
 #[tokio::test]
 async fn shutdown_agent_sends_shutdown_request() {
-    let (hub, _) = make_hub();
+    let (hub, _event_rx) = make_hub();
 
     let (sender, sr) = hub_server::connect_local(hub.clone(), "sender");
     spawn_mock_agent(sender.clone(), sr);
@@ -63,7 +63,7 @@ async fn shutdown_agent_sends_shutdown_request() {
 
 #[tokio::test]
 async fn tcp_invalid_token_rejected() {
-    let (hub, _) = make_hub();
+    let (hub, _event_rx) = make_hub();
 
     let (listener, port, _valid_token) = hub_server::start_hub_listener(hub.clone()).await.unwrap();
     let hub_bg = hub.clone();

@@ -1,4 +1,4 @@
-use loopal_protocol::{Envelope, MessageSource, QualifiedAddress};
+use loopal_protocol::{AgentCompletion, Envelope, MessageSource, QualifiedAddress};
 
 #[test]
 fn test_envelope_new_generates_unique_ids() {
@@ -305,4 +305,38 @@ fn test_agent_result_serde_roundtrip() {
     let json = serde_json::to_string(&src).unwrap();
     let back: MessageSource = serde_json::from_str(&json).unwrap();
     assert_eq!(src, back);
+}
+
+#[test]
+fn agent_result_completion_metadata_roundtrips_without_changing_raw_content() {
+    let env = Envelope::new(
+        MessageSource::AgentResult {
+            child: QualifiedAddress::local("worker"),
+        },
+        "parent",
+        "partial result",
+    )
+    .with_agent_completion(AgentCompletion::new("error", Some("partial result".into())));
+
+    let encoded = serde_json::to_value(&env).unwrap();
+    let decoded: Envelope = serde_json::from_value(encoded).unwrap();
+    assert_eq!(decoded.content.text, "partial result");
+    assert_eq!(decoded.agent_completion, env.agent_completion);
+}
+
+#[test]
+fn legacy_agent_result_envelope_decodes_without_completion_metadata() {
+    let env = Envelope::new(
+        MessageSource::AgentResult {
+            child: QualifiedAddress::local("worker"),
+        },
+        "parent",
+        "legacy result",
+    );
+    let mut encoded = serde_json::to_value(env).unwrap();
+    encoded.as_object_mut().unwrap().remove("agent_completion");
+
+    let decoded: Envelope = serde_json::from_value(encoded).unwrap();
+    assert_eq!(decoded.content.text, "legacy result");
+    assert_eq!(decoded.agent_completion, None);
 }

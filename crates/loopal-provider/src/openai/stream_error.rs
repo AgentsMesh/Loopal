@@ -34,6 +34,7 @@ pub(super) fn response_failed(event: &Value) -> LoopalError {
     ProviderError::Api {
         status,
         message: "openai API request failed".into(),
+        retry_after_ms: None,
     }
     .into()
 }

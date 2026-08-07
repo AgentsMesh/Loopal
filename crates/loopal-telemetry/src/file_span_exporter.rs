@@ -9,7 +9,7 @@ use std::path::Path;
 use std::pin::Pin;
 use std::time::SystemTime;
 
-use opentelemetry::trace::Status;
+use opentelemetry::trace::{SpanKind, Status};
 use opentelemetry_sdk::Resource;
 use opentelemetry_sdk::trace::{SpanData, SpanExporter};
 use serde::Serialize;
@@ -47,6 +47,7 @@ impl JsonlSpanExporter {
             span_id: span.span_context.span_id().to_string(),
             parent_span_id: span.parent_span_id.to_string(),
             name: span.name.to_string(),
+            kind: span_kind_name(&span.span_kind),
             duration_ms: span
                 .end_time
                 .duration_since(span.start_time)
@@ -96,13 +97,40 @@ struct SpanRecord<'a> {
     span_id: String,
     parent_span_id: String,
     name: String,
+    kind: &'a str,
     duration_ms: u64,
     status: &'a str,
     attributes: Vec<(String, String)>,
+}
+
+fn span_kind_name(kind: &SpanKind) -> &'static str {
+    match kind {
+        SpanKind::Client => "client",
+        SpanKind::Server => "server",
+        SpanKind::Producer => "producer",
+        SpanKind::Consumer => "consumer",
+        SpanKind::Internal => "internal",
+    }
 }
 
 pub(crate) fn epoch_ms(t: SystemTime) -> u64 {
     t.duration_since(SystemTime::UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as u64
+}
+
+#[cfg(test)]
+mod tests {
+    use opentelemetry::trace::SpanKind;
+
+    use super::span_kind_name;
+
+    #[test]
+    fn span_kinds_have_stable_json_names() {
+        assert_eq!(span_kind_name(&SpanKind::Client), "client");
+        assert_eq!(span_kind_name(&SpanKind::Server), "server");
+        assert_eq!(span_kind_name(&SpanKind::Producer), "producer");
+        assert_eq!(span_kind_name(&SpanKind::Consumer), "consumer");
+        assert_eq!(span_kind_name(&SpanKind::Internal), "internal");
+    }
 }

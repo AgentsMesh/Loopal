@@ -17,7 +17,7 @@ use crate::test_helpers::*;
 /// Spawn with target_hub but no uplink returns clear error.
 #[tokio::test]
 async fn spawn_without_uplink_fails_clearly() {
-    let (hub_a, _) = make_hub();
+    let (hub_a, _hub_a_event_rx) = make_hub();
 
     let result = loopal_agent_hub::dispatch::dispatch_hub_request(
         &hub_a,
@@ -38,8 +38,8 @@ async fn spawn_without_uplink_fails_clearly() {
 #[tokio::test]
 async fn spawn_injects_qualified_parent() {
     let meta_hub = Arc::new(Mutex::new(MetaHub::new()));
-    let (hub_a, _) = make_hub();
-    let (hub_b, _) = make_hub();
+    let (hub_a, _hub_a_event_rx) = make_hub();
+    let (hub_b, _hub_b_event_rx) = make_hub();
 
     let hub_a_conn = wire_hub_to_meta("hub-a", &hub_a, &meta_hub).await;
     let _hub_b_conn = wire_hub_to_meta("hub-b", &hub_b, &meta_hub).await;
@@ -69,7 +69,7 @@ async fn spawn_injects_qualified_parent() {
 /// Local parent completion works correctly when uplink is set (regression).
 #[tokio::test]
 async fn local_parent_completion_unaffected_by_uplink() {
-    let (hub, _) = make_hub();
+    let (hub, _hub_event_rx) = make_hub();
 
     {
         let (t, _) = loopal_ipc::duplex_pair();
@@ -97,7 +97,10 @@ async fn local_parent_completion_unaffected_by_uplink() {
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     let _ = child_client_conn
-        .send_notification(methods::AGENT_COMPLETED.name, json!({"result": "done"}))
+        .send_notification(
+            methods::AGENT_COMPLETED.name,
+            json!({"reason": "goal", "result": "done"}),
+        )
         .await;
     tokio::time::sleep(Duration::from_millis(50)).await;
     drop(child_client_conn);

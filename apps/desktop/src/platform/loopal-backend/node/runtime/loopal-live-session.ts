@@ -8,6 +8,7 @@ import {
   type SessionSummary,
 } from '../../../../shared/contracts'
 import { LoopalEventProjector } from '../projections/loopal-event-projector'
+import { reduceAgentStatus } from '../projections/loopal-agent-status-reducer'
 import { projectModifiedFiles } from '../projections/loopal-artifact-projection'
 import { LoopalLiveAttention } from '../attention/loopal-live-attention'
 import { loadSessionDetail } from '../sessions/loopal-session-snapshot'
@@ -39,6 +40,7 @@ export class LoopalLiveSession {
       append: (entry) => this.append(entry),
       appendAgent: (entry, agentId) => this.appendToAgent(agentId, entry),
       updateSession: (status, attention) => this.update(status, attention),
+      updateAgentLifecycle: (agentId, kind, value) => this.updateAgentLifecycle(agentId, kind, value),
       overflow: () => this.refreshes.requestImmediately(),
       attention: (kind, value, agentId) => this.attention.accept(kind, value, agentId),
       artifacts: (paths, agentId) => this.recordArtifacts(paths, agentId),
@@ -156,6 +158,21 @@ export class LoopalLiveSession {
       ? { ...agent, conversation: [...agent.conversation ?? [], entry] }
       : agent)
     this.detailValue = { ...this.detailValue, agents }
+    this.sink.event({ type: 'session_detail_replaced', detail: this.detailValue })
+  }
+
+  private updateAgentLifecycle(agentId: string, kind: string, value: unknown): void {
+    if (!this.active || !this.detailValue) return
+    const current = this.detailValue.agents.find((agent) => agent.id === agentId)
+    if (!current) return
+    const status = reduceAgentStatus(current.status, kind, value)
+    if (current.status === status) return
+    this.detailValue = {
+      ...this.detailValue,
+      agents: this.detailValue.agents.map((agent) => (
+        agent.id === agentId ? { ...agent, status } : agent
+      )),
+    }
     this.sink.event({ type: 'session_detail_replaced', detail: this.detailValue })
   }
 

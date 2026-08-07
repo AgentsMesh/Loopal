@@ -10,6 +10,15 @@ impl AgentLoopRunner {
             model: self.params.config.model(),
         })
         .await?;
+        self.emit(AgentEventPayload::TokenUsage {
+            input_tokens: 0,
+            output_tokens: 0,
+            context_window: self.turns.view().budget().context_window,
+            cache_creation_input_tokens: 0,
+            cache_read_input_tokens: 0,
+            thinking_tokens: 0,
+        })
+        .await?;
         self.emit(AgentEventPayload::ModeChanged {
             mode: self.params.config.mode.as_str().to_string(),
         })

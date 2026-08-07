@@ -44,6 +44,19 @@ fn make_readonly_backend(cwd: &std::path::Path) -> Arc<LocalBackend> {
     )
 }
 
+#[cfg(windows)]
+fn assert_wire_safe_windows_path(path: &std::path::Path) {
+    use std::path::{Component, Prefix};
+
+    let Some(Component::Prefix(prefix)) = path.components().next() else {
+        panic!("resolved Windows path must be absolute: {path:?}");
+    };
+    assert!(
+        matches!(prefix.kind(), Prefix::Disk(_) | Prefix::UNC(_, _)),
+        "backend-resolved paths must use the ordinary Windows namespace: {path:?}"
+    );
+}
+
 async fn write_via(
     backend: &Arc<LocalBackend>,
     raw: &str,
@@ -111,6 +124,26 @@ fn check_sandbox_path_returns_none_after_approve() {
 }
 
 // ── resolve_checked (via Backend methods) ────────────────────────
+
+#[cfg(windows)]
+#[test]
+fn windows_resolver_uses_wire_safe_paths_for_existing_and_missing_files() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("existing.txt"), "present").unwrap();
+    let backend = LocalBackend::new(
+        dir.path().to_path_buf(),
+        None,
+        ResourceLimits::default(),
+        unique_session_id(),
+    );
+
+    let existing = backend.resolve_path("existing.txt", false).unwrap();
+    let missing = backend.resolve_path("missing.txt", true).unwrap();
+
+    assert_wire_safe_windows_path(backend.cwd().as_path());
+    assert_wire_safe_windows_path(existing.as_path());
+    assert_wire_safe_windows_path(missing.as_path());
+}
 
 #[tokio::test]
 async fn write_to_allowed_path_succeeds() {

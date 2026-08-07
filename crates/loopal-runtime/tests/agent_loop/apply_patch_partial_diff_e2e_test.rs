@@ -3,6 +3,7 @@ use std::time::Duration;
 use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::Message;
 use loopal_test_support::{HarnessBuilder, chunks};
+use loopal_tool_api::ToolContext;
 use loopal_tool_invocation::ToolResultMetadata;
 use loopal_turn::{ToolExecState, TurnStep};
 
@@ -31,15 +32,11 @@ async fn partial_apply_patch_reports_only_operations_that_reached_disk() {
         .await;
     let recorded_turns = harness.recorded_messages.clone();
     let mut runner = harness.runner;
+    let expected = resolved_metadata_paths(&runner.tool_ctx, &["a.txt", "b.txt"]);
 
     let output = runner.run().await.unwrap();
     assert_eq!(output.result, "handled partial failure");
 
-    let canonical_root = std::fs::canonicalize(workdir.path()).unwrap();
-    let expected = vec![
-        canonical_root.join("a.txt").display().to_string(),
-        canonical_root.join("b.txt").display().to_string(),
-    ];
     assert_eq!(
         std::fs::read_to_string(workdir.path().join("a.txt")).unwrap(),
         "first\n"
@@ -100,4 +97,17 @@ async fn partial_apply_patch_reports_only_operations_that_reached_disk() {
         stored_metadata,
         Some(&ToolResultMetadata::modified_files(expected))
     );
+}
+
+fn resolved_metadata_paths(ctx: &ToolContext, relative_paths: &[&str]) -> Vec<String> {
+    relative_paths
+        .iter()
+        .map(|path| {
+            ctx.backend
+                .resolve_path(path, true)
+                .unwrap()
+                .as_str()
+                .into_owned()
+        })
+        .collect()
 }

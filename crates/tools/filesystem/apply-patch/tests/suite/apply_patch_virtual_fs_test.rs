@@ -17,6 +17,19 @@ fn make_tool() -> impl Tool {
     TypedBridge::<ApplyPatchTool, ApplyPatchParams>::new(ApplyPatchTool)
 }
 
+fn resolved_metadata_paths(ctx: &ToolContext, relative_paths: &[&str]) -> Vec<String> {
+    relative_paths
+        .iter()
+        .map(|path| {
+            ctx.backend
+                .resolve_path(path, true)
+                .unwrap()
+                .as_str()
+                .into_owned()
+        })
+        .collect()
+}
+
 #[tokio::test]
 async fn update_after_delete_same_file_in_batch_rejected() {
     let tmp = tempfile::tempdir().unwrap();
@@ -157,6 +170,8 @@ async fn mixed_ops_success_message_includes_all_counts() {
 
     let tool = make_tool();
     let ctx = make_ctx(tmp.path());
+    let expected_paths =
+        resolved_metadata_paths(&ctx, &["created.txt", "update.txt", "delete.txt"]);
 
     let patch = "\
 *** Add File: created.txt
@@ -178,11 +193,13 @@ async fn mixed_ops_success_message_includes_all_counts() {
     let Some(ToolResultMetadata::ModifiedFiles { paths }) = r.metadata else {
         panic!("successful batch must report its actual modified paths");
     };
-    let canonical_root = std::fs::canonicalize(tmp.path()).unwrap();
     assert_eq!(paths.len(), 3);
-    assert!(paths.contains(&canonical_root.join("created.txt").display().to_string()));
-    assert!(paths.contains(&canonical_root.join("update.txt").display().to_string()));
-    assert!(paths.contains(&canonical_root.join("delete.txt").display().to_string()));
+    for expected in expected_paths {
+        assert!(
+            paths.contains(&expected),
+            "missing {expected:?} in {paths:?}"
+        );
+    }
 }
 
 #[tokio::test]
@@ -196,6 +213,7 @@ async fn commit_failure_reports_applied_list_and_failed_index() {
 
     let tool = make_tool();
     let ctx = make_ctx(tmp.path());
+    let expected_paths = resolved_metadata_paths(&ctx, &["a.txt", "b.txt"]);
 
     let patch = "\
 *** Add File: a.txt
@@ -240,12 +258,5 @@ async fn commit_failure_reports_applied_list_and_failed_index() {
     let Some(ToolResultMetadata::ModifiedFiles { paths }) = r.metadata else {
         panic!("partial failure must report paths that reached disk");
     };
-    let canonical_root = std::fs::canonicalize(tmp.path()).unwrap();
-    assert_eq!(
-        paths,
-        vec![
-            canonical_root.join("a.txt").display().to_string(),
-            canonical_root.join("b.txt").display().to_string(),
-        ]
-    );
+    assert_eq!(paths, expected_paths);
 }

@@ -57,6 +57,71 @@ async fn test_edit_file() {
 }
 
 #[tokio::test]
+async fn test_apply_patch_envelope_from_mock_llm_executes_and_renders_operation_count() {
+    const PATCH: &str = "\
+*** Begin Patch
+*** Update File: existing.txt
+@@
+-old value
++updated value
+*** Delete File: obsolete.txt
+*** Add File: alpha.txt
++alpha
+*** Add File: nested/beta.txt
++beta
+*** Add File: file with spaces.txt
++spaces
+*** End Patch
+";
+
+    // Drive the public tool boundary exactly as an LLM does. The two Write
+    // calls establish update/delete inputs; ApplyPatch then exercises the
+    // provider -> agent loop -> tool registry -> parser -> TUI render chain.
+    let calls = vec![
+        chunks::tool_turn(
+            "tc-seed-existing",
+            "Write",
+            serde_json::json!({"file_path": "existing.txt", "content": "old value\n"}),
+        ),
+        chunks::tool_turn(
+            "tc-seed-obsolete",
+            "Write",
+            serde_json::json!({"file_path": "obsolete.txt", "content": "remove me\n"}),
+        ),
+        chunks::tool_turn(
+            "tc-patch",
+            "ApplyPatch",
+            serde_json::json!({"patch": PATCH}),
+        ),
+        chunks::text_turn("Patch verified."),
+    ];
+    let mut harness = build_tui_harness(calls, 120, 50).await;
+    let events = harness.collect_until_idle().await;
+
+    assertions::assert_has_tool_call(&events, "ApplyPatch");
+    assertions::assert_has_tool_result(&events, "ApplyPatch", false);
+
+    assert_eq!(
+        harness.inner.fixture.read_file("existing.txt"),
+        "updated value\n"
+    );
+    assert!(!harness.inner.fixture.file_exists("obsolete.txt"));
+    assert_eq!(harness.inner.fixture.read_file("alpha.txt"), "alpha\n");
+    assert_eq!(harness.inner.fixture.read_file("nested/beta.txt"), "beta\n");
+    assert_eq!(
+        harness.inner.fixture.read_file("file with spaces.txt"),
+        "spaces\n"
+    );
+
+    let rendered = harness.render_text();
+    assertions::assert_buffer_contains(&rendered, "ApplyPatch(5 file(s))");
+    assert!(
+        !rendered.contains("ApplyPatch(7 file(s))"),
+        "envelope markers must not be counted as files:\n{rendered}"
+    );
+}
+
+#[tokio::test]
 async fn test_glob_search() {
     let fixture = TestFixture::new();
     fixture.create_file("alpha.txt", "a");

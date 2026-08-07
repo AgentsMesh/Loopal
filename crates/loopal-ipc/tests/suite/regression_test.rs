@@ -54,6 +54,7 @@ async fn bridge_survives_malformed_event_notification() {
         turn_id: 0,
         correlation_id: 0,
         rev: None,
+        routing_generation: None,
         payload: AgentEventPayload::AwaitingInput,
     };
     server_conn
@@ -94,6 +95,7 @@ async fn client_recv_survives_malformed_event() {
         turn_id: 0,
         correlation_id: 0,
         rev: None,
+        routing_generation: None,
         payload: AgentEventPayload::Finished,
     };
     server_conn
@@ -111,6 +113,9 @@ async fn client_recv_survives_malformed_event() {
     match ev {
         loopal_agent_client::AgentClientEvent::AgentEvent(e) => {
             assert!(matches!(e.payload, AgentEventPayload::Finished));
+        }
+        loopal_agent_client::AgentClientEvent::AgentCompleted(completion) => {
+            panic!("expected agent event, got completion: {completion:?}")
         }
     }
 }

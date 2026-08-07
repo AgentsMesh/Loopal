@@ -1,13 +1,15 @@
 //! Tracks which files were modified during a turn.
 //!
-//! Extracts file paths from Write/Edit/MultiEdit/ApplyPatch tool inputs,
-//! filtered to only those that executed successfully (is_error=false).
-//! Emits a `TurnDiffSummary` event at turn end.
+//! Prefers structured modified-file metadata emitted by tools. Legacy successful
+//! tools fall back to extracting paths from their inputs. Emits a
+//! `TurnDiffSummary` event at turn end.
 
 use std::sync::Arc;
 
+use loopal_edit_core::patch_parser::parse_patch;
 use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::ContentBlock;
+use loopal_tool_invocation::ToolResultMetadata;
 
 use super::governance::traits::TurnHook;
 use super::turn_context::TurnContext;
@@ -34,24 +36,50 @@ impl TurnHook for DiffTracker {
         tool_uses: &[(String, String, serde_json::Value)],
         results: &[ContentBlock],
     ) {
-        // Build a set of tool_use_ids that succeeded (is_error=false)
-        let succeeded: std::collections::HashSet<&str> = results
-            .iter()
-            .filter_map(|block| match block {
-                ContentBlock::ToolResult {
-                    tool_use_id,
-                    is_error: false,
-                    ..
-                } => Some(tool_use_id.as_str()),
-                _ => None,
-            })
-            .collect();
+        let results_by_id: std::collections::HashMap<&str, (bool, Option<&ToolResultMetadata>)> =
+            results
+                .iter()
+                .filter_map(|block| match block {
+                    ContentBlock::ToolResult {
+                        tool_use_id,
+                        is_error,
+                        metadata,
+                        ..
+                    } => Some((tool_use_id.as_str(), (*is_error, metadata.as_ref()))),
+                    _ => None,
+                })
+                .collect();
 
         for (id, name, input) in tool_uses {
             if !WRITE_TOOLS.contains(&name.as_str()) {
                 continue;
             }
-            if !succeeded.contains(id.as_str()) {
+            let Some((is_error, metadata)) = results_by_id.get(id.as_str()).copied() else {
+                continue;
+            };
+
+            // Authoritative tool-reported side effects win even for a partial
+            // failure: is_error describes the overall batch, not whether none
+            // of its earlier operations reached disk.
+            if let Some(ToolResultMetadata::ModifiedFiles { paths }) = metadata {
+                ctx.modified_files.extend(paths.iter().cloned());
+                continue;
+            }
+
+            if is_error {
+                continue;
+            }
+
+            // Compatibility for turns produced before ModifiedFiles metadata.
+            if name == "ApplyPatch" {
+                if let Some(patch) = input.get("patch").and_then(|value| value.as_str())
+                    && let Ok(ops) = parse_patch(patch)
+                {
+                    ctx.modified_files.extend(
+                        ops.into_iter()
+                            .map(|op| op.path().to_string_lossy().into_owned()),
+                    );
+                }
                 continue;
             }
 

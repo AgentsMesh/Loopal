@@ -14,6 +14,7 @@ interface ProjectionSink {
   append(entry: ConversationEntry): void
   appendAgent?(entry: ConversationEntry, agentId: string): void
   updateSession(status: SessionStatus, attention?: SessionSummary['attention']): void
+  updateAgentLifecycle?(agentId: string, kind: string, value: unknown): void
   attention(kind: AttentionEventKind, value: unknown, agentId: string): void
   artifacts?(paths: readonly string[], agentId: string): void
   overflow?(): void
@@ -78,6 +79,7 @@ export class LoopalEventProjector {
     }
     const payload = unpackPayload(event.data.payload)
     if (!payload) return
+    this.sink.updateAgentLifecycle?.(address.agent, payload.kind, payload.value)
     const attention = attentionKindForPayload(payload.kind)
     if (attention) {
       const requested = attention.endsWith('_requested')

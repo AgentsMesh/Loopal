@@ -4,7 +4,9 @@ use std::time::Duration;
 use loopal_agent_hub::{AgentLifecycle, AgentRegistry, Hub, UiSession, start_event_loop};
 use loopal_ipc::Connection;
 use loopal_ipc::protocol::methods;
-use loopal_protocol::{AgentEvent, AgentEventPayload, AgentStatus, QualifiedAddress};
+use loopal_protocol::{
+    AgentCompletion, AgentEvent, AgentEventPayload, AgentStatus, QualifiedAddress,
+};
 use loopal_view_state::{ViewSnapshot, ViewSnapshotRequest};
 use tokio::sync::{Mutex, broadcast, mpsc};
 
@@ -103,12 +105,15 @@ async fn finished_child_is_queryable_after_unregister() {
         },
     )
     .await;
-    {
+    let mut completion = {
         let mut hub = hub.lock().await;
-        hub.registry
+        let completion = hub
+            .registry
             .emit_agent_finished("worker", Some("final answer".into()));
         hub.registry.unregister_connection("worker");
-    }
+        completion
+    };
+    completion.deliver_events().await.unwrap();
     events.recv().await.expect("Finished broadcast");
 
     assert!(
@@ -136,7 +141,7 @@ async fn finished_child_is_queryable_after_unregister() {
 }
 
 #[tokio::test]
-async fn failed_child_stays_failed_after_synthetic_finished() {
+async fn failed_child_stays_failed_after_typed_failure_completion() {
     let (hub, tx, rx) = make_hub();
     register(&hub, "worker", None).await;
     let mut events = hub.lock().await.ui.subscribe_events();
@@ -152,11 +157,16 @@ async fn failed_child_stays_failed_after_synthetic_finished() {
         },
     )
     .await;
-    {
+    let mut completion = {
         let mut hub = hub.lock().await;
-        hub.registry.emit_agent_finished("worker", None);
+        let completion = hub.registry.emit_agent_completion(
+            "worker",
+            AgentCompletion::new("error", Some("provider failed".into())),
+        );
         hub.registry.unregister_connection("worker");
-    }
+        completion
+    };
+    completion.deliver_events().await.unwrap();
     events.recv().await.expect("Finished broadcast");
 
     let (snapshot, topology) = cold_state(hub.clone(), "worker").await;
@@ -180,7 +190,7 @@ async fn completed_bundle_has_a_strict_limit_and_no_connections() {
         let (connection, _incoming) = Connection::new(transport).into_listening();
         registry.register_connection(&name, connection).unwrap();
         registry.set_lifecycle(&name, AgentLifecycle::Running);
-        registry.emit_agent_finished(&name, Some(name.clone()));
+        let _pending = registry.emit_agent_finished(&name, Some(name.clone()));
         registry.unregister_connection(&name);
     }
 
@@ -192,4 +202,35 @@ async fn completed_bundle_has_a_strict_limit_and_no_connections() {
     assert!(registry.agent_view("worker-2").is_some());
     let topology = registry.topology_snapshot();
     assert_eq!(topology["agents"].as_array().unwrap().len(), 2);
+}
+
+#[test]
+fn unknown_agent_failure_creates_a_failed_typed_tombstone() {
+    let (event_tx, _event_rx) = mpsc::channel(8);
+    let mut registry = AgentRegistry::new(event_tx);
+
+    let _first = registry.emit_agent_completion(
+        "late-remote",
+        AgentCompletion::new(
+            "error",
+            Some("remote failed before shadow registration".into()),
+        ),
+    );
+    let _duplicate = registry.emit_agent_completion(
+        "late-remote",
+        AgentCompletion::goal(Some("late duplicate".into())),
+    );
+
+    let completion = registry.completion("late-remote").unwrap();
+    assert_eq!(completion.reason, "error");
+    assert_eq!(
+        completion.result.as_deref(),
+        Some("remote failed before shadow registration")
+    );
+    let topology = registry.topology_snapshot();
+    assert_eq!(topology["agents"][0]["lifecycle"], "failed");
+    assert_eq!(
+        topology["agents"][0]["error"],
+        "remote failed before shadow registration"
+    );
 }

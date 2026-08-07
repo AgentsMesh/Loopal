@@ -1,4 +1,4 @@
-use loopal_protocol::QualifiedAddress;
+use loopal_protocol::{AgentCompletion, QualifiedAddress};
 
 use super::{AgentRegistry, MAX_COMPLETED_AGENTS};
 use crate::topology::{AgentInfo, AgentLifecycle};
@@ -14,25 +14,32 @@ impl AgentRegistry {
         self.completed.len()
     }
 
-    pub(crate) fn remember_output(&mut self, name: &str, output: String) {
+    pub(crate) fn remember_completion(&mut self, name: &str, completion: AgentCompletion) {
         if let Some(agent) = self.agents.get_mut(name) {
-            agent.output = Some(output);
+            agent.completion = Some(completion);
             return;
         }
         if let Some(agent) = self.completed.get_mut(name) {
-            agent.output = output;
+            agent.completion = completion;
             return;
         }
 
         let mut info = AgentInfo::new(name, None, None);
-        info.lifecycle = AgentLifecycle::Finished;
+        let generation = self.allocate_generation();
+        info.lifecycle = if completion.is_success() {
+            AgentLifecycle::Finished
+        } else {
+            AgentLifecycle::Failed(completion.failure_detail().to_string())
+        };
         self.remember_completed(
             name,
             CompletedAgent {
                 info,
-                output,
+                parent_generation: None,
+                completion,
                 view: ManagedAgent::new_view_reducer(name),
                 shadow: false,
+                generation,
             },
         );
     }
@@ -43,25 +50,34 @@ impl AgentRegistry {
         };
         if agent.info.lifecycle.is_terminal() {
             let shadow = agent.state.is_shadow();
-            let output = agent.output.unwrap_or_else(|| "(no output)".into());
+            let completion = agent
+                .completion
+                .unwrap_or_else(|| match &agent.info.lifecycle {
+                    AgentLifecycle::Failed(error) => {
+                        AgentCompletion::new("error", Some(error.clone()))
+                    }
+                    _ => AgentCompletion::goal(None),
+                });
             self.remember_completed(
                 name,
                 CompletedAgent {
                     info: agent.info,
-                    output,
+                    parent_generation: agent.parent_generation,
+                    completion,
                     view: agent.view,
                     shadow,
+                    generation: agent.generation,
                 },
             );
         } else {
-            self.remove_from_parent(name, agent.info.parent.as_ref());
+            self.remove_from_parent(name, agent.info.parent.as_ref(), agent.parent_generation);
         }
     }
 
     pub(crate) fn forget_completed(&mut self, name: &str) {
         self.completed_order.retain(|entry| entry != name);
         if let Some(agent) = self.completed.remove(name) {
-            self.remove_from_parent(name, agent.info.parent.as_ref());
+            self.remove_from_parent(name, agent.info.parent.as_ref(), agent.parent_generation);
         }
     }
 
@@ -79,19 +95,32 @@ impl AgentRegistry {
                 break;
             };
             if let Some(agent) = self.completed.remove(&name) {
-                self.remove_from_parent(&name, agent.info.parent.as_ref());
+                self.remove_from_parent(&name, agent.info.parent.as_ref(), agent.parent_generation);
             }
         }
     }
 
-    fn remove_from_parent(&mut self, child: &str, parent: Option<&QualifiedAddress>) {
+    fn remove_from_parent(
+        &mut self,
+        child: &str,
+        parent: Option<&QualifiedAddress>,
+        parent_generation: Option<u64>,
+    ) {
         let Some(parent) = parent.filter(|address| address.is_local()) else {
             return;
         };
-        if let Some(agent) = self.agents.get_mut(&parent.agent) {
+        if let Some(agent) = self
+            .agents
+            .get_mut(&parent.agent)
+            .filter(|agent| Some(agent.generation) == parent_generation)
+        {
             agent.info.children.retain(|name| name != child);
         }
-        if let Some(agent) = self.completed.get_mut(&parent.agent) {
+        if let Some(agent) = self
+            .completed
+            .get_mut(&parent.agent)
+            .filter(|agent| Some(agent.generation) == parent_generation)
+        {
             agent.info.children.retain(|name| name != child);
         }
     }

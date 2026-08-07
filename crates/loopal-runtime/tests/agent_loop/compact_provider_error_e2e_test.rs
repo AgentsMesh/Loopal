@@ -1,4 +1,4 @@
-use loopal_protocol::AgentEventPayload;
+use loopal_protocol::{AgentEventPayload, CompactPhase};
 use loopal_provider_api::Message;
 use loopal_test_support::{HarnessBuilder, chunks};
 
@@ -10,8 +10,20 @@ fn five_user_messages() -> Vec<Message> {
 
 fn saw_unavailable_notice(evts: &[AgentEventPayload]) -> bool {
     evts.iter().any(|e| {
-        matches!(e, AgentEventPayload::Stream { text }
-            if text.contains("compaction unavailable"))
+        matches!(e, AgentEventPayload::ProviderWarning { message }
+            if message.to_ascii_lowercase().contains("compaction unavailable"))
+    })
+}
+
+fn saw_compact_done(evts: &[AgentEventPayload]) -> bool {
+    evts.iter().any(|event| {
+        matches!(
+            event,
+            AgentEventPayload::CompactProgress {
+                phase: CompactPhase::Done,
+                ..
+            }
+        )
     })
 }
 
@@ -19,7 +31,7 @@ fn saw_unavailable_notice(evts: &[AgentEventPayload]) -> bool {
 async fn force_compact_surfaces_inline_notice_when_summarization_provider_missing() {
     // Main model resolves (anthropic mock), but the summarization route points
     // at a GPT model whose provider isn't registered → the resolve fails and
-    // must surface a visible inline notice (Stream), never a terminal Error.
+    // must surface a visible non-terminal notice, never model Stream or Error.
     let mut h = HarnessBuilder::new()
         .calls(vec![chunks::text_turn("unused")])
         .summarization_model("gpt-4o")
@@ -37,6 +49,16 @@ async fn force_compact_surfaces_inline_notice_when_summarization_provider_missin
     assert!(
         saw_unavailable_notice(&evts),
         "provider-unresolved compaction must surface an inline notice; got: {evts:?}"
+    );
+    assert!(
+        saw_compact_done(&evts),
+        "provider-unresolved compaction must still terminate its progress lifecycle; got: {evts:?}"
+    );
+    assert!(
+        !evts
+            .iter()
+            .any(|e| matches!(e, AgentEventPayload::Stream { .. })),
+        "system notices must not masquerade as model output; got: {evts:?}"
     );
     // Never the termination-semantic Error (would snap a viewed sub-agent to root).
     assert!(

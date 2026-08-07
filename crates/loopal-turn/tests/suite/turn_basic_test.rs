@@ -106,5 +106,6 @@ fn ok(text: &str) -> ToolResult {
         content: text.into(),
         is_error: false,
         images: vec![],
+        metadata: None,
     }
 }

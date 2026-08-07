@@ -4,6 +4,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use loopal_ipc::protocol::methods;
+use loopal_protocol::{
+    NO_AGENT_OUTPUT, WAIT_AGENT_TYPED_RESPONSE_V1, WaitAgentResponse, WaitAgentStatus,
+};
 use serde_json::json;
 
 use crate::shared::AgentShared;
@@ -133,7 +136,7 @@ pub async fn spawn_agent(
 
 /// Wait for a spawned agent to finish. Returns its final output.
 pub async fn wait_agent(shared: &Arc<AgentShared>, name: &str) -> Result<String, String> {
-    let request = json!({"name": name});
+    let request = wait_agent_request(name);
     tracing::info!(agent = %name, "sending hub/wait_agent request");
     let response = shared
         .hub_connection
@@ -142,8 +145,130 @@ pub async fn wait_agent(shared: &Arc<AgentShared>, name: &str) -> Result<String,
         .map_err(|e| format!("hub/wait_agent failed: {e}"))?;
     tracing::info!(agent = %name, "hub/wait_agent response received");
 
-    Ok(response["output"]
-        .as_str()
-        .unwrap_or("(no output)")
-        .to_string())
+    parse_wait_agent_response(name, response)
+}
+
+fn wait_agent_request(name: &str) -> serde_json::Value {
+    json!({
+        "name": name,
+        "response_format": WAIT_AGENT_TYPED_RESPONSE_V1,
+    })
+}
+
+fn parse_wait_agent_response(name: &str, value: serde_json::Value) -> Result<String, String> {
+    if value.get("status").is_none() {
+        if value
+            .get("timed_out")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false)
+        {
+            return Err(format!("Agent '{name}' timed out"));
+        }
+        return value
+            .get("output")
+            .and_then(serde_json::Value::as_str)
+            .map(String::from)
+            .ok_or_else(|| "hub/wait_agent returned an invalid legacy response".into());
+    }
+    let response = serde_json::from_value::<WaitAgentResponse>(value)
+        .map_err(|error| format!("hub/wait_agent returned an invalid response: {error}"))?;
+    match response.status {
+        WaitAgentStatus::Completed => Ok(response.output),
+        WaitAgentStatus::Failed => Err(failure_message(name, &response.reason, &response.output)),
+        WaitAgentStatus::TimedOut => Err(format!("Agent '{name}' timed out")),
+        WaitAgentStatus::NotFound => Err(format!("Agent '{name}' was not found")),
+    }
+}
+
+fn failure_message(name: &str, reason: &str, output: &str) -> String {
+    if output.is_empty() || output == NO_AGENT_OUTPUT {
+        format!("Agent '{name}' failed ({reason})")
+    } else {
+        format!("Agent '{name}' failed ({reason}): {output}")
+    }
+}
+
+#[cfg(test)]
+mod wait_response_tests {
+    use super::*;
+
+    #[test]
+    fn completed_empty_output_remains_successful() {
+        let result = parse_wait_agent_response(
+            "worker",
+            serde_json::json!({
+                "status": "completed",
+                "reason": "goal",
+                "output": "",
+            }),
+        );
+
+        assert_eq!(result.as_deref(), Ok(""));
+    }
+
+    #[test]
+    fn wait_request_opts_into_typed_failure_semantics() {
+        assert_eq!(
+            wait_agent_request("worker"),
+            serde_json::json!({
+                "name": "worker",
+                "response_format": WAIT_AGENT_TYPED_RESPONSE_V1,
+            })
+        );
+    }
+
+    #[test]
+    fn failure_with_partial_result_is_an_error() {
+        let error = parse_wait_agent_response(
+            "worker",
+            serde_json::json!({
+                "status": "failed",
+                "reason": "error",
+                "output": "partial findings",
+            }),
+        )
+        .unwrap_err();
+
+        assert!(error.contains("failed (error)"));
+        assert!(error.contains("partial findings"));
+    }
+
+    #[test]
+    fn typed_timeout_not_found_and_invalid_wire_are_errors() {
+        for response in [
+            serde_json::json!({
+                "status": "timed_out",
+                "reason": "timeout",
+                "output": "(agent timed out)",
+                "timed_out": true,
+            }),
+            serde_json::json!({
+                "status": "not_found",
+                "reason": "not_found",
+                "output": "agent not found or already finished",
+            }),
+            serde_json::json!({"unexpected": true}),
+        ] {
+            assert!(parse_wait_agent_response("worker", response).is_err());
+        }
+    }
+
+    #[test]
+    fn legacy_output_is_success_but_legacy_timeout_is_error() {
+        assert_eq!(
+            parse_wait_agent_response("worker", serde_json::json!({"output": "legacy result"}),)
+                .as_deref(),
+            Ok("legacy result")
+        );
+        assert!(
+            parse_wait_agent_response(
+                "worker",
+                serde_json::json!({
+                    "output": "(agent timed out)",
+                    "timed_out": true,
+                }),
+            )
+            .is_err()
+        );
+    }
 }

@@ -147,7 +147,9 @@ async fn test_google_stream_chat_server_error() {
 
     let result = provider.stream_chat(&test_chat_params()).await;
     match expect_err(result) {
-        LoopalError::Provider(ProviderError::Api { status, message }) => {
+        LoopalError::Provider(ProviderError::Api {
+            status, message, ..
+        }) => {
             assert_eq!(status, 500);
             assert!(message.contains("server failure"));
         }
@@ -176,4 +178,109 @@ async fn google_error_never_surfaces_query_api_key_or_oversized_body() {
         }
         other => panic!("expected safe Google API error, got: {other:?}"),
     }
+}
+
+#[tokio::test]
+async fn google_prompt_block_in_http_200_stream_is_a_terminal_error() {
+    let server = MockServer::start().await;
+    let sse = concat!(
+        "data: {\"promptFeedback\":{\"blockReason\":\"SAFETY\",",
+        "\"blockReasonMessage\":\"request blocked\"}}\n\n"
+    );
+    Mock::given(method("POST"))
+        .and(path("/models/test-model:streamGenerateContent"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(sse, "text/event-stream"))
+        .mount(&server)
+        .await;
+
+    let provider = GoogleProvider::new("key".into()).with_base_url(server.uri());
+    let chunks = collect_chunks(provider.stream_chat(&test_chat_params()).await.unwrap()).await;
+
+    assert_eq!(chunks.len(), 1, "chunks: {chunks:?}");
+    let error = chunks.into_iter().next().unwrap().unwrap_err();
+    assert!(!error.is_retryable());
+    assert!(error.to_string().contains("SAFETY"));
+    assert!(matches!(
+        error,
+        LoopalError::Provider(ProviderError::Api { status: 400, .. })
+    ));
+}
+
+#[tokio::test]
+async fn google_partial_text_is_preserved_before_blocked_terminal_error() {
+    let server = MockServer::start().await;
+    let sse = concat!(
+        "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"partial findings\"}]}}]}\n\n",
+        "data: {\"candidates\":[{\"finishReason\":\"SAFETY\",",
+        "\"finishMessage\":\"response blocked\"}]}\n\n"
+    );
+    Mock::given(method("POST"))
+        .and(path("/models/test-model:streamGenerateContent"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(sse, "text/event-stream"))
+        .mount(&server)
+        .await;
+
+    let provider = GoogleProvider::new("key".into()).with_base_url(server.uri());
+    let chunks = collect_chunks(provider.stream_chat(&test_chat_params()).await.unwrap()).await;
+
+    assert_eq!(chunks.len(), 2, "chunks: {chunks:?}");
+    assert!(matches!(
+        &chunks[0],
+        Ok(StreamChunk::Text { text }) if text == "partial findings"
+    ));
+    let error = chunks.into_iter().nth(1).unwrap().unwrap_err();
+    assert!(!error.is_retryable());
+    assert!(error.to_string().contains("SAFETY"));
+    assert!(matches!(
+        error,
+        LoopalError::Provider(ProviderError::Api { status: 400, .. })
+    ));
+}
+
+#[tokio::test]
+async fn google_server_error_finish_reason_is_retryable_over_http_stream() {
+    let server = MockServer::start().await;
+    let sse = concat!(
+        "data: {\"candidates\":[{\"finishReason\":\"SERVER_ERROR\",",
+        "\"finishMessage\":\"backend temporarily unavailable\"}]}\n\n"
+    );
+    Mock::given(method("POST"))
+        .and(path("/models/test-model:streamGenerateContent"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(sse, "text/event-stream"))
+        .mount(&server)
+        .await;
+
+    let provider = GoogleProvider::new("key".into()).with_base_url(server.uri());
+    let chunks = collect_chunks(provider.stream_chat(&test_chat_params()).await.unwrap()).await;
+
+    assert_eq!(chunks.len(), 1, "chunks: {chunks:?}");
+    let error = chunks.into_iter().next().unwrap().unwrap_err();
+    assert!(error.is_retryable());
+    assert!(error.to_string().contains("SERVER_ERROR"));
+    assert!(matches!(
+        error,
+        LoopalError::Provider(ProviderError::Api { status: 500, .. })
+    ));
+}
+
+#[tokio::test]
+async fn google_stream_terminal_error_redacts_sensitive_finish_message() {
+    const MARKER: &str = "google-stream-finish-secret-marker";
+    let server = MockServer::start().await;
+    let sse = format!(
+        "data: {{\"candidates\":[{{\"finishReason\":\"SAFETY\",\"finishMessage\":\"Authorization: Bearer {MARKER}\"}}]}}\n\n"
+    );
+    Mock::given(method("POST"))
+        .and(path("/models/test-model:streamGenerateContent"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(sse, "text/event-stream"))
+        .mount(&server)
+        .await;
+
+    let provider = GoogleProvider::new("key".into()).with_base_url(server.uri());
+    let chunks = collect_chunks(provider.stream_chat(&test_chat_params()).await.unwrap()).await;
+    let error = chunks.into_iter().next().unwrap().unwrap_err();
+
+    assert!(!error.to_string().contains(MARKER));
+    assert!(!format!("{error:?}").contains(MARKER));
+    assert!(error.to_string().contains("SAFETY"));
 }

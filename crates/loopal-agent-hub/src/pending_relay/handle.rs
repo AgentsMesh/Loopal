@@ -9,6 +9,7 @@ use uuid::Uuid;
 use super::cleanup::{InteractionKind, remove_if_current, schedule_timeout};
 use super::completion::complete_detached;
 use super::types::{FastPath, PendingPermissionInfo};
+use crate::authoritative_events::PreparedAuthoritativeEvent;
 use crate::hub::Hub;
 
 pub async fn handle_agent_permission(
@@ -88,11 +89,9 @@ pub async fn handle_agent_permission(
                     tool_name,
                 },
             );
-            let outcome = if h.registry.event_sender().try_send(event).is_err() {
-                FastPath::EmitFailed
-            } else {
-                FastPath::Pending
-            };
+            let event = h.registry.prepare_generation_event(agent_name, event);
+            let outcome =
+                FastPath::Pending(Box::new(PreparedAuthoritativeEvent::from_hub(&h, event)));
             (outcome, h.pending_interaction_timeout())
         }
     };
@@ -116,32 +115,72 @@ pub async fn handle_agent_permission(
                 None,
             );
         }
-        FastPath::EmitFailed => {
-            warn!(agent = %agent_name, tool_call_id, "ToolPermissionRequest dropped (channel full); denying");
-            if remove_if_current(
-                hub,
-                InteractionKind::Permission,
-                agent_name,
-                &tool_call_id,
-                &interaction_id,
-            )
-            .await
-            {
-                complete_detached(
-                    agent_conn,
-                    agent_ipc_id,
-                    serde_json::json!({"allow": false}),
-                    None,
-                );
+        FastPath::Pending(mut delivery) => {
+            // The coordinator owns both event admission and timeout/cleanup.
+            // If the agent IO owner is cancelled while backpressured, dropping
+            // the JoinHandle detaches this task instead of stranding pending
+            // state without an observable request.
+            let delivery_hub = hub.clone();
+            let delivery_conn = agent_conn.clone();
+            let delivery_agent = agent_name.to_string();
+            let delivery_logical_id = tool_call_id.clone();
+            let delivery_interaction_id = interaction_id.clone();
+            let coordinator = tokio::spawn(async move {
+                match delivery.deliver().await {
+                    Ok(()) => schedule_timeout(
+                        &delivery_hub,
+                        InteractionKind::Permission,
+                        delivery_agent,
+                        delivery_logical_id,
+                        delivery_interaction_id,
+                        timeout,
+                    ),
+                    Err(error) => {
+                        warn!(
+                            agent = %delivery_agent,
+                            tool_call_id = %delivery_logical_id,
+                            %error,
+                            "permission event admission failed; denying request"
+                        );
+                        if remove_if_current(
+                            &delivery_hub,
+                            InteractionKind::Permission,
+                            &delivery_agent,
+                            &delivery_logical_id,
+                            &delivery_interaction_id,
+                        )
+                        .await
+                        {
+                            complete_detached(
+                                delivery_conn,
+                                agent_ipc_id,
+                                serde_json::json!({"allow": false}),
+                                None,
+                            );
+                        }
+                    }
+                }
+            });
+            if let Err(error) = coordinator.await {
+                tracing::error!(agent = %agent_name, %error, "permission admission coordinator failed");
+                hub.lock().await.shutdown_signal.notify_one();
+                if remove_if_current(
+                    hub,
+                    InteractionKind::Permission,
+                    agent_name,
+                    &tool_call_id,
+                    &interaction_id,
+                )
+                .await
+                {
+                    complete_detached(
+                        agent_conn,
+                        agent_ipc_id,
+                        serde_json::json!({"allow": false}),
+                        None,
+                    );
+                }
             }
         }
-        FastPath::Pending => schedule_timeout(
-            hub,
-            InteractionKind::Permission,
-            agent_name.to_string(),
-            tool_call_id,
-            interaction_id,
-            timeout,
-        ),
     }
 }

@@ -3,7 +3,9 @@
 load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_test")
 load("//build_defs/rust:desktop_test.bzl", "desktop_serve_test")
 
-def _binary_e2e(name, src, deps, extra_srcs = []):
+def _binary_e2e(name, src, deps, extra_srcs = [], tags = []):
+    # These targets launch the real Loopal binary and assert wall-clock
+    # handshakes. Keep process startup out of the shared //... resource pool.
     rust_test(
         name = name,
         srcs = [src] + extra_srcs,
@@ -12,6 +14,7 @@ def _binary_e2e(name, src, deps, extra_srcs = []):
         edition = "2024",
         env = {"LOOPAL_BINARY": "$(rootpath :loopal)"},
         local = True,
+        tags = ["exclusive"] + tags,
         deps = deps,
     )
 
@@ -79,6 +82,7 @@ def loopal_root_tests():
         # by the dedicated Agent E2E gate job, mirroring the desktop e2e setup.
         tags = [
             "e2e",
+            "exclusive",
             "manual",
         ],
         deps = [
@@ -115,6 +119,7 @@ def loopal_root_tests():
         local = True,
         tags = [
             "e2e",
+            "exclusive",
             "manual",
         ],
         deps = [

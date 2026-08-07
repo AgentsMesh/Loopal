@@ -46,8 +46,8 @@ async fn test_event_ordering() {
 async fn test_token_accumulation() {
     // Two tool turns + text turn → multiple usage events
     let calls = vec![
-        chunks::tool_turn("tc-1", "Ls", serde_json::json!({"path": "/tmp"})),
-        chunks::tool_turn("tc-2", "Ls", serde_json::json!({"path": "/tmp"})),
+        chunks::tool_turn("tc-1", "Ls", serde_json::json!({"path": "."})),
+        chunks::tool_turn("tc-2", "Ls", serde_json::json!({"path": "."})),
         chunks::text_turn("done"),
     ];
     let mut harness = build_tui_harness(calls, 80, 24).await;

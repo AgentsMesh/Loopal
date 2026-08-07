@@ -134,6 +134,7 @@ mod tests {
         let error = ProviderError::Api {
             status: 500,
             message: safe,
+            retry_after_ms: None,
         };
         assert!(!format!("{error}").contains(marker));
         assert!(!format!("{error:?}").contains(marker));

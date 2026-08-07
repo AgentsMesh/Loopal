@@ -36,6 +36,13 @@ impl HubInputReceiver {
         }
     }
 
+    pub async fn try_next(&self) -> Result<AgentInput, tokio::sync::mpsc::error::TryRecvError> {
+        if self.shutdown.is_cancelled() {
+            return Err(tokio::sync::mpsc::error::TryRecvError::Disconnected);
+        }
+        self.input_rx.lock().await.try_recv()
+    }
+
     pub async fn drain(&self) -> Vec<AgentInput> {
         let mut rx = self.input_rx.lock().await;
         let mut inputs = Vec::new();
@@ -65,5 +72,27 @@ mod tests {
             .expect("pre-existing shutdown must wake the next idle receive");
 
         assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn try_next_observes_shutdown_before_queued_input() {
+        let (input_tx, input_rx) = tokio::sync::mpsc::channel(1);
+        let (_interrupt_tx, interrupt_rx) = tokio::sync::watch::channel(0);
+        let shutdown = CancellationToken::new();
+        input_tx
+            .send(AgentInput::Message(loopal_protocol::Envelope::new(
+                loopal_protocol::MessageSource::Human,
+                "main",
+                "must not run",
+            )))
+            .await
+            .unwrap();
+        shutdown.cancel();
+        let input = HubInputReceiver::new(input_rx, interrupt_rx, shutdown);
+
+        assert!(matches!(
+            input.try_next().await,
+            Err(tokio::sync::mpsc::error::TryRecvError::Disconnected)
+        ));
     }
 }

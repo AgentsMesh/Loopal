@@ -80,6 +80,7 @@ fn update_tool_state_round_trip() {
             content: "ok".into(),
             is_error: false,
             images: vec![],
+            metadata: None,
         }),
     )
     .unwrap();

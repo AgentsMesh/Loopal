@@ -71,11 +71,22 @@ pub(crate) fn parse_google_event(data: &str) -> Vec<Result<StreamChunk, LoopalEr
         }
     }
 
+    if let Some(reason) = parsed["promptFeedback"]["blockReason"]
+        .as_str()
+        .filter(|reason| !reason.is_empty() && *reason != "BLOCK_REASON_UNSPECIFIED")
+    {
+        chunks.push(Err(google_terminal_error(
+            "prompt blocked",
+            reason,
+            parsed["promptFeedback"]["blockReasonMessage"].as_str(),
+        )));
+        return chunks;
+    }
+
     // Candidates
+    let mut terminal: Option<Result<StreamChunk, LoopalError>> = None;
     if let Some(candidates) = parsed["candidates"].as_array() {
         for candidate in candidates {
-            let finish_reason = candidate["finishReason"].as_str();
-
             if let Some(parts) = candidate["content"]["parts"].as_array() {
                 for part in parts {
                     if let Some(text) = part["text"].as_str()
@@ -114,40 +125,66 @@ pub(crate) fn parse_google_event(data: &str) -> Vec<Result<StreamChunk, LoopalEr
                 }
             }
 
-            match finish_reason {
-                Some("MAX_TOKENS") => {
-                    chunks.push(Ok(StreamChunk::Done {
-                        stop_reason: StopReason::MaxTokens,
-                    }));
-                }
-                Some("STOP") => {
-                    chunks.push(Ok(StreamChunk::Done {
-                        stop_reason: StopReason::EndTurn,
-                    }));
-                }
-                Some("FINISH_REASON_UNSPECIFIED") | None => {}
-                Some(_) => chunks.push(Ok(StreamChunk::Done {
-                    stop_reason: StopReason::EndTurn,
-                })),
-            }
-
-            // Parse grounding metadata (Google Search Grounding results)
+            // Grounding belongs to the completed candidate. Emit it before the
+            // terminal marker because the runtime stops polling at `Done`.
             if let Some(meta) = candidate.get("groundingMetadata") {
                 parse_grounding_metadata(meta, &mut chunks);
+            }
+
+            if let Some(candidate_terminal) = candidate_terminal(candidate) {
+                let failed = candidate_terminal.is_err();
+                terminal = Some(candidate_terminal);
+                if failed {
+                    // Any non-success finish reason fails the whole response.
+                    // This also prevents an earlier candidate's `STOP` from
+                    // masking a later blocked/error candidate.
+                    break;
+                }
             }
         }
     }
 
-    if parsed["promptFeedback"]["blockReason"]
-        .as_str()
-        .is_some_and(|reason| !reason.is_empty() && reason != "BLOCK_REASON_UNSPECIFIED")
-    {
-        chunks.push(Ok(StreamChunk::Done {
-            stop_reason: StopReason::EndTurn,
-        }));
+    if let Some(terminal) = terminal {
+        chunks.push(terminal);
     }
 
     chunks
+}
+
+fn candidate_terminal(candidate: &Value) -> Option<Result<StreamChunk, LoopalError>> {
+    let reason = candidate["finishReason"].as_str()?;
+    match reason {
+        "FINISH_REASON_UNSPECIFIED" | "" => None,
+        "STOP" => Some(Ok(StreamChunk::Done {
+            stop_reason: StopReason::EndTurn,
+        })),
+        "MAX_TOKENS" => Some(Ok(StreamChunk::Done {
+            stop_reason: StopReason::MaxTokens,
+        })),
+        _ => Some(Err(google_terminal_error(
+            "candidate terminated",
+            reason,
+            candidate["finishMessage"].as_str(),
+        ))),
+    }
+}
+
+fn google_terminal_error(scope: &str, reason: &str, provider_message: Option<&str>) -> LoopalError {
+    let status = if reason == "SERVER_ERROR" { 500 } else { 400 };
+    let safe_reason = crate::safe_diagnostics::api_error_message("google", reason, &[]);
+    let detail = provider_message
+        .map(|message| crate::safe_diagnostics::api_error_message("google", message, &[]))
+        .filter(|message| !message.trim().is_empty());
+    let message = match detail {
+        Some(detail) => format!("google {scope}: {safe_reason}: {detail}"),
+        None => format!("google {scope}: {safe_reason}"),
+    };
+    ProviderError::Api {
+        status,
+        message,
+        retry_after_ms: None,
+    }
+    .into()
 }
 
 /// Simple collision-resistant ID generator (no uuid dep needed).
@@ -197,4 +234,136 @@ fn parse_grounding_metadata(meta: &Value, chunks: &mut Vec<Result<StreamChunk, L
         tool_use_id: search_id,
         content: json!(sources),
     }));
+}
+
+#[cfg(test)]
+mod terminal_tests {
+    use super::*;
+
+    fn terminal(data: Value) -> Vec<Result<StreamChunk, LoopalError>> {
+        parse_google_event(&data.to_string())
+    }
+
+    #[test]
+    fn only_stop_and_max_tokens_are_successful_terminal_reasons() {
+        let stop = terminal(json!({"candidates": [{"finishReason": "STOP"}]}));
+        assert!(matches!(
+            stop.as_slice(),
+            [Ok(StreamChunk::Done {
+                stop_reason: StopReason::EndTurn
+            })]
+        ));
+
+        let max_tokens = terminal(json!({"candidates": [{"finishReason": "MAX_TOKENS"}]}));
+        assert!(matches!(
+            max_tokens.as_slice(),
+            [Ok(StreamChunk::Done {
+                stop_reason: StopReason::MaxTokens
+            })]
+        ));
+
+        let unspecified = terminal(json!({
+            "candidates": [{"finishReason": "FINISH_REASON_UNSPECIFIED"}]
+        }));
+        assert!(unspecified.is_empty());
+    }
+
+    #[test]
+    fn blocked_and_invalid_candidate_reasons_fail_closed() {
+        for reason in [
+            "SAFETY",
+            "RECITATION",
+            "BLOCKLIST",
+            "PROHIBITED_CONTENT",
+            "SPII",
+            "MALFORMED_FUNCTION_CALL",
+            "UNEXPECTED_TOOL_CALL",
+            "TOO_MANY_TOOL_CALLS",
+            "OTHER",
+            "NEW_REASON_FROM_PROVIDER",
+        ] {
+            let chunks = terminal(json!({
+                "candidates": [{
+                    "finishReason": reason,
+                    "finishMessage": "provider rejected this response"
+                }]
+            }));
+            assert_eq!(chunks.len(), 1, "reason={reason}");
+            let error = chunks.into_iter().next().unwrap().unwrap_err();
+            assert!(!error.is_retryable(), "reason={reason}, error={error}");
+            assert!(matches!(
+                error,
+                LoopalError::Provider(ProviderError::Api { status: 400, .. })
+            ));
+        }
+    }
+
+    #[test]
+    fn prompt_block_is_an_error_and_sensitive_provider_detail_is_redacted() {
+        let chunks = terminal(json!({
+            "promptFeedback": {
+                "blockReason": "SAFETY",
+                "blockReasonMessage": "Authorization: Bearer provider-secret"
+            }
+        }));
+        let error = chunks.into_iter().next().unwrap().unwrap_err();
+        let rendered = error.to_string();
+        assert!(rendered.contains("SAFETY"));
+        assert!(!rendered.contains("provider-secret"));
+        assert!(matches!(
+            error,
+            LoopalError::Provider(ProviderError::Api { status: 400, .. })
+        ));
+
+        let chunks = terminal(json!({
+            "promptFeedback": {
+                "blockReason": "Authorization: Bearer reason-secret"
+            }
+        }));
+        let rendered = chunks.into_iter().next().unwrap().unwrap_err().to_string();
+        assert!(!rendered.contains("reason-secret"));
+    }
+
+    #[test]
+    fn server_error_is_retryable_and_preserves_safe_reason_and_message() {
+        let chunks = terminal(json!({
+            "candidates": [{
+                "finishReason": "SERVER_ERROR",
+                "finishMessage": "backend temporarily unavailable"
+            }]
+        }));
+        let error = chunks.into_iter().next().unwrap().unwrap_err();
+        assert!(error.is_retryable());
+        assert!(error.to_string().contains("SERVER_ERROR"));
+        assert!(
+            error
+                .to_string()
+                .contains("backend temporarily unavailable")
+        );
+        assert!(matches!(
+            error,
+            LoopalError::Provider(ProviderError::Api { status: 500, .. })
+        ));
+    }
+
+    #[test]
+    fn grounding_blocks_are_emitted_before_done() {
+        let chunks = terminal(json!({
+            "candidates": [{
+                "finishReason": "STOP",
+                "groundingMetadata": {
+                    "groundingChunks": [{"web": {"uri": "https://example.test", "title": "x"}}]
+                }
+            }]
+        }));
+        assert!(matches!(
+            chunks.first(),
+            Some(Ok(StreamChunk::ServerToolUse { .. }))
+        ));
+        assert!(matches!(
+            chunks.get(1),
+            Some(Ok(StreamChunk::ServerToolResult { .. }))
+        ));
+        assert!(matches!(chunks.get(2), Some(Ok(StreamChunk::Done { .. }))));
+    }
 }

@@ -28,7 +28,7 @@ test('isolates child processes and cleans active children across lifecycle contr
       await window.loopalDesktop.interruptAgent({ ...root, agentId })
     }, { root: target, agentId: 'interrupt-child' })
     await expect.poll(() => desktop.llm!.state()).toMatchObject({ clientDisconnects: 1 })
-    await expect.poll(() => agentStatus(page, 'interrupt-child')).toBe('completed')
+    await expect.poll(() => agentStatus(page, 'interrupt-child')).toBe('failed')
     await expect.poll(() => agentText(page, 'interrupt-child')).toContain('Turn cancelled')
     await expect.poll(() => rootText(page)).toContain('Root observed interrupted child completion.')
     await expect.poll(() => desktop.llm!.state()).toMatchObject({ served: 4, inFlight: 0 })

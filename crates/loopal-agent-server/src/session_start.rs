@@ -12,8 +12,9 @@ use loopal_runtime::agent_input::AgentInput;
 
 use crate::agent_setup;
 use crate::agent_setup_helpers::build_model_router;
+use crate::hub_broadcaster::HubBroadcaster;
 use crate::hub_frontend::HubFrontend;
-use crate::session_handlers_factory::build_session_handlers;
+use crate::session_handlers_factory::build_session_handlers_with_emitter;
 use crate::session_hub::{SessionHub, SharedSession};
 use crate::session_spawn::{parse_start_params, spawn_agent_and_bridges};
 use crate::session_start_prompt::push_start_prompt;
@@ -68,7 +69,9 @@ pub(crate) async fn start_session(
             .await?
         } else {
             match hub.get_test_provider().await {
-                Some(provider) => crate::params::build_kernel_with_provider(provider)?,
+                Some(provider) => {
+                    crate::params::build_kernel_with_provider(provider, start.model.as_deref())?
+                }
                 None => {
                     crate::params::build_kernel_from_config(
                         &config,
@@ -100,18 +103,27 @@ pub(crate) async fn start_session(
         ));
         let decision_context =
             loopal_runtime::frontend::DecisionContext::with_cwd(cwd.to_string_lossy().into_owned());
-        let model_router = SharedModelRouter::new(build_model_router(&config.settings));
-        let (perm_handler, q_handler, decision_cell) = build_session_handlers(
+        // The kernel owns the effective settings paired with its provider registry.
+        // This differs from `config` for injected test providers and may also differ
+        // after secret expansion, so deriving a second route from `config` can select
+        // a provider that the kernel does not contain.
+        let model_router = SharedModelRouter::new(build_model_router(kernel.settings()));
+        // Runtime events and classifier progress share one FIFO delivery worker.
+        // This prevents two emitters targeting the same client transport from
+        // racing each other at the connection write lock.
+        let broadcaster = HubBroadcaster::new(session_holder.clone(), None);
+        let (perm_handler, q_handler, decision_cell) = build_session_handlers_with_emitter(
             &config,
             &kernel,
             session_holder.clone(),
             decision_context.clone(),
             model_router.reader(),
+            Arc::new(broadcaster.clone()),
         );
-        let frontend_placeholder = Arc::new(HubFrontend::new(
+        let frontend_placeholder = Arc::new(HubFrontend::new_with_broadcaster(
             session_holder,
+            broadcaster,
             input_rx,
-            None,
             watch_rx,
             shutdown.clone(),
             perm_handler,

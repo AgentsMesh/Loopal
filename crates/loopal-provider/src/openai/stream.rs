@@ -97,6 +97,7 @@ pub(crate) fn parse_responses_event(data: &str) -> Vec<Result<StreamChunk, Loopa
                 chunks.push(Err(ProviderError::Api {
                     status: 400,
                     message: "openai response incomplete for an unsupported reason".into(),
+                    retry_after_ms: None,
                 }
                 .into()));
             }

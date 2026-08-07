@@ -5,9 +5,9 @@
 use std::sync::Arc;
 
 use loopal_ipc::connection::{Connection, Listening};
-use loopal_protocol::{AgentEvent, Envelope};
+use loopal_protocol::{AgentCompletion, Envelope};
 use loopal_view_state::ViewStateReducer;
-use tokio::sync::{Mutex, mpsc};
+use tokio::sync::Mutex;
 
 use crate::topology::{AgentInfo, AgentLifecycle};
 use crate::types::AgentConnectionState;
@@ -79,14 +79,9 @@ impl AgentRegistry {
 
     /// Clone the routing handles needed for delivery while the registry is
     /// borrowed. Callers must perform network I/O after releasing the Hub lock.
-    pub fn route_target(
-        &self,
-        envelope: &Envelope,
-    ) -> Result<(Arc<Connection<Listening>>, mpsc::Sender<AgentEvent>), String> {
-        let conn = self
-            .get_agent_connection(&envelope.target.agent)
-            .ok_or_else(|| format!("no agent: '{}'", envelope.target))?;
-        Ok((conn, self.event_tx.clone()))
+    pub fn route_target(&self, envelope: &Envelope) -> Result<Arc<Connection<Listening>>, String> {
+        self.get_agent_connection(&envelope.target.agent)
+            .ok_or_else(|| format!("no agent: '{}'", envelope.target))
     }
 
     pub fn agent_info(&self, name: &str) -> Option<&AgentInfo> {
@@ -97,43 +92,70 @@ impl AgentRegistry {
     }
 
     pub fn completion_output(&self, name: &str) -> Option<&str> {
+        self.completion(name).map(AgentCompletion::output)
+    }
+
+    pub fn completion(&self, name: &str) -> Option<&AgentCompletion> {
         self.agents
             .get(name)
-            .and_then(|agent| agent.output.as_deref())
-            .or_else(|| self.completed.get(name).map(|agent| agent.output.as_str()))
+            .and_then(|agent| agent.completion.as_ref())
+            .or_else(|| self.completed.get(name).map(|agent| &agent.completion))
     }
 
     pub fn set_lifecycle(&mut self, name: &str, lifecycle: AgentLifecycle) {
         if let Some(a) = self.agents.get_mut(name) {
-            if matches!(&a.info.lifecycle, AgentLifecycle::Failed(_))
-                && matches!(&lifecycle, AgentLifecycle::Finished)
-            {
+            if a.completion.is_some() {
                 return;
             }
             a.info.lifecycle = lifecycle;
+        } else if self.completed.contains_key(name) {
+            // Every completed entry has an authoritative typed completion.
+            let _ = lifecycle;
+            tracing::debug!(agent = %name, "ignoring lifecycle event for completed generation");
+        }
+    }
+
+    pub(crate) fn set_completion_lifecycle(&mut self, name: &str, lifecycle: AgentLifecycle) {
+        if let Some(a) = self.agents.get_mut(name) {
+            a.info.lifecycle = lifecycle;
         } else if let Some(a) = self.completed.get_mut(name) {
-            if matches!(&a.info.lifecycle, AgentLifecycle::Failed(_))
-                && matches!(&lifecycle, AgentLifecycle::Finished)
-            {
-                return;
-            }
             a.info.lifecycle = lifecycle;
         }
     }
 
     pub fn descendants(&self, name: &str) -> Vec<String> {
         let mut descendants = Vec::new();
-        let mut pending = self
-            .agent_info(name)
-            .map(|info| info.children.clone())
-            .unwrap_or_default();
-        while let Some(child) = pending.pop() {
-            if let Some(info) = self.agent_info(&child) {
-                pending.extend(info.children.iter().cloned());
+        let Some(root_generation) = self.generation(name) else {
+            return descendants;
+        };
+        let mut pending = vec![(name.to_string(), root_generation)];
+        while let Some((parent, parent_generation)) = pending.pop() {
+            let children = self
+                .agent_info(&parent)
+                .map(|info| info.children.clone())
+                .unwrap_or_default();
+            for child in children {
+                if self.parent_generation(&child) != Some(parent_generation) {
+                    continue;
+                }
+                if let Some(child_generation) = self.generation(&child) {
+                    pending.push((child.clone(), child_generation));
+                }
+                descendants.push(child);
             }
-            descendants.push(child);
         }
         descendants
+    }
+
+    fn parent_generation(&self, name: &str) -> Option<u64> {
+        self.agents
+            .get(name)
+            .and_then(|agent| agent.parent_generation)
+            .or_else(|| {
+                self.completed
+                    .get(name)
+                    .and_then(|agent| agent.parent_generation)
+            })
     }
 
     pub fn topology_snapshot(&self) -> serde_json::Value {

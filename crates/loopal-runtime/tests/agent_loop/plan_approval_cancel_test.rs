@@ -35,6 +35,12 @@ impl AgentFrontend for PlanFrontend {
         self.inner.recv_input().await
     }
 
+    async fn try_recv_input(
+        &self,
+    ) -> std::result::Result<AgentInput, tokio::sync::mpsc::error::TryRecvError> {
+        self.inner.try_recv_input().await
+    }
+
     async fn request_permission(
         &self,
         id: &str,

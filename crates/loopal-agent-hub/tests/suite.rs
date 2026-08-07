@@ -53,6 +53,8 @@ mod collaboration_test;
 mod completed_agent_tombstone_test;
 #[path = "suite/completion_injection_test.rs"]
 mod completion_injection_test;
+#[path = "suite/completion_mock_llm_e2e_test.rs"]
+mod completion_mock_llm_e2e_test;
 #[path = "suite/completion_notification_policy_test.rs"]
 mod completion_notification_policy_test;
 #[path = "suite/completion_output_test.rs"]

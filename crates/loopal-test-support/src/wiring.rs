@@ -152,7 +152,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         },
         loopal_runtime::AgentDeps {
             kernel,
-            frontend,
+            frontend: frontend.clone(),
             session_manager: fixture.session_manager(),
             decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
         },
@@ -186,6 +186,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
     let mut runner = AgentLoopRunner::new(params);
     let harness_cfg = loopal_config::HarnessConfig::default();
     runner.governance = loopal_runtime::agent_loop::governance::build_governance(&harness_cfg);
+    runner.hooks = loopal_runtime::agent_loop::governance::build_hooks(frontend);
     if !seed_messages.is_empty() {
         let turns = crate::seed_history::reverse_project_messages_to_turns(seed_messages);
         runner.seed_test_turns(turns);

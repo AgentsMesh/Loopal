@@ -1,17 +1,11 @@
 use super::cancel::TurnCancel;
 use super::llm_result::LlmStreamResult;
 use super::runner::AgentLoopRunner;
-use futures::StreamExt;
 use loopal_error::Result;
-use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::ContinuationIntent;
 use opentelemetry::KeyValue;
-use std::time::{Duration, Instant};
-use tracing::{info, warn};
-
-/// Max silence between stream chunks before a stalled response is treated as a
-/// recoverable truncation instead of blocking on the provider's 300s request cap.
-const STREAM_IDLE_TIMEOUT: Duration = Duration::from_secs(90);
+use std::time::Instant;
+use tracing::info;
 
 impl AgentLoopRunner {
     /// Stream the LLM response. `intent` carries continuation context that the
@@ -59,65 +53,9 @@ impl AgentLoopRunner {
             thinking = ?chat_params.thinking, "LLM request"
         );
 
-        let mut stream = self
-            .retry_stream_chat(&chat_params, &*provider, cancel)
+        let mut result = self
+            .retry_stream_response(&chat_params, &*provider, cancel)
             .await?;
-        let mut result = LlmStreamResult::default();
-        let mut received_done = false;
-
-        loop {
-            tokio::select! {
-                biased;
-                polled = tokio::time::timeout(STREAM_IDLE_TIMEOUT, stream.next()) => {
-                    match polled {
-                        Ok(Some(chunk_result)) => {
-                            if !self.handle_stream_chunk(chunk_result, &mut result, &mut received_done).await? {
-                                break;
-                            }
-                        }
-                        Ok(None) => break,
-                        Err(_elapsed) => {
-                            // reason: a provider/proxy can stop yielding without closing the
-                            // socket; without this the turn blocks on the 300s request cap.
-                            // Surface as truncation so the existing auto-continue path recovers.
-                            warn!(
-                                idle_secs = STREAM_IDLE_TIMEOUT.as_secs(),
-                                "LLM stream idle past timeout — treating as truncation"
-                            );
-                            self.emit_in_turn(AgentEventPayload::ProviderWarning {
-                                message: "Response stream stalled (no data received) — treating as interruption"
-                                    .to_string(),
-                            })
-                            .await?;
-                            result.stream_error = true;
-                            break;
-                        }
-                    }
-                }
-                _ = cancel.cancelled() => {
-                    info!("cancelled during LLM streaming");
-                    result.stream_error = true;
-                    break;
-                }
-            }
-        }
-
-        // Stream EOF without Done → connection dropped mid-stream.
-        // Exclude cancellation: retry_stream_chat returns empty stream on cancel,
-        // which would look like truncation but is intentional.
-        if !received_done
-            && !result.stream_error
-            && result.terminal_error.is_none()
-            && !cancel.is_cancelled()
-        {
-            warn!("SSE stream ended without message_stop — treating as stream truncation");
-            self.emit_in_turn(AgentEventPayload::ProviderWarning {
-                message: "Response stream ended unexpectedly — possible network interruption"
-                    .to_string(),
-            })
-            .await?;
-            result.stream_error = true;
-        }
 
         self.emit_thinking_complete(&result).await?;
         result.preserve_residual_thinking();

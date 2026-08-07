@@ -5,7 +5,13 @@
     {
       "expect": { "protocol": "google", "userContains": "Exercise Google safety terminal" },
       "rawSse": [
-        "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"Google safety terminal completed.\"}]},\"finishReason\":\"SAFETY\"}]}"
+        "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"GOOGLE SAFETY PARTIAL OUTPUT\"}]},\"finishReason\":\"SAFETY\"}]}"
+      ]
+    },
+    {
+      "expect": { "protocol": "google", "userContains": "Recover after Google safety terminal" },
+      "rawSse": [
+        "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"Google Session recovered after a safety terminal error.\"}]},\"finishReason\":\"STOP\"}]}"
       ]
     }
   ]

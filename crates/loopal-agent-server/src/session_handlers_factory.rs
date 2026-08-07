@@ -39,6 +39,22 @@ pub fn build_session_handlers(
     Box<dyn QuestionHandler>,
     DecisionCell,
 ) {
+    let emitter: Arc<dyn EventEmitter> = Arc::new(HubBroadcaster::new(session.clone(), None));
+    build_session_handlers_with_emitter(config, kernel, session, context, router, emitter)
+}
+
+pub(crate) fn build_session_handlers_with_emitter(
+    config: &ResolvedConfig,
+    kernel: &Arc<Kernel>,
+    session: SessionRef,
+    context: DecisionContext,
+    router: ModelRouterReader,
+    emitter: Arc<dyn EventEmitter>,
+) -> (
+    Box<dyn PermissionHandler>,
+    Box<dyn QuestionHandler>,
+    DecisionCell,
+) {
     let ipc_perm: Box<dyn PermissionHandler> = Box::new(IpcPermissionHandler::new(session.clone()));
     let ipc_q_arc: Arc<dyn QuestionHandler> = Arc::new(IpcQuestionHandler::new(session.clone()));
     if config.settings.decision_mode == DecisionMode::Agent {
@@ -64,7 +80,6 @@ pub fn build_session_handlers(
         kernel: kernel.clone(),
         router,
     });
-    let emitter: Arc<dyn EventEmitter> = Arc::new(HubBroadcaster::new(session, None));
     let auto_perm: Box<dyn PermissionHandler> = Box::new(
         ClassifierPermissionHandler::new(
             classifier.clone(),

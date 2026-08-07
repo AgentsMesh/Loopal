@@ -87,7 +87,7 @@ async fn blackhole_observer_is_bounded_and_does_not_block_primary() {
     );
 
     tokio::time::advance(EVENT_DELIVERY_DEADLINE).await;
-    delivery.await.unwrap();
+    assert_eq!(delivery.await.unwrap(), Ok(()));
 
     assert!(blackhole.closed.load(Ordering::Acquire));
     assert_eq!(session.all_connections().await.len(), 1);
@@ -95,4 +95,93 @@ async fn blackhole_observer_is_bounded_and_does_not_block_primary() {
         &session.primary_connection().await.unwrap(),
         &primary
     ));
+}
+
+#[tokio::test(start_paused = true)]
+async fn blackhole_primary_reports_failure_after_delivering_to_observer() {
+    let session = session();
+    let blackhole = Arc::new(BlackholeTransport {
+        send_started: Notify::new(),
+        closed: AtomicBool::new(false),
+    });
+    let (primary, _primary_rx) = Connection::new(blackhole.clone()).into_listening();
+    session.add_client("primary".into(), primary).await;
+
+    let (observer_peer, observer_server) = loopal_ipc::duplex_pair();
+    let (observer, _observer_incoming) = Connection::new(observer_server).into_listening();
+    let (_peer, mut observer_rx) = Connection::new(observer_peer).into_listening();
+    session
+        .add_client("observer".into(), observer.clone())
+        .await;
+
+    let delivery = tokio::spawn({
+        let session = session.clone();
+        async move { deliver(&session, serde_json::json!({"event": "critical"})).await }
+    });
+    blackhole.send_started.notified().await;
+
+    let observer_message = loop {
+        match observer_rx.try_recv() {
+            Ok(message) => break message,
+            Err(tokio::sync::mpsc::error::TryRecvError::Empty) => tokio::task::yield_now().await,
+            Err(error) => panic!("observer connection closed: {error}"),
+        }
+    };
+    assert!(matches!(
+        observer_message,
+        Incoming::Notification { method, .. }
+            if method == loopal_ipc::protocol::methods::AGENT_EVENT.name
+    ));
+    assert!(
+        !delivery.is_finished(),
+        "primary should still be at its deadline"
+    );
+
+    tokio::time::advance(EVENT_DELIVERY_DEADLINE).await;
+    assert_eq!(
+        delivery.await.unwrap(),
+        Err(DeliveryError::PrimaryConnectionFailed {
+            client_id: "primary".into(),
+        })
+    );
+
+    assert!(blackhole.closed.load(Ordering::Acquire));
+    assert_eq!(session.all_connections().await.len(), 1);
+    assert!(Arc::ptr_eq(
+        &session.primary_connection().await.unwrap(),
+        &observer
+    ));
+}
+
+#[tokio::test]
+async fn no_connections_is_a_delivery_failure() {
+    let session = session();
+    assert_eq!(
+        deliver(&session, serde_json::json!({"event": "critical"})).await,
+        Err(DeliveryError::NoConnections)
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn all_failed_connections_are_reported_after_cleanup() {
+    let session = session();
+    let blackhole = Arc::new(BlackholeTransport {
+        send_started: Notify::new(),
+        closed: AtomicBool::new(false),
+    });
+    let (primary, _primary_rx) = Connection::new(blackhole.clone()).into_listening();
+    session.add_client("primary".into(), primary).await;
+
+    let delivery = tokio::spawn({
+        let session = session.clone();
+        async move { deliver(&session, serde_json::json!({"event": "critical"})).await }
+    });
+    blackhole.send_started.notified().await;
+    tokio::time::advance(EVENT_DELIVERY_DEADLINE).await;
+
+    assert_eq!(
+        delivery.await.unwrap(),
+        Err(DeliveryError::AllConnectionsFailed { attempted: 1 })
+    );
+    assert!(session.all_connections().await.is_empty());
 }

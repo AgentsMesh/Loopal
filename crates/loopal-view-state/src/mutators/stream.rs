@@ -6,6 +6,10 @@ use super::MutationEffect;
 
 pub(super) fn stream(state: &mut SessionViewState, text: &str) -> MutationEffect {
     let conv = &mut state.agent.conversation;
+    // Regular model output proves that compaction has yielded back to the
+    // turn, even if its best-effort Done event was lost in transit.
+    conv.compact_banner = None;
+    conv.retry_banner = None;
     conv.begin_turn();
     conv.mark_active();
     conv.streaming_text.push_str(text);
@@ -15,6 +19,8 @@ pub(super) fn stream(state: &mut SessionViewState, text: &str) -> MutationEffect
 
 pub(super) fn thinking_stream(state: &mut SessionViewState, text: &str) -> MutationEffect {
     let conv = &mut state.agent.conversation;
+    conv.compact_banner = None;
+    conv.retry_banner = None;
     conv.begin_turn();
     conv.mark_active();
     conv.thinking_active = true;
@@ -39,7 +45,9 @@ pub(super) fn retry_error(
     let conv = &mut state.agent.conversation;
     conv.retry_banner = Some(format!("{message} ({attempt}/{max})"));
     conv.mark_active();
-    state.agent.observable.status = AgentStatus::Running;
+    // Retry is nested under whichever operation owns it. Main-model retries
+    // are already Running, while an idle manual compaction must remain
+    // WaitingForInput. The retry event cannot infer or replace that lifecycle.
     MutationEffect::Mutated
 }
 

@@ -4,7 +4,6 @@ use loopal_context::compact_config::{
     REHYDRATE_PER_FILE_BYTES, REHYDRATE_TIMEOUT, REHYDRATE_TOP_N, REHYDRATE_TOTAL_BYTES,
 };
 use loopal_context::middleware::touched_files::TouchedFile;
-use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::MessageOrigin;
 use loopal_provider_api::{ContentBlock, Message, MessageRole};
 use loopal_turn::{CompactionRehydrate, TurnStep};
@@ -173,14 +172,6 @@ impl AgentLoopRunner {
             bytes_injected = stats.bytes_injected,
             "post-compact rehydrate complete"
         );
-        let _ = self
-            .emit(AgentEventPayload::Stream {
-                text: format!(
-                    "[rehydrated {} files, {} bytes]\n",
-                    stats.files_succeeded, stats.bytes_injected
-                ),
-            })
-            .await;
         stats
     }
 }

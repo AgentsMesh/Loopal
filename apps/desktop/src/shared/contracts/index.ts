@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import {
+  type AgentControlDisposition,
   type AgentControlInput,
   type AgentControlTarget,
 } from './control-contracts'
@@ -125,7 +126,7 @@ export interface LoopalDesktopAPI {
     images?: readonly DesktopImageAttachment[],
   ): Promise<void>
   interruptAgent(target: AgentControlTarget): Promise<void>
-  controlAgent(input: AgentControlInput): Promise<void>
+  controlAgent(input: AgentControlInput): Promise<AgentControlDisposition>
   getDesktopPreferences(): Promise<DesktopPreferences>
   updateDesktopPreferences(input: UpdateDesktopPreferencesInput): Promise<DesktopPreferences>
   getLoopalSettings(workspaceId: string): Promise<LoopalDefaultSettings>

@@ -57,6 +57,19 @@ test('interrupts a live HTTP stream and keeps the Session reusable', async () =>
     await send(page, 'Hold this provider stream')
     const conversation = page.getByTestId('conversation')
     await expect(conversation).toContainText('STREAM START BEFORE INTERRUPT')
+    const target = await page.evaluate(async () => {
+      const bootstrap = await window.loopalDesktop.bootstrap()
+      const sessionId = bootstrap.activeSessionId!
+      const runtime = bootstrap.runtimes.find((item) => item.sessionId === sessionId)!
+      return {
+        sessionId, runtimeId: runtime.id, generation: runtime.generation,
+        agentId: runtime.rootAgent,
+      }
+    })
+    const queued = await page.evaluate(async (value) => (
+      window.loopalDesktop.controlAgent({ target: value, command: { type: 'suspend' } })
+    ), target)
+    expect(queued).toEqual({ status: 'queued' })
     await page.getByRole('button', { name: 'Settings' }).click()
     await selectSettingsSection(page, 'agent')
     await page.getByRole('group', { name: 'Agent controls' })

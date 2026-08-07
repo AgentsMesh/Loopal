@@ -35,7 +35,13 @@ pub fn start_event_loop(
             h.ui.event_broadcaster()
         };
         while let Some(mut event) = raw_rx.recv().await {
-            event.rev = apply_to_view_state(&hub, &event).await;
+            match apply_to_view_state(&hub, &event).await {
+                EventRoute::Broadcast(rev) => event.rev = rev,
+                EventRoute::DropStale => {
+                    tracing::debug!(agent = ?event.agent_name, "queued event belongs to a stale generation; dropping");
+                    continue;
+                }
+            }
             // Broadcast to all UI subscribers. Ignored error means no
             // active receivers — that's fine, ViewState is still updated.
             let _ = broadcaster.send(event);
@@ -44,36 +50,60 @@ pub fn start_event_loop(
     })
 }
 
+enum EventRoute {
+    Broadcast(Option<u64>),
+    DropStale,
+}
+
 /// Apply the event to the originating agent's `ViewStateReducer` so
 /// `view/snapshot` reflects it. Returns the post-apply `rev` so the
 /// caller can stamp it onto the broadcasted event copy. `None` when no
 /// reducer was touched (cross-hub event, untargeted event, or
 /// non-observable payload).
-async fn apply_to_view_state(
-    hub: &Arc<tokio::sync::Mutex<Hub>>,
-    event: &AgentEvent,
-) -> Option<u64> {
-    let addr = event.agent_name.as_ref()?;
+async fn apply_to_view_state(hub: &Arc<tokio::sync::Mutex<Hub>>, event: &AgentEvent) -> EventRoute {
+    let Some(addr) = event.agent_name.as_ref() else {
+        return EventRoute::Broadcast(None);
+    };
     if !addr.is_local() {
-        return None;
+        return EventRoute::Broadcast(None);
     }
     let reducer = {
         let mut h = hub.lock().await;
-        match &event.payload {
-            AgentEventPayload::Running | AgentEventPayload::Started => {
-                h.registry
-                    .set_lifecycle(&addr.agent, AgentLifecycle::Running);
-            }
-            AgentEventPayload::Error { message } => {
-                h.registry
-                    .set_lifecycle(&addr.agent, AgentLifecycle::Failed(message.clone()));
-            }
-            _ => {}
+        if event
+            .routing_generation
+            .is_some_and(|generation| !h.registry.owns_generation(&addr.agent, generation))
+        {
+            return EventRoute::DropStale;
         }
-        h.registry
+        project_lifecycle(&mut h, &addr.agent, &event.payload);
+        let Some(reducer) = h
+            .registry
             .agent_view(&addr.agent)
-            .or_else(|| h.remote_views.get(&addr.agent).cloned())?
+            .or_else(|| h.remote_views.get(&addr.agent).cloned())
+        else {
+            return EventRoute::Broadcast(None);
+        };
+        reducer
     };
-    let mut guard = reducer.lock().await;
-    guard.apply(event.payload.clone())
+    let rev = reducer.lock().await.apply(event.payload.clone());
+    if let Some(generation) = event.routing_generation {
+        let h = hub.lock().await;
+        if !h.registry.owns_generation(&addr.agent, generation) {
+            return EventRoute::DropStale;
+        }
+    }
+    EventRoute::Broadcast(rev)
+}
+
+fn project_lifecycle(hub: &mut Hub, agent: &str, payload: &AgentEventPayload) {
+    match payload {
+        AgentEventPayload::Running | AgentEventPayload::Started => {
+            hub.registry.set_lifecycle(agent, AgentLifecycle::Running);
+        }
+        AgentEventPayload::Error { message } => {
+            hub.registry
+                .set_lifecycle(agent, AgentLifecycle::Failed(message.clone()));
+        }
+        _ => {}
+    }
 }

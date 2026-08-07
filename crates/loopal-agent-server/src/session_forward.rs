@@ -99,8 +99,12 @@ pub(crate) async fn forward_loop(
                             session.interrupt_tx.send_modify(|v| *v = v.wrapping_add(1));
                         } else if method == methods::AGENT_MESSAGE.name {
                             // Hub-injected message (e.g. sub-agent completion notification).
-                            if let Ok(env) = serde_json::from_value::<Envelope>(params) {
-                                let _ = session.input_tx.send(AgentInput::Message(env)).await;
+                            if let Ok(env) = serde_json::from_value::<Envelope>(params)
+                                && session.input_tx.send(AgentInput::Message(env)).await.is_err()
+                            {
+                                tracing::warn!(
+                                    "dropping agent/message notification because the session input channel is closed"
+                                );
                             }
                         }
                     }
@@ -129,12 +133,23 @@ async fn route_request(
                 .await;
         }
         m if m == methods::AGENT_MESSAGE.name => match serde_json::from_value::<Envelope>(params) {
-            Ok(env) => {
-                let _ = session.input_tx.send(AgentInput::Message(env)).await;
-                let _ = connection
-                    .respond(id, serde_json::json!({"ok": true}))
-                    .await;
-            }
+            Ok(env) => match session.input_tx.send(AgentInput::Message(env)).await {
+                Ok(()) => {
+                    let _ = connection
+                        .respond(id, serde_json::json!({"ok": true}))
+                        .await;
+                }
+                Err(_) => {
+                    tracing::warn!("agent/message request reached a closed session input channel");
+                    let _ = connection
+                        .respond_error(
+                            id,
+                            jsonrpc::INTERNAL_ERROR,
+                            "session input channel is closed",
+                        )
+                        .await;
+                }
+            },
             Err(e) => {
                 let _ = connection
                     .respond_error(id, jsonrpc::INVALID_REQUEST, &e.to_string())

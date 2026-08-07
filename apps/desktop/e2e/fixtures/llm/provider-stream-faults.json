@@ -24,9 +24,9 @@
       ]
     },
     {
-      "expect": { "userContains": "Continue after empty disconnect" },
+      "expect": { "userContains": "Handle empty stream disconnect" },
       "chunks": [
-        { "type": "text", "text": "Session remained usable after an empty disconnect." },
+        { "type": "text", "text": "Empty stream recovered through exact request retry." },
         { "type": "usage", "input": 21, "output": 8 },
         { "type": "done" }
       ]
@@ -70,6 +70,14 @@
       "chunks": [
         { "type": "text", "text": "Server-only disconnect recovered." },
         { "type": "usage", "input": 25, "output": 8 },
+        { "type": "done" }
+      ]
+    },
+    {
+      "expect": { "userContains": "Continue after all stream recoveries" },
+      "chunks": [
+        { "type": "text", "text": "Session remained usable after every stream recovery." },
+        { "type": "usage", "input": 27, "output": 8 },
         { "type": "done" }
       ]
     }

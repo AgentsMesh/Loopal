@@ -134,8 +134,12 @@ fn log_unresolvable_routing(kernel: &Kernel) {
 
 pub fn build_kernel_with_provider(
     provider: Arc<dyn loopal_provider_api::Provider>,
+    model_override: Option<&str>,
 ) -> anyhow::Result<Arc<Kernel>> {
-    let settings = loopal_config::Settings::default();
+    let mut settings = loopal_config::Settings::default();
+    if let Some(model) = model_override {
+        settings.model = model.to_string();
+    }
     let mut kernel = Kernel::new(settings)?;
     loopal_agent::tools::register_all(&mut kernel);
     kernel.register_provider(provider);

@@ -36,11 +36,11 @@ impl PanelProvider for TasksPanelProvider {
         app: &App,
         state: &SessionState,
         focused: Option<&str>,
-        elapsed: Duration,
+        animation_elapsed: Duration,
         area: Rect,
     ) {
         let offset = app.section(PanelKind::Tasks).scroll_offset;
         let snapshots = app.view_client_for(&state.active_view).task_snapshots();
-        tasks_panel::render_tasks_panel(f, &snapshots, focused, elapsed, offset, area);
+        tasks_panel::render_tasks_panel(f, &snapshots, focused, animation_elapsed, offset, area);
     }
 }

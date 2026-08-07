@@ -79,6 +79,7 @@ fn derive_returns_none_when_last_batch_is_closed_even_if_earlier_is_pending() {
                 content: "ok".into(),
                 images: Vec::new(),
                 is_error: false,
+                metadata: None,
             }),
         )]),
     ]);

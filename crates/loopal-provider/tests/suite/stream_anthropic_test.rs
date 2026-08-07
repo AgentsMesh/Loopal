@@ -130,7 +130,9 @@ async fn test_anthropic_stream_chat_server_error() {
 
     let result = provider.stream_chat(&test_chat_params()).await;
     match expect_err(result) {
-        LoopalError::Provider(ProviderError::Api { status, message }) => {
+        LoopalError::Provider(ProviderError::Api {
+            status, message, ..
+        }) => {
             assert_eq!(status, 500);
             assert!(message.contains("internal server error"));
         }

@@ -42,6 +42,93 @@ async fn test_cancelled_wakes_on_signal_from_another_task() {
     assert!(cancel.is_cancelled());
 }
 
+/// token() is the cross-crate cancellation boundary used by compaction. It
+/// must wake without any caller also polling TurnCancel::cancelled().
+#[tokio::test]
+async fn exported_token_wakes_on_interrupt_generation() {
+    let interrupt = InterruptSignal::new();
+    let tx = Arc::new(tokio::sync::watch::channel(0u64).0);
+    let cancel = TurnCancel::new(interrupt.clone(), Arc::clone(&tx));
+    let token = cancel.token().clone();
+
+    interrupt.signal();
+    tx.send_modify(|generation| *generation = generation.wrapping_add(1));
+
+    tokio::time::timeout(Duration::from_millis(200), token.cancelled())
+        .await
+        .expect("exported token must be bridged to the interrupt watch");
+    assert!(cancel.is_cancelled());
+}
+
+#[tokio::test]
+async fn exported_token_ignores_generation_without_interrupt_then_wakes() {
+    let interrupt = InterruptSignal::new();
+    let tx = Arc::new(tokio::sync::watch::channel(0u64).0);
+    let cancel = TurnCancel::new(interrupt.clone(), Arc::clone(&tx));
+    let token = cancel.token().clone();
+
+    tx.send_modify(|generation| *generation = generation.wrapping_add(1));
+    tokio::task::yield_now().await;
+    assert!(
+        !token.is_cancelled(),
+        "a generation notification is not itself an interrupt"
+    );
+
+    interrupt.signal();
+    tx.send_modify(|generation| *generation = generation.wrapping_add(1));
+    tokio::time::timeout(Duration::from_millis(200), token.cancelled())
+        .await
+        .expect("later signaled generation must cancel the exported token");
+}
+
+#[tokio::test]
+async fn dropping_turn_cancel_stops_the_exported_token_bridge() {
+    let interrupt = InterruptSignal::new();
+    let tx = Arc::new(tokio::sync::watch::channel(0u64).0);
+    let cancel = TurnCancel::new(interrupt.clone(), Arc::clone(&tx));
+    let token = cancel.token().clone();
+    drop(cancel);
+
+    interrupt.signal();
+    tx.send_modify(|generation| *generation = generation.wrapping_add(1));
+    assert!(
+        tokio::time::timeout(Duration::from_millis(30), token.cancelled())
+            .await
+            .is_err(),
+        "a dropped turn scope must not retain a live bridge task"
+    );
+}
+
+#[test]
+fn turn_cancel_constructed_outside_runtime_starts_bridge_on_first_token_use() {
+    let interrupt = InterruptSignal::new();
+    let tx = Arc::new(tokio::sync::watch::channel(0u64).0);
+    let cancel = TurnCancel::new(interrupt.clone(), Arc::clone(&tx));
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .unwrap();
+
+    runtime.block_on(async {
+        let token = cancel.token().clone();
+        interrupt.signal();
+        tx.send_modify(|generation| *generation = generation.wrapping_add(1));
+        tokio::time::timeout(Duration::from_millis(200), token.cancelled())
+            .await
+            .expect("lazy bridge must wake after entering a Tokio runtime");
+    });
+}
+
+#[test]
+#[should_panic(expected = "TurnCancel::token() requires a Tokio runtime")]
+fn exported_token_cannot_silently_skip_bridge_outside_runtime() {
+    let cancel = TurnCancel::new(
+        InterruptSignal::new(),
+        Arc::new(tokio::sync::watch::channel(0u64).0),
+    );
+    let _ = cancel.token();
+}
+
 /// cancelled() returns when the watch sender is dropped.
 #[tokio::test]
 async fn test_cancelled_returns_on_sender_drop() {

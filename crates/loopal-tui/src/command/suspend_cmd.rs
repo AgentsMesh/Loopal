@@ -26,7 +26,7 @@ impl CommandHandler for SuspendCmd {
             .send_control(target, ControlCommand::Suspend)
             .await;
         CommandEffect::Reply(
-            "Session suspended. Cron, continuation, and hook wakes are blocked until /resume \
+            "Session suspended. Cron, continuation, and hook wakes are blocked until /unsuspend \
              (or until you send a new message)."
                 .into(),
         )

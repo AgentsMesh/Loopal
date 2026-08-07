@@ -4,6 +4,8 @@ pub use runner_support::{
     make_runner_with_question_channel, make_test_budget, make_turn_ctx,
 };
 
+mod apply_patch_compact_rehydrate_e2e_test;
+mod apply_patch_partial_diff_e2e_test;
 mod ask_user_schema_err_test;
 mod auto_continue_edge_test;
 mod auto_continue_test;
@@ -69,6 +71,7 @@ mod stream_truncation_edge_test;
 mod stream_truncation_test;
 mod suspend_cron_e2e_test;
 mod suspend_e2e_test;
+mod termination_reason_test;
 mod thinking_continue_test;
 mod tools_edit_safety_test;
 mod tools_test;

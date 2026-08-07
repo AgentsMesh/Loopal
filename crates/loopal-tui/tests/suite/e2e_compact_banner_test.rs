@@ -116,8 +116,13 @@ fn compacted_event_clears_stale_banner_from_frame() {
         },
     )));
     let after = render_frame(&mut app);
+    assert_eq!(
+        app.snapshot_active_conversation().compact_banner,
+        None,
+        "Compacted event must clear compact banner state",
+    );
     assert!(
-        !after.contains("rehydrat"),
+        !after.contains("▼ "),
         "Compacted event must clear stale banner from frame, got:\n{after}",
     );
 }

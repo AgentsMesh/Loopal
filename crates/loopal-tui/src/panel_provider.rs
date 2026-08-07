@@ -33,13 +33,15 @@ pub trait PanelProvider: Send + Sync {
         self.item_ids(app, state).len()
     }
     fn height(&self, app: &App, state: &SessionState) -> u16;
+    /// Render using a process-local monotonic clock for visual animation.
+    /// Business durations must come from the panel's view-state snapshots.
     fn render(
         &self,
         f: &mut Frame,
         app: &App,
         state: &SessionState,
         focused: Option<&str>,
-        elapsed: Duration,
+        animation_elapsed: Duration,
         area: Rect,
     );
 }

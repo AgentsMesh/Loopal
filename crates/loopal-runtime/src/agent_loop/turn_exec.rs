@@ -15,7 +15,6 @@ impl AgentLoopRunner {
         turn_ctx: &mut TurnContext,
     ) -> Result<TurnOutput> {
         let mut c = TurnLoopCounters {
-            last_text: String::new(),
             continuation_count: 0,
             stop_feedback_count: 0,
             max_continuations: self.params.harness.max_auto_continuations,
@@ -27,12 +26,12 @@ impl AgentLoopRunner {
             state = match state {
                 TurnState::Cancelled | TurnState::Complete => {
                     return Ok(TurnOutput {
-                        output: c.last_text,
+                        output: turn_ctx.best_effort_output().to_owned(),
                     });
                 }
                 TurnState::ReadyToCall => self.step_ready_to_call(turn_ctx).await?,
                 TurnState::ResponseRecorded { result } => {
-                    self.handle_response_recorded(turn_ctx, result, &mut c)
+                    self.handle_response_recorded(turn_ctx, *result, &mut c)
                         .await?
                 }
                 TurnState::NeedsContinuation { reason } => {
@@ -82,6 +81,8 @@ impl AgentLoopRunner {
         turn_ctx.metrics.llm_calls += 1;
         let intent = turn_ctx.pending_continuation.take();
         let result = self.stream_llm_with(intent, &turn_ctx.cancel).await?;
-        Ok(TurnState::ResponseRecorded { result })
+        Ok(TurnState::ResponseRecorded {
+            result: Box::new(result),
+        })
     }
 }

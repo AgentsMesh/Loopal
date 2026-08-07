@@ -48,11 +48,14 @@ async fn request_idle_emits_tool_result_and_does_not_trigger_next_llm() {
 
 #[tokio::test]
 async fn request_idle_invalid_arg_also_emits_tool_result() {
-    let calls = vec![chunks::tool_turn(
-        "tc-idle-bad",
-        "request_idle",
-        serde_json::json!({"reason": "missing duration"}),
-    )];
+    let calls = vec![
+        chunks::tool_turn(
+            "tc-idle-bad",
+            "request_idle",
+            serde_json::json!({"reason": "missing duration"}),
+        ),
+        chunks::text_turn("The idle request was invalid."),
+    ];
 
     let harness = HarnessBuilder::new()
         .calls(calls)

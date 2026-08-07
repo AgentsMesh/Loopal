@@ -1,4 +1,4 @@
-//! Child-process event bridge: track sub-agent completion and collect result text.
+//! Child-process event bridge for legacy direct-client integrations.
 
 use tokio::sync::mpsc;
 use tracing::info;
@@ -7,7 +7,7 @@ use loopal_agent_client::{AgentClient, AgentClientEvent};
 use loopal_protocol::{AgentEvent, AgentEventPayload};
 use tokio_util::sync::CancellationToken;
 
-/// Track child completion and collect result text.
+/// Track child completion and return the authoritative `agent/completed` result.
 /// Used by integration tests; production path uses Hub agent_io_loop.
 #[allow(dead_code)]
 pub async fn bridge_child_events(
@@ -16,36 +16,52 @@ pub async fn bridge_child_events(
     agent_name: &str,
     cancel_token: &CancellationToken,
 ) -> Result<String, String> {
-    let mut stream_text = String::new();
+    let mut terminal_error = None;
     loop {
         tokio::select! {
-            event = client.recv() => match event {
-                Some(AgentClientEvent::AgentEvent(ev)) => {
-                    match &ev.payload {
-                        AgentEventPayload::Stream { text } => {
-                            stream_text.push_str(text);
-                        }
-                        AgentEventPayload::Finished => {
-                            break;
-                        }
-                        _ => {}
-                    }
-                }
-                None => break,
-            },
+            biased;
             () = cancel_token.cancelled() => {
                 let _ = client.shutdown().await;
-                break;
+                return Err(format!("sub-agent {agent_name} cancelled"));
             }
+            event = client.recv() => match event {
+                Some(AgentClientEvent::AgentEvent(ev)) => {
+                    if let AgentEventPayload::Error { message } = &ev.payload {
+                        terminal_error = Some(message.clone());
+                    }
+                }
+                Some(AgentClientEvent::AgentCompleted(completion)) => {
+                    info!(
+                        agent = %agent_name,
+                        reason = %completion.reason,
+                        has_result = completion.result.is_some(),
+                        "sub-agent bridge received authoritative completion"
+                    );
+                    return match completion.reason.as_str() {
+                        "goal" => Ok(completion
+                            .result
+                            .unwrap_or_else(|| "(sub-agent completed)".into())),
+                        reason => {
+                            let detail = completion.result.or(terminal_error);
+                            Err(match detail {
+                                Some(detail) => format!(
+                                    "sub-agent {agent_name} completed with reason {reason}: {detail}"
+                                ),
+                                None => format!(
+                                    "sub-agent {agent_name} completed with reason {reason} and no result"
+                                ),
+                            })
+                        }
+                    };
+                }
+                None => {
+                    return Err(format!(
+                        "sub-agent {agent_name} connection closed before agent/completed"
+                    ));
+                }
+            },
         }
     }
-    info!(agent = %agent_name, "sub-agent bridge ended");
-    let output = if stream_text.is_empty() {
-        "(sub-agent completed)".into()
-    } else {
-        stream_text
-    };
-    Ok(output)
 }
 
 /// Read child's TCP server_info (port, token) — legacy, kept for tests.

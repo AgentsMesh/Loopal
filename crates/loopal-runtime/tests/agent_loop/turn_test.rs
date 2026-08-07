@@ -39,59 +39,67 @@ async fn test_turn_tool_then_text_non_interactive() {
     let tmp_file = std::env::temp_dir().join(format!("la_turn_test_{}.txt", std::process::id()));
     std::fs::write(&tmp_file, "content").unwrap();
 
-    // MockProvider only yields one batch of chunks, so if the runner tries
-    // a second LLM call (the old bug), stream_llm would get an empty stream.
-    let chunks = vec![
-        Ok(StreamChunk::ToolUse {
-            id: "tc-1".to_string(),
-            name: "Read".to_string(),
-            input: serde_json::json!({"file_path": tmp_file.to_str().unwrap()}),
-        }),
-        Ok(StreamChunk::Usage {
-            input_tokens: 10,
-            output_tokens: 5,
-            cache_creation_input_tokens: 0,
-            cache_read_input_tokens: 0,
-            thinking_tokens: 0,
-        }),
-        Ok(StreamChunk::Done {
-            stop_reason: StopReason::EndTurn,
-        }),
+    // Tool results require one follow-up model call in the same turn. Keep the
+    // fixture protocol-complete so an exhausted mock queue cannot masquerade as
+    // a valid empty response (or burn the production EOF retry budget).
+    let calls = vec![
+        vec![
+            Ok(StreamChunk::ToolUse {
+                id: "tc-1".to_string(),
+                name: "Read".to_string(),
+                input: serde_json::json!({"file_path": tmp_file.to_str().unwrap()}),
+            }),
+            Ok(StreamChunk::Usage {
+                input_tokens: 10,
+                output_tokens: 5,
+                cache_creation_input_tokens: 0,
+                cache_read_input_tokens: 0,
+                thinking_tokens: 0,
+            }),
+            Ok(StreamChunk::Done {
+                stop_reason: StopReason::EndTurn,
+            }),
+        ],
+        vec![
+            Ok(StreamChunk::Text {
+                text: "Read complete.".into(),
+            }),
+            Ok(StreamChunk::Done {
+                stop_reason: StopReason::EndTurn,
+            }),
+        ],
     ];
-    let (mut runner, mut event_rx, mbox_tx, ctrl_tx) = make_runner_with_mock_provider(chunks);
-    // Drop senders so recv_input() returns None after the turn completes.
-    drop(mbox_tx);
-    drop(ctrl_tx);
+    let (mut runner, mut event_rx) = super::mock_provider::make_multi_runner(calls);
 
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 
     let output = runner.run().await.unwrap();
     // Tool executed, non-interactive agent exits after first turn
     assert!(runner.turns.view().len() >= 3);
-    // Result may be empty since LLM text was empty (only tool use in the stream)
     assert_eq!(output.terminate_reason, TerminateReason::Goal);
+    assert_eq!(output.result, "Read complete.");
 
     let _ = std::fs::remove_file(&tmp_file);
 }
 
-/// Non-interactive: stream error with no prior output → Goal with empty result.
-/// Matches old behavior: stream_error + no content → break → Ok("").
-#[tokio::test]
+/// Non-interactive: a stream error with no prior output exhausts its retry
+/// budget and terminates as Error, never an empty Goal.
+#[tokio::test(start_paused = true)]
 async fn test_turn_stream_error_no_prior_output() {
-    let chunks = vec![Err(loopal_error::LoopalError::Provider(
-        loopal_error::ProviderError::StreamEnded,
-    ))];
-    let (mut runner, mut event_rx, mbox_tx, ctrl_tx) = make_runner_with_mock_provider(chunks);
-    // Drop senders so recv_input() returns None after the turn completes.
-    drop(mbox_tx);
-    drop(ctrl_tx);
+    let calls = (0..7)
+        .map(|_| {
+            vec![Err(loopal_error::LoopalError::Provider(
+                loopal_error::ProviderError::StreamEnded,
+            ))]
+        })
+        .collect();
+    let (mut runner, mut event_rx) = super::mock_provider::make_multi_runner(calls);
 
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 
     let output = runner.run().await.unwrap();
-    // Stream error with no prior text → Goal (not Error), matching old break behavior
-    assert_eq!(output.terminate_reason, TerminateReason::Goal);
-    assert!(output.result.is_empty());
+    assert_eq!(output.terminate_reason, TerminateReason::Error);
+    assert!(output.result.contains("Stream ended unexpectedly"));
 }
 
 /// E2E: AskUser + Read in the same LLM response → each tool_use_id appears

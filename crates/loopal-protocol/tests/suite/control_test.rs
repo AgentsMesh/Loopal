@@ -1,4 +1,7 @@
-use loopal_protocol::{AgentMode, ControlCommand};
+use loopal_protocol::{
+    AgentMode, CONTROL_RPC_COMPLETION_GRACE, ControlCommand, ControlDisposition,
+    DEFAULT_CONTROL_APPLICATION_TIMEOUT, DEFAULT_CONTROL_RPC_TIMEOUT,
+};
 use strum::IntoEnumIterator;
 
 #[test]
@@ -163,4 +166,45 @@ fn test_all_control_commands_serde_roundtrip() {
             "discriminant changed across roundtrip for {original:?}"
         );
     }
+}
+
+#[test]
+fn control_forwarding_deadline_outlives_application_window() {
+    assert!(DEFAULT_CONTROL_RPC_TIMEOUT > DEFAULT_CONTROL_APPLICATION_TIMEOUT);
+    assert!(
+        DEFAULT_CONTROL_RPC_TIMEOUT - DEFAULT_CONTROL_APPLICATION_TIMEOUT
+            >= CONTROL_RPC_COMPLETION_GRACE
+    );
+}
+
+#[test]
+fn control_disposition_is_typed_and_legacy_compatible() {
+    for disposition in [
+        ControlDisposition::Applied,
+        ControlDisposition::Queued,
+        ControlDisposition::Unknown,
+        ControlDisposition::Rejected {
+            reason: "unsupported".into(),
+        },
+    ] {
+        let value = serde_json::to_value(&disposition).unwrap();
+        assert_eq!(
+            ControlDisposition::from_wire_value(value).unwrap(),
+            disposition
+        );
+    }
+    assert_eq!(
+        ControlDisposition::from_wire_value(serde_json::json!({"ok": true})).unwrap(),
+        ControlDisposition::Queued
+    );
+    assert_eq!(
+        ControlDisposition::from_wire_value(
+            serde_json::json!({"ok": false, "error": "old rejection"})
+        )
+        .unwrap(),
+        ControlDisposition::Rejected {
+            reason: "old rejection".into()
+        }
+    );
+    assert!(ControlDisposition::from_wire_value(serde_json::json!({"ok": "yes"})).is_err());
 }

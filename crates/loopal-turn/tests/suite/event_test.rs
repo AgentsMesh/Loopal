@@ -1,3 +1,4 @@
+use loopal_tool_invocation::ToolResultMetadata;
 use loopal_turn::{
     AssistantOutput, OrderedToolBatch, StopReason, ToolBatchItem, ToolCall, ToolCallId,
     ToolExecState, ToolResult, TurnEvent, TurnId, TurnOutcome, TurnStep, TurnTrigger,
@@ -30,6 +31,7 @@ fn step_updated_event_carries_state_transition() {
             content: "ok".into(),
             is_error: false,
             images: vec![],
+            metadata: None,
         }),
         updated_at: None,
     };
@@ -46,6 +48,29 @@ fn step_updated_event_carries_state_transition() {
     } else {
         panic!("expected StepUpdated");
     }
+}
+
+#[test]
+fn tool_result_metadata_round_trips_and_legacy_result_defaults_to_none() {
+    let result = ToolResult {
+        content: "partially applied".into(),
+        is_error: true,
+        images: vec![],
+        metadata: Some(ToolResultMetadata::modified_files(vec![
+            "/workspace/a.rs".into(),
+        ])),
+    };
+    let json = serde_json::to_value(&result).unwrap();
+    let decoded: ToolResult = serde_json::from_value(json).unwrap();
+    assert_eq!(decoded.metadata, result.metadata);
+
+    let legacy: ToolResult = serde_json::from_value(serde_json::json!({
+        "content": "old turn",
+        "is_error": false,
+        "images": []
+    }))
+    .unwrap();
+    assert!(legacy.metadata.is_none());
 }
 
 #[test]

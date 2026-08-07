@@ -41,11 +41,10 @@ async fn register_agent(
     (client_conn, client_rx)
 }
 
-/// When a child completes, parent receives an agent/message notification
-/// containing an Envelope with MessageSource::System.
+/// Failed completion keeps raw parent content while carrying typed failure metadata.
 #[tokio::test]
-async fn child_completion_delivered_to_parent_via_bridge() {
-    let (hub, _) = make_hub();
+async fn failed_child_completion_delivered_to_parent_via_bridge() {
+    let (hub, _event_rx) = make_hub();
 
     // Register parent — listen on its client_rx for incoming notifications
     let (parent_conn, mut parent_rx) = register_agent(&hub, "parent", None).await;
@@ -78,11 +77,11 @@ async fn child_completion_delivered_to_parent_via_bridge() {
     let (child_conn, _child_rx) = register_agent(&hub, "child-a", Some("parent")).await;
     tokio::time::sleep(Duration::from_millis(100)).await;
 
-    // Child sends agent/completed with result
+    // Child sends a failed completion with a useful partial result.
     child_conn
         .send_notification(
             methods::AGENT_COMPLETED.name,
-            json!({"reason": "goal", "result": "Analysis: 42 issues found."}),
+            json!({"reason": "error", "result": "Analysis: 42 issues found before failure."}),
         )
         .await
         .unwrap();
@@ -107,12 +106,18 @@ async fn child_completion_delivered_to_parent_via_bridge() {
         text.contains("42 issues"),
         "body should be the raw result, got: {text}"
     );
+    let completion = envelope
+        .agent_completion
+        .as_ref()
+        .expect("parent envelope must preserve completion metadata");
+    assert_eq!(completion.reason, "error");
+    assert_eq!(completion.result.as_deref(), Some(text.as_str()));
 }
 
 /// Multiple children completing → parent receives all notifications.
 #[tokio::test]
 async fn multiple_children_all_delivered() {
-    let (hub, _) = make_hub();
+    let (hub, _event_rx) = make_hub();
 
     let (parent_conn, mut parent_rx) = register_agent(&hub, "parent", None).await;
     let (tx, rx) = mpsc::channel::<Envelope>(16);

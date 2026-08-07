@@ -1,5 +1,4 @@
-//! Full chain test: spawn-like flow where sub-agent result is delivered to parent.
-//! Simulates the exact flow inside spawn_agent without spawning a real process.
+//! Completion-chain test: a child server result reaches the parent-side waiter.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -18,9 +17,8 @@ use super::bridge_child_test::make_duplex_pair;
 
 const T: Duration = Duration::from_secs(10);
 
-/// The most fundamental scenario: sub-agent finishes -> result delivered to parent
-/// via oneshot channel -> parent can continue. Simulates the exact flow inside
-/// spawn_agent (bridge task + result_tx/rx) without spawning a real process.
+/// A sub-agent's authoritative agent/completed result is delivered through the
+/// parent-side oneshot so the parent can continue.
 #[tokio::test]
 async fn full_chain_sub_agent_result_delivered_to_parent() {
     let fixture = TestFixture::new();
@@ -36,7 +34,7 @@ async fn full_chain_sub_agent_result_delivered_to_parent() {
             loopal_agent_server::run_server_for_test(server_t, provider, cwd, session_dir).await;
     });
 
-    // Simulate spawn_agent internals
+    // Start a direct IPC child, then hand its completion to a parent-side waiter.
     let client = AgentClient::new(client_t);
     client.initialize().await.expect("initialize");
     client
@@ -52,20 +50,20 @@ async fn full_chain_sub_agent_result_delivered_to_parent() {
     let (event_tx, _event_rx) = mpsc::channel::<AgentEvent>(16);
     let cancel = CancellationToken::new();
 
-    // Bridge task — same as spawn_agent's join_handle
+    // The legacy direct-client bridge consumes the same completion contract as Hub.
     tokio::spawn(async move {
         let result = bridge_child_events(client, &event_tx, "researcher", &cancel).await;
         let _ = result_tx.send(result);
     });
 
-    // Simulate Agent tool's handle_spawn_result
+    // Simulate a parent waiting for its child's terminal result.
     let result = tokio::time::timeout(T, result_rx)
         .await
         .expect("result should arrive within timeout")
         .expect("oneshot channel should not be dropped")
         .expect("bridge should succeed");
 
-    // Parent got the sub-agent's stream output
+    // Parent got the authoritative result from agent/completed.
     assert!(
         result.contains("Research Report"),
         "parent should receive sub-agent's result, got: {}",

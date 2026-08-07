@@ -7,7 +7,7 @@ use super::mock_provider::{
     make_interactive_multi_runner, make_multi_runner, make_runner_with_mock_provider,
 };
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn test_full_run_stream_error_recovery_with_close() {
     let chunks = vec![Err(LoopalError::Provider(
         loopal_error::ProviderError::StreamEnded,
@@ -19,8 +19,8 @@ async fn test_full_run_stream_error_recovery_with_close() {
 
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 
-    let result = runner.run().await;
-    assert!(result.is_ok());
+    let output = runner.run().await.unwrap();
+    assert_eq!(output.terminate_reason, TerminateReason::Error);
 }
 
 /// Interactive agent emits AwaitingInput after responding, then exits when
@@ -117,7 +117,7 @@ async fn test_prompt_driven_exits_after_turn() {
 }
 
 /// Prompt-driven session with LLM error -> exits cleanly (no hang).
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn test_prompt_driven_error_exits_cleanly() {
     let calls = vec![vec![Err(LoopalError::Provider(
         loopal_error::ProviderError::Http("connection refused".into()),
@@ -125,14 +125,7 @@ async fn test_prompt_driven_error_exits_cleanly() {
     let (mut runner, _event_rx) = make_multi_runner(calls);
 
     let output = runner.run().await.unwrap();
-    assert!(
-        matches!(
-            output.terminate_reason,
-            TerminateReason::Goal | TerminateReason::Error
-        ),
-        "prompt-driven error should exit, got: {:?}",
-        output.terminate_reason
-    );
+    assert_eq!(output.terminate_reason, TerminateReason::Error);
 }
 
 /// Reproduces the cross-hub failure: a spawned (ephemeral) agent whose model

@@ -21,8 +21,8 @@ pub(crate) fn validate_call(value: &Value) -> Result<()> {
     reject_unknown(object, CALL_FIELDS, "scenario call")?;
     if let Some(count) = object.get("disconnectAfterEvents") {
         ensure!(
-            count.as_u64().is_some_and(|value| value > 0),
-            "disconnectAfterEvents must be a positive integer"
+            count.as_u64().is_some(),
+            "disconnectAfterEvents must be a non-negative integer"
         );
     }
     let chunks = object.get("chunks").and_then(Value::as_array);

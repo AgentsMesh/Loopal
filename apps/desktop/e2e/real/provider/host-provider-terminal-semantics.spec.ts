@@ -62,20 +62,42 @@ test('OpenAI response.failed is fatal, redacted, and recoverable next turn', asy
   }
 })
 
-test('Google SAFETY terminates normally without a truncation warning', async () => {
+test('Google SAFETY preserves partial output, fails closed, and recovers next turn', async () => {
   const desktop = await launchDesktop('real', 'provider-google-safety', {}, 'google')
   try {
-    const conversation = desktop.page.getByTestId('conversation')
-    await ready(desktop.page)
-    await send(desktop.page, 'Exercise Google safety terminal')
-    await expect(conversation).toContainText('Google safety terminal completed.', {
+    const page = desktop.page
+    const conversation = page.getByTestId('conversation')
+    await ready(page)
+    await send(page, 'Exercise Google safety terminal')
+    await expect(conversation).toContainText('GOOGLE SAFETY PARTIAL OUTPUT', {
       timeout: 20_000,
     })
+    await expect(conversation.locator('[data-message-role="error"]')).toContainText(
+      'status=400, message=google candidate terminated: SAFETY', { timeout: 20_000 },
+    )
+    await expect(page.getByTestId('runtime-status')).toContainText('Failed')
     await expect(conversation).not.toContainText('network interruption')
     await expect(conversation).not.toContainText('Auto-continuing')
-    await ready(desktop.page)
+
+    const failed = await activeDetail(page)
+    expect(failed.session.attention).toBe('failure')
+    expect(failed.agents.find((agent) => agent.id === 'main')?.status).toBe('failed')
+    expect(failed.conversation.some((entry) => (
+      entry.role === 'error'
+        && entry.text.includes('google candidate terminated: SAFETY')
+    ))).toBe(true)
+    expect(failed.view?.goal?.status).not.toBe('complete')
+
+    await send(page, 'Recover after Google safety terminal')
+    await expect(conversation).toContainText(
+      'Google Session recovered after a safety terminal error.', { timeout: 20_000 },
+    )
+    await ready(page)
+    const recovered = await activeDetail(page)
+    expect(recovered.session.attention).not.toBe('failure')
+    expect(recovered.agents.find((agent) => agent.id === 'main')?.status).not.toBe('failed')
     await expect.poll(() => desktop.llm!.state()).toMatchObject({
-      served: 1, remaining: 0, verified: true,
+      served: 2, remaining: 0, unmatchedRequests: 0, verified: true,
     })
   } finally {
     await closeDesktop(desktop)

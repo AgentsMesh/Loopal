@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use loopal_ipc::connection::Incoming;
 use loopal_ipc::protocol::methods;
 use loopal_ipc::rpc_error::RpcError;
@@ -24,7 +22,6 @@ async fn ui_acl_rejects_privileged_hub_methods() {
 async fn workspace_rpc_emits_notifications() {
     let root = tempfile::tempdir().unwrap();
     let (_hub, conn, mut rx) = setup(root.path()).await;
-    tokio::time::sleep(Duration::from_millis(50)).await;
     let document = conn
         .send_request(
             methods::WORKSPACE_WRITE_FILE.name,
@@ -48,7 +45,7 @@ async fn workspace_rpc_emits_notifications() {
     assert_eq!(listing["entries"][0]["path"], "hello.txt");
     let mut file_changed = false;
     while !file_changed {
-        let message = tokio::time::timeout(Duration::from_secs(10), rx.recv())
+        let message = tokio::time::timeout(std::time::Duration::from_secs(10), rx.recv())
             .await
             .unwrap()
             .unwrap();

@@ -33,7 +33,7 @@
     },
     {
       "expect": {
-        "userContains": "<agent-result name=\"remote-cancel\">\nREMOTE INTERRUPT STREAM ACTIVE 84F1"
+        "userContains": "[agent completion failed; reason: aborted]\nREMOTE INTERRUPT STREAM ACTIVE 84F1"
       },
       "chunks": [
         { "type": "text", "text": "Root observed remote child interruption." },

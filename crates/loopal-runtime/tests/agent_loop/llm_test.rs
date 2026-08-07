@@ -181,25 +181,18 @@ async fn test_stream_llm_error_in_stream() {
     assert!(stream_error);
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn test_stream_llm_empty_stream() {
-    // Empty stream (no chunks at all) — stream EOF without Done = truncation.
-    let chunks = vec![];
-    let (mut runner, _event_rx, _input_tx, _ctrl_tx) = make_runner_with_mock_provider(chunks);
+    // Empty stream (no chunks at all) is replayed within the retry budget,
+    // then surfaces a terminal error instead of an empty successful response.
+    let calls: Vec<Vec<Result<StreamChunk, LoopalError>>> = (0..7).map(|_| Vec::new()).collect();
+    let (mut runner, _event_rx) = super::mock_provider::make_multi_runner(calls);
 
     let cancel = make_cancel();
-    let result = in_turn(runner.stream_llm_with(None, &cancel))
+    let error = in_turn(runner.stream_llm_with(None, &cancel))
         .await
-        .unwrap();
-    let text = result.assistant_text;
-    let tool_uses = result.tool_uses;
-    let stream_error = result.stream_error;
-    assert!(text.is_empty());
-    assert!(tool_uses.is_empty());
-    assert!(
-        stream_error,
-        "empty stream (no Done) should set stream_error"
-    );
+        .expect_err("retry exhaustion must surface empty EOF as an error");
+    assert!(error.to_string().contains("Stream ended unexpectedly"));
 }
 
 #[test]

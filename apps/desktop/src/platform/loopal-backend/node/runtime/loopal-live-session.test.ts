@@ -105,6 +105,58 @@ describe('LoopalLiveSession', () => {
     }))
   })
 
+  it('replays a newer lifecycle event over a running startup snapshot', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const value = harness()
+    const implementation = value.request.getMockImplementation()!
+    value.request.mockImplementation(async (method, params, signal) => {
+      if (method === 'view/snapshot') {
+        await gate
+        return {
+          rev: 2,
+          state: { agent: {
+            name: 'main', observable: { status: 'Running' },
+            conversation: { streaming_text: '', messages: [] },
+          } },
+        }
+      }
+      return implementation(method, params, signal)
+    })
+
+    const pending = value.state.initialize()
+    await vi.waitFor(() => expect(value.request).toHaveBeenCalledWith(
+      'view/snapshot', { agent: 'main' },
+    ))
+    value.state.accept('agent/event', event('AwaitingInput', 3))
+    release()
+    await pending
+
+    expect(value.state.detail.agents.find((agent) => agent.id === 'main')?.status).toBe('waiting')
+  })
+
+  it('projects ordered lifecycle events without waiting for a snapshot refresh', async () => {
+    const value = harness()
+    await value.state.initialize()
+    value.state.detail.agents.push({
+      id: 'worker', name: 'Worker', parentId: 'main', status: 'waiting',
+    })
+
+    value.state.accept('agent/event', event('Running', 3))
+    value.state.accept('agent/event', event('Running', 3, 'worker'))
+    expect(value.state.detail.agents.find((agent) => agent.id === 'main')?.status).toBe('running')
+    expect(value.state.detail.agents.find((agent) => agent.id === 'worker')?.status).toBe('running')
+
+    value.state.accept('agent/event', event('AwaitingInput', 4))
+    value.state.accept('agent/event', event({ Error: { message: 'child failed' } }, 4, 'worker'))
+    value.state.accept('agent/event', event('Finished', 5, 'worker'))
+    expect(value.state.detail.agents.find((agent) => agent.id === 'main')?.status).toBe('waiting')
+    expect(value.state.detail.agents.find((agent) => agent.id === 'worker')?.status).toBe('failed')
+
+    value.state.accept('agent/event', event('Running', 3))
+    expect(value.state.detail.agents.find((agent) => agent.id === 'main')?.status).toBe('waiting')
+  })
+
   it('retains deduplicated artifacts produced by root and child turns', async () => {
     const { state, events } = harness()
     await state.initialize()

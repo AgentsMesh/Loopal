@@ -10,6 +10,7 @@ use loopal_protocol::{AgentEvent, AgentEventPayload, QualifiedAddress, UiCapabil
 use super::cleanup::{InteractionKind, remove_if_current, schedule_timeout};
 use super::completion::{TerminalEventSink, complete_detached};
 use super::types::{FastPath, PendingPlanApprovalInfo};
+use crate::authoritative_events::PreparedAuthoritativeEvent;
 use crate::hub::Hub;
 
 pub async fn handle_agent_plan_approval(
@@ -62,11 +63,9 @@ pub async fn handle_agent_plan_approval(
                     logical_id: logical_id.clone(),
                 },
             );
-            let outcome = if h.registry.event_sender().try_send(event).is_ok() {
-                FastPath::Pending
-            } else {
-                FastPath::EmitFailed
-            };
+            let event = h.registry.prepare_generation_event(agent_name, event);
+            let outcome =
+                FastPath::Pending(Box::new(PreparedAuthoritativeEvent::from_hub(&h, event)));
             (outcome, h.pending_interaction_timeout())
         }
     };
@@ -79,28 +78,59 @@ pub async fn handle_agent_plan_approval(
             warn!(agent = %agent_name, request_id = logical_id, "concurrent plan approval request rejected");
             cancel(agent_conn, agent_ipc_id, "superseded");
         }
-        FastPath::EmitFailed => {
-            warn!(agent = %agent_name, "PlanApprovalRequest dropped; cancelling");
-            if remove_if_current(
-                hub,
-                InteractionKind::PlanApproval,
-                agent_name,
-                &logical_id,
-                &interaction_id,
-            )
-            .await
-            {
-                cancel(agent_conn, agent_ipc_id, "unavailable");
+        FastPath::Pending(mut delivery) => {
+            let delivery_hub = hub.clone();
+            let delivery_conn = agent_conn.clone();
+            let delivery_agent = agent_name.to_string();
+            let delivery_logical_id = logical_id.clone();
+            let delivery_interaction_id = interaction_id.clone();
+            let coordinator = tokio::spawn(async move {
+                match delivery.deliver().await {
+                    Ok(()) => schedule_timeout(
+                        &delivery_hub,
+                        InteractionKind::PlanApproval,
+                        delivery_agent,
+                        delivery_logical_id,
+                        delivery_interaction_id,
+                        timeout,
+                    ),
+                    Err(error) => {
+                        warn!(
+                            agent = %delivery_agent,
+                            request_id = %delivery_logical_id,
+                            %error,
+                            "plan approval event admission failed; cancelling request"
+                        );
+                        if remove_if_current(
+                            &delivery_hub,
+                            InteractionKind::PlanApproval,
+                            &delivery_agent,
+                            &delivery_logical_id,
+                            &delivery_interaction_id,
+                        )
+                        .await
+                        {
+                            cancel(delivery_conn, agent_ipc_id, "unavailable");
+                        }
+                    }
+                }
+            });
+            if let Err(error) = coordinator.await {
+                tracing::error!(agent = %agent_name, %error, "plan approval admission coordinator failed");
+                hub.lock().await.shutdown_signal.notify_one();
+                if remove_if_current(
+                    hub,
+                    InteractionKind::PlanApproval,
+                    agent_name,
+                    &logical_id,
+                    &interaction_id,
+                )
+                .await
+                {
+                    cancel(agent_conn, agent_ipc_id, "unavailable");
+                }
             }
         }
-        FastPath::Pending => schedule_timeout(
-            hub,
-            InteractionKind::PlanApproval,
-            agent_name.to_string(),
-            logical_id,
-            interaction_id,
-            timeout,
-        ),
     }
 }
 

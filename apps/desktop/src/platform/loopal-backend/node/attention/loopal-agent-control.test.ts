@@ -35,12 +35,20 @@ function fixture(state = 'connected') {
   }
 }
 
+function controlResponse(response: unknown, rejects = false) {
+  const value = fixture()
+  value.request.mockResolvedValueOnce({ agents: [{ name: 'main', state: 'connected' }] })
+  if (rejects) value.request.mockRejectedValueOnce(response)
+  else value.request.mockResolvedValueOnce(response)
+  return value.service.controlAgent({ target, command: { type: 'clear' } })
+}
+
 describe('LoopalAgentControl', () => {
   it('validates the live agent then routes typed control and interrupt calls', async () => {
     const value = fixture()
-    await value.service.controlAgent({
+    await expect(value.service.controlAgent({
       target, command: { type: 'mode', mode: 'plan' },
-    }, CancellationToken.None)
+    }, CancellationToken.None)).resolves.toEqual({ status: 'applied' })
     expect(value.request).toHaveBeenNthCalledWith(1, 'hub/list_agents', {}, expect.any(AbortSignal))
     expect(value.request).toHaveBeenNthCalledWith(2, 'hub/control', {
       target: 'main', command: { ModeSwitch: 'Plan' },
@@ -74,7 +82,7 @@ describe('LoopalAgentControl', () => {
     const local = fixture('local')
     await expect(local.service.controlAgent({
       target, command: { type: 'suspend' },
-    }, CancellationToken.None)).resolves.toBeUndefined()
+    }, CancellationToken.None)).resolves.toEqual({ status: 'applied' })
     for (const state of ['shadow', 'finished']) {
       const value = fixture(state)
       await expect(value.service.controlAgent({
@@ -89,7 +97,7 @@ describe('LoopalAgentControl', () => {
     const remote = { ...target, agentId: 'hub-b/worker' }
     await expect(value.service.controlAgent({
       target: remote, command: { type: 'clear' },
-    })).resolves.toBeUndefined()
+    })).resolves.toEqual({ status: 'applied' })
     expect(value.request).toHaveBeenNthCalledWith(
       2, 'meta/topology', {}, expect.any(AbortSignal),
     )
@@ -137,35 +145,37 @@ describe('LoopalAgentControl', () => {
     source.dispose()
   })
 
-  it('requires an applied acknowledgement and classifies rejection and timeout', async () => {
-    for (const acknowledgement of [{ ok: true }, null, [], 'applied']) {
-      const invalid = fixture()
-      invalid.request.mockResolvedValueOnce({ agents: [{ name: 'main', state: 'connected' }] })
-        .mockResolvedValueOnce(acknowledgement)
-      await expect(invalid.service.controlAgent({
-        target, command: { type: 'clear' },
-      })).rejects.toMatchObject({ code: 'CONTROL_REJECTED' })
-    }
-
-    for (const [message, code] of [
-      ["control rejected: decision mode 'agent' is not implemented", 'CONTROL_REJECTED'],
-      ['Loopal Hub request timed out: hub/control', 'CONTROL_TIMEOUT'],
+  it('preserves typed, legacy, rejected, and indeterminate dispositions', async () => {
+    for (const [acknowledgement, expected] of [
+      [{ status: 'applied' }, { status: 'applied' }],
+      [{ status: 'queued' }, { status: 'queued' }],
+      [{ status: 'unknown' }, { status: 'unknown' }],
+      [
+        { status: 'rejected', reason: 'unsupported mode' },
+        { status: 'rejected', reason: 'unsupported mode' },
+      ],
+      [{ ok: true }, { status: 'queued' }],
+      [{ ok: false, error: 'old rejection' }, { status: 'rejected', reason: 'old rejection' }],
     ] as const) {
-      const value = fixture()
-      value.request.mockResolvedValueOnce({ agents: [{ name: 'main', state: 'connected' }] })
-        .mockRejectedValueOnce(new Error(message))
-      await expect(value.service.controlAgent({
-        target, command: { type: 'clear' },
-      })).rejects.toMatchObject({ code, message: expect.stringContaining(message) })
+      await expect(controlResponse(acknowledgement)).resolves.toEqual(expected)
     }
 
-    const nonError = fixture()
-    nonError.request.mockResolvedValueOnce({ agents: [{ name: 'main', state: 'connected' }] })
-      .mockRejectedValueOnce('remote rejected')
-    await expect(nonError.service.controlAgent({
-      target, command: { type: 'clear' },
-    })).rejects.toMatchObject({
-      code: 'CONTROL_REJECTED', message: expect.stringContaining('remote rejected'),
+    for (const acknowledgement of [null, [], 'applied', { ok: 'true' }]) {
+      await expect(controlResponse(acknowledgement))
+        .rejects.toMatchObject({ code: 'CONTROL_PROTOCOL' })
+    }
+
+    const oldRejection = new Error("control rejected: decision mode 'agent' is not implemented")
+    await expect(controlResponse(oldRejection, true)).resolves.toEqual({
+      status: 'rejected', reason: "decision mode 'agent' is not implemented",
+    })
+
+    await expect(controlResponse(
+      new Error('Loopal Hub request timed out: hub/control'), true,
+    )).resolves.toEqual({ status: 'unknown' })
+
+    await expect(controlResponse('remote rejected', true)).rejects.toMatchObject({
+      code: 'CONTROL_FAILED', message: expect.stringContaining('remote rejected'),
     })
   })
 

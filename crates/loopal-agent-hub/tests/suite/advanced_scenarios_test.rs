@@ -33,7 +33,7 @@ fn envelope(from: &str, target: &str, text: &str) -> serde_json::Value {
 
 #[tokio::test]
 async fn chain_routing_a_to_b_to_c() {
-    let (hub, _) = make_hub();
+    let (hub, _event_rx) = make_hub();
 
     // C: capture final message
     let (conn_c, rx_c) = hub_server::connect_local(hub.clone(), "C");
@@ -82,7 +82,7 @@ async fn chain_routing_a_to_b_to_c() {
 
 #[tokio::test]
 async fn permission_denied_when_tui_disconnects_mid_request() {
-    let (hub, _) = make_hub();
+    let (hub, _event_rx) = make_hub();
 
     // TUI connects but will be dropped before responding
     let tui = loopal_agent_hub::UiSession::connect(
@@ -118,7 +118,7 @@ async fn permission_denied_when_tui_disconnects_mid_request() {
 
 #[tokio::test]
 async fn recursive_agent_nesting_grandchild_routes_to_root() {
-    let (hub, _) = make_hub();
+    let (hub, _event_rx) = make_hub();
 
     // Root: capture messages from grandchild
     let (root_conn, root_rx) = hub_server::connect_local(hub.clone(), "root");

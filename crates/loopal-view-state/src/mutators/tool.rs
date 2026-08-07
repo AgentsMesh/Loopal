@@ -25,6 +25,9 @@ pub(super) fn tool_call(
     if !accepted {
         return MutationEffect::NoOp;
     }
+    // Tool execution only begins after pre-call compaction has completed.
+    conv.compact_banner = None;
+    conv.retry_banner = None;
     state.agent.observable.status = AgentStatus::Running;
     MutationEffect::Mutated
 }
@@ -50,6 +53,8 @@ pub(super) fn tool_result(
         },
     );
     if transitioned {
+        conv.compact_banner = None;
+        conv.retry_banner = None;
         state.agent.observable.status = AgentStatus::Running;
         MutationEffect::Mutated
     } else {
@@ -62,6 +67,8 @@ pub(super) fn tool_batch_start(
     tool_ids: &[String],
 ) -> MutationEffect {
     let conv = &mut state.agent.conversation;
+    conv.compact_banner = None;
+    conv.retry_banner = None;
     conv.mark_active();
     tool_result_handler::handle_tool_batch_start(conv, tool_ids);
     MutationEffect::Mutated
@@ -73,6 +80,8 @@ pub(super) fn tool_progress(
     output_tail: &str,
 ) -> MutationEffect {
     let conv = &mut state.agent.conversation;
+    conv.compact_banner = None;
+    conv.retry_banner = None;
     conv.mark_active();
     tool_result_handler::handle_tool_progress(conv, id.to_string(), output_tail.to_string());
     MutationEffect::Mutated
@@ -85,6 +94,8 @@ pub(super) fn server_tool_use(
     input: &serde_json::Value,
 ) -> MutationEffect {
     let conv = &mut state.agent.conversation;
+    conv.compact_banner = None;
+    conv.retry_banner = None;
     conv.mark_active();
     server_tool_display::handle_server_tool_use(
         conv,
@@ -102,8 +113,24 @@ pub(super) fn server_tool_result(
     content: &serde_json::Value,
 ) -> MutationEffect {
     let conv = &mut state.agent.conversation;
+    conv.compact_banner = None;
+    conv.retry_banner = None;
     conv.mark_active();
     server_tool_display::handle_server_tool_result(conv, tool_use_id, content);
+    state.agent.observable.status = AgentStatus::Running;
+    MutationEffect::Mutated
+}
+
+pub(super) fn server_tool_discarded(
+    state: &mut SessionViewState,
+    tool_use_id: &str,
+    reason: loopal_tool_invocation::StaleReason,
+) -> MutationEffect {
+    let conv = &mut state.agent.conversation;
+    conv.compact_banner = None;
+    conv.retry_banner = None;
+    conv.mark_active();
+    server_tool_display::handle_server_tool_discarded(conv, tool_use_id, reason);
     state.agent.observable.status = AgentStatus::Running;
     MutationEffect::Mutated
 }

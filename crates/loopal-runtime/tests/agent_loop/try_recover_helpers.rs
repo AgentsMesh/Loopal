@@ -82,6 +82,7 @@ impl Provider for SequencedProvider {
         if let LoopalError::Provider(ProviderError::Api {
             status: 400,
             message,
+            ..
         }) = err
         {
             if message.contains("does not support assistant message prefill") {
@@ -168,6 +169,7 @@ pub fn server_block_err() -> LoopalError {
     LoopalError::Provider(ProviderError::Api {
         status: 400,
         message: "code_execution server block without a corresponding tool_result".into(),
+        retry_after_ms: None,
     })
 }
 
@@ -181,6 +183,7 @@ pub fn prefill_rejection_err() -> LoopalError {
     LoopalError::Provider(ProviderError::Api {
         status: 400,
         message: "This model does not support assistant message prefill.".into(),
+        retry_after_ms: None,
     })
 }
 

@@ -10,7 +10,7 @@ pub enum AppEvent {
     ScrollUp,
     ScrollDown,
     Resize(u16, u16),
-    Agent(AgentEvent),
+    Agent(Box<AgentEvent>),
     Paste(PasteResult),
     Tick,
     Resync,
@@ -95,7 +95,11 @@ impl EventHandler {
         let agent_tx = tx.clone();
         tokio::spawn(async move {
             while let Some(event) = agent_rx.recv().await {
-                if agent_tx.send(AppEvent::Agent(event)).await.is_err() {
+                if agent_tx
+                    .send(AppEvent::Agent(Box::new(event)))
+                    .await
+                    .is_err()
+                {
                     break;
                 }
             }

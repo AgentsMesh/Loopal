@@ -9,6 +9,7 @@ rust_library(
         "//crates/loopal-error:loopal-error",
         "//crates/loopal-secret-runtime",
         "//crates/loopal-tool-api:loopal-tool-api",
+        "//crates/loopal-tool-invocation",
         "//crates/tools/filesystem/edit-core:loopal-edit-core",
         "@crates//:schemars",
         "@crates//:serde",
@@ -29,5 +30,6 @@ rust_test(
         "@crates//:tokio",
         "@crates//:serde_json",
         "//crates/loopal-tool-api",
+        "//crates/loopal-tool-invocation",
     ],
 )

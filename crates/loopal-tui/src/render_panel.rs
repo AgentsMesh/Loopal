@@ -37,11 +37,15 @@ pub fn panel_zone_height(app: &App, state: &loopal_session::state::SessionState)
 }
 
 /// Render the panel zone into `area`.
+///
+/// `animation_elapsed` is sampled once per frame and is only for visual
+/// animation. Providers that display lifecycle durations must read them from
+/// view state instead.
 pub fn render_panel_zone(
     f: &mut Frame,
     app: &App,
     state: &loopal_session::state::SessionState,
-    elapsed: Duration,
+    animation_elapsed: Duration,
     area: Rect,
 ) {
     if area.height == 0 {
@@ -80,7 +84,7 @@ pub fn render_panel_zone(
             chunk
         };
         let focused = active_focused_id(app, provider.kind(), active_kind);
-        provider.render(f, app, state, focused, elapsed, content_area);
+        provider.render(f, app, state, focused, animation_elapsed, content_area);
     }
 }
 

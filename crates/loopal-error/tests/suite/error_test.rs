@@ -1,4 +1,6 @@
-use loopal_error::{ConfigError, HookError, LoopalError, ProviderError, StorageError, ToolError};
+use loopal_error::{
+    ConfigError, HookError, LoopalError, MAX_RETRY_AFTER_MS, ProviderError, StorageError, ToolError,
+};
 
 // --- ProviderError ---
 
@@ -21,6 +23,7 @@ fn test_provider_error_is_rate_limited_false_for_api() {
     let err = ProviderError::Api {
         status: 500,
         message: "internal".into(),
+        retry_after_ms: None,
     };
     assert!(!err.is_rate_limited());
 }
@@ -52,6 +55,20 @@ fn test_provider_error_retry_after_ms_some() {
 }
 
 #[test]
+fn retry_after_is_bounded_at_the_shared_error_contract() {
+    let limited = ProviderError::RateLimited {
+        retry_after_ms: u64::MAX,
+    };
+    let gateway = ProviderError::Api {
+        status: 503,
+        message: "busy".into(),
+        retry_after_ms: Some(u64::MAX),
+    };
+    assert_eq!(limited.retry_after_ms(), Some(MAX_RETRY_AFTER_MS));
+    assert_eq!(gateway.retry_after_ms(), Some(MAX_RETRY_AFTER_MS));
+}
+
+#[test]
 fn test_provider_error_retry_after_ms_none_for_http() {
     let err = ProviderError::Http("err".into());
     assert_eq!(err.retry_after_ms(), None);
@@ -62,6 +79,7 @@ fn test_provider_error_retry_after_ms_none_for_api() {
     let err = ProviderError::Api {
         status: 429,
         message: "too many".into(),
+        retry_after_ms: None,
     };
     assert_eq!(err.retry_after_ms(), None);
 }
@@ -121,6 +139,7 @@ fn test_provider_error_display_api() {
     let err = ProviderError::Api {
         status: 401,
         message: "unauthorized".into(),
+        retry_after_ms: None,
     };
     assert_eq!(
         format!("{err}"),

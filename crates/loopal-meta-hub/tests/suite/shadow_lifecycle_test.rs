@@ -19,7 +19,7 @@ use crate::test_helpers::*;
 /// Shadow registration works correctly.
 #[tokio::test]
 async fn shadow_registered_with_correct_parent() {
-    let (hub, _) = make_hub();
+    let (hub, _hub_event_rx) = make_hub();
     let (_parent, _rx) = register_mock_agent(&hub, "parent", None).await;
 
     hub.lock()
@@ -49,7 +49,7 @@ async fn shadow_registered_with_correct_parent() {
 /// wait_agent blocks on shadow and resolves when completion arrives.
 #[tokio::test]
 async fn wait_agent_resolves_on_shadow_completion() {
-    let (hub, _) = make_hub();
+    let (hub, _hub_event_rx) = make_hub();
     // Register parent + shadow manually (simulate post-spawn state)
     let (_parent, _rx) = register_mock_agent(&hub, "parent", None).await;
     hub.lock()
@@ -77,7 +77,8 @@ async fn wait_agent_resolves_on_shadow_completion() {
     // Simulate completion arriving (normally via uplink)
     {
         let mut h = hub.lock().await;
-        h.registry
+        let _pending = h
+            .registry
             .emit_agent_finished("remote-child", Some("task result 42".into()));
         h.registry.unregister_connection("remote-child");
     }
@@ -98,7 +99,7 @@ async fn wait_agent_resolves_on_shadow_completion() {
 /// Active shadow resources are released while its completed tombstone remains.
 #[tokio::test]
 async fn shadow_cleaned_up_after_completion() {
-    let (hub, _) = make_hub();
+    let (hub, _hub_event_rx) = make_hub();
     let (_parent, _rx) = register_mock_agent(&hub, "parent", None).await;
     hub.lock()
         .await
@@ -112,7 +113,7 @@ async fn shadow_cleaned_up_after_completion() {
     // Complete + unregister (as uplink handler does)
     {
         let mut h = hub.lock().await;
-        h.registry.emit_agent_finished("child", Some("done".into()));
+        let _pending = h.registry.emit_agent_finished("child", Some("done".into()));
         h.registry.unregister_connection("child");
     }
 

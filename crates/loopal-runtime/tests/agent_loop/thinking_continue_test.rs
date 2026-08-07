@@ -1,4 +1,6 @@
+use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::{ContinuationIntent, ContinuationReason, StopReason, StreamChunk};
+use loopal_tool_invocation::{StaleReason, ToolResultMetadata};
 
 use super::mock_provider::make_multi_runner_with_intents;
 
@@ -68,9 +70,37 @@ async fn test_truncated_tools_sets_pending_continuation() {
         ],
     ];
     let (mut runner, mut event_rx, intents) = make_multi_runner_with_intents(calls);
-    tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 
     let _ = runner.run().await.unwrap();
+
+    let events = loopal_test_support::events::drain_pending(&mut event_rx).await;
+    let tool_call = events
+        .iter()
+        .position(|event| matches!(event, AgentEventPayload::ToolCall { id, .. } if id == "tc-1"))
+        .expect("provisional ToolCall must be visible");
+    let discarded = events
+        .iter()
+        .position(|event| {
+            matches!(
+                event,
+                AgentEventPayload::ToolResult {
+                    id,
+                    metadata: Some(ToolResultMetadata::Stale {
+                        reason: StaleReason::IncompleteModelResponse,
+                    }),
+                    ..
+                } if id == "tc-1"
+            )
+        })
+        .expect("discarded provisional tool must receive a terminal result");
+    let continuation = events
+        .iter()
+        .position(|event| matches!(event, AgentEventPayload::AutoContinuation { .. }))
+        .expect("max-token tool response must auto-continue");
+    assert!(
+        tool_call < discarded && discarded < continuation,
+        "tool terminalization must precede continuation: {events:?}"
+    );
 
     let snapshot = intents.lock().unwrap().clone();
     assert!(

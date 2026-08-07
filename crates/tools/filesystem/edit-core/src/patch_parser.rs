@@ -2,6 +2,9 @@ use std::path::PathBuf;
 
 use crate::patch_types::{FileOp, Hunk, HunkLine};
 
+const BEGIN_PATCH: &str = "*** Begin Patch";
+const END_PATCH: &str = "*** End Patch";
+
 #[derive(Debug)]
 pub struct PatchParseError {
     pub line: usize,
@@ -14,18 +17,40 @@ impl std::fmt::Display for PatchParseError {
     }
 }
 
-/// Parse a patch text into a list of file operations.
+/// Parse an ApplyPatch document into its file operations.
+///
+/// Documents may be bare operation sequences or wrapped in a paired
+/// `*** Begin Patch` / `*** End Patch` envelope.
 pub fn parse_patch(input: &str) -> Result<Vec<FileOp>, PatchParseError> {
     let mut ops = Vec::new();
     let lines: Vec<&str> = input.lines().collect();
     let mut i = 0;
+    let has_envelope = lines
+        .iter()
+        .find(|line| !line.trim().is_empty())
+        .is_some_and(|line| *line == BEGIN_PATCH);
+    let mut saw_begin = false;
+    let mut saw_end = false;
 
     while i < lines.len() {
         let line = lines[i];
-        if let Some(path) = line.strip_prefix("*** Add File: ") {
+        if has_envelope && line == BEGIN_PATCH {
+            if saw_begin {
+                return Err(unexpected_line(i, line));
+            }
+            saw_begin = true;
+            i += 1;
+        } else if line == END_PATCH {
+            if !has_envelope {
+                return Err(unexpected_line(i, line));
+            }
+            saw_end = true;
+            i += 1;
+            break;
+        } else if let Some(path) = line.strip_prefix("*** Add File: ") {
             let (content, next) = parse_add_body(&lines, i + 1)?;
             ops.push(FileOp::Add {
-                path: PathBuf::from(path.trim()),
+                path: parse_path(path, i)?,
                 content,
             });
             i = next;
@@ -38,25 +63,53 @@ pub fn parse_patch(input: &str) -> Result<Vec<FileOp>, PatchParseError> {
                 });
             }
             ops.push(FileOp::Update {
-                path: PathBuf::from(path.trim()),
+                path: parse_path(path, i)?,
                 hunks,
             });
             i = next;
         } else if let Some(path) = line.strip_prefix("*** Delete File: ") {
             ops.push(FileOp::Delete {
-                path: PathBuf::from(path.trim()),
+                path: parse_path(path, i)?,
             });
             i += 1;
         } else if line.trim().is_empty() {
             i += 1;
         } else {
-            return Err(PatchParseError {
-                line: i + 1,
-                message: format!("unexpected line: {line}"),
-            });
+            return Err(unexpected_line(i, line));
         }
     }
+
+    if has_envelope && !saw_end {
+        return Err(PatchParseError {
+            line: lines.len() + 1,
+            message: format!("missing closing marker: {END_PATCH}"),
+        });
+    }
+    while i < lines.len() {
+        if !lines[i].trim().is_empty() {
+            return Err(unexpected_line(i, lines[i]));
+        }
+        i += 1;
+    }
     Ok(ops)
+}
+
+fn parse_path(path: &str, line: usize) -> Result<PathBuf, PatchParseError> {
+    let path = path.trim();
+    if path.is_empty() {
+        return Err(PatchParseError {
+            line: line + 1,
+            message: "file operation path cannot be empty".into(),
+        });
+    }
+    Ok(PathBuf::from(path))
+}
+
+fn unexpected_line(line: usize, content: &str) -> PatchParseError {
+    PatchParseError {
+        line: line + 1,
+        message: format!("unexpected line: {content}"),
+    }
 }
 
 fn parse_add_body(lines: &[&str], start: usize) -> Result<(String, usize), PatchParseError> {

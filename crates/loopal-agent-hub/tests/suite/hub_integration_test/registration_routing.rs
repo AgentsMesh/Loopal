@@ -2,7 +2,7 @@
 
 #[tokio::test]
 async fn agent_registered_and_reachable() {
-    let (hub, _) = make_hub();
+    let (hub, _event_rx) = make_hub();
 
     let (conn, rx) = hub_server::connect_local(hub.clone(), "worker-1");
     spawn_mock_agent(conn, rx);
@@ -19,7 +19,7 @@ async fn agent_registered_and_reachable() {
 
 #[tokio::test]
 async fn duplicate_agent_name_rejected() {
-    let (hub, _) = make_hub();
+    let (hub, _event_rx) = make_hub();
 
     let (c1, r1) = hub_server::connect_local(hub.clone(), "dup");
     spawn_mock_agent(c1, r1);
@@ -44,7 +44,7 @@ async fn duplicate_agent_name_rejected() {
 
 #[tokio::test]
 async fn agent_a_routes_message_to_agent_b() {
-    let (hub, _) = make_hub();
+    let (hub, _event_rx) = make_hub();
 
     let (conn_a, rx_a) = hub_server::connect_local(hub.clone(), "agent-a");
     spawn_mock_agent(conn_a.clone(), rx_a);

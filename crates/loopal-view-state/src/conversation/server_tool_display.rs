@@ -1,6 +1,8 @@
 use std::time::Instant;
 
-use loopal_tool_invocation::{InvocationId, Outcome, ToolInvocation, TransitionCmd, transition};
+use loopal_tool_invocation::{
+    InvocationId, Outcome, StaleReason, ToolInvocation, TransitionCmd, transition,
+};
 use serde_json::Value;
 use tracing::warn;
 
@@ -43,15 +45,37 @@ pub(crate) fn handle_server_tool_result(
     let Ok(target_id) = InvocationId::new(tool_use_id.to_string()) else {
         return;
     };
-    let Some(msg) = conv.messages.last_mut() else {
+    for msg in conv.messages.iter_mut().rev() {
+        if let Some(tc) = msg.tool_calls.iter_mut().rfind(|tc| tc.id == target_id) {
+            let formatted = format_server_tool_content(content);
+            let outcome = Outcome::Success { content: formatted };
+            let prev = tc.clone();
+            if let Ok(next) = transition(prev, TransitionCmd::Complete(outcome), Instant::now()) {
+                tc.state = next.state;
+            }
+            return;
+        }
+    }
+}
+
+pub(crate) fn handle_server_tool_discarded(
+    conv: &mut AgentConversation,
+    tool_use_id: &str,
+    reason: StaleReason,
+) {
+    let Ok(target_id) = InvocationId::new(tool_use_id.to_string()) else {
         return;
     };
-    if let Some(tc) = msg.tool_calls.iter_mut().rfind(|tc| tc.id == target_id) {
-        let formatted = format_server_tool_content(content);
-        let outcome = Outcome::Success { content: formatted };
-        let prev = tc.clone();
-        if let Ok(next) = transition(prev, TransitionCmd::Complete(outcome), Instant::now()) {
-            tc.state = next.state;
+    for msg in conv.messages.iter_mut().rev() {
+        if let Some(tc) = msg.tool_calls.iter_mut().rfind(|tc| tc.id == target_id) {
+            if tc.state.is_terminal() {
+                return;
+            }
+            let prev = tc.clone();
+            if let Ok(next) = transition(prev, TransitionCmd::MarkStale(reason), Instant::now()) {
+                tc.state = next.state;
+            }
+            return;
         }
     }
 }

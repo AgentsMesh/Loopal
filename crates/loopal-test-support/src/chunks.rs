@@ -66,6 +66,7 @@ pub fn non_retryable_error(msg: &str) -> Result<StreamChunk, LoopalError> {
     Err(LoopalError::Provider(loopal_error::ProviderError::Api {
         status: 400,
         message: msg.to_string(),
+        retry_after_ms: None,
     }))
 }
 

@@ -21,7 +21,7 @@ impl AgentLoopRunner {
     }
 
     pub(super) async fn apply_tracked_control(&mut self, request: ControlRequest) -> Result<bool> {
-        if !request.caller_is_waiting() {
+        if !request.application_is_live() {
             return Ok(false);
         }
         let outcome = self.handle_control(request.command().clone()).await;

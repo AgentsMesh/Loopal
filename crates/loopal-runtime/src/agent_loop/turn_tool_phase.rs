@@ -43,12 +43,11 @@ impl AgentLoopRunner {
         turn_ctx.metrics.tool_errors += stats.errors;
         info!("tool exec complete");
 
-        // reason: capture result_blocks BEFORE BOTH the governance Injection
-        // step append AND inject_pending_messages. Either would shift
+        // reason: capture result_blocks before the governance Injection step
+        // append, which would shift
         // `view.messages().last()` away from the tool batch's user message
-        // — Injection projects to a User text message (the warning), and
-        // inject_pending_messages may end the current turn entirely. If
-        // we captured later, DiffTracker would see Text instead of
+        // because Injection projects to a User text message (the warning).
+        // If we captured later, DiffTracker would see Text instead of
         // ToolResult and miss every Write/Edit/Apply/MultiEdit.
         let result_blocks: Vec<_> = self
             .turns
@@ -72,7 +71,10 @@ impl AgentLoopRunner {
             }
         }
 
-        self.inject_pending_messages().await;
+        // Frontend input stays in its reliable mpsc queue until run_loop's
+        // turn-boundary arbitration. Applying a message or lifecycle/history
+        // control here would mutate TurnStore while the old TurnContext is
+        // still scoped and mix the tool follow-up across logical turns.
         // A cancelled batch's results are synthetic "Interrupted by user" errors;
         // feeding them to LoopDetector would let repeated interrupts accrue a
         // false loop streak. Hooks (DiffTracker) still run on partial writes.

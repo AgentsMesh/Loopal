@@ -3,27 +3,32 @@ import {
   closeDesktop, launchDesktop, waitForHostStatus,
 } from '../../support/electron/electron-fixture'
 
-test('acknowledges only controls applied by the real runtime', async () => {
+test('returns typed control dispositions from the real runtime', async () => {
   const desktop = await launchDesktop('real')
   try {
     const page = desktop.page
     await waitForHostStatus(page, 'ready')
     const target = await runtimeTarget(page)
 
-    await page.evaluate(async (value) => {
-      await window.loopalDesktop.controlAgent({
+    const applied = await page.evaluate(async (value) => Promise.all([
+      window.loopalDesktop.controlAgent({
         target: value, command: { type: 'mode', mode: 'plan' },
-      })
-      await window.loopalDesktop.controlAgent({
+      }),
+      window.loopalDesktop.controlAgent({
         target: value, command: { type: 'permission', mode: 'bypass' },
-      })
-    }, target)
+      }),
+    ]), target)
+    expect(applied).toEqual([{ status: 'applied' }, { status: 'applied' }])
     await expect.poll(() => agentConfig(page, target)).toBe('plan/bypass')
 
-    const unsupported = await controlError(page, target, {
-      type: 'decision', mode: 'agent',
+    const unsupported = await page.evaluate(async (value) => (
+      window.loopalDesktop.controlAgent({
+        target: value, command: { type: 'decision', mode: 'agent' },
+      })
+    ), target)
+    expect(unsupported).toMatchObject({
+      status: 'rejected', reason: expect.stringContaining("decision mode 'agent' is not implemented"),
     })
-    expect(unsupported).toContain("decision mode 'agent' is not implemented")
     await expect.poll(() => agentConfig(page, target)).toBe('plan/bypass')
 
     const stale = await controlError(page, { ...target, generation: target.generation + 1 }, {
@@ -66,7 +71,7 @@ async function agentConfig(page: Page, target: Target): Promise<string> {
 async function controlError(
   page: Page,
   target: Target,
-  command: { type: 'decision'; mode: 'agent' } | { type: 'mode'; mode: 'act' },
+  command: { type: 'mode'; mode: 'act' },
 ): Promise<string> {
   return page.evaluate(async ({ value, next }) => {
     try {

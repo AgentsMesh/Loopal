@@ -24,7 +24,10 @@ fn wrap_tui(inner: loopal_test_support::SpawnedHarness) -> TuiTestHarness {
 
 #[tokio::test]
 async fn test_rate_limit_error() {
-    let calls = vec![vec![chunks::rate_limited(5000)]];
+    // Exhaust the production retry budget with a short provider-directed
+    // delay. A single response would leave the mock queue empty while the
+    // runtime is correctly retrying the same request.
+    let calls = (0..=6).map(|_| vec![chunks::rate_limited(1)]).collect();
     let mut harness = build_tui_harness(calls, 80, 24).await;
     let evts = harness.collect_until_idle().await;
 

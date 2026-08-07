@@ -81,7 +81,7 @@ describe('DesktopBackendClient', () => {
         resolvedEntries: [{ key: 'model', value: 'gpt-5' }],
         settingSources: ['defaults'],
       }
-      return undefined
+      return command === 'controlAgent' ? { status: 'queued' } : undefined
     })
     const backend = new DesktopBackendClient(client)
     await expect(backend.bootstrap()).resolves.toMatchObject({ protocolVersion: 2 })

@@ -6,6 +6,7 @@ use loopal_runtime::agent_loop::diff_tracker::DiffTracker;
 use loopal_runtime::agent_loop::governance::TurnHook;
 use loopal_runtime::agent_loop::turn_context::TurnContext;
 use loopal_runtime::frontend::{DenyAllHandler, UnsupportedQuestionHandler};
+use loopal_tool_invocation::ToolResultMetadata;
 use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -69,6 +70,18 @@ fn err_result(id: &str) -> ContentBlock {
         images: Vec::new(),
         is_error: true,
         metadata: None,
+    }
+}
+
+fn modified_files_result(id: &str, is_error: bool, paths: &[&str]) -> ContentBlock {
+    ContentBlock::ToolResult {
+        tool_use_id: id.into(),
+        content: if is_error { "partial failure" } else { "ok" }.into(),
+        images: Vec::new(),
+        is_error,
+        metadata: Some(ToolResultMetadata::modified_files(
+            paths.iter().map(|path| (*path).into()).collect(),
+        )),
     }
 }
 
@@ -176,11 +189,77 @@ fn tracks_apply_patch() {
     let patch = (
         "t1".into(),
         "ApplyPatch".into(),
-        json!({"file_path": "/tmp/p.rs"}),
+        json!({
+            "patch": "\
+*** Begin Patch
+*** Add File: /tmp/added.rs
++new
+*** Update File: /tmp/updated.rs
+@@
+-old
++new
+*** Delete File: /tmp/deleted.rs
+*** End Patch
+"
+        }),
     );
     let results = [ok_result("t1")];
     tracker.on_after_tools(&mut ctx, &[patch], &results);
-    assert!(ctx.modified_files.contains("/tmp/p.rs"));
+    assert_eq!(ctx.modified_files.len(), 3);
+    assert!(ctx.modified_files.contains("/tmp/added.rs"));
+    assert!(ctx.modified_files.contains("/tmp/updated.rs"));
+    assert!(ctx.modified_files.contains("/tmp/deleted.rs"));
+}
+
+#[test]
+fn partial_apply_patch_uses_structured_paths_despite_error() {
+    let mut tracker = make_tracker();
+    let mut ctx = make_ctx();
+    let patch = (
+        "t1".into(),
+        "ApplyPatch".into(),
+        json!({
+            "patch": "\
+*** Begin Patch
+*** Add File: /tmp/applied-a.rs
++a
+*** Add File: /tmp/applied-b.rs
++b
+*** Add File: /tmp/failed.rs
++never
+*** End Patch
+"
+        }),
+    );
+    let results = [modified_files_result(
+        "t1",
+        true,
+        &["/tmp/applied-a.rs", "/tmp/applied-b.rs"],
+    )];
+
+    tracker.on_after_tools(&mut ctx, &[patch], &results);
+
+    assert_eq!(ctx.modified_files.len(), 2);
+    assert!(ctx.modified_files.contains("/tmp/applied-a.rs"));
+    assert!(ctx.modified_files.contains("/tmp/applied-b.rs"));
+    assert!(!ctx.modified_files.contains("/tmp/failed.rs"));
+}
+
+#[test]
+fn failed_legacy_apply_patch_without_metadata_does_not_guess() {
+    let mut tracker = make_tracker();
+    let mut ctx = make_ctx();
+    let patch = (
+        "t1".into(),
+        "ApplyPatch".into(),
+        json!({
+            "patch": "*** Begin Patch\n*** Add File: /tmp/unknown.rs\n+maybe\n*** End Patch"
+        }),
+    );
+
+    tracker.on_after_tools(&mut ctx, &[patch], &[err_result("t1")]);
+
+    assert!(ctx.modified_files.is_empty());
 }
 
 #[test]

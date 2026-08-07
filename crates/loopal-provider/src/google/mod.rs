@@ -86,34 +86,37 @@ impl Provider for GoogleProvider {
             "API request"
         );
 
-        let http_span = tracing::info_span!("http_request", gen_ai.system = "google");
+        let http_span = crate::http_telemetry::request_span("google", &url);
         let (client, client_gen) = self.client.get();
         let response = client
             .post(&url)
             .header("Content-Type", "application/json")
             .json(&body)
             .send()
-            .instrument(http_span)
-            .await
-            .map_err(|e| {
+            .instrument(http_span.clone())
+            .await;
+        let response = match response {
+            Ok(response) => response,
+            Err(e) => {
+                crate::http_telemetry::record_transport_error(&http_span);
                 self.client.report_network_error(client_gen);
-                crate::safe_diagnostics::network_error("google", &e)
-            })?;
+                return Err(crate::safe_diagnostics::network_error("google", &e).into());
+            }
+        };
         self.client.report_success(client_gen);
 
         let status = response.status();
+        crate::http_telemetry::record_response(&http_span, status);
         tracing::info!(status = status.as_u16(), "API response");
         if !status.is_success() {
+            let retry_after_ms = crate::retry_after::from_headers(response.headers());
             if status.as_u16() == 429 {
-                let retry_after_ms = response
-                    .headers()
-                    .get("retry-after")
-                    .and_then(|v| v.to_str().ok())
-                    .and_then(|s| s.parse::<f64>().ok())
-                    .map(|secs| (secs * 1000.0) as u64)
-                    .unwrap_or(30_000);
-                tracing::warn!(retry_after_ms, "rate limited by API");
-                return Err(ProviderError::RateLimited { retry_after_ms }.into());
+                return Err(crate::retry_after::provider_error(
+                    status.as_u16(),
+                    "rate limited by API".into(),
+                    retry_after_ms,
+                )
+                .into());
             }
             let text = crate::safe_diagnostics::response_error_message(
                 "google",
@@ -122,11 +125,9 @@ impl Provider for GoogleProvider {
             )
             .await;
             tracing::error!(status = status.as_u16(), "API error");
-            return Err(ProviderError::Api {
-                status: status.as_u16(),
-                message: text,
-            }
-            .into());
+            return Err(
+                crate::retry_after::provider_error(status.as_u16(), text, retry_after_ms).into(),
+            );
         }
 
         let sse = SseStream::from_response(response);
@@ -141,6 +142,7 @@ impl Provider for GoogleProvider {
         if let LoopalError::Provider(ProviderError::Api {
             status: 400,
             message,
+            ..
         }) = err
             && is_google_context_overflow_keyword(message)
         {

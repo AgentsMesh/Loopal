@@ -44,9 +44,43 @@ async fn provider_usage_past_threshold_triggers_auto_compaction() {
     assert!(
         out2.events
             .iter()
-            .any(|e| e.starts_with("Compacted") || e.starts_with("CompactProgress")),
-        "usage past the window threshold must auto-compact at the turn \
-         boundary; events: {:?}",
+            .any(|event| event.starts_with("Compacted")),
+        "usage past the window threshold must emit a structured compaction result; events: {:?}",
+        out2.events
+    );
+    let compact_phases: Vec<_> = out2
+        .events
+        .iter()
+        .filter(|event| event.starts_with("CompactProgress"))
+        .map(|event| {
+            if event.contains("phase: Summarize") {
+                "summarize"
+            } else if event.contains("phase: Done") {
+                "done"
+            } else {
+                "unexpected"
+            }
+        })
+        .collect();
+    assert_eq!(
+        compact_phases,
+        vec!["summarize", "done"],
+        "auto-compaction must always terminate with Done; events: {:?}",
+        out2.events
+    );
+    let done = out2
+        .events
+        .iter()
+        .position(|event| event.starts_with("CompactProgress") && event.contains("phase: Done"))
+        .expect("auto-compaction Done event");
+    let reply = out2
+        .events
+        .iter()
+        .position(|event| event.starts_with("Stream") && event.contains("reply b"))
+        .expect("normal model output after auto-compaction");
+    assert!(
+        done < reply,
+        "normal model work must start after compaction reaches Done; events: {:?}",
         out2.events
     );
 
@@ -56,4 +90,8 @@ async fn provider_usage_past_threshold_triggers_auto_compaction() {
         "turn 1 + summarization + turn 2 means at least three LLM calls; \
          journal: {journal}"
     );
+    let verify = h.verify().await;
+    assert_eq!(verify["served"], 3, "mock scenario: {verify}");
+    assert_eq!(verify["remaining"], 0, "mock scenario: {verify}");
+    assert_eq!(verify["verified"], true, "mock scenario: {verify}");
 }

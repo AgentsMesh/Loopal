@@ -67,12 +67,27 @@ impl ContentScroll {
 
     /// Render the content area into the given frame region.
     pub fn render(&mut self, f: &mut Frame, conv: &AgentConversation, area: Rect) {
+        self.render_with_animation_elapsed(f, conv, crate::animation::elapsed(), area);
+    }
+
+    /// Render with the animation clock already sampled by the frame composer.
+    pub(crate) fn render_with_animation_elapsed(
+        &mut self,
+        f: &mut Frame,
+        conv: &AgentConversation,
+        animation_elapsed: std::time::Duration,
+        area: Rect,
+    ) {
         let visible_h = area.height as usize;
         if visible_h == 0 {
             return;
         }
 
-        self.line_cache.update(&conv.messages, area.width);
+        self.line_cache.update_with_animation_elapsed(
+            &conv.messages,
+            area.width,
+            animation_elapsed,
+        );
 
         let streaming = streaming_to_lines(&conv.streaming_text, area.width);
         let thinking_lines = if conv.thinking_active {

@@ -108,15 +108,19 @@ pub(super) fn compacted(
     tokens_before: u32,
     tokens_after: u32,
     strategy: &str,
+    files_rehydrated: usize,
 ) -> MutationEffect {
-    state.agent.conversation.compact_banner = None;
+    let conv = &mut state.agent.conversation;
+    conv.compact_banner = None;
+    conv.retry_banner = None;
     conversation_display::handle_compaction(
-        &mut state.agent.conversation,
+        conv,
         kept,
         summarized,
         tokens_before,
         tokens_after,
         strategy,
+        files_rehydrated,
     );
     MutationEffect::Mutated
 }

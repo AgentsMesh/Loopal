@@ -17,7 +17,7 @@ use crate::test_helpers::*;
 #[tokio::test]
 async fn spawn_with_target_hub_reaches_metahub() {
     let meta_hub = Arc::new(Mutex::new(MetaHub::new()));
-    let (hub_a, _) = make_hub();
+    let (hub_a, _hub_a_event_rx) = make_hub();
     let hub_a_conn = wire_hub_to_meta("hub-a", &hub_a, &meta_hub).await;
     {
         let ul = Arc::new(loopal_agent_hub::HubUplink::new(hub_a_conn, "hub-a".into()));
@@ -44,8 +44,8 @@ async fn spawn_with_target_hub_reaches_metahub() {
 #[tokio::test]
 async fn cross_hub_spawn_reaches_target_hub() {
     let meta_hub = Arc::new(Mutex::new(MetaHub::new()));
-    let (hub_a, _) = make_hub();
-    let (hub_b, _) = make_hub();
+    let (hub_a, _hub_a_event_rx) = make_hub();
+    let (hub_b, _hub_b_event_rx) = make_hub();
     let hub_a_conn = wire_hub_to_meta("hub-a", &hub_a, &meta_hub).await;
     let _hub_b_conn = wire_hub_to_meta("hub-b", &hub_b, &meta_hub).await;
     {
@@ -73,12 +73,21 @@ async fn cross_hub_spawn_reaches_target_hub() {
 #[tokio::test]
 async fn completion_delivery_to_remote_parent() {
     let meta_hub = Arc::new(Mutex::new(MetaHub::new()));
-    let (hub_a, _) = make_hub();
-    let (hub_b, _) = make_hub();
+    let (hub_a, _hub_a_event_rx) = make_hub();
+    let (hub_b, _hub_b_event_rx) = make_hub();
     let _hub_a_conn = wire_hub_to_meta("hub-a", &hub_a, &meta_hub).await;
     let hub_b_conn = wire_hub_to_meta("hub-b", &hub_b, &meta_hub).await;
 
     let (_parent_conn, mut parent_rx) = register_mock_agent(&hub_a, "parent-agent", None).await;
+    hub_a
+        .lock()
+        .await
+        .registry
+        .register_shadow(
+            "child-worker",
+            loopal_protocol::QualifiedAddress::local("parent-agent"),
+        )
+        .unwrap();
     {
         let ul = Arc::new(loopal_agent_hub::HubUplink::new(hub_b_conn, "hub-b".into()));
         hub_b.lock().await.uplink = Some(ul);
@@ -101,7 +110,10 @@ async fn completion_delivery_to_remote_parent() {
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     let _ = child_client_conn
-        .send_notification(methods::AGENT_COMPLETED.name, json!({"result": "done"}))
+        .send_notification(
+            methods::AGENT_COMPLETED.name,
+            json!({"reason": "error", "result": "partial remote result"}),
+        )
         .await;
     tokio::time::sleep(Duration::from_millis(50)).await;
     drop(child_client_conn);
@@ -121,15 +133,20 @@ async fn completion_delivery_to_remote_parent() {
                 .and_then(|a| a.as_str())
                 .is_some_and(|name| name == "child-worker");
             if is_result {
-                return true;
+                return serde_json::from_value::<loopal_protocol::Envelope>(params.clone()).ok();
             }
         }
-        false
+        None
     })
     .await;
 
-    assert!(
-        received.unwrap_or(false),
-        "parent should receive remote child completion"
-    );
+    let envelope = received
+        .expect("parent completion timed out")
+        .expect("parent should receive remote child completion");
+    assert_eq!(envelope.content.text, "partial remote result");
+    let completion = envelope
+        .agent_completion
+        .expect("cross-hub completion metadata must survive routing");
+    assert_eq!(completion.reason, "error");
+    assert_eq!(completion.result.as_deref(), Some("partial remote result"));
 }

@@ -88,7 +88,10 @@ fn build_terminal_cmd(p: &ToolResultParams) -> TransitionCmd {
     match &p.metadata {
         Some(ToolResultMetadata::Stale { reason }) => TransitionCmd::MarkStale(*reason),
         Some(ToolResultMetadata::Cancelled { cause }) => TransitionCmd::Cancel(*cause),
-        Some(ToolResultMetadata::BytesWritten { .. }) | None => {
+        Some(
+            ToolResultMetadata::BytesWritten { .. } | ToolResultMetadata::ModifiedFiles { .. },
+        )
+        | None => {
             let outcome = if p.is_error {
                 Outcome::Failure {
                     error: truncate_result_for_storage(&p.result),

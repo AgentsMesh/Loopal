@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   AgentControlCommandSchema,
+  AgentControlDispositionSchema,
   AgentControlInputSchema,
   AgentControlTargetSchema,
   ThinkingConfigSchema,
@@ -64,5 +65,24 @@ describe('desktop agent control contracts', () => {
       { type: 'goal_pause' }, { type: 'goal_resume' }, { type: 'goal_complete' },
       { type: 'goal_reopen' }, { type: 'goal_clear' },
     ]) expect(AgentControlCommandSchema.safeParse(command).success).toBe(false)
+  })
+
+  it('parses typed control dispositions and preserves legacy queue semantics', () => {
+    for (const disposition of [
+      { status: 'applied' },
+      { status: 'queued' },
+      { status: 'unknown' },
+      { status: 'rejected', reason: 'unsupported mode' },
+    ]) expect(AgentControlDispositionSchema.parse(disposition)).toEqual(disposition)
+
+    expect(AgentControlDispositionSchema.parse({ ok: true })).toEqual({ status: 'queued' })
+    expect(AgentControlDispositionSchema.parse({ ok: false, error: 'old rejection' }))
+      .toEqual({ status: 'rejected', reason: 'old rejection' })
+    for (const invalid of [
+      { status: 'pending' },
+      { status: 'rejected' },
+      { status: 'applied', reason: 'extra' },
+      { ok: 'true' },
+    ]) expect(AgentControlDispositionSchema.safeParse(invalid).success).toBe(false)
   })
 })

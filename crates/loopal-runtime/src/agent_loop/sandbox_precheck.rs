@@ -1,6 +1,7 @@
 //! Sandbox path pre-check: extract paths from tool input, check sandbox
 //! policy, and determine if approval is needed before tool execution.
 
+use loopal_edit_core::patch_parser::parse_patch;
 use loopal_tool_api::Backend;
 use serde_json::Value;
 
@@ -82,16 +83,11 @@ fn patch_paths(input: &Value) -> Vec<(String, bool)> {
         Some(p) => p,
         None => return Vec::new(),
     };
-    patch
-        .lines()
-        .filter(|l| l.starts_with("*** "))
-        .filter_map(|l| {
-            l.strip_prefix("*** ").map(|p| {
-                // Strip trailing timestamp (unified diff: `*** file\ttimestamp`).
-                let path = p.split('\t').next().unwrap_or(p).trim();
-                (path.to_string(), true)
-            })
-        })
-        .filter(|(p, _)| !p.is_empty())
+    // Invalid documents cannot reach I/O: ApplyPatch runs the same parser
+    // before planning any filesystem operation.
+    parse_patch(patch)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|op| (op.path().to_string_lossy().into_owned(), true))
         .collect()
 }

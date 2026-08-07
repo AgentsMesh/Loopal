@@ -6,7 +6,27 @@
 //! session resume) must be rejected — receiver Hub uses its own local
 //! state instead.
 
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
+/// Authoritative outcome of the MetaHub's destination-side spawn handoff.
+///
+/// This is deliberately carried as a successful JSON-RPC result. Transport
+/// errors cannot distinguish a rejection that happened before side effects
+/// from a response lost after the destination committed the child.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "outcome", rename_all = "snake_case")]
+pub enum RemoteSpawnOutcome {
+    Spawned { response: Value },
+    RejectedBeforeSideEffect { message: String },
+    OutcomeUnknown { message: String },
+}
+
+impl RemoteSpawnOutcome {
+    pub fn into_value(self) -> Value {
+        serde_json::to_value(self).expect("RemoteSpawnOutcome must serialize")
+    }
+}
 
 /// Fields that must NOT appear in any cross-hub spawn payload.
 /// Caller, MetaHub, and receiver each enforce this independently
@@ -54,5 +74,24 @@ mod tests {
         assert!(validate_spawn_payload(&json!(null)).is_ok());
         assert!(validate_spawn_payload(&json!("just-a-string")).is_ok());
         assert!(validate_spawn_payload(&json!([1, 2, 3])).is_ok());
+    }
+
+    #[test]
+    fn remote_spawn_outcome_round_trips_without_string_classification() {
+        for outcome in [
+            RemoteSpawnOutcome::Spawned {
+                response: json!({"agent_id": "child-id"}),
+            },
+            RemoteSpawnOutcome::RejectedBeforeSideEffect {
+                message: "duplicate name".into(),
+            },
+            RemoteSpawnOutcome::OutcomeUnknown {
+                message: "destination response timed out".into(),
+            },
+        ] {
+            let decoded: RemoteSpawnOutcome =
+                serde_json::from_value(outcome.clone().into_value()).unwrap();
+            assert_eq!(decoded, outcome);
+        }
     }
 }

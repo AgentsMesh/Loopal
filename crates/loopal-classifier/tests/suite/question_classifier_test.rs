@@ -65,12 +65,12 @@ mod llm_path {
             "chunk-err"
         }
         async fn stream_chat(&self, _p: &ChatParams) -> Result<ChatStream, LoopalError> {
-            let pre = self
-                .text_before_err
-                .lock()
-                .unwrap()
-                .take()
-                .unwrap_or_default();
+            let pre = self.text_before_err.lock().unwrap().take().ok_or_else(|| {
+                LoopalError::Other(
+                    "ChunkErrProvider response exhausted: add the missing classifier response"
+                        .into(),
+                )
+            })?;
             let chunks = VecDeque::from(vec![
                 Ok(StreamChunk::Text { text: pre }),
                 Err(LoopalError::Other("chunk read failed mid-stream".into())),

@@ -22,6 +22,7 @@ rust_test(
     edition = "2024",
     deps = [
         ":loopal-turn",
+        "//crates/loopal-tool-invocation",
         "@crates//:chrono",
         "@crates//:serde_json",
     ],

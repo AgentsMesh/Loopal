@@ -4,6 +4,7 @@ use std::time::Duration;
 use serde_json::{Value, json};
 use tokio::sync::Mutex;
 
+use loopal_ipc::cross_hub::RemoteSpawnOutcome;
 use loopal_ipc::protocol::methods;
 
 use crate::meta_hub::MetaHub;
@@ -94,13 +95,29 @@ async fn handle_meta_spawn(meta_hub: &Arc<Mutex<MetaHub>>, params: Value) -> Res
         obj.remove("target_hub");
     }
 
-    tokio::time::timeout(
+    let outcome = match tokio::time::timeout(
         SPAWN_FORWARD_TIMEOUT,
         conn.send_request(methods::HUB_SPAWN_REMOTE_AGENT.name, spawn_params),
     )
     .await
-    .map_err(|_| format!("spawn on '{target_hub}' timed out"))?
-    .map_err(|e| format!("spawn on '{target_hub}' failed: {e}"))
+    {
+        Ok(Ok(response)) => RemoteSpawnOutcome::Spawned { response },
+        Ok(Err(loopal_ipc::RpcError::Remote { message, .. })) => {
+            // The destination produced an application response. Its spawn
+            // coordinator rolls registration/process state back before
+            // returning an error, so this is the only definitive rejection.
+            RemoteSpawnOutcome::RejectedBeforeSideEffect {
+                message: format!("spawn on '{target_hub}' rejected: {message}"),
+            }
+        }
+        Ok(Err(error)) => RemoteSpawnOutcome::OutcomeUnknown {
+            message: format!("spawn on '{target_hub}' transport failed: {error}"),
+        },
+        Err(_) => RemoteSpawnOutcome::OutcomeUnknown {
+            message: format!("spawn on '{target_hub}' timed out"),
+        },
+    };
+    Ok(outcome.into_value())
 }
 
 /// List all connected Sub-Hubs.

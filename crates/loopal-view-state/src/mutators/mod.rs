@@ -131,6 +131,7 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
             s.tokens_before,
             s.tokens_after,
             &s.strategy,
+            s.files_rehydrated,
         ),
         Rewound { remaining_turns } => stream::rewound(state, *remaining_turns),
         ServerToolUse { id, name, input } => tool::server_tool_use(state, id, name, input),
@@ -138,6 +139,10 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
             tool_use_id,
             content,
         } => tool::server_tool_result(state, tool_use_id, content),
+        ServerToolDiscarded {
+            tool_use_id,
+            reason,
+        } => tool::server_tool_discarded(state, tool_use_id, *reason),
         InboxEnqueued {
             envelope_id,
             source,

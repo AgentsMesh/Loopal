@@ -143,7 +143,7 @@ async fn test_wait_for_input_thinking_switch_preserves_full_effort() {
 
 #[tokio::test]
 async fn test_wait_for_input_rejects_invalid_thinking_effort() {
-    let (mut runner, mut event_rx, _mbox_tx, ctrl_tx, _perm_tx) = make_runner_with_channels();
+    let (mut runner, mut event_rx, mbox_tx, ctrl_tx, _perm_tx) = make_runner_with_channels();
     let original = serde_json::to_string(&runner.model_config.thinking).unwrap();
     ctrl_tx
         .send(ControlCommand::ThinkingSwitch(
@@ -152,6 +152,7 @@ async fn test_wait_for_input_rejects_invalid_thinking_effort() {
         .await
         .unwrap();
     drop(ctrl_tx);
+    drop(mbox_tx);
 
     let result = runner.wait_for_input().await.unwrap();
     assert!(result.is_none());

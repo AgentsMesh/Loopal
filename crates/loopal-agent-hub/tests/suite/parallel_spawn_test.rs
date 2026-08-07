@@ -46,7 +46,7 @@ async fn register_agent(
 /// Two agents completing in reverse order — both results collected correctly.
 #[tokio::test]
 async fn parallel_agents_reverse_completion_order() {
-    let (hub, _) = make_hub();
+    let (hub, _event_rx) = make_hub();
 
     let (parent_conn, parent_rx) = hub_server::connect_local(hub.clone(), "parent");
     tokio::spawn(async move {
@@ -109,7 +109,7 @@ async fn parallel_agents_reverse_completion_order() {
 /// Three agents with mixed results: success, empty, and no result field.
 #[tokio::test]
 async fn parallel_agents_mixed_results() {
-    let (hub, _) = make_hub();
+    let (hub, _event_rx) = make_hub();
     let (parent_conn, parent_rx) = hub_server::connect_local(hub.clone(), "parent");
     tokio::spawn(async move {
         let mut rx = parent_rx;
@@ -178,5 +178,10 @@ async fn parallel_agents_mixed_results() {
 
     assert_eq!(r1["output"].as_str().unwrap(), "detailed report");
     assert_eq!(r2["output"].as_str().unwrap(), "");
-    assert_eq!(r3["output"].as_str().unwrap(), "(no output)");
+    assert_eq!(r3["status"], "failed");
+    assert_eq!(r3["reason"], "shutdown");
+    assert_eq!(
+        r3["output"].as_str().unwrap(),
+        "[agent completion failed; reason: shutdown]\n(no output)"
+    );
 }

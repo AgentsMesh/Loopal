@@ -2,12 +2,18 @@ use loopal_error::LoopalError;
 use loopal_provider_api::{ContentBlock, StopReason};
 
 /// Structured result from `stream_llm_with()`, replacing the previous 4-element tuple.
+#[derive(Debug)]
 pub struct LlmStreamResult {
     pub assistant_text: String,
     pub tool_uses: Vec<(String, String, serde_json::Value)>,
     /// True for transport truncation, cancellation, or EOF without Done.
     /// Explicit provider failures retain their structure in `terminal_error`.
     pub stream_error: bool,
+    /// Retryable/transport failure that arrived after semantic output. The
+    /// runtime may first ask the model to continue, but if that continuation
+    /// budget is exhausted this original cause must terminate the turn as an
+    /// Error instead of promoting an unterminated fragment to Goal.
+    pub(crate) stream_failure: Option<LoopalError>,
     /// Explicit provider termination carried inside an otherwise valid stream.
     /// Unlike transport truncation, this must reach turn recovery unchanged.
     pub(crate) terminal_error: Option<LoopalError>,
@@ -25,6 +31,7 @@ impl Default for LlmStreamResult {
             assistant_text: String::new(),
             tool_uses: Vec::new(),
             stream_error: false,
+            stream_failure: None,
             terminal_error: None,
             stop_reason: StopReason::EndTurn,
             thinking_text: String::new(),
@@ -35,6 +42,38 @@ impl Default for LlmStreamResult {
 }
 
 impl LlmStreamResult {
+    /// Whether replaying the same request could duplicate caller-visible model
+    /// work. Usage-only frames are deliberately excluded: they carry no
+    /// semantic response and an unterminated stream still needs a real answer.
+    pub(crate) fn has_semantic_output(&self) -> bool {
+        !self.assistant_text.is_empty()
+            || !self.tool_uses.is_empty()
+            || !self.thinking_text.is_empty()
+            || !self.server_blocks.is_empty()
+    }
+
+    pub(crate) fn incomplete_server_tool_uses(&self) -> Vec<(String, String)> {
+        let completed = self
+            .server_blocks
+            .iter()
+            .filter_map(|block| match block {
+                ContentBlock::ServerToolResult { tool_use_id, .. } => Some(tool_use_id.as_str()),
+                _ => None,
+            })
+            .collect::<std::collections::HashSet<_>>();
+        self.server_blocks
+            .iter()
+            .filter_map(|block| match block {
+                ContentBlock::ServerToolUse { id, name, .. }
+                    if !completed.contains(id.as_str()) =>
+                {
+                    Some((id.clone(), name.clone()))
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
     pub fn preserve_residual_thinking(&mut self) {
         if self.thinking_text.is_empty() {
             return;

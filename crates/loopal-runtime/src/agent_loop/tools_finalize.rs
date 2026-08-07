@@ -58,7 +58,7 @@ fn collect_item_updates(
             content,
             is_error,
             images,
-            ..
+            metadata,
         } = block
         else {
             continue;
@@ -72,6 +72,7 @@ fn collect_item_updates(
                 content: content.clone(),
                 is_error: *is_error,
                 images: images.clone(),
+                metadata: metadata.clone(),
             }),
         ));
     }

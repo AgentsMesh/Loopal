@@ -1,3 +1,4 @@
+mod animation;
 pub mod app;
 pub mod command;
 pub mod event;
@@ -26,7 +27,7 @@ pub mod view_client;
 pub mod views;
 
 pub use terminal::install_panic_hook;
-pub use tui_loop::{ExitInfo, run_tui, run_tui_loop};
+pub use tui_loop::{ExitInfo, run_tui, run_tui_loop, run_tui_loop_with_animation_clock};
 
 /// Pure helpers re-exported for unit tests (synchronous, side-effect-free).
 #[doc(hidden)]

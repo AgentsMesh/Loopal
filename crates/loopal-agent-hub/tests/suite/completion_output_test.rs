@@ -21,7 +21,7 @@ fn make_hub() -> (Arc<Mutex<Hub>>, mpsc::Receiver<AgentEvent>) {
 /// emit_agent_finished passes actual output (not hardcoded "agent finished").
 #[tokio::test]
 async fn completion_output_passed_through_wait() {
-    let (hub, _) = make_hub();
+    let (hub, _event_rx) = make_hub();
 
     // Register agent (keep both sides alive)
     let (_ca, ct) = loopal_ipc::duplex_pair();
@@ -47,7 +47,8 @@ async fn completion_output_passed_through_wait() {
     // Simulate agent completion: emit BEFORE unregister (matches production order)
     {
         let mut h = hub.lock().await;
-        h.registry
+        let _pending = h
+            .registry
             .emit_agent_finished("worker", Some("42 findings in the analysis.".into()));
         h.registry.unregister_connection("worker");
     }
@@ -65,7 +66,7 @@ async fn completion_output_passed_through_wait() {
 /// emit_agent_finished with None output falls back to "(no output)".
 #[tokio::test]
 async fn completion_no_output_fallback() {
-    let (hub, _) = make_hub();
+    let (hub, _event_rx) = make_hub();
 
     let (_ca, ct) = loopal_ipc::duplex_pair();
     let (conn, rx) = Connection::new(ct).into_listening();
@@ -88,7 +89,7 @@ async fn completion_no_output_fallback() {
 
     {
         let mut h = hub.lock().await;
-        h.registry.emit_agent_finished("worker2", None);
+        let _pending = h.registry.emit_agent_finished("worker2", None);
         h.registry.unregister_connection("worker2");
     }
 
@@ -101,7 +102,7 @@ async fn completion_no_output_fallback() {
 /// Topology tracks parent-child relationships from spawn.
 #[tokio::test]
 async fn topology_tracks_parent_child() {
-    let (hub, _) = make_hub();
+    let (hub, _event_rx) = make_hub();
 
     // Register parent (keep both sides of duplex alive!)
     let (_pa, pt) = loopal_ipc::duplex_pair();
@@ -159,7 +160,7 @@ async fn topology_tracks_parent_child() {
 /// hub/topology returns serializable snapshot.
 #[tokio::test]
 async fn topology_query_via_hub() {
-    let (hub, _) = make_hub();
+    let (hub, _event_rx) = make_hub();
 
     let (parent_conn, parent_rx) = hub_server::connect_local(hub.clone(), "requester");
     tokio::spawn(async move {

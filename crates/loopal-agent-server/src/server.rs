@@ -10,6 +10,7 @@ use loopal_ipc::StdioTransport;
 use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
+use loopal_protocol::AgentCompletion;
 
 use crate::dispatch::{RpcErrorPayload, dispatch_simple, respond_with};
 use crate::server_init::wait_for_initialize_with_token;
@@ -143,14 +144,20 @@ async fn send_agent_completed(
     connection: &Connection<Listening>,
     output: Option<&loopal_error::AgentOutput>,
 ) {
-    let (reason, result) = match output {
-        Some(o) => (o.terminate_reason.as_str(), serde_json::json!(o.result)),
-        None => ("shutdown", serde_json::Value::Null),
+    let completion = match output {
+        Some(output) => AgentCompletion {
+            reason: output.terminate_reason.as_str().into(),
+            result: Some(output.result.clone()),
+        },
+        None => AgentCompletion {
+            reason: "shutdown".into(),
+            result: None,
+        },
     };
     let _ = connection
         .send_notification(
             methods::AGENT_COMPLETED.name,
-            serde_json::json!({"reason": reason, "result": result}),
+            serde_json::to_value(completion).expect("AgentCompletion is serializable"),
         )
         .await;
 }

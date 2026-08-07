@@ -121,6 +121,20 @@ async fn force_compact_short_circuits_on_tiny_history() {
         !saw_compacted,
         "Compacted must not fire when there's nothing to compact"
     );
+    assert!(
+        evts.iter().any(|event| matches!(
+            event,
+            AgentEventPayload::ProviderWarning { message }
+                if message.contains("Nothing to compact")
+        )),
+        "short-conversation notice must use a status-neutral event: {evts:?}"
+    );
+    assert!(
+        !evts
+            .iter()
+            .any(|event| matches!(event, AgentEventPayload::Stream { .. })),
+        "short-conversation notice must not be represented as model output: {evts:?}"
+    );
 }
 
 #[tokio::test]

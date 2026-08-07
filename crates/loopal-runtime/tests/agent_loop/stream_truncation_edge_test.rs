@@ -48,7 +48,8 @@ async fn test_eof_text_then_tool_on_continue() {
     let _ = std::fs::remove_file(&tmp);
 }
 
-/// Repeated EOF truncation exhausts max_auto_continuations → preserves last text.
+/// Repeated EOF truncation exhausts max_auto_continuations -> preserves the
+/// last text but terminates as Error because no attempt produced `Done`.
 #[tokio::test]
 async fn test_repeated_truncation_exhausts_continuations() {
     // max_auto_continuations = 3: original + 3 retries = 4 LLM calls
@@ -71,7 +72,11 @@ async fn test_repeated_truncation_exhausts_continuations() {
 
     let output = runner.run().await.unwrap();
     assert_eq!(output.result, "attempt 4");
-    assert_eq!(output.terminate_reason, TerminateReason::Goal);
+    assert_eq!(output.terminate_reason, TerminateReason::Error);
+    assert_eq!(
+        runner.turn_count, 0,
+        "an unterminated response is not a completed turn"
+    );
 }
 
 /// Prior successful turn → second turn truncates → auto-continue → final output.

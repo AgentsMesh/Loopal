@@ -7,6 +7,7 @@ pub use errors::{
     AgentOutput, ConfigError, HookError, LoopalError, McpError, ProviderError, StorageError,
     TerminateReason, ToolError,
 };
+pub use helpers::MAX_RETRY_AFTER_MS;
 pub use io_error::{ProcessHandle, ToolIoError};
 pub use memory_graph_error::{MemoryGraphError, MemorySubsystemBootstrapError};
 

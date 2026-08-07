@@ -80,7 +80,11 @@ impl Provider for ScriptedProvider {
         if !self.delay.is_zero() {
             tokio::time::sleep(self.delay).await;
         }
-        let text = self.response.lock().unwrap().take().unwrap_or_default();
+        let text = self.response.lock().unwrap().take().ok_or_else(|| {
+            LoopalError::Other(
+                "ScriptedProvider response exhausted: add the missing classifier response".into(),
+            )
+        })?;
         let chunks = VecDeque::from(vec![
             Ok(StreamChunk::Text { text }),
             Ok(StreamChunk::Done {

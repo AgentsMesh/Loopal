@@ -23,8 +23,8 @@ use crate::test_helpers::*;
 #[tokio::test]
 async fn nat_stamps_origin_hub_into_source_for_cross_hub_messages() {
     let meta_hub = Arc::new(Mutex::new(MetaHub::new()));
-    let (hub_a, _) = make_hub();
-    let (hub_b, _) = make_hub();
+    let (hub_a, _hub_a_event_rx) = make_hub();
+    let (hub_b, _hub_b_event_rx) = make_hub();
     let hub_a_conn = wire_hub_to_meta("hub-a", &hub_a, &meta_hub).await;
     let _hub_b_conn = wire_hub_to_meta("hub-b", &hub_b, &meta_hub).await;
     {
@@ -81,7 +81,7 @@ async fn nat_stamps_origin_hub_into_source_for_cross_hub_messages() {
 #[tokio::test]
 async fn local_route_does_not_inject_hub_into_source() {
     let meta_hub = Arc::new(Mutex::new(MetaHub::new()));
-    let (hub_a, _) = make_hub();
+    let (hub_a, _hub_a_event_rx) = make_hub();
     let hub_a_conn = wire_hub_to_meta("hub-a", &hub_a, &meta_hub).await;
     {
         let ul = Arc::new(loopal_agent_hub::HubUplink::new(hub_a_conn, "hub-a".into()));
@@ -128,7 +128,7 @@ async fn local_route_does_not_inject_hub_into_source() {
 #[tokio::test]
 async fn metahub_rejects_self_routing() {
     let meta_hub = Arc::new(Mutex::new(MetaHub::new()));
-    let (hub_a, _) = make_hub();
+    let (hub_a, _hub_a_event_rx) = make_hub();
     let _hub_a_conn = wire_hub_to_meta("hub-a", &hub_a, &meta_hub).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
@@ -156,8 +156,8 @@ async fn metahub_rejects_self_routing() {
 #[tokio::test]
 async fn nat_round_trip_reply_returns_to_origin() {
     let meta_hub = Arc::new(Mutex::new(MetaHub::new()));
-    let (hub_a, _) = make_hub();
-    let (hub_b, _) = make_hub();
+    let (hub_a, _hub_a_event_rx) = make_hub();
+    let (hub_b, _hub_b_event_rx) = make_hub();
     let hub_a_conn = wire_hub_to_meta("hub-a", &hub_a, &meta_hub).await;
     let hub_b_conn = wire_hub_to_meta("hub-b", &hub_b, &meta_hub).await;
     {
@@ -253,8 +253,8 @@ async fn nat_round_trip_reply_returns_to_origin() {
 #[tokio::test]
 async fn cross_hub_completion_carries_origin_hub_in_source() {
     let meta_hub = Arc::new(Mutex::new(MetaHub::new()));
-    let (hub_a, _) = make_hub();
-    let (hub_b, _) = make_hub();
+    let (hub_a, _hub_a_event_rx) = make_hub();
+    let (hub_b, _hub_b_event_rx) = make_hub();
     let _hub_a_conn = wire_hub_to_meta("hub-a", &hub_a, &meta_hub).await;
     let hub_b_conn = wire_hub_to_meta("hub-b", &hub_b, &meta_hub).await;
     {
@@ -264,6 +264,12 @@ async fn cross_hub_completion_carries_origin_hub_in_source() {
 
     // Set up a "parent" on hub-A — it's the receiver of the completion.
     let (_parent_conn, mut parent_rx) = register_mock_agent(&hub_a, "parent", None).await;
+    hub_a
+        .lock()
+        .await
+        .registry
+        .register_shadow("child", QualifiedAddress::local("parent"))
+        .unwrap();
 
     // Register a child on hub-B whose parent is *remote* (lives on hub-A).
     // No completion_tx — finish_and_deliver will fall through to uplink.
@@ -289,8 +295,13 @@ async fn cross_hub_completion_carries_origin_hub_in_source() {
 
     // Trigger finish. finish_and_deliver detects the remote parent and
     // routes the completion envelope through hub-B's uplink.
-    loopal_agent_hub::finish::finish_and_deliver(&hub_b, "child", Some("ok".into()), &child_conn)
-        .await;
+    loopal_agent_hub::finish::finish_and_deliver(
+        &hub_b,
+        "child",
+        loopal_protocol::AgentCompletion::goal(Some("ok".into())),
+        &child_conn,
+    )
+    .await;
 
     // hub-A's parent should observe the completion envelope.
     let msg = tokio::time::timeout(Duration::from_secs(2), parent_rx.recv())
@@ -315,6 +326,7 @@ async fn cross_hub_completion_carries_origin_hub_in_source() {
     assert_eq!(env.target, QualifiedAddress::local("parent"));
     // Body is raw now — the <agent-result> wrapper is a projection concern.
     assert_eq!(env.content.text, "ok");
+    assert_eq!(env.agent_completion.unwrap().reason, "goal");
 }
 
 /// Cross-hub spawn: a child registered with a qualified `hub/agent` parent

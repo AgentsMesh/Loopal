@@ -8,6 +8,7 @@
 
 pub mod agent_io;
 pub mod agent_registry;
+mod authoritative_events;
 pub mod dispatch;
 mod event_router;
 pub mod finish;

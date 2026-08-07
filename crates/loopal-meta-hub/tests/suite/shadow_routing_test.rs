@@ -47,10 +47,11 @@ async fn orphan_cascade_skips_shadows() {
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Parent finishes → should cascade interrupt to real-child only
-    {
+    let mut pending = {
         let mut h = hub.lock().await;
-        h.registry.emit_agent_finished("parent", Some("bye".into()));
-    }
+        h.registry.emit_agent_finished("parent", Some("bye".into()))
+    };
+    pending.deliver_events().await.unwrap();
 
     // Give time for interrupt to propagate
     tokio::time::sleep(Duration::from_millis(100)).await;
@@ -70,7 +71,7 @@ async fn orphan_cascade_skips_shadows() {
 /// Shadow is NOT a valid route target (hub/route to shadow fails).
 #[tokio::test]
 async fn route_to_shadow_fails() {
-    let (hub, _) = make_hub();
+    let (hub, _hub_event_rx) = make_hub();
     let (_parent, _rx) = register_mock_agent(&hub, "parent", None).await;
     hub.lock()
         .await
@@ -104,7 +105,7 @@ async fn route_to_shadow_fails() {
 /// Shadow appears in agent list with "shadow" state.
 #[tokio::test]
 async fn shadow_visible_in_agent_list() {
-    let (hub, _) = make_hub();
+    let (hub, _hub_event_rx) = make_hub();
     let (_parent, _rx) = register_mock_agent(&hub, "parent", None).await;
     hub.lock()
         .await

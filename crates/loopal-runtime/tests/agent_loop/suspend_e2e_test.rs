@@ -7,9 +7,35 @@ use loopal_test_support::{HarnessBuilder, TestFixture, chunks};
 use serde_json::json;
 
 use super::e2e_event_waiters::{
-    wait_for_gate_change, wait_for_interrupted_event, wait_for_running_event, wait_for_stream_event,
+    wait_for_call_count, wait_for_gate_change, wait_for_interrupted_event, wait_for_running_event,
+    wait_for_stream_event,
 };
 use super::goal_e2e_test::make_goal_session;
+
+async fn wait_for_tool_batch_start(
+    rx: &mut tokio::sync::mpsc::Receiver<loopal_protocol::AgentEvent>,
+) {
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while let Some(event) = rx.recv().await {
+            if matches!(event.payload, AgentEventPayload::ToolBatchStart { .. }) {
+                return;
+            }
+        }
+        panic!("event channel closed before ToolBatchStart");
+    })
+    .await
+    .expect("timed out waiting for ToolBatchStart");
+}
+
+fn slow_tool_turn() -> Vec<Result<loopal_provider_api::StreamChunk, loopal_error::LoopalError>> {
+    vec![
+        chunks::tool_use("b1", "Bash", json!({"command": "sleep 0.25"})),
+        chunks::tool_use("b2", "Bash", json!({"command": "sleep 0.25"})),
+        chunks::tool_use("b3", "Bash", json!({"command": "sleep 0.25"})),
+        chunks::usage(10, 5),
+        chunks::done(),
+    ]
+}
 
 #[tokio::test]
 async fn suspend_closes_gate_and_unsuspend_reopens() {
@@ -85,6 +111,349 @@ async fn human_input_in_suspended_auto_unsuspends() {
     harness.mailbox_tx.send(envelope).await.unwrap();
 
     wait_for_running_event(&mut harness.event_rx).await;
+    drop(harness.control_tx);
+    drop(harness.mailbox_tx);
+}
+
+#[tokio::test]
+async fn suspend_closes_prior_turn_and_human_resume_does_not_cancel_it() {
+    let calls = vec![
+        chunks::text_turn("kickoff complete"),
+        chunks::text_turn("human resume complete"),
+    ];
+    let mut harness = HarnessBuilder::new()
+        .calls(calls)
+        .messages(vec![])
+        .lifecycle(loopal_runtime::LifecycleMode::Persistent)
+        .llm_chunk_delay(Duration::from_millis(40))
+        .build_spawned()
+        .await;
+
+    harness
+        .mailbox_tx
+        .send(Envelope::new(MessageSource::Human, "main", "kickoff"))
+        .await
+        .unwrap();
+    wait_for_call_count(&harness.recorded_messages, 1, Duration::from_secs(5)).await;
+    harness
+        .control_tx
+        .send(ControlCommand::Suspend)
+        .await
+        .unwrap();
+    wait_for_gate_change(&mut harness.event_rx, false).await;
+
+    harness
+        .mailbox_tx
+        .send(Envelope::new(MessageSource::Human, "main", "resume"))
+        .await
+        .unwrap();
+    wait_for_call_count(&harness.recorded_messages, 2, Duration::from_secs(5)).await;
+
+    let calls = harness.recorded_messages.lock().unwrap();
+    let kickoff = calls[1]
+        .iter()
+        .find(|turn| {
+            matches!(
+                &turn.trigger,
+                loopal_turn::TurnTrigger::UserInput { content, .. } if content == "kickoff"
+            )
+        })
+        .expect("second request must retain the kickoff turn");
+    assert!(
+        matches!(&kickoff.outcome, loopal_turn::TurnOutcome::Complete),
+        "Suspend must close the prior turn as Complete before Human ingest; got {:?}",
+        kickoff.outcome
+    );
+    drop(calls);
+    drop(harness.control_tx);
+    drop(harness.mailbox_tx);
+}
+
+#[tokio::test]
+async fn message_queued_during_tools_starts_only_after_tool_followup_turn_completes() {
+    let calls = vec![
+        slow_tool_turn(),
+        chunks::text_turn("tool followup complete"),
+        chunks::text_turn("queued message complete"),
+    ];
+    let mut harness = HarnessBuilder::new()
+        .calls(calls)
+        .messages(vec![])
+        .lifecycle(loopal_runtime::LifecycleMode::Persistent)
+        .build_spawned()
+        .await;
+    harness
+        .mailbox_tx
+        .send(Envelope::new(MessageSource::Human, "main", "run tools"))
+        .await
+        .unwrap();
+    wait_for_tool_batch_start(&mut harness.event_rx).await;
+    harness
+        .mailbox_tx
+        .send(Envelope::new(
+            MessageSource::Human,
+            "main",
+            "queued during tools",
+        ))
+        .await
+        .unwrap();
+
+    wait_for_call_count(&harness.recorded_messages, 3, Duration::from_secs(10)).await;
+    let calls = harness.recorded_messages.lock().unwrap();
+    let first_turn = calls[2]
+        .iter()
+        .find(|turn| {
+            matches!(
+                &turn.trigger,
+                loopal_turn::TurnTrigger::UserInput { content, .. } if content == "run tools"
+            )
+        })
+        .expect("queued-message request must retain the tool turn");
+    assert!(matches!(
+        &first_turn.outcome,
+        loopal_turn::TurnOutcome::Complete
+    ));
+    assert!(first_turn.body.steps.iter().any(|step| {
+        matches!(
+            step,
+            loopal_turn::TurnStep::LlmCall { response, .. }
+                if response
+                    .text_blocks
+                    .iter()
+                    .any(|block| block.text == "tool followup complete")
+        )
+    }));
+    assert!(matches!(
+        calls[2].last().map(|turn| &turn.trigger),
+        Some(loopal_turn::TurnTrigger::UserInput { content, .. })
+            if content == "queued during tools"
+    ));
+    drop(calls);
+
+    let events: Vec<_> = std::iter::from_fn(|| harness.event_rx.try_recv().ok())
+        .map(|event| event.payload)
+        .collect();
+    let followup = events
+        .iter()
+        .position(|payload| {
+            matches!(payload, AgentEventPayload::Stream { text } if text == "tool followup complete")
+        })
+        .expect("tool-result follow-up stream missing");
+    let boundary = events[followup + 1..]
+        .iter()
+        .position(|payload| matches!(payload, AgentEventPayload::AwaitingInput))
+        .map(|offset| followup + 1 + offset)
+        .expect("queued message must wait for an AwaitingInput boundary");
+    assert!(
+        events[boundary + 1..]
+            .iter()
+            .any(|payload| matches!(payload, AgentEventPayload::Running))
+    );
+
+    drop(harness.control_tx);
+    drop(harness.mailbox_tx);
+}
+
+#[tokio::test]
+async fn suspend_queued_during_tools_applies_after_tool_followup_completes() {
+    let calls = vec![
+        slow_tool_turn(),
+        chunks::text_turn("tool followup before suspend"),
+        chunks::text_turn("resumed after completed tool turn"),
+    ];
+    let mut harness = HarnessBuilder::new()
+        .calls(calls)
+        .messages(vec![])
+        .lifecycle(loopal_runtime::LifecycleMode::Persistent)
+        .build_spawned()
+        .await;
+    harness
+        .mailbox_tx
+        .send(Envelope::new(MessageSource::Human, "main", "run tools"))
+        .await
+        .unwrap();
+    wait_for_tool_batch_start(&mut harness.event_rx).await;
+    harness
+        .control_tx
+        .send(ControlCommand::Suspend)
+        .await
+        .unwrap();
+
+    let closed = wait_for_gate_change(&mut harness.event_rx, false).await;
+    assert_eq!(closed.closed_reason, Some(GateCloseReason::UserSuspend));
+    assert_eq!(
+        harness.recorded_messages.lock().unwrap().len(),
+        2,
+        "Suspend must not cut off the tool-result follow-up provider call"
+    );
+    harness
+        .mailbox_tx
+        .send(Envelope::new(MessageSource::Human, "main", "resume"))
+        .await
+        .unwrap();
+    wait_for_gate_change(&mut harness.event_rx, true).await;
+    wait_for_call_count(&harness.recorded_messages, 3, Duration::from_secs(5)).await;
+
+    let calls = harness.recorded_messages.lock().unwrap();
+    let tool_turn = calls[2]
+        .iter()
+        .find(|turn| {
+            matches!(
+                &turn.trigger,
+                loopal_turn::TurnTrigger::UserInput { content, .. } if content == "run tools"
+            )
+        })
+        .expect("resume request must retain the completed tool turn");
+    assert!(matches!(
+        &tool_turn.outcome,
+        loopal_turn::TurnOutcome::Complete
+    ));
+    assert!(tool_turn.body.steps.iter().any(|step| {
+        matches!(
+            step,
+            loopal_turn::TurnStep::LlmCall { response, .. }
+                if response
+                    .text_blocks
+                    .iter()
+                    .any(|block| block.text == "tool followup before suspend")
+        )
+    }));
+    drop(calls);
+    drop(harness.control_tx);
+    drop(harness.mailbox_tx);
+}
+
+#[tokio::test]
+async fn non_human_frontend_message_is_deferred_until_after_human_resume_turn() {
+    let calls = vec![
+        chunks::text_turn("answered human first"),
+        chunks::text_turn("processed deferred agent message"),
+    ];
+    let mut harness = HarnessBuilder::new()
+        .calls(calls)
+        .messages(vec![])
+        .lifecycle(loopal_runtime::LifecycleMode::Persistent)
+        .build_spawned()
+        .await;
+
+    harness
+        .control_tx
+        .send(ControlCommand::Suspend)
+        .await
+        .unwrap();
+    let closed = wait_for_gate_change(&mut harness.event_rx, false).await;
+    assert_eq!(closed.closed_reason, Some(GateCloseReason::UserSuspend));
+
+    harness
+        .mailbox_tx
+        .send(Envelope::new(
+            MessageSource::Agent("worker".into()),
+            "main",
+            "deferred agent result",
+        ))
+        .await
+        .unwrap();
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert_eq!(
+        harness.recorded_messages.lock().unwrap().len(),
+        0,
+        "a non-Human frontend envelope must not run the LLM while suspended"
+    );
+    while let Ok(event) = harness.event_rx.try_recv() {
+        assert!(
+            !matches!(event.payload, AgentEventPayload::Running),
+            "a non-Human frontend envelope must not lift Suspended"
+        );
+    }
+
+    harness
+        .mailbox_tx
+        .send(Envelope::new(MessageSource::Human, "main", "resume now"))
+        .await
+        .unwrap();
+    wait_for_call_count(&harness.recorded_messages, 2, Duration::from_secs(5)).await;
+
+    let recorded = harness.recorded_messages.lock().unwrap();
+    assert!(matches!(
+        recorded[0].last().map(|turn| &turn.trigger),
+        Some(loopal_turn::TurnTrigger::UserInput { content, .. }) if content == "resume now"
+    ));
+    assert!(matches!(
+        recorded[1].last().map(|turn| &turn.trigger),
+        Some(loopal_turn::TurnTrigger::Agent { content, .. })
+            if content == "deferred agent result"
+    ));
+    assert_ne!(
+        recorded[0].last().map(|turn| turn.id.as_str()),
+        recorded[1].last().map(|turn| turn.id.as_str()),
+        "the Human resume and deferred envelope must be distinct turns"
+    );
+    drop(recorded);
+    let lifecycle: Vec<_> = std::iter::from_fn(|| harness.event_rx.try_recv().ok())
+        .filter_map(|event| match event.payload {
+            AgentEventPayload::Running => Some("running"),
+            AgentEventPayload::AwaitingInput => Some("awaiting"),
+            _ => None,
+        })
+        .collect();
+    let boundary = lifecycle
+        .iter()
+        .position(|state| *state == "awaiting")
+        .expect("deferred turn must be preceded by AwaitingInput");
+    assert!(
+        lifecycle[boundary + 1..].contains(&"running"),
+        "deferred turn must start only after the idle boundary: {lifecycle:?}"
+    );
+    drop(harness.control_tx);
+    drop(harness.mailbox_tx);
+}
+
+#[tokio::test]
+async fn explicit_unsuspend_releases_deferred_frontend_message() {
+    let calls = vec![chunks::text_turn("processed after unsuspend")];
+    let mut harness = HarnessBuilder::new()
+        .calls(calls)
+        .messages(vec![])
+        .lifecycle(loopal_runtime::LifecycleMode::Persistent)
+        .build_spawned()
+        .await;
+
+    harness
+        .control_tx
+        .send(ControlCommand::Suspend)
+        .await
+        .unwrap();
+    wait_for_gate_change(&mut harness.event_rx, false).await;
+    harness
+        .mailbox_tx
+        .send(Envelope::new(
+            MessageSource::Channel {
+                channel: "ops".into(),
+                from: "peer".into(),
+            },
+            "main",
+            "deferred channel input",
+        ))
+        .await
+        .unwrap();
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(harness.recorded_messages.lock().unwrap().is_empty());
+
+    harness
+        .control_tx
+        .send(ControlCommand::Unsuspend)
+        .await
+        .unwrap();
+    wait_for_gate_change(&mut harness.event_rx, true).await;
+    wait_for_call_count(&harness.recorded_messages, 1, Duration::from_secs(5)).await;
+    assert!(matches!(
+        harness.recorded_messages.lock().unwrap()[0]
+            .last()
+            .map(|turn| &turn.trigger),
+        Some(loopal_turn::TurnTrigger::Channel { content, .. })
+            if content == "deferred channel input"
+    ));
+
     drop(harness.control_tx);
     drop(harness.mailbox_tx);
 }

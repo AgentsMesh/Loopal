@@ -11,6 +11,7 @@ rust_library(
         "//crates/loopal-provider-api",
         "//crates/loopal-tool-api",
         "//crates/loopal-turn",
+        "@crates//:chrono",
         "@crates//:eventsource-stream",
         "@crates//:futures",
         "@crates//:pin-project-lite",

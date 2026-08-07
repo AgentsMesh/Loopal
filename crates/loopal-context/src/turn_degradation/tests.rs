@@ -55,6 +55,7 @@ fn make_turn_with_tool_result(body: String) -> Turn {
                 content: body,
                 images: Vec::new(),
                 is_error: false,
+                metadata: None,
             }),
         }],
     }));

@@ -65,14 +65,12 @@ test('keeps malformed, empty, and thinking-only stream failures recoverable', as
     await ready(page)
 
     await send(page, 'Handle empty stream disconnect')
+    await expect(conversation).toContainText(/Retrying in \d+\.\ds/, { timeout: 10_000 })
     await expect(conversation).toContainText(
-      'possible network interruption', { timeout: 20_000 },
+      'Empty stream recovered through exact request retry.', { timeout: 20_000 },
     )
-    await ready(page)
-    await send(page, 'Continue after empty disconnect')
-    await expect(conversation).toContainText(
-      'Session remained usable after an empty disconnect.', { timeout: 20_000 },
-    )
+    await expect(conversation).not.toContainText('possible network interruption')
+    await expect(conversation).not.toContainText('Retrying in')
     await ready(page)
 
     await send(page, 'Recover thinking-only disconnect')
@@ -87,14 +85,24 @@ test('keeps malformed, empty, and thinking-only stream failures recoverable', as
       'Server-only disconnect recovered.', { timeout: 20_000 },
     )
     await ready(page)
+
+    await send(page, 'Continue after all stream recoveries')
+    await expect(conversation).toContainText(
+      'Session remained usable after every stream recovery.', { timeout: 20_000 },
+    )
+    await ready(page)
+
     const detail = await activeDetail(page)
     expect(detail.session.attention).not.toBe('failure')
+    expect(detail.agents.find((agent) => agent.id === 'main')?.telemetry?.turnCount).toBe(5)
     expect(detail.conversation.some((entry) => (
       entry.role === 'thinking' && entry.text.includes('THINKING BEFORE DISCONNECT')
     ))).toBe(true)
-    expect(await desktop.llm!.requests()).toHaveLength(8)
+    const requests = await desktop.llm!.requests()
+    expect(requests).toHaveLength(9)
+    expect(requests[3]).toEqual({ ...requests[2], sequence: requests[3]!.sequence })
     await expect.poll(() => desktop.llm!.state()).toMatchObject({
-      served: 8, remaining: 0, verified: true,
+      served: 9, remaining: 0, unmatchedRequests: 0, verified: true,
     })
   } finally {
     await closeDesktop(desktop)

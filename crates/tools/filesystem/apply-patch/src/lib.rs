@@ -13,6 +13,11 @@ pub struct ApplyPatchTool;
 
 #[derive(Deserialize, JsonSchema)]
 pub struct ApplyPatchParams {
+    /// A patch document with this grammar: optional `*** Begin Patch`, then
+    /// `*** Add File: <path>` followed by `+` content lines,
+    /// `*** Update File: <path>` followed by one or more `@@` hunks using
+    /// space/-/+ lines, or `*** Delete File: <path>`, then optional
+    /// `*** End Patch`. The Begin and End markers must be paired.
     pub patch: String,
 }
 
@@ -25,7 +30,12 @@ impl TypedTool<ApplyPatchParams> for ApplyPatchTool {
     fn description(&self) -> &str {
         "Apply a patch to create, update, or delete multiple files in a best-effort batch \
          (fail-fast on first error; already-applied files are reported in the error). \
-         Uses a unified diff-like format with context lines for reliable matching."
+         The optional Begin/End envelope must be paired. Exact grammar:\n\
+         [*** Begin Patch]\n\
+         *** Add File: <path> followed by '+' content lines\n\
+         *** Update File: <path> followed by one or more '@@' hunks using space/-/+ lines\n\
+         *** Delete File: <path>\n\
+         [*** End Patch]"
     }
 
     fn permission(&self) -> PermissionLevel {

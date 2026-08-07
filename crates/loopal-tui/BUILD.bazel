@@ -20,6 +20,7 @@ rust_library(
         "//crates/loopal-tool-api",
         "//crates/loopal-tool-invocation",
         "//crates/loopal-view-state",
+        "//crates/tools/filesystem/edit-core:loopal-edit-core",
         "@crates//:anyhow",
         "@crates//:arboard",
         "@crates//:base64",

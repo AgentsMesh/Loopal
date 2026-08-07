@@ -79,6 +79,7 @@ fn fold_events_restores_last_step_at_from_step_updated() {
                 content: "ok".into(),
                 images: Vec::new(),
                 is_error: false,
+                metadata: None,
             }),
             updated_at: Some(updated),
         },

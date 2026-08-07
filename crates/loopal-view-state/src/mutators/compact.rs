@@ -14,6 +14,9 @@ pub(super) fn progress(
     match phase {
         CompactPhase::Done => {
             conv.compact_banner = None;
+            // Retry is a nested compaction sub-state. Closing the parent
+            // operation also repairs a lost RetryCleared event.
+            conv.retry_banner = None;
         }
         phase => {
             conv.compact_banner = Some(format_banner(phase, detail));

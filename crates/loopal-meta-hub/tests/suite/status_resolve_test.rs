@@ -15,7 +15,7 @@ use crate::test_helpers::*;
 
 #[tokio::test]
 async fn hub_status_shows_uplink() {
-    let (hub, _) = make_hub();
+    let (hub, _hub_event_rx) = make_hub();
     let (conn, rx) = loopal_agent_hub::hub_server::connect_local(hub.clone(), "querier");
     tokio::spawn(async move {
         let mut rx = rx;
@@ -47,8 +47,8 @@ async fn hub_status_shows_uplink() {
 #[tokio::test]
 async fn list_hubs_returns_registered() {
     let meta_hub = Arc::new(Mutex::new(MetaHub::new()));
-    let (ha, _) = make_hub();
-    let (hb, _) = make_hub();
+    let (ha, _ha_event_rx) = make_hub();
+    let (hb, _hb_event_rx) = make_hub();
     let _a = wire_hub_to_meta("hub-a", &ha, &meta_hub).await;
     let _b = wire_hub_to_meta("hub-b", &hb, &meta_hub).await;
 
@@ -66,7 +66,7 @@ async fn list_hubs_returns_registered() {
 #[tokio::test]
 async fn heartbeat_updates_agent_count() {
     let meta_hub = Arc::new(Mutex::new(MetaHub::new()));
-    let (hx, _) = make_hub();
+    let (hx, _hx_event_rx) = make_hub();
     let _c = wire_hub_to_meta("hub-x", &hx, &meta_hub).await;
     {
         meta_hub

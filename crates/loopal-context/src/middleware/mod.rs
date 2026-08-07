@@ -1,5 +1,6 @@
 mod bare_summary;
 mod compact_prompt;
+mod compact_retry;
 mod conversation_text;
 pub mod file_snapshot;
 pub mod microcompact;

@@ -7,7 +7,7 @@ use loopal_ipc::StdioTransport;
 use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
-use loopal_protocol::{AgentEvent, AgentEventPayload, Envelope, MessageSource};
+use loopal_protocol::{AgentCompletion, AgentEvent, AgentEventPayload, Envelope, MessageSource};
 use loopal_test_support::TestFixture;
 use loopal_test_support::mock_provider::{HangingProvider, MultiCallProvider};
 
@@ -286,5 +286,56 @@ async fn interrupt_cancels_turn_without_exiting_server() {
     tokio::time::timeout(Duration::from_secs(2), &mut server)
         .await
         .expect("cleanup shutdown did not exit server")
+        .expect("server task panicked");
+}
+
+/// Spawned agents are ephemeral. Interrupting one must complete the child with
+/// the explicit `aborted` reason and retain text streamed before cancellation;
+/// otherwise the Hub reports a cancelled child as a successful goal.
+#[tokio::test]
+async fn interrupting_ephemeral_session_reports_aborted_completion() {
+    use loopal_test_support::chunks;
+
+    let provider = MultiCallProvider::new(vec![vec![
+        chunks::text("partial child result"),
+        chunks::text(" must not arrive"),
+        chunks::done(),
+    ]])
+    .with_delay(Duration::from_millis(500));
+    let (conn, mut rx, _fixture, server) =
+        start_test_server(Arc::new(provider) as Arc<dyn loopal_provider_api::Provider>).await;
+
+    init_and_start(&conn, &mut rx, Some("do child work")).await;
+    wait_for_event(&mut rx, |event| {
+        matches!(event, AgentEventPayload::Stream { .. })
+    })
+    .await;
+
+    let ack = tokio::time::timeout(
+        Duration::from_secs(2),
+        conn.send_request(methods::AGENT_INTERRUPT.name, serde_json::json!({})),
+    )
+    .await
+    .expect("ephemeral interrupt ACK timed out")
+    .expect("ephemeral interrupt failed");
+    assert_eq!(ack["ok"], true);
+
+    let completion = tokio::time::timeout(T, async {
+        while let Some(Incoming::Notification { method, params }) = rx.recv().await {
+            if method == methods::AGENT_COMPLETED.name {
+                return serde_json::from_value::<AgentCompletion>(params)
+                    .expect("agent/completed payload must be typed");
+            }
+        }
+        panic!("connection closed before agent/completed");
+    })
+    .await
+    .expect("timed out waiting for aborted agent/completed");
+
+    assert_eq!(completion.reason, "aborted");
+    assert_eq!(completion.result.as_deref(), Some("partial child result"));
+    tokio::time::timeout(Duration::from_secs(3), server)
+        .await
+        .expect("ephemeral server did not exit after completion")
         .expect("server task panicked");
 }

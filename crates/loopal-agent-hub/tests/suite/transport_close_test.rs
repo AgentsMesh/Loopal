@@ -13,7 +13,7 @@ use loopal_agent_hub::Hub;
 use loopal_agent_hub::spawn_manager::register_agent_connection;
 use loopal_ipc::connection::Connection;
 use loopal_ipc::protocol::methods;
-use loopal_protocol::AgentEvent;
+use loopal_protocol::{AgentEvent, AgentEventPayload, AgentStatus, TRANSPORT_ERROR_REASON};
 use serde_json::json;
 
 fn make_hub() -> (Arc<Mutex<Hub>>, mpsc::Receiver<AgentEvent>) {
@@ -50,7 +50,7 @@ async fn transport_closed_after_agent_completes() {
     agent_conn
         .send_notification(
             methods::AGENT_COMPLETED.name,
-            json!({"reason": "end_turn", "result": "done"}),
+            json!({"reason": "goal", "result": "done"}),
         )
         .await
         .unwrap();
@@ -92,7 +92,7 @@ async fn agent_receives_eof_after_hub_closes_transport() {
     agent_conn
         .send_notification(
             methods::AGENT_COMPLETED.name,
-            json!({"reason": "end_turn", "result": "done"}),
+            json!({"reason": "goal", "result": "done"}),
         )
         .await
         .unwrap();
@@ -143,7 +143,7 @@ async fn result_delivered_before_transport_close() {
     agent_conn
         .send_notification(
             methods::AGENT_COMPLETED.name,
-            json!({"reason": "end_turn", "result": "the answer is 42"}),
+            json!({"reason": "goal", "result": "the answer is 42"}),
         )
         .await
         .unwrap();
@@ -152,11 +152,9 @@ async fn result_delivered_before_transport_close() {
     // called in finish_and_deliver BEFORE conn.close)
     let result = tokio::time::timeout(Duration::from_secs(2), watcher.changed()).await;
     assert!(result.is_ok(), "watcher should be notified");
-    assert_eq!(
-        watcher.borrow().as_deref(),
-        Some("the answer is 42"),
-        "result must be delivered before transport close"
-    );
+    let completion = watcher.borrow().clone().unwrap();
+    assert_eq!(completion.reason, "goal");
+    assert_eq!(completion.result.as_deref(), Some("the answer is 42"));
 }
 
 /// When the child process crashes (closes its connection without sending
@@ -164,7 +162,9 @@ async fn result_delivered_before_transport_close() {
 /// `agent_proc.wait()` background task can reap the child.
 #[tokio::test]
 async fn child_crash_triggers_transport_close() {
-    let (hub, _event_rx) = make_hub();
+    let (hub, event_rx) = make_hub();
+    let mut ui_events = hub.lock().await.ui.subscribe_events();
+    let _event_loop = loopal_agent_hub::start_event_loop(hub.clone(), event_rx);
 
     let (agent_transport, hub_transport) = loopal_ipc::duplex_pair();
     let hub_transport_ref = hub_transport.clone();
@@ -205,6 +205,124 @@ async fn child_crash_triggers_transport_close() {
             .is_none(),
         "crashed agent must be unregistered"
     );
+    let completion = hub
+        .lock()
+        .await
+        .registry
+        .completion("crasher")
+        .cloned()
+        .expect("transport failure must be cached");
+    assert_eq!(completion.reason, TRANSPORT_ERROR_REASON);
+    assert!(!completion.is_success());
+    let (saw_error, saw_finished) = tokio::time::timeout(Duration::from_secs(2), async {
+        let mut saw_error = false;
+        let mut saw_finished = false;
+        while !(saw_error && saw_finished) {
+            match ui_events.recv().await.unwrap().payload {
+                AgentEventPayload::Error { message } => {
+                    saw_error |= message.contains("before agent/completed");
+                }
+                AgentEventPayload::Finished => saw_finished = true,
+                _ => {}
+            }
+        }
+        (saw_error, saw_finished)
+    })
+    .await
+    .expect("transport terminal events timed out");
+    assert!(
+        saw_error,
+        "transport failure must emit a visible Error event"
+    );
+    assert!(saw_finished, "transport teardown must remain terminal");
+    let view = hub
+        .lock()
+        .await
+        .registry
+        .agent_view("crasher")
+        .expect("failed tombstone view");
+    assert_eq!(
+        view.lock().await.state().agent.observable.status,
+        AgentStatus::Error
+    );
+
+    let wait = loopal_agent_hub::dispatch::dispatch_hub_request(
+        &hub,
+        methods::HUB_WAIT_AGENT.name,
+        json!({"name": "crasher"}),
+        "parent".into(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(wait["status"], "failed");
+    assert_eq!(wait["reason"], TRANSPORT_ERROR_REASON);
+}
+
+#[tokio::test]
+async fn reported_error_is_not_duplicated_by_failed_completion() {
+    let (hub, event_rx) = make_hub();
+    let _event_loop = loopal_agent_hub::start_event_loop(hub.clone(), event_rx);
+    let (agent_transport, hub_transport) = loopal_ipc::duplex_pair();
+    let (agent_conn, _agent_rx) = Connection::new(agent_transport).into_listening();
+    let (server_conn, server_rx) = Connection::new(hub_transport).into_listening();
+    register_agent_connection(
+        hub.clone(),
+        "errored",
+        server_conn,
+        server_rx,
+        None,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+
+    let error = AgentEvent::named(
+        "errored",
+        AgentEventPayload::Error {
+            message: "provider exploded".into(),
+        },
+    );
+    agent_conn
+        .send_notification(
+            methods::AGENT_EVENT.name,
+            serde_json::to_value(error).unwrap(),
+        )
+        .await
+        .unwrap();
+    agent_conn
+        .send_notification(
+            methods::AGENT_COMPLETED.name,
+            json!({"reason": "error", "result": "partial result"}),
+        )
+        .await
+        .unwrap();
+
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if hub.lock().await.registry.completion("errored").is_some() {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    tokio::time::sleep(Duration::from_millis(50)).await;
+
+    let view = hub.lock().await.registry.agent_view("errored").unwrap();
+    let view = view.lock().await;
+    let errors: Vec<_> = view
+        .state()
+        .agent
+        .conversation
+        .messages
+        .iter()
+        .filter(|message| message.role == "error")
+        .map(|message| message.content.as_str())
+        .collect();
+    assert_eq!(errors, ["provider exploded"]);
+    assert_eq!(view.state().agent.observable.status, AgentStatus::Error);
 }
 
 /// After completion and transport close, the agent must no longer be
@@ -242,7 +360,7 @@ async fn agent_unregistered_after_completion() {
     agent_conn
         .send_notification(
             methods::AGENT_COMPLETED.name,
-            json!({"reason": "end_turn", "result": "ok"}),
+            json!({"reason": "goal", "result": "ok"}),
         )
         .await
         .unwrap();

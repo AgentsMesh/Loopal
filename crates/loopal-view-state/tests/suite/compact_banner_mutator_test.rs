@@ -49,6 +49,86 @@ fn done_phase_clears_banner() {
 }
 
 #[test]
+fn done_phase_clears_nested_retry_banner() {
+    let mut r = ViewStateReducer::new("root");
+    r.apply(progress(CompactPhase::Summarize, None));
+    r.apply(AgentEventPayload::RetryError {
+        message: "gateway unavailable".into(),
+        attempt: 1,
+        max_attempts: 3,
+    });
+    assert!(r.state().agent.conversation.retry_banner.is_some());
+
+    r.apply(progress(CompactPhase::Done, None));
+
+    assert_eq!(r.state().agent.conversation.retry_banner, None);
+}
+
+#[test]
+fn completed_microcompact_lifecycle_does_not_leave_a_banner() {
+    let mut r = ViewStateReducer::new("root");
+    r.apply(progress(
+        CompactPhase::Microcompact,
+        Some("scrubbed 46 stale tool results"),
+    ));
+    r.apply(progress(CompactPhase::Done, None));
+
+    assert_eq!(
+        banner_of(&r),
+        None,
+        "a completed microcompact lifecycle must not mask subsequent working status",
+    );
+}
+
+#[test]
+fn normal_turn_activity_repairs_a_lost_compact_terminal_event() {
+    let mut r = ViewStateReducer::new("root");
+    r.apply(progress(
+        CompactPhase::Microcompact,
+        Some("scrubbed 46 stale tool results"),
+    ));
+    r.apply(AgentEventPayload::RetryError {
+        message: "gateway unavailable".into(),
+        attempt: 1,
+        max_attempts: 3,
+    });
+    assert!(banner_of(&r).is_some());
+    assert!(r.state().agent.conversation.retry_banner.is_some());
+
+    r.apply(AgentEventPayload::Stream {
+        text: "normal model output".to_string(),
+    });
+
+    assert_eq!(
+        banner_of(&r),
+        None,
+        "normal turn activity must supersede a stale compact lifecycle",
+    );
+    assert_eq!(r.state().agent.conversation.retry_banner, None);
+}
+
+#[test]
+fn new_running_phase_repairs_a_stale_compact_snapshot() {
+    let mut r = ViewStateReducer::new("root");
+    r.apply(progress(CompactPhase::Summarize, None));
+    r.apply(AgentEventPayload::RetryError {
+        message: "gateway unavailable".into(),
+        attempt: 1,
+        max_attempts: 3,
+    });
+    assert!(banner_of(&r).is_some());
+
+    r.apply(AgentEventPayload::Running);
+
+    assert_eq!(
+        banner_of(&r),
+        None,
+        "a new running phase must not inherit an older compact banner",
+    );
+    assert_eq!(r.state().agent.conversation.retry_banner, None);
+}
+
+#[test]
 fn detail_is_appended_to_banner() {
     let mut r = ViewStateReducer::new("root");
     r.apply(progress(CompactPhase::Rehydrate, Some("3 files, 4.2K")));
@@ -68,7 +148,13 @@ fn empty_detail_does_not_append_separator() {
 fn compacted_event_clears_banner() {
     let mut r = ViewStateReducer::new("root");
     r.apply(progress(CompactPhase::Summarize, None));
+    r.apply(AgentEventPayload::RetryError {
+        message: "gateway unavailable".into(),
+        attempt: 1,
+        max_attempts: 3,
+    });
     assert!(banner_of(&r).is_some());
+    assert!(r.state().agent.conversation.retry_banner.is_some());
     r.apply(AgentEventPayload::Compacted(CompactionSummary {
         kept: 5,
         summarized: 100,
@@ -83,6 +169,7 @@ fn compacted_event_clears_banner() {
         None,
         "Compacted event must clear stale banner",
     );
+    assert_eq!(r.state().agent.conversation.retry_banner, None);
 }
 
 #[test]
@@ -149,4 +236,41 @@ fn compact_progress_does_not_touch_status() {
         AgentStatus::WaitingForInput,
         "compaction progress must not mutate backend-authoritative status",
     );
+}
+
+#[test]
+fn idle_compaction_retry_does_not_turn_waiting_session_into_running() {
+    let mut r = ViewStateReducer::new("root");
+    r.apply(AgentEventPayload::AwaitingInput);
+    r.apply(progress(CompactPhase::Summarize, None));
+    r.apply(AgentEventPayload::RetryError {
+        message: "HTTP 502. Retrying".into(),
+        attempt: 1,
+        max_attempts: 3,
+    });
+    r.apply(AgentEventPayload::RetryCleared);
+    r.apply(progress(CompactPhase::Done, None));
+
+    assert_eq!(
+        r.state().agent.observable.status,
+        AgentStatus::WaitingForInput,
+        "retry lifecycle must preserve the idle compaction owner status",
+    );
+    assert_eq!(r.state().agent.conversation.retry_banner, None);
+    assert_eq!(r.state().agent.conversation.compact_banner, None);
+}
+
+#[test]
+fn main_model_retry_preserves_running_status() {
+    let mut r = ViewStateReducer::new("root");
+    r.apply(AgentEventPayload::Running);
+    r.apply(AgentEventPayload::RetryError {
+        message: "HTTP 502. Retrying".into(),
+        attempt: 1,
+        max_attempts: 6,
+    });
+    r.apply(AgentEventPayload::RetryCleared);
+
+    assert_eq!(r.state().agent.observable.status, AgentStatus::Running);
+    assert_eq!(r.state().agent.conversation.retry_banner, None);
 }

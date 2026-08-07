@@ -8,7 +8,7 @@ use tracing::info;
 use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
-use loopal_protocol::{AgentEvent, ControlCommand, Envelope};
+use loopal_protocol::{AgentCompletion, AgentEvent, ControlCommand, Envelope};
 
 use crate::start_params::{StartAgentParams, encode};
 
@@ -152,8 +152,17 @@ impl AgentClient {
                 Incoming::Notification { method, params } => {
                     if method == methods::AGENT_EVENT.name {
                         match serde_json::from_value::<AgentEvent>(params) {
-                            Ok(event) => return Some(AgentClientEvent::AgentEvent(event)),
+                            Ok(event) => {
+                                return Some(AgentClientEvent::AgentEvent(Box::new(event)));
+                            }
                             Err(e) => tracing::warn!("failed to parse agent event: {e}"),
+                        }
+                    } else if method == methods::AGENT_COMPLETED.name {
+                        match serde_json::from_value::<AgentCompletion>(params) {
+                            Ok(completion) => {
+                                return Some(AgentClientEvent::AgentCompleted(completion));
+                            }
+                            Err(e) => tracing::warn!("failed to parse agent completion: {e}"),
                         }
                     }
                 }
@@ -186,5 +195,7 @@ impl AgentClient {
 #[derive(Debug)]
 pub enum AgentClientEvent {
     /// An agent event (stream text, tool calls, status, etc).
-    AgentEvent(AgentEvent),
+    AgentEvent(Box<AgentEvent>),
+    /// The authoritative terminal result from `agent/completed`.
+    AgentCompleted(AgentCompletion),
 }

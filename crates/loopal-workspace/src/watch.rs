@@ -6,10 +6,11 @@ use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use serde::Serialize;
 use tokio::sync::broadcast;
 
-use crate::notification::{ServiceNotification, publish_git_changed, publish_resync_required};
+use crate::notification::{
+    ServiceNotification, publish_file_changed, publish_git_changed, publish_resync_required,
+};
 use crate::{RootGuard, WorkspaceError};
 
 const QUIET_PERIOD: Duration = Duration::from_millis(75);
@@ -41,14 +42,6 @@ struct Batch {
 enum WatchInput {
     Event(Event),
     Resync,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct FileChanged<'a> {
-    workspace_id: &'a str,
-    path: &'a str,
-    kind: &'a str,
 }
 
 pub(crate) fn start(
@@ -156,14 +149,7 @@ impl Batch {
 
     fn publish(self, workspace_id: &str, events: &broadcast::Sender<ServiceNotification>) {
         for (path, kind) in self.files {
-            let payload = FileChanged {
-                workspace_id,
-                path: &path,
-                kind,
-            };
-            if let Ok(event) = ServiceNotification::broadcast("workspace/fileChanged", &payload) {
-                let _ = events.send(event);
-            }
+            publish_file_changed(events, workspace_id, &path, kind);
         }
         if self.git_changed {
             publish_git_changed(events, workspace_id);

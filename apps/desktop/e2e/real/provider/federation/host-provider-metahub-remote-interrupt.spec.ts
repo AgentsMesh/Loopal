@@ -43,7 +43,7 @@ test('interrupts a running remote child without late completion', async () => {
       'Root observed remote child interruption.', { timeout: 15_000 },
     )
     await expect.poll(() => child(desktop!.page), { timeout: 15_000 }).toMatchObject({
-      id: 'hub-b/remote-cancel', status: 'completed', controllable: false,
+      id: 'hub-b/remote-cancel', status: 'failed', controllable: false,
     })
 
     await desktop.page.waitForTimeout(1_500)

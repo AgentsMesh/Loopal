@@ -35,12 +35,15 @@ pub async fn handle_route(hub: &Arc<Mutex<Hub>>, params: Value) -> Result<Value,
         let h = hub.lock().await;
         h.registry
             .get_agent_connection(&envelope.target.agent)
-            .map(|conn| (conn, h.registry.event_sender()))
+            .map(|conn| {
+                let observation = routing::RouteObservation::from_hub(&h, &envelope.target.agent);
+                (conn, observation)
+            })
     };
 
     match result {
-        Some((conn, event_tx)) => {
-            routing::route_to_agent(&conn, &envelope, &event_tx).await?;
+        Some((conn, observation)) => {
+            routing::route_to_agent(&conn, &envelope, &observation).await?;
             Ok(json!({"ok": true}))
         }
         None => {
@@ -86,7 +89,9 @@ pub async fn handle_control(hub: &Arc<Mutex<Hub>>, params: Value) -> Result<Valu
         .ok_or("missing 'target' field")?
         .to_string();
     if loopal_protocol::QualifiedAddress::parse(&target).is_remote() {
-        return crate::remote_relay::forward_action(hub, &target, "control", params).await;
+        let response = crate::remote_relay::forward_action(hub, &target, "control", params).await?;
+        return agent_command::normalize_control_response(response)
+            .map_err(|error| format!("control to '{target}' returned {error}"));
     }
     let command = params["command"].clone();
     let conn = {
@@ -95,15 +100,23 @@ pub async fn handle_control(hub: &Arc<Mutex<Hub>>, params: Value) -> Result<Valu
             .get_agent_connection(&target)
             .ok_or_else(|| format!("no agent: '{target}'"))?
     };
-    agent_command::request(
-        conn,
+    let response = agent_command::request(
+        Arc::clone(&conn),
         methods::AGENT_CONTROL.name,
         command,
         &target,
         "control",
         agent_command::CONTROL_DEADLINE,
+        agent_command::TimeoutDisposition::PreserveAsUnknown,
     )
-    .await
+    .await?;
+    match agent_command::normalize_control_response(response) {
+        Ok(response) => Ok(response),
+        Err(error) => {
+            let _ = tokio::time::timeout(Duration::from_secs(2), conn.close()).await;
+            Err(format!("control to '{target}' returned {error}"))
+        }
+    }
 }
 
 pub async fn handle_interrupt(hub: &Arc<Mutex<Hub>>, params: Value) -> Result<Value, String> {
@@ -168,6 +181,7 @@ pub async fn handle_shutdown_agent(hub: &Arc<Mutex<Hub>>, params: Value) -> Resu
         &target,
         "shutdown",
         agent_command::SHUTDOWN_DEADLINE,
+        agent_command::TimeoutDisposition::CloseConnection,
     )
     .await?;
     Ok(json!({"ok": true}))

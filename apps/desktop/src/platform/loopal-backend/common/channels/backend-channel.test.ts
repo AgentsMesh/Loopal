@@ -41,7 +41,7 @@ describe('DesktopBackendChannel', () => {
     )).resolves.toBeUndefined()
     await expect(channel.call(
       {}, 'controlAgent', { target, command: { type: 'clear' } }, CancellationToken.None,
-    )).resolves.toBeUndefined()
+    )).resolves.toEqual({ status: 'applied' })
     await expect(channel.call(
       {}, 'getDesktopPreferences', undefined, CancellationToken.None,
     )).resolves.toEqual({ locale: 'system' })

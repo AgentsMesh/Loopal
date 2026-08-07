@@ -54,6 +54,13 @@ pub async fn wire_hub_to_meta(
         .await;
     });
 
+    // Mirror production: reverse traffic is authoritative only for the
+    // currently installed authenticated uplink lease.
+    hub.lock().await.uplink = Some(Arc::new(loopal_agent_hub::HubUplink::new(
+        hub_conn.clone(),
+        hub_name.to_string(),
+    )));
+
     hub_conn
 }
 

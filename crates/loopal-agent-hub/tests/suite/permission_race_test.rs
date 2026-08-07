@@ -76,7 +76,16 @@ async fn agent_finish_cleans_pending_permission_and_emits_resolved() {
         .registry
         .get_agent_connection("agent-1")
         .unwrap();
-    loopal_agent_hub::finish::finish_and_deliver(&hub, "agent-1", None, &hub_side_conn).await;
+    loopal_agent_hub::finish::finish_and_deliver(
+        &hub,
+        "agent-1",
+        loopal_protocol::AgentCompletion::new(
+            loopal_protocol::TRANSPORT_ERROR_REASON,
+            Some("test transport closed".into()),
+        ),
+        &hub_side_conn,
+    )
+    .await;
 
     // Pending must be gone.
     assert!(!pending_has(&hub, "agent-1", "tc-stranded").await);
@@ -180,41 +189,66 @@ async fn second_ui_respond_after_first_returns_unresolved() {
 }
 
 #[tokio::test]
-async fn emit_failure_synchronously_denies_and_cleans_pending() {
-    // Tiny channel + no event_loop drain → second emit will fail try_send.
-    let (tx, _rx) = mpsc::channel::<AgentEvent>(1);
+async fn full_event_queue_backpressures_permission_without_holding_hub_lock_or_denying() {
+    let (tx, mut rx) = mpsc::channel::<AgentEvent>(1);
     let hub = Arc::new(Mutex::new(Hub::new(tx)));
-    let _ui = UiSession::connect(hub.clone(), "ui-1", loopal_protocol::UiCapabilities::ALL).await;
+    let ui = UiSession::connect(hub.clone(), "ui-1", loopal_protocol::UiCapabilities::ALL).await;
     let (agent_conn, _) = hub_server::connect_local(hub.clone(), "agent-1");
     tokio::time::sleep(Duration::from_millis(30)).await;
+    hub.lock()
+        .await
+        .registry
+        .event_sender()
+        .send(AgentEvent::root(AgentEventPayload::Running))
+        .await
+        .unwrap();
 
-    // First request fills the registry mpsc slot. It will hang waiting for
-    // resolution — that is intentional, we don't await it.
-    let conn1 = agent_conn.clone();
-    let _hang = tokio::spawn(async move {
-        let _ = conn1
-            .send_request(
-                methods::AGENT_PERMISSION.name,
-                json!({"tool_call_id": "tc-1", "tool_name": "Bash", "tool_input": {}}),
-            )
-            .await;
+    let request = tokio::spawn({
+        let agent_conn = agent_conn.clone();
+        async move {
+            agent_conn
+                .send_request(
+                    methods::AGENT_PERMISSION.name,
+                    json!({"tool_call_id": "tc-pressure", "tool_name": "Bash", "tool_input": {}}),
+                )
+                .await
+        }
     });
-    tokio::time::sleep(Duration::from_millis(100)).await;
-
-    // Second request: try_send must fail (channel full); fast-deny path runs.
-    let result = tokio::time::timeout(
-        Duration::from_secs(2),
-        agent_conn.send_request(
-            methods::AGENT_PERMISSION.name,
-            json!({"tool_call_id": "tc-2", "tool_name": "Bash", "tool_input": {}}),
-        ),
-    )
+    tokio::time::timeout(Duration::from_secs(1), async {
+        while !pending_has(&hub, "agent-1", "tc-pressure").await {
+            tokio::task::yield_now().await;
+        }
+    })
     .await
-    .expect("emit-fail path must respond synchronously, not timeout")
-    .unwrap();
-    assert_eq!(result["allow"], false);
+    .expect("permission admission must commit pending state before backpressure");
     assert!(
-        !pending_has(&hub, "agent-1", "tc-2").await,
-        "pending must be removed after emit failure"
+        !request.is_finished(),
+        "a full event queue must backpressure instead of fast-denying"
     );
+    let guard = tokio::time::timeout(Duration::from_millis(100), hub.lock())
+        .await
+        .expect("permission backpressure must not hold the Hub lock");
+    drop(guard);
+
+    assert!(matches!(
+        rx.recv().await.unwrap().payload,
+        AgentEventPayload::Running
+    ));
+    let permission = tokio::time::timeout(Duration::from_secs(1), rx.recv())
+        .await
+        .expect("permission event must enter the queue once capacity is released")
+        .unwrap();
+    let AgentEventPayload::ToolPermissionRequest { id, .. } = permission.payload else {
+        panic!("expected ToolPermissionRequest");
+    };
+    assert!(permission.routing_generation.is_some());
+
+    ui.client.respond_permission("agent-1", &id, true).await;
+    let result = tokio::time::timeout(Duration::from_secs(2), request)
+        .await
+        .expect("permission response must resolve after backpressure")
+        .unwrap()
+        .unwrap();
+    assert_eq!(result["allow"], true);
+    assert!(!pending_has(&hub, "agent-1", "tc-pressure").await);
 }

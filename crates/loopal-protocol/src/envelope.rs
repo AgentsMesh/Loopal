@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::address::QualifiedAddress;
+use crate::agent_completion::AgentCompletion;
 use crate::user_content::UserContent;
 
 /// Origin of a message in the three-plane architecture.
@@ -118,6 +119,13 @@ pub struct Envelope {
     /// Sender-supplied UI preview, distinct from `content_preview()` truncation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
+    /// Structured completion metadata for `AgentResult` envelopes.
+    ///
+    /// `content.text` stays the raw result projection for parent injection and
+    /// compatibility. This optional field preserves the terminal reason across
+    /// Hub boundaries without changing ordinary message envelopes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_completion: Option<AgentCompletion>,
 }
 
 impl Envelope {
@@ -133,11 +141,17 @@ impl Envelope {
             content: content.into(),
             timestamp: Utc::now(),
             summary: None,
+            agent_completion: None,
         }
     }
 
     pub fn with_summary(mut self, summary: impl Into<String>) -> Self {
         self.summary = Some(summary.into());
+        self
+    }
+
+    pub fn with_agent_completion(mut self, completion: AgentCompletion) -> Self {
+        self.agent_completion = Some(completion);
         self
     }
 

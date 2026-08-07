@@ -2,6 +2,34 @@ use loopal_workspace::WorkspaceService;
 use loopal_workspace::types::{SearchParams, WorkspacePathParams, WriteFileParams};
 
 #[tokio::test]
+async fn writes_publish_commit_notifications_before_returning() {
+    let dir = tempfile::tempdir().unwrap();
+    let service = WorkspaceService::new(dir.path()).unwrap();
+    let mut events = service.subscribe();
+    let created = service
+        .write_file(WriteFileParams {
+            workspace_id: "local-workspace".into(),
+            path: "tracked.txt".into(),
+            content: "created".into(),
+            expected_version: None,
+        })
+        .await
+        .unwrap();
+    assert_commit_notifications(&mut events, "created");
+
+    service
+        .write_file(WriteFileParams {
+            workspace_id: "local-workspace".into(),
+            path: "tracked.txt".into(),
+            content: "changed".into(),
+            expected_version: Some(created.version),
+        })
+        .await
+        .unwrap();
+    assert_commit_notifications(&mut events, "changed");
+}
+
+#[tokio::test]
 async fn cas_read_list_and_search_are_root_scoped() {
     let dir = tempfile::tempdir().unwrap();
     let service = WorkspaceService::new(dir.path()).unwrap();
@@ -159,4 +187,21 @@ async fn readonly_file_cannot_be_replaced_by_atomic_write() {
         .unwrap_err();
     assert_eq!(error.code, "readonly_file");
     std::fs::set_permissions(&path, original_permissions).unwrap();
+}
+
+fn assert_commit_notifications(
+    events: &mut tokio::sync::broadcast::Receiver<loopal_workspace::ServiceNotification>,
+    kind: &str,
+) {
+    let notifications: Vec<_> = std::iter::from_fn(|| events.try_recv().ok()).collect();
+    assert!(notifications.iter().any(|event| {
+        event.method == "workspace/fileChanged"
+            && event.params["path"] == "tracked.txt"
+            && event.params["kind"] == kind
+    }));
+    assert!(
+        notifications
+            .iter()
+            .any(|event| event.method == "workspace/gitChanged")
+    );
 }

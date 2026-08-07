@@ -27,6 +27,7 @@ pub struct ClientHandle {
 pub(crate) struct ClientConnectionLease {
     pub id: String,
     pub connection: Arc<Connection<Listening>>,
+    pub is_primary: bool,
 }
 
 /// A shared session that multiple clients can observe.
@@ -133,16 +134,9 @@ impl SharedSession {
             .map(|client| ClientConnectionLease {
                 id: client.id.clone(),
                 connection: client.connection.clone(),
+                is_primary: client.is_primary,
             })
             .collect()
-    }
-
-    /// Broadcast a raw AgentEvent to all clients (preserving agent_name).
-    /// Used for sub-agent event forwarding where agent_name must be retained.
-    pub async fn broadcast_event(&self, event: &loopal_protocol::AgentEvent) {
-        if let Ok(params) = serde_json::to_value(event) {
-            crate::event_delivery::deliver(self, params).await;
-        }
     }
 
     /// Remove only the exact failed connection generations captured by a send.

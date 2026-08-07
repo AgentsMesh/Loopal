@@ -51,6 +51,12 @@ impl WorkspaceService {
         if current.is_some() && tokio::fs::metadata(&path).await?.permissions().readonly() {
             return Err(WorkspaceError::new("readonly_file", "file is read-only"));
         }
+        let relative = self.guard.relative(&path)?;
+        let kind = if current.is_some() {
+            "changed"
+        } else {
+            "created"
+        };
         let expected = match current.as_deref() {
             Some(bytes) => loopal_backend::fs::ExpectedContent::Bytes(bytes),
             None => loopal_backend::fs::ExpectedContent::Missing,
@@ -64,6 +70,8 @@ impl WorkspaceService {
                 "file changed while preparing the atomic write",
             ));
         }
+        self.publish_file_changed(&relative, kind);
+        self.publish_git_changed();
         self.read_document(&input.path).await
     }
 

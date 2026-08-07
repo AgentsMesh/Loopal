@@ -70,6 +70,7 @@ pub fn apply_event(state: &mut SessionState, event: AgentEvent) {
         | AgentEventPayload::Rewound { .. }
         | AgentEventPayload::ServerToolUse { .. }
         | AgentEventPayload::ServerToolResult { .. }
+        | AgentEventPayload::ServerToolDiscarded { .. }
         | AgentEventPayload::InboxEnqueued { .. }
         | AgentEventPayload::InboxConsumed { .. }
         | AgentEventPayload::MessageRouted { .. }

@@ -36,10 +36,10 @@ impl PanelProvider for BgTasksPanelProvider {
         app: &App,
         state: &SessionState,
         focused: Option<&str>,
-        elapsed: Duration,
+        animation_elapsed: Duration,
         area: Rect,
     ) {
         let snapshots = app.view_client_for(&state.active_view).bg_snapshots();
-        bg_tasks_panel::render_bg_tasks(f, &snapshots, focused, elapsed, area);
+        bg_tasks_panel::render_bg_tasks(f, &snapshots, focused, animation_elapsed, area);
     }
 }

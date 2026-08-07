@@ -6,8 +6,9 @@ use tracing::{info, warn};
 use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::{HandlerCtx, RpcError};
-use loopal_protocol::AgentEvent;
+use loopal_protocol::{AgentCompletion, AgentEvent, PROTOCOL_ERROR_REASON, TRANSPORT_ERROR_REASON};
 
+use crate::authoritative_events::PreparedAuthoritativeEvent;
 use crate::dispatch::dispatch_hub_request_with;
 use crate::hub::Hub;
 use crate::pending_relay::{
@@ -16,8 +17,8 @@ use crate::pending_relay::{
 
 const WAIT_AGENT_METHOD: &str = "hub/wait_agent";
 
-/// Run the IO loop for a connected agent. Returns the agent's final output
-/// extracted from the `agent/completed` notification — the single authoritative source.
+/// Run the IO loop for a connected agent. Returns the authoritative typed
+/// `agent/completed` payload. Closing without one is a transport failure.
 ///
 /// `dispatcher` is the hub-side request dispatcher. Each spawning site
 /// (bootstrap::register_handlers, hub_server::{connect_local, accept_loop})
@@ -28,22 +29,41 @@ pub async fn agent_io_loop(
     conn: Arc<Connection<Listening>>,
     mut rx: tokio::sync::mpsc::Receiver<Incoming>,
     agent_name: String,
-) -> Option<String> {
+) -> AgentCompletion {
     info!(agent = %agent_name, "agent IO loop started");
-    let mut agent_result: Option<String> = None;
 
     while let Some(msg) = rx.recv().await {
         match msg {
             Incoming::Notification { method, params } => {
                 if method == methods::AGENT_COMPLETED.name {
-                    agent_result = params
-                        .get("result")
-                        .and_then(|v| v.as_str())
-                        .map(String::from);
-                    info!(agent = %agent_name, has_result = agent_result.is_some(), "received agent/completed");
-                    break;
+                    match serde_json::from_value::<AgentCompletion>(params) {
+                        Ok(completion) => {
+                            info!(
+                                agent = %agent_name,
+                                reason = %completion.reason,
+                                has_result = completion.result.is_some(),
+                                "received agent/completed"
+                            );
+                            return completion;
+                        }
+                        Err(error) => {
+                            warn!(
+                                agent = %agent_name,
+                                %error,
+                                "malformed agent/completed"
+                            );
+                            return AgentCompletion::new(
+                                PROTOCOL_ERROR_REASON,
+                                Some(format!("malformed agent/completed: {error}")),
+                            );
+                        }
+                    }
                 } else if method == methods::AGENT_EVENT.name {
-                    forward_agent_event(&hub, &agent_name, params).await;
+                    if let Err(error) = forward_agent_event(&hub, &conn, &agent_name, params).await
+                    {
+                        warn!(agent = %agent_name, %error, "authoritative event transport failed");
+                        return AgentCompletion::new(TRANSPORT_ERROR_REASON, Some(error));
+                    }
                 } else if method == methods::REQUEST_CANCEL.name {
                     let Some(request_id) = params.get("id").and_then(|value| value.as_i64()) else {
                         warn!(agent = %agent_name, "malformed request cancellation ignored");
@@ -63,10 +83,18 @@ pub async fn agent_io_loop(
             }
         }
     }
-    agent_result
+    AgentCompletion::new(
+        TRANSPORT_ERROR_REASON,
+        Some("agent transport closed before agent/completed".into()),
+    )
 }
 
-async fn forward_agent_event(hub: &Arc<Mutex<Hub>>, agent_name: &str, params: serde_json::Value) {
+async fn forward_agent_event(
+    hub: &Arc<Mutex<Hub>>,
+    connection: &Arc<Connection<Listening>>,
+    agent_name: &str,
+    params: serde_json::Value,
+) -> Result<(), String> {
     match serde_json::from_value::<AgentEvent>(params) {
         Ok(mut event) => {
             if event.agent_name.is_none() {
@@ -74,15 +102,39 @@ async fn forward_agent_event(hub: &Arc<Mutex<Hub>>, agent_name: &str, params: se
                     agent_name.to_string(),
                 ));
             }
-            let h = hub.lock().await;
-            if h.registry.event_sender().try_send(event).is_err() {
-                tracing::warn!(agent = %agent_name, "event dropped (channel full)");
+            let source_matches = event
+                .agent_name
+                .as_ref()
+                .is_some_and(|address| address.is_local() && address.agent == agent_name);
+            if !source_matches {
+                warn!(agent = %agent_name, claimed = ?event.agent_name, "agent/event source mismatch; dropping");
+                return Ok(());
             }
+            let mut delivery = {
+                let mut h = hub.lock().await;
+                let Some(event) = h
+                    .registry
+                    .prepare_connection_event(agent_name, connection, event)
+                else {
+                    tracing::debug!(agent = %agent_name, "stale generation event dropped");
+                    return Ok(());
+                };
+                PreparedAuthoritativeEvent::from_hub(&h, event)
+            };
+            // Agent events are the authoritative ordered state stream. In
+            // particular, dropping AwaitingInput or ToolResult leaves every
+            // downstream UI permanently active. Apply bounded backpressure
+            // after releasing the Hub lock so the reducer can drain the queue.
+            delivery
+                .deliver()
+                .await
+                .map_err(|error| format!("agent '{agent_name}' event delivery failed: {error}"))?;
         }
         Err(e) => {
             tracing::warn!(agent = %agent_name, error = %e, "agent/event deserialize failed; dropping");
         }
     }
+    Ok(())
 }
 
 async fn handle_request(
@@ -180,4 +232,75 @@ fn spawn_wait_agent(
         }
         info!(agent = %agent_name, "background wait_agent resolved");
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    use loopal_ipc::connection::Connection;
+    use loopal_ipc::duplex_pair;
+    use loopal_protocol::{AgentEvent, AgentEventPayload};
+    use tokio::sync::{Mutex, mpsc};
+
+    use super::forward_agent_event;
+    use crate::Hub;
+
+    #[tokio::test]
+    async fn full_event_queue_backpressures_without_dropping_terminal_state_or_holding_hub_lock() {
+        let (event_tx, mut event_rx) = mpsc::channel(1);
+        event_tx
+            .send(AgentEvent::root(AgentEventPayload::Running))
+            .await
+            .unwrap();
+        let hub = Arc::new(Mutex::new(Hub::new(event_tx)));
+        let (transport, _peer) = duplex_pair();
+        let (connection, _incoming) = Connection::new(transport).into_listening();
+        hub.lock()
+            .await
+            .registry
+            .register_connection("main", connection.clone())
+            .unwrap();
+
+        let delivery = tokio::spawn({
+            let hub = hub.clone();
+            let connection = connection.clone();
+            async move {
+                forward_agent_event(
+                    &hub,
+                    &connection,
+                    "main",
+                    serde_json::to_value(AgentEvent::root(AgentEventPayload::AwaitingInput))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            }
+        });
+        tokio::task::yield_now().await;
+        assert!(
+            !delivery.is_finished(),
+            "a full queue must backpressure rather than drop the terminal event"
+        );
+        let hub_guard = tokio::time::timeout(Duration::from_millis(100), hub.lock())
+            .await
+            .expect("backpressured delivery must release the Hub lock");
+        drop(hub_guard);
+
+        assert!(matches!(
+            event_rx.recv().await.unwrap().payload,
+            AgentEventPayload::Running
+        ));
+        tokio::time::timeout(Duration::from_millis(100), delivery)
+            .await
+            .expect("delivery should resume when queue capacity is available")
+            .unwrap();
+        let delivered = event_rx.recv().await.unwrap();
+        assert!(matches!(
+            delivered.payload,
+            AgentEventPayload::AwaitingInput
+        ));
+        assert!(delivered.routing_generation.is_some());
+    }
 }

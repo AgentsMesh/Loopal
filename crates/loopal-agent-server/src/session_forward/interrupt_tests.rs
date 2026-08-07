@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use loopal_ipc::connection::{Connection, Incoming};
 use loopal_ipc::protocol::methods;
-use loopal_protocol::InterruptSignal;
+use loopal_protocol::{Envelope, InterruptSignal, MessageSource, QualifiedAddress};
 use loopal_runtime::agent_input::AgentInput;
 use tokio::sync::{mpsc, watch};
 use tokio_util::sync::CancellationToken;
@@ -97,4 +97,47 @@ async fn shutdown_request_ack_is_sent_after_signal_and_exits_forward_loop() {
     let response = request.await.unwrap().unwrap();
     assert_eq!(response["ok"], true);
     handle.agent_task.abort();
+}
+
+#[tokio::test]
+async fn agent_message_request_fails_when_session_input_is_closed() {
+    let (client_transport, server_transport) = loopal_ipc::duplex_pair();
+    let (client, _client_rx) = Connection::new(client_transport).into_listening();
+    let (server, mut server_rx) = Connection::new(server_transport).into_listening();
+    let (input_tx, input_rx) = mpsc::channel::<AgentInput>(1);
+    drop(input_rx);
+    let (interrupt_tx, _interrupt_rx) = watch::channel(0u64);
+    let session =
+        SharedSession::placeholder(input_tx, InterruptSignal::new(), Arc::new(interrupt_tx));
+    let envelope = Envelope::new(
+        MessageSource::AgentResult {
+            child: QualifiedAddress::local("child"),
+        },
+        QualifiedAddress::local("parent"),
+        "terminal result",
+    );
+
+    let request = tokio::spawn(async move {
+        client
+            .send_request(
+                methods::AGENT_MESSAGE.name,
+                serde_json::to_value(envelope).unwrap(),
+            )
+            .await
+    });
+    let Incoming::Request { id, method, params } = server_rx.recv().await.unwrap() else {
+        panic!("expected agent/message request");
+    };
+    route_request(id, &method, params, &session, &server).await;
+
+    let error = request.await.unwrap().unwrap_err();
+    assert_eq!(
+        error.remote_code(),
+        Some(loopal_ipc::jsonrpc::INTERNAL_ERROR)
+    );
+    assert!(
+        error
+            .to_string()
+            .contains("session input channel is closed")
+    );
 }

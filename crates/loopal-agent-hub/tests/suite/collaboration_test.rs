@@ -24,7 +24,7 @@ fn make_hub() -> (Arc<Mutex<Hub>>, mpsc::Receiver<AgentEvent>) {
 /// Simulates the Agent(action=spawn) + Agent(action=result) flow.
 #[tokio::test]
 async fn spawn_and_result_full_chain() {
-    let (hub, _) = make_hub();
+    let (hub, _event_rx) = make_hub();
 
     // Parent connects to Hub
     let (parent_conn, parent_rx) = hub_server::connect_local(hub.clone(), "parent");
@@ -60,7 +60,8 @@ async fn spawn_and_result_full_chain() {
     // Worker completes with real output
     {
         let mut h = hub.lock().await;
-        h.registry
+        let _pending = h
+            .registry
             .emit_agent_finished("worker", Some("Analysis: 42 crates found.".into()));
         h.registry.unregister_connection("worker");
     }
@@ -76,7 +77,7 @@ async fn spawn_and_result_full_chain() {
 /// Agent(action=status) for running and finished agents.
 #[tokio::test]
 async fn agent_info_running_and_finished() {
-    let (hub, _) = make_hub();
+    let (hub, _event_rx) = make_hub();
 
     let (parent_conn, parent_rx) = hub_server::connect_local(hub.clone(), "querier");
     tokio::spawn(async move {
@@ -111,7 +112,8 @@ async fn agent_info_running_and_finished() {
     // Finish agent
     {
         let mut h = hub.lock().await;
-        h.registry
+        let _pending = h
+            .registry
             .emit_agent_finished("child-a", Some("done!".into()));
         h.registry.unregister_connection("child-a");
     }
@@ -128,7 +130,7 @@ async fn agent_info_running_and_finished() {
 /// Query nonexistent agent returns error.
 #[tokio::test]
 async fn agent_info_not_found() {
-    let (hub, _) = make_hub();
+    let (hub, _event_rx) = make_hub();
     let (conn, rx) = hub_server::connect_local(hub.clone(), "q");
     tokio::spawn(async move {
         let mut rx = rx;
@@ -146,7 +148,7 @@ async fn agent_info_not_found() {
 /// SendMessage (hub/route) to running agent succeeds; to finished agent fails.
 #[tokio::test]
 async fn send_message_running_vs_finished() {
-    let (hub, _) = make_hub();
+    let (hub, _event_rx) = make_hub();
 
     // Sender
     let (sender, sr) = hub_server::connect_local(hub.clone(), "sender");
@@ -182,7 +184,7 @@ async fn send_message_running_vs_finished() {
     // Unregister receiver (simulating agent exit)
     {
         let mut h = hub.lock().await;
-        h.registry.emit_agent_finished("receiver", None);
+        let _pending = h.registry.emit_agent_finished("receiver", None);
         h.registry.unregister_connection("receiver");
     }
 
@@ -203,7 +205,7 @@ async fn send_message_running_vs_finished() {
 
 #[tokio::test]
 async fn send_message_with_summary_propagates_through_hub() {
-    let (hub, _) = make_hub();
+    let (hub, _event_rx) = make_hub();
 
     let (sender, sr) = hub_server::connect_local(hub.clone(), "sender");
     tokio::spawn(async move {
@@ -294,12 +296,15 @@ async fn cascade_shutdown_interrupts_children() {
     });
 
     // Parent finishes → should cascade interrupt to child
-    {
+    let mut completion = {
         let mut h = hub.lock().await;
-        h.registry
+        let completion = h
+            .registry
             .emit_agent_finished("parent", Some("parent done".into()));
         h.registry.unregister_connection("parent");
-    }
+        completion
+    };
+    completion.deliver_events().await.unwrap();
 
     // Child should receive interrupt
     let got_interrupt = tokio::time::timeout(Duration::from_secs(2), interrupt_rx.recv()).await;

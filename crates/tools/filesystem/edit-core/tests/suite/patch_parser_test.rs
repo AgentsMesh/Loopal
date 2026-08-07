@@ -141,6 +141,85 @@ fn parse_multiple_file_ops() {
 }
 
 #[test]
+fn parse_optional_begin_end_envelope() {
+    let patch = "\
+*** Begin Patch
+*** Add File: new.rs
++content
+
+*** Update File: existing.rs
+@@
+-old
++new
+
+*** Delete File: gone.rs
+*** End Patch
+";
+    let ops = parse_patch(patch).unwrap();
+    assert_eq!(ops.len(), 3);
+    assert!(matches!(&ops[0], FileOp::Add { path, .. } if path == std::path::Path::new("new.rs")));
+    assert!(
+        matches!(&ops[1], FileOp::Update { path, .. } if path == std::path::Path::new("existing.rs"))
+    );
+    assert!(matches!(&ops[2], FileOp::Delete { path } if path == std::path::Path::new("gone.rs")));
+}
+
+#[test]
+fn parse_envelope_allows_surrounding_blank_lines() {
+    let patch = "\n*** Begin Patch\n*** Add File: a.txt\n+content\n*** End Patch\n\n";
+    let ops = parse_patch(patch).unwrap();
+    assert_eq!(ops.len(), 1);
+}
+
+#[test]
+fn parse_envelope_accepts_crlf_without_final_newline() {
+    let patch = "*** Begin Patch\r\n*** Delete File: directory/file name.txt\r\n*** End Patch";
+    let ops = parse_patch(patch).unwrap();
+    assert!(matches!(
+        &ops[0],
+        FileOp::Delete { path } if path == std::path::Path::new("directory/file name.txt")
+    ));
+}
+
+#[test]
+fn parse_envelope_requires_end_marker() {
+    let patch = "*** Begin Patch\n*** Add File: a.txt\n+content\n";
+    let err = parse_patch(patch).unwrap_err();
+    assert_eq!(err.line, 4);
+    assert!(err.message.contains("missing closing marker"));
+}
+
+#[test]
+fn parse_rejects_end_marker_without_begin_marker() {
+    let patch = "*** Add File: a.txt\n+content\n*** End Patch\n";
+    let err = parse_patch(patch).unwrap_err();
+    assert_eq!(err.line, 3);
+    assert!(err.message.contains("unexpected line"));
+}
+
+#[test]
+fn parse_rejects_content_after_end_marker() {
+    let patch = "\
+*** Begin Patch
+*** Add File: a.txt
++content
+*** End Patch
+*** Delete File: b.txt
+";
+    let err = parse_patch(patch).unwrap_err();
+    assert_eq!(err.line, 5);
+    assert!(err.message.contains("unexpected line"));
+}
+
+#[test]
+fn parse_rejects_duplicate_begin_marker_at_its_line() {
+    let patch = "*** Begin Patch\n\n*** Begin Patch\n*** End Patch\n";
+    let err = parse_patch(patch).unwrap_err();
+    assert_eq!(err.line, 3);
+    assert!(err.message.contains("unexpected line"));
+}
+
+#[test]
 fn parse_error_unexpected_line() {
     let patch = "invalid line here\n";
     let err = parse_patch(patch).unwrap_err();
@@ -153,6 +232,13 @@ fn parse_error_update_without_hunks() {
     let patch = "*** Update File: x.rs\n*** Delete File: y.rs\n";
     let err = parse_patch(patch).unwrap_err();
     assert!(err.message.contains("no hunks"));
+}
+
+#[test]
+fn parse_error_empty_operation_path() {
+    let err = parse_patch("*** Add File:   \n+content\n").unwrap_err();
+    assert_eq!(err.line, 1);
+    assert!(err.message.contains("path cannot be empty"));
 }
 
 #[test]

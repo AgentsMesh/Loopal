@@ -11,7 +11,7 @@ use ratatui::widgets::{Block, Borders, Clear, canvas::Canvas};
 use loopal_protocol::AgentStatus;
 use loopal_session::ROOT_AGENT;
 
-use crate::views::unified_status::spinner_frame;
+use crate::animation::spinner_frame;
 use layout::abbreviate_model;
 
 /// Lightweight snapshot of one agent node for topology rendering.
@@ -107,7 +107,12 @@ pub fn extract_topology(
 }
 
 /// Render the topology overlay in the top-right corner.
-pub fn render_topology_overlay(f: &mut Frame, nodes: &[TopologyNode], area: Rect) {
+pub fn render_topology_overlay(
+    f: &mut Frame,
+    nodes: &[TopologyNode],
+    animation_elapsed: Duration,
+    area: Rect,
+) {
     if nodes.len() <= 1 {
         return; // Only root, no sub-agents
     }
@@ -139,10 +144,10 @@ pub fn render_topology_overlay(f: &mut Frame, nodes: &[TopologyNode], area: Rect
     f.render_widget(block, overlay_area);
 
     // Render with Canvas inside the inner area
-    render_graph(f, &placed, inner);
+    render_graph(f, &placed, animation_elapsed, inner);
 }
 
-fn render_graph(f: &mut Frame, placed: &[PlacedNode], area: Rect) {
+fn render_graph(f: &mut Frame, placed: &[PlacedNode], animation_elapsed: Duration, area: Rect) {
     if area.width < 4 || area.height < 2 {
         return;
     }
@@ -171,7 +176,7 @@ fn render_graph(f: &mut Frame, placed: &[PlacedNode], area: Rect) {
 
             // Draw node labels
             for pn in placed {
-                let (icon, color) = status_icon(&pn.node);
+                let (icon, color) = status_icon(&pn.node, animation_elapsed);
                 let label = format!("{icon} {} ({})", pn.node.name, pn.node.model);
                 ctx.print(pn.x, pn.y, label.fg(color));
             }
@@ -180,10 +185,10 @@ fn render_graph(f: &mut Frame, placed: &[PlacedNode], area: Rect) {
     f.render_widget(canvas, area);
 }
 
-fn status_icon(node: &TopologyNode) -> (&'static str, Color) {
+fn status_icon(node: &TopologyNode, animation_elapsed: Duration) -> (&'static str, Color) {
     match node.status {
-        AgentStatus::Starting => (spinner_frame(node.elapsed), Color::DarkGray),
-        AgentStatus::Running => (spinner_frame(node.elapsed), Color::Green),
+        AgentStatus::Starting => (spinner_frame(animation_elapsed), Color::DarkGray),
+        AgentStatus::Running => (spinner_frame(animation_elapsed), Color::Green),
         AgentStatus::WaitingForInput => ("●", Color::DarkGray),
         AgentStatus::Suspended => ("⏸", Color::Magenta),
         AgentStatus::Finished => ("✓", Color::Green),

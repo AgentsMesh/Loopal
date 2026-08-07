@@ -90,37 +90,40 @@ async fn test_err_with_tool_discards_and_continues() {
     let _ = std::fs::remove_file(&tmp);
 }
 
-/// Empty stream error (Err on first chunk, no text) → no auto-continue, exit.
-#[tokio::test]
-async fn test_empty_stream_error_exits_without_continue() {
-    let calls = vec![
-        // Only one LLM call: immediate error
-        vec![Err(loopal_error::LoopalError::Provider(
-            loopal_error::ProviderError::StreamEnded,
-        ))],
-    ];
+/// Empty stream errors are safe to replay, but exhaustion is a real Error.
+#[tokio::test(start_paused = true)]
+async fn test_empty_stream_error_retries_then_errors() {
+    // Initial attempt plus all six retries return the intended transport
+    // failure. Queue exhaustion is a fixture error and must not stand in for
+    // the production retry-exhaustion behavior under test.
+    let calls = (0..7)
+        .map(|_| {
+            vec![Err(loopal_error::LoopalError::Provider(
+                loopal_error::ProviderError::StreamEnded,
+            ))]
+        })
+        .collect();
     let (mut runner, mut event_rx) = make_multi_runner(calls);
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 
     let output = runner.run().await.unwrap();
-    assert!(output.result.is_empty());
-    assert_eq!(output.terminate_reason, TerminateReason::Goal);
-    // Only 1 LLM call — no retry for completely empty error
-    assert_eq!(runner.turn_count, 1);
+    assert!(output.result.contains("Stream ended unexpectedly"));
+    assert_eq!(output.terminate_reason, TerminateReason::Error);
+    assert_eq!(runner.turn_count, 0, "a failed turn is not completed");
 }
 
-/// EOF without Done + empty response → exit (nothing to continue from).
-#[tokio::test]
-async fn test_eof_empty_stream_exits_without_continue() {
-    let calls = vec![
-        // Empty stream: no chunks at all, no Done
-        vec![],
-    ];
+/// EOF without Done and without output also exhausts to Error, not Goal.
+#[tokio::test(start_paused = true)]
+async fn test_eof_empty_stream_retries_then_errors() {
+    // Script an explicit empty EOF for the initial attempt and all six
+    // retries. An absent call would mean fixture underflow, not EOF.
+    let calls: Vec<Vec<Result<StreamChunk, loopal_error::LoopalError>>> =
+        (0..7).map(|_| Vec::new()).collect();
     let (mut runner, mut event_rx) = make_multi_runner(calls);
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 
     let output = runner.run().await.unwrap();
-    assert!(output.result.is_empty());
-    assert_eq!(output.terminate_reason, TerminateReason::Goal);
-    assert_eq!(runner.turn_count, 1);
+    assert!(output.result.contains("Stream ended unexpectedly"));
+    assert_eq!(output.terminate_reason, TerminateReason::Error);
+    assert_eq!(runner.turn_count, 0, "a failed turn is not completed");
 }

@@ -4,6 +4,7 @@ use loopal_ipc::connection::{Connection, Listening};
 use loopal_protocol::AgentEventPayload;
 
 use crate::HubUplink;
+use crate::authoritative_events::PreparedAuthoritativeEvent;
 
 #[derive(Clone)]
 pub enum InteractionAudience {
@@ -76,6 +77,5 @@ pub(crate) struct OriginRemoteQuestionCancel {
 pub(super) enum FastPath {
     DenyNoUi,
     RejectDuplicate,
-    EmitFailed,
-    Pending,
+    Pending(Box<PreparedAuthoritativeEvent>),
 }

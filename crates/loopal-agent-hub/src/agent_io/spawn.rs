@@ -78,8 +78,8 @@ pub fn spawn_io_loop(
     let n = name.to_string();
     let n2 = name.to_string();
     tokio::spawn(async move {
-        let output = agent_io_loop(hub2, dispatcher, conn.clone(), rx, n.clone()).await;
-        finish_and_deliver(&hub, &n2, output, &conn).await;
+        let completion = agent_io_loop(hub2, dispatcher, conn.clone(), rx, n.clone()).await;
+        finish_and_deliver(&hub, &n2, completion, &conn).await;
         info!(agent = %n2, "agent IO loop ended");
     });
 }
@@ -137,8 +137,8 @@ async fn run_registered_agent(
     if let Some(tx) = ready_tx {
         let _ = tx.send(());
     }
-    let output = agent_io_loop(hub.clone(), dispatcher, conn.clone(), rx, name.clone()).await;
-    finish_and_deliver(&hub, &name, output, &conn).await;
+    let completion = agent_io_loop(hub.clone(), dispatcher, conn.clone(), rx, name.clone()).await;
+    finish_and_deliver(&hub, &name, completion, &conn).await;
     info!(agent = %name, "agent IO loop ended");
 }
 

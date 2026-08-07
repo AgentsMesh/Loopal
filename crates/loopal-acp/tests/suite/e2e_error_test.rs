@@ -20,13 +20,14 @@ async fn setup_session(harness: &mut super::e2e_harness::AcpTestHarness) -> Stri
 
 #[tokio::test]
 async fn test_provider_error_in_prompt() {
-    // Provider returns error during streaming — agent loop catches it and
-    // emits an Error event.  The prompt should still complete gracefully.
-    let calls = vec![vec![chunks::provider_error("network failure")]];
+    // This scenario exercises terminal ACP error projection, not retry. Use a
+    // non-retryable provider response so the fixture is explicit and cannot
+    // fall through to an exhausted mock queue during production retries.
+    let calls = vec![vec![chunks::non_retryable_error("network failure")]];
     let mut harness = build_acp_harness(calls).await;
     let sid = setup_session(&mut harness).await;
 
-    let (resp, _notifications) = harness
+    let (resp, notifications) = harness
         .request_with_notifications(
             "session/prompt",
             json!({
@@ -36,10 +37,14 @@ async fn test_provider_error_in_prompt() {
         )
         .await;
 
-    // The server must respond (either success or error), not crash / hang.
+    // The server must respond and surface the terminal provider failure rather
+    // than returning an empty successful prompt result.
     assert!(
-        resp.get("result").is_some() || resp.get("error").is_some(),
-        "expected a JSON-RPC response: {resp}"
+        resp.get("error").is_some()
+            || notifications
+                .iter()
+                .any(|notification| notification.to_string().contains("network failure")),
+        "expected the fatal provider error in response or notifications; response={resp}, notifications={notifications:?}"
     );
 }
 

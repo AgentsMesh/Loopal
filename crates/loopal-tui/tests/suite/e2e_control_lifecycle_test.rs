@@ -48,9 +48,17 @@ async fn test_cold_start_emits_initial_observable_seed() {
     let has_thinking = evts
         .iter()
         .any(|e| matches!(e, AgentEventPayload::ThinkingChanged { .. }));
+    let seeded_context_window = evts.iter().find_map(|e| match e {
+        AgentEventPayload::TokenUsage { context_window, .. } => Some(*context_window),
+        _ => None,
+    });
     assert!(has_model_changed, "cold-start must emit ModelChanged");
     assert!(has_mode_changed, "cold-start must emit ModeChanged");
     assert!(has_thinking, "cold-start must emit ThinkingChanged");
+    assert!(
+        seeded_context_window.is_some_and(|window| window > 0),
+        "cold-start must seed the selected model's context window"
+    );
 
     let obs = harness.app.observable_for("main");
     assert!(
@@ -65,6 +73,13 @@ async fn test_cold_start_emits_initial_observable_seed() {
     assert!(
         !obs.thinking_config.is_empty(),
         "observable.thinking_config must be seeded by cold-start"
+    );
+    assert_eq!(
+        harness
+            .app
+            .with_active_conversation(|conv| conv.context_window),
+        seeded_context_window.unwrap(),
+        "cold-start context window event must reach the active conversation"
     );
 }
 

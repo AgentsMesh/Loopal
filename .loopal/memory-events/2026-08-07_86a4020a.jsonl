@@ -1,0 +1,2 @@
+{"v":1,"ts":1786096118670,"sid":"86a4020a-9f73-4911-a98d-9327f03f49f4","type":"query_event","qid":"q-1786096118670618000","anchor":["archived-project-decisions"],"result_count":1,"latency_ms":0,"caller":"recall"}
+{"v":1,"ts":1786096118671,"sid":"86a4020a-9f73-4911-a98d-9327f03f49f4","type":"recall_hit","qid":"q-1786096118670618000","node":"archived-project-decisions","rank":0,"score":0.9925666,"source":"direct_hit"}

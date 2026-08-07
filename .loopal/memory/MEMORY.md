@@ -1,26 +1,17 @@
 ---
 generated_from: graph
-generated_at: 2026-08-04T14:16:51Z
+generated_at: 2026-08-07T09:47:57Z
 node_count: 1
 edge_count: 0
 ---
 
 # Memory Index
 
-## User
+## Recently added
+- 2026-08-04 [[archived-project-decisions]]
 
-_No entries._
+## Reference (high-relevance)
+- [[archived-project-decisions]] — Retain the Windows rules_rust PATH workaround until its upstream fix is verified; releases target four platforms and require Node.js-compatible actions; the hub defaults to 16 agents with MetaHub remote spawning
 
-## Feedback
-
-_No entries._
-
-## Project
-
-_No active entries._
-
-## Reference
-
-- 2026-08-04 [[archived-project-decisions]] — Preserve the verified release-platform, Windows rules_rust workaround, and agent-hub scaling decisions after their project memories expired.
 
 [Use memory_recall(query=...) to look up content. Do NOT Read individual .md files unless you are about to edit one.]

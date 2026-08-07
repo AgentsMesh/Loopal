@@ -17,9 +17,16 @@ async fn test_event_ordering() {
     let stream = evts
         .iter()
         .position(|e| matches!(e, AgentEventPayload::Stream { .. }));
-    let usage = evts
-        .iter()
-        .position(|e| matches!(e, AgentEventPayload::TokenUsage { .. }));
+    let usage = evts.iter().position(|e| {
+        matches!(
+            e,
+            AgentEventPayload::TokenUsage {
+                input_tokens,
+                output_tokens,
+                ..
+            } if *input_tokens > 0 || *output_tokens > 0
+        )
+    });
     let terminal = evts.iter().position(|e| {
         matches!(
             e,

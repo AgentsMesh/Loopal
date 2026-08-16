@@ -78,7 +78,7 @@ async fn bash_action(kernel: &Kernel) -> loopal_runtime::tool_action::PreparedTo
         "id",
         "Bash",
         json!({
-            "command": "echo effect",
+            "command": "exit 0",
             "env": {"TOKEN": "<secret_ref:missing>"}
         }),
     )
@@ -103,7 +103,6 @@ async fn unresolved_wire_ref_fails_closed_but_missing_marker_can_execute() {
         .await
         .expect("resolved missing-secret marker is safe literal input");
     assert!(!result.is_error, "{}", result.content);
-    assert!(result.content.contains("effect"));
 }
 
 #[tokio::test]

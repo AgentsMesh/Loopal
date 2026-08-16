@@ -9,7 +9,9 @@ use loopal_protocol::{
 
 use super::super::WorkflowCoordinatorError;
 use super::support::{owner, spec};
-use super::terminal_delivery_support::{TestTerminalSink, coordinator, coordinator_with_seed};
+use super::terminal_delivery_support::{
+    TestTerminalSink, coordinator, coordinator_with_seed, coordinator_without_intent,
+};
 
 #[tokio::test]
 async fn recovered_terminal_waits_for_activation_then_acks_applied_once() {
@@ -212,6 +214,40 @@ async fn poisoned_owner_rejects_an_in_flight_terminal_ack() {
     );
     assert!(journal.delivery_acks().is_empty());
 
+    drop(handle);
+    task.await.unwrap();
+}
+
+#[tokio::test]
+async fn poisoned_owner_rejects_terminal_delivery_activation() {
+    let run = terminal_run("wrun_poisoned_activation", WorkflowRunState::Succeeded, 15);
+    let sink = Arc::new(TestTerminalSink::new([]));
+    let (handle, task, journal) = coordinator_without_intent(run, [], sink);
+    let workflow_owner = owner("session", "root");
+
+    handle.recover(workflow_owner.clone()).await.unwrap();
+    journal.push_append_error(WorkflowCoordinatorError::JournalUnavailable);
+    assert_eq!(
+        handle
+            .cancel(
+                workflow_owner.clone(),
+                WorkflowCancelRequest {
+                    request_id: WorkflowRequestId::new("wreq_poisoned_activation_cancel"),
+                    run_id: WorkflowRunId::new("wrun_poisoned_activation"),
+                    reason: Some("poison before terminal activation".into()),
+                },
+            )
+            .await,
+        Err(WorkflowCoordinatorError::JournalUnavailable)
+    );
+
+    assert_eq!(
+        handle.activate_terminal_deliveries(workflow_owner).await,
+        Err(WorkflowCoordinatorError::OwnerPoisoned),
+        "a poisoned owner must not recreate terminal delivery intents"
+    );
+    assert!(journal.delivery_intents().is_empty());
+    assert!(journal.delivery_acks().is_empty());
     drop(handle);
     task.await.unwrap();
 }

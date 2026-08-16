@@ -133,11 +133,43 @@ pub(super) fn coordinator(
     )
 }
 
+pub(super) fn coordinator_without_intent(
+    run: WorkflowRunSnapshot,
+    acked: impl IntoIterator<Item = loopal_protocol::WorkflowTerminalDeliveryId>,
+    sink: Arc<TestTerminalSink>,
+) -> (
+    WorkflowCoordinatorHandle,
+    tokio::task::JoinHandle<()>,
+    Arc<TestJournal>,
+) {
+    coordinator_with_seed_and_intent(
+        run,
+        acked,
+        sink,
+        loopal_output_guard::FinalSinkRedactionSeed::new(),
+        false,
+    )
+}
+
 pub(super) fn coordinator_with_seed(
     run: WorkflowRunSnapshot,
     acked: impl IntoIterator<Item = loopal_protocol::WorkflowTerminalDeliveryId>,
     sink: Arc<TestTerminalSink>,
     redaction_seed: loopal_output_guard::FinalSinkRedactionSeed,
+) -> (
+    WorkflowCoordinatorHandle,
+    tokio::task::JoinHandle<()>,
+    Arc<TestJournal>,
+) {
+    coordinator_with_seed_and_intent(run, acked, sink, redaction_seed, true)
+}
+
+fn coordinator_with_seed_and_intent(
+    run: WorkflowRunSnapshot,
+    acked: impl IntoIterator<Item = loopal_protocol::WorkflowTerminalDeliveryId>,
+    sink: Arc<TestTerminalSink>,
+    redaction_seed: loopal_output_guard::FinalSinkRedactionSeed,
+    include_intent: bool,
 ) -> (
     WorkflowCoordinatorHandle,
     tokio::task::JoinHandle<()>,
@@ -154,7 +186,11 @@ pub(super) fn coordinator_with_seed(
     journal.push_recovery(Ok(RecoveredOwner {
         runs: vec![run],
         requests: Default::default(),
-        delivery_intents: vec![intent],
+        delivery_intents: if include_intent {
+            vec![intent]
+        } else {
+            Vec::new()
+        },
         acked_deliveries: acked.into_iter().collect(),
     }));
     let (handle, task) = WorkflowCoordinator::spawn_with_runtime_config_and_sinks(

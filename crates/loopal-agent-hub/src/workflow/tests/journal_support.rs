@@ -80,6 +80,10 @@ impl TestJournal {
         self.delivery_acks.lock().unwrap().clone()
     }
 
+    pub(super) fn delivery_intents(&self) -> Vec<(WorkflowOwner, WorkflowTerminalNotification)> {
+        self.delivery_intents.lock().unwrap().clone()
+    }
+
     pub(super) async fn wait_for_event_batches(&self, expected: usize) {
         tokio::time::timeout(Duration::from_secs(5), async {
             loop {

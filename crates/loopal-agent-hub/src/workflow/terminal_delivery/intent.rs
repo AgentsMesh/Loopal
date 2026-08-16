@@ -18,6 +18,9 @@ pub(in crate::workflow) async fn activate(
     if let Some(error) = coordinator.terminal_delivery_failure.clone() {
         return Err(error);
     }
+    if coordinator.state.is_poisoned(&owner) {
+        return Err(WorkflowCoordinatorError::OwnerPoisoned);
+    }
     for snapshot in coordinator.state.owner_snapshots(&owner) {
         if needs_intent(coordinator, &owner, &snapshot) {
             prepare(coordinator, &owner, &snapshot).await?;
@@ -48,6 +51,9 @@ pub(in crate::workflow) async fn prepare(
     owner: &WorkflowOwner,
     snapshot: &WorkflowRunSnapshot,
 ) -> Result<(), WorkflowCoordinatorError> {
+    if coordinator.state.is_poisoned(owner) {
+        return Err(WorkflowCoordinatorError::OwnerPoisoned);
+    }
     let delivery_id = WorkflowTerminalDeliveryId::new(
         owner.session_id.clone(),
         snapshot.id.clone(),
@@ -76,6 +82,9 @@ async fn append(
     owner: &WorkflowOwner,
     notification: WorkflowTerminalNotification,
 ) -> Result<WorkflowTerminalNotification, WorkflowCoordinatorError> {
+    if coordinator.state.is_poisoned(owner) {
+        return Err(WorkflowCoordinatorError::OwnerPoisoned);
+    }
     let journal = Arc::clone(&coordinator.journal);
     let append_owner = owner.clone();
     let append = tokio::task::spawn_blocking(move || {

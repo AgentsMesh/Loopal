@@ -111,7 +111,7 @@ async fn wait_until_terminal(pid: u32) {
 
 fn process_is_live(pid: u32) -> io::Result<bool> {
     let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
-    if handle == 0 {
+    if handle.is_null() {
         let error = io::Error::last_os_error();
         return if error.raw_os_error() == Some(ERROR_INVALID_PARAMETER as i32) {
             Ok(false)

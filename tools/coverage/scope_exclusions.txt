@@ -1,0 +1,83 @@
+# path|FNV-1a-64 content hash|review rationale
+crates/loopal-acp/src/adapter/mod.rs|837d0702f6cfe158|module registration only; ACP permission and question behavior is scoped
+crates/loopal-acp/src/jsonrpc.rs|fd4e1f654666566c|only changed production-source lines add a cfg(test) pending-response seam; ACP adapter behavior is scoped
+crates/loopal-agent/src/lib.rs|5fa02aa63c119ba7|module declarations and public re-exports only; workflow planner, control, tools, and shared capability behavior is scoped in focused modules
+crates/loopal-agent/src/tools/mod.rs|6d347603625e07b6|tool module registration delegates workflow registration and execution to scoped workflow tool modules
+crates/loopal-agent-server/src/lib.rs|cf16973a7f386aef|module declarations and public test re-exports only; workflow input, completion, lifecycle, and terminal delivery behavior is scoped in focused modules
+crates/loopal-agent-server/src/mcp_settle.rs|f54171e1885aa165|general MCP startup settling with a behavior-preserving test seam; authenticated MCP transport and workflow integration remain scoped in focused modules
+crates/loopal-agent-server/src/memory_init.rs|303e5accf1fc8e62|general project-memory initialization with a behavior-preserving test seam; it does not participate in workflow execution or Stage 0 authority
+crates/loopal-agent-server/src/mock_loader.rs|4b92c24cead5d96d|mock-provider fixture implementation with only cfg(test) stream scheduling coverage added; it is not production workflow or security behavior
+crates/loopal-agent-server/src/server_info.rs|0ac995702efdb66c|general server discovery with a behavior-preserving directory test seam; authenticated request and workflow behavior remains scoped in focused modules
+crates/loopal-agent-server/src/server_init.rs|7d75d487e2dae12a|general initialize handshake with only cfg(test) transport coverage added; workflow and capability authorization remain scoped in focused modules
+crates/loopal-agent-server/src/session_start/types.rs|879199f6003a5d89|session handle field declarations only; lifecycle selection, terminal pending state, and redaction behavior is scoped in focused modules
+crates/loopal-agent-hub/src/dispatch/registry/mod.rs|ebf1100469bb661a|dispatcher module registration only; registered workflow and authorization handler behavior is scoped
+crates/loopal-tool-api/src/lib.rs|bd3c9b9df444a924|module declarations and public re-exports only; private guarded overflow behavior is scoped in truncate/overflow.rs
+crates/loopal-agent-hub/src/agent_io/mod.rs|1baf324059f0e74b|module declarations and IO entry-point re-exports only; registration, root-session binding, request, event, and spawn behavior is scoped
+crates/loopal-agent-hub/src/lib.rs|5daff3769c0851ab|module and test declarations plus public re-exports only; completion, permission, routing, workflow runtime, and actor behavior is scoped in focused modules
+crates/loopal-agent-hub/src/pending_relay/mod.rs|c80af6b8fb4cd0bf|module declarations, relay entry-point re-exports, and test registration only; permission resolution behavior is scoped
+crates/loopal-agent-hub/src/spawn_manager/mod.rs|4fd49f299ff51f4e|module and test registration plus spawn entry-point re-exports only; workflow preparation, cleanup, audit, and spawn behavior is scoped
+crates/loopal-agent-hub/src/spawn_manager/spawn_audit_test_support.rs|6cfcea912d984dd2|cfg(test)-only spawn-audit fixture used by scoped authority-audit tests; it is not production code
+crates/loopal-agent-hub/src/workflow/command.rs|1934b4ad42f01b09|private command and response-channel type declarations only; executable actor dispatch, scheduling, and terminal delivery behavior is scoped
+crates/loopal-agent-hub/src/workflow/mod.rs|cd8f55bde8563211|module declarations and public re-exports only; executable workflow actor, scheduler, runtime, journal, recovery, and terminal delivery modules are scoped
+crates/loopal-config/src/lib.rs|71d32ade0af2ce7b|public re-exports only; workflow settings and resolver behavior are scoped
+crates/loopal-config/src/settings/mod.rs|f442721770bea833|settings module declarations and public re-exports only; workflow settings behavior is scoped
+crates/loopal-config/src/resolved.rs|35e28d915ffe49ea|resolved configuration data field and Debug wiring only; preset resolution behavior is scoped
+crates/loopal-config/src/validate.rs|784ee0044c2899cb|top-level known-key registration only; workflow validation is scoped
+crates/loopal-ipc/src/protocol/methods/hub.rs|f117614b1cfbe724|typed workflow, protected-audit, provider-secret, and MCP reconnect method constants only; handler behavior is scoped
+crates/loopal-ipc/src/protocol/methods/agent.rs|6054e26d778548ef|typed agent workflow-terminal method constant only; forwarding, validation, durable persistence, and acknowledgement behavior is scoped
+crates/loopal-mcp/src/client.rs|136ebe7ea02b3f98|OAuth change is field wiring only; connection-lifetime behavior is scoped in client_oauth.rs and response behavior remains scoped
+crates/loopal-mcp/src/handler.rs|f593df7fce387e8d|MCP client callback adapter with only cfg(test) capability-advertisement coverage added; transport, redirect, secret, and reconnect boundaries remain scoped
+crates/loopal-mcp/src/handshake_http_client_test_support.rs|0ba7188fa710ed06|cfg(test)-only fake StreamableHttpClient used by scoped handshake boundary tests; it is not production code
+crates/loopal-mcp/src/oauth_http_client_test_support.rs|82bada051d2ba65d|cfg(test)-only fake StreamableHttpClient used by scoped OAuth boundary tests; it is not production code
+crates/loopal-mcp/src/lib.rs|24857992f785f4c8|module and test registration plus public re-exports only; MCP transport, redirect, security, and reconnect implementations are scoped
+crates/loopal-mcp/src/oauth/flow.rs|252be960ae982d9d|OAuth browser orchestration delegates authenticated transport construction; credential observation and response handling are scoped in focused modules
+crates/loopal-protocol/src/event_payload.rs|ea729a47c471f473|typed PermissionIntent field and workflow event registration; behavior and projections are scoped
+crates/loopal-protocol/src/lib.rs|f2c60547186c5bef|module declarations and public re-exports only; permission, workflow, and provider-secret behavior modules are scoped
+crates/loopal-protocol/src/mcp_ipc.rs|bb6da8ea716c6f21|serde-only typed MCP request and response DTO declarations; authenticated handler and provider behavior is scoped
+crates/loopal-protocol/src/secret_ipc.rs|8edd14b97f56aa19|serde-only typed secret and workflow-provider request and response DTO declarations; authenticated handlers and client authority are scoped
+crates/loopal-protocol/src/workflow/command.rs|544c421f397bfe4c|serde-only workflow command types with no executable production behavior
+crates/loopal-protocol/src/workflow/event.rs|fd239ecab669b833|serde-only workflow event types with no executable production behavior
+crates/loopal-protocol/src/workflow/mod.rs|200b96fce0840480|module declarations and public re-exports only; executable workflow and terminal validation modules are scoped
+crates/loopal-protocol/src/workflow/start_lookup.rs|30e555a93ed27c2e|serde-only durable workflow-start lookup DTOs; lookup authorization and ledger behavior are scoped in Hub and AgentServer modules
+crates/loopal-runtime/src/agent_loop/input_mcp.rs|7e54cf0392d8ed8c|pre-existing MCP status and disconnect plumbing plus a moved reconnect method; reconnect authority is scoped in input_mcp_reconnect.rs
+crates/loopal-runtime/src/agent_loop/mod.rs|e33c7bec2d17d0e4|module registration only; input selection, workflow terminal, reconnect, permission audit, ToolResult sink, and runner lifecycle behavior are scoped in focused modules
+crates/loopal-runtime/src/agent_loop/streaming_tool_exec.rs|ad26f77b0a8ec35e|disabled compatibility shell; permission preparation and execution paths are scoped
+crates/loopal-runtime/src/agent_loop/turn_tool_phase.rs|55d1b6d6327f7942|removes early execution path; replacement permission/effect paths are scoped
+crates/loopal-runtime/src/lib.rs|0fedce39430d7f1b|module declarations, re-exports, and pre-existing budget helper only; workflow input, lease tracking, terminal delivery, and AgentOutput guarding are scoped in focused modules
+crates/loopal-storage/src/lib.rs|ccd28255eee824c5|module declarations and public re-exports only; resource, session discovery, and workflow journal behavior is scoped
+crates/loopal-storage/src/workflow_journal/strict/request/wire.rs|a0c8a110ea9e4ad3|strict serde request and response DTO declarations only; conversion and validation behavior is scoped
+crates/loopal-vault-api/src/error.rs|4cbb1dcc2b677543|declarative typed vault error variants only; protected audit behavior and propagation are scoped
+crates/loopal-vault-api/src/lib.rs|fd6a80603040947e|public re-exports only; audit contract and error propagation are scoped
+crates/loopal-view-state/src/mutators/aggregate.rs|5ea13d1e330f1c47|session reset plumbing; workflow projection mutator is scoped
+crates/loopal-view-state/src/state.rs|62c65fae8c0a6f31|view workflow snapshot field and constructor wiring only; revision validation and projection mutation behavior is scoped
+crates/loopal-backend/src/lib.rs|5aa13993683b78b5|module declarations and public re-exports only; guarded process behavior is scoped in focused backend modules
+crates/loopal-backend/src/search/mod.rs|dfc911ddef3e8d71|search module registration only; side-effect-free glob and grep behavior is scoped in their focused modules
+crates/loopal-backend/src/process_group/windows.rs|72587d4f3418be4c|Windows-only Job Object implementation cannot appear in the macOS base LCOV; Windows lifecycle integration tests enforce its behavior on the Windows CI host
+crates/loopal-storage/src/workflow_journal/fs/windows.rs|40deaf09434f782d|Windows-only reparse-point and file-identity implementation cannot appear in macOS LCOV; it remains disabled until compiled and exercised by the Windows platform gate
+crates/loopal-backend/src/local_backend_impl.rs|7305fe0f297d5c6f|Backend trait adapter delegates guarded process calls to the scoped LocalBackend process implementation
+crates/loopal-output-guard/src/lib.rs|e6162586fd6f9c29|module declarations and public re-exports only; completion, event, streaming, seed, JSON, image, and provenance behavior is scoped in focused modules
+crates/loopal-output-guard/src/stream_limits.rs|c0f2226afaf2b888|streaming redaction constants and declarative error types only; executable behavior is scoped
+crates/loopal-secret-runtime/src/lib.rs|8460bf2d99ff2c53|module declarations and public re-exports only; redaction and audit behavior is scoped
+crates/loopal-secret-runtime/src/audit_entry.rs|d213780046e0ed84|serde-only protected audit record fields with no executable LCOV statements; construction and serialization behavior remains scoped in audit.rs
+crates/loopal-tool-api/src/backend.rs|4a81d8d27bf46a3f|backend interface declarations only; concrete guarded execution behavior is scoped
+crates/loopal-tool-api/src/backend_types.rs|a452d306c9db9614|backend result DTO field removal only; premature persistence removal is scoped in concrete backend modules
+crates/loopal-tool-api/src/process_output.rs|a092ccd92c6e54bc|process sanitizer and executor interface declarations only; implementations are scoped
+crates/loopal-tool-api/src/truncate.rs|06c1a89d5971fe64|generic truncation helpers plus module delegation only; private guarded persistence is scoped in truncate/overflow.rs
+crates/tools/process/background/src/lib.rs|c8d3ee72996717fc|module declarations and public re-exports only; executable background process behavior is scoped in focused modules
+crates/tools/process/bash/src/format.rs|a1f809f2d0ce8df3|Bash result presentation only; guarded process dispatch and final sink behavior are scoped
+crates/loopal-agent-hub/src/view_router_test_support.rs|0163f04c28c4e7dd|cfg(test)-only Hub and workflow journal fixtures used by scoped view-router tests; it is not production code
+crates/loopal-agent-server/src/workflow_input_test_support.rs|012f8c9466167932|cfg(test)-only planner and workflow-control stubs used by scoped workflow-input adapter tests; it is not production code
+crates/loopal-agent-server/src/workflow_input_control_test_support.rs|ce9763dbc68d8b9f|cfg(test)-only workflow-control lookup stub used by replay adapter tests; it is not production code
+crates/loopal-protocol/src/agent_state_snapshot.rs|3c71137a13c5ce04|serde snapshot fields and empty-value constructor wiring only; workflow revision and projection behavior is scoped
+crates/loopal-runtime/src/workflow_input.rs|c09f14617ffecad6|workflow input disposition and handler interface declarations only; executable classification and dispatch behavior is scoped
+crates/loopal-view-state/src/lib.rs|4a3a36d95a60698b|module declarations and public re-exports only; workflow revision and mutation behavior is scoped
+crates/loopal-tui/src/app/types.rs|27c82e93c0d1e747|panel enum registration only; workflow projection, provider, rendering, and event-resync behavior is scoped in focused modules
+crates/loopal-tui/src/providers/mod.rs|9c1f74676e4ad18e|panel provider module registration only; workflow provider behavior is scoped in workflows_provider.rs
+crates/loopal-tui/src/views/mod.rs|af0ae0ad961d0c88|view module registration only; workflow rendering behavior is scoped in workflows_panel.rs
+src/bootstrap/hub/typestate/mod.rs|d0e999f2366cd904|typestate module registration and ownership field transfer only; workflow runtime installation and shutdown behavior is scoped
+src/bootstrap/hub/typestate/start_event_loop.rs|f1da7d7f1a2e4acb|existing event-loop transition with only workflow-runtime field initialization added; runtime installation and shutdown behavior is scoped
+src/bootstrap/hub/typestate/states.rs|feb14bcd4b0fc933|typestate data field declarations only; workflow runtime installation and shutdown behavior is scoped
+crates/loopal-agent-server/src/session_forward/forwarding_test_support.rs|16f94cbb044f74dd|cfg(test)-only IPC and workflow notification fixtures used by scoped session-forward tests; it is not production code
+crates/loopal-storage/src/workflow_journal/replay/read_test_support.rs|deb7120c3095abb0|cfg(test)-only journal snapshots and assertion fixtures used by scoped replay tests; it is not production code
+src/bootstrap/mod.rs|2a45065e70e4f32d|existing bootstrap dispatcher with only cfg(test) lifecycle fixture registration added; executable workflow bootstrap modules are scoped
+src/bootstrap/modes/lifecycle_test_support.rs|a94190e80b02336b|cfg(test)-only process and IPC fixtures used by scoped bootstrap lifecycle tests; it is not production code

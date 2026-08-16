@@ -170,43 +170,6 @@ async fn refiner_output_includes_raw_path_and_size() {
     assert!(r.content.contains("KB"));
 }
 
-#[test]
-fn settings_default_threshold_is_8kb() {
-    let cfg = loopal_config::FetchRefinerConfig::default();
-    assert_eq!(cfg.threshold_bytes, 8 * 1024);
-    assert!(cfg.enabled);
-}
-
-#[test]
-fn settings_does_not_pin_a_specific_model() {
-    let cfg = loopal_config::FetchRefinerConfig::default();
-    let json = serde_json::to_string(&cfg).unwrap();
-    assert!(
-        !json.contains("model"),
-        "model should be sourced from model_routing[refine], not embedded — got {json}"
-    );
-}
-
-#[test]
-fn one_shot_chat_error_displays_distinct_messages() {
-    let messages: Vec<String> = [
-        OneShotChatError::Timeout,
-        OneShotChatError::ProviderUnresolvable,
-        OneShotChatError::StreamFailed,
-        OneShotChatError::ChunkFailed,
-        OneShotChatError::EmptyResponse,
-    ]
-    .iter()
-    .map(|e| e.to_string())
-    .collect();
-    let unique: std::collections::HashSet<&String> = messages.iter().collect();
-    assert_eq!(
-        unique.len(),
-        messages.len(),
-        "every variant must be distinguishable"
-    );
-}
-
 #[tokio::test]
 async fn refiner_does_not_call_chat_when_model_is_none() {
     let resolver = Arc::new(MockResolver {

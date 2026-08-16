@@ -173,5 +173,4 @@ describe('LoopalLiveSession', () => {
     }, 4, 'worker'))
     expect(state.detail.artifacts).toHaveLength(2)
   })
-
 })

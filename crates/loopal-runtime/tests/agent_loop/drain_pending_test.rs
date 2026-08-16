@@ -133,20 +133,21 @@ async fn test_subagent_drains_pending_before_exit() {
             frontend,
             session_manager: fixture.session_manager(),
             decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
+            protected_effect_audit: super::noop_protected_effect_audit(),
         },
         fixture.test_session("drain-test"),
         make_test_budget(),
         InterruptHandle::new(),
     )
-    // reason: pre-seed a UserInput turn so the agent loop skips the idle
-    // phase (which would tokio::select! over a closed control channel +
-    // queued mailbox — race-prone). The pending mailbox message is what
-    // the test actually wants to verify gets drained after the turn.
-    .initial_turns(
-        loopal_test_support::seed_history::reverse_project_messages_to_turns(vec![
-            loopal_provider_api::Message::user("run task"),
-        ]),
-    )
+    // Keep the initial turn explicitly in progress. A completed User-only
+    // turn is valid persisted history and must be idle after resume.
+    .initial_turns(vec![loopal_turn::Turn::new(
+        loopal_turn::TurnTrigger::UserInput {
+            envelope_id: "initial-task".into(),
+            content: "run task".into(),
+            images: Vec::new(),
+        },
+    )])
     .build();
 
     // Drain events in background so channels don't block

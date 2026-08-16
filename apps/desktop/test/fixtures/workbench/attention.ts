@@ -18,8 +18,8 @@ export const stage2Model: Stage2WorkbenchModel = {
     activeSessionId: 'session-1',
   },
   permissions: [
-    { id: 'write', agentId: 'main', title: 'Write files', description: 'Modify the workspace.', risk: 'medium', command: 'apply_patch' },
-    { id: 'network', title: 'Use network', description: 'Contact the registry.', risk: 'high' },
+    { id: 'write', agentId: 'main', title: 'Write files', description: 'Modify the workspace.', risk: 'medium', canAllow: true, command: 'apply_patch' },
+    { id: 'network', title: 'Use network', description: 'Contact the registry.', risk: 'high', canAllow: false },
   ],
   questions: [{
     id: 'style',

@@ -1,5 +1,6 @@
 pub mod bridge;
 pub mod config;
+mod live_one_shot_chat;
 pub mod outstanding_tasks_impl;
 pub mod provider_resolver_impl;
 pub mod session_resume_adapters;
@@ -14,7 +15,10 @@ pub mod task_store;
 pub(crate) mod task_store_session;
 pub mod tools;
 pub mod types;
+pub mod workflow_control;
+pub mod workflow_planner;
 
+pub use live_one_shot_chat::LiveOneShotChatService;
 pub use session_resume_adapters::{CronResumeAdapter, TaskResumeAdapter};
 pub use shared::AgentShared;
 pub use state_snapshot::{cron_info_to_snapshot, task_to_snapshot};
@@ -24,3 +28,4 @@ pub use task_patch::TaskPatch;
 pub use task_session_storage::SessionScopedTaskStorage;
 pub use task_store::TaskStore;
 pub use types::{AgentId, Task, TaskId, TaskStatus};
+pub use workflow_planner::{ProactiveWorkflowPlanner, WorkflowPlanner, WorkflowPlannerOptions};

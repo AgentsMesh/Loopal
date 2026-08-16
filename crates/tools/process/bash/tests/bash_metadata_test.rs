@@ -13,6 +13,7 @@ fn test_bash_metadata() {
     assert_eq!(tool.name(), "Bash");
     assert!(tool.description().contains("bash"));
     assert_eq!(tool.permission(), PermissionLevel::Dangerous);
+    assert_eq!(tool.secret_eligible_params(), &["env"]);
 
     let schema = tool.parameters_schema();
     assert_eq!(schema["type"], "object");

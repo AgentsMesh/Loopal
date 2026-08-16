@@ -11,6 +11,7 @@ pub mod events;
 pub mod fixture;
 pub mod git_fixture;
 pub mod harness;
+mod harness_types;
 pub mod hook_fixture;
 pub mod ipc_harness;
 pub mod mcp_mock;
@@ -28,6 +29,7 @@ pub use loopal_ipc::duplex_pair as make_duplex_pair;
 
 pub use fixture::TestFixture;
 pub use git_fixture::GitFixture;
-pub use harness::{HarnessBuilder, IntegrationHarness, SpawnedHarness};
+pub use harness::HarnessBuilder;
+pub use harness_types::{IntegrationHarness, SpawnedHarness};
 pub use hook_fixture::HookFixture;
 pub use mcp_mock::MockMcpServer;

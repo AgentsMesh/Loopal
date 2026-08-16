@@ -36,6 +36,38 @@ impl AgentLoopRunner {
         Ok(ControlOutcome::applied())
     }
 
+    pub(super) async fn handle_thinking_switch(&mut self, json: String) -> Result<ControlOutcome> {
+        let config = match serde_json::from_str::<loopal_provider_api::ThinkingConfig>(&json) {
+            Ok(config) => config,
+            Err(error) => {
+                error!(%error, "invalid thinking config");
+                return Ok(ControlOutcome::rejected(format!(
+                    "invalid thinking config: {error}"
+                )));
+            }
+        };
+        info!(thinking = ?config, "switching thinking config");
+        // Emit-first: all runtime and auxiliary request state stays unchanged
+        // when view-state cannot observe the switch.
+        self.emit(AgentEventPayload::ThinkingChanged {
+            thinking_config: json,
+        })
+        .await?;
+        self.model_config.thinking = config.clone();
+        self.params.config.thinking_config = config.clone();
+        if let Some(state) = &self.params.config.thinking_state {
+            state.set(config.clone());
+        }
+        if let Ok(value) = serde_json::to_value(&config) {
+            super::input_control::persist_local_setting(
+                &self.params.session.cwd,
+                "thinking",
+                value,
+            );
+        }
+        Ok(ControlOutcome::applied())
+    }
+
     pub(super) async fn handle_decision_switch(&mut self, s: String) -> Result<ControlOutcome> {
         let Ok(mode) = s.parse::<loopal_decision_api::DecisionMode>() else {
             error!(value = %s, "invalid decision mode");

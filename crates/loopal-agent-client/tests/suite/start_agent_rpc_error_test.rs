@@ -50,6 +50,8 @@ async fn start_agent_returns_err_on_rpc_error_response() {
         Duration::from_secs(5),
         client.start_agent(&StartAgentParams {
             cwd: std::env::current_dir().unwrap(),
+            sandbox_policy: None,
+            session_id: None,
             resume: Some("bogus-id".into()),
             ..Default::default()
         }),

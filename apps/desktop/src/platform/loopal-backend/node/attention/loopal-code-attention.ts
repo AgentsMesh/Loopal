@@ -12,8 +12,12 @@ type Input = PermissionResponseInput | QuestionResponseInput | PlanApprovalRespo
 export async function respondPermission(
   router: CodeWorkbenchRuntimeRouter, input: PermissionResponseInput, token: CancellationToken,
 ): Promise<void> {
+  if (input.decision !== 'deny' && !input.intentDigest) {
+    throw new Error('Permission intent digest is required to allow a tool')
+  }
   await route(router, input, 'hub/permission_response', {
     agent_name: input.agentId, tool_call_id: input.requestId, allow: input.decision !== 'deny',
+    ...(input.intentDigest ? { permission_intent_digest: input.intentDigest } : {}),
     ...(input.decision === 'allow_session' ? { remember_session: true } : {}),
   }, token)
 }

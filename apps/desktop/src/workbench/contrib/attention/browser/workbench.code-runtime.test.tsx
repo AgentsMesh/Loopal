@@ -2,6 +2,8 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { createTestAPI, updatedAt } from '../../../../../test/support/workbench/api-stub'
 import { Workbench } from '../../../browser/workbench'
 
+const intentDigest = `sha256:${'ab'.repeat(32)}`
+
 describe('Workbench attention runtime surfaces', () => {
   it('projects permission and multi-question events into actionable panes', async () => {
     const respondPermission = vi.fn(async () => undefined)
@@ -14,7 +16,7 @@ describe('Workbench attention runtime surfaces', () => {
         type: 'permission_requested',
         request: {
           id: 'permission', sessionId: 'session-1', runtimeId: 'runtime-1', generation: 1,
-          agentId: 'main', tool: 'shell',
+          agentId: 'main', tool: 'shell', intentDigest,
           title: 'Run tests', detail: 'bazel test //...', risk: 'medium', createdAt: updatedAt,
         },
       })
@@ -37,7 +39,7 @@ describe('Workbench attention runtime surfaces', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Allow' }))
     await waitFor(() => expect(respondPermission).toHaveBeenCalledWith({
       sessionId: 'session-1', runtimeId: 'runtime-1', generation: 1,
-      agentId: 'main', requestId: 'permission', decision: 'allow_once',
+      agentId: 'main', requestId: 'permission', intentDigest, decision: 'allow_once',
     }))
     act(() => events.fire({
       type: 'permission_resolved', sessionId: 'session-1', runtimeId: 'runtime-1',

@@ -9,8 +9,8 @@ use loopal_tool_api::backend_types::{
     GrepSearchResult, ImageResult, LsResult, ReadResult, WriteResult,
 };
 use loopal_tool_api::{
-    Backend, BatchOp, BatchOutcome, ExecOutcome, GoalSession, GoalSessionError, ResolvedPath, Tool,
-    ToolContext, TypedBridge,
+    Backend, BatchOp, BatchOutcome, ExecOutcome, GoalSession, GoalSessionError,
+    ProcessOutputSanitizer, ResolvedPath, Tool, ToolContext, TypedBridge,
 };
 use loopal_tool_goal::{
     CreateGoalParams, CreateGoalTool, GetGoalParams, GetGoalTool, UpdateGoalParams, UpdateGoalTool,
@@ -111,10 +111,37 @@ impl Backend for PanicBackend {
     ) -> Result<ExecOutcome, ToolIoError> {
         unimplemented!()
     }
+    async fn exec_guarded(
+        &self,
+        _: &str,
+        _: Duration,
+        _: &EnvOverride,
+        _: Option<Arc<dyn ProcessOutputSanitizer>>,
+    ) -> Result<ExecResult, ToolIoError> {
+        unimplemented!()
+    }
+    async fn exec_streaming_guarded(
+        &self,
+        _: &str,
+        _: Duration,
+        _: &EnvOverride,
+        _: Arc<loopal_tool_api::OutputTail>,
+        _: Option<Arc<dyn ProcessOutputSanitizer>>,
+    ) -> Result<ExecOutcome, ToolIoError> {
+        unimplemented!()
+    }
     async fn exec_background(
         &self,
         _: &str,
         _: &EnvOverride,
+    ) -> Result<ProcessHandle, ToolIoError> {
+        unimplemented!()
+    }
+    async fn exec_background_guarded(
+        &self,
+        _: &str,
+        _: &EnvOverride,
+        _: Option<Arc<dyn ProcessOutputSanitizer>>,
     ) -> Result<ProcessHandle, ToolIoError> {
         unimplemented!()
     }

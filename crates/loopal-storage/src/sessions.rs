@@ -6,6 +6,8 @@ use uuid::Uuid;
 
 use loopal_error::StorageError;
 
+mod workflows;
+
 /// Reference to a sub-agent session spawned during a parent session.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubAgentRef {
@@ -53,6 +55,10 @@ impl SessionStore {
     /// Create a store with a custom base directory (useful for testing).
     pub fn with_base_dir(base_dir: PathBuf) -> Self {
         Self { base_dir }
+    }
+
+    pub(crate) fn base_dir(&self) -> &Path {
+        &self.base_dir
     }
 
     pub(crate) fn sessions_dir(&self) -> PathBuf {
@@ -147,6 +153,25 @@ impl SessionStore {
             self.update_session(&session)?;
         }
         Ok(())
+    }
+}
+
+pub(crate) fn validate_path_component(
+    field: &'static str,
+    value: &str,
+) -> Result<(), StorageError> {
+    let valid = !value.is_empty()
+        && Path::new(value)
+            .components()
+            .all(|component| matches!(component, std::path::Component::Normal(_)))
+        && !value.contains(['/', '\\']);
+    if valid {
+        Ok(())
+    } else {
+        Err(StorageError::InvalidPathComponent {
+            field,
+            value: value.to_string(),
+        })
     }
 }
 

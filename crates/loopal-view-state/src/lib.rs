@@ -15,6 +15,6 @@ pub use loopal_tool_invocation::{
     CancelCause, FailureKind, InvocationId, InvocationState, Outcome, ProgressSnapshot,
     StaleReason, ToolInvocation, ToolResultMetadata,
 };
-pub use reducer::ViewStateReducer;
+pub use reducer::{ViewStateApplyOutcome, ViewStateReducer, WorkflowRevisionGap};
 pub use state::{AgentView, BgTaskView, SessionViewState};
 pub use view_proto::ViewSnapshotRequest;

@@ -22,6 +22,7 @@ pub fn trigger_llm_text(trigger: &TurnTrigger) -> Option<String> {
         } => Some(format!("[from: #{channel}/{from}] {content}")),
         TurnTrigger::GoalContinuation { content, .. } => Some(content.clone()),
         TurnTrigger::BackgroundHook { content, .. } => Some(content.clone()),
+        TurnTrigger::WorkflowResult { content, .. } => Some(content.clone()),
         TurnTrigger::Resume => None,
     }
 }

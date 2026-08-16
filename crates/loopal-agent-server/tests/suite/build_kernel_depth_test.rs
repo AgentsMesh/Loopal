@@ -8,7 +8,7 @@ use loopal_config::{ConfigResolver, McpServerConfig, ResolvedConfig};
 use loopal_mcp::HubMcpClient;
 use serde_json::Value;
 
-fn empty_config() -> ResolvedConfig {
+pub(super) fn empty_config() -> ResolvedConfig {
     ConfigResolver::new()
         .resolve()
         .expect("empty resolver should produce default ResolvedConfig")
@@ -41,7 +41,7 @@ impl HubMcpClient for NoopHubClient {
     }
 }
 
-async fn build_or_panic(
+pub(super) async fn build_or_panic(
     config: &ResolvedConfig,
     production: bool,
     depth: u32,

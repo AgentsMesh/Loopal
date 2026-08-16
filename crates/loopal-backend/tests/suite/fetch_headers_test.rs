@@ -125,3 +125,80 @@ async fn fetch_reports_final_url_when_redirect_crosses_host() {
         "final_url should reflect the redirected host; got: {final_url}"
     );
 }
+
+#[tokio::test]
+async fn fetch_rejects_non_http_schemes_before_connecting() {
+    let error =
+        loopal_backend::net::fetch_url("file:///etc/passwd", None, &ResourceLimits::default())
+            .await
+            .unwrap_err();
+
+    assert!(
+        error
+            .to_string()
+            .contains("must start with http:// or https://")
+    );
+}
+
+#[tokio::test]
+async fn fetch_rejects_non_success_statuses() {
+    let url = spawn_static_server(
+        b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n".to_vec(),
+    )
+    .await;
+
+    let error = loopal_backend::net::fetch_url(&url, None, &ResourceLimits::default())
+        .await
+        .unwrap_err();
+
+    assert!(error.to_string().contains("HTTP 503"));
+}
+
+#[tokio::test]
+async fn fetch_truncates_at_the_byte_cap_and_allows_missing_content_type() {
+    let url =
+        spawn_static_server(b"HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\nabcdefghij".to_vec())
+            .await;
+    let limits = ResourceLimits {
+        max_fetch_bytes: 4,
+        ..ResourceLimits::default()
+    };
+
+    let result = loopal_backend::net::fetch_url(&url, None, &limits)
+        .await
+        .unwrap();
+
+    assert_eq!(result.body, "abcd");
+    assert_eq!(result.content_type, None);
+    assert_eq!(result.final_url, None);
+}
+
+#[tokio::test]
+async fn fetch_omits_final_url_for_redirects_that_keep_the_same_host() {
+    let target =
+        spawn_static_server(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok".to_vec()).await;
+    let redirect = spawn_static_server(
+        format!("HTTP/1.1 302 Found\r\nLocation: {target}\r\nContent-Length: 0\r\n\r\n")
+            .into_bytes(),
+    )
+    .await;
+
+    let result = loopal_backend::net::fetch_url(&redirect, None, &ResourceLimits::default())
+        .await
+        .unwrap();
+
+    assert_eq!(result.body, "ok");
+    assert_eq!(result.final_url, None);
+}
+
+#[tokio::test]
+async fn fetch_surfaces_incomplete_response_bodies_as_read_errors() {
+    let url =
+        spawn_static_server(b"HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\nshort".to_vec()).await;
+
+    let error = loopal_backend::net::fetch_url(&url, None, &ResourceLimits::default())
+        .await
+        .unwrap_err();
+
+    assert!(error.to_string().contains("read error"));
+}

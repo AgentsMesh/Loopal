@@ -32,6 +32,7 @@ pub struct UiCapabilitySnapshot {
 pub struct UiDispatcher {
     pub(crate) clients: HashMap<String, UiClient>,
     pub(crate) event_broadcast: broadcast::Sender<AgentEvent>,
+    resync_broadcast: broadcast::Sender<()>,
     capability_state: watch::Sender<UiCapabilitySnapshot>,
 }
 
@@ -44,6 +45,7 @@ impl Default for UiDispatcher {
 impl UiDispatcher {
     pub fn new() -> Self {
         let (broadcast_tx, _) = broadcast::channel(256);
+        let (resync_broadcast, _) = broadcast::channel(16);
         let (capability_state, _) = watch::channel(UiCapabilitySnapshot {
             generation: 0,
             capabilities: UiCapabilities::NONE,
@@ -51,6 +53,7 @@ impl UiDispatcher {
         Self {
             clients: HashMap::new(),
             event_broadcast: broadcast_tx,
+            resync_broadcast,
             capability_state,
         }
     }
@@ -115,6 +118,23 @@ impl UiDispatcher {
             .is_some_and(|client| client.capabilities.supports(capability))
     }
 
+    pub(crate) fn client_lease(
+        &self,
+        lease_id: &str,
+    ) -> Option<(String, UiCapabilities, Arc<Connection<Listening>>)> {
+        self.clients.get(lease_id).map(|client| {
+            (
+                client.name.clone(),
+                client.capabilities,
+                client.connection.clone(),
+            )
+        })
+    }
+
+    pub fn capability_snapshot(&self) -> UiCapabilitySnapshot {
+        *self.capability_state.borrow()
+    }
+
     pub fn subscribe_capabilities(&self) -> watch::Receiver<UiCapabilitySnapshot> {
         self.capability_state.subscribe()
     }
@@ -125,6 +145,14 @@ impl UiDispatcher {
 
     pub fn event_broadcaster(&self) -> broadcast::Sender<AgentEvent> {
         self.event_broadcast.clone()
+    }
+
+    pub fn subscribe_resync(&self) -> broadcast::Receiver<()> {
+        self.resync_broadcast.subscribe()
+    }
+
+    pub(crate) fn request_resync(&self) {
+        let _ = self.resync_broadcast.send(());
     }
 
     fn publish_capabilities(&self) {

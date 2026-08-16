@@ -46,6 +46,16 @@ fn trigger_origin(trigger: &TurnTrigger) -> Option<MessageOrigin> {
         TurnTrigger::BackgroundHook { hook_kind, .. } => Some(MessageOrigin::Other {
             label: hook_kind.clone(),
         }),
+        TurnTrigger::WorkflowResult {
+            run_id,
+            terminal_revision,
+            state,
+            ..
+        } => Some(MessageOrigin::WorkflowResult {
+            run_id: run_id.clone(),
+            terminal_revision: *terminal_revision,
+            state: state.clone(),
+        }),
         TurnTrigger::Resume => None,
     }
 }

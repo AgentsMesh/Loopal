@@ -14,9 +14,14 @@ use super::string_err_to_rpc;
 
 pub fn register(b: DispatcherBuilder, hub: Arc<Mutex<Hub>>) -> DispatcherBuilder {
     let h = hub.clone();
-    let b = b.register_fn(methods::HUB_ROUTE.name, move |params, _ctx| {
+    let b = b.register_fn(methods::HUB_ROUTE.name, move |params, ctx| {
         let h = h.clone();
-        Box::pin(async move { handle_route(&h, params).await.map_err(string_err_to_rpc) })
+        let principal = crate::dispatch::authorization::principal(ctx);
+        Box::pin(async move {
+            handle_route(&h, params, principal?.as_ref())
+                .await
+                .map_err(string_err_to_rpc)
+        })
     });
     let h = hub.clone();
     let b = b.register_fn(methods::HUB_LIST_AGENTS.name, move |_params, _ctx| {

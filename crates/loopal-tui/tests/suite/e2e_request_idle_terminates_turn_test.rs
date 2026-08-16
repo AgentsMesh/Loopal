@@ -25,7 +25,7 @@ async fn request_idle_emits_tool_result_and_does_not_trigger_next_llm() {
 
     let harness = HarnessBuilder::new()
         .calls(calls)
-        .messages(vec![Message::user("please go idle")])
+        .prompt(vec![Message::user("please go idle")])
         .build_spawned()
         .await;
 
@@ -59,7 +59,7 @@ async fn request_idle_invalid_arg_also_emits_tool_result() {
 
     let harness = HarnessBuilder::new()
         .calls(calls)
-        .messages(vec![Message::user("test bad input")])
+        .prompt(vec![Message::user("test bad input")])
         .build_spawned()
         .await;
 
@@ -87,7 +87,7 @@ async fn signal_does_not_leak_to_next_turn() {
 
     let harness = HarnessBuilder::new()
         .calls(calls)
-        .messages(vec![Message::user("turn 1: please go idle")])
+        .prompt(vec![Message::user("turn 1: please go idle")])
         .build_spawned()
         .await;
 

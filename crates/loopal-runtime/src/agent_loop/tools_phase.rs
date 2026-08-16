@@ -3,26 +3,30 @@ use std::sync::Arc;
 
 use loopal_error::Result;
 use loopal_protocol::AgentEventPayload;
-use loopal_provider_api::ContentBlock;
 
 use super::cancel::TurnCancel;
 use super::runner::AgentLoopRunner;
 use super::tool_exec::execute_approved_tools;
+use super::tool_result_sink::PendingToolResult;
 use crate::mode::AgentMode;
 use crate::plan_file::wrap_plan_reminder;
+use crate::tool_action::PreparedToolAction;
 
 impl AgentLoopRunner {
     pub(super) async fn run_approved_batch(
         &self,
-        approved: Vec<(String, String, serde_json::Value)>,
+        approved: Vec<PreparedToolAction>,
         tool_uses: &[(String, String, serde_json::Value)],
         cancel: &TurnCancel,
-    ) -> Result<Vec<(usize, ContentBlock)>> {
+    ) -> Result<Vec<(usize, PendingToolResult)>> {
         if approved.is_empty() {
             return Ok(Vec::new());
         }
         if approved.len() >= 3 {
-            let tool_ids: Vec<String> = approved.iter().map(|(id, _, _)| id.clone()).collect();
+            let tool_ids = approved
+                .iter()
+                .map(|action| action.id().to_string())
+                .collect();
             let batch_id = loopal_protocol::event_id::next_event_id();
             loopal_protocol::event_id::scope_correlation(
                 batch_id,
@@ -36,11 +40,11 @@ impl AgentLoopRunner {
 
     async fn batch_with_announce(
         &self,
-        approved: Vec<(String, String, serde_json::Value)>,
+        approved: Vec<PreparedToolAction>,
         tool_ids: Vec<String>,
         tool_uses: &[(String, String, serde_json::Value)],
         cancel: &TurnCancel,
-    ) -> Result<Vec<(usize, ContentBlock)>> {
+    ) -> Result<Vec<(usize, PendingToolResult)>> {
         self.emit_in_turn(AgentEventPayload::ToolBatchStart { tool_ids })
             .await?;
         self.execute_batch(approved, tool_uses, cancel).await
@@ -48,19 +52,16 @@ impl AgentLoopRunner {
 
     async fn execute_batch(
         &self,
-        approved: Vec<(String, String, serde_json::Value)>,
+        approved: Vec<PreparedToolAction>,
         tool_uses: &[(String, String, serde_json::Value)],
         cancel: &TurnCancel,
-    ) -> Result<Vec<(usize, ContentBlock)>> {
-        let kernel = Arc::clone(&self.params.deps.kernel);
-        let tool_ctx = self.tool_ctx.clone();
-        let mode = self.params.config.mode;
+    ) -> Result<Vec<(usize, PendingToolResult)>> {
         Ok(execute_approved_tools(
             approved,
             tool_uses,
-            kernel,
-            tool_ctx,
-            mode,
+            Arc::clone(&self.params.deps.kernel),
+            self.tool_ctx.clone(),
+            self.params.config.mode,
             &self.params.deps.frontend,
             cancel,
         )
@@ -69,33 +70,20 @@ impl AgentLoopRunner {
 
     pub(super) fn wrap_plan_results(
         &self,
-        results: &mut [(usize, ContentBlock)],
+        results: &mut [(usize, PendingToolResult)],
         intercepted: &HashSet<usize>,
     ) {
         if self.params.config.mode != AgentMode::Plan {
             return;
         }
-        let plan_path = self.plan_file.path().to_string_lossy().to_string();
-        for (idx, block) in results {
-            if intercepted.contains(idx) {
-                continue;
-            }
-            if let ContentBlock::ToolResult {
-                content, is_error, ..
-            } = block
-                && !*is_error
-            {
-                *content = wrap_plan_reminder(content, &plan_path);
+        let path = self.plan_file.path().to_string_lossy();
+        for (index, result) in results {
+            if !intercepted.contains(index) && !result.is_error() {
+                let reminder = wrap_plan_reminder("", &path);
+                result.append_content(&reminder);
             }
         }
     }
-}
-
-pub(super) fn count_errors(results: &[(usize, ContentBlock)]) -> u32 {
-    results
-        .iter()
-        .filter(|(_, b)| matches!(b, ContentBlock::ToolResult { is_error: true, .. }))
-        .count() as u32
 }
 
 #[cfg(test)]

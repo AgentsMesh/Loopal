@@ -60,6 +60,8 @@ async fn full_bootstrap_hub_to_agent_roundtrip() {
             model: Some("claude-opus-4-8".to_string()),
             mode: Some("act".to_string()),
             no_sandbox: true,
+            sandbox_policy: None,
+            session_id: None,
             ..Default::default()
         })
         .await
@@ -191,6 +193,8 @@ async fn exit_plan_interrupt_unblocks_full_hub_runtime_chain() {
             mode: Some("plan".to_string()),
             permission_mode: Some("bypass".to_string()),
             no_sandbox: true,
+            sandbox_policy: None,
+            session_id: None,
             ..Default::default()
         })
         .await

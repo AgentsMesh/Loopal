@@ -222,12 +222,20 @@ async fn parent_reconnect_during_spawn_backpressure_prevents_orphan_start() {
     let hub = Arc::new(Mutex::new(Hub::new(event_tx)));
     let (old_parent_peer, old_parent_transport) = loopal_ipc::duplex_pair();
     let (_old_parent, _old_parent_rx) = Connection::new(old_parent_peer).into_listening();
-    let (old_parent, _old_hub_rx) = Connection::new(old_parent_transport).into_listening();
-    hub.lock()
-        .await
-        .registry
-        .register_connection("parent", old_parent)
-        .unwrap();
+    let (old_parent, old_hub_rx) = Connection::new(old_parent_transport).into_listening();
+    let old_dispatcher = Arc::new(loopal_agent_hub::dispatch::build_hub_dispatcher(
+        hub.clone(),
+    ));
+    let (old_ready_tx, old_ready_rx) = tokio::sync::oneshot::channel();
+    loopal_agent_hub::agent_io::start_agent_io(
+        hub.clone(),
+        old_dispatcher,
+        "parent",
+        old_parent,
+        old_hub_rx,
+        Some(old_ready_tx),
+    );
+    old_ready_rx.await.unwrap();
     let (child_peer, child_transport) = loopal_ipc::duplex_pair();
     let (_child, _child_rx) = Connection::new(child_peer).into_listening();
     let (child, child_incoming) = Connection::new(child_transport).into_listening();
@@ -262,14 +270,21 @@ async fn parent_reconnect_during_spawn_backpressure_prevents_orphan_start() {
     .unwrap();
     let (new_parent_peer, new_parent_transport) = loopal_ipc::duplex_pair();
     let (_new_parent, _new_parent_rx) = Connection::new(new_parent_peer).into_listening();
-    let (new_parent, _new_hub_rx) = Connection::new(new_parent_transport).into_listening();
-    {
-        let mut hub = hub.lock().await;
-        hub.registry.unregister_connection("parent");
-        hub.registry
-            .register_connection("parent", new_parent)
-            .unwrap();
-    }
+    let (new_parent, new_hub_rx) = Connection::new(new_parent_transport).into_listening();
+    hub.lock().await.registry.unregister_connection("parent");
+    let new_dispatcher = Arc::new(loopal_agent_hub::dispatch::build_hub_dispatcher(
+        hub.clone(),
+    ));
+    let (new_ready_tx, new_ready_rx) = tokio::sync::oneshot::channel();
+    loopal_agent_hub::agent_io::start_agent_io(
+        hub.clone(),
+        new_dispatcher,
+        "parent",
+        new_parent,
+        new_hub_rx,
+        Some(new_ready_tx),
+    );
+    new_ready_rx.await.unwrap();
 
     assert!(matches!(
         event_rx.recv().await.unwrap().payload,

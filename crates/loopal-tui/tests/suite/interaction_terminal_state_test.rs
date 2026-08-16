@@ -37,6 +37,7 @@ fn request_permission(app: &mut App, id: &str) {
         id: id.into(),
         name: "Write".into(),
         input: serde_json::json!({"file_path": "/tmp/example"}),
+        permission_intent: None,
     }));
 }
 

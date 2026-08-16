@@ -3,17 +3,18 @@
 /// Creates transport and connects to MCP server in one step.
 /// HTTP connections automatically fall back to OAuth if auth is required.
 use std::collections::{HashMap, VecDeque};
-use std::process::Stdio;
 use std::sync::Arc;
 use std::time::Duration;
 
 use loopal_error::McpError;
-use rmcp::transport::child_process::TokioChildProcess;
 use tokio::sync::Mutex;
 use tracing::{info, warn};
+use zeroize::Zeroizing;
 
 use crate::client::McpClient;
+use crate::contained_stdio_transport::ContainedStdioTransport;
 use crate::handler::SamplingCallback;
+use crate::handshake_transport::HandshakePolicy;
 use crate::safe_diagnostics::{REDACTED_STDERR, connection_failed, endpoint_label};
 use crate::stdio_command::stdio_command;
 
@@ -21,10 +22,31 @@ use crate::stdio_command::stdio_command;
 pub async fn connect_stdio(
     command: &str,
     args: &[String],
-    env: &HashMap<String, String>,
+    env: &HashMap<String, Zeroizing<String>>,
     timeout: Duration,
     sampling: Option<Arc<dyn SamplingCallback>>,
     stderr_tail: Option<Arc<Mutex<VecDeque<String>>>>,
+) -> Result<McpClient, McpError> {
+    connect_stdio_with_policy(
+        command,
+        args,
+        env,
+        timeout,
+        sampling,
+        stderr_tail,
+        HandshakePolicy::Strip,
+    )
+    .await
+}
+
+pub(crate) async fn connect_stdio_with_policy(
+    command: &str,
+    args: &[String],
+    env: &HashMap<String, Zeroizing<String>>,
+    timeout: Duration,
+    sampling: Option<Arc<dyn SamplingCallback>>,
+    stderr_tail: Option<Arc<Mutex<VecDeque<String>>>>,
+    handshake_policy: HandshakePolicy,
 ) -> Result<McpClient, McpError> {
     info!(
         transport = "stdio",
@@ -34,34 +56,27 @@ pub async fn connect_stdio(
     );
 
     let cmd = stdio_command(command, args, env);
-    // reason: ensure MCP child is reaped when its parent (Hub or root agent)
-    // exits. Without this, killing Hub leaves chrome-devtools-mcp / chrome
-    // grandchildren running indefinitely. Set kill_on_drop so the Tokio child
-    // handle's Drop sends SIGKILL.
-    let (transport, stderr) = TokioChildProcess::builder(cmd)
-        .stderr(Stdio::piped())
-        .spawn()
+    let (transport, stderr) = ContainedStdioTransport::spawn(cmd)
         .map_err(|_| connection_failed("MCP stdio spawn failed"))?;
 
     // Retain only the presence of stderr; server output may echo expanded secrets.
     if let Some(stderr) = stderr {
-        tokio::spawn(async move {
-            drain_stderr(stderr, stderr_tail).await;
-        });
+        spawn_stderr_drain(stderr, stderr_tail);
     }
 
-    McpClient::connect(transport, timeout, sampling).await
+    McpClient::connect_with_policy(transport, timeout, sampling, handshake_policy).await
 }
 
 /// Connect to an MCP server over Streamable HTTP.
 ///
 /// If the initial connection fails with an auth error, automatically
 /// falls back to OAuth browser-based authorization.
-pub async fn connect_http(
+pub(crate) async fn connect_http(
     url: &str,
-    headers: &HashMap<String, String>,
+    client: crate::scoped_http_client::ScopedHttpClient,
     timeout: Duration,
     sampling: Option<Arc<dyn SamplingCallback>>,
+    handshake_policy: HandshakePolicy,
 ) -> Result<McpClient, McpError> {
     use rmcp::transport::WorkerTransport;
     use rmcp::transport::streamable_http_client::{
@@ -69,14 +84,15 @@ pub async fn connect_http(
     };
 
     let endpoint = endpoint_label(url);
-    info!(%endpoint, header_count = headers.len(), "connecting to MCP HTTP server");
+    info!(%endpoint, "connecting to MCP HTTP server");
 
-    let http_client = build_http_client(headers)?;
     let config = StreamableHttpClientTransportConfig::with_uri(url);
-    let worker = StreamableHttpClientWorker::new(http_client, config);
+    let worker = StreamableHttpClientWorker::new(client, config);
     let transport = WorkerTransport::spawn(worker);
 
-    match McpClient::connect(transport, timeout, sampling.clone()).await {
+    match McpClient::connect_with_policy(transport, timeout, sampling.clone(), handshake_policy)
+        .await
+    {
         Ok(client) => Ok(client),
         Err(e) if is_auth_error(&e) => {
             warn!(%endpoint, "auth required, starting OAuth flow");
@@ -89,34 +105,24 @@ pub async fn connect_http(
 /// Check if an McpError indicates authentication is required.
 fn is_auth_error(err: &McpError) -> bool {
     let msg = err.to_string().to_lowercase();
-    msg.contains("auth") || msg.contains("401") || msg.contains("unauthorized")
+    msg.contains("auth") || msg.contains("401")
 }
 
-/// Build a reqwest client with custom default headers and connection timeout.
-fn build_http_client(headers: &HashMap<String, String>) -> Result<reqwest::Client, McpError> {
-    let mut header_map = reqwest::header::HeaderMap::new();
-    for (k, v) in headers {
-        let name = reqwest::header::HeaderName::from_bytes(k.as_bytes())
-            .map_err(|_| connection_failed("invalid MCP HTTP header name"))?;
-        let value = reqwest::header::HeaderValue::from_str(v)
-            .map_err(|_| connection_failed("invalid MCP HTTP header value"))?;
-        header_map.insert(name, value);
-    }
-
-    reqwest::Client::builder()
-        .default_headers(header_map)
-        .connect_timeout(std::time::Duration::from_secs(30))
-        .build()
-        .map_err(|_| connection_failed("MCP HTTP client initialization failed"))
+fn spawn_stderr_drain(
+    stderr: impl tokio::io::AsyncRead + Unpin + Send + 'static,
+    tail: Option<Arc<Mutex<VecDeque<String>>>>,
+) {
+    tokio::spawn(async move {
+        drain_stderr(stderr, tail).await;
+    });
 }
 
 /// Record bounded, redacted stderr presence for diagnostics.
 async fn drain_stderr(
-    stderr: tokio::process::ChildStderr,
+    mut reader: impl tokio::io::AsyncRead + Unpin,
     stderr_tail: Option<Arc<Mutex<VecDeque<String>>>>,
 ) {
     use tokio::io::AsyncReadExt;
-    let mut reader = stderr;
     let mut buffer = [0u8; 8192];
     let mut recorded = false;
     loop {
@@ -142,3 +148,7 @@ async fn drain_stderr(
         }
     }
 }
+
+#[cfg(test)]
+#[path = "transport_tests.rs"]
+mod tests;

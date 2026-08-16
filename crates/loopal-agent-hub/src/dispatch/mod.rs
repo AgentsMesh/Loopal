@@ -2,23 +2,48 @@
 
 use std::sync::Arc;
 
-use loopal_ipc::{Dispatcher, DispatcherBuilder, HandlerCtx, RpcError, jsonrpc};
+use loopal_ipc::{Dispatcher, DispatcherBuilder, RpcError, jsonrpc};
 use serde_json::Value;
 use tokio::sync::Mutex;
 
 use crate::hub::Hub;
 
+pub(crate) mod authorization;
+mod authorization_policy;
+#[cfg(test)]
+mod authorization_tests;
+#[cfg(test)]
+mod authorization_workflow_tests;
+#[cfg(test)]
+mod authorization_workflow_worker_tests;
 mod cross_hub_forward;
+mod cross_hub_spawn_admission;
 pub(crate) mod dispatch_handlers;
+#[cfg(test)]
+#[path = "fallback_tests.rs"]
+mod fallback_tests;
 mod mcp_handlers;
+mod protected_audit_handler;
 mod registry;
+#[cfg(test)]
+#[path = "relay_response_coverage_tests.rs"]
+mod relay_response_coverage_tests;
 pub(crate) mod relay_response_handlers;
+mod route_handler;
 mod secret_handlers;
 mod shutdown_handler;
 mod skill_routing;
+mod spawn_authority;
+mod spawn_authority_fields;
+#[cfg(test)]
+#[path = "spawn_authority_tests.rs"]
+mod spawn_authority_tests;
 mod spawn_parent_policy;
 #[doc(hidden)]
 pub mod spawn_prepare;
+#[cfg(test)]
+#[path = "spawn_prepare_tests.rs"]
+mod spawn_prepare_tests;
 mod spawn_routing;
 mod status_handler;
 mod topology_handlers;
@@ -67,7 +92,7 @@ async fn handle_fallback(
     }
 }
 
-fn make_invalid_request(message: String) -> RpcError {
+pub(crate) fn make_invalid_request(message: String) -> RpcError {
     RpcError::Remote {
         code: jsonrpc::INVALID_REQUEST,
         message,
@@ -80,13 +105,16 @@ fn make_invalid_request(message: String) -> RpcError {
 /// Use this on the hot path (`agent_io_loop`, `tcp_ui_io_loop`) where the
 /// dispatcher is built once and shared. Building it costs ~20 register_fn +
 /// Arc allocations.
-pub async fn dispatch_hub_request_with(
+pub(crate) async fn dispatch_hub_request_with_principal(
+    hub: &Arc<Mutex<Hub>>,
     dispatcher: &Dispatcher,
     method: &str,
     params: Value,
-    from_agent: String,
+    principal: Arc<crate::request_principal::HubRequestPrincipal>,
 ) -> Result<Value, String> {
-    let ctx = HandlerCtx::new(from_agent);
+    let ctx = authorization::authorize(hub, method, principal)
+        .await
+        .map_err(|error| error.to_string())?;
     dispatcher
         .dispatch(method, params, &ctx)
         .await
@@ -99,18 +127,21 @@ pub async fn dispatch_hub_request_with(
         })
 }
 
-/// One-shot dispatch: build a fresh `Dispatcher` for this single call.
-///
-/// **For tests and cold paths only.** Production IO loops (agent_io,
-/// ui_session, tcp_ui_io, uplink) hold an `Arc<Dispatcher>` and call
-/// `dispatch_hub_request_with` instead.
+/// One-shot internal dispatch for tests and coordinator-owned paths.
 #[doc(hidden)]
 pub async fn dispatch_hub_request(
     hub: &Arc<Mutex<Hub>>,
     method: &str,
     params: Value,
-    from_agent: String,
+    _from: String,
 ) -> Result<Value, String> {
     let dispatcher = build_hub_dispatcher(hub.clone());
-    dispatch_hub_request_with(&dispatcher, method, params, from_agent).await
+    dispatch_hub_request_with_principal(
+        hub,
+        &dispatcher,
+        method,
+        params,
+        Arc::new(crate::request_principal::HubRequestPrincipal::Internal),
+    )
+    .await
 }

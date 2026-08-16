@@ -133,6 +133,27 @@ impl ConfigResolver {
         }
         settings.compaction = sanitized_compaction;
 
+        let (sanitized_workflow, workflow_warnings) = settings.workflow.clone().sanitize();
+        for warning in &workflow_warnings {
+            tracing::warn!("{warning}");
+        }
+        sanitized_workflow
+            .validate()
+            .map_err(|reason| ConfigError::InvalidValue {
+                field: "workflow".into(),
+                reason,
+            })?;
+        settings.workflow = sanitized_workflow;
+        let preset_resolution = settings.resolve_workflow_preset();
+        settings = preset_resolution.settings;
+        settings
+            .workflow
+            .validate()
+            .map_err(|reason| ConfigError::InvalidValue {
+                field: "workflow".into(),
+                reason,
+            })?;
+
         // Mirror typed fields back into Settings so Kernel / HookRegistry
         // (which read Settings directly) see the merged view.
         settings.mcp_servers = mcp_servers
@@ -140,13 +161,16 @@ impl ConfigResolver {
             .map(|(name, entry)| (name.clone(), entry.config.clone()))
             .collect();
         settings.hooks = hooks.iter().map(|h| h.config.clone()).collect();
+        let secrets = build_secret_store(
+            settings.secrets.vaults_dir.clone().or(vaults_dir),
+            settings.secrets.default_vault.as_deref(),
+            settings.telemetry.telemetry_dir(),
+        )?;
 
         Ok(ResolvedConfig {
-            secrets: build_secret_store(
-                settings.secrets.vaults_dir.clone().or(vaults_dir),
-                settings.secrets.default_vault.as_deref(),
-            ),
+            secrets,
             settings,
+            workflow_preset_thinking_recommendation: preset_resolution.recommended_thinking,
             mcp_servers,
             skills,
             hooks,

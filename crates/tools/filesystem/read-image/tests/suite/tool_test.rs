@@ -82,9 +82,14 @@ async fn missing_file_returns_error_result() {
 fn declared_metadata() {
     let tool = TypedBridge::<_, ReadImageParams>::new(ReadImageTool);
     assert_eq!(tool.name(), "ReadImage");
+    assert!(tool.description().contains("Supported formats"));
     assert!(matches!(
         tool.permission(),
         loopal_tool_api::PermissionLevel::ReadOnly
     ));
     assert_eq!(tool.secret_eligible_params(), &[] as &[&str]);
+    assert_eq!(
+        tool.image_output_policy(),
+        loopal_tool_api::ImageOutputPolicy::ValidatedInline
+    );
 }

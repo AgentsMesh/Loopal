@@ -47,6 +47,72 @@ pub fn validate_spawn_payload(params: &Value) -> Result<(), String> {
     Ok(())
 }
 
+pub fn validate_forwarded_spawn_payload(params: &Value) -> Result<(), String> {
+    validate_spawn_payload(params)?;
+    let object = params
+        .as_object()
+        .ok_or_else(|| "cross-hub spawn payload must be an object".to_string())?;
+    for field in [
+        "name",
+        "model",
+        "parent",
+        "depth",
+        "permission_mode",
+        "decision_mode",
+        "sandbox_policy",
+        "no_sandbox",
+    ] {
+        if !object.contains_key(field) {
+            return Err(format!("cross-hub spawn missing '{field}'"));
+        }
+    }
+    require_nonempty_string(params, "name")?;
+    require_nonempty_string(params, "model")?;
+    require_nonempty_string(params, "parent")?;
+    params["depth"]
+        .as_u64()
+        .filter(|depth| *depth > 0 && *depth <= u64::from(u32::MAX))
+        .ok_or_else(|| "cross-hub spawn 'depth' must be a positive u32".to_string())?;
+    require_enum(
+        params,
+        "permission_mode",
+        &["bypass", "ask_dangerous", "ask_any_write"],
+    )?;
+    require_enum(params, "decision_mode", &["manual", "classifier", "agent"])?;
+    let sandbox = require_enum(
+        params,
+        "sandbox_policy",
+        &["disabled", "default_write", "read_only"],
+    )?;
+    let no_sandbox = params["no_sandbox"]
+        .as_bool()
+        .ok_or_else(|| "cross-hub spawn 'no_sandbox' must be a boolean".to_string())?;
+    if no_sandbox != (sandbox == "disabled") {
+        return Err("cross-hub spawn sandbox fields conflict".into());
+    }
+    Ok(())
+}
+
+fn require_nonempty_string<'a>(params: &'a Value, field: &str) -> Result<&'a str, String> {
+    params[field]
+        .as_str()
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| format!("cross-hub spawn '{field}' must be a non-empty string"))
+}
+
+fn require_enum<'a>(params: &'a Value, field: &str, allowed: &[&str]) -> Result<&'a str, String> {
+    let value = require_nonempty_string(params, field)?;
+    if allowed.contains(&value) {
+        Ok(value)
+    } else {
+        Err(format!("cross-hub spawn '{field}' has an unknown value"))
+    }
+}
+
+#[cfg(test)]
+#[path = "cross_hub_forwarded_tests.rs"]
+mod forwarded_tests;
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -13,7 +13,7 @@ use serde_json::json;
 
 fn make_hub() -> (Arc<Mutex<Hub>>, mpsc::Receiver<AgentEvent>) {
     let (tx, rx) = mpsc::channel::<AgentEvent>(64);
-    (Arc::new(Mutex::new(Hub::new(tx))), rx)
+    (crate::permission_support::hub_with_noop_audit(tx), rx)
 }
 
 async fn first_permission_event(rx: &mut broadcast::Receiver<AgentEvent>) -> AgentEvent {
@@ -40,9 +40,15 @@ async fn ui_deny_returns_false_to_agent() {
     tokio::spawn(async move {
         let mut rx = ui.event_rx;
         let ev = first_permission_event(&mut rx).await;
-        if let AgentEventPayload::ToolPermissionRequest { id, .. } = ev.payload {
+        if let AgentEventPayload::ToolPermissionRequest {
+            id,
+            permission_intent,
+            ..
+        } = ev.payload
+        {
             let agent = ev.agent_name.unwrap().agent;
-            client.respond_permission(&agent, &id, false).await;
+            let digest = permission_intent.map(|intent| intent.intent_digest());
+            client.respond_permission(&agent, &id, digest, false).await;
         }
     });
     tokio::time::sleep(Duration::from_millis(50)).await;
@@ -50,7 +56,7 @@ async fn ui_deny_returns_false_to_agent() {
     let result = agent_conn
         .send_request(
             methods::AGENT_PERMISSION.name,
-            json!({"tool_call_id": "deny-1", "tool_name": "Bash", "tool_input": {}}),
+            crate::permission_request("deny-1", "Bash", json!({})),
         )
         .await
         .unwrap();
@@ -73,7 +79,7 @@ async fn no_ui_fast_denies_permission() {
         Duration::from_secs(2),
         agent_conn.send_request(
             methods::AGENT_PERMISSION.name,
-            json!({"tool_call_id": "no-ui", "tool_name": "Bash", "tool_input": {}}),
+            crate::permission_request("no-ui", "Bash", json!({})),
         ),
     )
     .await
@@ -100,7 +106,7 @@ async fn duplicate_tool_call_id_preserves_old_pending_and_rejects_new_rpc() {
         conn1
             .send_request(
                 methods::AGENT_PERMISSION.name,
-                json!({"tool_call_id": "dup", "tool_name": "Bash", "tool_input": {"v": 1}}),
+                crate::permission_request("dup", "Bash", json!({"v": 1})),
             )
             .await
     });
@@ -111,7 +117,7 @@ async fn duplicate_tool_call_id_preserves_old_pending_and_rejects_new_rpc() {
         conn2
             .send_request(
                 methods::AGENT_PERMISSION.name,
-                json!({"tool_call_id": "dup", "tool_name": "Bash", "tool_input": {"v": 2}}),
+                crate::permission_request("dup", "Bash", json!({"v": 2})),
             )
             .await
     });
@@ -122,9 +128,9 @@ async fn duplicate_tool_call_id_preserves_old_pending_and_rejects_new_rpc() {
         "the original request must remain pending"
     );
 
-    let interaction_id = crate::permission_interaction_id(&hub, "agent-1", "dup").await;
+    let interaction = crate::permission_interaction(&hub, "agent-1", "dup").await;
     ui.client
-        .respond_permission("agent-1", &interaction_id, true)
+        .respond_permission("agent-1", &interaction.id, Some(interaction.digest), true)
         .await;
     let result1 = req1.await.unwrap().unwrap();
     assert_eq!(result1["allow"], true);
@@ -150,7 +156,7 @@ async fn cross_agent_same_tool_call_id_isolated() {
         async move {
             c.send_request(
                 methods::AGENT_PERMISSION.name,
-                json!({"tool_call_id": "shared", "tool_name": "Bash", "tool_input": {}}),
+                crate::permission_request("shared", "Bash", json!({})),
             )
             .await
         }
@@ -160,7 +166,7 @@ async fn cross_agent_same_tool_call_id_isolated() {
         async move {
             c.send_request(
                 methods::AGENT_PERMISSION.name,
-                json!({"tool_call_id": "shared", "tool_name": "Bash", "tool_input": {}}),
+                crate::permission_request("shared", "Bash", json!({})),
             )
             .await
         }
@@ -179,13 +185,23 @@ async fn cross_agent_same_tool_call_id_isolated() {
         );
     }
 
-    let interaction_a = crate::permission_interaction_id(&hub, "agent-a", "shared").await;
-    let interaction_b = crate::permission_interaction_id(&hub, "agent-b", "shared").await;
+    let interaction_a = crate::permission_interaction(&hub, "agent-a", "shared").await;
+    let interaction_b = crate::permission_interaction(&hub, "agent-b", "shared").await;
     ui.client
-        .respond_permission("agent-a", &interaction_a, true)
+        .respond_permission(
+            "agent-a",
+            &interaction_a.id,
+            Some(interaction_a.digest),
+            true,
+        )
         .await;
     ui.client
-        .respond_permission("agent-b", &interaction_b, false)
+        .respond_permission(
+            "agent-b",
+            &interaction_b.id,
+            Some(interaction_b.digest),
+            false,
+        )
         .await;
 
     let resp_a = req_a.await.unwrap().unwrap();

@@ -4,8 +4,8 @@
 async fn hub_control_reaches_target_agent() {
     let (hub, _event_rx) = make_hub();
 
-    let (sender, sr) = hub_server::connect_local(hub.clone(), "sender");
-    spawn_mock_agent(sender.clone(), sr);
+    let ui = connect_control_ui(hub.clone()).await;
+    let sender = ui.client.connection().clone();
 
     // Target: capture method of incoming request
     let (target_conn, target_rx) = hub_server::connect_local(hub.clone(), "target");
@@ -37,8 +37,8 @@ async fn hub_control_reaches_target_agent() {
 #[tokio::test]
 async fn hub_control_normalizes_legacy_queue_acknowledgement() {
     let (hub, _event_rx) = make_hub();
-    let (sender, sender_rx) = hub_server::connect_local(hub.clone(), "sender");
-    spawn_mock_agent(sender.clone(), sender_rx);
+    let ui = connect_control_ui(hub.clone()).await;
+    let sender = ui.client.connection().clone();
 
     let (target_conn, mut target_rx) = hub_server::connect_local(hub, "legacy-target");
     tokio::spawn(async move {
@@ -69,8 +69,8 @@ async fn hub_control_normalizes_legacy_queue_acknowledgement() {
 async fn hub_control_timeout_preserves_connection_and_late_application() {
     let (hub, _event_rx) = make_hub();
 
-    let (sender, sender_rx) = hub_server::connect_local(hub.clone(), "sender");
-    spawn_mock_agent(sender.clone(), sender_rx);
+    let ui = connect_control_ui(hub.clone()).await;
+    let sender = ui.client.connection().clone();
 
     let (target_conn, mut target_rx) = hub_server::connect_local(hub, "slow-target");
     let target_for_responses = target_conn.clone();
@@ -143,8 +143,8 @@ async fn hub_control_timeout_preserves_connection_and_late_application() {
 async fn hub_interrupt_reaches_target_agent() {
     let (hub, _event_rx) = make_hub();
 
-    let (sender, sr) = hub_server::connect_local(hub.clone(), "sender");
-    spawn_mock_agent(sender.clone(), sr);
+    let ui = connect_control_ui(hub.clone()).await;
+    let sender = ui.client.connection().clone();
 
     // Target: acknowledge only after the interrupt request is observed.
     let (target_conn, target_rx) = hub_server::connect_local(hub.clone(), "target");
@@ -174,8 +174,8 @@ async fn hub_interrupt_reaches_target_agent() {
 #[tokio::test]
 async fn hub_interrupt_reports_closed_target_transport() {
     let (hub, _event_rx) = make_hub();
-    let (sender, sr) = hub_server::connect_local(hub.clone(), "sender");
-    spawn_mock_agent(sender.clone(), sr);
+    let ui = connect_control_ui(hub.clone()).await;
+    let sender = ui.client.connection().clone();
     let (transport, _peer) = loopal_ipc::duplex_pair();
     let (target, _rx) = Connection::new(transport).into_listening();
     hub.lock()

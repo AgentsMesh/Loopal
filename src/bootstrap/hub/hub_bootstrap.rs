@@ -20,14 +20,15 @@ pub async fn prepare_hub_and_agent_with_alive(
     config: &loopal_config::ResolvedConfig,
     alive_tx: Option<oneshot::Sender<HubAliveInfo>>,
 ) -> anyhow::Result<RootPending> {
-    let bs = HubBuilt::new(cwd, config).await;
+    let bs = HubBuilt::new(cwd, config).await?;
     let bs = bs.bind_listener().await?;
     if let Some(tx) = alive_tx {
         let _ = tx.send(bs.alive_info());
     }
     let bs = bs.register_handlers(cli).await?;
     let bs = bs.spawn_agent_process().await?;
-    Ok(bs.start_event_loop())
+    let bs = bs.start_event_loop();
+    bs.install_workflow_runtime(&config.settings.workflow).await
 }
 
 pub async fn start_prepared_hub_and_agent(
@@ -38,7 +39,7 @@ pub async fn start_prepared_hub_and_agent(
     resume: Option<&str>,
 ) -> anyhow::Result<BootstrapContext> {
     let params = build_start_params(cli, cwd, config, resume);
-    let bs = prepared.start_root_agent(&params).await?;
+    let bs = prepared.start_root_agent(params).await?;
     Ok(bs.into_context())
 }
 
@@ -56,6 +57,11 @@ fn build_start_params(
     };
     let lifecycle_str = if cli.child.ephemeral {
         Some("ephemeral".to_string())
+    } else if prompt.is_some()
+        && config.settings.workflow.execution_enabled
+        && config.settings.workflow.policy != loopal_config::OrchestrationPolicy::Off
+    {
+        Some("workflow_ephemeral".to_string())
     } else {
         None
     };
@@ -74,6 +80,11 @@ fn build_start_params(
         permission_mode,
         decision_mode: cli.child.decision.clone(),
         no_sandbox: cli.child.no_sandbox,
+        sandbox_policy: Some(config.settings.sandbox.policy.to_string()),
+        session_id: None,
+        workflow_permission_causation: None,
+        workflow_attempt_capability: None,
+        workflow_completion_result_limit: None,
         resume: resume.map(String::from),
         lifecycle: lifecycle_str,
         agent_type: None,
@@ -81,3 +92,7 @@ fn build_start_params(
         fork_context: None,
     }
 }
+
+#[cfg(test)]
+#[path = "tests/hub_bootstrap_tests.rs"]
+mod tests;

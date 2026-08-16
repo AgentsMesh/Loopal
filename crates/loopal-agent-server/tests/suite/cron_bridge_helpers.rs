@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 
 use loopal_error::{LoopalError, Result};
-use loopal_protocol::AgentEventPayload;
+use loopal_protocol::{AgentEventPayload, PermissionIntentRequest};
 use loopal_runtime::frontend::traits::EventEmitter;
 
 pub struct CaptureEmitter {
@@ -56,9 +56,7 @@ impl loopal_runtime::frontend::traits::AgentFrontend for CaptureFrontend {
     }
     async fn request_permission(
         &self,
-        _id: &str,
-        _name: &str,
-        _input: &serde_json::Value,
+        _request: &PermissionIntentRequest,
     ) -> loopal_tool_api::PermissionDecision {
         loopal_tool_api::PermissionDecision::Allow
     }
@@ -106,9 +104,7 @@ impl loopal_runtime::frontend::traits::AgentFrontend for FailingFrontend {
     }
     async fn request_permission(
         &self,
-        _id: &str,
-        _name: &str,
-        _input: &serde_json::Value,
+        _request: &PermissionIntentRequest,
     ) -> loopal_tool_api::PermissionDecision {
         loopal_tool_api::PermissionDecision::Allow
     }

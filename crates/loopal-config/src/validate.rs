@@ -19,6 +19,7 @@ const KNOWN_KEYS: &[&str] = &[
     "compaction",
     "images",
     "bg_tasks",
+    "workflow",
 ];
 
 pub fn warn_unknown_keys(merged: &serde_json::Value) {

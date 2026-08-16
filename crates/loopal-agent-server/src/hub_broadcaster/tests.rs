@@ -44,6 +44,31 @@ async fn critical_broadcast_propagates_delivery_failure() {
 }
 
 #[tokio::test]
+async fn delivery_worker_handles_cancelled_and_best_effort_failures() {
+    let session_ref = Arc::new(tokio::sync::RwLock::new(session()));
+    let redaction_seed = FinalSinkRedactionSeed::new();
+    let (delivery_tx, delivery_rx) = tokio::sync::mpsc::unbounded_channel();
+    let (completion_tx, completion_rx) = tokio::sync::oneshot::channel();
+    drop(completion_rx);
+
+    delivery_tx
+        .send(DeliveryRequest {
+            event: AgentEvent::for_agent(None, stream("cancelled critical")),
+            completion: Some(completion_tx),
+        })
+        .unwrap();
+    delivery_tx
+        .send(DeliveryRequest {
+            event: AgentEvent::for_agent(None, stream("failed best effort")),
+            completion: None,
+        })
+        .unwrap();
+    drop(delivery_tx);
+
+    delivery_loop(session_ref, delivery_rx, redaction_seed).await;
+}
+
+#[tokio::test]
 async fn try_broadcast_queues_during_session_lock_contention_and_stays_ordered() {
     let session = session();
     let (peer, server) = loopal_ipc::duplex_pair();

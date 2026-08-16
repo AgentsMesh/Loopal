@@ -40,8 +40,18 @@ pub async fn run_tui(
     let mut terminal = Terminal::new(backend)?;
     let events = EventHandler::new(agent_event_rx, resync_rx);
 
-    run_tui_loop(&mut terminal, events, &mut app).await?;
+    run_tui_with_terminal(&mut terminal, events, &mut app).await
+}
 
+async fn run_tui_with_terminal<B: Backend>(
+    terminal: &mut Terminal<B>,
+    events: EventHandler,
+    app: &mut App,
+) -> anyhow::Result<ExitInfo>
+where
+    B::Error: Send + Sync + 'static,
+{
+    run_tui_loop(terminal, events, app).await?;
     terminal.show_cursor()?;
     let connection_lost = app.hub_connection_lost.load(Ordering::Relaxed);
     Ok(ExitInfo {
@@ -104,7 +114,9 @@ where
                         break;
                     }
                 }
-                AppEvent::Agent(agent_event) => handle_agent_event(app, *agent_event),
+                AppEvent::Agent(agent_event) => {
+                    should_resync |= handle_agent_event(app, *agent_event)
+                }
                 AppEvent::Paste(result) => paste::apply_paste_result(app, result),
                 AppEvent::Resync => should_resync = true,
                 AppEvent::Resize(_, _) | AppEvent::Tick => {}
@@ -125,11 +137,18 @@ where
     Ok(())
 }
 
-fn handle_agent_event(app: &mut App, agent_event: AgentEvent) {
-    if let AgentEventPayload::SessionResumed { ref session_id, .. } = agent_event.payload {
+fn handle_agent_event(app: &mut App, agent_event: AgentEvent) -> bool {
+    let is_root_event = agent_event.agent_name.as_ref().is_none_or(|address| {
+        address.is_local() && address.agent == loopal_protocol::ROOT_AGENT_NAME
+    });
+    if is_root_event
+        && let AgentEventPayload::SessionResumed { ref session_id, .. } = agent_event.payload
+    {
         load_resumed_display(app, session_id);
     }
-    if let AgentEventPayload::SessionResumeWarnings { ref warnings, .. } = agent_event.payload {
+    if is_root_event
+        && let AgentEventPayload::SessionResumeWarnings { ref warnings, .. } = agent_event.payload
+    {
         for w in warnings {
             push_session_warning(app, w);
         }
@@ -138,10 +157,11 @@ fn handle_agent_event(app: &mut App, agent_event: AgentEvent) {
         agent_event.payload,
         AgentEventPayload::McpStatusReport { .. }
     );
-    app.dispatch_event(agent_event);
+    let resync_required = app.dispatch_event(agent_event);
     if is_mcp_report {
         refresh_mcp_page(app);
     }
+    resync_required
 }
 
 fn refresh_mcp_page(app: &mut App) {
@@ -154,3 +174,11 @@ fn refresh_mcp_page(app: &mut App) {
         state.action_menu = None;
     }
 }
+
+#[cfg(test)]
+#[path = "tui_loop_tests.rs"]
+mod tests;
+
+#[cfg(test)]
+#[path = "tui_loop_event_tests.rs"]
+mod event_tests;

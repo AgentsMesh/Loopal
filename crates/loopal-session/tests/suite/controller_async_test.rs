@@ -23,14 +23,14 @@ fn make_controller() -> (
 #[tokio::test]
 async fn respond_permission_local_sends_true() {
     let (ctrl, _, mut perm_rx) = make_controller();
-    ctrl.respond_permission("main", "tc-1", true).await;
+    ctrl.respond_permission("main", "tc-1", None, true).await;
     assert_eq!(perm_rx.recv().await, Some(true));
 }
 
 #[tokio::test]
 async fn respond_permission_local_sends_false() {
     let (ctrl, _, mut perm_rx) = make_controller();
-    ctrl.respond_permission("main", "tc-1", false).await;
+    ctrl.respond_permission("main", "tc-1", None, false).await;
     assert_eq!(perm_rx.recv().await, Some(false));
 }
 
@@ -91,7 +91,7 @@ async fn hub_respond_permission_sends_request() {
     let hub_client = Arc::new(HubClient::new(conn));
     let ctrl = SessionController::with_hub(hub_client);
     let _handle = tokio::spawn(async move {
-        ctrl.respond_permission("main", "tc-42", true).await;
+        ctrl.respond_permission("main", "tc-42", None, true).await;
     });
     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 }

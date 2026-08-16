@@ -36,12 +36,28 @@ fn only_goal_continuation_is_goal_continuation() {
         content: "c".into(),
     };
     let resume = TurnTrigger::Resume;
+    let workflow = TurnTrigger::WorkflowResult {
+        session_id: "session".into(),
+        run_id: "wrun_one".into(),
+        terminal_revision: 1,
+        payload_digest: format!("sha256:{}", "0".repeat(64)),
+        state: "succeeded".into(),
+        content: "done".into(),
+    };
 
     assert!(goal.is_goal_continuation());
-    for t in [user, cron, agent, channel, hook, resume] {
+    for t in [user, cron, agent, channel, hook, workflow.clone(), resume] {
         assert!(
             !t.is_goal_continuation(),
             "non-GoalContinuation trigger must not be flagged: {t:?}"
         );
     }
+
+    let encoded = serde_json::to_value(&workflow).unwrap();
+    let decoded: TurnTrigger = serde_json::from_value(encoded).unwrap();
+    assert!(matches!(
+        decoded,
+        TurnTrigger::WorkflowResult { payload_digest, .. }
+            if payload_digest.starts_with("sha256:")
+    ));
 }

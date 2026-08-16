@@ -10,53 +10,55 @@ pub(crate) fn register(
     store: &Arc<BackgroundTaskStore>,
     handle: ProcessHandle,
     command: &str,
-) -> Option<(String, PathBuf)> {
-    let data = handle.0.downcast::<TimedOutProcessData>().ok()?;
+) -> Result<(String, PathBuf), &'static str> {
+    let data = handle
+        .0
+        .downcast::<TimedOutProcessData>()
+        .map_err(|_| "timed-out process adoption failed")?;
     let TimedOutProcessData {
         spawned,
         log_path,
-        stdout_head_tail,
-        stderr_buf,
-        drainers,
+        capture_state,
+        capture_task,
     } = *data;
-    let desc = format!("(auto-bg) {}", truncate_cmd_for_desc(command, 60));
+    let description = format!("(auto-bg) {}", truncate_cmd_for_desc(command, 60));
     let id = store.spawn_process_task(
         spawned,
         log_path.clone(),
-        stdout_head_tail,
-        stderr_buf,
-        drainers,
-        &desc,
+        capture_state,
+        capture_task,
+        &description,
     );
-    Some((id, log_path))
+    Ok((id, log_path))
 }
 
 pub(crate) fn register_spawned(
     store: &Arc<BackgroundTaskStore>,
     handle: ProcessHandle,
-    desc: &str,
-) -> Option<(String, PathBuf)> {
-    let data = handle.0.downcast::<SpawnedBackgroundData>().ok()?;
+    description: &str,
+) -> Result<(String, PathBuf), &'static str> {
+    let data = handle
+        .0
+        .downcast::<SpawnedBackgroundData>()
+        .map_err(|_| "background process adoption failed")?;
     let SpawnedBackgroundData {
         spawned,
         log_path,
-        head_tail,
-        stderr_buf,
-        drainers,
+        capture_state,
+        capture_task,
     } = *data;
     let id = store.spawn_process_task(
         spawned,
         log_path.clone(),
-        head_tail,
-        stderr_buf,
-        drainers,
-        desc,
+        capture_state,
+        capture_task,
+        description,
     );
-    Some((id, log_path))
+    Ok((id, log_path))
 }
 
-fn truncate_cmd_for_desc(cmd: &str, max: usize) -> String {
-    let single_line: String = cmd.split_whitespace().collect::<Vec<_>>().join(" ");
+fn truncate_cmd_for_desc(command: &str, max: usize) -> String {
+    let single_line = command.split_whitespace().collect::<Vec<_>>().join(" ");
     if single_line.len() <= max {
         return single_line;
     }
@@ -66,3 +68,7 @@ fn truncate_cmd_for_desc(cmd: &str, max: usize) -> String {
     }
     format!("{}…", &single_line[..end])
 }
+
+#[cfg(test)]
+#[path = "bg_convert_boundary_tests.rs"]
+mod boundary_tests;

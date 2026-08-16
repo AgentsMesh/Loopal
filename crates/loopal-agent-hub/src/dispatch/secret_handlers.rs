@@ -6,114 +6,167 @@ use serde_json::Value;
 use tokio::sync::Mutex;
 
 use loopal_hub_vault::{AuditContext, HubVaultService};
+use loopal_output_guard::FinalSinkRedactionSeed;
 use loopal_protocol::{
     SecretCaller, SecretGetRequest, SecretGetResponse, SecretHealthRequest, SecretHealthResponse,
     SecretIpcError, SecretListNamesRequest, SecretListNamesResponse,
+    WorkflowProviderSecretGetRequest,
 };
 use loopal_secret_client::{ExposeSecret, SecretError};
 
 use crate::hub::Hub;
-use crate::spawn_registry::SpawnRegistry;
+use crate::request_principal::AgentPrincipal;
 
 pub async fn handle_secret_get(
     hub: &Arc<Mutex<Hub>>,
     params: Value,
-    from_agent: &str,
+    agent: &AgentPrincipal,
 ) -> Result<Value, String> {
-    let req: SecretGetRequest =
+    let request: SecretGetRequest =
         serde_json::from_value(params).map_err(|e| format!("invalid secret_get params: {e}"))?;
-    let (vault, spawn_registry) = resolve_deps(hub).await?;
-    verify_caller(&spawn_registry, from_agent, &req.cwd, Some(&req.caller)).map_err(map_err)?;
-    let cwd = PathBuf::from(&req.cwd);
+    verify_caller(agent, &request.caller).map_err(map_err)?;
+    let (vault, cwd, redaction_seed) = authorize_cwd(hub, agent, &request.cwd).await?;
     let plain = vault
-        .get(&cwd, &req.name, audit_ctx(&req.caller))
+        .get(&cwd, &request.name, audit_ctx(agent, &request.caller))
         .await
         .map_err(map_err)?;
+    redaction_seed
+        .observe(&request.name, plain.clone())
+        .map_err(|_| "final-sink redaction seed unavailable".to_string())?;
     serde_json::to_value(SecretGetResponse {
         plaintext: plain.expose_secret().to_string(),
     })
-    .map_err(|e| e.to_string())
+    .map_err(|error| error.to_string())
+}
+
+pub async fn handle_workflow_provider_secret_get(
+    hub: &Arc<Mutex<Hub>>,
+    params: Value,
+    agent: &AgentPrincipal,
+) -> Result<Value, String> {
+    let request: WorkflowProviderSecretGetRequest = serde_json::from_value(params)
+        .map_err(|error| format!("invalid workflow provider secret params: {error}"))?;
+    verify_workflow_provider_authority(hub, agent, &request).await?;
+    let caller = SecretCaller {
+        agent_name: agent.execution.address.agent.clone(),
+        depth: agent.depth,
+        tool_name: Some("workflow_provider_config".into()),
+    };
+    let (vault, cwd, redaction_seed) = authorize_cwd(hub, agent, &request.cwd).await?;
+    let plain = vault
+        .get(&cwd, &request.name, audit_ctx(agent, &caller))
+        .await
+        .map_err(map_err)?;
+    redaction_seed
+        .observe(&request.name, plain.clone())
+        .map_err(|_| "final-sink redaction seed unavailable".to_string())?;
+    serde_json::to_value(SecretGetResponse {
+        plaintext: plain.expose_secret().to_string(),
+    })
+    .map_err(|error| error.to_string())
 }
 
 pub async fn handle_secret_list_names(
     hub: &Arc<Mutex<Hub>>,
     params: Value,
-    from_agent: &str,
+    agent: &AgentPrincipal,
 ) -> Result<Value, String> {
-    let req: SecretListNamesRequest = serde_json::from_value(params)
+    let request: SecretListNamesRequest = serde_json::from_value(params)
         .map_err(|e| format!("invalid secret_list_names params: {e}"))?;
-    let (vault, spawn_registry) = resolve_deps(hub).await?;
-    verify_caller(&spawn_registry, from_agent, &req.cwd, None).map_err(map_err)?;
-    let names = vault
-        .list_names(&PathBuf::from(&req.cwd))
-        .await
-        .map_err(map_err)?;
-    serde_json::to_value(SecretListNamesResponse { names }).map_err(|e| e.to_string())
+    let (vault, cwd, _) = authorize_cwd(hub, agent, &request.cwd).await?;
+    let names = vault.list_names(&cwd).await.map_err(map_err)?;
+    serde_json::to_value(SecretListNamesResponse { names }).map_err(|error| error.to_string())
 }
 
-pub async fn handle_secret_health(hub: &Arc<Mutex<Hub>>, params: Value) -> Result<Value, String> {
-    let req: SecretHealthRequest =
+pub async fn handle_secret_health(
+    hub: &Arc<Mutex<Hub>>,
+    params: Value,
+    agent: &AgentPrincipal,
+) -> Result<Value, String> {
+    let request: SecretHealthRequest =
         serde_json::from_value(params).map_err(|e| format!("invalid secret_health params: {e}"))?;
-    let (vault, _) = resolve_deps(hub).await?;
-    let names = vault
-        .list_names(&PathBuf::from(&req.cwd))
-        .await
-        .map_err(map_err)?;
-    let ts = SystemTime::now()
+    let (vault, cwd, _) = authorize_cwd(hub, agent, &request.cwd).await?;
+    vault.list_names(&cwd).await.map_err(map_err)?;
+    let last_op_ts = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
-        .map(|d| d.as_secs())
+        .map(|duration| duration.as_secs())
         .unwrap_or(0);
-    let _ = names;
     serde_json::to_value(SecretHealthResponse {
         vault_count: 1,
         default_vault: "default".to_string(),
-        last_op_ts: ts,
+        last_op_ts,
     })
-    .map_err(|e| e.to_string())
+    .map_err(|error| error.to_string())
 }
 
-async fn resolve_deps(
+async fn authorize_cwd(
     hub: &Arc<Mutex<Hub>>,
-) -> Result<(Arc<HubVaultService>, Arc<SpawnRegistry>), String> {
-    let h = hub.lock().await;
-    let vault = h
+    agent: &AgentPrincipal,
+    requested_cwd: &str,
+) -> Result<(Arc<HubVaultService>, PathBuf, FinalSinkRedactionSeed), String> {
+    let requested = PathBuf::from(requested_cwd);
+    let locked = hub.lock().await;
+    if !locked.registry.owns_active_lease(&agent.execution)
+        || !locked
+            .spawn_registry
+            .verify_vault_access_exact(&agent.execution, &requested)
+    {
+        return Err(map_err(SecretError::PermissionDenied));
+    }
+    let vault = locked
         .vault_service
         .clone()
         .ok_or_else(|| "vault service not initialized in Hub".to_string())?;
-    let spawn_registry = h.spawn_registry.clone();
-    Ok((vault, spawn_registry))
+    Ok((vault, requested, locked.final_sink_redaction_seed()))
 }
 
-fn verify_caller(
-    spawn_registry: &SpawnRegistry,
-    from_agent: &str,
-    cwd: &str,
-    caller: Option<&SecretCaller>,
-) -> Result<(), SecretError> {
-    if let Some(c) = caller
-        && c.agent_name != from_agent
-    {
-        return Err(SecretError::PermissionDenied);
+async fn verify_workflow_provider_authority(
+    hub: &Arc<Mutex<Hub>>,
+    agent: &AgentPrincipal,
+    request: &WorkflowProviderSecretGetRequest,
+) -> Result<(), String> {
+    let locked = hub.lock().await;
+    let facts = locked
+        .registry
+        .runtime_facts(&agent.execution)
+        .filter(|_| locked.registry.owns_active_lease(&agent.execution))
+        .ok_or_else(|| map_err(SecretError::PermissionDenied))?;
+    let valid = facts.origin == crate::types::AgentOrigin::ManagedChild
+        && facts.depth > 0
+        && facts.parent.is_some()
+        && agent.workflow_permission_causation.as_ref() == Some(&request.causation)
+        && facts.workflow_permission_causation.as_ref() == Some(&request.causation)
+        && facts
+            .workflow_attempt_capability_digest
+            .is_some_and(|digest| request.capability.matches_digest(digest));
+    if valid {
+        Ok(())
+    } else {
+        Err(map_err(SecretError::PermissionDenied))
     }
-    if !spawn_registry.verify_vault_access(from_agent, std::path::Path::new(cwd)) {
+}
+
+fn verify_caller(agent: &AgentPrincipal, caller: &SecretCaller) -> Result<(), SecretError> {
+    if caller.agent_name != agent.execution.address.agent || caller.depth != agent.depth {
         return Err(SecretError::PermissionDenied);
     }
     Ok(())
 }
 
-fn audit_ctx(caller: &SecretCaller) -> AuditContext {
+fn audit_ctx(agent: &AgentPrincipal, caller: &SecretCaller) -> AuditContext {
     AuditContext {
+        session_id: agent.session_id.clone(),
         agent_name: caller.agent_name.clone(),
         depth: caller.depth,
         tool_name: caller.tool_name.clone(),
     }
 }
 
-fn map_err(e: SecretError) -> String {
-    let ipc_err = match e {
+fn map_err(error: SecretError) -> String {
+    let error = match error {
         SecretError::SecretNotFound(name) => SecretIpcError::SecretNotFound { name },
-        SecretError::VaultNotFound(p) => SecretIpcError::VaultNotFound {
-            cwd: p.display().to_string(),
+        SecretError::VaultNotFound(path) => SecretIpcError::VaultNotFound {
+            cwd: path.display().to_string(),
         },
         SecretError::PermissionDenied => SecretIpcError::PermissionDenied,
         SecretError::DecryptFailed(detail) => SecretIpcError::DecryptFailed { detail },
@@ -121,5 +174,17 @@ fn map_err(e: SecretError) -> String {
         SecretError::TemplateParse(detail) => SecretIpcError::TemplateParse { detail },
         SecretError::Ipc(detail) => SecretIpcError::Ipc { detail },
     };
-    serde_json::to_string(&ipc_err).unwrap_or_else(|e| format!("ipc_encode_failed: {e}"))
+    serde_json::to_string(&error).unwrap_or_else(|e| format!("ipc_encode_failed: {e}"))
 }
+
+#[cfg(test)]
+#[path = "secret_handler_tests.rs"]
+mod tests;
+
+#[cfg(test)]
+#[path = "secret_handler_success_tests.rs"]
+mod success_tests;
+
+#[cfg(test)]
+#[path = "secret_provider_handler_tests.rs"]
+mod provider_tests;

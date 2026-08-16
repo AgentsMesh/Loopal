@@ -7,10 +7,12 @@ use loopal_tool_api::backend_types::{
     EnvOverride, ExecResult, FetchResult, FileInfo, GlobOptions, GlobSearchResult, GrepOptions,
     GrepSearchResult, ImageResult, LsResult, ReadResult, WriteResult,
 };
-use loopal_tool_api::{Backend, BatchOp, BatchOutcome, ExecOutcome, OutputTail, ResolvedPath};
+use loopal_tool_api::{
+    Backend, BatchOp, BatchOutcome, ExecOutcome, OutputTail, ProcessOutputSanitizer, ResolvedPath,
+};
 
 use crate::local::LocalBackend;
-use crate::{batch, fs, image, net, path, platform, search, shell, shell_stream};
+use crate::{batch, fs, image, net, path, platform, search};
 
 #[async_trait]
 impl Backend for LocalBackend {
@@ -103,15 +105,18 @@ impl Backend for LocalBackend {
         timeout: Duration,
         env: &EnvOverride,
     ) -> Result<ExecResult, ToolIoError> {
-        shell::exec_command(
-            self.cwd.as_path(),
-            self.policy.as_ref(),
-            command,
-            env,
-            timeout,
-            &self.session_id,
-        )
-        .await
+        self.exec_guarded_inner(command, timeout, env, None).await
+    }
+
+    async fn exec_guarded(
+        &self,
+        command: &str,
+        timeout: Duration,
+        env: &EnvOverride,
+        sanitizer: Option<Arc<dyn ProcessOutputSanitizer>>,
+    ) -> Result<ExecResult, ToolIoError> {
+        self.exec_guarded_inner(command, timeout, env, sanitizer)
+            .await
     }
 
     async fn exec_streaming(
@@ -121,16 +126,20 @@ impl Backend for LocalBackend {
         env: &EnvOverride,
         tail: Arc<OutputTail>,
     ) -> Result<ExecOutcome, ToolIoError> {
-        shell_stream::exec_command_streaming(
-            self.cwd.as_path(),
-            self.policy.as_ref(),
-            command,
-            env,
-            timeout,
-            tail,
-            &self.session_id,
-        )
-        .await
+        self.exec_streaming_guarded_inner(command, timeout, env, tail, None)
+            .await
+    }
+
+    async fn exec_streaming_guarded(
+        &self,
+        command: &str,
+        timeout: Duration,
+        env: &EnvOverride,
+        tail: Arc<OutputTail>,
+        sanitizer: Option<Arc<dyn ProcessOutputSanitizer>>,
+    ) -> Result<ExecOutcome, ToolIoError> {
+        self.exec_streaming_guarded_inner(command, timeout, env, tail, sanitizer)
+            .await
     }
 
     async fn exec_background(
@@ -138,15 +147,17 @@ impl Backend for LocalBackend {
         command: &str,
         env: &EnvOverride,
     ) -> Result<ProcessHandle, ToolIoError> {
-        let data = shell::exec_background(
-            self.cwd.as_path(),
-            self.policy.as_ref(),
-            command,
-            env,
-            &self.session_id,
-        )
-        .await?;
-        Ok(ProcessHandle(Box::new(data)))
+        self.exec_background_guarded_inner(command, env, None).await
+    }
+
+    async fn exec_background_guarded(
+        &self,
+        command: &str,
+        env: &EnvOverride,
+        sanitizer: Option<Arc<dyn ProcessOutputSanitizer>>,
+    ) -> Result<ProcessHandle, ToolIoError> {
+        self.exec_background_guarded_inner(command, env, sanitizer)
+            .await
     }
 
     async fn fetch(&self, url: &str) -> Result<FetchResult, ToolIoError> {

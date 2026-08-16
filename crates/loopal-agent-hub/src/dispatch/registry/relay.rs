@@ -16,12 +16,15 @@ pub fn register(b: DispatcherBuilder, hub: Arc<Mutex<Hub>>) -> DispatcherBuilder
     let h = hub.clone();
     let b = b.register_fn(methods::HUB_PERMISSION_RESPONSE.name, move |params, ctx| {
         let h = h.clone();
-        let from = ctx.from.clone();
+        let ui = crate::dispatch::authorization::ui(ctx);
         Box::pin(async move {
-            require_capability(&h, &from, UiCapability::Permission)
-                .await
-                .map_err(string_err_to_rpc)?;
-            handle_permission_response(&h, params)
+            let ui = ui?;
+            if !ui.capabilities.supports(UiCapability::Permission) {
+                return Err(string_err_to_rpc(
+                    "UI connection is not authorized for Permission responses".into(),
+                ));
+            }
+            handle_permission_response(&h, params, &ui)
                 .await
                 .map_err(string_err_to_rpc)
         })
@@ -55,11 +58,14 @@ pub fn register(b: DispatcherBuilder, hub: Arc<Mutex<Hub>>) -> DispatcherBuilder
             })
         },
     );
-    b.register_fn(methods::HUB_REMOTE_RELAY.name, move |_params, _ctx| {
+    b.register_fn(methods::HUB_REMOTE_RELAY.name, move |params, ctx| {
+        let hub = hub.clone();
+        let trusted = crate::dispatch::authorization::trusted_meta(ctx);
         Box::pin(async move {
-            Err(string_err_to_rpc(
-                "remote relay requires an authenticated reverse MetaHub transport".into(),
-            ))
+            let trusted = trusted?;
+            crate::remote_relay::handle(&hub, params, &trusted)
+                .await
+                .map_err(string_err_to_rpc)
         })
     })
 }

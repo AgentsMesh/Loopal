@@ -1,6 +1,7 @@
 pub mod collaboration;
 pub mod cron;
 pub mod task;
+pub mod workflow;
 
 use std::sync::Arc;
 
@@ -23,6 +24,10 @@ pub fn register_all(kernel: &mut Kernel) {
     kernel.register_tool(Box::new(cron::CronCreateTool));
     kernel.register_tool(Box::new(cron::CronDeleteTool));
     kernel.register_tool(Box::new(cron::CronListTool));
+}
+
+pub fn register_workflow(kernel: &Kernel) {
+    workflow::register(kernel);
 }
 
 /// Register the `memory_recall` tool. Called separately because it requires

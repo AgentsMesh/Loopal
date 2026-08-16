@@ -7,6 +7,10 @@ use tokio::sync::oneshot;
 use crate::control::{StopOutcome, StoreError, TaskStatus};
 use crate::store::BackgroundTaskStore;
 
+#[cfg(test)]
+#[path = "ops_tests.rs"]
+mod tests;
+
 pub async fn bg_output(
     store: &Arc<BackgroundTaskStore>,
     process_id: &str,
@@ -29,22 +33,23 @@ pub async fn bg_output(
             }
         };
         if tokio::time::timeout(timeout, wait).await.is_err() {
-            let preview = store
-                .read_task(process_id, |t| t.render_preview())
+            let output = store
+                .read_task(process_id, |task| task.render_output(true))
                 .unwrap_or_default();
-            return ToolResult::success(format!(
-                "{preview}\n[Status: Running (timed out waiting)]"
-            ));
+            return ToolResult::success(output);
         }
     }
 
-    let Some((status, exit_code, preview)) = store.read_task(process_id, |t| {
-        (t.status(), t.exit_code(), t.render_preview())
+    let Some((status, output)) = store.read_task(process_id, |task| {
+        (task.status(), task.render_output(false))
     }) else {
         return ToolResult::error(format!("Process not found: {process_id}"));
     };
-
-    format_status(&preview, status, exit_code)
+    if matches!(status, TaskStatus::Running | TaskStatus::Completed) {
+        ToolResult::success(output)
+    } else {
+        ToolResult::error(output)
+    }
 }
 
 pub async fn bg_stop(store: &Arc<BackgroundTaskStore>, process_id: &str) -> ToolResult {
@@ -80,23 +85,5 @@ pub async fn bg_stop(store: &Arc<BackgroundTaskStore>, process_id: &str) -> Tool
             "Stop ack channel dropped before reply: {process_id}"
         )),
         Err(_) => ToolResult::error(format!("Stop ack timed out: {process_id}")),
-    }
-}
-
-fn format_status(preview: &str, status: TaskStatus, exit_code: Option<i32>) -> ToolResult {
-    match status {
-        TaskStatus::Running => ToolResult::success(format!("{preview}\n[Status: Running]")),
-        TaskStatus::Completed => match exit_code {
-            Some(c) => ToolResult::success(format!("{preview}\n[Completed, exit {c}]")),
-            None => ToolResult::success(format!("{preview}\n[Status: Completed]")),
-        },
-        TaskStatus::Failed => match exit_code {
-            Some(c) => ToolResult::error(format!("{preview}\n[Failed, exit {c}]")),
-            None => ToolResult::error(format!("{preview}\n[Status: Failed]")),
-        },
-        TaskStatus::Killed => match exit_code {
-            Some(c) => ToolResult::error(format!("{preview}\n[Killed, exit {c}]")),
-            None => ToolResult::error(format!("{preview}\n[Status: Killed]")),
-        },
     }
 }

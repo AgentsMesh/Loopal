@@ -14,9 +14,10 @@ pub fn register(b: DispatcherBuilder, hub: Arc<Mutex<Hub>>) -> DispatcherBuilder
     let h = hub.clone();
     let b = b.register_fn(methods::HUB_SPAWN_AGENT.name, move |params, ctx| {
         let h = h.clone();
-        let from = ctx.from.clone();
         Box::pin(async move {
-            handle_spawn_agent(&h, params, &from)
+            let agent = crate::dispatch::authorization::agent(ctx)?;
+            crate::dispatch::authorization::revalidate_agent(&h, &agent).await?;
+            handle_spawn_agent(&h, params, &agent)
                 .await
                 .map_err(string_err_to_rpc)
         })
@@ -24,9 +25,9 @@ pub fn register(b: DispatcherBuilder, hub: Arc<Mutex<Hub>>) -> DispatcherBuilder
     let h = hub.clone();
     let b = b.register_fn(methods::HUB_SPAWN_REMOTE_AGENT.name, move |params, ctx| {
         let h = h.clone();
-        let from = ctx.from.clone();
         Box::pin(async move {
-            handle_spawn_remote_agent(&h, params, &from)
+            let meta = crate::dispatch::authorization::trusted_meta(ctx)?;
+            handle_spawn_remote_agent(&h, params, &meta)
                 .await
                 .map_err(string_err_to_rpc)
         })

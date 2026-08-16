@@ -2,11 +2,12 @@ use std::collections::HashMap;
 
 use loopal_protocol::META_HUB_TOKEN_ENV;
 use tokio::process::Command;
+use zeroize::Zeroizing;
 
 pub(crate) fn stdio_command(
     executable: &str,
     args: &[String],
-    env: &HashMap<String, String>,
+    env: &HashMap<String, Zeroizing<String>>,
 ) -> Command {
     let mut command = Command::new(executable);
     command.args(args);
@@ -24,14 +25,21 @@ mod tests {
     use std::ffi::{OsStr, OsString};
 
     use loopal_protocol::META_HUB_TOKEN_ENV;
+    use zeroize::Zeroizing;
 
     use super::stdio_command;
 
     #[test]
     fn stdio_command_removes_meta_token_after_provider_env() {
         let env = HashMap::from([
-            (META_HUB_TOKEN_ENV.to_string(), "secret".to_string()),
-            ("MCP_KEEP".to_string(), "visible".to_string()),
+            (
+                META_HUB_TOKEN_ENV.to_string(),
+                Zeroizing::new("secret".to_string()),
+            ),
+            (
+                "MCP_KEEP".to_string(),
+                Zeroizing::new("visible".to_string()),
+            ),
         ]);
         let command = stdio_command("server", &[], &env);
         let overrides = command

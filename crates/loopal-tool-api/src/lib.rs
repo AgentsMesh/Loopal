@@ -11,6 +11,8 @@ pub mod output_tail;
 pub mod outstanding_tasks;
 pub mod path;
 pub mod permission;
+pub mod process_output;
+pub mod protected_effect_audit;
 pub mod provider_resolver;
 pub mod schema_normalize;
 pub mod stderr_buf;
@@ -37,14 +39,18 @@ pub use output_tail::OutputTail;
 pub use outstanding_tasks::OutstandingTasksDigest;
 pub use path::ResolvedPath;
 pub use permission::{PermissionDecision, PermissionLevel, PermissionMode};
-pub use provider_resolver::{FetchRefinerPolicy, OneShotChatError, OneShotChatService};
+pub use process_output::{ProcessExecutor, ProcessOutputSanitizer, ProcessOutputStream};
+pub use protected_effect_audit::{NoopProtectedEffectAudit, ProtectedEffectAudit};
+pub use provider_resolver::{
+    FetchRefinerPolicy, OneShotChatEffort, OneShotChatError, OneShotChatOptions, OneShotChatService,
+};
 pub use stderr_buf::{STDERR_CAP_BYTES, StderrCappedBuffer};
-pub use tool::{Tool, ToolDefinition, ToolDispatch, ToolResult};
+pub use tool::{ImageOutputPolicy, Tool, ToolDefinition, ToolDispatch, ToolResult};
 pub use tool_context::ToolContext;
 pub use truncate::{
-    DEFAULT_MAX_OUTPUT_BYTES, DEFAULT_MAX_OUTPUT_LINES, OverflowResult, SEARCH_TIMEOUT_NOTICE,
-    extract_overflow_path, handle_overflow, humanize_size, needs_truncation, save_to_overflow_file,
-    truncate_output, truncate_tail,
+    DEFAULT_MAX_OUTPUT_BYTES, DEFAULT_MAX_OUTPUT_LINES, MAX_OVERFLOW_FILE_BYTES,
+    OverflowPersistenceError, OverflowResult, SEARCH_TIMEOUT_NOTICE, extract_overflow_path,
+    handle_overflow, humanize_size, needs_truncation, truncate_output, truncate_tail,
 };
 pub use truncate_middle::truncate_middle;
 pub use typed_bridge::TypedBridge;

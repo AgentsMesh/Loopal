@@ -29,6 +29,7 @@ impl AgentLoopRunner {
                 &mut chat_params.turns,
                 store.as_ref(),
                 &self.params.session.id,
+                self.params.deps.kernel.settings().images.max_bytes,
             )
             .await?;
         }

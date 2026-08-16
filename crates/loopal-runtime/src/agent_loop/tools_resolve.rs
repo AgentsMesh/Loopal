@@ -1,61 +1,108 @@
-use loopal_provider_api::ContentBlock;
-use loopal_tool_api::PermissionDecision;
+use loopal_protocol::PermissionAuditSource;
+use loopal_tool_api::{PermissionDecision, PermissionLevel};
+
+use super::tool_result_sink::PendingToolResult;
 use loopal_tool_invocation::{CancelCause, ToolResultMetadata};
 use tracing::info;
 
 use super::cancel::TurnCancel;
 use super::runner::AgentLoopRunner;
+use crate::tool_action::PreparedToolAction;
 
 impl AgentLoopRunner {
     pub(super) async fn resolve_pending(
         &self,
-        approved: &mut Vec<(String, String, serde_json::Value)>,
-        denied: &mut Vec<(usize, ContentBlock)>,
-        pending: Vec<(usize, String, String, serde_json::Value)>,
+        approved: &mut Vec<PreparedToolAction>,
+        denied: &mut Vec<(usize, PendingToolResult)>,
+        pending: Vec<(usize, PreparedToolAction)>,
         cancel: &TurnCancel,
     ) -> loopal_error::Result<()> {
         if pending.is_empty() {
             return Ok(());
         }
         self.refresh_decision_context().await;
-        // Human-attention requests are intentionally serialized. The Hub can
-        // track multiple requests, but terminal UIs present one modal at a
-        // time; emitting a whole tool batch concurrently can otherwise hide
-        // all but the last request and strand the remaining RPCs.
-        for (orig_idx, id, name, input) in pending {
-            let decision = if cancel.is_cancelled() {
+        // reason: terminal UIs present one human-attention request at a time.
+        for (original_index, mut action) in pending {
+            let permission =
+                action.permission_request(self.params.workflow_permission_causation.clone())?;
+            let outcome = if cancel.is_cancelled() {
                 None
             } else {
                 let request = self
                     .params
                     .deps
                     .frontend
-                    .request_permission(&id, &name, &input);
+                    .request_permission_outcome(&permission);
                 tokio::pin!(request);
                 tokio::select! {
                     biased;
                     _ = cancel.cancelled() => None,
-                    decision = &mut request => Some(decision),
+                    outcome = &mut request => Some(outcome),
                 }
             };
+            let decision = outcome.as_ref().map(|outcome| outcome.decision);
+            let receipt = outcome
+                .as_ref()
+                .and_then(|outcome| outcome.receipt.as_ref());
+            let hub_audited_allow = if decision == Some(PermissionDecision::Allow) {
+                if let Some(receipt) = receipt {
+                    receipt
+                        .validate_for(&permission.intent_seed)
+                        .map_err(|error| {
+                            loopal_error::LoopalError::Permission(format!(
+                                "permission receipt binding mismatch: {error}"
+                            ))
+                        })?;
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+            if let Some(decision) = decision.filter(|_| !hub_audited_allow) {
+                self.audit_permission_request(
+                    &permission,
+                    decision,
+                    PermissionAuditSource::Frontend,
+                )
+                .await?;
+            }
             if decision == Some(PermissionDecision::Allow) {
-                approved.push((id, name, input));
+                let receipt = outcome.and_then(|outcome| outcome.receipt);
+                if self.params.workflow_permission_causation.is_some()
+                    && action.tool().permission() != PermissionLevel::ReadOnly
+                    && receipt.is_none()
+                {
+                    return Err(loopal_error::LoopalError::Permission(
+                        "workflow effect approval missing Hub permission receipt".into(),
+                    ));
+                }
+                if let Some(receipt) = receipt {
+                    action.set_permission_receipt(receipt);
+                }
+                approved.push(action);
             } else if decision.is_none() {
                 let block = self
-                    .emit_and_block(
-                        &id,
-                        &name,
+                    .pending_tool_result(
+                        action.id(),
+                        action.tool_name(),
                         "Interrupted by user",
                         true,
                         Some(ToolResultMetadata::cancelled(CancelCause::UserInterrupt)),
                     )
                     .await?;
-                denied.push((orig_idx, block));
+                denied.push((original_index, block));
             } else {
-                info!(tool = name.as_str(), decision = "deny", "permission");
-                let msg = format!("Permission denied: tool '{name}' not allowed");
-                let block = self.emit_and_block(&id, &name, msg, true, None).await?;
-                denied.push((orig_idx, block));
+                info!(tool = action.tool_name(), decision = "deny", "permission");
+                let message = format!(
+                    "Permission denied: tool '{}' not allowed",
+                    action.tool_name()
+                );
+                let block = self
+                    .pending_tool_result(action.id(), action.tool_name(), message, true, None)
+                    .await?;
+                denied.push((original_index, block));
             }
         }
         Ok(())

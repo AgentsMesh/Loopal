@@ -12,6 +12,10 @@ mod bridge_edge_test;
 mod bridge_helpers;
 #[path = "suite/build_kernel_depth_test.rs"]
 mod build_kernel_depth_test;
+#[path = "suite/build_kernel_secret_client_test.rs"]
+mod build_kernel_secret_client_test;
+#[path = "suite/build_kernel_workflow_tools_test.rs"]
+mod build_kernel_workflow_tools_test;
 #[path = "suite/control_ack_test.rs"]
 mod control_ack_test;
 #[path = "suite/control_ack_transport.rs"]
@@ -56,8 +60,12 @@ mod observer_join_test;
 mod params_test;
 #[path = "suite/permission_mode_e2e_test.rs"]
 mod permission_mode_e2e_test;
+#[path = "suite/permission_request_support.rs"]
+mod permission_request_support;
 #[path = "suite/prompt_post_test.rs"]
 mod prompt_post_test;
+#[path = "suite/protected_audit_hub.rs"]
+mod protected_audit_hub;
 #[path = "suite/resolve_sessions_root_test.rs"]
 mod resolve_sessions_root_test;
 #[path = "suite/resume_e2e_helpers.rs"]
@@ -66,10 +74,14 @@ mod resume_e2e_helpers;
 mod server_info_test;
 #[path = "suite/server_test.rs"]
 mod server_test;
+#[path = "suite/session_handlers_agent_mode_test.rs"]
+mod session_handlers_agent_mode_test;
 #[path = "suite/session_handlers_factory_test.rs"]
 mod session_handlers_factory_test;
 #[path = "suite/session_hub_storage_test.rs"]
 mod session_hub_storage_test;
+#[path = "suite/session_start_id_test.rs"]
+mod session_start_id_test;
 #[path = "suite/session_start_test.rs"]
 mod session_start_test;
 #[path = "suite/spawn_policy_test.rs"]

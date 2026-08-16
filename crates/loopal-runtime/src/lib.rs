@@ -1,16 +1,28 @@
 pub mod agent_input;
 pub mod agent_loop;
+mod agent_output_guard;
 pub mod fire_hooks;
 pub mod frontend;
 pub mod goal;
 pub mod hydrate;
+mod image_limits;
 pub mod mode;
 pub mod otel_metrics;
 pub mod permission;
 pub mod plan_file;
+mod process_guarded_backend;
+mod process_output_sanitizer;
 pub mod session;
 pub mod session_resume_hook;
+pub mod tool_action;
+mod tool_effect_secrets;
+mod tool_execution_output;
+mod tool_input_validation;
 pub mod tool_pipeline;
+pub mod tool_prepare;
+mod tool_result_guard;
+pub mod workflow_input;
+pub mod workflow_lease;
 
 pub use agent_loop::{
     AgentConfig, AgentDeps, AgentLoopParams, AgentLoopParamsBuilder, InterruptHandle,
@@ -22,6 +34,7 @@ pub use mode::AgentMode;
 pub use permission::check_permission;
 pub use session::SessionManager;
 pub use session_resume_hook::{SessionResumeError, SessionResumeHook};
+pub use workflow_lease::WorkflowLeaseTracker;
 
 /// Build initial context budget from model info + settings cap.
 ///

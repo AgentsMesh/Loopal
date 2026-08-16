@@ -5,7 +5,7 @@ use loopal_config::HarnessConfig;
 use loopal_context::ContextBudget;
 use loopal_kernel::Kernel;
 use loopal_protocol::InterruptSignal;
-use loopal_provider_api::{SharedModelRouter, ThinkingConfig};
+use loopal_provider_api::{SharedModelRouter, SharedThinkingConfig, ThinkingConfig};
 use loopal_storage::Session;
 use loopal_tool_api::{
     FetchRefinerPolicy, MemoryChannel, OneShotChatService, OutstandingTasksDigest, PermissionMode,
@@ -23,6 +23,21 @@ pub enum LifecycleMode {
     #[default]
     Persistent,
     Ephemeral,
+    WorkflowEphemeral,
+}
+
+impl LifecycleMode {
+    pub fn is_persistent(self) -> bool {
+        matches!(self, Self::Persistent)
+    }
+
+    pub fn is_one_shot(self) -> bool {
+        !self.is_persistent()
+    }
+
+    pub fn waits_for_workflow(self) -> bool {
+        matches!(self, Self::WorkflowEphemeral)
+    }
 }
 
 pub struct AgentConfig {
@@ -33,6 +48,10 @@ pub struct AgentConfig {
     pub permission_mode: PermissionMode,
     pub tool_filter: Option<HashSet<String>>,
     pub thinking_config: ThinkingConfig,
+    /// Production shares this configured value with auxiliary LLM services.
+    /// Tests and embedders may omit it and retain the legacy local behavior.
+    pub thinking_state: Option<SharedThinkingConfig>,
+    pub workflow_preset_thinking_recommendation: Option<ThinkingConfig>,
     pub context_tokens_cap: u32,
     pub microcompact_idle: std::time::Duration,
     pub plan_state: Option<PlanModeState>,
@@ -66,6 +85,8 @@ impl Default for AgentConfig {
             permission_mode: PermissionMode::Bypass,
             tool_filter: None,
             thinking_config: ThinkingConfig::Auto,
+            thinking_state: None,
+            workflow_preset_thinking_recommendation: None,
             context_tokens_cap: 0,
             microcompact_idle: std::time::Duration::from_secs(60 * 60),
             plan_state: None,
@@ -78,6 +99,7 @@ pub struct AgentDeps {
     pub frontend: Arc<dyn AgentFrontend>,
     pub session_manager: SessionManager,
     pub decision_context: DecisionContext,
+    pub protected_effect_audit: Arc<dyn loopal_tool_api::ProtectedEffectAudit>,
 }
 
 pub struct InterruptHandle {
@@ -130,6 +152,7 @@ pub struct AgentLoopParams {
     pub rewake_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
     pub message_snapshot: Option<Arc<std::sync::RwLock<Vec<loopal_provider_api::Message>>>>,
     pub scheduler: Option<Arc<loopal_scheduler::CronScheduler>>,
+    pub workflow_permission_causation: Option<loopal_protocol::WorkflowPermissionCausation>,
     /// Hooks invoked after `handle_resume_session` swaps the active
     /// session, so per-session state (cron, task list, etc.) can follow.
     /// Default is empty — runtime callers that don't supply hooks see no
@@ -139,6 +162,10 @@ pub struct AgentLoopParams {
     /// `DecisionModeSwitch` writes it; defaults to `DecisionMode::default()`
     /// (Manual) for callers that don't wire it to their handler chain.
     pub decision_cell: DecisionCell,
+    /// Optional root-input orchestration callback. Kept in runtime as a
+    /// dependency-inverted trait so the runtime does not depend on agent.
+    pub workflow_input_handler: Option<Arc<dyn crate::workflow_input::WorkflowInputHandler>>,
+    pub workflow_lease_tracker: Arc<crate::workflow_lease::WorkflowLeaseTracker>,
 }
 
 impl AgentLoopParams {

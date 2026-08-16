@@ -1,9 +1,12 @@
 import {
   type AgentSummary,
   type SessionView,
+  type WorkflowRunSummary,
 } from '../../../../shared/contracts'
 import { projectMessages } from './loopal-message-projection'
-import { type Topology, type ViewSnapshot } from '../runtime/loopal-wire'
+import {
+  type Topology, type ViewSnapshot, type WireWorkflowRunSummary,
+} from '../runtime/loopal-wire'
 
 export function projectAgent(
   snapshot: ViewSnapshot,
@@ -108,6 +111,12 @@ export function projectSessionView(snapshot: ViewSnapshot): SessionView {
       resourceCount: server.resource_count, promptCount: server.prompt_count,
       errors: server.errors,
     })),
+    workflows: state.agent.name === 'main'
+      ? {
+          active: state.workflows.active.map(projectWorkflowRun),
+          recent: state.workflows.recent.map(projectWorkflowRun),
+        }
+      : { active: [], recent: [] },
     ...(state.thread_goal ? { goal: {
       id: state.thread_goal.goal_id, objective: state.thread_goal.objective,
       status: goalStatus(state.thread_goal.status),
@@ -116,6 +125,19 @@ export function projectSessionView(snapshot: ViewSnapshot): SessionView {
     ...(state.hub_degraded_since_ms !== undefined && state.hub_degraded_since_ms !== null
       ? { hubDegradedSince: new Date(state.hub_degraded_since_ms).toISOString() }
       : {}),
+  }
+}
+
+export function projectWorkflowRun(run: WireWorkflowRunSummary): WorkflowRunSummary {
+  return {
+    id: run.id,
+    runGoal: run.run_goal,
+    state: run.state,
+    revision: run.revision,
+    outputNode: run.output_node,
+    counts: run.counts,
+    createdAt: new Date(run.created_at_unix_ms).toISOString(),
+    updatedAt: new Date(run.updated_at_unix_ms).toISOString(),
   }
 }
 

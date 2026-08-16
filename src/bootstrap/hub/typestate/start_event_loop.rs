@@ -16,6 +16,7 @@ impl AgentSpawned {
             hub_token,
             agent_proc,
             client_conn,
+            workflow_runtime: None,
         }
     }
 }

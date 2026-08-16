@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+export const PermissionIntentDigestSchema = z.string().regex(/^sha256:[0-9a-f]{64}$/)
+
 export const PermissionRequestSchema = z.object({
   id: z.string().min(1),
   sessionId: z.string().min(1),
@@ -10,6 +12,7 @@ export const PermissionRequestSchema = z.object({
   title: z.string().min(1),
   detail: z.string(),
   risk: z.enum(['low', 'medium', 'high']),
+  intentDigest: PermissionIntentDigestSchema.optional(),
   createdAt: z.string().datetime(),
 })
 export type PermissionRequest = z.infer<typeof PermissionRequestSchema>
@@ -57,7 +60,15 @@ export const PermissionResponseInputSchema = z.object({
   generation: z.number().int().positive(),
   agentId: z.string().min(1),
   requestId: z.string().min(1),
+  intentDigest: PermissionIntentDigestSchema.optional(),
   decision: z.enum(['allow_once', 'allow_session', 'deny']),
+}).superRefine((input, context) => {
+  if (input.decision !== 'deny' && !input.intentDigest) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Permission intent digest is required to allow a tool',
+    })
+  }
 })
 export const QuestionResponseInputSchema = z.object({
   sessionId: z.string().min(1),

@@ -69,6 +69,8 @@ async fn run_mock_llm_through_hub(
         &StartAgentParams {
             cwd: fixture.path().to_path_buf(),
             prompt: Some("perform the assigned work".into()),
+            sandbox_policy: None,
+            session_id: None,
             lifecycle: Some("ephemeral".into()),
             ..Default::default()
         },
@@ -172,6 +174,8 @@ async fn hub_control_deadline_preserves_queued_suspend_until_runtime_boundary() 
         &connection,
         &StartAgentParams {
             cwd: fixture.path().to_path_buf(),
+            sandbox_policy: None,
+            session_id: None,
             lifecycle: Some("persistent".into()),
             ..Default::default()
         },

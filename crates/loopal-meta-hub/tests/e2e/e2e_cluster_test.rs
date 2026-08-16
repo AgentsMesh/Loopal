@@ -3,6 +3,7 @@
 //! Boots a real MetaHub + real Hub instances with real agent processes
 //! to verify the complete cross-hub communication stack.
 
+mod cluster_agent_driver;
 mod cluster_cross_hub_spawn_happy_test;
 mod cluster_cross_hub_spawn_test;
 mod cluster_harness;
@@ -12,6 +13,7 @@ use std::time::Duration;
 use loopal_ipc::protocol::methods;
 use serde_json::json;
 
+use cluster_agent_driver::AgentDriver;
 use cluster_harness::{HubHandle, MetaHubHandle};
 
 /// Two-hub cluster: both agents become ready via real IPC.
@@ -63,15 +65,11 @@ async fn cluster_list_hubs_via_agent() {
     let hub_a = HubHandle::boot("hub-a", &meta).await;
     let hub_b = HubHandle::boot("hub-b", &meta).await;
     tokio::time::sleep(Duration::from_millis(200)).await;
+    let caller = AgentDriver::connect(hub_a.hub.clone(), "list-driver").await;
 
-    // Agent on hub-a queries meta/list_hubs via dispatch
-    let result = loopal_agent_hub::dispatch::dispatch_hub_request(
-        &hub_a.hub,
-        methods::META_LIST_HUBS.name,
-        json!({}),
-        "main".into(),
-    )
-    .await;
+    let result = caller
+        .request(methods::META_LIST_HUBS.name, json!({}))
+        .await;
 
     assert!(result.is_ok(), "list_hubs should succeed: {result:?}");
     let hubs = result.unwrap();
@@ -105,13 +103,8 @@ async fn cluster_cross_hub_message_delivery() {
         "content": {"text": "hello from hub-a", "images": []},
         "timestamp": "2026-01-01T00:00:00Z"
     });
-    let result = loopal_agent_hub::dispatch::dispatch_hub_request(
-        &hub_a.hub,
-        methods::HUB_ROUTE.name,
-        envelope,
-        "main".into(),
-    )
-    .await;
+    let caller = AgentDriver::connect(hub_a.hub.clone(), "route-driver").await;
+    let result = caller.request(methods::HUB_ROUTE.name, envelope).await;
 
     assert!(result.is_ok(), "cross-hub route should succeed: {result:?}");
 

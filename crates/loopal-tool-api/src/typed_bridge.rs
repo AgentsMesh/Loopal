@@ -9,7 +9,7 @@ use crate::ToolResult;
 use crate::input_normalize::strip_empty_optionals;
 use crate::permission::PermissionLevel;
 use crate::schema_normalize::normalize_schema;
-use crate::tool::{Tool, ToolDispatch};
+use crate::tool::{ImageOutputPolicy, Tool, ToolDispatch};
 use crate::tool_context::ToolContext;
 use crate::typed_tool::{Params, TypedTool};
 use loopal_error::LoopalError;
@@ -64,6 +64,10 @@ impl<T: TypedTool<P>, P: Params> Tool for TypedBridge<T, P> {
 
     fn dispatch(&self) -> ToolDispatch {
         self.inner.dispatch()
+    }
+
+    fn image_output_policy(&self) -> ImageOutputPolicy {
+        self.inner.image_output_policy()
     }
 
     fn secret_eligible_params(&self) -> &'static [&'static str] {

@@ -8,6 +8,7 @@ rust_library(
     deps = [
         "//crates/loopal-decision-api",
         "//crates/loopal-error",
+        "//crates/loopal-protocol",
         "//crates/loopal-provider-api",
         "//crates/loopal-secret-runtime",
         "//crates/loopal-tool-api",
@@ -28,6 +29,7 @@ rust_test(
     name = "loopal-config-unit-test",
     crate = ":loopal-config",
     edition = "2024",
+    proc_macro_deps = ["@crates//:async-trait"],
     deps = [
         "@crates//:filetime",
         "@crates//:tempfile",

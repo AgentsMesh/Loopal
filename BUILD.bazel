@@ -1,8 +1,32 @@
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("//build_defs/rust:platforms.bzl", "loopal_platforms")
 load("//build_defs/rust:root_binary.bzl", "loopal_binary")
 load("//build_defs/rust:root_tests.bzl", "loopal_root_tests")
 load("//build_defs/web:npm_workspace.bzl", "desktop_npm_workspace")
 load("//tools:version_env.bzl", "version_env")
+
+# Select the compatibility Rust toolchain only for real branch coverage. The
+# ordinary toolchain remains the release compiler (currently Rust 1.94).
+bool_flag(
+    name = "rust_branch_toolchain",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "rust_branch_toolchain_disabled",
+    flag_values = {":rust_branch_toolchain": "false"},
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "rust_branch_toolchain_enabled",
+    flag_values = {
+        ":rust_branch_toolchain": "true",
+        "@rules_rust//rust/toolchain/channel:channel": "stable",
+    },
+    visibility = ["//visibility:public"],
+)
 
 desktop_npm_workspace()
 

@@ -49,7 +49,9 @@ pub use sandbox::{
 };
 pub use settings::{
     CompactionSettings, CwdIsolation, FetchRefinerConfig, ImageSettings, McpServerConfig,
-    McpSharing, MemoryConfig, OpenAiCompatConfig, ProviderConfig, ProvidersConfig, Settings,
+    McpSharing, MemoryConfig, OpenAiCompatConfig, OrchestrationPolicy, ProviderConfig,
+    ProvidersConfig, Settings, WorkflowLimits, WorkflowPlannerProfile, WorkflowPreset,
+    WorkflowPresetResolution, WorkflowSettings, WorkflowTiming,
 };
 pub use skills::{
     ManagedSkill, Skill, delete_global_skill, expand_skill, format_skills_summary,

@@ -75,7 +75,8 @@ function view(patch: Partial<SessionView> = {}): SessionView {
     streamingText: 'partial response before continuation', streamingThinking: '',
     thinkingActive: false, retryBanner: 'Provider unavailable. Retrying in 2.0s (1/6)',
     compactBanner: '⠉ summarizing context — model request',
-    tasks: [], backgroundTasks: [], crons: [], mcpServers: [], ...patch,
+    tasks: [], backgroundTasks: [], crons: [], mcpServers: [],
+    workflows: { active: [], recent: [] }, ...patch,
   }
 }
 

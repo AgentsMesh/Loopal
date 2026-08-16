@@ -24,6 +24,20 @@ async fn test_bash_simple_echo() {
 }
 
 #[tokio::test]
+async fn direct_execute_rejects_command_secret_ref() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tool = make_tool();
+    let ctx = make_ctx(tmp.path());
+
+    let error = tool
+        .execute(json!({"command": "echo <secret_ref:token>"}), &ctx)
+        .await
+        .expect_err("direct execution must not bypass command secret policy");
+
+    assert!(error.to_string().contains("process arguments"));
+}
+
+#[tokio::test]
 async fn test_bash_nonzero_exit_code() {
     let tmp = tempfile::tempdir().unwrap();
     let tool = make_tool();

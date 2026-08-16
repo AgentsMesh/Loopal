@@ -6,6 +6,7 @@ mod register_handlers;
 mod spawn_agent;
 mod start_event_loop;
 mod start_root;
+mod workflow_runtime;
 
 pub mod context;
 pub mod states;
@@ -30,6 +31,7 @@ impl Ready {
             agent_proc: self.agent_proc,
             root_session_id: self.root_session_id,
             hub_token: self.hub_token,
+            workflow_runtime: self.workflow_runtime,
         }
     }
 }

@@ -6,7 +6,6 @@ fn timed_out_empty() -> GrepSearchResult {
         file_matches: vec![],
         total_match_count: 0,
         timed_out: true,
-        overflow_path: None,
     }
 }
 
@@ -24,7 +23,6 @@ fn timed_out_with_match() -> GrepSearchResult {
         }],
         total_match_count: 1,
         timed_out: true,
-        overflow_path: None,
     }
 }
 

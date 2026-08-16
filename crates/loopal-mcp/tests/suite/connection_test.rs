@@ -70,7 +70,7 @@ async fn make_connected_client() -> McpClient {
 async fn test_mock_client_has_peer_info() {
     let client = make_connected_client().await;
     let info = client.peer_info().expect("peer info missing");
-    assert_eq!(info.server_info.name, "mock");
+    assert_eq!(info.server_info.name, "MCP server");
 }
 
 #[tokio::test]

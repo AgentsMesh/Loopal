@@ -5,7 +5,7 @@
 //! for the small per-agent panels this is cheap and avoids holding
 //! the read lock across rendering.
 
-use loopal_protocol::{BgTaskSnapshot, CronJobSnapshot, TaskSnapshot};
+use loopal_protocol::{BgTaskSnapshot, CronJobSnapshot, TaskSnapshot, WorkflowRunsSnapshot};
 
 use super::ViewClient;
 
@@ -25,6 +25,18 @@ impl ViewClient {
             .expect("view client lock poisoned")
             .state()
             .crons
+            .clone()
+    }
+
+    pub fn workflow_snapshots(&self) -> WorkflowRunsSnapshot {
+        if self.agent != loopal_protocol::ROOT_AGENT_NAME {
+            return WorkflowRunsSnapshot::default();
+        }
+        self.inner
+            .read()
+            .expect("view client lock poisoned")
+            .state()
+            .workflows
             .clone()
     }
 

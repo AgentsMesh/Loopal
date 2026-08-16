@@ -11,6 +11,7 @@ pub(super) fn tool_permission_request(
     id: &str,
     name: &str,
     input: &serde_json::Value,
+    permission_intent: Option<&loopal_protocol::PermissionIntent>,
 ) -> MutationEffect {
     let conv = &mut state.agent.conversation;
     conv.flush_streaming();
@@ -18,6 +19,7 @@ pub(super) fn tool_permission_request(
         id: id.to_string(),
         name: name.to_string(),
         input: input.clone(),
+        intent_digest: permission_intent.map(loopal_protocol::PermissionIntent::intent_digest),
         cursor: Default::default(),
     });
     MutationEffect::Mutated

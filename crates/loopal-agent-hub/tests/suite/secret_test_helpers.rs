@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use loopal_agent_hub::Hub;
-use loopal_agent_hub::dispatch::dispatch_hub_request;
 use loopal_ipc::connection::Incoming;
 use loopal_ipc::{Connection, Listening};
 use tokio::sync::Mutex;
@@ -32,26 +31,23 @@ pub fn write_key_0600(path: &std::path::Path, content: &str) {
     std::fs::write(path, content).unwrap();
 }
 
-pub fn spawn_hub_dispatch_loop(
+pub async fn spawn_hub_dispatch_loop(
     hub: Arc<Mutex<Hub>>,
     hub_conn: Arc<Connection<Listening>>,
-    mut rx: tokio::sync::mpsc::Receiver<Incoming>,
+    rx: tokio::sync::mpsc::Receiver<Incoming>,
     from_agent: String,
 ) {
-    let conn = hub_conn.clone();
-    tokio::spawn(async move {
-        while let Some(msg) = rx.recv().await {
-            if let Incoming::Request { id, method, params } = msg {
-                let outcome = dispatch_hub_request(&hub, &method, params, from_agent.clone()).await;
-                match outcome {
-                    Ok(v) => {
-                        let _ = conn.respond(id, v).await;
-                    }
-                    Err(m) => {
-                        let _ = conn.respond_error(id, -32000, &m).await;
-                    }
-                }
-            }
-        }
-    });
+    let dispatcher = Arc::new(loopal_agent_hub::dispatch::build_hub_dispatcher(
+        hub.clone(),
+    ));
+    let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
+    loopal_agent_hub::agent_io::start_agent_io(
+        hub,
+        dispatcher,
+        &from_agent,
+        hub_conn,
+        rx,
+        Some(ready_tx),
+    );
+    ready_rx.await.expect("Agent fixture must register");
 }

@@ -126,6 +126,11 @@ pub const HUB_MCP_CALL_TOOL: Method = Method {
     name: "hub/mcp/call_tool",
 };
 
+/// Root Agent → Hub: reconnect one MCP server through its Hub-owned provider.
+pub const HUB_MCP_RECONNECT: Method = Method {
+    name: "hub/mcp/reconnect",
+};
+
 /// Sub-agent → Hub: snapshot of all MCP server statuses (for display).
 /// Response: `Vec<McpServerSnapshot>`.
 pub const HUB_MCP_SNAPSHOT: Method = Method {
@@ -139,6 +144,13 @@ pub const HUB_SECRET_GET: Method = Method {
     name: "hub/secret/get",
 };
 
+/// Workflow worker startup -> Hub: fetch a provider configuration secret.
+/// Params bind the authenticated exact worker to its workflow attempt
+/// capability. This method is not available to the worker's runtime tools.
+pub const HUB_WORKFLOW_PROVIDER_SECRET_GET: Method = Method {
+    name: "hub/workflow/provider_secret/get",
+};
+
 /// Agent → Hub: list secret names in the cwd-resolved vault.
 /// Params: `{ cwd: String }`. Response: `{ names: Vec<String> }`.
 /// Does not expose plaintext.
@@ -150,4 +162,38 @@ pub const HUB_SECRET_LIST_NAMES: Method = Method {
 /// Params: `{ cwd: String }`. Response: `{ vault_count, default_vault, last_op_ts }`.
 pub const HUB_SECRET_HEALTH: Method = Method {
     name: "hub/secret/health",
+};
+
+/// Agent → Hub: append a generation-bound pre-effect audit record.
+pub const HUB_AUDIT_PROTECTED_EFFECT: Method = Method {
+    name: "hub/audit/protected_effect",
+};
+
+/// Agent → Hub: append a digest-bound permission decision audit record.
+pub const HUB_AUDIT_PERMISSION_DECISION: Method = Method {
+    name: "hub/audit/permission_decision",
+};
+
+pub const HUB_WORKFLOW_START: Method = Method {
+    name: "hub/workflow/start",
+};
+
+pub const HUB_WORKFLOW_LOOKUP_START: Method = Method {
+    name: "hub/workflow/lookup_start",
+};
+
+pub const HUB_WORKFLOW_GET: Method = Method {
+    name: "hub/workflow/get",
+};
+
+pub const HUB_WORKFLOW_WAIT: Method = Method {
+    name: "hub/workflow/wait",
+};
+
+pub const HUB_WORKFLOW_CANCEL: Method = Method {
+    name: "hub/workflow/cancel",
+};
+
+pub const HUB_WORKFLOW_WORKER_HANDSHAKE: Method = Method {
+    name: "hub/workflow/worker_handshake",
 };

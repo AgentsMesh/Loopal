@@ -1,5 +1,7 @@
-// Single test binary — includes all test modules
-
+#[path = "suite/app_dispatch_coverage_test.rs"]
+mod app_dispatch_coverage_test;
+#[path = "suite/app_dispatch_edge_coverage_test.rs"]
+mod app_dispatch_edge_coverage_test;
 #[path = "suite/app_test.rs"]
 mod app_test;
 #[path = "suite/bg_task_focus_test.rs"]
@@ -28,6 +30,8 @@ mod cycle_focus_test;
 mod detach_exit_info_test;
 #[path = "suite/detach_hub_cmd_test.rs"]
 mod detach_hub_cmd_test;
+#[path = "suite/e2e_modules.rs"]
+mod e2e_modules;
 #[path = "suite/enter_panel_test.rs"]
 mod enter_panel_test;
 #[path = "suite/event_forwarding_test.rs"]
@@ -54,6 +58,16 @@ mod input_scroll_test;
 mod input_test;
 #[path = "suite/interaction_terminal_state_test.rs"]
 mod interaction_terminal_state_test;
+#[path = "suite/interaction_tests.rs"]
+mod interaction_tests;
+#[path = "suite/key_dispatch_control_coverage_test.rs"]
+mod key_dispatch_control_coverage_test;
+#[path = "suite/key_dispatch_effect_coverage_test.rs"]
+mod key_dispatch_effect_coverage_test;
+#[path = "suite/key_dispatch_permission_coverage_test.rs"]
+mod key_dispatch_permission_coverage_test;
+#[path = "suite/key_dispatch_terminate_coverage_test.rs"]
+mod key_dispatch_terminate_coverage_test;
 #[path = "suite/kill_hub_cmd_test.rs"]
 mod kill_hub_cmd_test;
 #[path = "suite/line_cache_test.rs"]
@@ -104,14 +118,6 @@ mod panel_provider_count_test;
 mod panel_tab_crons_test;
 #[path = "suite/panel_tab_test.rs"]
 mod panel_tab_test;
-#[path = "suite/permission_arrow_nav_test.rs"]
-mod permission_arrow_nav_test;
-#[path = "suite/plan_approval_test.rs"]
-mod plan_approval_test;
-#[path = "suite/question_classifier_status_test.rs"]
-mod question_classifier_status_test;
-#[path = "suite/question_confirm_test.rs"]
-mod question_confirm_test;
 #[path = "suite/question_edge_test.rs"]
 mod question_edge_test;
 #[path = "suite/question_input_test.rs"]
@@ -138,69 +144,11 @@ mod styled_wrap_test;
 mod tasks_panel_test;
 #[path = "suite/text_width_test.rs"]
 mod text_width_test;
+#[path = "suite/view_client_coverage_test.rs"]
+mod view_client_coverage_test;
 #[path = "suite/view_client_reset_test.rs"]
 mod view_client_reset_test;
-
-// E2E tests
-#[path = "suite/e2e_compact_banner_test.rs"]
-mod e2e_compact_banner_test;
-#[path = "suite/e2e_compact_control_serialization_test.rs"]
-mod e2e_compact_control_serialization_test;
-#[path = "suite/e2e_compact_token_feedback_test.rs"]
-mod e2e_compact_token_feedback_test;
-#[path = "suite/e2e_control_completeness_test.rs"]
-mod e2e_control_completeness_test;
-#[path = "suite/e2e_control_lifecycle_test.rs"]
-mod e2e_control_lifecycle_test;
-#[path = "suite/e2e_control_test.rs"]
-mod e2e_control_test;
-#[path = "suite/e2e_edge_test.rs"]
-mod e2e_edge_test;
-#[path = "suite/e2e_error_test.rs"]
-mod e2e_error_test;
-#[path = "suite/e2e_fetch_test.rs"]
-mod e2e_fetch_test;
-#[path = "suite/e2e_git_test.rs"]
-mod e2e_git_test;
-#[path = "suite/e2e_goal_edge_test.rs"]
-mod e2e_goal_edge_test;
-#[path = "suite/e2e_goal_replace_test.rs"]
-mod e2e_goal_replace_test;
-#[path = "suite/e2e_goal_support.rs"]
-mod e2e_goal_support;
-#[path = "suite/e2e_goal_test.rs"]
-mod e2e_goal_test;
-#[path = "suite/e2e_harness.rs"]
-mod e2e_harness;
-#[path = "suite/e2e_hooks_test.rs"]
-mod e2e_hooks_test;
-#[path = "suite/e2e_intercept_emit_test.rs"]
-mod e2e_intercept_emit_test;
-#[path = "suite/e2e_loop_test.rs"]
-mod e2e_loop_test;
-#[path = "suite/e2e_mcp_test.rs"]
-mod e2e_mcp_test;
-#[path = "suite/e2e_multi_turn_test.rs"]
-mod e2e_multi_turn_test;
-#[path = "suite/e2e_panel_detail_test.rs"]
-mod e2e_panel_detail_test;
-#[path = "suite/e2e_permission_test.rs"]
-mod e2e_permission_test;
-#[path = "suite/e2e_question_test.rs"]
-mod e2e_question_test;
-#[path = "suite/e2e_request_idle_terminates_turn_test.rs"]
-mod e2e_request_idle_terminates_turn_test;
-#[path = "suite/e2e_scroll_test.rs"]
-mod e2e_scroll_test;
-#[path = "suite/e2e_session_test.rs"]
-mod e2e_session_test;
-#[path = "suite/e2e_system_test.rs"]
-mod e2e_system_test;
-#[path = "suite/e2e_task_test.rs"]
-mod e2e_task_test;
-#[path = "suite/e2e_test.rs"]
-mod e2e_test;
-#[path = "suite/e2e_tools_extended_test.rs"]
-mod e2e_tools_extended_test;
-#[path = "suite/e2e_tools_test.rs"]
-mod e2e_tools_test;
+#[path = "suite/workflow_panel_coverage_test.rs"]
+mod workflow_panel_coverage_test;
+#[path = "suite/workflow_panel_test.rs"]
+mod workflow_panel_test;

@@ -5,12 +5,12 @@ use std::time::Duration;
 
 use tokio::sync::{Mutex, mpsc};
 
-use loopal_agent_hub::Hub;
 use loopal_agent_hub::hub_server;
-use loopal_ipc::connection::{Connection, Incoming, Listening};
+use loopal_agent_hub::{Hub, UiSession};
+use loopal_ipc::connection::Incoming;
 use loopal_ipc::protocol::methods;
 use loopal_ipc::rpc_error::RpcError;
-use loopal_protocol::AgentEvent;
+use loopal_protocol::{AgentEvent, UiCapabilities};
 use serde_json::json;
 
 fn make_hub() -> (Arc<Mutex<Hub>>, mpsc::Receiver<AgentEvent>) {
@@ -18,22 +18,12 @@ fn make_hub() -> (Arc<Mutex<Hub>>, mpsc::Receiver<AgentEvent>) {
     (Arc::new(Mutex::new(Hub::new(tx))), rx)
 }
 
-fn spawn_mock_agent(conn: Arc<Connection<Listening>>, mut rx: mpsc::Receiver<Incoming>) {
-    tokio::spawn(async move {
-        while let Some(msg) = rx.recv().await {
-            if let Incoming::Request { id, .. } = msg {
-                let _ = conn.respond(id, json!({"ok": true})).await;
-            }
-        }
-    });
-}
-
 #[tokio::test]
 async fn shutdown_agent_sends_shutdown_request() {
     let (hub, _event_rx) = make_hub();
 
-    let (sender, sr) = hub_server::connect_local(hub.clone(), "sender");
-    spawn_mock_agent(sender.clone(), sr);
+    let ui = UiSession::connect(hub.clone(), "lifecycle-ui", UiCapabilities::NONE).await;
+    let sender = ui.client.connection().clone();
 
     let (target_conn, target_rx) = hub_server::connect_local(hub.clone(), "victim");
     let (method_tx, mut method_rx) = mpsc::channel::<String>(1);

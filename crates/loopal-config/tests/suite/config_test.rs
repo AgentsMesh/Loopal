@@ -1,5 +1,5 @@
 use loopal_config::settings::McpServerConfig;
-use loopal_config::{ProvidersConfig, Settings};
+use loopal_config::{CompactionSettings, ProvidersConfig, Settings};
 use loopal_tool_api::PermissionMode;
 
 #[test]
@@ -58,6 +58,30 @@ fn test_settings_serde_partial_override() {
     assert_eq!(settings.model, "gpt-4");
     assert_eq!(settings.max_context_tokens, 100);
     assert_eq!(settings.permission_mode, PermissionMode::Bypass);
+}
+
+#[test]
+fn compaction_sanitize_preserves_boundary_and_clamps_overflow() {
+    let (at_limit, warnings) = CompactionSettings {
+        microcompact_idle_minutes: CompactionSettings::MAX_MICROCOMPACT_IDLE_MINUTES,
+    }
+    .sanitize();
+    assert_eq!(
+        at_limit.microcompact_idle_minutes,
+        CompactionSettings::MAX_MICROCOMPACT_IDLE_MINUTES
+    );
+    assert!(warnings.is_empty());
+
+    let (clamped, warnings) = CompactionSettings {
+        microcompact_idle_minutes: CompactionSettings::MAX_MICROCOMPACT_IDLE_MINUTES + 1,
+    }
+    .sanitize();
+    assert_eq!(
+        clamped.microcompact_idle_minutes,
+        CompactionSettings::MAX_MICROCOMPACT_IDLE_MINUTES
+    );
+    assert_eq!(warnings.len(), 1);
+    assert!(warnings[0].contains("clamped"));
 }
 
 #[test]

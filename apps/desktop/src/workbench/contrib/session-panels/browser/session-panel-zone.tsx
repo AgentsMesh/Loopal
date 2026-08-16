@@ -11,7 +11,8 @@ import { useI18n } from '../../../browser/i18n-context'
 
 const panelKeys: Record<SessionPanelId, MessageKey> = {
   agents: 'panels.agents', tasks: 'panels.tasks', background: 'panels.background',
-  scheduled: 'panels.scheduled', artifacts: 'panels.artifacts', mcp: 'panels.mcp',
+  workflows: 'panels.workflows', scheduled: 'panels.scheduled',
+  artifacts: 'panels.artifacts', mcp: 'panels.mcp',
   diagnostics: 'panels.diagnostics',
 }
 

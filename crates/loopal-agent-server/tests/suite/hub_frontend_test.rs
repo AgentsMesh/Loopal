@@ -4,13 +4,13 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use tokio::sync::Mutex;
-
 use loopal_ipc::StdioTransport;
 use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
 use loopal_protocol::{AgentEventPayload, InterruptSignal};
+
+use super::permission_request_support::{permission_receipt, permission_request};
 use loopal_runtime::frontend::traits::AgentFrontend;
 
 use loopal_agent_server::session_hub::SharedSession;
@@ -46,14 +46,12 @@ fn make_session() -> (
     let (input_tx, input_rx) = tokio::sync::mpsc::channel(16);
     let interrupt = InterruptSignal::new();
     let (watch_tx, watch_rx) = tokio::sync::watch::channel(0u64);
-    let session = Arc::new(SharedSession {
-        session_id: "test-session".into(),
-        clients: Mutex::new(Vec::new()),
+    let session = Arc::new(SharedSession::new(
+        "test-session".into(),
         input_tx,
         interrupt,
-        interrupt_tx: Arc::new(watch_tx),
-        agent_shared: Mutex::new(None),
-    });
+        Arc::new(watch_tx),
+    ));
     (session, input_rx, watch_rx)
 }
 
@@ -118,10 +116,9 @@ async fn hub_permission_routes_to_primary() {
     );
 
     let f2 = frontend.clone();
-    let perm_task = tokio::spawn(async move {
-        f2.request_permission("tc-1", "Bash", &serde_json::json!({"cmd": "ls"}))
-            .await
-    });
+    let request = permission_request("tc-1", "Bash", serde_json::json!({"cmd": "ls"}));
+    let receipt = permission_receipt(&request);
+    let perm_task = tokio::spawn(async move { f2.request_permission(&request).await });
 
     // Primary should receive permission request
     let msg = tokio::time::timeout(T, rx_a.recv()).await.unwrap().unwrap();
@@ -129,7 +126,13 @@ async fn hub_permission_routes_to_primary() {
         Incoming::Request { id, method, .. } => {
             assert_eq!(method, methods::AGENT_PERMISSION.name);
             cli_a
-                .respond(id, serde_json::json!({"allow": true}))
+                .respond(
+                    id,
+                    serde_json::json!({
+                        "allow": true,
+                        "permission_receipt": receipt,
+                    }),
+                )
                 .await
                 .unwrap();
         }

@@ -4,6 +4,9 @@ rust_library(
     name = "loopal-secret-runtime",
     srcs = glob(["src/**/*.rs"]),
     edition = "2024",
+    proc_macro_deps = [
+        "@crates//:async-trait",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         "//crates/loopal-secret-client",
@@ -19,16 +22,26 @@ rust_library(
         "@crates//:tokio",
         "@crates//:tracing",
     ],
-    proc_macro_deps = [
-        "@crates//:async-trait",
-    ],
+)
+
+rust_test(
+    name = "loopal-secret-runtime-unit-test",
+    crate = ":loopal-secret-runtime",
+    edition = "2024",
+    deps = ["@crates//:tempfile"],
 )
 
 rust_test(
     name = "loopal-secret-runtime_test",
-    srcs = glob(["tests/**/*.rs"], allow_empty = True),
+    srcs = glob(
+        ["tests/**/*.rs"],
+        allow_empty = True,
+    ),
     crate_root = "tests/suite.rs",
     edition = "2024",
+    proc_macro_deps = [
+        "@crates//:async-trait",
+    ],
     deps = [
         ":loopal-secret-runtime",
         "//crates/loopal-secret-client",
@@ -37,8 +50,5 @@ rust_test(
         "@crates//:serde_json",
         "@crates//:tempfile",
         "@crates//:tokio",
-    ],
-    proc_macro_deps = [
-        "@crates//:async-trait",
     ],
 )

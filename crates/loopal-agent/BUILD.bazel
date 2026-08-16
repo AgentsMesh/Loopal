@@ -4,6 +4,7 @@ rust_library(
     name = "loopal-agent",
     srcs = glob(["src/**/*.rs"]),
     edition = "2024",
+    proc_macro_deps = ["@crates//:async-trait"],
     visibility = ["//visibility:public"],
     deps = [
         "//crates/loopal-agent-client",
@@ -14,10 +15,11 @@ rust_library(
         "//crates/loopal-ipc",
         "//crates/loopal-kernel",
         "//crates/loopal-memory",
-        "//crates/loopal-provider-api",
         "//crates/loopal-prompt",
         "//crates/loopal-prompt-system",
         "//crates/loopal-protocol",
+        "//crates/loopal-provider",
+        "//crates/loopal-provider-api",
         "//crates/loopal-runtime",
         "//crates/loopal-scheduler",
         "//crates/loopal-storage",
@@ -33,7 +35,6 @@ rust_library(
         "@crates//:tracing",
         "@crates//:uuid",
     ],
-    proc_macro_deps = ["@crates//:async-trait"],
 )
 
 rust_test(
@@ -46,10 +47,11 @@ rust_test(
     name = "loopal-agent_test",
     srcs = glob(["tests/**/*.rs"]),
     crate_root = "tests/suite.rs",
-    edition = "2024",
-    local = True,
     data = ["//:loopal"],
+    edition = "2024",
     env = {"LOOPAL_BINARY": "$(rootpath //:loopal)"},
+    local = True,
+    proc_macro_deps = ["@crates//:async-trait"],
     deps = [
         ":loopal-agent",
         "//crates/loopal-agent-client",
@@ -71,5 +73,4 @@ rust_test(
         "@crates//:tokio",
         "@crates//:tokio-util",
     ],
-    proc_macro_deps = ["@crates//:async-trait"],
 )

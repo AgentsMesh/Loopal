@@ -8,12 +8,13 @@ use indexmap::IndexMap;
 use loopal_agent_server::testing::{collect_feature_tags, spawn_sub_agent_forwarder};
 use loopal_config::{ResolvedConfig, Settings};
 use loopal_error::Result;
-use loopal_protocol::{AgentEvent, AgentEventPayload};
+use loopal_protocol::{AgentEvent, AgentEventPayload, PermissionIntentRequest};
 use loopal_runtime::frontend::traits::{AgentFrontend, EventEmitter};
 
 fn empty_resolved_config() -> ResolvedConfig {
     ResolvedConfig {
         settings: Settings::default(),
+        workflow_preset_thinking_recommendation: None,
         mcp_servers: IndexMap::new(),
         skills: IndexMap::new(),
         hooks: Vec::new(),
@@ -60,9 +61,7 @@ impl AgentFrontend for CaptureFrontend {
     }
     async fn request_permission(
         &self,
-        _id: &str,
-        _name: &str,
-        _input: &serde_json::Value,
+        _request: &PermissionIntentRequest,
     ) -> loopal_tool_api::PermissionDecision {
         loopal_tool_api::PermissionDecision::Allow
     }

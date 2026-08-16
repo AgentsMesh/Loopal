@@ -21,7 +21,7 @@ async fn run_intercept_emit_scenario(
     ];
     let harness = HarnessBuilder::new()
         .calls(calls)
-        .messages(vec![Message::user("trigger plan intercept")])
+        .prompt(vec![Message::user("trigger plan intercept")])
         .mode(mode)
         .lifecycle(LifecycleMode::Ephemeral)
         .build()

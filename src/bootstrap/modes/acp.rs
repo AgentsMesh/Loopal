@@ -14,6 +14,19 @@ pub async fn run(
     cwd: &std::path::Path,
     config: &loopal_config::ResolvedConfig,
 ) -> anyhow::Result<()> {
+    run_with_adapter(cli, cwd, config, loopal_acp::run_acp).await
+}
+
+async fn run_with_adapter<F, Fut>(
+    cli: &Cli,
+    cwd: &std::path::Path,
+    config: &loopal_config::ResolvedConfig,
+    adapter: F,
+) -> anyhow::Result<()>
+where
+    F: FnOnce(UiSession) -> Fut,
+    Fut: std::future::Future<Output = anyhow::Result<()>>,
+{
     info!("starting in ACP mode (Hub-backed)");
 
     let prepared = super::hub_bootstrap::prepare_hub_and_agent(cli, cwd, config).await?;
@@ -32,10 +45,14 @@ pub async fn run(
         .await?;
 
     // Run ACP adapter
-    let result = loopal_acp::run_acp(ui_session).await;
+    let result = adapter(ui_session).await;
 
-    info!("shutting down agent process");
-    let _ = ctx.agent_proc.shutdown().await;
+    info!("shutting down workflow runtime and agent process");
+    let shutdown = ctx.shutdown().await;
 
-    result
+    result.and(shutdown)
 }
+
+#[cfg(test)]
+#[path = "acp_lifecycle_tests.rs"]
+mod tests;

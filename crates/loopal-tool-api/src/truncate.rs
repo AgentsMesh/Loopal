@@ -1,3 +1,9 @@
+mod overflow;
+
+pub use overflow::{
+    MAX_OVERFLOW_FILE_BYTES, OverflowPersistenceError, OverflowResult, handle_overflow,
+};
+
 pub const DEFAULT_MAX_OUTPUT_LINES: usize = 2_000;
 pub const DEFAULT_MAX_OUTPUT_BYTES: usize = 512_000;
 
@@ -82,59 +88,6 @@ pub fn extract_overflow_path(s: &str) -> (String, Option<String>) {
     let path = s[path_start..path_start + rel_close].to_string();
     let body = s[..marker_idx].trim_end_matches('\n').to_string();
     (body, Some(path))
-}
-
-pub struct OverflowResult {
-    pub display: String,
-    pub overflowed: bool,
-}
-
-pub fn handle_overflow(
-    output: &str,
-    max_lines: usize,
-    max_bytes: usize,
-    label: &str,
-) -> OverflowResult {
-    if !needs_truncation(output, max_lines, max_bytes) {
-        return OverflowResult {
-            display: output.to_string(),
-            overflowed: false,
-        };
-    }
-    let path = save_to_overflow_file(output, label);
-    let preview_lines = max_lines / 4;
-    let preview_bytes = max_bytes / 4;
-    let preview = truncate_output(output, preview_lines, preview_bytes);
-    let total = humanize_size(output.len());
-    let display = format!(
-        "{preview}\n\n\
-         [Output too large for context ({total}). Full output saved to: {path}]\n\
-         Use the Read tool to access the complete output if needed."
-    );
-    OverflowResult {
-        display,
-        overflowed: true,
-    }
-}
-
-pub fn save_to_overflow_file(content: &str, label: &str) -> String {
-    let dir = overflow_dir();
-    if std::fs::create_dir_all(&dir).is_err() {
-        return "(failed to save overflow file)".into();
-    }
-    let ts = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis();
-    let path = dir.join(format!("{label}_{ts}.txt"));
-    match std::fs::write(&path, content) {
-        Ok(()) => path.to_string_lossy().into_owned(),
-        Err(_) => "(failed to save overflow file)".into(),
-    }
-}
-
-fn overflow_dir() -> std::path::PathBuf {
-    std::env::temp_dir().join("loopal").join("overflow")
 }
 
 pub fn humanize_size(bytes: usize) -> String {

@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
@@ -16,11 +17,39 @@ pub trait RequestHandler: Send + Sync {
 
 pub struct HandlerCtx {
     pub from: String,
+    extension: Option<Arc<dyn Any + Send + Sync>>,
 }
 
 impl HandlerCtx {
     pub fn new(from: impl Into<String>) -> Self {
-        Self { from: from.into() }
+        Self {
+            from: from.into(),
+            extension: None,
+        }
+    }
+
+    pub fn with_extension<T>(mut self, extension: Arc<T>) -> Self
+    where
+        T: Any + Send + Sync,
+    {
+        self.extension = Some(extension);
+        self
+    }
+
+    pub fn extension<T>(&self) -> Option<Arc<T>>
+    where
+        T: Any + Send + Sync,
+    {
+        self.extension.clone()?.downcast().ok()
+    }
+}
+
+impl<T> From<T> for HandlerCtx
+where
+    T: Into<String>,
+{
+    fn from(from: T) -> Self {
+        Self::new(from)
     }
 }
 
@@ -115,6 +144,12 @@ pub struct Dispatcher {
 }
 
 impl Dispatcher {
+    pub fn registered_methods(&self) -> Vec<&'static str> {
+        let mut methods: Vec<_> = self.handlers.keys().copied().collect();
+        methods.sort_unstable();
+        methods
+    }
+
     pub async fn dispatch(
         &self,
         method: &str,
@@ -136,57 +171,5 @@ impl Dispatcher {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn register_fn_then_dispatch() {
-        let d = DispatcherBuilder::new()
-            .register_fn("echo", |params, _ctx| Box::pin(async move { Ok(params) }))
-            .build();
-        let ctx = HandlerCtx::new("test");
-        let out = d
-            .dispatch("echo", serde_json::json!({"a": 1}), &ctx)
-            .await
-            .unwrap();
-        assert_eq!(out["a"], 1);
-    }
-
-    #[tokio::test]
-    async fn unknown_method_returns_method_not_found() {
-        let d = DispatcherBuilder::new().build();
-        let ctx = HandlerCtx::new("test");
-        let err = d
-            .dispatch("nope", serde_json::Value::Null, &ctx)
-            .await
-            .unwrap_err();
-        match err {
-            RpcError::Remote { code, .. } => assert_eq!(code, jsonrpc::METHOD_NOT_FOUND),
-            _ => panic!("expected Remote METHOD_NOT_FOUND, got {err:?}"),
-        }
-    }
-
-    #[tokio::test]
-    async fn fallback_receives_method_name() {
-        let d = DispatcherBuilder::new()
-            .fallback(|method, _params, _ctx| {
-                let method = method.to_string();
-                Box::pin(async move { Ok(serde_json::json!({"method": method})) })
-            })
-            .build();
-        let ctx = HandlerCtx::new("test");
-        let out = d
-            .dispatch("custom/x", serde_json::Value::Null, &ctx)
-            .await
-            .unwrap();
-        assert_eq!(out["method"], "custom/x");
-    }
-
-    #[test]
-    #[should_panic(expected = "duplicate handler registration")]
-    fn duplicate_register_panics() {
-        let _ = DispatcherBuilder::new()
-            .register_fn("foo", |_p, _c| Box::pin(async { Ok(Value::Null) }))
-            .register_fn("foo", |_p, _c| Box::pin(async { Ok(Value::Null) }));
-    }
-}
+#[path = "dispatcher/tests.rs"]
+mod tests;

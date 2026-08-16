@@ -17,6 +17,7 @@ export function permissionItem(request: PermissionRequest): PermissionItem {
     title: request.title,
     description: request.detail,
     risk: request.risk,
+    canAllow: request.intentDigest !== undefined,
     command: request.tool,
   }
 }

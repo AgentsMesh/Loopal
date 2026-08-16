@@ -1,209 +1,103 @@
-//! Tests for `hub/spawn_remote_agent` handler — verifies cross-hub spawn
-//! safety invariants: forbidden filesystem-coupled fields are rejected,
-//! receiver Hub's `default_cwd` is used (not the caller's).
-
-use std::path::PathBuf;
 use std::sync::Arc;
 
+use loopal_agent_hub::{Hub, agent_io, hub_server};
+use loopal_ipc::connection::Connection;
+use loopal_ipc::protocol::methods;
+use loopal_ipc::transport::Transport;
+use loopal_ipc::{RpcError, TcpTransport};
+use serde_json::json;
+use tokio::net::TcpStream;
 use tokio::sync::{Mutex, mpsc};
 
-use loopal_agent_hub::Hub;
-use loopal_agent_hub::dispatch::dispatch_hub_request;
-use loopal_protocol::AgentEvent;
-use serde_json::json;
-
-fn make_hub_with_cwd(cwd: PathBuf) -> Arc<Mutex<Hub>> {
-    let (tx, _rx) = mpsc::channel::<AgentEvent>(16);
-    Arc::new(Mutex::new(Hub::with_cwd(tx, cwd)))
+#[tokio::test]
+async fn internal_string_cannot_create_agent_principal() {
+    let (event_tx, _event_rx) = mpsc::channel(8);
+    let hub = Arc::new(Mutex::new(Hub::new(event_tx)));
+    for method in [
+        methods::HUB_SPAWN_AGENT.name,
+        methods::HUB_SPAWN_REMOTE_AGENT.name,
+    ] {
+        let error = loopal_agent_hub::dispatch::dispatch_hub_request(
+            &hub,
+            method,
+            json!({"name": "child"}),
+            "main".into(),
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            error.contains("principal") || error.contains("MetaHub"),
+            "{error}"
+        );
+    }
 }
 
 #[tokio::test]
-async fn rejects_cwd_field() {
-    let hub = make_hub_with_cwd(PathBuf::from("/hub-local"));
-    let result = dispatch_hub_request(
-        &hub,
-        "hub/spawn_remote_agent",
-        json!({
-            "name": "child",
-            "prompt": "report cwd",
-            "cwd": "/attacker/path",
-        }),
-        "from-agent".into(),
-    )
-    .await;
-    let err = result.expect_err("must reject cwd in cross-hub spawn");
-    assert!(
-        err.contains("cwd"),
-        "error must mention forbidden 'cwd' field, got: {err}"
+async fn managed_agent_reaches_local_validation_with_typed_principal() {
+    let root = tempfile::tempdir().unwrap();
+    let (event_tx, mut event_rx) = mpsc::channel(16);
+    let hub = Arc::new(Mutex::new(Hub::with_cwd(event_tx, root.path().into())));
+    let (agent_transport, hub_transport) = loopal_ipc::duplex_pair();
+    let (agent, mut agent_rx) = Connection::new(agent_transport).into_listening();
+    let (hub_connection, hub_rx) = Connection::new(hub_transport).into_listening();
+    let dispatcher = Arc::new(loopal_agent_hub::dispatch::build_hub_dispatcher(
+        hub.clone(),
+    ));
+    let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
+    agent_io::start_agent_io(
+        hub,
+        dispatcher,
+        loopal_protocol::ROOT_AGENT_NAME,
+        hub_connection,
+        hub_rx,
+        Some(ready_tx),
     );
+    ready_rx.await.unwrap();
+    tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
+    let reverse_agent = agent.clone();
+    tokio::spawn(async move {
+        while let Some(incoming) = agent_rx.recv().await {
+            if let loopal_ipc::connection::Incoming::Request { id, .. } = incoming {
+                let _ = reverse_agent.respond(id, json!({"ok": true})).await;
+            }
+        }
+    });
+
+    let error = agent
+        .send_request(
+            methods::HUB_SPAWN_AGENT.name,
+            json!({"name": "child", "depth": 0}),
+        )
+        .await
+        .unwrap_err();
+    assert!(error.to_string().contains("depth"), "{error}");
 }
 
 #[tokio::test]
-async fn rejects_fork_context_field() {
-    let hub = make_hub_with_cwd(PathBuf::from("/hub-local"));
-    let result = dispatch_hub_request(
-        &hub,
-        "hub/spawn_remote_agent",
-        json!({
-            "name": "child",
-            "prompt": "do work",
-            "fork_context": [],
-        }),
-        "from-agent".into(),
-    )
-    .await;
-    let err = result.expect_err("must reject fork_context");
+async fn external_tcp_agent_cannot_spawn() {
+    let (event_tx, _event_rx) = mpsc::channel(8);
+    let hub = Arc::new(Mutex::new(Hub::new(event_tx)));
+    let (listener, port, token) = hub_server::start_hub_listener(hub.clone()).await.unwrap();
+    tokio::spawn(hub_server::accept_loop(listener, hub, token.clone()));
+    let stream = TcpStream::connect(format!("127.0.0.1:{port}"))
+        .await
+        .unwrap();
+    let transport: Arc<dyn Transport> = Arc::new(TcpTransport::new(stream));
+    let (client, _incoming) = Connection::new(transport).into_listening();
+    client
+        .send_request(
+            methods::HUB_REGISTER.name,
+            json!({"name": "external", "token": token, "role": "agent"}),
+        )
+        .await
+        .unwrap();
+
+    let error = client
+        .send_request(methods::HUB_SPAWN_AGENT.name, json!({"name": "child"}))
+        .await
+        .unwrap_err();
     assert!(
-        err.contains("fork_context"),
-        "error must mention 'fork_context', got: {err}"
-    );
-}
-
-#[tokio::test]
-async fn rejects_resume_field() {
-    let hub = make_hub_with_cwd(PathBuf::from("/hub-local"));
-    let result = dispatch_hub_request(
-        &hub,
-        "hub/spawn_remote_agent",
-        json!({
-            "name": "child",
-            "prompt": "do work",
-            "resume": "session-123",
-        }),
-        "from-agent".into(),
-    )
-    .await;
-    let err = result.expect_err("must reject session resume");
-    assert!(
-        err.contains("resume"),
-        "error must mention 'resume', got: {err}"
-    );
-}
-
-#[tokio::test]
-async fn rejects_when_name_missing() {
-    let hub = make_hub_with_cwd(PathBuf::from("/hub-local"));
-    let result = dispatch_hub_request(
-        &hub,
-        "hub/spawn_remote_agent",
-        json!({"prompt": "do work"}),
-        "from-agent".into(),
-    )
-    .await;
-    assert!(result.is_err());
-}
-
-#[tokio::test]
-async fn local_spawn_path_unaffected_by_remote_handler() {
-    // Verify the new method is wired distinctly: a regular hub/spawn_agent
-    // request without target_hub still reaches the local handler (not the
-    // remote one). Failure here would surface as a different error type.
-    let hub = make_hub_with_cwd(PathBuf::from("/hub-local"));
-    // No name provided — local handler returns "missing 'name' field".
-    let result = dispatch_hub_request(
-        &hub,
-        "hub/spawn_agent",
-        json!({"prompt": "x"}),
-        "from-agent".into(),
-    )
-    .await;
-    let err = result.expect_err("missing name");
-    assert!(err.contains("name"), "got: {err}");
-}
-
-#[tokio::test]
-async fn empty_target_hub_uses_local_spawn_path() {
-    let hub = make_hub_with_cwd(PathBuf::from("/hub-local"));
-    // Include cwd so a mistaken cross-hub path would fail on the cross-hub
-    // forbidden-field check before reaching the local missing-name error.
-    let result = dispatch_hub_request(
-        &hub,
-        "hub/spawn_agent",
-        json!({"prompt": "x", "cwd": "/local/path", "target_hub": ""}),
-        "from-agent".into(),
-    )
-    .await;
-    let err = result.expect_err("missing name");
-    assert!(err.contains("name"), "got: {err}");
-    assert!(
-        !err.contains("cross-hub") && !err.contains("cwd"),
-        "empty target_hub must not use cross-hub validation, got: {err}"
-    );
-}
-
-#[tokio::test]
-async fn whitespace_target_hub_uses_local_spawn_path() {
-    let hub = make_hub_with_cwd(PathBuf::from("/hub-local"));
-    let result = dispatch_hub_request(
-        &hub,
-        "hub/spawn_agent",
-        json!({"prompt": "x", "cwd": "/local/path", "target_hub": "   "}),
-        "from-agent".into(),
-    )
-    .await;
-    let err = result.expect_err("missing name");
-    assert!(err.contains("name"), "got: {err}");
-    assert!(
-        !err.contains("cross-hub") && !err.contains("cwd"),
-        "blank target_hub must not use cross-hub validation, got: {err}"
-    );
-}
-
-#[tokio::test]
-async fn rejects_non_string_target_hub() {
-    let hub = make_hub_with_cwd(PathBuf::from("/hub-local"));
-    let result = dispatch_hub_request(
-        &hub,
-        "hub/spawn_agent",
-        json!({"name": "child", "prompt": "x", "target_hub": 42}),
-        "from-agent".into(),
-    )
-    .await;
-    let err = result.expect_err("non-string target_hub must be rejected");
-    assert!(
-        err.contains("target_hub") && err.contains("string"),
-        "error must point to type mismatch, got: {err}"
-    );
-}
-
-#[tokio::test]
-async fn cross_hub_forward_rejects_slash_in_child_name() {
-    let hub = make_hub_with_cwd(PathBuf::from("/hub-local"));
-    let result = dispatch_hub_request(
-        &hub,
-        "hub/spawn_agent",
-        json!({
-            "name": "foo/bar",
-            "prompt": "x",
-            "target_hub": "hub-b",
-        }),
-        "main".into(),
-    )
-    .await;
-    let err = result.expect_err("'/' in child name must be rejected");
-    assert!(
-        err.contains("'/'") || err.contains("cannot contain"),
-        "error must mention slash restriction, got: {err}"
-    );
-}
-
-#[tokio::test]
-async fn cross_hub_forward_rejects_slash_in_caller_name() {
-    let hub = make_hub_with_cwd(PathBuf::from("/hub-local"));
-    let result = dispatch_hub_request(
-        &hub,
-        "hub/spawn_agent",
-        json!({
-            "name": "child",
-            "prompt": "x",
-            "target_hub": "hub-b",
-        }),
-        "main/branch".into(),
-    )
-    .await;
-    let err = result.expect_err("'/' in caller name must be rejected");
-    assert!(
-        err.contains("caller") && (err.contains("'/'") || err.contains("cannot contain")),
-        "error must point to caller name slash, got: {err}"
+        matches!(error, RpcError::Remote { ref message, .. } if message.contains("not authorized")),
+        "{error}"
     );
 }

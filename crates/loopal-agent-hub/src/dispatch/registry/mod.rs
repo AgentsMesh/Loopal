@@ -8,6 +8,7 @@ use tokio::sync::Mutex;
 
 use crate::hub::Hub;
 
+mod audit;
 mod desktop;
 mod desktop_mcp;
 mod desktop_mcp_layers;
@@ -28,6 +29,7 @@ mod relay;
 mod secret;
 mod spawn;
 mod topology;
+mod workflow;
 mod workspace;
 
 pub(super) fn string_err_to_rpc(e: String) -> RpcError {
@@ -39,6 +41,7 @@ pub(super) fn string_err_to_rpc(e: String) -> RpcError {
 }
 
 pub fn register_all(b: DispatcherBuilder, hub: Arc<Mutex<Hub>>) -> DispatcherBuilder {
+    let b = audit::register(b, hub.clone());
     let b = lifecycle::register(b, hub.clone());
     let b = desktop::register(b, hub.clone());
     let b = desktop_mcp::register(b, hub.clone());
@@ -48,6 +51,7 @@ pub fn register_all(b: DispatcherBuilder, hub: Arc<Mutex<Hub>>) -> DispatcherBui
     let b = secret::register(b, hub.clone());
     let b = spawn::register(b, hub.clone());
     let b = topology::register(b, hub.clone());
+    let b = workflow::register(b, hub.clone());
     let b = workspace::register(b, hub.clone());
     relay::register(b, hub)
 }

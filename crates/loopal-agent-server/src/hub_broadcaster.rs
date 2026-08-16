@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use tokio::sync::{mpsc, oneshot};
 
 use loopal_error::{LoopalError, Result};
+use loopal_output_guard::FinalSinkRedactionSeed;
 use loopal_protocol::{AgentEvent, AgentEventPayload, QualifiedAddress};
 use loopal_runtime::frontend::traits::EventEmitter;
 
@@ -15,6 +16,7 @@ pub(crate) struct HubBroadcaster {
     session: SessionRef,
     agent_name: Option<QualifiedAddress>,
     delivery_tx: mpsc::UnboundedSender<DeliveryRequest>,
+    redaction_seed: FinalSinkRedactionSeed,
 }
 
 struct DeliveryRequest {
@@ -24,16 +26,29 @@ struct DeliveryRequest {
 
 impl HubBroadcaster {
     pub fn new(session: SessionRef, agent_name: Option<QualifiedAddress>) -> Self {
+        Self::new_with_redaction_seed(session, agent_name, FinalSinkRedactionSeed::new())
+    }
+
+    pub fn new_with_redaction_seed(
+        session: SessionRef,
+        agent_name: Option<QualifiedAddress>,
+        redaction_seed: FinalSinkRedactionSeed,
+    ) -> Self {
         // `try_emit` is synchronous and is also used from Drop guards. An
         // unbounded admission queue lets those guards enqueue without taking
         // an async lock; the single consumer provides ordering, while each
         // transport write remains bounded by event_delivery's deadline.
         let (delivery_tx, delivery_rx) = mpsc::unbounded_channel();
-        tokio::spawn(delivery_loop(session.clone(), delivery_rx));
+        tokio::spawn(delivery_loop(
+            session.clone(),
+            delivery_rx,
+            redaction_seed.clone(),
+        ));
         Self {
             session,
             agent_name,
             delivery_tx,
+            redaction_seed,
         }
     }
 
@@ -42,11 +57,17 @@ impl HubBroadcaster {
     }
 
     fn build_event(&self, payload: AgentEventPayload) -> AgentEvent {
-        AgentEvent::for_agent(self.agent_name.clone(), payload)
+        crate::agent_event_guard::guard(
+            AgentEvent::for_agent(self.agent_name.clone(), payload),
+            &self.redaction_seed,
+        )
     }
 
     fn build_event_in_turn(&self, payload: AgentEventPayload) -> AgentEvent {
-        AgentEvent::for_agent_in_turn(self.agent_name.clone(), payload)
+        crate::agent_event_guard::guard(
+            AgentEvent::for_agent_in_turn(self.agent_name.clone(), payload),
+            &self.redaction_seed,
+        )
     }
 
     pub async fn broadcast(&self, payload: AgentEventPayload) -> Result<()> {
@@ -86,9 +107,10 @@ impl HubBroadcaster {
 async fn delivery_loop(
     session: SessionRef,
     mut delivery_rx: mpsc::UnboundedReceiver<DeliveryRequest>,
+    redaction_seed: FinalSinkRedactionSeed,
 ) {
     while let Some(request) = delivery_rx.recv().await {
-        let outcome = deliver_event(&session, &request.event).await;
+        let outcome = deliver_event(&session, request.event, &redaction_seed).await;
         match request.completion {
             Some(completion) => {
                 if let Err(outcome) = completion.send(outcome)
@@ -106,7 +128,12 @@ async fn delivery_loop(
     }
 }
 
-async fn deliver_event(session: &SessionRef, event: &AgentEvent) -> Result<()> {
+async fn deliver_event(
+    session: &SessionRef,
+    event: AgentEvent,
+    redaction_seed: &FinalSinkRedactionSeed,
+) -> Result<()> {
+    let event = crate::agent_event_guard::guard(event, redaction_seed);
     let params = serde_json::to_value(event)
         .map_err(|error| LoopalError::Ipc(format!("serialize event: {error}")))?;
     let session = session.read().await.clone();

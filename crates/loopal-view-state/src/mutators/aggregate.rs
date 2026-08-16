@@ -45,6 +45,7 @@ pub(super) fn session_resumed(state: &mut SessionViewState, session_id: &str) ->
     state.tasks.clear();
     state.crons.clear();
     state.bg_tasks.clear();
+    state.workflows = Default::default();
     state.thread_goal = None;
     // Clear stale Hub-health snapshot; the next poller tick will re-sync.
     state.hub_degraded_since_ms = None;

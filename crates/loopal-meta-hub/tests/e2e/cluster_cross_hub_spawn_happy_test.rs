@@ -7,6 +7,7 @@ use std::time::Duration;
 use loopal_ipc::protocol::methods;
 use serde_json::json;
 
+use crate::cluster_agent_driver::AgentDriver;
 use crate::cluster_harness::{HubHandle, MetaHubHandle};
 
 #[cfg(not(target_os = "windows"))]
@@ -16,18 +17,18 @@ async fn cluster_cross_hub_spawn_happy_path_reaches_receiver() {
     let hub_a = HubHandle::boot("hub-a", &meta).await;
     let hub_b = HubHandle::boot("hub-b", &meta).await;
     tokio::time::sleep(Duration::from_millis(300)).await;
+    let caller = AgentDriver::connect(hub_a.hub.clone(), "spawn-driver").await;
 
-    let result = loopal_agent_hub::dispatch::dispatch_hub_request(
-        &hub_a.hub,
-        methods::HUB_SPAWN_AGENT.name,
-        json!({
-            "name": "remote-child",
-            "prompt": "say hi",
-            "target_hub": "hub-b",
-        }),
-        "main".into(),
-    )
-    .await;
+    let result = caller
+        .request(
+            methods::HUB_SPAWN_AGENT.name,
+            json!({
+                "name": "remote-child",
+                "prompt": "say hi",
+                "target_hub": "hub-b",
+            }),
+        )
+        .await;
 
     let resp = result.expect("cross-hub spawn should succeed");
     assert_eq!(resp["name"].as_str(), Some("remote-child"));
@@ -62,23 +63,22 @@ async fn cluster_cross_hub_spawn_rejects_duplicate_name() {
     let hub_a = HubHandle::boot("hub-a", &meta).await;
     let hub_b = HubHandle::boot("hub-b", &meta).await;
     tokio::time::sleep(Duration::from_millis(300)).await;
+    let caller = AgentDriver::connect(hub_a.hub.clone(), "spawn-driver").await;
 
-    let first = loopal_agent_hub::dispatch::dispatch_hub_request(
-        &hub_a.hub,
-        methods::HUB_SPAWN_AGENT.name,
-        json!({"name": "dup", "prompt": "hi", "target_hub": "hub-b"}),
-        "main".into(),
-    )
-    .await;
+    let first = caller
+        .request(
+            methods::HUB_SPAWN_AGENT.name,
+            json!({"name": "dup", "prompt": "hi", "target_hub": "hub-b"}),
+        )
+        .await;
     assert!(first.is_ok(), "first spawn: {first:?}");
 
-    let second = loopal_agent_hub::dispatch::dispatch_hub_request(
-        &hub_a.hub,
-        methods::HUB_SPAWN_AGENT.name,
-        json!({"name": "dup", "prompt": "again", "target_hub": "hub-b"}),
-        "main".into(),
-    )
-    .await;
+    let second = caller
+        .request(
+            methods::HUB_SPAWN_AGENT.name,
+            json!({"name": "dup", "prompt": "again", "target_hub": "hub-b"}),
+        )
+        .await;
     let err = second.expect_err("duplicate name must be rejected");
     assert!(
         err.contains("already registered") || err.contains("dup"),

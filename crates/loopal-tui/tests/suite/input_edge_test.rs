@@ -40,6 +40,7 @@ fn test_ctrl_c_denies_permission() {
             id: "1".into(),
             name: "Bash".into(),
             input: "rm".into(),
+            intent_digest: None,
             cursor: Default::default(),
         });
     });

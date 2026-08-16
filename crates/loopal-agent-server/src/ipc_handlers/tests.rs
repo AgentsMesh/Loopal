@@ -2,12 +2,14 @@ use std::future::pending;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use loopal_ipc::Transport;
-use loopal_protocol::InterruptSignal;
+use loopal_protocol::{InterruptSignal, PermissionIntentRequest};
 use loopal_runtime::frontend::permission_handler::PermissionHandler;
 use loopal_runtime::frontend::question_handler::{AskOptions, QuestionHandler};
+use loopal_runtime::{PlanApproval, PlanApprovalCancellationReason};
 use loopal_tool_api::PermissionDecision;
 use tokio::sync::mpsc;
 
+use super::plan::request_plan_approval_with_timeout;
 use super::*;
 
 const TEST_TIMEOUT: Duration = Duration::from_millis(20);
@@ -81,10 +83,17 @@ async fn assert_incomplete_transport_was_closed(transport: &PendingSendTransport
 async fn permission_send_timeout_denies_and_cancels_peer() {
     let (session, transport) = pending_session().await;
     let handler = IpcPermissionHandler::with_timeout(session, TEST_TIMEOUT);
+    let request = PermissionIntentRequest::create(
+        "tool-1",
+        "Write",
+        serde_json::json!({}),
+        serde_json::json!({}),
+        serde_json::json!({"type": "object"}),
+        None,
+    )
+    .unwrap();
 
-    let outcome = handler
-        .decide("tool-1", "Write", &serde_json::json!({}))
-        .await;
+    let outcome = handler.decide(&request).await;
 
     assert_eq!(outcome.decision, PermissionDecision::Deny);
     assert!(outcome.reason.contains("timed out"));

@@ -1,6 +1,7 @@
 use loopal_config::Settings;
 use loopal_kernel::Kernel;
 use loopal_runtime::tool_pipeline::execute_tool;
+use loopal_runtime::tool_prepare::prepare_tool_action;
 use loopal_tool_api::ToolContext;
 use std::path::PathBuf;
 
@@ -28,16 +29,29 @@ fn make_ctx_for(cwd: PathBuf) -> ToolContext {
     ToolContext::new(backend, "test-session".to_string())
 }
 
+async fn run_tool(
+    kernel: &Kernel,
+    name: &str,
+    input: serde_json::Value,
+    ctx: &ToolContext,
+    mode: loopal_runtime::mode::AgentMode,
+) -> loopal_error::Result<loopal_tool_api::ToolResult> {
+    let action = prepare_tool_action(kernel, "test-id", name, input)
+        .await?
+        .into_prepared()?;
+    execute_tool(kernel, action, ctx, &mode).await
+}
+
 #[tokio::test]
 async fn test_execute_tool_not_found() {
     let kernel = make_kernel();
     let ctx = make_ctx();
-    let result = execute_tool(
+    let result = run_tool(
         &kernel,
         "NonExistentTool",
         serde_json::json!({}),
         &ctx,
-        &loopal_runtime::mode::AgentMode::Act,
+        loopal_runtime::mode::AgentMode::Act,
     )
     .await;
     assert!(result.is_err(), "executing a nonexistent tool should fail");
@@ -56,12 +70,12 @@ async fn test_execute_read_tool_on_temp_file() {
     std::fs::write(&test_file, "hello from test").unwrap();
 
     let ctx = make_ctx_for(tmp_dir.clone());
-    let result = execute_tool(
+    let result = run_tool(
         &kernel,
         "Read",
         serde_json::json!({"file_path": test_file.to_str().unwrap()}),
         &ctx,
-        &loopal_runtime::mode::AgentMode::Act,
+        loopal_runtime::mode::AgentMode::Act,
     )
     .await;
 
@@ -75,12 +89,12 @@ async fn test_execute_read_tool_on_temp_file() {
 async fn test_execute_read_tool_missing_file() {
     let kernel = make_kernel();
     let ctx = make_ctx();
-    let result = execute_tool(
+    let result = run_tool(
         &kernel,
         "Read",
         serde_json::json!({"file_path": "/tmp/nonexistent_file_loopal_test_xyz_12345.txt"}),
         &ctx,
-        &loopal_runtime::mode::AgentMode::Act,
+        loopal_runtime::mode::AgentMode::Act,
     )
     .await;
 
@@ -97,12 +111,12 @@ async fn test_execute_tool_in_plan_mode() {
     std::fs::write(&test_file, "plan mode test content").unwrap();
 
     let ctx = make_ctx_for(tmp_dir.clone());
-    let result = execute_tool(
+    let result = run_tool(
         &kernel,
         "Read",
         serde_json::json!({"file_path": test_file.to_str().unwrap()}),
         &ctx,
-        &loopal_runtime::mode::AgentMode::Plan,
+        loopal_runtime::mode::AgentMode::Plan,
     )
     .await;
 
@@ -125,12 +139,12 @@ async fn test_large_tool_output_is_truncated_and_saved() {
     std::fs::write(&test_file, &content).unwrap();
 
     let ctx = make_ctx_for(tmp_dir.clone());
-    let result = execute_tool(
+    let result = run_tool(
         &kernel,
         "Read",
         serde_json::json!({"file_path": test_file.to_str().unwrap()}),
         &ctx,
-        &loopal_runtime::mode::AgentMode::Act,
+        loopal_runtime::mode::AgentMode::Act,
     )
     .await;
 

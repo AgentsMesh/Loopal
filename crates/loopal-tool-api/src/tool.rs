@@ -14,6 +14,13 @@ pub enum ToolDispatch {
     RunnerDirect,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ImageOutputPolicy {
+    #[default]
+    Deny,
+    ValidatedInline,
+}
+
 #[async_trait]
 pub trait Tool: Send + Sync {
     fn name(&self) -> &str;
@@ -23,6 +30,10 @@ pub trait Tool: Send + Sync {
 
     fn dispatch(&self) -> ToolDispatch {
         ToolDispatch::Pipeline
+    }
+
+    fn image_output_policy(&self) -> ImageOutputPolicy {
+        ImageOutputPolicy::Deny
     }
 
     fn precheck(&self, _input: &serde_json::Value) -> Option<String> {

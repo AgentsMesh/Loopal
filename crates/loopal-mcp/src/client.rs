@@ -1,7 +1,6 @@
 /// MCP client wrapping rmcp's `RunningService`.
 ///
 /// Provides typed methods for tools/resources/prompts with timeout enforcement.
-use std::sync::Arc;
 use std::time::Duration;
 
 use loopal_error::McpError;
@@ -10,53 +9,20 @@ use rmcp::model::{
     ListToolsResult, PaginatedRequestParams, ReadResourceRequestParams, ReadResourceResult,
     Request, RequestOptionalParam, ServerResult,
 };
-use rmcp::service::{PeerRequestOptions, RoleClient, RunningService, ServiceError, ServiceExt};
-use tracing::{Instrument, info};
+use rmcp::service::{PeerRequestOptions, RoleClient, RunningService, ServiceError};
+use tracing::Instrument;
 
-use crate::handler::{LoopalClientHandler, SamplingCallback};
+use crate::handler::LoopalClientHandler;
+use crate::oauth_credential_seed::OAuthCredentialSeed;
 
 /// A connected MCP client backed by rmcp.
 pub struct McpClient {
-    service: RunningService<RoleClient, LoopalClientHandler>,
-    timeout: Duration,
+    pub(crate) service: RunningService<RoleClient, LoopalClientHandler>,
+    pub(crate) timeout: Duration,
+    pub(crate) oauth_credentials: Option<std::sync::Arc<OAuthCredentialSeed>>,
 }
 
 impl McpClient {
-    /// Connect to an MCP server over any transport.
-    ///
-    /// Performs the MCP handshake (`initialize` / `initialized`) and returns a
-    /// ready-to-use client. Pass a `SamplingCallback` to enable server-initiated
-    /// LLM calls; pass `None` to disable sampling.
-    pub async fn connect<T, E, A>(
-        transport: T,
-        timeout: Duration,
-        sampling: Option<Arc<dyn SamplingCallback>>,
-    ) -> Result<Self, McpError>
-    where
-        T: rmcp::transport::IntoTransport<RoleClient, E, A>,
-        E: std::error::Error + From<std::io::Error> + Send + Sync + 'static,
-    {
-        let handler = LoopalClientHandler::new(sampling);
-        let service = handler.serve(transport).await.map_err(|error| {
-            let detail = error.to_string().to_ascii_lowercase();
-            if detail.contains("auth") || detail.contains("401") || detail.contains("unauthorized")
-            {
-                McpError::ConnectionFailed("MCP authentication required".into())
-            } else {
-                McpError::ConnectionFailed("MCP handshake failed".into())
-            }
-        })?;
-
-        if let Some(info) = service.peer_info() {
-            info!(
-                protocol = ?info.protocol_version,
-                "MCP server connected"
-            );
-        }
-
-        Ok(Self { service, timeout })
-    }
-
     /// List tools the server exposes.
     pub async fn list_tools(&self) -> Result<ListToolsResult, McpError> {
         let req = ClientRequest::ListToolsRequest(RequestOptionalParam::with_param(

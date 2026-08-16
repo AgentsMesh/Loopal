@@ -17,13 +17,21 @@ pub mod interrupt;
 pub mod mcp_ipc;
 pub mod mcp_snapshot;
 pub mod naming;
+pub mod permission_action;
+pub mod permission_decision_audit;
+pub mod permission_digest;
+pub mod permission_intent;
+pub mod permission_receipt;
+pub mod permission_request;
 pub mod projected;
+pub mod protected_effect_audit;
 pub mod question;
 pub mod secret_ipc;
 pub mod task_snapshot;
 pub mod thread_goal;
 pub mod ui_capabilities;
 pub mod user_content;
+pub mod workflow;
 
 pub const META_HUB_TOKEN_ENV: &str = "LOOPAL_META_HUB_TOKEN";
 
@@ -54,17 +62,40 @@ pub use interaction::{
 pub use interrupt::InterruptSignal;
 pub use mcp_ipc::{
     McpCallToolRequest, McpCallToolResponse, McpContentBlock, McpListToolsResponse,
-    McpSnapshotResponse, McpToolEntry,
+    McpReconnectRequest, McpReconnectResponse, McpSnapshotResponse, McpToolEntry,
 };
 pub use mcp_snapshot::McpServerSnapshot;
 pub use naming::ROOT_AGENT_NAME;
+pub use permission_action::{
+    calculate_permission_action_digest, calculate_permission_display_digest,
+    calculate_permission_schema_digest,
+};
+pub use permission_decision_audit::{
+    PermissionAuditDecision, PermissionAuditSource, PermissionDecisionAuditError,
+    PermissionDecisionAuditRequest, PermissionDecisionAuditResponse,
+};
+pub use permission_digest::{
+    PermissionActionDigest, PermissionDisplayDigest, PermissionIntentDigest,
+    PermissionSchemaDigest, WorkflowAttemptCapabilityDigest,
+};
+pub use permission_intent::{
+    PERMISSION_INTENT_VERSION, PermissionIntent, PermissionIntentError, PermissionIntentSeed,
+    WorkflowPermissionCausation,
+};
+pub use permission_receipt::{PermissionReceipt, PermissionReceiptError};
+pub use permission_request::{PermissionIntentRequest, PermissionRequestError};
 pub use projected::{ProjectedMessage, ProjectedToolCall, SessionHistorySnapshot};
+pub use protected_effect_audit::{
+    ProtectedEffectAuditError, ProtectedEffectAuditRequest, ProtectedEffectAuditResponse,
+};
 pub use question::{Question, QuestionOption, ResolveSource, UserQuestionResponse};
 pub use secret_ipc::{
     SecretCaller, SecretGetRequest, SecretGetResponse, SecretHealthRequest, SecretHealthResponse,
     SecretIpcError, SecretListNamesRequest, SecretListNamesResponse,
+    WorkflowProviderSecretGetRequest,
 };
 pub use task_snapshot::{TaskSnapshot, TaskSnapshotStatus};
 pub use thread_goal::{GoalTransitionReason, ThreadGoal, ThreadGoalStatus};
 pub use ui_capabilities::{UiCapabilities, UiCapability};
 pub use user_content::{ImageAttachment, SkillInvocation, UserContent};
+pub use workflow::*;

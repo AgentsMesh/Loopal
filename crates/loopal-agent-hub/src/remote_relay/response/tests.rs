@@ -80,10 +80,13 @@ async fn unresolved_origin_ack_keeps_destination_record_retryable() {
         };
         meta.respond(id, json!({"resolved": false})).await.unwrap();
     });
-    let resolved =
-        forward_question_response(&hub, "origin/worker", response_payload("token", "token"))
-            .await
-            .unwrap();
+    let resolved = super::super::forward_question_response(
+        &hub,
+        "origin/worker",
+        response_payload("token", "token"),
+    )
+    .await
+    .unwrap();
     responder.await.unwrap();
     assert!(!resolved);
     let h = hub.lock().await;

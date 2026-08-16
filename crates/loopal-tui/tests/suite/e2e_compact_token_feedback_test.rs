@@ -26,7 +26,7 @@ async fn usage_chunk_drives_effective_tokens_above_estimate() {
 
     let mut h = HarnessBuilder::new()
         .calls(calls)
-        .messages(vec![Message::user("trigger one turn")])
+        .prompt(vec![Message::user("trigger one turn")])
         .build()
         .await;
 
@@ -64,7 +64,7 @@ async fn api_token_feedback_triggers_next_auto_compact() {
 
     let mut h = HarnessBuilder::new()
         .calls(calls)
-        .messages(vec![Message::user("first turn")])
+        .prompt(vec![Message::user("first turn")])
         .build()
         .await;
 

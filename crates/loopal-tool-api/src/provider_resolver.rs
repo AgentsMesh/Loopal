@@ -9,6 +9,41 @@ pub enum OneShotChatError {
     EmptyResponse,
 }
 
+/// Optional effort hint for one-shot callers. The default path deliberately
+/// remains unchanged so fetch refinement and other callers do not inherit a
+/// workflow preset's reasoning policy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum OneShotChatEffort {
+    #[default]
+    Default,
+    Max,
+}
+
+/// Optional knobs for a bounded one-shot request.
+///
+/// This lives in `tool-api` rather than `provider-api` so the one-shot
+/// capability remains dependency-neutral: provider-specific thinking config
+/// is resolved only by the concrete agent implementation. The legacy
+/// `one_shot_chat` method remains the default path, while callers that own a
+/// stronger policy (for example the Ultracode planner) can opt into this
+/// additive API.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct OneShotChatOptions {
+    pub effort: OneShotChatEffort,
+}
+
+impl OneShotChatOptions {
+    pub const fn new(effort: OneShotChatEffort) -> Self {
+        Self { effort }
+    }
+}
+
+impl From<OneShotChatEffort> for OneShotChatOptions {
+    fn from(effort: OneShotChatEffort) -> Self {
+        Self::new(effort)
+    }
+}
+
 impl std::fmt::Display for OneShotChatError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
@@ -33,6 +68,42 @@ pub trait OneShotChatService: Send + Sync {
         user_prompt: &str,
         max_tokens: u32,
     ) -> Result<String, OneShotChatError>;
+
+    /// Ask for a bounded effort hint when the caller owns that policy. Existing
+    /// implementations get the legacy behavior unless they opt in.
+    async fn one_shot_chat_with_effort(
+        &self,
+        model: &str,
+        system_prompt: &str,
+        user_prompt: &str,
+        max_tokens: u32,
+        _effort: OneShotChatEffort,
+    ) -> Result<String, OneShotChatError> {
+        self.one_shot_chat(model, system_prompt, user_prompt, max_tokens)
+            .await
+    }
+
+    /// Additive options entry point. Its default implementation routes through
+    /// the existing effort hook, so implementations that already opted into
+    /// `one_shot_chat_with_effort` keep working and implementations that only
+    /// provide the legacy method remain source-compatible.
+    async fn one_shot_chat_with_options(
+        &self,
+        model: &str,
+        system_prompt: &str,
+        user_prompt: &str,
+        max_tokens: u32,
+        options: OneShotChatOptions,
+    ) -> Result<String, OneShotChatError> {
+        self.one_shot_chat_with_effort(
+            model,
+            system_prompt,
+            user_prompt,
+            max_tokens,
+            options.effort,
+        )
+        .await
+    }
 }
 
 pub trait FetchRefinerPolicy: Send + Sync {

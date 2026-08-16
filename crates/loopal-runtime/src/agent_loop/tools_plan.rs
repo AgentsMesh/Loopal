@@ -1,5 +1,4 @@
 use loopal_protocol::AgentEventPayload;
-use loopal_provider_api::ContentBlock;
 use loopal_tool_api::PermissionDecision;
 use loopal_tool_invocation::{CancelCause, ToolResultMetadata};
 use loopal_tool_plan_mode::ENTER_PLAN_NAME;
@@ -7,6 +6,7 @@ use tracing::{debug, info, warn};
 
 use super::PlanModeState;
 use super::runner::AgentLoopRunner;
+use super::tool_result_sink::PendingToolResult;
 use super::turn_context::TurnContext;
 use crate::mode::AgentMode;
 use crate::plan_file::build_plan_mode_filter;
@@ -17,20 +17,20 @@ impl AgentLoopRunner {
         turn_ctx: &mut TurnContext,
         idx: usize,
         id: &str,
-    ) -> loopal_error::Result<(usize, ContentBlock)> {
+    ) -> loopal_error::Result<(usize, PendingToolResult)> {
         debug!(tool = ENTER_PLAN_NAME, "intercepted");
 
         if self.params.config.mode == AgentMode::Plan {
             return Ok((
                 idx,
-                self.emit_and_block(id, ENTER_PLAN_NAME, "Already in plan mode.", true, None)
+                self.pending_tool_result(id, ENTER_PLAN_NAME, "Already in plan mode.", true, None)
                     .await?,
             ));
         }
-        if self.params.config.lifecycle == super::LifecycleMode::Ephemeral {
+        if self.params.config.lifecycle.is_one_shot() {
             return Ok((
                 idx,
-                self.emit_and_block(
+                self.pending_tool_result(
                     id,
                     ENTER_PLAN_NAME,
                     "EnterPlanMode cannot be used in agent contexts",
@@ -44,11 +44,26 @@ impl AgentLoopRunner {
         self.refresh_decision_context().await;
         let decision = {
             let input = serde_json::json!({});
-            let request = self
+            let tool = self
                 .params
                 .deps
-                .frontend
-                .request_permission(id, ENTER_PLAN_NAME, &input);
+                .kernel
+                .get_tool(ENTER_PLAN_NAME)
+                .ok_or_else(|| {
+                    loopal_error::LoopalError::Tool(loopal_error::ToolError::NotFound(
+                        ENTER_PLAN_NAME.into(),
+                    ))
+                })?;
+            let permission = loopal_protocol::PermissionIntentRequest::create(
+                id,
+                ENTER_PLAN_NAME,
+                input.clone(),
+                input,
+                tool.parameters_schema(),
+                self.params.workflow_permission_causation.clone(),
+            )
+            .map_err(|error| loopal_error::LoopalError::Permission(error.to_string()))?;
+            let request = self.params.deps.frontend.request_permission(&permission);
             tokio::pin!(request);
             tokio::select! {
                 biased;
@@ -59,7 +74,7 @@ impl AgentLoopRunner {
         if decision.is_none() {
             return Ok((
                 idx,
-                self.emit_and_block(
+                self.pending_tool_result(
                     id,
                     ENTER_PLAN_NAME,
                     "Interrupted by user",
@@ -72,7 +87,7 @@ impl AgentLoopRunner {
         if decision != Some(PermissionDecision::Allow) {
             return Ok((
                 idx,
-                self.emit_and_block(
+                self.pending_tool_result(
                     id,
                     ENTER_PLAN_NAME,
                     "User declined to enter plan mode. Continue without planning.",
@@ -112,7 +127,7 @@ impl AgentLoopRunner {
             let msg = format!("Cannot create plans directory: {e}. Plan mode was not entered.");
             return Ok((
                 idx,
-                self.emit_and_block(id, ENTER_PLAN_NAME, msg, true, None)
+                self.pending_tool_result(id, ENTER_PLAN_NAME, msg, true, None)
                     .await?,
             ));
         }
@@ -138,7 +153,7 @@ impl AgentLoopRunner {
         );
         Ok((
             idx,
-            self.emit_and_block(id, ENTER_PLAN_NAME, msg, false, None)
+            self.pending_tool_result(id, ENTER_PLAN_NAME, msg, false, None)
                 .await?,
         ))
     }

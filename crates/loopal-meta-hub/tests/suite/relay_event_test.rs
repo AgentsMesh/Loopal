@@ -38,14 +38,21 @@ async fn local_ui_responds_with_uplink_present() {
     tokio::spawn(async move {
         let mut event_rx = ui.event_rx;
         while let Ok(ev) = event_rx.recv().await {
-            if let loopal_protocol::AgentEventPayload::ToolPermissionRequest { id, .. } = ev.payload
+            if let loopal_protocol::AgentEventPayload::ToolPermissionRequest {
+                id,
+                permission_intent,
+                ..
+            } = ev.payload
             {
                 let agent = ev
                     .agent_name
                     .as_ref()
                     .map(|q| q.agent.clone())
                     .unwrap_or_else(|| "main".to_string());
-                ui_client.respond_permission(&agent, &id, true).await;
+                let digest = permission_intent.map(|intent| intent.intent_digest());
+                ui_client
+                    .respond_permission(&agent, &id, digest, true)
+                    .await;
                 return;
             }
         }
@@ -58,10 +65,19 @@ async fn local_ui_responds_with_uplink_present() {
     });
     tokio::time::sleep(Duration::from_millis(50)).await;
 
+    let request = loopal_protocol::PermissionIntentRequest::create(
+        "t-local",
+        "Bash",
+        json!({}),
+        json!({}),
+        json!({"type": "object"}),
+        None,
+    )
+    .unwrap();
     let resp = ac
         .send_request(
             methods::AGENT_PERMISSION.name,
-            json!({"tool_call_id": "t-local", "tool_name": "Bash", "tool_input": {}}),
+            serde_json::to_value(request).unwrap(),
         )
         .await
         .unwrap();

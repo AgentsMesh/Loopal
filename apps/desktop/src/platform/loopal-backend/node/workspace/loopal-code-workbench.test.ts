@@ -47,6 +47,8 @@ function harness() {
   return { code: new LoopalCodeWorkbench(router), request, router, runtime, setLive }
 }
 
+const intentDigest = `sha256:${'ab'.repeat(32)}`
+
 describe('LoopalCodeWorkbench routing', () => {
   it('maps workspace operations and binds their schemas', async () => {
     const { code, request } = harness()
@@ -82,15 +84,18 @@ describe('LoopalCodeWorkbench routing', () => {
     const { code, request, setLive } = harness()
     const permission = {
       sessionId: 'session', runtimeId: 'runtime-1', generation: 1,
-      agentId: 'worker', requestId: 'permission', decision: 'allow_once' as const,
+      agentId: 'worker', requestId: 'permission', intentDigest,
+      decision: 'allow_once' as const,
     }
     await code.respondPermission(permission, CancellationToken.None)
     expect(request).toHaveBeenLastCalledWith('hub/permission_response', {
-      agent_name: 'worker', tool_call_id: 'permission', allow: true,
+      agent_name: 'worker', tool_call_id: 'permission',
+      permission_intent_digest: intentDigest, allow: true,
     }, expect.any(AbortSignal))
     await code.respondPermission({ ...permission, requestId: 'deny', decision: 'deny' }, CancellationToken.None)
     expect(request).toHaveBeenLastCalledWith('hub/permission_response', {
-      agent_name: 'worker', tool_call_id: 'deny', allow: false,
+      agent_name: 'worker', tool_call_id: 'deny',
+      permission_intent_digest: intentDigest, allow: false,
     }, expect.any(AbortSignal))
     const question = {
       sessionId: 'session', runtimeId: 'runtime-1', generation: 1,

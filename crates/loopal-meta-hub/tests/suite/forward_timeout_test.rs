@@ -65,7 +65,18 @@ async fn blackhole_forwarding_is_bounded_without_holding_registry_lock() {
         loopal_meta_hub::dispatch::dispatch_meta_request(
             &spawn_hub,
             methods::META_SPAWN.name,
-            json!({"name": "child", "prompt": "work", "target_hub": "hub-b"}),
+            json!({
+                "name": "child",
+                "model": "test-model",
+                "parent": "hub-a/parent",
+                "depth": 1,
+                "permission_mode": "ask_dangerous",
+                "decision_mode": "manual",
+                "sandbox_policy": "default_write",
+                "no_sandbox": false,
+                "prompt": "work",
+                "target_hub": "hub-b",
+            }),
             "hub-a".into(),
         )
         .await

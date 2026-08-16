@@ -16,7 +16,7 @@ but Bazel owns Desktop build, test, E2E, staging, and packaging actions.
 BUILD.bazel                 root `loopal` binary and root test macros
 MODULE.bazel                Bazel modules, Rust/Node toolchains, crate specs
 src/                        CLI parsing and process/bootstrap composition
-crates/                     42 top-level Rust product/support crates
+crates/                     44 top-level Rust product/support crates
 crates/tools/               fine-grained built-in tool packages and registry
 apps/desktop/               Electron Desktop application and its tests
 tests/                      root architecture, process E2E, and regression tests
@@ -56,12 +56,13 @@ depend on root `src/`.
 
 ## Rust crate families
 
-The 42 top-level crate directories are grouped here by responsibility, not as a claim
+The 44 top-level crate directories are grouped here by responsibility, not as a claim
 that every crate in a row may depend on every other crate.
 
 | Family | Crates |
 | --- | --- |
 | Contracts and APIs | `loopal-decision-api`, `loopal-error`, `loopal-provider-api`, `loopal-protocol`, `loopal-tool-api`, `loopal-vault-api` |
+| Safety and validation | `loopal-output-guard`, `loopal-workflow-schema` |
 | Agent execution | `loopal-agent`, `loopal-agent-client`, `loopal-agent-hub`, `loopal-agent-server`, `loopal-classifier`, `loopal-context`, `loopal-kernel`, `loopal-runtime`, `loopal-scheduler`, `loopal-session`, `loopal-tool-invocation`, `loopal-turn` |
 | Integrations and capabilities | `loopal-acp`, `loopal-backend`, `loopal-config`, `loopal-git`, `loopal-hooks`, `loopal-ipc`, `loopal-mcp`, `loopal-memory`, `loopal-meta-hub`, `loopal-prompt`, `loopal-prompt-system`, `loopal-provider`, `loopal-sandbox`, `loopal-storage`, `loopal-telemetry`, `loopal-workspace` |
 | Secrets and vaults | `loopal-hub-vault`, `loopal-secret-client`, `loopal-secret-runtime`, `loopal-vault-age` |

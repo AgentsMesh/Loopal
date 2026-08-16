@@ -26,6 +26,10 @@ pub const AGENT_MESSAGE: Method = Method {
     name: "agent/message",
 };
 
+pub const AGENT_WORKFLOW_TERMINAL: Method = Method {
+    name: "agent/workflow_terminal",
+};
+
 // ── Control plane (Client → Agent) ──────────────────────────────
 
 pub const AGENT_CONTROL: Method = Method {

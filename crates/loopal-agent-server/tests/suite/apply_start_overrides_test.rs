@@ -5,7 +5,7 @@
 //! `--decision classifier` alone caused permission_mode to flip from Bypass
 //! to AskAnyWrite.
 
-use loopal_config::Settings;
+use loopal_config::{SandboxPolicy, Settings};
 use loopal_decision_api::DecisionMode;
 use loopal_runtime::LifecycleMode;
 use loopal_tool_api::PermissionMode;
@@ -14,18 +14,8 @@ use loopal_agent_server::testing::StartParams;
 
 fn default_start_params() -> StartParams {
     StartParams {
-        cwd: None,
-        model: None,
-        mode: None,
-        prompt: None,
-        permission_mode: None,
-        decision_mode: None,
-        no_sandbox: false,
-        resume: None,
         lifecycle: LifecycleMode::Ephemeral,
-        agent_type: None,
-        depth: None,
-        fork_context: None,
+        ..StartParams::default()
     }
 }
 
@@ -137,4 +127,28 @@ fn settings_file_values_preserved_when_cli_unspecified() {
         DecisionMode::Classifier,
         "settings file decision_mode must be preserved when CLI unspecified"
     );
+}
+
+#[test]
+fn sandbox_policy_overrides_config() {
+    let mut settings = Settings::default();
+    settings.sandbox.policy = SandboxPolicy::Disabled;
+    let mut start = default_start_params();
+    start.sandbox_policy = Some(SandboxPolicy::ReadOnly);
+
+    loopal_agent_server::testing::apply_start_overrides(&mut settings, &start);
+
+    assert_eq!(settings.sandbox.policy, SandboxPolicy::ReadOnly);
+}
+
+#[test]
+fn legacy_no_sandbox_remains_compatible() {
+    let mut settings = Settings::default();
+    settings.sandbox.policy = SandboxPolicy::ReadOnly;
+    let mut start = default_start_params();
+    start.no_sandbox = true;
+
+    loopal_agent_server::testing::apply_start_overrides(&mut settings, &start);
+
+    assert_eq!(settings.sandbox.policy, SandboxPolicy::Disabled);
 }

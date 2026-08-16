@@ -1,5 +1,3 @@
-use serde::{Deserialize, Serialize};
-
 use crate::address::QualifiedAddress;
 use crate::bg_task::BgTaskStatus;
 use crate::cron_snapshot::CronJobSnapshot;
@@ -12,6 +10,7 @@ use crate::mcp_snapshot::McpServerSnapshot;
 use crate::question::{Question, ResolveSource};
 use crate::task_snapshot::TaskSnapshot;
 use crate::thread_goal::{GoalTransitionReason, ThreadGoal};
+use serde::{Deserialize, Serialize};
 
 /// `#[rustfmt::skip]` keeps single-field variants on one line (200-line budget).
 #[rustfmt::skip]
@@ -43,11 +42,8 @@ pub enum AgentEventPayload {
         elapsed_ms: u64,
     },
     ToolBatchStart { tool_ids: Vec<String> },
-    ToolPermissionRequest {
-        id: String,
-        name: String,
-        input: serde_json::Value,
-    },
+    ToolPermissionRequest { id: String, name: String, input: serde_json::Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")] permission_intent: Option<Box<crate::PermissionIntent>> },
     PlanApprovalRequest { id: String, plan_content: String, plan_path: String },
     PlanApprovalResolved { id: String },
     Error { message: String },
@@ -195,6 +191,7 @@ pub enum AgentEventPayload {
     ContinuationGateChanged(ContinuationGateSummary),
     /// A goal-continuation turn was skipped (goal changed) — keeps the skip observable, not silent.
     ContinuationSkipped { reason: String },
+    WorkflowRunChanged(crate::WorkflowRunSummary),
     /// A turn was cancelled (parent abort / governance / interrupt). `cause` is the rendered CancelledCause.
     TurnCancelled { cause: String },
 }

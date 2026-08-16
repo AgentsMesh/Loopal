@@ -129,7 +129,7 @@ pub fn format_converted_to_background(
     let mut msg = format!(
         "Command timed out after {timeout_secs}s and was moved to background.\n\
          process_id: {task_id}\n\
-         Use Bash with process_id to check output later."
+         Use BashProcess with process_id to check output later."
     );
     if !log_path.as_os_str().is_empty() {
         msg.push_str(&format!("\nFull log: {}", log_path.display()));

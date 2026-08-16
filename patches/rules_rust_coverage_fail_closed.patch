@@ -1,0 +1,73 @@
+--- a/util/collect_coverage/collect_coverage.rs
++++ b/util/collect_coverage/collect_coverage.rs
+@@ -25,6 +25,32 @@
+ use std::path::PathBuf;
+ use std::process;
+ 
++#[cfg(unix)]
++fn ensure_coverage_dir_writable(coverage_dir: &Path) {
++    use std::os::unix::fs::PermissionsExt;
++
++    let mut permissions = fs::metadata(coverage_dir)
++        .expect("Failed to inspect coverage directory permissions")
++        .permissions();
++    let mode = permissions.mode();
++    permissions.set_mode(mode | 0o200);
++    fs::set_permissions(coverage_dir, permissions)
++        .expect("Failed to make coverage directory owner-writable");
++}
++
++#[cfg(windows)]
++fn ensure_coverage_dir_writable(coverage_dir: &Path) {
++    let mut permissions = fs::metadata(coverage_dir)
++        .expect("Failed to inspect coverage directory permissions")
++        .permissions();
++    permissions.set_readonly(false);
++    fs::set_permissions(coverage_dir, permissions)
++        .expect("Failed to make coverage directory owner-writable");
++}
++
++#[cfg(not(any(unix, windows)))]
++fn ensure_coverage_dir_writable(_coverage_dir: &Path) {}
++
+ macro_rules! debug_log {
+     ($($arg:tt)*) => {
+         if env::var("VERBOSE_COVERAGE").is_ok() {
+@@ -87,6 +113,7 @@
+ 
+ fn main() {
+     let coverage_dir = PathBuf::from(env::var("COVERAGE_DIR").unwrap());
++    ensure_coverage_dir_writable(&coverage_dir);
+     let execroot = PathBuf::from(env::var("ROOT").unwrap());
+     let mut runfiles_dir = PathBuf::from(env::var("RUNFILES_DIR").unwrap());
+ 
+@@ -151,7 +178,8 @@
+         .arg("-ignore-filename-regex='/tmp/.+'")
+         .arg(format!("-path-equivalence=.,'{}'", execroot.display()))
+         .arg(test_binary)
+-        .stdout(process::Stdio::piped());
++        .stdout(process::Stdio::piped())
++        .stderr(process::Stdio::piped());
+ 
+     debug_log!("Spawning {:#?}", llvm_cov_cmd);
+     let child = llvm_cov_cmd
+@@ -160,6 +188,19 @@
+ 
+     let output = child.wait_with_output().expect("llvm-cov process failed");
+ 
++    if !output.status.success() {
++        if let Err(error) = fs::remove_file(&profdata_file) {
++            eprintln!(
++                "failed to remove {} after llvm-cov export failure: {}",
++                profdata_file.display(),
++                error
++            );
++        }
++        let stderr = std::str::from_utf8(&output.stderr).unwrap_or("<non-utf8>");
++        eprintln!("llvm-cov export failed:\n{}", stderr);
++        process::exit(output.status.code().unwrap_or(1));
++    }
++
+     // Parse the child process's stdout to a string now that it's complete.
+     debug_log!("Parsing llvm-cov output");
+     let report_str = std::str::from_utf8(&output.stdout).expect("Failed to parse llvm-cov output");

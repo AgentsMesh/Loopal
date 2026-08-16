@@ -45,35 +45,6 @@ impl AgentLoopRunner {
             .await
     }
 
-    pub(super) async fn handle_mcp_reconnect(&mut self, server: String) -> Result<ControlOutcome> {
-        info!(server = %server, "reconnecting MCP server");
-        let rejection = match self.params.deps.kernel.mcp_manager() {
-            Some(mgr) => {
-                let result = mgr.write().await.restart_connection(&server).await;
-                let rejection = if let Err(e) = result {
-                    error!(server = %server, error = %e, "MCP reconnect failed");
-                    Some(format!("MCP reconnect failed for {server}: {e}"))
-                } else {
-                    None
-                };
-                self.params
-                    .deps
-                    .kernel
-                    .register_mcp_tools_for_server(&server)
-                    .await;
-                rejection
-            }
-            None => {
-                warn!(server = %server, "MCP reconnect ignored: no owned connections");
-                Some("this agent does not own MCP connections".to_string())
-            }
-        };
-        let snapshots = self.collect_mcp_snapshots().await;
-        self.emit(AgentEventPayload::McpStatusReport { servers: snapshots })
-            .await?;
-        Ok(rejection.map_or_else(ControlOutcome::applied, ControlOutcome::rejected))
-    }
-
     pub(super) async fn handle_mcp_disconnect(&mut self, server: String) -> Result<ControlOutcome> {
         info!(server = %server, "disconnecting MCP server");
         let rejection = match self.params.deps.kernel.mcp_manager() {
@@ -101,7 +72,7 @@ impl AgentLoopRunner {
         Ok(rejection.map_or_else(ControlOutcome::applied, ControlOutcome::rejected))
     }
 
-    async fn collect_mcp_snapshots(&self) -> Vec<McpServerSnapshot> {
+    pub(super) async fn collect_mcp_snapshots(&self) -> Vec<McpServerSnapshot> {
         let source_map = self.load_mcp_source_map();
         let snapshots = self
             .params

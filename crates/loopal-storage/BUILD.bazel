@@ -4,12 +4,13 @@ rust_library(
     name = "loopal-storage",
     srcs = glob(["src/**/*.rs"]),
     edition = "2024",
+    proc_macro_deps = ["@crates//:async-trait"],
     visibility = ["//visibility:public"],
     deps = [
         "//crates/loopal-config",
         "//crates/loopal-error",
-        "//crates/loopal-provider-api",
         "//crates/loopal-protocol",
+        "//crates/loopal-provider-api",
         "//crates/loopal-tool-invocation",
         "//crates/loopal-turn",
         "@crates//:chrono",
@@ -19,14 +20,17 @@ rust_library(
         "@crates//:thiserror",
         "@crates//:tokio",
         "@crates//:uuid",
-    ],
-    proc_macro_deps = ["@crates//:async-trait"],
+    ] + select({
+        "@platforms//os:windows": ["@crates//:windows-sys"],
+        "//conditions:default": ["@crates//:libc"],
+    }),
 )
 
 rust_test(
     name = "loopal-storage-unit-test",
     crate = ":loopal-storage",
     edition = "2024",
+    deps = ["@crates//:tempfile"],
 )
 
 rust_test(
@@ -44,5 +48,25 @@ rust_test(
         "@crates//:serde_json",
         "@crates//:tempfile",
         "@crates//:tokio",
+    ],
+)
+
+rust_test(
+    name = "workflow_journal_windows_test",
+    srcs = [
+        "tests/suite/workflow_journal_support.rs",
+        "tests/windows_workflow_journal.rs",
+    ],
+    crate_root = "tests/windows_workflow_journal.rs",
+    edition = "2024",
+    target_compatible_with = select({
+        "@platforms//os:windows": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":loopal-storage",
+        "//crates/loopal-protocol",
+        "@crates//:serde_json",
+        "@crates//:tempfile",
     ],
 )

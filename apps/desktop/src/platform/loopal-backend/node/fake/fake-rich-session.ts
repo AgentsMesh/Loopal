@@ -76,5 +76,6 @@ export function fakeSessionView(now: string): SessionView {
       name: 'filesystem', transport: 'stdio', source: 'builtin', status: 'ready',
       toolCount: 8, resourceCount: 2, promptCount: 1, errors: [],
     }],
+    workflows: { active: [], recent: [] },
   }
 }

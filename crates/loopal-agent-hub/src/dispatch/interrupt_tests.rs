@@ -10,9 +10,9 @@ use super::{handle_control, handle_interrupt, handle_shutdown_agent};
 use crate::Hub;
 use crate::pending_relay::PendingPlanApprovalInfo;
 
-struct RecordingTransport {
+pub(super) struct RecordingTransport {
     sent: mpsc::UnboundedSender<Vec<u8>>,
-    incoming_tx: mpsc::UnboundedSender<Vec<u8>>,
+    pub(super) incoming_tx: mpsc::UnboundedSender<Vec<u8>>,
     incoming_rx: Mutex<mpsc::UnboundedReceiver<Vec<u8>>>,
     fail_first_send: AtomicBool,
     closed: AtomicBool,
@@ -59,7 +59,7 @@ impl Transport for RecordingTransport {
     }
 }
 
-async fn fixture(
+pub(super) async fn fixture(
     fail_first_send: bool,
 ) -> (
     Arc<Mutex<Hub>>,

@@ -40,6 +40,7 @@ async fn drain_compact_phases(
 async fn microcompact_scrubs_idle_tool_results_e2e() {
     let mut h = HarnessBuilder::new()
         .calls(vec![chunks::text_turn("noop")])
+        .messages(vec![loopal_provider_api::Message::user("hello")])
         .build()
         .await;
 
@@ -72,6 +73,7 @@ async fn microcompact_scrubs_idle_tool_results_e2e() {
 async fn microcompact_noop_when_recent_activity_e2e() {
     let mut h = HarnessBuilder::new()
         .calls(vec![chunks::text_turn("noop")])
+        .messages(vec![loopal_provider_api::Message::user("hello")])
         .build()
         .await;
 
@@ -94,6 +96,7 @@ async fn microcompact_noop_when_recent_activity_e2e() {
 async fn microcompact_preserves_non_scrubbable_tools_e2e() {
     let mut h = HarnessBuilder::new()
         .calls(vec![chunks::text_turn("noop")])
+        .messages(vec![loopal_provider_api::Message::user("hello")])
         .build()
         .await;
 
@@ -128,6 +131,7 @@ async fn microcompact_scrubs_all_supported_tool_types() {
     ];
     let mut h = HarnessBuilder::new()
         .calls(vec![chunks::text_turn("noop")])
+        .messages(vec![loopal_provider_api::Message::user("hello")])
         .build()
         .await;
     h.runner.params.config.microcompact_idle = Duration::from_secs(60);
@@ -155,6 +159,7 @@ async fn microcompact_scrubs_all_supported_tool_types() {
 async fn microcompact_disabled_when_idle_duration_is_zero() {
     let mut h = HarnessBuilder::new()
         .calls(vec![chunks::text_turn("noop")])
+        .messages(vec![loopal_provider_api::Message::user("hello")])
         .build()
         .await;
 

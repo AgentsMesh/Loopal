@@ -4,9 +4,13 @@ rust_library(
     name = "loopal-secret-client",
     srcs = glob(["src/**/*.rs"]),
     edition = "2024",
+    proc_macro_deps = [
+        "@crates//:async-trait",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         "//crates/loopal-ipc",
+        "//crates/loopal-output-guard",
         "//crates/loopal-protocol",
         "@crates//:once_cell",
         "@crates//:regex",
@@ -14,9 +18,6 @@ rust_library(
         "@crates//:serde_json",
         "@crates//:thiserror",
         "@crates//:tokio",
-    ],
-    proc_macro_deps = [
-        "@crates//:async-trait",
     ],
 )
 

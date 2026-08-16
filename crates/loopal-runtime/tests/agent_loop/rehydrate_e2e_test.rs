@@ -18,6 +18,7 @@ fn touched_at(path: &std::path::Path, mutated: bool, idx: usize) -> TouchedFile 
 async fn rehydrate_reads_files_via_real_read_tool() {
     let mut h = HarnessBuilder::new()
         .calls(vec![chunks::text_turn("noop")])
+        .messages(vec![loopal_provider_api::Message::user("hello")])
         .build()
         .await;
     reopen_for_test(&mut h.runner);
@@ -78,6 +79,7 @@ async fn rehydrate_reads_files_via_real_read_tool() {
 async fn rehydrate_noop_on_empty_touched() {
     let mut h = HarnessBuilder::new()
         .calls(vec![chunks::text_turn("noop")])
+        .messages(vec![loopal_provider_api::Message::user("hello")])
         .build()
         .await;
     reopen_for_test(&mut h.runner);
@@ -97,6 +99,7 @@ async fn rehydrate_noop_on_empty_touched() {
 async fn rehydrate_skips_unreadable_paths() {
     let mut h = HarnessBuilder::new()
         .calls(vec![chunks::text_turn("noop")])
+        .messages(vec![loopal_provider_api::Message::user("hello")])
         .build()
         .await;
     reopen_for_test(&mut h.runner);
@@ -126,6 +129,7 @@ async fn rehydrate_skips_unreadable_paths() {
 async fn rehydrate_handles_partial_success() {
     let mut h = HarnessBuilder::new()
         .calls(vec![chunks::text_turn("noop")])
+        .messages(vec![loopal_provider_api::Message::user("hello")])
         .build()
         .await;
     reopen_for_test(&mut h.runner);
@@ -167,6 +171,7 @@ async fn rehydrate_handles_partial_success() {
 async fn rehydrate_respects_total_bytes_budget() {
     let mut h = HarnessBuilder::new()
         .calls(vec![chunks::text_turn("noop")])
+        .messages(vec![loopal_provider_api::Message::user("hello")])
         .build()
         .await;
     reopen_for_test(&mut h.runner);
@@ -196,6 +201,7 @@ async fn rehydrate_respects_total_bytes_budget() {
 async fn rehydrate_does_not_emit_synthetic_model_stream() {
     let mut h = HarnessBuilder::new()
         .calls(vec![chunks::text_turn("noop")])
+        .messages(vec![loopal_provider_api::Message::user("hello")])
         .build()
         .await;
     reopen_for_test(&mut h.runner);
@@ -222,6 +228,7 @@ async fn rehydrate_does_not_emit_synthetic_model_stream() {
 async fn rehydrate_partial_failure_appends_model_visible_note() {
     let mut h = HarnessBuilder::new()
         .calls(vec![chunks::text_turn("noop")])
+        .messages(vec![loopal_provider_api::Message::user("hello")])
         .build()
         .await;
     reopen_for_test(&mut h.runner);
@@ -261,6 +268,7 @@ async fn rehydrate_partial_failure_appends_model_visible_note() {
 async fn rehydrate_pre_cancelled_token_skips_persist() {
     let mut h = HarnessBuilder::new()
         .calls(vec![chunks::text_turn("noop")])
+        .messages(vec![loopal_provider_api::Message::user("hello")])
         .build()
         .await;
     reopen_for_test(&mut h.runner);
@@ -283,6 +291,7 @@ async fn rehydrate_pre_cancelled_token_skips_persist() {
 async fn rehydrate_cancel_during_reads_leaves_store_untouched() {
     let mut h = HarnessBuilder::new()
         .calls(vec![chunks::text_turn("noop")])
+        .messages(vec![loopal_provider_api::Message::user("hello")])
         .build()
         .await;
     reopen_for_test(&mut h.runner);

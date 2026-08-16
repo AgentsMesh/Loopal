@@ -3,6 +3,7 @@ import { createBackendStub } from '../../../../../test/support/backend/backend-s
 import { DesktopBackendChannel } from './backend-channel'
 
 const token = CancellationToken.None
+const intentDigest = `sha256:${'ab'.repeat(32)}`
 
 describe('DesktopBackendChannel code workbench commands', () => {
   it('dispatches workspace, Git, worktree, and attention commands', async () => {
@@ -37,7 +38,7 @@ describe('DesktopBackendChannel code workbench commands', () => {
       sessionId: 'session', runtimeId: 'runtime', generation: 1, agentId: 'main',
     }
     await expect(call('respondPermission', {
-      ...scope, requestId: 'p1', decision: 'allow_once',
+      ...scope, requestId: 'p1', intentDigest, decision: 'allow_once',
     }))
       .resolves.toBeUndefined()
     await expect(call('respondQuestion', { ...scope, requestId: 'q1', answers: ['yes'] }))

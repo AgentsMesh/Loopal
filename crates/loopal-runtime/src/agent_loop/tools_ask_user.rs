@@ -1,5 +1,6 @@
-use loopal_provider_api::ContentBlock;
 use loopal_tool_invocation::{CancelCause, ToolResultMetadata};
+
+use super::tool_result_sink::PendingToolResult;
 
 use super::question_format::format_response;
 use super::question_parse::parse_questions;
@@ -14,7 +15,7 @@ impl AgentLoopRunner {
         id: &str,
         name: &str,
         input: &serde_json::Value,
-    ) -> loopal_error::Result<(usize, ContentBlock)> {
+    ) -> loopal_error::Result<(usize, PendingToolResult)> {
         match parse_questions(input) {
             Ok(questions) => {
                 self.handle_ask_user_ok(turn_ctx, idx, id, name, questions)
@@ -34,7 +35,7 @@ impl AgentLoopRunner {
         id: &str,
         name: &str,
         questions: Vec<loopal_protocol::Question>,
-    ) -> loopal_error::Result<(usize, ContentBlock)> {
+    ) -> loopal_error::Result<(usize, PendingToolResult)> {
         self.refresh_decision_context().await;
         let response = {
             let request = self.params.deps.frontend.ask_user(questions.clone());
@@ -48,7 +49,7 @@ impl AgentLoopRunner {
         let Some(response) = response else {
             return Ok((
                 idx,
-                self.emit_and_block(
+                self.pending_tool_result(
                     id,
                     name,
                     "Interrupted by user",
@@ -61,7 +62,7 @@ impl AgentLoopRunner {
         let (content, is_error) = format_response(&response, &questions);
         Ok((
             idx,
-            self.emit_and_block(id, name, content, is_error, None)
+            self.pending_tool_result(id, name, content, is_error, None)
                 .await?,
         ))
     }
@@ -72,10 +73,11 @@ impl AgentLoopRunner {
         id: &str,
         name: &str,
         err_msg: String,
-    ) -> loopal_error::Result<(usize, ContentBlock)> {
+    ) -> loopal_error::Result<(usize, PendingToolResult)> {
         Ok((
             idx,
-            self.emit_and_block(id, name, err_msg, true, None).await?,
+            self.pending_tool_result(id, name, err_msg, true, None)
+                .await?,
         ))
     }
 }

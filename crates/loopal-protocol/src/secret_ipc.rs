@@ -20,6 +20,19 @@ pub struct SecretGetResponse {
     pub plaintext: String,
 }
 
+/// Startup-only provider credential request for a workflow worker.
+///
+/// The Hub binds both opaque fields to the authenticated exact execution.
+/// This request is deliberately separate from `SecretGetRequest` so the
+/// worker's runtime tool secret client remains outside the workflow ACL.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkflowProviderSecretGetRequest {
+    pub cwd: String,
+    pub name: String,
+    pub causation: crate::WorkflowPermissionCausation,
+    pub capability: crate::WorkflowAttemptCapability,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SecretListNamesRequest {
     pub cwd: String,

@@ -7,6 +7,8 @@ use loopal_context::ContextBudget;
 use loopal_provider_api::Message;
 use loopal_test_support::{HarnessBuilder, HookFixture, chunks};
 
+const TEST_HOOK_TIMEOUT_MS: u64 = 30_000;
+
 fn tiny_budget() -> ContextBudget {
     ContextBudget {
         context_window: 500,
@@ -31,7 +33,7 @@ fn build_hook(script: &std::path::Path) -> HookConfig {
         event: HookEvent::PreCompact,
         command: script.to_str().unwrap().to_string(),
         tool_filter: None,
-        timeout_ms: 5000,
+        timeout_ms: TEST_HOOK_TIMEOUT_MS,
         hook_type: Default::default(),
         url: None,
         headers: Default::default(),
@@ -40,6 +42,16 @@ fn build_hook(script: &std::path::Path) -> HookConfig {
         condition: None,
         id: None,
     }
+}
+
+async fn wait_for_marker(path: &std::path::Path, expected: &str) {
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while !std::fs::read_to_string(path).is_ok_and(|content| content.contains(expected)) {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap_or_else(|_| panic!("hook marker did not appear: {}", path.display()));
 }
 
 #[tokio::test]
@@ -55,7 +67,7 @@ async fn precompact_hook_fires_on_manual_compact() {
         .await;
 
     h.runner.force_compact(None).await.unwrap();
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    wait_for_marker(&marker, "manual_compact_fired").await;
 
     assert!(
         marker.exists(),
@@ -113,7 +125,7 @@ async fn precompact_hook_fires_on_auto_compact() {
 
     let cancel = tokio_util::sync::CancellationToken::new();
     h.runner.check_and_compact(&cancel).await.unwrap();
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    wait_for_marker(&marker, "auto_compact_fired").await;
 
     assert!(
         marker.exists(),

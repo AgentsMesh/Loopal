@@ -6,7 +6,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 
 use loopal_error::Result;
-use loopal_protocol::AgentEventPayload;
+use loopal_protocol::{AgentEventPayload, PermissionIntentRequest};
 use loopal_runtime::frontend::traits::EventEmitter;
 use loopal_tool_api::{Tool, ToolContext, TypedBridge};
 use loopal_tool_background::BackgroundTaskStore;
@@ -80,9 +80,7 @@ impl loopal_runtime::frontend::traits::AgentFrontend for CaptureFrontend {
     }
     async fn request_permission(
         &self,
-        _id: &str,
-        _name: &str,
-        _input: &serde_json::Value,
+        _request: &PermissionIntentRequest,
     ) -> loopal_tool_api::PermissionDecision {
         loopal_tool_api::PermissionDecision::Allow
     }

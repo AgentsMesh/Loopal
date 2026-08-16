@@ -11,6 +11,7 @@ use loopal_protocol::{AgentEvent, AgentEventPayload};
 
 use crate::authoritative_events::AuthoritativeEventSink;
 use crate::hub::Hub;
+use crate::types::AgentExecutionRef;
 use crate::uplink::HubUplink;
 use crate::uplink_requests::SpawnAgentRequestError;
 
@@ -53,9 +54,9 @@ fn check_payload_and_names(params: &Value, from_agent: &str) -> Result<String, S
 async fn preflight(
     hub: &Arc<Mutex<Hub>>,
     params: &Value,
-    from_agent: &str,
+    requester: &AgentExecutionRef,
 ) -> Result<ForwardPreflight, String> {
-    let name = check_payload_and_names(params, from_agent)?;
+    let name = check_payload_and_names(params, &requester.address.agent)?;
     let h = hub.lock().await;
     let uplink = h
         .uplink
@@ -72,9 +73,10 @@ async fn preflight(
 pub(super) async fn forward_cross_hub_spawn(
     hub: &Arc<Mutex<Hub>>,
     params: Value,
-    from_agent: &str,
+    requester: &AgentExecutionRef,
 ) -> Result<Value, String> {
-    let pf = preflight(hub, &params, from_agent).await?;
+    let from_agent = requester.address.agent.as_str();
+    let pf = preflight(hub, &params, requester).await?;
 
     let mut spawn_params = params.clone();
     if let Some(obj) = spawn_params.as_object_mut() {
@@ -83,6 +85,7 @@ pub(super) async fn forward_cross_hub_spawn(
         let parent_addr = loopal_protocol::QualifiedAddress::remote([pf.hub_name], from_agent);
         obj.insert("parent".into(), json!(parent_addr.to_string()));
     }
+    loopal_ipc::cross_hub::validate_forwarded_spawn_payload(&spawn_params)?;
 
     // Completion always travels back from the remote Hub to resolve this
     // shadow's waiters. The shadow separately owns whether that completion is
@@ -90,54 +93,18 @@ pub(super) async fn forward_cross_hub_spawn(
     let (_, notify_parent_on_completion) =
         super::spawn_parent_policy::local_parent_policy(&params, from_agent)?;
 
-    // Atomic budget check + shadow registration: holding the same lock
-    // across both prevents two concurrent cross-hub spawns from each
-    // observing budget=N-1 and overshooting. Pre-registering before the
-    // IPC also closes the race where a fast-completing remote child's
-    // envelope arrives before the spawn response — `emit_agent_finished`
-    // would otherwise return None (no entry for the child), and the
-    // parent's local completion_tx would never receive the agent-result
-    // envelope. With the shadow present, emit_agent_finished can read the
-    // shadow's `info.parent` and route the envelope to the local parent.
-    let (event_sink, parent_generation, shadow_generation) = {
-        let mut h = hub.lock().await;
-        if !h
-            .uplink
-            .as_ref()
-            .is_some_and(|active| Arc::ptr_eq(active, &pf.uplink))
-        {
-            return Err("MetaHub uplink changed during remote spawn admission".into());
-        }
-        if h.shadow_name_is_quarantined(&pf.name, &pf.uplink) {
-            return Err(format!(
-                "remote agent name '{}' is quarantined until the MetaHub uplink reconnects",
-                pf.name
-            ));
-        }
-        let sub_count = h.registry.sub_agent_count();
-        if sub_count >= h.max_total_agents as usize {
-            return Err(format!(
-                "Spawn budget exhausted ({sub_count}/{} sub-agents). \
-                 Complete the task with your own tools.",
-                h.max_total_agents
-            ));
-        }
-        h.registry.register_shadow_with_parent_policy(
-            &pf.name,
-            loopal_protocol::QualifiedAddress::local(from_agent),
-            notify_parent_on_completion,
-        )?;
-        let shadow_generation = h
-            .registry
-            .generation(&pf.name)
-            .expect("newly registered shadow must own a generation");
-        h.install_shadow_spawn_admission(&pf.name, shadow_generation, pf.uplink.clone());
-        (
-            AuthoritativeEventSink::from_hub(&h),
-            h.registry.generation(from_agent),
-            shadow_generation,
-        )
-    };
+    let admission = super::cross_hub_spawn_admission::audit_and_register_shadow(
+        hub,
+        &pf.name,
+        &params,
+        requester,
+        &pf.uplink,
+        notify_parent_on_completion,
+    )
+    .await?;
+    let event_sink = admission.event_sink;
+    let parent_generation = admission.parent_generation;
+    let shadow_generation = admission.shadow_generation;
 
     // Once the shadow is committed, the remote RPC, event admission, and
     // rollback form one durable coordinator. Cancelling the caller detaches
@@ -484,502 +451,15 @@ fn interrupt_remote_best_effort(uplink: Arc<HubUplink>, target_hub: String, name
 }
 
 #[cfg(test)]
-mod tests {
-    use std::time::Duration;
+#[path = "cross_hub_spawn_audit_tests.rs"]
+mod audit_tests;
+#[cfg(test)]
+#[path = "cross_hub_forward_reconciliation_tests.rs"]
+mod reconciliation_tests;
+#[cfg(test)]
+#[path = "cross_hub_forward_validation_tests.rs"]
+mod validation_tests;
 
-    use loopal_ipc::Connection;
-    use loopal_ipc::connection::Incoming;
-    use loopal_ipc::protocol::methods;
-    use loopal_protocol::{AgentEvent, AgentEventPayload};
-    use tokio::sync::{Mutex, mpsc};
-
-    use super::*;
-
-    async fn hub_with_uplink(
-        event_tx: mpsc::Sender<AgentEvent>,
-    ) -> (
-        Arc<Mutex<Hub>>,
-        Arc<Connection<loopal_ipc::Listening>>,
-        mpsc::Receiver<Incoming>,
-    ) {
-        let (hub_transport, meta_transport) = loopal_ipc::duplex_pair();
-        let (hub_connection, _hub_rx) = Connection::new(hub_transport).into_listening();
-        let (meta_connection, meta_rx) = Connection::new(meta_transport).into_listening();
-        let hub = Arc::new(Mutex::new(Hub::new(event_tx)));
-        hub.lock().await.uplink = Some(Arc::new(HubUplink::new(hub_connection, "origin".into())));
-        (hub, meta_connection, meta_rx)
-    }
-
-    fn respond_to_spawn(
-        meta_connection: Arc<Connection<loopal_ipc::Listening>>,
-        mut meta_rx: mpsc::Receiver<Incoming>,
-    ) -> tokio::task::JoinHandle<()> {
-        tokio::spawn(async move {
-            let Incoming::Request { id, method, .. } = meta_rx.recv().await.unwrap() else {
-                panic!("expected meta/spawn request");
-            };
-            assert_eq!(method, methods::META_SPAWN.name);
-            meta_connection
-                .respond(id, json!({"agent_id": "remote-id"}))
-                .await
-                .unwrap();
-        })
-    }
-
-    #[tokio::test]
-    async fn full_queue_backpressures_cross_hub_spawn_without_holding_hub_lock() {
-        let (event_tx, mut event_rx) = mpsc::channel(1);
-        event_tx
-            .send(AgentEvent::root(AgentEventPayload::Running))
-            .await
-            .unwrap();
-        let (hub, meta_connection, meta_rx) = hub_with_uplink(event_tx).await;
-        let responder = respond_to_spawn(meta_connection, meta_rx);
-        let spawn = tokio::spawn({
-            let hub = hub.clone();
-            async move {
-                forward_cross_hub_spawn(
-                    &hub,
-                    json!({
-                        "name": "remote-worker",
-                        "prompt": "work",
-                        "target_hub": "destination",
-                    }),
-                    "main",
-                )
-                .await
-            }
-        });
-        responder.await.unwrap();
-        tokio::task::yield_now().await;
-        assert!(
-            !spawn.is_finished(),
-            "remote spawn must wait for SubAgentSpawned queue capacity"
-        );
-        assert!(
-            hub.lock()
-                .await
-                .registry
-                .agent_info("remote-worker")
-                .is_some()
-        );
-        let guard = tokio::time::timeout(Duration::from_millis(100), hub.lock())
-            .await
-            .expect("cross-hub event backpressure must not hold the Hub lock");
-        drop(guard);
-
-        assert!(matches!(
-            event_rx.recv().await.unwrap().payload,
-            AgentEventPayload::Running
-        ));
-        let event = event_rx.recv().await.unwrap();
-        assert!(matches!(
-            event.payload,
-            AgentEventPayload::SubAgentSpawned(ref spawned)
-                if spawned.name == "remote-worker" && spawned.agent_id == "remote-id"
-        ));
-        assert_eq!(spawn.await.unwrap().unwrap()["agent_id"], "remote-id");
-    }
-
-    #[tokio::test]
-    async fn closed_queue_reports_failure_but_preserves_remote_completion_shadow() {
-        let (event_tx, event_rx) = mpsc::channel(1);
-        drop(event_rx);
-        let (hub, meta_connection, meta_rx) = hub_with_uplink(event_tx).await;
-        let shutdown = hub.lock().await.shutdown_signal.clone();
-        let responder = respond_to_spawn(meta_connection, meta_rx);
-
-        let error = forward_cross_hub_spawn(
-            &hub,
-            json!({
-                "name": "remote-worker",
-                "prompt": "work",
-                "target_hub": "destination",
-            }),
-            "main",
-        )
-        .await
-        .unwrap_err();
-        responder.await.unwrap();
-        assert!(error.contains("authoritative Hub event queue closed"));
-        assert!(
-            hub.lock()
-                .await
-                .registry
-                .agent_info("remote-worker")
-                .is_some(),
-            "remote child exists, so its shadow must remain for late completion routing"
-        );
-        tokio::time::timeout(Duration::from_millis(100), shutdown.notified())
-            .await
-            .expect("closed authoritative queue must invalidate the Hub");
-    }
-
-    #[tokio::test]
-    async fn remote_spawn_timeout_terminalizes_in_order_and_quarantines_same_lease_name() {
-        let (event_tx, mut event_rx) = mpsc::channel(8);
-        let (hub, meta_connection, mut meta_rx) = hub_with_uplink(event_tx).await;
-        let old_uplink = hub.lock().await.uplink.clone().unwrap();
-        let remote = tokio::spawn(async move {
-            let Incoming::Request { method, .. } = meta_rx.recv().await.unwrap() else {
-                panic!("expected meta/spawn request");
-            };
-            assert_eq!(method, methods::META_SPAWN.name);
-            tokio::time::sleep(Duration::from_millis(150)).await;
-            drop(meta_connection);
-        });
-
-        let error = forward_cross_hub_spawn(
-            &hub,
-            json!({
-                "name": "unknown-outcome-worker",
-                "prompt": "work",
-                "target_hub": "destination",
-            }),
-            "main",
-        )
-        .await
-        .unwrap_err();
-        assert!(error.contains("outcome unknown"));
-        let spawned = event_rx.recv().await.unwrap();
-        let terminal_error = event_rx.recv().await.unwrap();
-        let finished = event_rx.recv().await.unwrap();
-        assert!(matches!(
-            spawned.payload,
-            AgentEventPayload::SubAgentSpawned(ref event)
-                if event.name == "unknown-outcome-worker" && event.agent_id == "unknown"
-        ));
-        assert!(matches!(
-            terminal_error.payload,
-            AgentEventPayload::Error { ref message }
-                if message.contains("remote spawn outcome unknown")
-        ));
-        assert!(matches!(finished.payload, AgentEventPayload::Finished));
-        assert_eq!(
-            hub.lock()
-                .await
-                .registry
-                .completion("unknown-outcome-worker")
-                .map(|completion| completion.reason.as_str()),
-            Some("remote_spawn_outcome_unknown")
-        );
-
-        let quarantined = forward_cross_hub_spawn(
-            &hub,
-            json!({
-                "name": "unknown-outcome-worker",
-                "prompt": "must not reuse",
-                "target_hub": "destination",
-            }),
-            "main",
-        )
-        .await
-        .unwrap_err();
-        assert!(quarantined.contains("quarantined"));
-
-        // Even if another registration path reuses the bare name, a late
-        // completion on the indeterminate lease cannot finish it.
-        let replacement_generation = {
-            let mut h = hub.lock().await;
-            h.registry
-                .register_shadow(
-                    "unknown-outcome-worker",
-                    loopal_protocol::QualifiedAddress::local("replacement-parent"),
-                )
-                .unwrap();
-            h.registry.generation("unknown-outcome-worker").unwrap()
-        };
-        assert!(matches!(
-            crate::finish::record_cross_hub_completion_from_uplink(
-                &hub,
-                "unknown-outcome-worker",
-                loopal_protocol::AgentCompletion::goal(Some("late old result".into())),
-                old_uplink.connection(),
-            )
-            .await,
-            crate::finish::CrossHubCompletionRoute::Consumed
-        ));
-        assert_eq!(
-            hub.lock()
-                .await
-                .registry
-                .generation("unknown-outcome-worker"),
-            Some(replacement_generation)
-        );
-        assert!(
-            hub.lock()
-                .await
-                .registry
-                .completion("unknown-outcome-worker")
-                .is_none()
-        );
-
-        let (new_hub_transport, _new_meta_transport) = loopal_ipc::duplex_pair();
-        let (new_connection, _new_rx) = Connection::new(new_hub_transport).into_listening();
-        let new_uplink = Arc::new(HubUplink::new(new_connection, "origin".into()));
-        {
-            let mut h = hub.lock().await;
-            h.uplink = Some(new_uplink.clone());
-            assert!(
-                !h.shadow_name_is_quarantined("unknown-outcome-worker", &new_uplink),
-                "a new authenticated uplink lease releases the conservative name quarantine"
-            );
-        }
-        remote.await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn failed_remote_rpc_cannot_rollback_a_same_name_new_generation() {
-        let (event_tx, _event_rx) = mpsc::channel(8);
-        let (hub, meta_connection, mut meta_rx) = hub_with_uplink(event_tx).await;
-        let (request_seen_tx, request_seen_rx) = tokio::sync::oneshot::channel();
-        let (respond_tx, respond_rx) = tokio::sync::oneshot::channel();
-        let responder = tokio::spawn(async move {
-            let Incoming::Request { id, method, .. } = meta_rx.recv().await.unwrap() else {
-                panic!("expected meta/spawn request");
-            };
-            assert_eq!(method, methods::META_SPAWN.name);
-            request_seen_tx.send(()).unwrap();
-            respond_rx.await.unwrap();
-            meta_connection
-                .respond(id, json!({"message": "remote rejected"}))
-                .await
-                .unwrap();
-        });
-        let spawn = tokio::spawn({
-            let hub = hub.clone();
-            async move {
-                forward_cross_hub_spawn(
-                    &hub,
-                    json!({
-                        "name": "remote-worker",
-                        "prompt": "work",
-                        "target_hub": "destination",
-                    }),
-                    "main",
-                )
-                .await
-            }
-        });
-        request_seen_rx.await.unwrap();
-
-        let replacement_generation = {
-            let mut hub = hub.lock().await;
-            hub.registry.unregister_connection("remote-worker");
-            hub.registry
-                .register_shadow(
-                    "remote-worker",
-                    loopal_protocol::QualifiedAddress::local("replacement-parent"),
-                )
-                .unwrap();
-            hub.registry.generation("remote-worker").unwrap()
-        };
-        respond_tx.send(()).unwrap();
-        assert!(spawn.await.unwrap().is_err());
-        responder.await.unwrap();
-
-        let hub = hub.lock().await;
-        assert_eq!(
-            hub.registry.generation("remote-worker"),
-            Some(replacement_generation)
-        );
-        assert_eq!(
-            hub.registry
-                .agent_info("remote-worker")
-                .and_then(|info| info.parent.as_ref())
-                .map(ToString::to_string)
-                .as_deref(),
-            Some("replacement-parent")
-        );
-    }
-
-    #[tokio::test]
-    async fn spawn_response_on_superseded_uplink_terminalizes_shadow_fail_closed() {
-        let (event_tx, mut event_rx) = mpsc::channel(8);
-        let (hub, meta_connection, mut meta_rx) = hub_with_uplink(event_tx).await;
-        let (request_seen_tx, request_seen_rx) = tokio::sync::oneshot::channel();
-        let (respond_tx, respond_rx) = tokio::sync::oneshot::channel();
-        let responder = tokio::spawn(async move {
-            let Incoming::Request { id, method, .. } = meta_rx.recv().await.unwrap() else {
-                panic!("expected meta/spawn request");
-            };
-            assert_eq!(method, methods::META_SPAWN.name);
-            request_seen_tx.send(()).unwrap();
-            respond_rx.await.unwrap();
-            meta_connection
-                .respond(id, json!({"agent_id": "remote-id-on-old-lease"}))
-                .await
-                .unwrap();
-        });
-        let spawn = tokio::spawn({
-            let hub = hub.clone();
-            async move {
-                forward_cross_hub_spawn(
-                    &hub,
-                    json!({
-                        "name": "lease-race-worker",
-                        "prompt": "work",
-                        "target_hub": "destination",
-                    }),
-                    "main",
-                )
-                .await
-            }
-        });
-        request_seen_rx.await.unwrap();
-
-        let (replacement_transport, _replacement_peer) = loopal_ipc::duplex_pair();
-        let (replacement_connection, _replacement_rx) =
-            Connection::new(replacement_transport).into_listening();
-        hub.lock().await.uplink = Some(Arc::new(HubUplink::new(
-            replacement_connection,
-            "origin".into(),
-        )));
-        respond_tx.send(()).unwrap();
-
-        let error = spawn.await.unwrap().unwrap_err();
-        assert!(error.contains("superseded MetaHub uplink lease"));
-        responder.await.unwrap();
-        assert!(matches!(
-            event_rx.recv().await.unwrap().payload,
-            AgentEventPayload::SubAgentSpawned(ref event)
-                if event.name == "lease-race-worker" && event.agent_id == "unknown"
-        ));
-        assert!(matches!(
-            event_rx.recv().await.unwrap().payload,
-            AgentEventPayload::Error { .. }
-        ));
-        assert!(matches!(
-            event_rx.recv().await.unwrap().payload,
-            AgentEventPayload::Finished
-        ));
-        assert_eq!(
-            hub.lock()
-                .await
-                .registry
-                .completion("lease-race-worker")
-                .map(|completion| completion.reason.as_str()),
-            Some("remote_spawn_outcome_unknown")
-        );
-    }
-
-    #[tokio::test]
-    async fn remote_completion_before_spawn_response_is_cached_without_blocking_and_drained_in_order()
-     {
-        let (event_tx, mut event_rx) = mpsc::channel(8);
-        let (hub, meta_connection, mut meta_rx) = hub_with_uplink(event_tx).await;
-        let completion_lease = hub.lock().await.uplink.clone().unwrap();
-        let (request_seen_tx, request_seen_rx) = tokio::sync::oneshot::channel();
-        let (respond_tx, respond_rx) = tokio::sync::oneshot::channel();
-        let responder = tokio::spawn(async move {
-            let Incoming::Request { id, method, .. } = meta_rx.recv().await.unwrap() else {
-                panic!("expected meta/spawn request");
-            };
-            assert_eq!(method, methods::META_SPAWN.name);
-            request_seen_tx.send(()).unwrap();
-            respond_rx.await.unwrap();
-            meta_connection
-                .respond(id, json!({"agent_id": "instant-remote-id"}))
-                .await
-                .unwrap();
-        });
-        let spawn = tokio::spawn({
-            let hub = hub.clone();
-            async move {
-                forward_cross_hub_spawn(
-                    &hub,
-                    json!({
-                        "name": "instant-remote",
-                        "prompt": "work",
-                        "target_hub": "destination",
-                    }),
-                    "main",
-                )
-                .await
-            }
-        });
-        request_seen_rx.await.unwrap();
-        let typed_completion =
-            loopal_protocol::AgentCompletion::new("error", Some("failed immediately".into()));
-        let envelope = loopal_protocol::Envelope::new(
-            loopal_protocol::MessageSource::AgentResult {
-                child: loopal_protocol::QualifiedAddress::local("instant-remote"),
-            },
-            loopal_protocol::QualifiedAddress::local("main"),
-            "failed immediately",
-        )
-        .with_agent_completion(typed_completion.clone());
-        let cached = tokio::time::timeout(
-            Duration::from_millis(100),
-            crate::finish::cache_cross_hub_completion_if_spawning(
-                &hub,
-                "instant-remote",
-                typed_completion,
-                envelope,
-            ),
-        )
-        .await
-        .expect("reverse completion admission must not wait for spawn RPC response");
-        assert!(cached);
-
-        respond_tx.send(()).unwrap();
-        assert_eq!(
-            spawn.await.unwrap().unwrap()["agent_id"],
-            "instant-remote-id"
-        );
-        responder.await.unwrap();
-
-        let spawned = event_rx.recv().await.unwrap();
-        assert!(matches!(
-            spawned.payload,
-            AgentEventPayload::SubAgentSpawned(ref event)
-                if event.name == "instant-remote"
-        ));
-        let error = event_rx.recv().await.unwrap();
-        assert!(matches!(error.payload, AgentEventPayload::Error { .. }));
-        let finished = event_rx.recv().await.unwrap();
-        assert!(matches!(finished.payload, AgentEventPayload::Finished));
-
-        let reuse_error = forward_cross_hub_spawn(
-            &hub,
-            json!({
-                "name": "instant-remote",
-                "prompt": "must not reuse on same lease",
-                "target_hub": "destination",
-            }),
-            "main",
-        )
-        .await
-        .unwrap_err();
-        assert!(reuse_error.contains("quarantined"));
-
-        // A non-cross-hub registration path cannot make an old duplicate
-        // completion authoritative for the replacement generation either.
-        let replacement_generation = {
-            let mut h = hub.lock().await;
-            h.registry
-                .register_shadow(
-                    "instant-remote",
-                    loopal_protocol::QualifiedAddress::local("replacement-parent"),
-                )
-                .unwrap();
-            h.registry.generation("instant-remote").unwrap()
-        };
-        assert!(matches!(
-            crate::finish::record_cross_hub_completion_from_uplink(
-                &hub,
-                "instant-remote",
-                loopal_protocol::AgentCompletion::goal(Some("late duplicate".into())),
-                completion_lease.connection(),
-            )
-            .await,
-            crate::finish::CrossHubCompletionRoute::Consumed
-        ));
-        let h = hub.lock().await;
-        assert_eq!(
-            h.registry.generation("instant-remote"),
-            Some(replacement_generation)
-        );
-        assert!(h.registry.completion("instant-remote").is_none());
-    }
-}
+#[cfg(test)]
+#[path = "cross_hub_forward_tests.rs"]
+mod tests;

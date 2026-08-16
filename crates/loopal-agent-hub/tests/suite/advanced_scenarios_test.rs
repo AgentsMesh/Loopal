@@ -104,7 +104,7 @@ async fn permission_denied_when_tui_disconnects_mid_request() {
         Duration::from_secs(2),
         agent_conn.send_request(
             methods::AGENT_PERMISSION.name,
-            json!({"tool_call_id": "t1", "tool_name": "Bash", "tool_input": {}}),
+            crate::permission_request("t1", "Bash", json!({})),
         ),
     )
     .await;

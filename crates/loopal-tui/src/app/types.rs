@@ -146,6 +146,8 @@ pub enum PanelKind {
     Agents,
     /// Structured tasks progress.
     Tasks,
+    /// Root-owned workflow runs.
+    Workflows,
     /// Background shell tasks.
     BgTasks,
     /// Scheduled cron jobs.

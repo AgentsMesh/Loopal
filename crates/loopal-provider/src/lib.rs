@@ -21,4 +21,4 @@ pub use model_info::{
 pub use openai::OpenAiProvider;
 pub use openai_compat::OpenAiCompatProvider;
 pub use router::ProviderRegistry;
-pub use thinking_resolver::resolve_thinking_config;
+pub use thinking_resolver::{resolve_thinking_config, resolve_thinking_config_with_recommendation};

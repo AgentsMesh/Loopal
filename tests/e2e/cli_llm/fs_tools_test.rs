@@ -348,9 +348,8 @@ async fn write_rejects_wire_secret_refs() {
 
 /// Oversized tool output must overflow to a file: the in-context result keeps
 /// a preview plus a pointer to the saved full output instead of flooding the
-/// conversation. Line-heavy output is already elided by the Bash tool's own
-/// head/tail truncation, so the pipeline overflow (100KB) is exercised with a
-/// byte-heavy single line.
+/// conversation. Two lines stay below the capture layer's per-line limit while
+/// their aggregate exceeds the pipeline overflow limit.
 #[tokio::test]
 async fn huge_tool_output_overflows_to_file() {
     let mut h = CliHarness::start(json!({
@@ -360,7 +359,7 @@ async fn huge_tool_output_overflows_to_file() {
             {"expect": {"userContains": "dump the blob"},
              "chunks": [
                 {"type": "tool_use", "id": "o1", "name": "Bash",
-                 "input": {"command": "head -c 150000 /dev/zero | tr '\\0' x"}},
+                 "input": {"command": "for _ in 1 2; do head -c 60000 /dev/zero | tr '\\0' x; printf '\\n'; done"}},
                 {"type": "done"}
              ]},
             {"expect": {"toolResultId": "o1"},
@@ -382,7 +381,7 @@ async fn huge_tool_output_overflows_to_file() {
         .expect("a Bash ToolResult");
     assert!(
         result.contains("Output too large for context") && result.contains("Full output saved to:"),
-        "a 150KB single-line output must trigger the overflow-to-file path; \
+        "a 120KB two-line output must trigger the overflow-to-file path; \
          result head: {}",
         &result[..result.len().min(400)]
     );

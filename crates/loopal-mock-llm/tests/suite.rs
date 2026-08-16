@@ -1,8 +1,10 @@
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-
 use loopal_mock_llm_lib::{MockResponse, Scenario, SseAction, plan_sse, serve};
 use serde_json::json;
+use std::net::Ipv4Addr;
 use tokio::net::TcpListener;
+
+mod metadata_suite;
+mod mutation_suite;
 
 #[test]
 fn parses_legacy_and_request_aware_scenarios() {
@@ -93,9 +95,7 @@ async fn serves_real_anthropic_sse_and_redacted_journal() {
             ]
         }]
     })).unwrap().as_bytes()).unwrap();
-    let listener = TcpListener::bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0))
-        .await
-        .unwrap();
+    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await.unwrap();
     let address = listener.local_addr().unwrap();
     let task = tokio::spawn(serve(listener, scenario, "test-key".into()));
     let client = reqwest::Client::new();
@@ -154,9 +154,7 @@ async fn unmatched_requests_are_recorded_without_consuming_the_call() {
         .as_bytes(),
     )
     .unwrap();
-    let listener = TcpListener::bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0))
-        .await
-        .unwrap();
+    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await.unwrap();
     let address = listener.local_addr().unwrap();
     let task = tokio::spawn(serve(listener, scenario, "test-key".into()));
     let client = reqwest::Client::new();

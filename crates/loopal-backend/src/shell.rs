@@ -1,17 +1,19 @@
 use std::path::Path;
+use std::sync::Arc;
 use std::time::Duration;
 
 use loopal_config::ResolvedPolicy;
 use loopal_error::ToolIoError;
+use loopal_tool_api::ProcessOutputSanitizer;
 use loopal_tool_api::backend_types::{EnvOverride, ExecResult};
 
-use crate::log_writer::flush_writer;
-use crate::process_group::{SpawnedChild, kill_process_group};
-use crate::shell_spawn::{prepare_spawn, spawn_readers};
+use crate::process_capture_result::exec_result;
+use crate::process_capture_task;
+use crate::process_cleanup::terminate_and_drain;
+use crate::process_wait::{self, WaitOutcome};
+use crate::shell_spawn::{CapturePolicy, prepare_spawn, spawn_capture};
 
 pub use crate::shell_spawn::SpawnedBackgroundData;
-
-const EXEC_KILL_GRACE: Duration = Duration::from_millis(500);
 
 pub async fn exec_command(
     cwd: &Path,
@@ -21,57 +23,56 @@ pub async fn exec_command(
     timeout: Duration,
     session_id: &str,
 ) -> Result<ExecResult, ToolIoError> {
-    let mut prepared = prepare_spawn(cwd, policy, command, env_overrides, session_id).await?;
-    let readers = spawn_readers(
-        prepared.stdout_pipe.take(),
-        prepared.stderr_pipe.take(),
-        prepared.log_writer.clone(),
-        prepared.head_tail.clone(),
-        prepared.stderr_buf.clone(),
+    exec_command_guarded(
+        cwd,
+        policy,
+        command,
+        env_overrides,
+        timeout,
+        session_id,
         None,
-    );
+    )
+    .await
+}
 
-    let SpawnedChild { mut child, pgid } = prepared.spawned;
+pub async fn exec_command_guarded(
+    cwd: &Path,
+    policy: Option<&ResolvedPolicy>,
+    command: &str,
+    env_overrides: &EnvOverride,
+    timeout: Duration,
+    session_id: &str,
+    sanitizer: Option<Arc<dyn ProcessOutputSanitizer>>,
+) -> Result<ExecResult, ToolIoError> {
+    let capture = CapturePolicy::new(session_id, sanitizer);
+    let mut prepared = prepare_spawn(cwd, policy, command, env_overrides, &capture).await?;
+    let capture_task = spawn_capture(&mut prepared, None, capture.sanitizer);
+    let wait = process_wait::wait(&mut prepared.spawned, &prepared.capture_state, timeout).await;
 
-    let exit_code = match tokio::time::timeout(timeout, child.wait()).await {
-        Ok(Ok(status)) => status.code().unwrap_or(-1),
-        Ok(Err(e)) => {
-            for r in readers {
-                r.abort();
-            }
-            return Err(ToolIoError::ExecFailed(format!("wait failed: {e}")));
+    match wait {
+        WaitOutcome::Exited(Ok(status)) => {
+            process_capture_task::join(capture_task).await?;
+            Ok(exec_result(
+                &prepared.capture_state,
+                status.code().unwrap_or(-1),
+                prepared.log_path,
+            ))
         }
-        Err(_) => {
-            // reason: killpg the whole process group so grandchildren (sh fork
-            // pnpm → node) don't leak past the timeout; kill_on_drop only
-            // signals child PID.
-            let _ = kill_process_group(pgid, &mut child, EXEC_KILL_GRACE).await;
-            for r in readers {
-                r.abort();
-            }
-            return Err(ToolIoError::Timeout(timeout));
+        WaitOutcome::Exited(Err(error)) => {
+            terminate_and_drain(&mut prepared.spawned, capture_task).await?;
+            Err(ToolIoError::ExecFailed(format!("wait failed: {error}")))
         }
-    };
-
-    for r in readers {
-        let _ = r.await;
+        WaitOutcome::CaptureFailed => {
+            terminate_and_drain(&mut prepared.spawned, capture_task).await?;
+            Err(ToolIoError::ExecFailed(
+                "process output capture failed".into(),
+            ))
+        }
+        WaitOutcome::TimedOut => {
+            terminate_and_drain(&mut prepared.spawned, capture_task).await?;
+            Err(ToolIoError::Timeout(timeout))
+        }
     }
-    flush_writer(&prepared.log_writer).await;
-
-    let stdout = prepared.head_tail.render_preview();
-    let stdout_truncated = prepared.head_tail.was_truncated();
-    let (stderr, stderr_truncated) = {
-        let g = prepared.stderr_buf.lock();
-        (g.snapshot(), g.was_truncated())
-    };
-    Ok(ExecResult {
-        stdout,
-        stderr,
-        stdout_truncated,
-        stderr_truncated,
-        exit_code,
-        log_path: prepared.log_path,
-    })
 }
 
 pub async fn exec_background(
@@ -81,21 +82,24 @@ pub async fn exec_background(
     env_overrides: &EnvOverride,
     session_id: &str,
 ) -> Result<SpawnedBackgroundData, ToolIoError> {
-    let mut prepared = prepare_spawn(cwd, policy, command, env_overrides, session_id).await?;
-    let readers = spawn_readers(
-        prepared.stdout_pipe.take(),
-        prepared.stderr_pipe.take(),
-        prepared.log_writer.clone(),
-        prepared.head_tail.clone(),
-        prepared.stderr_buf.clone(),
-        None,
-    );
+    exec_background_guarded(cwd, policy, command, env_overrides, session_id, None).await
+}
 
+pub async fn exec_background_guarded(
+    cwd: &Path,
+    policy: Option<&ResolvedPolicy>,
+    command: &str,
+    env_overrides: &EnvOverride,
+    session_id: &str,
+    sanitizer: Option<Arc<dyn ProcessOutputSanitizer>>,
+) -> Result<SpawnedBackgroundData, ToolIoError> {
+    let capture = CapturePolicy::new(session_id, sanitizer);
+    let mut prepared = prepare_spawn(cwd, policy, command, env_overrides, &capture).await?;
+    let capture_task = spawn_capture(&mut prepared, None, capture.sanitizer);
     Ok(SpawnedBackgroundData {
         spawned: prepared.spawned,
         log_path: prepared.log_path,
-        head_tail: prepared.head_tail,
-        stderr_buf: prepared.stderr_buf,
-        drainers: readers,
+        capture_state: prepared.capture_state,
+        capture_task,
     })
 }

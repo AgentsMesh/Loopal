@@ -85,6 +85,20 @@ async fn agent_info_running_and_finished() {
         while let Some(_msg) = rx.recv().await {}
     });
 
+    tokio::time::timeout(Duration::from_secs(1), async {
+        while hub
+            .lock()
+            .await
+            .registry
+            .get_agent_connection("querier")
+            .is_none()
+        {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("parent Agent lease must become active");
+
     // Register child
     let (_ca, ct) = loopal_ipc::duplex_pair();
     let (child, child_rx) = Connection::new(ct).into_listening();

@@ -171,4 +171,24 @@ mod tests {
                 .contains("JsonMockProvider script exhausted")
         );
     }
+
+    #[tokio::test(start_paused = true)]
+    async fn delayed_script_yields_pending_before_the_next_chunk() {
+        let mut stream = JsonMockStream {
+            items: VecDeque::from([
+                MockItem::Delay(Duration::from_secs(1)),
+                MockItem::Chunk(Ok(StreamChunk::Text {
+                    text: "after delay".into(),
+                })),
+            ]),
+            sleep: None,
+        };
+        let mut next = std::pin::pin!(stream.next());
+        assert!(matches!(futures::poll!(&mut next), Poll::Pending));
+
+        tokio::time::advance(Duration::from_secs(1)).await;
+        assert!(
+            matches!(next.await, Some(Ok(StreamChunk::Text { text })) if text == "after delay")
+        );
+    }
 }

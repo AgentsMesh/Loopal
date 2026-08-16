@@ -1,68 +1,45 @@
 use loopal_error::Result;
-use loopal_protocol::AgentEventPayload;
-use loopal_provider_api::ContentBlock;
 use loopal_tool_invocation::{CancelCause, ToolResultMetadata};
-use loopal_turn::{CancelCause as TurnCancelCause, ToolExecState};
 use tracing::info;
 
 use super::runner::AgentLoopRunner;
+use super::tool_result_sink::PendingToolResult;
 
 impl AgentLoopRunner {
-    // reason: 单点写回 tool_result event + ContentBlock，保证 view-state 与 LLM 同源
-    // (历史上分两步调用导致 4 个 intercept handler 里 3 个漏 emit)。
-    pub(super) async fn emit_and_block(
+    pub(super) async fn pending_tool_result(
         &self,
         id: &str,
         name: &str,
         content: impl Into<String>,
         is_error: bool,
         metadata: Option<ToolResultMetadata>,
-    ) -> Result<ContentBlock> {
-        let content = content.into();
-        self.emit_in_turn(AgentEventPayload::ToolResult {
-            id: id.to_string(),
-            name: name.to_string(),
-            result: content.clone(),
-            is_error,
-            duration_ms: None,
-            metadata: metadata.clone(),
-        })
-        .await?;
-        Ok(ContentBlock::ToolResult {
-            tool_use_id: id.to_string(),
-            content,
-            images: Vec::new(),
-            is_error,
-            metadata,
-        })
+    ) -> Result<PendingToolResult> {
+        Ok(PendingToolResult::new(
+            id, name, content, is_error, metadata,
+        ))
     }
 
-    /// Emit interrupted results for all tools (early cancel path).
-    pub(super) async fn emit_all_interrupted(
-        &mut self,
+    pub(super) fn all_interrupted(
+        &self,
         tool_uses: &[(String, String, serde_json::Value)],
-    ) -> Result<()> {
+    ) -> Vec<(usize, PendingToolResult)> {
         info!("cancelled, skipping tool execution");
-        let cancel_md = ToolResultMetadata::cancelled(CancelCause::UserInterrupt);
-        for (id, name, _) in tool_uses {
-            self.emit_and_block(
-                id,
-                name,
-                "Interrupted by user",
-                true,
-                Some(cancel_md.clone()),
-            )
-            .await?;
-        }
-        if self.turns.current_tool_batch_step().is_some() {
-            for (item_index, _) in tool_uses.iter().enumerate() {
-                self.update_tool_batch_item_state(
-                    item_index as u32,
-                    ToolExecState::Cancelled(TurnCancelCause::UserInterrupt),
-                );
-            }
-            self.close_tool_batch_record();
-        }
-        Ok(())
+        let metadata = ToolResultMetadata::cancelled(CancelCause::UserInterrupt);
+        tool_uses
+            .iter()
+            .enumerate()
+            .map(|(index, (id, name, _))| {
+                (
+                    index,
+                    PendingToolResult::new(
+                        id,
+                        name,
+                        "Interrupted by user",
+                        true,
+                        Some(metadata.clone()),
+                    ),
+                )
+            })
+            .collect()
     }
 }

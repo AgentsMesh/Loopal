@@ -59,6 +59,8 @@ pub async fn build_ipc_harness(
             // a developer's configured default model select another provider.
             model: Some("claude-opus-4-8".to_string()),
             prompt: Some("hello".to_string()),
+            sandbox_policy: None,
+            session_id: None,
             ..Default::default()
         })
         .await

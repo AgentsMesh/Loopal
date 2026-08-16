@@ -5,6 +5,11 @@ use anyhow::{Context, Result, bail, ensure};
 use serde::Deserialize;
 use serde_json::Value;
 
+use crate::RequestMetadataMatcher;
+
+mod matching;
+mod mutation;
+
 const MAX_SCENARIO_BYTES: u64 = 4 * 1024 * 1024;
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -22,6 +27,7 @@ pub struct ExpectedRequest {
     pub server_block_count: Option<usize>,
     pub thinking_enabled: Option<bool>,
     pub image_block_count: Option<usize>,
+    pub request_metadata: Option<Vec<RequestMetadataMatcher>>,
 }
 
 impl ExpectedRequest {
@@ -38,6 +44,14 @@ impl ExpectedRequest {
             && self.server_block_count.is_none()
             && self.thinking_enabled.is_none()
             && self.image_block_count.is_none()
+            && self.request_metadata.is_none()
+    }
+
+    pub(crate) fn validate(&self) -> Result<()> {
+        if let Some(matchers) = &self.request_metadata {
+            RequestMetadataMatcher::validate_all(matchers)?;
+        }
+        Ok(())
     }
 }
 
@@ -73,6 +87,7 @@ impl Default for MockResponse {
 
 #[derive(Clone, Debug)]
 pub struct MockCall {
+    pub label: Option<String>,
     pub expected: ExpectedRequest,
     pub response: MockResponse,
 }
@@ -80,6 +95,7 @@ pub struct MockCall {
 #[derive(Debug)]
 pub struct Scenario {
     pub name: String,
+    version: u64,
     calls: VecDeque<MockCall>,
     fallback: Option<MockCall>,
     served: usize,
@@ -105,7 +121,7 @@ impl Scenario {
         );
         let value: Value = serde_json::from_slice(bytes).context("parse scenario JSON")?;
         match value {
-            Value::Array(calls) => Self::build("legacy".into(), calls, None),
+            Value::Array(calls) => Self::build("legacy".into(), calls, None, 1),
             Value::Object(mut root) => {
                 let version = root.remove("version").map_or(Ok(1), |value| {
                     value
@@ -113,7 +129,7 @@ impl Scenario {
                         .context("scenario.version must be an integer")
                 })?;
                 ensure!(
-                    (1..=2).contains(&version),
+                    (1..=3).contains(&version),
                     "unsupported scenario version {version}"
                 );
                 let name = root.remove("name").map_or(Ok("scenario".into()), |value| {
@@ -128,53 +144,37 @@ impl Scenario {
                     .context("scenario.calls must be an array")?;
                 let fallback = root
                     .remove("fallback")
-                    .map(crate::scenario_parse::parse_call)
+                    .map(|call| crate::scenario_parse::parse_call(call, version))
                     .transpose()?;
                 ensure!(
                     root.is_empty(),
                     "unknown scenario field: {}",
                     root.keys().next().unwrap()
                 );
-                Self::build(name, calls, fallback)
+                Self::build(name, calls, fallback, version)
             }
             _ => bail!("scenario root must be an object or array"),
         }
     }
 
-    fn build(name: String, calls: Vec<Value>, fallback: Option<MockCall>) -> Result<Self> {
+    fn build(
+        name: String,
+        calls: Vec<Value>,
+        fallback: Option<MockCall>,
+        version: u64,
+    ) -> Result<Self> {
         ensure!(calls.len() <= 4096, "scenario has too many calls");
         let calls = calls
             .into_iter()
-            .map(crate::scenario_parse::parse_call)
+            .map(|call| crate::scenario_parse::parse_call(call, version))
             .collect::<Result<VecDeque<_>>>()?;
         Ok(Self {
             name,
+            version,
             calls,
             fallback,
             served: 0,
         })
-    }
-
-    pub fn take_matching(
-        &mut self,
-        body: &Value,
-        record: &crate::RequestRecord,
-    ) -> Option<MockCall> {
-        let position = self
-            .calls
-            .iter()
-            .position(|call| {
-                !call.expected.is_empty()
-                    && crate::validate_request(&call.expected, body, record).is_empty()
-            })
-            .or_else(|| self.calls.iter().position(|call| call.expected.is_empty()));
-        let call = position
-            .and_then(|index| self.calls.remove(index))
-            .or_else(|| self.fallback.clone());
-        if call.is_some() {
-            self.served += 1;
-        }
-        call
     }
 
     pub fn served(&self) -> usize {

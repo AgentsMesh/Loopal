@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use loopal_secret_client::{HUB_RPC_BUDGET, SecretClient, SecretError};
+use loopal_vault_api::AuditMetadata;
 use secrecy::{ExposeSecret, SecretString};
 use serde_json::Value;
 use tracing::warn;
@@ -29,6 +30,7 @@ pub async fn apply_resolver(
     let mut resolved: std::collections::HashMap<String, SecretString> =
         std::collections::HashMap::new();
     let mut seed: Vec<(String, SecretString)> = Vec::new();
+    let mut hard_failure = false;
     for n in &names {
         match client.get(n, HUB_RPC_BUDGET).await {
             Ok(v) => {
@@ -37,15 +39,19 @@ pub async fn apply_resolver(
             }
             Err(SecretError::SecretNotFound(_)) => {}
             Err(e) => {
+                hard_failure = true;
                 warn!(
                     tool = tool_name,
                     name = %n,
                     error = %e,
-                    "secret_ref resolve failed (non-NotFound); \
-                     falling back to placeholder — tool may receive literal `<secret_ref:NAME>`"
+                    "secret_ref resolve failed (non-NotFound); preserving wire refs so the \
+                     protected-effect boundary fails closed"
                 );
             }
         }
+    }
+    if hard_failure {
+        return Vec::new();
     }
     let report = resolve_in_value(effective_input, &resolved, whitelist);
     if !report.missing.is_empty() {
@@ -54,7 +60,10 @@ pub async fn apply_resolver(
     record_audit(
         RuntimeOp::Resolved,
         &report.resolved_names,
-        Some(session_id),
+        &AuditMetadata {
+            session_id: Some(session_id),
+            ..AuditMetadata::default()
+        },
     );
 
     let leaked = detect_argv_exposure(effective_input, &seed);
@@ -65,7 +74,14 @@ pub async fn apply_resolver(
             "secret plaintext substituted into shell-argv-visible field (e.g. `command`); \
              prefer the `env` field for secret injection"
         );
-        record_audit(RuntimeOp::Resolved, &leaked, Some(session_id));
+        record_audit(
+            RuntimeOp::Resolved,
+            &leaked,
+            &AuditMetadata {
+                session_id: Some(session_id),
+                ..AuditMetadata::default()
+            },
+        );
     }
     seed
 }
@@ -113,17 +129,32 @@ pub fn apply_redactor(
     }
     let redactor = Redactor::from_pairs(seed);
     let (redacted, hit_names) = redactor.scan_and_redact(&content);
-    if !hit_names.is_empty() {
-        warn!(tool = tool_name, hit = ?hit_names, "redacted plaintext from tool output");
-        record_audit(RuntimeOp::Redacted, &hit_names, Some(session_id));
-    }
+    record_redaction_hits(tool_name, &hit_names, session_id);
     redacted
 }
 
-fn record_audit(op: RuntimeOp, names: &[String], session_id: Option<&str>) {
+pub fn record_redaction_hits(tool_name: &str, hit_names: &[String], session_id: &str) {
+    if hit_names.is_empty() {
+        return;
+    }
+    warn!(tool = tool_name, hit = ?hit_names, "redacted plaintext from tool output");
+    record_audit(
+        RuntimeOp::Redacted,
+        hit_names,
+        &AuditMetadata {
+            session_id: Some(session_id),
+            ..AuditMetadata::default()
+        },
+    );
+}
+
+fn record_audit(op: RuntimeOp, names: &[String], metadata: &AuditMetadata<'_>) {
     let Some(dir) = default_telemetry_dir() else {
+        warn!("runtime audit directory unavailable");
         return;
     };
     let sink = JsonlAuditSink::new(dir);
-    sink.record_runtime(op, names, session_id);
+    if let Err(error) = sink.record_runtime(op, names, metadata) {
+        warn!(%error, "runtime protected audit failed");
+    }
 }

@@ -3,10 +3,12 @@ import {
   type ConversationEntry,
   type SessionStatus,
   type SessionSummary,
+  type WorkflowRunSummary,
 } from '../../../../shared/contracts'
-import { AgentEventSchema } from '../runtime/loopal-wire'
+import { AgentEventSchema, WireWorkflowRunSummarySchema } from '../runtime/loopal-wire'
 import { attentionKindForPayload, type AttentionEventKind } from '../attention/loopal-attention'
 import { projectEventNotice } from './loopal-event-notice'
+import { projectWorkflowRun } from './loopal-view-projection'
 
 export { normalizeAgentStatus, normalizeRole } from './loopal-event-normalizers'
 
@@ -17,6 +19,7 @@ interface ProjectionSink {
   updateAgentLifecycle?(agentId: string, kind: string, value: unknown): void
   attention(kind: AttentionEventKind, value: unknown, agentId: string): void
   artifacts?(paths: readonly string[], agentId: string): void
+  workflow?(summary: WorkflowRunSummary): void
   overflow?(): void
 }
 
@@ -80,6 +83,12 @@ export class LoopalEventProjector {
     const payload = unpackPayload(event.data.payload)
     if (!payload) return
     this.sink.updateAgentLifecycle?.(address.agent, payload.kind, payload.value)
+    if (payload.kind === 'WorkflowRunChanged') {
+      if (address.agent !== 'main') return
+      const summary = WireWorkflowRunSummarySchema.safeParse(payload.value)
+      if (summary.success) this.sink.workflow?.(projectWorkflowRun(summary.data))
+      return
+    }
     const attention = attentionKindForPayload(payload.kind)
     if (attention) {
       const requested = attention.endsWith('_requested')

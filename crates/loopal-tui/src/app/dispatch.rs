@@ -1,7 +1,7 @@
 use super::App;
 
 impl App {
-    pub fn dispatch_event(&mut self, event: loopal_protocol::AgentEvent) {
+    pub fn dispatch_event(&mut self, event: loopal_protocol::AgentEvent) -> bool {
         let active = self.session.lock().active_view.clone();
         let targets_active = event.agent_name.as_ref().map_or_else(
             || active == loopal_protocol::ROOT_AGENT_NAME,
@@ -33,10 +33,14 @@ impl App {
             }
             self.view_clients.insert(s.name.clone(), vc);
         }
-        for vc in self.view_clients.values() {
-            vc.apply_event(&event);
-        }
+        let resync_required = self.view_clients.values().any(|vc| {
+            matches!(
+                vc.apply_event(&event),
+                loopal_view_state::ViewStateApplyOutcome::ResyncRequired(_)
+            )
+        });
         self.session.handle_event(event);
+        resync_required
     }
 
     pub fn push_system_message(&self, content: String) {

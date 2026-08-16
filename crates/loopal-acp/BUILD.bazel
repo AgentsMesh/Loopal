@@ -44,6 +44,7 @@ rust_test(
         "//crates/loopal-protocol",
         "//crates/loopal-provider-api",
         "//crates/loopal-test-support",
+        "//crates/loopal-vault-api",
         "@crates//:serde_json",
         "@crates//:tokio",
     ],

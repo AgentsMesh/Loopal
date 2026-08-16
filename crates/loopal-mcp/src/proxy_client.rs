@@ -24,7 +24,7 @@ pub struct McpProxyClient {
     client: Arc<dyn HubMcpClient>,
 }
 
-enum ProxyRpcError {
+pub(super) enum ProxyRpcError {
     Forbidden,
     TimedOut,
     Remote,
@@ -35,7 +35,7 @@ impl McpProxyClient {
         Self { client }
     }
 
-    async fn rpc(
+    pub(super) async fn rpc(
         &self,
         method: &str,
         params: Value,
@@ -91,6 +91,10 @@ impl McpProvider for McpProxyClient {
                 )
             })
             .collect()
+    }
+
+    async fn reconnect(&self, server: &str, budget: IpcBudget) -> Result<(), McpError> {
+        super::proxy_reconnect::reconnect(self, server, budget).await
     }
 
     async fn call_tool(

@@ -101,6 +101,7 @@ fn make_runner_with_history(
             frontend,
             session_manager: fixture.session_manager(),
             decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
+            protected_effect_audit: super::noop_protected_effect_audit(),
         },
         fixture.test_session("rt-test"),
         make_test_budget(),
@@ -138,9 +139,9 @@ async fn resume_with_assistant_tail_does_not_call_llm() {
 }
 
 #[tokio::test]
-async fn resume_with_user_tail_calls_llm_immediately() {
-    // Sanity: when last message is a User (e.g. tool_result mid-turn), the
-    // agent should resume the turn without waiting for further input.
+async fn resume_with_completed_user_tail_waits_for_input() {
+    // A workflow-handled input is a completed user-only turn. Its User tail
+    // remains in history for future context, but must not be executed again.
     let history = vec![user("question")];
     let (mut runner, calls, mut rx, mbox_tx, ctrl_tx) = make_runner_with_history(history);
     drop(mbox_tx);
@@ -151,8 +152,8 @@ async fn resume_with_user_tail_calls_llm_immediately() {
 
     assert_eq!(
         calls.load(Ordering::SeqCst),
-        1,
-        "User tail should trigger immediate LLM call to resume the turn"
+        0,
+        "a completed user-only turn must be idle after resume"
     );
 }
 
@@ -173,19 +174,24 @@ async fn resume_with_empty_store_waits_for_input() {
 }
 
 #[tokio::test]
-async fn resume_user_tail_records_turn_with_llm_step() {
-    // Bug D regression: a User-tail history projects to a Complete turn, so
-    // `current_turn_id` is None on resume. Pre-fix, run_loop went straight to
-    // execute_turn without opening a turn record, and every append_step hit
-    // NoCurrentTurn — the LlmCall step was silently dropped (no turn recorded).
-    let history = vec![user("question")];
-    let (mut runner, _calls, mut rx, mbox_tx, ctrl_tx) = make_runner_with_history(history);
+async fn crash_recovered_user_tail_resumes_and_records_llm_step() {
+    let (mut runner, calls, mut rx, mbox_tx, ctrl_tx) = make_runner_with_history(vec![]);
+    let mut recovered = loopal_turn::Turn::new(loopal_turn::TurnTrigger::UserInput {
+        envelope_id: "crashed-envelope".into(),
+        content: "question".into(),
+        images: Vec::new(),
+    });
+    recovered.outcome = loopal_turn::TurnOutcome::Cancelled {
+        cause: loopal_turn::CancelledCause::CrashRecovery,
+    };
+    runner.seed_test_turns(vec![recovered]);
     drop(mbox_tx);
     drop(ctrl_tx);
     tokio::spawn(async move { while rx.recv().await.is_some() {} });
 
     let _ = runner.run().await.unwrap();
 
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
     let has_llm_step = runner
         .recorded_turns()
         .iter()
@@ -193,24 +199,14 @@ async fn resume_user_tail_records_turn_with_llm_step() {
         .any(|s| matches!(s, loopal_turn::TurnStep::LlmCall { .. }));
     assert!(
         has_llm_step,
-        "resumed turn must open a turn record so its LlmCall step is persisted, \
-         not dropped by NoCurrentTurn",
+        "crash-recovered input must open a resume record for its LlmCall",
     );
 }
 
 #[tokio::test]
-async fn resume_then_followup_message_runs_second_turn() {
-    // Bug C end-to-end: after a User-tail cold-start resume runs its turn to
-    // completion, the loop must return to idle and consume queued input —
-    // proving the "continue not consumed" regression is gone. Pre-Bug-D-fix the
-    // resumed turn never closed cleanly, the loop never came back to idle, and
-    // a followup never ran.
-    //
-    // Delivery is gated on the agent's own AwaitingInput event so the followup
-    // is never injected during the resume turn's mid-turn drain window (which
-    // would absorb it into turn 1 and make the count ambiguous). First idle →
-    // send "continue"; second idle (turn 2 done) → drop both senders so
-    // wait_for_input observes a closed channel and the loop exits.
+async fn completed_user_tail_accepts_a_new_followup_turn() {
+    // The retained user-only history stays visible, while only the newly
+    // delivered envelope is dispatched after resume.
     let history = vec![user("question")];
     let (mut runner, calls, mut rx, mbox_tx, ctrl_tx) = make_runner_with_history(history);
 
@@ -241,8 +237,7 @@ async fn resume_then_followup_message_runs_second_turn() {
 
     assert_eq!(
         calls.load(Ordering::SeqCst),
-        2,
-        "resume turn (1) + followup 'continue' turn (2); a count of 1 means the \
-         queued message was never consumed after the loop returned to idle",
+        1,
+        "only the newly delivered followup should call the provider",
     );
 }

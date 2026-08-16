@@ -1,8 +1,10 @@
 use async_trait::async_trait;
 
 use crate::agent_input::AgentInput;
+use crate::frontend::permission_handler::PermissionOutcome;
 use loopal_error::Result;
 use loopal_protocol::AgentEventPayload;
+use loopal_protocol::PermissionIntentRequest;
 use loopal_protocol::Question;
 use loopal_tool_api::PermissionDecision;
 
@@ -63,12 +65,22 @@ pub trait AgentFrontend: Send + Sync {
         &self,
     ) -> std::result::Result<AgentInput, tokio::sync::mpsc::error::TryRecvError>;
 
-    async fn request_permission(
+    async fn request_permission(&self, request: &PermissionIntentRequest) -> PermissionDecision;
+
+    /// Full permission result, including a Hub-issued effect receipt when the
+    /// frontend has one. Existing frontend implementations remain compatible
+    /// through the decision-only fallback.
+    async fn request_permission_outcome(
         &self,
-        id: &str,
-        name: &str,
-        input: &serde_json::Value,
-    ) -> PermissionDecision;
+        request: &PermissionIntentRequest,
+    ) -> PermissionOutcome {
+        PermissionOutcome {
+            decision: self.request_permission(request).await,
+            reason: String::new(),
+            duration_ms: 0,
+            receipt: None,
+        }
+    }
 
     fn event_emitter(&self) -> Box<dyn EventEmitter>;
 
@@ -102,3 +114,7 @@ pub trait EventEmitter: Send + Sync {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "traits_tests.rs"]
+mod tests;

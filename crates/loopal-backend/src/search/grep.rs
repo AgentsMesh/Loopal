@@ -11,9 +11,7 @@ use parking_lot::Mutex;
 use regex::RegexBuilder;
 
 use crate::limits::ResourceLimits;
-use crate::search::grep_file::{
-    empty_result, maybe_save_overflow, search_one_file, search_single_file,
-};
+use crate::search::grep_file::{empty_result, search_one_file, search_single_file};
 use crate::search::walker;
 
 pub(crate) fn build_regex(opts: &GrepOptions) -> Result<regex::Regex, ToolIoError> {
@@ -118,11 +116,9 @@ pub fn grep_search(
     });
 
     let file_matches = Arc::try_unwrap(results).unwrap().into_inner();
-    let truncated = total.load(Ordering::Relaxed) >= max;
     Ok(GrepSearchResult {
         total_match_count: total.load(Ordering::Relaxed),
         timed_out: timed_out.load(Ordering::Relaxed),
-        overflow_path: maybe_save_overflow(truncated, &file_matches),
         file_matches,
     })
 }

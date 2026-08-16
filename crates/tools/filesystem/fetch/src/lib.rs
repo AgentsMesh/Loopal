@@ -1,5 +1,7 @@
 mod cleanup;
 mod refiner;
+#[cfg(test)]
+mod tests;
 
 use async_trait::async_trait;
 use loopal_error::LoopalError;
@@ -38,7 +40,7 @@ impl TypedTool<FetchParams> for FetchTool {
     }
 
     fn permission(&self) -> PermissionLevel {
-        PermissionLevel::ReadOnly
+        PermissionLevel::Write
     }
 
     fn secret_eligible_params(&self) -> &'static [&'static str] {

@@ -19,6 +19,12 @@ use crate::manager_query::McpConnectionSnapshot;
 pub trait McpProvider: Send + Sync {
     async fn list_tools(&self, budget: IpcBudget) -> Vec<(String, ToolDefinition)>;
 
+    async fn reconnect(&self, server: &str, _budget: IpcBudget) -> Result<(), McpError> {
+        Err(McpError::CapabilityNotSupported(format!(
+            "MCP reconnect is unavailable for '{server}'"
+        )))
+    }
+
     async fn call_tool(
         &self,
         server: &str,
@@ -29,3 +35,7 @@ pub trait McpProvider: Send + Sync {
 
     async fn snapshot(&self, budget: IpcBudget) -> Vec<McpConnectionSnapshot>;
 }
+
+#[cfg(test)]
+#[path = "provider_tests.rs"]
+mod tests;

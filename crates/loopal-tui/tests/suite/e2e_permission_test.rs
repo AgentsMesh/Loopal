@@ -47,11 +47,13 @@ async fn collect_until_perm(harness: &mut TuiTestHarness) -> Vec<AgentEventPaylo
     all_events
 }
 
-fn take_pending_tool_call_id(app: &loopal_tui::app::App) -> String {
+fn take_pending_permission(
+    app: &loopal_tui::app::App,
+) -> (String, Option<loopal_protocol::PermissionIntentDigest>) {
     app.with_active_conversation_mut(|conv| {
         conv.pending_permission
             .take()
-            .map(|p| p.id)
+            .map(|permission| (permission.id, permission.intent_digest))
             .unwrap_or_default()
     })
 }
@@ -78,11 +80,11 @@ async fn test_supervised_approve() {
 
     let mut harness = build_custom_tui(inner);
     let mut all_events = collect_until_perm(&mut harness).await;
-    let tool_call_id = take_pending_tool_call_id(&harness.app);
+    let (tool_call_id, intent_digest) = take_pending_permission(&harness.app);
     harness
         .inner
         .session_ctrl
-        .respond_permission("main", &tool_call_id, true)
+        .respond_permission("main", &tool_call_id, intent_digest, true)
         .await;
     let rest = harness.collect_until_idle().await;
     all_events.extend(rest);
@@ -113,11 +115,11 @@ async fn test_supervised_deny() {
 
     let mut harness = build_custom_tui(inner);
     let mut all_events = collect_until_perm(&mut harness).await;
-    let tool_call_id = take_pending_tool_call_id(&harness.app);
+    let (tool_call_id, intent_digest) = take_pending_permission(&harness.app);
     harness
         .inner
         .session_ctrl
-        .respond_permission("main", &tool_call_id, false)
+        .respond_permission("main", &tool_call_id, intent_digest, false)
         .await;
     let rest = harness.collect_until_idle().await;
     all_events.extend(rest);
@@ -184,11 +186,11 @@ async fn test_permission_dialog_render() {
     );
 
     // Approve so the loop can finish cleanly
-    let tool_call_id = take_pending_tool_call_id(&harness.app);
+    let (tool_call_id, intent_digest) = take_pending_permission(&harness.app);
     harness
         .inner
         .session_ctrl
-        .respond_permission("main", &tool_call_id, true)
+        .respond_permission("main", &tool_call_id, intent_digest, true)
         .await;
     let _ = harness.collect_until_idle().await;
 }

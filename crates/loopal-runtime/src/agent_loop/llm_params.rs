@@ -1,9 +1,25 @@
 use loopal_context::{degrade_turns_for_wire, estimate_tokens, estimate_turns_tokens};
 use loopal_error::Result;
-use loopal_provider::{get_thinking_capability, resolve_thinking_config};
-use loopal_provider_api::{ChatParams, ContinuationIntent};
+use loopal_provider::{get_thinking_capability, resolve_thinking_config_with_recommendation};
+use loopal_provider_api::{ChatParams, ContinuationIntent, ThinkingConfig};
 
+use super::model_config::ModelConfig;
 use super::runner::AgentLoopRunner;
+
+fn resolve_thinking_for_request(
+    model_config: &ModelConfig,
+    model: &str,
+    max_output_tokens: u32,
+) -> Result<Option<ThinkingConfig>> {
+    resolve_thinking_config_with_recommendation(
+        &model_config.thinking,
+        model_config
+            .workflow_preset_thinking_recommendation
+            .as_ref(),
+        get_thinking_capability(model),
+        max_output_tokens,
+    )
+}
 use crate::mode::AgentMode;
 
 impl AgentLoopRunner {
@@ -57,9 +73,8 @@ impl AgentLoopRunner {
             .clamp_output_tokens(estimated_input);
 
         let model = self.params.config.model();
-        let capability = get_thinking_capability(&model);
         let resolved_thinking =
-            resolve_thinking_config(&self.model_config.thinking, capability, safe_max_tokens)?;
+            resolve_thinking_for_request(&self.model_config, &model, safe_max_tokens)?;
         Ok(ChatParams {
             model,
             turns,
@@ -71,5 +86,95 @@ impl AgentLoopRunner {
             continuation_intent,
             debug_dump_dir: Some(loopal_config::tmp_dir()),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use loopal_provider_api::EffortLevel;
+
+    fn model_config(
+        configured: ThinkingConfig,
+        recommendation: Option<ThinkingConfig>,
+    ) -> ModelConfig {
+        ModelConfig::from_model_with_recommendation(
+            "claude-sonnet-4-6",
+            configured,
+            recommendation,
+            0,
+        )
+    }
+
+    fn max_recommendation() -> ThinkingConfig {
+        ThinkingConfig::Effort {
+            level: EffortLevel::Max,
+        }
+    }
+
+    #[test]
+    fn auto_uses_supported_recommendation_without_mutating_setting() {
+        let config = model_config(ThinkingConfig::Auto, Some(max_recommendation()));
+        let resolved = resolve_thinking_for_request(&config, "claude-sonnet-4-6", 64_000).unwrap();
+
+        assert!(matches!(config.thinking, ThinkingConfig::Auto));
+        assert!(matches!(
+            resolved,
+            Some(ThinkingConfig::Effort {
+                level: EffortLevel::Max
+            })
+        ));
+    }
+
+    #[test]
+    fn unsupported_recommendation_falls_back_to_active_model_auto() {
+        let config = model_config(ThinkingConfig::Auto, Some(max_recommendation()));
+        let resolved =
+            resolve_thinking_for_request(&config, "claude-sonnet-4-20250514", 10_000).unwrap();
+
+        assert!(matches!(
+            resolved,
+            Some(ThinkingConfig::Budget { tokens: 8_000 })
+        ));
+    }
+
+    #[test]
+    fn explicit_thinking_wins_and_auto_restores_recommendation() {
+        let mut config = model_config(
+            ThinkingConfig::Effort {
+                level: EffortLevel::Low,
+            },
+            Some(max_recommendation()),
+        );
+        let explicit = resolve_thinking_for_request(&config, "claude-sonnet-4-6", 64_000).unwrap();
+        assert!(matches!(
+            explicit,
+            Some(ThinkingConfig::Effort {
+                level: EffortLevel::Low
+            })
+        ));
+
+        config.thinking = ThinkingConfig::Auto;
+        let restored = resolve_thinking_for_request(&config, "claude-sonnet-4-6", 64_000).unwrap();
+        assert!(matches!(
+            restored,
+            Some(ThinkingConfig::Effort {
+                level: EffortLevel::Max
+            })
+        ));
+    }
+
+    #[test]
+    fn model_update_preserves_both_thinking_inputs() {
+        let mut config = model_config(ThinkingConfig::Auto, Some(max_recommendation()));
+        config.update_model("claude-sonnet-4-20250514");
+
+        assert!(matches!(config.thinking, ThinkingConfig::Auto));
+        assert!(matches!(
+            config.workflow_preset_thinking_recommendation,
+            Some(ThinkingConfig::Effort {
+                level: EffortLevel::Max
+            })
+        ));
     }
 }

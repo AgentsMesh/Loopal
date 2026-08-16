@@ -10,6 +10,7 @@
 
 use loopal_protocol::{
     AgentEvent, AgentEventPayload, BgTaskSnapshot, BgTaskStatus, CronJobSnapshot, TaskSnapshot,
+    WorkflowRunSummary,
 };
 
 use super::ViewClient;
@@ -49,6 +50,15 @@ impl ViewClient {
                     output: String::new(),
                 }));
             }
+        }
+    }
+
+    #[doc(hidden)]
+    pub fn inject_workflows_for_test(&self, runs: Vec<WorkflowRunSummary>) {
+        for run in runs {
+            self.apply_event(&AgentEvent::root(AgentEventPayload::WorkflowRunChanged(
+                run,
+            )));
         }
     }
 }

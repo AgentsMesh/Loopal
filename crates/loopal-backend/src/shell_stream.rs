@@ -4,26 +4,30 @@ use std::time::Duration;
 
 use loopal_config::ResolvedPolicy;
 use loopal_error::{ProcessHandle, ToolIoError};
-use loopal_tool_api::ExecOutcome;
 use loopal_tool_api::backend_types::{EnvOverride, ExecResult};
-use loopal_tool_api::{HeadTail, OutputTail, StderrCappedBuffer};
-use parking_lot::Mutex as PlMutex;
-use tokio::task::JoinHandle;
+use loopal_tool_api::{ExecOutcome, OutputTail};
 
-use crate::log_writer::flush_writer;
+use crate::process_capture_result::exec_result;
+use crate::process_capture_task;
+use crate::process_cleanup::terminate_and_drain;
 use crate::process_group::SpawnedChild;
-use crate::shell_spawn::{prepare_spawn, spawn_readers};
+use crate::process_wait::{self, WaitOutcome};
+use crate::shell_spawn::{CapturePolicy, prepare_spawn, spawn_capture};
+use crate::{ProcessCaptureState, ProcessCaptureTask};
 
 pub struct TimedOutProcessData {
     pub spawned: SpawnedChild,
     pub log_path: std::path::PathBuf,
-    pub stdout_head_tail: Arc<HeadTail>,
-    pub stderr_buf: Arc<PlMutex<StderrCappedBuffer>>,
-    /// JoinHandles of the still-running reader tasks. The monitor that
-    /// adopts this `TimedOutProcessData` should `await` them after the
-    /// child's pipes close so log/preview state is complete before the
-    /// task is marked terminal. Bounded by `drainers_grace` upstream.
-    pub drainers: Vec<JoinHandle<()>>,
+    pub capture_state: Arc<ProcessCaptureState>,
+    pub capture_task: ProcessCaptureTask,
+}
+
+fn wait_failed(error: &std::io::Error) -> ToolIoError {
+    ToolIoError::ExecFailed(format!("wait failed: {error}"))
+}
+
+fn capture_failed() -> ToolIoError {
+    ToolIoError::ExecFailed("process output capture failed".into())
 }
 
 pub async fn exec_command_streaming(
@@ -35,63 +39,62 @@ pub async fn exec_command_streaming(
     tail: Arc<OutputTail>,
     session_id: &str,
 ) -> Result<ExecOutcome, ToolIoError> {
-    let mut prepared = prepare_spawn(cwd, policy, command, env_overrides, session_id).await?;
-    let readers = spawn_readers(
-        prepared.stdout_pipe.take(),
-        prepared.stderr_pipe.take(),
-        prepared.log_writer.clone(),
-        prepared.head_tail.clone(),
-        prepared.stderr_buf.clone(),
-        Some(tail.clone()),
-    );
+    exec_command_streaming_guarded(
+        cwd,
+        policy,
+        command,
+        env_overrides,
+        timeout,
+        tail,
+        CapturePolicy::new(session_id, None),
+    )
+    .await
+}
 
-    let SpawnedChild { mut child, pgid } = prepared.spawned;
+pub(crate) async fn exec_command_streaming_guarded(
+    cwd: &Path,
+    policy: Option<&ResolvedPolicy>,
+    command: &str,
+    env_overrides: &EnvOverride,
+    timeout: Duration,
+    tail: Arc<OutputTail>,
+    capture: CapturePolicy<'_>,
+) -> Result<ExecOutcome, ToolIoError> {
+    let mut prepared = prepare_spawn(cwd, policy, command, env_overrides, &capture).await?;
+    let capture_task = spawn_capture(&mut prepared, Some(tail.clone()), capture.sanitizer);
+    let wait = process_wait::wait(&mut prepared.spawned, &prepared.capture_state, timeout).await;
 
-    match tokio::time::timeout(timeout, child.wait()).await {
-        Ok(Ok(status)) => {
-            for h in readers {
-                let _ = h.await;
-            }
-            flush_writer(&prepared.log_writer).await;
-            let exit_code = status.code().unwrap_or(-1);
-            let stdout = prepared.head_tail.render_preview();
-            let stdout_truncated = prepared.head_tail.was_truncated();
-            let (stderr, stderr_truncated) = {
-                let g = prepared.stderr_buf.lock();
-                (g.snapshot(), g.was_truncated())
-            };
-            Ok(ExecOutcome::Completed(ExecResult {
-                stdout,
-                stderr,
-                stdout_truncated,
-                stderr_truncated,
-                exit_code,
+    match wait {
+        WaitOutcome::Exited(Ok(status)) => {
+            process_capture_task::join(capture_task).await?;
+            let result: ExecResult = exec_result(
+                &prepared.capture_state,
+                status.code().unwrap_or(-1),
+                prepared.log_path,
+            );
+            Ok(ExecOutcome::Completed(result))
+        }
+        WaitOutcome::Exited(Err(error)) => {
+            terminate_and_drain(&mut prepared.spawned, capture_task).await?;
+            Err(wait_failed(&error))
+        }
+        WaitOutcome::CaptureFailed => {
+            terminate_and_drain(&mut prepared.spawned, capture_task).await?;
+            Err(capture_failed())
+        }
+        WaitOutcome::TimedOut => Ok(ExecOutcome::TimedOut {
+            timeout,
+            partial_output: tail.snapshot(),
+            handle: ProcessHandle(Box::new(TimedOutProcessData {
+                spawned: prepared.spawned,
                 log_path: prepared.log_path,
-            }))
-        }
-        Ok(Err(e)) => {
-            for h in readers {
-                h.abort();
-            }
-            Err(ToolIoError::ExecFailed(format!("wait failed: {e}")))
-        }
-        Err(_timeout) => {
-            // Flush the writer once so any data already in BufWriter / page
-            // cache lands on disk before the caller starts polling the log
-            // file. Without this a fast follow-up `read_to_string` can race
-            // the kernel's writeback and see partial / no content.
-            flush_writer(&prepared.log_writer).await;
-            Ok(ExecOutcome::TimedOut {
-                timeout,
-                partial_output: tail.snapshot(),
-                handle: ProcessHandle(Box::new(TimedOutProcessData {
-                    spawned: SpawnedChild { child, pgid },
-                    log_path: prepared.log_path,
-                    stdout_head_tail: prepared.head_tail,
-                    stderr_buf: prepared.stderr_buf,
-                    drainers: readers,
-                })),
-            })
-        }
+                capture_state: prepared.capture_state,
+                capture_task,
+            })),
+        }),
     }
 }
+
+#[cfg(test)]
+#[path = "shell_stream_tests.rs"]
+mod tests;

@@ -94,6 +94,27 @@ describe('SessionPanelZone', () => {
     actions.rerender(element({ ...tasks, view: emptyView() }, actions))
     expect(screen.queryByTestId('session-panel-zone')).not.toBeInTheDocument()
   })
+
+  it('routes projected workflows through the session panel deck', () => {
+    const run = {
+      id: 'wrun_zone', runGoal: 'Render production workflow', state: 'running' as const,
+      revision: 2, outputNode: 'done', createdAt: richTimestamp, updatedAt: richTimestamp,
+      counts: {
+        pending: 1, ready: 0, active: 1, succeeded: 0,
+        failed: 0, cancelled: 0, skipped: 0,
+      },
+    }
+    mount(richDetail({
+      agents: [{ id: 'agent-root', name: 'Loopal', status: 'waiting' }],
+      artifacts: [],
+      view: { ...emptyView(), workflows: { active: [run], recent: [] } },
+    }))
+    const tab = screen.getByRole('tab', { name: 'Workflows' })
+    expect(tab).toHaveTextContent('1')
+    fireEvent.click(tab)
+    expect(screen.getByTestId('workflows-pane')).toBeVisible()
+    expect(screen.getByText('Render production workflow')).toBeInTheDocument()
+  })
 })
 
 function mount(detail: SessionDetail) {

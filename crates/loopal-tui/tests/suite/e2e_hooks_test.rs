@@ -14,6 +14,8 @@ use ratatui::backend::TestBackend;
 
 use super::e2e_harness::TuiTestHarness;
 
+const TEST_HOOK_TIMEOUT_MS: u64 = 30_000;
+
 fn wrap_tui(inner: loopal_test_support::SpawnedHarness) -> TuiTestHarness {
     let terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
     let app = App::new(
@@ -27,6 +29,16 @@ fn wrap_tui(inner: loopal_test_support::SpawnedHarness) -> TuiTestHarness {
     }
 }
 
+async fn wait_for_marker(path: &std::path::Path) {
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while !path.exists() {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap_or_else(|_| panic!("hook marker did not appear: {}", path.display()));
+}
+
 #[tokio::test]
 async fn test_pre_tool_hook_executes() {
     let mut hook_fx = HookFixture::new();
@@ -36,7 +48,7 @@ async fn test_pre_tool_hook_executes() {
         event: HookEvent::PreToolUse,
         command: script.to_str().unwrap().to_string(),
         tool_filter: None,
-        timeout_ms: 5000,
+        timeout_ms: TEST_HOOK_TIMEOUT_MS,
         hook_type: Default::default(),
         url: None,
         headers: Default::default(),
@@ -64,10 +76,8 @@ async fn test_pre_tool_hook_executes() {
 
     assertions::assert_has_tool_result(&evts, "Read", false);
 
-    // Wait briefly for hook I/O to flush
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    wait_for_marker(&marker).await;
 
-    // Marker file should have been created by the pre-hook script
     assert!(
         marker.exists(),
         "pre-hook marker file should exist at {}",
@@ -90,7 +100,7 @@ async fn test_hook_failure_blocks_tool() {
         event: HookEvent::PreToolUse,
         command: script.to_str().unwrap().to_string(),
         tool_filter: None,
-        timeout_ms: 5000,
+        timeout_ms: TEST_HOOK_TIMEOUT_MS,
         hook_type: Default::default(),
         url: None,
         headers: Default::default(),
@@ -130,7 +140,7 @@ async fn test_post_hook_output_captured() {
         event: HookEvent::PostToolUse,
         command: script.to_str().unwrap().to_string(),
         tool_filter: None,
-        timeout_ms: 5000,
+        timeout_ms: TEST_HOOK_TIMEOUT_MS,
         hook_type: Default::default(),
         url: None,
         headers: Default::default(),
@@ -158,9 +168,8 @@ async fn test_post_hook_output_captured() {
 
     assertions::assert_has_tool_result(&evts, "Read", false);
 
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    wait_for_marker(&marker).await;
 
-    // Post-hook should have created the marker
     assert!(
         marker.exists(),
         "post-hook marker file should exist at {}",

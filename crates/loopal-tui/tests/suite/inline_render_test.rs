@@ -1,6 +1,6 @@
 use loopal_protocol::{Question, QuestionOption};
-use loopal_tui::views::{permission_inline, question_inline};
-use loopal_view_state::{PendingPermission, PendingQuestion};
+use loopal_tui::views::question_inline;
+use loopal_view_state::PendingQuestion;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
@@ -33,7 +33,7 @@ fn cursor(q: &mut PendingQuestion, c: usize) {
     }
 }
 
-fn render_to_buffer(
+pub(crate) fn render_to_buffer(
     width: u16,
     height: u16,
     draw: impl FnOnce(&mut ratatui::Frame, Rect),
@@ -171,52 +171,4 @@ fn question_height_capped_keeps_render_safe() {
     let q = pq(opts_vec, false);
     let s = render_to_buffer(60, 4, |f, area| question_inline::render(f, &q, area, None));
     assert!(s.contains("? Pick"));
-}
-
-#[test]
-fn permission_renders_tool_name_and_keys() {
-    let p = PendingPermission {
-        id: "1".into(),
-        name: "Bash".into(),
-        input: serde_json::json!({"cmd": "ls"}),
-        cursor: Default::default(),
-    };
-    let s = render_to_buffer(60, 6, |f, area| {
-        permission_inline::render_prepared(f, &permission_inline::prepare(&p), area, None)
-    });
-    assert!(s.contains("⚠ Tool: Bash"));
-    assert!(s.contains("Allow"), "Allow label missing:\n{s}");
-    assert!(s.contains("Deny"), "Deny label missing:\n{s}");
-    assert!(s.contains("[y]"));
-    assert!(s.contains("[n]"));
-    assert!(s.contains("Enter confirm"));
-}
-
-#[test]
-fn permission_truncates_large_input_with_ellipsis() {
-    let mut big = serde_json::Map::new();
-    for i in 0..20 {
-        big.insert(format!("k{i}"), serde_json::json!(i));
-    }
-    let p = PendingPermission {
-        id: "1".into(),
-        name: "X".into(),
-        input: serde_json::Value::Object(big),
-        cursor: Default::default(),
-    };
-    let s = render_to_buffer(80, 12, |f, area| {
-        permission_inline::render_prepared(f, &permission_inline::prepare(&p), area, None)
-    });
-    assert!(s.contains("more lines"), "truncation marker missing:\n{s}");
-}
-
-#[test]
-fn permission_height_for_simple_input() {
-    let p = PendingPermission {
-        id: "1".into(),
-        name: "X".into(),
-        input: serde_json::json!({}),
-        cursor: Default::default(),
-    };
-    assert_eq!(permission_inline::height(&p, 80), 3);
 }

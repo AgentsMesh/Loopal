@@ -32,8 +32,10 @@ async fn cleanup_agent(hub: &Arc<Mutex<Hub>>, agent_name: &str, reason: CleanupR
     let (pending, terminal_sink) = {
         let mut h = hub.lock().await;
         if reason == CleanupReason::AgentDisconnected {
-            h.session_permission_grants
-                .retain(|(agent, _)| agent != agent_name);
+            h.clear_permission_grants_for_agent(agent_name);
+            if let Some(execution) = h.registry.current_execution(agent_name) {
+                h.permission_receipts.revoke_execution(&execution);
+            }
         }
         let pending = store::take_for_agent(&mut h, agent_name);
         (pending, TerminalEventSink::from_hub(&h))
@@ -169,6 +171,9 @@ async fn expire_if_current(
     }
 }
 
+#[cfg(test)]
+#[path = "cleanup/store_tests.rs"]
+mod store_tests;
 #[cfg(test)]
 #[path = "cleanup/tests.rs"]
 mod tests;

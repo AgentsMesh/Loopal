@@ -51,6 +51,29 @@ are `anthropic`, `openai_responses`, `openai_compat`, and `google`:
 }
 ```
 
+Scenario v3 adds optional call labels and request metadata predicates. Metadata
+paths are JSON Pointers relative to the top-level request `metadata` value. All
+predicates in `requestMetadata` must match:
+
+```json
+{
+  "version": 3,
+  "calls": [{
+    "label": "build node attempt 2",
+    "expect": {"requestMetadata": [
+      {"path": "/workflow/run", "exists": true},
+      {"path": "/workflow/node", "equals": "build"},
+      {"path": "/workflow/attempt", "equals": 2},
+      {"path": "/workflow/phase", "contains": "execute"},
+      {"path": "/workflow/phase", "excludes": "cancel"}
+    ]},
+    "chunks": [{"type": "done"}]
+  }]
+}
+```
+
+Labels and matcher paths appear in mismatch diagnostics. Request metadata values
+and the metadata object are never copied into the request journal.
 `assistantBlockTypes` matches the exact canonical assistant history order;
 `serverBlockCount` matches the number of canonical server-history blocks.
 

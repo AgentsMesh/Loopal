@@ -4,72 +4,15 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use loopal_ipc::protocol::methods;
-use loopal_protocol::Envelope;
 use serde_json::{Value, json};
 use tokio::sync::Mutex;
 
 use crate::hub::Hub;
-use crate::routing;
+
+pub(super) use super::route_handler::handle_route;
 
 #[path = "agent_command.rs"]
 mod agent_command;
-
-pub async fn handle_route(hub: &Arc<Mutex<Hub>>, params: Value) -> Result<Value, String> {
-    let mut envelope: Envelope =
-        serde_json::from_value(params).map_err(|e| format!("invalid envelope: {e}"))?;
-    let cwd = {
-        let h = hub.lock().await;
-        h.spawn_registry
-            .cwd_of(&envelope.target.agent)
-            .unwrap_or_else(|| h.default_cwd.clone())
-    };
-    super::skill_routing::expand_human_skill(&mut envelope, &cwd);
-
-    // Remote address → uplink immediately (target carries the next hop).
-    if envelope.target.is_remote() {
-        return route_via_uplink(hub, &envelope).await;
-    }
-
-    // Local lookup
-    let result = {
-        let h = hub.lock().await;
-        h.registry
-            .get_agent_connection(&envelope.target.agent)
-            .map(|conn| {
-                let observation = routing::RouteObservation::from_hub(&h, &envelope.target.agent);
-                (conn, observation)
-            })
-    };
-
-    match result {
-        Some((conn, observation)) => {
-            routing::route_to_agent(&conn, &envelope, &observation).await?;
-            Ok(json!({"ok": true}))
-        }
-        None => {
-            // Local miss — escalate to MetaHub if uplink exists
-            route_via_uplink(hub, &envelope).await
-        }
-    }
-}
-
-/// Forward an envelope to MetaHub via uplink. Errors if no uplink.
-async fn route_via_uplink(hub: &Arc<Mutex<Hub>>, envelope: &Envelope) -> Result<Value, String> {
-    let uplink = {
-        let h = hub.lock().await;
-        h.uplink.clone()
-    };
-    match uplink {
-        Some(ul) => {
-            ul.route(envelope).await?;
-            Ok(json!({"ok": true}))
-        }
-        None => Err(format!(
-            "agent '{}' not found locally and no MetaHub uplink configured",
-            envelope.target
-        )),
-    }
-}
 
 pub async fn handle_list_agents(hub: &Arc<Mutex<Hub>>) -> Result<Value, String> {
     let agents: Vec<Value> = hub
@@ -96,9 +39,30 @@ pub async fn handle_control(hub: &Arc<Mutex<Hub>>, params: Value) -> Result<Valu
     let command = params["command"].clone();
     let conn = {
         let h = hub.lock().await;
-        h.registry
+        let conn = h
+            .registry
             .get_agent_connection(&target)
-            .ok_or_else(|| format!("no agent: '{target}'"))?
+            .ok_or_else(|| format!("no agent: '{target}'"))?;
+        let execution = h.registry.execution_for_connection(&target, &conn);
+        if h.workflow_coordinator().is_some()
+            && serde_json::from_value::<loopal_protocol::ControlCommand>(command.clone()).is_ok_and(
+                |command| matches!(command, loopal_protocol::ControlCommand::ResumeSession(_)),
+            )
+            && execution
+                .as_ref()
+                .and_then(|execution| h.registry.runtime_facts(execution))
+                .is_some_and(|facts| {
+                    facts.origin == crate::types::AgentOrigin::ManagedRoot
+                        && facts.parent.is_none()
+                        && facts.depth == 0
+                        && facts.root == loopal_protocol::ROOT_AGENT_NAME
+                })
+        {
+            return Err(
+                "root session hot-swap is unavailable while workflow execution is enabled".into(),
+            );
+        }
+        conn
     };
     let response = agent_command::request(
         Arc::clone(&conn),
@@ -194,3 +158,7 @@ mod interrupt_generation_tests;
 #[cfg(test)]
 #[path = "interrupt_tests.rs"]
 mod interrupt_tests;
+
+#[cfg(test)]
+#[path = "workflow_control_tests.rs"]
+mod workflow_control_tests;

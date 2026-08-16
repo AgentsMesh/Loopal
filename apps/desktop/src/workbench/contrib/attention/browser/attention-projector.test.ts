@@ -6,13 +6,17 @@ import {
   questionRequestId,
 } from './attention-projector'
 
+const intentDigest = `sha256:${'ab'.repeat(32)}`
+
 describe('Attention projector', () => {
   it('projects permission and multi-question requests', () => {
     expect(permissionItem({
       id: 'p', sessionId: 's', runtimeId: 'r', generation: 1,
-      agentId: 'a', tool: 'shell', title: 'Run', detail: 'ls',
+      agentId: 'a', tool: 'shell', title: 'Run', detail: 'ls', intentDigest,
       risk: 'high', createdAt: '2026-07-11T12:00:00.000Z',
-    })).toMatchObject({ id: 'a:p', agentId: 'a', command: 'shell', description: 'ls' })
+    })).toMatchObject({
+      id: 'a:p', agentId: 'a', command: 'shell', description: 'ls', canAllow: true,
+    })
     const items = questionItems({
       id: 'request', sessionId: 's', runtimeId: 'r', generation: 1,
       agentId: 'a', classifierRunning: false,

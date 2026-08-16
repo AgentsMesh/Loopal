@@ -12,6 +12,8 @@ use loopal_runtime::frontend::permission_handler::PermissionHandler;
 use loopal_runtime::frontend::question_handler::QuestionHandler;
 use loopal_runtime::frontend::{DecisionCell, DecisionContext};
 
+use super::permission_request_support::permission_request;
+
 type Handlers = (
     Box<dyn PermissionHandler>,
     Box<dyn QuestionHandler>,
@@ -36,6 +38,7 @@ fn empty_config(decision: DecisionMode) -> ResolvedConfig {
     };
     ResolvedConfig {
         settings,
+        workflow_preset_thinking_recommendation: None,
         mcp_servers: IndexMap::new(),
         skills: IndexMap::new(),
         hooks: Vec::new(),
@@ -62,7 +65,9 @@ async fn manual_decision_yields_ipc_only_no_primary_connection() {
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
     let session = dummy_session();
     let (perm, _q, _cell) = handlers(&config, &kernel, session);
-    let outcome = perm.decide("id1", "Bash", &serde_json::json!({})).await;
+    let outcome = perm
+        .decide(&permission_request("id1", "Bash", serde_json::json!({})))
+        .await;
     assert_eq!(
         outcome.decision,
         loopal_tool_api::PermissionDecision::Deny,
@@ -81,7 +86,9 @@ async fn auto_decision_wraps_with_auto_handlers_and_falls_back() {
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
     let session = dummy_session();
     let (perm, _q, _cell) = handlers(&config, &kernel, session);
-    let outcome = perm.decide("id1", "Bash", &serde_json::json!({})).await;
+    let outcome = perm
+        .decide(&permission_request("id1", "Bash", serde_json::json!({})))
+        .await;
     assert_eq!(
         outcome.decision,
         loopal_tool_api::PermissionDecision::Deny,
@@ -147,43 +154,21 @@ async fn decision_cell_switch_flips_manual_to_classifier_at_runtime() {
     let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
     let session = dummy_session();
     let (perm, _q, cell) = handlers(&config, &kernel, session);
-    let manual = perm.decide("id1", "Bash", &serde_json::json!({})).await;
+    let manual = perm
+        .decide(&permission_request("id1", "Bash", serde_json::json!({})))
+        .await;
     assert!(
         manual.reason.contains("no primary connection"),
         "Manual cell must delegate to fallback, got: {}",
         manual.reason
     );
     cell.set(DecisionMode::Classifier);
-    let classifier = perm.decide("id2", "Bash", &serde_json::json!({})).await;
+    let classifier = perm
+        .decide(&permission_request("id2", "Bash", serde_json::json!({})))
+        .await;
     assert!(
         classifier.reason.contains("provider lookup failed"),
         "Classifier cell must run the classifier path, got: {}",
         classifier.reason
-    );
-}
-
-#[tokio::test]
-async fn agent_decision_falls_back_to_classifier_path_today() {
-    // Agent mode is not yet implemented; factory must transparently fall
-    // back to Classifier behaviour so existing setups keep working.
-    let config = empty_config(DecisionMode::Agent);
-    let kernel = Arc::new(Kernel::new(Settings::default()).unwrap());
-    let session = dummy_session();
-    let (perm, q, _cell) = handlers(&config, &kernel, session);
-    // Permission path: Agent → Classifier → IpcPermission fallback denies (no conn)
-    let outcome = perm.decide("id1", "Bash", &serde_json::json!({})).await;
-    assert_eq!(
-        outcome.decision,
-        loopal_tool_api::PermissionDecision::Deny,
-        "Agent mode must fall through to Classifier permission path"
-    );
-    // Question path: Agent → Classifier → IpcQuestion fallback cancels (no conn)
-    let q_outcome = q.ask(vec![]).await;
-    assert!(
-        matches!(
-            q_outcome.response,
-            loopal_protocol::UserQuestionResponse::Cancelled { .. }
-        ),
-        "Agent mode question path should reach the manual fallback (no conn)"
     );
 }

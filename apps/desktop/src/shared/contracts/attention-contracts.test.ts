@@ -6,18 +6,24 @@ import {
   QuestionResponseInputSchema,
 } from './attention-contracts'
 
+const intentDigest = `sha256:${'ab'.repeat(32)}`
+
 describe('attention contracts', () => {
   it('validates permission and multi-question lifecycles', () => {
     const permission = PermissionRequestSchema.parse({
       id: 'p', sessionId: 'session', runtimeId: 'runtime', generation: 1,
-      agentId: 'main', tool: 'bash', title: 'Allow bash',
+      agentId: 'main', tool: 'bash', title: 'Allow bash', intentDigest,
       detail: '{}', risk: 'high', createdAt: '2026-07-11T12:00:00.000Z',
     })
     expect(permission.risk).toBe('high')
     expect(PermissionResponseInputSchema.parse({
       sessionId: 'session', runtimeId: 'runtime', generation: 1,
-      agentId: 'main', requestId: 'p', decision: 'allow_session',
+      agentId: 'main', requestId: 'p', intentDigest, decision: 'allow_session',
     }).decision).toBe('allow_session')
+    expect(() => PermissionResponseInputSchema.parse({
+      sessionId: 'session', runtimeId: 'runtime', generation: 1,
+      agentId: 'main', requestId: 'p', decision: 'allow_once',
+    })).toThrow('Permission intent digest is required')
     const question = QuestionRequestSchema.parse({
       id: 'q', sessionId: 'session', runtimeId: 'runtime', generation: 1,
       agentId: 'main', classifierRunning: true,

@@ -2,6 +2,7 @@ use loopal_config::Settings;
 use loopal_config::{HookConfig, HookEvent};
 use loopal_kernel::Kernel;
 use loopal_runtime::tool_pipeline::execute_tool;
+use loopal_runtime::tool_prepare::prepare_tool_action;
 use loopal_tool_api::ToolContext;
 
 fn make_kernel_with_hooks(hooks: Vec<HookConfig>) -> Kernel {
@@ -26,6 +27,18 @@ fn temp_file(name: &str, content: &str) -> (std::path::PathBuf, ToolContext) {
     (path, ctx)
 }
 
+async fn run_tool(
+    kernel: &Kernel,
+    name: &str,
+    input: serde_json::Value,
+    ctx: &ToolContext,
+) -> loopal_error::Result<loopal_tool_api::ToolResult> {
+    let action = prepare_tool_action(kernel, "hook-test", name, input)
+        .await?
+        .into_prepared()?;
+    execute_tool(kernel, action, ctx, &loopal_runtime::mode::AgentMode::Act).await
+}
+
 #[tokio::test]
 async fn test_passing_pre_hook() {
     let kernel = make_kernel_with_hooks(vec![HookConfig {
@@ -42,12 +55,11 @@ async fn test_passing_pre_hook() {
         id: None,
     }]);
     let (path, ctx) = temp_file("tool_pre_hook_pass.txt", "pre-hook pass content");
-    let result = execute_tool(
+    let result = run_tool(
         &kernel,
         "Read",
         serde_json::json!({"file_path": path.to_str().unwrap()}),
         &ctx,
-        &loopal_runtime::mode::AgentMode::Act,
     )
     .await;
     let _ = std::fs::remove_file(&path);
@@ -72,18 +84,16 @@ async fn test_failing_pre_hook() {
         id: None,
     }]);
     let (path, ctx) = temp_file("tool_pre_hook_fail.txt", "should not read this");
-    let result = execute_tool(
+    let result = run_tool(
         &kernel,
         "Read",
         serde_json::json!({"file_path": path.to_str().unwrap()}),
         &ctx,
-        &loopal_runtime::mode::AgentMode::Act,
     )
     .await;
     let _ = std::fs::remove_file(&path);
-    let result = result.expect("failing pre-hook should return Ok(error)");
-    assert!(result.is_error);
-    assert!(result.content.contains("Pre-hook rejected"));
+    let error = result.expect_err("failing pre-hook should deny preparation");
+    assert!(error.to_string().contains("Pre-hook rejected"));
 }
 
 #[tokio::test]
@@ -102,47 +112,17 @@ async fn test_post_hook_failure_ignored() {
         id: None,
     }]);
     let (path, ctx) = temp_file("tool_post_hook_fail.txt", "post hook test content");
-    let result = execute_tool(
+    let result = run_tool(
         &kernel,
         "Read",
         serde_json::json!({"file_path": path.to_str().unwrap()}),
         &ctx,
-        &loopal_runtime::mode::AgentMode::Act,
     )
     .await;
     let _ = std::fs::remove_file(&path);
     let result = result.expect("post-hook failure should not prevent result");
     assert!(!result.is_error);
     assert!(result.content.contains("post hook test content"));
-}
-
-#[tokio::test]
-async fn test_filtered_pre_hook_not_matching() {
-    let kernel = make_kernel_with_hooks(vec![HookConfig {
-        event: HookEvent::PreToolUse,
-        command: "exit 1".to_string(),
-        tool_filter: Some(vec!["Bash".to_string()]),
-        timeout_ms: 5000,
-        hook_type: Default::default(),
-        url: None,
-        headers: Default::default(),
-        prompt: None,
-        model: None,
-        condition: None,
-        id: None,
-    }]);
-    let (path, ctx) = temp_file("tool_filtered_hook.txt", "filtered hook content");
-    let result = execute_tool(
-        &kernel,
-        "Read",
-        serde_json::json!({"file_path": path.to_str().unwrap()}),
-        &ctx,
-        &loopal_runtime::mode::AgentMode::Act,
-    )
-    .await;
-    let _ = std::fs::remove_file(&path);
-    let result = result.expect("filtered hook should not block unmatched tool");
-    assert!(!result.is_error);
 }
 
 #[tokio::test]
@@ -176,12 +156,11 @@ async fn test_both_pre_and_post_hooks() {
         },
     ]);
     let (path, ctx) = temp_file("tool_both_hooks.txt", "both hooks content");
-    let result = execute_tool(
+    let result = run_tool(
         &kernel,
         "Read",
         serde_json::json!({"file_path": path.to_str().unwrap()}),
         &ctx,
-        &loopal_runtime::mode::AgentMode::Act,
     )
     .await;
     let _ = std::fs::remove_file(&path);

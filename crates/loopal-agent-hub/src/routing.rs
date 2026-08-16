@@ -9,7 +9,6 @@ use loopal_protocol::{AgentEvent, AgentEventPayload, Envelope, MessageSource, Qu
 use crate::Hub;
 use crate::authoritative_events::AuthoritativeEventSink;
 
-/// Generation-bound observation channel captured while resolving a route.
 #[derive(Clone)]
 pub(crate) struct RouteObservation {
     sink: AuthoritativeEventSink,
@@ -38,36 +37,18 @@ impl RouteObservation {
     }
 }
 
-/// Route an envelope to a single target agent.
-///
-/// Order matters: emit `UserMessageQueued` BEFORE `send_request` so all
-/// UI clients see the user's row land in the conversation before the
-/// agent's reply events (which agents typically emit during request
-/// processing, before the request response returns).
-///
-/// On successful delivery a `MessageRouted` audit event is emitted
-/// after the response returns.
 pub async fn route_to_agent(
     conn: &Arc<Connection<Listening>>,
     envelope: &Envelope,
     observation: &RouteObservation,
 ) -> Result<(), String> {
-    if matches!(envelope.source, MessageSource::Human) {
-        let queued = AgentEvent::named(
-            QualifiedAddress::local(envelope.target.agent.clone()),
-            AgentEventPayload::UserMessageQueued {
-                envelope_id: envelope.id.to_string(),
-                content: envelope.content.text.clone(),
-                image_count: envelope.content.images.len(),
-                skill_info: envelope.content.skill_info.clone(),
-            },
-        );
+    if let Some(queued) = queued_event(envelope) {
         observation
             .deliver_target_event(queued)
             .await
             .map_err(|error| {
                 format!(
-                    "cannot admit user message for '{}': {error}",
+                    "cannot admit routed message for '{}': {error}",
                     envelope.target
                 )
             })?;
@@ -75,7 +56,6 @@ pub async fn route_to_agent(
 
     let params =
         serde_json::to_value(envelope).map_err(|e| format!("failed to serialize envelope: {e}"))?;
-
     conn.send_request(methods::AGENT_MESSAGE.name, params)
         .await
         .map_err(|e| format!("delivery to '{}' failed: {e}", envelope.target))?;
@@ -94,126 +74,33 @@ pub async fn route_to_agent(
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use std::time::Duration;
-
-    use loopal_ipc::connection::Incoming;
-    use loopal_protocol::{AgentEventPayload, UserContent};
-    use tokio::sync::{Mutex, mpsc};
-
-    use super::*;
-
-    #[tokio::test]
-    async fn full_observation_queue_backpressures_and_preserves_route_order() {
-        let (event_tx, mut event_rx) = mpsc::channel(1);
-        event_tx
-            .send(AgentEvent::root(AgentEventPayload::Running))
-            .await
-            .unwrap();
-        let hub = Arc::new(Mutex::new(Hub::new(event_tx)));
-        let (agent_transport, hub_transport) = loopal_ipc::duplex_pair();
-        let (agent, mut agent_rx) = Connection::new(agent_transport).into_listening();
-        let (hub_connection, _hub_rx) = Connection::new(hub_transport).into_listening();
-        hub.lock()
-            .await
-            .registry
-            .register_connection("main", hub_connection.clone())
-            .unwrap();
-        let observation = {
-            let hub = hub.lock().await;
-            RouteObservation::from_hub(&hub, "main")
-        };
-        let envelope = Envelope::new(
-            MessageSource::Human,
-            QualifiedAddress::local("main"),
-            UserContent::from("queued under pressure"),
-        );
-
-        let route = tokio::spawn({
-            let hub_connection = hub_connection.clone();
-            let observation = observation.clone();
-            async move { route_to_agent(&hub_connection, &envelope, &observation).await }
-        });
-        tokio::task::yield_now().await;
-        assert!(
-            !route.is_finished(),
-            "a full queue must backpressure routing"
-        );
-        assert!(
-            tokio::time::timeout(Duration::from_millis(20), agent_rx.recv())
-                .await
-                .is_err(),
-            "the agent/message RPC must not overtake UserMessageQueued admission"
-        );
-        let guard = tokio::time::timeout(Duration::from_millis(100), hub.lock())
-            .await
-            .expect("route backpressure must not hold the Hub lock");
-        drop(guard);
-
-        assert!(matches!(
-            event_rx.recv().await.unwrap().payload,
-            AgentEventPayload::Running
+fn queued_event(envelope: &Envelope) -> Option<AgentEvent> {
+    let target = QualifiedAddress::local(envelope.target.agent.clone());
+    if matches!(envelope.source, MessageSource::Human) {
+        return Some(AgentEvent::named(
+            target,
+            AgentEventPayload::UserMessageQueued {
+                envelope_id: envelope.id.to_string(),
+                content: envelope.content.text.clone(),
+                image_count: envelope.content.images.len(),
+                skill_info: envelope.content.skill_info.clone(),
+            },
         ));
-        let queued = event_rx.recv().await.unwrap();
-        assert!(matches!(
-            queued.payload,
-            AgentEventPayload::UserMessageQueued { .. }
-        ));
-        assert!(queued.routing_generation.is_some());
-
-        let Incoming::Request { id, method, .. } = agent_rx.recv().await.unwrap() else {
-            panic!("expected agent/message request");
-        };
-        assert_eq!(method, methods::AGENT_MESSAGE.name);
-        agent
-            .respond(id, serde_json::json!({"ok": true}))
-            .await
-            .unwrap();
-        let routed = event_rx.recv().await.unwrap();
-        assert!(matches!(
-            routed.payload,
-            AgentEventPayload::MessageRouted { .. }
-        ));
-        route.await.unwrap().unwrap();
     }
-
-    #[tokio::test]
-    async fn closed_observation_queue_rejects_route_before_agent_delivery() {
-        let (event_tx, event_rx) = mpsc::channel(1);
-        drop(event_rx);
-        let hub = Arc::new(Mutex::new(Hub::new(event_tx)));
-        let shutdown = hub.lock().await.shutdown_signal.clone();
-        let (agent_transport, hub_transport) = loopal_ipc::duplex_pair();
-        let (_agent, mut agent_rx) = Connection::new(agent_transport).into_listening();
-        let (hub_connection, _hub_rx) = Connection::new(hub_transport).into_listening();
-        hub.lock()
-            .await
-            .registry
-            .register_connection("main", hub_connection.clone())
-            .unwrap();
-        let observation = {
-            let hub = hub.lock().await;
-            RouteObservation::from_hub(&hub, "main")
-        };
-        let envelope = Envelope::new(
-            MessageSource::Human,
-            QualifiedAddress::local("main"),
-            UserContent::from("must not disappear"),
-        );
-
-        let error = route_to_agent(&hub_connection, &envelope, &observation)
-            .await
-            .unwrap_err();
-        assert!(error.contains("authoritative Hub event queue closed"));
-        assert!(
-            tokio::time::timeout(Duration::from_millis(20), agent_rx.recv())
-                .await
-                .is_err(),
-            "routing must fail before agent delivery when the observation sink is closed"
-        );
-        tokio::time::timeout(Duration::from_millis(100), shutdown.notified())
-            .await
-            .expect("closed route sink must invalidate the Hub");
+    if envelope.source.is_ephemeral_in_history() {
+        return None;
     }
+    Some(AgentEvent::named(
+        target,
+        AgentEventPayload::InboxEnqueued {
+            envelope_id: envelope.id.to_string(),
+            source: envelope.source.clone(),
+            content: envelope.content.text.clone(),
+            summary: envelope.summary.clone(),
+        },
+    ))
 }
+
+#[cfg(test)]
+#[path = "routing_tests.rs"]
+mod tests;

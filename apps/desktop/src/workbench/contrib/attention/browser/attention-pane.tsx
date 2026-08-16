@@ -32,11 +32,13 @@ export function AttentionPane(props: AttentionPaneProps): React.JSX.Element {
               </button>
               <button
                 className="primary"
+                disabled={!request.canAllow}
                 onClick={() => props.callbacks.onResolvePermission?.(request.id, 'allow')}
               >
                 {t('attention.allow')}
               </button>
               <button
+                disabled={!request.canAllow}
                 onClick={() => props.callbacks.onResolvePermission?.(request.id, 'allow_session')}
               >
                 {t('attention.allowSession')}

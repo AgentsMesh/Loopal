@@ -15,7 +15,7 @@ async fn agent_tool_spawns_a_real_child_process_turn() {
             {"expect": {"userContains": "delegate the subtask"},
              "chunks": [
                 {"type": "tool_use", "id": "a1", "name": "Agent",
-                 "input": {"prompt": "solve magic-subtask-424242 and report",
+                 "input": {"prompt": "solve magic-subtask-424242 spawn-prompt-canary and report",
                            "name": "subworker"}},
                 {"type": "done"}
              ]},
@@ -62,4 +62,27 @@ async fn agent_tool_spawns_a_real_child_process_turn() {
         "root + child + continuation means at least three LLM calls; \
          journal: {journal}"
     );
+
+    let audit = std::fs::read_to_string(h.protected_audit_path()).unwrap();
+    let records = audit
+        .lines()
+        .map(|line| serde_json::from_str::<serde_json::Value>(line).unwrap())
+        .filter(|record| record["op"] == "spawn_authority")
+        .collect::<Vec<_>>();
+    assert_eq!(records.len(), 1, "spawn audit records: {records:?}");
+    let record = &records[0];
+    assert_eq!(record["phase"], "pre_effect");
+    assert_eq!(record["name"], "subworker");
+    assert_eq!(record["session_id"], h.session_id);
+    assert_eq!(record["agent_name"], "main");
+    assert_eq!(record["depth"], 1);
+    assert!(record["connection_generation"].as_u64().is_some());
+    assert_eq!(record["spawn_target"], "local");
+    assert_eq!(record["model"], "claude-opus-4-8");
+    assert_eq!(record["permission_mode"], "bypass");
+    assert_eq!(record["decision_mode"], "manual");
+    assert_eq!(record["sandbox_policy"], "default_write");
+    assert!(!audit.contains("spawn-prompt-canary"));
+    assert!(record.get("prompt").is_none());
+    assert!(record.get("fork_context").is_none());
 }

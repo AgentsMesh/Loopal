@@ -31,13 +31,6 @@ fn test_get_prompts_empty() {
 }
 
 #[tokio::test]
-async fn test_restart_connection_unknown_server() {
-    let mut manager = McpManager::new();
-    let result = manager.restart_connection("nonexistent").await;
-    assert!(result.is_err());
-}
-
-#[tokio::test]
 async fn test_start_all_with_failed_server_keeps_connection() {
     use indexmap::IndexMap;
     use loopal_config::McpServerConfig;
@@ -86,32 +79,6 @@ async fn test_get_tools_for_server_failed_returns_empty() {
     );
     let _ = manager.start_all(&configs).await;
     assert!(manager.get_tools_for_server("bad").is_empty());
-}
-
-#[tokio::test]
-async fn test_restart_connection_on_failed_server() {
-    use indexmap::IndexMap;
-    use loopal_config::McpServerConfig;
-    let mut manager = McpManager::new();
-    let mut configs = IndexMap::new();
-    configs.insert(
-        "bad".to_string(),
-        McpServerConfig::Stdio {
-            command: "__nonexistent__".to_string(),
-            args: vec![],
-            env: Default::default(),
-            enabled: true,
-            timeout_ms: 2000,
-            sharing: Default::default(),
-            cwd_isolation: None,
-        },
-    );
-    let _ = manager.start_all(&configs).await;
-    let result = manager.restart_connection("bad").await;
-    assert!(result.is_ok());
-    let snapshots = manager.collect_snapshots();
-    assert_eq!(snapshots.len(), 1);
-    assert!(snapshots[0].status.starts_with("failed"));
 }
 
 #[tokio::test]

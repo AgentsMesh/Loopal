@@ -6,8 +6,8 @@ use crate::support::CliHarness;
 
 /// Hub secret outage through a live session: three failed `hub/secret/get`
 /// resolutions trip HubHealth's degrade threshold, the health poller emits
-/// HubDegraded over the wire, yet the turn completes gracefully — unresolved
-/// refs are rewritten to `<missing-secret:NAME>` markers instead of crashing.
+/// HubDegraded over the wire, while the unresolved-secret effect fails closed
+/// and the model can still complete the turn gracefully.
 /// After the vault heals, the next successful resolution emits HubRecovered.
 #[tokio::test]
 async fn hub_outage_degrades_and_recovers_over_the_wire() {
@@ -18,8 +18,14 @@ async fn hub_outage_degrades_and_recovers_over_the_wire() {
             {"expect": {"userContains": "trigger outage"},
              "chunks": [
                 {"type": "tool_use", "id": "d1", "name": "Bash",
-                 "input": {"command":
-                    "echo 'o-<secret_ref:dg_a>-o' 'o-<secret_ref:dg_b>-o' 'o-<secret_ref:dg_c>-o'"}},
+                 "input": {
+                    "command": "echo \"o-$DG_A-o\" \"o-$DG_B-o\" \"o-$DG_C-o\"",
+                    "env": {
+                        "DG_A": "<secret_ref:dg_a>",
+                        "DG_B": "<secret_ref:dg_b>",
+                        "DG_C": "<secret_ref:dg_c>"
+                    }
+                 }},
                 {"type": "done"}
              ]},
             {"expect": {"toolResultId": "d1"},
@@ -27,7 +33,10 @@ async fn hub_outage_degrades_and_recovers_over_the_wire() {
             {"expect": {"userContains": "after recovery"},
              "chunks": [
                 {"type": "tool_use", "id": "d2", "name": "Bash",
-                 "input": {"command": "echo 'r-<secret_ref:dg_a>-r'"}},
+                 "input": {
+                    "command": "echo \"r-$DG_A-r\"",
+                    "env": {"DG_A": "<secret_ref:dg_a>"}
+                 }},
                 {"type": "done"}
              ]},
             {"expect": {"toolResultId": "d2"},
@@ -46,11 +55,15 @@ async fn hub_outage_degrades_and_recovers_over_the_wire() {
         "the turn must survive a vault outage; out: {out1:?}"
     );
     assert!(
+        out1.events.iter().any(|e| e.starts_with("ToolResult")
+            && e.contains("secret resolution failed")
+            && e.contains("is_error: true")),
+        "an unresolved secret must reject the effect without crashing the turn; events: {:?}",
         out1.events
-            .iter()
-            .any(|e| e.starts_with("ToolResult") && e.contains("<missing-secret:dg_b>")),
-        "unresolved refs must be rewritten to missing-secret markers, not \
-         crash the turn; events: {:?}",
+    );
+    assert!(
+        !out1.events.iter().any(|e| e.contains("<missing-secret:")),
+        "an unresolved secret must not be rewritten into executable input; events: {:?}",
         out1.events
     );
     let degraded = out1.events.iter().any(|e| e.contains("HubDegraded"))

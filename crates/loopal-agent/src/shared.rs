@@ -128,6 +128,8 @@ pub struct AgentShared {
     /// is disabled in settings. Shared with the runtime so multi-UI clients
     /// see the same single source of truth.
     pub goal_session: Option<Arc<GoalRuntimeSession>>,
+    /// Narrow root-only capability for Hub-owned workflow control.
+    pub workflow_control: Option<Arc<dyn crate::workflow_control::WorkflowControlClient>>,
 }
 
 impl AgentShared {
@@ -168,6 +170,7 @@ impl AgentShared {
             crons,
             bg_tasks,
             thread_goal,
+            workflows: Default::default(),
         }
     }
 

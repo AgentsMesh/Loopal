@@ -24,6 +24,16 @@ pub struct McpCallToolRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct McpReconnectRequest {
+    pub server: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct McpReconnectResponse {
+    pub connected: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct McpCallToolResponse {
     pub content: Vec<McpContentBlock>,
     pub is_error: bool,

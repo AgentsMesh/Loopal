@@ -27,6 +27,18 @@ build:ci --disk_cache=~/.cache/bazel-disk
 build:ci --repository_cache=~/.cache/bazel-repo
 test:ci --test_output=all
 
+# Rust branch coverage
+coverage:rust_branch --combined_report=lcov
+coverage:rust_branch --experimental_fetch_all_coverage_outputs
+coverage:rust_branch --experimental_split_coverage_postprocessing
+coverage:rust_branch --@rules_rust//rust/settings:extra_rustc_env=RUSTC_BOOTSTRAP=1
+coverage:rust_branch --@rules_rust//rust/settings:extra_rustc_flag=-Zcoverage-options=branch
+# LLVM 21.1.8 (bundled with Rust 1.94) can crash while exporting branch maps
+# from async/generic Rust test binaries. The branch-only toolchain setting pins
+# both producer and collector to Rust 1.92/LLVM 21.1.3 without changing the
+# compiler used by ordinary builds and tests.
+build:rust_branch --//:rust_branch_toolchain=true
+
 # Clippy
 build:clippy --aspects=@rules_rust//rust:defs.bzl%rust_clippy_aspect
 build:clippy --output_groups=clippy_checks

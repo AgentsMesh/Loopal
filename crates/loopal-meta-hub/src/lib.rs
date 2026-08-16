@@ -23,6 +23,7 @@ mod meta_hub;
 mod remote_relay;
 mod router;
 pub mod server;
+mod spawn;
 
 pub use address::QualifiedAddress;
 pub use hub_info::{HubInfo, HubStatus};

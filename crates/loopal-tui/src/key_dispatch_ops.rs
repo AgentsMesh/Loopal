@@ -16,7 +16,9 @@ pub(crate) async fn tool_approve(app: &mut App) {
     let pending = app.with_active_conversation(|conv| conv.pending_permission.clone());
     if let Some(p) = pending {
         let agent = app.session.lock().active_view.clone();
-        app.session.respond_permission(&agent, &p.id, true).await;
+        app.session
+            .respond_permission(&agent, &p.id, p.intent_digest, true)
+            .await;
     }
 }
 
@@ -25,7 +27,9 @@ pub(crate) async fn tool_deny(app: &mut App) {
     let pending = app.with_active_conversation(|conv| conv.pending_permission.clone());
     if let Some(p) = pending {
         let agent = app.session.lock().active_view.clone();
-        app.session.respond_permission(&agent, &p.id, false).await;
+        app.session
+            .respond_permission(&agent, &p.id, p.intent_digest, false)
+            .await;
     }
 }
 
@@ -161,6 +165,7 @@ pub(crate) async fn terminate_focused_agent(app: &mut App) {
     }
     app.section_mut(PanelKind::Agents).focused = None;
     if !panel_ops::has_live_agents(app) {
+        app.focus_mode = crate::app::FocusMode::Input;
         panel_ops::enter_panel(app);
         // enter_panel is a no-op if no panels have content → stays Input
     }

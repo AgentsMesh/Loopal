@@ -4,7 +4,7 @@ use serde::de::DeserializeOwned;
 
 use crate::ToolResult;
 use crate::permission::PermissionLevel;
-use crate::tool::ToolDispatch;
+use crate::tool::{ImageOutputPolicy, ToolDispatch};
 use crate::tool_context::ToolContext;
 use loopal_error::LoopalError;
 
@@ -19,6 +19,10 @@ pub trait TypedTool<P: Params>: Send + Sync {
 
     fn dispatch(&self) -> ToolDispatch {
         ToolDispatch::Pipeline
+    }
+
+    fn image_output_policy(&self) -> ImageOutputPolicy {
+        ImageOutputPolicy::Deny
     }
 
     fn precheck(&self, _input: &P) -> Option<String> {

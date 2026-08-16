@@ -11,6 +11,7 @@ use crate::backend_types::{
 use crate::batch::{BatchOp, BatchOutcome};
 use crate::output_tail::OutputTail;
 use crate::path::ResolvedPath;
+use crate::process_output::ProcessOutputSanitizer;
 
 pub enum ExecOutcome {
     Completed(ExecResult),
@@ -83,10 +84,34 @@ pub trait Backend: Send + Sync {
             .map(ExecOutcome::Completed)
     }
 
+    async fn exec_guarded(
+        &self,
+        command: &str,
+        timeout: Duration,
+        env: &EnvOverride,
+        sanitizer: Option<Arc<dyn ProcessOutputSanitizer>>,
+    ) -> Result<ExecResult, ToolIoError>;
+
+    async fn exec_streaming_guarded(
+        &self,
+        command: &str,
+        timeout: Duration,
+        env: &EnvOverride,
+        tail: Arc<OutputTail>,
+        sanitizer: Option<Arc<dyn ProcessOutputSanitizer>>,
+    ) -> Result<ExecOutcome, ToolIoError>;
+
     async fn exec_background(
         &self,
         command: &str,
         env: &EnvOverride,
+    ) -> Result<ProcessHandle, ToolIoError>;
+
+    async fn exec_background_guarded(
+        &self,
+        command: &str,
+        env: &EnvOverride,
+        sanitizer: Option<Arc<dyn ProcessOutputSanitizer>>,
     ) -> Result<ProcessHandle, ToolIoError>;
 
     // --- Network ---

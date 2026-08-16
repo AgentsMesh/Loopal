@@ -1,7 +1,5 @@
 use std::sync::Arc;
 
-use tokio::sync::mpsc;
-
 use loopal_agent::shared::AgentShared;
 use loopal_agent::task_store::TaskStore;
 use loopal_config::Settings;
@@ -14,14 +12,17 @@ use loopal_runtime::frontend::PermissionHandler;
 use loopal_runtime::frontend::{DenyAllHandler, ManualPermissionHandler};
 use loopal_session::SessionController;
 use loopal_tool_api::PermissionMode;
+use tokio::sync::mpsc;
 
 use crate::fixture::TestFixture;
-use crate::harness::{HarnessBuilder, SpawnedHarness};
+use crate::harness::HarnessBuilder;
+use crate::harness_types::SpawnedHarness;
 use crate::mock_provider::MultiCallProvider;
 
 pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopRunner) {
     let fixture = TestFixture::new();
     let seed_messages = builder.messages.clone();
+    let seed_messages_are_pending = builder.messages_pending;
 
     let (event_tx, event_rx) = mpsc::channel::<AgentEvent>(256);
     let (mailbox_tx, mailbox_rx) = mpsc::channel::<Envelope>(16);
@@ -31,8 +32,6 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
     let interrupt = loopal_runtime::InterruptHandle::new();
     let interrupt_signal_for_test = interrupt.signal.clone();
 
-    // Bypass policy never returns Ask → DenyAllHandler is a no-op that flags
-    // misconfig if it's ever called. Other modes need a real channel.
     let perm_handler: Box<dyn PermissionHandler> =
         if builder.permission_mode == PermissionMode::Bypass {
             Box::new(DenyAllHandler)
@@ -86,8 +85,6 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         .map(|p| p.canonicalize().unwrap_or_else(|_| p.clone()))
         .unwrap_or_else(|| fixture.path().to_path_buf());
     let session_cwd = cwd.clone();
-
-    // Mock hub connection (in-memory duplex; hub side dropped).
     let (hub_conn, _hub_peer) = loopal_ipc::duplex_pair();
     let (hub_connection, _hub_rx) = loopal_ipc::Connection::new(hub_conn).into_listening();
 
@@ -99,7 +96,6 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         .unwrap_or_else(|| Arc::new(loopal_scheduler::CronScheduler::new()));
     let (scheduler_handle, scheduled_rx) =
         loopal_agent::shared::SchedulerHandle::create_with_scheduler(scheduler_for_params.clone());
-    // Test fixtures don't switch sessions; activate the tick loop now.
     scheduler_handle.start();
     let shared = Arc::new(AgentShared {
         kernel: kernel.clone(),
@@ -113,6 +109,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
         scheduler_handle,
         message_snapshot: Arc::new(std::sync::RwLock::new(Vec::new())),
         goal_session: builder.goal_session.clone(),
+        workflow_control: None,
     });
     let shared_any: Arc<dyn std::any::Any + Send + Sync> = Arc::new(shared);
 
@@ -146,6 +143,8 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
             permission_mode: builder.permission_mode,
             tool_filter: builder.tool_filter,
             thinking_config: builder.thinking_config,
+            thinking_state: None,
+            workflow_preset_thinking_recommendation: None,
             context_tokens_cap: 200_000,
             microcompact_idle: std::time::Duration::from_secs(60 * 60),
             plan_state: None,
@@ -155,6 +154,7 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
             frontend: frontend.clone(),
             session_manager: fixture.session_manager(),
             decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
+            protected_effect_audit: Arc::new(loopal_tool_api::NoopProtectedEffectAudit),
         },
         if has_cwd_override {
             let mut s = fixture.unique_test_session("integration-test");
@@ -188,12 +188,12 @@ pub(crate) async fn wire(builder: HarnessBuilder) -> (SpawnedHarness, AgentLoopR
     runner.governance = loopal_runtime::agent_loop::governance::build_governance(&harness_cfg);
     runner.hooks = loopal_runtime::agent_loop::governance::build_hooks(frontend);
     if !seed_messages.is_empty() {
-        let turns = crate::seed_history::reverse_project_messages_to_turns(seed_messages);
+        let turns = if seed_messages_are_pending {
+            crate::seed_history::project_pending_messages_to_turns(seed_messages)
+        } else {
+            crate::seed_history::reverse_project_messages_to_turns(seed_messages)
+        };
         runner.seed_test_turns(turns);
     }
-    // Don't auto-open a Resume turn for empty seed — run_loop handles empty
-    // store naturally (needs_input=true → idle phase). Pre-opening conflicted
-    // with F7 (try_start_turn refuses to overwrite an in-progress turn): user
-    // message ingestion saw Resume still open and failed to start UserInput.
     (harness, runner)
 }

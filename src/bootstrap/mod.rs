@@ -56,6 +56,9 @@ mod sub_agent_resume;
 mod worktree_session;
 
 #[cfg(test)]
+#[path = "modes/lifecycle_test_support.rs"]
+mod lifecycle_test_support;
+#[cfg(test)]
 #[path = "tests/normalize_vault_at.rs"]
 mod normalize_vault_at_test;
 
@@ -106,7 +109,6 @@ pub async fn run() -> anyhow::Result<()> {
         }
         _ => {}
     }
-
     let cli = Cli::from_arg_matches(&matches).expect(
         "matches just produced by build_cli().get_matches_from; from_arg_matches cannot fail",
     );
@@ -114,7 +116,6 @@ pub async fn run() -> anyhow::Result<()> {
     // Hub children skip their parent's expensive session scan so startup stays
     // within the machine-handshake deadline.
     startup_housekeeping(&cwd, cli.parent_only.hub_only).await;
-
     let mut config = load_config(&cwd)?;
     cli.apply_overrides(&mut config.settings);
 

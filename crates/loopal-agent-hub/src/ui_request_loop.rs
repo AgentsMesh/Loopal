@@ -9,12 +9,10 @@ use tracing::info;
 use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 
-use crate::dispatch::dispatch_hub_request_with;
+use crate::dispatch::dispatch_hub_request_with_principal;
 use crate::hub::Hub;
-
-#[path = "ui_request_policy.rs"]
-mod policy;
-use policy::{is_control_request, is_recovery_request, is_ui_request};
+use crate::request_principal::{HubRequestPrincipal, UiPrincipal};
+use crate::ui_request_policy::{is_control_request, is_recovery_request, is_ui_request};
 
 pub(crate) const UI_DATA_REQUEST_LIMIT: usize = 16;
 pub(crate) const UI_CONTROL_REQUEST_LIMIT: usize = 4;
@@ -160,7 +158,27 @@ async fn serve_request(
         if method == methods::VIEW_SNAPSHOT.name {
             crate::view_router::handle_snapshot(&context.hub, params).await
         } else if is_ui_request(&method) {
-            dispatch_hub_request_with(&context.dispatcher, &method, params, context.name).await
+            let (name, capabilities, connection) = context
+                .hub
+                .lock()
+                .await
+                .ui
+                .client_lease(&context.name)
+                .ok_or_else(|| "stale UI connection lease".to_string())?;
+            let principal = HubRequestPrincipal::Ui(UiPrincipal::new(
+                context.name.clone(),
+                name,
+                capabilities,
+                connection,
+            ));
+            dispatch_hub_request_with_principal(
+                &context.hub,
+                &context.dispatcher,
+                &method,
+                params,
+                Arc::new(principal),
+            )
+            .await
         } else {
             Err(format!("method is not allowed for UI clients: {method}"))
         }

@@ -10,51 +10,6 @@ use super::types::InteractionAudience;
 use crate::HubUplink;
 use crate::hub::Hub;
 
-/// Take a pending permission and respond to the agent. Emits Resolved.
-/// Returns false if the pending was already removed (race / cleanup).
-pub async fn resolve_permission(
-    hub: &Arc<Mutex<Hub>>,
-    agent_name: &str,
-    interaction_id: &str,
-    allow: bool,
-    remember_session: bool,
-) -> bool {
-    let (info, terminal_sink) = {
-        let mut h = hub.lock().await;
-        let key = h
-            .pending_permissions
-            .iter()
-            .find(|((agent, _), info)| agent == agent_name && info.interaction_id == interaction_id)
-            .map(|(key, _)| key.clone());
-        let info = key.and_then(|key| h.pending_permissions.remove(&key));
-        if allow
-            && remember_session
-            && let Some(info) = info.as_ref()
-        {
-            h.session_permission_grants
-                .insert((info.agent_name.clone(), info.tool_name.clone()));
-        }
-        (info, TerminalEventSink::from_hub(&h))
-    };
-    let Some(info) = info else {
-        return false;
-    };
-    info!(agent = %info.agent_name, logical_id = %info.logical_id, interaction_id, allow, "permission resolved");
-    let resolved = AgentEvent::named(
-        QualifiedAddress::local(&info.agent_name),
-        AgentEventPayload::ToolPermissionResolved {
-            id: info.interaction_id.clone(),
-        },
-    );
-    complete_detached(
-        info.agent_conn,
-        info.agent_ipc_id,
-        serde_json::json!({"allow": allow}),
-        Some((terminal_sink, resolved)),
-    );
-    true
-}
-
 pub async fn resolve_question(
     hub: &Arc<Mutex<Hub>>,
     agent_name: &str,

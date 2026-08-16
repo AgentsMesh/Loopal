@@ -41,6 +41,8 @@ async fn full_chain_sub_agent_result_delivered_to_parent() {
         .start_agent(&loopal_agent_client::StartAgentParams {
             cwd: fixture.path().to_path_buf(),
             prompt: Some("research this project".to_string()),
+            sandbox_policy: None,
+            session_id: None,
             ..Default::default()
         })
         .await

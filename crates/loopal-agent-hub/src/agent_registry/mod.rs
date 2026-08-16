@@ -4,9 +4,21 @@
 
 mod completion;
 mod events;
+mod insertion;
+mod operations;
 mod queries;
 mod registration;
+mod removal;
+mod shadows;
 mod tombstones;
+mod topology_queries;
+
+#[cfg(test)]
+mod lease_tests;
+#[cfg(test)]
+mod query_tests;
+#[cfg(test)]
+mod registration_tests;
 
 pub use completion::PendingCompletionDelivery;
 
@@ -16,6 +28,7 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, watch};
 
 use loopal_ipc::connection::{Connection, Listening};
+use loopal_output_guard::FinalSinkRedactionSeed;
 use loopal_protocol::{AgentCompletion, AgentEvent};
 
 use crate::topology::AgentInfo;
@@ -35,10 +48,18 @@ pub struct AgentRegistry {
     /// TCP agent names reserved during the register-ACK handshake. Reservations
     /// are neither routable nor visible in topology snapshots.
     pub(crate) reservations: HashMap<String, Arc<Connection<Listening>>>,
+    pub(crate) final_sink_redaction_seed: FinalSinkRedactionSeed,
 }
 
 impl AgentRegistry {
     pub fn new(event_tx: mpsc::Sender<AgentEvent>) -> Self {
+        Self::new_with_redaction_seed(event_tx, FinalSinkRedactionSeed::new())
+    }
+
+    pub fn new_with_redaction_seed(
+        event_tx: mpsc::Sender<AgentEvent>,
+        final_sink_redaction_seed: FinalSinkRedactionSeed,
+    ) -> Self {
         Self {
             agents: HashMap::new(),
             event_tx,
@@ -48,6 +69,7 @@ impl AgentRegistry {
             completed_limit: MAX_COMPLETED_AGENTS,
             next_generation: 1,
             reservations: HashMap::new(),
+            final_sink_redaction_seed,
         }
     }
 
@@ -64,6 +86,7 @@ impl AgentRegistry {
             ManagedAgent {
                 state: AgentConnectionState::Local(channels),
                 info: AgentInfo::new(name, None, None),
+                runtime: None,
                 parent_generation: None,
                 completion_tx: None,
                 notify_parent_on_completion: true,

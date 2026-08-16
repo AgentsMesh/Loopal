@@ -19,7 +19,7 @@ AAAEADBJvjZT8X6JRJI8xVq/1aU8nMVgOtVnmdwqWwrSlXG3sKLqeplhpW+uObz5dvMgjz
 /// Seed a REAL age-encrypted vault into the Hub's project before launch: SSH
 /// identity under HOME/.ssh, `<cwd>/.loopal/vaults/main.vault` holding one
 /// secret. This is the actual production secret store, not a harness stub.
-async fn seed_vault(env: &HubEnv, name: &str, value: &str) {
+pub(crate) async fn seed_vault(env: &HubEnv, name: &str, value: &str) {
     let ssh_dir = env.home.path().join(".ssh");
     std::fs::create_dir_all(&ssh_dir).unwrap();
     let key_path = ssh_dir.join("id_ed25519");
@@ -48,7 +48,7 @@ async fn seed_vault(env: &HubEnv, name: &str, value: &str) {
         .unwrap();
 }
 
-/// The complete production secret chain: `<secret_ref:NAME>` in a Bash call
+/// The complete production secret chain: `<secret_ref:NAME>` in Bash `env`
 /// resolves through the Hub's REAL vault service (age decryption of the
 /// on-disk store), the shell runs with the plaintext (proved by length), and
 /// the result is redacted before the LLM wire ever sees it.
@@ -65,10 +65,13 @@ async fn secret_resolves_from_a_real_age_vault_and_redacts() {
                 {"expect": {"userContains": "use the vault secret"},
                  "chunks": [
                     {"type": "tool_use", "id": "v1", "name": "Bash",
-                     "input": {"command":
-                        "echo 'tag-<secret_ref:e2e_token>-tag'; \
-                         test \"$(printf %s '<secret_ref:e2e_token>' | wc -c)\" -eq 15 \
-                         && echo len-ok || echo len-bad"}},
+                     "input": {
+                        "command":
+                            "echo \"tag-$TOKEN-tag\"; \
+                             test \"$(printf %s \"$TOKEN\" | wc -c)\" -eq 15 \
+                             && echo len-ok || echo len-bad",
+                        "env": {"TOKEN": "<secret_ref:e2e_token>"}
+                     }},
                     {"type": "done"}
                  ]},
                 {"expect": {"toolResultId": "v1"},

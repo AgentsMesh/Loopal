@@ -9,6 +9,9 @@ use loopal_runtime::AgentLoopParams;
 use loopal_scheduler::CronScheduler;
 
 use crate::mcp_settle::{mcp_startup_wait, spawn_proxy_mcp_settle_poll};
+use provider_secrets::expand_provider_secrets;
+
+mod provider_secrets;
 
 pub struct AgentSetupResult {
     pub params: AgentLoopParams,
@@ -27,11 +30,21 @@ pub struct StartParams {
     pub permission_mode: Option<String>,
     pub decision_mode: Option<String>,
     pub no_sandbox: bool,
+    pub sandbox_policy: Option<loopal_config::SandboxPolicy>,
+    pub session_id: Option<uuid::Uuid>,
+    pub workflow_permission_causation: Option<loopal_protocol::WorkflowPermissionCausation>,
+    pub workflow_attempt_capability: Option<loopal_protocol::WorkflowAttemptCapability>,
+    pub workflow_completion_result_limit: Option<u32>,
     pub resume: Option<String>,
     pub lifecycle: loopal_runtime::LifecycleMode,
     pub agent_type: Option<String>,
     pub depth: Option<u32>,
     pub fork_context: Option<serde_json::Value>,
+}
+
+pub(crate) struct WorkflowProviderSecretAuthority {
+    pub(crate) causation: loopal_protocol::WorkflowPermissionCausation,
+    pub(crate) capability: loopal_protocol::WorkflowAttemptCapability,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -47,24 +60,77 @@ pub async fn build_kernel_from_config(
     agent_name: String,
     session_id: String,
 ) -> anyhow::Result<Arc<Kernel>> {
+    build_kernel_from_config_with_workflow_provider(
+        config,
+        production,
+        depth,
+        hub_client,
+        hub_connection,
+        cwd,
+        agent_name,
+        session_id,
+        None,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn build_kernel_from_config_with_workflow_provider(
+    config: &ResolvedConfig,
+    production: bool,
+    depth: u32,
+    hub_client: Option<Arc<dyn loopal_mcp::HubMcpClient>>,
+    hub_connection: Option<
+        Arc<loopal_ipc::connection::Connection<loopal_ipc::connection::Listening>>,
+    >,
+    cwd: std::path::PathBuf,
+    agent_name: String,
+    session_id: String,
+    workflow_provider: Option<WorkflowProviderSecretAuthority>,
+) -> anyhow::Result<Arc<Kernel>> {
     let mut settings = config.settings.clone();
     let cwd_for_memory = cwd.clone();
+    let redaction_seed = loopal_output_guard::FinalSinkRedactionSeed::new();
     let secret_client: Option<Arc<dyn loopal_secret_client::SecretClient>> =
-        hub_connection.map(|conn| {
-            Arc::new(loopal_secret_client::HubSecretClient::new(
-                conn, cwd, agent_name, depth,
-            )) as Arc<dyn loopal_secret_client::SecretClient>
+        hub_connection.as_ref().map(|conn| {
+            Arc::new(
+                loopal_secret_client::HubSecretClient::new(
+                    conn.clone(),
+                    cwd.clone(),
+                    agent_name,
+                    depth,
+                )
+                .with_final_sink_redaction_seed(redaction_seed.clone()),
+            ) as Arc<dyn loopal_secret_client::SecretClient>
         });
-    if let Some(client) = secret_client.as_ref() {
+    if let Some(authority) = workflow_provider {
+        let connection = hub_connection.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("workflow provider secret authority requires Hub IPC")
+        })?;
+        let client = loopal_secret_client::HubSecretClient::new_workflow_provider(
+            connection.clone(),
+            cwd,
+            authority.causation,
+            authority.capability,
+        )
+        .with_final_sink_redaction_seed(redaction_seed);
+        expand_provider_secrets(&mut settings, &client).await;
+    } else if let Some(client) = secret_client.as_ref() {
         expand_provider_secrets(&mut settings, client.as_ref()).await;
     }
     let settings_memory = settings.memory.clone();
+    let workflow_tools_enabled = depth == 0
+        && settings.workflow.execution_enabled
+        && settings.workflow.policy != loopal_config::OrchestrationPolicy::Off;
     let mut kernel = Kernel::new(settings)?;
     if let Some(client) = secret_client {
         kernel.set_secret_client(client);
     }
     if depth == 0 {
         kernel.register_goal_tools();
+        if workflow_tools_enabled {
+            loopal_agent::tools::register_workflow(&kernel);
+        }
     }
     if production {
         let uses_proxy = hub_client.is_some();
@@ -164,38 +230,9 @@ pub fn apply_start_overrides(settings: &mut loopal_config::Settings, start: &Sta
             tracing::warn!(input = %decision, "invalid decision_mode, ignoring");
         }
     }
-    if start.no_sandbox {
+    if let Some(policy) = start.sandbox_policy {
+        settings.sandbox.policy = policy;
+    } else if start.no_sandbox {
         settings.sandbox.policy = loopal_config::SandboxPolicy::Disabled;
-    }
-}
-
-async fn expand_provider_secrets(
-    settings: &mut loopal_config::Settings,
-    client: &dyn loopal_secret_client::SecretClient,
-) {
-    // Critical-path (agent/start) but reverse-IPC dispatcher is already
-    // Listening per P2-A's happens-before; 8s budget bounds any stuck hub
-    // call so we surface "timed out" rather than the 30s handshake timeout.
-    let budget = loopal_ipc::HUB_RPC_BUDGET;
-    for slot in [
-        &mut settings.providers.anthropic,
-        &mut settings.providers.openai,
-        &mut settings.providers.google,
-    ] {
-        if let Some(cfg) = slot.as_mut() {
-            if let Some(k) = cfg.api_key.as_mut() {
-                *k = loopal_secret_runtime::expand_to_plaintext(k, client, budget).await;
-            }
-            if let Some(u) = cfg.base_url.as_mut() {
-                *u = loopal_secret_runtime::expand_to_plaintext(u, client, budget).await;
-            }
-        }
-    }
-    for cfg in settings.providers.openai_compat.iter_mut() {
-        cfg.base_url =
-            loopal_secret_runtime::expand_to_plaintext(&cfg.base_url, client, budget).await;
-        if let Some(k) = cfg.api_key.as_mut() {
-            *k = loopal_secret_runtime::expand_to_plaintext(k, client, budget).await;
-        }
     }
 }

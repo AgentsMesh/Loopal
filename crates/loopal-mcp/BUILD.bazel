@@ -4,8 +4,10 @@ rust_library(
     name = "loopal-mcp",
     srcs = glob(["src/**/*.rs"]),
     edition = "2024",
+    proc_macro_deps = ["@crates//:async-trait"],
     visibility = ["//visibility:public"],
     deps = [
+        "//crates/loopal-backend",
         "//crates/loopal-config",
         "//crates/loopal-error",
         "//crates/loopal-ipc",
@@ -13,7 +15,6 @@ rust_library(
         "//crates/loopal-secret-client",
         "//crates/loopal-secret-runtime",
         "//crates/loopal-tool-api",
-        "//crates/loopal-vault-api",
         "@crates//:dirs",
         "@crates//:futures",
         "@crates//:indexmap",
@@ -27,14 +28,15 @@ rust_library(
         "@crates//:thiserror",
         "@crates//:tokio",
         "@crates//:tracing",
+        "@crates//:zeroize",
     ],
-    proc_macro_deps = ["@crates//:async-trait"],
 )
 
 rust_test(
     name = "loopal-mcp-unit-test",
     crate = ":loopal-mcp",
     edition = "2024",
+    deps = ["@crates//:libc"],
 )
 
 rust_test(
@@ -42,17 +44,17 @@ rust_test(
     srcs = glob(["tests/**/*.rs"]),
     crate_root = "tests/suite.rs",
     edition = "2024",
+    proc_macro_deps = ["@crates//:async-trait"],
     deps = [
         ":loopal-mcp",
+        "//crates/loopal-config",
+        "//crates/loopal-error",
         "//crates/loopal-test-support",
-        "@crates//:tokio",
+        "//crates/loopal-tool-api",
         "@crates//:indexmap",
         "@crates//:rmcp",
         "@crates//:serde",
         "@crates//:serde_json",
-        "//crates/loopal-config",
-        "//crates/loopal-error",
-        "//crates/loopal-tool-api",
+        "@crates//:tokio",
     ],
-    proc_macro_deps = ["@crates//:async-trait"],
 )

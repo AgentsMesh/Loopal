@@ -53,3 +53,9 @@ mod telemetry_edge_test;
 mod telemetry_test;
 #[path = "suite/validate_test.rs"]
 mod validate_test;
+#[path = "suite/workflow_loader_test.rs"]
+mod workflow_loader_test;
+#[path = "suite/workflow_preset_test.rs"]
+mod workflow_preset_test;
+#[path = "suite/workflow_settings_test.rs"]
+mod workflow_settings_test;

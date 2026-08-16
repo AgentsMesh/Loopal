@@ -1,7 +1,6 @@
 mod clock;
 pub mod control;
 pub mod monitor;
-mod monitor_watchdog;
 pub mod ops;
 pub mod store;
 mod store_spawn;

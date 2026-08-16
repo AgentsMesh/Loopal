@@ -131,6 +131,7 @@ async fn reconnecting_view_client_sees_existing_goal_via_snapshot() {
         crons: vec![],
         bg_tasks: vec![],
         thread_goal: Some(live_goal.clone()),
+        workflows: Default::default(),
     };
     let rebuilt = SessionViewState::from_snapshot("main", agent_snap);
     let view_snap = ViewSnapshot {

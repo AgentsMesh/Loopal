@@ -1,5 +1,5 @@
 import { projectMessages } from './loopal-message-projection'
-import { richSnapshot } from './loopal-rich-projection.test'
+import { richSnapshot } from './loopal-rich-projection.test-fixtures'
 import { projectTool } from './loopal-tool-projection'
 import {
   projectAgent, projectSessionView, retiredAgent, topologyAgent,

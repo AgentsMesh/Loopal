@@ -5,6 +5,8 @@ mod store_fixtures;
 #[path = "suite/vault_fixtures.rs"]
 mod vault_fixtures;
 
+#[path = "suite/audit_failure_test.rs"]
+mod audit_failure_test;
 #[path = "suite/concurrent_lock_test.rs"]
 mod concurrent_lock_test;
 #[path = "suite/discovery_test.rs"]

@@ -2,6 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use loopal_ipc::connection::{Connection, Listening};
+use loopal_output_guard::FinalSinkRedactionSeed;
 use loopal_protocol::AgentEvent;
 use tokio::sync::{Mutex, Notify, mpsc};
 use tracing::warn;
@@ -13,6 +14,7 @@ pub(super) struct TerminalEventSink {
     event_tx: mpsc::Sender<AgentEvent>,
     ui_connections: Vec<Arc<Connection<Listening>>>,
     shutdown_signal: Arc<Notify>,
+    redaction_seed: FinalSinkRedactionSeed,
 }
 
 impl TerminalEventSink {
@@ -26,6 +28,7 @@ impl TerminalEventSink {
                 .map(|client| client.connection.clone())
                 .collect(),
             shutdown_signal: hub.shutdown_signal.clone(),
+            redaction_seed: hub.final_sink_redaction_seed(),
         }
     }
 }
@@ -91,6 +94,7 @@ pub(super) fn complete_detached(
 }
 
 async fn enqueue_terminal_event(sink: &TerminalEventSink, event: AgentEvent) -> Result<(), String> {
+    let event = sink.redaction_seed.guard_event(event);
     match tokio::time::timeout(Duration::from_secs(2), sink.event_tx.send(event)).await {
         Ok(Ok(())) => Ok(()),
         Ok(Err(_)) => Err("interaction Resolved event queue closed".into()),

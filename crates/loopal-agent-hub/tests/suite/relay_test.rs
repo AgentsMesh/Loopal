@@ -16,7 +16,7 @@ use serde_json::json;
 
 fn make_hub() -> (Arc<Mutex<Hub>>, mpsc::Receiver<AgentEvent>) {
     let (tx, rx) = mpsc::channel::<AgentEvent>(16);
-    (Arc::new(Mutex::new(Hub::new(tx))), rx)
+    (crate::permission_support::hub_with_noop_audit(tx), rx)
 }
 
 async fn approve_via_events(
@@ -25,13 +25,19 @@ async fn approve_via_events(
     allow: bool,
 ) {
     while let Ok(event) = rx.recv().await {
-        if let AgentEventPayload::ToolPermissionRequest { id, .. } = event.payload {
+        if let AgentEventPayload::ToolPermissionRequest {
+            id,
+            permission_intent,
+            ..
+        } = event.payload
+        {
             let agent = event
                 .agent_name
                 .as_ref()
                 .map(|q| q.agent.clone())
                 .unwrap_or_else(|| "main".to_string());
-            client.respond_permission(&agent, &id, allow).await;
+            let digest = permission_intent.map(|intent| intent.intent_digest());
+            client.respond_permission(&agent, &id, digest, allow).await;
             return;
         }
     }
@@ -69,7 +75,7 @@ async fn permission_resolved_by_ui_response() {
     let result = agent_conn
         .send_request(
             methods::AGENT_PERMISSION.name,
-            json!({"tool_call_id": "t1", "tool_name": "Bash", "tool_input": {}}),
+            crate::permission_request("t1", "Bash", json!({})),
         )
         .await;
 
@@ -114,7 +120,7 @@ async fn pending_recorded_then_emitted_event() {
         agent_conn
             .send_request(
                 methods::AGENT_PERMISSION.name,
-                json!({"tool_call_id": "tc-7", "tool_name": "Bash", "tool_input": {}}),
+                crate::permission_request("tc-7", "Bash", json!({})),
             )
             .await
     });
@@ -132,8 +138,12 @@ async fn pending_recorded_then_emitted_event() {
     .await
     .expect("timeout waiting for ToolPermissionRequest");
 
-    let interaction_id = match event.payload {
-        AgentEventPayload::ToolPermissionRequest { id, .. } => id,
+    let (interaction_id, intent_digest) = match event.payload {
+        AgentEventPayload::ToolPermissionRequest {
+            id,
+            permission_intent,
+            ..
+        } => (id, permission_intent.map(|intent| intent.intent_digest())),
         _ => unreachable!(),
     };
     assert!(
@@ -144,7 +154,7 @@ async fn pending_recorded_then_emitted_event() {
     );
 
     ui.client
-        .respond_permission("agent-1", &interaction_id, false)
+        .respond_permission("agent-1", &interaction_id, intent_digest, false)
         .await;
     let resp = req_handle.await.expect("agent task panicked");
     assert!(resp.is_ok());

@@ -18,7 +18,7 @@ use serde_json::json;
 
 fn make_hub() -> (Arc<Mutex<Hub>>, mpsc::Receiver<AgentEvent>) {
     let (tx, rx) = mpsc::channel::<AgentEvent>(64);
-    (Arc::new(Mutex::new(Hub::new(tx))), rx)
+    (crate::permission_support::hub_with_noop_audit(tx), rx)
 }
 
 fn spawn_mock(conn: Arc<Connection<Listening>>, rx: mpsc::Receiver<Incoming>) {
@@ -49,13 +49,21 @@ async fn concurrent_permissions_from_two_agents() {
     tokio::spawn(async move {
         let mut event_rx = ui.event_rx;
         while let Ok(event) = event_rx.recv().await {
-            if let AgentEventPayload::ToolPermissionRequest { id, .. } = event.payload {
+            if let AgentEventPayload::ToolPermissionRequest {
+                id,
+                permission_intent,
+                ..
+            } = event.payload
+            {
                 let agent = event
                     .agent_name
                     .as_ref()
                     .map(|q| q.agent.clone())
                     .unwrap_or_else(|| "main".to_string());
-                ui_client.respond_permission(&agent, &id, true).await;
+                let digest = permission_intent.map(|intent| intent.intent_digest());
+                ui_client
+                    .respond_permission(&agent, &id, digest, true)
+                    .await;
             }
         }
     });
@@ -69,7 +77,7 @@ async fn concurrent_permissions_from_two_agents() {
         tokio::spawn(async move {
             c.send_request(
                 methods::AGENT_PERMISSION.name,
-                json!({"tool_call_id": "a1", "tool_name": "Bash", "tool_input": {}}),
+                crate::permission_request("a1", "Bash", json!({})),
             )
             .await
         })
@@ -79,7 +87,7 @@ async fn concurrent_permissions_from_two_agents() {
         tokio::spawn(async move {
             c.send_request(
                 methods::AGENT_PERMISSION.name,
-                json!({"tool_call_id": "b1", "tool_name": "Edit", "tool_input": {}}),
+                crate::permission_request("b1", "Edit", json!({})),
             )
             .await
         })

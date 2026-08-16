@@ -1,10 +1,10 @@
 use loopal_error::Result;
-use loopal_provider_api::ContentBlock;
 use loopal_tool_ask_user::NAME as ASK_USER_NAME;
 use loopal_tool_idle::NAME as REQUEST_IDLE_NAME;
 use loopal_tool_plan_mode::{ENTER_PLAN_NAME, EXIT_PLAN_NAME};
 
 use super::runner::AgentLoopRunner;
+use super::tool_result_sink::PendingToolResult;
 use super::turn_context::TurnContext;
 
 impl AgentLoopRunner {
@@ -13,7 +13,7 @@ impl AgentLoopRunner {
         turn_ctx: &mut TurnContext,
         tool_uses: &[(String, String, serde_json::Value)],
     ) -> Result<(
-        Vec<(usize, ContentBlock)>,
+        Vec<(usize, PendingToolResult)>,
         Vec<(String, String, serde_json::Value)>,
     )> {
         let mut intercepted = Vec::new();

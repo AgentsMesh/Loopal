@@ -63,7 +63,7 @@ async fn make_real_vault_client(
     let (hub_conn, hub_rx) = Connection::new(hub_t).into_listening();
 
     let (event_tx, _event_rx) = mpsc::channel(64);
-    let hub = Arc::new(Mutex::new(Hub::new(event_tx)));
+    let hub = Arc::new(Mutex::new(Hub::with_cwd(event_tx, fixture.cwd.clone())));
     let vault = HubVaultService::with_identity(
         fixture.identity.clone(),
         Arc::new(loopal_vault_api::NoopAuditSink),
@@ -73,7 +73,7 @@ async fn make_real_vault_client(
         .await
         .spawn_registry
         .register(agent_name.into(), fixture.cwd.clone(), None);
-    spawn_hub_dispatch_loop(hub.clone(), hub_conn, hub_rx, agent_name.into());
+    spawn_hub_dispatch_loop(hub.clone(), hub_conn, hub_rx, agent_name.into()).await;
 
     let client = HubSecretClient::new(client_conn, request_cwd, agent_name.into(), 0);
     (client, hub)

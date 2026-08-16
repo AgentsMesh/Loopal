@@ -1,14 +1,13 @@
 use std::sync::Arc;
 
-use tokio::sync::Mutex;
-use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, info};
 
 use loopal_config::load_config;
-use loopal_error::AgentOutput;
 use loopal_ipc::connection::{Connection, Listening};
 use loopal_protocol::InterruptSignal;
+use loopal_provider_api::SharedModelRouter;
 use loopal_runtime::agent_input::AgentInput;
+use loopal_scheduler::CronScheduler;
 
 use crate::agent_setup;
 use crate::agent_setup_helpers::build_model_router;
@@ -18,17 +17,12 @@ use crate::session_handlers_factory::build_session_handlers_with_emitter;
 use crate::session_hub::{SessionHub, SharedSession};
 use crate::session_spawn::{parse_start_params, spawn_agent_and_bridges};
 use crate::session_start_prompt::push_start_prompt;
-use loopal_provider_api::SharedModelRouter;
 
-pub(crate) struct SessionHandle {
-    pub session_id: String,
-    pub session: Arc<SharedSession>,
-    pub agent_task: tokio::task::JoinHandle<Option<AgentOutput>>,
-    pub lifecycle: loopal_runtime::LifecycleMode,
-    /// Level-triggered session termination, distinct from per-turn interrupt.
-    pub shutdown: CancellationToken,
-}
-
+mod kernel;
+mod lifecycle;
+mod types;
+mod workflow_handshake;
+pub(crate) use types::SessionHandle;
 pub(crate) async fn start_session(
     connection: &Arc<Connection<Listening>>,
     request_id: i64,
@@ -38,61 +32,43 @@ pub(crate) async fn start_session(
 ) -> anyhow::Result<SessionHandle> {
     let session_span = tracing::info_span!("session_start", session.id = tracing::field::Empty);
     async {
-        let (start, cwd, lifecycle) = parse_start_params(&params)?;
+        let (mut start, cwd, mut lifecycle) = parse_start_params(&params)?;
 
         let mut config = load_config(&cwd)?;
         crate::params::apply_start_overrides(&mut config.settings, &start);
-        let depth = start.depth.unwrap_or(0);
-        let hub_client: Option<Arc<dyn loopal_mcp::HubMcpClient>> = Some(Arc::new(
-            crate::connection_mcp_client::ConnectionMcpClient::new(connection.clone()),
-        ));
-        let agent_name = if depth == 0 {
-            loopal_protocol::ROOT_AGENT_NAME.to_string()
-        } else {
-            "sub".to_string()
-        };
+        lifecycle = lifecycle::select_lifecycle(
+            lifecycle,
+            params.get("lifecycle").is_some(),
+            start.prompt.as_deref(),
+            start.depth.unwrap_or(0),
+            &config.settings.workflow,
+        );
+        start.lifecycle = lifecycle;
         let preset_session_id = start
             .resume
             .clone()
+            .or_else(|| start.session_id.map(|id| id.to_string()))
             .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
-        let kernel = if is_production {
-            crate::params::build_kernel_from_config(
-                &config,
-                true,
-                depth,
-                hub_client,
-                Some(connection.clone()),
-                cwd.clone(),
-                agent_name,
-                preset_session_id.clone(),
-            )
-            .await?
-        } else {
-            match hub.get_test_provider().await {
-                Some(provider) => {
-                    crate::params::build_kernel_with_provider(provider, start.model.as_deref())?
-                }
-                None => {
-                    crate::params::build_kernel_from_config(
-                        &config,
-                        false,
-                        depth,
-                        None,
-                        None,
-                        cwd.clone(),
-                        "test".to_string(),
-                        preset_session_id.clone(),
-                    )
-                    .await?
-                }
-            }
-        };
+        let kernel = kernel::build(
+            connection,
+            &config,
+            &start,
+            &cwd,
+            &preset_session_id,
+            hub,
+            is_production,
+        )
+        .await?;
+        let redaction_seed = kernel
+            .secret_client()
+            .and_then(|client| client.final_sink_redaction_seed())
+            .unwrap_or_default();
 
         let (input_tx, input_rx) = tokio::sync::mpsc::channel::<AgentInput>(16);
         let interrupt = InterruptSignal::new();
         let (watch_tx, watch_rx) = tokio::sync::watch::channel(0u64);
         let interrupt_tx = Arc::new(watch_tx);
-        let shutdown = CancellationToken::new();
+        let shutdown = tokio_util::sync::CancellationToken::new();
 
         let session_holder: crate::ipc_handlers::SessionRef = Arc::new(tokio::sync::RwLock::new(
             Arc::new(SharedSession::placeholder(
@@ -111,7 +87,11 @@ pub(crate) async fn start_session(
         // Runtime events and classifier progress share one FIFO delivery worker.
         // This prevents two emitters targeting the same client transport from
         // racing each other at the connection write lock.
-        let broadcaster = HubBroadcaster::new(session_holder.clone(), None);
+        let broadcaster = HubBroadcaster::new_with_redaction_seed(
+            session_holder.clone(),
+            None,
+            redaction_seed.clone(),
+        );
         let (perm_handler, q_handler, decision_cell) = build_session_handlers_with_emitter(
             &config,
             &kernel,
@@ -155,12 +135,13 @@ pub(crate) async fn start_session(
         let scheduler_for_bridge = setup.scheduler;
         let agent_shared_for_session = setup.agent_shared;
 
-        if let Err(e) = scheduler_for_bridge
-            .switch_session(&agent_params.session().id)
-            .await
-        {
-            tracing::warn!(error = %e, "failed to bind scheduler to session");
-        }
+        // A workflow child must prove its attempt over the already
+        // authenticated Hub connection before the start response or worker
+        // task can be observed. The Hub derives execution identity from the
+        // transport; only opaque workflow proof fields cross this boundary.
+        workflow_handshake::send_if_worker(connection, &start).await?;
+
+        bind_scheduler(&scheduler_for_bridge, &agent_params.session().id).await;
         // Tick loop activates after switch_session so the first survey sees
         // the loaded task set, not empty in-memory state.
         agent_shared_for_session.scheduler_handle.start();
@@ -168,14 +149,12 @@ pub(crate) async fn start_session(
         let session_id = agent_params.session().id.clone();
         tracing::Span::current().record("session.id", session_id.as_str());
 
-        let session = Arc::new(SharedSession {
-            session_id: session_id.clone(),
-            clients: Mutex::new(Vec::new()),
+        let session = Arc::new(SharedSession::new(
+            session_id.clone(),
             input_tx,
-            interrupt: interrupt.clone(),
-            interrupt_tx: interrupt_tx.clone(),
-            agent_shared: Mutex::new(None),
-        });
+            interrupt.clone(),
+            interrupt_tx.clone(),
+        ));
         session.add_client("stdio".into(), connection.clone()).await;
         session.set_agent_shared(&agent_shared_for_session).await;
         frontend_placeholder.replace_session(session.clone()).await;
@@ -209,8 +188,77 @@ pub(crate) async fn start_session(
             agent_task,
             lifecycle,
             shutdown,
+            redaction_seed,
+            completion_result_limit: start
+                .workflow_completion_result_limit
+                .map(|limit| limit as usize)
+                .unwrap_or(loopal_output_guard::MAX_AGENT_COMPLETION_RESULT_BYTES),
         })
     }
     .instrument(session_span)
     .await
+}
+
+async fn bind_scheduler(scheduler: &CronScheduler, session_id: &str) {
+    if let Err(error) = scheduler.switch_session(session_id).await {
+        tracing::warn!(error = %error, "failed to bind scheduler to session");
+    }
+}
+
+#[cfg(test)]
+mod scheduler_binding_tests {
+    use std::sync::Arc;
+
+    use async_trait::async_trait;
+    use loopal_scheduler::{CronScheduler, PersistError, PersistedTask, SessionScopedCronStorage};
+
+    use super::bind_scheduler;
+
+    struct FailingStorage;
+
+    #[async_trait]
+    impl SessionScopedCronStorage for FailingStorage {
+        async fn load(&self, _session_id: &str) -> Result<Vec<PersistedTask>, PersistError> {
+            Err(PersistError::Io(std::io::Error::other("test load failure")))
+        }
+
+        async fn save_all(
+            &self,
+            _session_id: &str,
+            _tasks: &[PersistedTask],
+        ) -> Result<(), PersistError> {
+            Ok(())
+        }
+    }
+
+    struct EmptyStorage;
+
+    #[async_trait]
+    impl SessionScopedCronStorage for EmptyStorage {
+        async fn load(&self, _session_id: &str) -> Result<Vec<PersistedTask>, PersistError> {
+            Ok(Vec::new())
+        }
+
+        async fn save_all(
+            &self,
+            _session_id: &str,
+            _tasks: &[PersistedTask],
+        ) -> Result<(), PersistError> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn scheduler_binding_logs_and_returns_on_storage_failure() {
+        bind_scheduler(
+            &CronScheduler::with_session_storage(Arc::new(EmptyStorage)),
+            "ok-session",
+        )
+        .await;
+        bind_scheduler(
+            &CronScheduler::with_session_storage(Arc::new(FailingStorage)),
+            "failed-session",
+        )
+        .await;
+    }
 }

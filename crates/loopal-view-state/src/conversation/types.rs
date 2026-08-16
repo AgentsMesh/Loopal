@@ -1,4 +1,4 @@
-use loopal_protocol::{MessageSource, SkillInvocation};
+use loopal_protocol::{MessageSource, PermissionIntentDigest, SkillInvocation};
 use loopal_tool_invocation::ToolInvocation;
 use serde::{Deserialize, Serialize};
 
@@ -48,6 +48,8 @@ pub struct PendingPermission {
     pub id: String,
     pub name: String,
     pub input: serde_json::Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intent_digest: Option<PermissionIntentDigest>,
     #[serde(default)]
     pub cursor: PermissionChoice,
 }

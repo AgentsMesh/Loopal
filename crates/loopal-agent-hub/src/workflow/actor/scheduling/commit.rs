@@ -12,6 +12,9 @@ pub(super) async fn payload(
     payload: WorkflowEventPayload,
     occurred_at_unix_ms: u64,
 ) -> Result<WorkflowRunSnapshot, WorkflowCoordinatorError> {
+    if coordinator.state.is_poisoned(owner) {
+        return Err(WorkflowCoordinatorError::OwnerPoisoned);
+    }
     let (event, next) = apply_payload(run, payload, occurred_at_unix_ms)?;
     events(coordinator, owner, &run.id, vec![event], next).await
 }

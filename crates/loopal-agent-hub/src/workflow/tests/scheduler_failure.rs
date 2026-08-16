@@ -57,6 +57,16 @@ async fn bound_append_failure_contains_orphan_and_poisons_owner() {
 
     assert_eq!(journal.events().len(), 2);
     assert_eq!(
+        handle.tick(100_000).await,
+        Err(WorkflowCoordinatorError::OwnerPoisoned),
+        "a poisoned owner must reject deadline transitions"
+    );
+    assert_eq!(
+        journal.events().len(),
+        2,
+        "a poisoned-owner tick must not append from stale state"
+    );
+    assert_eq!(
         handle
             .get(owner, get_request("wreq_bind_failure_get", run_id),)
             .await,

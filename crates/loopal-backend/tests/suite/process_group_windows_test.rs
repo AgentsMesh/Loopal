@@ -17,7 +17,12 @@ const POLL: Duration = Duration::from_millis(20);
 
 fn descendant_command(pid_file: &Path, leader_exits: bool) -> Command {
     let script = r#"
-$child = Start-Process -PassThru -WindowStyle Hidden -FilePath 'powershell.exe' -ArgumentList '-NoProfile -NonInteractive -Command "Start-Sleep -Seconds 30"'
+$child = Start-Process -PassThru -WindowStyle Hidden -FilePath 'powershell.exe' -ArgumentList @(
+    '-NoProfile',
+    '-NonInteractive',
+    '-Command',
+    'Start-Sleep -Seconds 30'
+)
 [System.IO.File]::WriteAllText($env:PID_FILE, $child.Id.ToString())
 if ($env:LEADER_EXITS -eq '1') { exit 0 }
 Wait-Process -Id $child.Id

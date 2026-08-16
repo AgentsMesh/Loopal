@@ -17,20 +17,28 @@ const POLL: Duration = Duration::from_millis(20);
 
 fn descendant_command(pid_file: &Path, leader_exits: bool) -> Command {
     let script = r#"
-$child = Start-Process -PassThru -WindowStyle Hidden -FilePath 'powershell.exe' -ArgumentList @(
-    '-NoProfile',
-    '-NonInteractive',
-    '-Command',
-    'Start-Sleep -Seconds 30'
-)
-[System.IO.File]::WriteAllText($env:PID_FILE, $child.Id.ToString())
-if ($env:LEADER_EXITS -eq '1') { exit 0 }
-Wait-Process -Id $child.Id
+$ErrorActionPreference = 'Stop'
+try {
+    $child = Start-Process -PassThru -WindowStyle Hidden -FilePath $env:ComSpec -ArgumentList @(
+        '/D',
+        '/C',
+        'ping -n 31 127.0.0.1 > nul'
+    )
+    [System.IO.File]::WriteAllText($env:PID_FILE, $child.Id.ToString())
+    if ($env:LEADER_EXITS -eq '1') { exit 0 }
+    Wait-Process -Id $child.Id
+}
+catch {
+    [System.IO.File]::WriteAllText($env:ERROR_FILE, ($_ | Out-String))
+    exit 1
+}
 "#;
+    let error_file = error_path(pid_file);
     let mut command = Command::new("powershell.exe");
     command
         .args(["-NoProfile", "-NonInteractive", "-Command", script])
         .env("PID_FILE", pid_file)
+        .env("ERROR_FILE", error_file)
         .env("LEADER_EXITS", if leader_exits { "1" } else { "0" })
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -85,6 +93,12 @@ fn unique_pid_path(label: &str) -> PathBuf {
     ))
 }
 
+fn error_path(pid_file: &Path) -> PathBuf {
+    let mut path = pid_file.to_path_buf();
+    path.set_extension("error");
+    path
+}
+
 async fn wait_for_pid(path: &Path) -> u32 {
     let deadline = Instant::now() + Duration::from_secs(10);
     loop {
@@ -97,11 +111,15 @@ async fn wait_for_pid(path: &Path) -> u32 {
             Err(error) if error.kind() == io::ErrorKind::NotFound => {}
             Err(error) => panic!("failed reading {}: {error}", path.display()),
         }
-        assert!(
-            Instant::now() < deadline,
-            "pid file not ready: {}",
-            path.display()
-        );
+        if Instant::now() >= deadline {
+            let detail = tokio::fs::read_to_string(error_path(path))
+                .await
+                .ok()
+                .filter(|value| !value.trim().is_empty())
+                .map(|value| format!("\nchild command error:\n{}", value.trim()))
+                .unwrap_or_default();
+            panic!("pid file not ready: {}{detail}", path.display());
+        }
         tokio::time::sleep(POLL).await;
     }
 }
@@ -135,4 +153,9 @@ fn process_is_live(pid: u32) -> io::Result<bool> {
 
 async fn remove_pid_file(path: &Path) {
     tokio::fs::remove_file(path).await.expect("remove pid file");
+    match tokio::fs::remove_file(error_path(path)).await {
+        Ok(()) => {}
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => panic!("remove child command error file: {error}"),
+    }
 }

@@ -1,8 +1,10 @@
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use loopal_protocol::{
-    QualifiedAddress, WorkflowFailureClass, WorkflowRunId, WorkflowRunSnapshot, WorkflowRunState,
-    WorkflowTerminalDeliveryId, WorkflowTerminalDisposition,
+    QualifiedAddress, WorkflowCancelRequest, WorkflowFailureClass, WorkflowRequestId,
+    WorkflowRunId, WorkflowRunSnapshot, WorkflowRunState, WorkflowTerminalDeliveryId,
+    WorkflowTerminalDisposition,
 };
 
 use super::super::WorkflowCoordinatorError;
@@ -159,6 +161,57 @@ async fn terminal_sink_panic_poisoning_is_observable_on_tick() {
     }
     assert_eq!(observed, Some(WorkflowCoordinatorError::Unavailable));
     assert!(journal.delivery_acks().is_empty());
+    drop(handle);
+    task.await.unwrap();
+}
+
+#[tokio::test]
+async fn poisoned_owner_rejects_an_in_flight_terminal_ack() {
+    let run = terminal_run("wrun_poisoned_ack", WorkflowRunState::Succeeded, 14);
+    let sink = Arc::new(TestTerminalSink::new([Ok(
+        WorkflowTerminalDisposition::Applied,
+    )]));
+    let gate = sink.block_next_delivery();
+    let (handle, task, journal) = coordinator(run, [], sink);
+    let workflow_owner = owner("session", "root");
+
+    handle.recover(workflow_owner.clone()).await.unwrap();
+    handle
+        .activate_terminal_deliveries(workflow_owner.clone())
+        .await
+        .unwrap();
+    gate.wait_started().await;
+
+    journal.push_append_error(WorkflowCoordinatorError::JournalUnavailable);
+    assert_eq!(
+        handle
+            .cancel(
+                workflow_owner.clone(),
+                WorkflowCancelRequest {
+                    request_id: WorkflowRequestId::new("wreq_poisoned_ack_cancel"),
+                    run_id: WorkflowRunId::new("wrun_poisoned_ack"),
+                    reason: Some("poison before terminal acknowledgement".into()),
+                },
+            )
+            .await,
+        Err(WorkflowCoordinatorError::JournalUnavailable)
+    );
+
+    gate.release();
+    for _ in 0..100 {
+        handle.tick(20).await.unwrap();
+        if journal.delivery_ack_attempts.load(Ordering::SeqCst) > 0 {
+            break;
+        }
+        tokio::task::yield_now().await;
+    }
+    assert_eq!(
+        journal.delivery_ack_attempts.load(Ordering::SeqCst),
+        0,
+        "a poisoned owner must not append a terminal delivery acknowledgement"
+    );
+    assert!(journal.delivery_acks().is_empty());
+
     drop(handle);
     task.await.unwrap();
 }

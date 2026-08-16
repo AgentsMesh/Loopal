@@ -72,6 +72,9 @@ async fn validate(
     if !request.run_id.is_valid() {
         return Err(WorkflowCoordinatorError::InvalidRunId);
     }
+    if coordinator.state.is_poisoned(owner) {
+        return Err(WorkflowCoordinatorError::OwnerPoisoned);
+    }
     if !coordinator.state.is_recovered(owner) {
         coordinator.recover_owner(owner.clone()).await?;
     }

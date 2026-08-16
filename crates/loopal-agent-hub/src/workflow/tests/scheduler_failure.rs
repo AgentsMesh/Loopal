@@ -68,6 +68,25 @@ async fn bound_append_failure_contains_orphan_and_poisons_owner() {
     );
     assert_eq!(
         handle
+            .cancel(
+                owner.clone(),
+                WorkflowCancelRequest {
+                    request_id: WorkflowRequestId::new("wreq_bind_failure_cancel"),
+                    run_id: run_id.clone(),
+                    reason: Some("cancel after poison".into()),
+                },
+            )
+            .await,
+        Err(WorkflowCoordinatorError::OwnerPoisoned),
+        "a poisoned owner must reject cancel journal writes"
+    );
+    assert_eq!(
+        journal.events().len(),
+        2,
+        "a poisoned-owner cancel must not append from stale state"
+    );
+    assert_eq!(
+        handle
             .get(owner, get_request("wreq_bind_failure_get", run_id),)
             .await,
         Err(WorkflowCoordinatorError::OwnerPoisoned)

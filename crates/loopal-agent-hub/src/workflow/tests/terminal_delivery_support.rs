@@ -14,10 +14,26 @@ use super::super::{WorkflowCoordinator, WorkflowCoordinatorHandle, WorkflowCoord
 use super::journal_support::TestJournal;
 use super::support::{TestClock, TestIds};
 
+pub(super) struct DeliveryGate {
+    started: Notify,
+    release: Notify,
+}
+
+impl DeliveryGate {
+    pub(super) async fn wait_started(&self) {
+        self.started.notified().await;
+    }
+
+    pub(super) fn release(&self) {
+        self.release.notify_one();
+    }
+}
+
 pub(super) struct TestTerminalSink {
     results: Mutex<VecDeque<Result<WorkflowTerminalDisposition, String>>>,
     panics: Mutex<usize>,
     deliveries: Mutex<Vec<WorkflowTerminalNotification>>,
+    blocked_delivery: Mutex<Option<Arc<DeliveryGate>>>,
     delivered: Notify,
 }
 
@@ -29,6 +45,7 @@ impl TestTerminalSink {
             results: Mutex::new(results.into_iter().collect()),
             panics: Mutex::new(0),
             deliveries: Mutex::new(Vec::new()),
+            blocked_delivery: Mutex::new(None),
             delivered: Notify::new(),
         }
     }
@@ -39,6 +56,15 @@ impl TestTerminalSink {
 
     pub(super) fn push_panic(&self) {
         *self.panics.lock().unwrap() += 1;
+    }
+
+    pub(super) fn block_next_delivery(&self) -> Arc<DeliveryGate> {
+        let gate = Arc::new(DeliveryGate {
+            started: Notify::new(),
+            release: Notify::new(),
+        });
+        *self.blocked_delivery.lock().unwrap() = Some(gate.clone());
+        gate
     }
 
     pub(super) async fn wait_for_deliveries(&self, expected: usize) {
@@ -65,12 +91,23 @@ impl WorkflowTerminalSink for TestTerminalSink {
     ) -> Result<WorkflowTerminalDisposition, String> {
         self.deliveries.lock().unwrap().push(notification);
         self.delivered.notify_waiters();
-        let mut panics = self.panics.lock().unwrap();
-        if *panics > 0 {
-            *panics -= 1;
+        let should_panic = {
+            let mut panics = self.panics.lock().unwrap();
+            if *panics > 0 {
+                *panics -= 1;
+                true
+            } else {
+                false
+            }
+        };
+        if should_panic {
             panic!("injected terminal sink panic");
         }
-        drop(panics);
+        let blocked_delivery = self.blocked_delivery.lock().unwrap().take();
+        if let Some(gate) = blocked_delivery {
+            gate.started.notify_one();
+            gate.release.notified().await;
+        }
         self.results
             .lock()
             .unwrap()

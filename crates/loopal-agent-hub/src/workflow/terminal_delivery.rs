@@ -125,6 +125,9 @@ pub(super) async fn resolved(
     if !coordinator.terminal_deliveries.remove(&delivery_id) {
         return Ok(());
     }
+    if coordinator.state.is_poisoned(&owner) {
+        return Err(WorkflowCoordinatorError::OwnerPoisoned);
+    }
     if task_panicked {
         let error = WorkflowCoordinatorError::Unavailable;
         coordinator.terminal_delivery_failure = Some(error.clone());

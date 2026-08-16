@@ -26,6 +26,8 @@ async fn failed_replace_accepts_an_existing_matching_winner() {
     assert_eq!(std::fs::read(target).unwrap(), b"expected");
 }
 
+// This invalid-temp fixture relies on Unix directory rename/unlink semantics.
+#[cfg(unix)]
 #[tokio::test]
 async fn matching_winner_reports_loser_cleanup_failure() {
     let root = tempfile::tempdir().unwrap();

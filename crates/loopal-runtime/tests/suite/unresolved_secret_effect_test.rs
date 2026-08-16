@@ -77,7 +77,7 @@ async fn bash_action_at(
     marker: &std::path::Path,
 ) -> loopal_runtime::tool_action::PreparedToolAction {
     let command = if cfg!(windows) {
-        format!("echo effect>\"{}\"", marker.display())
+        format!("echo effect > \"{}\"", marker.display())
     } else {
         let marker = marker.to_string_lossy().replace('\'', "'\\''");
         format!("printf effect > '{marker}'")

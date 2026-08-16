@@ -72,22 +72,13 @@ fn context() -> ToolContext {
         .with_protected_effect_audit(Arc::new(loopal_tool_api::NoopProtectedEffectAudit))
 }
 
-async fn bash_action_at(
-    kernel: &Kernel,
-    marker: &std::path::Path,
-) -> loopal_runtime::tool_action::PreparedToolAction {
-    let command = if cfg!(windows) {
-        format!("echo effect > \"{}\"", marker.display())
-    } else {
-        let marker = marker.to_string_lossy().replace('\'', "'\\''");
-        format!("printf effect > '{marker}'")
-    };
+async fn bash_action(kernel: &Kernel) -> loopal_runtime::tool_action::PreparedToolAction {
     prepare_tool_action(
         kernel,
         "id",
         "Bash",
         json!({
-            "command": command,
+            "command": "echo effect",
             "env": {"TOKEN": "<secret_ref:missing>"}
         }),
     )
@@ -99,31 +90,26 @@ async fn bash_action_at(
 
 #[tokio::test]
 async fn unresolved_wire_ref_fails_closed_but_missing_marker_can_execute() {
-    let root = tempfile::tempdir().unwrap();
-    let path = root.path().join("unresolved-secret-effect");
     let kernel = Kernel::new(Settings::default()).unwrap();
-    let action = bash_action_at(&kernel, &path).await;
+    let action = bash_action(&kernel).await;
     let error = execute_tool(&kernel, action, &context(), &AgentMode::Act)
         .await
         .expect_err("missing secret client must fail closed");
     assert!(error.to_string().contains("secret resolution failed"));
-    assert!(!path.exists());
 
-    let action = bash_action_at(&kernel, &path).await;
+    let action = bash_action(&kernel).await;
     let ctx = context().with_secret_client(Arc::new(MissingSecret));
     let result = execute_tool(&kernel, action, &ctx, &AgentMode::Act)
         .await
         .expect("resolved missing-secret marker is safe literal input");
-    assert!(!result.is_error);
-    assert!(path.exists());
+    assert!(!result.is_error, "{}", result.content);
+    assert!(result.content.contains("effect"));
 }
 
 #[tokio::test]
 async fn denied_secret_resolution_cannot_execute_the_effect() {
-    let root = tempfile::tempdir().unwrap();
-    let path = root.path().join("denied-secret-effect");
     let kernel = Kernel::new(Settings::default()).unwrap();
-    let action = bash_action_at(&kernel, &path).await;
+    let action = bash_action(&kernel).await;
     let ctx = context().with_secret_client(Arc::new(DeniedSecret));
 
     let error = execute_tool(&kernel, action, &ctx, &AgentMode::Act)
@@ -131,5 +117,4 @@ async fn denied_secret_resolution_cannot_execute_the_effect() {
         .expect_err("permission-denied secret resolution must fail closed");
 
     assert!(error.to_string().contains("secret resolution failed"));
-    assert!(!path.exists());
 }

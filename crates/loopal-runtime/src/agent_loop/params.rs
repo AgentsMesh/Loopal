@@ -140,6 +140,7 @@ pub struct AgentLoopParams {
     pub budget: ContextBudget,
     pub initial_turns: Vec<loopal_turn::Turn>,
     pub hydrate_initial_history: bool,
+    pub resource_store: Option<Arc<dyn loopal_storage::ResourceStore>>,
     pub interrupt: InterruptHandle,
     pub shared: Option<Arc<dyn std::any::Any + Send + Sync>>,
     pub memory_channel: Option<Arc<dyn MemoryChannel>>,

@@ -43,8 +43,9 @@ fn runner_with_hook(
 async fn rewritten_action_is_the_action_permission_classifies() {
     let target = std::env::temp_dir().join(format!("loopal-rewritten-{}.txt", std::process::id()));
     let _ = std::fs::remove_file(&target);
+    let hook_target = target.to_string_lossy().replace('\\', "/");
     let rewrite = json!({
-        "updated_input": {"file_path": target, "content": "rewritten"}
+        "updated_input": {"file_path": hook_target.clone(), "content": "rewritten"}
     });
     let (mut runner, mut events, permission_tx) = runner_with_hook(&rewrite.to_string());
     runner.params.config.permission_mode = PermissionMode::AskAnyWrite;
@@ -72,7 +73,7 @@ async fn rewritten_action_is_the_action_permission_classifies() {
         input = input_rx.recv() => input.unwrap(),
         result = &mut execution => panic!("execution ended before approval: {result:?}"),
     };
-    assert_eq!(approved_input["file_path"], json!(target));
+    assert_eq!(approved_input["file_path"], json!(hook_target));
     permission_tx.send(true).await.unwrap();
     let _ = execution.await.unwrap();
     event_task.await.unwrap();

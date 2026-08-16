@@ -14,7 +14,7 @@ use super::{StartupProtocol, run, run_desktop, run_with_protocol_observed};
 #[tokio::test]
 #[ignore = "real-process Bazel coverage producer"]
 async fn hub_only_runs_enabled_workflow_runtime_until_remote_shutdown() {
-    assert_runtime_fixture();
+    let _fixtures = assert_runtime_fixture();
     let home = tempfile::tempdir().expect("create Hub-only coverage home");
     let _home = EnvGuard::set("HOME", home.path());
     let project = tempfile::tempdir().expect("create Hub-only coverage project");
@@ -42,7 +42,7 @@ async fn hub_only_runs_enabled_workflow_runtime_until_remote_shutdown() {
 #[tokio::test]
 #[ignore = "real-process Bazel coverage producer"]
 async fn missing_resume_reports_startup_failure_and_rolls_back() {
-    assert_runtime_fixture();
+    let _fixtures = assert_runtime_fixture();
     let home = tempfile::tempdir().expect("create resume coverage home");
     let _home = EnvGuard::set("HOME", home.path());
     let project = tempfile::tempdir().expect("create resume coverage project");
@@ -70,7 +70,7 @@ async fn missing_resume_reports_startup_failure_and_rolls_back() {
 #[ignore = "real-process Bazel coverage producer"]
 #[cfg(unix)]
 async fn desktop_entrypoint_rejects_a_parent_that_exited_during_startup() {
-    assert_runtime_fixture();
+    let _fixtures = assert_runtime_fixture();
     let home = tempfile::tempdir().expect("create Desktop failure coverage home");
     let _home = EnvGuard::set("HOME", home.path());
     let project = tempfile::tempdir().expect("create Desktop failure coverage project");
@@ -105,7 +105,7 @@ async fn desktop_entrypoint_rejects_a_parent_that_exited_during_startup() {
 #[ignore = "real-process Bazel coverage producer"]
 #[cfg(unix)]
 async fn desktop_covers_parent_exit_and_hub_shutdown_paths() {
-    assert_runtime_fixture();
+    let _fixtures = assert_runtime_fixture();
     let home = tempfile::tempdir().expect("create Desktop coverage home");
     let _home = EnvGuard::set("HOME", home.path());
     for parent_exits in [true, false] {

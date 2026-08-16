@@ -125,12 +125,12 @@ impl McpProvider for LocalMcpProvider {
         args: &Value,
         _budget: loopal_ipc::IpcBudget,
     ) -> Result<CallToolResult, McpError> {
-        let first = self
-            .manager
-            .read()
-            .await
-            .call_tool(server, tool, args)
-            .await;
+        let (failed_generation, first) = {
+            let manager = self.manager.read().await;
+            let generation = manager.connection_generation(server);
+            let result = manager.call_tool(server, tool, args).await;
+            (generation, result)
+        };
         let transport_closed = matches!(&first, Err(McpError::TransportClosed(_)))
             || self
                 .manager
@@ -142,7 +142,11 @@ impl McpProvider for LocalMcpProvider {
                 .is_none_or(|client| client.is_closed());
         if first.is_err() && transport_closed {
             tracing::warn!(server, tool, "MCP transport closed, attempting reconnect");
-            if self.try_reconnect(server).await {
+            let reconnected = match failed_generation {
+                Some(generation) => self.try_reconnect_after_failure(server, generation).await,
+                None => self.try_reconnect(server).await,
+            };
+            if reconnected {
                 return self
                     .manager
                     .read()

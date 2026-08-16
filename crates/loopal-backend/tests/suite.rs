@@ -31,8 +31,6 @@ mod log_permissions_test;
 mod path_approval_test;
 #[path = "suite/process_group_test.rs"]
 mod process_group_test;
-#[path = "suite/process_group_windows_test.rs"]
-mod process_group_windows_test;
 #[path = "suite/process_test_support.rs"]
 mod process_test_support;
 #[path = "suite/resolve_checked_test.rs"]

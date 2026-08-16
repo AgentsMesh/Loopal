@@ -22,8 +22,8 @@ use tokio::time::timeout;
 const ALIVE_BUDGET: Duration = Duration::from_secs(3);
 const READY_BUDGET: Duration = Duration::from_secs(8);
 
-fn binary_path() -> String {
-    std::env::var("LOOPAL_BINARY").expect("LOOPAL_BINARY env required")
+fn binary_path() -> std::path::PathBuf {
+    loopal_agent_client::require_runfile_env("LOOPAL_BINARY").expect("resolve LOOPAL_BINARY")
 }
 
 #[tokio::test]

@@ -4,6 +4,7 @@ rust_library(
     name = "loopal-ipc",
     srcs = glob(["src/**/*.rs"]),
     edition = "2024",
+    proc_macro_deps = ["@crates//:async-trait"],
     visibility = ["//visibility:public"],
     deps = [
         "//crates/loopal-error",
@@ -13,7 +14,6 @@ rust_library(
         "@crates//:tracing",
         "@crates//:uuid",
     ],
-    proc_macro_deps = ["@crates//:async-trait"],
 )
 
 rust_test(
@@ -26,10 +26,10 @@ rust_test(
     name = "loopal-ipc_test",
     srcs = glob(["tests/**/*.rs"]),
     crate_root = "tests/suite.rs",
-    edition = "2024",
-    local = True,
     data = ["//:loopal"],
-    env = {"LOOPAL_BINARY": "$(rootpath //:loopal)"},
+    edition = "2024",
+    env = {"LOOPAL_BINARY": "$(rlocationpath //:loopal)"},
+    local = True,
     deps = [
         ":loopal-ipc",
         "//crates/loopal-agent-client",

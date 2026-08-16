@@ -56,7 +56,10 @@ pub(super) fn managed_meta_method(method: &str) -> bool {
 }
 
 pub(super) fn trusted_meta_method(method: &str) -> bool {
-    matches!(method, "hub/spawn_remote_agent" | "hub/remote_relay")
+    matches!(
+        method,
+        "hub/spawn_remote_agent" | "hub/remote_relay" | "hub/topology"
+    )
 }
 
 #[cfg(test)]
@@ -110,5 +113,14 @@ mod tests {
         assert!(managed_meta_method(methods::META_TOPOLOGY.name));
         assert!(!managed_meta_method(methods::META_SPAWN.name));
         assert!(!managed_meta_method("meta/future_admin"));
+    }
+
+    #[test]
+    fn trusted_metahub_acl_is_closed_set() {
+        assert!(trusted_meta_method(methods::HUB_SPAWN_REMOTE_AGENT.name));
+        assert!(trusted_meta_method(methods::HUB_REMOTE_RELAY.name));
+        assert!(trusted_meta_method(methods::HUB_TOPOLOGY.name));
+        assert!(!trusted_meta_method(methods::HUB_STATUS.name));
+        assert!(!trusted_meta_method("hub/future_metahub_method"));
     }
 }

@@ -160,6 +160,36 @@ async fn trusted_metahub_principal_requires_active_uplink_connection() {
     );
 }
 
+#[tokio::test]
+async fn trusted_metahub_topology_requires_active_uplink_connection() {
+    let hub = hub();
+    let active = connection();
+    let stale = connection();
+    hub.lock().await.uplink = Some(Arc::new(HubUplink::new(active.clone(), "local".into())));
+
+    let stale_principal = Arc::new(HubRequestPrincipal::TrustedMetaHub(
+        TrustedMetaHubPrincipal::new(stale),
+    ));
+    let error =
+        match authorization::authorize(&hub, methods::HUB_TOPOLOGY.name, stale_principal).await {
+            Ok(_) => panic!("stale MetaHub topology principal was authorized"),
+            Err(error) => error,
+        };
+    assert!(error.to_string().contains("not authorized"));
+
+    let active_principal = Arc::new(HubRequestPrincipal::TrustedMetaHub(
+        TrustedMetaHubPrincipal::new(active.clone()),
+    ));
+    let context = authorization::authorize(&hub, methods::HUB_TOPOLOGY.name, active_principal)
+        .await
+        .unwrap();
+    assert!(
+        authorization::trusted_meta(&context)
+            .unwrap()
+            .matches_connection(&active)
+    );
+}
+
 #[test]
 fn principal_extractors_fail_closed_for_missing_or_wrong_type() {
     let empty = loopal_ipc::HandlerCtx::new("none");

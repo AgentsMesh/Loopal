@@ -65,7 +65,8 @@ pub(super) fn discover(base: &Path, session: &str) -> Result<Vec<Entry>, FsError
         let name = entry.file_name();
         let mut options = OpenOptions::new();
         options.read(true);
-        secure_options(&mut options, false, true);
+        // Open directories too, then reject them from the opened handle.
+        secure_options(&mut options, true, true);
         let file = options.open(directory.join(&name)).map_err(classify_open)?;
         let opened = validate_file(&file)?;
         let bytes = file.metadata().map_err(FsError::Io)?.len();

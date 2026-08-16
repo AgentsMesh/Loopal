@@ -14,11 +14,14 @@ use loopal_ipc::protocol::methods;
 
 /// Path to the built binary. Checks LOOPAL_BINARY env var (Bazel), then
 /// CARGO_BIN_EXE_loopal (Cargo).
-fn binary_path() -> String {
-    if let Ok(path) = std::env::var("LOOPAL_BINARY") {
+fn binary_path() -> std::path::PathBuf {
+    if let Some(path) =
+        loopal_agent_client::resolve_runfile_env("LOOPAL_BINARY").expect("resolve LOOPAL_BINARY")
+    {
         return path;
     }
-    std::env::var("CARGO_BIN_EXE_loopal")
+    std::env::var_os("CARGO_BIN_EXE_loopal")
+        .map(std::path::PathBuf::from)
         .expect("Set LOOPAL_BINARY or CARGO_BIN_EXE_loopal to the loopal binary path")
 }
 

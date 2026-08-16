@@ -1,6 +1,6 @@
 use loopal_error::StorageError;
 
-use super::file_io::read_regular_bounded;
+use super::file_io::{read_regular_bounded, replace_file};
 
 #[cfg(unix)]
 use super::file_io::existing_matches;
@@ -12,6 +12,112 @@ async fn bounded_read_rejects_a_directory() {
         read_regular_bounded(temp.path(), 16).await,
         Err(StorageError::ResourceIntegrity)
     ));
+}
+
+#[tokio::test]
+async fn failed_replace_accepts_an_existing_matching_winner() {
+    let temp = tempfile::tempdir().unwrap();
+    let missing = temp.path().join("missing-temp");
+    let target = temp.path().join("resource");
+    std::fs::write(&target, b"expected").unwrap();
+
+    replace_file(&missing, &target, b"expected").await.unwrap();
+
+    assert_eq!(std::fs::read(target).unwrap(), b"expected");
+}
+
+#[tokio::test]
+async fn matching_winner_reports_loser_cleanup_failure() {
+    let root = tempfile::tempdir().unwrap();
+    let temp = root.path().join("invalid-temp-directory");
+    let target = root.path().join("resource");
+    std::fs::create_dir(&temp).unwrap();
+    std::fs::write(&target, b"expected").unwrap();
+
+    assert!(matches!(
+        replace_file(&temp, &target, b"expected").await,
+        Err(StorageError::Io(_))
+    ));
+    assert!(temp.is_dir());
+    assert_eq!(std::fs::read(target).unwrap(), b"expected");
+}
+
+#[tokio::test]
+async fn failed_replace_does_not_accept_mismatched_content() {
+    let temp = tempfile::tempdir().unwrap();
+    let missing = temp.path().join("missing-temp");
+    let target = temp.path().join("resource");
+    std::fs::write(&target, b"tampered").unwrap();
+
+    let error = replace_file(&missing, &target, b"expected")
+        .await
+        .unwrap_err();
+
+    assert!(matches!(error, StorageError::Io(_)));
+    assert_eq!(std::fs::read(target).unwrap(), b"tampered");
+}
+
+#[tokio::test]
+async fn failed_replace_rejects_a_non_regular_winner() {
+    let temp = tempfile::tempdir().unwrap();
+    let missing = temp.path().join("missing-temp");
+    let target = temp.path().join("resource");
+    std::fs::create_dir(&target).unwrap();
+
+    assert!(matches!(
+        replace_file(&missing, &target, b"expected").await,
+        Err(StorageError::ResourceIntegrity)
+    ));
+}
+
+#[cfg(windows)]
+#[tokio::test]
+async fn matching_locked_winner_resolves_replace_competition_and_cleans_temp() {
+    use std::os::windows::fs::OpenOptionsExt;
+    use windows_sys::Win32::Storage::FileSystem::{FILE_SHARE_READ, FILE_SHARE_WRITE};
+
+    let root = tempfile::tempdir().unwrap();
+    let temp = root.path().join("prepared-temp");
+    let target = root.path().join("resource");
+    std::fs::write(&temp, b"expected").unwrap();
+    std::fs::write(&target, b"expected").unwrap();
+    let locked_target = std::fs::OpenOptions::new()
+        .read(true)
+        .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE)
+        .open(&target)
+        .unwrap();
+
+    replace_file(&temp, &target, b"expected").await.unwrap();
+
+    assert!(!temp.exists());
+    assert_eq!(std::fs::read(&target).unwrap(), b"expected");
+    drop(locked_target);
+}
+
+#[cfg(windows)]
+#[tokio::test]
+async fn mismatched_locked_winner_fails_closed_after_bounded_retries() {
+    use std::os::windows::fs::OpenOptionsExt;
+    use windows_sys::Win32::Storage::FileSystem::{FILE_SHARE_READ, FILE_SHARE_WRITE};
+
+    let root = tempfile::tempdir().unwrap();
+    let temp = root.path().join("prepared-temp");
+    let target = root.path().join("resource");
+    std::fs::write(&temp, b"expected").unwrap();
+    std::fs::write(&target, b"tampered").unwrap();
+    let locked_target = std::fs::OpenOptions::new()
+        .read(true)
+        .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE)
+        .open(&target)
+        .unwrap();
+
+    assert!(matches!(
+        replace_file(&temp, &target, b"expected").await,
+        Err(StorageError::Io(_))
+    ));
+    assert!(temp.exists());
+    assert_eq!(std::fs::read(&target).unwrap(), b"tampered");
+    drop(locked_target);
 }
 
 #[cfg(unix)]

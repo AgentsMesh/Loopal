@@ -166,20 +166,15 @@ impl HubHarness {
     }
 }
 
-fn binary_path() -> String {
-    let path = std::env::var("LOOPAL_BINARY").expect("LOOPAL_BINARY env required");
-    // reason: the child uses a different cwd than Bazel's rootpath.
-    std::fs::canonicalize(&path)
-        .map(|p| p.to_string_lossy().into_owned())
-        .unwrap_or(path)
+fn binary_path() -> std::path::PathBuf {
+    loopal_agent_client::require_runfile_env("LOOPAL_BINARY").expect("resolve LOOPAL_BINARY")
 }
 
 fn write_hub_settings(home: &std::path::Path) {
-    let command = std::env::var("LOOPAL_MOCK_MCP_BINARY")
-        .expect("LOOPAL_MOCK_MCP_BINARY env required (bazel data dep)");
-    let command = std::fs::canonicalize(&command)
-        .map(|p| p.to_string_lossy().into_owned())
-        .unwrap_or(command);
+    let command = loopal_agent_client::require_runfile_env("LOOPAL_MOCK_MCP_BINARY")
+        .expect("resolve LOOPAL_MOCK_MCP_BINARY")
+        .to_string_lossy()
+        .into_owned();
     let dir = home.join(".loopal");
     std::fs::create_dir_all(&dir).unwrap();
     let settings = json!({

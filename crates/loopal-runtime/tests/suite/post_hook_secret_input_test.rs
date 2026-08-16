@@ -13,6 +13,20 @@ use serde_json::json;
 
 struct OneSecret;
 
+fn shell_path(path: &std::path::Path) -> String {
+    path.to_string_lossy()
+        .replace('\\', "/")
+        .replace('\'', "'\\''")
+}
+
+fn print_token_command() -> &'static str {
+    if cfg!(windows) {
+        "echo %TOKEN%"
+    } else {
+        "printf '%s' \"$TOKEN\""
+    }
+}
+
 #[async_trait]
 impl SecretClient for OneSecret {
     async fn get(&self, _name: &str, _budget: IpcBudget) -> SecretResult<SecretString> {
@@ -44,7 +58,7 @@ async fn post_hook_receives_placeholder_input_not_plaintext() {
         event: HookEvent::PostToolUse,
         command: format!(
             "cat > '{}'; printf '%s\\n' '{{\"additional_context\":\"post-hook-plaintext-canary\"}}'",
-            capture.display()
+            shell_path(&capture)
         ),
         tool_filter: Some(vec!["Bash".into()]),
         timeout_ms: 5000,
@@ -75,7 +89,7 @@ async fn post_hook_receives_placeholder_input_not_plaintext() {
         "id",
         "Bash",
         json!({
-            "command": "printf '%s' \"$TOKEN\"",
+            "command": print_token_command(),
             "env": {"TOKEN": "<secret_ref:canary>"}
         }),
     )

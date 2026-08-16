@@ -1,6 +1,6 @@
-use base64::Engine;
 use loopal_protocol::AgentEventPayload;
 use loopal_provider_api::ContentBlock;
+use loopal_storage::FileResourceStore;
 use loopal_tool_api::PermissionMode;
 use loopal_tool_invocation::ToolImageBlock;
 use serde_json::json;
@@ -20,8 +20,13 @@ async fn validated_image_flows_through_final_event_and_block_sink() {
     let (mut runner, mut events, _, _, _) = make_runner_with_channels();
     runner.params.config.permission_mode = PermissionMode::Bypass;
     let temp = tempfile::tempdir().unwrap();
+    runner.params.resource_store = Some(FileResourceStore::with_base_dir(
+        temp.path().join("resources"),
+    ));
     let path = temp.path().join("sink.png");
-    std::fs::write(&path, minimal_png()).unwrap();
+    let mut image = minimal_png();
+    image.resize(300 * 1024, 0);
+    std::fs::write(&path, &image).unwrap();
     runner.tool_ctx.backend = loopal_backend::LocalBackend::new(
         temp.path().to_path_buf(),
         None,
@@ -57,17 +62,8 @@ async fn validated_image_flows_through_final_event_and_block_sink() {
         panic!("expected ToolResult");
     };
     assert_eq!(images.len(), 1);
-    match &images[0] {
-        ToolImageBlock::Inline { data, .. } => {
-            assert_eq!(
-                base64::engine::general_purpose::STANDARD
-                    .decode(data)
-                    .unwrap(),
-                minimal_png()
-            );
-        }
-        ToolImageBlock::SessionResource { byte_size, .. } => {
-            assert_eq!(*byte_size, minimal_png().len());
-        }
-    }
+    let ToolImageBlock::SessionResource { byte_size, .. } = &images[0] else {
+        panic!("injected resource store must persist the inline image");
+    };
+    assert_eq!(*byte_size, image.len());
 }

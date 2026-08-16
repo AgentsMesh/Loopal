@@ -33,10 +33,19 @@ impl Drop for EnvGuard {
     }
 }
 
-pub fn assert_runtime_fixture() {
-    for variable in ["LOOPAL_BINARY", "LOOPAL_TEST_PROVIDER"] {
-        let path = std::env::var(variable).unwrap_or_else(|_| panic!("{variable} must be set"));
-        assert!(std::path::Path::new(&path).is_file(), "missing {variable}");
+pub struct RuntimeFixtureGuard {
+    _binary: EnvGuard,
+    _provider: EnvGuard,
+}
+
+pub fn assert_runtime_fixture() -> RuntimeFixtureGuard {
+    let binary = loopal_agent_client::require_runfile_env("LOOPAL_BINARY")
+        .expect("resolve LOOPAL_BINARY fixture");
+    let provider = loopal_agent_client::require_runfile_env("LOOPAL_TEST_PROVIDER")
+        .expect("resolve LOOPAL_TEST_PROVIDER fixture");
+    RuntimeFixtureGuard {
+        _binary: EnvGuard::set("LOOPAL_BINARY", binary),
+        _provider: EnvGuard::set("LOOPAL_TEST_PROVIDER", provider),
     }
 }
 

@@ -1,17 +1,40 @@
 use super::LocalMcpProvider;
+use crate::connection_generation::ConnectionGeneration;
 
 impl LocalMcpProvider {
     pub async fn try_reconnect(&self, server: &str) -> bool {
-        self.try_reconnect_guarded(server, |commit| commit()).await
+        self.try_reconnect_guarded_inner(server, None, |commit| commit())
+            .await
     }
 
     pub async fn try_reconnect_guarded<F>(&self, server: &str, guard: F) -> bool
     where
         F: FnOnce(&mut dyn FnMut()),
     {
+        self.try_reconnect_guarded_inner(server, None, guard).await
+    }
+
+    pub(super) async fn try_reconnect_after_failure(
+        &self,
+        server: &str,
+        failed_generation: ConnectionGeneration,
+    ) -> bool {
+        self.try_reconnect_guarded_inner(server, Some(failed_generation), |commit| commit())
+            .await
+    }
+
+    async fn try_reconnect_guarded_inner<F>(
+        &self,
+        server: &str,
+        failed_generation: Option<ConnectionGeneration>,
+        guard: F,
+    ) -> bool
+    where
+        F: FnOnce(&mut dyn FnMut()),
+    {
         let plan = {
             let manager = self.manager.read().await;
-            match manager.plan_reconnect(server) {
+            match manager.plan_reconnect(server, failed_generation.as_ref()) {
                 Ok(Some(plan)) => plan,
                 Ok(None) => return true,
                 Err(_) => return false,

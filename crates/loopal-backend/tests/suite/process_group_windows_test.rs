@@ -56,13 +56,14 @@ fn job_object_leader_helper() {
             "--nocapture",
             "--test-threads=1",
         ])
-        .env(HELPER_PID_FILE, pid_file)
         .env(HELPER_ROLE, "descendant")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
         .expect("spawn Windows Job Object descendant helper");
+    std::fs::write(pid_file, descendant.id().to_string())
+        .expect("write Windows Job Object descendant PID");
     if std::env::var(HELPER_LEADER_EXITS).as_deref() == Ok("1") {
         return;
     }
@@ -78,11 +79,6 @@ fn job_object_descendant_helper() {
     if std::env::var(HELPER_ROLE).as_deref() != Ok("descendant") {
         return;
     }
-    let Some(pid_file) = std::env::var_os(HELPER_PID_FILE) else {
-        return;
-    };
-    std::fs::write(pid_file, std::process::id().to_string())
-        .expect("write Windows Job Object descendant PID");
     std::thread::sleep(Duration::from_secs(30));
 }
 

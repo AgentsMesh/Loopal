@@ -16,13 +16,21 @@ fn assert_corruption<T>(result: Result<T, WorkflowJournalError>) {
 }
 
 fn junction(target: &std::path::Path, link: &std::path::Path) {
-    let command = format!("mklink /J \"{}\" \"{}\"", link.display(), target.display());
-    let status = std::process::Command::new("cmd")
-        .arg("/C")
-        .arg(command)
-        .status()
+    let script = r#"
+$ErrorActionPreference = 'Stop'
+New-Item -ItemType Junction -Path $env:LOOPAL_JUNCTION_LINK -Target $env:LOOPAL_JUNCTION_TARGET -ErrorAction Stop | Out-Null
+"#;
+    let output = std::process::Command::new("powershell.exe")
+        .args(["-NoProfile", "-NonInteractive", "-Command", script])
+        .env("LOOPAL_JUNCTION_LINK", link)
+        .env("LOOPAL_JUNCTION_TARGET", target)
+        .output()
         .unwrap();
-    assert!(status.success());
+    assert!(
+        output.status.success(),
+        "junction creation failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 #[test]

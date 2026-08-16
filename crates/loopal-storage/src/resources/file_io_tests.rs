@@ -1,6 +1,9 @@
 use loopal_error::StorageError;
 
-use super::file_io::{existing_matches, read_regular_bounded};
+use super::file_io::read_regular_bounded;
+
+#[cfg(unix)]
+use super::file_io::existing_matches;
 
 #[tokio::test]
 async fn bounded_read_rejects_a_directory() {

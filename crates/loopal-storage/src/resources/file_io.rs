@@ -119,7 +119,7 @@ async fn replace_file_inner(temp: &Path, target: &Path) -> std::io::Result<()> {
 async fn replace_file_inner(temp: &Path, target: &Path) -> std::io::Result<()> {
     use std::os::windows::ffi::OsStrExt;
     use windows_sys::Win32::Storage::FileSystem::{
-        MOVE_FILE_REPLACE_EXISTING, MOVE_FILE_WRITE_THROUGH, MoveFileExW,
+        MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH, MoveFileExW,
     };
 
     let temp: Vec<u16> = temp
@@ -137,7 +137,7 @@ async fn replace_file_inner(temp: &Path, target: &Path) -> std::io::Result<()> {
             MoveFileExW(
                 temp.as_ptr(),
                 target.as_ptr(),
-                MOVE_FILE_REPLACE_EXISTING | MOVE_FILE_WRITE_THROUGH,
+                MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
             )
         };
         if moved == 0 {

@@ -1,5 +1,6 @@
 #![cfg(windows)]
 
+use std::fs::{self, File};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -33,16 +34,28 @@ catch {
     exit 1
 }
 "#;
+    let script_file = script_path(pid_file);
+    fs::write(&script_file, script).expect("write descendant PowerShell script");
     let error_file = error_path(pid_file);
+    let stderr_file = stderr_path(pid_file);
     let mut command = Command::new("powershell.exe");
     command
-        .args(["-NoProfile", "-NonInteractive", "-Command", script])
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+        ])
+        .arg(script_file)
         .env("PID_FILE", pid_file)
         .env("ERROR_FILE", error_file)
         .env("LEADER_EXITS", if leader_exits { "1" } else { "0" })
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::null());
+        .stderr(Stdio::from(
+            File::create(stderr_file).expect("create PowerShell stderr file"),
+        ));
     command
 }
 
@@ -99,6 +112,18 @@ fn error_path(pid_file: &Path) -> PathBuf {
     path
 }
 
+fn script_path(pid_file: &Path) -> PathBuf {
+    let mut path = pid_file.to_path_buf();
+    path.set_extension("ps1");
+    path
+}
+
+fn stderr_path(pid_file: &Path) -> PathBuf {
+    let mut path = pid_file.to_path_buf();
+    path.set_extension("stderr");
+    path
+}
+
 async fn wait_for_pid(path: &Path) -> u32 {
     let deadline = Instant::now() + Duration::from_secs(10);
     loop {
@@ -112,13 +137,9 @@ async fn wait_for_pid(path: &Path) -> u32 {
             Err(error) => panic!("failed reading {}: {error}", path.display()),
         }
         if Instant::now() >= deadline {
-            let detail = tokio::fs::read_to_string(error_path(path))
-                .await
-                .ok()
-                .filter(|value| !value.trim().is_empty())
-                .map(|value| format!("\nchild command error:\n{}", value.trim()))
-                .unwrap_or_default();
-            panic!("pid file not ready: {}{detail}", path.display());
+            let error = diagnostic(error_path(path), "child command error").await;
+            let stderr = diagnostic(stderr_path(path), "PowerShell stderr").await;
+            panic!("pid file not ready: {}{error}{stderr}", path.display());
         }
         tokio::time::sleep(POLL).await;
     }
@@ -153,9 +174,20 @@ fn process_is_live(pid: u32) -> io::Result<bool> {
 
 async fn remove_pid_file(path: &Path) {
     tokio::fs::remove_file(path).await.expect("remove pid file");
-    match tokio::fs::remove_file(error_path(path)).await {
-        Ok(()) => {}
-        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-        Err(error) => panic!("remove child command error file: {error}"),
+    for companion in [error_path(path), script_path(path), stderr_path(path)] {
+        match tokio::fs::remove_file(&companion).await {
+            Ok(()) => {}
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => panic!("remove {}: {error}", companion.display()),
+        }
     }
+}
+
+async fn diagnostic(path: PathBuf, label: &str) -> String {
+    tokio::fs::read_to_string(path)
+        .await
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .map(|value| format!("\n{label}:\n{}", value.trim()))
+        .unwrap_or_default()
 }

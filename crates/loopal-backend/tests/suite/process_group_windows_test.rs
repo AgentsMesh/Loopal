@@ -1,6 +1,5 @@
 #![cfg(windows)]
 
-use std::fs::{self, File};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -15,48 +14,76 @@ use windows_sys::Win32::System::Threading::{
 };
 
 const POLL: Duration = Duration::from_millis(20);
+const HELPER_PID_FILE: &str = "LOOPAL_JOB_HELPER_PID_FILE";
+const HELPER_LEADER_EXITS: &str = "LOOPAL_JOB_HELPER_LEADER_EXITS";
+const HELPER_ROLE: &str = "LOOPAL_JOB_HELPER_ROLE";
 
 fn descendant_command(pid_file: &Path, leader_exits: bool) -> Command {
-    let script = r#"
-$ErrorActionPreference = 'Stop'
-try {
-    $child = Start-Process -PassThru -WindowStyle Hidden -FilePath $env:ComSpec -ArgumentList @(
-        '/D',
-        '/C',
-        'ping -n 31 127.0.0.1 > nul'
-    )
-    [System.IO.File]::WriteAllText($env:PID_FILE, $child.Id.ToString())
-    if ($env:LEADER_EXITS -eq '1') { exit 0 }
-    Wait-Process -Id $child.Id
-}
-catch {
-    [System.IO.File]::WriteAllText($env:ERROR_FILE, ($_ | Out-String))
-    exit 1
-}
-"#;
-    let script_file = script_path(pid_file);
-    fs::write(&script_file, script).expect("write descendant PowerShell script");
-    let error_file = error_path(pid_file);
-    let stderr_file = stderr_path(pid_file);
-    let mut command = Command::new("powershell.exe");
+    let executable = std::env::current_exe().expect("resolve Windows process helper executable");
+    let mut command = Command::new(executable);
     command
         .args([
-            "-NoProfile",
-            "-NonInteractive",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-File",
+            "job_object_leader_helper",
+            "--exact",
+            "--ignored",
+            "--nocapture",
+            "--test-threads=1",
         ])
-        .arg(script_file)
-        .env("PID_FILE", pid_file)
-        .env("ERROR_FILE", error_file)
-        .env("LEADER_EXITS", if leader_exits { "1" } else { "0" })
+        .env(HELPER_PID_FILE, pid_file)
+        .env(HELPER_LEADER_EXITS, if leader_exits { "1" } else { "0" })
+        .env(HELPER_ROLE, "leader")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::from(
-            File::create(stderr_file).expect("create PowerShell stderr file"),
-        ));
+        .stderr(Stdio::null());
     command
+}
+
+#[test]
+#[ignore = "spawned by the Windows Job Object tests"]
+fn job_object_leader_helper() {
+    if std::env::var(HELPER_ROLE).as_deref() != Ok("leader") {
+        return;
+    }
+    let Some(pid_file) = std::env::var_os(HELPER_PID_FILE) else {
+        return;
+    };
+    let executable = std::env::current_exe().expect("resolve descendant helper executable");
+    let mut descendant = std::process::Command::new(executable)
+        .args([
+            "job_object_descendant_helper",
+            "--exact",
+            "--ignored",
+            "--nocapture",
+            "--test-threads=1",
+        ])
+        .env(HELPER_PID_FILE, pid_file)
+        .env(HELPER_ROLE, "descendant")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("spawn Windows Job Object descendant helper");
+    if std::env::var(HELPER_LEADER_EXITS).as_deref() == Ok("1") {
+        return;
+    }
+    let status = descendant
+        .wait()
+        .expect("wait for Windows Job Object descendant helper");
+    assert!(status.success());
+}
+
+#[test]
+#[ignore = "spawned by the Windows Job Object tests"]
+fn job_object_descendant_helper() {
+    if std::env::var(HELPER_ROLE).as_deref() != Ok("descendant") {
+        return;
+    }
+    let Some(pid_file) = std::env::var_os(HELPER_PID_FILE) else {
+        return;
+    };
+    std::fs::write(pid_file, std::process::id().to_string())
+        .expect("write Windows Job Object descendant PID");
+    std::thread::sleep(Duration::from_secs(30));
 }
 
 #[tokio::test]
@@ -106,24 +133,6 @@ fn unique_pid_path(label: &str) -> PathBuf {
     ))
 }
 
-fn error_path(pid_file: &Path) -> PathBuf {
-    let mut path = pid_file.to_path_buf();
-    path.set_extension("error");
-    path
-}
-
-fn script_path(pid_file: &Path) -> PathBuf {
-    let mut path = pid_file.to_path_buf();
-    path.set_extension("ps1");
-    path
-}
-
-fn stderr_path(pid_file: &Path) -> PathBuf {
-    let mut path = pid_file.to_path_buf();
-    path.set_extension("stderr");
-    path
-}
-
 async fn wait_for_pid(path: &Path) -> u32 {
     let deadline = Instant::now() + Duration::from_secs(10);
     loop {
@@ -137,9 +146,7 @@ async fn wait_for_pid(path: &Path) -> u32 {
             Err(error) => panic!("failed reading {}: {error}", path.display()),
         }
         if Instant::now() >= deadline {
-            let error = diagnostic(error_path(path), "child command error").await;
-            let stderr = diagnostic(stderr_path(path), "PowerShell stderr").await;
-            panic!("pid file not ready: {}{error}{stderr}", path.display());
+            panic!("pid file not ready: {}", path.display());
         }
         tokio::time::sleep(POLL).await;
     }
@@ -174,20 +181,4 @@ fn process_is_live(pid: u32) -> io::Result<bool> {
 
 async fn remove_pid_file(path: &Path) {
     tokio::fs::remove_file(path).await.expect("remove pid file");
-    for companion in [error_path(path), script_path(path), stderr_path(path)] {
-        match tokio::fs::remove_file(&companion).await {
-            Ok(()) => {}
-            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-            Err(error) => panic!("remove {}: {error}", companion.display()),
-        }
-    }
-}
-
-async fn diagnostic(path: PathBuf, label: &str) -> String {
-    tokio::fs::read_to_string(path)
-        .await
-        .ok()
-        .filter(|value| !value.trim().is_empty())
-        .map(|value| format!("\n{label}:\n{}", value.trim()))
-        .unwrap_or_default()
 }
